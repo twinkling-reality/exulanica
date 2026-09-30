@@ -25,6 +25,8 @@ from exulanica.world.decision_roles import DecisionContract, RoleOption, decisio
 from exulanica.world.role_decisions import (
     PROVIDER_CONFIG,
     PROVIDER_RECORD,
+    RECEIPT_STATUSES,
+    RESULT_BYTES,
     check_envelope,
     role_request,
     seal,
@@ -116,14 +118,14 @@ def receipt_for(request: dict, sequence: int, result: dict) -> dict:
 def validate_decision_receipt(document: dict, request: dict) -> None:
     if request.get("profile") == REQUEST_PROFILE:
         result = {key: document[key] for key in ("status", "reason", "proposal", "provider")}
-        if result["status"] not in ("accepted", "rejected", "unavailable", "stale"):
+        if result["status"] not in RECEIPT_STATUSES:
             raise ValueError("invalid decision status")
         if result["proposal"] is not None:
             GoalProposal.model_validate(result["proposal"])
         if document != receipt_for(request, document["decision_seq"], result):
             raise ValueError("decision receipt request binding mismatch")
         # Provider metadata stays serializable and bounded without admitting arbitrary output.
-        if len(json.dumps(result)) > 16_000:
+        if len(json.dumps(result)) > RESULT_BYTES:
             raise ValueError("decision result exceeds bound")
         return
     role = decision_roles().for_request(str(request.get("profile")))

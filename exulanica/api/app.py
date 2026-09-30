@@ -39,13 +39,17 @@ a route it does not serve. A missing permission follows the error map's own rule
 ``unknown_reference`` on a route addressed by an id, 403 ``not_authorised`` everywhere else. A
 tile quota refusal is 429, like a budget ceiling, because in both cases this instance is
 declining to spend rather than failing, and an egress refusal is 502 ``egress_refused``, a
-dependency this instance will not reach rather than one that failed.
+dependency this instance will not reach rather than one that failed. Below the floor, a statement
+the database role this instance connects as may not run is 403 ``database_privilege_refused`` on
+every route, and is logged at ERROR, because a route its permissions allow reaching a write its
+role may not make is a grant gap somewhere.
 """
 
 from __future__ import annotations
 
 import asyncio
 import gc
+import logging
 import threading
 from collections.abc import AsyncIterator, Mapping
 from contextlib import asynccontextmanager
@@ -53,6 +57,7 @@ from typing import Final
 
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
+from psycopg.errors import InsufficientPrivilege
 
 from exulanica.api.account_repository import AccountUnavailable
 from exulanica.api.authorisation import TokenNotAccepted
@@ -166,6 +171,8 @@ from exulanica.world.specification_samples import close_sample_worker
 from exulanica.world.traffic_host import close_traffic_worker
 
 __all__ = ["create_app"]
+
+_LOG = logging.getLogger(__name__)
 
 #: Which rejection code means which status. See the module docstring for why unknown_reference
 #: is a 404 and not_authorised is a 403.
@@ -408,6 +415,27 @@ def create_app(services: Services | None = None, *, verify: bool = True) -> Fast
         # 404 on an id-addressed route and 403 elsewhere, decided in exulanica.api.permissions
         # from the route template alone, so the answer cannot depend on whether the id exists.
         return _problem(exc.status, exc.code, exc.detail)
+
+    @app.exception_handler(InsufficientPrivilege)
+    async def _database_privilege(request: Request, exc: InsufficientPrivilege) -> JSONResponse:
+        # SQLSTATE 42501 reached a route: a table grant the role lacks, a row policy or a guard
+        # trigger refused a statement the route's permissions let it run. A refusal rather than a
+        # crash, so 403 by name instead of a bare 500. The same answer on an id-addressed route:
+        # a table grant is checked before any row is read, so it cannot say whether an id exists,
+        # and a policy or trigger refusal answers one status here where it answered 500 before.
+        # The detail names no table; the log line keeps the database's own words for an operator.
+        _LOG.error(
+            "The database refused %s %s: SQLSTATE %s, %s",
+            request.method,
+            getattr(request.scope.get("route"), "path", request.url.path),
+            exc.sqlstate,
+            exc.diag.message_primary,
+        )
+        return _problem(
+            403,
+            "database_privilege_refused",
+            "this instance's database role may not do what this request asked",
+        )
 
     @app.exception_handler(TileQuotaExceeded)
     async def _tile_quota(_request: Request, exc: TileQuotaExceeded) -> JSONResponse:

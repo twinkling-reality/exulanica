@@ -194,7 +194,8 @@ def test_second_bootstrap_and_seed_are_noops(repository, composed, bootstrap_api
     seeded = prepare_sandbox_world(
         repository.connection, workspace_id=repository.workspace_id, actor=uuid.uuid4()
     )
-    assert seeded == second.json()
+    assert {key: seeded[key] for key in second.json()} == second.json()
+    assert seeded["entry"] == "created"
     assert counts(repository) == before
 
 

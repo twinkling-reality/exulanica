@@ -44,6 +44,7 @@ __all__ = [
     "RECEIPT_PROFILE",
     "SEED_PROFILE",
     "ComposedWorld",
+    "GeneratedWorldIdentitiesRefused",
     "GeneratedWorldRefused",
     "StatedExtent",
     "UnknownWorldComposer",
@@ -86,6 +87,32 @@ class GeneratedWorldRefused(Exception):
         super().__init__(
             f"recipe {recipe_key} generated no world from any of its {len(self.refusals)} "
             f"seed candidates ({stated})"
+        )
+
+
+class GeneratedWorldIdentitiesRefused(GeneratedWorldRefused):
+    """A recipe that generated no world for any identity one request drew, under the same code,
+    with each identity's candidates' refusals (each refusal also names its ``identity``)."""
+
+    def __init__(self, recipe_key: str, drawn: Mapping[str, GeneratedWorldRefused]) -> None:
+        super().__init__(
+            recipe_key,
+            [
+                {"identity": world_id, **r}
+                for world_id, refused in drawn.items()
+                for r in refused.refusals
+            ],
+        )
+        self.identities = tuple(drawn)
+        stated = "; ".join(
+            f"{world_id}: "
+            + ", ".join(f"candidate {r['candidate']}: {r['refusal']}" for r in refused.refusals)
+            for world_id, refused in drawn.items()
+        )
+        Exception.__init__(
+            self,
+            f"recipe {recipe_key} generated no world for any of the {len(drawn)} identities "
+            f"drawn for it ({stated})",
         )
 
 

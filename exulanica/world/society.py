@@ -18,6 +18,11 @@ from typing import Any, ClassVar, Final, TypeVar
 from exulanica.canonical import canonical_json
 
 SOCIETY_ENGINE_VERSION: Final = "exulanica-society/v1"
+#: How many people a district's society of the v1 to v3 engines starts with. Declared, not
+#: measured: it came with the first stored district society (migration 0052, whose check admits
+#: 100 to 512), and no derivation is recorded. Measured afterwards
+#: (``docs/evaluation/2026-09-22-world-scale-baseline.json``): one tick of 128 people had a 95th
+#: percentile of 154.8 ms, and one of 512 of 513.1 ms.
 SOCIETY_POPULATION: Final = 128
 SOCIETY_TICK_SECONDS: Final = 60
 SOCIETY_NAMESPACE: Final = uuid.UUID("234a55f8-2680-4fd0-812d-bd67905fc930")

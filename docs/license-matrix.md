@@ -44,6 +44,7 @@ Apache-2.0 release and an invalid one.
 | **BLOCKED** | Do not touch |
 | **DISPUTED** | Primary sources contradict each other. Resolve before use |
 | **UNVERIFIED** | The license was not read. Not a verdict, an admission |
+| **CONDITIONAL** | Usable only while conditions the terms attach to this use are met; the row names each condition and whether the product meets it |
 
 ### Standing rules
 
@@ -212,7 +213,7 @@ noted, which per section 5 is a derived label and not authoritative.
 | Component | Code license | Weights license | Apache-2.0 compatible | Source URL | Verdict |
 | --- | --- | --- | --- | --- | --- |
 | `openbmb/MiniCPM-V-4_5` | n/a, API | "Apache 2.0 License" per catalog, URL points at the **code** repo LICENSE | **Yes per catalog** | <https://github.com/OpenBMB/MiniCPM-V/blob/main/LICENSE> | **SHIP.** The vision role's fallback. **OPEN:** under the standing rule the HF card frontmatter has not been read; confirm it |
-| `MiniMaxAI/MiniMax-M3` | n/a, API | custom, named only "MiniMax-M3" | **UNVERIFIED** | <https://huggingface.co/MiniMaxAI/MiniMax-M3/blob/main/LICENSE> | **UNVERIFIED.** The vision role's primary: every photograph observation is asked of it, and its license text has not been read (L-2, section 8). Nebius recommended it to replace the removed NVIDIA vision models, and it declares the `video` use case |
+| `MiniMaxAI/MiniMax-M3` | n/a, API | **MiniMax Community License** (card frontmatter `license: other`, `license_name: minimax-community`), read at revision `f0e1c1e04d40177e4673a22097036854f536e9c0`; the LICENSE file is 3,339 bytes with SHA-256 `b53f2fdda3049b0e9013207be51efc2d372cda1fcfdd8bb4bb8b22658ca5db9c` | **Conditional** | <https://huggingface.co/MiniMaxAI/MiniMax-M3/blob/f0e1c1e04d40177e4673a22097036854f536e9c0/LICENSE> | **CONDITIONAL.** The vision role's primary: every photograph observation is asked of it. The grant covers non-commercial use. Commercial use, which the text defines to include the commercial use of APIs provided for the model in a hosted environment, requires displaying "Built with MiniMax M3" on a related website, interface or product documentation and a one-time notice to MiniMax, or its prior written authorization above 20 million US dollars of yearly revenue. An appendix prohibits listed uses. The product displays no such attribution and has sent no notice (L-2, section 8). Nebius recommended it to replace the removed NVIDIA vision models, and it declares the `video` use case |
 | `Qwen/Qwen3-Embedding-8B` | n/a | Apache 2.0 | **Yes** | catalog | **SHIP.** The embedding role, and the only embedding model on Token Factory |
 | `Qwen/Qwen3-235B-A22B-Instruct-2507`, `Qwen3-30B-A3B-Instruct-2507`, `Qwen3.5-397B-A17B` | n/a | Apache 2.0 | **Yes** | catalog | **SHIP.** `Qwen3-235B-A22B-Instruct-2507` is the structured-extraction primary and a model offered for a person's decisions; the other two have no role |
 | `openai/gpt-oss-120b` | n/a | Apache 2.0 | **Yes** | catalog | SHIP |
@@ -539,7 +540,7 @@ that closes it.
 | # | Item | Why it matters | Check |
 | --- | --- | --- | --- |
 | L-1 | `nvidia/diar_streaming_sortformer_4spk-v2` license, **DISPUTED** | Determines whether diarization is commercially clean | X-0e, section 4a. 5 min |
-| L-2 | `MiniMaxAI/MiniMax-M3` license text never read | It is the vision role's primary, asked about every photograph, so the product depends on a license nobody has read | Read <https://huggingface.co/MiniMaxAI/MiniMax-M3/blob/main/LICENSE>. 10 min |
+| L-2 | `MiniMaxAI/MiniMax-M3` license is CONDITIONAL (section 3.2) | It is the vision role's primary, asked about every photograph, and commercial use through an API needs a displayed "Built with MiniMax M3" and a notice to MiniMax, neither of which the product has | Decide between displaying the attribution with the notice sent and making `openbmb/MiniCPM-V-4_5`, the fallback, the vision primary |
 | L-3 | `openbmb/MiniCPM-V-4_5` license is recorded from the Nebius catalog, whose URL points at the **code** repo | It is the vision role's fallback. Under the section 5 rule, a catalog reading is not authoritative | `curl` the HF card frontmatter for the pinned SHA. 5 min |
 | L-4 | `nvidia/Nemotron-3-Ultra-550b-a55b` OpenMDW-1.1 attribution is catalog-only, and is the one row where the catalog is **more** permissive than any verified reading | The error direction that ends a project. Exposure is zero because Ultra has no role | `curl` the HF card before any use. 5 min |
 | L-5 | PostgreSQL 18 and pgvector 0.8.6 license text never read | Two core dependencies | X-0g. 15 min, with the GitHub chip check |

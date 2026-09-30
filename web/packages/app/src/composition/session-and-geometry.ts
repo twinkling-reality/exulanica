@@ -64,7 +64,8 @@ import type { Credentials } from '../config.js';
 
 export class StarterWorldOpeningError extends Error {
   constructor(cause: unknown) {
-    super(cause instanceof Error ? cause.message : 'The starter world request failed.');
+    // The cause is kept so the page can say what refused the starter, not only that it failed.
+    super(cause instanceof Error ? cause.message : 'The starter world request failed.', { cause });
     this.name = 'StarterWorldOpeningError';
   }
 }

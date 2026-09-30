@@ -16,7 +16,7 @@ import { addUsd, increaseUsd } from './usd.mjs';
 import {
   BUTTON, OBJECT_PANEL, OPEN_CONFIRM, PLACEHOLDER, SAVED_WORLD_LIST, TITLE_FIELD, WORLD_MENU_BUTTON, WORLD_READY,
   chooseMenu, confirm, confirmation, enter, focusCanvas, liveObjects, objectRows, objectStatus, open,
-  openObjects, reload, savedWorld, waitForWorld,
+  openEntryId, openObjects, reload, savedWorld, waitForWorld,
 } from './app.mjs';
 
 // A write the page confirms and the API then holds: the confirmed request and the read after it.
@@ -78,8 +78,12 @@ async function accessGate(ctx) {
     const account = form.querySelector('button.account-sign-in');
     return { token_field: !!form.querySelector('input[aria-label="Access token"]'),
       account_sign_in: account ? (account.disabled ? 'disabled' : 'enabled') : 'absent' }; })()`);
-  ctx.observe('gate-shown', first === 'gate' && gate?.token_field === true && gate?.account_sign_in === 'disabled',
-    { first_surface: first, ...gate });
+  // Account sign-in is offered only where the server says accounts are configured: GET
+  // /auth/session answers 401 there (no session yet) and 503 where no account path is configured.
+  const accounts = (await fetch(`${ctx.runtime.api_base}/auth/session`).catch(() => null))?.status ?? null;
+  const offered = accounts === 401 ? 'enabled' : 'absent';
+  ctx.observe('gate-shown', first === 'gate' && gate?.token_field === true && gate?.account_sign_in === offered,
+    { first_surface: first, ...gate, auth_session_status: accounts, account_sign_in_expected: offered });
   await ctx.screenshot('gate', 'the credential gate the production build shows on arrival');
   if (first !== 'gate') throw new Error('the application opened without its credential gate');
 
@@ -969,16 +973,19 @@ const openInspectorDetails = (page) => page.evaluate(`(() => { const d = ${INSPE
 
 /**
  * What the models deciding in this world have cost so far, as the product reports it, counted into
- * the run's spend once: each call reads the total and reports what it adds to the last reading.
+ * the run's spend once: each call reads the world's total and reports what it adds to the last
+ * reading of the same world (the starter and a town each report their own).
  */
 async function decisionSpend(ctx, models) {
   const rows = models?.by_model ?? [];
   const total = rows.reduce((sum, row) => (row.cost_usd == null ? sum : addUsd(sum, String(row.cost_usd))), '0');
   const unknown = rows.filter((row) => row.cost_known === false).map((row) => row.name ?? row.model_id);
   if (unknown.length > 0) ctx.note(`the cost of some decisions is not known: ${unknown.join(', ')}`);
-  const added = increaseUsd(total, ctx.facts.decision_spend_reported_usd ?? '0');
+  const world = openEntryId(ctx) ?? 'unnamed';
+  const reported = (ctx.facts.decision_spend_reported_usd_by_entry ??= {});
+  const added = increaseUsd(total, reported[world] ?? '0');
   if (added !== '0') ctx.spend(added);
-  ctx.facts.decision_spend_reported_usd = total;
+  reported[world] = total;
   return total;
 }
 
@@ -1026,7 +1033,7 @@ async function chooseModelForAGroup(ctx) {
     && [...choices.values()].filter((c) => !group.includes(c.subject_id)).every((c) => c.model === null),
   { posted: posted === null ? null : { status: posted.status, body: pick(document, ['choice_seq', 'people', 'model', 'chosen_by', 'document_sha256', 'recorded_at']) },
     choices: [...choices.values()].map((c) => pick(c, ['subject_id', 'model', 'choice_seq', 'refusal'])) });
-  ctx.facts.model_group = { people: group, choice_seq: document.choice_seq ?? null, model, name: served?.name ?? null };
+  ctx.facts[ctx.parameters.fact ?? 'model_group'] = { people: group, choice_seq: document.choice_seq ?? null, model, name: served?.name ?? null };
   await decisionSpend(ctx, after);
 }
 
@@ -1574,8 +1581,19 @@ async function confirmProposedPlace(ctx) {
     { lists_name: text.toLowerCase().includes(ctx.parameters.display_name.toLowerCase()), occurrences_stated: count,
       excerpt: text.slice(0, 600) });
   await ctx.screenshot('library', 'the Library after the place was confirmed');
-  await page.key('Escape', 'Escape');
+  // The Library's own Return control, as a person leaves it: in rehearsal 8's runs on 731066f8
+  // Escape, pressed once or twice, left the Library open over the drawer. Return goes back to the
+  // World menu the Library was opened from, and a second press of the World menu's button closes it.
+  await page.click(LIBRARY_RETURN, 'Return from the Library');
+  await sleep(PAGE_SETTLE_MS);
+  if (await page.evaluate(`document.querySelector('section.world-menu')?.checkVisibility() ?? false`)) {
+    await page.click(WORLD_MENU_BUTTON, 'the World menu, to close it');
+  }
+  await page.waitFor(`document.querySelector('#shell')?.dataset.primary === 'world'
+    && !(document.querySelector('section.world-menu')?.checkVisibility() ?? false)`, 10_000, 'the world after the Library');
 }
+// The Library's Return button, by its words.
+const LIBRARY_RETURN = `[...document.querySelectorAll('button')].find(b => /^return$/i.test(b.textContent.trim()) && b.checkVisibility())`;
 
 // -- a world from the photographs -----------------------------------------------------------------
 
@@ -2105,8 +2123,9 @@ async function compareViewShowsThePair(ctx) {
   if (!ran?.comparison_id) throw new Error('no comparison was recorded for the view to show');
   const { entry } = await savedWorld(ctx);
   const path = `/world/versions/${entry.authored_version_id}/society/comparisons`;
-  const listed = (await ctx.api('GET', `${path}?${worldQuery(ctx)}`)).body;
-  const result = (await ctx.api('GET', `${path}/${ran.comparison_id}?${worldQuery(ctx)}`)).body;
+  const query = `world_id=${encodeURIComponent(entry.world_id)}`;
+  const listed = (await ctx.api('GET', `${path}?${query}`)).body;
+  const result = (await ctx.api('GET', `${path}/${ran.comparison_id}?${query}`)).body;
   await chooseMenu(page, 'compare');
   const drawn = await page.waitFor(`(() => { const v = ${COMPARE}; return v?.checkVisibility() && v.querySelector('section.comparison-verdict') ? true : null; })()`,
     ctx.parameters.drawn_seconds * 1000, 'the Compare view with its verdict').catch(() => false);
@@ -2497,6 +2516,390 @@ async function madeWorldTakesNewPhotograph(ctx) {
 // page's requests and notices are read (return-to-made-world's drawn_after_ms, for the same reason).
 const REOPEN_DRAWN_MS = 5_000;
 
+// -- a town: made from values, its people and vehicles, a model for a group, a comparison --------
+
+const RECIPES = `document.querySelector('section.world-recipes')`;
+const DESCRIPTION = `document.querySelector('section.world-description')`;
+const WAITING = `document.querySelector('[data-generated-world-waiting]')`;
+
+/** Open Make a world and wait for the served specification to be drawn. */
+async function openRecipes(page) {
+  if (!await page.evaluate(`${RECIPES}?.checkVisibility() ?? false`)) await chooseMenu(page, 'make');
+  await page.waitFor(`${RECIPES}?.querySelectorAll('button.world-recipes-choice').length > 0 ? true : null`,
+    SETTLE_MS, 'the presets Make a world offers');
+}
+
+/** What Make a world shows: its presets, each value's control with its range, and its state. */
+const recipesSeen = (page) => page.evaluate(`(() => { const r = ${RECIPES}; if (!r || !r.checkVisibility()) return null;
+  return { state: r.getAttribute('data-specification-state'),
+    presets: [...r.querySelectorAll('button.world-recipes-choice')].map(b => ({ key: b.dataset.recipe, label: b.textContent.trim(), pressed: b.getAttribute('aria-pressed') })),
+    values: [...r.querySelectorAll('[data-parameter]')].map(i => ({ key: i.dataset.parameter, kind: i.tagName.toLowerCase(), value: i.value,
+      min: i.min ?? null, max: i.max ?? null, step: i.step ?? null })),
+    status: r.querySelector('.world-recipes-status, p[role="status"]')?.textContent.trim() ?? null,
+    make: (() => { const b = r.querySelector('button.world-recipes-make'); return b ? { hidden: b.hidden, disabled: b.disabled, text: b.textContent.trim() } : null; })() }; })()`);
+
+/**
+ * After Make this town: the page opens the new entry, says it is being built while its tiles bake,
+ * and draws it once they are. Returns the entry and what was seen, read from the API as it waits.
+ */
+async function townOpened(ctx, entryId, seconds) {
+  const { page } = ctx;
+  let entry = null;
+  let waitingSeen = null;
+  await until('the town\'s tiles to be baked and the town drawn', seconds * 1000, async () => {
+    waitingSeen ??= await page.evaluate(`${WAITING}?.getAttribute('data-generated-world-waiting') ?? null`).catch(() => null);
+    entry = (await ctx.api('GET', `/world-entries/${entryId}`)).body;
+    const tiles = entry?.generated_ground?.tiles ?? [];
+    if (tiles.some((tile) => tile.state === 'failed')) return true;
+    const drawn = await page.evaluate(`!${WAITING} && ${WORLD_READY}`).catch(() => false);
+    return tiles.length > 0 && tiles.every((tile) => tile.state === 'baked') && drawn ? true : null;
+  }).catch(() => null);
+  await sleep(PAGE_SETTLE_MS);
+  const drawn = await page.evaluate(`({ waiting: ${WAITING}?.getAttribute('data-generated-world-waiting') ?? null, ready: ${WORLD_READY},
+    title: document.querySelector('input[aria-label="World title"]')?.value ?? null })`);
+  return { entry, drawn, waiting_seen: waitingSeen };
+}
+
+/** The saved world a generated world's POST made, and its tiles, as the observations hold them. */
+const tilesOf = (entry) => (entry?.generated_ground?.tiles ?? []).map((t) => pick(t, ['tile_x', 'tile_y', 'state', 'baked_tile_id']));
+
+async function makeTownWithValues(ctx) {
+  const { page } = ctx;
+  const { preset: presetKey, changed_values: changing, bake_seconds: bakeSeconds } = ctx.parameters;
+  const specification = (await ctx.api('GET', '/worlds/specification')).body;
+  const preset = (specification?.presets ?? []).find((p) => p.key === presetKey) ?? null;
+  if (preset === null) throw new Error(`the served specification offers no preset ${presetKey}`);
+  await openRecipes(page);
+  await page.click(`${RECIPES}.querySelector('button.world-recipes-choice[data-recipe="${presetKey}"]')`, preset.label);
+  await page.waitFor(`${RECIPES}?.querySelector('[data-parameter]') ? true : null`, SETTLE_MS, 'the preset\'s values');
+  const offered = await recipesSeen(page);
+  const adjustable = (specification.values ?? []).filter((v) => v.adjustable).map((v) => v.key);
+  // Each changed value moves one step inside the range the page states for it, which the served
+  // schema gives: up when that stays inside, else down.
+  const moved = {};
+  for (const key of changing) {
+    const control = offered?.values.find((v) => v.key === key);
+    if (control === undefined) throw new Error(`Make a world shows no control for ${key}`);
+    const [value, min, max, step] = [control.value, control.min, control.max, control.step].map(Number);
+    const next = value + step <= max ? value + step : value - step;
+    if (next < min || next === value) throw new Error(`${key}'s range ${min} to ${max} holds no other value than ${value}`);
+    await page.setValue(`${RECIPES}.querySelector('[data-parameter="${key}"]')`, String(next));
+    moved[key] = next;
+  }
+  await sleep(PAGE_SETTLE_MS);
+  const set = await recipesSeen(page);
+  ctx.observe('values-offered', offered !== null && offered.presets.map((p) => p.key).sort().join() === specification.presets.map((p) => p.key).sort().join()
+    && offered.values.map((v) => v.key).sort().join() === adjustable.sort().join() && set?.state === 'admitted' && set?.make?.disabled === false,
+  { presets: offered?.presets ?? null, controls: offered?.values ?? null, after_setting: set, served_adjustable: adjustable });
+  await ctx.screenshot('values', `Make a world with ${preset.label} and two values moved`);
+  const postsBefore = (await responses(ctx, 'POST', '/api/worlds/generated')).length;
+  await page.click(`${RECIPES}.querySelector('button.world-recipes-make')`, 'Make this town');
+  const made = await until('the town to be made', SETTLE_MS * 4, async () =>
+    (await responses(ctx, 'POST', '/api/worlds/generated')).slice(postsBefore).find((r) => r.status !== null) ?? null);
+  if (made.status !== 201) {
+    ctx.observe('made-with-the-values', false, { status: made.status, response: made.response_body, request: made.request_body });
+    throw new Error(`POST /worlds/generated answered ${made.status}`);
+  }
+  const entryId = made.response_body?.entry_id;
+  ctx.facts.open_entry_id = entryId;
+  ctx.facts.town = { entry_id: entryId, world_id: made.response_body?.world_id, preset: presetKey, values: made.request_body?.values ?? null };
+  await sleep(PAGE_SETTLE_MS);
+  await ctx.screenshot('building', 'the town being built while its tiles bake').catch(() => null);
+  const opened = await townOpened(ctx, entryId, bakeSeconds);
+  const sent = made.request_body?.values ?? {};
+  const inRange = (key) => { const v = specification.values.find((x) => x.key === key); return v && sent[key] >= v.minimum && sent[key] <= v.maximum; };
+  ctx.observe('made-with-the-values', made.response_body?.source_kind === 'generated' && made.request_body?.recipe === presetKey
+    && changing.every((key) => sent[key] === moved[key] && sent[key] !== preset.values[key] && inRange(key)),
+  { request: made.request_body, status: made.status, moved, preset_values: preset.values,
+    entry: pick(made.response_body, ['entry_id', 'world_id', 'title', 'source_kind', 'takes_photographs']) });
+  const tiles = tilesOf(opened.entry);
+  ctx.observe('tiles-baked', tiles.length > 0 && tiles.every((t) => t.state === 'baked'), { tiles });
+  ctx.observe('town-drawn', opened.drawn?.ready === true && opened.drawn?.waiting === null && opened.waiting_seen !== 'failed',
+    { ...opened.drawn, waiting_seen: opened.waiting_seen });
+  await ctx.screenshot('town', `the ${preset.label.toLowerCase()} made from the values`);
+  await reload(ctx, entryId);
+  await sleep(PAGE_SETTLE_MS);
+  const again = await townOpened(ctx, entryId, SETTLE_MS / 1000);
+  ctx.observe('town-reopens', again.drawn?.ready === true && again.drawn?.waiting === null
+    && tilesOf(again.entry).every((t) => t.state === 'baked'), { ...again.drawn, tiles: tilesOf(again.entry) });
+  await ctx.screenshot('reopened', 'the town after a reload');
+}
+
+/** The tile of the town a point lies on, a tile's width being the town's extent over its tiles along it. */
+const tileWidthOf = (town, entry) => {
+  const along = new Set((entry?.generated_ground?.tiles ?? []).map((t) => t.tile_x)).size;
+  const extent = Number(town?.values?.city_extent_x_mm);
+  return along > 0 && Number.isFinite(extent) ? extent / along : null;
+};
+
+async function peopleCrossTileSeams(ctx) {
+  const { page } = ctx;
+  const { entry } = await savedWorld(ctx);
+  const width = tileWidthOf(ctx.facts.town, entry);
+  if (width === null) throw new Error('the town states no extent and tiles to measure a tile by');
+  await openPeopleNearby(page);
+  await page.waitFor(`['absent', 'present'].includes(${PEOPLE}?.dataset.state)`, SETTLE_MS, 'People nearby to read the town\'s society');
+  if (await page.evaluate(`${PEOPLE}?.dataset.state`) === 'absent') {
+    await page.click(BUTTON('Bring in inhabitants', PEOPLE), 'Bring in inhabitants');
+    await page.waitFor(`${PEOPLE}?.dataset.state === 'present'`, SETTLE_MS, 'the town\'s people to be present');
+  }
+  await page.waitFor(`(() => { const b = ${PLAYBACK}; return b && !b.hidden && !b.disabled ? true : null; })()`, SETTLE_MS, 'Play beside the people');
+  if (await page.evaluate(`${PLAYBACK}?.dataset.action`) === 'play') await page.click(PLAYBACK, 'Play');
+  await sleep(PAGE_SETTLE_MS);
+  const seen = await peopleSeen(page);
+  const control = (await ctx.api('GET', societyPath(entry, '/control'))).body;
+  const interval = control?.host_playback?.interval_ms ?? null;
+  if (!Number.isInteger(interval) || interval <= 0) throw new Error(`the control read states no host interval: ${JSON.stringify(control?.host_playback ?? null)}`);
+  ctx.facts.playback_interval_ms = interval;
+  const tiles = new Map();
+  const reads = [];
+  let crossing = null;
+  let outside = [];
+  const deadline = Date.now() + ctx.parameters.watch_seconds * 1000;
+  while (Date.now() < deadline && crossing === null) {
+    const society = (await ctx.api('GET', societyPath(entry))).body;
+    const people = society?.state?.inhabitants ?? [];
+    reads.push({ tick: society?.current_tick ?? null, people: people.length });
+    for (const person of people) {
+      const x = person.position_mm?.[0];
+      if (typeof x !== 'number') continue;
+      if (x < 0 || x > width * new Set(tilesOf(entry).map((t) => t.tile_x)).size) outside.push({ id: person.id, x });
+      const tile = Math.floor(x / width);
+      const before = tiles.get(person.id);
+      if (before !== undefined && before.tile !== tile && crossing === null) {
+        crossing = { person: person.id, from: before, to: { tile, x, tick: society.current_tick } };
+      }
+      tiles.set(person.id, { tile, x, tick: society.current_tick });
+    }
+    if (crossing === null) await sleep(interval);
+  }
+  outside = outside.slice(0, 10);
+  const drawn = await page.evaluate(`(() => { const c = document.querySelector('canvas[data-society-rendered]');
+    return c ? { population: c.dataset.societyPopulation ?? null, rendered: c.dataset.societyRendered ?? null, tick: c.dataset.societyTick ?? null } : null; })()`);
+  const count = reads.at(-1)?.people ?? 0;
+  ctx.observe('town-people-present', seen?.state === 'present' && count > 0 && new RegExp(`\\b${count}\\b`).test(seen?.summary ?? '')
+    && Number(drawn?.rendered ?? 0) > 0, { seen, canvas: drawn, inhabitants_read: count });
+  ctx.observe('someone-crosses-a-seam', crossing !== null && outside.length === 0,
+    { crossing, tile_width_mm: width, reads: reads.length, outside_the_town: outside });
+  ctx.observe('minutes-pass-in-the-town', reads.length > 1 && reads.at(-1).tick > reads[0].tick, { first: reads[0], last: reads.at(-1) });
+  await ctx.screenshot('people', 'the town\'s people playing');
+}
+
+async function vehiclesDriveTheTown(ctx) {
+  const { page } = ctx;
+  const { entry } = await savedWorld(ctx);
+  const window = ctx.parameters.window_seconds;
+  const path = (from) => `/world/versions/${entry.authored_version_id}/traffic?world_id=${encodeURIComponent(entry.world_id)}&seconds=${window}${from === undefined ? '' : `&from_second=${from}`}`;
+  const pageTraffic = async () => page.evaluate(`(() => { try { return JSON.parse(document.querySelector('#shell')?.getAttribute('data-tile-traffic') ?? 'null'); } catch { return null; } })()`);
+  const drawn = await page.waitFor(`(() => { try { const s = JSON.parse(document.querySelector('#shell')?.getAttribute('data-tile-traffic') ?? 'null');
+    return s && s.state === 'driving' && s.drawn > 0 ? true : null; } catch { return null; } })()`, SETTLE_MS * 2, 'the town\'s vehicles to be drawn').catch(() => false);
+  const first = await ctx.api('GET', path());
+  const shown = await pageTraffic();
+  await ctx.screenshot('vehicles', 'the town\'s streets with its vehicles');
+  // A vehicle drives when its front axle is somewhere else within one served window. Trips are
+  // requested at an episode's start, so the step reads window after window for at most one
+  // episode, whose length the route serves, and records how long it read before one drove.
+  const episodeMs = (first.body?.episode_steps ?? 0) * (first.body?.step_ms ?? 0);
+  const moving = (read) => (read.body?.vehicles ?? []).filter((v) => {
+    const axle = v.front_axle_mm ?? [];
+    return axle.some((value, index) => index >= 2 && value !== axle[index % 2]);
+  }).map((v) => v.vehicle_id);
+  const windows = [];
+  let read = first;
+  let found = null;
+  const deadline = Date.now() + Math.max(episodeMs, window * 1000);
+  while (read.status === 200) {
+    const ids = moving(read);
+    windows.push({ from_second: read.body?.from_second ?? null, vehicles: (read.body?.vehicles ?? []).length, moving: ids.length,
+      trips: read.body?.episodes?.map((e) => ({ episode: e.episode, trips: e.trips })) ?? null });
+    if (ids.length > 0) { found = { from_second: read.body.from_second, moving: ids.length }; break; }
+    if (Date.now() + window * 1000 > deadline) break;
+    await sleep(window * 1000);
+    read = await ctx.api('GET', path());
+  }
+  const during = await pageTraffic();
+  if (found !== null) await ctx.screenshot('driving', 'the town\'s streets while a vehicle drives');
+  ctx.observe('vehicles-drawn', drawn === true && shown?.state === 'driving' && shown.drawn > 0 && during?.state === 'driving',
+    { at_start: shown, when_read_last: during });
+  ctx.observe('vehicles-move', first.status === 200 && found !== null,
+    { found, windows_read: windows.length, waited_ms: (windows.length - 1) * window * 1000, episode_ms: episodeMs, windows,
+      refusal: first.status === 200 ? null : first.body });
+}
+
+/** The comparison start form's controls. */
+const START = `document.querySelector('section.comparison-start')`;
+const startSeen = (page) => page.evaluate(`(() => { const s = ${START}; if (!s || !s.checkVisibility()) return null;
+  const text = (e) => e?.textContent.trim() ?? null;
+  return { groups: [...s.querySelectorAll('select.comparison-start-group option')].map(o => ({ value: o.value, text: o.textContent.trim() })),
+    group: s.querySelector('select.comparison-start-group')?.value ?? null,
+    models: [...s.querySelectorAll('select.comparison-start-model')].map(m => ({ label: m.getAttribute('aria-label'), value: m.value,
+      options: [...m.options].map(o => o.value) })),
+    control: s.querySelector('input.comparison-start-control')?.checked ?? null,
+    seeds: s.querySelector('input.comparison-start-seeds')?.value ?? null,
+    bound: s.querySelector('input.comparison-start-bound')?.value ?? null,
+    placeholder: s.querySelector('input.comparison-start-bound')?.placeholder ?? null,
+    plan: text(s.querySelector('p.comparison-start-plan')), decided: text(s.querySelector('p.comparison-start-decided')),
+    note: text(s.querySelector('p.comparison-start-note')),
+    start: (() => { const b = s.querySelector('button.comparison-start-button'); return b ? { disabled: b.disabled, text: b.textContent.trim() } : null; })() }; })()`);
+
+async function compareTownGroup(ctx) {
+  const { page } = ctx;
+  const { models, control, seeds, bound_cap_usd: cap, finish_seconds: finishSeconds } = ctx.parameters;
+  const group = ctx.facts.town_model_group;
+  if (!group?.choice_seq) throw new Error('no model choice for a group of the town is recorded');
+  const { entry } = await savedWorld(ctx);
+  const query = `world_id=${encodeURIComponent(entry.world_id)}`;
+  const base = `/world/versions/${entry.authored_version_id}/society/comparisons`;
+  const before = pick(entry, ['authored_version_id', 'current_authored_state_sha256', 'current_authored_edit_seq']);
+  // The town stops playing first, so the group's model is asked by the comparison alone while it
+  // runs, not also by the living town for as long as the comparison takes.
+  await openPeopleNearby(page);
+  if (await page.evaluate(`${PLAYBACK}?.dataset.action`) === 'pause') {
+    await page.click(PLAYBACK, 'Pause');
+    await page.waitFor(`${PLAYBACK}?.dataset.action === 'play'`, SETTLE_MS, 'Play to take the place of Pause').catch(() => null);
+  }
+  await decisionSpend(ctx, (await ctx.api('GET', societyPath(entry, '/models'))).body);
+  await chooseMenu(page, 'compare');
+  await page.waitFor(`${START}?.querySelector('select.comparison-start-group option') ? true : null`, SETTLE_MS, 'the comparison start form');
+  const form = await startSeen(page);
+  const owner = form?.groups.find((g) => new RegExp(`^The ${group.people.length} people you chose`).test(g.text)) ?? null;
+  if (owner === null) throw new Error(`the start form offers no group of the ${group.people.length} people chosen: ${JSON.stringify(form?.groups)}`);
+  await page.setValue(`${START}.querySelector('select.comparison-start-group')`, owner.value);
+  await sleep(PAGE_SETTLE_MS);
+  await page.setValue(`${START}.querySelectorAll('select.comparison-start-model')[0]`, models[0].model_id);
+  await sleep(PAGE_SETTLE_MS);
+  await page.setValue(`${START}.querySelectorAll('select.comparison-start-model')[1]`, models[1].model_id);
+  await sleep(PAGE_SETTLE_MS);
+  if (control && !await page.evaluate(`${START}.querySelector('input.comparison-start-control').checked`)) {
+    await page.click(`${START}.querySelector('input.comparison-start-control')`, 'Control run');
+  }
+  await page.setValue(`${START}.querySelector('input.comparison-start-seeds')`, String(seeds));
+  // The plan the page asked for: the least bound it serves for a typical comparison to finish.
+  await page.waitFor(`(${START})?.querySelector('p.comparison-start-plan')?.textContent.trim() ? true : null`, SETTLE_MS, 'the plan');
+  await sleep(PAGE_SETTLE_MS);
+  const planRead = (await responses(ctx, 'GET', `/api${base}/plan`)).filter((r) => r.status === 200).at(-1)?.response_body ?? null;
+  const suggested = planRead?.plan?.suggested_usd ?? null;
+  const bound = suggested !== null && Number(suggested) <= Number(cap) ? String(suggested) : cap;
+  await page.typeInto(`${START}.querySelector('input.comparison-start-bound')`, bound);
+  await page.evaluate(`${START}.querySelector('input.comparison-start-bound').dispatchEvent(new Event('change', {bubbles: true}))`);
+  await page.waitFor(`(() => { const b = (${START})?.querySelector('button.comparison-start-button'); return b && !b.disabled ? true : null; })()`,
+    SETTLE_MS, 'Start the comparison to be offered');
+  const planned = await startSeen(page);
+  ctx.observe('plan-shown', owner !== null && /could cost at most \$/.test(planned?.plan ?? '') && /typically costs/.test(planned?.plan ?? '')
+    && planned?.control === Boolean(control),
+  { form: planned, plan_read: planRead?.plan ?? null, plan_refusal: planRead?.plan_refusal ?? null, bound_stated_usd: bound, cap_usd: cap });
+  await ctx.screenshot('plan', 'Compare models with the group, the two models and the plan');
+  const postsBefore = (await responses(ctx, 'POST', `/api${base}`)).length;
+  await page.click(`${START}.querySelector('button.comparison-start-button')`, 'Start the comparison');
+  const posted = await until('the comparison to be started', SETTLE_MS, async () =>
+    (await responses(ctx, 'POST', `/api${base}`)).slice(postsBefore).find((r) => r.status !== null) ?? null);
+  const id = posted.response_body?.comparison_id ?? posted.request_body?.comparison_id ?? null;
+  const sent = posted.request_body ?? {};
+  ctx.observe('started-for-the-group', [200, 201].includes(posted.status) && sent.group?.kind === 'owner_choice'
+    && sent.group?.choice_seq === group.choice_seq && same((sent.models ?? []).map((m) => m.model_id), models.map((m) => m.model_id))
+    && sent.control === Boolean(control) && Number(sent.bound_usd) === Number(bound),
+  { status: posted.status, request: sent, response: pick(posted.response_body, ['comparison_id', 'status', 'phase', 'start']) });
+  ctx.facts.comparison = { comparison_id: id, models, world_id: entry.world_id, version_id: entry.authored_version_id, bound_usd: bound };
+  // The comparison's start is waiting or running until the host finishes or closes it.
+  let result = null;
+  await until('the comparison to finish', finishSeconds * 1000, async () => {
+    result = (await ctx.api('GET', `${base}/${id}?${query}`)).body;
+    if (result?.start?.state !== undefined && !['waiting', 'running'].includes(result.start.state)) return true;
+    await sleep(POLL_MS * 4);
+    return null;
+  }).catch(() => null);
+  const listing = ((await ctx.api('GET', `${base}?${query}`)).body?.comparisons ?? []).find((c) => c.comparison_id === id) ?? null;
+  await sleep(PAGE_SETTLE_MS * 3);
+  const listed = await page.evaluate(`[...document.querySelectorAll('button.comparison-listing')].map(b => ({ id: b.dataset.comparisonId, text: b.textContent.trim() }))`);
+  const note = await page.evaluate(`(${START})?.querySelector('p.comparison-start-note')?.textContent.trim() ?? null`);
+  const mine = listed.find((l) => l.id === id) ?? null;
+  ctx.observe('started-in-words', /Started/.test(note ?? '') || /Finished/.test(mine?.text ?? ''), { note, listing_text: mine?.text ?? null });
+  const start = result?.start ?? {};
+  const runs = (result?.seeds ?? []).flatMap((seed) => Object.entries(seed.runs ?? {}).map(([arm, run]) => ({ arm, status: run.status, failure: run.failure ?? null })));
+  const stoppedByBound = runs.filter((r) => /bound/.test(String(r.failure ?? '')));
+  ctx.facts.comparison_stopped_by_bound = stoppedByBound;
+  const spent = start.spent_usd ?? null;
+  if (spent !== null) ctx.spend(String(spent));
+  ctx.observe('runs-finished-within-bound', start.state === 'finished' && runs.length === start.runs_planned
+    && runs.every((r) => ['completed', 'failed'].includes(r.status)) && spent !== null && Number(spent) <= Number(start.bound_usd),
+  { start, runs, stopped_by_bound: stoppedByBound, listing });
+  const after = pick((await savedWorld(ctx)).entry, ['authored_version_id', 'current_authored_state_sha256', 'current_authored_edit_seq']);
+  ctx.observe('saved-world-unchanged', same(before, after), { before, after });
+  await ctx.screenshot('finished', 'Compare models after the comparison finished');
+}
+
+async function askWhatHappened(ctx) {
+  const { page } = ctx;
+  await openPeopleNearby(page);
+  const id = await page.waitFor(`[...(${INSPECT})?.options ?? []].find(o => o.value)?.value ?? null`, SETTLE_MS, 'someone nearby to inspect');
+  await page.setValue(INSPECT, id);
+  await page.waitFor(`${INSPECTOR}?.checkVisibility() ?? false`, 10_000, 'the inspector');
+  const { face, answer, answer_status: status } = await ask(ctx, ctx.parameters.question);
+  const calls = (answer?.execution?.calls ?? []).filter((c) => c.role === 'answer_composer');
+  const last = calls.at(-1) ?? null;
+  const words = face.clauses.join(' ');
+  const composed = last?.outcome === 'completed';
+  const ended = ['deadline_ended', 'timed_out', 'failed'].includes(last?.outcome);
+  const saidEnded = /did not (?:choose|answer)/.test(words);
+  const named = last?.model_name ?? last?.served_model_name ?? null;
+  ctx.observe('answer-drawn', face.mode === 'answer' && face.clauses.length > 0
+    && ((composed && !saidEnded && Boolean(face.provenance)) || (ended && saidEnded)),
+  { face: pick(face, ['mode', 'clauses', 'provenance']), composer: last === null ? null : pick(last, ['outcome', 'model_id', 'model_name', 'served_model_name', 'duration_ms', 'latency_ms']) });
+  ctx.observe('composer-outcome-shown', status === 200 && last !== null && (composed || ended)
+    && (composed ? !saidEnded : saidEnded),
+  { status, composer_calls: calls.map((c) => pick(c, ['outcome', 'model_id', 'served_model_name', 'latency_ms'])), named,
+    society_context: (await responses(ctx, 'POST', '/api/selection/ask')).at(-1)?.request_body?.society_context ?? null });
+  await ctx.screenshot('answer', 'the Companion\'s answer to what happened in the town');
+}
+
+async function describeTownAndUseTheDraft(ctx) {
+  const { page } = ctx;
+  await openRecipes(page);
+  await page.waitFor(`${DESCRIPTION}?.querySelector('textarea.world-description-input') ? true : null`, SETTLE_MS, 'Describe it');
+  await page.typeInto(`${DESCRIPTION}.querySelector('textarea.world-description-input')`, ctx.parameters.description);
+  await page.evaluate(`${DESCRIPTION}.querySelector('textarea.world-description-input').dispatchEvent(new Event('input', {bubbles: true}))`);
+  const draftsBefore = (await responses(ctx, 'POST', '/api/worlds/specification/drafts')).length;
+  await page.click(`${DESCRIPTION}.querySelector('button.world-description-draft')`, 'Draft the values');
+  const drafted = await until('the draft', replyDeadlineMs(ctx), async () =>
+    (await responses(ctx, 'POST', '/api/worlds/specification/drafts')).slice(draftsBefore).find((r) => r.status !== null) ?? null);
+  await page.waitFor(`(${DESCRIPTION})?.querySelector('button.world-description-use') || /No draft was made/.test((${DESCRIPTION})?.textContent ?? '') ? true : null`,
+    SETTLE_MS, 'the draft to be drawn').catch(() => null);
+  await sleep(PAGE_SETTLE_MS);
+  const body = drafted.response_body ?? {};
+  ctx.spend(usdOf(body.execution));
+  const proposal = body.proposal ?? null;
+  const shownText = await page.evaluate(`(${DESCRIPTION})?.innerText ?? ''`);
+  const name = body.model_name ?? null;
+  ctx.observe('drafted-by-the-model', drafted.status === 200 && proposal?.valid === true && Boolean(name) && proposal?.sample?.status === 'sampled',
+    { status: drafted.status, model_id: body.model_id ?? null, model_name: name, refusal: body.refusal ?? null,
+      proposal: pick(proposal, ['preset', 'values', 'set_by_words', 'valid', 'value_refusal']), sample: proposal?.sample ?? null, not_supported: body.not_supported ?? null });
+  ctx.observe('draft-shown', Boolean(name) && shownText.includes(name) && shownText.includes(ctx.parameters.description)
+    && /One sample town of these values/.test(shownText), { shown: shownText.slice(0, 2000) });
+  await ctx.screenshot('draft', 'the drafted values and the sample town');
+  if (proposal?.valid !== true) throw new Error('the draft was not a valid proposal, so there are no values to use');
+  await page.click(`${DESCRIPTION}.querySelector('button.world-description-use')`, 'Use these values');
+  await sleep(PAGE_SETTLE_MS);
+  const used = await recipesSeen(page);
+  const holds = Object.entries(proposal.values ?? {}).filter(([key]) => used?.values.some((v) => v.key === key))
+    .every(([key, value]) => String(used.values.find((v) => v.key === key).value) === String(value));
+  ctx.observe('values-used', used?.presets.find((p) => p.pressed === 'true')?.key === proposal.preset && holds && used?.state === 'admitted',
+    { preset: proposal.preset, drafted: proposal.values, controls: used?.values ?? null, state: used?.state ?? null });
+  const postsBefore = (await responses(ctx, 'POST', '/api/worlds/generated')).length;
+  await page.click(`${RECIPES}.querySelector('button.world-recipes-make')`, 'Make this town');
+  const made = await until('the drafted town to be made', SETTLE_MS * 4, async () =>
+    (await responses(ctx, 'POST', '/api/worlds/generated')).slice(postsBefore).find((r) => r.status !== null) ?? null);
+  const entryId = made.response_body?.entry_id ?? null;
+  const opened = made.status === 201 ? await townOpened(ctx, entryId, ctx.parameters.bake_seconds) : { entry: null, drawn: null };
+  const sent = made.request_body?.values ?? {};
+  ctx.observe('made-from-the-draft', made.status === 201 && made.request_body?.recipe === proposal.preset
+    && Object.entries(proposal.values ?? {}).every(([key, value]) => String(sent[key]) === String(value))
+    && tilesOf(opened.entry).length > 0 && tilesOf(opened.entry).every((t) => t.state === 'baked'),
+  { status: made.status, request: made.request_body, response: made.status === 201 ? pick(made.response_body, ['entry_id', 'world_id', 'title', 'source_kind']) : made.response_body,
+    tiles: tilesOf(opened.entry) });
+  ctx.observe('drafted-town-drawn', opened.drawn?.ready === true && opened.drawn?.waiting === null, opened.drawn);
+  await ctx.screenshot('town', 'the town made from the drafted values');
+}
+
 /**
  * A step that acts in the world: a page session starts on a blank page, so the first such step of
  * a session opens the application and passes its gate, the way the person arrives.
@@ -2541,6 +2944,13 @@ export const HANDLERS = Object.freeze({
   'birds-fly-and-perch': inWorld(birdsFlyAndPerch),
   'pause-playback': inWorld(pausePlayback),
   'compare-view-shows-the-pair': inWorld(compareViewShowsThePair),
+  'make-town-with-values': inWorld(makeTownWithValues),
+  'people-cross-tile-seams': inWorld(peopleCrossTileSeams),
+  'vehicles-drive-the-town': inWorld(vehiclesDriveTheTown),
+  'choose-model-for-a-town-group': inWorld(chooseModelForAGroup),
+  'compare-town-group': inWorld(compareTownGroup),
+  'ask-what-happened': inWorld(askWhatHappened),
+  'describe-town-and-use-the-draft': inWorld(describeTownAndUseTheDraft),
   'open-close-photo-intake': inWorld(openClosePhotoIntake),
   'upload-synthetic-photographs': inWorld(uploadSyntheticPhotographs),
   'authorize-admission-in-app': inWorld(authorizeAdmissionInApp),

@@ -292,10 +292,9 @@ routine decides ([model selection](model-and-service-selection.md#what-a-persons
 
 **The per-lens guard.** `LensBudgetGuard` in `exulanica/models/lens_budget.py` has the shape of
 `BudgetGuard` and plugs into `ModelClient(budget=...)`. It holds one lens to four ceilings,
-`max_tokens`, `max_calls`, `max_wall_clock_ms` and `max_cost_usd`, declared in
-`EXULANICA_LENS_BUDGETS`, a JSON object mapping a lens name to exactly those four fields. Ceilings
-are integers and the cost is a decimal string; a JSON float anywhere in the document is refused, and
-a lens with no declared budget is refused by `budget_for`. Every request is reserved against all four
+`max_tokens`, `max_calls`, `max_wall_clock_ms` and `max_cost_usd`, stated in the `LensBudget` it is
+built with; there is no default budget. Ceilings are integers and the cost is a `Decimal`; a float
+cost is refused. Every request is reserved against all four
 before it is sent: the caller's `max_tokens` plus an over-estimate of the prompt, the worst-case
 price, one call, and the full per-call timeout. A request that could cross any ceiling is refused
 with `LensBudgetExceeded`, which is a `BudgetExceededError`. A lens record references its budget by

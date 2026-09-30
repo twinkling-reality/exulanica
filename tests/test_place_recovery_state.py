@@ -45,9 +45,7 @@ pytestmark = pytest.mark.postgres
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURES = ROOT / "tests/fixtures/capture-overlap"
 VOLCANIC = ROOT / ".exulanica/reference-baseline/inputs/volcanic-sample/photographs"
-SCRATCH_STORE = Path(
-    "/Users/glendonchin/dev/Technology/exulanica-scratch/capture-size/segments-view-data/blobs"
-)
+RETAINED_STORE = ROOT / ".exulanica/reference-baseline/runtime/blobs"
 _RUNS = {
     run["label"]: run for run in json.loads((FIXTURES / "measured-runs.json").read_text())["runs"]
 }
@@ -65,7 +63,7 @@ def _real_six() -> list[Path]:
 
 def _real_receipt(label: str) -> bytes:
     run = _RUNS[label]
-    matches = glob.glob(str(SCRATCH_STORE / f"sha-256/*/*/{run['receipt_sha256']}"))
+    matches = glob.glob(str(RETAINED_STORE / f"sha-256/*/*/{run['receipt_sha256']}"))
     if not matches:
         pytest.skip(f"the retained {label} pose receipt is not on this machine")
     data = Path(matches[0]).read_bytes()

@@ -164,17 +164,14 @@ python3 scripts/rehearsal/rehearse.py --worktree <checkout> --slot <n> --out <ne
   the run's bound. Without `--model-env`, the steps that call a hosted model are reported not
   reachable. They also stop starting once the spend the product reports reaches that bound, and a
   step list whose estimates exceed `spend.ask_before_usd` is refused before anything runs.
-- The launcher starts the API with no derivative worker of its own. The rehearsal starts the
-  production worker command the step list names, `exulanica-derivative-worker`, with the
-  environment the step list gives it (the depth model and its device), over the run's database and
-  workspace, and hands it the key the same way.
+- The launcher starts the API with no derivative worker of its own. The rehearsal starts each
+  production worker command the step list names over the run's database and workspace:
+  `exulanica-derivative-worker`, with the environment the step list gives it (the depth model and
+  its device), handing it the key the same way, and `exulanica-generated-tile-worker`, which bakes
+  a made town's tiles and publishes them through the run database's owner connection.
 - `--bound-usd` sets a spend bound for one run below the step list's; `--sessions` runs only the
   named browser sessions; `--reuse-database` reuses the slot's database; `--gpu-slot` names the
   machine's GPU slot command.
-- `--comparison-seeds` names a file of comparison seeds, one a line. The comparison step takes
-  from it only the lines whose SHA-256 is a development seed of
-  `assets/catalogs/society/society-comparison-seeds.v2.json`, writes them to a file outside the run
-  directory for as long as the command runs, and records each seed by its key and digest.
 
 **The launcher on its own.** `scripts/acceptance/launch.py` also runs the application for a
 person, without the rehearsal:
@@ -199,8 +196,12 @@ state and records stay in the system temporary directory, `down` stops only what
 every refusal prints `refused (<name>)` and exits 2.
 
 **Reading the result.** The run directory holds `result.json`, described by
-`scripts/rehearsal/result.schema.json`, a `summary.txt` table, one screenshot per observed moment
-and each browser session's log. Every step appears once, in step-list order:
+`scripts/rehearsal/result.schema.json`, a `summary.txt` table, a JPEG screenshot of every observed
+moment and at least one of every browser step, and each browser session's log. A step's evidence
+keeps each request and response body of at most 4 KiB whole and a larger one as its SHA-256 and
+size (`RECORDED_BODY_BYTES` in `scripts/rehearsal/resultdoc.py`); a step's checks read whole bodies
+while the run is live and keep what they read in their observations. Every step appears once, in
+step-list order:
 
 | Status | Meaning |
 | --- | --- |
@@ -226,9 +227,7 @@ counts as continuous when someone is drawn walking and the 95th percentile of th
 drawn at is at most 6 m/s: people walk on rather than rush a minute's path and stand. Standing is
 not a failure, since people linger by design. It reads one inhabitant in the inspector, waits for
 someone to use an object of the square, and pauses the world. These steps serve the first
-milestone's A world to run and the Usable world delivery gate in part: they watch people move under
-the deterministic planner in a starter furnished with one square, not in the small town those gates
-name.
+milestone's A world to run and the Usable world delivery gate with the town session's.
 
 **Models deciding for people.** In People nearby, under Who decides for them, the rehearsal ticks
 four of the starter's people and chooses DeepSeek V4 Flash for them before it presses Play. While the
@@ -243,18 +242,29 @@ that moment of the shared clock, away from a change of state, and every press of
 meanwhile must be answered within 200 ms, the Core Web Vitals line for a good Interaction to Next
 Paint.
 
-**A comparison.** Once the world is paused, the rehearsal runs the product's own command,
-`python -m exulanica.orchestration.compare`, from the application's checkout over the run's database
-and store, for the group of the owner's choice (`--group-choice`), with that model and Nemotron 3
-Nano 30B, on one development seed, under a bound of at most 0.05 USD passed as
-`EXULANICA_BUDGET_USD`. It checks that the saved world is unchanged by it, then opens Compare models
-from the World menu and reads the verdict, each model's arm with how its model answered beside how
-the group fared, and the two runs drawn side by side under one clock, replayed from their stored
-decisions. These steps serve the model gates in part: one group under one model beside people who
-follow their routine, and one simulated hour of the starter, started from the command rather than
-the application. A development seed is never judged and no same-model control pair runs, so Honest
-difference is reported `not_served`, as is every gate that needs a client other than the browser to
-read the runs.
+**A town.** The town session makes a market town from Make a world, with two of its values moved to
+the next value inside the ranges the server serves, and waits while the tile worker bakes its tiles
+until the town opens and reopens after a reload. It brings the town's people in and plays: society
+reads a host interval apart must place one person on one tile and then on another, a tile being the
+town's extent over its tiles along it, and within one traffic episode a traffic read must serve a
+vehicle that moves while the page draws them. It chooses Nemotron 3 Nano 30B for four of the town's
+people, pauses the town and starts a comparison in Compare models for that group, against Nemotron
+3.5 Lightning with a same-model control run on one development seed, under the bound the plan
+suggests for a typical comparison to finish or 0.05 USD when that is less. It waits until the comparison finishes,
+records any run its bound stopped, and checks that the town is unchanged by it. It asks the
+Companion what happened in the town and checks that the page says which model chose the answer's
+lines, or that none did within the answer's wait. Last, it describes a town in words under Describe
+it, uses the values the model drafts and makes that town too. The Compare view then shows the town's
+comparison, and the developer client reads it, its runs and their decisions through the API
+(`python -m exulanica_client comparisons`). A development seed is never judged, so Honest difference
+is reported `not_served`; the model and comparison gates are served in part, for one group under one
+model and one simulated hour of the town.
+
+**The judge seed.** The last session exports the run's workspace with `exulanica-seed export`,
+verifies the archive, and restores it into a fresh database on the run's own server and an empty
+data directory with the judge deployment's jobs (`exulanica-db`, `exulanica-seed role` and
+`restore`), then reads each town's tiles back from them: every tile must read baked, with its bytes
+in the restored tile store.
 
 **The Companion's memory and the made world.** In the world made from the photographs the Companion
 is asked for a change the reviewed design cannot make and must answer once, without offering to

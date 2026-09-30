@@ -16,7 +16,7 @@ import psycopg
 import pytest
 from exulanica.api.quotas import declare_tile_quota
 from exulanica.db.roles import INSERT_ONLY_TABLES, READ_ONLY_TABLES, provision_runtime_role
-from exulanica.orchestration.judge_seed import GLOBAL_TABLES
+from exulanica.orchestration.judge_seed import REACHED_TABLES
 from exulanica.store.namespaces import TILE_NAMESPACE, tile_store
 from exulanica.world.baked_tiles import (
     BakedTileFaulted,
@@ -96,7 +96,8 @@ def _serve_as_a_route_does(admin: psycopg.Connection) -> None:
 
 
 def test_the_table_is_global_and_read_only_for_the_runtime():
-    assert "baked_tile" in GLOBAL_TABLES
+    # Global, and carried by a judge seed with the rows its workspace reaches.
+    assert "baked_tile" in REACHED_TABLES
     assert "baked_tile" in READ_ONLY_TABLES
     assert "workspace_baked_tile" in INSERT_ONLY_TABLES
 

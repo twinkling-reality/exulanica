@@ -66,6 +66,18 @@ __all__ = [
 ]
 
 _WORKSPACE_LOCK_SEED: Final = 880_024
+#: How many world identities one request to make a generated world may draw. A world's seed
+#: candidates are drawn from its identity, and for about one identity in six hundred none of a
+#: recipe's four generates (``world-recipe.v1.json`` states the rate for its small town), so one
+#: identity per request would refuse that many requests. Another is drawn only after the composer
+#: refuses one, so three leave about one request in two hundred million refused if identities fail
+#: independently. The request's bound, measured at 731066f8 on the development machine inside the
+#: machine-wide quiet slot (load 3.7 before and 5.7 after on 18 cores), composing each preset of
+#: ``world-recipe.v2.json`` with its own values for 20 fresh identities: the slowest composition was
+#: a market town's, 1.31 s over two candidates, and the slowest candidate 0.95 s, also a market
+#: town's. A refused identity tries all four candidates, so a request refused three times composes
+#: for at most about 3 x 4 x 0.95 s, 11.4 s, if no candidate is slower than the slowest measured.
+GENERATED_WORLD_DRAWS: Final = 3
 
 
 class StaleSavedWorldEntry(Exception):
@@ -371,13 +383,20 @@ class SavedWorldEntryRepository:
         in one transaction.
 
         The world is generated for a fresh identity before the transaction, so no lock is held
-        while it runs; everything it writes is written together or not at all. An unknown preset,
-        a value its specification schema does not offer, a specification none of whose seed
-        candidates generate, and a workspace already holding as many generated worlds as the count
-        policy allows are each refused by name, and nothing is written. The count is asked before
+        while it runs; everything it writes is written together or not at all. When none of the
+        identity's seed candidates generate, another identity is drawn, up to
+        :data:`GENERATED_WORLD_DRAWS`. An unknown preset, a value its specification schema does not
+        offer, a specification none of whose seed candidates generate for any identity drawn
+        (:class:`~exulanica.world.composers.GeneratedWorldIdentitiesRefused`, naming each identity's
+        refusals), and a workspace already holding as many generated worlds as the count policy
+        allows are each refused by name, and nothing is written. The count is asked before
         generating, so a workspace at its limit costs no generation, and again under the workspace
         lock, where its answer holds.
         """
+        from exulanica.world.composers import (
+            GeneratedWorldIdentitiesRefused,
+            GeneratedWorldRefused,
+        )
         from exulanica.world.generated_worlds import (
             compose_generated_world,
             create_generated_authorities,
@@ -389,8 +408,17 @@ class SavedWorldEntryRepository:
             raise ValueError("title must contain between 1 and 200 characters")
         recipe = town_recipe(recipe_key, values)
         refuse_past_limit(self.connection, self.workspace_id, GENERATED)
-        world_id = new_world_id(GENERATED)
-        composed = compose_generated_world(recipe, world_id)
+        refused: dict[str, GeneratedWorldRefused] = {}
+        for _ in range(GENERATED_WORLD_DRAWS):
+            world_id = new_world_id(GENERATED)
+            try:
+                composed = compose_generated_world(recipe, world_id)
+            except GeneratedWorldRefused as exc:
+                refused[world_id] = exc
+                continue
+            break
+        else:
+            raise GeneratedWorldIdentitiesRefused(recipe.key, refused)
         with self.connection.transaction():
             self._lock_workspace()
             _, style, authored_version_id = create_generated_authorities(

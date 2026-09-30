@@ -1,6 +1,6 @@
 {
   "profile": "exulanica.rehearsal-steps/v1",
-  "version": 7,
+  "version": 8,
   "about": "The first demonstration, as a person does it in the application, one step per action. Each step names the gates of docs/product-direction.md it serves, the results that must be observable after it, and the owner area a failure routes to. scripts/rehearsal/rehearse.py runs it; tests/test_rehearsal_steps.py holds it to the gates that document states.",
   "gate_sources": [
     {"key": "milestone", "document": "docs/product-direction.md", "heading": "First milestone", "form": "table"},
@@ -13,18 +13,16 @@
     "reason": "Hosted model calls are made only by the steps marked hosted_model, through the product's configured client and its policy boundary. A run stops starting them once the spend the product reports reaches bound_usd, and a step list whose estimates add up to more than ask_before_usd is not well formed, because that run needs a decision first."
   },
   "unserved_gates": {
-    "milestone:Honest difference": "The rehearsal's comparison runs on one development seed, which is never judged, and runs no same-model control pair: a verdict bounding a difference with that pair is given only on held-out seeds, which a rehearsal does not spend.",
-    "milestone:Independent reading": "No client other than the browser reads the comparison, its runs or their decisions in the rehearsal; the developer client's read and edit of a saved version serves the saved-world foundation's Developer proof.",
-    "delivery:Independent use": "No client other than the browser reads the runs and decisions through the developer interface in the rehearsal; the developer client's read and edit of a saved version serves the saved-world foundation's Developer proof."
+    "milestone:Honest difference": "The rehearsal's comparison runs on one development seed, which is never judged: a verdict bounding a difference between models by its same-model control pair is given only on held-out seeds, which a rehearsal does not spend."
   },
   "gates_in_part": {
-    "milestone:A world to run": "the world is the starter furnished with one small square from the catalogs, not a small town built from them; its people are seen moving under the deterministic planner there.",
-    "milestone:A model per group": "one group of the starter's people is decided by one open model and the others by their routine; the people are not split into several named groups each under its own model, and a refused proposal is seen only when the model makes one.",
-    "milestone:Swap and compare": "the comparison swaps one group's model for one simulated hour of the starter on one development seed, started from the local command rather than from the application, not the town's day.",
-    "delivery:Usable world": "the people are watched moving in the starter furnished with one small square, not in the town the milestone builds.",
-    "delivery:Models in their roles": "one group's decisions come from its named model and the others' from their routine, in the starter rather than the town; a refused proposal is seen only when the model makes one.",
-    "delivery:Swap and compare": "the swapped pair runs one simulated hour of the starter on one development seed, started from the local command, with no same-model control pair beside it.",
-    "delivery:Persistence and replay": "the saved world is reopened and holds what was saved, the living society and the comparison's two runs replay from their stored decisions without calling a model, and the comparison leaves the saved world unchanged; the runs are one simulated hour of the starter, not the town's day."
+    "milestone:A world to run": "the market town and the drafted town are made from the catalogs and opened; the town's people are seen moving by the society's reads and drawn, and their walking pace is sampled only in the starter's square.",
+    "milestone:A model per group": "one group of the starter's people and one of the town's are each decided by one open model and the others by their routine; the people are not split into several named groups each under its own model, and a refused proposal is seen only when the model makes one.",
+    "milestone:Swap and compare": "the comparison swaps one group's model for one simulated hour of the town on one development seed, not the town's day.",
+    "delivery:Usable world": "the town's people are watched moving by the society's reads and drawn, and vehicles by the traffic reads; the separate diagnosis of world, simulation and rendering failures is by each step's owner area.",
+    "delivery:Models in their roles": "one group's decisions come from its named model and the others' from their routine, in the starter and in the town; a refused proposal is seen only when the model makes one.",
+    "delivery:Swap and compare": "the swapped pair and its same-model control run one simulated hour of the town on one development seed.",
+    "delivery:Persistence and replay": "the saved world is reopened and holds what was saved, the living society and the comparison's runs replay from their stored decisions without calling a model, and the comparison leaves the saved town unchanged; the runs are one simulated hour of the town, not its day."
   },
   "stand_ins": {
     "human-review": {
@@ -38,11 +36,22 @@
   "runtime": {
     "derivative_worker": {
       "command": "exulanica-derivative-worker",
-      "name": "rehearsal-derivative-worker",
+      "arguments": ["--name", "rehearsal-derivative-worker"],
+      "model_key": true,
       "environment": {"EXULANICA_DEPTH_MODEL": "moge", "EXULANICA_DEPTH_DEVICE": "cpu", "HF_HUB_OFFLINE": "1"},
       "startup_seconds": 300,
       "stop_seconds": 60,
       "reason": "The API's own worker runs no depth model (exulanica/api/services.py build_derivative_worker), so a photograph it finishes stays without a point map. The worker main runs in production (exulanica/ingest/worker_command.py) runs the depth stage when EXULANICA_DEPTH_MODEL is moge, with the checkpoint models.manifest.json pins, on the device docs/scene-reconstruction-operations.md section 7 gives a local checkout. HF_HUB_OFFLINE keeps it to the checkpoint already on this machine: a run downloads nothing."
+    },
+    "tile_worker": {
+      "command": "exulanica-generated-tile-worker",
+      "arguments": [],
+      "model_key": false,
+      "environment": {},
+      "owner_environment": ["EXULANICA_TILE_PUBLISHER_DATABASE_URL"],
+      "startup_seconds": 60,
+      "stop_seconds": 60,
+      "reason": "A town is made on the request and its tiles are baked off it, by the worker main runs in production (exulanica/ingest/generated_tiles_command.py); the API bakes none, so without it a made town waits for its tiles for ever. It reads jobs as the runtime role and publishes each baked tile through the owner connection migration 0072 gives that write alone, and bakes with the worktree's own web packages. It asks no model. Its startup is a schema check and a role check, well inside a minute."
     },
     "society_playback": {
       "launcher_flags": ["--society-playback"],
@@ -68,8 +77,6 @@
       "instruments": ["walker-positions", "bird-positions"],
       "instruments_reason": "The motion measure reads where the page draws each walker in every animation frame, and the birds' measure where it draws each bird and how long it takes to answer an input, which no control shows; both are installed before the page loads (instruments.mjs)."
     },
-    {"id": "comparison", "runner": "orchestrator", "purpose": "A development comparison of the starter's people, run by the product's local command for the group the owner chose a model for."},
-    {"id": "compare", "runner": "browser", "budget_seconds": 300, "budget_reason": "Its bounds with room for the page: the 60 s wait for both runs to be drawn and the 5 s of play, with a page load and the gate.", "purpose": "The comparison in the application's Compare view: its verdict, each arm with how its model answered, and the two runs on one clock."},
     {
       "id": "photos",
       "runner": "browser",
@@ -102,7 +109,11 @@
         "photographs_reason": "One more drawing of scripts/make_place_proposal_d_photographs.py, with no text, captured a day after the others, so it is a photograph the made world was not made with. No personal photograph."
       }
     },
-    {"id": "made-world-people", "runner": "browser", "budget_seconds": 300, "budget_reason": "A page load and the gate, the square's confirmation and apply, and bringing people in, each with its 30 s settle; none waits on a job.", "purpose": "People brought into the world made from the photographs, on the floor it declares, with the model panel beside them."}
+    {"id": "made-world-people", "runner": "browser", "budget_seconds": 300, "budget_reason": "A page load and the gate, the square's confirmation and apply, and bringing people in, each with its 30 s settle; none waits on a job.", "purpose": "People brought into the world made from the photographs, on the floor it declares, with the model panel beside them."},
+    {"id": "town", "runner": "browser", "budget_seconds": 6600, "budget_reason": "The sum of its bounds with room for the pages: two towns' bakes of at most 900 s each, 240 s of watching people, at most one traffic episode (1200 s, the route's episode_steps times step_ms) of watching vehicles, the comparison's 1500 s, the Companion's answer at most as long as the page waits (ASK_TIMEOUT_MS 180 s in web/packages/app/src/companion-ask-api.ts) and the draft's model and sample calls, with page loads and the gate.", "purpose": "A town made from values a person sets, its people crossing tile seams and its vehicles driving, a model chosen for a group of its people and compared from the application, the Companion asked what happened, and a second town made from a model's draft of a person's words."},
+    {"id": "compare", "runner": "browser", "budget_seconds": 300, "budget_reason": "Its bounds with room for the page: the 60 s wait for both runs to be drawn and the 5 s of play, with a page load and the gate.", "purpose": "The comparison in the application's Compare view: its verdict, each arm with how its model answered, and the two runs on one clock."},
+    {"id": "developer-reading", "runner": "orchestrator", "purpose": "The developer client reads the comparison the owner started from the application, its runs and their decisions, through the authenticated API."},
+    {"id": "judge-seed", "runner": "orchestrator", "purpose": "The run's workspace, towns included, exported as a judge seed and restored into a fresh database and data directory as the judge deployment restores one."}
   ],
   "steps": [
     {
@@ -130,7 +141,7 @@
       "owner_area": "access: web/packages/app/src/main.ts (askForAccess) and the API's bearer authentication",
       "expect": {
         "page": [
-          {"id": "gate-shown", "says": "The production build shows its credential gate with an access-token field; account sign-in is offered but disabled because this runtime configures none."},
+          {"id": "gate-shown", "says": "The production build shows its credential gate with an access-token field, and offers account sign-in only when GET /auth/session says accounts are configured, which this runtime does not."},
           {"id": "wrong-token-refused", "says": "A token the instance does not hold is refused at the gate with a stated reason, and no world opens."},
           {"id": "token-opens-world", "says": "The run's token opens the world: the world title field appears and the shell stops booting."}
         ]
@@ -651,71 +662,6 @@
       }
     },
     {
-      "id": "run-development-comparison",
-      "session": "comparison",
-      "action": "Compare the group's chosen model with another for one simulated hour of the starter, with the product's command: python -m exulanica.orchestration.compare --group-choice <the owner's choice> on one development seed.",
-      "gates": ["milestone:Swap and compare", "delivery:Swap and compare"],
-      "gates_reason": "Two runs from the same saved version differing only in one group's model; part of each, which gates_in_part states.",
-      "requires": ["choose-model-for-a-group", "pause-playback"],
-      "hosted_model": true,
-      "spend_estimate_usd": "0.05",
-      "spend_estimate_source": "The step's own bound. Measured 0.03817782 USD for one development seed of two models deciding for all eight people (lane C2's development pair); a group of four under DeepSeek V4 Flash and Nemotron 3 Nano 30B costs less (docs/evaluation/2026-09-26-society-model-actions.json).",
-      "parameters": {
-        "models": [
-          {"provider": "nebius_token_factory", "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731"},
-          {"provider": "nebius_token_factory", "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"}
-        ],
-        "models_reason": "The model the owner chose for the group, and the least costly other model the product offers a person; each ask of either reserves at most 0.0035 USD (ask_bound_usd), so the runs' reservations stay inside the bound.",
-        "seed_catalog": "assets/catalogs/society/society-comparison-seeds.v2.json",
-        "seed_catalog_reason": "The catalog the command itself checks seeds against; only its development seeds are handed to the command.",
-        "seed_count": 1,
-        "seed_count_reason": "One development seed: a development comparison is never judged, and one seed shows the pair in the Compare view.",
-        "bound_usd": "0.05",
-        "bound_usd_reason": "The rehearsal's allowance for one development comparison, given to the command as EXULANICA_BUDGET_USD, or what is left of the run's bound when that is less.",
-        "timeout_seconds": 900,
-        "timeout_reason": "Six times the 2.5 minutes lane C2's development pair of eight people took, for four runs of which two are anchors."
-      },
-      "owner_area": "comparisons: exulanica/orchestration/compare.py, exulanica/api/society_comparison_runner.py and exulanica/world/society_comparison_result.py",
-      "expect": {
-        "api": [
-          {"id": "comparison-ran", "says": "The command exits 0 and the comparison it names is served with every run completed."},
-          {"id": "the-owners-group-swapped", "says": "The comparison scores the people of the owner's choice, named by that choice, and its candidate arms are the two models the command was given."},
-          {"id": "saved-world-unchanged", "says": "The saved world's authored version, state and edit sequence are what they were before the comparison."},
-          {"id": "spend-within-bound", "says": "What every run's recorded calls cost is within the bound the command ran under."}
-        ]
-      }
-    },
-    {
-      "id": "compare-view-shows-the-pair",
-      "session": "compare",
-      "action": "Open Compare models from the World menu, read the verdict and the arms, choose the two models' runs for the left and right sides, press Play under them and move the clock.",
-      "gates": ["milestone:Swap and compare", "milestone:Recorded decisions", "delivery:Swap and compare", "delivery:Persistence and replay"],
-      "gates_reason": "The application shows the two runs side by side with what each person did, replayed from their stored decisions with no model called.",
-      "requires": ["run-development-comparison"],
-      "parameters": {
-        "drawn_seconds": 60,
-        "drawn_reason": "The view replays both runs from the API before it draws them; an allowance for a busy machine, not a measurement.",
-        "play_seconds": 5,
-        "play_reason": "Long enough for the view's clock to move several minutes at its slowest speed.",
-        "sides": ["model_a", "model_b"],
-        "sides_reason": "The two models' runs, left and right, chosen by the view's own Left and Right controls.",
-        "shown_minute": 30,
-        "shown_minute_reason": "The middle of the hour, where the two runs have had time to differ, for the screenshot."
-      },
-      "owner_area": "the Compare view: web/packages/app/src/ui/society-comparison.ts and web/packages/app/src/society-comparison-api.ts; exulanica/api/routes/society_comparisons.py",
-      "expect": {
-        "page": [
-          {"id": "verdict-shown", "says": "The Compare view lists the comparison, opens it and shows its verdict and whom each arm decides for."},
-          {"id": "arms-with-reliability", "says": "Each model's arm shows how the group fared beside what its model answered, named by the model's name, and every arm served is shown."},
-          {"id": "two-runs-one-clock", "says": "Two runs are drawn side by side, each with its people and how its model answered, under one clock whose Play moves the minute both are drawn at."}
-        ],
-        "api": [
-          {"id": "comparison-recorded", "says": "GET /world/versions/{version_id}/society/comparisons lists it with every run completed, and its result reads not judged because its seeds are development seeds."},
-          {"id": "replayed-from-records", "says": "The page read both runs it drew from GET /world/versions/{version_id}/society/comparisons/{comparison_id}/runs/{run_id}, which replays a run from its stored decisions and answered 200."}
-        ]
-      }
-    },
-    {
       "id": "open-close-photo-intake",
       "session": "photos",
       "action": "Open Add photos beside the world, then return to the world.",
@@ -1199,6 +1145,287 @@
         ],
         "api": [
           {"id": "society-on-declared-floor", "says": "The made world's entry declares a floor, its society's walkable area is the declared one, and every inhabitant, synthetic, stands inside it."}
+        ]
+      }
+    },
+    {
+      "id": "make-town-with-values",
+      "session": "town",
+      "action": "Open Make a world from the World menu, choose A market town, move two of its values to other values inside the ranges the server serves, press Make this town, and wait while its tiles are baked until the town opens.",
+      "gates": ["milestone:A world to run", "delivery:Usable world"],
+      "gates_reason": "A small town from the catalogs opens as a saved version in the application: the town is generated from values the person sets, saved, baked off the request and drawn.",
+      "requires": ["enter-owned-starter"],
+      "parameters": {
+        "preset": "market_town",
+        "preset_reason": "The preset with the most tiles, three, so the town has two seams for its people to cross and its vehicles the most streets.",
+        "changed_values": ["block_length_mm", "storey_band_high"],
+        "changed_values_reason": "Two values the served schema declares adjustable for every preset. Each is moved to the nearest other value its served range admits, read from GET /worlds/specification, so no value is written here.",
+        "bake_seconds": 900,
+        "bake_reason": "One tile of the one-tile town baked in 13.3 s on the development machine (exulanica/world/world_recipes.py TILES_MAXIMUM's reason); three tiles by one worker with the page polling every 5 s, with room for a machine running a browser and the API."
+      },
+      "owner_area": "towns: web/packages/app/src/ui/world-recipes.ts, web/packages/app/src/world-specification.ts and web/packages/app/src/composition/generated-world.ts; exulanica/api/routes/generated_worlds.py, exulanica/world/world_recipes.py and exulanica/ingest/generated_tiles.py",
+      "expect": {
+        "page": [
+          {"id": "values-offered", "says": "Make a world offers the presets the server serves and, for the chosen one, each adjustable value as a control inside the range the server states."},
+          {"id": "town-drawn", "says": "After Make this town the page says the town is being built until its tiles are baked, then opens it: the world is mounted, the waiting line is gone and no tile is reported failed."}
+        ],
+        "api": [
+          {"id": "made-with-the-values", "says": "POST /worlds/generated answered 201 for the preset with the two values the person set, each inside its served range and other than the preset's, and the saved world is listed as a generated world."},
+          {"id": "tiles-baked", "says": "Every tile of the town the saved world names is baked, by the tile worker the run started."}
+        ],
+        "reload": [
+          {"id": "town-reopens", "says": "After a reload the application opens the town again, drawn from its baked tiles."}
+        ]
+      }
+    },
+    {
+      "id": "people-cross-tile-seams",
+      "session": "town",
+      "action": "In the town, bring in its inhabitants from People nearby, press Play, and watch them while minutes pass.",
+      "gates": ["milestone:A world to run", "delivery:Usable world"],
+      "gates_reason": "The town's people are visible and move under the deterministic planner, from tile to tile.",
+      "requires": ["make-town-with-values"],
+      "parameters": {
+        "watch_seconds": 240,
+        "watch_reason": "Time for several simulated minutes at the host's base wait of 8 s a minute (docs/evaluation/2026-09-24-living-world-pace.json), read once a host interval."
+      },
+      "owner_area": "town societies: exulanica/world/society_grounds.py, exulanica/world/society_walking_surfaces.py and web/packages/app/src/composition/environment-selection.ts",
+      "expect": {
+        "page": [
+          {"id": "town-people-present", "says": "People nearby says the town's people are present, with the count the society serves, and the canvas draws them."}
+        ],
+        "api": [
+          {"id": "someone-crosses-a-seam", "says": "Society reads a host interval or more apart place one person on one tile of the town and then on another, a tile's width being the town's extent over its count of tiles along it."},
+          {"id": "minutes-pass-in-the-town", "says": "The town's society advances while it plays."}
+        ]
+      }
+    },
+    {
+      "id": "vehicles-drive-the-town",
+      "session": "town",
+      "action": "Watch the town's streets until a vehicle drives, for at most one traffic episode.",
+      "gates": ["delivery:Usable world"],
+      "gates_reason": "The town is used by its vehicles as well as its people, driven on its own roads on the shared clock.",
+      "requires": ["make-town-with-values"],
+      "parameters": {
+        "window_seconds": 60,
+        "window_reason": "The window one traffic read asks for, a minute of the shared clock. The step reads window after window for at most one traffic episode, whose length the route serves (episode_steps times step_ms): an episode's trips are requested at its start, and in rehearsal 8's first run every vehicle was parked for two minutes once its episode's 18 trips had arrived."
+      },
+      "owner_area": "traffic: exulanica/api/routes/world_traffic.py, exulanica/world/traffic_host.py and web/packages/app/src/composition/tile-traffic.ts",
+      "expect": {
+        "page": [
+          {"id": "vehicles-drawn", "says": "The page's traffic state is driving and it draws the vehicles the server serves."}
+        ],
+        "api": [
+          {"id": "vehicles-move", "says": "Within one traffic episode a read of GET /world/versions/{version_id}/traffic serves a vehicle whose front axle is somewhere else within its window; the reads before it and how long they took are recorded."}
+        ]
+      }
+    },
+    {
+      "id": "choose-model-for-a-town-group",
+      "session": "town",
+      "action": "In People nearby in the town, under Who decides for them, tick four people, choose Nemotron 3 Nano 30B and press Use for the chosen people.",
+      "gates": ["milestone:A model per group", "delivery:Models in their roles"],
+      "gates_reason": "The owner chooses the open model that decides for a group of the town's people, through the one hosted policy boundary; one group under one model is part of each, which gates_in_part states.",
+      "requires": ["people-cross-tile-seams"],
+      "hosted_model": true,
+      "spend_estimate_usd": "0.01",
+      "spend_estimate_source": "Measured 0.00132226 USD a person-hour for Nemotron 3 Nano 30B deciding in a town (docs/evaluation/2026-09-29-town-comparison-cost.json); four people over the minutes the session plays after the choice stay well under this.",
+      "parameters": {
+        "model": {"provider": "nebius_token_factory", "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"},
+        "model_reason": "One of the pair a comparison of a town's group measured (docs/evaluation/2026-09-29-town-comparison-cost.json), so the plan for this group's comparison states what one like it typically costs and the bound it suggests.",
+        "group_size": 4,
+        "group_size_reason": "A group a comparison of a market town can hold whatever its population (a model decides for at most 11 of 86 people, exulanica/world/society_comparison_reading.py), and the same size as the starter's group.",
+        "fact": "town_model_group",
+        "fact_reason": "The name the compare step reads the choice by, beside the starter's model_group."
+      },
+      "owner_area": "model choices: web/packages/app/src/ui/society-models.ts and web/packages/app/src/composition/society-models-mount.ts; exulanica/api/routes/society_models.py and exulanica/world/society_model_choice_repository.py",
+      "expect": {
+        "page": [
+          {"id": "models-offered", "says": "Who decides for them is shown beside the town's people, its host line says this server asks the models chosen before each simulated minute, and it offers the model by the name the server serves."},
+          {"id": "group-chosen-in-words", "says": "After the choice it says that many people are decided by the model chosen, and each chosen person's row names the model, which you chose."}
+        ],
+        "api": [
+          {"id": "choice-recorded", "says": "POST /world/versions/{version_id}/society/models answered the stored choice naming exactly the ticked people and the model; the models read holds that model for each of them and none for the others."}
+        ]
+      }
+    },
+    {
+      "id": "compare-town-group",
+      "session": "town",
+      "action": "Open Compare models from the World menu, choose the people you chose a model for, two models and a control run, state the bound the plan suggests, press Start the comparison, and wait until the list says it finished.",
+      "gates": ["milestone:Swap and compare", "delivery:Swap and compare"],
+      "gates_reason": "Two runs start from the same saved version of the town and differ only in one group's model, with the same-model control pair beside them, started from the application within a bound its owner states.",
+      "requires": ["choose-model-for-a-town-group"],
+      "hosted_model": true,
+      "spend_estimate_usd": "0.05",
+      "spend_estimate_source": "The step's cap on its bound. A comparison of a group of four in a 48-person town with a control run cost about 0.022 USD (docs/evaluation/2026-09-29-town-comparison-cost.json).",
+      "parameters": {
+        "models": [{"provider": "nebius_token_factory", "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"}, {"provider": "nebius_token_factory", "model_id": "nvidia/Nemotron-3_5-Lightning"}],
+        "models_reason": "The model the owner chose for the group and Nemotron 3.5 Lightning: the pair a comparison of a town's group of four measured (docs/evaluation/2026-09-29-town-comparison-cost.json), so the plan states a typical cost and suggests a bound. In rehearsal 8's second run DeepSeek V4 Flash, which no town comparison measured, left the plan with no suggestion.",
+        "control": true,
+        "control_reason": "The same-model control pair the delivery gate asks for beside the swapped pair.",
+        "seeds": 1,
+        "seeds_reason": "One development seed: a comparison on development seeds is never judged, and one seed shows the pair in the Compare view.",
+        "bound_cap_usd": "0.05",
+        "bound_cap_reason": "The step states the bound the plan suggests for a typical comparison of this group to finish (typical cost plus what two runs can hold reserved), unless that is above this cap, when it states the cap: the lane's allowance for one comparison. The server refuses a bound its process budget cannot hold beside the share it keeps for other asks (bound_over_budget), so a run gives the API a budget (--bound-usd) with room for this bound over what the run spends before it.",
+        "finish_seconds": 1500,
+        "finish_reason": "A comparison of the small square's group of eight took about 1 min 48 s from the application (docs/evaluation/2026-09-29-developer-client-comparison.json); a town's reads take longer (about 5.5 s a pair at 48 people, finding #79), and there are more runs with the control."
+      },
+      "owner_area": "comparisons from the application: web/packages/app/src/ui/society-comparison-start.ts and web/packages/app/src/composition/society-comparison-mount.ts; exulanica/api/routes/society_comparisons.py, exulanica/api/society_comparison_start.py and exulanica/api/society_comparison_runner.py",
+      "expect": {
+        "page": [
+          {"id": "plan-shown", "says": "Compare models offers the owner's group and the models, and states the plan: its runs, the most it could cost and what one like it typically costs."},
+          {"id": "started-in-words", "says": "After Start the page says the comparison started and the server runs it, and its list entry says when it finished."}
+        ],
+        "api": [
+          {"id": "started-for-the-group", "says": "POST /world/versions/{version_id}/society/comparisons answered 201 for the owner's choice, the two models, the control and the bound the page stated."},
+          {"id": "runs-finished-within-bound", "says": "Every run the start planned has an outcome and what the comparison spent is within its bound; a run stopped by the bound is recorded with the figures."},
+          {"id": "saved-world-unchanged", "says": "The town's authored version, state and edit sequence are what they were before the comparison."}
+        ]
+      }
+    },
+    {
+      "id": "ask-what-happened",
+      "session": "town",
+      "action": "Inspect one of the town's people in People nearby, open the Companion and ask what happened in this world.",
+      "gates": ["foundation:Companion interaction"],
+      "gates_reason": "The Companion answers a question about a world's people within its bounded wait, and says which model chose its lines or that none did in time.",
+      "requires": ["people-cross-tile-seams"],
+      "hosted_model": true,
+      "spend_estimate_usd": "0.01",
+      "spend_estimate_source": "One planner call and one composer call with its fallback at most; the Companion's asks in the companion session cost under 0.003 USD each (docs/evaluation/2026-09-29-rehearsal-models-and-comparison.json).",
+      "parameters": {
+        "question": "What happened in this world?",
+        "question_reason": "The typed question the Companion answers about a world's people from the society's recorded lines."
+      },
+      "owner_area": "the Companion's people answers: exulanica/selection/society_question.py and web/packages/app/src/companion-ask-api.ts",
+      "expect": {
+        "page": [
+          {"id": "answer-drawn", "says": "The Companion draws an answer, and its provenance line names the model that chose the lines, or its words say the model did not choose them in time and give the latest recorded lines."}
+        ],
+        "api": [
+          {"id": "composer-outcome-shown", "says": "POST /selection/ask answered 200, and what the answer composer's last call did (completed, or ended by the wait, timed out or failed) is what the page says."}
+        ]
+      }
+    },
+    {
+      "id": "describe-town-and-use-the-draft",
+      "session": "town",
+      "action": "Open Make a world, write the town you want under Describe it, press Draft the values, read the drafted values and the sample town, press Use these values, then Make this town and wait while it is baked.",
+      "gates": ["milestone:A world to run"],
+      "gates_reason": "A town from the catalogs, specified in a person's own words by an open model whose draft the server checks and samples, opens as a saved version.",
+      "requires": ["enter-owned-starter"],
+      "hosted_model": true,
+      "spend_estimate_usd": "0.005",
+      "spend_estimate_source": "Measured 0.0166 USD for 12 drafts by the specification drafter's primary, about 0.0014 USD each (docs/evaluation/2026-09-29-world-drafting-models-v2.json), with a repair at most.",
+      "parameters": {
+        "description": "A small, quiet town of low houses, two or three storeys, with its cross streets far apart.",
+        "description_reason": "Words that each name something the specification states (a town's size, its storeys and the distance between its cross streets), so a draft can be checked against them.",
+        "bake_seconds": 900,
+        "bake_reason": "As make-town-with-values: a town's tiles baked by one worker with the page polling."
+      },
+      "owner_area": "describing a town: web/packages/app/src/ui/world-description.ts and web/packages/app/src/world-draft-api.ts; exulanica/api/routes/world_drafts.py, exulanica/selection/world_drafting.py and exulanica/world/specification_samples.py",
+      "expect": {
+        "page": [
+          {"id": "draft-shown", "says": "After Draft the values the page repeats the words, names the model that drafted the values and the preset it started from, lists each value, and describes one sample town of those values."},
+          {"id": "values-used", "says": "After Use these values the preset is chosen and each control holds the value the draft states."},
+          {"id": "drafted-town-drawn", "says": "After Make this town the page waits for its tiles and opens the town."}
+        ],
+        "api": [
+          {"id": "drafted-by-the-model", "says": "POST /worlds/specification/drafts answered a valid proposal from the model it names, with a sample the server generated from it."},
+          {"id": "made-from-the-draft", "says": "POST /worlds/generated answered 201 for the draft's preset and values, and every tile of that town is baked."}
+        ]
+      }
+    },
+    {
+      "id": "compare-view-shows-the-pair",
+      "session": "compare",
+      "action": "Open Compare models from the World menu, read the verdict and the arms, choose the two models' runs for the left and right sides, press Play under them and move the clock.",
+      "gates": ["milestone:Swap and compare", "milestone:Recorded decisions", "delivery:Swap and compare", "delivery:Persistence and replay"],
+      "gates_reason": "The application shows the two runs side by side with what each person did, replayed from their stored decisions with no model called.",
+      "requires": ["compare-town-group"],
+      "parameters": {
+        "drawn_seconds": 60,
+        "drawn_reason": "The view replays both runs from the API before it draws them; an allowance for a busy machine, not a measurement.",
+        "play_seconds": 5,
+        "play_reason": "Long enough for the view's clock to move several minutes at its slowest speed.",
+        "sides": ["model_a", "model_b"],
+        "sides_reason": "The two models' runs, left and right, chosen by the view's own Left and Right controls.",
+        "shown_minute": 30,
+        "shown_minute_reason": "The middle of the hour, where the two runs have had time to differ, for the screenshot."
+      },
+      "owner_area": "the Compare view: web/packages/app/src/ui/society-comparison.ts and web/packages/app/src/society-comparison-api.ts; exulanica/api/routes/society_comparisons.py",
+      "expect": {
+        "page": [
+          {"id": "verdict-shown", "says": "The Compare view lists the comparison, opens it and shows its verdict and whom each arm decides for."},
+          {"id": "arms-with-reliability", "says": "Each model's arm shows how the group fared beside what its model answered, named by the model's name, and every arm served is shown."},
+          {"id": "two-runs-one-clock", "says": "Two runs are drawn side by side, each with its people and how its model answered, under one clock whose Play moves the minute both are drawn at."}
+        ],
+        "api": [
+          {"id": "comparison-recorded", "says": "GET /world/versions/{version_id}/society/comparisons lists it with every run completed, and its result reads not judged because its seeds are development seeds."},
+          {"id": "replayed-from-records", "says": "The page read both runs it drew from GET /world/versions/{version_id}/society/comparisons/{comparison_id}/runs/{run_id}, which replays a run from its stored decisions and answered 200."}
+        ]
+      }
+    },
+    {
+      "id": "developer-client-reads-the-comparison",
+      "session": "developer-reading",
+      "action": "Read the comparison the owner started, its runs and their decisions with the developer client: python -m exulanica_client comparisons --comparison <its id>.",
+      "gates": ["milestone:Independent reading", "delivery:Independent use"],
+      "gates_reason": "A client other than the browser reads the runs, their decisions and the models that served them through the authenticated API.",
+      "requires": ["compare-town-group"],
+      "parameters": {
+        "timeout_seconds": 300,
+        "timeout_reason": "Reading every run replays it on the server, about 5.5 s a pair at 48 people (finding #79); an allowance for several runs on a busy machine."
+      },
+      "owner_area": "the developer client: clients/python/exulanica_client/comparisons.py; exulanica/api/routes/society_comparisons.py",
+      "expect": {
+        "api": [
+          {"id": "client-read-the-comparison", "says": "The client exits 0 having read the comparison the application started, every run's outcome, and each completed model run replayed with its decisions, and its own checks hold."},
+          {"id": "same-comparison", "says": "The comparison the client read is the one compare-town-group started, with the same models."}
+        ]
+      }
+    },
+    {
+      "id": "export-judge-seed",
+      "session": "judge-seed",
+      "action": "Export the run's workspace as a judge seed with the application's command (exulanica-seed export), and verify the archive against its manifest (exulanica-seed verify).",
+      "gates": ["delivery:Release rehearsal"],
+      "gates_reason": "The access a judge is given starts from a seed of a workspace a person used, towns included; exporting it from the rehearsed workspace is the first half of that setup.",
+      "requires": ["make-town-with-values"],
+      "parameters": {
+        "timeout_seconds": 600,
+        "timeout_reason": "The archive holds every row and stored byte of the workspace, synthetic photographs, their derivatives and the towns' baked tiles among them; an allowance for a busy machine, not a measurement."
+      },
+      "owner_area": "the judge seed: exulanica/orchestration/judge_seed.py and exulanica/orchestration/judge_seed_cli.py; deploy/judge/compose.yaml",
+      "expect": {
+        "api": [
+          {"id": "archive-written", "says": "exulanica-seed export exits 0 and writes an archive whose manifest names the run's workspace."},
+          {"id": "archive-verifies", "says": "exulanica-seed verify re-hashes every file of the archive against its manifest and exits 0."}
+        ]
+      }
+    },
+    {
+      "id": "restore-judge-seed-into-a-fresh-stack",
+      "session": "judge-seed",
+      "action": "Create a fresh database on the run's server and an empty data directory, migrate it (exulanica-db), provision the judge role and restore the seed into it (exulanica-seed role, restore), and read each town's tiles back from them.",
+      "gates": ["delivery:Release rehearsal"],
+      "gates_reason": "A judge's stack is brought up from the seed with no worker; the towns in it must draw from what the seed carried.",
+      "requires": ["export-judge-seed"],
+      "parameters": {
+        "timeout_seconds": 600,
+        "timeout_reason": "As export-judge-seed: every migration, then every row and byte of the archive loaded and verified.",
+        "database_prefix": "judge_restore",
+        "database_prefix_reason": "The fresh database's name on the run's own disposable server, with the rehearsal's process id; it is dropped after the check.",
+        "data_directory": "judge-restore-data",
+        "data_directory_reason": "An empty data directory inside the run directory, standing for the judge stack's media volume."
+      },
+      "owner_area": "the judge seed: exulanica/orchestration/judge_seed.py and exulanica/orchestration/judge_seed_cli.py; deploy/judge/compose.yaml",
+      "expect": {
+        "api": [
+          {"id": "restored-and-verified", "says": "exulanica-db, exulanica-seed role and exulanica-seed restore each exit 0 on the fresh database, the restore having verified the rows and bytes that landed against the manifest."},
+          {"id": "towns-drawn-from-the-seed", "says": "Every tile of every generated world of the restored workspace reads baked, and its container is in the restored tile store and hashes to the digest its bake records."}
         ]
       }
     }

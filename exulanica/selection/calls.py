@@ -100,12 +100,12 @@ class ModelCall:
     """One model call this question actually made, as the response reported it.
 
     Every field is read off the response rather than off the configuration, and the distinction
-    is the whole reason this exists. ``docs/product-direction.md`` requires the memory gate to
-    "record the executed model, task, latency and output", and adds that "Nemotron use must be
-    functional in that interaction if claimed, with the actual executed variant recorded rather
-    than inferred from configuration". A manifest says which model a role asks for. Only the
-    response says which one answered, and the two differ exactly when the fallback fired, which
-    is the case a configuration-derived record would report wrongly and silently.
+    is the whole reason this exists. ``docs/product-direction.md`` requires the Companion
+    interaction to "record the executed model, task, latency and output", and adds that "Nemotron
+    use must be functional in that interaction if claimed, with the actual executed variant
+    recorded rather than inferred from configuration". A manifest says which model a role asks
+    for. Only the response says which one answered, and the two differ exactly when the fallback
+    fired, which is the case a configuration-derived record would report wrongly and silently.
 
     ``requested_model`` is the identifier the chain sent; ``served_model`` is the one the body
     echoed back. ``used_fallback`` says the primary was withdrawn and the next model in the

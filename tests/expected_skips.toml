@@ -119,9 +119,10 @@ reason = "web/node_modules is not installed, so the tessellator cannot bake"
 only_without = "web/node_modules"
 
 # The operator's retained photographs and pose receipts, reached through the ignored
-# .exulanica/reference-baseline link a lane worktree carries. Two tests read receipts from a
-# scratch store at an absolute path on the operator's machine instead; a checkout without the
-# link is not on that machine, so its absence stands for both.
+# .exulanica/reference-baseline link a lane worktree carries. A receipt is read from the retained
+# store under it by its digest (tests/fixtures/capture-overlap/measured-runs.json names each), and
+# the store need not hold every receipt, so each receipt's skip is accepted only without that
+# receipt's own file.
 [[cause]]
 reason = "the retained volcanic photographs are not reachable through .exulanica"
 only_without = ".exulanica/reference-baseline"
@@ -132,19 +133,27 @@ only_without = ".exulanica/reference-baseline"
 
 [[cause]]
 reason = "receipt f44362e2840e is not on this machine"
-only_without = ".exulanica/reference-baseline"
+only_without = ".exulanica/reference-baseline/runtime/blobs/sha-256/f4/43/f44362e2840ef4f997082774d4b4cf665a734e810460aa48141887b7eb0363bb"
 
 [[cause]]
 reason = "receipt 8280728d5c8c is not on this machine"
-only_without = ".exulanica/reference-baseline"
+only_without = ".exulanica/reference-baseline/runtime/blobs/sha-256/82/80/8280728d5c8c71a54b333e8c3a76634b0d12d710e384bb2904914ecfae207b4f"
+
+[[cause]]
+reason = "receipt 0d4194430b77 is not on this machine"
+only_without = ".exulanica/reference-baseline/runtime/blobs/sha-256/0d/41/0d4194430b77f947efc14c41472bbb0717a92258622ad160a7a30979e46cf391"
+
+[[cause]]
+reason = "receipt e7a9145ad066 is not on this machine"
+only_without = ".exulanica/reference-baseline/runtime/blobs/sha-256/e7/a9/e7a9145ad0662e54e828ab21d40229465d389324389e01be05faa542c73c904b"
 
 [[cause]]
 reason = "the retained six pose receipt is not on this machine"
-only_without = ".exulanica/reference-baseline"
+only_without = ".exulanica/reference-baseline/runtime/blobs/sha-256/82/80/8280728d5c8c71a54b333e8c3a76634b0d12d710e384bb2904914ecfae207b4f"
 
 [[cause]]
 reason = "the retained twelve_wide pose receipt is not on this machine"
-only_without = ".exulanica/reference-baseline"
+only_without = ".exulanica/reference-baseline/runtime/blobs/sha-256/0d/41/0d4194430b77f947efc14c41472bbb0717a92258622ad160a7a30979e46cf391"
 
 # Evaluation records kept only on the operator's machine, which tests measure against when they
 # are present.

@@ -28,9 +28,8 @@ at its worst case.
 :class:`~exulanica.models.errors.BudgetExceededError`, which the chain does not catch and the API
 answers with 429, and its message says so. Retrying is the loop the budget is stopping.
 
-**Configuration comes from the environment and has no default.** ``EXULANICA_LENS_BUDGETS`` maps a
-lens name to its four ceilings. A lens with no declared budget has no budget, and
-:func:`budget_for` refuses it rather than inventing one.
+**A budget is stated, never defaulted.** A guard is built with a :class:`LensBudget` of the four
+ceilings and refuses to be built with anything else.
 
 **What the wall clock does not bound.** The reservation keeps a call from *starting* unless its
 full timeout fits. It cannot stop a call that has started: httpx applies the timeout per
@@ -47,41 +46,30 @@ refusal is the lens lane's, and :meth:`LensBudgetExceeded.record` is the shape i
 from __future__ import annotations
 
 import copy
-import json
-import os
 import re
 import time
-from collections.abc import Callable, Mapping
+from collections.abc import Callable
 from dataclasses import dataclass
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 from enum import StrEnum
 from typing import Any, Final
 
 from exulanica.canonical import canonical_json, sha256_of_canonical
-from exulanica.env import env_get, env_name
 from exulanica.models.budget import BudgetGuard
 from exulanica.models.errors import BudgetExceededError, ModelError
 from exulanica.models.manifest import ModelSpec, Role
 from exulanica.models.usage import USD_QUANTUM, CallUsage, CostBasis, CostLedger, usd_string
 
 __all__ = [
-    "LENS_BUDGETS_ENV",
     "LensBudget",
     "LensBudgetAxis",
     "LensBudgetConfigurationError",
     "LensBudgetExceeded",
     "LensBudgetGuard",
-    "budget_for",
-    "load_lens_budgets",
     "usd_string",
 ]
 
-#: A JSON object mapping a lens name to ``{"max_tokens": int, "max_calls": int,
-#: "max_wall_clock_ms": int, "max_cost_usd": "<decimal string>"}``.
-LENS_BUDGETS_ENV: Final = env_name("LENS_BUDGETS")
-
 _LENS_NAME: Final = re.compile(r"^[a-z0-9][a-z0-9_.-]{0,99}$")
-_FIELDS: Final = ("max_tokens", "max_calls", "max_wall_clock_ms", "max_cost_usd")
 
 #: Characters per token for sizing a reservation, rounded up. Deliberately low, which
 #: over-estimates the prompt, which over-reserves. The provider's report is what is recorded.
@@ -91,7 +79,7 @@ _NS_PER_MS: Final = 1_000_000
 
 
 class LensBudgetConfigurationError(ModelError, ValueError):
-    """A lens budget is absent, malformed, or was asked for by a lens that has none."""
+    """A lens budget or lens guard that is malformed, or a guard given no budget."""
 
 
 class LensBudgetAxis(StrEnum):
@@ -410,71 +398,3 @@ class LensBudgetGuard(BudgetGuard):
                 raise TypeError(f"{name} is set by the lens budget guard")
         kwargs.setdefault("max_attempts", 1)
         return ModelClient(budget=self, timeout=self.per_call_timeout_ms / 1000, **kwargs)
-
-
-def _parse_budget(lens: str, raw: object) -> LensBudget:
-    where = f"{LENS_BUDGETS_ENV}: lens {lens!r}"
-    if not isinstance(raw, dict):
-        raise LensBudgetConfigurationError(f"{where} is not an object")
-    if set(raw) != set(_FIELDS):
-        raise LensBudgetConfigurationError(
-            f"{where} must declare exactly {', '.join(_FIELDS)}; got {', '.join(sorted(raw))}"
-        )
-    cost = raw["max_cost_usd"]
-    if not isinstance(cost, str):
-        raise LensBudgetConfigurationError(
-            f'{where}: max_cost_usd must be a decimal string such as "0.50", never a JSON '
-            "number, which a parser may read as a float"
-        )
-    try:
-        amount = Decimal(cost.strip())
-    except InvalidOperation as exc:
-        raise LensBudgetConfigurationError(f"{where}: {cost!r} is not a decimal amount") from exc
-    return LensBudget(
-        max_tokens=_whole(raw["max_tokens"], f"{where} max_tokens"),
-        max_calls=_whole(raw["max_calls"], f"{where} max_calls"),
-        max_wall_clock_ms=_whole(raw["max_wall_clock_ms"], f"{where} max_wall_clock_ms"),
-        max_cost_usd=_amount(amount, f"{where} max_cost_usd"),
-    )
-
-
-def load_lens_budgets(environ: Mapping[str, str] | None = None) -> Mapping[str, LensBudget]:
-    """Every declared lens budget, or raise. There is no default budget."""
-    environ = os.environ if environ is None else environ
-    raw = env_get("LENS_BUDGETS", environ)
-    if not raw:
-        raise LensBudgetConfigurationError(
-            f"{LENS_BUDGETS_ENV} is not set. It maps each lens name to its max_tokens, max_calls, "
-            "max_wall_clock_ms and max_cost_usd. There is no default: a budget nobody declared "
-            "is a number nobody chose."
-        )
-    try:
-        # parse_float refuses a float anywhere in the document rather than reading one.
-        parsed = json.loads(raw, parse_float=_no_float)
-    except json.JSONDecodeError as exc:
-        raise LensBudgetConfigurationError(f"{LENS_BUDGETS_ENV} is not valid JSON: {exc}") from exc
-    if not isinstance(parsed, dict) or not parsed:
-        raise LensBudgetConfigurationError(f"{LENS_BUDGETS_ENV} must be a non-empty JSON object")
-    budgets: dict[str, LensBudget] = {}
-    for lens, declared in parsed.items():
-        if not _LENS_NAME.match(lens):
-            raise LensBudgetConfigurationError(f"{LENS_BUDGETS_ENV}: {lens!r} is not a lens name")
-        budgets[lens] = _parse_budget(lens, declared)
-    return budgets
-
-
-def _no_float(text: str) -> Decimal:
-    raise LensBudgetConfigurationError(
-        f"{LENS_BUDGETS_ENV} contains the number {text}, which JSON would read as a float. "
-        "Ceilings are integers and the cost is a decimal string."
-    )
-
-
-def budget_for(lens: str, environ: Mapping[str, str] | None = None) -> LensBudget:
-    """The declared budget for ``lens``, or raise. A lens with no budget does not run."""
-    budgets = load_lens_budgets(environ)
-    if lens not in budgets:
-        raise LensBudgetConfigurationError(
-            f"lens {lens!r} has no budget in {LENS_BUDGETS_ENV}, so it may not call a model"
-        )
-    return budgets[lens]

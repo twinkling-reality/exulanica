@@ -1,4 +1,5 @@
 import { ApiError } from '@exulanica/graph-client';
+import { say } from './copy.js';
 import { el } from './dom.js';
 import { buildThinkingStatus } from './thinking-status.js';
 
@@ -62,6 +63,9 @@ export function worldOpeningReason(error: unknown): string | null {
   for (let cause: unknown = error, depth = 0; depth < 8; depth += 1) {
     if (cause instanceof ApiError) {
       if (cause.isUnauthenticated) return 'This session is no longer signed in.';
+      if (cause.code === 'database_privilege_refused') {
+        return say('world.opening.database_privilege_refused');
+      }
       if (cause.status >= 500) return 'The server did not answer.';
       return null;
     }

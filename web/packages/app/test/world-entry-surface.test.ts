@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
 
 import { describe, expect, it, vi } from 'vitest';
-import { ApiError } from '@exulanica/graph-client';
+import { ApiError, toApiError } from '@exulanica/graph-client';
+import { StarterWorldOpeningError } from '../src/composition/session-and-geometry.js';
 import { buildWorldEntrySurface } from '../src/composition/world-entry.js';
 import {
   buildWorldOpeningFailure,
@@ -109,6 +110,25 @@ describe('one world that did not open', () => {
     // A refusal the server gave a reason for is not a dropped connection, and must not be
     // reported as one.
     expect(worldOpeningReason(new ApiError(409, 'saved_world_conflict', 'no'))).toBeNull();
+  });
+
+  it('says in words that the server may not make the starter world', async () => {
+    // The body the API answers when its database role may not create a world, read by the same
+    // client code every request uses, and wrapped the way start-up wraps a starter failure.
+    const refusal = await toApiError(new Response(JSON.stringify({
+      code: 'database_privilege_refused',
+      detail: 'this instance\'s database role may not do what this request asked',
+    }), { status: 403, headers: { 'content-type': 'application/json' } }));
+    const reason = worldOpeningReason(new StarterWorldOpeningError(refusal));
+    expect(reason).toBe('This server is not set up to save new worlds, so none was made.');
+    const panel = buildWorldOpeningFailure({ reason, retry: vi.fn(async () => undefined) });
+    expect(panel.querySelector('h1')?.textContent).toBe('Your world did not open');
+    const note = panel.querySelector('.gate-note') as HTMLElement;
+    expect(note.hidden).toBe(false);
+    expect(note.textContent).toBe('This server is not set up to save new worlds, so none was made.');
+    // The words, not the code or the server's engineering sentence.
+    expect(panel.textContent).not.toContain('database_privilege_refused');
+    expect(panel.textContent).not.toContain('database role');
   });
 });
 

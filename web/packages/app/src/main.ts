@@ -32,7 +32,6 @@
  * interface would be confidently wrong. Re-reading costs one request and cannot drift.
  */
 
-import { ApiError } from '@exulanica/graph-client';
 import { readBrowserAccount, type BrowserAccountState } from './account-session.js';
 import {
   anchorId as toAnchorId,
@@ -46,6 +45,7 @@ import {
   PREVIEW_NYC_OPEN_DATA_ADMISSION_ID,
 } from './config.js';
 import { buildScene } from './scene.js';
+import { buildCredentialGate } from './ui/credential-gate.js';
 import type { AtlasCommand } from './ui/atlas-commands.js';
 import { buildWorldChrome } from './ui/world-chrome.js';
 import { buildWorldMenu } from './ui/world-menu.js';
@@ -182,69 +182,11 @@ async function boot(): Promise<void> {
  * retains its previous no-storage behavior.
  */
 function askForAccess(accountState: 'signed-out' | 'unavailable'): void {
-  const form = el('form', { class: 'gate credential-gate' });
-  const google = el('button', {
-    type: 'button', class: 'account-sign-in',
-    disabled: accountState === 'unavailable',
-  }, [
-    el('span', { class: 'account-sign-in-label', text: 'Continue with Google' }),
-    el('span', { class: 'account-sign-in-arrow', 'aria-hidden': 'true', text: '→' }),
-  ]);
-  google.addEventListener('click', () => window.location.assign('/api/auth/google/start'));
-  const input = el('input', {
-    type: 'password',
-    autocomplete: 'off',
-    'aria-label': 'Access token',
-    placeholder: 'Paste access token',
-  });
-  const failure = el('p', { class: 'gate-failure' });
-  failure.hidden = true;
-  const submit = el('button', {
-    type: 'submit',
-    class: 'credential-submit',
-    'aria-label': 'Enter Exulanica',
-    disabled: true,
-  }, [el('span', { 'aria-hidden': 'true', text: '→' })]);
-  input.addEventListener('input', () => {
-    submit.disabled = input.value.trim().length === 0;
-  });
-
-  const operator = el('div', { class: 'credential-operator' }, [
-    el('div', { class: 'credential-divider', role: 'separator' }, [
-      el('span', { text: 'or, for developers' }),
-    ]),
-    el('div', { class: 'credential-controls' }, [
-      el('div', { class: 'credential-entry' }, [input]), submit,
-    ]),
-  ]);
-
-  form.append(
-    el('p', { class: 'gate-wordmark', text: 'Exulanica' }),
-    ...(accountState === 'unavailable'
-      ? []
-      : [el('p', { class: 'gate-note', text: 'Enter your personal world.' })]),
-    el('div', { class: 'credential-action' }, [
-      google,
-      operator,
-      failure,
-    ]),
-  );
-  form.addEventListener('submit', (event) => {
-    event.preventDefault();
-    const token = input.value.trim();
-    if (token.length === 0) return;
-    failure.hidden = true;
-    void start(token).catch((error: unknown) => {
-      failure.hidden = false;
-      failure.textContent =
-        error instanceof ApiError && error.isUnauthenticated
-          ? 'That token is not configured on this instance.'
-          : error instanceof Error
-            ? error.message
-            : 'the request failed';
-    });
-  });
-  replace(shell, [form]);
+  replace(shell, [buildCredentialGate({
+    accounts: accountState,
+    signIn: () => window.location.assign('/api/auth/google/start'),
+    enter: (token) => start(token),
+  })]);
 }
 
 async function start(token: string, csrfToken?: string): Promise<void> {

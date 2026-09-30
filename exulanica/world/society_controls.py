@@ -21,6 +21,10 @@ BASE_TICK_INTERVAL_DIVISOR = math.lcm(*SPEEDS)
 #: still leaves 2 s between minutes. tests/test_living_world_pace.py holds it to both.
 DEFAULT_BASE_TICK_INTERVAL_MS = 8000
 MAX_CATCHUP_TICKS = 3
+#: How long a playback claim holds a society before another worker may take it: the 30-second
+#: expiry the society contract's playback policy declares (``docs/synthetic-society-contract.md``).
+#: Declared with the playback leases (migration 0059), not measured, and no derivation is
+#: recorded; a decision's deadline must end inside it, and a comparison start is leased for it.
 LEASE_SECONDS = 30
 MAX_CLAIM_ATTEMPTS = 3
 

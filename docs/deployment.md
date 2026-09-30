@@ -451,8 +451,6 @@ its own role. The [local database](local-database.md) guide owns its steps.
   owner stated ([running a comparison](society-experiments.md#running-a-comparison)).
 - `exulanica-wmp` is owned by the [world memory package](world-memory-package.md), and
   `exulanica-gsplat-scene-v1` by [scene training](gsplat-scene-jobs.md).
-- `EXULANICA_LENS_BUDGETS` configures the per-lens guard in `exulanica/models/lens_budget.py`, which
-  no command constructs ([security floor](security-floor.md#4-model-spend-budgets)).
 - `TAVILY_API_KEY` is read only by `scripts/verify_web_lookup.py`, a one-off credential check. No
   product code calls a web-lookup provider.
 - The test suite's settings, such as `EXULANICA_TEST_DATABASE_URL`, `EXULANICA_TEST_POSTGRES`,

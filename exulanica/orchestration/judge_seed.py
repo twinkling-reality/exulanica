@@ -21,9 +21,9 @@ for the first two and could not reach the third.
     classification is exhaustive over the live schema and a table nobody classified fails the
     export rather than being silently dropped from every seed thereafter.
 *   :func:`restore_seed` brings a freshly migrated, empty database and store to what the archive
-    holds. Its property is that it is BYTE VERIFIED: every row file and every blob is re-hashed
-    against the manifest before it is loaded and the landed state is counted after, and a
-    mismatch raises rather than warns.
+    holds. Its property is that it is BYTE VERIFIED: every row file, every blob and every baked
+    tile's bytes are re-hashed against the manifest before they are loaded and the landed state
+    is counted after, and a mismatch raises rather than warns.
 *   :func:`reset_to_seed` returns a used stack to the archive. Its property is that it NEVER
     TOUCHES THE STORE. Keys are content addressed, a reset that deleted them would be deleting
     the evidence every citation resolves to, and ``docs/demo-integrity.md`` section 2.2 decided
@@ -88,7 +88,18 @@ __all__ = [
 
 #: Bumped when the layout changes in a way an older reader would misread. A restore refuses a
 #: version it was not written for rather than reading it optimistically.
-SEED_FORMAT_VERSION: Final = 1
+SEED_FORMAT_VERSION: Final = 2
+
+#: Why each earlier format is refused, by its version. A version absent here and not
+#: :data:`SEED_FORMAT_VERSION` is refused as one this build was not written for.
+_EARLIER_FORMATS: Final[Mapping[int, str]] = {
+    1: (
+        "format 1 carries no baked tiles and its registry digest covers the global baked_tile "
+        "table, so a source that has baked any tile is refused by the digest and a generated "
+        "world it holds would read as baking for ever on a stack that runs no bake worker. "
+        "Export the workspace again with this build"
+    ),
+}
 
 #: The role the judge deployment's API connects as. Not ``exulanica_app``: the point of the
 #: deployment is that it cannot write a source row or a deletion marker even if a route tried,
@@ -116,11 +127,13 @@ class SeedRefused(ExulanicaError):
 #:
 #: ``tests/conftest.py`` preserves the same registries across its per-test truncation, for the
 #: same reason: emptying them empties the vocabulary and every later insert is then refused by a
-#: guard doing its job. The sets differ outside the registries: ``baked_tile`` is global here and
-#: truncated there, and the harness also keeps ``schema_migrations`` and ``stage_registry``.
+#: guard doing its job. The harness also keeps ``schema_migrations`` and ``stage_registry``.
+#:
+#: ``baked_tile`` has no ``workspace_id`` either and is not one of these: a bake writes it, never a
+#: migration, so a fresh stack holds none of its rows. It is carried, narrowed to the tiles this
+#: workspace reaches, in :data:`REACHED_TABLES`.
 GLOBAL_TABLES: Final[Mapping[str, str]] = {
     **REGISTRY_TABLES,
-    "baked_tile": "tiles baked offline from a generated city, keyed by their inputs",
 }
 
 #: Tables that belong to a deployment rather than to a workspace, and must not cross.
@@ -163,11 +176,14 @@ INSTANCE_TABLES: Final[Mapping[str, str]] = {
 #: that says it holds one.
 #:
 #: ``%(workspace_id)s`` is a bound parameter. None of this is ever formatted into SQL as text.
+#: ``%(baked_tile_ids)s`` is bound too: the baked tiles :func:`_reached_baked_tiles` finds in
+#: Python, because a generated world names its tiles through its receipt rather than in a column.
 REACHED_TABLES: Final[Mapping[str, str]] = {
     "blob": (
         "t.blob_sha256 in ("
         "  select c.blob_sha256 from capture c where c.workspace_id = %(workspace_id)s)"
     ),
+    "baked_tile": "t.baked_tile_id = any(%(baked_tile_ids)s::uuid[])",
     "media_track": (
         "t.blob_sha256 in ("
         "  select c.blob_sha256 from capture c where c.workspace_id = %(workspace_id)s)"
@@ -236,6 +252,9 @@ JUDGE_WRITE_TABLES: Final[tuple[str, ...]] = (
     "world_alternate_version_edit",
     "world_alternate_object",
     "world_alternate_element_override",
+    # A judge's edits and appearance changes advance the saved entry the page opened, so the page
+    # can keep its saved_entry binding.
+    "saved_world_entry",
     # Appearance: preview, apply, discard, rollback, and the audit row each leaves behind.
     "world_style_proposal",
     "world_style_preview",
@@ -277,6 +296,16 @@ JUDGE_PERMISSIONS: Final[tuple[str, ...]] = (
 #: reaches this. A seed that DOES carry rows for them is refused rather than worked around.
 _TRUNCATE_GUARDED: Final = ("purge_job", "tombstone")
 
+#: The carried table a reset merges rather than truncates: its rows are global, each keyed by its
+#: bake's inputs, so emptying it would empty tiles that belong to no workspace
+#: (:func:`reset_to_seed`). Staged in :data:`_STAGED_BAKED_TILE` for the comparison.
+_MERGED_TABLE: Final = "baked_tile"
+_STAGED_BAKED_TILE: Final = "seed_baked_tile"
+
+#: How much of a row file or an archived object is read at once: one mebibyte, so a file is
+#: streamed through a digest or a COPY rather than held whole.
+_CHUNK_BYTES: Final = 1 << 20
+
 #: The advisory key :func:`provision_judge_role` holds while it writes ``pg_authid``. The same
 #: reasoning as ``exulanica.db.roles._ROLE_LOCK_KEY`` and deliberately a different value, so a
 #: judge provision and a runtime provision serialise rather than deadlock.
@@ -311,6 +340,10 @@ class SeedManifest:
     #: the archive quietly promising bytes nobody has. Only ever non-empty when the export was
     #: asked for it.
     absent: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
+    #: The containers of the carried ``baked_tile`` rows, from the tile store, as
+    #: ``{store key: {"sha256": str, "bytes": int}}``. A judge stack runs no bake worker, so a
+    #: tile whose bytes the seed did not carry could never be served there.
+    tiles: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -322,12 +355,15 @@ class SeedManifest:
             "rows": {name: dict(value) for name, value in sorted(self.rows.items())},
             "blobs": {key: dict(value) for key, value in sorted(self.blobs.items())},
             "absent": {key: dict(value) for key, value in sorted(self.absent.items())},
+            "tiles": {key: dict(value) for key, value in sorted(self.tiles.items())},
             "totals": {
                 "row_files": len(self.rows),
                 "rows": sum(int(value["rows"]) for value in self.rows.values()),
                 "blobs": len(self.blobs),
                 "blob_bytes": sum(int(value["bytes"]) for value in self.blobs.values()),
                 "absent": len(self.absent),
+                "tiles": len(self.tiles),
+                "tile_bytes": sum(int(value["bytes"]) for value in self.tiles.values()),
             },
         }
 
@@ -343,6 +379,7 @@ class SeedManifest:
                 blobs=dict(value["blobs"]),
                 registry_digest=str(value["registry_digest"]),
                 absent=dict(value.get("absent") or {}),
+                tiles=dict(value["tiles"]),
             )
         except (KeyError, TypeError, ValueError) as exc:
             raise SeedRefused(
@@ -465,9 +502,14 @@ def _registry_digest(connection: psycopg.Connection) -> str:
     Compared rather than carried. If the destination's migrations produced a different reviewed
     asset list from the source's, an authored object in the archive names bytes the destination
     resolves differently, and that has to be a refusal rather than a picture nobody can explain.
+
+    Over :data:`~exulanica.db.registries.REGISTRY_TABLES` and nothing else. A global table that
+    something other than a migration writes differs between a stack that has used it and a fresh
+    one by construction: with ``baked_tile`` hashed here, every seed exported after a town was
+    made was refused by a fresh destination.
     """
     parts: list[dict[str, Any]] = []
-    for table in sorted(GLOBAL_TABLES):
+    for table in sorted(REGISTRY_TABLES):
         # Timestamps are dropped, and that is the difference between a digest that means
         # something and one that never matches. `world_reviewed_asset.reviewed_at` defaults to
         # `now()`, so two correctly migrated schemas disagree on it by construction: the value
@@ -526,7 +568,7 @@ def _digest_file(path: Path) -> tuple[str, int]:
     digest = hashlib.sha256()
     size = 0
     with path.open("rb") as stream:
-        while chunk := stream.read(1 << 20):
+        while chunk := stream.read(_CHUNK_BYTES):
             digest.update(chunk)
             size += len(chunk)
     return digest.hexdigest(), size
@@ -619,6 +661,104 @@ def _referenced_keys(connection: psycopg.Connection, workspace_id: uuid.UUID) ->
     return keys
 
 
+def _reached_baked_tiles(
+    connection: psycopg.Connection, workspace_id: uuid.UUID
+) -> list[uuid.UUID]:
+    """The baked tiles this workspace reaches, which are the ``baked_tile`` rows a seed carries.
+
+    Two sources. The delivery ledger names every tile the workspace was served. A generated world
+    names its tiles through its receipt, by the digest over each tile's bake inputs, and no column
+    holds that link, so it is read the way the product reads it:
+    :func:`~exulanica.world.generated_worlds.generated_tiles` for each of the world's
+    recipe-composed snapshots, and :func:`~exulanica.world.baked_tiles.current_bake` for each
+    tile, whatever its job's state, so a bake stored before its job ended travels too. Only the
+    current bake of a generated tile is carried; it stays current in the destination, because it
+    is the most recently published of the rows the archive holds for that tile.
+
+    A generated world whose receipt no longer reads is refused by name rather than skipped: the
+    seed could not say which tiles it reaches.
+    """
+    from exulanica.world.baked_tiles import current_bake
+    from exulanica.world.errors import InvalidStructuralData
+    from exulanica.world.generated_worlds import generated_tiles, states_records
+    from exulanica.world.worlds import GENERATED, workspace_worlds
+
+    reached = {
+        row["baked_tile_id"]
+        for row in connection.execute(
+            "select baked_tile_id from workspace_baked_tile where workspace_id = %s",
+            (workspace_id,),
+        ).fetchall()
+    }
+    for world in workspace_worlds(connection, workspace_id):
+        if world.kind != GENERATED:
+            continue
+        snapshots = connection.execute(
+            "select snapshot_id from world_structure_snapshot"
+            " where workspace_id = %s and world_id = %s order by snapshot_id",
+            (workspace_id, world.world_id),
+        ).fetchall()
+        for snapshot in snapshots:
+            snapshot_id = snapshot["snapshot_id"]
+            if not states_records(connection, workspace_id, world.world_id, snapshot_id):
+                continue
+            try:
+                tiles = generated_tiles(connection, workspace_id, world.world_id, snapshot_id)
+            except InvalidStructuralData as exc:
+                raise SeedRefused(
+                    f"generated world {world.world_id} cannot be read ({exc}), so a seed cannot "
+                    "say which baked tiles it reaches"
+                ) from exc
+            for tile in tiles:
+                bake = current_bake(connection, tile.tile_inputs_digest)
+                if bake is not None:
+                    reached.add(bake.baked_tile_id)
+    return sorted(reached)
+
+
+def _export_tiles(
+    connection: psycopg.Connection,
+    tiles: ContentAddressedStore,
+    reached: Sequence[uuid.UUID],
+    directory: Path,
+) -> dict[str, dict[str, Any]]:
+    """Copy each reached tile's container from the tile store into ``directory``, re-hashed.
+
+    Keyed by the row's ``container_sha256``, which is how the tile store names the bytes. A row
+    whose bytes the source store does not hold is refused whatever ``allow_absent`` says: a judge
+    stack runs no bake worker, so a tile carried without its bytes is one it can never serve.
+    """
+    carried: dict[str, dict[str, Any]] = {}
+    for row in connection.execute(
+        "select baked_tile_id, container_sha256, container_bytes from baked_tile"
+        " where baked_tile_id = any(%s::uuid[]) order by baked_tile_id",
+        (list(reached),),
+    ).fetchall():
+        digest = bytes(row["container_sha256"]).hex()
+        key = _key_for(digest)
+        if key in carried:
+            continue
+        if not tiles.exists(_blob_id(key)):
+            raise SeedRefused(
+                f"baked tile {row['baked_tile_id']} names {key} and the source tile store does "
+                "not hold it. A judge stack runs no bake worker, so the seed cannot carry the "
+                "tile without its bytes."
+            )
+        payload = _read_key(tiles, key)
+        actual = hashlib.sha256(payload).hexdigest()
+        if actual != digest or len(payload) != int(row["container_bytes"]):
+            raise SeedRefused(
+                f"the tile store's bytes for {key} hash to {actual} at {len(payload)} bytes; "
+                f"baked tile {row['baked_tile_id']} records {digest} at "
+                f"{row['container_bytes']} bytes"
+            )
+        target = directory / key
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(payload)
+        carried[key] = {"sha256": actual, "bytes": len(payload)}
+    return carried
+
+
 def _refuse_private_bakes(connection: psycopg.Connection, workspace_id: uuid.UUID) -> None:
     """A workspace holding its own material bakes cannot be seeded.
 
@@ -651,12 +791,17 @@ def export_seed(
     destination: Path,
     created_at: str,
     allow_absent: bool = False,
+    tiles: ContentAddressedStore | None = None,
 ) -> SeedManifest:
     """Write one workspace and exactly the bytes it references into ``destination``.
 
     ``connection`` reads the source and may be any role that can see the whole workspace.
     ``created_at`` is supplied rather than read from a clock, so a caller can produce the same
     archive twice and diff the two.
+
+    ``tiles`` is the source's tile store. The baked tiles the workspace reaches (its generated
+    worlds' tiles and the tiles it was served) are carried with their bytes, so a workspace that
+    reaches any is refused without one rather than exported with tiles nothing could serve.
 
     ``allow_absent`` governs the one judgement call in the export. By default a row that
     references bytes the source store does not hold FAILS the export, because "complete" is the
@@ -675,10 +820,16 @@ def export_seed(
     buckets = classify_tables(connection)
     exported = list(buckets["workspace"]) + list(buckets["reached"])
     order = _load_order(connection, exported)
+    reached_tiles = _reached_baked_tiles(connection, workspace_id)
+    if reached_tiles and tiles is None:
+        raise SeedRefused(
+            f"workspace {workspace_id} reaches {len(reached_tiles)} baked tile(s) and no tile "
+            "store was given, so the seed cannot carry their bytes"
+        )
 
     rows_dir = destination / "rows"
     rows_dir.mkdir(parents=True, exist_ok=True)
-    parameters = {"workspace_id": str(workspace_id)}
+    parameters = {"workspace_id": str(workspace_id), "baked_tile_ids": reached_tiles}
     manifest_rows: dict[str, dict[str, Any]] = {}
 
     for position, table in enumerate(order):
@@ -736,6 +887,12 @@ def export_seed(
         target.write_bytes(payload)
         manifest_blobs[key] = {"sha256": actual, "bytes": len(payload)}
 
+    manifest_tiles = (
+        _export_tiles(connection, tiles, reached_tiles, destination / "tiles")
+        if tiles is not None
+        else {}
+    )
+
     schema_version = connection.execute(
         "select max(version) as version from schema_migrations"
     ).fetchone()
@@ -749,6 +906,7 @@ def export_seed(
         blobs=manifest_blobs,
         registry_digest=_registry_digest(connection),
         absent=manifest_absent,
+        tiles=manifest_tiles,
     )
     _write_manifest(destination, manifest)
     return manifest
@@ -778,13 +936,33 @@ def read_manifest(archive: Path) -> SeedManifest:
     actual = hashlib.sha256(payload).hexdigest()
     if actual != recorded:
         raise SeedRefused(f"manifest.json hashes to {actual}, and manifest.sha256 says {recorded}")
-    manifest = SeedManifest.from_json(json.loads(payload))
-    if manifest.seed_format_version != SEED_FORMAT_VERSION:
+    document = json.loads(payload)
+    _refuse_other_formats(document)
+    return SeedManifest.from_json(document)
+
+
+def _refuse_other_formats(document: Any) -> None:
+    """Refuse a manifest of any format but this build's, naming the format and why.
+
+    Checked before the manifest is read as this format's, so an earlier archive is refused for
+    what it is rather than for a field it never had.
+    """
+    try:
+        version = int(document["seed_format_version"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise SeedRefused(f"the manifest states no seed format version: {exc!r}") from exc
+    if version == SEED_FORMAT_VERSION:
+        return
+    reason = _EARLIER_FORMATS.get(version)
+    if reason is not None:
         raise SeedRefused(
-            f"the archive is seed format {manifest.seed_format_version} and this build reads "
-            f"{SEED_FORMAT_VERSION}"
+            f"the archive is seed format {version} and this build reads "
+            f"{SEED_FORMAT_VERSION}: {reason}"
         )
-    return manifest
+    raise SeedRefused(
+        f"the archive is seed format {version} and this build reads {SEED_FORMAT_VERSION}, a "
+        "format it was not written for and does not read optimistically"
+    )
 
 
 # ---------------------------------------------------------------------------------------------
@@ -816,45 +994,51 @@ def verify_seed(archive: Path, manifest: SeedManifest | None = None) -> SeedMani
                 f"{recorded['sha256']} at {recorded['bytes']} bytes"
             )
 
-    blobs_dir = archive / "blobs"
-    found = (
-        {str(path.relative_to(blobs_dir)) for path in blobs_dir.rglob("*") if path.is_file()}
-        if blobs_dir.is_dir()
-        else set()
-    )
-    if found != set(manifest.blobs):
-        raise SeedRefused(
-            "the archive's blobs do not match the manifest: unexpected "
-            f"{sorted(found - set(manifest.blobs))[:5]}, missing "
-            f"{sorted(set(manifest.blobs) - found)[:5]}"
-        )
+    _verify_archived(archive / "blobs", manifest.blobs)
     overlap = set(manifest.absent) & set(manifest.blobs)
     if overlap:
         raise SeedRefused(
             "the manifest records these keys as both carried and absent, so it disagrees with "
             f"itself about what the archive holds: {sorted(overlap)[:5]}"
         )
-    for key, recorded in manifest.blobs.items():
-        digest, size = _digest_file(blobs_dir / key)
-        if digest != recorded["sha256"] or size != recorded["bytes"]:
-            raise SeedRefused(
-                f"{key} hashes to {digest} at {size} bytes; the manifest says "
-                f"{recorded['sha256']} at {recorded['bytes']} bytes"
-            )
+    _verify_archived(archive / "tiles", manifest.tiles)
     return manifest
+
+
+def _verify_archived(directory: Path, recorded: Mapping[str, Mapping[str, Any]]) -> None:
+    """The store objects under ``directory`` are exactly ``recorded``, each at its digest."""
+    found = (
+        {str(path.relative_to(directory)) for path in directory.rglob("*") if path.is_file()}
+        if directory.is_dir()
+        else set()
+    )
+    if found != set(recorded):
+        raise SeedRefused(
+            f"the archive's {directory.name} do not match the manifest: unexpected "
+            f"{sorted(found - set(recorded))[:5]}, missing {sorted(set(recorded) - found)[:5]}"
+        )
+    for key, value in recorded.items():
+        digest, size = _digest_file(directory / key)
+        if digest != value["sha256"] or size != value["bytes"]:
+            raise SeedRefused(
+                f"{directory.name}/{key} hashes to {digest} at {size} bytes; the manifest says "
+                f"{value['sha256']} at {value['bytes']} bytes"
+            )
 
 
 def verify_restored(
     connection: psycopg.Connection,
     store: ContentAddressedStore,
     manifest: SeedManifest,
+    *,
+    tiles: ContentAddressedStore | None = None,
 ) -> None:
     """Check the LANDED state, which is a different question from checking the archive.
 
     :func:`verify_seed` proves the archive is the archive. This proves the destination now holds
-    it: every blob is in the store at its recorded digest, and every table holds the recorded row
-    count. A restore that reported success while a COPY silently wrote nothing is what this
-    catches.
+    it: every blob is in the store and every baked tile's bytes in ``tiles`` at their recorded
+    digests, and every table holds the recorded row count. A restore that reported success while
+    a COPY silently wrote nothing is what this catches.
     """
     for key in manifest.absent:
         if store.exists(_blob_id(key)):
@@ -862,14 +1046,14 @@ def verify_restored(
                 f"the manifest records {key} as absent from the source, and the destination "
                 "store holds it. The restored stack would not be the state the seed describes."
             )
-    for key, recorded in manifest.blobs.items():
-        payload = _read_key(store, key)
-        digest = hashlib.sha256(payload).hexdigest()
-        if digest != recorded["sha256"] or len(payload) != recorded["bytes"]:
+    _verify_landed(store, manifest.blobs, "store")
+    if manifest.tiles:
+        if tiles is None:
             raise SeedRefused(
-                f"the restored store's {key} hashes to {digest} at {len(payload)} bytes; the "
-                f"manifest says {recorded['sha256']} at {recorded['bytes']} bytes"
+                f"the manifest carries {len(manifest.tiles)} baked tile(s) and no tile store was "
+                "given to check them in"
             )
+        _verify_landed(tiles, manifest.tiles, "tile store")
     for _name, recorded in sorted(manifest.rows.items()):
         table = str(recorded["table"])
         landed = connection.execute(
@@ -880,6 +1064,20 @@ def verify_restored(
             raise SeedRefused(
                 f"{table} holds {found} rows after the restore and the manifest recorded "
                 f"{recorded['rows']}"
+            )
+
+
+def _verify_landed(
+    store: ContentAddressedStore, recorded: Mapping[str, Mapping[str, Any]], name: str
+) -> None:
+    """Every recorded object is in ``store`` at its recorded digest and size."""
+    for key, value in recorded.items():
+        payload = _read_key(store, key)
+        digest = hashlib.sha256(payload).hexdigest()
+        if digest != value["sha256"] or len(payload) != value["bytes"]:
+            raise SeedRefused(
+                f"the restored {name}'s {key} hashes to {digest} at {len(payload)} bytes; the "
+                f"manifest says {value['sha256']} at {value['bytes']} bytes"
             )
 
 
@@ -963,14 +1161,20 @@ def _copy_in(
     ):
         for name, table in files:
             columns = [str(value) for value in manifest.rows[name]["columns"]]
-            path = archive / "rows" / name
-            statement = sql.SQL("copy {} ({}) from stdin").format(
-                sql.Identifier(table),
-                sql.SQL(", ").join(sql.Identifier(column) for column in columns),
-            )
-            with connection.cursor().copy(statement) as copy, path.open("rb") as stream:
-                while chunk := stream.read(1 << 20):
-                    copy.write(chunk)
+            _copy_file_in(connection, table, columns, archive / "rows" / name)
+
+
+def _copy_file_in(
+    connection: psycopg.Connection, table: str, columns: Sequence[str], path: Path
+) -> None:
+    """COPY one row file into ``table``, naming ``columns``."""
+    statement = sql.SQL("copy {} ({}) from stdin").format(
+        sql.Identifier(table),
+        sql.SQL(", ").join(sql.Identifier(column) for column in columns),
+    )
+    with connection.cursor().copy(statement) as copy, path.open("rb") as stream:
+        while chunk := stream.read(_CHUNK_BYTES):
+            copy.write(chunk)
 
 
 def _load_rows(connection: psycopg.Connection, archive: Path, manifest: SeedManifest) -> None:
@@ -994,20 +1198,23 @@ def _load_rows(connection: psycopg.Connection, archive: Path, manifest: SeedMani
         _copy_in(connection, archive, manifest, _row_files(manifest))
 
 
-def _load_blobs(archive: Path, store: ContentAddressedStore, manifest: SeedManifest) -> int:
-    """Place the archive's blobs in the store, skipping any already there.
+def _load_blobs(
+    directory: Path, store: ContentAddressedStore, recorded_objects: Mapping[str, Mapping[str, Any]]
+) -> int:
+    """Place the archive's objects under ``directory`` in the store, skipping any already there.
 
     Content addressed, so an object already at that key IS the object and putting it again would
     be work with no effect. Written through ``put_bytes``, which is what gives the file the
     store's layout and its 0444 mode; copying the archive's file into place directly would leave
-    a writable object at a key that promises immutability.
+    a writable object at a key that promises immutability. The blobs go to the blob store and the
+    baked tiles' containers to the tile store, by the same path.
     """
     written = 0
-    for key, recorded in sorted(manifest.blobs.items()):
+    for key, recorded in sorted(recorded_objects.items()):
         blob_id = _blob_id(key)
         if store.exists(blob_id):
             continue
-        payload = (archive / "blobs" / key).read_bytes()
+        payload = (directory / key).read_bytes()
         digest = hashlib.sha256(payload).hexdigest()
         if digest != recorded["sha256"] or len(payload) != recorded["bytes"]:
             raise SeedRefused(
@@ -1051,19 +1258,29 @@ def restore_seed(
     store: ContentAddressedStore,
     *,
     archive: Path,
+    tiles: ContentAddressedStore | None = None,
     verify: bool = True,
 ) -> SeedManifest:
     """Bring a freshly migrated, empty database and store to what ``archive`` holds.
 
     ``connection`` is administrative: the same principal that ran the migrations, because the
     load writes tables no runtime role may write and creates the workspace's embedding partition.
+    ``tiles`` is the destination's tile store, required when the archive carries baked tiles.
 
     The order is not negotiable. The registry digest is compared BEFORE anything is written,
     because a mismatch means this archive's authored objects name bytes this schema resolves
     differently and there is nothing to gain from a half load. The partition is created before
-    the rows, because ``embedding`` has nowhere to put a row without it.
+    the rows, because ``embedding`` has nowhere to put a row without it. The baked tiles' bytes
+    are placed before the rows, as the bake itself places them, so no ``baked_tile`` row ever
+    names bytes the tile store does not hold. ``baked_tile`` is loaded before
+    ``workspace_baked_tile``, whose foreign key names it, because the load order is topological.
     """
     manifest = verify_seed(archive) if verify else read_manifest(archive)
+    if manifest.tiles and tiles is None:
+        raise SeedRefused(
+            f"the archive carries {len(manifest.tiles)} baked tile(s) and no tile store was "
+            "given to place them in"
+        )
 
     actual_registry = _registry_digest(connection)
     if actual_registry != manifest.registry_digest:
@@ -1090,10 +1307,12 @@ def restore_seed(
 
     provision_workspace(connection, manifest.workspace_id)
     grant_workspace_partition(connection, f"embedding_ws_{manifest.workspace_id.hex}")
+    if tiles is not None:
+        _load_blobs(archive / "tiles", tiles, manifest.tiles)
     _load_rows(connection, archive, manifest)
-    _load_blobs(archive, store, manifest)
+    _load_blobs(archive / "blobs", store, manifest.blobs)
     if verify:
-        verify_restored(connection, store, manifest)
+        verify_restored(connection, store, manifest, tiles=tiles)
     return manifest
 
 
@@ -1101,6 +1320,7 @@ def reset_to_seed(
     connection: psycopg.Connection,
     *,
     archive: Path,
+    tiles: ContentAddressedStore | None = None,
     verify: bool = True,
 ) -> SeedManifest:
     """Return a used stack to the archive's rows. The store is not touched.
@@ -1108,7 +1328,14 @@ def reset_to_seed(
     **The store is not touched, and that is a decision rather than an optimisation.** Keys are
     content addressed, and a reset that deleted them would be deleting the evidence every
     citation in the workspace resolves to. ``docs/demo-integrity.md`` section 2.2 said so before
-    there was code to say it in.
+    there was code to say it in. Neither store is written: ``tiles`` is only read, to refuse a
+    reset whose baked tiles' bytes the tile store does not hold, before anything changes.
+
+    **``baked_tile`` is merged, not truncated.** Its rows are global and each is keyed by its
+    bake's inputs, so a row the stack already holds under an archived key is kept when it is
+    identical to the archive's, an archived row the stack lacks is inserted, and a row that
+    differs in any carried column, or claims the same bake of the same tile under another key,
+    refuses the reset by name. Truncating it would empty tiles that belong to no workspace.
 
     **Truncates rather than deletes, because DELETE does not work here.** Thirty-eight tables in
     this schema carry an append-only or no-delete trigger, including every one a judge can write:
@@ -1140,12 +1367,20 @@ def reset_to_seed(
             f"the archive carries rows for {', '.join(sorted(carried))}, which migration 0013 "
             "guards against TRUNCATE. A seed holding deletion state cannot be reset by this path."
         )
+    _require_tile_bytes(tiles, manifest)
 
-    keep = [(name, table) for name, table in files if table not in _TRUNCATE_GUARDED]
+    merged = [(name, table) for name, table in files if table == _MERGED_TABLE]
+    keep = [
+        (name, table)
+        for name, table in files
+        if table not in _TRUNCATE_GUARDED and table != _MERGED_TABLE
+    ]
     with connection.transaction():
         connection.execute(
             "select set_config('exulanica.workspace_id', %s, true)", (str(manifest.workspace_id),)
         )
+        for name, _table in merged:
+            _merge_baked_tiles(connection, archive, manifest, name)
         connection.execute(
             sql.SQL("truncate {} cascade").format(
                 sql.SQL(", ").join(sql.Identifier(table) for _, table in keep)
@@ -1154,6 +1389,85 @@ def reset_to_seed(
         connection.execute("set constraints all deferred")
         _copy_in(connection, archive, manifest, keep)
     return manifest
+
+
+def _require_tile_bytes(tiles: ContentAddressedStore | None, manifest: SeedManifest) -> None:
+    """Refuse a reset whose baked tiles' bytes the tile store does not hold, reading nothing.
+
+    A reset writes no store, so a tile row it inserts could only be served if the bytes are
+    already there, as a restore of the same archive leaves them.
+    """
+    if not manifest.tiles:
+        return
+    if tiles is None:
+        raise SeedRefused(
+            f"the archive carries {len(manifest.tiles)} baked tile(s) and no tile store was "
+            "given to check their bytes in"
+        )
+    missing = [
+        key
+        for key, recorded in sorted(manifest.tiles.items())
+        if not tiles.exists(_blob_id(key)) or tiles.size(_blob_id(key)) != int(recorded["bytes"])
+    ]
+    if missing:
+        raise SeedRefused(
+            f"the tile store does not hold {len(missing)} of the archive's baked tiles, first "
+            f"{missing[:5]}. A reset writes no store; restore the archive into a fresh stack."
+        )
+
+
+def _merge_baked_tiles(
+    connection: psycopg.Connection, archive: Path, manifest: SeedManifest, name: str
+) -> None:
+    """Keep an identical ``baked_tile`` row, insert a missing one, refuse a different one by name.
+
+    The archive's rows are staged in a temporary table and compared column by column over every
+    column the archive carries, timestamps included, because ``baked_at`` is what decides which
+    of one tile's bakes is current. A stack row claiming the same bake of the same tile under
+    another key (migration 0077's uniqueness) counts as different. Inserted rows are copies of
+    rows that passed the bake's guard when they were written, so the guard is off for the insert
+    exactly as it is for a restore's COPY (:func:`_without_user_triggers`).
+    """
+    columns = [str(value) for value in manifest.rows[name]["columns"]]
+    listed = sql.SQL(", ").join(sql.Identifier(column) for column in columns)
+    connection.execute(
+        sql.SQL("create temporary table {} (like baked_tile) on commit drop").format(
+            sql.Identifier(_STAGED_BAKED_TILE)
+        )
+    )
+    _copy_file_in(connection, _STAGED_BAKED_TILE, columns, archive / "rows" / name)
+
+    differing = connection.execute(
+        sql.SQL(
+            "select distinct s.baked_tile_id from {staged} s join baked_tile b"
+            "  on b.baked_tile_id = s.baked_tile_id"
+            "  or (b.stage_version, b.stage_params_sha256, b.tile_inputs_digest)"
+            "   = (s.stage_version, s.stage_params_sha256, s.tile_inputs_digest)"
+            " where row({staged_columns}) is distinct from row({held_columns})"
+            " order by s.baked_tile_id"
+        ).format(
+            staged=sql.Identifier(_STAGED_BAKED_TILE),
+            staged_columns=sql.SQL(", ").join(sql.Identifier("s", column) for column in columns),
+            held_columns=sql.SQL(", ").join(sql.Identifier("b", column) for column in columns),
+        )
+    ).fetchall()
+    if differing:
+        names = ", ".join(str(row["baked_tile_id"]) for row in differing)
+        raise SeedRefused(
+            f"this stack holds baked tile rows that differ from the archive's: {names}. A baked "
+            "tile is what it was baked as, so the reset keeps neither and changes nothing."
+        )
+    with contextlib.contextmanager(_without_user_triggers)(connection, [_MERGED_TABLE]):
+        connection.execute(
+            sql.SQL(
+                "insert into baked_tile ({listed}) select {listed} from {staged} s"
+                " where not exists (select 1 from baked_tile b"
+                "  where b.baked_tile_id = s.baked_tile_id)"
+            ).format(listed=listed, staged=sql.Identifier(_STAGED_BAKED_TILE))
+        )
+    # Dropped here as well as on commit: inside a caller's longer transaction the reset's own is a
+    # savepoint, and a second reset before that caller commits would find the table still there.
+    connection.execute(sql.SQL("drop table {}").format(sql.Identifier(_STAGED_BAKED_TILE)))
 
 
 # ---------------------------------------------------------------------------------------------
@@ -1306,23 +1620,55 @@ def prepare_sandbox_world(
     actor: uuid.UUID,
     title: str = "Judge sandbox",
 ) -> dict[str, Any]:
-    """Open the sandbox through the same source-preserving path as the product route.
+    """Open the sandbox through the same source-preserving path as the product route, and save
+    the entry a judge opens it by.
 
     The sandbox branches from the seeded workspace's personal-source world, which the registry
     names; a seed whose workspace holds none, or several, is refused by name.
+
+    The page opens a workspace's saved entry and, finding none, makes an authored starter, which
+    writes ``world_identity``, a table the judge role may not write. So the entry is saved here, as
+    the page saves one for a personal-source world (``createFromPersonalSources`` in
+    ``web/packages/app/src/world-entry-api.ts``): the bootstrapped version, the world's current
+    style version and ``source_kind`` personal, created by ``actor``. A world holds at most one
+    entry, so a second run returns the one it holds rather than adding another, and an entry a
+    judge could not open is refused by name.
+
+    Returns the bootstrap report with ``entry`` (``created`` or ``reused``) and ``entry_id``.
     """
     from exulanica.world.bootstrap import bootstrap_world
     from exulanica.world.repository import WorldStyleRepository
+    from exulanica.world.saved_entries import SavedWorldEntryRepository
     from exulanica.world.worlds import resolve_personal_source_world
 
     world_id = resolve_personal_source_world(connection, workspace_id)
-    return bootstrap_world(
+    styles = WorldStyleRepository(connection, workspace_id, world_id=world_id)
+    # Read before the bootstrap, as the page reads it; opening a version leaves the style alone.
+    style_version_id = styles.current().version_id
+    opened = bootstrap_world(
         connection,
         workspace_id=workspace_id,
         actor=actor,
         title=title,
         world_id=world_id,
-        base_topology_digest=WorldStyleRepository(
-            connection, workspace_id, world_id=world_id
-        ).current_topology_digest(),
+        base_topology_digest=styles.current_topology_digest(),
     )
+    entries = SavedWorldEntryRepository(connection, workspace_id)
+    saved = next((entry for entry in entries.entries() if entry.world_id == world_id), None)
+    state = "reused"
+    if saved is None:
+        saved = entries.create(
+            world_id=world_id,
+            title=title,
+            authored_version_id=uuid.UUID(opened["version_id"]),
+            style_version_id=style_version_id,
+            created_by=actor,
+            source_kind="personal",
+        )
+        state = "created"
+    if saved.availability != "available":
+        raise SeedRefused(
+            f"world {world_id}'s saved entry {saved.entry_id} is unavailable "
+            f"({saved.unavailable_reason}), so a judge could not open it"
+        )
+    return {**opened, "entry": state, "entry_id": str(saved.entry_id)}

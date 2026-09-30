@@ -10,7 +10,7 @@
 # Read `docs/judge-access.md` before changing anything here. The two facts that are load bearing:
 #
 #   1. `api` connects as `exulanica_judge`, NOT as `exulanica_app`. That role holds SELECT on
-#      every table, INSERT and UPDATE on thirteen, and DELETE on none, so the database enforces
+#      every table, INSERT and UPDATE on fourteen, and DELETE on none, so the database enforces
 #      "a judge cannot touch sources or deletion" whatever the API does. The judge's bearer token
 #      is also limited, to the permissions JUDGE_PERMISSIONS names in
 #      exulanica/orchestration/judge_seed.py, which the API checks on every route.

@@ -1,0 +1,91 @@
+STEP                                         STATUS          REASON
+clean-start                                  passed          
+access-gate                                  passed          
+enter-owned-starter                          passed          
+read-about-this-place                        passed          
+start-with-small-square                      passed          
+name-world                                   passed          
+explore-walk                                 passed          
+place-reviewed-object                        passed          
+move-object                                  passed          
+inspect-object                               passed          
+give-bounded-motion                          passed          
+trigger-stop-reset                           passed          
+refuse-unsupported-behaviour                 passed          
+creation-survives-reload                     passed          
+undo-last-change                             passed          
+change-appearance                            passed          
+appearance-survives-reload                   passed          
+restore-original-appearance                  passed          
+furnish-small-square                         passed          
+bring-in-inhabitants                         passed          
+choose-model-for-a-group                     passed          
+play-and-watch-walking                       passed          
+inspect-an-inhabitant                        passed          
+inspect-a-model-decision                     passed          
+model-chose-stand-or-talk                    passed          
+birds-fly-and-perch                          passed          
+object-in-use                                passed          
+pause-playback                               passed          
+open-close-photo-intake                      passed          
+upload-synthetic-photographs                 passed          
+authorize-admission-in-app                   passed          
+grant-model-rights-in-app                    passed          
+confirm-proposed-place                       failed          Error: waited 10000 ms for the world after the Library; last saw false |     at Object.waitFor (file://<rehearsal-tree>/scripts/rehearsal/cdp.mjs:224:13) |     
+review-photographs-in-app                    not_reachable   requires confirm-proposed-place, which was failed
+wait-for-depth-and-grouping                  not_reachable   requires review-photographs-in-app, which was not_reachable
+make-world-from-photographs                  not_reachable   requires wait-for-depth-and-grouping, which was not_reachable
+photo-jobs-end-cleanly                       failed          did not hold: every-job-succeeded
+ask-grounded-question                        not_reachable   requires confirm-proposed-place, which was failed
+open-cited-photograph                        not_reachable   requires ask-grounded-question, which was not_reachable
+unanswerable-question-abstains               not_reachable   requires ask-grounded-question, which was not_reachable
+companion-refuses-unsupported-change         not_reachable   requires make-world-from-photographs, which was not_reachable
+refused-answer-redrawn-after-reload          not_reachable   requires companion-refuses-unsupported-change, which was not_reachable
+companion-proposes-appearance-change         not_reachable   requires make-world-from-photographs, which was not_reachable
+accepted-answer-redrawn-after-reload         not_reachable   requires companion-proposes-appearance-change, which was not_reachable
+developer-client-walkthrough                 passed          
+returning-user-reopens                       passed          
+return-to-made-world                         not_reachable   requires make-world-from-photographs, which was not_reachable
+made-world-takes-new-photograph              not_reachable   requires return-to-made-world, which was not_reachable
+reconstruct-scene-geometry                   not_available   What this rehearsal runs, and what it cannot. It runs main's production derivative worker with its depth model (runtime.derivative_worker: MoGe-2 on this machin
+observe-a-person-and-footage                 not_available   A person's use of the experience and the demonstration footage are observed and recorded by a person; this rehearsal keeps a screenshot of each step as its own 
+furnish-made-world                           not_reachable   requires return-to-made-world, which was not_reachable
+made-world-hosts-people                      not_reachable   requires furnish-made-world, which was not_reachable
+make-town-with-values                        passed          
+people-cross-tile-seams                      passed          
+vehicles-drive-the-town                      passed          
+choose-model-for-a-town-group                passed          
+compare-town-group                           passed          
+ask-what-happened                            passed          
+describe-town-and-use-the-draft              passed          
+compare-view-shows-the-pair                  passed          
+developer-client-reads-the-comparison        passed          
+export-judge-seed                            passed          
+restore-judge-seed-into-a-fresh-stack        passed          
+
+GATE                                         STATUS              FIRST FAILURE (OWNER AREA)
+milestone:A world to run                     passed_in_part      
+                                             In part: the market town and the drafted town are made from the catalogs and opened; the town's people are seen moving by the society's reads and drawn, and their walking pace is sampled only in the starter's square.
+milestone:A model per group                  passed_in_part      
+                                             In part: one group of the starter's people and one of the town's are each decided by one open model and the others by their routine; the people are not split into several named groups each under its own model, and a refused proposal is seen only when the model makes one.
+milestone:Recorded decisions                 passed              
+milestone:Swap and compare                   passed_in_part      
+                                             In part: the comparison swaps one group's model for one simulated hour of the town on one development seed, not the town's day.
+milestone:Honest difference                  not_served          The rehearsal's comparison runs on one development seed, which is never judged: a verdict bounding a difference between models by its same-model control pair is given only on held-out seeds, which a rehearsal does not spend.
+milestone:Independent reading                passed              
+foundation:World entry                       not_reachable       
+foundation:Durable creation                  passed              
+foundation:Inspection                        passed              
+foundation:Bounded interaction               passed              
+foundation:Companion interaction             failed              confirm-proposed-place (place identity: exulanica/api/routes/identity.py; the Library: web/packages/app/src/ui (index))
+foundation:Developer proof                   passed              
+foundation:Personal-media path               failed              photo-jobs-end-cleanly (the derivative worker and its stages: exulanica/ingest/worker.py, exulanica/ingest/pipeline.py and exulanica/ingest/stages)
+delivery:Usable world                        passed_in_part      
+                                             In part: the town's people are watched moving by the society's reads and drawn, and vehicles by the traffic reads; the separate diagnosis of world, simulation and rendering failures is by each step's owner area.
+delivery:Models in their roles               passed_in_part      
+                                             In part: one group's decisions come from its named model and the others' from their routine, in the starter and in the town; a refused proposal is seen only when the model makes one.
+delivery:Swap and compare                    passed_in_part      
+                                             In part: the swapped pair and its same-model control run one simulated hour of the town on one development seed.
+delivery:Persistence and replay              not_reachable       
+delivery:Independent use                     passed              
+delivery:Release rehearsal                   not_available       

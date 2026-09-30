@@ -39,6 +39,7 @@ from psycopg.rows import dict_row
 
 from exulanica.orchestration.judge_seed import export_seed, prepare_sandbox_world
 from exulanica.store.local import LocalContentAddressedStore
+from exulanica.store.namespaces import tile_store
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -174,18 +175,21 @@ def _copy_database(source: str, target: str, *, force: bool, replace: str | None
         raise SystemExit(f"copying {source} failed: {load_error.decode()[:2000]}")
 
 
+def prepare_workspace(connection: psycopg.Connection, workspace: uuid.UUID) -> dict:
+    """Open ``workspace``'s sandbox version and save its entry, committed: ``prepare`` after the
+    copy, apart from it so a test runs exactly this on a scratch database."""
+    connection.execute("select set_config('exulanica.workspace_id', %s, false)", (str(workspace),))
+    result = prepare_sandbox_world(connection, workspace_id=workspace, actor=SEED_ACTOR)
+    connection.commit()
+    return result
+
+
 def prepare(arguments: argparse.Namespace) -> int:
     _copy_database(
         arguments.source, arguments.seed_source, force=arguments.force, replace=arguments.replace
     )
     with psycopg.connect(arguments.seed_source, row_factory=dict_row) as connection:
-        connection.execute(
-            "select set_config('exulanica.workspace_id', %s, false)", (str(arguments.workspace),)
-        )
-        result = prepare_sandbox_world(
-            connection, workspace_id=arguments.workspace, actor=SEED_ACTOR
-        )
-        connection.commit()
+        result = prepare_workspace(connection, arguments.workspace)
     json.dump(result, sys.stdout, indent=2, sort_keys=True)
     sys.stdout.write("\n")
     return 0
@@ -201,6 +205,7 @@ def export(arguments: argparse.Namespace) -> int:
             destination=Path(arguments.into),
             created_at=arguments.created_at,
             allow_absent=arguments.allow_absent,
+            tiles=tile_store(Path(arguments.store_parent)),
         )
     document = manifest.to_json()
     json.dump(document["totals"], sys.stdout, indent=2, sort_keys=True)
@@ -221,7 +226,9 @@ def main(argv: list[str] | None = None) -> int:
     subparsers = parser.add_subparsers(dest="verb", required=True)
 
     prepared = subparsers.add_parser(
-        "prepare", help="copy the source and compose the structural plane and one sandbox version"
+        "prepare",
+        help="copy the source, compose the structural plane, open one sandbox version and save "
+        "its entry",
     )
     prepared.add_argument("--force", action="store_true", help="replace an existing seed source")
     prepared.add_argument(

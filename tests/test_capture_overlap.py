@@ -55,9 +55,6 @@ FIXTURES = ROOT / "tests/fixtures/capture-overlap"
 VOLCANIC = ROOT / ".exulanica/reference-baseline/inputs/volcanic-sample/photographs"
 BOWL = ROOT / ".exulanica/reference-baseline/inputs/chili-salmon-bowl/images"
 RETAINED_STORE = ROOT / ".exulanica/reference-baseline/runtime/blobs"
-SCRATCH_STORE = Path(
-    "/Users/glendonchin/dev/Technology/exulanica-scratch/capture-size/segments-view-data/blobs"
-)
 CAMERAS = json.loads((FIXTURES / "volcanic-cameras.json").read_text())["photographs"]
 NAMES = [camera["name"] for camera in CAMERAS]
 RUNS = {
@@ -588,7 +585,9 @@ def _retained_receipt(store: Path, digest: str) -> dict:
 def test_outcomes_read_from_the_real_pose_receipts():
     for label in ("six", "twelve_wide", "twelve_close"):
         run = RUNS[label]
-        outcome = outcome_from_pose_receipt(_retained_receipt(SCRATCH_STORE, run["receipt_sha256"]))
+        outcome = outcome_from_pose_receipt(
+            _retained_receipt(RETAINED_STORE, run["receipt_sha256"])
+        )
         assert outcome.state == _outcome(run)
         assert (outcome.registered_count, outcome.member_count) == (
             run["registered_count"],

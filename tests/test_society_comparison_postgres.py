@@ -64,7 +64,9 @@ class _Chooser(FakeTransport):
                 "type": "function",
                 "function": {
                     "name": "act",
-                    "arguments": json.dumps({"action": next(a for a in enum if " m away" in a)}),
+                    "arguments": json.dumps(
+                        {"action": next((a for a in enum if " m away" in a), enum[0])}
+                    ),
                 },
             }
         ]

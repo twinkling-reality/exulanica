@@ -19,14 +19,11 @@ from exulanica.errors import CanonicalisationError
 from exulanica.models.budget import BudgetGuard
 from exulanica.models.errors import BudgetExceededError, TransportError
 from exulanica.models.lens_budget import (
-    LENS_BUDGETS_ENV,
     LensBudget,
     LensBudgetAxis,
     LensBudgetConfigurationError,
     LensBudgetExceeded,
     LensBudgetGuard,
-    budget_for,
-    load_lens_budgets,
     usd_string,
 )
 from exulanica.models.manifest import Role, load_manifest
@@ -392,64 +389,6 @@ def test_no_clock_reaches_the_usage_document():
     before = canonical_json(guard.usage_document())
     clock.advance_ms(60_000)
     assert canonical_json(guard.usage_document()) == before
-
-
-@pytest.mark.parametrize(
-    "environ",
-    [{}, {LENS_BUDGETS_ENV: ""}],
-)
-def test_there_is_no_default_budget(environ):
-    with pytest.raises(LensBudgetConfigurationError, match="no default"):
-        load_lens_budgets(environ)
-
-
-def _declared(**overrides) -> dict[str, str]:
-    declared = {
-        "max_tokens": 4000,
-        "max_calls": 3,
-        "max_wall_clock_ms": 30000,
-        "max_cost_usd": "0.25",
-        **overrides,
-    }
-    return {LENS_BUDGETS_ENV: json.dumps({LENS: declared})}
-
-
-def test_a_declared_budget_loads_exactly():
-    assert budget_for(LENS, _declared()) == LensBudget(4000, 3, 30000, Decimal("0.25"))
-
-
-@pytest.mark.parametrize(
-    ("environ", "message"),
-    [
-        (_declared(max_cost_usd=0.25), "decimal string"),
-        (_declared(max_cost_usd=1), "decimal string"),
-        (_declared(max_cost_usd="a quarter"), "not a decimal amount"),
-        (_declared(max_cost_usd="-1"), "non-negative"),
-        (_declared(max_tokens=4000.0), "float"),
-        (_declared(max_calls=True), "integer"),
-        (_declared(extra=1), "exactly"),
-        ({LENS_BUDGETS_ENV: json.dumps({LENS: {"max_tokens": 1}})}, "exactly"),
-        (
-            {
-                LENS_BUDGETS_ENV: json.dumps(
-                    {"Not A Lens": json.loads(_declared()[LENS_BUDGETS_ENV])[LENS]}
-                )
-            },
-            "not a lens name",
-        ),
-        ({LENS_BUDGETS_ENV: "[]"}, "non-empty JSON object"),
-        ({LENS_BUDGETS_ENV: "{"}, "not valid JSON"),
-        ({LENS_BUDGETS_ENV: json.dumps({LENS: []})}, "not an object"),
-    ],
-)
-def test_a_malformed_budget_is_refused_at_load(environ, message):
-    with pytest.raises(LensBudgetConfigurationError, match=message):
-        load_lens_budgets(environ)
-
-
-def test_a_lens_without_a_declared_budget_may_not_call():
-    with pytest.raises(LensBudgetConfigurationError, match="no budget"):
-        budget_for("undeclared-lens", _declared())
 
 
 def test_a_guard_needs_a_real_budget_and_a_real_timeout():

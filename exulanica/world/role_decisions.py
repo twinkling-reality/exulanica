@@ -47,6 +47,7 @@ __all__ = [
     "PROVIDER_RECORD",
     "RECEIPT_STATUSES",
     "REQUEST_FIELDS",
+    "RESULT_BYTES",
     "Asking",
     "DecisionDisposition",
     "PlayedMinutes",
@@ -97,9 +98,14 @@ _BOUND_FIELDS: Final = (
 )
 #: How a receipt may end: an answer, a refusal, no answer, or an answer over another state.
 RECEIPT_STATUSES: Final = ("accepted", "rejected", "unavailable", "stale")
-#: The most a request's canonical JSON may hold, and a receipt's result.
+#: The most a request's canonical JSON may hold, and a receipt's result. Declared ceilings, not
+#: measurements: both came with the first recorded society decisions, the social society's
+#: (migration 0055), and no derivation of either figure is recorded. A request holds a context the
+#: decision policy bounds by ``context_bytes_maximum`` (12,000 bytes in
+#: ``society-decision-policy.v2.json``); the result bound keeps provider metadata bounded without
+#: admitting arbitrary output.
 _REQUEST_BYTES: Final = 70_000
-_RESULT_BYTES: Final = 16_000
+RESULT_BYTES: Final = 16_000
 #: What a request records about the model it asked: which, how, under which contract.
 PROVIDER_CONFIG: Final = frozenset(
     {
@@ -225,7 +231,7 @@ def validate_role_receipt(
     if dict(document) != role_receipt(role, request, document["decision_seq"], result):
         raise ValueError("decision receipt request binding mismatch")
     # Provider metadata stays serializable and bounded without admitting arbitrary output.
-    if len(json.dumps(result)) > _RESULT_BYTES:
+    if len(json.dumps(result)) > RESULT_BYTES:
         raise ValueError("decision result exceeds bound")
 
 

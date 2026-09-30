@@ -10,9 +10,10 @@ and reports the path and the token's SHA-256, which is what the API compares aga
 command that echoed the secret would put it in a terminal scrollback, a CI log and a screen
 recording, and the operator needs the file rather than the string.
 
-Connection and store come from the environment the deployment already sets:
-``EXULANICA_DATABASE_URL`` and ``EXULANICA_DATA_DIR``. ``restore`` and ``reset`` need the
-administrative principal that ran the migrations, not the runtime role, and say so when refused.
+Connection and stores come from the environment the deployment already sets:
+``EXULANICA_DATABASE_URL`` and ``EXULANICA_DATA_DIR``, under which the blob store and the tile
+store sit side by side. ``restore`` and ``reset`` need the administrative principal that ran the
+migrations, not the runtime role, and say so when refused.
 """
 
 from __future__ import annotations
@@ -44,6 +45,7 @@ from exulanica.orchestration.judge_seed import (
     verify_seed,
 )
 from exulanica.store.local import LocalContentAddressedStore
+from exulanica.store.namespaces import tile_store
 
 __all__ = ["JUDGE_ROLE_PASSWORD_ENV", "main"]
 
@@ -56,6 +58,11 @@ _TOKEN_BYTES: Final = 36
 
 def _store(explicit: str | None) -> LocalContentAddressedStore:
     return LocalContentAddressedStore(resolve_data_dir(explicit=explicit) / "blobs")
+
+
+def _tiles(explicit: str | None) -> LocalContentAddressedStore:
+    """The tile store under the same data directory the blob store is resolved from."""
+    return tile_store(resolve_data_dir(explicit=explicit))
 
 
 def _report(stream: Any, manifest: Any, archive: Path) -> None:
@@ -71,6 +78,10 @@ def _report(stream: Any, manifest: Any, archive: Path) -> None:
     )
     print(
         f"blobs       {totals['blobs']} objects, {totals['blob_bytes']} bytes",
+        file=stream,
+    )
+    print(
+        f"tiles       {totals['tiles']} baked tile containers, {totals['tile_bytes']} bytes",
         file=stream,
     )
     if document["absent"]:
@@ -94,6 +105,7 @@ def _export(arguments: argparse.Namespace, stream: Any) -> int:
             destination=destination,
             created_at=arguments.created_at,
             allow_absent=arguments.allow_absent,
+            tiles=_tiles(arguments.data_dir),
         )
     _report(stream, manifest, destination)
     return 0
@@ -103,7 +115,7 @@ def _verify(arguments: argparse.Namespace, stream: Any) -> int:
     archive = Path(arguments.archive)
     manifest = verify_seed(archive)
     _report(stream, manifest, archive)
-    print("verified    every row file and every blob matches the manifest", file=stream)
+    print("verified    every row file, blob and baked tile matches the manifest", file=stream)
     return 0
 
 
@@ -115,6 +127,7 @@ def _restore(arguments: argparse.Namespace, stream: Any) -> int:
             connection,
             _store(arguments.data_dir),
             archive=archive,
+            tiles=_tiles(arguments.data_dir),
             verify=not arguments.no_verify,
         )
     _report(stream, manifest, archive)
@@ -126,7 +139,12 @@ def _reset(arguments: argparse.Namespace, stream: Any) -> int:
     database = Database.from_env()
     archive = Path(arguments.archive)
     with database.unscoped() as connection:
-        manifest = reset_to_seed(connection, archive=archive, verify=not arguments.no_verify)
+        manifest = reset_to_seed(
+            connection,
+            archive=archive,
+            tiles=_tiles(arguments.data_dir),
+            verify=not arguments.no_verify,
+        )
     print(f"reset       workspace {manifest.workspace_id} is back at the seed", file=stream)
     print("store       untouched, because its keys are content addressed", file=stream)
     return 0
@@ -245,6 +263,7 @@ def build_parser() -> argparse.ArgumentParser:
     reset = subparsers.add_parser("reset", help="return a used stack to the archive's rows")
     reset.add_argument("--archive", required=True)
     reset.add_argument("--no-verify", action="store_true")
+    with_data_dir(reset)
     reset.set_defaults(handler=_reset)
 
     role = subparsers.add_parser("role", help="provision the judge database role")
