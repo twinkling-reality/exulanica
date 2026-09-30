@@ -1,6 +1,7 @@
 import * as pc from 'playcanvas';
+import { SignalLights } from './signal-lights.js';
 import { type LookBox, VEHICLE_LOOKS_V1 } from './vehicle-looks.js';
-import type { TrafficWindow, VehicleSamples } from './types.js';
+import type { GroundAt, ToRenderer, TrafficWindow, VehicleSamples } from './types.js';
 
 /**
  * A world's vehicles, drawn from the seconds the traffic route served.
@@ -21,7 +22,8 @@ import type { TrafficWindow, VehicleSamples } from './types.js';
  * rises. A vehicle standing where the drawn world has no ground is not drawn.
  *
  * Every body family and colour is resolved through `vehicle-looks.ts`; a key it does not state is
- * an error, never a stand-in.
+ * an error, never a stand-in. The window's signals are drawn beside the vehicles, lit as each group
+ * shows at the second drawn (`signal-lights.ts`).
  */
 
 const MM_PER_METRE = 1000;
@@ -38,10 +40,6 @@ export const VEHICLE_LOOKS = VEHICLE_LOOKS_V1;
 
 export class VehicleLookError extends Error {}
 
-/** Where the drawn world's ground is at a plan point, in renderer metres, or null for none. */
-export type GroundAt = (xMm: number, yMm: number) => number | null;
-/** A plan point in the road records' frame, in the renderer's frame (x east, y up, z south). */
-export type ToRenderer = (xMm: number, yMm: number, zMm: number) => readonly [number, number, number];
 
 interface Drawn {
   readonly root: pc.Entity;
@@ -129,6 +127,7 @@ export class TrafficLayer {
   private destroyed = false;
   private readonly yaw = new pc.Quat();
   private readonly yAxis = new pc.Vec3(0, 1, 0);
+  private readonly lights: SignalLights;
 
   constructor(
     parent: pc.Entity,
@@ -137,6 +136,7 @@ export class TrafficLayer {
   ) {
     this.root = new pc.Entity('traffic');
     parent.addChild(this.root);
+    this.lights = new SignalLights(this.root, groundAt, toRenderer);
   }
 
   /**
@@ -168,6 +168,12 @@ export class TrafficLayer {
       rows: new Map(window.vehicles.map((row) => [row.vehicleId, row])),
       late: new Set(window.lateHome.map((late) => lateKey(late.second, late.vehicleId))),
     });
+    this.lights.setWindow(window);
+  }
+
+  /** Signal heads lit at the last update. */
+  get lightsLit(): number {
+    return this.lights.lit;
   }
 
   /** The first second no window held covers, where the next request starts. */
@@ -209,7 +215,10 @@ export class TrafficLayer {
   update(nowMs: number): void {
     if (this.destroyed || this.startMs === null) return;
     if (nowMs === Number.MAX_SAFE_INTEGER) {
-      if (this.heldSecond !== null) this.poseAt(this.heldSecond, 0);
+      if (this.heldSecond !== null) {
+        this.poseAt(this.heldSecond, 0);
+        this.lights.show(this.heldSecond, this.heldSecond - BEHIND_SECONDS);
+      }
       return;
     }
     const at = this.secondAt(nowMs);
@@ -224,12 +233,14 @@ export class TrafficLayer {
     const whole = Math.floor(second);
     this.heldSecond = whole;
     this.poseAt(whole, second - whole);
+    this.lights.show(whole, whole - BEHIND_SECONDS);
   }
 
   clear(): void {
     for (const drawn of this.drawn.values()) drawn.root.destroy();
     this.drawn.clear();
     this.windows.clear();
+    this.lights.clear();
     this.inputSha256 = null;
     this.startMs = null;
     this.heldSecond = null;
@@ -238,6 +249,7 @@ export class TrafficLayer {
   destroy(): void {
     if (this.destroyed) return;
     this.clear();
+    this.lights.destroy();
     for (const material of this.materials.values()) material.destroy();
     this.materials.clear();
     this.destroyed = true;

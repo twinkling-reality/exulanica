@@ -171,7 +171,7 @@ def test_a_window_of_the_corridors_traffic_is_served_and_no_tile_is_charged(rout
     assert answer.status_code == 200, answer.text
     body = answer.json()
     assert (body["profile"], body["from_second"], body["seconds"]) == (
-        "exulanica.traffic-window/v1",
+        "exulanica.traffic-window/v2",
         start,
         60,
     )

@@ -309,7 +309,7 @@ def test_every_profile_a_row_declares_is_the_one_its_code_reads_or_writes():
     assert tuple(flight_row.space_profiles) == (AIR_VOLUME_PROFILE,)
     assert volume.document()["profile"] == AIR_VOLUME_PROFILE
     assert tuple(roads_row.space_profiles) == (NETWORK_PROFILE,)
-    assert WINDOW_PROFILE == roads_row.output_profile == "exulanica.traffic-window/v1"
+    assert WINDOW_PROFILE == roads_row.output_profile == "exulanica.traffic-window/v2"
     assert walking_row.output_profile == walking.MOTION_PATH_PROFILE
     assert set(walking_row.space_profiles) == set(NAVIGATION_PROFILES.values()) | set(
         PLACE_PROFILES

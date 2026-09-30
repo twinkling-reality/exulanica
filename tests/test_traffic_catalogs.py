@@ -99,6 +99,10 @@ DECLARED = (
     ("road-derivation", "city_streets", "bay_stop_line_clearance_mm"),
     ("road-derivation", "city_streets", "stand_furniture_category"),
     ("road-derivation", "city_streets", "stand_parking_kind"),
+    ("signal-placement", "high_street_crossroads", "hierarchies"),
+    ("signal-placement", "high_street_crossroads", "legs"),
+    ("signal-placement", "high_street_crossroads", "offset_s"),
+    ("signal-placement", "high_street_crossroads", "plan"),
 )
 
 _VEHICLE_NUMBERS = (
@@ -154,6 +158,7 @@ def test_the_catalogs_live_in_their_own_directory_under_the_catalog_root():
         "parking-kind-access.v1.json",
         "right-of-way-policy.v1.json",
         "road-derivation.v1.json",
+        "signal-placement.v1.json",
         "signal-plan.v1.json",
         "vehicle-class.v1.json",
     ]

@@ -9,9 +9,10 @@ from the episodes it spans. This module holds that, in the pattern the flight's 
   its city identity and grammar version, keyed by world and version and digested whole;
 - **the wire form** (:func:`wire`, :func:`from_wire`): plain data the worker process rebuilds the
   input from, refused when its digest differs;
-- **the network** (:func:`prepared`): the lane connections and parking spaces traffic derives
-  from the records (:mod:`exulanica.traffic.city_derivation`), compiled, kept in the worker by the
-  input's digest, because compiling a district takes seconds;
+- **the network** (:func:`prepared`): the lane connections, parking spaces and signals traffic
+  derives from the records (:mod:`exulanica.traffic.city_derivation`, signals by the
+  ``signal-placement`` entry it names), compiled, kept in the worker by the input's digest,
+  because compiling a district takes seconds;
 - **the fleet**, by rule from the home places the network holds: in every parking kind, the
   roads module's ``fleet_share_permille`` of its places, divided among the classes the kind admits
   in the catalog's order, so every vehicle has a place free to drive to. A world whose places
@@ -24,7 +25,9 @@ from the episodes it spans. This module holds that, in the pattern the flight's 
   second by this rule and recorded as the run's inputs, so the episode replays exactly. The
   crossing feed is empty: no walker's crossing is fed to traffic, and the window says so;
 - **a window** (:func:`window_of`): the presentation frames of its seconds
-  (``exulanica.traffic-presentation-frame/v1``), grouped by vehicle, packed as integers.
+  (``exulanica.traffic-presentation-frame/v1``), grouped by vehicle, packed as integers, and each
+  signal's groups with where their heads stand and the indication each shows every second
+  (``exulanica.traffic-signal-presentation/v1``).
 
 Pure: no connection, no store, no process of its own (:mod:`exulanica.world.traffic_host` runs the
 job in one).
@@ -50,12 +53,13 @@ from exulanica.grammar.grammars.city.streets import CurbEdgeRecord
 from exulanica.grammar.records import record_payload
 from exulanica.movement.registry import ROADS, MovementError, built_module
 from exulanica.traffic.catalogs import TrafficCatalogs, load_traffic_catalogs
-from exulanica.traffic.city_derivation import DerivedRoads, derive_road_records
+from exulanica.traffic.city_derivation import PLACEMENT_KEY, DerivedRoads, derive_road_records
 from exulanica.traffic.city_roads import READ_KINDS, road_input_from_city
 from exulanica.traffic.inputs import LOOKAHEAD_S, CrossingFeed, TrafficInputs, TripRequest
 from exulanica.traffic.network import RoadNetwork, compile_network
-from exulanica.traffic.presentation import presentation_frame
+from exulanica.traffic.presentation import presentation_frame, signal_codes, signal_heads
 from exulanica.traffic.routing import plan_route
+from exulanica.traffic.signals import PEDESTRIAN_INDICATIONS, VEHICLE_INDICATIONS
 from exulanica.traffic.simulation import advance_traffic, initial_traffic
 
 __all__ = [
@@ -304,9 +308,15 @@ def prepared(value: TrafficInput) -> Prepared:
         catalogs,
         load_city_catalogs(grammar_version=value.grammar_version),
         city_identity=value.city_identity,
+        placement_key=PLACEMENT_KEY,
     )
     network = compile_network(
-        road_input_from_city(derived.records, catalogs, city_identity=value.city_identity),
+        road_input_from_city(
+            derived.records,
+            catalogs,
+            city_identity=value.city_identity,
+            signals=derived.signals,
+        ),
         catalogs,
     )
     found = Prepared(derived, network, catalogs, _fleet(network, catalogs))
@@ -336,6 +346,10 @@ class PackedTrafficEpisode:
     path_points: tuple[bytes, ...]
     #: The vehicles not parked at home at the episode's last second, in id order.
     late_home: tuple[str, ...]
+    #: Each signal's groups and where their heads stand (``signal_heads``), in identity order.
+    signals: tuple[dict[str, Any], ...]
+    #: For each signal, for each of its groups, the code it shows every second, packed.
+    signal_codes: tuple[tuple[bytes, ...], ...]
     #: Trips requested, arrived, and blocked by reason.
     trips: dict[str, Any]
     derivation: dict[str, Any]
@@ -518,6 +532,14 @@ def compute_episode(data: Mapping[str, Any], episode: int) -> PackedTrafficEpiso
         for vehicle_id in sorted(last)
         if last[vehicle_id]["mode"] != "parked" or last[vehicle_id]["space"] != homes[vehicle_id]
     )
+    heads = signal_heads(ready.network, ready.catalogs)
+    shown = [[array(_TYPECODE) for _group in item["groups"]] for item in heads]
+    for state in states:
+        for signal_index, row in enumerate(
+            signal_codes(ready.network, ready.catalogs, state["second"])
+        ):
+            for group_index, code in enumerate(row):
+                shown[signal_index][group_index].append(code)
     return PackedTrafficEpisode(
         input_sha256=value.sha256,
         episode=episode,
@@ -528,6 +550,8 @@ def compute_episode(data: Mapping[str, Any], episode: int) -> PackedTrafficEpiso
         path_counts=tuple(counts),
         path_points=tuple(points),
         late_home=late,
+        signals=tuple(heads),
+        signal_codes=tuple(tuple(codes.tobytes() for codes in row) for row in shown),
         trips=summary,
         derivation=ready.derived.document(),
     )
@@ -583,6 +607,19 @@ def window_of(
         if high == EPISODE
         for vehicle_id in packed.late_home
     ]
+    signals = []
+    for signal_index, heads in enumerate(head.signals):
+        groups = []
+        for group_index, group in enumerate(heads["groups"]):
+            codes = array(_TYPECODE)
+            for packed, low, high in spans:
+                source = array(_TYPECODE)
+                source.frombytes(packed.signal_codes[signal_index][group_index])
+                codes.extend(source[low:high])
+            groups.append({**group, "codes": codes.tolist()})
+        signals.append(
+            {"signal_id": heads["signal_id"], "junction_id": heads["junction_id"], "groups": groups}
+        )
     return {
         "profile": WINDOW_PROFILE,
         "module": ROADS,
@@ -597,6 +634,11 @@ def window_of(
         "crossings_fed": False,
         "vehicles": vehicles,
         "late_home": late,
+        "indications": {
+            "vehicle": list(VEHICLE_INDICATIONS),
+            "pedestrian": list(PEDESTRIAN_INDICATIONS),
+        },
+        "signals": signals,
         "episodes": [
             {"episode": packed.episode, "trips": packed.trips, "derivation": packed.derivation}
             for packed, _low, _high in spans

@@ -77,8 +77,8 @@
       },
       "module": "exulanica-movement/roads/v1",
       "output": {
-        "profile": "exulanica.traffic-window/v1",
-        "reason": "The traffic presentation frame (exulanica.traffic-presentation-frame/v1) of every second of a window, grouped by vehicle: its axles, the path its front passed, its mode, speed and place each second, and its class, body family, colour and dimensions once. A renderer draws the body from these and moves it along the path, never across its corners."
+        "profile": "exulanica.traffic-window/v2",
+        "reason": "The traffic presentation frame (exulanica.traffic-presentation-frame/v1) of every second of a window, grouped by vehicle: its axles, the path its front passed, its mode, speed and place each second, and its class, body family, colour and dimensions once. A renderer draws the body from these and moves it along the path, never across its corners. Version 2 adds each signal (exulanica.traffic-signal-presentation/v1): its groups, where their heads stand, and the indication each shows every second, the one the step obeyed."
       },
       "parameters": [
         {"maximum": 1200, "minimum": 1200, "name": "clock_reach_steps", "reason": "How far from the clock, either way, a window may start: one episode. A page reads the minute ahead of the clock, so a window further off is refused by name (traffic_second_out_of_range) and a server computes only the episodes around the clock.", "unit": "step", "value": 1200},

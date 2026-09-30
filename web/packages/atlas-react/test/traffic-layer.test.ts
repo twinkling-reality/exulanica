@@ -7,6 +7,7 @@ import {
   pointAlong,
   poseBetween,
 } from '../src/playcanvas/traffic/traffic-layer.js';
+import { SIGNAL_LOOKS_V1, SignalLookError } from '../src/playcanvas/traffic/signal-lights.js';
 import type { TrafficWindow, VehicleSamples } from '../src/playcanvas/traffic/types.js';
 
 const CAR = { length: 5790, width: 2130, height: 1300, wheelbase: 3350, frontOverhang: 910, rearOverhang: 1530 };
@@ -65,6 +66,9 @@ function trafficWindow(vehicles: readonly VehicleSamples[], extra: Partial<Traff
     crossingsFed: false,
     vehicles,
     lateHome: [],
+    vehicleIndications: ['green', 'amber', 'red'],
+    pedestrianIndications: ['walk', 'clearance', 'dont_walk'],
+    signals: [],
     ...extra,
   };
 }
@@ -141,4 +145,47 @@ describe('the traffic layer', () => {
     expect(layer.drawnCount).toBe(0);
   });
 
+});
+
+describe('the traffic signals', () => {
+  const signals = [{
+    signalId: 's1',
+    junctionId: 'j1',
+    groups: [
+      { group: 'phase_a', kind: 'vehicle' as const, pointsMm: [0, 0, 10_000, 0], codes: Array.from({ length: 10 }, (_, s) => (s < 5 ? 0 : 2)) },
+      { group: 'walk_a', kind: 'pedestrian' as const, pointsMm: [5_000, 5_000], codes: Array.from({ length: 10 }, (_, s) => (s < 5 ? 2 : 0)) },
+    ],
+  }];
+
+  function lampColour(root: pc.Entity, name: string): string {
+    const head = root.findByName(name) as pc.Entity;
+    const lamp = head.findByName('lamp') as pc.Entity;
+    const colour = (lamp.render!.material as pc.StandardMaterial).diffuse;
+    return [colour.r, colour.g, colour.b].map((c) => Math.round(c * 255).toString(16).padStart(2, '0')).join('');
+  }
+
+  it('lights each head as its group shows at the second drawn, and a head with no ground is not lit', () => {
+    const { root } = setup();
+    const layer = new TrafficLayer(root, (x) => (x > 9_000 ? null : 0), toRenderer);
+    layer.setWindow(trafficWindow([car('parked', 10, false)], { signals }), 0);
+    layer.update(2500);
+    // Second 102: the vehicle group shows green, the walk shows don't walk; the stop line at 10 m
+    // stands where the drawn world has no ground.
+    expect(layer.lightsLit).toBe(2);
+    expect(lampColour(root, 'signal-head:s1:phase_a:0:0')).toBe(SIGNAL_LOOKS_V1.colours['green']!.slice(1));
+    expect(lampColour(root, 'signal-head:s1:walk_a:5000:5000')).toBe(SIGNAL_LOOKS_V1.colours['dont_walk']!.slice(1));
+    layer.update(7500);
+    // Second 107: red for the vehicles, walk for the walkers.
+    expect(lampColour(root, 'signal-head:s1:phase_a:0:0')).toBe(SIGNAL_LOOKS_V1.colours['red']!.slice(1));
+    expect(lampColour(root, 'signal-head:s1:walk_a:5000:5000')).toBe(SIGNAL_LOOKS_V1.colours['walk']!.slice(1));
+  });
+
+  it('refuses an indication its looks do not state, before anything is drawn', () => {
+    const { root } = setup();
+    const layer = new TrafficLayer(root, () => 0, toRenderer);
+    expect(() => layer.setWindow(
+      trafficWindow([car('parked', 10, false)], { signals, vehicleIndications: ['green', 'amber', 'purple' as never] }),
+      0,
+    )).toThrow(SignalLookError);
+  });
 });

@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "catalog_id": "signal-placement",
+  "catalog_version": 1,
+  "references": {},
+  "entries": [
+    {
+      "key": "high_street_crossroads",
+      "label": "Signals where a high street crosses another street",
+      "hierarchies": [
+        "high_street"
+      ],
+      "legs": 4,
+      "plan": "fixed_two_phase_60s",
+      "offset_s": 0,
+      "sources": {
+        "hierarchies": "declared: a town's busiest junctions are where its high street is crossed; the city's street-hierarchy catalog ranks the high street above every street a town lays but the avenue",
+        "legs": "declared: a crossroads, where two streets cross and each approach has a straight movement; a junction of three legs keeps the control the city gives it",
+        "plan": "declared: the one fixed-time plan of the signal-plan catalog, two phases with a concurrent walk each, which the compiler checks against every crossing and conflict of the junction",
+        "offset_s": "declared: every derived signal starts its cycle at second 0 of the clock; no coordination between signals is derived"
+      },
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/traffic-contract.md"
+      }
+    }
+  ]
+}

@@ -115,8 +115,8 @@ def test_the_discovery_finds_every_family_and_no_unknown_shape():
     # versions and the specification schema their presets are points in.
     assert len(found[ENTRY_SHAPE]) == 61
     # The traffic catalogs: vehicle classes, right-of-way policies, signal plans, the two access
-    # mappings and the road derivation.
-    assert len(found[CITED_SHAPE]) == 6
+    # mappings, the road derivation and the signal placement.
+    assert len(found[CITED_SHAPE]) == 7
     assert len(found[GLYPH_SHAPE]) == 4
     # And the discovery is looking where the catalogs are: the city files are among what it found.
     assert CATALOGS / "band.v1.json" in found[ENTRY_SHAPE]

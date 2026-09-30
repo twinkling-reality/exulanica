@@ -43,6 +43,18 @@ function vehicle(overrides: Record<string, unknown> = {}): Record<string, unknow
   };
 }
 
+function signalRow(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    signal_id: 's1',
+    junction_id: 'j1',
+    groups: [
+      { group: 'phase_a', kind: 'vehicle', points_mm: [[0, 0], [10, 0]], codes: [0, 1] },
+      { group: 'walk_a', kind: 'pedestrian', points_mm: [[5, 5]], codes: [0, 2] },
+    ],
+    ...overrides,
+  };
+}
+
 function answer(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     profile: TRAFFIC_WINDOW_PROFILE,
@@ -59,6 +71,8 @@ function answer(overrides: Record<string, unknown> = {}): Record<string, unknown
     vehicles: [vehicle()],
     late_home: [],
     episodes: [],
+    indications: { vehicle: ['green', 'amber', 'red'], pedestrian: ['walk', 'clearance', 'dont_walk'] },
+    signals: [signalRow()],
     clock_second: 101,
     world_seed: 'd'.repeat(64),
     version_id: 'e'.repeat(64),
@@ -79,6 +93,33 @@ describe('the traffic answer', () => {
     expect(read.window.vehicles[0]!.motionPathMm).toEqual([[], [910, 0, 1910, 0]]);
     expect(read.window.crossingsFed).toBe(false);
     expect(read.window.clockSecond).toBe(101);
+  });
+
+  it('reads each signal: where its groups stand and what each shows every second', () => {
+    const read = parseTrafficRead(answer());
+    expect(read.window.vehicleIndications).toEqual(['green', 'amber', 'red']);
+    expect(read.window.pedestrianIndications).toEqual(['walk', 'clearance', 'dont_walk']);
+    const [signal] = read.window.signals;
+    expect(signal!.signalId).toBe('s1');
+    expect(signal!.groups[0]).toEqual({ group: 'phase_a', kind: 'vehicle', pointsMm: [0, 0, 10, 0], codes: [0, 1] });
+    expect(signal!.groups[1]!.codes).toEqual([0, 2]);
+  });
+
+  it('refuses a signal group that names no indication, misses a second or stands nowhere', () => {
+    const group = (overrides: Record<string, unknown>) => signalRow({
+      groups: [{ group: 'phase_a', kind: 'vehicle', points_mm: [[0, 0]], codes: [0, 1], ...overrides }],
+    });
+    const cases: Record<string, unknown>[] = [
+      { signals: [group({ codes: [0, 3] })] },
+      { signals: [group({ codes: [0] })] },
+      { signals: [group({ points_mm: [] })] },
+      { signals: [group({ kind: 'tram' })] },
+      { signals: undefined },
+      { indications: { vehicle: ['red', 'amber', 'green'], pedestrian: ['walk', 'clearance', 'dont_walk'] } },
+    ];
+    for (const overrides of cases) {
+      expect(() => parseTrafficRead(answer(overrides)), JSON.stringify(overrides)).toThrow(TrafficContractError);
+    }
   });
 
   it('is refused by name when a field does not hold for every second', () => {

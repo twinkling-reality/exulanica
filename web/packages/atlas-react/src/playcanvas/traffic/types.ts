@@ -45,6 +45,28 @@ export interface VehicleLate {
   readonly vehicleId: string;
 }
 
+/** What a vehicle group or a pedestrian group of a signal can show, in the order its codes index. */
+export type VehicleIndication = 'green' | 'amber' | 'red';
+export type PedestrianIndication = 'walk' | 'clearance' | 'dont_walk';
+
+/** One group of a signal: where its heads stand, and what it shows each second of the window. */
+export interface SignalGroupSamples {
+  readonly group: string;
+  readonly kind: 'vehicle' | 'pedestrian';
+  /** Plan points in the road records' frame: stop lines for a vehicle group, crosswalk ends for a
+   * pedestrian group, two entries a point. */
+  readonly pointsMm: readonly number[];
+  /** One code a second, indexing the window's vehicle or pedestrian indications. */
+  readonly codes: readonly number[];
+}
+
+/** A signal the traffic runs at a junction (`exulanica.traffic-signal-presentation/v1`). */
+export interface SignalSamples {
+  readonly signalId: string;
+  readonly junctionId: string;
+  readonly groups: readonly SignalGroupSamples[];
+}
+
 /** A window of consecutive seconds of one world's traffic, as the route serves it. */
 export interface TrafficWindow {
   /** The digest of everything the traffic was computed from; a new one is a new traffic. */
@@ -59,4 +81,13 @@ export interface TrafficWindow {
   readonly crossingsFed: boolean;
   readonly vehicles: readonly VehicleSamples[];
   readonly lateHome: readonly VehicleLate[];
+  readonly vehicleIndications: readonly VehicleIndication[];
+  readonly pedestrianIndications: readonly PedestrianIndication[];
+  /** Every signal of the world's roads, each group's code every second of the window. */
+  readonly signals: readonly SignalSamples[];
 }
+
+/** Where the drawn world's ground is at a plan point, in renderer metres, or null for none. */
+export type GroundAt = (xMm: number, yMm: number) => number | null;
+/** A plan point in the road records' frame, in the renderer's frame (x east, y up, z south). */
+export type ToRenderer = (xMm: number, yMm: number, zMm: number) => readonly [number, number, number];

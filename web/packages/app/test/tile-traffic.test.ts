@@ -42,6 +42,9 @@ function read(fromSecond: number, clockSecond: number): TrafficRead {
       modes: ['parked', 'leaving', 'driving', 'arriving'],
       crossingsFed: false,
       lateHome: [],
+      vehicleIndications: ['green', 'amber', 'red'],
+      pedestrianIndications: ['walk', 'clearance', 'dont_walk'],
+      signals: [],
       vehicles: [{
         vehicleId: 'v1', vehicleClass: 'passenger_car', bodyFamily: 'sedan', colour: 'red',
         dimensionsMm: { length: 5790, width: 2130, height: 1300, wheelbase: 3350, frontOverhang: 910, rearOverhang: 1530 },
@@ -142,11 +145,13 @@ describe('the tile traffic', { timeout: 3 * EVENTUALLY.timeout }, () => {
       reads += 1;
       const second = 1000;
       const body = {
-        profile: 'exulanica.traffic-window/v1', module: 'exulanica-movement/roads/v1',
+        profile: 'exulanica.traffic-window/v2', module: 'exulanica-movement/roads/v1',
         input_sha256: 'a'.repeat(64), network_sha256: 'b'.repeat(64), catalog_sha256: 'c'.repeat(64),
         step_ms: 1000, episode_steps: 1200, from_second: second, seconds: 1,
         modes: ['parked', 'leaving', 'driving', 'arriving'], crossings_fed: false, late_home: [], episodes: [],
         clock_second: second, world_seed: 'd'.repeat(64), version_id: 'e'.repeat(64), vehicles: [],
+        indications: { vehicle: ['green', 'amber', 'red'], pedestrian: ['walk', 'clearance', 'dont_walk'] },
+        signals: [],
       };
       return new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
     }) as unknown as typeof globalThis.fetch;

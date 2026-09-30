@@ -318,8 +318,9 @@ not in storage is named in `data-flight-undrawn` and not drawn.
 ([`exulanica/traffic`](../exulanica/traffic), [traffic contract](traffic-contract.md)) compiles from a
 city's street and road records and the connections and spaces it derives from them; its agents are
 the vehicle classes of `assets/catalogs/traffic/vehicle-class.v1.json` with their cited bounds; its
-clock is shared real time, one second a step; and its output is `exulanica.traffic-window/v1`, the
-traffic presentation frames of a window's seconds grouped by vehicle. Its step is the simulation's
+clock is shared real time, one second a step; and its output is `exulanica.traffic-window/v2`, the
+traffic presentation frames of a window's seconds grouped by vehicle, and what each signal shows each
+second. Its step is the simulation's
 `advance_traffic`, which this package may not import, so the step runs in its host,
 [`traffic_episodes.py`](../exulanica/world/traffic_episodes.py), named in `steps.HOSTED`.
 

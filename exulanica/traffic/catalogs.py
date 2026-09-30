@@ -7,7 +7,8 @@ map the city's own keys to vehicle classes: ``lane-use-access`` says which class
 lane use carries (none for a lane that carries no traffic), and ``parking-kind-access`` which
 classes a parking space of each kind admits. The city records carry the keys; traffic owns what
 they admit. ``road-derivation`` states how traffic derives the lane connections and parking
-spaces a city's streets imply and write none of (:mod:`exulanica.traffic.city_derivation`).
+spaces a city's streets imply and write none of (:mod:`exulanica.traffic.city_derivation`), and
+``signal-placement`` which of a city's junctions it derives a signal for.
 
 **Envelope.** ``schema_version`` (1), ``catalog_id``, ``catalog_version``, ``references`` and
 ``entries``, and nothing else. The id and version match the file name, the same rule the grammar
@@ -23,7 +24,7 @@ or unparseable source is refused, so a number cannot be added without saying whe
 catalogs. Entries are authored here, so they are ``original`` and Apache-2.0; the facts they
 cite are facts, and the citation says where they were read.
 
-**Digest.** :func:`catalogs_digest` covers the canonical form of all six catalogs, references
+**Digest.** :func:`catalogs_digest` covers the canonical form of all seven catalogs, references
 and sources included, so changing a citation changes the digest. :attr:`TrafficCatalogs.file_sha256`
 keeps the SHA-256 of each file's bytes, because a city signal record names the signal-plan catalog
 by that byte digest.
@@ -57,6 +58,7 @@ __all__ = [
     "RoadDerivation",
     "SignalGroupSpec",
     "SignalInterval",
+    "SignalPlacement",
     "SignalPlan",
     "TrafficCatalogs",
     "VehicleClass",
@@ -92,6 +94,7 @@ _ENVELOPE: Final = frozenset(
 _SOURCE: Final = re.compile(
     r"cited ([a-z][a-z0-9_]*(?: and [a-z][a-z0-9_]*)*): \S.*|declared: \S.*"
 )
+_MS_PER_S: Final = 1000
 #: Every catalog file this module reads, by catalog id. Deliberately a list, and not a claim about
 #: the directory: :func:`load_traffic_catalogs` compares it against the directory's own ``*.json``
 #: and refuses a file with no entry here as well as an entry with no file. So a sixth catalog
@@ -106,6 +109,7 @@ _FILES: Final = {
     "lane-use-access": "lane-use-access.v1.json",
     "parking-kind-access": "parking-kind-access.v1.json",
     "road-derivation": "road-derivation.v1.json",
+    "signal-placement": "signal-placement.v1.json",
 }
 
 
@@ -321,6 +325,25 @@ class RoadDerivation:
 
 
 @dataclass(frozen=True, slots=True)
+class SignalPlacement:
+    """Which of a city's junctions traffic derives a signal for, and how it runs.
+
+    A junction of ``legs`` legs where two streets cross and a segment of one of ``hierarchies``
+    meets the other gets a signal of plan ``plan`` starting its cycle at second ``offset_s``. The
+    hierarchies are the city's street-hierarchy keys, which only
+    :mod:`exulanica.traffic.city_derivation` reads.
+    """
+
+    key: str
+    label: str
+    hierarchies: tuple[str, ...]
+    legs: int
+    plan: str
+    offset_s: int
+    sources: tuple[tuple[str, str], ...]
+
+
+@dataclass(frozen=True, slots=True)
 class TrafficCatalogs:
     vehicle_classes: tuple[VehicleClass, ...]
     policies: tuple[RightOfWayPolicy, ...]
@@ -328,6 +351,7 @@ class TrafficCatalogs:
     lane_uses: tuple[AccessMapping, ...]
     parking_kinds: tuple[AccessMapping, ...]
     derivations: tuple[RoadDerivation, ...]
+    placements: tuple[SignalPlacement, ...]
     #: ``(catalog_id, canonical payload)`` for each file, which is what the digest covers.
     payloads: tuple[tuple[str, Mapping[str, Any]], ...]
     #: ``(catalog_id, sha256 of the file bytes)``, the digest a city signal record carries.
@@ -365,6 +389,12 @@ class TrafficCatalogs:
             if entry.key == key:
                 return entry
         raise TrafficCatalogError(f"no parking kind {key!r} in parking-kind-access")
+
+    def placement(self, key: str) -> SignalPlacement:
+        for entry in self.placements:
+            if entry.key == key:
+                return entry
+        raise TrafficCatalogError(f"no signal placement {key!r} in signal-placement")
 
     def derivation(self, key: str) -> RoadDerivation:
         for entry in self.derivations:
@@ -652,6 +682,30 @@ def _derivation(where: str, raw: object, references: Mapping[str, str]) -> RoadD
     )
 
 
+_PLACEMENT_KEYS: Final = frozenset(
+    {"key", "label", "hierarchies", "legs", "plan", "offset_s", "sources", "licence"}
+)
+
+
+def _placement(where: str, raw: object, references: Mapping[str, str]) -> SignalPlacement:
+    entry = _object(where, raw, _PLACEMENT_KEYS)
+    return SignalPlacement(
+        key=_key(f"{where}.key", entry["key"]),
+        label=_text(f"{where}.label", entry["label"]),
+        hierarchies=_keys(f"{where}.hierarchies", entry["hierarchies"]),
+        # A junction has at least three legs; a signal's phases are read from two streets crossing.
+        legs=_int(f"{where}.legs", entry["legs"], 3, 8),
+        plan=_key(f"{where}.plan", entry["plan"]),
+        offset_s=_int(f"{where}.offset_s", entry["offset_s"], 0, 3_600),
+        sources=_sources(
+            f"{where}.sources",
+            entry["sources"],
+            {"hierarchies", "legs", "plan", "offset_s"},
+            references,
+        ),
+    )
+
+
 def _lane_use(where: str, raw: object, references: Mapping[str, str]) -> AccessMapping:
     # A lane use may carry no traffic at all: a parking lane or a buffer.
     return _access(where, raw, references, empty=True)
@@ -756,6 +810,11 @@ def load_traffic_catalogs(directory: Path = CATALOG_DIRECTORY) -> TrafficCatalog
             envelopes["road-derivation"],
             _derivation,
         ),
+        placements=_entries(
+            directory.joinpath(_FILES["signal-placement"]),
+            envelopes["signal-placement"],
+            _placement,
+        ),
         payloads=payloads,
         file_sha256=tuple(digests),
         digest=_payloads_digest(payloads),
@@ -771,6 +830,14 @@ def load_traffic_catalogs(directory: Path = CATALOG_DIRECTORY) -> TrafficCatalog
                 raise _fail(
                     _FILES[catalog_id], f"{mapping.key} admits unknown classes {sorted(unknown)}"
                 )
+    plans = {plan.key: plan for plan in catalogs.plans}
+    placements = _FILES["signal-placement"]
+    for placement in catalogs.placements:
+        plan = plans.get(placement.plan)
+        if plan is None:
+            raise _fail(placements, f"{placement.key} names an unknown plan")
+        if placement.offset_s * _MS_PER_S >= plan.cycle_ms:
+            raise _fail(placements, f"{placement.key} offset is not below its cycle")
     return catalogs
 
 
@@ -795,6 +862,7 @@ def declared_values(catalogs: TrafficCatalogs) -> tuple[tuple[str, str, str, str
         ("lane-use-access", catalogs.lane_uses),
         ("parking-kind-access", catalogs.parking_kinds),
         ("road-derivation", catalogs.derivations),
+        ("signal-placement", catalogs.placements),
     ):
         for entry in entries:
             for field, text in entry.sources:

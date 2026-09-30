@@ -42,6 +42,9 @@ export interface TileTrafficState {
   readonly vehicles: number;
   readonly drawn: number;
   readonly hidden: number;
+  /** The signals the served window names, and their heads lit at the last draw. */
+  readonly signals: number;
+  readonly lightsLit: number;
   readonly clockSecond: number | null;
   readonly crossingsFed: false;
   readonly reason: string | null;
@@ -131,6 +134,7 @@ export function startTileTraffic(
   let retryAtMs = 0;
   let backoffMs = 0;
   let vehicles = 0;
+  let signals = 0;
   let clockSecond: number | null = null;
   let state: TileTrafficState['state'] = 'starting';
   let reason: string | null = null;
@@ -141,6 +145,8 @@ export function startTileTraffic(
       vehicles,
       drawn: layer?.drawnCount ?? 0,
       hidden: layer?.hidden ?? 0,
+      signals,
+      lightsLit: layer?.lightsLit ?? 0,
       clockSecond,
       crossingsFed: false,
       reason,
@@ -172,6 +178,7 @@ export function startTileTraffic(
       if (stopped || layer === null) return;
       layer.setWindow(answer.window, now());
       vehicles = answer.window.vehicles.length;
+      signals = answer.window.signals.length;
       clockSecond = answer.window.clockSecond;
       state = 'driving';
       reason = null;

@@ -16,6 +16,13 @@ carries some must run ``forward`` or ``backward``. A space's ``parking_kind`` th
 bytes have exactly the ``plan_catalog_sha256`` the record names, and its ``offset_ms`` must be
 whole seconds. A crossing is ``signalised`` exactly when it names a signal.
 
+**Placed signals.** A signal traffic derives for a junction the city gives none
+(:func:`~exulanica.traffic.city_derivation.derive_road_records` with a placement) is handed in
+as it is read, a :class:`SignalInput`: its junction takes the one right-of-way policy whose rule
+is the signal's and that policy's one approach control, and every crossing it releases is
+``signalised`` naming it. A placed signal for a junction or a crossing that already has one, or
+for one the records do not hold, is refused.
+
 **Positions.** A crossing's centre is the point on its segment's centreline at ``offset_mm``,
 walking pieces by the city's run length (the floor of each piece's true length). A parking
 space's access stretch, stated along the segment centreline, becomes positions on its access
@@ -25,7 +32,8 @@ On the straight pieces a stretch is required to lie on, that is exact.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Sequence
+from dataclasses import replace
 from itertools import pairwise
 from typing import Any, Final
 
@@ -138,10 +146,70 @@ def _mapping(lookup: Callable[[str], AccessMapping], key: str, what: str) -> Acc
         raise _refuse(f"{what}: {error}") from error
 
 
-def road_input_from_city(
-    records: Iterable[object], catalogs: TrafficCatalogs, *, city_identity: str
+def _placed(
+    road: RoadInput, signals: Sequence[SignalInput], catalogs: TrafficCatalogs
 ) -> RoadInput:
-    """Validate, resolve and map the city's road records, or raise ``UnsupportedNetworkError``."""
+    """``road`` with the placed ``signals`` controlling their junctions and crossings."""
+    rules = [policy for policy in catalogs.policies if policy.rule == "signal"]
+    if len(rules) != 1 or len(rules[0].approach_controls) != 1:
+        raise _refuse("traffic's right-of-way policies state no one signal rule with one control")
+    [policy] = rules
+    [control] = policy.approach_controls
+    junctions = {junction.identity for junction in road.junctions}
+    signalled = {signal.junction for signal in road.signals}
+    crossings = {crossing.identity: crossing for crossing in road.crossings}
+    placed_junctions: set[str] = set()
+    released: dict[str, str] = {}
+    for signal in signals:
+        if signal.junction not in junctions or signal.junction in signalled | placed_junctions:
+            raise _refuse(
+                f"placed signal {signal.identity} controls junction {signal.junction}, which the "
+                "records do not hold or which has a signal"
+            )
+        placed_junctions.add(signal.junction)
+        for group in signal.groups:
+            for identity in group.crossings:
+                crossing = crossings.get(identity)
+                if crossing is None or crossing.signal or identity in released:
+                    raise _refuse(
+                        f"placed signal {signal.identity} releases crossing {identity}, which the "
+                        "records do not hold or which a signal releases"
+                    )
+                released[identity] = signal.identity
+    return replace(
+        road,
+        junctions=tuple(
+            replace(junction, policy=policy.key)
+            if junction.identity in placed_junctions
+            else junction
+            for junction in road.junctions
+        ),
+        approaches=tuple(
+            replace(approach, control=control)
+            if approach.junction in placed_junctions
+            else approach
+            for approach in road.approaches
+        ),
+        crossings=tuple(
+            replace(crossing, control="signalised", signal=released[crossing.identity])
+            if crossing.identity in released
+            else crossing
+            for crossing in road.crossings
+        ),
+        signals=tuple(sorted((*road.signals, *signals), key=lambda item: item.identity)),
+    )
+
+
+def road_input_from_city(
+    records: Iterable[object],
+    catalogs: TrafficCatalogs,
+    *,
+    city_identity: str,
+    signals: Sequence[SignalInput] = (),
+) -> RoadInput:
+    """Validate, resolve and map the city's road records, with any placed ``signals``, or raise
+    ``UnsupportedNetworkError``."""
+    placed = tuple(signals)
     read: list[Any] = []
     for record in records:
         shape = CITY_SHAPES_BY_TYPE.get(type(record))
@@ -290,7 +358,7 @@ def road_input_from_city(
         )
 
     plan_bytes = catalogs.file_digest("signal-plan")
-    signals = []
+    signal_inputs = []
     for signal in of(SignalRecord):
         controlled = stated.get(signal.controls_identity)
         if type(controlled) is CrossingRecord:
@@ -328,7 +396,7 @@ def road_input_from_city(
                     group.group, group.connection_identities, group.crossing_identities
                 )
             )
-        signals.append(
+        signal_inputs.append(
             SignalInput(
                 identity=signal.identity,
                 junction=signal.controls_identity,
@@ -394,7 +462,7 @@ def road_input_from_city(
             )
         )
 
-    return RoadInput(
+    road = RoadInput(
         city=city_identity,
         driving_side=driving_side,
         nodes=nodes,
@@ -403,7 +471,8 @@ def road_input_from_city(
         junctions=tuple(junctions),
         approaches=tuple(approaches),
         connections=tuple(connections),
-        signals=tuple(signals),
+        signals=tuple(signal_inputs),
         crossings=tuple(crossings),
         spaces=tuple(spaces),
     )
+    return _placed(road, placed, catalogs) if placed else road

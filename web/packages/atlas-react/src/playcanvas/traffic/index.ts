@@ -6,6 +6,17 @@
  * streets, and a build that never imports it carries none of it.
  */
 
-export type { TrafficWindow, VehicleDimensions, VehicleLate, VehicleMode, VehicleSamples } from './types.js';
-export type { GroundAt, ToRenderer } from './traffic-layer.js';
+export type {
+  PedestrianIndication,
+  SignalGroupSamples,
+  SignalSamples,
+  TrafficWindow,
+  VehicleDimensions,
+  VehicleIndication,
+  VehicleLate,
+  VehicleMode,
+  VehicleSamples,
+} from './types.js';
+export { SIGNAL_LOOKS_V1, SignalLights, SignalLookError } from './signal-lights.js';
+export type { GroundAt, ToRenderer } from './types.js';
 export { TrafficLayer, VEHICLE_LOOKS, VehicleLookError, pointAlong, poseBetween } from './traffic-layer.js';

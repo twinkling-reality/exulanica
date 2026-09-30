@@ -54,7 +54,7 @@ A vehicle here is always synthetic. No record, event or presentation of it is ev
 | Input | What it is |
 | --- | --- |
 | City road records | The city grammar's street and road records (below), of one tile or of several merged by identity, with the connections and spaces [derived](#derived-road-records) from them. Only `exulanica/traffic/city_roads.py` and `city_derivation.py` read them. |
-| Traffic catalogs | Six versioned files under `assets/catalogs/traffic`: vehicle classes, right-of-way policies, signal plans, two access mappings and the road derivation rules (below). |
+| Traffic catalogs | Seven versioned files under `assets/catalogs/traffic`: vehicle classes, right-of-way policies, signal plans, two access mappings, the road derivation rules and the signal placement (below). |
 | Seed | A string. Its SHA-256 is written into the state; the only draws are the fleet's placement, body family and colour at the start. |
 | Fleet | A count per vehicle class. Vehicles start parked in spaces that admit their class. |
 | Trip requests | `exulanica.traffic-trip-request/v1`: a vehicle, the second it wants to leave, and a destination, either a parking space by record identity or a society destination by its `destination_id` and frontage `street_segment_ordinal`. Numbered from 1 with no gaps. |
@@ -107,7 +107,10 @@ The city grammar's streets stage lays lanes, junctions, approaches and crossings
 connection, signal or parking space. `derive_road_records(records, catalogs, city_catalogs,
 city_identity=...)` in `exulanica/traffic/city_derivation.py` derives connections and spaces by rule
 from the records, the city's catalogs and the `road-derivation` catalog, and hands them to the
-conversion beside the city's own. It derives no signal. A junction the city states any connection
+conversion beside the city's own. With `placement_key`, it also places signals by the
+`signal-placement` catalog ([below](#placed-signals)); without it, the derivation is the v1 one,
+byte for byte (`tests/test_traffic_signal_placement.py` holds the corridor's derived records to
+the digest the derivation gave before signals were placed). A junction the city states any connection
 for gets none derived, and a curb the city states any space on gets none. Every derived record has a
 city record's shape and identity, owned as the city owns its kind, and is synthetic. Derived records
 are not held to the city document's checks: a connection runs from its stop line, which the streets
@@ -140,6 +143,32 @@ refuses in a tile document.
 On the corridor city baked at grammar version 4 this derives 59 bays and 10 cycle spaces, the 69
 spaces `tests/test_traffic_city_derivation.py` holds, and leaves out five parking lanes whose access
 lanes are off the round network.
+
+### Placed signals
+
+The city lays no signal and no signal head. The `signal-placement` entry served traffic uses,
+`high_street_crossroads`, names every junction of four legs where a segment of the high street
+meets another street, as a town's high street is crossed by its cross streets; a junction the city
+gives a signal keeps it, and every other junction keeps the control the city gives it. At a named
+junction:
+
+- **Phases.** Its two streets must cross, two legs each. The street the city makes the major road,
+  its approaches' lowest priority rank, runs the plan's first vehicle phase and the other street the
+  second; every lane connection of the junction goes with the phase of the street it comes from.
+- **Walks.** A crosswalk of the junction's region walks beside the phase of the street it does not
+  cross, the pairing the plan's intervals state (a walk shows while one phase is green), so a
+  straight movement never crosses a walking crosswalk. Each crosswalk is a society crossing
+  (`crossing:<segment ordinal>:<offset>`), so the society's walkers are named on the same crossings.
+- **What it is.** The signal is traffic's own control, not a city record: the junction takes the
+  one right-of-way policy whose rule is `signal`, its approaches that policy's control, and its
+  crosswalks become signalised, all in the road input the compiler reads. Its identity is the city's
+  identity of a signal owned by the junction, and its plan and offset are the entry's
+  (`fixed_two_phase_60s`, offset 0).
+- **Refused by name.** A named junction where other than two streets cross, or whose city ranks no
+  one street its major road, and a placed signal for a junction or crosswalk that has one.
+
+The derivation document names the placement and each signal's groups
+(`exulanica.traffic-road-derivation/v2`).
 
 ## The network
 
@@ -338,6 +367,10 @@ is and what class, body family and colour it has; the renderer owns what a body 
 angles, doors, occupants, a manoeuvre path between bay and lane, and any height other than the
 catalog's.
 
+**Signals.** The window states where each signal's heads stand and what each group shows every
+second, and nothing of a head's look: a reader draws a head at each point the window names, lit as
+its group's code says at the second it draws, and states its own look.
+
 The body families and colours the catalog states:
 
 | Class | Body families | Colours |
@@ -359,6 +392,10 @@ path by distance and places the rear axle a wheelbase back along the trail the f
 stands each body on the tile's walking surface at the body's centre, and keeps a vehicle it finds
 no ground for undrawn and counted. A vehicle named late at an episode's end is held where that
 episode left it. While a drawn vehicle moves, the page draws every frame rather than its idle cadence.
+Beside the vehicles it draws each signal's heads (`signal-lights.ts`): a post at every point the
+window names, topped by a lamp lit in the colour its looks (`exulanica.signal-looks/v1`) state for
+what the group shows at the second drawn, and refuses an indication the looks do not state
+(`SignalLookError`) before it draws anything; a head where the drawn world has no ground is not lit.
 
 `web/packages/app/src/composition/tile-traffic.ts` attaches the layer to a walk's tiles and reads
 windows through the reader it is given: the development page's baked tile walk, reached from one
@@ -367,7 +404,8 @@ call in `composition/generated-tile.ts`, reads `GET /tiles/traffic`, and a saved
 first from the server's clock, then the next minute whenever fewer than 30 served seconds are left
 ahead of it; it stops on a refusal the server will keep giving, and tries again later on any other
 failure. The shell's `data-tile-traffic` attribute states the vehicles served, drawn and held
-without ground, the clock's second and that no walker's crossing is fed; its counts change when a
+without ground, the signals served and their heads lit, the clock's second and that no walker's
+crossing is fed; its counts change when a
 window is read, not every frame. In a saved town a refusal the server will keep giving is said in
 words on the page (`trafficRefusalWords`, the `world.traffic.*` copy), never left blank, and a page
 that cannot load its traffic code opens the town without vehicles and says so.
@@ -385,6 +423,7 @@ Every number traffic uses about a vehicle, a rule or a signal is in a versioned 
 | `lane-use-access.v1.json` | Which classes a lane of each city lane use carries. |
 | `parking-kind-access.v1.json` | Which classes a parking space of each city parking kind admits. |
 | `road-derivation.v1.json` | The [derivation](#derived-road-records) rules: a turning connection's arc chords, the lane use and parking kind of kerbside bays with their crossing and stop-line clearances, and the furniture category and parking kind of cycle stands. |
+| `signal-placement.v1.json` | Where [signals are placed](#placed-signals): the street hierarchies and legs of a named junction, and the plan and offset its signal runs. |
 
 **Sources.** Every entry names a source for each numeric field and each key list, exactly once:
 either `cited <reference>: <where>`, where the reference's full citation is in the file's
@@ -401,7 +440,7 @@ Section 4F.17) for walk, clearance, amber and all-red times.
 **Licence.** Entries are written for this repository: `original`, Apache-2.0. Cited facts are facts;
 the citation says where they were read.
 
-**Digest.** The catalogs' digest covers the canonical form of all six files, references and sources
+**Digest.** The catalogs' digest covers the canonical form of all seven files, references and sources
 included, and is written into every state. The SHA-256 of each file's bytes is kept as well, because
 a city signal record names the signal-plan catalog by those bytes.
 
@@ -462,10 +501,15 @@ the movement package and run the roads module, `exulanica-movement/roads/v1`
   them.
 
 `GET /tiles/traffic?world_seed=<64 hex>&from_second=<n>&seconds=<1 to 60>` answers a window,
-`exulanica.traffic-window/v1`: for every vehicle its class, body family, colour and dimensions and,
+`exulanica.traffic-window/v2`: for every vehicle its class, body family, colour and dimensions and,
 for every second, its front and rear axle plan points, mode (`parked`, `leaving`, `driving`,
-`arriving`), speed, slot and the path its front followed during that second, with `crossings_fed`
-false, `late_home`, and the clock's second when it answered. Without `from_second` the window starts
+`arriving`), speed, slot and the path its front followed during that second; for every signal
+(`exulanica.traffic-signal-presentation/v1`) its identity, its junction's and each group of its
+plan with its kind, the plan points its heads stand at (level with the stop line of each lane a
+vehicle group releases, beside it on the driving side just outside the corridor its vehicles sweep,
+and both ends of each crosswalk a pedestrian group releases) and, every second, a code naming
+what the group shows among the window's `indications`, the indication the step obeyed that second;
+with `crossings_fed` false, `late_home`, and the clock's second when it answered. Without `from_second` the window starts
 at the clock. It requires `tiles.materialise` and charges no tile (`SELF_CHARGING_TILE_ROUTES`).
 It refuses a second before the epoch or more than `clock_reach_steps` from the clock
 (`traffic_second_out_of_range`) and a window of more than 60 seconds (`traffic_window_too_long`)
@@ -514,8 +558,9 @@ the city grammar, so a new city version changes those two files.
   records are the road sources, and no other kind of world states roads. No store keeps a run's
   states, and nothing feeds traffic the society's crossings or reads its events. A vehicle never
   waits for a walker the page shows.
-- **Connections are derived only where legs meet along the plan axes**, and spaces only as kerbside
-  bays and cycle stands; no signal, loading bay or bus layover is derived.
+- **Connections are derived only where legs meet along the plan axes**, spaces only as kerbside
+  bays and cycle stands, and signals only where the placement names a junction, with no signal head
+  a renderer could draw from records; no loading bay or bus layover is derived.
 
 ## Where to look
 

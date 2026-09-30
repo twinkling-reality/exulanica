@@ -12,12 +12,22 @@
  */
 
 import { Transport, type TransportOptions } from '@exulanica/graph-client';
-import type { TrafficWindow, VehicleMode, VehicleSamples } from '@exulanica/atlas-react/traffic';
+import type {
+  PedestrianIndication,
+  SignalSamples,
+  TrafficWindow,
+  VehicleIndication,
+  VehicleMode,
+  VehicleSamples,
+} from '@exulanica/atlas-react/traffic';
 
 /** The window profile and the movement module this client draws. */
-export const TRAFFIC_WINDOW_PROFILE = 'exulanica.traffic-window/v1';
+export const TRAFFIC_WINDOW_PROFILE = 'exulanica.traffic-window/v2';
 export const ROADS_MODULE = 'exulanica-movement/roads/v1';
 export const VEHICLE_MODES: readonly VehicleMode[] = Object.freeze(['parked', 'leaving', 'driving', 'arriving']);
+/** What a signal's vehicle and pedestrian groups show, in the order the served codes index. */
+export const VEHICLE_INDICATIONS: readonly VehicleIndication[] = Object.freeze(['green', 'amber', 'red']);
+export const PEDESTRIAN_INDICATIONS: readonly PedestrianIndication[] = Object.freeze(['walk', 'clearance', 'dont_walk']);
 
 export class TrafficContractError extends Error {}
 
@@ -97,6 +107,42 @@ function vehicle(value: unknown, seconds: number, modes: number, where: string):
   };
 }
 
+function sameList(value: unknown, expected: readonly string[], where: string): void {
+  if (!Array.isArray(value) || value.length !== expected.length || value.some((item, index) => item !== expected[index])) {
+    throw new TrafficContractError(`${where} are not ${expected.join(', ')}`);
+  }
+}
+
+function signal(value: unknown, seconds: number, where: string): SignalSamples {
+  const row = object(value, where);
+  const groups = row['groups'];
+  if (!Array.isArray(groups) || groups.length === 0) throw new TrafficContractError(`${where}.groups is a non-empty list`);
+  return {
+    signalId: text(row['signal_id'], `${where}.signal_id`),
+    junctionId: text(row['junction_id'], `${where}.junction_id`),
+    groups: groups.map((item, index) => {
+      const group = object(item, `${where}.groups[${index}]`);
+      const kind = group['kind'];
+      if (kind !== 'vehicle' && kind !== 'pedestrian') throw new TrafficContractError(`${where}.groups[${index}].kind names no kind`);
+      const shown = kind === 'vehicle' ? VEHICLE_INDICATIONS.length : PEDESTRIAN_INDICATIONS.length;
+      const codes = wholes(group['codes'], `${where}.groups[${index}].codes`, seconds);
+      if (codes.some((code) => code < 0 || code >= shown)) {
+        throw new TrafficContractError(`${where}.groups[${index}].codes names no indication`);
+      }
+      const points = group['points_mm'];
+      if (!Array.isArray(points) || points.length === 0) {
+        throw new TrafficContractError(`${where}.groups[${index}].points_mm is a non-empty list`);
+      }
+      return {
+        group: text(group['group'], `${where}.groups[${index}].group`),
+        kind,
+        pointsMm: points.flatMap((point, pointIndex) => wholes(point, `${where}.groups[${index}].points_mm[${pointIndex}]`, 2)),
+        codes,
+      };
+    }),
+  };
+}
+
 /** A route's answer, read strictly, or a `TrafficContractError` naming what does not hold. */
 export function parseTrafficRead(value: unknown): TrafficRead {
   const body = object(value, 'the traffic');
@@ -132,6 +178,11 @@ function parseWindow(body: Json): TrafficWindow {
   const vehicles = body['vehicles'];
   const late = body['late_home'];
   if (!Array.isArray(vehicles) || !Array.isArray(late)) throw new TrafficContractError('the traffic lists vehicles and late ones');
+  const indications = object(body['indications'], 'indications');
+  sameList(indications['vehicle'], VEHICLE_INDICATIONS, "the traffic's vehicle indications");
+  sameList(indications['pedestrian'], PEDESTRIAN_INDICATIONS, "the traffic's pedestrian indications");
+  const signals = body['signals'];
+  if (!Array.isArray(signals)) throw new TrafficContractError('the traffic lists its signals');
   return {
     inputSha256: text(body['input_sha256'], 'input_sha256'),
     clockSecond: whole(body['clock_second'], 'clock_second'),
@@ -148,6 +199,9 @@ function parseWindow(body: Json): TrafficWindow {
         vehicleId: text(item['vehicle_id'], `late_home[${index}].vehicle_id`),
       };
     }),
+    vehicleIndications: VEHICLE_INDICATIONS,
+    pedestrianIndications: PEDESTRIAN_INDICATIONS,
+    signals: signals.map((row, index) => signal(row, seconds, `signals[${index}]`)),
   };
 }
 

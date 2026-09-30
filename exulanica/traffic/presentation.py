@@ -29,6 +29,15 @@
 
 Not supplied in v1, and a reader must not invent them: lamps, indicators, wheel angles, doors,
 occupants, and any height other than the catalog's.
+
+**Signals** (``exulanica.traffic-signal-presentation/v1``). For each signal of the network, in
+identity order: its identity, its junction's, and each group of its plan, in the plan's order, with
+its kind (``vehicle`` or ``pedestrian``) and the plan points a head of it stands at: beside the stop
+line of every lane whose movements the group releases, on the driving side just outside the corridor
+the lane's widest vehicle sweeps, and both ends of every crosswalk it releases.
+What a group shows at a second is the index of its indication in :data:`VEHICLE_INDICATIONS` or
+:data:`PEDESTRIAN_INDICATIONS` (:func:`signal_codes`), the one the step obeyed at that second. Where
+a head stands and what it shows are all a reader may rely on; a head's look is the renderer's.
 """
 
 from __future__ import annotations
@@ -41,10 +50,104 @@ from exulanica.canonical import round_half_down
 from exulanica.traffic.catalogs import TrafficCatalogs, VehicleClass
 from exulanica.traffic.geometry import Point
 from exulanica.traffic.network import RoadNetwork
+from exulanica.traffic.signals import (
+    PEDESTRIAN_INDICATIONS,
+    VEHICLE_INDICATIONS,
+    pedestrian_indication,
+    vehicle_indication,
+)
 
-__all__ = ["PRESENTATION_PROFILE", "presentation_frame", "vehicle_presentation"]
+__all__ = [
+    "PRESENTATION_PROFILE",
+    "SIGNAL_PRESENTATION_PROFILE",
+    "presentation_frame",
+    "signal_codes",
+    "signal_heads",
+    "vehicle_presentation",
+]
 
 PRESENTATION_PROFILE: Final = "exulanica.traffic-vehicle-presentation/v1"
+SIGNAL_PRESENTATION_PROFILE: Final = "exulanica.traffic-signal-presentation/v1"
+
+
+def signal_heads(network: RoadNetwork, catalogs: TrafficCatalogs) -> list[dict[str, Any]]:
+    """Every signal of ``network`` in identity order: its groups, with where their heads stand."""
+    signals = []
+    for junction in sorted(
+        (junction for junction in network.junctions.values() if junction.signal is not None),
+        key=lambda junction: junction.signal.identity,  # type: ignore[union-attr]
+    ):
+        signal = junction.signal
+        assert signal is not None
+        plan = catalogs.plan(signal.plan)
+        by_group: dict[str, list[list[int]]] = {group.key: [] for group in plan.groups}
+        for connector, group in signal.connector_groups:
+            head = _beside_stop_line(network, network.paths[connector].predecessors[0])
+            if head not in by_group[group]:
+                by_group[group].append(head)
+        bands = {band.band_id: band for band in network.bands}
+        for band_id, group in signal.band_groups:
+            for end in bands[band_id].line:
+                by_group[group].append(list(end))
+        signals.append(
+            {
+                "profile": SIGNAL_PRESENTATION_PROFILE,
+                "signal_id": signal.identity,
+                "junction_id": junction.identity,
+                "groups": [
+                    {
+                        "group": group.key,
+                        "kind": group.kind,
+                        "points_mm": sorted(by_group[group.key]),
+                    }
+                    for group in plan.groups
+                ],
+            }
+        )
+    return signals
+
+
+def _beside_stop_line(network: RoadNetwork, lane_id: str) -> list[int]:
+    """Where a lane's signal head stands: level with its stop line, on the driving side, at the edge
+    of the corridor its widest vehicle sweeps there, so no vehicle it holds passes through it."""
+    lane = network.paths[lane_id]
+    last = lane.line.piece_count - 1
+    start, stop = lane.line.piece(last)
+    dx, dy = stop[0] - start[0], stop[1] - start[1]
+    left, right = lane.extents[last]
+    # Right of the travel direction is (dy, -dx); a left-driving network would stand them left.
+    if network.driving_side == "right":
+        normal, reach = (dy, -dx), right
+    else:
+        normal, reach = (-dy, dx), left
+    run = isqrt(dx * dx + dy * dy)
+    return [
+        stop[0] + round_half_down(normal[0] * reach, run),
+        stop[1] + round_half_down(normal[1] * reach, run),
+    ]
+
+
+def signal_codes(network: RoadNetwork, catalogs: TrafficCatalogs, second: int) -> list[list[int]]:
+    """What each group of each signal shows at ``second``, in :func:`signal_heads`'s order: the
+    index of its indication among the vehicle or pedestrian indications."""
+    codes = []
+    for junction in sorted(
+        (junction for junction in network.junctions.values() if junction.signal is not None),
+        key=lambda junction: junction.signal.identity,  # type: ignore[union-attr]
+    ):
+        signal = junction.signal
+        assert signal is not None
+        plan = catalogs.plan(signal.plan)
+        row = []
+        for group in plan.groups:
+            if group.kind == "vehicle":
+                shown = vehicle_indication(plan, signal.offset_s, second, group.key)
+                row.append(VEHICLE_INDICATIONS.index(shown))
+            else:
+                shown = pedestrian_indication(plan, signal.offset_s, second, group.key)
+                row.append(PEDESTRIAN_INDICATIONS.index(shown))
+        codes.append(row)
+    return codes
 
 
 def _route_point(network: RoadNetwork, route: list[str], position: int) -> Point:

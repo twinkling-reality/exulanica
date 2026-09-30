@@ -5,8 +5,9 @@ declares lane connections, signals and parking spaces as kinds it writes none of
 (``docs/grammar-package.md``, section 7). A network needs connections to drive and spaces for its
 fleet to start in, so this module derives both by rule, from the records a city states, the city's
 own catalogs and traffic's ``road-derivation`` catalog, and hands them to
-:func:`~exulanica.traffic.city_roads.road_input_from_city` beside the city's own. It derives no
-signal: a junction keeps the control the city gives it.
+:func:`~exulanica.traffic.city_roads.road_input_from_city` beside the city's own. With a
+``signal-placement`` entry it also places signals, traffic's own control rather than city records,
+at the junctions the entry names; every other junction keeps the control the city gives it.
 
 **What is derived, and what is not.** A junction the city states any connection for gets none
 derived, and a curb the city states any parking space on gets none: the city's statement stands.
@@ -43,6 +44,14 @@ street-furniture catalog says a stand takes, reached across the kind's shortest 
 traffic lane nearest its curb. A stand whose access stretch meets a junction region, a zone or a
 crossing band, or runs off its lane, is left out, and :attr:`DerivedRoads.left_out` says why.
 
+**Signals.** A junction of the placement's legs where a segment of one of its hierarchies meets
+another street gets a signal of the placement's plan. Its two streets must cross; the street the
+city makes the major road (its approaches' lowest priority rank) runs the plan's first vehicle phase
+and the other the second, each lane connection going with the street it comes from, and each
+crosswalk of the junction's region walks beside the phase of the street it does not cross. A named
+junction where other than two streets cross, or whose city ranks no one street its major road, is
+refused by name.
+
 Only this module and :mod:`exulanica.traffic.city_roads` read the city grammar's records.
 """
 
@@ -58,6 +67,7 @@ from exulanica.grammar.catalogs import Catalog
 from exulanica.grammar.geometry import Extent, integer_sqrt
 from exulanica.grammar.grammars.city.catalogs import entry_fields
 from exulanica.grammar.grammars.city.roads import (
+    JunctionApproachRecord,
     JunctionRecord,
     LaneConnectionRecord,
     LaneRecord,
@@ -66,16 +76,28 @@ from exulanica.grammar.grammars.city.roads import (
 from exulanica.grammar.grammars.city.streetlife import StreetFurnitureRecord
 from exulanica.grammar.grammars.city.streets import CurbEdgeRecord, StreetSegmentRecord
 from exulanica.grammar.subjects import subject_identity
-from exulanica.traffic.catalogs import RoadDerivation, TrafficCatalogs
+from exulanica.traffic.catalogs import RoadDerivation, SignalPlacement, TrafficCatalogs
 from exulanica.traffic.city_roads import CITY_GRAMMAR_ID, road_input_from_city
 from exulanica.traffic.errors import UnsupportedNetworkError
 from exulanica.traffic.network import PathSpec, RoadNetwork, compile_network
+from exulanica.traffic.road_input import SignalGroupInput, SignalInput
 
-__all__ = ["DERIVATION_KEY", "DERIVATION_PROFILE", "DerivedRoads", "derive_road_records"]
+__all__ = [
+    "DERIVATION_KEY",
+    "DERIVATION_PROFILE",
+    "PLACEMENT_KEY",
+    "SIGNALS_PROFILE",
+    "DerivedRoads",
+    "derive_road_records",
+]
 
 DERIVATION_PROFILE: Final = "exulanica.traffic-road-derivation/v1"
+#: The derivation with signals placed: the v1 records, and the signals of a placement entry.
+SIGNALS_PROFILE: Final = "exulanica.traffic-road-derivation/v2"
 #: The road-derivation catalog entry for a city's streets.
 DERIVATION_KEY: Final = "city_streets"
+#: The signal-placement catalog entry served traffic derives signals by.
+PLACEMENT_KEY: Final = "high_street_crossroads"
 _PLACEMENT_CARRIAGEWAY: Final = "carriageway"
 _PLACEMENT_FOOTWAY: Final = "footway"
 _LEFT: Final = "left"
@@ -94,16 +116,42 @@ class DerivedRoads:
     #: ``(record identity, reason)`` for a stand that yields no space.
     left_out: tuple[tuple[str, str], ...]
     derivation: RoadDerivation
+    #: The signals placed, as traffic reads them, and the placement entry; none without one.
+    signals: tuple[SignalInput, ...] = ()
+    placement: SignalPlacement | None = None
 
     def document(self) -> dict[str, Any]:
         """What was derived, as counts a reader can check against the records."""
-        return {
-            "profile": DERIVATION_PROFILE,
+        counts = {
             "derivation": self.derivation.key,
             "connections": len(self.connections),
             "bays": sum(space.placement == _PLACEMENT_CARRIAGEWAY for space in self.spaces),
             "stand_spaces": sum(space.placement == _PLACEMENT_FOOTWAY for space in self.spaces),
             "left_out": [{"identity": identity, "reason": why} for identity, why in self.left_out],
+        }
+        if self.placement is None:
+            return {"profile": DERIVATION_PROFILE, **counts}
+        return {
+            "profile": SIGNALS_PROFILE,
+            **counts,
+            "placement": self.placement.key,
+            "signals": [
+                {
+                    "signal": signal.identity,
+                    "junction": signal.junction,
+                    "plan": signal.plan,
+                    "offset_s": signal.offset_s,
+                    "groups": [
+                        {
+                            "group": group.group,
+                            "connections": list(group.connections),
+                            "crossings": list(group.crossings),
+                        }
+                        for group in signal.groups
+                    ],
+                }
+                for signal in self.signals
+            ],
         }
 
 
@@ -592,6 +640,130 @@ def _spaces(
     return spaces, left_out
 
 
+# -- signals ------------------------------------------------------------------------------------
+
+
+def _walks_beside(plan_key: str, catalogs: TrafficCatalogs) -> tuple[tuple[str, str], ...]:
+    """``(vehicle group, pedestrian group)`` in the plan's group order: each of the plan's two
+    vehicle groups with the one pedestrian group whose walk shows while it is green. A plan that
+    does not pair them so is refused, since a crossroads' phases are one per street."""
+    plan = catalogs.plan(plan_key)
+    vehicles = [group.key for group in plan.groups if group.kind == "vehicle"]
+    if len(vehicles) != 2:
+        raise _refuse(f"plan {plan.key} has {len(vehicles)} vehicle groups; a crossroads has two")
+    beside = {}
+    for group in (item.key for item in plan.groups if item.kind == "pedestrian"):
+        greens = {
+            vehicle
+            for interval in plan.intervals
+            if group in interval.pedestrian_walk
+            for vehicle in interval.vehicle_green
+        }
+        if len(greens) != 1:
+            raise _refuse(f"plan {plan.key} walks {group} beside {sorted(greens)}, not one phase")
+        [vehicle] = greens
+        if vehicle in beside:
+            raise _refuse(f"plan {plan.key} walks two pedestrian groups beside {vehicle}")
+        beside[vehicle] = group
+    if set(beside) != set(vehicles):
+        raise _refuse(f"plan {plan.key} walks no pedestrian group beside a phase")
+    return tuple((vehicle, beside[vehicle]) for vehicle in vehicles)
+
+
+def _signals(
+    records: Sequence[object],
+    network: RoadNetwork,
+    catalogs: TrafficCatalogs,
+    placement: SignalPlacement,
+    city: str,
+) -> list[SignalInput]:
+    """A signal for every junction the placement names that the city gives no signal.
+
+    A junction is named when it has the placement's legs and a segment of one of its hierarchies
+    meets it. Its two streets must cross, two legs each; the street the city makes the major road
+    (its approaches' lowest priority rank) runs the plan's first vehicle phase and the other the
+    second. A crossing of the junction's region walks beside the phase of the street it does not
+    cross. Anything else about a named junction is refused by name.
+    """
+    segments = {r.identity: r for r in records if type(r) is StreetSegmentRecord}
+    lanes = {r.identity: r for r in records if type(r) is LaneRecord}
+    approaches: dict[str, list[JunctionApproachRecord]] = defaultdict(list)
+    for approach in (r for r in records if type(r) is JunctionApproachRecord):
+        approaches[approach.junction_identity].append(approach)
+    connections: dict[str, list[LaneConnectionRecord]] = defaultdict(list)
+    for connection in (r for r in records if type(r) is LaneConnectionRecord):
+        connections[connection.junction_identity].append(connection)
+    bands: dict[str, list[tuple[str, str]]] = defaultdict(list)
+    for band in network.bands:
+        if band.junction is not None:
+            bands[band.junction].append((band.identity, band.segment))
+    phases = _walks_beside(placement.plan, catalogs)
+    wanted = set(placement.hierarchies)
+    signals = []
+    for junction in sorted(
+        (r for r in records if type(r) is JunctionRecord), key=lambda r: r.identity
+    ):
+        legs = [segments.get(identity) for identity in junction.segment_identities]
+        if junction.signal_identity or len(legs) != placement.legs:
+            continue
+        if None in legs:
+            # A leg the records do not carry, as at a tile's edge: the junction is not all here.
+            continue
+        if not any(leg.hierarchy in wanted for leg in legs):  # type: ignore[union-attr]
+            continue
+        streets: dict[str, set[str]] = defaultdict(set)
+        for leg in legs:
+            streets[leg.street_identity].add(leg.identity)  # type: ignore[union-attr]
+        if len(streets) != 2 or any(len(members) != 2 for members in streets.values()):
+            raise _refuse(
+                f"junction {junction.identity}: {len(streets)} streets meet at its "
+                f"{len(legs)} legs; a signal runs one phase for each of two streets crossing"
+            )
+        ranks = {
+            street: {
+                approach.priority_rank
+                for approach in approaches[junction.identity]
+                if approach.segment_identity in members
+            }
+            for street, members in streets.items()
+        }
+        lowest = min(rank for held in ranks.values() for rank in held)
+        majors = [street for street, held in ranks.items() if lowest in held]
+        if len(majors) != 1 or ranks[majors[0]] != {lowest}:
+            raise _refuse(
+                f"junction {junction.identity}: the city ranks no one street its major road, "
+                "so no street runs the first phase"
+            )
+        [major] = majors
+        order = {major: 0, **{street: 1 for street in streets if street != major}}
+        movements: list[list[str]] = [[], []]
+        for connection in sorted(connections[junction.identity], key=lambda r: r.identity):
+            source = lanes[connection.from_lane_identity]
+            street = next(
+                name for name, members in streets.items() if source.segment_identity in members
+            )
+            movements[order[street]].append(connection.identity)
+        walks: list[list[str]] = [[], []]
+        for crossing, segment in sorted(bands[junction.identity]):
+            crossed = next(name for name, members in streets.items() if segment in members)
+            # Walkers crossing one street go while the other street's traffic goes.
+            walks[1 - order[crossed]].append(crossing)
+        groups = []
+        for index, (vehicle, pedestrian) in enumerate(phases):
+            groups.append(SignalGroupInput(vehicle, tuple(movements[index]), ()))
+            groups.append(SignalGroupInput(pedestrian, (), tuple(walks[index])))
+        signals.append(
+            SignalInput(
+                identity=_identity(city, "signal", junction.identity, 0),
+                junction=junction.identity,
+                plan=placement.plan,
+                offset_s=placement.offset_s,
+                groups=tuple(sorted(groups, key=lambda group: group.group)),
+            )
+        )
+    return signals
+
+
 def derive_road_records(
     records: Sequence[object],
     catalogs: TrafficCatalogs,
@@ -599,11 +771,14 @@ def derive_road_records(
     *,
     city_identity: str,
     derivation_key: str = DERIVATION_KEY,
+    placement_key: str | None = None,
 ) -> DerivedRoads:
-    """The connections and spaces a city's records imply, or a refusal naming the record.
+    """The connections and spaces a city's records imply, and with ``placement_key`` the signals
+    its signal-placement entry places, or a refusal naming the record.
 
     ``city_catalogs`` are the catalogs the records were generated against: the parking-kind and
-    street-furniture catalogs size the spaces.
+    street-furniture catalogs size the spaces. Without ``placement_key`` nothing about signals is
+    derived and the document is the v1 one.
     """
     derivation = catalogs.derivation(derivation_key)
     records = tuple(records)
@@ -615,10 +790,18 @@ def derive_road_records(
     spaces, left_out = _spaces(
         with_connections, network, catalogs, derivation, city_catalogs, city_identity
     )
+    placement = None if placement_key is None else catalogs.placement(placement_key)
+    signals = (
+        ()
+        if placement is None
+        else tuple(_signals(with_connections, network, catalogs, placement, city_identity))
+    )
     return DerivedRoads(
         records=(*with_connections, *spaces),
         connections=tuple(connections),
         spaces=tuple(spaces),
         left_out=tuple(left_out),
         derivation=derivation,
+        signals=signals,
+        placement=placement,
     )

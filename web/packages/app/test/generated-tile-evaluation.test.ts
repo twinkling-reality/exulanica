@@ -48,7 +48,7 @@ const RUNTIME_MARKERS = [
   'No surface_material record dresses this surface: the tile states that none exists.',
   'generated-tile-sky',
   'exulanica/owd-triangle-digest',
-  'exulanica.traffic-window/v1',
+  'exulanica.traffic-window/v2',
 ] as const;
 
 // Relative to web/, where the suite runs.

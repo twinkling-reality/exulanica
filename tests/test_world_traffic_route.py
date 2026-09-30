@@ -119,7 +119,7 @@ def test_a_saved_towns_traffic_is_served_to_its_world_from_its_own_records(made,
     assert answer.status_code == 200, answer.text
     body = answer.json()
     assert (body["profile"], body["seconds"], body["crossings_fed"]) == (
-        "exulanica.traffic-window/v1",
+        "exulanica.traffic-window/v2",
         5,
         False,
     )
