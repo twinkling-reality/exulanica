@@ -6,7 +6,7 @@ shape, so a role declared as data needs no migration of its own; which role a pr
 whether that role is registered, stays the application's to say. The application connects as a
 provisioned runtime role over a saved world whose society's engine hosts roles. What is shown:
 
-*   a request, a receipt and a model choice of a role no product registry holds, a junction signal,
+*   a request, a receipt and a model choice of a role no product registry holds, a test sentinel,
     are admitted when their profiles have a role's shape;
 *   a malformed profile, and one of no role's shape, are refused by the constraints 0117 names, and
     a choice names its subjects under one field, exactly;
@@ -36,11 +36,10 @@ saved_world = stays.saved_world
 app = stays.app
 pytestmark = pytest.mark.postgres
 
-#: The junction signal's profiles, as its test registry states them: a role's shape, and no
-#: product role's.
-REQUEST = "exulanica.junction-signal-decision-request/v1"
-RECEIPT = "exulanica.junction-signal-decision/v1"
-CHOICE = "exulanica.junction-signal-model-choice/v1"
+#: The test sentinel's profiles have a role's shape without naming a registered product role.
+REQUEST = "exulanica.test-sentinel-decision-request/v1"
+RECEIPT = "exulanica.test-sentinel-decision/v1"
+CHOICE = "exulanica.test-sentinel-model-choice/v1"
 
 
 def _held(connection, world) -> dict[str, Any]:
@@ -275,7 +274,7 @@ def test_a_stored_request_of_no_registered_role_is_refused_when_read(app):
                 decisions.read(world["binding"].version_id, person)["request"]
                 == (reserved["request"])
             )
-        # A junction signal's request is admitted by the database and refused by the registry.
+        # The test sentinel's request is admitted by the database and refused by the registry.
         stranger = _request(held, REQUEST, people[1])
         with connection.transaction():
             _reserve(connection, world, held, stranger)

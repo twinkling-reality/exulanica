@@ -75,8 +75,8 @@ def _episode(monkeypatch, guard) -> tuple[dict[str, Any], int, list[dict[str, An
 
     real_advance = simulation.advance_traffic
 
-    def advance(*args: Any):
-        step = real_advance(*args)
+    def advance(*args: Any, **kwargs: Any):
+        step = real_advance(*args, **kwargs)
         revoked.extend(
             event["document"]
             for event in step.events

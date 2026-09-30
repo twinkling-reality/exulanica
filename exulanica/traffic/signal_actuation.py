@@ -24,7 +24,7 @@ __all__ = [
     "signal_observation",
 ]
 
-_DIRECTORY: Final = Path(__file__).resolve().parents[2] / "assets" / "catalogs" / "roles"
+_DIRECTORY: Final = Path(__file__).resolve().parents[2].joinpath("assets", "catalogs", "roles")
 _CATALOG: Final = "junction-signal-timing"
 _VERSION: Final = 1
 _MILLISECONDS_PER_SECOND: Final = 1000
@@ -46,7 +46,7 @@ class SignalActuation:
 @cache
 def signal_actuation() -> SignalActuation:
     catalog = load_catalog(
-        _DIRECTORY / f"{_CATALOG}.v{_VERSION}.json",
+        _DIRECTORY.joinpath(f"{_CATALOG}.v{_VERSION}.json"),
         CatalogSchema(
             _CATALOG,
             _VERSION,
