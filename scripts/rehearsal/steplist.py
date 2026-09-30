@@ -250,6 +250,22 @@ def problems(steps: Mapping[str, Any], gates: Sequence[Gate]) -> list[str]:
     ask_before = _decimal(spend.get("ask_before_usd"))
     if bound is None or ask_before is None:
         found.append("spend.bound_usd and spend.ask_before_usd must be decimal strings")
+    worker_bound = _decimal(spend.get("worker_bound_usd"))
+    total_cap = _decimal(spend.get("total_cap_usd"))
+    if (
+        worker_bound is None
+        or total_cap is None
+        or bound is None
+        or bound + worker_bound > total_cap
+    ):
+        found.append("spend process bounds must add to no more than total_cap_usd")
+    if not str(spend.get("budget_split_reason", "")).strip():
+        found.append("spend process bounds need a reason")
+    maximum_calls = spend.get("max_calls")
+    if type(maximum_calls) is not int or maximum_calls <= 0:
+        found.append("spend.max_calls must be a positive integer")
+    if not str(spend.get("max_calls_reason", "")).strip():
+        found.append("spend.max_calls needs a reason")
 
     gate_keys = {gate.key for gate in gates}
     served: dict[str, list[str]] = {gate.key: [] for gate in gates}

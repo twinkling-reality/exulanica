@@ -159,19 +159,22 @@ python3 scripts/rehearsal/rehearse.py --worktree <checkout> --slot <n> --out <ne
   the page loads. The living session's instrument reads where the page draws each walker in every
   animation frame and changes nothing the page does.
 - `--model-env` names the environment file that holds the hosted-model key. A child process reads
-  only `NEBIUS_API_KEY` from it and hands it to the launcher by environment, together with the step
-  list's `spend.bound_usd` as `EXULANICA_BUDGET_USD`, so the API itself refuses a model call past
-  the run's bound. Without `--model-env`, the steps that call a hosted model are reported not
+  only `NEBIUS_API_KEY` from it and hands it to the launcher by environment, together with the
+  effective API allocation as `EXULANICA_BUDGET_USD` and the step list's call ceiling as
+  `EXULANICA_BUDGET_MAX_CALLS`, so the API itself refuses a model call past either bound. The
+  derivative worker gets a separate money allocation; both process ceilings add to no more than
+  the effective total run cap. Without `--model-env`, hosted-model steps are reported not
   reachable. They also stop starting once the spend the product reports reaches that bound, and a
   step list whose estimates exceed `spend.ask_before_usd` is refused before anything runs.
-- The launcher starts the API with no derivative worker of its own. The rehearsal starts each
-  production worker command the step list names over the run's database and workspace:
-  `exulanica-derivative-worker`, with the environment the step list gives it (the depth model and
-  its device), handing it the key the same way, and `exulanica-generated-tile-worker`, which bakes
-  a made town's tiles and publishes them through the run database's owner connection.
-- `--bound-usd` sets a spend bound for one run below the step list's; `--sessions` runs only the
-  named browser sessions; `--reuse-database` reuses the slot's database; `--gpu-slot` names the
-  machine's GPU slot command.
+- The launcher starts one `exulanica-generated-tile-worker` for its workspace, checks its startup
+  event, records its bake events and stops it with the stack. The rehearsal checks that the worker
+  reported each saved town tile as baked. The rehearsal starts `exulanica-derivative-worker` over
+  the same database and workspace, with the depth model and device the step list gives it, handing
+  it the key through the child process.
+- `--bound-usd` sets a lower total spend cap for one run and reduces both process ceilings;
+  the result records the requested and effective total cap and both allocations. `--sessions`
+  runs only the named browser sessions; `--reuse-database` reuses the slot's database; `--gpu-slot`
+  names the machine's GPU slot command.
 
 **The launcher on its own.** `scripts/acceptance/launch.py` also runs the application for a
 person, without the rehearsal:
@@ -188,11 +191,12 @@ made with no `VITE_` variable in its environment and served by `vite preview`, s
 the workspace token, which is in the run directory's `token` file; without it, the Vite development
 server runs with the token built in. `--no-derivative-worker` starts the API with
 `EXULANICA_DERIVATIVE_WORKER=off`, the production shape. `--model` passes `NEBIUS_API_KEY`,
-`EXULANICA_EGRESS_ALLOWLIST` and `EXULANICA_BUDGET_USD` from the environment to the API and refuses
+`EXULANICA_EGRESS_ALLOWLIST`, `EXULANICA_BUDGET_USD` and `EXULANICA_BUDGET_MAX_CALLS` from the environment to the API and refuses
 without any of them. `--society-playback` makes the API play the run's own workspace
 (`EXULANICA_SOCIETY_CONTROL_WORKSPACES` names it alone) at the declared base wait, or at
 `--society-tick-interval-ms`, and `up` refuses unless readiness reports that workspace played. Run
-state and records stay in the system temporary directory, `down` stops only what `up` started, and
+state and records stay in the system temporary directory. `status` names the tile worker's running
+state and its successful and failed bake events; `down` stops only what `up` started, and
 every refusal prints `refused (<name>)` and exits 2.
 
 **Reading the result.** The run directory holds `result.json`, described by

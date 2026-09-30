@@ -22,17 +22,15 @@ names. In order, refusing at the first precondition that does not hold:
     ``NEBIUS_API_KEY`` from that file, puts it in its own
     environment with ``EXULANICA_EGRESS_ALLOWLIST`` set to the origins of the providers the
     worktree's model manifest binds a role to, as the worktree's own code derives them
-    (``Manifest.bound_origins``), and replaces itself with the launcher, with the run's bound as
-    ``EXULANICA_BUDGET_USD`` so the API itself refuses a call past it. The run's bound is the step
-    list's ``spend.bound_usd``, or the lower one ``--bound-usd`` names for a run whose spending
-    allowance is smaller. The key never enters this process, and nothing here prints, logs or
-    writes it.
+    (``Manifest.bound_origins``), and replaces itself with the launcher, with the API's allocated
+    bound as ``EXULANICA_BUDGET_USD`` so the API itself refuses a call past it. ``--bound-usd``
+    lowers the total run cap and both process allocations. The key never enters this process, and
+    nothing here prints, logs or writes it.
 3.  Takes the launcher's record of that build (its script and index hashes, and the hash of the page
     the preview served) as this run's build, and checks the preview's ``/api`` proxy answers.
     The launcher starts the API with no derivative worker of its own (``--no-derivative-worker``);
     this script then starts each worker main runs in production that the step list's ``runtime``
-    names by its command (the derivative worker, and the tile worker that bakes a made town's
-    tiles), from that worktree's environment, over the run's workspace and database, with the
+    names by its command (the derivative worker), from that worktree's environment, over the run's workspace and database, with the
     environment the step list gives it (the derivative worker's depth model among it) and, for a
     worker that asks a model and with ``--model-env``, the key through the same child-process
     handoff. It waits for each worker's startup event and stops them before the launcher stops
@@ -225,21 +223,26 @@ def worker_events(log: Path) -> list[dict[str, Any]]:
     return events
 
 
-def run_bound(steps: Mapping[str, Any], requested: str | None) -> Decimal:
-    """The run's hosted-spend bound: the step list's, or a lower one the operator names."""
-    ceiling = Decimal(steps["spend"]["bound_usd"])
+def run_bounds(steps: Mapping[str, Any], requested: str | None) -> tuple[Decimal, Decimal, Decimal]:
+    """Total, API and worker money ceilings; an override reduces both process ceilings."""
+    spend = steps["spend"]
+    ceiling = Decimal(spend["total_cap_usd"])
+    api = Decimal(spend["bound_usd"])
+    worker = Decimal(spend["worker_bound_usd"])
     if requested is None:
-        return ceiling
+        return ceiling, api, worker
     try:
         bound = Decimal(requested)
-    except InvalidOperation:
+    except (InvalidOperation, TypeError):
         bound = None
     if bound is None or not bound.is_finite() or not Decimal(0) < bound <= ceiling:
         raise Refused(
             f"--bound-usd {requested!r} must be a decimal above 0 and at most the step list's "
-            f"bound of {ceiling} USD"
+            f"total cap of {ceiling} USD"
         )
-    return bound
+    api = min(api * bound / ceiling, bound)
+    worker = min(worker * bound / ceiling, bound - api)
+    return bound, api, worker
 
 
 def page_deadlines(worktree: Path, source: Mapping[str, Any]) -> dict[str, int]:
@@ -307,7 +310,9 @@ class Run:
         gpu_slot = Path(arguments.gpu_slot or checkout / ".exulanica/bin/gpu-slot")
         self.gpu_slot = gpu_slot if gpu_slot.exists() else None
         self.steps, self.gates = steplist.load_checked()
-        self.bound = run_bound(self.steps, arguments.bound_usd)
+        self.total_bound, self.bound, self.worker_bound = run_bounds(
+            self.steps, arguments.bound_usd
+        )
         self.outcomes: dict[str, dict[str, Any]] = {}
         self.unreached: dict[str, str] = {}
         self.facts: dict[str, Any] = {}
@@ -355,6 +360,7 @@ class Run:
         environment = clean_environment()
         if self.model_configured:  # the API itself then refuses a model call past the run's bound
             environment["EXULANICA_BUDGET_USD"] = str(self.bound)
+            environment["EXULANICA_BUDGET_MAX_CALLS"] = str(self.steps["spend"]["max_calls"])
         completed = subprocess.run(command, capture_output=True, text=True, env=environment)
         (self.out / "launcher-up.txt").write_text(
             scrub(f"exit {completed.returncode}\n{completed.stdout}\n{completed.stderr}")
@@ -412,7 +418,8 @@ class Run:
         command = [str(program), *configured.get("arguments", [])]
         with_key = self.model_configured and configured.get("model_key") is True
         if with_key:
-            environment["EXULANICA_BUDGET_USD"] = str(self.bound)
+            environment["EXULANICA_BUDGET_USD"] = str(self.worker_bound)
+            environment["EXULANICA_BUDGET_MAX_CALLS"] = str(self.steps["spend"]["max_calls"])
             command = [*self.key_handoff(), *command]
         log_name = f"{key.replace('_', '-')}.log"
         log_file = self.out / log_name
@@ -461,6 +468,56 @@ class Run:
             record["events"] = sorted(
                 {str(e.get("event")) for e in worker_events(self.out / record["log"])}
             )
+
+    def verify_town_worker(self) -> None:
+        """Tie the launcher's actual bake events to the saved town's tiles and live worker."""
+        outcome = self.outcomes.get("make-town-with-values")
+        if outcome is None or outcome.get("status") == "not_reachable":
+            return
+        assert self.state is not None and self.launcher is not None
+        observed_tiles = next(
+            (
+                item.get("observed", {}).get("tiles", [])
+                for item in outcome.get("observations", [])
+                if item.get("id") == "tiles-baked"
+            ),
+            [],
+        )
+        world_id = self.facts.get("town", {}).get("world_id")
+        events = self.launcher.tile_worker_events(
+            Path(self.state["run_dir"]) / "logs" / "generated-tile-worker.log"
+        )
+        baked = {
+            (
+                event.get("tile", [None, None])[0],
+                event.get("tile", [None, None])[1],
+                event.get("baked_tile_id"),
+            )
+            for event in events
+            if event.get("event") == "bake"
+            and event.get("status") == "baked"
+            and event.get("world_id") == world_id
+            and isinstance(event.get("tile"), list)
+            and len(event["tile"]) == 2
+        }
+        expected = {
+            (tile.get("tile_x"), tile.get("tile_y"), tile.get("baked_tile_id"))
+            for tile in observed_tiles
+            if tile.get("state") == "baked"
+        }
+        running = self.launcher.tile_worker_running(self.state)
+        outcome.setdefault("observations", []).append(
+            {
+                "id": "launcher-worker-baked-town",
+                "ok": bool(world_id) and bool(expected) and expected <= baked and running,
+                "observed": {
+                    "world_id": world_id,
+                    "expected": sorted(expected),
+                    "reported_baked": sorted(baked),
+                    "worker_running": running,
+                },
+            }
+        )
 
     def launcher_down(self) -> None:
         if (
@@ -688,6 +745,8 @@ class Run:
         self.facts.update(report.get("facts", {}))
         for step_id, outcome in report.get("outcomes", {}).items():
             self.outcomes[step_id] = outcome
+        if session["id"] == "town":
+            self.verify_town_worker()
         tail = scrub((directory / "session.log").read_text(errors="replace")[-1500:])
         for step in plan_steps:
             if step["id"] not in self.outcomes:
@@ -741,6 +800,13 @@ class Run:
                 "workspace_id": state.get("workspace_id"),
                 "api_imported_exulanica_from": scrub(str(state.get("api_imported_exulanica_from"))),
                 **self.worker_records,
+                "launcher_tile_worker": {
+                    "events": self.launcher.tile_worker_events(
+                        Path(state["run_dir"]) / "logs" / "generated-tile-worker.log"
+                    )
+                    if self.launcher is not None and state.get("run_dir")
+                    else [],
+                },
                 "launcher_in_process_worker": state.get("derivative_worker"),
                 "page_deadlines_ms": self.deadlines,
                 "society_playback": state.get("society_playback"),
@@ -764,6 +830,10 @@ class Run:
                 ),
                 "spend": {
                     "bound_usd": str(self.bound),
+                    "worker_bound_usd": str(self.worker_bound),
+                    "effective_total_cap_usd": str(self.total_bound),
+                    "requested_total_cap_usd": self.arguments.bound_usd,
+                    "step_list_total_cap_usd": self.steps["spend"]["total_cap_usd"],
                     "step_list_bound_usd": self.steps["spend"]["bound_usd"],
                     "ask_before_usd": self.steps["spend"]["ask_before_usd"],
                     "estimate_usd": str(steplist.spend_estimate(self.steps)),
@@ -1281,7 +1351,7 @@ def main() -> int:
     )
     parser.add_argument(
         "--bound-usd",
-        help="a hosted-spend bound for this run below the step list's spend.bound_usd",
+        help="a total hosted-spend cap for this run at or below the step list's total_cap_usd",
     )
     parser.add_argument("--sessions", help="run only these sessions, comma separated")
     parser.add_argument("--reuse-database", action="store_true")

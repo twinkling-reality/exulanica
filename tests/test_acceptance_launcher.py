@@ -163,6 +163,14 @@ def test_a_model_run_is_refused_until_it_has_a_key_an_allowlist_and_a_bound():
             {"NEBIUS_API_KEY": key, "EXULANICA_EGRESS_ALLOWLIST": '["https://model.example"]'},
             "budget-missing",
         ),
+        (
+            {
+                "NEBIUS_API_KEY": key,
+                "EXULANICA_EGRESS_ALLOWLIST": '["https://model.example"]',
+                "EXULANICA_BUDGET_USD": "1.00",
+            },
+            "call-ceiling-missing",
+        ),
     ]
     for environ, expected in steps:
         with pytest.raises(LAUNCH.Refused) as refused:
@@ -174,6 +182,7 @@ def test_a_model_run_is_refused_until_it_has_a_key_an_allowlist_and_a_bound():
         "NEBIUS_API_KEY": key,
         "EXULANICA_EGRESS_ALLOWLIST": '["https://model.example"]',
         "EXULANICA_BUDGET_USD": "1.00",
+        "EXULANICA_BUDGET_MAX_CALLS": "7000",
         "EXULANICA_DATA_DIR": "/elsewhere",
     }
     assert LAUNCH.model_environment(complete) == {
@@ -340,6 +349,7 @@ def test_the_api_gets_the_model_and_its_bound_only_with_model():
         "NEBIUS_API_KEY": "sk-not-a-real-key",
         "EXULANICA_EGRESS_ALLOWLIST": '["https://model.example"]',
         "EXULANICA_BUDGET_USD": "1.00",
+        "EXULANICA_BUDGET_MAX_CALLS": "7000",
         "EXULANICA_DATA_DIR": "/somebody/else",
     }
 

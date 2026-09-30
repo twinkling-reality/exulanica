@@ -27,14 +27,18 @@ imports the code it starts.
     ``TILES_LIMIT``, declared as the owner, so the development page can walk a baked tile.
 4.  Starts the API as the non-owner runtime role with the read-only and purge URLs, a
     content-addressed store in the run directory and no Google configuration. With ``--model``
-    it also passes ``NEBIUS_API_KEY``, ``EXULANICA_EGRESS_ALLOWLIST`` and ``EXULANICA_BUDGET_USD``
+    it also passes ``NEBIUS_API_KEY``, ``EXULANICA_EGRESS_ALLOWLIST``, ``EXULANICA_BUDGET_USD``
+    and ``EXULANICA_BUDGET_MAX_CALLS``
     from this process's environment, and refuses without any of them: a run with a model always
     states the bound the API enforces. Nothing writes the key anywhere. With
     ``--society-playback`` the API also plays the synthetic workspace's societies on their own
     (``EXULANICA_SOCIETY_CONTROL_WORKSPACES`` names that workspace alone), at the host's declared
     base wait or at ``--society-tick-interval-ms``, which the API validates. Without it the API
     plays nothing.
-5.  Serves the application on the slot's app port. By default that is the Vite development server,
+5.  Starts one generated-tile worker for the synthetic workspace, checks its startup event and
+    records its process and bake events. It claims jobs as the runtime role and publishes baked
+    tiles through the owner connection.
+6.  Serves the application on the slot's app port. By default that is the Vite development server,
     with the synthetic token built in as ``VITE_EXULANICA_TOKEN``. With ``--production`` it is a
     ``vite build`` into the run directory, made in a clean environment with no ``VITE_`` variable,
     served by ``vite preview``; the page then asks for the token, which is in the run directory's
@@ -59,6 +63,7 @@ import hashlib
 import json
 import os
 import secrets
+import shlex
 import shutil
 import signal
 import subprocess
@@ -114,6 +119,7 @@ MODEL_VARIABLES = {
     "NEBIUS_API_KEY": "model-key-missing",
     "EXULANICA_EGRESS_ALLOWLIST": "model-allowlist-missing",
     "EXULANICA_BUDGET_USD": "budget-missing",
+    "EXULANICA_BUDGET_MAX_CALLS": "call-ceiling-missing",
 }
 
 #: Environment prefixes dropped from every process this starts, so nothing in the caller's shell
@@ -123,6 +129,7 @@ SCRUBBED_PREFIXES = ("EXULANICA_", "PG", "NEBIUS_", "VITE_", "GOOGLE_", "OPENAI_
 #: How long each service may take to answer before the run is refused.
 API_START_SECONDS = 90
 READY_SECONDS = 30
+TILE_WORKER_START_SECONDS = 60  # Schema and role checks complete before a tile job is claimed.
 TOKEN_PROBE_SECONDS = 10
 APP_START_SECONDS = 90
 PROXY_SECONDS = 30
@@ -149,9 +156,11 @@ REFUSALS = {
     "serve-output": "scripts/test_postgres.py serve did not print a URL the run needs",
     "workspace-partition": "the synthetic workspace has no embedding partition",
     "tile-quota": "--tiles did not declare the synthetic workspace's tile quota",
+    "tile-worker-startup": "the generated-tile worker did not report a successful startup",
     "model-key-missing": "--model needs NEBIUS_API_KEY in this environment",
     "model-allowlist-missing": "--model needs EXULANICA_EGRESS_ALLOWLIST in this environment",
     "budget-missing": "--model needs EXULANICA_BUDGET_USD, the bound the API enforces",
+    "call-ceiling-missing": "--model needs EXULANICA_BUDGET_MAX_CALLS, the call bound the API enforces",
     "api-origin": "the API did not confirm it imported exulanica from the checkout",
     "token-refused": "the API did not accept the synthetic token",
     "no-answer": "a service did not answer in time",
@@ -474,11 +483,134 @@ def spawn(command: list[str], cwd: Path, env: Mapping[str, str], log: Path) -> i
     return process.pid
 
 
+def tile_worker_events(log: Path) -> list[dict[str, object]]:
+    """Read only the worker's structured events, never treating other output as success."""
+    if not log.exists():
+        return []
+    events = []
+    for line in log.read_text(errors="replace").splitlines():
+        try:
+            event = json.loads(line)
+        except ValueError:
+            continue
+        if isinstance(event, dict) and event.get("component") == "generated-tile-worker":
+            events.append(event)
+    return events
+
+
+def start_tile_worker(
+    worktree: Path,
+    exports: Mapping[str, str],
+    data_dir: Path,
+    workspace_id: str,
+    logs: Path,
+    state: dict,
+    state_file: Path,
+) -> None:
+    """Start the production baker for this workspace and wait for its role check."""
+    program = worktree / ".venv" / "bin" / "exulanica-generated-tile-worker"
+    if not program.exists():
+        refuse("toolchain-missing", f"the checkout lacks {program}")
+    environment = clean_environment()
+    environment.update(
+        {
+            "EXULANICA_DATABASE_URL": exports["EXULANICA_DATABASE_URL"],
+            "EXULANICA_TILE_PUBLISHER_DATABASE_URL": exports["OWNER_URL"],
+            "EXULANICA_DATA_DIR": str(data_dir),
+        }
+    )
+    log = logs / "generated-tile-worker.log"
+    pid = spawn([str(program), "--workspace", workspace_id], worktree, environment, log)
+    state["pids"]["tile_worker"] = pid
+    write_state(state_file, state)
+    deadline = time.monotonic() + TILE_WORKER_START_SECONDS
+    expected = {"executable": str(program), "workspace": workspace_id}
+    while time.monotonic() < deadline:
+        events = tile_worker_events(log)
+        if any(event.get("event") == "startup_failed" for event in events):
+            refuse("tile-worker-startup", str(events[-1])[:REFUSAL_EXCERPT_CHARACTERS])
+        command = command_of(pid)
+        if command and not worker_command_matches(command, expected):
+            break
+        started = process_started_at(pid)
+        if command and started and "tile_worker_identity" not in state:
+            state["tile_worker_identity"] = {**expected, "started_at": started}
+            write_state(state_file, state)
+        if any(event.get("event") == "startup" for event in events):
+            if tile_worker_running(state):
+                return
+            break
+        if not command:
+            break
+        time.sleep(0.5)
+    refuse("tile-worker-startup", log.read_text(errors="replace")[-REFUSAL_EXCERPT_CHARACTERS:])
+
+
 def command_of(pid: int) -> str:
     completed = subprocess.run(
         ["ps", "-p", str(pid), "-o", "command="], capture_output=True, text=True, check=False
     )
     return completed.stdout.strip()
+
+
+def process_started_at(pid: int) -> str:
+    """The OS creation identity, so a recycled PID cannot stand for this worker."""
+    completed = subprocess.run(
+        ["ps", "-p", str(pid), "-o", "lstart="], capture_output=True, text=True, check=False
+    )
+    return completed.stdout.strip() if completed.returncode == 0 else ""
+
+
+def worker_command_matches(command: str, identity: Mapping[str, str]) -> bool:
+    """Accept the exact entry point, with only its workspace argument and optional interpreter."""
+    try:
+        argv = shlex.split(command)
+    except ValueError:
+        return False
+    expected = [identity["executable"], "--workspace", identity["workspace"]]
+    return argv == expected or (
+        len(argv) == 4 and Path(argv[0]).name.lower().startswith("python") and argv[1:] == expected
+    )
+
+
+def tile_worker_running(state: Mapping[str, object]) -> bool:
+    pids = state.get("pids")
+    identity = state.get("tile_worker_identity")
+    if not isinstance(pids, dict) or not isinstance(identity, dict):
+        return False
+    pid = pids.get("tile_worker")
+    if not isinstance(pid, int) or not all(
+        isinstance(identity.get(key), str) and identity[key]
+        for key in ("executable", "workspace", "started_at")
+    ):
+        return False
+    return (
+        worker_command_matches(command_of(pid), identity)
+        and process_started_at(pid) == identity["started_at"]
+    )
+
+
+def stop_tile_worker(state: Mapping[str, object]) -> None:
+    """Stop only the recorded process group when command, workspace and creation still match."""
+    pid = state["pids"]["tile_worker"]
+    if not tile_worker_running(state):
+        print(f"tile worker: pid {pid} is gone or does not match this run; left alone")
+        return
+    try:
+        if os.getpgid(pid) != pid or not tile_worker_running(state):
+            print(f"tile worker: pid {pid} is not this run's process group; left alone")
+            return
+        os.killpg(pid, signal.SIGTERM)
+    except ProcessLookupError:
+        return
+    for _ in range(STOP_POLLS):
+        if not tile_worker_running(state):
+            print(f"tile worker: stopped pid {pid}")
+            return
+        time.sleep(0.25)
+    if tile_worker_running(state) and os.getpgid(pid) == pid:
+        os.killpg(pid, signal.SIGKILL)
+        print(f"tile worker: killed pid {pid} after SIGTERM timeout")
 
 
 def stop(pid: int, marker: str, label: str) -> None:
@@ -760,6 +892,7 @@ def up(arguments: argparse.Namespace) -> None:
             "readyz": check,
         }
         write_state(state_file, state)
+    start_tile_worker(worktree, exports, data_dir, workspace_id, logs, state, state_file)
     probe_status, probe_body = wait_http(
         f"{api_url(chosen)}/world-entries",
         TOKEN_PROBE_SECONDS,
@@ -888,7 +1021,24 @@ def status(arguments: argparse.Namespace) -> None:
         return
     state = json.loads(state_file.read_text())
     for name, pid in state["pids"].items():
-        print(f"{name}: pid {pid} {'alive' if command_of(pid) else 'gone'}")
+        command = command_of(pid)
+        alive = tile_worker_running(state) if name == "tile_worker" else bool(command)
+        print(f"{name}: pid {pid} {'alive' if alive else 'gone'}")
+    if "tile_worker" in state["pids"]:
+        events = tile_worker_events(Path(state["run_dir"]) / "logs" / "generated-tile-worker.log")
+        bakes = [event for event in events if event.get("event") == "bake"]
+        print(
+            "tile worker: "
+            + json.dumps(
+                {
+                    "running": tile_worker_running(state),
+                    "started": any(event.get("event") == "startup" for event in events),
+                    "baked": sum(event.get("status") == "baked" for event in bakes),
+                    "failed": sum(event.get("status") != "baked" for event in bakes),
+                    "last_event": events[-1] if events else None,
+                }
+            )
+        )
     shown = ("tree", "ports", "run_dir", "workspace_id", "database", "society_playback")
     print(json.dumps({key: state.get(key) for key in shown}, indent=2))
 
@@ -906,6 +1056,8 @@ def down(arguments: argparse.Namespace) -> None:
     if not state_file.exists():
         refuse("no-state", str(state_file))
     state = json.loads(state_file.read_text())
+    if "tile_worker" in state["pids"]:
+        stop_tile_worker(state)
     if "vite" in state["pids"]:
         stop(state["pids"]["vite"], "vite", "app")
     if "api" in state["pids"]:
@@ -943,7 +1095,8 @@ def build_parser() -> argparse.ArgumentParser:
             command.add_argument(
                 "--model",
                 action="store_true",
-                help="pass NEBIUS_API_KEY, EXULANICA_EGRESS_ALLOWLIST and EXULANICA_BUDGET_USD "
+                help="pass NEBIUS_API_KEY, EXULANICA_EGRESS_ALLOWLIST, EXULANICA_BUDGET_USD "
+                "and EXULANICA_BUDGET_MAX_CALLS "
                 "through to the API (default: no model)",
             )
             command.add_argument(

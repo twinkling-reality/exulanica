@@ -3,9 +3,9 @@
 ``scripts/rehearsal/rehearse.py`` runs the repository's own launcher by default,
 ``scripts/acceptance/launch.py``, with ``up --production``, in an environment with every
 ``EXULANICA_`` variable removed. In a run with a hosted model it puts back exactly one: the step
-list's ``spend.bound_usd`` as ``EXULANICA_BUDGET_USD``, which the launcher requires and passes to
-the API, so the API itself refuses a model call past the run's bound. The application is the
-production build the launcher made and serves, and the rehearsal records that build and the page
+list's API allocation as ``EXULANICA_BUDGET_USD`` and its call ceiling, which the launcher requires
+and passes to the API, so the API itself refuses a model call past either bound. The application is
+the production build the launcher made and serves. The rehearsal records that build and the page
 the preview served, and looks for the workspace token in it as well as in its own run directory.
 
 These run ``Run.launcher_up`` and ``Run.take_build`` without starting anything: the launcher is
@@ -44,6 +44,8 @@ def _rehearse() -> ModuleType:
 
 REHEARSE = _rehearse()
 BOUND = steplist.load()["spend"]["bound_usd"]
+WORKER_BOUND = steplist.load()["spend"]["worker_bound_usd"]
+TOTAL_CAP = steplist.load()["spend"]["total_cap_usd"]
 
 
 def _run(
@@ -112,8 +114,10 @@ def test_a_model_run_asks_for_a_production_build_and_hands_over_the_step_lists_b
 
     assert environment["EXULANICA_BUDGET_USD"] == BOUND
     assert [name for name in environment if name.startswith("EXULANICA_")] == [
-        "EXULANICA_BUDGET_USD"
+        "EXULANICA_BUDGET_USD",
+        "EXULANICA_BUDGET_MAX_CALLS",
     ]
+    assert environment["EXULANICA_BUDGET_MAX_CALLS"] == "7000"
     assert command[-1] == "--model"
     assert "--production" in command
     assert "--society-playback" in command
@@ -134,15 +138,31 @@ def test_the_model_allowlist_is_the_manifests_own_derivation_of_its_origins():
 
 
 def test_a_run_may_lower_the_bound_it_hands_over_and_never_raise_it(tmp_path, monkeypatch):
-    above = str(steplist.Decimal(BOUND) + 1)
+    above = str(steplist.Decimal(TOTAL_CAP) + 1)
     for index, refused in enumerate((above, "0", "-0.01", "NaN", "a dollar")):
         each = tmp_path / f"refused-{index}"
         each.mkdir()
         with pytest.raises(REHEARSE.Refused, match="--bound-usd"):
             _run(each, monkeypatch, model=True, bound_usd=refused)
-    lower = str(steplist.Decimal(BOUND) / 10)
+    lower = "0.01"
+    each = tmp_path / "allocations"
+    each.mkdir()
+    run = _run(each, monkeypatch, model=True, bound_usd=lower)
+    assert run.total_bound == steplist.Decimal(lower)
+    assert run.bound + run.worker_bound <= run.total_bound
+    assert run.worker_bound == steplist.Decimal("0.002")
+    assert steplist.Decimal(BOUND) + steplist.Decimal(WORKER_BOUND) <= steplist.Decimal(TOTAL_CAP)
     _, environment = _launch(tmp_path, monkeypatch, model=True, bound_usd=lower)
-    assert environment["EXULANICA_BUDGET_USD"] == lower
+    assert environment["EXULANICA_BUDGET_USD"] == "0.008"
+
+
+def test_default_run_keeps_both_allocations_and_total_cap(tmp_path, monkeypatch):
+    run = _run(tmp_path, monkeypatch, model=True)
+    assert (run.total_bound, run.bound, run.worker_bound) == (
+        steplist.Decimal(TOTAL_CAP),
+        steplist.Decimal(BOUND),
+        steplist.Decimal(WORKER_BOUND),
+    )
 
 
 def test_a_run_without_a_model_asks_for_a_production_build_and_hands_over_no_bound(

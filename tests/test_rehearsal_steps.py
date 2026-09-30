@@ -257,6 +257,27 @@ def test_hosted_model_steps_are_estimated_within_the_decision_threshold():
     assert f"{hosted[0]['id']}: a hosted-model step needs spend_estimate_usd" in found
 
 
+def test_the_process_call_ceiling_is_declared_and_validated():
+    assert STEPS["spend"]["max_calls"] > 0
+    assert STEPS["spend"]["max_calls_reason"].strip()
+    broken = _problems_with(lambda s: s["spend"].pop("max_calls"))
+    assert "spend.max_calls must be a positive integer" in broken
+    assert steplist.Decimal(STEPS["spend"]["bound_usd"]) + steplist.Decimal(
+        STEPS["spend"]["worker_bound_usd"]
+    ) <= steplist.Decimal(STEPS["spend"]["total_cap_usd"])
+    broken = _problems_with(lambda s: s["spend"].update(worker_bound_usd="0.50"))
+    assert "spend process bounds must add to no more than total_cap_usd" in broken
+
+
+def test_the_launcher_owns_the_only_town_tile_worker():
+    tile = STEPS["runtime"]["tile_worker"]
+    assert tile["launcher"] == "scripts/acceptance/launch.py"
+    assert "command" not in tile
+    assert "launcher-worker-baked-town" in {
+        observable["id"] for observable in _step(STEPS, "make-town-with-values")["expect"]["api"]
+    }
+
+
 def test_every_runnable_step_has_exactly_one_handler():
     node = shutil.which("node")
     if node is None:

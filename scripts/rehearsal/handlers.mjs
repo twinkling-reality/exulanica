@@ -341,7 +341,18 @@ async function inspectObject(ctx) {
   const missing = lines.filter((l) => /^\w+: unavailable\./.test(l.text));
   ctx.observe('missing-explicit', missing.length > 0 && missing.every((l) => /^\w+: unavailable\.\s+\S/.test(l.text)),
     { unavailable: missing });
-  await ctx.screenshot('inspector', 'World to data with the placed object selected');
+  await page.evaluate(`(${subjects})?.scrollIntoView({block: 'center'})`);
+  const visibleSubject = await page.evaluate(`(() => { const panel = document.getElementById('world-panel-details');
+    const inspector = ${inspector}; const subject = ${subjects}; const rect = subject?.getBoundingClientRect();
+    return { panel_visible: panel?.checkVisibility() ?? false, inspector_open: inspector?.open ?? false,
+      subject_visible: subject?.checkVisibility() ?? false, subject_in_frame: !!rect && rect.top >= 0 && rect.bottom <= window.innerHeight,
+      selected_value: subject?.value ?? null, selected_name: subject?.selectedOptions[0]?.textContent.trim() ?? null }; })()`);
+  ctx.observe('selected-subject-visible', visibleSubject.panel_visible && visibleSubject.inspector_open
+    && visibleSubject.subject_visible && visibleSubject.subject_in_frame && visibleSubject.selected_value === target.value
+    && visibleSubject.selected_name?.startsWith(ctx.facts.asset_key), visibleSubject);
+  await ctx.screenshot('inspector', 'World to data in About this place, with the placed object selected and visible');
+  await page.evaluate(`(${inspector})?.querySelector('ul.representation-availability > li:last-child')?.scrollIntoView({block: 'center'})`);
+  await ctx.screenshot('provenance', 'World to data with the selected object and its availability lines');
   await page.click(BUTTON('Close', `document.getElementById('world-panel-details')`), 'Close About this place').catch(() => null);
 }
 

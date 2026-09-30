@@ -182,6 +182,10 @@ try {
       await context(step, evidence, observations)
         .screenshot('end', 'the page when the step ended').catch(() => null);
     }
+    if (evidence.screenshots.length === 0) {
+      status = 'failed';
+      failure = failure ? `${failure}; no screenshot was captured` : 'no screenshot was captured';
+    }
     evidence.network = await page.traffic(step.id);
     evidence.console = page.console(step.id);
     const { spend_usd: spendUsd, ...kept } = evidence;
