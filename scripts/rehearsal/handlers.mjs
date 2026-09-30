@@ -2927,6 +2927,11 @@ async function compareTownGroup(ctx) {
 
 async function askWhatHappened(ctx) {
   const { page } = ctx;
+  const { entry } = await savedWorld(ctx);
+  const recorded = (await ctx.api('GET', societyPath(entry, '/events'))).body?.events ?? [];
+  ctx.observe('town-events-recorded', recorded.length > 0,
+    { world_id: entry.world_id, version_id: entry.authored_version_id,
+      count: recorded.length, ticks: [...new Set(recorded.map((event) => event.tick))].sort((a, b) => a - b) });
   await openPeopleNearby(page);
   const id = await page.waitFor(`[...(${INSPECT})?.options ?? []].find(o => o.value)?.value ?? null`, SETTLE_MS, 'someone nearby to inspect');
   await page.setValue(INSPECT, id);
@@ -2939,12 +2944,23 @@ async function askWhatHappened(ctx) {
   const ended = ['deadline_ended', 'timed_out', 'failed'].includes(last?.outcome);
   const saidEnded = /did not (?:choose|answer)/.test(words);
   const named = last?.model_name ?? last?.served_model_name ?? null;
+  const clauses = answer?.answer?.clauses ?? [];
+  const citedActivity = clauses.filter((clause) => clause.type === 'simulation'
+    && (clause.citations ?? []).length > 0 && typeof clause.text === 'string' && clause.text.trim());
+  ctx.observe('town-answer-cites-activity', recorded.length > 0 && face.mode === 'answer'
+    && !face.abstained && citedActivity.length > 0
+    && clauses.some((clause) => /simulat(?:ion|ed).*minute/i.test(clause.text ?? ''))
+    && face.chips.some((chip) => !chip.disabled)
+    && !/no words for|Nothing has been recorded/.test(words),
+  { world_id: entry.world_id, version_id: entry.authored_version_id,
+    recorded_count: recorded.length, cited_clauses: citedActivity.map((clause) =>
+      pick(clause, ['text', 'citations'])), face: pick(face, ['mode', 'abstained', 'clauses', 'chips']) });
   ctx.observe('answer-drawn', face.mode === 'answer' && face.clauses.length > 0
-    && ((composed && !saidEnded && Boolean(face.provenance)) || (ended && saidEnded)),
+    && composed && !saidEnded && Boolean(face.provenance),
   { face: pick(face, ['mode', 'clauses', 'provenance']), composer: last === null ? null : pick(last, ['outcome', 'model_id', 'model_name', 'served_model_name', 'duration_ms', 'latency_ms']) });
-  ctx.observe('composer-outcome-shown', status === 200 && last !== null && (composed || ended)
-    && (composed ? !saidEnded : saidEnded),
+  ctx.observe('composer-outcome-shown', status === 200 && last !== null && composed && !saidEnded,
   { status, composer_calls: calls.map((c) => pick(c, ['outcome', 'model_id', 'served_model_name', 'latency_ms'])), named,
+    composer_ended_without_answer: ended && saidEnded,
     society_context: (await responses(ctx, 'POST', '/api/selection/ask')).at(-1)?.request_body?.society_context ?? null });
   await ctx.screenshot('answer', 'the Companion\'s answer to what happened in the town');
 }

@@ -1300,24 +1300,26 @@
     {
       "id": "ask-what-happened",
       "session": "town",
-      "action": "Inspect one of the town's people in People nearby, open the Companion and ask what happened in this world.",
+      "action": "After the town records activity, inspect one of its people in People nearby, open the Companion and ask what happened in this world.",
       "gates": ["foundation:Companion interaction"],
-      "gates_reason": "The Companion answers a question about a world's people within its bounded wait, and says which model chose its lines or that none did in time.",
+      "gates_reason": "The Companion answers a question about the living town's recorded activity within its bounded wait and names the model that chose its cited lines; a timed-out or unavailable composer is recorded as an incomplete answer.",
       "requires": ["people-cross-tile-seams"],
       "hosted_model": true,
       "spend_estimate_usd": "0.01",
       "spend_estimate_source": "One planner call and one composer call with its fallback at most; the Companion's asks in the companion session cost under 0.003 USD each (docs/evaluation/2026-09-29-rehearsal-models-and-comparison.json).",
       "parameters": {
         "question": "What happened in this world?",
-        "question_reason": "The typed question the Companion answers about a world's people from the society's recorded lines."
+        "question_reason": "A world-wide recent-events question for the living town, whose answer can cite actual recorded resident activity and simulation minutes without waiting for a new model decision."
       },
       "owner_area": "the Companion's people answers: exulanica/selection/society_question.py and web/packages/app/src/companion-ask-api.ts",
       "expect": {
         "page": [
-          {"id": "answer-drawn", "says": "The Companion draws an answer, and its provenance line names the model that chose the lines, or its words say the model did not choose them in time and give the latest recorded lines."}
+          {"id": "town-answer-cites-activity", "says": "The Companion answers with at least one cited simulation activity line and a simulation-minute span from this town, rather than an empty or no-words fallback."},
+          {"id": "answer-drawn", "says": "The Companion draws an answer with a provenance line after the answer composer completed; a fallback after its failure does not satisfy this hosted-answer check."}
         ],
         "api": [
-          {"id": "composer-outcome-shown", "says": "POST /selection/ask answered 200, and what the answer composer's last call did (completed, or ended by the wait, timed out or failed) is what the page says."}
+          {"id": "town-events-recorded", "says": "Before asking, the same saved town and version expose at least one recorded society event for the answer to describe."},
+          {"id": "composer-outcome-shown", "says": "POST /selection/ask answered 200 and the answer composer's last call completed; its timeout, failure or missing call is recorded without counting the step as a completed hosted answer."}
         ]
       }
     },
