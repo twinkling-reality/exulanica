@@ -112,6 +112,7 @@
     {"id": "town", "runner": "browser", "budget_seconds": 6600, "budget_reason": "The sum of its bounds with room for the pages: two towns' bakes of at most 900 s each, 240 s of watching people, at most one traffic episode (1200 s, the route's episode_steps times step_ms) of watching vehicles, the comparison's 1500 s, the Companion's answer at most as long as the page waits (ASK_TIMEOUT_MS 180 s in web/packages/app/src/companion-ask-api.ts) and the draft's model and sample calls, with page loads and the gate.", "purpose": "A town made from values a person sets, its people crossing tile seams and its vehicles driving, a model chosen for a group of its people and compared from the application, the Companion asked what happened, and a second town made from a model's draft of a person's words."},
     {"id": "compare", "runner": "browser", "budget_seconds": 300, "budget_reason": "Its bounds with room for the page: the 60 s wait for both runs to be drawn and the 5 s of play, with a page load and the gate.", "purpose": "The comparison in the application's Compare view: its verdict, each arm with how its model answered, and the two runs on one clock."},
     {"id": "developer-reading", "runner": "orchestrator", "purpose": "The developer client reads the comparison the owner started from the application, its runs and their decisions, through the authenticated API."},
+    {"id": "traffic-signal", "runner": "browser", "budget_seconds": 400, "budget_reason": "A page load and choice, plus at most 240 s for a model's first sealed traffic-light decision, followed by one 60-second traffic read and screenshots.", "purpose": "Return to the first saved town and choose one model-run traffic light shortly before exporting the judge seed."},
     {"id": "judge-seed", "runner": "orchestrator", "purpose": "The run's workspace, towns included, exported as a judge seed and restored into a fresh database and data directory as the judge deployment restores one."}
   ],
   "steps": [
@@ -1142,6 +1143,10 @@
       "gates": ["foundation:Personal-media path"],
       "gates_reason": "The made world hosts people on the floor each region declares, one society loop for every world; the gate itself is not available for want of reconstruction.",
       "requires": ["furnish-made-world"],
+      "parameters": {
+        "arrival_clearance_mm": 2000,
+        "arrival_clearance_reason": "The v4 authored-ground genesis keeps resident starts two metres from the saved region-local arrival; the rehearsal measures actual first-frame positions against the served integer pose."
+      },
       "owner_area": "people in a made world: exulanica/world/society_authored_ground.py, assets/catalogs/society-ground/society-ground.v1.json and web/packages/app/src/composition/environment-selection.ts",
       "expect": {
         "page": [
@@ -1149,6 +1154,8 @@
           {"id": "model-panel-beside-them", "says": "Who decides for them is shown beside them, listing each of them and offering every model the server offers."}
         ],
         "api": [
+          {"id": "made-arrival-source-bound", "says": "The v4 made world's served arrival pose and authorized scene, point-map or photograph pin bind the same world, version, source snapshot and region, with exact source digests where that source has them."},
+          {"id": "made-residents-clear-of-arrival", "says": "At the first resident minute, each person's actual position is at least two metres from the served region-local arrival."},
           {"id": "society-on-declared-floor", "says": "The made world's entry declares a floor, its society's walkable area is the declared one, and every inhabitant, synthetic, stands inside it."}
         ]
       }
@@ -1353,6 +1360,33 @@
       }
     },
     {
+      "id": "choose-model-for-traffic-light",
+      "session": "traffic-signal",
+      "action": "Return to the first saved town, choose a model for one traffic light in Nearby, and watch its first sealed decision become active.",
+      "gates": ["delivery:Models in their roles", "delivery:Persistence and replay"],
+      "gates_reason": "A model chosen in the world page controls one signal only after a sealed accepted decision, and the page's traffic read replays that recorded choice on the same saved version.",
+      "requires": ["describe-town-and-use-the-draft", "vehicles-drive-the-town"],
+      "hosted_model": true,
+      "spend_estimate_usd": "0.005",
+      "spend_estimate_source": "One accepted traffic decision is enough for activation; a focused town proof recorded ten accepted calls at 0.00055470 USD. The rehearsal chooses this role after its other hosted steps and allows for further preparation while it waits.",
+      "parameters": {
+        "activation_wait_seconds": 240,
+        "activation_wait_reason": "Four sealed one-minute traffic segments allow the role's first decision to be prepared and activated under the API's bounded worker."
+      },
+      "owner_area": "model-run traffic lights: exulanica/api/routes/world_models.py, exulanica/api/traffic_signal_controller.py, exulanica/world/traffic_signal_repository.py, web/packages/app/src/ui/world-signals-models.ts",
+      "expect": {
+        "page": [
+          {"id": "traffic-light-choice-offered", "says": "Nearby offers a specific traffic light and an admitted model for this saved town and version."},
+          {"id": "active-traffic-model-shown", "says": "After the first sealed decision, Nearby names the chosen model as running that light."}
+        ],
+        "api": [
+          {"id": "traffic-light-choice-recorded", "says": "The page POSTs one signal and the offered model to the registered signal role."},
+          {"id": "traffic-light-model-active", "says": "The same signal's choice becomes active under the chosen model and generation."},
+          {"id": "active-choice-sealed-in-traffic", "says": "A traffic read spanning activation has a sealed segment whose world, version, roads, choice sequence, activation second and decision, frame and continuation digests bind that visible choice."}
+        ]
+      }
+    },
+    {
       "id": "compare-view-shows-the-pair",
       "session": "compare",
       "action": "Open Compare models from the World menu, read the verdict and the arms, choose the two models' runs for the left and right sides, press Play under them and move the clock.",
@@ -1423,7 +1457,7 @@
     {
       "id": "restore-judge-seed-into-a-fresh-stack",
       "session": "judge-seed",
-      "action": "Create a fresh database on the run's server and an empty data directory, migrate it (exulanica-db), provision the judge role and restore the seed into it (exulanica-seed role, restore), and read each town's tiles back from them.",
+      "action": "Create a fresh database on the run's server and an empty data directory, migrate it (exulanica-db), provision the judge role and restore the seed into it (exulanica-seed role, restore), then read each town's tiles and the sealed signal choice back from them.",
       "gates": ["delivery:Release rehearsal"],
       "gates_reason": "A judge's stack is brought up from the seed with no worker; the towns in it must draw from what the seed carried.",
       "requires": ["export-judge-seed"],
@@ -1439,7 +1473,8 @@
       "expect": {
         "api": [
           {"id": "restored-and-verified", "says": "exulanica-db, exulanica-seed role and exulanica-seed restore each exit 0 on the fresh database, the restore having verified the rows and bytes that landed against the manifest."},
-          {"id": "towns-drawn-from-the-seed", "says": "Every tile of every generated world of the restored workspace reads baked, and its container is in the restored tile store and hashes to the digest its bake records."}
+          {"id": "towns-drawn-from-the-seed", "says": "Every tile of every generated world of the restored workspace reads baked, and its container is in the restored tile store and hashes to the digest its bake records."},
+          {"id": "signal-choice-restored", "says": "The restored workspace holds the same activated model-controlled traffic-light choice and sealed segment, with accepted decision receipts and provider cost accounted as known cost or a conservative bound when a call's cost is unknown."}
         ]
       }
     }

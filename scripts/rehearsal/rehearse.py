@@ -334,6 +334,8 @@ class Run:
         self.sessions_run: list[dict[str, Any]] = []
         self.timing_phase: dict[str, Any] | None = None
         self.timing_spend = Decimal(0)
+        self.signal_receipts: dict[str, Any] | None = None
+        self.signal_spend = Decimal(0)
         self.prepared: dict[str, dict[str, Any]] = {}
         self.launcher: ModuleType | None = None
         self.state: dict[str, Any] | None = None
@@ -682,9 +684,52 @@ class Run:
         return None
 
     def reported_spend(self) -> Decimal:
-        return self.timing_spend + sum(
-            (Decimal(str(o.get("spend_usd", "0"))) for o in self.outcomes.values()), Decimal(0)
+        return (
+            self.timing_spend
+            + self.signal_spend
+            + sum(
+                (Decimal(str(o.get("spend_usd", "0"))) for o in self.outcomes.values()), Decimal(0)
+            )
         )
+
+    def capture_signal_receipts(self) -> None:
+        """Read background signal costs before the owned API and database shut down."""
+        if self.state is None:
+            return
+        try:
+            completed = subprocess.run(
+                [
+                    str(self.worktree / ".venv/bin/python"),
+                    str(HERE / "signal_receipts.py"),
+                    self.state["workspace_id"],
+                ],
+                cwd=self.worktree,
+                env=clean_environment()
+                | {
+                    "EXULANICA_DATABASE_URL": self.state["database"]["owner_url_for_evidence_reads"]
+                },
+                capture_output=True,
+                text=True,
+                timeout=60,
+                check=False,
+            )
+        except (OSError, subprocess.SubprocessError) as error:
+            self.signal_receipts = {"status": "unverified", "checker_error": type(error).__name__}
+            return
+        if completed.returncode == 0:
+            try:
+                snapshot = json.loads(completed.stdout)
+                self.signal_spend = Decimal(snapshot["accounted_usd"])
+                self.signal_receipts = {
+                    **snapshot,
+                    "capture_phase": "live_before_api_shutdown",
+                    "final_accounting_complete": False,
+                    "process_api_bound_usd": str(self.bound),
+                }
+                return
+            except (ValueError, KeyError, TypeError):
+                pass
+        self.signal_receipts = {"status": "unverified", "checker_exit": completed.returncode}
 
     def run_sessions(self) -> None:
         selected = (
@@ -1050,10 +1095,13 @@ class Run:
                     "ask_before_usd": self.steps["spend"]["ask_before_usd"],
                     "estimate_usd": str(steplist.spend_estimate(self.steps)),
                     "reported_usd": str(self.reported_spend()),
+                    "signal_receipts_complete": False,
+                    "signal_receipts_reason": "The source receipt read was a live snapshot before the owned API shut down; its accountable upper-bound cost is included, but final process accounting was not measured after shutdown.",
                 },
             },
             "browser": {"gpu_slot": self.gpu_slot is not None, "sessions": self.sessions_run},
             "timing_phase": self.timing_phase,
+            "signal_receipts": self.signal_receipts,
             "prepared": {
                 session: {key: value for key, value in inputs.items() if key != "photographs"}
                 | {
@@ -1481,12 +1529,24 @@ def restore_judge_seed(
             timeout=timeout,
             env=clean_environment() | target,
         )
+        signal_checked = subprocess.run(
+            [python, str(HERE / "signal_receipts.py"), run.state["workspace_id"]],
+            cwd=run.worktree,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            env=clean_environment() | target,
+        )
     finally:
         dropped = database("drop", " with (force)") if created == 0 else None
     try:
         towns = json.loads(checked.stdout)["generated_worlds"]
     except (ValueError, KeyError):
         towns = None
+    try:
+        restored_signals = json.loads(signal_checked.stdout)
+    except ValueError:
+        restored_signals = None
     evidence["restore"] = {
         "log": "judge-restore.txt",
         "fresh_database": {"created": created == 0, "dropped": dropped == 0},
@@ -1515,6 +1575,23 @@ def restore_judge_seed(
             "generated_worlds": towns,
             "check_exit": checked.returncode,
             "check_error": scrub(checked.stderr[-600:]),
+        },
+    )
+    signal_choice = run.facts.get("signal_choice")
+    observe(
+        "signal-choice-restored",
+        signal_checked.returncode == 0
+        and signal_choice is not None
+        and restored_signals is not None
+        and restored_signals.get("profile") == "exulanica.rehearsal-signal-receipts/v1"
+        and restored_signals.get("accepted_decisions", 0) > 0
+        and restored_signals.get("counts", {}).get("segments", 0) > 0
+        and signal_choice in restored_signals.get("active_choices", []),
+        {
+            "expected_choice": signal_choice,
+            "restored": restored_signals,
+            "check_exit": signal_checked.returncode,
+            "check_error": scrub(signal_checked.stderr[-600:]),
         },
     )
 
@@ -1614,6 +1691,7 @@ def main() -> int:
     except Refused as error:
         refused = str(error)
     finally:
+        run.capture_signal_receipts()
         run.workers_down()
         run.launcher_down()
     if refused is not None:

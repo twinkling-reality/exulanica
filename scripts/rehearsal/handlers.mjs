@@ -2290,9 +2290,52 @@ async function madeWorldHostsPeople(ctx) {
   await page.click(BUTTON('Bring in inhabitants', PEOPLE), 'Bring in inhabitants');
   await page.waitFor(`${PEOPLE}?.dataset.state === 'present'`, SETTLE_MS, 'the inhabitants to be present');
   await sleep(PAGE_SETTLE_MS);
+  await ctx.screenshot('arrival-people', 'the made world on the first resident frame at its pinned arrival');
   const seen = await peopleSeen(page);
   const society = (await ctx.api('GET', societyPath(entry, '', '&places=true'))).body;
   const people = society?.state?.inhabitants ?? [];
+  const opened = (await ctx.api('GET', `/world-entries/${entry.entry_id}`)).body;
+  const arrival = opened?.arrival ?? null;
+  const source = arrival?.source ?? null;
+  const scene = opened?.arrival_scene ?? null;
+  const captureIds = new Set((ctx.facts.captures ?? []).map((capture) => capture.capture_id));
+  const pinned = source?.profile === 'exulanica.arrival-scene-pin/v1'
+    ? scene?.scene_id === source.scene_id && scene?.pose_receipt_sha256 === source.pose_receipt_sha256
+      && scene?.placement_receipt_sha256 === source.placement_receipt_sha256
+      && scene?.gate_digest === source.gate_receipt_sha256
+    : source?.profile === 'exulanica.arrival-point-map-pin/v1'
+      ? (ctx.facts.point_maps ?? []).some((point) => point.capture_id === source.capture_id
+          && point.point_map?.artifact_id === source.artifact_id)
+      : source?.profile === 'exulanica.arrival-photograph-pin/v1'
+        && captureIds.has(source.capture_id);
+  const pose = arrival?.position_local_mm ?? null;
+  const forward = arrival?.forward_local_millionths ?? null;
+  const digest = (value) => typeof value === 'string' && /^[0-9a-f]{64}$/.test(value);
+  const sourceDigest = source?.profile === 'exulanica.arrival-scene-pin/v1'
+    ? [source.pose_receipt_sha256, source.placement_receipt_sha256, source.gate_receipt_sha256].every(digest)
+    : source?.profile === 'exulanica.arrival-point-map-pin/v1' ? digest(source.content_sha256)
+      : source?.profile === 'exulanica.arrival-photograph-pin/v1';
+  ctx.observe('made-arrival-source-bound', arrival?.profile === 'exulanica.arrival-descriptor/v1'
+    && arrival.presentation_policy === 'exulanica.arrival-presentation/v1'
+    && opened.arrival_unavailable_reason === null && opened.world_id === entry.world_id
+    && opened.authored_version_id === entry.authored_version_id
+    && source.world_id === entry.world_id && source.version_id === entry.authored_version_id
+    && source.source_snapshot_id === opened.source_snapshot_id
+    && source.region_id === arrival.region_id && society?.region_id === arrival.region_id
+    && Array.isArray(pose) && pose.length === 3 && pose.every(Number.isInteger)
+    && Array.isArray(forward) && forward.length === 3 && forward.every(Number.isInteger)
+    && forward.some((value) => Math.abs(value) >= 100_000) && pinned && sourceDigest,
+  { entry_id: entry.entry_id, world_id: entry.world_id, version_id: entry.authored_version_id,
+    source_snapshot_id: opened?.source_snapshot_id ?? null, arrival, arrival_scene: scene === null ? null
+      : pick(scene, ['scene_id', 'pose_receipt_sha256', 'placement_receipt_sha256', 'gate_digest']) });
+  const squared = people.map((person) => Array.isArray(person.position_mm) && pose !== null
+    ? (person.position_mm[0] - pose[0]) ** 2 + (person.position_mm[1] - pose[2]) ** 2 : null);
+  const clearance = ctx.parameters.arrival_clearance_mm;
+  ctx.observe('made-residents-clear-of-arrival', society?.current_tick === 0
+    && people.length > 0 && squared.every((distance) => Number.isInteger(distance)
+      && distance >= clearance * clearance),
+  { world_id: entry.world_id, version_id: entry.authored_version_id, region_id: society?.region_id ?? null,
+    clearance_mm: clearance, resident_count: people.length, nearest_squared_mm: Math.min(...squared.map((d) => d ?? 0)) });
   const area = society?.places?.walkable_area ?? null;
   const floor = entry.declared_floor ?? null;
   // Positions and the area's centre are ground coordinates, [x, z] in millimetres.
@@ -3013,6 +3056,89 @@ async function describeTownAndUseTheDraft(ctx) {
   await ctx.screenshot('town', 'the town made from the drafted values');
 }
 
+async function chooseModelForTrafficLight(ctx) {
+  const { page } = ctx;
+  const townId = ctx.facts.town?.entry_id;
+  if (!townId) throw new Error('the first saved town has no entry to reopen');
+  await open(ctx, townId);
+  ctx.facts.open_entry_id = townId;
+  const { entry } = await savedWorld(ctx, townId);
+  const query = `world_id=${encodeURIComponent(entry.world_id)}`;
+  const modelsPath = `/world/versions/${entry.authored_version_id}/models?${query}`;
+  const readModels = async () => (await ctx.api('GET', modelsPath)).body;
+  await openPeopleNearby(page);
+  await ctx.screenshot('nearby', 'the first town with traffic-light controls in Nearby');
+  const models = await readModels();
+  const signal = models?.roles?.find((role) => role.subject === 'signal') ?? null;
+  const subject = signal?.subjects?.[0] ?? null;
+  const offered = (signal?.models ?? []).filter((model) => model.refusal === null);
+  const model = offered.find((item) => item.provider === 'nebius') ?? offered[0] ?? null;
+  const panel = `document.querySelector('.world-signal-models')`;
+  await page.waitFor(`${panel}?.checkVisibility() ?? false`, SETTLE_MS, 'the traffic-light model controls');
+  const options = await page.evaluate(`(() => { const p = ${panel}; return {
+    lights: [...(p?.querySelector('select[aria-label="Traffic light"]')?.options ?? [])].map(o => o.value),
+    models: [...(p?.querySelector('select[aria-label="Who decides this traffic light"]')?.options ?? [])].map(o => o.value)
+  }; })()`);
+  ctx.observe('traffic-light-choice-offered', models?.profile === 'exulanica.world-models/v1'
+    && models.world_id === entry.world_id && models.version_id === entry.authored_version_id
+    && signal?.available === true && signal.host_refusal === null && subject !== null && model !== null
+    && options.lights.includes(subject.signal_id)
+    && options.models.includes(`${model.provider} ${model.model_id}`),
+  { world_id: entry.world_id, version_id: entry.authored_version_id, role_key: signal?.key ?? null,
+    subject, model: model === null ? null : pick(model, ['provider', 'model_id', 'name', 'refusal']), options });
+  if (subject === null || model === null || signal === null) throw new Error('no traffic-light model is offered');
+  await page.setValue(`${panel}?.querySelector('select[aria-label="Traffic light"]')`, subject.signal_id);
+  await page.setValue(`${panel}?.querySelector('select[aria-label="Who decides this traffic light"]')`, `${model.provider} ${model.model_id}`);
+  await ctx.screenshot('before-choice', 'the saved town and the selected traffic-light model');
+  const postsBefore = (await responses(ctx, 'POST', `/api/world/versions/${entry.authored_version_id}/models/${signal.key}`)).length;
+  await page.click(`${panel}?.querySelector('button')`, 'Use for this traffic light');
+  const posted = await until('the traffic-light model choice to be recorded', SETTLE_MS, async () =>
+    (await responses(ctx, 'POST', `/api/world/versions/${entry.authored_version_id}/models/${signal.key}`))
+      .slice(postsBefore).find((item) => item.status !== null) ?? null);
+  ctx.observe('traffic-light-choice-recorded', posted.status === 200
+    && posted.request_body?.subjects?.length === 1
+    && posted.request_body.subjects[0] === subject.signal_id
+    && posted.request_body.model?.provider === model.provider
+    && posted.request_body.model?.model_id === model.model_id,
+  { post_status: posted.status, request: posted.request_body, response: posted.response_body });
+  const chosen = await until('a sealed model decision to activate the traffic light',
+    ctx.parameters.activation_wait_seconds * 1000, async () => {
+      const read = await readModels();
+      const choice = read?.roles?.find((role) => role.subject === 'signal')?.choices
+        ?.find((item) => item.subject_id === subject.signal_id) ?? null;
+      return choice?.status === 'active' && choice.active_second != null ? choice : null;
+    });
+  ctx.observe('traffic-light-model-active', chosen.model?.model_id === model.model_id
+    && chosen.model?.provider === model.provider
+    && chosen.running_choice_seq === chosen.choice_seq,
+  { choice: chosen });
+  await page.waitFor(`(${panel})?.innerText.includes('runs this light') ?? false`, SETTLE_MS,
+    'Nearby to show the sealed traffic-light decision').catch(() => null);
+  const shown = await page.evaluate(`(${panel})?.innerText ?? ''`);
+  ctx.observe('active-traffic-model-shown', shown.includes(model.name)
+    && shown.includes('runs this light') && shown.includes('first sealed decision'),
+  { shown, model_name: model.name });
+  await ctx.screenshot('active', 'the chosen model shown as running the traffic light');
+  const traffic = await ctx.api('GET', `/world/versions/${entry.authored_version_id}/traffic?${query}&from_second=${chosen.active_second}&seconds=60`);
+  const segments = traffic.body?.sealed_segments ?? [];
+  const active = segments.find((segment) => segment.choice_seq === chosen.choice_seq
+    && segment.active_second === chosen.active_second
+    && segment.start_second <= chosen.active_second && segment.end_second > chosen.active_second) ?? null;
+  const digest = (value) => typeof value === 'string' && /^[0-9a-f]{64}$/.test(value);
+  ctx.observe('active-choice-sealed-in-traffic', traffic.status === 200
+    && traffic.body?.world_id === entry.world_id && traffic.body?.version_id === entry.authored_version_id
+    && active?.profile === 'exulanica.traffic-sealed-segment/v1'
+    && active.world_id === entry.world_id && active.version_id === entry.authored_version_id
+    && active.roads_version === traffic.body.roads_version
+    && digest(active.decisions_sha256) && digest(active.frames_sha256)
+    && digest(active.continuation_sha256),
+  { traffic_status: traffic.status, world_id: entry.world_id, version_id: entry.authored_version_id,
+    subject_id: subject.signal_id, active_second: chosen.active_second, choice_seq: chosen.choice_seq,
+    roads_version: traffic.body?.roads_version ?? null, sealed_segments: segments });
+  ctx.facts.signal_choice = { world_id: entry.world_id, version_id: entry.authored_version_id,
+    subject_id: subject.signal_id, choice_seq: chosen.choice_seq, active_second: chosen.active_second };
+}
+
 /**
  * A step that acts in the world: a page session starts on a blank page, so the first such step of
  * a session opens the application and passes its gate, the way the person arrives.
@@ -3064,6 +3190,7 @@ export const HANDLERS = Object.freeze({
   'compare-town-group': inWorld(compareTownGroup),
   'ask-what-happened': inWorld(askWhatHappened),
   'describe-town-and-use-the-draft': inWorld(describeTownAndUseTheDraft),
+  'choose-model-for-traffic-light': chooseModelForTrafficLight,
   'open-close-photo-intake': inWorld(openClosePhotoIntake),
   'upload-synthetic-photographs': inWorld(uploadSyntheticPhotographs),
   'authorize-admission-in-app': inWorld(authorizeAdmissionInApp),
