@@ -356,6 +356,16 @@ class Services:
         keep_usd, _keep_calls = share_kept(budget, role.contract())
         return budget.ceiling_usd - budget.spent_usd - keep_usd
 
+    def comparison_call_room(self, role: DecisionRole) -> int | None:
+        """How many calls this process's model budget has left for a comparison it plays itself,
+        beside the calls ``role``'s contract keeps for other work; None where another process
+        plays them. A comparison can stop at this as it stops at its bound, whatever it spent."""
+        if not self.runs_comparison_worker or self.model_client is None:
+            return None
+        budget = self.model_client.budget
+        _keep_usd, keep_calls = share_kept(budget, role.contract())
+        return budget.max_calls - budget.billed_calls - keep_calls
+
     def build_comparison_worker(self, *, keeps_share: bool) -> SocietyComparisonWorker | None:
         """What plays the comparisons started from the application, for the workspaces this host
         asks models for, or None where it asks models for none or has no society runtime."""

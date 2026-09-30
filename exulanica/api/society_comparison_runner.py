@@ -73,7 +73,12 @@ from exulanica.world.society_comparison import (
     plan_role,
     play,
 )
-from exulanica.world.society_comparison_drawing import drawing_sha256, encode
+from exulanica.world.society_comparison_drawing import (
+    DrawingCorrupt,
+    decode,
+    drawing_sha256,
+    encode,
+)
 from exulanica.world.society_comparison_repository import (
     SocietyComparisonRepository,
     run_id_for,
@@ -629,15 +634,15 @@ class SocietyComparisonRunner:
         *,
         host: RunHost | None = None,
     ) -> list[dict]:
-        """Play every run that has no outcome yet, the protocol's number at a time: every
-        anchor first, so each seed's routine run has recorded the group's choice points before any
-        model is asked on that seed, then each seed's model runs, one seed after another, in the
-        order the definition commits its seeds. Before a seed's model runs start, ``host``
-        admits them or stops the comparison there (:attr:`RunHost.admit`): a stop keeps every seed
-        already played, and closes the rest as :data:`BOUND_BEFORE_SEED`. Outcomes come back in
-        the order ``run_ids`` names them. ``host`` is the host that claimed the comparison
-        (:class:`RunHost`); the local command plays with none, admits every seed and plays every
-        seed's model runs in one wave."""
+        """Play every run that has no outcome yet, the protocol's number at a time, a seed's
+        anchors before its model runs, so each seed's routine run has recorded the group's choice
+        points before any model is asked on that seed. Under a claiming ``host``, the seeds are
+        played one after another in the order the definition commits them, and before a seed's
+        runs start the host admits them or stops the comparison there (:attr:`RunHost.admit`): a
+        stop keeps every seed already played, and closes that seed's runs and every later seed's
+        as :data:`BOUND_BEFORE_SEED`, asking nothing. The local command plays with none, admits
+        every seed, and plays every anchor, then every model run, each in one wave. Outcomes come
+        back in the order ``run_ids`` names them."""
         at_once = protocol_value(self.catalogs, "runs_at_once")
         with self.database.session(self.workspace_id) as connection:
             repository = self._repository(connection)
@@ -646,7 +651,7 @@ class SocietyComparisonRunner:
             reserved = {run_id: repository._run(run_id) for run_id in run_ids}
             # A run that holds receipts was stopped part way: it asks nothing more, and is closed
             # as interrupted when it is played, whatever the bound holds.
-            resumed = {run_id for run_id in run_ids if repository.stored(run_id)}
+            resumed = {row["run_id"] for row in repository.open_runs(comparison_id) if row["asked"]}
         roles = {run_id: arms[row["arm"]]["role"] for run_id, row in reserved.items()}
         found: dict[uuid.UUID, dict] = {}
 
@@ -660,24 +665,27 @@ class SocietyComparisonRunner:
                     )
                 )
 
-        played([run_id for run_id in run_ids if roles[run_id] in ANCHOR_ROLES])
-        seeds: dict[str, list[uuid.UUID]] = {digest: [] for digest in definition["seeds"]}
+        anchors: dict[str, list[uuid.UUID]] = {digest: [] for digest in definition["seeds"]}
+        models: dict[str, list[uuid.UUID]] = {digest: [] for digest in definition["seeds"]}
         for run_id in run_ids:
-            if roles[run_id] not in ANCHOR_ROLES:
-                seeds[reserved[run_id]["seed_digest"]].append(run_id)
+            held = anchors if roles[run_id] in ANCHOR_ROLES else models
+            held[reserved[run_id]["seed_digest"]].append(run_id)
         closing: list[uuid.UUID] = []
         if host is None:
-            # The local command admits every seed, so its model runs share one wave.
-            played([run_id for wave in seeds.values() for run_id in wave])
+            # The local command admits every seed, so each kind of run shares one wave.
+            played([run_id for wave in anchors.values() for run_id in wave])
+            played([run_id for wave in models.values() for run_id in wave])
         else:
-            for wave in seeds.values():
-                if not wave:
+            for digest in definition["seeds"]:
+                seed = [*anchors[digest], *models[digest]]
+                if not seed:
                     continue
-                fresh = [run_id for run_id in wave if run_id not in resumed]
+                fresh = [run_id for run_id in seed if run_id not in resumed]
                 if not closing and (not fresh or host.admit(fresh)):
-                    played(wave)
+                    played(anchors[digest])
+                    played(models[digest])
                 else:
-                    played([run_id for run_id in wave if run_id in resumed])
+                    played([run_id for run_id in seed if run_id in resumed])
                     closing.extend(fresh)
         if closing:
             self.fail_open(comparison_id, dict.fromkeys(closing, BOUND_BEFORE_SEED))
@@ -811,12 +819,33 @@ class SocietyComparisonRunner:
                 connection, self._repository(connection).finish(comparison_id, run_id, outcome)
             )
 
-    def draw_all(self, comparison_id: uuid.UUID, run_ids: Sequence[uuid.UUID]) -> int:
-        """Draw every completed run of ``run_ids`` not drawn yet (:meth:`draw`), one after another,
-        and say how many are stored. Asked once a comparison's runs are played, and by a host once
-        it has finished its start: a town's drawing takes a replay of seconds, which no claim's
-        lease is held for, and a run left undrawn is read by a replay as before."""
-        return sum(1 for run_id in run_ids if self.draw(comparison_id, run_id))
+    def draw_all(
+        self,
+        comparison_id: uuid.UUID,
+        *,
+        stopping: Callable[[], bool] | None = None,
+    ) -> int:
+        """Draw every completed run of the comparison not drawn yet under this code
+        (:meth:`draw`), one after another, whichever claim or process played it, and say how many
+        are stored. Asked once a comparison's runs are played, and by a host once it has finished
+        its start: a town's drawing takes a replay of seconds, which no claim's lease is held for,
+        and a run left undrawn is read by a replay as before. A run that cannot be drawn is logged
+        and the rest are drawn; ``stopping`` ends it between runs."""
+        with self.database.session(self.workspace_id) as connection:
+            completed = [
+                run["run_id"]
+                for run in self._repository(connection).runs(comparison_id)
+                if run.get("status") == "completed"
+            ]
+        stored = 0
+        for run_id in completed:
+            if stopping is not None and stopping():
+                break
+            try:
+                stored += self.draw(comparison_id, run_id)
+            except Exception:
+                _LOG.exception("A completed comparison run could not be drawn; reads replay it")
+        return stored
 
     def draw(self, comparison_id: uuid.UUID, run_id: uuid.UUID) -> bool:
         """Replay a completed run from what it stored, verify it against its outcome, and store
@@ -838,7 +867,14 @@ class SocietyComparisonRunner:
                 outcome = repository.outcome(run_id)
                 if outcome is None or outcome["status"] != "completed":
                     return False
-                if repository.drawing(run_id, drawing) is not None:
+                found = repository.drawing(run_id, drawing)
+                if found is not None:
+                    try:
+                        decode(found)
+                    except DrawingCorrupt:
+                        # Appended rows are never changed: reads replay this run instead.
+                        _LOG.error("A comparison run's stored drawing is not the drawing it names")
+                        return False
                     return True
                 plan, definition = repository.plan(comparison_id, run_id)
                 stored = repository.stored(run_id)

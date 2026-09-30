@@ -39,6 +39,7 @@ from typing import Any
 import psycopg
 import pytest
 from exulanica.api import society_comparison_start as start_module
+from exulanica.api import society_comparison_worker as worker_module
 from exulanica.api.app import create_app
 from exulanica.api.authorisation import load_token_directory
 from exulanica.api.decision_host import ask_bound_usd
@@ -530,30 +531,45 @@ def _model_run(started: dict[str, Any], comparison_id: str) -> tuple[dict, dict]
     return seed["runs"]["model_a"], result
 
 
+#: No ground's measurement: a seed is then admitted only while its bound holds what its runs can
+#: hold reserved at once (``held_usd``).
+def _no_figures(monkeypatch) -> None:
+    monkeypatch.setattr(start_module, "typical_figures", lambda *_args: None)
+
+
 @pytest.mark.parametrize("saved_world", [2], indirect=True)
-def test_a_bound_that_holds_no_ask_stops_the_run_before_it_asks(started, monkeypatch):
+def test_a_bound_that_holds_no_ask_closes_the_seed_before_it_asks(started, monkeypatch):
     world = started["world"]
     stays._inhabited(world, started["client"])
-    # With no typical figure the seed is admitted, so it is the bound, ask by ask, that stops it.
-    monkeypatch.setattr(start_module, "figures_for", lambda *_args: (None, False))
+    _no_figures(monkeypatch)
     body = _body(bound_usd=format((_one_ask() / 2).quantize(Decimal("0.00000001")), "f"))
     assert _start(started, body).status_code == 201, body
     assert _worker(started).run_once(world["workspace"]) is True
     run, result = _model_run(started, body["comparison_id"])
-    assert (run["status"], run["failure"]) == ("failed", "comparison_bound_spent")
-    assert {result["seeds"][0]["runs"][arm]["status"] for arm in ("routine", "wait")} == {
-        "completed"
-    }
-    assert result["start"]["state"] == "finished"
+    # With no figure, the seed needs what its runs can hold at once; half an ask is not that.
+    assert (run["status"], run["failure"]) == ("failed", "comparison_bound_before_seed")
+    assert (result["start"]["state"], result["start"]["closed_reason"]) == (
+        "closed",
+        "comparison_bound_before_seed",
+    )
     assert not started["transport"].requests, "nothing was asked past the bound"
 
 
 @pytest.mark.parametrize("saved_world", [2], indirect=True)
-def test_what_a_comparison_spends_stays_within_its_bound(started, monkeypatch):
+def test_what_a_comparison_spends_stays_within_its_bound_ask_by_ask(started, monkeypatch):
+    """The bound ask by ask, the backstop behind admission: admission holds a seed to at least
+    what its runs can hold at once, so a seed it admits is one this bound rarely has to stop. Here
+    the host admits the seed whatever it needs, and the bound alone stops the run."""
     world = started["world"]
     stays._inhabited(world, started["client"])
-    # With no typical figure the seed is admitted, so it is the bound, ask by ask, that stops it.
-    monkeypatch.setattr(start_module, "figures_for", lambda *_args: (None, False))
+    real = worker_module.comparison_cost
+
+    def admits_anything(*args, **kwargs):
+        return dataclasses.replace(
+            real(*args, **kwargs), typical_usd=Decimal(0), held_usd=Decimal(0)
+        )
+
+    monkeypatch.setattr(worker_module, "comparison_cost", admits_anything)
     bound = (_one_ask() * 3).quantize(Decimal("0.00000001"))
     body = _body(bound_usd=format(bound, "f"))
     assert _start(started, body).status_code == 201, body
@@ -708,8 +724,9 @@ def test_a_host_that_finished_a_run_before_it_stopped_never_counts_as_finishing_
 def test_a_takeover_counts_the_minute_a_stopped_host_may_have_been_asking(started, monkeypatch):
     world = started["world"]
     stays._inhabited(world, started["client"])
-    # With no typical figure the seed is admitted, so the first host reaches the model's run.
-    monkeypatch.setattr(start_module, "figures_for", lambda *_args: (None, False))
+    # With no figure the seed needs what its run can hold at once, one minute: it is admitted, so
+    # the first host reaches the model's run.
+    _no_figures(monkeypatch)
     # The most one minute of the model's run can cost: every person asked once.
     minute = (_population(started) * _one_ask()).quantize(
         Decimal("0.00000001"), rounding=ROUND_CEILING

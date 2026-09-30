@@ -152,6 +152,7 @@ START_REFUSALS: Final = {
     # has left beside the part its decision contract keeps for other work.
     "bound_out_of_range": 422,
     "bound_over_budget": 409,
+    "calls_over_budget": 409,
 }
 
 
@@ -428,6 +429,15 @@ def typical_per_person_hour(navigation: str | None = TYPICAL_NAVIGATION) -> dict
     return dict(sorted(merged.items()))
 
 
+def dearest_per_person_hour() -> dict[str, Decimal]:
+    """Each model's dearest figure per person-hour over every ground a measurement names."""
+    dearest: dict[str, Decimal] = {}
+    for navigation in TYPICAL_RECORDS:
+        for model_id, figure in (typical_figures(navigation) or _NONE).per_person_hour.items():
+            dearest[model_id] = max(figure, dearest.get(model_id, figure))
+    return dict(sorted(dearest.items()))
+
+
 #: No measurement: no figures.
 _NONE: Final = TypicalFigures(record="", per_person_hour={}, latency_p95_ms={})
 
@@ -494,13 +504,17 @@ def comparison_cost(
     at_once: int,
     navigation_profile: str | None,
     runs_left: Sequence[tuple[str, str]] | None = None,
+    dearest_elsewhere: bool = False,
 ) -> ComparisonCost:
     """What the comparison ``body`` states can cost at most, over a society of ``population``
     people, asking ``role``: every run's asks at their bound. ``at_once`` is how many runs are
     played at the same time (the protocol's ``runs_at_once``); ``navigation_profile`` is the kind
     of ground the society stands on, which says whether the typical figure was measured there
     (None where no reader is shown it). ``runs_left`` names the runs to
-    count, by arm and seed digest; left out, every run the body plans."""
+    count, by arm and seed digest; left out, every run the body plans. With
+    ``dearest_elsewhere``, where the society's own ground has no figure for every model it asks,
+    each model is taken at the dearest figure any ground has for it rather than the small
+    square's, which a town's people are asked more often than: what a host admits a seed by."""
     contract = role.contract()
     window = int(body["window_ticks"])
     people = population if body["group"]["people"] is None else len(body["group"]["people"])
@@ -543,6 +557,8 @@ def comparison_cost(
         navigation_profile, sorted({model_id for pairs in asked.values() for model_id, _ in pairs})
     )
     typical = dict((figures or _NONE).per_person_hour)
+    if dearest_elsewhere and not matches:
+        typical = dearest_per_person_hour()
     asks = 0
     most = Decimal(0)
     per_hour = Decimal(0)

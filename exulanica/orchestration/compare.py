@@ -182,7 +182,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     run_ids = runner.reserve_all(comparison_id, seeds)
     runner.run_all(comparison_id, run_ids)
-    runner.draw_all(comparison_id, run_ids)
+    runner.draw_all(comparison_id)
     with services.database.session(arguments.workspace) as connection:
         repository = runner._repository(connection)
         row = repository.definition(arguments.version, comparison_id)

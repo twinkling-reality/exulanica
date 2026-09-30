@@ -203,10 +203,12 @@ class SocietyComparisonWorker:
             self._close(runner, claim, open_runs, BOUND_SPENT, change)
             return
         bound = None
+        keep_usd, keep_calls = (
+            share_kept(budget, role.contract())
+            if budget is not None and self.keeps_share
+            else (Decimal(0), 0)
+        )
         if budget is not None:
-            keep_usd, keep_calls = (
-                share_kept(budget, role.contract()) if self.keeps_share else (Decimal(0), 0)
-            )
             if budget.ceiling_usd - budget.spent_usd - keep_usd < min(ceiling, cost.most_usd) or (
                 budget.max_calls - budget.billed_calls - keep_calls < 1
             ):
@@ -230,10 +232,12 @@ class SocietyComparisonWorker:
             navigation = None if society is None else repository.navigation_profile(society)
 
         def admit(runs: Sequence[uuid.UUID]) -> bool:
-            """Whether what is left of the bound holds what one seed's model runs like these
-            typically cost and what they can hold reserved at once: the least that lets them
-            finish (``suggested_usd``), from the typical figures of this society's ground. A seed
-            with no typical figure is admitted, and its asks stay held to the bound one by one."""
+            """Whether what is left of the bound, and of this process's calls, holds one seed's
+            runs like these: the least that lets them finish (``suggested_usd``) from the
+            typical figures of this society's ground, or, where that ground has none for a
+            model, the dearest any ground has; where no ground has one, what the runs can hold
+            reserved at once (``held_usd``), which is logged. The calls are the most the runs can
+            make, since a process that runs out of calls stops them whatever they spent."""
             with self.database.session(claim.workspace_id) as connection:
                 repository = runner._repository(connection)
                 left_runs = [repository._run(run_id) for run_id in runs]
@@ -249,29 +253,43 @@ class SocietyComparisonWorker:
                 at_once=protocol_value(runner.catalogs, "runs_at_once"),
                 navigation_profile=navigation,
                 runs_left=[(row["arm"], row["seed_digest"]) for row in left_runs],
+                dearest_elsewhere=True,
             )
             needed = seed.suggested_usd
-            return needed is None or claim.bound_usd - spent_now - presumed >= needed
+            if needed is None:
+                _LOG.warning(
+                    "No typical figure covers a comparison's models; a seed is admitted only "
+                    "while its bound holds what its runs can hold reserved"
+                )
+                needed = seed.held_usd
+            money = claim.bound_usd - spent_now - presumed >= needed
+            calls = budget is None or (
+                budget.max_calls - budget.billed_calls - keep_calls >= seed.calls
+            )
+            return money and calls
 
         host = RunHost(minute=minute, stopping=stop.is_set, recorded=recorded, admit=admit)
         order = [run["run_id"] for run in open_runs]
         try:
-            outcomes = played.run_all(claim.comparison_id, order, host=host)
+            played.run_all(claim.comparison_id, order, host=host)
         except HostStopping:
             change("release")
             return
         except ClaimLost:
             return
         with self.database.session(claim.workspace_id) as connection:
-            left = runner._repository(connection).open_runs(claim.comparison_id)
-        if not left:
+            repository = runner._repository(connection)
+            left = repository.open_runs(claim.comparison_id)
+            # Why it stopped, from the outcomes stored, whichever claim recorded them.
             stopped = any(
-                outcome.get("code") == BOUND_BEFORE_SEED for outcome in outcomes if outcome
+                (run.get("outcome") or {}).get("code") == BOUND_BEFORE_SEED
+                for run in repository.runs(claim.comparison_id)
             )
+        if not left:
             change("finish", closed_reason=BOUND_BEFORE_SEED if stopped else None)
-            # Once the start is finished, with no lease held, each completed run is drawn for its
-            # reads (the runner's ``draw``): a town's drawing takes seconds a lease is not held for.
-            runner.draw_all(claim.comparison_id, order)
+            # Once the start is finished, with no lease held, each completed run not drawn yet
+            # is drawn for its reads, whichever claim played it (the runner's ``draw_all``).
+            runner.draw_all(claim.comparison_id, stopping=stop.is_set)
 
     def _close(
         self,

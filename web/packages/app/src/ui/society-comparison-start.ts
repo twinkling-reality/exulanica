@@ -50,6 +50,7 @@ export const START_REFUSAL_WORDS: Readonly<Record<string, string>> = {
   seeds_out_of_range: 'This server holds fewer seeds than that.',
   bound_out_of_range: 'State a bound above $0 and at most the most the comparison can cost.',
   bound_over_budget: 'This server\'s model budget has too little left for that bound.',
+  calls_over_budget: 'This server\'s model budget allows fewer calls than this comparison can make. Choose fewer people, models or seeds.',
 };
 
 /**

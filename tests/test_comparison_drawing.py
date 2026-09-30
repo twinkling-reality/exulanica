@@ -21,13 +21,17 @@ import pytest
 from exulanica.api.routes import society_comparisons
 from exulanica.api.society_comparison_runner import SocietyComparisonRunner
 from exulanica.models.manifest import load_manifest
+from exulanica.movement.registry import MODULES_PATH
 from exulanica.world import society_comparison_drawing as drawing_module
+from exulanica.world.decision_roles import REGISTRY_DIRECTORY
+from exulanica.world.society_catalogs import ROUTINE_DIRECTORY
 from exulanica.world.society_comparison import play
 from exulanica.world.society_comparison_drawing import (
     DRAWING_MODULES,
     DrawingCorrupt,
     StoredDrawing,
     decode,
+    drawing_data,
     drawing_sha256,
     encode,
     with_names,
@@ -37,6 +41,7 @@ from exulanica.world.society_comparison_result import (
     replay_document,
     verified_replay,
 )
+from exulanica.world.society_engines import ENGINES_PATH
 from fastapi.testclient import TestClient
 
 import test_comparison_play_goldens as goldens
@@ -81,21 +86,62 @@ def test_the_digest_covers_every_module_a_verified_replay_and_its_drawing_execut
     assert executed <= set(DRAWING_MODULES), sorted(executed - set(DRAWING_MODULES))
 
 
-def test_a_change_to_a_drawing_module_is_a_new_digest(monkeypatch):
-    before = drawing_sha256(REPLAY_PROFILE)
-    real = drawing_module._module_bytes
-    monkeypatch.setattr(
-        drawing_module,
-        "_module_bytes",
-        lambda name: real(name) + (b"#" if name == "exulanica.world.society_planner" else b""),
+def test_the_digest_covers_the_data_a_replay_reads_as_well_as_its_code():
+    data = set(drawing_data())
+    assert {MODULES_PATH, ENGINES_PATH} <= data
+    assert set(REGISTRY_DIRECTORY.glob("*.json")) <= data
+    assert set(ROUTINE_DIRECTORY.glob("*.json")) <= data
+
+
+@pytest.mark.parametrize("changed", ["module", "movement", "engines", "roles"])
+def test_a_change_to_any_file_the_digest_covers_is_a_new_digest(monkeypatch, tmp_path, changed):
+    before = drawing_module._code_sha256()
+    assert before == drawing_module.CODE_SHA256, "taken once, at import"
+    targets = {
+        "movement": MODULES_PATH,
+        "engines": ENGINES_PATH,
+        "roles": sorted(REGISTRY_DIRECTORY.glob("*.json"))[0],
+    }
+    if changed == "module":
+        planner = drawing_module._module_path("exulanica.world.society_planner")
+        copy = tmp_path / planner.name
+        copy.write_bytes(planner.read_bytes() + b"#")
+        real = drawing_module._module_path
+        monkeypatch.setattr(
+            drawing_module,
+            "_module_path",
+            lambda name: copy if name == "exulanica.world.society_planner" else real(name),
+        )
+    else:
+        target = targets[changed]
+        copy = tmp_path / target.name
+        copy.write_bytes(target.read_bytes() + b" ")
+        files = tuple(copy if path == target else path for path in drawing_data())
+        monkeypatch.setattr(drawing_module, "drawing_data", lambda: files)
+    assert drawing_module._code_sha256() != before
+
+
+@pytest.mark.parametrize("damage", ["not-gzip", "cut-short", "longer"])
+def test_stored_bytes_that_are_not_the_drawing_are_refused_by_name(damage):
+    plan, stored, outcome = _played("routine")
+    encoded = encode(
+        replay_document(
+            plan, {}, "routine", "0" * 64, verified_replay(plan, stored, outcome), model_name=str
+        )
     )
-    drawing_sha256.cache_clear()
-    try:
-        assert drawing_sha256(REPLAY_PROFILE) != before
-    finally:
-        monkeypatch.undo()
-        drawing_sha256.cache_clear()
-    assert drawing_sha256(REPLAY_PROFILE) == before
+    broken = {
+        "not-gzip": StoredDrawing(b"not gzip", encoded.document_sha256, encoded.document_bytes),
+        "cut-short": StoredDrawing(
+            encoded.document_gzip[: len(encoded.document_gzip) // 2],
+            encoded.document_sha256,
+            encoded.document_bytes,
+        ),
+        "longer": StoredDrawing(
+            encoded.document_gzip, encoded.document_sha256, encoded.document_bytes - 1
+        ),
+    }[damage]
+    with pytest.raises(DrawingCorrupt):
+        decode(broken)
 
 
 def test_a_stored_drawing_names_models_by_id_and_is_held_to_its_digest():
@@ -139,7 +185,7 @@ def _drawn_routine_run(client, world):
     """A completed routine run, drawn as a host draws its runs once they are played."""
     comparison_id, run_id = route_support._completed_routine_run(client, world)
     assert not _drawings(world["connection"], run_id), "playing a run draws nothing"
-    assert _runner(client, world).draw_all(comparison_id, [run_id]) == 1
+    assert _runner(client, world).draw_all(comparison_id) == 1
     return comparison_id, run_id
 
 
@@ -244,3 +290,34 @@ def test_a_drawing_is_appended_once_and_never_changed(runtime_app):
                     ),
                 )
     assert len(_drawings(world["connection"], run_id)) == 1
+
+
+@pytest.mark.postgres
+@route_support.CURRENT_GROUND
+def test_a_stored_drawing_that_is_not_its_drawing_is_read_by_a_replay(runtime_app):
+    world, make_app = runtime_app
+    with TestClient(make_app()) as client:
+        comparison_id, run_id = route_support._completed_routine_run(client, world)
+        services = client.app.state.services
+        # Bytes stored under this code's digest that are not gzip: what a damaged row reads as.
+        with services.database.session(world["workspace"]) as connection, connection.transaction():
+            connection.execute(
+                "insert into society_comparison_replay(workspace_id,world_id,comparison_id,"
+                "run_id,drawing_sha256,document_sha256,document_bytes,document_gzip) "
+                "values(%s,%s,%s,%s,%s,%s,%s,%s)",
+                (
+                    world["workspace"],
+                    world["binding"].world_id,
+                    comparison_id,
+                    run_id,
+                    drawing_sha256(REPLAY_PROFILE),
+                    "0" * 64,
+                    10,
+                    b"not gzip at all",
+                ),
+            )
+        read = route_support._read(client, world, comparison_id, run_id)
+        assert read.status_code == 200, read.text
+        assert read.json()["replay_verified"] is True
+        # The row is never changed, so the run is not drawn again, and reads keep replaying it.
+        assert _runner(client, world).draw_all(comparison_id) == 0

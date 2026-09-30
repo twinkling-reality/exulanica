@@ -35,6 +35,7 @@ answered with the start it made, and every refusal is named (``START_REFUSALS``)
 from __future__ import annotations
 
 import dataclasses
+import logging
 import uuid
 from collections.abc import Sequence
 from decimal import Decimal, InvalidOperation
@@ -104,6 +105,7 @@ from exulanica.world.society_repository import SocietyRepository
 from exulanica.world.society_score import ScoreRefused
 from exulanica.world.worlds import require_world
 
+_LOG = logging.getLogger(__name__)
 router = APIRouter(prefix="/world/versions/{version_id}/society/comparisons", tags=["society"])
 
 __all__ = ["router"]
@@ -350,6 +352,9 @@ def society_comparison_run(
             try:
                 drawn = decode(stored)
             except DrawingCorrupt:
+                # Stored bytes that are not the drawing their digest names: the run is replayed
+                # instead, and the rows stay as they are, appended and never changed.
+                _LOG.error("A comparison run's stored drawing is not the drawing it names")
                 drawn = None
         if drawn is None:
             try:
@@ -682,6 +687,13 @@ def start_society_comparison(
             raise StartRefused(
                 "bound_over_budget",
                 f"this server's model budget has ${room} left for comparisons",
+            )
+        calls = services.comparison_call_room(prepared.role)
+        if existing is None and calls is not None and prepared.cost.calls > calls:
+            raise StartRefused(
+                "calls_over_budget",
+                f"this server's model budget has {calls} calls left for comparisons, and this "
+                f"one can make {prepared.cost.calls}",
             )
         with connection.transaction():
             prepared.runner.define(

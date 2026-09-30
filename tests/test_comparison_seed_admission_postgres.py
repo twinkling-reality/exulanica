@@ -11,12 +11,15 @@ says so. The bound itself is unchanged: no ask is admitted past it.
 
 from __future__ import annotations
 
+import dataclasses
 from decimal import Decimal
 
 import pytest
 from exulanica.api import society_comparison_start as start_module
 from exulanica.api.society_comparison_start import TypicalFigures
 from exulanica.db.session import set_workspace
+from exulanica.models.budget import BudgetGuard
+from exulanica.models.client import ModelClient
 
 import test_society_comparison_start_postgres as starts
 import test_society_stay_requests_api as stays
@@ -71,12 +74,10 @@ def test_a_bound_between_one_and_two_seeds_typical_cost_stops_between_them(start
     )
     first, second = result["seeds"]
     # The first seed was admitted and played to its end; its runs are kept and scored.
-    assert {run["status"] for run in first["runs"].values()} == {"completed"}, first
+    assert {run["status"] for run in first["runs"].values()} == {"completed"}
     assert first["runs"]["model_a"]["score"] is not None
-    # The second seed's anchors played, and its model run was closed before it asked anything.
-    assert second["runs"]["model_a"]["status"] == "failed"
-    assert second["runs"]["model_a"]["failure"] == "comparison_bound_before_seed"
-    assert {second["runs"][arm]["status"] for arm in ("routine", "wait")} == {"completed"}
+    # The second seed was not admitted: its anchors and its model run were closed, asking nothing.
+    assert {run["failure"] for run in second["runs"].values()} == {"comparison_bound_before_seed"}
     # The served start says why it stopped, and it spent within its bound.
     assert (result["start"]["state"], result["start"]["closed_reason"]) == (
         "closed",
@@ -110,3 +111,47 @@ def test_a_bound_that_holds_both_seeds_plays_both(started, monkeypatch):
     ).fetchone()["n"]
     connection.commit()
     assert drawn == 6
+
+
+def _with_budget(held: dict, *, max_calls: int, plays_here: bool) -> None:
+    """The server's model client under a process budget of ``max_calls`` calls."""
+    services = held["client"].app.state.services
+    held["client"].app.state.services = dataclasses.replace(
+        services,
+        runs_comparison_worker=plays_here,
+        model_client=ModelClient(
+            api_key="test-key-not-real",
+            manifest=starts.MANIFEST,
+            transport=held["transport"],
+            budget=BudgetGuard(ceiling_usd=Decimal("5"), max_calls=max_calls),
+        ),
+    )
+
+
+@pytest.mark.parametrize("saved_world", [2], indirect=True)
+def test_a_start_whose_calls_this_process_cannot_hold_is_refused(started):
+    world = started["world"]
+    stays._inhabited(world, started["client"])
+    calls = _plan(started, 1)["calls_most"]
+    _with_budget(started, max_calls=calls, plays_here=True)
+    refused = starts._start(started, starts._body())
+    assert (refused.status_code, refused.json()["code"]) == (409, "calls_over_budget")
+    # Positive control: with room for every call it can make, the same start is taken.
+    _with_budget(started, max_calls=10 * calls, plays_here=True)
+    assert starts._start(started, starts._body()).status_code == 201
+
+
+@pytest.mark.parametrize("saved_world", [2], indirect=True)
+def test_a_seed_whose_calls_this_process_cannot_hold_is_not_admitted(started):
+    world = started["world"]
+    stays._inhabited(world, started["client"])
+    calls = _plan(started, 1)["calls_most"]
+    body = starts._body()
+    assert starts._start(started, body).status_code == 201, body
+    # The process that plays it has fewer calls left than the seed's runs can make.
+    _with_budget(started, max_calls=calls - 1, plays_here=False)
+    assert starts._worker(started).run_once(world["workspace"]) is True
+    run, result = starts._model_run(started, body["comparison_id"])
+    assert (run["status"], run["failure"]) == ("failed", "comparison_bound_before_seed")
+    assert result["start"]["closed_reason"] == "comparison_bound_before_seed"
+    assert not started["transport"].requests, "nothing was asked"

@@ -224,7 +224,7 @@ writes anything.
 | `GET /world/versions/{version_id}/society/comparisons` | `world.read` | The version's comparisons, newest first, with their arms, the group they decide for, how far their runs got and, for one started from the application, its start: the bound, what its asks spent, what hosts that stopped are presumed to have spent unrecorded, and where it stands |
 | `GET /world/versions/{version_id}/society/comparisons/plan` | `world.read` | What this server offers a comparison of the version's society, the roles its engine hosts with their groups and models, the most people a comparison runs and the most of the society's people a model may decide for ([what it can read](#running-a-comparison)), the society's people by id and name, from whom a named group is chosen, and for a selection its runs, the most it can cost, what one like it typically costs and how many of a minute's asks each of its models can have answered, or the refusal a start of it would meet ([running a comparison](#running-a-comparison)) |
 | `GET /world/versions/{version_id}/society/comparisons/{comparison_id}` | `world.read` | Scores per seed and per arm with intervals and, beside each, what its arm's model answered; the group and who decides for everybody else; the registered differences and the server's verdict |
-| `GET /world/versions/{version_id}/society/comparisons/{comparison_id}/runs/{run_id}` | `world.read` | One completed run as the page draws it, naming who decides for each person: the drawing the host stored once it had played the comparison's runs, replaying each from its stored requests and receipts with no model call and held to its recorded minute digests, events and receipts, served while it was drawn by the code reading it; otherwise the run replayed and held to them here, and a replay that differs is refused as `run_replay_mismatch`. Either way its inputs' rights are asked before anything drawn from them is answered |
+| `GET /world/versions/{version_id}/society/comparisons/{comparison_id}/runs/{run_id}` | `world.read` | One completed run as the page draws it, naming who decides for each person: the drawing the host stored once it had played the comparison's runs, replaying each from its stored requests and receipts with no model call and held to its recorded minute digests, events and receipts, served while it was drawn by the code reading it and the data that code reads (the digest taken when the server started), and read as the drawing its digest names; otherwise, and for stored bytes that are not that drawing, the run replayed and held to them here, and a replay that differs is refused as `run_replay_mismatch`. Either way its inputs' rights are asked before anything drawn from them is answered |
 
 No response carries a run's seed or a raw state. A comparison or run under another workspace or
 world is an unknown reference, and a run whose inputs lost their rights before or while it was
@@ -262,7 +262,8 @@ role is not offered, one named twice, or one this server cannot ask now, whether
 for somebody outside it whose owner chose it; a group naming nobody, somebody not here or a choice
 this world does not hold; more seeds than the server holds; and a bound above the most the
 comparison can cost (`bound_out_of_range`) or above what this server's model budget has left beside
-the part its decision contract keeps for other work (`bound_over_budget`).
+the part its decision contract keeps for other work (`bound_over_budget`), or a comparison that can
+make more calls than this server's model budget has left beside that part (`calls_over_budget`).
 
 **What it can cost.** The most is derived: a run asks each subject a model decides for at most once
 a minute, so its asks are at most the protocol's window times those subjects (the arm's group under
@@ -341,11 +342,14 @@ calls the bound refused stops after it; either fails by name (`comparison_bound_
 bound cannot finish: it plays every seed's anchors first, then each seed's model runs one seed after
 another, and admits a seed's model runs only while what is left of the bound holds what runs like
 them typically cost on the society's kind of ground and what they can hold reserved at once (the
-plan's `suggested_usd` for them). A seed it does not admit closes its model runs and every later
+plan's `suggested_usd` for them), and while this process has calls left for the most its runs can
+make, since a process that runs out of calls stops them whatever they spent. Where the society's
+ground has no measured figure for a model, the dearest figure any ground has for it is used; where
+none does, the seed still needs what its runs can hold reserved at once (`held_usd`), and the host
+logs it. The seed's anchors play once it is admitted. A seed it does not admit closes its model runs and every later
 seed's, asking nothing, as `comparison_bound_before_seed`, and the start closes by that name, so the
 seeds already played are kept and scored ([`tests/test_comparison_seed_admission_postgres.py`](../tests/test_comparison_seed_admission_postgres.py)).
-A seed whose models no measurement covers is admitted, its asks still held to the bound one by one,
-and a run left part way with receipts is closed as `interrupted` whatever the bound holds. The bound
+A run left part way with receipts is closed as `interrupted` whatever the bound holds. The bound
 itself is unchanged: no ask is admitted past it. An attempt
 whose cost is unknown, such as one that timed out, counts at the most it can have cost, so a
 provider slow to answer spends the bound faster than its answers alone would. A comparison writes no

@@ -30,20 +30,27 @@ from __future__ import annotations
 import gzip
 import hashlib
 import importlib
+import importlib.util
+import io
 import json
+import zlib
 from collections.abc import Callable, Mapping
-from functools import cache
 from pathlib import Path
 from typing import Any, Final
 
 from exulanica.canonical import canonical_json
+from exulanica.movement.registry import MODULES_PATH
+from exulanica.world.decision_roles import REGISTRY_DIRECTORY
 from exulanica.world.society_catalogs import ROUTINE_DIRECTORY
+from exulanica.world.society_engines import ENGINES_PATH
 
 __all__ = [
+    "CODE_SHA256",
     "DRAWING_MODULES",
     "DrawingCorrupt",
     "StoredDrawing",
     "decode",
+    "drawing_data",
     "drawing_sha256",
     "encode",
     "with_names",
@@ -81,21 +88,49 @@ _NAME_FILLED_ON_READ: Final = ""
 _GZIP_LEVEL: Final = 9
 
 
-def _module_bytes(name: str) -> bytes:
-    return Path(str(importlib.import_module(name).__file__)).read_bytes()
+def _module_path(name: str) -> Path:
+    """Where a module's source is, found without importing it: this module is imported by modules
+    the list names, so importing them here would import it again half made."""
+    spec = importlib.util.find_spec(name)
+    if spec is None or spec.origin is None:
+        raise ImportError(f"no source for {name}")
+    return Path(spec.origin)
 
 
-@cache
-def drawing_sha256(profile: str) -> str:
-    """The digest a drawing of ``profile`` is stored and found under: the drawing's profile, every
-    module of :data:`DRAWING_MODULES` and every society catalog, by name and bytes."""
+def drawing_data() -> tuple[Path, ...]:
+    """Every data file a verified replay and its drawing read: the society catalogs, the movement
+    modules walking reads, the society engines and the decision role registry and catalogs."""
+    return tuple(
+        sorted(
+            {
+                *ROUTINE_DIRECTORY.glob("*.json"),
+                MODULES_PATH,
+                ENGINES_PATH,
+                *REGISTRY_DIRECTORY.glob("*.json"),
+            }
+        )
+    )
+
+
+def _code_sha256() -> str:
     digest = hashlib.sha256()
-    digest.update(profile.encode("utf-8") + b"\0")
     for name in DRAWING_MODULES:
-        digest.update(name.encode("utf-8") + b"\0" + _module_bytes(name) + b"\0")
-    for file in sorted(ROUTINE_DIRECTORY.glob("*.json")):
+        digest.update(name.encode("utf-8") + b"\0" + _module_path(name).read_bytes() + b"\0")
+    for file in drawing_data():
         digest.update(file.name.encode("utf-8") + b"\0" + file.read_bytes() + b"\0")
     return digest.hexdigest()
+
+
+#: The digest of the drawing code and the data it reads, taken once when this module is imported:
+#: a process reads under the code it started with, whatever changes on disk after it.
+CODE_SHA256: Final = _code_sha256()
+
+
+def drawing_sha256(profile: str) -> str:
+    """The digest a drawing of ``profile`` is stored and found under: the drawing's profile and
+    :data:`CODE_SHA256`, every module of :data:`DRAWING_MODULES` and every file of
+    :func:`drawing_data`, by name and bytes."""
+    return hashlib.sha256(profile.encode("utf-8") + b"\0" + CODE_SHA256.encode("ascii")).hexdigest()
 
 
 class StoredDrawing:
@@ -139,8 +174,14 @@ class DrawingCorrupt(ValueError):
 
 
 def decode(stored: StoredDrawing) -> dict[str, Any]:
-    """The stored drawing, held to its digest and length; anything else is refused by name."""
-    raw = gzip.decompress(stored.document_gzip)
+    """The stored drawing, held to its digest and length; anything else, bytes that are not gzip,
+    a stream cut short, or more bytes than the drawing states, is refused by name. At most one
+    byte past the stated length is ever decompressed."""
+    try:
+        with gzip.GzipFile(fileobj=io.BytesIO(stored.document_gzip)) as stream:
+            raw = stream.read(stored.document_bytes + 1)
+    except (EOFError, OSError, zlib.error) as exc:
+        raise DrawingCorrupt("run_drawing_corrupt") from exc
     if len(raw) != stored.document_bytes or hashlib.sha256(raw).hexdigest() != (
         stored.document_sha256
     ):
