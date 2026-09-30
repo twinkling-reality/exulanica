@@ -2672,6 +2672,26 @@ async function peopleCrossTileSeams(ctx) {
     await page.click(BUTTON('Bring in inhabitants', PEOPLE), 'Bring in inhabitants');
     await page.waitFor(`${PEOPLE}?.dataset.state === 'present'`, SETTLE_MS, 'the town\'s people to be present');
   }
+  const firstSociety = (await ctx.api('GET', societyPath(entry))).body;
+  const servedArrival = entry.generated_ground?.arrival_mm ?? null;
+  // The entry's drawing frame is east/height/south; society positions use east/north.
+  const arrivalPlan = Array.isArray(servedArrival) && servedArrival.length === 3
+    ? [servedArrival[0], -servedArrival[2]] : null;
+  const residents = firstSociety?.state?.inhabitants ?? [];
+  const clearance = ctx.parameters.arrival_clearance_mm;
+  const distances = residents.map((person) => ({ id: person.id,
+    squared_mm: Array.isArray(person.position_mm) && arrivalPlan !== null
+      ? (person.position_mm[0] - arrivalPlan[0]) ** 2 + (person.position_mm[1] - arrivalPlan[1]) ** 2 : null }));
+  ctx.observe('resident-starts-clear-of-arrival', firstSociety?.profile === 'exulanica-society/v5'
+    && firstSociety.world_id === entry.world_id && firstSociety.version_id === entry.authored_version_id
+    && firstSociety.region_id === entry.generated_ground?.region_id && firstSociety.current_tick === 0
+    && arrivalPlan !== null && residents.length > 0
+    && distances.every((person) => Number.isInteger(person.squared_mm)
+      && person.squared_mm >= clearance * clearance),
+  { world_id: entry.world_id, version_id: entry.authored_version_id, source_snapshot_id: entry.source_snapshot_id,
+    served_arrival_mm: servedArrival, city_arrival_mm: arrivalPlan, clearance_mm: clearance,
+    resident_count: residents.length, nearest_squared_mm: Math.min(...distances.map((person) => person.squared_mm ?? 0)) });
+  await ctx.screenshot('people-at-arrival', 'the town on the first frame after its residents arrive');
   await page.waitFor(`(() => { const b = ${PLAYBACK}; return b && !b.hidden && !b.disabled ? true : null; })()`, SETTLE_MS, 'Play beside the people');
   if (await page.evaluate(`${PLAYBACK}?.dataset.action`) === 'play') await page.click(PLAYBACK, 'Play');
   await sleep(PAGE_SETTLE_MS);

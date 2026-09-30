@@ -1177,6 +1177,7 @@
         "api": [
           {"id": "made-with-the-values", "says": "POST /worlds/generated answered 201 for the preset with the two values the person set, each inside its served range and other than the preset's, and the saved world is listed as a generated world."},
           {"id": "tiles-baked", "says": "Every tile of the town the saved world names is baked, by the tile worker the launcher started."},
+          {"id": "town-arrival-objects-clear", "says": "The entry's served arrival and facing match its digest-held generation receipt, whose pinned policy requires at least two metres from the full occupied extent of every street tree and furniture item; an independent read of those records measures the clearance."},
           {"id": "launcher-worker-baked-town", "says": "The one worker the acceptance launcher started reported a successful bake for every tile of this town and was still running when the town finished."}
         ],
         "reload": [
@@ -1193,7 +1194,9 @@
       "requires": ["make-town-with-values"],
       "parameters": {
         "watch_seconds": 240,
-        "watch_reason": "Time for several simulated minutes at the host's base wait of 8 s a minute (docs/evaluation/2026-09-24-living-world-pace.json), read once a host interval."
+        "watch_reason": "Time for several simulated minutes at the host's base wait of 8 s a minute (docs/evaluation/2026-09-24-living-world-pace.json), read once a host interval.",
+        "arrival_clearance_mm": 2000,
+        "arrival_clearance_reason": "The pinned minimum resident clearance in exulanica/world/composers/town-arrival.v1.json; the first society read checks actual resident positions against the served arrival, not only the receipt's claimed choice."
       },
       "owner_area": "town societies: exulanica/world/society_grounds.py, exulanica/world/society_walking_surfaces.py and web/packages/app/src/composition/environment-selection.ts",
       "expect": {
@@ -1201,6 +1204,7 @@
           {"id": "town-people-present", "says": "People nearby says the town's people are present, with the count the society serves, and the canvas draws them."}
         ],
         "api": [
+          {"id": "resident-starts-clear-of-arrival", "says": "Before Play, the town's living v5 society is at minute zero in the generated region, and every resident's actual starting position is at least the pinned clearance from the arrival point the entry serves."},
           {"id": "someone-crosses-a-seam", "says": "Society reads a host interval or more apart place one person on one tile of the town and then on another, a tile's width being the town's extent over its count of tiles along it."},
           {"id": "minutes-pass-in-the-town", "says": "The town's society advances while it plays."}
         ]

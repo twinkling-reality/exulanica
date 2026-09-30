@@ -536,6 +536,72 @@ class Run:
             }
         )
 
+    def verify_town_arrival(self) -> None:
+        """Measure the saved town's receipt and occupied geometry after its browser first frame."""
+        outcome = self.outcomes.get("make-town-with-values")
+        if outcome is None or outcome.get("status") == "not_reachable":
+            return
+        assert self.state is not None and self.token is not None
+        try:
+            status, listed = http(f"{self.api}/world-entries", token=self.token)
+        except OSError as error:
+            status, listed = None, None
+            read_error = type(error).__name__
+        else:
+            read_error = None
+        town = self.facts.get("town", {})
+        entry = (
+            next(
+                (item for item in listed if item.get("entry_id") == town.get("entry_id")),
+                None,
+            )
+            if status == 200 and isinstance(listed, list)
+            else None
+        )
+        observed: dict[str, Any] = {
+            "entry_status": status,
+            "entry_found": entry is not None,
+            "read_error": read_error,
+        }
+        if entry is not None and entry.get("generated_ground") is not None:
+            command = [
+                str(self.worktree / ".venv/bin/python"),
+                str(HERE / "town_arrival_check.py"),
+                "--workspace",
+                self.state["workspace_id"],
+                "--world",
+                entry["world_id"],
+                "--snapshot",
+                entry["source_snapshot_id"],
+            ]
+            environment = clean_environment() | {
+                "EXULANICA_DATABASE_URL": self.state["database"]["owner_url_for_evidence_reads"]
+            }
+            try:
+                checked = subprocess.run(
+                    command,
+                    cwd=self.worktree,
+                    env=environment,
+                    input=json.dumps(entry["generated_ground"]),
+                    text=True,
+                    capture_output=True,
+                    timeout=120,
+                    check=False,
+                )
+                observed["checker_exit"] = checked.returncode
+                if checked.returncode in (0, 1):
+                    observed["measurement"] = json.loads(checked.stdout)
+            except (OSError, subprocess.SubprocessError, json.JSONDecodeError) as error:
+                observed["checker_error"] = type(error).__name__
+        outcome.setdefault("observations", []).append(
+            {
+                "id": "town-arrival-objects-clear",
+                "ok": observed.get("checker_exit") == 0
+                and observed.get("measurement", {}).get("ok") is True,
+                "observed": observed,
+            }
+        )
+
     def launcher_down(self) -> None:
         if (
             self.launcher is None
@@ -892,6 +958,7 @@ class Run:
             self.outcomes[step_id] = outcome
         if session["id"] == "town":
             self.verify_town_worker()
+            self.verify_town_arrival()
         tail = scrub((directory / "session.log").read_text(errors="replace")[-1500:])
         for step in plan_steps:
             if step["id"] not in self.outcomes:
