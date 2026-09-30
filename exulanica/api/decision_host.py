@@ -21,12 +21,14 @@ from __future__ import annotations
 
 import dataclasses
 import logging
+import threading
 import time
 import uuid
 from collections.abc import Callable, Mapping, Sequence
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
 from decimal import Decimal
+from functools import cache
 from typing import Any, Final, TypeVar
 
 import psycopg
@@ -367,7 +369,21 @@ def ask(
             status, reason = "unavailable", "no_time_to_ask"
             break
         answers += 1
+        role_slot = _role_call_slots(role.key, contract.value("concurrent_calls_maximum"))
+        if not role_slot.acquire(timeout=remaining):
+            status, reason = "unavailable", "no_time_to_ask"
+            break
+        slot = _process_call_slots()
+        remaining = ends_at - time.monotonic()
+        if remaining <= 0 or not slot.acquire(timeout=remaining):
+            role_slot.release()
+            status, reason = "unavailable", "no_time_to_ask"
+            break
         try:
+            remaining = ends_at - time.monotonic()
+            if remaining <= 0:
+                status, reason = "unavailable", "no_time_to_ask"
+                break
             chosen = sender.choose(
                 role.chosen,
                 asked.spec.model_id,
@@ -393,6 +409,9 @@ def ask(
             _LOG.error(_ASK_FAILED, role.key, _error_class(exc))
             status, reason = "unavailable", "model_call_failed"
             break
+        finally:
+            slot.release()
+            role_slot.release()
         log.record(chosen.call)
         served = chosen.call.served_model_id
         option = next(o for o in context["options"] if o["label"] == chosen.label)
@@ -426,6 +445,20 @@ def ask(
             "latency_ms": round((time.monotonic() - started) * 1000),
         }
     return {"status": status, "reason": reason, "proposal": proposal, "provider": provider}
+
+
+@cache
+def _role_call_slots(role_key: str, maximum: int) -> threading.BoundedSemaphore:
+    """A role's process-wide call ceiling, including calls outside a society minute."""
+    return threading.BoundedSemaphore(maximum)
+
+
+@cache
+def _process_call_slots() -> threading.BoundedSemaphore:
+    """One process ceiling for society, traffic and comparison calls sharing the client."""
+    return threading.BoundedSemaphore(
+        max(role.contract().value("concurrent_calls_maximum") for role in decision_roles())
+    )
 
 
 def _refused(reason: str) -> dict[str, Any]:
@@ -539,58 +572,86 @@ class DecisionHost:
                 return False
             planned = []
             for role, contract, chosen in asking_roles:
-                ends_at = self._ends_at(contract, lease_ends)
-                if ends_at <= time.monotonic():
-                    continue
                 due = self._due(role, contract, chosen, row["state"], client)
                 if due:
-                    planned.append((role, contract, ends_at, due))
+                    planned.append((role, contract, lease_ends, due))
             if not planned:
                 return True
             # Asked under the workspace's own rules, which also decide what may be offered.
             asking = client.with_policy(self.policy_for(claim.workspace_id))
-            sendable = _once_more_after_a_race(lambda: self._judged(society, row, asking, planned))
-
             # Each role's requests are reserved in a transaction of its own, asked again on its
             # own after a race: another role's committed reservations are never read again, where
             # an existing request is not fresh and would go unasked.
             reserved = []
-            for role, contract, ends_at, due in planned:
+            for role, contract, _lease_ends, due in planned:
+                # A lease with no time left makes no request. The actual ask window is set
+                # after reservation, so time spent reserving cannot borrow another role's time.
+                if self._ends_at(contract, lease_ends) <= time.monotonic():
+                    continue
+                try:
+                    sendable = _once_more_after_a_race(
+                        lambda role=role, contract=contract, due=due: self._judged(
+                            society, row, asking, [(role, contract, lease_ends, due)]
+                        )
+                    )
+                except Exception as exc:
+                    _LOG.error("A %s question failed with %s", role.key, _error_class(exc))
+                    continue
 
                 def reserve(
                     role: DecisionRole = role,
                     contract: DecisionContract = contract,
                     due: list = due,
+                    sendable: dict = sendable,
                 ) -> tuple[list[RoleAsk], list[tuple[uuid.UUID, dict[str, Any]]]]:
                     return self._reserved(
                         connection, claim, decisions, row, role, contract, due, sendable, client
                     )
 
-                reserved.append((contract, ends_at, *_once_more_after_a_race(reserve)))
+                try:
+                    asks, refused = _once_more_after_a_race(reserve)
+                except Exception as exc:
+                    # One role's reservation cannot cancel requests already committed for
+                    # another. The transaction above rolls this role's incomplete work back.
+                    _LOG.error("A %s reservation failed with %s", role.key, _error_class(exc))
+                    continue
+                ends_at = self._ends_at(contract, lease_ends)
+                reserved.append((contract, ends_at, asks, refused))
         # No connection from the reservations survives here: the models are asked without one.
-        results = self._asked_by_every_role(asking, reserved)
-        with self.database.session(claim.workspace_id) as connection:
-            decisions = SocietyDecisionRepository(
-                SocietyRepository(
-                    connection,
-                    claim.workspace_id,
-                    world_id=claim.world_id,
-                    input_authorizer=lambda doc: self.runtime.authorize(connection, session, doc),
-                )
-            )
-            for request_id, result in results:
+        result_groups = self._asked_by_every_role(asking, reserved)
+        for role_results in result_groups:
+            try:
+                with self.database.session(claim.workspace_id) as connection:
+                    decisions = SocietyDecisionRepository(
+                        SocietyRepository(
+                            connection,
+                            claim.workspace_id,
+                            world_id=claim.world_id,
+                            input_authorizer=lambda doc: self.runtime.authorize(
+                                connection, session, doc
+                            ),
+                        )
+                    )
+                    for request_id, result in role_results:
 
-                def finish(
-                    last_try: bool,
-                    request_id: uuid.UUID = request_id,
-                    result: dict[str, Any] = result,
-                ) -> None:
-                    with connection.transaction():
-                        decisions.finish(claim.version_id, request_id, result, last_try=last_try)
+                        def finish(
+                            last_try: bool,
+                            request_id: uuid.UUID = request_id,
+                            result: dict[str, Any] = result,
+                            decisions: SocietyDecisionRepository = decisions,
+                        ) -> None:
+                            with connection.transaction():
+                                decisions.finish(
+                                    claim.version_id, request_id, result, last_try=last_try
+                                )
 
-                # An answer a model was paid for is recorded: asked again after a race, and on the
-                # last try recorded as decision_sources_unavailable rather than left open.
-                asked_again_after_a_race(finish)
+                        # An answer a model was paid for is recorded: asked again after a race,
+                        # and on the last try recorded as decision_sources_unavailable.
+                        asked_again_after_a_race(finish)
+            except Exception as exc:
+                # A broken connection or a role-specific recording fault cannot drop another
+                # role's answers. Open its own session for the next role.
+                _LOG.error("A decision recording failed with %s", _error_class(exc))
         return True
 
     def _due(
@@ -717,31 +778,71 @@ class DecisionHost:
         reserved: Sequence[
             tuple[DecisionContract, float, list[RoleAsk], list[tuple[uuid.UUID, dict[str, Any]]]]
         ],
-    ) -> list[tuple[uuid.UUID, dict[str, Any]]]:
+    ) -> list[list[tuple[uuid.UUID, dict[str, Any]]]]:
         """Every role's asks at once, each by its own deadline, so no role waits for another's;
         then each role's results, refusals first, in the order its requests were reserved."""
-        asking = [(contract, ends_at, asks) for contract, ends_at, asks, _refused in reserved]
-        with ThreadPoolExecutor(max_workers=max(1, sum(1 for *_, asks in asking if asks))) as pool:
-            answered = [
-                pool.submit(
-                    self._ask,
+        # One executor bounds calls across all roles. The first pass gives each role a slot
+        # before any role's second ask, so a slow role cannot consume the entire pool first.
+        active = [item for item in reserved if item[2]]
+        if not active:
+            return [list(refused) for _contract, _ends_at, _asks, refused in reserved]
+        process_limit = max(
+            len(active), max(contract.value("concurrent_calls_maximum") for contract, *_ in active)
+        )
+        role_limits = [
+            threading.Semaphore(contract.value("concurrent_calls_maximum"))
+            for contract, *_ in reserved
+        ]
+
+        def bounded_ask(
+            role_index: int,
+            asked: RoleAsk,
+            contract: DecisionContract,
+            ends_at: float,
+            keep_usd: Decimal,
+            keep_calls: int,
+        ) -> dict[str, Any]:
+            with role_limits[role_index]:
+                return ask(
                     client,
-                    asks,
+                    asked,
                     contract,
                     ends_at,
-                    *share_kept(client.budget, contract),
+                    keep_usd=keep_usd,
+                    keep_calls=keep_calls,
                 )
-                if asks
-                else None
-                for contract, ends_at, asks in asking
-            ]
-            results: list[tuple[uuid.UUID, dict[str, Any]]] = []
-            for (_contract, _ends_at, _asks, refused), future in zip(
-                reserved, answered, strict=True
+
+        per_role: list[list[tuple[uuid.UUID, Future[dict[str, Any]]]]] = [[] for _ in reserved]
+        with ThreadPoolExecutor(max_workers=process_limit) as pool:
+            for index in range(max(len(asks) for _contract, _ends_at, asks, _held in reserved)):
+                for role_index, (contract, ends_at, asks, _held) in enumerate(reserved):
+                    if index >= len(asks):
+                        continue
+                    asked = asks[index]
+                    keep_usd, keep_calls = share_kept(client.budget, contract)
+                    future = pool.submit(
+                        bounded_ask,
+                        role_index,
+                        asked,
+                        contract,
+                        ends_at,
+                        keep_usd,
+                        keep_calls,
+                    )
+                    per_role[role_index].append((uuid.UUID(asked.request["request_id"]), future))
+            results = []
+            for (_contract, _ends_at, _asks, role_refusals), futures in zip(
+                reserved, per_role, strict=True
             ):
-                results.extend(refused)
-                if future is not None:
-                    results.extend(future.result())
+                role_results = list(role_refusals)
+                for request_id, future in futures:
+                    try:
+                        result = future.result()
+                    except Exception as exc:
+                        _LOG.error("A decision ask failed with %s", _error_class(exc))
+                        result = _refused("model_call_failed")
+                    role_results.append((request_id, result))
+                results.append(role_results)
         return results
 
     @staticmethod
@@ -763,6 +864,7 @@ class DecisionHost:
         keep_usd: Decimal,
         keep_calls: int,
     ) -> list[tuple[uuid.UUID, dict[str, Any]]]:
+        """Ask one role in isolation, retained for the single-role decision contract caller."""
         results: list[tuple[uuid.UUID, dict[str, Any]]] = []
         workers = min(contract.value("concurrent_calls_maximum"), len(asks))
         with ThreadPoolExecutor(max_workers=workers) as pool:
@@ -785,8 +887,6 @@ class DecisionHost:
                 try:
                     result = future.result()
                 except Exception as exc:
-                    # Its class names the defect; never its text, which may carry request bytes
-                    # or a credential.
                     _LOG.error(_ASK_FAILED, asked.role.key, _error_class(exc))
                     result = _refused("model_call_failed")
                 results.append((uuid.UUID(asked.request["request_id"]), result))

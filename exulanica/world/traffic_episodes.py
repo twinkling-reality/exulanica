@@ -40,7 +40,7 @@ import uuid
 from array import array
 from collections import OrderedDict
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass, replace
 from typing import Any, Final
 
 from exulanica.canonical import canonical_json
@@ -59,8 +59,9 @@ from exulanica.traffic.inputs import LOOKAHEAD_S, CrossingFeed, TrafficInputs, T
 from exulanica.traffic.network import RoadNetwork, compile_network
 from exulanica.traffic.presentation import presentation_frame, signal_codes, signal_heads
 from exulanica.traffic.routing import plan_route
+from exulanica.traffic.signal_actuation import SignalTimeline, signal_actuation, signal_observation
 from exulanica.traffic.signals import PEDESTRIAN_INDICATIONS, VEHICLE_INDICATIONS
-from exulanica.traffic.simulation import advance_traffic, initial_traffic
+from exulanica.traffic.simulation import advance_traffic, initial_traffic, state_sha256
 
 __all__ = [
     "EPISODE",
@@ -72,10 +73,15 @@ __all__ = [
     "TrafficRefused",
     "check_request",
     "compute_episode",
+    "compute_signal_catalog",
+    "compute_signal_probe",
+    "compute_signal_replay",
     "from_wire",
+    "home_segment",
     "road_records",
     "traffic_input",
     "window_of",
+    "window_of_segments",
     "wire",
 ]
 
@@ -355,10 +361,26 @@ class PackedTrafficEpisode:
     derivation: dict[str, Any]
 
 
-def _home_trip_rule(
-    value: TrafficInput, prepared_input: Prepared, episode: int
-) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any]]:
-    """Run ``episode``: its seconds' states, and its trip requests decided second by second."""
+def home_segment(
+    value: TrafficInput,
+    prepared_input: Prepared,
+    episode: int,
+    end_second: int,
+    continuation: Mapping[str, Any] | None = None,
+    *,
+    signal_timelines: Mapping[str, SignalTimeline] | None = None,
+    chosen_signals: Sequence[str] = (),
+) -> tuple[list[dict[str, Any]], dict[str, Any], dict[str, Any], dict[str, Any] | None]:
+    """Run to an exclusive episode-local second, carrying every trip-rule fact across a seam.
+
+    The continuation is sealed over the exact road input and episode. A later worker can resume
+    it without replaying the prefix or drawing a different departure, destination or dwell.
+    A segment returns only its own states; the first also returns the genesis state.
+    """
+    if type(episode) is not int or episode < 0 or type(end_second) is not int:
+        raise TrafficRefused("traffic_second_out_of_range", "invalid segment coordinates")
+    if not 1 <= end_second <= EPISODE:
+        raise TrafficRefused("traffic_second_out_of_range", "segment ends outside the episode")
     network, catalogs = prepared_input.network, prepared_input.catalogs
     seed = value.seed
     genesis = initial_traffic(value.traffic_id, seed, network, catalogs, prepared_input.fleet)
@@ -373,12 +395,77 @@ def _home_trip_rule(
         vehicle_id: draw_integer(seed, "traffic_host.departure", salt + ordinal, 0, _DEPARTURE - 1)
         for vehicle_id, ordinal in ordinals.items()
     }
-    returning: dict[str, int] = {}
-    trips: list[TripRequest] = []
     feeds = (CrossingFeed(1, EPISODE + LOOKAHEAD_S, ()),)
-    state = genesis
-    states = [state]
-    legs: dict[str, int] = {}
+    if continuation is None:
+        returning: dict[str, int] = {}
+        trips: list[TripRequest] = []
+        state = genesis
+        states = [state]
+        legs: dict[str, int] = {}
+        start_second = 1
+    else:
+        source = dict(continuation)
+        digest = source.pop("document_sha256", None)
+        if (
+            set(source)
+            != {
+                "profile",
+                "input_sha256",
+                "episode",
+                "next_second",
+                "state",
+                "returning",
+                "trips",
+                "legs",
+                "signal_choices",
+                "signal_cursors",
+                "signal_cursors_before",
+                "initial_signal_cursors",
+            }
+            or source["profile"] != "exulanica.traffic-continuation/v1"
+            or source["input_sha256"] != value.sha256
+            or source["episode"] != episode
+            or hashlib.sha256(canonical_json(source)).hexdigest() != digest
+            or type(source["next_second"]) is not int
+            or not 1 <= source["next_second"] <= EPISODE
+            or source["state"].get("second") != source["next_second"] - 1
+        ):
+            raise TrafficRefused(
+                "traffic_continuation_changed", "segment state or identity changed"
+            )
+        state = source["state"]
+        returning = dict(source["returning"])
+        trips = [TripRequest(**item) for item in source["trips"]]
+        legs = dict(source["legs"])
+        states = []
+        start_second = source["next_second"]
+        for signal_id, choices in source["signal_choices"].items():
+            timeline = (signal_timelines or {}).get(signal_id)
+            if timeline is None or any(
+                timeline.choices.get(int(second)) != action for second, action in choices.items()
+            ):
+                raise TrafficRefused(
+                    "traffic_continuation_changed", "recorded signal choices changed"
+                )
+        for signal_id, cursor in source["signal_cursors_before"].items():
+            timeline = (signal_timelines or {}).get(signal_id)
+            before = (
+                None
+                if timeline is None
+                else timeline.cursor
+                if state["second"] == 0
+                else timeline.cursor_at(state["second"] - 1)
+            )
+            if before is None or list(before) != cursor:
+                raise TrafficRefused(
+                    "traffic_continuation_changed", "recorded signal phase changed"
+                )
+        for signal_id, cursor in source["initial_signal_cursors"].items():
+            timeline = (signal_timelines or {}).get(signal_id)
+            if timeline is None or timeline.cursor is None or list(timeline.cursor) != cursor:
+                raise TrafficRefused("traffic_continuation_changed", "initial signal phase changed")
+    if end_second < start_second:
+        raise TrafficRefused("traffic_second_out_of_range", "segment ends before its continuation")
 
     def request(second: int, vehicle_id: str, destination: str) -> None:
         leg = legs.get(vehicle_id, 0)
@@ -443,7 +530,31 @@ def _home_trip_rule(
                 return identity
         return None
 
-    for second in range(EPISODE - 1):
+    def due_point() -> dict[str, Any] | None:
+        second = state["second"]
+        for signal_id in sorted(chosen_signals):
+            timeline = (signal_timelines or {}).get(signal_id)
+            if timeline is None:
+                raise TrafficRefused("traffic_signal_timeline_missing", signal_id)
+            if second in timeline.choices:
+                continue
+            observation = signal_observation(state, network, timeline, signal_id)
+            if observation is not None and observation["near_vehicle_count"] > 0:
+                return {
+                    "signal_id": signal_id,
+                    "choice_second": second,
+                    "state_sha256": state_sha256(state),
+                    "observation": observation,
+                }
+        return None
+
+    point = None
+    reached_end = end_second
+    for second in range(start_second - 1, end_second - 1):
+        point = due_point()
+        if point is not None:
+            reached_end = second + 1
+            break
         by_id = {vehicle["id"]: vehicle for vehicle in state["vehicles"]}
         for vehicle_id in sorted(by_id):
             vehicle = by_id[vehicle_id]
@@ -456,7 +567,9 @@ def _home_trip_rule(
             elif returning.get(vehicle_id) == second:
                 request(second, vehicle_id, homes[vehicle_id])
         inputs = TrafficInputs(trips=tuple(trips), feeds=feeds)
-        step = advance_traffic(state, seed, network, catalogs, inputs)
+        step = advance_traffic(
+            state, seed, network, catalogs, inputs, signal_timelines=signal_timelines
+        )
         state = step.state
         states.append(state)
         for event in step.events:
@@ -469,6 +582,8 @@ def _home_trip_rule(
                     seed, "traffic_host.dwell", salt + ordinals[vehicle_id], _DWELL[0], _DWELL[1]
                 )
                 returning[vehicle_id] = state["second"] + dwell
+    if point is None and state["second"] == end_second - 1:
+        point = due_point()
     reasons: dict[str, int] = {}
     arrived = 0
     for trip in state["trips"]:
@@ -482,7 +597,178 @@ def _home_trip_rule(
         "blocked": dict(sorted(reasons.items())),
         "unfinished": len(trips) - arrived - sum(reasons.values()),
     }
-    return states, [trip.document() for trip in trips], summary
+    next_state = {
+        "profile": "exulanica.traffic-continuation/v1",
+        "input_sha256": value.sha256,
+        "episode": episode,
+        "next_second": reached_end,
+        "state": state,
+        "returning": returning,
+        "trips": [asdict(trip) for trip in trips],
+        "legs": legs,
+        "signal_choices": {
+            signal_id: {str(second): action for second, action in timeline.choices.items()}
+            for signal_id, timeline in sorted((signal_timelines or {}).items())
+            if timeline.choices
+        },
+        "signal_cursors": {
+            signal_id: list(timeline.cursor_at(state["second"]))
+            for signal_id, timeline in sorted((signal_timelines or {}).items())
+        },
+        "signal_cursors_before": {
+            signal_id: list(
+                timeline.cursor
+                if state["second"] == 0 and timeline.cursor is not None
+                else timeline.cursor_at(state["second"] - 1)
+            )
+            for signal_id, timeline in sorted((signal_timelines or {}).items())
+            if state["second"] > 0 or timeline.cursor is not None
+        },
+        "initial_signal_cursors": {
+            signal_id: list(timeline.cursor)
+            for signal_id, timeline in sorted((signal_timelines or {}).items())
+            if timeline.cursor is not None
+        },
+    }
+    next_state["document_sha256"] = hashlib.sha256(canonical_json(next_state)).hexdigest()
+    return states, next_state, summary, point
+
+
+def _home_trip_rule(
+    value: TrafficInput, prepared_input: Prepared, episode: int
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any]]:
+    """Run the fixed episode through the same continuation rule used at signal handoffs."""
+    states: list[dict[str, Any]] = []
+    continuation = None
+    summary: dict[str, Any] = {}
+    for end_second in range(60, EPISODE + 1, 60):
+        section, continuation, summary, point = home_segment(
+            value, prepared_input, episode, end_second, continuation
+        )
+        assert point is None
+        states.extend(section)
+    assert continuation is not None
+    return states, [TripRequest(**item).document() for item in continuation["trips"]], summary
+
+
+def compute_signal_probe(
+    data: Mapping[str, Any],
+    episode: int,
+    end_second: int,
+    continuation: Mapping[str, Any] | None,
+    choices: Mapping[str, Mapping[int, str]],
+    initial_cursors: Mapping[str, Sequence[int]],
+    chosen_signals: Sequence[str],
+) -> dict[str, Any]:
+    """One released-worker probe, stopping before a live model choice when one is due.
+
+    The caller supplies only recorded actions and a prior sealed phase cursor. No model client,
+    clock or database is present in this worker job. Its continuation binds the road input and
+    every traffic rule fact; the controller persists and validates it before another probe.
+    """
+    value = from_wire(data)
+    ready = prepared(value)
+    signals = {
+        junction.signal.identity: junction.signal
+        for junction in ready.network.junctions.values()
+        if junction.signal is not None
+    }
+    named = set(choices) | set(initial_cursors) | set(chosen_signals)
+    if not named <= signals.keys():
+        raise TrafficRefused("signal_not_in_world", "a signal is not in the compiled roads")
+    timelines = {
+        signal_id: SignalTimeline(
+            ready.catalogs.plan(signals[signal_id].plan),
+            signals[signal_id].offset_s,
+            0,
+            EPISODE + LOOKAHEAD_S,
+            dict(choices.get(signal_id, {})),
+            signal_actuation(),
+            None if signal_id not in initial_cursors else tuple(initial_cursors[signal_id]),
+        )
+        for signal_id in sorted(named)
+    }
+    states, following, summary, point = home_segment(
+        value,
+        ready,
+        episode,
+        end_second,
+        continuation,
+        signal_timelines=timelines,
+        chosen_signals=chosen_signals,
+    )
+    return {
+        "states": states,
+        "continuation": following,
+        "summary": summary,
+        "point": point,
+        "network_sha256": ready.network.digest,
+    }
+
+
+def compute_signal_catalog(data: Mapping[str, Any]) -> list[dict[str, str]]:
+    """The compiled signals a saved world's roads own, for a model choice read or write."""
+    value = from_wire(data)
+    ready = prepared(value)
+    return [
+        {"signal_id": head["signal_id"], "junction_id": head["junction_id"]}
+        for head in signal_heads(ready.network, ready.catalogs)
+    ]
+
+
+def compute_signal_replay(
+    data: Mapping[str, Any],
+    episode: int,
+    segment: int,
+    continuation: Mapping[str, Any] | None,
+    choices: Mapping[str, Mapping[int, str]],
+    initial_cursors: Mapping[str, Sequence[int]],
+) -> tuple[PackedTrafficEpisode, dict[str, Any], str]:
+    """Rebuild a sealed minute without a client, returning its packed frames and state digest."""
+    value = from_wire(data)
+    ready = prepared(value)
+    signals = {
+        junction.signal.identity: junction.signal
+        for junction in ready.network.junctions.values()
+        if junction.signal is not None
+    }
+    named = set(choices) | set(initial_cursors)
+    if not named <= signals.keys():
+        raise TrafficRefused("signal_not_in_world", "a replay signal is not in these roads")
+    timelines = {
+        signal_id: SignalTimeline(
+            ready.catalogs.plan(signals[signal_id].plan),
+            signals[signal_id].offset_s,
+            0,
+            EPISODE + LOOKAHEAD_S,
+            dict(choices.get(signal_id, {})),
+            signal_actuation(),
+            None if signal_id not in initial_cursors else tuple(initial_cursors[signal_id]),
+        )
+        for signal_id in sorted(named)
+    }
+    states, following, summary, point = home_segment(
+        value,
+        ready,
+        episode,
+        (segment + 1) * signal_actuation().segment_seconds,
+        continuation,
+        signal_timelines=timelines,
+    )
+    assert point is None
+    packed = _pack_states(value, ready, episode, states, summary, timelines)
+    if segment != EPISODE // signal_actuation().segment_seconds - 1:
+        packed = replace(packed, late_home=())
+    frames_sha = hashlib.sha256(
+        canonical_json(
+            {
+                "states": states,
+                "signal_choices": following["signal_choices"],
+                "initial_signal_cursors": following["initial_signal_cursors"],
+            }
+        )
+    ).hexdigest()
+    return packed, following, frames_sha
 
 
 def compute_episode(data: Mapping[str, Any], episode: int) -> PackedTrafficEpisode:
@@ -492,8 +778,25 @@ def compute_episode(data: Mapping[str, Any], episode: int) -> PackedTrafficEpiso
     value = from_wire(data)
     ready = prepared(value)
     states, _trips, summary = _home_trip_rule(value, ready, episode)
+    return _pack_states(value, ready, episode, states, summary)
+
+
+def _pack_states(
+    value: TrafficInput,
+    ready: Prepared,
+    episode: int,
+    states: Sequence[Mapping[str, Any]],
+    summary: Mapping[str, Any],
+    timelines: Mapping[str, SignalTimeline] | None = None,
+) -> PackedTrafficEpisode:
+    """Pack the states a whole episode or one sealed minute provides in the worker."""
+    if not states:
+        raise ValueError("a packed traffic segment carries at least one state")
     frames = [presentation_frame(state, ready.network, ready.catalogs) for state in states]
-    homes = {vehicle["id"]: vehicle["space"] for vehicle in states[0]["vehicles"]}
+    genesis = initial_traffic(
+        value.traffic_id, value.seed, ready.network, ready.catalogs, ready.fleet
+    )
+    homes = {vehicle["id"]: vehicle["space"] for vehicle in genesis["vehicles"]}
     last = {vehicle["id"]: vehicle for vehicle in states[-1]["vehicles"]}
     vehicles = []
     samples = []
@@ -536,7 +839,7 @@ def compute_episode(data: Mapping[str, Any], episode: int) -> PackedTrafficEpiso
     shown = [[array(_TYPECODE) for _group in item["groups"]] for item in heads]
     for state in states:
         for signal_index, row in enumerate(
-            signal_codes(ready.network, ready.catalogs, state["second"])
+            signal_codes(ready.network, ready.catalogs, state["second"], signal_timelines=timelines)
         ):
             for group_index, code in enumerate(row):
                 shown[signal_index][group_index].append(code)
@@ -577,6 +880,43 @@ def window_of(
             raise ValueError(f"episode {episode} of this input was not handed in")
         first = episode * EPISODE
         spans.append((packed, max(from_second, first) - first, min(end, first + EPISODE) - first))
+    return _window_spans(value, spans, from_second, seconds)
+
+
+def window_of_segments(
+    value: TrafficInput,
+    segments: Mapping[tuple[int, int], PackedTrafficEpisode],
+    from_second: int,
+    seconds: int,
+) -> dict[str, Any]:
+    """Cut a page window across sealed minutes, including a 1,200-second episode boundary."""
+    check_request(from_second, seconds)
+    end = from_second + seconds
+    span_seconds = signal_actuation().segment_seconds
+    spans = []
+    for first in range(
+        (from_second // span_seconds) * span_seconds,
+        ((end - 1) // span_seconds) * span_seconds + 1,
+        span_seconds,
+    ):
+        episode, local = divmod(first, EPISODE)
+        segment = local // span_seconds
+        packed = segments.get((episode, segment))
+        if packed is None or packed.input_sha256 != value.sha256:
+            raise ValueError(f"sealed traffic segment {episode}:{segment} was not handed in")
+        spans.append(
+            (packed, max(from_second, first) - first, min(end, first + span_seconds) - first)
+        )
+    return _window_spans(value, spans, from_second, seconds)
+
+
+def _window_spans(
+    value: TrafficInput,
+    spans: Sequence[tuple[PackedTrafficEpisode, int, int]],
+    from_second: int,
+    seconds: int,
+) -> dict[str, Any]:
+    """The common packed-frame projection of whole episodes and sealed minute segments."""
     head = spans[0][0]
     vehicles = []
     for ordinal, static in enumerate(head.vehicles):
@@ -604,7 +944,8 @@ def window_of(
     late = [
         {"second": (packed.episode + 1) * EPISODE - 1, "vehicle_id": vehicle_id}
         for packed, _low, high in spans
-        if high == EPISODE
+        if packed.late_home
+        and high == len(packed.samples[0][0]) // (array(_TYPECODE).itemsize * _FIELDS[0][1])
         for vehicle_id in packed.late_home
     ]
     signals = []
@@ -639,8 +980,14 @@ def window_of(
             "pedestrian": list(PEDESTRIAN_INDICATIONS),
         },
         "signals": signals,
-        "episodes": [
-            {"episode": packed.episode, "trips": packed.trips, "derivation": packed.derivation}
-            for packed, _low, _high in spans
-        ],
+        "episodes": list(
+            {
+                packed.episode: {
+                    "episode": packed.episode,
+                    "trips": packed.trips,
+                    "derivation": packed.derivation,
+                }
+                for packed, _low, _high in spans
+            }.values()
+        ),
     }

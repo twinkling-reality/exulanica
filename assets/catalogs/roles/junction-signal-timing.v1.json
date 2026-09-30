@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "catalog_id": "junction-signal-timing",
+  "catalog_version": 1,
+  "entries": [
+    {
+      "key": "actuated_two_phase",
+      "plan": "fixed_two_phase_60s",
+      "green_extension_seconds_maximum": 12,
+      "near_distance_mm": 50000,
+      "segment_seconds": 60,
+      "preparation_lead_seconds": 60,
+      "pending_handoffs_maximum": 8,
+      "reason": "The fixed plan's first two intervals give each street 24 seconds of green including its walk and clearance. A model may add at most 12 one-second extensions after that clearance, before the plan's unchanged four-second amber and two-second all-red. A vehicle within 50 metres of its stop line makes the choice relevant. Sixty-second immutable segments preserve the 1,200-second trip episode while giving the host one segment of preparation lead. Eight pending handoffs across worlds bound the API process queue. These are declared prototype bounds to be checked against measured delay, safety and queue time before wider deployment.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the junction signal decision role; see the entry reason"
+      }
+    }
+  ]
+}

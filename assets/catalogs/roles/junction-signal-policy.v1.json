@@ -1,0 +1,139 @@
+{
+  "schema_version": 1,
+  "catalog_id": "junction-signal-policy",
+  "catalog_version": 1,
+  "entries": [
+    {
+      "key": "answer_attempts_maximum",
+      "value": 1,
+      "reason": "One answer fits a traffic choice point before the next second is sealed. An invalid answer falls back to the fixed plan instead of delaying traffic for another call.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the junction signal decision role; see the entry reason"
+      }
+    },
+    {
+      "key": "answer_rank_json_schema",
+      "value": 2,
+      "reason": "The strict JSON choice mechanism is second in the accepted order when a model has a verified probe for it.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the junction signal decision role; see the entry reason"
+      }
+    },
+    {
+      "key": "answer_rank_tool_call",
+      "value": 1,
+      "reason": "The forced act tool is first in the accepted order when a model has a verified probe for it.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the junction signal decision role; see the entry reason"
+      }
+    },
+    {
+      "key": "concurrent_calls_maximum",
+      "value": 2,
+      "reason": "The signal placement used by served towns has two controlled junctions at its default rule, so two calls can proceed together without multiplying the process-wide pool.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the junction signal decision role; see the entry reason"
+      }
+    },
+    {
+      "key": "context_bytes_maximum",
+      "value": 2048,
+      "reason": "The observation is counts and whole-second waits for one junction, bounded well below the prompt size used for a person. A larger observation is refused and fixed timing applies.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the junction signal decision role; see the entry reason"
+      }
+    },
+    {
+      "key": "decision_deadline_ms",
+      "value": 5000,
+      "reason": "A traffic choice point is prepared ahead of the served minute. Five seconds leaves room for recording and sealing; a later answer does not move a light already shown.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the junction signal decision role; see the entry reason"
+      }
+    },
+    {
+      "key": "decisions_per_world_hour_maximum",
+      "value": 60,
+      "reason": "At most one model choice per wall-clock minute on average bounds a world even if a signal asks every second. Additional points use the fixed plan and record the bound.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the junction signal decision role; see the entry reason"
+      }
+    },
+    {
+      "key": "model_signals_maximum",
+      "value": 8,
+      "reason": "A town grammar may lay up to eight high streets, and eight controlled junctions bound the largest selection this role admits for one world.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the junction signal decision role; see the entry reason"
+      }
+    },
+    {
+      "key": "options_maximum",
+      "value": 2,
+      "reason": "A signal offers exactly keep or switch at an eligible choice point. No other action can alter the safety clearance the plan states.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the junction signal decision role; see the entry reason"
+      }
+    },
+    {
+      "key": "process_reserve_percent",
+      "value": 50,
+      "reason": "Half of the API process model budget remains for the Companion and other work. People and signals draw from the same budget and cannot each claim a separate one.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the junction signal decision role; see the entry reason"
+      }
+    },
+    {
+      "key": "spend_per_world_hour_microusd",
+      "value": 100000,
+      "reason": "Ten cents per world per wall-clock hour bounds a cheap repeated signal choice before the process lifetime budget is reached. A refused point follows fixed timing.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the junction signal decision role; see the entry reason"
+      }
+    }
+  ]
+}

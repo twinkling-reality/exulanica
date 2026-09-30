@@ -32,6 +32,7 @@ checked again before an execution campaign.
 | Request classification, search planning, appearance drafts and environment drafts | Nebius Token Factory: Qwen3-235B-A22B-Instruct-2507; DeepSeek-V4-Flash-0731 fallback | `propose_plan`, `classify_request`, `draft_appearance` and `draft_environment_operation` call `STRUCTURED_EXTRACTION`; this is an implemented role with feature-level validation of proposals. |
 | Photograph observations | Nebius Token Factory: MiniMax M3; MiniCPM-V-4_5 fallback | `exulanica/ingest/vision.py`; observation and evidence validation remain separate. On synthetic held-out photographs M3 omitted and misplaced fewer objects than MiniCPM, which also reported people who were not there ([outcome](evaluation/2026-09-22-model-selection-outcome.json)). Synthetic drawings do not establish accuracy on real photographs. |
 | A person's decisions in a world | The open model the world's owner chose for that person, among those the manifest offers the person's decision role (`society_decision`, declared by the decision role registry); none unless chosen | `exulanica/api/decision_host.py` asks through `ModelClient.choose` before a minute of play, and the planner takes only a validated answer ([below](#providers-chosen-roles-and-a-persons-decisions)). Each offered model's mechanism was verified by a pre-registered probe ([record](evaluation/2026-09-25-society-person-models-probe.json)); measurements compare what four models decide, and two judged comparisons found no measured difference between the models they compared ([below](#judged-comparisons-of-models-deciding-for-people)). |
+| A town's signal choices | The model its owner chose for a junction signal among models the manifest offers `junction_signal`; fixed timing when none is chosen or no answer is usable | `exulanica/api/traffic_signal_controller.py` asks at green choice points from traffic state, records the receipt and seals replayable traffic minutes. The model may keep a green for one second within the plan's bounds or switch to amber; the traffic step checks the proposal. This role has no comparative model ranking. |
 | Caption/text semantic retrieval | Nebius Token Factory: Qwen3-Embedding-8B, 4096 dimensions | `exulanica/epistemics/caption_embeddings.py` and `exulanica/selection/embeddings.py`; lexical and cosine retrieval, not direct image embeddings. No model fallback is configured for embeddings. |
 | Object boxes | Grounding DINO Tiny; OWLv2 Base Patch16 Ensemble fallback | `exulanica/ingest/stages/segmentation.py`; local inference when hosted observations lack suitable boxes. |
 | Object masks | SAM 2.1 Hiera Tiny | Same segmentation module; masks are distinct from human identity confirmation, source rights and placement into recovered shared coordinates. |
@@ -50,6 +51,8 @@ configured. One path lets a model decide for a simulated person: a purposeful so
 whose world's owner chose a model, asked by the host's playback before a minute. It is validated
 against the offered choice and replayed from stored receipts rather than recalled during stepping,
 as are the explicitly requested proposals a v3 society stored before that engine was retired.
+Saved towns can also give a junction signal's bounded green choice to an offered model; traffic
+stores its decision receipt and keeps fixed timing when the model cannot answer in time.
 
 Nemotron Ultra is a configured role with no production caller in the reviewed Python code;
 Nemotron Super's production callers are the answer composer and the specification drafter.
@@ -145,8 +148,9 @@ declares each such role as data
 with the use cases a model must declare to be offered it, and passes those requirements to the
 model layer as a `ChosenRoleBinding`; the manifest's `Role` names only the roles call sites bind to
 a model, and nothing in `exulanica/models` names a chosen role (`tests/test_decision_roles.py`
-scans it). A person in a purposeful society deciding what to do next, `society_decision`, is the
-first. A model is offered to a role only when its catalog use cases hold the role's and its
+scans it). A person deciding what to do next has role `society_decision`; a junction signal's
+green choice has role `junction_signal`. A model is offered to a role only when its catalog use
+cases hold the role's and its
 `answering` entry names a mechanism the client asks by, a function the request forces by name
 (`tool_call`) or a strict JSON schema (`json_schema`), with the evaluation record whose probe
 verified that mechanism for that model; a model with neither is offered to no role.

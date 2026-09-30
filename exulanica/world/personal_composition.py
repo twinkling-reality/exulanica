@@ -149,6 +149,9 @@ VERSION_TABLES: Final[Mapping[str, str]] = {
     "society_experiment_definition": "stays in the previous version with its society",
     "society_comparison": "stays in the previous version with its society",
     "saved_world_entry": "moved to the new version",
+    "world_traffic_signal_choice": "stays with the previous version's traffic history",
+    "world_traffic_signal_decision_request": "stays with the previous version's traffic history",
+    "world_traffic_signal_segment": "stays with the previous version's traffic history",
 }
 
 

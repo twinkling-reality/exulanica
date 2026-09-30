@@ -339,11 +339,11 @@ def test_an_adapter_is_imported_from_its_package_alone_or_refused_by_name(tmp_pa
     with pytest.raises(RoleRefused) as unknown:
         load_decision_roles(_registry_in(tmp_path, adapter="no_such_adapter"), adapters=PACKAGE)
     assert unknown.value.code == "role_adapter_unknown"
-    # The package is the caller's code: the same entry read against the product's package finds
-    # no adapter there.
-    with pytest.raises(RoleRefused) as elsewhere:
-        load_decision_roles(FIXTURES, adapters=ADAPTER_PACKAGE)
-    assert elsewhere.value.code == "role_adapter_unknown"
+    # The product has an adapter under this key as well; the package selects which code runs.
+    production = load_decision_roles(FIXTURES, adapters=ADAPTER_PACKAGE)
+    assert production.role("junction_signal").adapter.__name__ == (
+        "exulanica.world.roles.junction_signal"
+    )
     # Data never names an import path: an adapter is a key, so a dotted name is refused.
     with pytest.raises(CatalogError, match="lowercase key"):
         load_decision_roles(_registry_in(tmp_path, adapter="os.path"), adapters=PACKAGE)
@@ -426,6 +426,9 @@ def test_a_roles_key_profiles_and_prompt_are_stated_in_its_entry_and_adapter_alo
             if path.resolve() == adapter:
                 seen_in_adapter = role.key in hits
                 continue
+            # The city grammar's older junction_signal is a record kind, not a role declaration.
+            if path.relative_to(ROOT).as_posix() == "exulanica/grammar/grammars/city/document.py":
+                hits = [hit for hit in hits if hit != "junction_signal"]
             assert not hits, (path.relative_to(ROOT).as_posix(), hits)
         # The positive control: the adapter declares its key, so the scan can see one.
         assert seen_in_adapter, role.key

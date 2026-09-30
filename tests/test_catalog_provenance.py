@@ -113,8 +113,9 @@ def test_the_discovery_finds_every_family_and_no_unknown_shape():
     # catalog's three versions and its arrangements, the flight kind catalog, the local
     # detector's vocabulary, the decision role registry, the society ground catalog's second
     # version (the grounds' navigation forms and population rules), the world recipes in four
-    # versions and the two versions of the specification schema their presets are points in.
-    assert len(found[ENTRY_SHAPE]) == 66
+    # versions and the two versions of the specification schema their presets are points in,
+    # plus the signal role registry and its policy, observation and response catalogs.
+    assert len(found[ENTRY_SHAPE]) == 70
     # The traffic catalogs: vehicle classes, right-of-way policies, signal plans, the two access
     # mappings, the road derivation and the signal placement.
     assert len(found[CITED_SHAPE]) == 7

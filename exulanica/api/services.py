@@ -465,7 +465,7 @@ class Services:
                 next(
                     (
                         refused
-                        for role in decision_roles()
+                        for role in (decision_roles().deciding_for("person"),)
                         if (
                             refused := host_refusal(
                                 role, self.model_client, load_manifest(), role.contract()

@@ -219,8 +219,8 @@ order:
 1. Consume this second's trip requests: route the trip, or block it at once with its reason
    (`unknown_vehicle`, `vehicle_busy`, `unknown_space`, `space_does_not_fit_class`,
    `destination_space_taken`, `no_parking_at_destination`, `no_route`).
-2. Record signal interval changes. A signal's indication is a pure function of its plan, its offset
-   and the second, so nothing about a signal is stored.
+2. Record signal interval changes. Fixed indications follow the plan, offset and second. For an
+   actuated signal, the step also reads the sealed keep or switch choices and phase cursor.
 3. Finish parking manoeuvres that end now and start leaving where it is safe to.
 4. Release reservations whose vehicle has cleared its region; revoke those whose vehicle can still
    stop when another vehicle without a reservation of that junction stands between it and its stop
@@ -495,10 +495,15 @@ the movement package and run the roads module, `exulanica-movement/roads/v1`
   exactly. A vehicle not home at an episode's end is named in the window's `late_home`. The seed is
   the SHA-256 of the city's world and version keys, and the draws are `traffic_host.departure`,
   `traffic_host.destination` and `traffic_host.dwell`.
-- **The worker.** Episodes are computed in a worker process of their own by the episode worker the
-  flight shares (`exulanica/world/episode_worker.py`), kept by the input's digest, with the episode
-  after the last one read asked for ahead of need. A request's own work is its window, cut from
-  them.
+- **The worker.** Traffic without a chosen signal model uses whole episodes in the shared episode
+  worker, cached by input digest and episode. A saved world with a signal choice uses a separate
+  time-driven controller: it prepares 60-second segments, records each model request and answer or
+  fixed-timing fallback, and seals a digest-bound continuation before a viewer reads that minute.
+  Its pure worker releases the process between model choice points. A viewer replays sealed segments
+  and verifies their digests without asking a model; a missing segment is unavailable by name.
+  A saved-world traffic window made from sealed segments names each segment's world, version,
+  second interval, accepted choice sequence and first active second when present, plus the
+  decision, frame and continuation digests (`sealed_segments`).
 
 `GET /tiles/traffic?world_seed=<64 hex>&from_second=<n>&seconds=<1 to 60>` answers a window,
 `exulanica.traffic-window/v2`: for every vehicle its class, body family, colour and dimensions and,
@@ -548,15 +553,18 @@ the city grammar, so a new city version changes those two files.
   even one it would already have passed; walkers never wait for vehicles. Under a busy crossing feed
   the signalised junction of the test network passes about 150 vehicles an hour with a mean delay of
   several minutes.
-- **One signal plan**, fixed time, 60 seconds; no actuation, no mid-block signals, no u-turns.
+- **One signal plan**, with 24-second minimum greens and bounded one-second extensions when a
+  chosen model answers at a vehicle's choice point; amber and all-red intervals remain fixed. No
+  mid-block signals or u-turns.
 - **A priority junction's major street has one inbound lane per approach**, because the catalog's
   critical headways are for a two-lane major street.
 - **Parking manoeuvres are stops on the lane**, with no path between the lane and the bay.
 - **Society destinations are frontage by segment ordinal**: a trip to a society destination parks in
   the first free space on that segment, in identity order, that admits its class, not the nearest.
 - **Served from generated streets only.** A generated city's stored tiles and a saved town's own
-  records are the road sources, and no other kind of world states roads. No store keeps a run's
-  states, and nothing feeds traffic the society's crossings or reads its events. A vehicle never
+  records are the road sources, and no other kind of world states roads. Model-controlled traffic
+  stores sealed continuations and decision receipts, not every frame. Nothing feeds traffic the
+  society's crossings or reads its events. A vehicle never
   waits for a walker the page shows.
 - **Connections are derived only where legs meet along the plan axes**, spaces only as kerbside
   bays and cycle stands, and signals only where the placement names a junction, with no signal head

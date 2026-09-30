@@ -391,6 +391,7 @@ _WORLD_READS_WITH_A_MODEL: Final = _every(
 #: commits it to asking the models compared, within the bound its owner stated.
 _WORLD_WRITES_WITH_A_MODEL: Final = _every(
     _requires(_P.WORLD_WRITE, _P.MODEL_INVOKE),
+    "POST /world/versions/{version_id}/models/{role_key}",
     "POST /world/versions/{version_id}/society/comparisons",
     "POST /world/versions/{version_id}/society/models",
 )
@@ -502,6 +503,7 @@ _WORLD_READS: Final = _every(
     "GET /world/versions/{version_id}/characters/{subject_kind}/{subject_id}/appearance/families",
     "GET /world/versions/{version_id}/characters/{subject_kind}/{subject_id}/appearance/history",
     "GET /world/versions/{version_id}/flight",
+    "GET /world/versions/{version_id}/models",
     "GET /world/versions/{version_id}/society",
     "GET /world/versions/{version_id}/society/actions",
     "GET /world/versions/{version_id}/society/actions/{request_id}",

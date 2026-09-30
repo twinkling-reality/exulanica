@@ -238,7 +238,7 @@ class SocietyDecisionRepository:
             (row["workspace_id"], row["society_id"], subject_id, base_tick),
         ).fetchone()
         if occupied:
-            raise StaleSocietyState("subject already has a decision reservation at this tick")
+            return {"request": None, "decision": None, "status": "subject_already_decided"}, False
         latest_seq = self.society._chain(row)
         document = self.society._inputs(row, [latest_seq])[latest_seq]
         request, status = role_request(

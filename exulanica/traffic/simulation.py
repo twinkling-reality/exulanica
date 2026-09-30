@@ -56,6 +56,7 @@ from exulanica.traffic.kinematics import (
 )
 from exulanica.traffic.network import Gate, JunctionSpec, RoadNetwork
 from exulanica.traffic.routing import plan_route
+from exulanica.traffic.signal_actuation import SignalTimeline
 from exulanica.traffic.signals import interval_index, seconds_until_red, vehicle_indication
 
 __all__ = [
@@ -427,6 +428,7 @@ class _Step:
     vehicles: dict[str, Vehicle]
     trips: dict[str, Trip]
     occupancies: list[CrossingEntry]
+    signal_timelines: Mapping[str, SignalTimeline] = field(default_factory=dict)
     events: list[dict[str, Any]] = field(default_factory=list)
     bodies: dict[str, list[tuple[int, int, str]]] = field(default_factory=dict)
     holders: dict[tuple[int, str], set[str]] = field(default_factory=dict)
@@ -474,6 +476,9 @@ class _Step:
     def indication(self, junction: JunctionSpec, connector: str, second: int) -> str:
         signal = junction.signal
         assert signal is not None
+        timeline = self.signal_timelines.get(signal.identity)
+        if timeline is not None:
+            return timeline.vehicle_indication(second, signal.group_of(connector))
         plan = self.catalogs.plan(signal.plan)
         return vehicle_indication(plan, signal.offset_s, second, signal.group_of(connector))
 
@@ -482,10 +487,16 @@ class _Step:
         if key not in self.red_cache:
             signal = junction.signal
             assert signal is not None
-            plan = self.catalogs.plan(signal.plan)
-            self.red_cache[key] = seconds_until_red(
-                plan, signal.offset_s, self.second, signal.group_of(connector)
-            )
+            timeline = self.signal_timelines.get(signal.identity)
+            if timeline is not None:
+                self.red_cache[key] = timeline.seconds_until_red(
+                    self.second, signal.group_of(connector)
+                )
+            else:
+                plan = self.catalogs.plan(signal.plan)
+                self.red_cache[key] = seconds_until_red(
+                    plan, signal.offset_s, self.second, signal.group_of(connector)
+                )
         return self.red_cache[key]
 
     # Geometry of routes ------------------------------------------------------------------------
@@ -531,6 +542,8 @@ def advance_traffic(
     network: RoadNetwork,
     catalogs: TrafficCatalogs,
     inputs: TrafficInputs,
+    *,
+    signal_timelines: Mapping[str, SignalTimeline] | None = None,
 ) -> TrafficStep:
     require_seed(seed)
     previous_digest = state_sha256(state)
@@ -547,6 +560,7 @@ def advance_traffic(
         vehicles={vehicle.vehicle_id: vehicle for vehicle in vehicles},
         trips={trip.trip_id: trip for trip in trips},
         occupancies=inputs.occupancies(feed_count),
+        signal_timelines={} if signal_timelines is None else signal_timelines,
     )
     step.index_bands()
     consumed = state["trip_requests_consumed"]
@@ -742,10 +756,22 @@ def _signal_changes(step: _Step) -> None:
         if signal is None:
             continue
         plan = step.catalogs.plan(signal.plan)
-        now = interval_index(plan, signal.offset_s, step.second)
-        if step.second > 0 and now == interval_index(plan, signal.offset_s, step.second - 1):
+        timeline = step.signal_timelines.get(signal.identity)
+        now = (
+            timeline.index_at(step.second)
+            if timeline is not None
+            else interval_index(plan, signal.offset_s, step.second)
+        )
+        previous = (
+            timeline.index_at(step.second - 1)
+            if timeline is not None and step.second > timeline.start_second
+            else interval_index(plan, signal.offset_s, step.second - 1)
+        )
+        if step.second > 0 and now == previous:
             continue
-        interval = plan.intervals[now]
+        interval = (
+            timeline.interval_at(step.second) if timeline is not None else plan.intervals[now]
+        )
         step.emit(
             "signal_interval",
             junction=junction.identity,

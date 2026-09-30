@@ -50,6 +50,7 @@ from exulanica.canonical import round_half_down
 from exulanica.traffic.catalogs import TrafficCatalogs, VehicleClass
 from exulanica.traffic.geometry import Point
 from exulanica.traffic.network import RoadNetwork
+from exulanica.traffic.signal_actuation import SignalTimeline
 from exulanica.traffic.signals import (
     PEDESTRIAN_INDICATIONS,
     VEHICLE_INDICATIONS,
@@ -127,7 +128,13 @@ def _beside_stop_line(network: RoadNetwork, lane_id: str) -> list[int]:
     ]
 
 
-def signal_codes(network: RoadNetwork, catalogs: TrafficCatalogs, second: int) -> list[list[int]]:
+def signal_codes(
+    network: RoadNetwork,
+    catalogs: TrafficCatalogs,
+    second: int,
+    *,
+    signal_timelines: Mapping[str, SignalTimeline] | None = None,
+) -> list[list[int]]:
     """What each group of each signal shows at ``second``, in :func:`signal_heads`'s order: the
     index of its indication among the vehicle or pedestrian indications."""
     codes = []
@@ -138,13 +145,22 @@ def signal_codes(network: RoadNetwork, catalogs: TrafficCatalogs, second: int) -
         signal = junction.signal
         assert signal is not None
         plan = catalogs.plan(signal.plan)
+        timeline = None if signal_timelines is None else signal_timelines.get(signal.identity)
         row = []
         for group in plan.groups:
             if group.kind == "vehicle":
-                shown = vehicle_indication(plan, signal.offset_s, second, group.key)
+                shown = (
+                    timeline.vehicle_indication(second, group.key)
+                    if timeline is not None
+                    else vehicle_indication(plan, signal.offset_s, second, group.key)
+                )
                 row.append(VEHICLE_INDICATIONS.index(shown))
             else:
-                shown = pedestrian_indication(plan, signal.offset_s, second, group.key)
+                shown = (
+                    timeline.pedestrian_indication(second, group.key)
+                    if timeline is not None
+                    else pedestrian_indication(plan, signal.offset_s, second, group.key)
+                )
                 row.append(PEDESTRIAN_INDICATIONS.index(shown))
         codes.append(row)
     return codes

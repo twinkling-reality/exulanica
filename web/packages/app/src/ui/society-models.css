@@ -20,6 +20,8 @@
   opacity: .75;
 }
 #shell .society-models h4 { margin: 16px 0 8px; font-size: 13px; }
+#shell .society-models { display: flex; flex-direction: column; }
+#shell .society-models .world-signal-models { order: -1; }
 #shell .society-models-model {
   display: flex;
   align-items: center;

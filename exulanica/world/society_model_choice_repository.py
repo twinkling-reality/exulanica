@@ -53,6 +53,9 @@ CHOICE_REFUSALS: Final = {
     "model_not_askable": "the decision contract accepts no mechanism the model was verified for",
     "too_many_model_people": "the choice would run more people by models than the contract allows",
     "choice_key_reused": "this idempotency key already names another choice",
+    "subject_chosen_under_another_role": (
+        "one subject cannot be run by chosen models under two decision roles"
+    ),
 }
 
 
@@ -199,6 +202,20 @@ class SocietyModelChoiceRepository:
             present = set(role.adapter.subjects(society["state"]))
             if not chosen or not set(chosen) <= present:
                 raise ModelChoiceRefused("person_not_in_this_world")
+            if record is not None:
+                occupied: dict[tuple[str, str], bool] = {}
+                for row in rows:
+                    document = row["document"]
+                    other = decision_roles().for_choice(document["profile"])
+                    if other is None:
+                        raise ValueError("a model choice names no registered role")
+                    if other.key == role.key:
+                        continue
+                    for subject in document[other.choice_subjects]:
+                        if subject in chosen:
+                            occupied[(other.key, subject)] = document["model"] is not None
+                if any(occupied.values()):
+                    raise ModelChoiceRefused("subject_chosen_under_another_role")
             after = self._current(role, rows)
             for subject in chosen:
                 after[subject] = {"model": record}

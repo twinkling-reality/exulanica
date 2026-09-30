@@ -398,6 +398,14 @@ PROBE_OVERRIDES: Final[dict[str, dict[str, Any]]] = {
         **_IN_WORLD,
         "json": {"base_state_sha256": _ZERO_DIGEST},
     },
+    "POST /world/versions/{version_id}/models/{role_key}": {
+        **_IN_WORLD,
+        "json": {
+            "idempotency_key": str(uuid.uuid4()),
+            "subjects": [str(uuid.uuid4())],
+            "model": None,
+        },
+    },
     "POST /world/versions/{version_id}/objects": {
         **_IN_WORLD,
         "json": {
@@ -586,7 +594,11 @@ ROUTE_PROBES: Final[dict[tuple[str, str], dict[str, Any]]] = derive_probes(
 #: Path parameters that are not identifiers, with the value the sweep sends. Each route checks these
 #: against a closed set before anything else, so an identifier there would be refused as malformed
 #: and the sweep would be asking the validator about the session rather than the route.
-_NON_IDENTIFIER_PARAMETERS: Final[Mapping[str, str]] = {"kind": "source", "subject_kind": "avatar"}
+_NON_IDENTIFIER_PARAMETERS: Final[Mapping[str, str]] = {
+    "kind": "source",
+    "role_key": decision_roles().deciding_for("person").key,
+    "subject_kind": "avatar",
+}
 _PLACEHOLDER: Final = re.compile(r"\{([^}]+)\}")
 
 

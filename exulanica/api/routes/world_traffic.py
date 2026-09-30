@@ -1,10 +1,10 @@
 """A saved world's traffic, read: the vehicles its roads hold, second by second, for a page to draw.
 
-Nothing is stored and nothing is read from the store. The server reads the roads the world's own
-records state (the version's snapshot's records, generated again from the world's receipt and held
-to its output digest: :func:`exulanica.world.traffic_host.saved_world_roads`) and cuts the window of
-seconds asked for from whole episodes the traffic's worker process computes, the worker
-``GET /tiles/traffic`` also uses, so no request computes a second itself.
+The server reads the roads the world's own records state (the version's snapshot's records,
+generated again from the world's receipt and held to its output digest). Before a signal model
+choice takes effect, windows come from fixed whole episodes. After a choice, a time-driven
+controller seals 60-second segments and their decision inputs and receipts. A request replays
+those sealed segments in a pure worker to verify the served frame digest; it never asks a model.
 
 It is read with ``world.read``, like the world's own tiles, and charges nothing: a world's traffic
 is bounded by the tiles its recipe states and the fleet rule, not by a quota. The traffic keeps
@@ -30,7 +30,7 @@ from __future__ import annotations
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Path, Query
+from fastapi import APIRouter, Path, Query, Request
 from fastapi.responses import JSONResponse, Response
 
 from exulanica.api.traffic_answer import refusal_status, vehicles_encoded
@@ -40,6 +40,7 @@ from exulanica.world.errors import InvalidStructuralData
 from exulanica.world.generated_worlds import unreadable_reason
 from exulanica.world.traffic_episodes import TrafficRefused, check_clock, check_request
 from exulanica.world.traffic_host import saved_world_roads, served_window, traffic_clock
+from exulanica.world.traffic_signal_repository import SignalChoiceRefused, TrafficSignalRepository
 
 __all__ = ["router"]
 
@@ -62,6 +63,7 @@ def _problem(status: int, code: str, detail: str) -> JSONResponse:
 def world_traffic(
     version_id: Annotated[uuid.UUID, Path()],
     repository: ReadObjects,
+    request: Request,
     from_second: Annotated[int | None, Query()] = None,
     seconds: Annotated[int, Query()] = 60,
 ) -> Response:
@@ -80,13 +82,32 @@ def world_traffic(
             repository.world_id,
             version.source_snapshot_id,
         )
-        window = served_window(value, start, seconds)
+        signal_facts = TrafficSignalRepository(
+            repository.connection, repository.workspace_id, repository.world_id, version_id
+        )
+        choices = signal_facts._choices()
+        if choices and start + seconds > min(row["effective_second"] for row in choices):
+            controller = getattr(request.app.state, "traffic_signal_controller", None)
+            if controller is None:
+                raise SignalChoiceRefused("traffic_controller_unavailable")
+            window = controller.replay_window(
+                repository.workspace_id,
+                repository.world_id,
+                version_id,
+                value,
+                start,
+                seconds,
+            )
+        else:
+            window = served_window(value, start, seconds)
     except TrafficRefused as error:
         return _problem(refusal_status(error), error.code, error.detail)
     except UnsupportedNetworkError as error:
         return _problem(409, "roads_unavailable", str(error))
     except InvalidStructuralData as error:
         return _problem(409, unreadable_reason(error), str(error))
+    except SignalChoiceRefused as error:
+        return _problem(503, error.code, "The sealed traffic minute is unavailable.")
     answer = {
         **window,
         "clock_second": traffic_clock(),

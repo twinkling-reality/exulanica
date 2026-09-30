@@ -149,6 +149,11 @@ INSERT_ONLY_TABLES: Final = (
     # Migration 0121 appends a completed comparison run's verified drawing and refuses every
     # update and delete of it.
     "society_comparison_replay",
+    # A signal's owner choice, bounded ask, receipt and sealed traffic minute are immutable.
+    "world_traffic_signal_choice",
+    "world_traffic_signal_decision_request",
+    "world_traffic_signal_decision",
+    "world_traffic_signal_segment",
 )
 
 #: The vocabulary is administered, not generated. Without revoking this the role could insert a

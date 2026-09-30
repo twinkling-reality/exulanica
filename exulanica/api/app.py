@@ -106,6 +106,7 @@ from exulanica.api.routes import (
     world_environments,
     world_flight,
     world_generation,
+    world_models,
     world_objects,
     world_read,
     world_traffic,
@@ -115,6 +116,7 @@ from exulanica.api.routes import (
 )
 from exulanica.api.routes.selection import failure_extensions
 from exulanica.api.services import Services, build_services
+from exulanica.api.traffic_signal_controller import TrafficSignalController
 from exulanica.db.migrate import verify_schema
 from exulanica.db.roles import assert_runtime_role
 from exulanica.deletion.restore import verify_restore
@@ -246,6 +248,13 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     # evidence path cannot write either, so it is a broken deployment rather than a degraded
     # feature, and it should say so at boot instead of at the first asset read.
     seed_reviewed_assets(services.store)
+    traffic_signals = TrafficSignalController(
+        services.database,
+        services.model_client,
+        services.society_control_workspaces,
+        services.person_decision_policy,
+    )
+    app.state.traffic_signal_controller = traffic_signals
     society_worker = services.build_society_control_worker()
     society_stop = threading.Event()
     society_thread = (
@@ -281,6 +290,7 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
             society_thread.start()
         if comparison_thread is not None:
             comparison_thread.start()
+        traffic_signals.start()
         # What startup made lives as long as the server. A full garbage collection walks every
         # tracked object and holds the interpreter's lock while it does, so no request the server is
         # answering moves: over about 172,000 objects once the application is imported, 33 to 36 ms
@@ -299,6 +309,7 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
             await asyncio.to_thread(society_thread.join)
         if comparison_thread is not None:
             await asyncio.to_thread(comparison_thread.join)
+        await asyncio.to_thread(traffic_signals.close)
         if worker is not None:
             worker.stop()
         # The flight's worker process starts at the first flight read; it stops with the server.
@@ -381,6 +392,7 @@ def create_app(services: Services | None = None, *, verify: bool = True) -> Fast
     app.include_router(world_entries.router)
     app.include_router(world_flight.router)
     app.include_router(world_traffic.router)
+    app.include_router(world_models.router)
     app.include_router(interaction.router)
     app.include_router(world_read.router)
     app.include_router(world_write.router)

@@ -53,6 +53,7 @@ export const CHOICE_REFUSAL_WORDS: Readonly<Record<string, string>> = {
   model_not_askable: 'That model cannot be asked for a decision here.',
   too_many_model_people: 'That would put more people under models than this world allows.',
   choice_key_reused: 'That choice was already sent with different people. Choose again.',
+  subject_chosen_under_another_role: 'That subject is already assigned to a model under another kind of decision.',
 };
 
 const decisionWords = (code: string): string =>
@@ -210,12 +211,14 @@ export function buildSocietyModels(handlers: {
     choose.disabled = checked.size === 0;
   });
   choose.addEventListener('click', () => handlers.onChoose([...checked].sort(), optionModel(model.value)));
-  const root = el('section', { class: 'society-models', 'aria-label': 'Who decides for them', hidden: true }, [
+  const peopleGroup = el('div', { class: 'society-models-people-group' }, [
     heading, about, host, modelLabel, peopleList, everyone, choose, limit, result, summariesHeading, summaries,
   ]);
+  const root = el('section', { class: 'society-models', 'aria-label': 'Who decides', hidden: true }, [peopleGroup]);
 
   const render: SocietyModelsSection['render'] = ({ view, people, busy, message }) => {
-    root.hidden = view === null || !view.takesModelChoices;
+    peopleGroup.hidden = view === null || !view.takesModelChoices;
+    root.hidden = peopleGroup.hidden;
     result.textContent = message;
     if (view === null || !view.takesModelChoices) return;
     host.textContent = hostWords(view.hostRefusal);

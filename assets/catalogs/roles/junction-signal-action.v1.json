@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "catalog_id": "junction-signal-action",
+  "catalog_version": 1,
+  "entries": [
+    {
+      "key": "switch",
+      "kind": "switch",
+      "words": "end this green and show amber",
+      "reason": "The fixed plan ends a green at its minimum. Switching then follows its amber and all-red clearance before the other street can get green; this is the idle action and the fallback when no valid answer arrives.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the junction signal decision role; see the entry reason"
+      }
+    },
+    {
+      "key": "keep",
+      "kind": "keep",
+      "words": "keep this green one more second",
+      "reason": "A model may extend the active street's green one second when a vehicle is near, after the plan's minimum walk and pedestrian clearance. The step checks the request again and refuses an extension at the declared maximum.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the junction signal decision role; see the entry reason"
+      }
+    }
+  ]
+}

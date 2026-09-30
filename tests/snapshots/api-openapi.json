@@ -11219,6 +11219,165 @@
     }
    }
   },
+  "/world/versions/{version_id}/models": {
+   "get": {
+    "tags": [
+     "world"
+    ],
+    "summary": "World Models",
+    "operationId": "world_models_world_versions__version_id__models_get",
+    "parameters": [
+     {
+      "name": "version_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Version Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response World Models World Versions  Version Id  Models Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/world/versions/{version_id}/models/{role_key}": {
+   "post": {
+    "tags": [
+     "world"
+    ],
+    "summary": "Choose World Model",
+    "operationId": "choose_world_model_world_versions__version_id__models__role_key__post",
+    "parameters": [
+     {
+      "name": "role_key",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Role Key"
+      }
+     },
+     {
+      "name": "version_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Version Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/RoleChoiceBody"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Choose World Model World Versions  Version Id  Models  Role Key  Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/world/interactions/catalog": {
    "get": {
     "tags": [
@@ -22999,6 +23158,42 @@
      "occurrence_id"
     ],
     "title": "RevokeRequest"
+   },
+   "RoleChoiceBody": {
+    "properties": {
+     "idempotency_key": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Idempotency Key"
+     },
+     "subjects": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "maxItems": 512,
+      "minItems": 1,
+      "title": "Subjects"
+     },
+     "model": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/ChosenModel"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "idempotency_key",
+     "subjects",
+     "model"
+    ],
+    "title": "RoleChoiceBody"
    },
    "RollbackBody": {
     "properties": {

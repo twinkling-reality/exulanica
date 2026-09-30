@@ -13,6 +13,7 @@
 import { ApiError } from '@exulanica/graph-client';
 import type { Credentials } from '../config.js';
 import { SocietyModelsClient, type ModelRef, type SocietyModels } from '../society-models-api.js';
+import { WorldModelsClient, type SignalRole } from '../world-models-api.js';
 import {
   buildSocietyModels,
   choiceRefusalWords,
@@ -21,6 +22,7 @@ import {
   recordedWords,
   type ChoosablePerson,
 } from '../ui/society-models.js';
+import { buildSignalModels } from '../ui/world-signals-models.js';
 
 export interface MountedSocietyModels {
   readonly root: HTMLElement;
@@ -38,18 +40,26 @@ export function mountSocietyModels(options: {
   readonly credentials: Credentials;
   readonly world: { readonly worldId: string; readonly versionId: string };
   readonly client?: SocietyModelsClient;
+  readonly worldClient?: WorldModelsClient;
   /** Called after each read, so an open inspector can say what changed. */
   readonly onRead?: () => void;
 }): MountedSocietyModels {
   const abort = new AbortController();
-  const client = options.client
-    ?? new SocietyModelsClient({ ...options.credentials, signal: abort.signal, worldId: options.world.worldId });
+  const worldClient = options.worldClient ?? (options.client === undefined
+    ? new WorldModelsClient({ ...options.credentials, signal: abort.signal, worldId: options.world.worldId })
+    : null);
+  const client = options.client ?? (worldClient === null
+    ? new SocietyModelsClient({ ...options.credentials, signal: abort.signal, worldId: options.world.worldId })
+    : null);
   let view: SocietyModels | null = null;
+  let signalView: SignalRole | null = null;
+  let personRoleKey = 'society_decision';
   let people: readonly ChoosablePerson[] = [];
   let busy = false;
   /** What the last choice came to, and why the last read failed, each until the next. */
   let message = '';
   let failure = '';
+  let signalMessage = '';
   let readTick: number | null | undefined;
   let wanted: number | null = null;
   let reading: Promise<void> | null = null;
@@ -60,13 +70,28 @@ export function mountSocietyModels(options: {
   let ended = 0;
 
   const section = buildSocietyModels({ onChoose: (chosen, model) => void choose(chosen, model) });
-  const render = () => section.render({ view, people, busy, message: [message, failure].filter(Boolean).join(' ') });
+  const signals = buildSignalModels({ onChoose: (signalId, model) => void chooseSignal(signalId, model) });
+  section.root.append(signals.root);
+  const render = () => {
+    section.render({ view, people, busy, message: [message, failure].filter(Boolean).join(' ') });
+    signals.render(signalView, busy, [signalMessage, failure].filter(Boolean).join(' '));
+    section.root.hidden = (section.root.firstElementChild as HTMLElement).hidden && signals.root.hidden;
+  };
 
   async function read(tick: number | null): Promise<void> {
     readTick = tick;
     const number = ++begun;
     try {
-      view = await client.read(options.world.versionId);
+      if (worldClient !== null) {
+        const world = await worldClient.read(options.world.versionId);
+        const person = world.roles.find((role) => role.subject === 'person');
+        const signal = world.roles.find((role) => role.subject === 'signal');
+        view = person?.subject === 'person' ? person.view : null;
+        if (person?.subject === 'person') personRoleKey = person.key;
+        signalView = signal?.subject === 'signal' ? signal : null;
+      } else if (client !== null) {
+        view = await client.read(options.world.versionId);
+      }
       failure = '';
     } catch (error) {
       if (disposed) return;
@@ -82,7 +107,7 @@ export function mountSocietyModels(options: {
   /** Resolves once a read begun after this call has ended, or at once where nothing is read. */
   async function readAfterNow(): Promise<void> {
     const since = begun;
-    while (!disposed && wanted !== null && ended <= since) {
+    while (!disposed && (wanted !== null || worldClient !== null) && ended <= since) {
       if (reading === null) await refresh(wanted, people, true);
       else await reading;
     }
@@ -93,7 +118,7 @@ export function mountSocietyModels(options: {
     people = held;
     wanted = tick;
     render();
-    if (tick === null || (!force && tick === readTick)) return;
+    if ((tick === null && worldClient === null) || (!force && tick === readTick)) return;
     // Hidden by what the server said: a new minute changes nothing a hidden section shows.
     if (!force && view !== null && section.root.hidden) return;
     if (reading !== null) { again = true; return; }
@@ -109,7 +134,8 @@ export function mountSocietyModels(options: {
     render();
     let recorded = false;
     try {
-      await client.choose(options.world.versionId, chosen, model);
+      if (worldClient !== null) await worldClient.choose(options.world.versionId, personRoleKey, chosen, model);
+      else if (client !== null) await client.choose(options.world.versionId, chosen, model);
       recorded = true;
     } catch (error) {
       message = error instanceof ApiError
@@ -127,6 +153,29 @@ export function mountSocietyModels(options: {
     }
   }
 
+  async function chooseSignal(signalId: string, model: ModelRef | null): Promise<void> {
+    if (disposed || busy || worldClient === null || signalView === null) return;
+    busy = true;
+    signalMessage = '';
+    render();
+    try {
+      await worldClient.choose(options.world.versionId, signalView.key, [signalId], model);
+      signalMessage = 'Choice recorded. The scheduled time and active status below come from the server.';
+      await refresh(wanted, people, true);
+    } catch (error) {
+      signalMessage = error instanceof ApiError
+        ? choiceRefusalWords(error.code, error.message)
+        : `The choice was not recorded. ${error instanceof Error ? error.message : ''}`.trim();
+    } finally {
+      busy = false;
+      render();
+    }
+  }
+
+  const statusTimer = worldClient === null ? null : window.setInterval(() => {
+    if (!disposed && !section.root.hidden) void refresh(wanted, people, true);
+  }, 30_000);
+
   return {
     root: section.root,
     refresh,
@@ -140,6 +189,7 @@ export function mountSocietyModels(options: {
     dispose() {
       disposed = true;
       abort.abort();
+      if (statusTimer !== null) window.clearInterval(statusTimer);
       section.root.remove();
     },
   };

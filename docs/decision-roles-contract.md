@@ -1,11 +1,11 @@
 # Decision roles and model decisions
 
-Status: **ONE ROLE REGISTERED: A PERSON IN A PURPOSEFUL SOCIETY**. A role's contract is data and
-one adapter module; hosting a role in a world also takes the code that
-[adding a role](#adding-a-role) lists, which only the person has.
+The registry hosts two roles: `society_decision` for a person in a society and `junction_signal`
+for a traffic light at a town's junction. Each role has a data contract and an adapter; its host
+owns the clock, state and persistent decisions for the subject it controls.
 
-A world's owner can hand some of the choices made in their world to an open model: which model
-decides for which of the world's people. This contract owns that path for every kind of thing a
+A world's owner can hand some choices made in their world to an open model: which model decides
+for a person or a traffic light. This contract owns that path for every kind of thing a
 model may decide for, called a decision role: the role registry and what adding a role takes, the
 owner's choice of a model, the person role's contract, how the playback host asks a chosen model
 before a minute and what it may spend, what each decision does in its minute, and replay. The
@@ -40,7 +40,7 @@ calling a model. With no choice recorded, nothing is asked or reserved and the r
 
 A decision role is a kind of thing in a world that changes and chooses at choice points of its own,
 whose choices a world's owner may hand to an open model. Each role is one entry of the registry
-catalog `assets/catalogs/roles/decision-roles.v1.json`, read at its newest version by
+catalog `assets/catalogs/roles/decision-roles.v2.json`, read at its newest version by
 `exulanica/world/decision_roles.py`. An entry states, with a licence and a reason like every catalog
 entry:
 
@@ -57,7 +57,7 @@ entry:
 | `request_profile`, `receipt_profile`, `choice_profile`, `context_profile` | The profiles of its documents |
 | `prompt_version`, `instruction`, `choice_description`, `not_offered` | Its prompt: the one instruction, how the one choice is described, and what a model is told when its answer was not offered |
 
-The adapter is the only code a role has of its own: which of its subjects are at a choice point
+The adapter defines which of its subjects are at a choice point
 (`subjects`, `due`), their options and what a model reads (`options`, `context`,
 `option_from_record`, `messages`), how the engine checks a validated choice again, promises and
 applies it through its seam, and the events it records (`apply`, `events`), with the reasons only
@@ -70,7 +70,7 @@ every role: requests, receipts and their checks, the minute loop and replay
 names no role: a role's requirements reach it as a `ChosenRoleBinding`, and
 `tests/test_decision_roles.py` scans `exulanica/models` for role names.
 
-The person is the one registered role: key `society_decision`, subject `person`, hosted by the
+The person role has key `society_decision`, subject `person`, and is hosted by the
 purposeful society (`exulanica-society/v2`) and the living town (`exulanica-society/v5`). Its
 adapter is `exulanica/world/roles/person.py`, over its contract in
 `exulanica/world/society_decision_contract.py` and its minute in
@@ -78,15 +78,14 @@ adapter is `exulanica/world/roles/person.py`, over its contract in
 engine's own answer set and applied through its choice seam, in
 `exulanica/world/society_living_decisions.py`, by the state family the engine table states, and
 any other family is refused by name (`person_family_unsupported`). The engines the registry names are held equal to the
-engines whose `owner_model_choice` the engine table states (`tests/test_decision_roles.py`). A role
-declared in test data alone, a traffic signal at a junction (`tests/decision_role_fixtures/`), runs
-through the minute loop, the one hosted ask and replay with a scripted model, and replays with no
-call; no society engine hosts it, so the host, the repositories and a society's step are not run
-for it.
+engines whose `owner_model_choice` the engine table states (`tests/test_decision_roles.py`). The
+signal role has key `junction_signal`, subject `signal`, and adapter
+`exulanica/world/roles/junction_signal.py`. Its traffic controller holds a choice and sealed
+decision in the saved world and version named by the request. No society engine hosts that role.
 
 ## Adding a role
 
-What a role needs as data and one module, with no migration:
+What a role needs as data and one module:
 
 1. A registry entry, in a new registry version beside the last (`decision-roles.v<N>.json`).
    Nothing stored records the registry's version: a request records its role's own profile and
@@ -111,21 +110,21 @@ What a role needs as data and one module, with no migration:
    The deployment preflight holds the models each registered role is offered to that role's use
    cases.
 
-What a role in a world still needs in code, because only the person is built:
+What a role in a world also needs:
 
-- **An engine that hosts it.** Only a stored society holds decisions: the decision tables bind
-  every request and receipt to a society row, and the purposeful engine's and the living town's
+- **An engine that hosts it.** A stored society's decision tables bind requests and receipts to a
+  society row, and the purposeful engine's and the living town's
   steps apply a hosted role's receipts (`apply_receipts`, called from
   `exulanica/world/society_repository.py`). The binding triggers admit a role's documents only in
   an `exulanica-society/v2` or `v5` society (migration 0120), and the retired social profile only
   in `v3`, so a role another engine hosts needs a migration widening them and that engine's step
   applying receipts through the generic seam. The living society over a district (`v4`) consumes
-  no receipts. Flight is derived and never stored, and traffic has
-  no runtime ([movement modules](movement-modules-contract.md#a-model-choosing-for-a-flyer)), so
-  neither can host a role.
-- **A route and a panel.** The models route and the People panel serve the one role whose subject
-  is `person` (`SUBJECT` in `exulanica/api/routes/society_models.py`), and answer
-  `409 role_not_registered` unless exactly one registered role decides for people.
+  no receipts. Traffic's separate controller persists choices, requests, receipts and segment
+  continuations under the saved world and version; flight is derived and has no decision host.
+- **A route and a panel.** `GET /world/versions/{version_id}/models` serves registered person and
+  signal roles with offered models, subjects and choices. `POST` at its role-key child records an
+  owner's choice. The Who decides panel renders the served roles. The person-specific society
+  models route remains available to its existing callers.
 - **Comparisons.** A comparison names the role it asks by the contract its definition records,
   which the registry resolves to one role (`RoleRegistry.for_contract`), and asks it through the
   generic path, and the start controls offer the roles the society's engine hosts. Its waiting
@@ -177,6 +176,27 @@ cost, over the society's latest 2,000 decisions (`DECISIONS_READ`). Neither rout
 In a saved world the People panel offers the choice for one person or for everyone and shows this
 read (`web/packages/app/src/composition/society-models-mount.ts`). Where the host cannot ask a
 person's model, the page says the person follows their own routine for now, and why.
+
+## The signal's contract
+
+A saved town's owner may choose one offered model for each signal at a high street junction, or
+restore fixed timing. The choice takes effect at a 60-second boundary at least one minute ahead.
+The route serves that target and the first sealed second at which an accepted model answer took
+effect separately. Pending and preparing choices do not claim that a model controls the light.
+
+At the end of a plan's minimum green, and after each permitted one-second extension, the traffic
+step derives nearby vehicle counts, queued vehicles and longest waits on the active and other
+street. It asks the chosen model to keep the current green for one second or switch to amber only
+when a vehicle is near. The step rechecks the recorded proposal against the plan's extension
+maximum. Missing, late, refused or unavailable answers switch at the fixed timing boundary;
+amber and all-red clearances still run. A choice changes neither trip draws nor a sealed minute.
+The controller stores a versioned, digest-bound continuation every 60 seconds, including trip and
+signal state, and replay verifies the stored decision and frame digests without a model call
+(`exulanica/api/traffic_signal_controller.py`, migration 0122).
+
+Comparing signal models would need a paired run over the same towns and episode seeds, with each
+model's sealed decisions, delays, trip arrivals, unanswered points, spend and health timing kept
+as separate evidence. The society comparison runner does not compare this role.
 
 ## The person's contract
 

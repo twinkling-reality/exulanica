@@ -266,6 +266,11 @@ JUDGE_WRITE_TABLES: Final[tuple[str, ...]] = (
     "companion_answer",
     "companion_answer_citation",
     "companion_escape",
+    # A judge can choose a model for a world's signals and keep its immutable traffic decisions.
+    "world_traffic_signal_choice",
+    "world_traffic_signal_decision_request",
+    "world_traffic_signal_decision",
+    "world_traffic_signal_segment",
 )
 
 #: What the judge's bearer token may do, named from ``exulanica.api.permissions.Permission``.
