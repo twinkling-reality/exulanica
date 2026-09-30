@@ -1,8 +1,11 @@
 """A dead traffic process does not poison subsequent catalog or replay jobs."""
 
+import os
+import threading
 import time
 from concurrent.futures import Future
-from concurrent.futures.process import BrokenProcessPool
+from concurrent.futures.process import BrokenProcessPool, _ExecutorManagerThread
+from multiprocessing import popen_fork
 
 import exulanica.api.traffic_signal_controller as controller_module
 import pytest
@@ -75,6 +78,30 @@ def test_a_real_timeout_reaps_both_owned_replacement_workers(monkeypatch):
         controller.close()
     assert len(retired) == 2
     assert all(process.exitcode is not None and not process.is_alive() for process in retired)
+
+
+def test_a_worker_the_pool_reaps_first_still_reads_as_reaped(monkeypatch):
+    """The pool's manager thread also waits on a retired child, and whichever waiter loses the
+    waitpid race records no exit code. Here the manager always wins and records it late, the
+    schedule a loaded CI runner produced."""
+
+    def poll(self, flag=os.WNOHANG):
+        if self.returncode is None:
+            manager = isinstance(threading.current_thread(), _ExecutorManagerThread)
+            if not manager and flag == 0:
+                time.sleep(0.2)
+            try:
+                pid, status = os.waitpid(self.pid, flag)
+            except OSError:
+                return None
+            if pid == self.pid:
+                if manager:
+                    time.sleep(0.8)
+                self.returncode = os.waitstatus_to_exitcode(status)
+        return self.returncode
+
+    monkeypatch.setattr(popen_fork.Popen, "poll", poll)
+    test_a_real_timeout_reaps_both_owned_replacement_workers(monkeypatch)
 
 
 def test_close_reaps_an_owned_worker_with_a_running_job():

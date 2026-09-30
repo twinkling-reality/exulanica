@@ -115,6 +115,10 @@ class TrafficSignalController:
         # ProcessPoolExecutor.shutdown(wait=False) cancels queued jobs but leaves a running
         # child alive on Python 3.11. Its process map is the only bounded kill path there.
         processes = tuple((getattr(pool, "_processes", None) or {}).values())
+        # The pool's manager thread joins these same children, and shutdown() drops its
+        # reference, so it is taken first. Two threads waiting on one child race: the one whose
+        # waitpid loses records no exit code, and a reaped child then still reads as running.
+        manager = getattr(pool, "_executor_manager_thread", None)
         for process in processes:
             try:
                 if process.is_alive():
@@ -122,6 +126,9 @@ class TrafficSignalController:
             except (AssertionError, OSError):
                 pass
         pool.shutdown(wait=False, cancel_futures=True)
+        if manager is not None:
+            with suppress(RuntimeError):
+                manager.join(timeout=1.0)
         for process in processes:
             try:
                 if process.pid is not None:
