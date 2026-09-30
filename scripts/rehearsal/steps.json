@@ -302,6 +302,7 @@
           {"id": "subject-selectable", "says": "The placed object is offered as a subject to inspect."},
           {"id": "geometry-and-origin", "says": "For that subject the inspector shows its rendered and point geometry and its origin: the reviewed catalog asset and its digest."},
           {"id": "missing-explicit", "says": "Every representation the object does not have is listed as unavailable with a reason."},
+          {"id": "inspector-heading-visible", "says": "The World to data heading is visible in a screenshot while the placed object remains selected."},
           {"id": "selected-subject-visible", "says": "The World to data panel and the selected object's name are visible in the screenshot frame."}
         ]
       }

@@ -342,6 +342,18 @@ async function inspectObject(ctx) {
   const missing = lines.filter((l) => /^\w+: unavailable\./.test(l.text));
   ctx.observe('missing-explicit', missing.length > 0 && missing.every((l) => /^\w+: unavailable\.\s+\S/.test(l.text)),
     { unavailable: missing });
+  const heading = `${inspector}.querySelector(':scope > summary')`;
+  await page.evaluate(`(${heading})?.scrollIntoView({block: 'start'})`);
+  const visibleHeading = await page.evaluate(`(() => { const element = ${heading};
+    const rect = element?.getBoundingClientRect();
+    return { text: element?.textContent.trim() ?? null,
+      visible: element?.checkVisibility() ?? false,
+      in_frame: !!rect && rect.top >= 0 && rect.bottom <= window.innerHeight,
+      selected_value: ${subjects}?.value ?? null }; })()`);
+  ctx.observe('inspector-heading-visible', visibleHeading.text === 'World → data'
+    && visibleHeading.visible && visibleHeading.in_frame && visibleHeading.selected_value === target.value,
+  visibleHeading);
+  await ctx.screenshot('inspector-heading', 'the visible World to data heading with the placed object selected');
   await page.evaluate(`(${subjects})?.scrollIntoView({block: 'center'})`);
   const visibleSubject = await page.evaluate(`(() => { const panel = document.getElementById('world-panel-details');
     const inspector = ${inspector}; const subject = ${subjects}; const rect = subject?.getBoundingClientRect();
