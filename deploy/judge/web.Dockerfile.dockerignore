@@ -1,0 +1,15 @@
+# The judge web image's context, an allowlist as the root `.dockerignore` is: the web workspace
+# without its installed or built output, and the files the bundle imports from outside `web/`.
+# Never a `.env`.
+*
+!web
+web/**/node_modules
+web/**/dist
+!assets/catalogs
+!assets/characters
+!assets/owned-world
+!assets/textures/manifest.json
+!assets/textures/blobs
+!exulanica/world/interaction-policy-registry.v1.json
+**/.env
+**/.env.*

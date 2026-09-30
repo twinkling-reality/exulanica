@@ -1,10 +1,13 @@
 # The judge stack's browser client: build the bundle, then serve it beside a proxy to the API.
 #
-# The build context is `web/`, not the repository root. The root `.dockerignore` is an allowlist
-# and `web/` is not on it, so a stage added to the root Dockerfile would receive an empty
-# directory and produce an empty bundle without saying so. The server configuration is a heredoc
-# rather than a file for the same reason from the other side: `web/` is not this change's to
-# write into, and a config that lived in `deploy/judge/` would be outside the build context.
+# The build context is the repository root, filtered by `web.Dockerfile.dockerignore` beside this
+# file, an allowlist like the root `.dockerignore`. Not `web/` alone: the application bundles
+# catalogs, character sources, the owned district and the texture set from `assets/`, and the
+# interaction policy registry from `exulanica/world/`, by relative imports that leave `web/`
+# (MEASURED 2026-09-29: a `web/` context fails `vite build` with "Could not resolve
+# ../../../../assets/owned-world/..."). The repository layout is kept under /src, so those
+# imports resolve unchanged. The server configuration is a heredoc so the image needs no file
+# of its own.
 #
 # TWO THINGS HERE ARE LOAD BEARING and both are about the single origin:
 #
@@ -15,24 +18,28 @@
 #   2. The bundle is served at the origin ROOT. `vite.config.ts` sets no `base`, so index.html
 #      references `/assets/...` absolutely and serving it under a path prefix breaks every asset.
 
-FROM node:22-bookworm-slim AS build
+# The bundle is the same bytes on every architecture, so this stage runs on the build host's own
+# platform and only the nginx stage below is built for the target. Building it under emulation
+# fails outright: esbuild's install step segfaults under qemu (MEASURED 2026-09-29, a linux/amd64
+# build on an arm64 host, exit 139 in `pnpm install`).
+FROM --platform=$BUILDPLATFORM node:22-bookworm-slim AS build
 ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
 # The version the workspace pins in `package.json`. Corepack rather than a global install, so the
 # container resolves the same pnpm the lockfile was written by.
 RUN corepack enable && corepack prepare pnpm@10.7.1 --activate
-WORKDIR /src
+WORKDIR /src/web
 
 # The lockfile and the workspace manifests first, so editing a source file does not re-resolve
 # the dependency closure. `--frozen-lockfile` for the same reason the Python image uses
 # `--locked`: a lockfile that no longer matches fails the build here rather than quietly
 # resolving to something else.
-COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+COPY web/pnpm-lock.yaml web/pnpm-workspace.yaml web/package.json ./
 # The shared TypeScript bases too. Every package's tsconfig.json extends `../../tsconfig.base.json`,
 # and Vite reads that file during the build to learn the JSX and target settings, so a context
 # without it fails with "failed to resolve extends" and zero modules transformed.
-COPY tsconfig.json tsconfig.base.json ./
-COPY packages ./packages
+COPY web/tsconfig.json web/tsconfig.base.json ./
+COPY web/packages ./packages
 RUN --mount=type=cache,target=/pnpm/store pnpm install --frozen-lockfile
 
 # Built LAST, and that ordering is not cosmetic. `pnpm check` runs `tsc --build` into the same
@@ -42,12 +49,41 @@ RUN --mount=type=cache,target=/pnpm/store pnpm install --frozen-lockfile
 # VITE_EXULANICA_TOKEN is deliberately NOT set. Baking it would publish the bearer token as a
 # string literal inside the JavaScript, readable by anyone who can fetch the file. Left unset,
 # the app renders its own token gate and the judge pastes the credential once.
+# What the bundle imports from outside `web/`, at the paths its relative imports name.
+COPY assets /src/assets
+COPY exulanica/world/interaction-policy-registry.v1.json /src/exulanica/world/
 RUN pnpm --filter @exulanica/app build
 
 FROM nginx:1.29-alpine AS runtime
-COPY --from=build /src/packages/app/dist /usr/share/nginx/html
+COPY --from=build /src/web/packages/app/dist /usr/share/nginx/html
 
 COPY <<'CONF' /etc/nginx/conf.d/default.conf
+# The client address a write is counted against. Behind the public edge every connection comes
+# from the edge's container, so the address is taken from X-Forwarded-For, trusted only from the
+# private ranges a container network is drawn from. The edge replaces that header with the address
+# it accepted the connection from, so a visitor cannot choose it; with no edge in front, the
+# address is whatever reached the loopback port.
+set_real_ip_from 10.0.0.0/8;
+set_real_ip_from 172.16.0.0/12;
+set_real_ip_from 192.168.0.0/16;
+real_ip_header X-Forwarded-For;
+
+# Writes are counted; reads are not. An empty key is not limited, so GET, HEAD and OPTIONS pass
+# freely and every other method is counted per client address.
+map $request_method $exulanica_write_client {
+    default $binary_remote_addr;
+    GET "";
+    HEAD "";
+    OPTIONS "";
+}
+
+# At most one write every two seconds per address, with a burst of twenty served at once. Every
+# route that can call a hosted model is a write, so this paces a script against the model budget
+# while leaving a person's clicks alone. The figures are a stated bound, not a measurement of
+# a person's pace; the process's model budget remains the ceiling on spend.
+limit_req_zone $exulanica_write_client zone=exulanica_writes:10m rate=30r/m;
+limit_req_status 429;
+
 server {
     listen 8080;
     server_name _;
@@ -60,6 +96,7 @@ server {
 
     # The API, same origin, prefix stripped by the trailing slash on proxy_pass.
     location /api/ {
+        limit_req zone=exulanica_writes burst=20 nodelay;
         proxy_pass http://api:8000/;
         proxy_http_version 1.1;
         proxy_set_header Host $host;

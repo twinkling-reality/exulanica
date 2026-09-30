@@ -109,6 +109,12 @@ services:
       # then an unset or malformed allowlist, or one that omits the model endpoint, stops startup.
       # See docs/security-floor.md.
       EXULANICA_EGRESS_ALLOWLIST: ${EXULANICA_EGRESS_ALLOWLIST:-}
+      # The process's model spend ceiling in USD and its call ceiling. No default here, although
+      # the API has one: a stack that anybody outside can reach spends from a prepaid balance, and
+      # the figure is the operator's to state. Each is a ceiling for one process life; a restart
+      # starts a fresh one, so the provider balance is what bounds spend across restarts.
+      EXULANICA_BUDGET_USD: ${EXULANICA_BUDGET_USD:?set EXULANICA_BUDGET_USD; this stack states its model spend ceiling}
+      EXULANICA_BUDGET_MAX_CALLS: ${EXULANICA_BUDGET_MAX_CALLS:?set EXULANICA_BUDGET_MAX_CALLS; this stack states its model call ceiling}
     volumes:
       - media:/var/lib/exulanica
     expose:
@@ -120,9 +126,13 @@ services:
   # The browser client, and the only port published. It serves the built bundle at the origin
   # root and proxies /api to the API, which is what keeps the two on one origin.
   web:
+    # Named, like the backend image, so a host that loads built images runs them by this name
+    # rather than building its own.
+    image: exulanica-judge-web
     build:
-      context: ../../web
-      dockerfile: ../deploy/judge/web.Dockerfile
+      # The repository root, filtered by web.Dockerfile.dockerignore; see web.Dockerfile.
+      context: ../..
+      dockerfile: deploy/judge/web.Dockerfile
     ports:
       # 127.0.0.1 on purpose, and not only for exposure. The client refuses every region when
       # `crypto.subtle` is absent, and a browser gives SubtleCrypto to a secure context only:

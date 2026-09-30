@@ -53,6 +53,7 @@ worker. The repository holds the recipes; no cloud account, host or domain is pr
   - [7.3 How it is run](#73-how-it-is-run)
   - [7.4 Limits](#74-limits)
 - [8. A seeded deployment for a reviewer](#8-a-seeded-deployment-for-a-reviewer)
+  - [8.1 Serving it over HTTPS from one host](#81-serving-it-over-https-from-one-host)
 - [9. Backups and recovery](#9-backups-and-recovery)
 - [10. Hosting options researched and not built](#10-hosting-options-researched-and-not-built)
 - [11. Open items](#11-open-items)
@@ -72,7 +73,7 @@ worker. The repository holds the recipes; no cloud account, host or domain is pr
 | `Dockerfile` | One image recipe for the backend. The default build serves the API, runs migrations and runs the scene worker; a build argument selects the reconstruction extra for the derivative worker, so torch and pycolmap never share a process. The image runs as the non-root `exulanica` user, and its `HEALTHCHECK` is liveness on `/healthz`, never readiness |
 | `.dockerignore` | An allowlist rather than a denylist, because `exulanica/models/credentials.py` reads a `.env` file from the working directory or a parent, and a denylist is one forgotten line away from an image that carries a credential |
 | `compose.yaml` | A local composition: PostgreSQL 18 with pgvector 0.8.6 (`pgvector/pgvector:0.8.6-pg18`), the one-shot `migrate` service, the API, the derivative worker and the scene worker. It names no cloud, region, domain or account |
-| `deploy/judge/` | The seeded stack for a reviewer (section 8) |
+| `deploy/judge/` | The seeded stack for a reviewer, its HTTPS edge overlay and the operator script `stack.sh` (section 8) |
 | `deploy/material-bake/Dockerfile` | The image recipe for `exulanica-material-bake`, which `compose.yaml` does not start |
 | `deploy/gsplat/` | The CUDA scene-training image and the launcher that runs the scene worker on a GPU host; [scene training](gsplat-scene-jobs.md) owns both |
 | `.github/workflows/check.yml` | Continuous integration: `ruff`, the import contracts, the backend suite with `EXULANICA_REQUIRE_POSTGRES=1`, the web workspace's `pnpm check` and an image build. The backend run's skips are held to `tests/expected_skips.toml` by `scripts/run_backend_suite.py --check-skips` |
@@ -80,8 +81,9 @@ worker. The repository holds the recipes; no cloud account, host or domain is pr
 `tests/test_deployment.py` holds these properties, including that `compose.yaml` and the
 `Dockerfile` name no deployment target.
 
-**Not provisioned:** no cloud account, project, region, domain, registry or host. Choosing them
-is open item D-9 (section 11). The [depth image record](evaluation/2026-09-04-linux-amd64-depth-forward.json)
+**Not provisioned:** no cloud account, project, region, domain, registry or host. Section 8.1 is
+the recipe for serving the reviewer stack from one Nebius AI Cloud virtual machine; nothing has
+been provisioned from it (open item D-9, section 11). The [depth image record](evaluation/2026-09-04-linux-amd64-depth-forward.json)
 shows a `linux/amd64` image of the derivative worker loading the manifest's MoGe checkpoint with
 network loading disabled and running the production depth adapter on a CPU under emulation. That is
 compatibility evidence, not a performance result on a chosen host.
@@ -458,7 +460,10 @@ its own role. The [local database](local-database.md) guide owns its steps.
   [development setup](development-setup.md).
 - `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` and `EXULANICA_PORT` are read by
   `compose.yaml` itself, and `EXULANICA_SEED_ARCHIVE` and `EXULANICA_JUDGE_PORT` by
-  `deploy/judge/compose.yaml`; `EXULANICA_SYNC_EXTRAS` is an image build argument.
+  `deploy/judge/compose.yaml`, which also requires `EXULANICA_BUDGET_USD` and
+  `EXULANICA_BUDGET_MAX_CALLS` with no default; `EXULANICA_PUBLIC_HOST`, `EXULANICA_TLS`,
+  `EXULANICA_EDGE_ADDRESS`, `EXULANICA_EDGE_HTTP_PORT` and `EXULANICA_EDGE_HTTPS_PORT` by
+  `deploy/judge/edge.yaml` (section 8.1); `EXULANICA_SYNC_EXTRAS` is an image build argument.
 
 ### 5.3 Rules
 
@@ -656,6 +661,89 @@ The archive is not a backup and not a World Memory Package: it carries no signat
 integrity against its own manifest and nothing else. The stack runs on one machine; no host is
 provisioned for it.
 
+The browser client's proxy in `deploy/judge/web.Dockerfile` limits writes per client address: any
+`/api` request other than `GET`, `HEAD` and `OPTIONS` is counted at 30 a minute with a burst of 20,
+and the excess is refused with 429. Every route that can call a hosted model is a write, so the
+limit paces a script against the model budget; it is a stated bound, not a measurement of how fast
+a person works. The address comes from `X-Forwarded-For` only when the connection arrives from a
+private container range.
+
+### 8.1 Serving it over HTTPS from one host
+
+A browser gives `crypto.subtle` only to a secure context, and the client refuses every region
+without it, so a judge on another machine needs HTTPS rather than a wider bind.
+`deploy/judge/edge.yaml` is an overlay on the reviewer stack that adds one service, a Caddy
+reverse proxy (`caddy:2.11.4-alpine`) that terminates TLS and forwards to `web`, never to `api`,
+so the `/api` prefix strip and the write limit stay in the path. Its `Caddyfile` takes the host
+name from `EXULANICA_PUBLIC_HOST` and the certificate issuer from `EXULANICA_TLS`: an ACME contact
+email asks a public certificate authority, and `internal` issues from Caddy's local authority for
+a rehearsal. The overlay gives `postgres`, `api`, `web` and the edge `restart: unless-stopped` and
+JSON logs capped at ten 10 MB files each; `migrate` and `seed` stay one-shot. The edge's bind
+address has no default. Caddy redacts `Authorization` and `Cookie` values in its access log.
+
+`deploy/judge/stack.sh` runs every step. It writes the stack's secrets into a directory it
+creates mode 0700 (`EXULANICA_DEPLOY_DIR`), with the database passwords generated into a
+`judge.env` created mode 0600 and each judge's token minted by `exulanica-seed token` into a file
+of its own, merged into the one directory the API loads. It never writes the model credential:
+`up` passes `NEBIUS_API_KEY` through from the calling shell, and without it the model routes answer
+that no credential is configured. It never builds on the host, and it starts `migrate` and `seed`
+only on the first `up`, because the restore refuses a database that already holds the seed.
+
+| Command | What it does |
+| --- | --- |
+| `build` | On the build host: builds `exulanica-judge-backend` and `exulanica-judge-web` for `linux/amd64` from the checkout, as `compose.yaml` declares them, and prints their image IDs |
+| `images` | Prints the two image IDs, to compare the host with the build host |
+| `init` | Writes `judge.env` from `EXULANICA_PUBLIC_HOST`, `EXULANICA_TLS`, `EXULANICA_SEED_ARCHIVE` and `EXULANICA_EDGE_ADDRESS`, leaving `EXULANICA_BUDGET_USD` and `EXULANICA_BUDGET_MAX_CALLS` empty; the stack refuses to start until both are filled in |
+| `mint <label>`, `revoke <label>` | Adds or removes one judge's token; the next `up` serves the change |
+| `up` | Starts the stack from loaded images; the first run migrates, seeds and verifies |
+| `reset` | Returns the world to the archive (section 8, step 4) |
+| `status`, `logs [service]` | The containers and the API's readiness from inside the stack; the logs |
+| `down`, `destroy --yes-delete-volumes` | Stops the stack, keeping or deleting its volumes |
+
+**On Nebius AI Cloud.** The recipe is one CPU virtual machine: platform `cpu-d3` (AMD EPYC Genoa),
+preset `4vcpu-16gb`, a 50 GiB network SSD boot disk with Ubuntu 24.04, a public IP address, and
+inbound TCP 22, 80 and 443 only. Run from these images on 2026-09-29 with the Montserrat volcanic
+seed, the API peaked at 235 MiB across a graph read and PostgreSQL at 176 MiB (`docker stats`,
+sampled each second), so either preset leaves room; `2vcpu-8gb` is the smaller one. The host
+needs Docker Engine with the Compose plugin, `python3` and `openssl`; the images are loaded, not
+built there, and the host's CPU must be `x86_64`. The steps, with `<placeholders>` for every
+value:
+
+1. On the build host, from a checkout of the commit to serve, with Docker running:
+   `deploy/judge/stack.sh build`, then
+   `docker save exulanica-judge-backend exulanica-judge-web | gzip > judge-images.tar.gz`.
+2. Export the seed archive with the same commit's `exulanica-seed` (section 8, step 1), because the
+   restore refuses an archive whose schema or registries differ from the images'.
+3. Copy the images, the archive and the checkout's `deploy/judge/` directory to the host
+   (`scp` or `rsync` over SSH), then on the host
+   `gunzip -c judge-images.tar.gz | docker load` and `deploy/judge/stack.sh images`; the two IDs
+   must equal the ones `build` printed.
+4. Choose the host name. Without a domain, `<address with dashes>.sslip.io` resolves to the
+   public address through the third-party sslip.io service, assumed available rather than
+   guaranteed; with a domain, an `A` record pointing at the address and that name. Either way,
+   the certificate authority must reach the host on port 80 or 443 to issue the certificate.
+5. `EXULANICA_DEPLOY_DIR=<secrets directory> EXULANICA_PUBLIC_HOST=<host name>
+   EXULANICA_TLS=<contact email> EXULANICA_SEED_ARCHIVE=<archive directory>
+   EXULANICA_EDGE_ADDRESS=0.0.0.0 deploy/judge/stack.sh init`, then set `EXULANICA_BUDGET_USD`
+   (for example `10.00`) and `EXULANICA_BUDGET_MAX_CALLS` in `<secrets directory>/judge.env`.
+6. `deploy/judge/stack.sh mint <label>` once per judge.
+7. `read -rs NEBIUS_API_KEY && export NEBIUS_API_KEY`, then `deploy/judge/stack.sh up`. Leaving
+   the key unset serves everything except the model routes.
+8. From any machine, `uv run python scripts/judge_smoke.py --origin https://<host name>
+   --token-file <one judge's token file> --http-origin http://<host name> --rate-limit`; it checks
+   the client, liveness, readiness, a refused and an accepted read, the world list, the redirect
+   and the write limit through the public origin, and exits 0 when all pass. `--ask "<question>"`
+   adds one Companion question, which calls a hosted model.
+9. Give each judge the address and their own token, which the client asks for once. The token
+   is the key of the one entry in `<secrets directory>/judge-tokens/<label>.json`.
+10. When judging ends: `deploy/judge/stack.sh destroy --yes-delete-volumes`, then delete the
+    virtual machine, its disk and its public address in the console.
+
+`EXULANICA_BUDGET_USD` is a ceiling for one API process life: a restart of `api`, or of the host,
+starts a fresh one, so the model provider's own balance is what bounds spend across restarts. The
+stack has no per-judge spend limit, no backup of its volumes (D-3) and no monitoring beyond
+Docker's liveness check and `status`; a revoked token stays valid until the next `up`.
+
 ## 9. Backups and recovery
 
 - **Personal install:** `exulanica-local-db` backs up on every stop and around every upgrade, and
@@ -680,6 +768,14 @@ is configured or built, and its prices and provider facts have not been checked 
 text is at revision 47f9f7d3:
 [deployment.md at 47f9f7d3](https://github.com/twinkling-reality/exulanica/blob/47f9f7d3/docs/deployment.md).
 
+Section 8.1's host, quoted from the Nebius compute pricing page
+(`docs.nebius.com/compute/resources/pricing`, read 2026-09-29) at the rates it lists from
+2026-10-01, before tax: a `cpu-d3` vCPU at $0.015 an hour and memory at $0.0045 per GiB-hour make
+`4vcpu-16gb` $0.132 an hour ($3.168 a day) and `2vcpu-8gb` $0.066 an hour ($1.584 a day); a network
+SSD at $0.071 per GiB-month makes a 50 GiB disk about $0.12 a day. The page lists no price for a
+public IP address, and outbound traffic is not quoted. The pricing documentation states that a
+stopped virtual machine's compute is not charged.
+
 ## 11. Open items
 
 | # | Item | Resolved by |
@@ -690,8 +786,8 @@ text is at revision 47f9f7d3:
 | D-5 | The preflight treats an unreachable catalog as a failure, which is right for a deployment step and wrong for a scheduled check | Retry with backoff, and distinguish the two outcomes in the report |
 | D-6 | The embedding role has no fallback and no recovery path | Precomputing the vectors a deployment needs, or accepting the single dependency and saying so |
 | D-7 | The fallback rule has never run against the live platform | Forcing a primary to fail |
-| D-9 | No cloud account, project, region, domain or host is chosen | A human decision; section 10 holds the research |
-| D-13 | The composition has no reverse proxy and no static client host | Choosing a host (D-9) |
+| D-9 | No cloud account, project, region, domain or host is provisioned. Section 8.1 is the recipe for one Nebius AI Cloud virtual machine serving the reviewer stack | Provisioning it and running the smoke check against the public address |
+| D-13 | `compose.yaml` has no reverse proxy and no static client host. The reviewer stack has both: the web image serves the client and proxies `/api`, and `edge.yaml` terminates TLS in front of it (section 8.1) | Choosing a host for the general composition (D-9) |
 | D-14 | Nothing limits in-flight requests, so one process can demand more backends than the server has slots | Setting `uvicorn --limit-concurrency` |
 | D-15 | The container restart under thread saturation (5.4.2) is deduced from the health check's timeout, not observed | Running the image, saturating it and watching whether Docker restarts it |
 

@@ -18,6 +18,7 @@
 !assets/textures/manifest.json
 !assets/textures/catalog.json
 !assets/textures/objects
+!assets/textures/blobs
 # The versioned catalogs the package reads, some of them when it is imported: the society's
 # routine, words and identities, and the detector's vocabulary. About 800 KiB.
 !assets/catalogs

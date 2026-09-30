@@ -1,0 +1,34 @@
+# The judge stack's public edge. deploy/judge/edge.yaml mounts this file and supplies the two
+# values it reads from the environment.
+#
+# `tls` takes an email address, which asks a public certificate authority for a certificate
+# through ACME, or the word `internal`, which issues from Caddy's own local authority for a
+# rehearsal. Caddy redirects plain HTTP to HTTPS on its own.
+#
+# It proxies to `web`, never to `api`: `web` holds the single-origin `/api` prefix strip and the
+# per-address write limit, and an edge that reached `api` directly would bypass both.
+#
+# Caddy's access log records request headers with Authorization and Cookie values redacted, so a
+# judge's bearer token does not reach the log.
+{
+	admin off
+}
+
+{$EXULANICA_PUBLIC_HOST} {
+	tls {$EXULANICA_TLS}
+	# The same ceiling as the web proxy's client_max_body_size.
+	request_body {
+		max_size 8MB
+	}
+	encode zstd gzip
+	reverse_proxy web:8080 {
+		transport http {
+			# Answering a question runs a model call; the web proxy allows 300 s for the same reason.
+			read_timeout 300s
+		}
+	}
+	log {
+		output stdout
+		format json
+	}
+}

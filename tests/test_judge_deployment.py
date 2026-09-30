@@ -162,7 +162,7 @@ def test_the_web_build_context_carries_the_shared_typescript_bases():
     Without them the build fails with "failed to resolve extends" after transforming zero
     modules, which is a build that succeeds at everything except producing the application.
     """
-    assert "COPY tsconfig.json tsconfig.base.json ./" in JUDGE_WEB
+    assert "COPY web/tsconfig.json web/tsconfig.base.json ./" in JUDGE_WEB
 
 
 def test_no_judge_artefact_names_a_deployment_target():

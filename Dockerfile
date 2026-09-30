@@ -66,11 +66,16 @@ RUN apt-get update \
  && chown exulanica:exulanica /app /var/lib/exulanica
 
 COPY --from=builder --chown=exulanica:exulanica /app/.venv /app/.venv
-# The published material catalog, read-only: the makers a person's recipe is checked against. The
-# baked texture sets themselves are not here, and the bake worker has an image of its own
-# (deploy/material-bake/Dockerfile) because it runs Node.
-COPY assets/textures/manifest.json assets/textures/catalog.json /app/assets/textures/
+# The published material catalog, read-only: the makers a person's recipe is checked against,
+# and the baked texture sets the reviewed furniture embeds. The API verifies every set the
+# manifest names when it builds the object catalog at startup, so an image without the blobs
+# serves nothing (MEASURED 2026-09-29: the API exited with TextureCatalogError on the first
+# set). The bake worker has an image of its own (deploy/material-bake/Dockerfile) because it
+# runs Node. `tests/test_image_ships_startup_reads.py` holds the blobs to this image.
+COPY assets/textures/manifest.json /app/assets/textures/manifest.json
+COPY assets/textures/catalog.json /app/assets/textures/catalog.json
 COPY assets/textures/objects /app/assets/textures/objects
+COPY assets/textures/blobs /app/assets/textures/blobs
 # The versioned catalogs, and a link that puts them where the installed package reads them: a
 # module finds a catalog two directories above its own file, which for this non-editable install
 # is site-packages. Several are read when the package is imported, so an image without them
