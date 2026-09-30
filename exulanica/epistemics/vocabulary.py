@@ -198,4 +198,16 @@ DECISIONS: Final[tuple[VocabularyDecision, ...]] = (
             "rungs were withheld, and the number of photographs in that set."
         ),
     ),
+    VocabularyDecision(
+        key="reconstruction_scene_build_rung_is",
+        seeded_by="0123",
+        allows_kind=("inference",),
+        writes_a_name=False,
+        functional=False,
+        object_is=(
+            "A rung and gate result for one succeeded reconstruction job, named by its job ID. "
+            "Several builds of a scene can keep distinct authorized claims. The object is a "
+            "build's quality result, never the name a person is called by."
+        ),
+    ),
 )

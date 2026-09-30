@@ -528,8 +528,7 @@ def test_a_new_point_map_build_supersedes_the_displayed_build_without_rewriting_
     )
     graph = json.loads((package.output / "memory/graph.json").read_text(encoding="utf-8"))
     assert all(
-        claim["predicate"] != "reconstruction_scene_build_rung_is"
-        for claim in graph["assertions"]
+        claim["predicate"] != "reconstruction_scene_build_rung_is" for claim in graph["assertions"]
     ), "the job-bound arrival claim is private to saved entry reads"
     assert len(reconstruction["rung_claims"]) == 1
     assert len([item for item in reconstruction["items"] if item["scene"] is not None]) == 3
@@ -641,7 +640,14 @@ def test_graph_delivers_the_validated_scene_and_exact_placed_maps(repository, tm
 
     graph = read_snapshot(repository.connection, repository.workspace_id, store)
 
-    assert graph.state_version == before_version + 2
+    build_claims = repository.connection.execute(
+        "select count(*) as count from assertion a join predicate p using(predicate_id) "
+        "where a.workspace_id=%s and p.key='reconstruction_scene_build_rung_is' "
+        "and a.status='active' and a.subject_ref->>'job_id'=%s",
+        (repository.workspace_id, str(claimed.job_id)),
+    ).fetchone()["count"]
+    assert build_claims == 1, "the job keeps its own claim beside the current scene claim"
+    assert graph.state_version == before_version + 3
     assert len(graph.reconstruction_scenes) == 1
     scene = graph.reconstruction_scenes[0]
     assert scene.scene_id == outcome.scene_id

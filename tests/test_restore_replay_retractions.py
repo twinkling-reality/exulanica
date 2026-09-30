@@ -221,7 +221,10 @@ def test_every_retraction_a_trigger_writes_retracts_a_claim_no_person_can_state(
         "where p.pronamespace = current_schema()::regnamespace "
         "and p.prosrc ~* 'insert\\s+into\\s+retraction'"
     ).fetchall()
-    assert [row["name"] for row in writers] == ["retract_scene_rungs_for_tombstone"]
+    assert {row["name"] for row in writers} == {
+        "retract_scene_rungs_for_tombstone",
+        "retract_scene_build_rungs_for_tombstone",
+    }
     for row in writers:
         predicates = set(re.findall(r"p\.key\s*=\s*'([a-z_]+)'", row["body"]))
         assert predicates, "the positive control: the cascade names what it retracts"
