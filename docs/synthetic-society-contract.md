@@ -1350,8 +1350,9 @@ society replays from its stored inputs, the catalog versions its state records a
 receipts, with nothing regenerated and no model asked. Standing spots within the 2,000 mm arrival
 clearance of where a person arrives are left out of the place, so nobody stands in front of a
 person arriving at any hour; a bench's seats there stay seats. On the largest market town a
-recipe admits, one input is about 775 KB of JSON; the runtime writes one when the society is
-created and one for each edit of the world that changes what the society reads.
+recipe admits (92 residents in the measured run below), one input is 829,953 bytes of JSON; the
+runtime writes one when the society is created and one for each edit of the world that changes
+what the society reads.
 
 **Its day is data.** The town's routine (`TOWN_ROUTINE_VERSIONS` in
 `exulanica/world/society_catalogs.py`) reads the living routine's needs, activities and
@@ -1381,6 +1382,20 @@ minute with no receipt is the rule's alone. A comparison of models does not run 
 `LivingSeam` in the same module.
 
 It takes no directed actions, its people are not sent away, and it runs no experiments.
+
+**What a minute costs.** Measured with `scripts/measure_living_town.py` (market town preset at its
+largest values, eight identities) on a quiet development machine (one-minute load under 8), on the
+largest town it made, 92 residents on 935 walking nodes: a minute of the engine took 4.6 ms at the
+median and 8.6 ms at the 95th percentile over a whole simulated day, where the district's rule
+over the same town took 3.7 and 7.2 ms; with the town's homes holding the ground's bound of 128
+people, 8.3 and 13.0 ms over four simulated hours; and replaying an hour from genesis, the work a
+replay of an hour does, took 0.50 s at 92 people and 0.65 s at 128. A stored minute through the
+steps route, which also reads, validates and authorizes the town's input and writes the minute,
+took 93 ms at the median and 101 ms at the 95th percentile on the same machine (a 62-person
+market town, 30 minutes, the acceptance launcher's production stack). While that town played at
+the fastest cadence (1,000 ms base interval, speed 4), the API's health check took 17.3 ms at the
+95th percentile, where it took 7.3 ms with the town paused: the society host shares the API
+process.
 
 ## Retired and frozen engines
 
