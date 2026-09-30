@@ -64,20 +64,23 @@ def _catalogs_with(tmp_path: Path, change) -> Path:
     return tmp_path
 
 
-def test_the_fourth_version_keeps_the_development_seeds_and_draws_its_held_out_seeds_afresh():
+@pytest.mark.parametrize("version", [4, 5])
+def test_each_later_version_keeps_development_seeds_and_draws_held_out_seeds_afresh(version):
     third = _entries(SEEDS_V3)
-    fourth = _entries(SEEDS_NOW)
+    later = _entries(ROUTINE_DIRECTORY / f"society-comparison-seeds.v{version}.json")
     assert [
-        (e["key"], e["seed_digest"], e["seed"]) for e in fourth if e["phase"] == "development"
+        (e["key"], e["seed_digest"], e["seed"]) for e in later if e["phase"] == "development"
     ] == [(e["key"], e["seed_digest"], e["seed"]) for e in third if e["phase"] == "development"]
-    held_out = [entry for entry in fourth if entry["phase"] == "held_out"]
+    held_out = [entry for entry in later if entry["phase"] == "held_out"]
     assert len(held_out) == 8
     assert all(entry["seed"] == "none" for entry in held_out)
     # None of them is a seed an earlier version committed, whose held-out seeds were spent.
     earlier = {
         entry["seed_digest"]
-        for path in (SEEDS_V2, SEEDS_V3, ROUTINE_DIRECTORY / "society-comparison-seeds.v1.json")
-        for entry in _entries(path)
+        for earlier_version in range(1, version)
+        for entry in _entries(
+            ROUTINE_DIRECTORY / f"society-comparison-seeds.v{earlier_version}.json"
+        )
     }
     assert not {entry["seed_digest"] for entry in held_out} & earlier
 
@@ -104,7 +107,7 @@ def test_the_committed_catalog_reads_and_gives_its_development_seeds_in_order():
     catalogs = load_comparison_catalogs()
     assert (
         catalogs.versions["society-comparison-seeds"]
-        == 4
+        == 5
         == COMPARISON_VERSIONS["society-comparison-seeds"]
     )
     seeds = development_seeds(catalogs)

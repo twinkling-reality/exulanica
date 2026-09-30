@@ -195,11 +195,11 @@ COMPARISON_SEEDS_CATALOG: Final = "society-comparison-seeds"
 #: The versions a new comparison is defined under: the score of how people fared, half the need
 #: they were spared and half the variety of their hour, with what each model answered reported
 #: apart; the protocol whose population bound is derived from a measured replay; and seeds whose
-#: development text is committed, with held-out seeds drawn afresh.
+#: development text is committed, with held-out seeds drawn afresh for each judged comparison.
 COMPARISON_VERSIONS: Final = {
     PERSON_SCORE_CATALOG: 3,
     COMPARISON_PROTOCOL_CATALOG: 3,
-    COMPARISON_SEEDS_CATALOG: 4,
+    COMPARISON_SEEDS_CATALOG: 5,
 }
 #: Whether a score term is weighed or only reported, and what a term reads: a run's minutes, the
 #: events the engine appended, or the host's record of each call, which only a reader outside the
@@ -657,7 +657,7 @@ SCHEMAS: Final[dict[tuple[str, int], CatalogSchema]] = {
             ),
             entry_check=_seed_v3_bounds,
         )
-        for version in (3, 4)
+        for version in (3, 4, 5)
     },
 }
 

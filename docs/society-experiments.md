@@ -182,8 +182,9 @@ development seed's text beside the digest the earlier versions commit it by, sin
 seed is looked at freely and never judged, and its schema holds each text to its digest; its
 held-out seeds are the second version's twelve, by digest alone, which the second judged comparison
 ran on, and an entry that states a held-out seed's text is refused (`held_out_seed_text`). The
-fourth, which a new comparison is defined under, keeps the development seeds and their text and
-commits eight held-out seeds drawn afresh, none of an earlier version's, by digest alone.
+fourth keeps the development seeds and their text and commits eight held-out seeds drawn afresh,
+none of an earlier version's, by digest alone, which the town comparison of 2026-09-30 spent; the
+fifth, which a new comparison is defined under, does the same with eight more.
 
 ### Judged comparisons
 
@@ -213,6 +214,13 @@ receipts with no billed call.
   under the third version. Incomplete, so it claims nothing: the process that ran it made its asks
   under its default ceiling of 2000 calls, which the pre-registration did not count, and 13 of the
   24 model runs failed before asking anything once it was reached. Its held-out seeds are spent.
+- [2026-09-30-town-comparison-2.json](evaluation/2026-09-30-town-comparison-2.json)
+  ([pre-registration](evaluation/2026-09-30-town-comparison-2-preregistration.json)): the same
+  design over eight fresh held-out seeds, its process's call ceiling set above the most its runs
+  could make. No measured difference: every run completed and seven seeds were scored, one
+  excluded by the floor; Lightning's mean over Nemotron 3 Nano 30B's was 0.0064, its interval from
+  -0.0206 to 0.0298 and not rejected, beside a control bound of 0.0360, while both models' people
+  fared worse than their own routine by a difference each rejected.
 
 ### Reads
 
