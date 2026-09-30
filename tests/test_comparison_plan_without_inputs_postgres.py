@@ -11,7 +11,8 @@ from __future__ import annotations
 
 import pytest
 from exulanica.api.routes import society_comparisons as routes
-from exulanica.world.society_engines import DEFAULT_ENGINE, ENGINES, society_engine
+from exulanica.world.society_engines import DEFAULT_ENGINE, society_engine
+from exulanica.world.society_social import SOCIAL_PROFILE
 
 import test_society_comparison_start_postgres as starts
 
@@ -53,19 +54,17 @@ def test_a_society_without_inputs_has_nothing_to_compare_and_a_start_is_refused_
 
 
 @pytest.mark.parametrize("saved_world", [2], indirect=True)
-def test_a_living_town_is_answered_with_the_starts_refusal_and_none_of_its_people_are_read(
+def test_an_unsupported_saved_world_engine_is_refused_before_its_people_are_read(
     started, monkeypatch
 ):
-    """A society whose engine takes no comparison, as a made town's living engine, is answered
-    by the plan with the start's own refusal and no roles or people, and its inhabitants are not
-    read: a living state names no display_name, which the plan once read and answered 500 for."""
-    living = next(e for e in ENGINES if e.state_family == "living" and e.saved_world)
-    assert not living.comparisons, "the case needs a saved-world engine that takes no comparison"
+    """A retired saved-world engine still refuses comparisons before reading unnamed people."""
+    unsupported = society_engine(SOCIAL_PROFILE)
+    assert unsupported.saved_world and not unsupported.comparisons
     world, client = started["world"], started["client"]
     starts.stays._inhabited(world, client)
     read = routes._society
 
-    def as_living(comparisons, version_id):
+    def as_unsupported(comparisons, version_id):
         row = read(comparisons, version_id)
         people = [
             {key: value for key, value in person.items() if key != "display_name"}
@@ -74,11 +73,11 @@ def test_a_living_town_is_answered_with_the_starts_refusal_and_none_of_its_peopl
         assert people, "the positive control: the society holds people whose names are left out"
         return {
             **row,
-            "engine_version": living.engine,
+            "engine_version": unsupported.engine,
             "state": {**row["state"], "inhabitants": people},
         }
 
-    monkeypatch.setattr(routes, "_society", as_living)
+    monkeypatch.setattr(routes, "_society", as_unsupported)
     planned = client.get(
         starts._comparisons(world) + "/plan", headers=starts.OWNER, params=starts._scope(world)
     )

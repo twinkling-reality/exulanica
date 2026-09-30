@@ -23,6 +23,22 @@
       }
     },
     {
+      "case": "purposeful person with an ordinal still uses purposeful words",
+      "person": {
+        "display_name": "Ari Ash 1",
+        "role": "walker",
+        "goal": null,
+        "ordinal": 0
+      },
+      "expected": {
+        "who": "Ari Ash 1",
+        "what": "A simulated walker, invented for this world: not anyone you know, and nothing they do is a memory.",
+        "doing": "Nothing is recorded about what they are doing.",
+        "why": ""
+      },
+      "profile": "exulanica-society/v2"
+    },
+    {
       "case": "unnamed with no role, deciding",
       "person": {
         "display_name": null,
@@ -669,7 +685,8 @@
         "what": "A simulated baker in this town. They have a home and an assigned workplace.",
         "doing": "waiting for the next choice",
         "why": "Their routine chose this to meet a need."
-      }
+      },
+      "profile": "exulanica-society/v5"
     },
     {
       "case": "living eat at home",
@@ -698,7 +715,8 @@
         "what": "A simulated baker in this town. They have a home and an assigned workplace.",
         "doing": "eating at home",
         "why": "Their routine chose this to meet a need."
-      }
+      },
+      "profile": "exulanica-society/v5"
     },
     {
       "case": "living eat out",
@@ -727,7 +745,8 @@
         "what": "A simulated baker in this town. They have a home and an assigned workplace.",
         "doing": "eating out",
         "why": "Their routine chose this to meet a need."
-      }
+      },
+      "profile": "exulanica-society/v5"
     },
     {
       "case": "living rest",
@@ -756,7 +775,8 @@
         "what": "A simulated baker in this town. They have a home and an assigned workplace.",
         "doing": "resting",
         "why": "Their routine chose this to meet a need."
-      }
+      },
+      "profile": "exulanica-society/v5"
     },
     {
       "case": "living shop",
@@ -785,7 +805,8 @@
         "what": "A simulated baker in this town. They have a home and an assigned workplace.",
         "doing": "shopping",
         "why": "Their routine chose this to meet a need."
-      }
+      },
+      "profile": "exulanica-society/v5"
     },
     {
       "case": "living sleep",
@@ -814,7 +835,8 @@
         "what": "A simulated baker in this town. They have a home and an assigned workplace.",
         "doing": "sleeping at home",
         "why": "Their routine chose this to meet a need."
-      }
+      },
+      "profile": "exulanica-society/v5"
     },
     {
       "case": "living stay home",
@@ -843,7 +865,8 @@
         "what": "A simulated baker in this town. They have a home and an assigned workplace.",
         "doing": "spending time at home",
         "why": "Their routine chose this to meet a need."
-      }
+      },
+      "profile": "exulanica-society/v5"
     },
     {
       "case": "living stroll",
@@ -872,7 +895,8 @@
         "what": "A simulated baker in this town. They have a home and an assigned workplace.",
         "doing": "taking a walk",
         "why": "Their routine chose this to meet a need."
-      }
+      },
+      "profile": "exulanica-society/v5"
     },
     {
       "case": "living visit",
@@ -901,7 +925,8 @@
         "what": "A simulated baker in this town. They have a home and an assigned workplace.",
         "doing": "visiting a place",
         "why": "Their routine chose this to meet a need."
-      }
+      },
+      "profile": "exulanica-society/v5"
     },
     {
       "case": "living work",
@@ -930,7 +955,8 @@
         "what": "A simulated baker in this town. They have a home and an assigned workplace.",
         "doing": "working",
         "why": "Their routine chose this to meet a need."
-      }
+      },
+      "profile": "exulanica-society/v5"
     },
     {
       "case": "living unknown",
@@ -959,7 +985,8 @@
         "what": "A simulated baker in this town. They have a home and an assigned workplace.",
         "doing": "carrying out an activity",
         "why": "Their routine chose this to meet a need."
-      }
+      },
+      "profile": "exulanica-society/v5"
     },
     {
       "case": "living heading eat at home",
@@ -988,7 +1015,8 @@
         "what": "A simulated baker in this town. They have a home and an assigned workplace.",
         "doing": "walking home to eat",
         "why": "Their routine chose this to meet a need."
-      }
+      },
+      "profile": "exulanica-society/v5"
     },
     {
       "case": "living heading eat out",
@@ -1017,7 +1045,8 @@
         "what": "A simulated baker in this town. They have a home and an assigned workplace.",
         "doing": "walking to a meal",
         "why": "Their routine chose this to meet a need."
-      }
+      },
+      "profile": "exulanica-society/v5"
     },
     {
       "case": "living heading rest",
@@ -1046,7 +1075,8 @@
         "what": "A simulated baker in this town. They have a home and an assigned workplace.",
         "doing": "walking to a place to rest",
         "why": "Their routine chose this to meet a need."
-      }
+      },
+      "profile": "exulanica-society/v5"
     },
     {
       "case": "living heading shop",
@@ -1075,7 +1105,8 @@
         "what": "A simulated baker in this town. They have a home and an assigned workplace.",
         "doing": "walking to shop",
         "why": "Their routine chose this to meet a need."
-      }
+      },
+      "profile": "exulanica-society/v5"
     },
     {
       "case": "living heading sleep",
@@ -1104,7 +1135,8 @@
         "what": "A simulated baker in this town. They have a home and an assigned workplace.",
         "doing": "walking home to sleep",
         "why": "Their routine chose this to meet a need."
-      }
+      },
+      "profile": "exulanica-society/v5"
     },
     {
       "case": "living heading stay home",
@@ -1133,7 +1165,8 @@
         "what": "A simulated baker in this town. They have a home and an assigned workplace.",
         "doing": "going home",
         "why": "Their routine chose this to meet a need."
-      }
+      },
+      "profile": "exulanica-society/v5"
     },
     {
       "case": "living heading stroll",
@@ -1162,7 +1195,8 @@
         "what": "A simulated baker in this town. They have a home and an assigned workplace.",
         "doing": "taking a walk",
         "why": "Their routine chose this to meet a need."
-      }
+      },
+      "profile": "exulanica-society/v5"
     },
     {
       "case": "living heading visit",
@@ -1191,7 +1225,8 @@
         "what": "A simulated baker in this town. They have a home and an assigned workplace.",
         "doing": "walking to visit a place",
         "why": "Their routine chose this to meet a need."
-      }
+      },
+      "profile": "exulanica-society/v5"
     },
     {
       "case": "living heading work",
@@ -1220,7 +1255,8 @@
         "what": "A simulated baker in this town. They have a home and an assigned workplace.",
         "doing": "walking to work",
         "why": "Their work shift is due."
-      }
+      },
+      "profile": "exulanica-society/v5"
     },
     {
       "case": "living heading unknown",
@@ -1249,7 +1285,8 @@
         "what": "A simulated baker in this town. They have a home and an assigned workplace.",
         "doing": "walking through town",
         "why": "Their routine chose this to meet a need."
-      }
+      },
+      "profile": "exulanica-society/v5"
     }
   ]
 }

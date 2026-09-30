@@ -42,7 +42,12 @@ SQUARE_MINUTES = 90
 
 
 def _said(case: dict) -> dict:
-    words = inhabitant_words(case["person"], CASES["places"].get, CASES["people"].get)
+    words = inhabitant_words(
+        case["person"],
+        CASES["places"].get,
+        CASES["people"].get,
+        profile=case.get("profile"),
+    )
     return {"who": words.who, "what": words.what, "doing": words.doing, "why": words.why}
 
 

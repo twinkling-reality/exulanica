@@ -63,6 +63,7 @@ def test_living_words_name_work_and_reason_from_recorded_fields():
         },
         lambda _target: None,
         lambda _partner: None,
+        profile="exulanica-society/v5",
     )
     assert (said.who, said.what, said.doing, said.why) == (
         "Resident 7",

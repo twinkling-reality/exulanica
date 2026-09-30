@@ -70,7 +70,7 @@ def test_the_table_creates_the_living_town_over_a_town_and_keeps_v2_for_other_sa
     assert CREATES["saved_world"] == "exulanica-society/v2"
     engine = society_engine(LIVING_TOWN_PROFILE)
     assert engine.state_family == "living" and engine.saved_world and engine.owner_model_choice
-    assert not engine.comparisons and not engine.experiments and not engine.directed_actions
+    assert engine.comparisons and not engine.experiments and not engine.directed_actions
 
 
 def test_every_use_the_city_grammar_places_keeps_hours_and_shifts():

@@ -24,6 +24,7 @@ from typing import Any, Final
 
 from exulanica.grammar.catalogs import CatalogSchema, load_catalog, text_field
 from exulanica.world.society_catalogs import ACTIVITY_SETTINGS
+from exulanica.world.society_engines import society_engine
 
 __all__ = [
     "ACTIVITY_WORDS",
@@ -243,16 +244,19 @@ def inhabitant_words(
     place: Callable[[str], str | None],
     partner: Callable[[str], str | None],
     catalog: InhabitantWordsCatalog | None = None,
+    *,
+    profile: str | None = None,
 ) -> InhabitantWords:
     """Who a simulated person is and what they are doing, from their recorded state.
 
     ``place`` writes a target the person uses, or returns None for one the world no longer holds;
     ``partner`` writes another person, or None for one not in the society. The choice follows
     ``inhabitantWords`` in the inspector line for line, and the shared cases hold the two equal.
-    Talking has no content, so nothing here says what anybody talked about.
+    ``profile`` names the recorded engine for living words; callers without a profile retain the
+    purposeful words. Talking has no content, so nothing here says what anybody talked about.
     """
     words = catalog or inhabitant_words_catalog()
-    if "ordinal" in person:
+    if profile is not None and society_engine(profile).state_family == "living":
         return _living_inhabitant_words(person, words)
     phrase = words.tables["phrase"]
     doing_words = words.tables["doing"]

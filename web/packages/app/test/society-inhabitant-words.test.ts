@@ -4,10 +4,12 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { inhabitantWordsFrom, livingInhabitantWords, livingNeedLabel, REASON_WORDS, type WordedPerson } from '../src/society-inhabitant-words.js';
+import { parseSociety } from '../src/society-api.js';
 import { inhabitantWords } from '../src/ui/world-inhabitants.js';
 
 interface Case {
   readonly case: string;
+  readonly profile?: string;
   readonly person: WordedPerson;
   readonly expected: { readonly who: string; readonly what: string; readonly doing: string; readonly why: string };
 }
@@ -20,6 +22,22 @@ const CATALOG = JSON.parse(
 ) as { readonly entries: readonly { readonly kind: string; readonly code: string; readonly words: string }[] };
 
 describe('a simulated person in words, as the server says them', () => {
+  it('keeps purposeful words for an older saved-world response that also has an ordinal', () => {
+    const digest = 'a'.repeat(64);
+    const person = { id: 'person-1', synthetic: true, ordinal: 0, display_name: 'Ari Ash 1', role: 'walker',
+      position_mm: [0, 0], motion_path_mm: [[0, 0]], goal: null, route: null,
+      action: { kind: 'idle', status: 'active', target_id: null, remaining_ticks: 0, reason: 'awaiting_goal' },
+      explanation: { summary: 'Awaiting a goal.', event_ids: [] } };
+    const saved = parseSociety({ society_id: 'society', version_id: 'version', branch_id: 'version',
+      place_id: 'place', population_size: 1, current_tick: 0, state_sha256: digest,
+      input_seq: 1, input_sha256: digest,
+      state: { profile: 'exulanica-society/v2', society_id: 'society', branch_id: 'version',
+        tick: 0, input_seq: 1, input_sha256: digest, inhabitants: [person] } });
+    expect(inhabitantWordsFrom(saved.state.inhabitants[0]!, () => null, () => null, saved.state.profile))
+      .toEqual({ who: 'Ari Ash 1',
+        what: 'A simulated walker, invented for this world: not anyone you know, and nothing they do is a memory.',
+        doing: 'Standing, deciding where to go.', why: 'Because they have only just arrived.' });
+  });
   it('describes a living resident without an identifier or a need level', () => {
     const said = livingInhabitantWords({
       role: 'shopkeeper',
@@ -50,6 +68,7 @@ describe('a simulated person in words, as the server says them', () => {
         held.person,
         (targetId) => CASES.places[targetId] ?? null,
         (id) => CASES.people[id] ?? null,
+        held.profile ?? null,
       );
       expect(said, held.case).toEqual(held.expected);
     }

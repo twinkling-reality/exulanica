@@ -624,7 +624,7 @@ export function mountEnvironmentSelection(
     // engine: a stored society of a retired engine shares the purposeful family and has none.
     const worded = savedWorld !== null && purposeful && hasInhabitantWords(state.profile);
     const words = worded && society?.places
-      ? inhabitantWords(inhabitant, placeRows(savedObjects() ?? [], society.places), state.inhabitants)
+      ? inhabitantWords(inhabitant, placeRows(savedObjects() ?? [], society.places), state.inhabitants, state.profile)
       : null;
     inspector.show({
       subject: id,

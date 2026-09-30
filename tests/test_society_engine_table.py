@@ -84,8 +84,8 @@ def test_each_capability_is_claimed_only_by_engines_that_implement_it():
         "town": LIVING_TOWN_PROFILE,
     }
     assert EXPERIMENT_ENGINES == (LIVING_PROFILE,)
-    # A comparison plays the purposeful engine's genesis and minutes with person decisions.
-    assert COMPARISON_ENGINES == (PURPOSEFUL_PROFILE,)
+    # Comparisons play the purposeful society or living town through each engine's choice seam.
+    assert COMPARISON_ENGINES == (PURPOSEFUL_PROFILE, LIVING_TOWN_PROFILE)
     assert SAVED_WORLD_ENGINES == (PURPOSEFUL_PROFILE, SOCIAL_PROFILE, LIVING_TOWN_PROFILE)
     # Sending people away and bringing them back is the purposeful engine's own transition.
     assert PRESENCE_ENGINES == (PURPOSEFUL_PROFILE,)

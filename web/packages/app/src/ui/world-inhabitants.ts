@@ -283,6 +283,7 @@ export function inhabitantWords(
   person: Inhabitant,
   rows: readonly PlaceRow[],
   people: readonly Inhabitant[] = [],
+  profile: string | null = null,
 ): InhabitantWords {
   const named = new Map<string, string>();
   for (const row of rows) if (row.status.kind === 'usable') named.set(row.status.targetId, row.label);
@@ -290,6 +291,7 @@ export function inhabitantWords(
     person,
     (targetId) => named.get(targetId) ?? null,
     (id) => people.find((other) => other.id === id)?.display_name ?? null,
+    profile,
   );
 }
 

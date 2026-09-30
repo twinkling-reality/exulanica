@@ -11,6 +11,7 @@
 import catalogText from '../../../../assets/catalogs/society-words/society-inhabitant-words.v1.json?raw';
 import livingNeedsText from '../../../../assets/catalogs/society/society-need.v1.json?raw';
 import { ACTIVITY_KINDS } from './society-activity-words.js';
+import { societyEngine } from './society-engines.js';
 
 /** The entry kinds the catalog holds; a kind outside these is refused when the page loads. */
 const KINDS = ['reason', 'phrase', 'doing', 'outcome', 'event_reason', 'line', 'decision_reason'] as const;
@@ -150,6 +151,7 @@ export function inhabitantWordsFrom(
   person: WordedPerson,
   place: (targetId: string) => string | null,
   partner: (inhabitantId: string) => string | null,
+  profile: string | null = null,
 ): InhabitantWords {
   const living = person as unknown as {
     readonly ordinal?: number;
@@ -159,7 +161,10 @@ export function inhabitantWordsFrom(
     readonly action?: { readonly kind: string; readonly reason: string } | null;
     readonly goal?: { readonly activity: string; readonly reason?: string } | null;
   };
-  if (typeof living.ordinal === 'number') {
+  if (profile !== null && societyEngine(profile).stateFamily === 'living') {
+    if (typeof living.ordinal !== 'number' || !Number.isSafeInteger(living.ordinal)) {
+      throw new Error('a living resident has no ordinal');
+    }
     return livingInhabitantWords({
       role: living.role?.label ?? null,
       has_home: living.home != null,

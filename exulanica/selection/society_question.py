@@ -67,7 +67,7 @@ from exulanica.selection.packet import MAX_PACKET_ITEMS, TOKEN_LENGTH, ValueRefe
 from exulanica.selection.plan import SocietyAspect, SocietyScope, SocietySelector
 from exulanica.selection.prompts import _SOCIETY_COMPOSER_SYSTEM, PROMPT_VERSION
 from exulanica.world.society import UnavailableSocietyInput, UnknownSociety
-from exulanica.world.society_engines import INPUT_ENGINES
+from exulanica.world.society_engines import INPUT_ENGINES, society_engine
 from exulanica.world.society_model_decisions import DECISION_EVENT_KIND
 from exulanica.world.society_person_label import person_label
 from exulanica.world.society_repository import SocietyRepository
@@ -525,6 +525,7 @@ def read_scene(
     except (UnavailableSocietyInput, ValueError):
         return SocietyRefusal.UNAVAILABLE
     try:
+        living = society_engine(snapshot["profile"]).state_family == "living"
         events = _authorized_events(
             connection,
             workspace_id,
@@ -533,11 +534,8 @@ def read_scene(
             repository,
             once,
             latest=EVENT_LINES,
-            include_decisions=any(
-                "ordinal" in person for person in snapshot["state"]["inhabitants"]
-            ),
+            include_decisions=living,
         )
-        living = any("ordinal" in person for person in snapshot["state"]["inhabitants"])
         selected_events = (
             _authorized_events(
                 connection,
@@ -906,6 +904,7 @@ class _Builder:
             lambda target: scene.labels.spot(target) if target in scene.usable_targets else None,
             lambda other: scene.labels.person(other) if other in scene.people else None,
             self.catalog,
+            profile=scene.profile,
         )
 
     def state(self, inhabitant_id: str, line: str) -> SocietyEvidenceItem:
@@ -927,14 +926,20 @@ class _Builder:
         if (
             self.scene.profile in self.catalog.profiles
             and subject in self.scene.people
-            and ("ordinal" in self.scene.people[subject])
+            and society_engine(self.scene.profile).state_family == "living"
         ):
             past = {
                 **self.scene.people[subject],
                 "action": document.get("action"),
                 "goal": document.get("goal"),
             }
-            said = inhabitant_words(past, lambda _target: None, lambda _other: None, self.catalog)
+            said = inhabitant_words(
+                past,
+                lambda _target: None,
+                lambda _other: None,
+                self.catalog,
+                profile=self.scene.profile,
+            )
             label = self.scene.labels.person(subject)
             minute = self.minute(tick)
             if event.get("event_kind") == DECISION_EVENT_KIND:
