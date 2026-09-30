@@ -379,12 +379,19 @@ DATA_KEYED = frozenset({"minutes_by_activity", "reasons"})
 #: Objects whose keys are fixed and each of whose values is keyed by data: a run's reasons under the
 #: class each left a turn in.
 KEYED_BY_DATA_WITHIN = frozenset({"reasons_by_class"})
+#: Objects a served document holds as null where its run carries no score (a seed excluded by name,
+#: which depends on what the run's people did): their shape is being an object or null, and the
+#: score's own tests hold their keys (tests/test_society_score_v3.py).
+NULLABLE_OBJECTS = frozenset({"parts"})
+_OBJECT_OR_NULL = "object or null"
 
 
 def _keys(value: Any, name: str | None = None) -> Any:
     """A document's shape: every object's keys, recursively, and a list's by all its entries
     merged, so no entry's place in the list decides it; an object keyed by data is shape only in
     being an object."""
+    if name in NULLABLE_OBJECTS and (value is None or isinstance(value, dict)):
+        return _OBJECT_OR_NULL
     if isinstance(value, dict):
         if name in DATA_KEYED:
             return {}
@@ -403,6 +410,8 @@ def _merged(shapes: list[Any]) -> Any:
     found = [shape for shape in shapes if shape is not None]
     if not found:
         return None
+    if isinstance(found[0], str):
+        return found[0]
     if isinstance(found[0], dict):
         keys = sorted({key for shape in found for key in shape})
         return {key: _merged([shape.get(key) for shape in found]) for key in keys}
