@@ -204,6 +204,32 @@ def _observable_problems(step_id: str, expect: object) -> list[str]:
     return problems
 
 
+def timing_only_failure(step: Mapping[str, Any], outcome: Mapping[str, Any]) -> bool:
+    """Whether only idle-gated timing observations failed after all functional checks ran.
+
+    The runner still reports this step failed. This permits later independent actions to run
+    during a loaded functional capture without treating its pace numbers as accepted evidence.
+    """
+    timing = set(step.get("timing_observations", []))
+    if not timing or outcome.get("status") != "failed":
+        return False
+    declared = {item["id"] for group in step["expect"].values() for item in group}
+    observations = outcome.get("observations", [])
+    if len(observations) != len(declared) or {item.get("id") for item in observations} != declared:
+        return False
+    broken = {item["id"] for item in observations if item.get("ok") is not True}
+    stated = str(outcome.get("reason", ""))
+    return (
+        bool(broken)
+        and broken <= timing
+        and stated
+        == (
+            "did not hold: "
+            + ", ".join(item["id"] for item in observations if item.get("ok") is not True)
+        )
+    )
+
+
 def problems(steps: Mapping[str, Any], gates: Sequence[Gate]) -> list[str]:
     """Every way the step list is not well formed; an empty list means it is."""
     found: list[str] = []
@@ -284,6 +310,25 @@ def problems(steps: Mapping[str, Any], gates: Sequence[Gate]) -> list[str]:
         if not str(step.get("owner_area", "")).strip():
             found.append(f"{identifier}: names no owner area to route a failure to")
         found.extend(_observable_problems(identifier, step.get("expect")))
+        timing = step.get("timing_observations", [])
+        if (
+            not isinstance(timing, list)
+            or any(not isinstance(item, str) for item in timing)
+            or len(timing) != len(set(timing))
+        ):
+            found.append(f"{identifier}: timing_observations must be a list of distinct ids")
+        else:
+            declared = {
+                item.get("id")
+                for group in (
+                    step.get("expect") if isinstance(step.get("expect"), dict) else {}
+                ).values()
+                if isinstance(group, list)
+                for item in group
+                if isinstance(item, dict)
+            }
+            if not set(timing) <= declared:
+                found.append(f"{identifier}: timing_observations names an undeclared result")
         step_gates = step.get("gates")
         if not isinstance(step_gates, list) or (
             not step_gates and not str(step.get("gates_reason", "")).strip()

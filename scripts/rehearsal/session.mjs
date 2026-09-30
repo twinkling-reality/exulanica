@@ -22,6 +22,7 @@ import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
 import { open } from './cdp.mjs';
+import { timingOnlyFailure } from './continuation.mjs';
 import { HANDLERS } from './handlers.mjs';
 import { INSTRUMENTS } from './instruments.mjs';
 import { addUsd, compareUsd } from './usd.mjs';
@@ -194,7 +195,8 @@ try {
       ...(spendUsd === undefined ? {} : { spend_usd: spendUsd }),
       started_at: started, finished_at: new Date().toISOString(),
     };
-    statuses[step.id] = status;
+    statuses[step.id] = status === 'failed' && timingOnlyFailure(step, observations, failure)
+      ? 'passed' : status;
     write();
     console.log(`${status.toUpperCase()} ${step.id}${failure ? `: ${failure.slice(0, 300)}` : ''}`);
   }

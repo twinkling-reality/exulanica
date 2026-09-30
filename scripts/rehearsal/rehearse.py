@@ -2,7 +2,8 @@
 """Rehearse the first demonstration in the real application and write what every step showed.
 
     python3 scripts/rehearsal/rehearse.py --worktree PATH --slot N --out DIR [--model-env FILE]
-        [--bound-usd USD] [--sessions ID,ID] [--reuse-database] [--launcher PATH] [--gpu-slot PATH]
+        [--bound-usd USD] [--sessions ID,ID] [--timing-phase] [--reuse-database]
+        [--launcher PATH] [--gpu-slot PATH]
 
 The step list (``steps.json``), its gates (read from ``docs/product-direction.md``) and the drivers
 all come from the tree this script is in. The application under test is the worktree ``--worktree``
@@ -40,7 +41,12 @@ names. In order, refusing at the first precondition that does not hold:
     machine's GPU slot (``.exulanica/bin/gpu-slot``) because browser work on this machine takes
     turns. A step that requires a step that did not pass is reported ``not_reachable`` with that
     reason; a hosted-model step is not started once reported spend reaches the step list's bound.
-5.  Writes ``result.json`` (``result.schema.json``) and ``summary.txt``, checks that no file in the
+5.  With ``--timing-phase``, repeats the walker, host and menu timing observations after the
+    functional sessions in a separate production-browser session. The caller takes gpu-slot,
+    then quiet-slot; the timing driver refuses to start below 70 percent CPU idle over ten
+    seconds and discards its measurements if the during-run mean is below 50 percent. It records
+    its receipt and pictures separately from the loaded functional observations.
+6.  Writes ``result.json`` (``result.schema.json``) and ``summary.txt``, checks that no file in the
     run directory or the production build holds the synthetic token, and stops everything it
     started, in every outcome.
 
@@ -317,6 +323,8 @@ class Run:
         self.unreached: dict[str, str] = {}
         self.facts: dict[str, Any] = {}
         self.sessions_run: list[dict[str, Any]] = []
+        self.timing_phase: dict[str, Any] | None = None
+        self.timing_spend = Decimal(0)
         self.prepared: dict[str, dict[str, Any]] = {}
         self.launcher: ModuleType | None = None
         self.state: dict[str, Any] | None = None
@@ -575,7 +583,12 @@ class Run:
 
     def status_of(self, step_id: str) -> str | None:
         outcome = self.outcomes.get(step_id)
-        return None if outcome is None else outcome.get("status")
+        if outcome is None:
+            return None
+        step = next((item for item in self.steps["steps"] if item["id"] == step_id), None)
+        if step is not None and steplist.timing_only_failure(step, outcome):
+            return "passed"
+        return outcome.get("status")
 
     def blocked(self, step: Mapping[str, Any], within: frozenset[str] = frozenset()) -> str | None:
         """Why a step cannot be reached now, or None. ``within`` are its own session's steps, whose
@@ -594,7 +607,7 @@ class Run:
         return None
 
     def reported_spend(self) -> Decimal:
-        return sum(
+        return self.timing_spend + sum(
             (Decimal(str(o.get("spend_usd", "0"))) for o in self.outcomes.values()), Decimal(0)
         )
 
@@ -614,6 +627,130 @@ class Run:
                 self.run_orchestrated(members)
             else:
                 self.run_browser_session(session, members)
+        if self.arguments.timing_phase:
+            self.run_timing_phase()
+
+    def run_timing_phase(self) -> None:
+        """Repeat only the timing claims after the functional run, under both shared slots."""
+        timing_ids = ("play-and-watch-walking", "birds-fly-and-perch")
+        if self.gpu_slot is None:
+            self.timing_phase = {"status": "slot_unavailable", "reason": "no GPU slot is available"}
+            return
+        quiet = main_checkout(REHEARSAL_TREE) / ".exulanica" / "bin" / "quiet-slot"
+        if not quiet.is_file():
+            self.timing_phase = {
+                "status": "slot_unavailable",
+                "reason": "no quiet slot is available",
+            }
+            return
+        if any(self.status_of(step_id) != "passed" for step_id in timing_ids):
+            self.timing_phase = {
+                "status": "prerequisite_failed",
+                "steps": {step_id: self.status_of(step_id) for step_id in timing_ids},
+            }
+            return
+        starter = self.facts.get("entry_id")
+        if not starter or not self.facts.get("world_id"):
+            self.timing_phase = {"status": "starter_unknown"}
+            return
+        assert self.state is not None
+        directory = self.out / "sessions" / "timing"
+        directory.mkdir(parents=True, exist_ok=False)
+        members = [step for step in self.steps["steps"] if step["id"] in timing_ids]
+        budget_seconds = 660
+        plan = {
+            "session": {
+                "id": "timing",
+                "budget_seconds": budget_seconds,
+                "instruments": ["walker-positions", "bird-positions"],
+            },
+            "steps": members,
+            "statuses": {key: self.status_of(key) for key in self.outcomes},
+            "facts": {**self.facts, "open_entry_id": starter},
+            "runtime": {
+                "app_url": self.app_url,
+                "api_base": self.api,
+                "token_file": self.state["token_file"],
+                "browser_port": self.state["ports"]["browser"],
+                "chrome_flags": list(CHROME_GPU_FLAGS),
+                "hosted_model": self.model_configured,
+                "spend_bound_usd": str(self.bound),
+                "spend_reported_usd": str(self.reported_spend()),
+                "page_deadlines_ms": self.deadlines,
+                "stand_ins": self.steps["stand_ins"],
+            },
+            "out": str(directory),
+        }
+        plan_file = directory / "plan.json"
+        plan_file.write_text(json.dumps(plan, indent=2))
+        receipt_file = directory / "timing-receipt.json"
+        command = [
+            str(self.gpu_slot),
+            str(quiet),
+            sys.executable,
+            str(HERE / "timing_phase.py"),
+            "--plan",
+            str(plan_file),
+            "--receipt",
+            str(receipt_file),
+            "--timeout-seconds",
+            str(budget_seconds + 30),
+        ]
+        with (directory / "slot.log").open("wb") as output:
+            process = subprocess.Popen(
+                command,
+                cwd=REHEARSAL_TREE,
+                stdin=subprocess.DEVNULL,
+                stdout=output,
+                stderr=subprocess.STDOUT,
+                env=clean_environment(),
+                start_new_session=True,
+            )
+            try:
+                process.wait(timeout=budget_seconds + GPU_SLOT_WAIT_SECONDS + 90)
+            except subprocess.TimeoutExpired:
+                os.killpg(process.pid, signal.SIGTERM)
+                try:
+                    process.wait(timeout=20)
+                except subprocess.TimeoutExpired:
+                    os.killpg(process.pid, signal.SIGKILL)
+                    process.wait()
+        receipt = (
+            json.loads(receipt_file.read_text())
+            if receipt_file.exists()
+            else {
+                "status": "receipt_missing",
+                "slot_exit": process.returncode,
+            }
+        )
+        session_file = directory / "session.json"
+        session = json.loads(session_file.read_text()) if session_file.exists() else {}
+        self.timing_phase = {
+            **receipt,
+            "slot_exit": process.returncode,
+            "application_tree": self.state.get("tree"),
+            "served_index_sha256": self.build.get("served_index_sha256"),
+            "outcomes": {
+                step_id: {
+                    "status": outcome.get("status"),
+                    "reason": outcome.get("reason"),
+                    "observations": [
+                        {"id": item["id"], "ok": item["ok"]}
+                        for item in outcome.get("observations", [])
+                    ],
+                    "screenshots": outcome.get("evidence", {}).get("screenshots", []),
+                    "spend_usd": outcome.get("spend_usd"),
+                }
+                for step_id, outcome in session.get("outcomes", {}).items()
+            },
+        }
+        self.timing_spend = sum(
+            (
+                Decimal(str(outcome.get("spend_usd") or "0"))
+                for outcome in session.get("outcomes", {}).values()
+            ),
+            Decimal(0),
+        )
 
     def run_orchestrated(self, members: list[Mapping[str, Any]]) -> None:
         for step in members:
@@ -694,7 +831,7 @@ class Run:
                 "instruments": session.get("instruments", []),
             },
             "steps": plan_steps,
-            "statuses": {k: v["status"] for k, v in self.outcomes.items()},
+            "statuses": {k: self.status_of(k) for k in self.outcomes},
             "facts": self.facts,
             "runtime": {
                 "app_url": self.app_url,
@@ -841,6 +978,7 @@ class Run:
                 },
             },
             "browser": {"gpu_slot": self.gpu_slot is not None, "sessions": self.sessions_run},
+            "timing_phase": self.timing_phase,
             "prepared": {
                 session: {key: value for key, value in inputs.items() if key != "photographs"}
                 | {
@@ -873,6 +1011,14 @@ def summary(document: Mapping[str, Any]) -> str:
             first = gate["reason"]
         lines.append(f"{gate['gate']:44} {gate['status']:19} {first}")
         lines.extend(f"{'':44} {qualification}" for qualification in gate["qualification"])
+    phase = document["run"].get("timing_phase")
+    if phase is not None:
+        lines.append("")
+        lines.append(
+            "TIMING PHASE: "
+            + str(phase.get("status"))
+            + f" (idle before {phase.get('idle_before_percent')}%, mean {phase.get('idle_mean_percent')}%)"
+        )
     return "\n".join(lines) + "\n"
 
 
@@ -1354,6 +1500,11 @@ def main() -> int:
         help="a total hosted-spend cap for this run at or below the step list's total_cap_usd",
     )
     parser.add_argument("--sessions", help="run only these sessions, comma separated")
+    parser.add_argument(
+        "--timing-phase",
+        action="store_true",
+        help="repeat timing claims under CPU idle and both shared slots",
+    )
     parser.add_argument("--reuse-database", action="store_true")
     parser.add_argument(
         "--launcher", help="the acceptance launcher (default: scripts/acceptance/launch.py here)"
@@ -1406,6 +1557,24 @@ def main() -> int:
         print(f"refused: {refused}", file=sys.stderr)
         return 2
     counts = document["summary"]
+    if arguments.timing_phase:
+        phase = document["run"].get("timing_phase") or {}
+        timing = {
+            (step_id, item["id"]): item["ok"]
+            for step_id, outcome in phase.get("outcomes", {}).items()
+            for item in outcome.get("observations", [])
+        }
+        needed = {
+            (step["id"], identifier)
+            for step in run.steps["steps"]
+            for identifier in step.get("timing_observations", [])
+        }
+        if (
+            phase.get("status") != "eligible"
+            or not needed
+            or not all(timing.get(key) is True for key in needed)
+        ):
+            return 1
     return 0 if counts["failed"] == 0 and counts["not_reachable"] == 0 else 1
 
 

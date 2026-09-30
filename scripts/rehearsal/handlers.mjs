@@ -13,6 +13,7 @@ import { randomBytes } from 'node:crypto';
 import { setTimeout as sleep } from 'node:timers/promises';
 
 import { addUsd, increaseUsd } from './usd.mjs';
+import { hostProgresses } from './continuation.mjs';
 import {
   BUTTON, OBJECT_PANEL, OPEN_CONFIRM, PLACEHOLDER, SAVED_WORLD_LIST, TITLE_FIELD, WORLD_MENU_BUTTON, WORLD_READY,
   chooseMenu, confirm, confirmation, enter, focusCanvas, liveObjects, objectRows, objectStatus, open,
@@ -851,11 +852,16 @@ async function playAndWatchWalking(ctx) {
     { minute_at_start: start.seen?.minute ?? null, minute_at_end: end.seen?.minute ?? null, summary_at_end: end.seen?.summary ?? null });
   const { walkers, ...summary } = motion ?? {};
   const pace = motion?.walking?.pace_m_per_s ?? {};
+  ctx.observe('walkers-visible-moving', motion !== null && motion.walkers_seen >= 1
+    && motion.walking.walker_frames > 0,
+  { walkers_seen: motion?.walkers_seen ?? null, walker_frames: motion?.walking?.walker_frames ?? null });
   ctx.observe('walking-continuously', motion !== null && motion.walkers_seen >= 1 && motion.walking.walker_frames > 0
     && pace.p95 !== null && pace.p95 <= most,
   { ...summary, pace_p95_at_most_m_per_s: most, walkers });
   const advanced = (end.control?.current_tick ?? 0) - (start.control?.current_tick ?? 0);
   const expected = Math.floor((seconds * 1000) / (2 * interval)) * perTwo;
+  ctx.observe('host-playing', hostProgresses(control, end.control, advanced),
+  { start: start.control, end: end.control, advanced });
   ctx.observe('host-plays', control?.mode === 'playing' && control?.host_playback?.running === true
     && end.control?.mode === 'playing' && advanced >= expected,
   { start: start.control, end: end.control, advanced, expected_at_least: expected, interval_ms: interval });

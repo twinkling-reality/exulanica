@@ -520,6 +520,7 @@
       "gates": ["milestone:A world to run", "delivery:Usable world"],
       "gates_reason": "People visible and moving under the deterministic planner in the application, in a saved world furnished from the catalogs: part of A world to run and of Usable world. The world is a starter with one small square rather than the small town those name, which gates_in_part states once.",
       "requires": ["bring-in-inhabitants"],
+      "timing_observations": ["walking-continuously", "host-plays"],
       "parameters": {
         "sample_seconds": 60,
         "sample_reason": "The window lane W2 measured continuous walking over (lane-data 2026-09-24-watchlive, evidence/after/motion.json), several host minutes long at the shipped pace.",
@@ -535,9 +536,11 @@
         "page": [
           {"id": "play-offered", "says": "Play is offered beside the people where the API says the host plays this world, and pressing it turns it into Pause, with the pace said in words."},
           {"id": "minutes-pass", "says": "The simulated minute People nearby names moves on during the watch with nothing pressed."},
+          {"id": "walkers-visible-moving", "says": "At least one walker is drawn and moves during the watch."},
           {"id": "walking-continuously", "says": "Over the watch, at least one walker is drawn walking at or above the walking floor, and the 95th percentile of the pace walkers are drawn at stays at or under the stated bound: people walk on rather than rush a minute's path and stand (lane W2's measure, read as pace)."}
         ],
         "api": [
+          {"id": "host-playing", "says": "GET /world/versions/{version_id}/society/control reads playing with host_playback running after the page presses Play, and its durable current tick advances at least once during the watch."},
           {"id": "host-plays", "says": "GET /world/versions/{version_id}/society/control reads playing with host_playback running, and its current tick advances during the watch by at least one minute in every two of the host's intervals."}
         ]
       }
@@ -609,6 +612,7 @@
       "gates": [],
       "gates_reason": "Birds are the flight movement module in the saved world; no gate of the first demonstration names flight or an animal, so the step serves none.",
       "requires": ["furnish-small-square"],
+      "timing_observations": ["page-stays-responsive"],
       "parameters": {"sample_seconds": 60, "sample_reason": "A minute: several of the flight's take-offs and landings at the square's tree, the window the walkers are watched over too.", "transition_margin_steps": 3, "transition_margin_steps_reason": "The page's copy of the flight clock may be two steps from the server's before it is set again (CLOCK_DRIFT_STEPS in web/packages/atlas-react/src/playcanvas/flight/flock.ts), and a frame is drawn between two steps, so a bird within three steps of a change of state is not held to either.", "interaction_presses": 5, "interaction_presses_reason": "Enough inputs, spread over the minute, for the worst of them to say whether the page answers while it draws the birds and the people; each opens the World menu and a second press closes it.", "interaction_ms_at_most": 200, "interaction_ms_at_most_reason": "The Core Web Vitals line for a good Interaction to Next Paint (web.dev/inp): the longest time from an input to the frame after it."},
       "owner_area": "flight: exulanica/world/flight_worker.py, exulanica/api/routes/world_flight.py and web/packages/atlas-react/src/playcanvas/flight/flock.ts; the saved world's flight: web/packages/app/src/composition/environment-selection.ts",
       "expect": {
