@@ -132,7 +132,7 @@ Companion, whether or not the keyboard is in the Companion: inside it the Compan
 takes the key, and outside it the page's handler in
 `web/packages/app/src/composition/input-modes.ts` offers the key to the photograph before dismissing
 the Companion. Going back either way returns the keyboard to what opened the photograph, the
-answer's chip or the question's `Open the source` button. A read is drawn only while its photograph
+answer's chip or the question's `See the photo` button. A read is drawn only while its photograph
 is still the one open, so going back, opening another or sending the Companion away before it
 arrives leaves it undrawn, and opening a photograph again while its first read is under way shares
 that read rather than making a second copy (`web/packages/app/src/evidence.ts`). A photograph that

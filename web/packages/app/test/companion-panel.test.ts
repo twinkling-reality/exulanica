@@ -115,10 +115,21 @@ describe('the choice rail stays separate from the Companion speech', () => {
 });
 
 describe('dismissal belongs to the shell rather than a floating close button', () => {
+  it('tracks the last input method so hover cannot hide keyboard focus', () => {
+    const panel = opened();
+    panel.render(turn());
+    expect(panel.root.dataset['input']).toBe('keyboard');
+    panel.root.querySelector('.companion-choice')?.dispatchEvent(new PointerEvent('pointermove', { bubbles: true }));
+    expect(panel.root.dataset['input']).toBe('pointer');
+    panel.root.querySelector('.companion-choice')?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
+    expect(panel.root.dataset['input']).toBe('keyboard');
+  });
+
   it('stays an aside and renders no close glyph', () => {
     const panel = opened();
     expect(panel.root.tagName.toLowerCase()).toBe('aside');
     expect(panel.root.querySelector('.panel-close')).toBeNull();
+    expect(panel.root.querySelector('.companion-dismiss')).toBeNull();
   });
 
   it('does not consume Escape inside the free text field', () => {
@@ -130,7 +141,7 @@ describe('dismissal belongs to the shell rather than a floating close button', (
     expect(said).toBe(0);
   });
 
-  it('owns Escape once, traps focus, and restores the opening control', () => {
+  it('owns Escape once, lets Tab leave, and restores the opening control', () => {
     const opener = document.createElement('button');
     document.body.append(opener);
     opener.focus();
@@ -145,12 +156,10 @@ describe('dismissal belongs to the shell rather than a floating close button', (
 
     panel.setState('open');
     panel.render(turn());
-    expect(document.activeElement).toBe(panel.root.querySelector('.companion-dismiss'));
-    const last = [...panel.root.querySelectorAll<HTMLButtonElement>('button:not([disabled])')].at(-1);
-    panel.root.querySelector('.companion-dismiss')?.dispatchEvent(
-      new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true, cancelable: true }),
-    );
-    expect(document.activeElement).toBe(last);
+    expect(document.activeElement).toBe(panel.root.querySelector('.companion-choices .companion-choice'));
+    const tab = new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true, cancelable: true });
+    panel.root.querySelector('.companion-choices .companion-choice')?.dispatchEvent(tab);
+    expect(tab.defaultPrevented).toBe(false);
     panel.root.dispatchEvent(
       new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }),
     );
@@ -166,6 +175,24 @@ describe('dismissal belongs to the shell rather than a floating close button', (
 });
 
 describe('the exchange stays subordinate to the Companion presence', () => {
+  it('introduces the Companion before a first-use question and keeps both ways forward', () => {
+    const onSay = vi.fn();
+    const panel = opened({ ...NOOP, onSay });
+    panel.render(turn());
+    panel.showGreeting();
+    expect(panel.mode()).toBe('greeting');
+    expect(panel.root.querySelector('.companion-utterance')?.textContent).toContain('I can help you explore');
+    expect(panel.pressNumber(1)).toBe(false);
+    panel.root.querySelector<HTMLButtonElement>('.companion-greeting-actions button')?.click();
+    const form = panel.root.querySelector<HTMLFormElement>('.companion-composer');
+    expect(form?.hidden).toBe(false);
+    const input = form?.querySelector<HTMLInputElement>('input');
+    if (input !== undefined && input !== null) input.value = 'What is here?';
+    form?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    expect(onSay).toHaveBeenCalledWith('What is here?');
+    expect(panel.mode()).toBe('turn');
+  });
+
   it('holds speech and nothing else, even when the turn cites evidence', () => {
     const panel = opened();
     panel.render(turn({ evidence: ['evidence-1'] }));
@@ -174,7 +201,7 @@ describe('the exchange stays subordinate to the Companion presence', () => {
     expect(panel.root.querySelector('.companion-utterance')?.textContent).toContain(
       'same person',
     );
-    expect(panel.root.querySelector('.companion-speaker')?.textContent).toBe('Unnamed Companion');
+    expect(panel.root.querySelector('.companion-speaker')?.textContent).toBe('Companion');
     // No control inside the sentence. A cited turn used to grow a button in the middle of what
     // the Companion had just said, which put an action in the one region reserved for speech
     // while the rail beside it exists to hold actions. The source is reached by aiming at the
@@ -192,7 +219,7 @@ describe('the exchange stays subordinate to the Companion presence', () => {
     expect(panel.root.querySelectorAll('.companion-choices > .choice-item')).not.toHaveLength(0);
   });
 
-  it('renders free text as the next numbered option and removes the text Send control', () => {
+  it('renders free text as the next numbered option with a clear Send control', () => {
     const panel = opened();
     panel.render(
       turn({
@@ -217,7 +244,7 @@ describe('the exchange stays subordinate to the Companion presence', () => {
     expect(panel.root.querySelector('.companion-reply-submit')?.getAttribute('aria-label')).toBe(
       'Send reply',
     );
-    expect(panel.root.textContent).not.toContain('Send');
+    expect(panel.root.querySelector('.companion-reply-submit')?.textContent).toBe('Send');
   });
 
   it('opens Other from its number key without committing a graph option', () => {
@@ -411,7 +438,7 @@ describe('nothing stands on screen until it is called', () => {
     expect(panel.root.querySelector('.companion-speech')).toBeNull();
   });
 
-  it('offers Dismiss on the welcome as a real control with its key cap, and none while walking', () => {
+  it('offers Dismiss on the welcome as a real control without a key badge, and none while walking', () => {
     const onFirstUseAction = vi.fn();
     const panel = buildCompanionPanel(NOOP, { onFirstUseAction });
     const guidance = createFirstUseGuidance({ getItem: () => null, setItem: () => undefined });
@@ -419,10 +446,9 @@ describe('nothing stands on screen until it is called', () => {
     const dismiss = [...panel.root.querySelectorAll<HTMLButtonElement>('button.companion-prompt-button')]
       .find((button) => button.textContent?.includes('Dismiss'));
     expect(dismiss?.type).toBe('button');
-    expect(dismiss?.querySelector('b')?.textContent).toBe('Esc');
-    expect(dismiss?.querySelector('b')?.getAttribute('aria-hidden')).toBe('true');
+    expect(dismiss?.querySelector('b')).toBeNull();
     dismiss?.click();
-    expect(onFirstUseAction).toHaveBeenCalledWith({ key: 'Esc', label: 'Dismiss', activate: 'dismiss' });
+    expect(onFirstUseAction).toHaveBeenCalledWith({ label: 'Dismiss', activate: 'dismiss' });
 
     // The orientation shows while the pointer is locked, so its Esc stays words, not a control.
     panel.setFirstUsePrompt(guidance.prompt('traverse'));

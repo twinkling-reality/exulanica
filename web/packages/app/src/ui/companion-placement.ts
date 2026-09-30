@@ -13,26 +13,25 @@ export interface CompanionPlacementInput {
   readonly preferredSide: CompanionSide;
 }
 
-/** The supplied visual-novel reference is a fixed composition, not a mirrored card layout. */
+/** The supplied dialogue reference is a fixed composition, not a mirrored card layout. */
 export interface CompanionPlacement {
   readonly presenceSide: 'center';
   readonly speechSide: 'center';
-  readonly choicesSide: 'right';
+  readonly choicesSide: 'center';
   readonly basis: 'reference-fixed';
 }
 
 /**
  * Return the authored encounter composition.
  *
- * Earlier versions mirrored the entire interface to avoid a projected memory rectangle. That
- * made answer order unpredictable and moved the dialogue away from the reference. The memory is
- * intentionally the backdrop now: character at centre, answers right, speech across the bottom.
+ * The world remains the backdrop. Speech and responses share one lower-centre reading path;
+ * projected world objects do not move them or reorder the answers.
  */
 export function resolveCompanionPlacement(_input: CompanionPlacementInput): CompanionPlacement {
   return Object.freeze({
     presenceSide: 'center',
     speechSide: 'center',
-    choicesSide: 'right',
+    choicesSide: 'center',
     basis: 'reference-fixed',
   });
 }

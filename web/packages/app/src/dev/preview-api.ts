@@ -33,6 +33,10 @@ export function previewApiResponse(method: string, requestUrl: string): PreviewA
   if (method === 'GET' && path === '/formation') {
     return { statusCode: 200, body: [] };
   }
+  if (method === 'GET' && path === '/companion/memory/recent') {
+    // The development world has no retained person or answer history.
+    return { statusCode: 200, body: { answers: [], escapes: [] } };
+  }
   const evidence = /^\/evidence\/([^/]+)(?:\/masked)?$/.exec(path);
   if (evidence !== null) {
     let evidenceRef: string;

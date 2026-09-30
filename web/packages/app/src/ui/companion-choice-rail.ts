@@ -187,7 +187,7 @@ export function buildCompanionChoiceRail(
       const open = el('button', {
         type: 'button',
         class: 'companion-choice companion-evidence-action',
-      }, commandAction('E', turn.evidence.length === 1 ? 'Open the source' : 'Open the sources'));
+      }, commandAction('E', turn.evidence.length === 1 ? 'See the photo' : 'See the photos'));
       open.addEventListener('click', () => handlers.onEvidence(0));
       content.push(el('div', { class: 'companion-rail-foot' }, [open]));
     }

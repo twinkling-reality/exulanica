@@ -422,10 +422,11 @@ The development preview disables upload and review and explains that an authenti
 is required. Authenticated operations retain their existing authorization, exact-request retry,
 consent, review and eligibility checks. File identifiers remain available through disclosure.
 
-The Companion reads as one panel with the question, response choices and evidence actions in
-order. Closing it retains the existing conversation lifecycle. Confirmation keeps its staged
-proposal boundary; Escape cancels through the same handler as Cancel and returns focus to the
-opening control. World panels release pointer lock before focusing their controls.
+The Companion speaks through a lower-centre caption over the world. Response choices appear
+above it, while supporting answer detail and evidence open on request. Closing retains the
+conversation lifecycle. Confirmation keeps its staged proposal boundary; Escape cancels through
+the same handler as Cancel and returns focus to the opening control. World panels release pointer
+lock before focusing their controls.
 
 Application sheets apply a fixed cool-neutral reading palette and consistent control
 geometry. This does not alter world materials, scene identity or the versioned world-profile
@@ -526,93 +527,56 @@ constructs or parses one; it passes it to the evidence resolver and renders what
 
 ## 4. The Companion
 
-### 4.1 Three-part encounter, deliberately separated
+### 4.1 Companion conversation in the world
 
-**DECISION.** The Companion encounter is a **presence in the world**, a **speech lens in the view**,
-and a **separate decision rail**. The presence remains a rendered object. Speech, evidence, choices,
-and custom reply remain accessible DOM. They use one fixed visual-novel composition and one optical
-material language, not one generic card or a mirrored dashboard layout.
+**DECISION.** The Companion is a small SVG presence beside a lower-centre caption. The caption
+carries what is spoken; numbered responses sit directly above it, followed by unnumbered
+uncertainty, skip and correction routes when the turn offers them. The world remains visible around
+the conversation. The encounter uses one presence and does not draw a second character or a large
+enclosing panel. The speaker name uses the dialogue's type size and weight. A short caption uses a
+restrained translucent backing; the aligned response rows show a distinct hover and keyboard focus
+state.
 
-**DECISION: SVG geometric avatar.** The geometric silhouette and
-two slit eyes draw on the visual grammar documented by the MIT-licensed Bloub project.
-The product path is an original DOM/SVG implementation.
-Shape, colour, and two-eye expression are saved device preferences resolved through a versioned
-presentation contract. The implementation has no Spline runtime dependency.
+The first-use invitation opens with a Companion greeting and an explicit choice to ask in the
+person's own words or continue to the next available turn. A preview world may supply a synthetic
+turn, but the greeting does not present that turn as a live answer.
 
-Resting, attending, uncertain, working, and settled remain operational states, not an emotional
-performance. Only `working` has a distinct semantic render: three pulsing dots. Expression
-selection is appearance only and never changes confidence, intent, or what the Companion may do.
+The geometric avatar has two slit eyes and a shape, colour and expression from the versioned
+presentation contract. Resting, attending, uncertain, working and settled are operational states.
+Only working has a distinct semantic render, three pulsing dots. Expression changes appearance,
+not confidence, intent or authority. The DOM/SVG avatar is the only Companion renderer.
 
-**Exchange.** The question occupies one dark optical-glass
-speech squircle across the bottom centre. A small speaker-name pill physically bisects its top
-boundary; the component accepts a name and receives `Companion`, so identity is not
-hard-coded as permanent product chrome. Evidence actions stay in this lens because they support
-what was said. Individual numbered answer pills occupy a fixed right-side rail. The next
-numbered answer is `Other…`; opening it replaces that pill in place with an unlined composer and an
-arrow icon rather than turning the encounter back into a form card. Unnumbered uncertainty, skip,
-and correction responses remain in the decision rail. Escape dismisses the complete encounter and
-has the same no-penalty meaning as Later.
+A turn keeps each offered option and its availability reason. The next numbered option opens a
+custom reply field with an explicit Send action. A keyboard number activates only the option with
+that number; an unavailable option does nothing. The field owns typing, so its digits do not
+select graph options or move the world. A multi-select turn requires its separate submit action.
 
-**Association.** The presence occupies the upper centre over the world behind it. Speech
-anchors the bottom and decisions remain on the right. The presence is the Companion; the lens is
-its accessible utterance and evidence; the right rail is what the person can decide. Library, Map,
-Customize and Settings become circular icon controls around the speech band while an encounter is
-open, maintaining a consistent control rhythm.
+An answer keeps its first clause in the caption. Additional clauses, content rows, uncertainty,
+model attribution and unanswered-attempt information are in an expandable reading area. Source
+actions remain available with the answer, and a citation opens its masked photograph with a way
+back to the same sentence. A failed question replaces the waiting line with a failure sentence;
+its diagnostic detail can be expanded. A memory failure is visible as a secondary disclosure
+without replacing a valid answer.
 
-SVG supports the geometric design without an additional scene renderer.
+### 4.2 Spatial placement and keyboard ownership
 
-Rejected alternative: putting the text inside the body or tethering a speech bubble to it. The
-separate glass surface can still hold evidence and multi-select without turning the body into a
-window frame.
+The screen-space conversation stays near the bottom centre on desktop and short viewports.
+Choices may scroll when their full set exceeds the available height; no choice is silently removed
+to fit. The stage sits beside the caption. Empty overlay bounds do not take world clicks, and
+ordinary captions do not trap Tab. Speech precedes choices in reading order even though choices
+are drawn above it. Focus moves to the first available choice when a turn opens and returns to the
+opening control when the conversation closes.
 
-### 4.2 Spatial placement
+Summoning enters converse and releases pointer lock so the cursor can choose responses. While
+the conversation is open, text input does not move the world. Escape or a tap on the world closes
+an open photograph first and then dismisses the conversation; the Companion key also dismisses the
+conversation. The caption has no separate close control. An open confirmation takes Escape through
+its Cancel action. Confirmation is a separate modal reading step with the proposed change, its
+consequences and explicit controls before any write. Dismissing returns the person to the world.
 
-**DECISION.** The Companion is a screen-space overlay, not an entity in the
-Atlas coordinate frame. It occupies the stable upper centre of the view. The presence does not
-trail the camera, travel to anchors, or use inferred geometry for placement.
-
-On ordinary laptop and desktop viewports the presence occupies upper centre, speech spans the lower
-centre, and decisions remain right. The short 1012 × 324 stress layout preserves that same reading
-order with a smaller character and shallower speech band rather than mirroring or recombining it.
-
-`companion-placement.ts` reports `reference-fixed`. The world behind is intentionally backdrop,
-so its projected rectangle does not reorder answers or move the question. Choices remain on
-the right and dialogue remains below, preserving a stable reading order.
-
-The screen-space presence does not use an in-world home or errand solver. One placement
-model determines where the Companion appears.
-
-Attention happens inside the stable silhouette. A local gather marks an open question, and the world
-anchor itself carries any required focus or evidence highlight. This keeps the presence findable and
-lets the actual memory point at what the question concerns.
-
-Under `prefers-reduced-motion`, blink and working-dot pulses stop on a settled frame. No
-semantic information is lost because conversation content and evidence remain ordinary DOM text.
-
-Implemented in `web/packages/app/src/ui/companion-stage.ts`.
-
-#### SVG default; no character fallback renderer
-
-The DOM/SVG avatar is the only Companion renderer. There is no Spline query path and no PlayCanvas
-character entity. A future rights-cleared VRM or GLB character would require a separate design,
-asset-provenance, licensing, performance, and accessibility decision; it is not implied by the
-current geometric-avatar reference.
-
-#### Summon owns the mode transition
-
-**DECISION.** An open Companion conversation is always `converse`. Summoning releases
-pointer lock because choices need a real cursor position; Pointer Lock freezes that position by
-specification. WASD movement remains available relative to the last heading, while clicking the
-world cannot recapture pointer lock until the conversation is dismissed. With lock already absent,
-Escape dismisses the Companion even when the
-custom reply has focus. Choice-set options keep their number bindings as an efficient keyboard
-route, and the next number opens `Other…`; an open panel never remains in `traverse`.
-
-Two properties this must keep. An unavailable option's key does nothing at all rather than falling
-through to the next available option, because a key that silently selects something adjacent
-commits a claim nobody chose. And the escapes are deliberately unnumbered: they are not answers to
-the question, and giving them digits would put "skip" one keystroke away from an assertion about a
-person.
+Under prefers-reduced-motion, blink and working-dot pulses stop. No semantic information depends
+on animation. The Companion placement contract fixes the lower composition instead of moving
+responses around projected world objects; the Companion stage renders the one avatar.
 
 ### 4.3 The dialogue system
 
@@ -1155,6 +1119,6 @@ decision and replacement bindings.
 | I-2 | Renderer (section 10) | Closed by [ADR-0003](adr/0003-renderer-selection.md): PlayCanvas Engine 2.21.4 |
 | I-3 | Per-stage counters, which gate section 8 | Closed: `exulanica/ingest/formation.py` counts them (8.4) |
 | I-4 | Layout at three regions: algorithmic or hand-placed (1.4) | Side-by-side comparison on three real captures |
-| I-5 | The Companion uses the fixed centre/right/bottom encounter composition and needs no tether (4.1) | Closed |
+| I-5 | The Companion uses the fixed lower-centre encounter composition and needs no tether (4.1) | Closed |
 | I-6 | Whether muting stays legible at high mute ratios, and the right cross-fade duration (7.3) | Debug-panel tuning |
 | I-7 | The evidence reference shape for stills is settled in [domain-and-evidence-model.md](domain-and-evidence-model.md) section 1.5 | Closed |

@@ -10,7 +10,7 @@ describe('Companion encounter placement', () => {
     })).toEqual({
       presenceSide: 'center',
       speechSide: 'center',
-      choicesSide: 'right',
+      choicesSide: 'center',
       basis: 'reference-fixed',
     });
   });
@@ -24,7 +24,7 @@ describe('Companion encounter placement', () => {
     expect(placement).toMatchObject({
       presenceSide: 'center',
       speechSide: 'center',
-      choicesSide: 'right',
+      choicesSide: 'center',
       basis: 'reference-fixed',
     });
   });

@@ -41,6 +41,11 @@
   /* Two reading weights on that scrim, and only two. */
   --companion-ink: color-mix(in srgb, var(--ui-companion-surface) 92%, transparent);
   --companion-ink-soft: color-mix(in srgb, var(--ui-companion-surface) 78%, transparent);
+  --companion-caption-back: color-mix(in srgb, var(--ui-companion-text) 72%, transparent);
+  --companion-choice-back: color-mix(in srgb, var(--ui-companion-text) 76%, transparent);
+  --companion-composer-back: color-mix(in srgb, var(--ui-companion-text) 76%, transparent);
+  --companion-detail-back: color-mix(in srgb, var(--ui-companion-text) 92%, transparent);
+  --companion-choice-selected: color-mix(in srgb, var(--ui-companion-surface) 94%, transparent);
 }
 
 /*

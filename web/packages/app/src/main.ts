@@ -696,6 +696,7 @@ async function mount(): Promise<void> {
   runFirstUseAction = (): void => {
     finishFirstUse();
     companion.summon();
+    companion.panel.showGreeting();
   };
 
   if (memoryLoadFailure !== null) {
@@ -1240,6 +1241,16 @@ async function mount(): Promise<void> {
   retainedLoading.remove();
   shell.removeAttribute('aria-busy');
   shell.removeAttribute('data-booting');
+  if (preview) {
+    const { companionPreviewScenario, showCompanionPreviewScenario } =
+      await import('./dev/companion-scenarios.js');
+    const scenario = companionPreviewScenario(window.location.search);
+    if (scenario !== null) {
+      finishFirstUse();
+      companion.summon();
+      showCompanionPreviewScenario(companion.panel, scenario);
+    }
+  }
 }
 
 function syncIndexRoute(facets: IndexFacets): void {

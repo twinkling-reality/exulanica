@@ -10,19 +10,20 @@ import {
   type CompanionStarterActions,
 } from './companion-choice-rail.js';
 import { buildCompanionEvidence, type ShownEvidence } from './companion-evidence.js';
+import { buildCompanionComposer } from './companion-composer.js';
 import type { AskingAbout } from './companion-speech.js';
 import type { CompanionPlacement } from './companion-placement.js';
 import { buildCompanionSpeech } from './companion-speech.js';
+import { say } from './copy.js';
 import { el, replace } from './dom.js';
 import type { FirstUsePrompt, FirstUsePromptAction } from './first-use-guidance.js';
-import { createModalFocus } from './modal-focus.js';
 
 export type CompanionHandlers = CompanionChoiceHandlers;
 
 export type PanelState = 'enter' | 'summon' | 'open';
 
 /** Which of the encounter's five faces is on the screen. */
-export type PanelMode = 'turn' | 'asking' | 'answer' | 'failed' | 'evidence';
+export type PanelMode = 'greeting' | 'turn' | 'asking' | 'answer' | 'failed' | 'evidence';
 
 export interface CompanionEncounterOptions {
   readonly speakerName?: string;
@@ -69,6 +70,8 @@ export interface CompanionEncounter {
   setState(state: PanelState): void;
   state(): PanelState;
   render(turn: Turn | null): void;
+  /** Introduce the Companion once when the first-use invitation opens it. */
+  showGreeting(): void;
   reportRefusal(reasonKey: string): void;
   /**
    * The question went to the library. Shown before the answer, and it is not an answer.
@@ -142,12 +145,12 @@ export function buildCompanionEncounter(
   handlers: CompanionHandlers,
   options: CompanionEncounterOptions = {},
 ): CompanionEncounter {
-  const speakerName = options.speakerName ?? 'Unnamed Companion';
+  const speakerName = options.speakerName ?? 'Companion';
   const root = el('aside', {
     class: 'companion-encounter',
-    role: 'dialog',
-    'aria-label': 'Companion encounter',
-    'aria-live': 'polite',
+    role: 'region',
+    'aria-label': 'Companion conversation',
+    tabindex: '-1',
     'data-state': 'enter',
   });
   /*
@@ -159,23 +162,8 @@ export function buildCompanionEncounter(
    * Companion is for. Customize is already one of the four Atlas commands and is reachable from
    * the encounter like everywhere else.
    */
-  const dismissButton = el('button', {
-    type: 'button',
-    class: 'companion-dismiss',
-    'aria-label': 'Close Companion',
-  }, [
-    el('kbd', { text: 'Esc' }),
-    el('span', { text: 'Close' }),
-  ]);
-  dismissButton.addEventListener('click', () => options.onDismiss?.());
-  dismissButton.hidden = options.onDismiss === undefined;
-  const toolbar = el('header', { class: 'companion-toolbar' }, [
+  const toolbar = el('div', { class: 'companion-toolbar' }, [
     ...(options.presence === undefined ? [] : [options.presence]),
-    el('span', { class: 'companion-identity' }, [
-      el('span', { class: 'companion-surface-kicker', text: 'In your world' }),
-      el('span', { class: 'companion-surface-title', text: 'Companion' }),
-    ]),
-    dismissButton,
   ]);
   const speech = buildCompanionSpeech({
     speakerName,
@@ -230,6 +218,7 @@ export function buildCompanionEncounter(
   let evidenceTickets = 0;
   let currentPlacement: CompanionPlacement | null = null;
   let firstUsePrompt: FirstUsePrompt | null = null;
+  let returnFocus: HTMLElement | null = null;
   const draw = (children: readonly Node[]): void => {
     const focused =
       document.activeElement instanceof HTMLElement && root.contains(document.activeElement)
@@ -289,6 +278,7 @@ export function buildCompanionEncounter(
   }
 
   function renderTurn(turn: Turn): void {
+    const focusWasInConversation = root.contains(document.activeElement);
     mode = 'turn';
     if (turn.intent === 'acknowledge' && options.starterActions !== undefined) {
       speech.renderGuidance(
@@ -297,10 +287,46 @@ export function buildCompanionEncounter(
       );
       choices.renderStarter(options.starterActions);
       draw([toolbar, speech.root, choices.root]);
+      if (focusWasInConversation && (document.activeElement === root || !root.contains(document.activeElement))) {
+        root.querySelector<HTMLElement>('.companion-starter-actions .companion-choice')?.focus({ preventScroll: true });
+      }
       return;
     }
     speech.render(turn);
     choices.render(turn);
+    draw([toolbar, speech.root, choices.root]);
+    if (focusWasInConversation && (document.activeElement === root || !root.contains(document.activeElement))) {
+      root.querySelector<HTMLElement>('.companion-choices .companion-choice:not([disabled]), .companion-escapes .companion-choice')?.focus({ preventScroll: true });
+    }
+  }
+
+  function renderGreeting(): void {
+    mode = 'greeting';
+    speech.renderGreeting();
+    const continueButton = el('button', {
+      type: 'button', class: 'companion-choice', text: say('companion.greetingContinue'),
+    });
+    continueButton.addEventListener('click', () => {
+      mode = 'turn';
+      reflect();
+    });
+    const askButton = el('button', {
+      type: 'button', class: 'companion-choice', text: say('companion.greetingAsk'),
+      'aria-expanded': 'false',
+    });
+    const composer = buildCompanionComposer((question) => {
+      mode = 'turn';
+      handlers.onSay(question);
+    }, { ariaLabel: 'Ask your Companion', placeholder: 'What would you like to ask?' });
+    askButton.addEventListener('click', () => {
+      composer.open();
+      askButton.hidden = true;
+      askButton.setAttribute('aria-expanded', 'true');
+    });
+    replace(choices.root, [
+      el('div', { class: 'companion-greeting-actions' }, [askButton, continueButton]),
+      composer.root,
+    ]);
     draw([toolbar, speech.root, choices.root]);
   }
 
@@ -384,7 +410,8 @@ export function buildCompanionEncounter(
       renderPrompt();
       return;
     }
-    if (evidence !== null) renderEvidence(evidence);
+    if (mode === 'greeting') renderGreeting();
+    else if (evidence !== null) renderEvidence(evidence);
     else if (pendingFailure !== null) renderFailure(pendingFailure);
     else if (answer !== null) renderAnswer(answer);
     else if (mode === 'asking' && lastQuestion !== null) renderAsking(lastQuestion);
@@ -411,8 +438,10 @@ export function buildCompanionEncounter(
   }
 
   renderPrompt();
-  const modalFocus = createModalFocus(root, dismissButton);
+  root.dataset['input'] = 'keyboard';
+  root.addEventListener('pointermove', () => { root.dataset['input'] = 'pointer'; });
   root.addEventListener('keydown', (event) => {
+    root.dataset['input'] = 'keyboard';
     if (event.key !== 'Escape' || state !== 'open') return;
     event.preventDefault();
     event.stopImmediatePropagation();
@@ -442,16 +471,23 @@ export function buildCompanionEncounter(
     },
     setState(next) {
       const wasOpen = state === 'open';
-      if (next !== 'open' && wasOpen) modalFocus.setVisible(false);
+      if (next === 'open' && !wasOpen) {
+        returnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      }
       // Sending the Companion away closes a photograph it had open: summoning it again shows what
       // cited the photograph, not the photograph.
       if (next !== 'open') dropEvidence();
-      if (next === 'open' && !wasOpen) root.hidden = true;
+      if (next !== 'open' && mode === 'greeting') mode = 'turn';
       state = next;
       root.dataset['state'] = next;
-      root.toggleAttribute('aria-modal', next === 'open');
       reflect();
-      if (next === 'open' && !wasOpen) modalFocus.setVisible(true);
+      if (next === 'open' && !wasOpen) {
+        root.hidden = false;
+        (root.querySelector<HTMLElement>('.companion-choices .companion-choice:not([disabled]), .companion-starter-actions .companion-choice, .companion-answer-foot .companion-reply-input') ?? root).focus({ preventScroll: true });
+      } else if (next !== 'open' && wasOpen) {
+        if (returnFocus?.isConnected) returnFocus.focus({ preventScroll: true });
+        returnFocus = null;
+      }
     },
     render(turn) {
       lastTurn = turn;
@@ -464,6 +500,12 @@ export function buildCompanionEncounter(
         renderTurn(turn);
         appendMemoryNotice();
       }
+    },
+    showGreeting() {
+      // A remembered answer, a pending request, or a later summon must keep its own face.
+      if (state !== 'open' || mode !== 'turn' || answer !== null || pendingFailure !== null) return;
+      renderGreeting();
+      root.querySelector<HTMLButtonElement>('.companion-greeting-actions button')?.focus({ preventScroll: true });
     },
     reportRefusal(reasonKey) {
       speech.reportRefusal(reasonKey);

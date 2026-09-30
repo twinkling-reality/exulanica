@@ -118,7 +118,7 @@ export function createFirstUseGuidance(
     return true;
   };
 
-  const dismiss = Object.freeze({ key: 'Esc', label: say('firstUse.dismiss'), activate: 'dismiss' as const });
+  const dismiss = Object.freeze({ label: say('firstUse.dismiss'), activate: 'dismiss' as const });
   const welcome = (square: boolean): FirstUsePrompt => Object.freeze({
     kind: 'welcome',
     statement: say('firstUse.welcome'),

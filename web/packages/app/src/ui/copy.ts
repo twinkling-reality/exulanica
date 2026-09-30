@@ -357,14 +357,17 @@ const COPY: Readonly<Record<string, string>> = Object.freeze({
   'photosDrawer.return': 'Return to world',
 
   // -- what somebody who has just arrived is told (`first-use-guidance.ts`) -----------------
-  'firstUse.welcome': 'This is your world. Nothing is in it yet.',
-  'firstUse.startBuilding': 'Start building',
+  'firstUse.welcome': 'Welcome to your world. Your Companion can help you explore it and decide what to add.',
+  'firstUse.startBuilding': 'Meet your Companion',
   'firstUse.smallSquare': 'Start with a small square',
   'firstUse.smallSquareRole': 'Place a small square in front of you. What is it to you?',
   'firstUse.dismiss': 'Dismiss',
   'firstUse.orientation': 'Look around with the mouse.',
   'firstUse.walk': 'Walk',
   'firstUse.callCompanion': 'Call your Companion',
+  'companion.greeting': 'Hello. I can help you explore this world and the photos you add. Where would you like to start?',
+  'companion.greetingAsk': 'Ask a question',
+  'companion.greetingContinue': 'Look at something together',
 
   // -- what inhabitants do with the kind chosen in Create (`objectUseWords`) ----------------
   //

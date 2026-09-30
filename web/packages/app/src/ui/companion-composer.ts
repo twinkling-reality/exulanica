@@ -16,17 +16,6 @@ export interface CompanionComposer {
   opened(): boolean;
 }
 
-function arrowIcon(): SVGSVGElement {
-  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  svg.setAttribute('viewBox', '0 0 20 20');
-  svg.setAttribute('aria-hidden', 'true');
-  svg.classList.add('reply-arrow');
-  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-  path.setAttribute('d', 'M4 10h11m-4.5-4.5L15 10l-4.5 4.5');
-  svg.append(path);
-  return svg;
-}
-
 export function buildCompanionComposer(
   onSay: (text: string) => void,
   options: { readonly ariaLabel?: string; readonly placeholder?: string } = {},
@@ -43,7 +32,8 @@ export function buildCompanionComposer(
     class: 'companion-reply-submit',
     'aria-label': 'Send reply',
     title: 'Send reply',
-  }, [arrowIcon()]);
+    text: 'Send',
+  });
   const root = el('form', {
     class: 'companion-composer',
     hidden: true,

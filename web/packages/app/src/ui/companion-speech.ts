@@ -32,6 +32,7 @@ export interface CompanionSpeechOptions {
 export interface CompanionSpeech {
   readonly root: HTMLElement;
   render(turn: Turn): void;
+  renderGreeting(): void;
   /** Factual host guidance, visually in the speech band but attributed to no speaker. */
   renderGuidance(title: string, detail: string): void;
   reportRefusal(reasonKey: string): void;
@@ -279,7 +280,10 @@ function spoken(pieces: readonly DrawnPiece[]): (Node | string)[] {
 export function buildCompanionSpeech(options: CompanionSpeechOptions): CompanionSpeech {
   const root = el('section', {
     class: 'companion-speech',
+    tabindex: '-1',
     'aria-labelledby': 'companion-speaker-name',
+    'aria-live': 'polite',
+    'aria-atomic': 'true',
   });
 
   let lastQuestion = '';
@@ -325,7 +329,8 @@ export function buildCompanionSpeech(options: CompanionSpeechOptions): Companion
       el('p', { class: 'companion-question-echo', text: answer.question }),
     ];
 
-    for (const clause of answer.clauses) {
+    const supporting: Node[] = [];
+    for (const [index, clause] of answer.clauses.entries()) {
       const paragraph = el(
         'p',
         { class: 'companion-utterance' },
@@ -336,28 +341,34 @@ export function buildCompanionSpeech(options: CompanionSpeechOptions): Companion
         )),
       );
       paragraph.dataset['clause'] = clause.type;
-      content.push(paragraph);
+      if (index === 0) content.push(paragraph);
+      else supporting.push(paragraph);
     }
     if (answer.clauses.length === 0) {
       content.push(el('p', { class: 'companion-utterance', text: say('ask.emptyAnswer') }));
     }
 
-    content.push(...renderContentSurface(answer));
+    supporting.push(...renderContentSurface(answer));
 
     // A place with nothing linked to it is not a photograph search that found nothing, so the
     // photograph abstention sentence would be wrong there. The server's clause and the empty
     // place-content line already say what happened.
     if (answer.abstained !== null && answer.content?.placeConfirmed !== true) {
-      content.push(el('p', {
+      supporting.push(el('p', {
         class: 'companion-abstention',
         text: say(`abstention.${answer.abstained}`),
       }));
     }
 
-    content.push(el('p', {
+    supporting.push(el('p', {
       class: 'companion-provenance',
       text: provenanceParagraph(answer),
     }));
+
+    content.push(el('details', { class: 'companion-answer-details' }, [
+      el('summary', { text: 'Answer details and sources' }),
+      el('div', { class: 'companion-answer-detail-body' }, supporting),
+    ]));
 
     root.dataset['mode'] = 'answer';
     root.toggleAttribute('data-abstained', answer.abstained !== null);
@@ -366,6 +377,18 @@ export function buildCompanionSpeech(options: CompanionSpeechOptions): Companion
 
   return {
     root,
+    renderGreeting() {
+      root.dataset['mode'] = 'greeting';
+      root.removeAttribute('data-abstained');
+      root.setAttribute('aria-labelledby', 'companion-speaker-name');
+      replace(root, [
+        speaker(),
+        el('p', {
+          class: 'companion-utterance',
+          text: say('companion.greeting'),
+        }),
+      ]);
+    },
     render(turn) {
       root.dataset['mode'] = 'turn';
       root.removeAttribute('data-abstained');
@@ -413,8 +436,13 @@ export function buildCompanionSpeech(options: CompanionSpeechOptions): Companion
         speaker(),
         el('p', { class: 'companion-question-echo', text: lastQuestion }),
         el('p', { class: 'companion-refusal', text: say(`ask.failed.${failure.kind}`) }),
-        ...(detail === '' ? [] : [el('p', { class: 'companion-refusal-detail', text: detail })]),
-        ...(paid === '' ? [] : [el('p', { class: 'companion-provenance', text: paid })]),
+        ...((detail === '' && paid === '') ? [] : [el('details', {
+          class: 'companion-failure-details',
+        }, [
+          el('summary', { text: 'Why this did not complete' }),
+          ...(detail === '' ? [] : [el('p', { class: 'companion-refusal-detail', text: detail })]),
+          ...(paid === '' ? [] : [el('p', { class: 'companion-provenance', text: paid })]),
+        ])]),
       ]);
     },
     reportRefusal(reasonKey) {
@@ -424,10 +452,10 @@ export function buildCompanionSpeech(options: CompanionSpeechOptions): Companion
       // The kind, then whatever the failing side said, which is the same two-sentence shape
       // `reportAskFailure` uses. An empty detail is the case with no server in it at all: an
       // answer whose citations this session could not resolve was refused here, not there.
-      root.append(el('p', { class: 'companion-memory-notice', text: say(reasonKey) }));
-      if (detail !== '') {
-        root.append(el('p', { class: 'companion-memory-notice-detail', text: detail }));
-      }
+      root.append(el('details', { class: 'companion-memory-details' }, [
+        el('summary', { class: 'companion-memory-notice', text: say(reasonKey) }),
+        ...(detail === '' ? [] : [el('p', { class: 'companion-memory-notice-detail', text: detail })]),
+      ]));
     },
   };
 }

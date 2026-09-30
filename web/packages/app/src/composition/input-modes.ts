@@ -201,7 +201,14 @@ export function mountInputModes(deps: InputModeDependencies): MountedInputModes 
   env.canvas.addEventListener(
     'pointerup',
     (event) => {
-      if (event.button !== 0 || status.inspectorRoot.hidden) return;
+      if (event.button !== 0) return;
+      // The world itself is the pointer and touch way out of a conversation. It does not add a
+      // close glyph to the caption, and it uses the same dismissal path as Escape and the X key.
+      if (companion.panel.state() === 'open') {
+        if (!companion.panel.closeEvidence()) companion.dismiss();
+        return;
+      }
+      if (status.inspectorRoot.hidden) return;
       status.resolveEvidenceAt(event.clientX, event.clientY);
     },
     { signal },

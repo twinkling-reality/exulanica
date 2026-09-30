@@ -30,14 +30,16 @@ describe('world-owned interface style contract', () => {
     }
     expect(componentStyles).not.toMatch(/transition:[^;]*\b\d+(?:ms|s)\b/);
     expect(componentStyles).not.toMatch(/saturate\(\s*\d/);
-    expect(componentStyles).toContain('var(--ui-speech-radius)');
     expect(componentStyles).toContain('var(--ui-texture-image)');
     expect(componentStyles).toContain('var(--ui-companion-blur)');
+    expect(companionStyles).toContain('var(--companion-caption-back)');
+    expect(companionStyles).toContain('var(--companion-choice-back)');
+    expect(companionStyles).toContain('var(--companion-choice-selected)');
     expect(componentStyles).toContain('var(--motion-easing)');
     expect(componentStyles).toContain("[data-transparency='reduced']");
     expect(componentStyles).toContain("[data-contrast='high'] .status");
-    expect(componentStyles).toContain('color: var(--ui-companion-ink)');
-    expect(componentStyles).toContain('background-color: var(--ui-companion-surface)');
+    expect(companionStyles).toContain('color: var(--companion-ink)');
+    expect(companionStyles).toContain('background: var(--ui-companion-text)');
     expect(worldStyleAdapter).not.toMatch(/['"]--(?:radius-|ui-choice-radius|ui-speech-radius)['"]\s*:/);
   });
 
@@ -96,7 +98,7 @@ describe('world-owned interface style contract', () => {
   it('defines one open Companion arrival animation', () => {
     const allStyles = [baseStyles, redesignStyles, companionStyles].join('\n');
     const animatedOpenRules = allStyles.match(
-      /[^{}]*\.companion-encounter\[data-state='open'\][^{}]*\{[^{}]*\banimation:\s*diegetic-plane-arrive/g,
+      /[^{}]*\.companion-encounter\[data-state='open'\][^{}]*\{[^{}]*\banimation:\s*world-tool-arrive/g,
     );
     expect(animatedOpenRules).toHaveLength(1);
   });

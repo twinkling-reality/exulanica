@@ -21,10 +21,10 @@ describe('what the product says to somebody who has just arrived', () => {
     expect(guidance.phase()).toBe('new');
     expect(guidance.prompt('converse')).toEqual({
       kind: 'welcome',
-      statement: 'This is your world. Nothing is in it yet.',
+      statement: 'Welcome to your world. Your Companion can help you explore it and decide what to add.',
       actions: [
-        { label: 'Start building', activate: 'summon-companion' },
-        { key: 'Esc', label: 'Dismiss', activate: 'dismiss' },
+        { label: 'Meet your Companion', activate: 'summon-companion' },
+        { label: 'Dismiss', activate: 'dismiss' },
       ],
     });
   });

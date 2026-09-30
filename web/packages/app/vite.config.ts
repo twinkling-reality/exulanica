@@ -149,6 +149,16 @@ const previewApi: Plugin = {
           readonly question?: unknown;
           readonly city_context?: { readonly admission_id?: unknown; readonly feature_id?: unknown };
         };
+        if (body.city_context?.admission_id !== NYC_ADMISSION_ID) {
+          response.statusCode = 422;
+          response.setHeader('cache-control', 'no-store');
+          response.setHeader('content-type', 'application/json; charset=utf-8');
+          response.end(JSON.stringify({
+            code: 'preview_question_unavailable',
+            detail: 'This local preview cannot answer that question. Open a signed-in world to ask about its sources.',
+          }));
+          return;
+        }
         const catalog = await loadPreviewNYCCatalog();
         const features = catalog['features'] as readonly PreviewNYCFeature[];
         const feature = body.city_context?.admission_id === NYC_ADMISSION_ID

@@ -26,18 +26,18 @@ const labels = (actions: readonly FirstUsePromptAction[] | undefined): string[] 
   (actions ?? []).map((action) => action.label);
 
 describe('the welcome offers a small square where the Create panel would', () => {
-  it('offers it beside Start building only when the world takes one', () => {
+  it('offers it beside the Companion introduction only when the world takes one', () => {
     const offered = createFirstUseGuidance(storage(), { smallSquareOffered: () => true });
     expect(offered.prompt('converse')?.actions).toEqual([
-      { label: 'Start building', activate: 'summon-companion' },
+      { label: 'Meet your Companion', activate: 'summon-companion' },
       { label: 'Start with a small square', activate: 'small-square' },
-      { key: 'Esc', label: 'Dismiss', activate: 'dismiss' },
+      { label: 'Dismiss', activate: 'dismiss' },
     ]);
     const notOffered = createFirstUseGuidance(storage(), { smallSquareOffered: () => false });
-    expect(labels(notOffered.prompt('converse')?.actions)).toEqual(['Start building', 'Dismiss']);
+    expect(labels(notOffered.prompt('converse')?.actions)).toEqual(['Meet your Companion', 'Dismiss']);
     // Asking for a role where no square is offered changes nothing on the card.
     notOffered.askSmallSquareRole();
-    expect(labels(notOffered.prompt('converse')?.actions)).toEqual(['Start building', 'Dismiss']);
+    expect(labels(notOffered.prompt('converse')?.actions)).toEqual(['Meet your Companion', 'Dismiss']);
   });
 
   it('asks what the square is to the person, one control per role, and sends no role itself', () => {
@@ -53,7 +53,7 @@ describe('the welcome offers a small square where the Create panel would', () =>
         activate: 'place-small-square',
         role,
       })),
-      { key: 'Esc', label: 'Dismiss', activate: 'dismiss' },
+      { label: 'Dismiss', activate: 'dismiss' },
     ]);
     // Nothing on the welcome itself carries a role: the only role on the card is one a person picks.
     const welcome = createFirstUseGuidance(storage(), { smallSquareOffered: () => true }).prompt('converse');
