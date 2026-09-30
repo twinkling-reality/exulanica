@@ -681,16 +681,22 @@ def load_decision_roles(
             raise RoleRefused(
                 "role_profile_shared", f"two roles state one {name.replace('_', ' ')}"
             )
-    adapters_named = [role.adapter.ROLE for role in roles.values()]
-    if len(set(adapters_named)) != len(adapters_named):
-        raise RoleRefused("role_adapter_shared", "two roles name one adapter")
+    # A request's id is derived from its role's subject word, the subject and the minute, so two
+    # roles deciding for one kind of subject would reserve one id and the second would be skipped.
+    subjects = sorted(role.subject for role in roles.values())
+    shared = sorted({subject for subject in subjects if subjects.count(subject) > 1})
+    if shared:
+        raise RoleRefused(
+            "role_subject_shared", f"two roles decide for one kind of subject: {shared}"
+        )
     return RoleRegistry(version=version, roles=dict(sorted(roles.items())))
 
 
 @cache
 def decision_roles() -> RoleRegistry:
-    """The production registry, read once."""
-    return load_decision_roles()
+    """The registry this process reads, once: the newest version in :data:`REGISTRY_DIRECTORY`,
+    each adapter from :data:`ADAPTER_PACKAGE`. Every reader asks this one registry."""
+    return load_decision_roles(REGISTRY_DIRECTORY, adapters=ADAPTER_PACKAGE)
 
 
 def _catalog(role: DecisionRole, catalog_id: str, version: int, schema: Any) -> Catalog:

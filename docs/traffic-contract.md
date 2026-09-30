@@ -158,7 +158,9 @@ written into every state.
   Vehicles on the two sides may never be inside their intervals at the same time.
 - **Regions.** Crossing a stop line means reserving the junction region: the connection and the
   start of the lane it leads to, as far as any conflict zone or junction crosswalk reaches on that
-  lane. A vehicle is only admitted when there is room beyond the region for its whole body.
+  lane. A vehicle is only admitted when there is room beyond the region for its whole body and no
+  other vehicle stands between it and its stop line: one it cannot pass would take that room while
+  its reservation kept the other out, and neither could move again.
   A lane that leaves a junction without that room for a class is kept for the classes it has room
   for: the class with the longest body and gap is left off it, recorded in the network's
   restrictions as `body and gap do not fit beyond the junction region it leaves`, and the network
@@ -192,8 +194,10 @@ order:
    and the second, so nothing about a signal is stored.
 3. Finish parking manoeuvres that end now and start leaving where it is safe to.
 4. Release reservations whose vehicle has cleared its region; revoke those whose vehicle can still
-   stop when its signal is no longer green or a pedestrian is due.
-5. Admit vehicles at their stop lines, junction by junction, by the junction's rule.
+   stop when another vehicle without a reservation of that junction stands between it and its stop
+   line, its signal is no longer green or a pedestrian is due.
+5. Admit vehicles at their stop lines, junction by junction, by the junction's rule, never one with
+   another vehicle standing between it and its line, such as one leaving or entering a space there.
 6. Move every driving vehicle at the highest speed the safety rule, the speed caps, the destination
    and the gates allow. Decisions read the state at the start of the second, so the order vehicles
    are listed in never matters.

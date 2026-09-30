@@ -11,8 +11,10 @@ a model or touches a float; the only draws are the seeded fleet choices at initi
 2. Record signal interval changes. Signals are a pure function of plan, offset and second.
 3. Finish parking manoeuvres that end now, and start leaving where it is safe to.
 4. Release reservations whose vehicle has cleared its region; revoke reservations of vehicles
-   that can still stop when their signal is no longer green or a pedestrian is due.
-5. Admit vehicles at their gates, junction by junction, by the junction's rule.
+   that can still stop when another vehicle without a reservation of that junction stands between
+   them and their stop line, their signal is no longer green or a pedestrian is due.
+5. Admit vehicles at their gates, junction by junction, by the junction's rule, never one with
+   another vehicle standing between it and its stop line.
 6. Move every driving vehicle by the highest speed the safety rule, the speed caps, the
    destination and its gates allow (see :mod:`exulanica.traffic.kinematics`). Decisions read the
    state at the start of the second, so the order vehicles are listed in never matters.
@@ -929,6 +931,22 @@ def _reservation_points(step: _Step, vehicle: Vehicle) -> tuple[int, int]:
     return gate, clear
 
 
+def _vehicle_ahead(step: _Step, vehicle: Vehicle, lane: str, junction_id: str) -> bool:
+    """Whether another vehicle stands on ``lane``, ahead of ``vehicle``'s front and before the
+    stop line, without a reservation of ``junction_id``: one waiting, parking or leaving a space
+    there, which ``vehicle`` cannot pass before the line. A vehicle not yet on the lane has every
+    body on it ahead of it."""
+    front = vehicle.position if vehicle.path == lane else -1
+    for _rear, body_front, other_id in step.bodies.get(lane, ()):
+        if other_id == vehicle.vehicle_id or body_front <= front:
+            continue
+        held = step.vehicles[other_id].reservation
+        if held is not None and held.kind == "junction" and held.target == junction_id:
+            continue
+        return True
+    return False
+
+
 def _release_and_revoke(step: _Step) -> None:
     network = step.network
     for vehicle in (step.vehicles[key] for key in sorted(step.vehicles)):
@@ -954,8 +972,15 @@ def _release_and_revoke(step: _Step) -> None:
             continue
         reason = ""
         junction = network.junctions[reservation.target] if reservation.kind == "junction" else None
+        if junction is not None and _vehicle_ahead(
+            step, vehicle, reservation.gate_path, junction.identity
+        ):
+            # Held behind a vehicle it cannot pass, it could not clear the junction in its turn,
+            # and the room it holds would keep that vehicle out: it waits outside, unreserved.
+            reason = "vehicle_ahead"
         if (
-            junction is not None
+            not reason
+            and junction is not None
             and junction.signal is not None
             and step.indication(junction, reservation.connector, step.second) != "green"
         ):
@@ -1338,7 +1363,9 @@ def _admit(step: _Step) -> None:
                 "stopped_since": candidate.stopped,
             }
             reason = ""
-            if policy.rule == "signal":
+            if _vehicle_ahead(step, vehicle, candidate.lane, junction_id):
+                reason = "vehicle_ahead"
+            if not reason and policy.rule == "signal":
                 shown = step.indication(junction, connector, step.second)
                 facts["indication"] = shown
                 if shown != "green":

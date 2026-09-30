@@ -25,7 +25,7 @@ import time
 import uuid
 from collections.abc import Callable, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any, Final, TypeVar
 
@@ -55,7 +55,6 @@ from exulanica.world.decision_roles import (
     DecisionContract,
     DecisionRole,
     RoleOption,
-    RoleRegistry,
     decision_roles,
 )
 from exulanica.world.society import asked_again_after_a_race, society_state_sha256
@@ -472,8 +471,9 @@ class DecisionHost:
     ``workspaces`` are the ones the host's environment lists (``EXULANICA_SOCIETY_CONTROL_
     WORKSPACES``): no other workspace's subjects are asked for, whatever its owner chose.
     ``client`` is the process's model client, or ``None`` with no credential, in which case
-    nothing is asked or written. ``policy_for`` attaches the workspace's rules to each ask.
-    ``roles`` is the decision role registry, the production one unless a caller gives another.
+    nothing is asked or written. ``policy_for`` attaches the workspace's rules to each ask. The
+    roles are the registry's (:func:`~exulanica.world.decision_roles.decision_roles`), the one
+    every reader of a role's documents asks.
     """
 
     database: Database
@@ -483,7 +483,6 @@ class DecisionHost:
     policy_for: Callable[[uuid.UUID], HostedRequestPolicy]
     manifest: Manifest
     manifest_sha256: str
-    roles: RoleRegistry = field(default_factory=decision_roles)
 
     def before_minute(self, claim: ControlClaim, lease_ends: float) -> bool:
         """Ask every chosen subject at a choice point; True when the coming minute runs alone.
@@ -512,7 +511,7 @@ class DecisionHost:
             choice_repository = SocietyModelChoiceRepository(
                 connection, claim.workspace_id, world_id=claim.world_id
             )
-            for role in self.roles.hosted_by(row["engine_version"]):
+            for role in decision_roles().hosted_by(row["engine_version"]):
                 choices = choice_repository.current(claim.version_id, role)
                 chosen = {subject: c for subject, c in choices.items() if c["model"]}
                 if chosen:
@@ -552,29 +551,24 @@ class DecisionHost:
             asking = client.with_policy(self.policy_for(claim.workspace_id))
             sendable = _once_more_after_a_race(lambda: self._judged(society, row, asking, planned))
 
-            def reserve() -> list[
-                tuple[DecisionRole, DecisionContract, float, list[RoleAsk], list]
-            ]:
-                return [
-                    (
-                        role,
-                        contract,
-                        ends_at,
-                        *self._reserved(
-                            connection, claim, decisions, row, role, contract, due, sendable, client
-                        ),
-                    )
-                    for role, contract, ends_at, due in planned
-                ]
+            # Each role's requests are reserved in a transaction of its own, asked again on its
+            # own after a race: another role's committed reservations are never read again, where
+            # an existing request is not fresh and would go unasked.
+            reserved = []
+            for role, contract, ends_at, due in planned:
 
-            reserved = _once_more_after_a_race(reserve)
+                def reserve(
+                    role: DecisionRole = role,
+                    contract: DecisionContract = contract,
+                    due: list = due,
+                ) -> tuple[list[RoleAsk], list[tuple[uuid.UUID, dict[str, Any]]]]:
+                    return self._reserved(
+                        connection, claim, decisions, row, role, contract, due, sendable, client
+                    )
+
+                reserved.append((contract, ends_at, *_once_more_after_a_race(reserve)))
         # No connection from the reservations survives here: the models are asked without one.
-        results: list[tuple[uuid.UUID, dict[str, Any]]] = []
-        for _role, contract, ends_at, asks, refused in reserved:
-            keep_usd, keep_calls = share_kept(client.budget, contract)
-            results.extend(refused)
-            if asks:
-                results.extend(self._ask(asking, asks, contract, ends_at, keep_usd, keep_calls))
+        results = self._asked_by_every_role(asking, reserved)
         with self.database.session(claim.workspace_id) as connection:
             decisions = SocietyDecisionRepository(
                 SocietyRepository(
@@ -716,6 +710,39 @@ class DecisionHost:
                 spent += bound
                 asks.append(RoleAsk(role, request, spec, mechanism))
         return asks, refused
+
+    def _asked_by_every_role(
+        self,
+        client: ModelClient,
+        reserved: Sequence[
+            tuple[DecisionContract, float, list[RoleAsk], list[tuple[uuid.UUID, dict[str, Any]]]]
+        ],
+    ) -> list[tuple[uuid.UUID, dict[str, Any]]]:
+        """Every role's asks at once, each by its own deadline, so no role waits for another's;
+        then each role's results, refusals first, in the order its requests were reserved."""
+        asking = [(contract, ends_at, asks) for contract, ends_at, asks, _refused in reserved]
+        with ThreadPoolExecutor(max_workers=max(1, sum(1 for *_, asks in asking if asks))) as pool:
+            answered = [
+                pool.submit(
+                    self._ask,
+                    client,
+                    asks,
+                    contract,
+                    ends_at,
+                    *share_kept(client.budget, contract),
+                )
+                if asks
+                else None
+                for contract, ends_at, asks in asking
+            ]
+            results: list[tuple[uuid.UUID, dict[str, Any]]] = []
+            for (_contract, _ends_at, _asks, refused), future in zip(
+                reserved, answered, strict=True
+            ):
+                results.extend(refused)
+                if future is not None:
+                    results.extend(future.result())
+        return results
 
     @staticmethod
     def _ends_at(contract: DecisionContract, lease_ends: float) -> float:

@@ -131,9 +131,14 @@ What a role in a world still needs in code, because only the person is built:
   held to the person's reasons by `tests/test_companion_decision_model.py` and
   `web/packages/app/test/society-models-words-parity.test.ts`.
 - **One role per subject at a time.** A subject has at most one request a minute, whatever its
-  role (`prepare_role` in `exulanica/world/society_decision_repository.py`), and the host reserves
-  every hosted role's requests of a minute as one unit, asked again together after a race, then asks
-  the roles one after another, each by its own deadline.
+  role (`prepare_role` in `exulanica/world/society_decision_repository.py`). A request's id is
+  derived from its role's subject word, the subject and the minute, so the registry refuses two
+  roles that decide for one kind of subject (`role_subject_shared`), as it refuses two that state one
+  profile (`role_profile_shared`). With several hosted roles, the host reserves each role's
+  requests of a minute in a transaction of its own, asked again on its own after a race, and asks
+  every role at once, each to its own deadline, so a race or a slow model of one role leaves the
+  others' requests asked in their minute (`tests/test_decision_host_roles_postgres.py`, with two
+  roles made from the person's adapter under other keys).
 
 ## The owner's choice
 
@@ -258,17 +263,17 @@ by. A workspace the worker plays through account-wide discovery alone is asked n
    name one of whose parts is a word of it would, asks nobody of that model and writes nothing
    (`question_changed_by_rules` on the models route). A label they would change, a place a saved
    name happens to match, is left out of that person's options.
-4. **Reserve.** In one transaction the host reserves a request
+4. **Reserve.** In one transaction for each role the host reserves a request
    (`exulanica.society-decision-request/v2`) for each person still due, bound to the state, the input
    and the options offered. A request past the world's hourly bounds is answered at once with a
    receipt naming the bound (`world_hour_decisions_spent` or `world_hour_spend_spent`), counted from
    the hour's receipts with an unknown cost at its bound and each ask admitted that minute at its
    bound.
 5. **Ask with no connection held.** The host commits, closes its connection and asks the models
-   concurrently, at most `concurrent_calls_maximum` at once. Every ask of the minute ends by one
-   time: the contract's deadline after the phase begins, and never later than the 30 second lease
-   leaves the minute to commit in. A phase with no time left asks nobody, and an ask that could only
-   start after that time records `no_time_to_ask`.
+   concurrently, every role at once and at most a role's `concurrent_calls_maximum` of its asks at
+   once. Every ask of a role ends by one time: its contract's deadline after the phase begins, and
+   never later than the 30 second lease leaves the minute to commit in. A phase with no time left
+   asks nobody, and an ask that could only start after that time records `no_time_to_ask`.
 6. **Record.** Each receipt (`exulanica.society-decision/v2`) is recorded in its own transaction and
    checked against the state and input then: a receipt asked over another state or input is
    `stale` (`decision_context_changed`); one whose inputs can no longer be authorised is

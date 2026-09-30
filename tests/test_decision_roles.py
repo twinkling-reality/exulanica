@@ -561,6 +561,41 @@ def test_the_deployment_gate_fails_when_a_role_s_model_loses_the_role_s_use_case
     assert preflight.main(checked) == 0
 
 
+def test_two_roles_sharing_a_profile_or_a_subject_word_are_refused_and_an_unknown_key_named(
+    tmp_path, monkeypatch
+):
+    """Each role states its own profiles and prompt version, and decides for its own kind of
+    subject: a request's id is derived from the role's subject word, the subject and the minute,
+    so two roles sharing a word would reserve one id and the second would be skipped. A key the
+    registry does not hold is named, never guessed."""
+    from decision_role_support import person_entry, person_like, write_registry
+
+    def loaded(name: str, second: dict[str, Any]):
+        root = tmp_path / name
+        monkeypatch.syspath_prepend(str(root))
+        directory, package = write_registry(root, [person_entry(), second])
+        return load_decision_roles(directory, adapters=package)
+
+    # The positive control: a second role deciding for its own kind of subject loads beside it.
+    registry = loaded("apart", person_like("tenant_decision", "tenant"))
+    assert {role.key for role in registry} == {"society_decision", "tenant_decision"}
+    with pytest.raises(RoleRefused) as unknown:
+        registry.role("weather_decision")
+    assert unknown.value.code == "role_not_registered"
+    with pytest.raises(RoleRefused) as profile:
+        loaded(
+            "profile",
+            {
+                **person_like("tenant_decision", "tenant"),
+                "receipt_profile": person_entry()["receipt_profile"],
+            },
+        )
+    assert profile.value.code == "role_profile_shared"
+    with pytest.raises(RoleRefused) as subject:
+        loaded("subject", person_like("tenant_decision", "person"))
+    assert subject.value.code == "role_subject_shared"
+
+
 def test_a_role_s_bounds_are_read_from_its_own_contract():
     role = load_decision_roles(FIXTURES, adapters=PACKAGE).role("junction_signal")
     contract = role.contract()

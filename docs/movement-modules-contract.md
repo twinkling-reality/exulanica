@@ -328,7 +328,7 @@ Each parameter holds one value:
 | Parameter | Value | What it bounds |
 | --- | --- | --- |
 | `episode_steps` | 1,200 | Seconds in an episode, each computed whole from the fleet parked at home |
-| `departure_steps` | 300 | The first seconds of an episode, in which each vehicle leaves home once; measured so that no town's traffic locks at a junction and every vehicle is home before the episode ends |
+| `departure_steps` | 600 | The first seconds of an episode, in which each vehicle leaves home once; measured so that no town's traffic locks at a junction and every vehicle is home before the episode ends |
 | `dwell_steps_minimum`, `dwell_steps_maximum` | 30, 90 | How long a vehicle stays where it drove before it drives home |
 | `fleet_share_permille` | 500 | The share of each parking kind's places that hosts a vehicle |
 | `max_vehicles` | 120 | The most vehicles one city's traffic drives; more is refused, never trimmed |
