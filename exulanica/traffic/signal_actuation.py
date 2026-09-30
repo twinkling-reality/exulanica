@@ -237,10 +237,14 @@ def signal_observation(
     if second == timeline.start_second:
         if timeline.cursor is None:
             return None
-        prior = timeline.cursor[0]
+        before = timeline.cursor
     else:
-        prior = timeline.index_at(second - 1)
-    if (index, prior) not in ((2, 1), (2, 8), (6, 5), (6, 9)):
+        before = timeline.cursor_at(second - 1)
+    if (index, before[0]) not in ((2, 1), (2, 8), (6, 5), (6, 9)):
+        return None
+    if before[2] >= timeline.policy.green_extension_seconds_maximum:
+        # The green already holds every extension the plan allows: amber follows whatever is
+        # answered, and the timeline accepts no choice here, so this second is no choice point.
         return None
     junction = next(
         (
