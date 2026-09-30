@@ -118,7 +118,7 @@
   --ui-plane-depth: 1400px;
   --ui-plane-yaw: 5deg;
   --ui-menu-depth: 1000px;
-  --ui-menu-yaw: 12deg;
+  --ui-menu-yaw: -12deg;
   --ui-plane-right: 5vw;
   --radius-pill: 999px;
   /*

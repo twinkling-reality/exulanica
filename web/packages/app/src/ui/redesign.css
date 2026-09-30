@@ -773,16 +773,18 @@
   border: 1px solid color-mix(in srgb, var(--ui-chromatic-ink) 17%, white);
   border-radius: var(--radius-menu);
   text-align: left;
+  overflow: hidden;
   overflow-wrap: anywhere;
   isolation: isolate;
   box-shadow: inset 0 1px 0 #ffffff9c, 0 7px 26px #192b4924;
-  transition: transform var(--motion-standard) var(--motion-easing), box-shadow var(--motion-standard) var(--motion-easing), border-color var(--motion-standard) var(--motion-easing);
+  transition: border-color var(--motion-standard) var(--motion-easing);
 }
 #shell .world-menu-entry::before,
 #shell .world-menu-entry::after {
   content: '';
   position: absolute;
   inset: 0;
+  border-radius: inherit;
   pointer-events: none;
   z-index: 0;
 }
@@ -816,8 +818,6 @@
 #shell .world-menu-entry:hover,
 #shell .world-menu-entry:focus-visible {
   border-color: var(--ui-chromatic-ink);
-  box-shadow: inset 0 1px 0 #ffffffcb, 0 14px 38px #192b4950;
-  transform: translateY(-3px);
 }
 #shell .world-menu-companion:is(:hover, :focus-visible) { color: var(--ui-chromatic-paper); border-color: var(--ui-spectrum-green); }
 #shell .world-menu-entry:focus-visible {
