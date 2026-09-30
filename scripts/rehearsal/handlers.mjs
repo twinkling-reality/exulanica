@@ -2852,6 +2852,54 @@ async function compareTownGroup(ctx) {
   ctx.observe('runs-finished-within-bound', start.state === 'finished' && runs.length === start.runs_planned
     && runs.every((r) => ['completed', 'failed'].includes(r.status)) && spent !== null && Number(spent) <= Number(start.bound_usd),
   { start, runs, stopped_by_bound: stoppedByBound, listing });
+  const society = (await ctx.api('GET', societyPath(entry))).body;
+  const arms = result?.arms ?? [];
+  const candidateArms = arms.filter((arm) => arm.role === 'candidate');
+  const controlPair = result?.control ?? [];
+  const paired = controlPair.length === 2 && arms.find((arm) => arm.key === controlPair[0])?.role === 'candidate'
+    && arms.find((arm) => arm.key === controlPair[1])?.role === 'control'
+    && arms.find((arm) => arm.key === controlPair[0])?.decider?.model_id
+      === arms.find((arm) => arm.key === controlPair[1])?.decider?.model_id;
+  ctx.observe('living-v5-control-bound', society?.profile === 'exulanica-society/v5'
+    && society.world_id === entry.world_id && society.version_id === entry.authored_version_id
+    && result?.score_version === 4 && result.window_ticks === 60
+    && result.group?.source?.kind === 'owner_choice' && result.group.source.choice_seq === group.choice_seq
+    && candidateArms.length === 2 && same(candidateArms.map((arm) => arm.decider?.model_id).sort(),
+      models.map((model) => model.model_id).sort()) && paired,
+  { world_id: entry.world_id, version_id: entry.authored_version_id, society_profile: society?.profile,
+    society_tick: society?.current_tick, score_version: result?.score_version, window_ticks: result?.window_ticks,
+    group: result?.group ?? null, arms, control: controlPair });
+  const replays = [];
+  for (const seed of result?.seeds ?? []) {
+    for (const arm of arms) {
+      const plannedRun = seed.runs?.[arm.key] ?? null;
+      if (plannedRun?.status !== 'completed' || !plannedRun.run_id) {
+        replays.push({ seed_digest: seed.seed_digest, arm: arm.key, run_id: plannedRun?.run_id ?? null,
+          status: plannedRun?.status ?? null, valid: false });
+        continue;
+      }
+      const replay = await ctx.api('GET', `${base}/${id}/runs/${plannedRun.run_id}?${query}`);
+      const played = replay.body ?? {};
+      const ticks = (played.minutes ?? []).map((minute) => minute.tick);
+      replays.push({ seed_digest: seed.seed_digest, arm: arm.key, run_id: plannedRun.run_id,
+        status: plannedRun.status, replay_status: replay.status, profile: played.profile,
+        replay_verified: played.replay_verified, first_tick: ticks[0] ?? null,
+        last_tick: ticks.at(-1) ?? null, minutes: ticks.length,
+        valid: replay.status === 200 && played.profile === 'exulanica.society-comparison-run-replay/v3'
+          && played.replay_verified === true && played.run_id === plannedRun.run_id
+          && played.arm === arm.key && played.seed_digest === seed.seed_digest
+          && ticks.length === 61 && ticks.at(-1) - ticks[0] === 60 });
+    }
+  }
+  const startsAligned = (result?.seeds ?? []).every((seed) =>
+    new Set(replays.filter((replay) => replay.seed_digest === seed.seed_digest)
+      .map((replay) => replay.first_tick)).size === 1);
+  ctx.observe('all-arms-replayed', start.state === 'finished' && (result?.seeds?.length ?? 0) === seeds
+    && replays.length === seeds * arms.length && replays.length === start.runs_planned
+    && replays.every((replay) => replay.valid) && startsAligned
+    && listing?.runs_finished === listing?.runs_expected,
+  { world_id: entry.world_id, version_id: entry.authored_version_id, comparison_id: id,
+    runs_finished: listing?.runs_finished ?? null, runs_expected: listing?.runs_expected ?? null, replays });
   const after = pick((await savedWorld(ctx)).entry, ['authored_version_id', 'current_authored_state_sha256', 'current_authored_edit_seq']);
   ctx.observe('saved-world-unchanged', same(before, after), { before, after });
   await ctx.screenshot('finished', 'Compare models after the comparison finished');

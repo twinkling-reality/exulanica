@@ -1287,6 +1287,8 @@
         "api": [
           {"id": "started-for-the-group", "says": "POST /world/versions/{version_id}/society/comparisons answered 201 for the owner's choice, the two models, the control and the bound the page stated."},
           {"id": "runs-finished-within-bound", "says": "Every run the start planned has an outcome and what the comparison spent is within its bound; a run stopped by the bound is recorded with the figures."},
+          {"id": "living-v5-control-bound", "says": "The same town and version serve a living v5 society and a score-v4 comparison of the owner's chosen group over 60 minutes, with two candidate models and a same-model control pair."},
+          {"id": "all-arms-replayed", "says": "Every planned candidate and control run completes and replays from stored decisions, verified under the same world, version, seed and 60-minute window without a model call for the read."},
           {"id": "saved-world-unchanged", "says": "The town's authored version, state and edit sequence are what they were before the comparison."}
         ]
       }
