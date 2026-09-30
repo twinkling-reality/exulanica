@@ -42,6 +42,7 @@ from exulanica.environment.district_geometry import DistrictGeometry, segment_bl
 from exulanica.environment.district_interpretation import Frame, validate_interpretation
 from exulanica.errors import BlobNotFoundError, IntegrityError
 from exulanica.evidence.blob import BlobId
+from exulanica.grammar.errors import CatalogError
 from exulanica.selection.validation import Session
 from exulanica.store.base import ContentAddressedStore
 from exulanica.world.authored_delta import AlternateVersion
@@ -62,6 +63,7 @@ from exulanica.world.society_authored_ground import (
     objects_in_region,
     read_authored_ground,
 )
+from exulanica.world.society_catalogs import RoutineModel
 from exulanica.world.society_composition import (
     build_society_input,
     keep_registry,
@@ -71,6 +73,7 @@ from exulanica.world.society_composition import (
 from exulanica.world.society_engines import society_engine
 from exulanica.world.society_input_policy import (
     LEGACY_COMPOSITION,
+    LIVING_INPUTS,
     LOCAL_INPUT,
     WALKING_SURFACES_BY_FAMILY,
     WALKING_SURFACES_COMPOSITION,
@@ -81,7 +84,7 @@ from exulanica.world.society_input_policy import (
 from exulanica.world.society_input_policy import (
     composition_profile as policy_for_input,
 )
-from exulanica.world.society_living import current_routine, town_routine
+from exulanica.world.society_living import current_routine, input_routine, town_routine
 from exulanica.world.society_planner import input_sha256, validate_society_input
 from exulanica.world.society_repository import SocietyRepository
 from exulanica.world.society_walking_surfaces import (
@@ -151,14 +154,16 @@ class _ReadFirst:
 @dataclass(frozen=True, slots=True)
 class _TownRead:
     """A generated world's records as its receipt generated them before the asset read lock: the
-    receipt's digest and the place the records make, under the living routine a district reads
-    and under a town's (the living place a living town's input carries), or the refusal
-    generating them raised."""
+    receipt's digest, the records, and the place they make under the living routine a district
+    reads, or the refusal generating them raised. A living town's place is made from the records
+    only when a living input is composed, under the routine that input records
+    (``living_places``, by the routine's digest), so a purposeful town's input never pays for it."""
 
     receipt_sha256: str | None
     place: Mapping[str, Any] | None
     refusal: str | None
-    living_place: Mapping[str, Any] | None = None
+    records: tuple[object, ...] = ()
+    living_places: dict[str, Mapping[str, Any]] = field(default_factory=dict)
 
 
 #: What a saved world's input says of the edit it follows, not of what its society reads: its
@@ -432,8 +437,7 @@ class SocietyRuntime:
             read.towns[key] = _TownRead(None, None, str(exc))
             return
         place = walking_surfaces_place(ground.place_id, generated.records)
-        living = walking_surfaces_place(ground.place_id, generated.records, town_routine())
-        read.towns[key] = _TownRead(generated.receipt_sha256, place, None, living)
+        read.towns[key] = _TownRead(generated.receipt_sha256, place, None, tuple(generated.records))
 
     def _transaction_read(self, connection: psycopg.Connection) -> _ReadFirst:
         """What this transaction read before the asset read lock; call inside the transaction.
@@ -1325,12 +1329,15 @@ class SocietyRuntime:
         seq: int,
         read: _ReadFirst,
         composition: str | None = None,
+        living_routine: RoutineModel | None = None,
     ) -> dict:
         """Compose a saved world's input under the asset read lock, from rows and ``read``.
 
         ``composition`` is the composition a world's own walking surfaces are composed under: the
         purposeful society's, when left out, or the living town's, which also carries the living
-        place; a lattice ground has one composition and names none."""
+        place, made under ``living_routine``: the routine the society's inputs record, or for a
+        new society the town's routine a new town is made under; a lattice ground has one
+        composition and names none."""
         registry = json.loads(self._registry_bytes)
         reason = None
         try:
@@ -1383,18 +1390,30 @@ class SocietyRuntime:
                 raise UnavailableSocietyInput(
                     f"no composition {chosen!r} walks a world's own surfaces"
                 )
-            living = chosen == WALKING_SURFACES_COMPOSITION_V2
+            routine = None
+            place = town.place
+            if chosen == WALKING_SURFACES_COMPOSITION_V2:
+                routine = town_routine() if living_routine is None else living_routine
+                place = town.living_places.get(routine.sha256)
+                if place is None:
+                    try:
+                        place = walking_surfaces_place(ground.place_id, town.records, routine)
+                    except (CatalogError, InvalidStructuralData, ValueError) as exc:
+                        raise UnavailableSocietyInput(
+                            f"the town's living place could not be made: {exc}"
+                        ) from exc
+                    town.living_places[routine.sha256] = place
             return build_walking_surfaces_input(
                 ground=ground,
                 version=version,
-                place=town.living_place if living else town.place,
+                place=place,
                 input_seq=seq,
                 dependency_refs=self._authored_refs(binding, ground),
                 availability="available" if reason is None else "unavailable",
                 unavailable_reason=reason,
                 reviewed_affordances=registry,
                 standing=self._standing,
-                living=town_routine() if living else None,
+                living=routine,
             )
         raise UnavailableSocietyInput(
             f"no society composition walks a {ground.navigation_form!r} ground"
@@ -1506,10 +1525,12 @@ class SocietyRuntime:
                     version,
                     document["input_seq"],
                     read,
-                    # Composed again under its own composition, a town's living one included.
+                    # Composed again under its own composition, a town's living one included,
+                    # and under the routine it records.
                     policy_for_input(document["profile"])
                     if ground.navigation_form == "walking_surfaces"
                     else None,
+                    input_routine(document) if document["profile"] in LIVING_INPUTS else None,
                 )
                 if document != expected:
                     raise UnavailableSocietyInput(
@@ -1602,7 +1623,8 @@ class SocietyRuntime:
                 (session.workspace_id, row["society_id"], last),
             ).fetchone()
             # A society's next input is composed as its last was: a living town's carries its
-            # living place again.
+            # living place again, made under the routine its inputs record, never a newer one.
+            last_document = None if previous is None else previous["document"]
             document = self._authored_compose(
                 connection,
                 binding,
@@ -1610,8 +1632,11 @@ class SocietyRuntime:
                 version,
                 last + 1,
                 read,
-                policy_for_input(previous["document"]["profile"])
-                if previous is not None and ground.navigation_form == "walking_surfaces"
+                policy_for_input(last_document["profile"])
+                if last_document is not None and ground.navigation_form == "walking_surfaces"
+                else None,
+                input_routine(last_document)
+                if last_document is not None and last_document["profile"] in LIVING_INPUTS
                 else None,
             )
             if previous is not None and _reads_the_same(previous["document"], document):

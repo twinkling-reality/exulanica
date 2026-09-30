@@ -5,19 +5,27 @@ replayed from what it stored, as the runtime role under row-level security."""
 from __future__ import annotations
 
 import dataclasses
+import time
 import uuid
 from types import MappingProxyType
 
 import pytest
 from exulanica.selection.validation import Session
+from exulanica.world import society_catalogs
 from exulanica.world import world_recipes as recipe_catalog
 from exulanica.world.decision_roles import decision_roles
 from exulanica.world.society_decision_repository import SocietyDecisionRepository
 from exulanica.world.society_engines import CREATES
+from exulanica.world.society_living import town_routine
 from exulanica.world.society_repository import SocietyRepository
 from exulanica.world.world_recipes import CANDIDATES_MAXIMUM
 
+import test_world_objects_api as object_helpers
+from society_living_fixtures import grid_input
+from test_society_made_world import _place
 from test_society_made_world import made as imported_made  # noqa: F401
+
+objects_api = object_helpers.objects_api
 
 pytestmark = pytest.mark.postgres
 
@@ -110,8 +118,8 @@ def test_a_saved_world_whose_input_carries_no_homes_gets_no_living_town(made):
     region = entry["authored_scene"]["region"]["region_id"]
     society = f"/world/versions/{entry['authored_version_id']}/society?world_id={entry['world_id']}"
     refused = api.post(society, {"region_id": region, "profile": TOWN})
-    assert refused.status_code == 422, refused.text
-    assert "carries its homes" in refused.json()["detail"]
+    assert refused.status_code == 409, refused.text
+    assert refused.json()["code"] == "engine_not_for_this_ground"
 
 
 def _decided(api, kind: str) -> tuple[dict, dict, str, dict]:
@@ -243,3 +251,127 @@ def test_a_chosen_model_s_wait_is_stored_and_replayed(made):
         for e in theirs
         if e["event_kind"] == "goal_selected" and e["tick"] == body["current_tick"]
     ]
+
+
+def test_the_living_town_is_refused_over_a_district_s_input(objects_api, repository):
+    """The ground-to-engine pairing is the server's: a caller naming the living town over a
+    district's input is refused by name, and nothing is written."""
+    api = objects_api
+    place = uuid.uuid4()
+    repository.connection.execute(
+        "insert into place(workspace_id,place_id) values(%s,%s)", (repository.workspace_id, place)
+    )
+    repository.connection.commit()
+    version_id = uuid.UUID(api.version()["version_id"])
+    document = grid_input(version_id=version_id)
+    api.client.app.state.society_initial_input = lambda *_args: document
+    api.client.app.state.society_input_authorizer = lambda _conn, _session, _value: None
+    route = api.in_world(f"/world/versions/{version_id}/society")
+    refused = api.post(route, {"place_id": str(place), "region_id": "region-a", "profile": TOWN})
+    assert refused.status_code == 409, refused.text
+    assert refused.json()["code"] == "engine_not_for_this_ground"
+    assert api.get(route).status_code == 404
+
+
+def test_a_town_edited_after_its_routine_is_bumped_keeps_its_own_routine(made, monkeypatch):
+    """A town's next input is made under the routine its society recorded, never the routine a
+    new town is made under: after TOWN_ROUTINE_VERSIONS moves, an edit of a stored town still
+    records an input its society reads, and it still advances and replays."""
+    api = made
+    entry, _society, body = _town_society(api)
+    recorded = body["state"]["routine"]
+    body = _step(api, entry, body)
+    bumped = dict(society_catalogs.TOWN_ROUTINE_VERSIONS, **{"society-policy": 1})
+    monkeypatch.setattr(society_catalogs, "TOWN_ROUTINE_VERSIONS", bumped)
+    assert town_routine().binding() != recorded
+    edited = _place(api, entry, "a-plate-in-town", "region:generated", x_mm=4_000, z_mm=-6_000)
+    assert edited["authored_edit_seq"] > entry["authored_edit_seq"]
+    with api.database.session(api.repository.workspace_id) as connection:
+        inputs = connection.execute(
+            "select i.input_seq,i.document->'living'->'routine' as routine "
+            "from world_society_input i join world_society s using(workspace_id,society_id) "
+            "where s.workspace_id=%s "
+            "and s.world_id=%s and s.version_id=%s order by i.input_seq",
+            (api.repository.workspace_id, entry["world_id"], entry["authored_version_id"]),
+        ).fetchall()
+    assert [row["input_seq"] for row in inputs] == [1, 2]
+    assert all(row["routine"] == recorded for row in inputs)
+    body = _step(api, entry, body)
+    assert body["input_seq"] == 2
+    replayed = api.get(
+        f"/world/versions/{entry['authored_version_id']}/society/replay?world_id={entry['world_id']}"
+    )
+    assert replayed.status_code == 200, replayed.text
+    assert replayed.json()["replay_verified"] is True
+
+
+def test_the_decision_host_asks_a_chosen_model_for_a_town_person(made):
+    """The host's decision phase, unchanged, asks the model the owner chose for a living town's
+    person at the engine's own choice point, and the minute after it applies the receipt."""
+    from exulanica.api.decision_host import DecisionHost
+    from exulanica.epistemics.hosted_requests import no_place_released
+    from exulanica.world.society_controls import LEASE_SECONDS, ControlClaim
+    from exulanica.world.society_decision_contract import decision_contract, person_role
+    from exulanica.world.society_model_choice_repository import SocietyModelChoiceRepository
+
+    from test_society_person_decisions_postgres import _Chooser, _client, _offered
+
+    api = made
+    services = api.client.app.state.services
+    workspace = api.repository.workspace_id
+    entry, _society, body = _town_society(api)
+    version_id = uuid.UUID(entry["authored_version_id"])
+    free = [p["id"] for p in body["state"]["inhabitants"] if p["work"] is None][:2]
+    manifest, model_id = _offered()
+    spec = manifest.models[model_id]
+    with services.database.session(workspace) as connection:
+        SocietyModelChoiceRepository(
+            connection, workspace, world_id=entry["world_id"]
+        ).record_choice(
+            version_id,
+            person_role(),
+            request_id=uuid.uuid4(),
+            subjects=free,
+            model={"provider": spec.provider, "model_id": model_id},
+            chosen_by=api.actor,
+            manifest=manifest,
+            contract=decision_contract(),
+        )
+    transport = _Chooser()
+    host = DecisionHost(
+        database=services.database,
+        runtime=services.society_runtime,
+        client=_client(manifest, transport),
+        workspaces=frozenset({workspace}),
+        policy_for=lambda workspace_id: services.request_policy(
+            workspace_id,
+            lambda: services.readonly_database.session(workspace_id),
+            released_places=no_place_released,
+        ),
+        manifest=manifest,
+        manifest_sha256="a" * 64,
+    )
+    asked = False
+    for _ in range(90):
+        claim = ControlClaim(
+            workspace_id=workspace,
+            world_id=entry["world_id"],
+            society_id=uuid.UUID(body["society_id"]),
+            version_id=version_id,
+            token=uuid.uuid4(),
+            revision=1,
+            actor=api.actor,
+        )
+        assert host.before_minute(claim, time.monotonic() + LEASE_SECONDS)
+        body = _step(api, entry, body)
+        if transport.requests:
+            asked = True
+            break
+    assert asked, "no chosen town person came to a choice point"
+    events = api.get(
+        f"/world/versions/{entry['authored_version_id']}/society/events?world_id={entry['world_id']}"
+    ).json()["events"]
+    applied = [e for e in events if e["event_kind"] == "decision_applied"]
+    assert applied and applied[0]["subject_id"] in free
+    assert applied[0]["document"]["model"]["model_id"] == model_id
+    assert applied[0]["document"]["disposition"] == "applied", applied[0]["document"]["reason"]

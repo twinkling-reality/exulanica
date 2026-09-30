@@ -626,6 +626,10 @@ def place_from_town_input(document: dict[str, Any]) -> dict[str, Any]:
                 "unavailable_reason": document["unavailable_reason"] or "input_unavailable",
             }
         )
+    # The carried place is held to its own digest before anything is read from it: the input
+    # names it by that digest among its dependencies, so a place that differs from its digest is
+    # not the place the input names.
+    _require(place_sha256(city) == city["document_sha256"], "the carried living place digest")
     for key in ("vertical_unit", "datum"):
         if key in city["frame"]:
             frame[key] = city["frame"][key]

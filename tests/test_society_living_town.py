@@ -23,6 +23,13 @@ from exulanica.world.society_catalogs import (
     TOWN_ROUTINE_VERSIONS,
     load_routine_model,
 )
+from exulanica.world.society_choice import (
+    WAIT,
+    WAIT_KEY,
+    AppliedChoices,
+    ChoiceQuestion,
+    choice_question,
+)
 from exulanica.world.society_engines import CREATES, society_engine
 from exulanica.world.society_living import (
     LIVING_TOWN_PROFILE,
@@ -334,3 +341,46 @@ def test_the_person_role_decides_only_in_the_families_it_serves():
     legacy = {"profile": "exulanica-society/v1", "inhabitants": []}
     with pytest.raises(RoleRefused, match="person_family_unsupported"):
         role.adapter.due(legacy, str(uuid.uuid4()))
+
+
+def _question(ordinal: int, options: list[tuple[str, str]]) -> ChoiceQuestion:
+    """A closed answer set of (activity, option key) rows, as the living engine builds one."""
+    return choice_question(
+        subject_ordinal=ordinal,
+        tick=1,
+        minute_of_day=600,
+        day=0,
+        needs={},
+        options=tuple(
+            {
+                "option_key": key,
+                "activity": activity,
+                "destination_id": key.split("|")[0] or None,
+                "spot_id": key.split("|")[1] or None,
+                "outcome": (activity, key),
+            }
+            for activity, key in options
+        ),
+    )
+
+
+def test_the_seam_takes_a_choice_it_still_offers_and_says_why_it_takes_none_otherwise():
+    rule = ("rest", {"destination_id": "bench", "spot_id": None}, "the rule's pick")
+    seam = AppliedChoices(
+        {1: ("shop", "grocery|"), 2: ("shop", "bakery|"), 3: ("visit", "library|"), 4: WAIT_KEY}
+    )
+    offered = [("shop", "grocery|"), ("eat_out", "cafe|")]
+    taken = seam.decide(lambda: _question(1, offered), lambda: rule)
+    assert (taken.decided_by, taken.outcome) == ("model", ("shop", "grocery|"))
+    # The activity is still offered, at another place: the one chosen was taken this minute.
+    other = seam.decide(lambda: _question(2, offered), lambda: rule)
+    assert (other.decided_by, other.outcome) == ("deterministic_chooser", rule)
+    # The activity is not offered at all this minute: its place closed or went.
+    gone = seam.decide(lambda: _question(3, offered), lambda: rule)
+    assert gone.outcome == rule
+    waited = seam.decide(lambda: _question(4, offered), lambda: rule)
+    assert waited.outcome is WAIT and waited.option_key == WAIT_KEY
+    # Somebody nobody chose for is the rule's.
+    assert seam.decide(lambda: _question(5, offered), lambda: rule).outcome == rule
+    assert seam.taken == {1, 4}
+    assert seam.refused == {2: "place_taken_this_minute", 3: "target_disabled_or_removed"}

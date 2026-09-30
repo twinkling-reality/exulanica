@@ -181,6 +181,12 @@ class SocietyStartRefused(ValueError):
 #: Why a society cannot place its people, by the code the routes answer with, and the detail.
 START_REFUSALS: Final = {
     "no_reachable_targets": "initial society requires reachable targets",
+    # A living engine reads the living place a town's input carries exactly when the engine table
+    # says it stands on a saved world; any other pairing of engine and ground is refused.
+    "engine_not_for_this_ground": (
+        "this engine does not stand on this world's ground; the engine table names the engine "
+        "a society over it is created with"
+    ),
 }
 
 
@@ -643,6 +649,14 @@ def validate_input_successor(previous: dict[str, Any], current: dict[str, Any]) 
             current["navigation"]["arrival_mm"] == previous["navigation"]["arrival_mm"],
             "input changed immutable arrival_mm",
         )
+        # A living town's place is made under the routine its society was made under, for its
+        # whole life: a newer routine is a new society's, never a stored one's next input.
+        if previous["profile"] in LIVING_INPUTS:
+            _require(
+                current["profile"] in LIVING_INPUTS
+                and current["living"]["routine"] == previous["living"]["routine"],
+                "input changed immutable living routine",
+            )
     old, new = previous["authored_state"], current["authored_state"]
     _require(new["edit_seq"] >= old["edit_seq"], "authored edit order regressed")
     _require(

@@ -1139,8 +1139,10 @@ as `authored_affordance_unreachable`. They are copied from that one authorised i
 later edit queued is not described until a step consumes it. Without the parameter the read is
 unchanged.
 
-The application supplies `society_initial_input(connection, session, version_id, place_id, region_id)`
-and `society_input_authorizer(connection, session, document)` on application state. The repository
+The application supplies `society_initial_input(connection, session, version_id, place_id, region_id,
+engine)`, where `engine` is the engine the society is created with and says how a town's walking
+surfaces are composed for it, and `society_input_authorizer(connection, session, document)` on
+application state. The repository
 accepts an `input_authorizer(document)` callback and exposes internal `record_input(version_id, doc)`
 for the authored-edit transaction. The adapter must take appropriate source/asset locks and validate
 current bindings. An absent authorizer/provider fails closed. The public routes report

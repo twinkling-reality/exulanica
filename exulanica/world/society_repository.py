@@ -50,6 +50,7 @@ from exulanica.world.society_living import (
 from exulanica.world.society_living_decisions import LivingSeam, living_step
 from exulanica.world.society_planner import (
     PURPOSEFUL_PROFILE,
+    SocietyStartRefused,
     advance_purposeful_society,
     initial_purposeful_society,
     ordered_events_document,
@@ -224,16 +225,13 @@ class SocietyRepository:
                     # of its place. A saved world's ground states a flat rectangle and none of
                     # those, so this refuses rather than publishing a place of empty answers.
                     raise ValueError(f"{profile} has no place contract for an authored ground")
-                if (
-                    engine.state_family == "living"
-                    and is_authored_ground(initial_input["profile"])
-                    and initial_input["profile"] not in LIVING_INPUTS
+                if engine.state_family == "living" and engine.saved_world != (
+                    initial_input["profile"] in LIVING_INPUTS
                 ):
-                    # A living society over a saved world walks the living place its input
-                    # carries: a town's. A ground that carries none states no homes to live in.
-                    raise ValueError(
-                        f"{profile} stands on a saved world whose input carries its homes"
-                    )
+                    # A living engine that stands on a saved world walks the living place a
+                    # town's input carries; one that does not reads a district's input. Any other
+                    # pairing is refused by name, whichever engine a caller names.
+                    raise SocietyStartRefused("engine_not_for_this_ground")
                 self._validate_scope(version_id, initial_input)
                 self._authorize(initial_input)
                 # A saved world's own ground holds the population its entry in the society ground

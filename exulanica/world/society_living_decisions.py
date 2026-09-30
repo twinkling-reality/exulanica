@@ -40,7 +40,13 @@ from exulanica.world.decision_roles import DecisionContract, DecisionRole
 from exulanica.world.role_decisions import DecisionDisposition, written_messages
 from exulanica.world.society import SOCIETY_NAMESPACE, SocietyEvent, society_state_sha256
 from exulanica.world.society_catalogs import MINUTES_PER_DAY, RoutineModel
-from exulanica.world.society_choice import WAIT_KEY, AppliedChoices, option_key
+from exulanica.world.society_choice import (
+    WAIT_KEY,
+    AppliedChoices,
+    ChoiceSource,
+    DeterministicChoices,
+    option_key,
+)
 from exulanica.world.society_decision_contract import DecisionOption
 from exulanica.world.society_living import (
     LivingPlace,
@@ -88,7 +94,11 @@ class LivingSeam:
     #: The people decided for, by identity, in decision order: they act first.
     acting_first: tuple[str, ...] = ()
 
-    def choices(self) -> AppliedChoices:
+    def choices(self) -> ChoiceSource:
+        """The minute's choice source: the rule alone, lazily, when nobody was decided for, so a
+        minute with no receipt builds no question; otherwise the applied choices."""
+        if not self.chosen:
+            return DeterministicChoices()
         return AppliedChoices(dict(self.chosen))
 
 
@@ -318,7 +328,7 @@ def apply_living_receipts(
         acting_first=tuple(order),
     )
     if tried:
-        trial = decided.choices()
+        trial = AppliedChoices(dict(decided.chosen))
         advance_living_society(
             dict(state),
             seam.seed,

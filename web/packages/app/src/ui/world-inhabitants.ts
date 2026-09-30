@@ -151,6 +151,12 @@ export function refusalWords(refusal: NonNullable<InhabitantsView['refusal']>): 
     return 'Nobody came in: there is nowhere in this world they could reach yet. Put something they can '
       + `rest on or visit near where you arrive, then ask again. ${say('inhabitants.whereToPlace')}`;
   }
+  if (refusal.code === 'engine_not_for_this_ground') {
+    // The page asked for inhabitants of another kind than this world's ground takes, as a page
+    // older than the server's engine table would.
+    return 'Nobody came in: this page asked for another kind of inhabitants than this world takes. '
+      + 'Reload the page, then bring them in again.';
+  }
   if (refusal.status === 424) return `Inhabitants cannot come in right now. ${refusal.detail}`;
   return `Inhabitants were not brought in. ${refusal.detail}`;
 }

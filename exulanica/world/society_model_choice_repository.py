@@ -39,7 +39,10 @@ __all__ = [
 
 #: Why a choice is refused, by the code the route answers with, and the detail.
 CHOICE_REFUSALS: Final = {
-    "engine_takes_no_model_choice": "only a purposeful society's people are run by chosen models",
+    "engine_takes_no_model_choice": (
+        "this society's engine hosts no role a chosen model decides for; the engine table says "
+        "which do"
+    ),
     "person_not_in_this_world": "a choice names somebody who is not one of this society's people",
     "person_named_twice": "a choice names one person more than once",
     "model_not_declared": "the model is not one the manifest declares",

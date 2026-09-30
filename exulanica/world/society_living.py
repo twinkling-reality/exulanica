@@ -1,5 +1,11 @@
 """The living society, profile ``exulanica-society/v4``: routines over a place, with occupancy.
 
+The living town, ``exulanica-society/v5``, is this engine over a town's own place, which its input
+carries, under the town's routine: the engine's rules are the same, and what differs is catalog
+data (a routine whose use classes keep opening hours and name each position's shift, and a policy
+that employs a share of the residents) and the choices a chosen model makes, applied through the
+choice seam before anybody else acts in the minute.
+
 V4 is a successor to the v2 purposeful policy, never a change to it. Each inhabitant carries the
 needs its place can relieve. Every simulated minute those needs grow
 at their catalogued rates, and an inhabitant with nothing in progress chooses the activity whose
@@ -28,6 +34,7 @@ function in ``exulanica.world.society``, and every length is an integer number o
 from __future__ import annotations
 
 import json
+import threading
 import uuid
 from collections import OrderedDict
 from collections.abc import Iterable, Sequence
@@ -254,6 +261,7 @@ def routine_for(state: dict[str, Any]) -> RoutineModel:
 #: validation and copy took about 14 ms on the development machine, its minute about 4 ms).
 _PLACES_KEPT: Final = 8
 _HELD: Final[OrderedDict[str, LivingPlace]] = OrderedDict()
+_HELD_LOCK: Final = threading.Lock()
 
 
 def living_places(
@@ -266,23 +274,36 @@ def living_places(
     A town's input (``LIVING_INPUTS``) carries its living place; any other input is projected as
     it is (:func:`~exulanica.world.society_place.place_from_society_input`). Left without
     ``held``, the process's few most recently prepared places are reused."""
-    held = _HELD if held is None else held
     places = []
     for document in documents:
         key = f"{document['document_sha256']}:{routine.sha256}"
-        if key not in held:
-            projected = (
-                place_from_town_input(document)
-                if document["profile"] in LIVING_INPUTS
-                else place_from_society_input(document, routine)
-            )
-            held[key] = LivingPlace(projected, routine)
-        places.append(held[key])
-        if held is _HELD:
-            _HELD.move_to_end(key)
-            while len(_HELD) > _PLACES_KEPT:
-                _HELD.popitem(last=False)
+        if held is not None:
+            if key not in held:
+                held[key] = LivingPlace(_projected(document, routine), routine)
+            places.append(held[key])
+            continue
+        # The process's own places are read by the playback worker and by requests at once.
+        with _HELD_LOCK:
+            place = _HELD.get(key)
+            if place is not None:
+                _HELD.move_to_end(key)
+        if place is None:
+            place = LivingPlace(_projected(document, routine), routine)
+            with _HELD_LOCK:
+                _HELD[key] = place
+                _HELD.move_to_end(key)
+                while len(_HELD) > _PLACES_KEPT:
+                    _HELD.popitem(last=False)
+        places.append(place)
     return places
+
+
+def _projected(document: dict[str, Any], routine: RoutineModel) -> dict[str, Any]:
+    """The place a persisted input projects to: a town's carries its own, any other is read as
+    it is."""
+    if document["profile"] in LIVING_INPUTS:
+        return place_from_town_input(document)
+    return place_from_society_input(document, routine)
 
 
 def _supported_needs(place: LivingPlace, routine: RoutineModel) -> set[str]:

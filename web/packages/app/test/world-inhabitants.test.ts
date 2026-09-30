@@ -157,3 +157,14 @@ describe('the inhabitants panel', () => {
     expect(panel.advance.disabled).toBe(true);
   });
 });
+
+describe('a society the server will not start on this ground', () => {
+  it('says the page asked for another kind of inhabitants, and to reload', () => {
+    const words = refusalWords({
+      status: 409, code: 'engine_not_for_this_ground',
+      detail: "this engine does not stand on this world's ground",
+    });
+    expect(words).toMatch(/^Nobody came in: this page asked for another kind of inhabitants/);
+    expect(words).toContain('Reload the page');
+  });
+});
