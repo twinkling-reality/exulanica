@@ -736,7 +736,7 @@
   gap: 12px;
   width: min(760px, 58vw);
   pointer-events: auto;
-  transform: perspective(var(--ui-plane-depth)) rotateY(var(--ui-plane-yaw));
+  transform: perspective(var(--ui-menu-depth)) rotateY(var(--ui-menu-yaw));
   transform-origin: right center;
 }
 #shell .world-menu-grid {
@@ -955,9 +955,9 @@
   border-radius: 3px;
 }
 #shell .world-menu-world { grid-column: span 2; grid-row: span 2; --field-main: var(--ui-spectrum-rose); --field-counter: var(--ui-spectrum-orange); --light-x: 10%; --light-y: 115%; --pigment-x: 95%; --pigment-y: 5%; }
-#shell .world-menu-character { grid-column: span 2; --field-main: var(--ui-spectrum-violet); --field-counter: var(--ui-spectrum-violet); --light-x: 12%; --light-y: 105%; --pigment-x: 90%; --pigment-y: -10%; }
-#shell .world-menu-library { --field-main: var(--ui-spectrum-blue); --field-counter: var(--ui-spectrum-blue); --pigment-x: 96%; --pigment-y: 0%; }
-#shell .world-menu-map { --field-main: var(--ui-spectrum-green); --field-counter: var(--ui-spectrum-green); --pigment-x: 92%; --pigment-y: 4%; }
+#shell .world-menu-character { grid-column: span 2; --field-main: var(--ui-spectrum-violet); --field-counter: var(--ui-spectrum-rose); --light-x: 12%; --light-y: 105%; --pigment-x: 90%; --pigment-y: -10%; }
+#shell .world-menu-library { --field-main: var(--ui-spectrum-blue); --field-counter: var(--ui-spectrum-violet); --pigment-x: 96%; --pigment-y: 0%; }
+#shell .world-menu-map { --field-main: var(--ui-spectrum-green); --field-counter: var(--ui-spectrum-blue); --pigment-x: 92%; --pigment-y: 4%; }
 #shell .world-menu-experiment,
 #shell .world-menu-compare { --field-main: var(--ui-spectrum-orange); --field-counter: var(--ui-spectrum-rose); --pigment-x: 90%; --pigment-y: 0%; }
 #shell .world-menu-make { --field-main: var(--ui-spectrum-rose); --field-counter: var(--ui-spectrum-orange); --light-x: 88%; --light-y: 125%; --pigment-x: 0%; --pigment-y: -10%; }
