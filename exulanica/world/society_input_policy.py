@@ -30,6 +30,12 @@ AUTHORED_GROUND_INPUT_V3 = "exulanica.society-input/authored-ground-v3"
 #: and the input records the population its ground's rule derived (migration 0118).
 WALKING_SURFACES_COMPOSITION = "exulanica.society-composition/walking-surfaces-v1"
 WALKING_SURFACES_INPUT = "exulanica.society-input/walking-surfaces-v1"
+#: The same projection again, carrying the town's living place beside it: the place the world's
+#: records make under a living routine, whose homes, workplaces and shifts the living town reads
+#: (migration 0120). It never rewrites a stored walking-surfaces-v1 input; a society holding those
+#: replays them with their own semantics.
+WALKING_SURFACES_COMPOSITION_V2 = "exulanica.society-composition/walking-surfaces-v2"
+WALKING_SURFACES_INPUT_V2 = "exulanica.society-input/walking-surfaces-v2"
 UNREACHABLE = "authored_affordance_unreachable"
 #: An object that moves offers no activity: where it stands when an inhabitant arrives is a phase
 #: the renderer holds and the society does not.
@@ -50,6 +56,7 @@ _PAIRS = (
     (AUTHORED_GROUND_COMPOSITION_V2, AUTHORED_GROUND_INPUT_V2),
     (AUTHORED_GROUND_COMPOSITION_V3, AUTHORED_GROUND_INPUT_V3),
     (WALKING_SURFACES_COMPOSITION, WALKING_SURFACES_INPUT),
+    (WALKING_SURFACES_COMPOSITION_V2, WALKING_SURFACES_INPUT_V2),
 )
 #: Compositions that record a known unreachable authored activity against that activity alone,
 #: type-check authored transforms strictly, and publish an ``unavailable_affordances`` list.
@@ -59,6 +66,7 @@ LOCAL_FAILURE_COMPOSITIONS = (
     AUTHORED_GROUND_COMPOSITION_V2,
     AUTHORED_GROUND_COMPOSITION_V3,
     WALKING_SURFACES_COMPOSITION,
+    WALKING_SURFACES_COMPOSITION_V2,
 )
 LOCAL_FAILURE_INPUTS = (
     LOCAL_INPUT,
@@ -66,6 +74,7 @@ LOCAL_FAILURE_INPUTS = (
     AUTHORED_GROUND_INPUT_V2,
     AUTHORED_GROUND_INPUT_V3,
     WALKING_SURFACES_INPUT,
+    WALKING_SURFACES_INPUT_V2,
 )
 #: Every input profile a saved world's own ground produces, oldest first. A society's inputs may
 #: move forward along this order and never back.
@@ -74,16 +83,32 @@ AUTHORED_GROUND_INPUTS: Final = (
     AUTHORED_GROUND_INPUT_V2,
     AUTHORED_GROUND_INPUT_V3,
     WALKING_SURFACES_INPUT,
+    WALKING_SURFACES_INPUT_V2,
 )
 #: Input profiles that record the purposeful routine they were composed under. Every other profile
 #: records none and is read under the routine the society was first released with.
-ROUTINE_INPUTS: Final = (AUTHORED_GROUND_INPUT_V3, WALKING_SURFACES_INPUT)
+ROUTINE_INPUTS: Final = (
+    AUTHORED_GROUND_INPUT_V3,
+    WALKING_SURFACES_INPUT,
+    WALKING_SURFACES_INPUT_V2,
+)
 #: Input profiles that record the population their ground's rule derived from the world.
-POPULATION_INPUTS: Final = (WALKING_SURFACES_INPUT,)
+POPULATION_INPUTS: Final = (WALKING_SURFACES_INPUT, WALKING_SURFACES_INPUT_V2)
+#: Input profiles that carry the living place a living society over them walks, with the living
+#: routine it was made under.
+LIVING_INPUTS: Final = (WALKING_SURFACES_INPUT_V2,)
+#: The composition an input over a world's own walking surfaces is made under, by the state
+#: family of the engine that consumes it: the purposeful society walks the surfaces alone, and the
+#: living town also reads the living place they are made from.
+WALKING_SURFACES_BY_FAMILY: Final[Mapping[str, str]] = {
+    "purposeful": WALKING_SURFACES_COMPOSITION,
+    "living": WALKING_SURFACES_COMPOSITION_V2,
+}
 #: The kinds of a world's own records an input may name an activity of, besides the objects its
 #: person placed, per input profile: a record's subject is its kind and its identity.
 WORLD_RECORD_SUBJECTS: Final[Mapping[str, tuple[str, ...]]] = {
     WALKING_SURFACES_INPUT: ("city.premises", "city.street_furniture"),
+    WALKING_SURFACES_INPUT_V2: ("city.premises", "city.street_furniture"),
 }
 #: Why an activity may be recorded as unavailable on its own, per input profile. A profile only
 #: ever gains reasons in a new version, so a stored input is read with the vocabulary it was
@@ -96,12 +121,14 @@ LOCAL_RECORD_REASONS: Final[Mapping[str, frozenset[str]]] = {
     # A world that states its walking surfaces joins no object its person placed to them, and a
     # place of its own too close to another's is not stood at: either activity is unreachable.
     WALKING_SURFACES_INPUT: frozenset({UNREACHABLE}),
+    WALKING_SURFACES_INPUT_V2: frozenset({UNREACHABLE}),
 }
 #: Why a placement may be named as unread, per input profile that carries the list.
 UNREAD_PLACEMENT_REASONS: Final[Mapping[str, frozenset[str]]] = {
     AUTHORED_GROUND_INPUT_V2: frozenset({NO_AUTHORED_FRAME}),
     AUTHORED_GROUND_INPUT_V3: frozenset({NO_AUTHORED_FRAME}),
     WALKING_SURFACES_INPUT: frozenset({NO_AUTHORED_FRAME}),
+    WALKING_SURFACES_INPUT_V2: frozenset({NO_AUTHORED_FRAME}),
 }
 #: The bound on a local record list, shared with targets as the input bound always was.
 LOCAL_RECORD_BOUND: Final = 4096

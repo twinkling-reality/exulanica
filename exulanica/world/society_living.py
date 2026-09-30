@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import json
 import uuid
+from collections import OrderedDict
 from collections.abc import Iterable, Sequence
 from functools import cache, partial
 from itertools import pairwise
@@ -53,31 +54,43 @@ from exulanica.world.society_catalogs import (
     load_routine_model,
 )
 from exulanica.world.society_choice import (
+    RULE,
+    WAIT,
     ChoiceQuestion,
     ChoiceSource,
     DeterministicChoices,
     choice_question,
     option_key,
 )
+from exulanica.world.society_engines import society_engine
+from exulanica.world.society_input_policy import LIVING_INPUTS
 from exulanica.world.society_place import (
     ceil_distance,
     place_capacity,
     place_from_society_input,
+    place_from_town_input,
     validate_place,
 )
 
 __all__ = [
     "LIVING_PROFILE",
+    "LIVING_TOWN_PROFILE",
     "LivingPlace",
     "advance_living_society",
+    "at_living_choice_point",
     "current_routine",
     "initial_living_society",
+    "input_routine",
     "living_places",
     "living_places_follow",
+    "next_minute_options",
     "routine_for",
+    "town_routine",
 ]
 
 LIVING_PROFILE: Final = "exulanica-society/v4"
+#: The living town: this engine over a saved world whose input carries its living place.
+LIVING_TOWN_PROFILE: Final = "exulanica-society/v5"
 TICK_SECONDS: Final = 60
 #: One row of the closed answer set: urgency, activity key, the activity, the pick, and why.
 _OptionRow = tuple[int, str, "Activity", dict, str]
@@ -202,6 +215,29 @@ def current_routine() -> RoutineModel:
     return _routine(tuple(sorted(versions.items())), society_catalogs.ROUTINE_DIRECTORY)
 
 
+def town_routine() -> RoutineModel:
+    """The living routine a new town's place is made under (``TOWN_ROUTINE_VERSIONS``): opening
+    hours, the shifts each workplace's positions work, and a share of the residents employed."""
+    versions = society_catalogs.TOWN_ROUTINE_VERSIONS
+    return _routine(tuple(sorted(versions.items())), society_catalogs.ROUTINE_DIRECTORY)
+
+
+def input_routine(document: dict[str, Any]) -> RoutineModel:
+    """The living routine a society over this input is made under: the one a town's input names
+    for the living place it carries, and for any other input the one a new district reads."""
+    if document["profile"] not in LIVING_INPUTS:
+        return current_routine()
+    named = document["living"]["routine"]
+    routine = _routine(
+        tuple(sorted((str(k), int(v)) for k, v in named["catalog_versions"].items())),
+        society_catalogs.ROUTINE_DIRECTORY,
+    )
+    _require(
+        routine.binding() == named, "the input names a living routine these catalogs differ from"
+    )
+    return routine
+
+
 def routine_for(state: dict[str, Any]) -> RoutineModel:
     """The routine a stored society recorded: the catalog versions it names, read side by side
     with any newer ones. A changed catalog file fails the digest check."""
@@ -212,19 +248,40 @@ def routine_for(state: dict[str, Any]) -> RoutineModel:
     )
 
 
+#: How many prepared places one process keeps, the least recently read dropped first: a place is a
+#: pure function of its input and routine, validated once, and its routes are kept with it, so a
+#: society played minute after minute prepares its place once rather than every minute (a town's
+#: validation and copy took about 14 ms on the development machine, its minute about 4 ms).
+_PLACES_KEPT: Final = 8
+_HELD: Final[OrderedDict[str, LivingPlace]] = OrderedDict()
+
+
 def living_places(
     documents: Iterable[dict[str, Any]],
     routine: RoutineModel,
     held: dict[str, LivingPlace] | None = None,
 ) -> list[LivingPlace]:
-    """Project persisted society inputs to places, reusing any already prepared by digest."""
-    held = {} if held is None else held
+    """Project persisted society inputs to places, reusing any already prepared by digest.
+
+    A town's input (``LIVING_INPUTS``) carries its living place; any other input is projected as
+    it is (:func:`~exulanica.world.society_place.place_from_society_input`). Left without
+    ``held``, the process's few most recently prepared places are reused."""
+    held = _HELD if held is None else held
     places = []
     for document in documents:
-        key = document["document_sha256"]
+        key = f"{document['document_sha256']}:{routine.sha256}"
         if key not in held:
-            held[key] = LivingPlace(place_from_society_input(document, routine), routine)
+            projected = (
+                place_from_town_input(document)
+                if document["profile"] in LIVING_INPUTS
+                else place_from_society_input(document, routine)
+            )
+            held[key] = LivingPlace(projected, routine)
         places.append(held[key])
+        if held is _HELD:
+            _HELD.move_to_end(key)
+            while len(_HELD) > _PLACES_KEPT:
+                _HELD.popitem(last=False)
     return places
 
 
@@ -288,8 +345,17 @@ def initial_living_society(
     *,
     branch_id: str,
     population: int | None = None,
+    profile: str = LIVING_PROFILE,
 ) -> dict[str, Any]:
-    """A population sized to its place, spread over that place's own spots and homes."""
+    """A population sized to its place, spread over that place's own spots and homes.
+
+    ``profile`` is the living engine the society is created with, as the engine table states it.
+    Where the routine's policy states an employment share (a town's), that share of the residents,
+    in a seeded order, takes the place's positions workplace-first, one position at every
+    workplace in a seeded order before a second at any, and each position works the shift its use
+    class names for it; otherwise every inhabitant in the seeded order takes the next position.
+    """
+    _require(society_engine(profile).state_family == "living", f"{profile} is not a living engine")
     _require(
         isinstance(seed, str) and len(seed) == 64 and all(c in "0123456789abcdef" for c in seed),
         "society seed must be a lowercase SHA-256",
@@ -322,7 +388,14 @@ def initial_living_society(
     _require(size <= limit, f"this place supports at most {limit} inhabitants")
     staff = _positions(place, "work")
     order = sorted(range(size), key=lambda i: (_number(seed, "work", i), i))
+    share = policy.get("employment_share_milli")
+    if share is not None:
+        order = order[: size * share // 1000]
+        staff = sorted(
+            staff, key=lambda row: (row[1], _number(seed, f"workplace:{row[0]}", 0), row)
+        )
     jobs = dict(zip(order, staff, strict=False))
+    employed = set(order)
     spot_order = sorted(place.spots, key=lambda s: (_number(seed, f"spot:{s}", 0), s))
     supported = _supported_needs(place, routine)
     inhabitants = []
@@ -371,14 +444,17 @@ def initial_living_society(
         if job is not None:
             dest = place.destinations[job[0]]
             jitter = policy["shift_jitter_minutes"]
-            start = dest["shift"]["start_minute"] + _span(seed, "shift", ordinal, -jitter, jitter)
+            begins, minutes = _position_shift(dest, job[1], routine)
+            start = begins + _span(seed, "shift", ordinal, -jitter, jitter)
             person["work"] = {
                 "destination_id": job[0],
                 "shift_start_minute": start % MINUTES_PER_DAY,
-                "shift_minutes": dest["shift"]["minutes"],
+                "shift_minutes": minutes,
             }
             person["role"] = {**dest["role"], "destination_id": job[0]}
             person["role_reason"] = "works_at_premises"
+        elif homes and staff and ordinal not in employed:
+            person["role_reason"] = "keeps_no_job"
         elif homes and staff:
             person["role_reason"] = "no_open_position"
         if home is not None:
@@ -437,7 +513,7 @@ def initial_living_society(
     ]
     start = policy["start_minute_of_day"]
     return {
-        "profile": LIVING_PROFILE,
+        "profile": profile,
         "society_id": str(society_id),
         "branch_id": branch_id,
         "tick": 0,
@@ -464,6 +540,16 @@ def initial_living_society(
         "inhabitants": inhabitants,
         "relationships": relationships,
     }
+
+
+def _position_shift(dest: dict[str, Any], index: int, routine: RoutineModel) -> tuple[int, int]:
+    """When a workplace's position ``index`` starts work and for how long: the shift its use class
+    names for that position in turn, or the premises' one shift where it names none."""
+    use = routine.use_classes.get(dest["use_class"]) if dest["use_class"] else None
+    if use is None or not use.shifts:
+        return dest["shift"]["start_minute"], dest["shift"]["minutes"]
+    shift = routine.shifts[use.shifts[index % len(use.shifts)]]
+    return shift.start_minute, shift.minutes
 
 
 def living_places_follow(previous_place: LivingPlace, current_place: LivingPlace) -> None:
@@ -500,15 +586,23 @@ def advance_living_society(
     places: Sequence[LivingPlace],
     routine: RoutineModel,
     choices: ChoiceSource | None = None,
+    *,
+    acting_first: Sequence[str] = (),
 ) -> tuple[dict[str, Any], tuple[SocietyEvent, ...]]:
     """Consume the current place and every queued successor, then take one simulated minute.
 
     ``choices`` names who answers each inhabitant's next choice. Left unset it is
     ``DeterministicChoices``. ``tests/test_society_choice_seam.py`` holds the resulting tick to a
-    state digest.
+    state digest. ``acting_first`` names the people who act before everybody else this minute, in
+    order: those a chosen model decided for, so what the model chose is still there when they
+    act. Everybody else acts in ordinal order, as always; with nobody first nothing changes.
     """
     choices = DeterministicChoices() if choices is None else choices
-    _require(state.get("profile") == LIVING_PROFILE, "unsupported living society profile")
+    _require(
+        isinstance(state.get("profile"), str)
+        and society_engine(state["profile"]).state_family == "living",
+        "unsupported living society profile",
+    )
     _require(state["seed_sha256"] == seed, "society seed lineage mismatch")
     _require(state["routine"] == routine.binding(), "society was built under another routine")
     _require(bool(places), "the current place is required")
@@ -546,7 +640,7 @@ def advance_living_society(
         document = {
             "summary": summary,
             "synthetic": True,
-            "profile": LIVING_PROFILE,
+            "profile": state["profile"],
             "branch_id": result["branch_id"],
             "subject_id": person["id"],
             "tick": tick,
@@ -566,9 +660,9 @@ def advance_living_society(
             "previous_state_sha256": previous_digest,
             "seed_sha256": seed,
         }
-        # Only a run that consulted something records who chose. A run on the rule alone writes
-        # events without a decision field, byte for byte, which is what lets every stored
-        # history keep verifying.
+        # Only a run that consulted something, or a choice something other than the rule made,
+        # records who chose. A run on the rule alone writes events without a decision field, byte
+        # for byte, which is what lets every stored history keep verifying.
         if "decision" in detail:
             document["decision"] = detail["decision"]
         identity = uuid.uuid5(
@@ -630,16 +724,7 @@ def advance_living_society(
     result["input_seq"] = current.document["source"]["input_seq"]
     result["input_sha256"] = current.document["source"]["document_sha256"]
 
-    spot_holder: dict[str, str] = {}
-    visitors: dict[str, int] = {}
-    for person in result["inhabitants"]:
-        held = person["reservation"]
-        if held is None:
-            continue
-        if held["kind"] == "spot":
-            spot_holder[held["id"]] = person["id"]
-        elif held["kind"] == "visitor":
-            visitors[held["id"]] = visitors.get(held["id"], 0) + 1
+    spot_holder, visitors = _reservations(result)
 
     def release(person: dict) -> None:
         held = person["reservation"]
@@ -649,7 +734,20 @@ def advance_living_society(
             visitors[held["id"]] -= 1
         person["reservation"] = None
 
-    for person in result["inhabitants"]:
+    # Premises that keep hours admit visitors only while one of their workers is there, as the
+    # minute begins.
+    admitting = _admitting(current, routine, minute, _staffed(result, routine))
+    by_id = {person["id"]: person for person in result["inhabitants"]}
+    _require(
+        len(set(acting_first)) == len(acting_first)
+        and all(subject in by_id for subject in acting_first),
+        "who acts first is named once each, among this society's people",
+    )
+    leading = set(acting_first)
+    acting = [by_id[subject] for subject in acting_first] + [
+        person for person in result["inhabitants"] if person["id"] not in leading
+    ]
+    for person in acting:
         for key in person["needs"]:
             person["needs"][key] = min(1000, person["needs"][key] + routine.needs[key].growth)
         if not current.available:
@@ -681,13 +779,27 @@ def advance_living_society(
             continue
         if person["route"] is None:
             pool = _options(
-                person, current, routine, seed, tick, minute, day, spot_holder, visitors
+                person, current, routine, seed, tick, minute, day, spot_holder, visitors, admitting
             )
             decision = choices.decide(
                 partial(_question, person, pool, tick, minute, day),
                 partial(_from_options, pool),
             )
             chosen = decision.outcome
+            if chosen is WAIT:
+                # Somebody other than the rule chose to wait: this minute they stay where they
+                # are, and they choose again the next. The engine records no event of its own for
+                # it: the receipt that chose it is recorded as its own event
+                # (``decision_applied``), the one kind of event a model's choice adds.
+                person["action"] = {
+                    "kind": "idle",
+                    "status": "active",
+                    "destination_id": None,
+                    "remaining_ticks": 0,
+                    "reason": "waiting_a_minute",
+                }
+                person["blocked_key"] = None
+                continue
             if isinstance(chosen, str):
                 block(person, chosen)
                 continue
@@ -697,7 +809,7 @@ def advance_living_society(
             _plan(person, current, activity, target, because)
             person["blocked_key"] = None
             detail = {"because": because}
-            if choices.records:
+            if choices.records or decision.decided_by != RULE:
                 detail["decision"] = decision.recorded()
             emit(person, "goal_selected", person["goal"]["reason"], "goal_selected", detail)
         crossings = _walk(person, current, routine)
@@ -719,6 +831,65 @@ def advance_living_society(
                 {"crossings": crossings},
             )
     return result, tuple(events)
+
+
+def at_living_choice_point(person: dict[str, Any]) -> bool:
+    """Whether the rule chooses for this person in the coming minute: nothing is under way for
+    them (no route, and no activity whose stay is running), so the minute asks who chooses."""
+    action = person["action"]
+    return person["route"] is None and (action["status"] != "active" or action["kind"] == "idle")
+
+
+def _reservations(state: dict[str, Any]) -> tuple[dict[str, str], dict[str, int]]:
+    """Who holds each standing spot, and how many visitors each destination holds, in a state."""
+    spot_holder: dict[str, str] = {}
+    visitors: dict[str, int] = {}
+    for person in state["inhabitants"]:
+        held = person["reservation"]
+        if held is None:
+            continue
+        if held["kind"] == "spot":
+            spot_holder[held["id"]] = person["id"]
+        elif held["kind"] == "visitor":
+            visitors[held["id"]] = visitors.get(held["id"], 0) + 1
+    return spot_holder, visitors
+
+
+def next_minute_options(
+    state: dict[str, Any],
+    seed: str,
+    place: LivingPlace,
+    routine: RoutineModel,
+    subject_id: str,
+) -> list[tuple[str, Activity, dict[str, Any], str]]:
+    """The engine's own answer set for this person in the coming minute, were they first to act.
+
+    The rows the rule picks from, each as its activity's key, the activity, the target it picks
+    and why, built by the same code the minute runs, over ``place`` (the place the minute
+    consumes last) with the person's needs grown by one minute. Empty where the rule will not
+    choose for them in that minute or the place cannot be walked. People a chosen model decided
+    for act first in the minute (:func:`advance_living_society`'s ``acting_first``), so what is
+    offered here is what their turn finds unless somebody decided for before them takes it.
+    """
+    person = next((p for p in state["inhabitants"] if p["id"] == subject_id), None)
+    _require(person is not None, "the subject is not one of this society's people")
+    assert person is not None
+    if not at_living_choice_point(person) or not place.available:
+        return []
+    if not _location_valid(person, place):
+        return []
+    tick = state["tick"] + 1
+    absolute = state["clock"]["start_minute_of_day"] + tick
+    minute, day = absolute % MINUTES_PER_DAY, absolute // MINUTES_PER_DAY
+    ahead = _clone(person)
+    for key in ahead["needs"]:
+        ahead["needs"][key] = min(1000, ahead["needs"][key] + routine.needs[key].growth)
+    spot_holder, visitors = _reservations(state)
+    admitting = _admitting(place, routine, minute, _staffed(state, routine))
+    pool = _options(
+        ahead, place, routine, seed, tick, minute, day, spot_holder, visitors, admitting
+    )
+    return [(key, activity, pick, because) for _, key, activity, pick, because in pool]
 
 
 def _location_valid(person: dict, place: LivingPlace) -> bool:
@@ -829,6 +1000,7 @@ def _options(
     day: int,
     spot_holder: dict,
     visitors: dict,
+    admitting: frozenset[str] | None = None,
 ) -> list[_OptionRow]:
     """Every activity this inhabitant can act on now, the pressing ones alone when any press.
 
@@ -883,7 +1055,15 @@ def _options(
         # The shortage is deliberately discarded: v4 cannot record it (see this function's
         # docstring).
         targets, _shortage = _targets(
-            person, place, activity, paths, here_spot, here_dest, spot_holder, visitors
+            person,
+            place,
+            activity,
+            paths,
+            here_spot,
+            here_dest,
+            spot_holder,
+            visitors,
+            admitting,
         )
         if not targets:
             continue
@@ -932,6 +1112,44 @@ def _choose(
     )
 
 
+def _staffed(state: dict[str, Any], routine: RoutineModel) -> frozenset[str] | None:
+    """The workplaces one of whose workers is at work there, or None under a routine whose use
+    classes keep no hours, where nobody asks."""
+    if not routine.keeps_hours:
+        return None
+    return frozenset(
+        p["action"]["destination_id"]
+        for p in state["inhabitants"]
+        if p["action"]["kind"] in routine.activities
+        and routine.activities[p["action"]["kind"]].mode == "shift"
+        and p["action"]["status"] == "active"
+    )
+
+
+def _admitting(
+    place: LivingPlace, routine: RoutineModel, minute: int, staffed: frozenset[str] | None
+) -> frozenset[str] | None:
+    """The destinations that admit a visitor this minute, or None where every one does.
+
+    Under a routine whose use classes keep hours (a town's), a destination of such a use class
+    admits visitors inside its opening hours, and a workplace only while one of its workers is at
+    work there; a destination of no use class, or of one that states no hours, admits them as
+    always, by its activity's own window alone.
+    """
+    if staffed is None:
+        return None
+    admitting = set()
+    for dest_id, dest in place.destinations.items():
+        use = routine.use_classes.get(dest["use_class"]) if dest["use_class"] else None
+        if (
+            use is None
+            or use.opening is None
+            or (use.open_at(minute) and (not use.staff_per_unit or dest_id in staffed))
+        ):
+            admitting.add(dest_id)
+    return frozenset(admitting)
+
+
 def _targets(
     person: dict,
     place: LivingPlace,
@@ -941,6 +1159,7 @@ def _targets(
     here_dest: str | None,
     spot_holder: dict,
     visitors: dict,
+    admitting: frozenset[str] | None = None,
 ) -> tuple[list[dict], str | None]:
     """Every target this activity could take now, and when there are none, which shortage it is.
 
@@ -1003,11 +1222,14 @@ def _targets(
         return rows, None if rows else _shortage(
             "standing spot", out_of_reach, taken_spots, already_here
         )
-    offered = out_of_reach = no_room = already_here = 0
+    offered = out_of_reach = no_room = already_here = closed = 0
     for dest_id, dest in sorted(place.destinations.items()):
         if activity.affordance not in dest["affordances"]:
             continue
         offered += 1
+        if admitting is not None and dest_id not in admitting:
+            closed += 1
+            continue
         # Somewhere this person is already standing, and somewhere with no room, are both places
         # that offer this: only the count of destinations OFFERING it may decide whether the
         # place publishes any. A person in the only cafe wanting a meal is the first case, and
@@ -1059,11 +1281,13 @@ def _targets(
     if not offered:
         return [], f"this place publishes nowhere that offers {activity.affordance}"
     return [], _shortage(
-        f"place that offers {activity.affordance}", out_of_reach, no_room, already_here
+        f"place that offers {activity.affordance}", out_of_reach, no_room, already_here, closed
     )
 
 
-def _shortage(what: str, out_of_reach: int, no_room: int, already_here: int = 0) -> str:
+def _shortage(
+    what: str, out_of_reach: int, no_room: int, already_here: int = 0, closed: int = 0
+) -> str:
     """Why no target of this kind is open, naming every cause that got this far.
 
     Every non-zero count is stated, because a person kept indoors by a full street, one kept
@@ -1078,6 +1302,8 @@ def _shortage(what: str, out_of_reach: int, no_room: int, already_here: int = 0)
         causes.append(f"{no_room} {'has' if no_room == 1 else 'have'} no room")
     if already_here:
         causes.append(f"this person is already at {already_here}")
+    if closed:
+        causes.append(f"{closed} {'is' if closed == 1 else 'are'} closed")
     if not causes:
         return f"this place publishes no {what}"
     return f"no {what} is open to this person: {', '.join(causes)}"

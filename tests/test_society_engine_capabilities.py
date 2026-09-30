@@ -36,16 +36,16 @@ IDENTITY_COMPARISONS: dict[str, tuple[int, str]] = {
         "definition and the state it reads are that engine's",
     ),
     "exulanica/world/society_legacy.py": (1, "the first engine checks its own state"),
-    "exulanica/world/society_living.py": (1, "the living engine checks its own state"),
     "exulanica/world/society_planner.py": (1, "the purposeful engine checks its own state"),
     "exulanica/world/society_presence.py": (
         1,
         "the purposeful engine's own presence transition checks its state and seed",
     ),
     "exulanica/world/society_repository.py": (
-        7,
-        "creation dispatches to each engine's own initializer (three), and the retired v3 "
-        "engine's social block is read and advanced by that engine's own functions (four)",
+        6,
+        "creation dispatches to the purposeful and social engines' own initializers (two), and "
+        "the retired v3 engine's social block is read and advanced by that engine's own "
+        "functions (four)",
     ),
     "exulanica/world/society_social.py": (1, "the social engine checks its own state"),
 }

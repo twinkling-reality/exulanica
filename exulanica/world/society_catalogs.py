@@ -80,10 +80,14 @@ __all__ = [
     "LEGACY_IDENTITY_CATALOG",
     "LEGACY_IDENTITY_DIGESTS",
     "PERSON_SCORE_CATALOG",
+    "POLICY_KEYS_BY_VERSION",
     "PURPOSEFUL_CATALOG",
     "PURPOSEFUL_ROUTINE_VERSIONS",
+    "ROUTINE_CATALOG_SETS",
     "ROUTINE_DIRECTORY",
     "ROUTINE_VERSIONS",
+    "SHIFT_CATALOG",
+    "TOWN_ROUTINE_VERSIONS",
     "UNRECORDED_ROUTINE_VERSIONS",
     "Activity",
     "ActivityKind",
@@ -94,6 +98,7 @@ __all__ = [
     "PurposefulActivity",
     "PurposefulRoutine",
     "RoutineModel",
+    "Shift",
     "UseClass",
     "check_object_kinds",
     "legacy_identity",
@@ -116,6 +121,25 @@ ROUTINE_VERSIONS: Final = {
     "society-policy": 1,
     "society-use-class": 1,
 }
+#: The catalog of the shifts a workplace's positions work, which a town's routine reads beside the
+#: others: a use class names the shifts its positions take in turn.
+SHIFT_CATALOG: Final = "society-shift"
+#: The catalog versions a new town's living society reads (``exulanica-society/v5``): the living
+#: routine with each workplace's opening hours and the shifts its positions work
+#: (``society-use-class`` v2 over ``society-shift`` v1), and a policy that employs a share of the
+#: town's residents and starts its day early (``society-policy`` v2). A town's input records the
+#: versions its living place was built under, and its society reads them from there.
+TOWN_ROUTINE_VERSIONS: Final = {
+    "society-activity": 1,
+    "society-capacity": 1,
+    "society-need": 1,
+    "society-policy": 2,
+    SHIFT_CATALOG: 1,
+    "society-use-class": 2,
+}
+#: Every set of catalogs one living routine reads: a district's, and a town's, which adds the
+#: shifts its use classes name.
+ROUTINE_CATALOG_SETS: Final = (frozenset(ROUTINE_VERSIONS), frozenset(TOWN_ROUTINE_VERSIONS))
 #: The one catalog the purposeful society's routine reads.
 PURPOSEFUL_CATALOG: Final = "society-purposeful-activity"
 #: The purposeful routine a saved world's new input records: people stay a while, varied, at what
@@ -212,6 +236,12 @@ POLICY_KEYS: Final = frozenset(
         "walk_speed_minimum_mm_per_tick",
     }
 )
+#: The policy keys each version of the policy catalog states, compared for exact equality as
+#: :data:`POLICY_KEYS` is: the second adds the share of a town's residents who hold a job.
+POLICY_KEYS_BY_VERSION: Final = {
+    1: POLICY_KEYS,
+    2: POLICY_KEYS | {"employment_share_milli"},
+}
 
 
 def _key(where: str, value: object) -> FieldValue:
@@ -359,7 +389,7 @@ def _sha256_text(where: str, value: object) -> FieldValue:
     return value
 
 
-def _use_class_bounds(where: str, values: dict[str, FieldValue]) -> None:
+def _use_class_kind_bounds(where: str, values: dict[str, FieldValue]) -> None:
     kind = values["kind"]
     if (kind == "workplace") != (values["staff_per_unit"] != 0):
         raise CatalogError(f"{where}: exactly the workplaces have staff")
@@ -367,8 +397,33 @@ def _use_class_bounds(where: str, values: dict[str, FieldValue]) -> None:
         raise CatalogError(f"{where}: workplaces and homes name a role, furniture does not")
     if (kind == "residential") != (values["resident_capacity"] != 0):
         raise CatalogError(f"{where}: exactly the residential units house residents")
-    if kind == "workplace" and values["shift_minutes"] == 0:
+
+
+def _use_class_bounds(where: str, values: dict[str, FieldValue]) -> None:
+    _use_class_kind_bounds(where, values)
+    if values["kind"] == "workplace" and values["shift_minutes"] == 0:
         raise CatalogError(f"{where}: a workplace declares its shift")
+
+
+def _shift_keys(where: str, value: object) -> FieldValue:
+    """The shifts a use class's positions take in turn, by the shift catalog's keys; a key may
+    repeat, since two positions may work one shift."""
+    if not isinstance(value, list) or not all(
+        type(v) is str and KEY_PATTERN.fullmatch(v) for v in value
+    ):
+        raise CatalogError(f"{where} lists shift keys")
+    return tuple(value)
+
+
+def _use_class_v2_bounds(where: str, values: dict[str, FieldValue]) -> None:
+    """A second-version use class states its opening hours and, exactly for a workplace, the
+    shifts its positions work; a closing minute before the opening one wraps past midnight, and an
+    opening minute equal to the closing one is refused, since it says neither always nor never."""
+    _use_class_kind_bounds(where, values)
+    if (values["kind"] == "workplace") != bool(values["shifts"]):
+        raise CatalogError(f"{where}: exactly a workplace names the shifts its positions work")
+    if values["opening_minute"] == values["closing_minute"]:
+        raise CatalogError(f"{where}: opening and closing minutes differ; 0 to 1440 is always")
 
 
 #: Every schema the society reads, keyed by catalog id and version. A version a stored society
@@ -434,11 +489,43 @@ SCHEMAS: Final[dict[tuple[str, int], CatalogSchema]] = {
         ),
         entry_check=_use_class_bounds,
     ),
-    ("society-policy", 1): CatalogSchema(
-        "society-policy",
-        1,
-        (("value", integer_field(0, 10**9)), ("reason", text_field)),
+    ("society-use-class", 2): CatalogSchema(
+        "society-use-class",
+        2,
+        (
+            ("label", text_field),
+            ("kind", _choice(USE_CLASS_KINDS)),
+            ("role_key", _key),
+            ("role_label", text_field),
+            ("staff_per_unit", integer_field(0, 4096)),
+            ("visitor_capacity", integer_field(0, 4096)),
+            ("resident_capacity", integer_field(0, 4096)),
+            ("visitor_affordances", key_list_field),
+            ("opening_minute", _MINUTE),
+            ("closing_minute", _MINUTE),
+            ("shifts", _shift_keys),
+            ("reason", text_field),
+        ),
+        entry_check=_use_class_v2_bounds,
     ),
+    (SHIFT_CATALOG, 1): CatalogSchema(
+        SHIFT_CATALOG,
+        1,
+        (
+            ("label", text_field),
+            ("start_minute", integer_field(0, MINUTES_PER_DAY - 1)),
+            ("minutes", _TICKS),
+            ("reason", text_field),
+        ),
+    ),
+    **{
+        ("society-policy", version): CatalogSchema(
+            "society-policy",
+            version,
+            (("value", integer_field(0, 10**9)), ("reason", text_field)),
+        )
+        for version in (1, 2)
+    },
     **{
         (PURPOSEFUL_CATALOG, version): CatalogSchema(
             PURPOSEFUL_CATALOG,
@@ -608,8 +695,34 @@ class UseClass:
     visitor_capacity: int
     resident_capacity: int
     visitor_affordances: tuple[str, ...]
+    #: The shift the use class's first position works, which a place records as its shift.
     shift_start: int
     shift_minutes: int
+    #: When it admits visitors, as minutes of the day, or None where its catalog version states
+    #: no hours: then its activity's own window is the only one.
+    opening: tuple[int, int] | None = None
+    #: The shifts its positions work in turn, by the shift catalog's keys; empty where its
+    #: catalog version names none, and every position works :attr:`shift_start`.
+    shifts: tuple[str, ...] = ()
+
+    def open_at(self, minute: int) -> bool:
+        """Whether its hours admit a visitor at this minute of the day; hours may wrap midnight."""
+        if self.opening is None:
+            return True
+        start, end = self.opening
+        if start == 0 and end == MINUTES_PER_DAY:
+            return True
+        if start <= end:
+            return start <= minute < end
+        return minute >= start or minute < end
+
+
+@dataclass(frozen=True, slots=True)
+class Shift:
+    key: str
+    label: str
+    start_minute: int
+    minutes: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -621,6 +734,14 @@ class RoutineModel:
     policy: Mapping[str, int]
     versions: Mapping[str, int]
     sha256: str
+    #: The shifts its use classes name; empty for a routine that reads no shift catalog.
+    shifts: Mapping[str, Shift] = field(default_factory=dict)
+
+    @property
+    def keeps_hours(self) -> bool:
+        """Whether its premises admit visitors by their own hours while a worker is there: a
+        routine whose use classes state opening hours."""
+        return any(use.opening is not None for use in self.use_classes.values())
 
     def binding(self) -> dict[str, object]:
         """What a society records about the model it was advanced under."""
@@ -757,8 +878,11 @@ def load_routine_model(
     society reads. A stored society passes the versions it recorded.
     """
     chosen = dict(ROUTINE_VERSIONS if versions is None else versions)
-    if set(chosen) != set(ROUTINE_VERSIONS):
-        raise CatalogError(f"a routine model reads exactly {sorted(ROUTINE_VERSIONS)}")
+    if frozenset(chosen) not in ROUTINE_CATALOG_SETS:
+        raise CatalogError(
+            "a routine model reads exactly one of "
+            f"{[sorted(catalogs) for catalogs in ROUTINE_CATALOG_SETS]}"
+        )
     for catalog_id, version in sorted(chosen.items()):
         if (catalog_id, version) not in SCHEMAS:
             raise CatalogError(f"{catalog_id} v{version} has no schema")
@@ -816,6 +940,15 @@ def load_routine_model(
         if (rule.rule == "use_class") != (rule.capacity == 0):
             raise CatalogError(f"capacity {rule.key}: only use-class rules defer their capacity")
     affordances = {a.affordance for a in activities.values() if a.setting == "destination"}
+    shifts = {
+        key: Shift(
+            key,
+            str(v["label"]),
+            int(v["start_minute"]),  # type: ignore[arg-type]
+            int(v["minutes"]),  # type: ignore[arg-type]
+        )
+        for key, v in by_id.get(SHIFT_CATALOG, {}).items()
+    }
     use_classes = {}
     for key, v in by_id["society-use-class"].items():
         offered = tuple(v["visitor_affordances"])  # type: ignore[arg-type]
@@ -823,6 +956,16 @@ def load_routine_model(
             raise CatalogError(f"use class {key} offers an affordance no activity uses")
         if bool(offered) != (v["visitor_capacity"] != 0):
             raise CatalogError(f"use class {key}: visitors need both a capacity and an affordance")
+        named = tuple(v.get("shifts", ()))  # type: ignore[arg-type]
+        if not set(named) <= set(shifts):
+            raise CatalogError(f"use class {key} names a shift the shift catalog does not state")
+        if named:
+            # The first position's shift is the one a place records for the premises.
+            first = shifts[named[0]]
+            start, minutes = first.start_minute, first.minutes
+        else:
+            start = int(v.get("shift_start_minute", 0))  # type: ignore[arg-type]
+            minutes = int(v.get("shift_minutes", 0))  # type: ignore[arg-type]
         use_classes[key] = UseClass(
             key,
             str(v["label"]),
@@ -833,12 +976,21 @@ def load_routine_model(
             int(v["visitor_capacity"]),  # type: ignore[arg-type]
             int(v["resident_capacity"]),  # type: ignore[arg-type]
             offered,
-            int(v["shift_start_minute"]),  # type: ignore[arg-type]
-            int(v["shift_minutes"]),  # type: ignore[arg-type]
+            start,
+            minutes,
+            opening=(
+                (int(v["opening_minute"]), int(v["closing_minute"]))  # type: ignore[arg-type]
+                if "opening_minute" in v
+                else None
+            ),
+            shifts=named,
         )
     policy = {key: int(v["value"]) for key, v in by_id["society-policy"].items()}  # type: ignore[arg-type]
-    if set(policy) != POLICY_KEYS:
-        raise CatalogError(f"the policy catalog holds exactly {sorted(POLICY_KEYS)}")
+    policy_keys = POLICY_KEYS_BY_VERSION[chosen["society-policy"]]
+    if set(policy) != policy_keys:
+        raise CatalogError(f"the policy catalog holds exactly {sorted(policy_keys)}")
+    if not 0 < policy.get("employment_share_milli", 1000) <= 1000:
+        raise CatalogError("the employment share is a positive share of residents, at most 1000")
     if not 0 < policy["occupancy_target_milli"] <= policy["occupancy_maximum_milli"] <= 1000:
         raise CatalogError("occupancy target is positive and at most the maximum, at most 1000")
     if not 0 < policy["walk_speed_minimum_mm_per_tick"] <= policy["walk_speed_maximum_mm_per_tick"]:
@@ -857,6 +1009,7 @@ def load_routine_model(
         policy=policy,
         versions=chosen,
         sha256=catalog_digest(catalogs),
+        shifts=shifts,
     )
 
 

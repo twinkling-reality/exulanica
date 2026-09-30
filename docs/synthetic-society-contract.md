@@ -9,7 +9,7 @@ people is the [decision roles contract](decision-roles-contract.md)'s, how peopl
 [walking movement module](movement-modules-contract.md#walking)'s, and how the app draws them is
 the [character representation contract](character-representation-contract.md#drawing-a-societys-people)'s.
 
-Four engines exist, and the engine table below says which one a new society over each kind of
+Five engines exist, and the engine table below says which one a new society over each kind of
 ground is created with:
 
 - `exulanica-society/v1`, which a creation naming no engine gets, keeps seeded synthetic motion
@@ -23,6 +23,11 @@ ground is created with:
 - `exulanica-society/v4`, the living society, adds catalogued needs and routines, occupancy and a
   population sized to its place. The app creates it over the owned district, which it draws only
   in the development preview.
+- `exulanica-society/v5`, the living town, is the living society over a town generated from a
+  recipe: its people live in the town's homes, a share of them work their workplace's shifts, the
+  rest run errands and keep their leisure while the town's premises are open, and the world's
+  owner may choose a model for a person. A town's society made before this engine keeps its v2
+  society; a new one is the living town ([the living town](#the-living-town-v5)).
 - `exulanica-society/v3`, a bounded social cast that took explicitly requested model proposals, is
   retired: nothing creates one and its proposals are refused, while a stored one reads, advances
   and replays as recorded.
@@ -51,6 +56,7 @@ residents, infer demographic facts or demonstrate general social intelligence.
   - [Persisted playback controls and bounded host progression](#persisted-playback-controls-and-bounded-host-progression)
   - [Server integration and HTTP](#server-integration-and-http)
 - [V4 living society: routines, places and occupancy](#v4-living-society-routines-places-and-occupancy)
+- [The living town (v5)](#the-living-town-v5)
 - [Retired and frozen engines](#retired-and-frozen-engines)
   - [The frozen first engine (v1)](#the-frozen-first-engine-v1)
   - [V3 bounded observations and communication](#v3-bounded-observations-and-communication)
@@ -87,6 +93,9 @@ Implementation:
   `exulanica/world/society_presence.py`;
 - the frozen v1 engine and the fixed tables stored v1 to v3 histories depend on:
   `exulanica/world/society_legacy.py`;
+- the living town: the living society's modules with its input's projection
+  (`place_from_town_input`) and a person's decisions in it,
+  `exulanica/world/society_living_decisions.py`;
 - the v4 living society: `exulanica/world/society_living.py`, its routine catalogs
   `exulanica/world/society_catalogs.py` over `assets/catalogs/society/`, the place contract
   `exulanica/world/society_place.py`, the generated-city place `exulanica/world/society_city_place.py`
@@ -122,8 +131,9 @@ of its people (`owner_model_choice`), whether a comparison of the models that de
 may run it, whether the person whose world it lives in may send its people away, whether it can
 stand on a saved world's own ground, which state shape it writes and how many people it may hold,
 with a reason per row. It also states which engine a new society over each kind of ground is
-created with (`creates`: a district's and a saved world's), which the browser reads rather than
-naming an engine. `model_decisions` means the engine's history may hold validated model decisions,
+created with (`creates`: a district's, a saved world's, and a town's, a saved world whose own
+records state its walking surfaces and homes), which the browser reads rather than naming an
+engine. `model_decisions` means the engine's history may hold validated model decisions,
 which the schema's decision triggers admit; `owner_model_choice` requires it, and a comparison
 requires `owner_model_choice`. `exulanica/world/society_engines.py` reads and checks it, and every
 list of engines derives from it: the runtime's edit hook, the repositories' dispatch and population
@@ -143,6 +153,7 @@ held to this one's rows by a test.
 | `exulanica-society/v2` | yes | yes | yes | yes | yes | yes | yes | no | yes | yes | 1 to 512 |
 | `exulanica-society/v3` | no (retired) | yes | yes | yes | yes | no | no | no | no | yes | 1 to 512 |
 | `exulanica-society/v4` | yes | yes | yes | no | no | no | no | yes | no | no | 1 to 65,536 |
+| `exulanica-society/v5` | yes | yes | yes | no | yes | yes | no | no | no | yes | 1 to 512 |
 
 The browser reads the same file: `pnpm run society-engines:sync` writes it byte for byte, with the
 union of its profiles, into `web/packages/app/src/society-engines.generated.ts`, which
@@ -1317,6 +1328,57 @@ recorded paths and actions
 ([drawing a society's people](character-representation-contract.md#drawing-a-societys-people)).
 The development preview plays a recording made by the real engine over the committed Flatiron
 input (`scripts/record_living_society.py`), with every frame bound to its state digest.
+
+## The living town (v5)
+
+The living town is the living engine (`exulanica/world/society_living.py`) over a saved world whose
+own records state its walking surfaces and homes: a town generated from a recipe. The engine table
+creates it over such a world (`creates.town`); a starter or a world made from photographs keeps the
+purposeful society, and a creation that asks for the living town over a ground that carries no
+homes is refused by name. A town whose society was created before the living town existed keeps
+that v2 society: an engine is immutable for a version's society.
+
+**Its input carries its place.** A town's input is `exulanica.society-input/walking-surfaces-v2`
+(migration 0120): the walking-surfaces-v1 input and, beside it, the living place the town's records
+make under the town's routine, with that routine's catalog versions and digest. The place is the
+city place the input already names among its dependencies, by digest; the living town walks it in
+the input's east and south frame (`place_from_town_input` in `exulanica/world/society_place.py`),
+so its people walk the town's footways, corners, crossings and doors across tile seams, and its
+society replays from its stored inputs, the catalog versions its state records and its stored
+receipts, with nothing regenerated and no model asked. Standing spots within the 2,000 mm arrival
+clearance of where a person arrives are left out of the place, so nobody stands in front of a
+person arriving at any hour; a bench's seats there stay seats. On the largest market town a
+recipe admits, one input is about 775 KB of JSON; the runtime writes one when the society is
+created and one for each edit of the world that changes what the society reads.
+
+**Its day is data.** The town's routine (`TOWN_ROUTINE_VERSIONS` in
+`exulanica/world/society_catalogs.py`) reads the living routine's needs, activities and
+capacities with three catalogs of its own under `assets/catalogs/society/`, each entry with its
+reason: `society-use-class` v2, which states each use class's opening hours and the shifts its
+positions work in turn; `society-shift` v1, the early, day, late and evening shifts; and
+`society-policy` v2, which employs six in ten residents and starts the town's day at 06:00. One
+inhabitant lives in each place in a home the town's premises offer. A seeded share of them takes
+the town's positions workplace-first: every workplace gets one worker, in a seeded order, before
+any gets a second, and each position works the shift its use class names for it. The rest keep
+no job. A premises admits visitors inside its opening hours and only while one of its workers is
+at work there, so a shop is open while it is staffed and a workplace nobody works at stays
+closed. Every use class the city grammar can give a premises (`assets/catalogs/use-class.v1.json`)
+states its hours (`tests/test_society_living_town.py`).
+
+**A model its owner chose decides for a person** through the person role as registered
+([decision roles](decision-roles-contract.md)): at the engine's own choice point, when nothing is
+under way for them, the host asks the chosen model to choose among the engine's own answer set for
+that person in the coming minute, one option for each activity the rule could start at the target
+the rule itself picks, and waiting a minute (`exulanica/world/society_living_decisions.py`). The
+minute applies the stored receipt through the engine's choice seam
+(`AppliedChoices` in `exulanica/world/society_choice.py`): the people a model decided for act
+first, in decision order, each taking what their model chose where their turn still offers it;
+otherwise the rule decides for them and the receipt is recorded as rejected, with the reason. A
+minute with no receipt is the rule's alone. A comparison of models does not run the living town
+(its row states no comparisons); a comparison would step it through `living_step` and
+`LivingSeam` in the same module.
+
+It takes no directed actions, its people are not sent away, and it runs no experiments.
 
 ## Retired and frozen engines
 

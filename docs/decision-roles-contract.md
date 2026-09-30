@@ -71,9 +71,13 @@ names no role: a role's requirements reach it as a `ChosenRoleBinding`, and
 `tests/test_decision_roles.py` scans `exulanica/models` for role names.
 
 The person is the one registered role: key `society_decision`, subject `person`, hosted by the
-purposeful society (`exulanica-society/v2`). Its adapter is `exulanica/world/roles/person.py`, over
-its contract in `exulanica/world/society_decision_contract.py` and its minute in
-`exulanica/world/society_model_decisions.py`. The engines the registry names are held equal to the
+purposeful society (`exulanica-society/v2`) and the living town (`exulanica-society/v5`). Its
+adapter is `exulanica/world/roles/person.py`, over its contract in
+`exulanica/world/society_decision_contract.py` and its minute in
+`exulanica/world/society_model_decisions.py`; a person in a living town is offered the living
+engine's own answer set and applied through its choice seam, in
+`exulanica/world/society_living_decisions.py`, by the state family the engine table states, and
+any other family is refused by name (`person_family_unsupported`). The engines the registry names are held equal to the
 engines whose `owner_model_choice` the engine table states (`tests/test_decision_roles.py`). A role
 declared in test data alone, a traffic signal at a junction (`tests/decision_role_fixtures/`), runs
 through the minute loop, the one hosted ask and replay with a scripted model, and replays with no
@@ -110,12 +114,13 @@ What a role needs as data and one module, with no migration:
 What a role in a world still needs in code, because only the person is built:
 
 - **An engine that hosts it.** Only a stored society holds decisions: the decision tables bind
-  every request and receipt to a society row, and only the purposeful engine's step applies a
-  hosted role's receipts (`apply_receipts`, called from `exulanica/world/society_repository.py`).
-  The binding triggers 0117 restates admit a role's documents only in an `exulanica-society/v2`
-  society, and the retired social profile only in `v3`, so a role another engine hosts needs a
-  migration widening them and that engine's step applying receipts through the generic seam. The
-  living society (`v4`) consumes no receipts. Flight is derived and never stored, and traffic has
+  every request and receipt to a society row, and the purposeful engine's and the living town's
+  steps apply a hosted role's receipts (`apply_receipts`, called from
+  `exulanica/world/society_repository.py`). The binding triggers admit a role's documents only in
+  an `exulanica-society/v2` or `v5` society (migration 0120), and the retired social profile only
+  in `v3`, so a role another engine hosts needs a migration widening them and that engine's step
+  applying receipts through the generic seam. The living society over a district (`v4`) consumes
+  no receipts. Flight is derived and never stored, and traffic has
   no runtime ([movement modules](movement-modules-contract.md#a-model-choosing-for-a-flyer)), so
   neither can host a role.
 - **A route and a panel.** The models route and the People panel serve the one role whose subject

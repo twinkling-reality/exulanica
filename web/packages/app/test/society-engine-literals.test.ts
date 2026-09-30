@@ -17,7 +17,6 @@ const ENGINE_NAME = /['"`]exulanica-society\/v\d+/g;
 
 /** Files that may name an engine, how many times, and why each is not a capability. */
 const NAMED: Readonly<Record<string, readonly [number, string]>> = {
-  'society-api.ts': [1, 'the living state reader types the state it parses as the living engine\'s'],
   'society-preview-presentation.ts': [
     2,
     'the development preview parses a recording the living engine made, and says so of its state',

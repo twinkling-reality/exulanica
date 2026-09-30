@@ -59,9 +59,13 @@ ENGINES_PATH: Final = Path(__file__).with_name("society-engines.v2.json")
 TABLE_PROFILE: Final = "exulanica.society-engines/v2"
 StateFamily = Literal["legacy", "purposeful", "living"]
 _STATE_FAMILIES: Final = ("legacy", "purposeful", "living")
-#: The kinds of ground a new society is created over, each with the engine the table names for it.
-GroundKind = Literal["district", "saved_world"]
-_GROUND_KINDS: Final = ("district", "saved_world")
+#: The kinds of ground a new society is created over, each with the engine the table names for it:
+#: an owned district, a saved world's own ground, and a saved world whose own records state its
+#: walking surfaces and homes (a town generated from a recipe).
+GroundKind = Literal["district", "saved_world", "town"]
+_GROUND_KINDS: Final = ("district", "saved_world", "town")
+#: The grounds that are a saved world's own, whose engine must stand on a saved world.
+_SAVED_WORLD_GROUNDS: Final = ("saved_world", "town")
 _CAPABILITIES: Final = (
     "comparisons",
     "creatable",
@@ -182,8 +186,8 @@ def _creates(document: Any, engines: Mapping[str, SocietyEngine]) -> dict[Ground
         engine = engines.get(row["engine"])
         if engine is None or not engine.creatable:
             raise ValueError(f"creates.{ground} names an engine the table creates with")
-        if ground == "saved_world" and not engine.saved_world:
-            raise ValueError("creates.saved_world names an engine that stands on a saved world")
+        if ground in _SAVED_WORLD_GROUNDS and not engine.saved_world:
+            raise ValueError(f"creates.{ground} names an engine that stands on a saved world")
         created[ground] = engine.engine  # type: ignore[index]
     return created
 

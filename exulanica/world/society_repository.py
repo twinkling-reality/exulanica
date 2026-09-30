@@ -39,16 +39,15 @@ from exulanica.world.society_engines import (
     society_engine,
 )
 from exulanica.world.society_grounds import society_population
-from exulanica.world.society_input_policy import is_authored_ground
+from exulanica.world.society_input_policy import LIVING_INPUTS, is_authored_ground
 from exulanica.world.society_legacy import advance_society, initial_society
 from exulanica.world.society_living import (
-    LIVING_PROFILE,
-    advance_living_society,
-    current_routine,
     initial_living_society,
+    input_routine,
     living_places,
     routine_for,
 )
+from exulanica.world.society_living_decisions import LivingSeam, living_step
 from exulanica.world.society_planner import (
     PURPOSEFUL_PROFILE,
     advance_purposeful_society,
@@ -225,6 +224,16 @@ class SocietyRepository:
                     # of its place. A saved world's ground states a flat rectangle and none of
                     # those, so this refuses rather than publishing a place of empty answers.
                     raise ValueError(f"{profile} has no place contract for an authored ground")
+                if (
+                    engine.state_family == "living"
+                    and is_authored_ground(initial_input["profile"])
+                    and initial_input["profile"] not in LIVING_INPUTS
+                ):
+                    # A living society over a saved world walks the living place its input
+                    # carries: a town's. A ground that carries none states no homes to live in.
+                    raise ValueError(
+                        f"{profile} stands on a saved world whose input carries its homes"
+                    )
                 self._validate_scope(version_id, initial_input)
                 self._authorize(initial_input)
                 # A saved world's own ground holds the population its entry in the society ground
@@ -235,11 +244,21 @@ class SocietyRepository:
                     if is_authored_ground(initial_input["profile"])
                     else SOCIETY_POPULATION
                 )
-                if profile == LIVING_PROFILE:
-                    routine = current_routine()
+                if engine.state_family == "living":
+                    routine = input_routine(initial_input)
                     [place] = living_places([initial_input], routine)
                     state = initial_living_society(
-                        society_id, seed, place, routine, branch_id=str(version_id)
+                        society_id,
+                        seed,
+                        place,
+                        routine,
+                        branch_id=str(version_id),
+                        # A town's people are its homes' residents, bounded by its ground's rule;
+                        # a district's population is sized to its place.
+                        population=(
+                            population if is_authored_ground(initial_input["profile"]) else None
+                        ),
+                        profile=profile,
                     )
                 elif profile == SOCIAL_PROFILE:
                     state = initial_social_society(
@@ -548,9 +567,26 @@ class SocietyRepository:
                 inputs = self._pending_inputs(row)
                 self._authorize(inputs[-1])
                 routine = routine_for(row["state"])
-                state, events = advance_living_society(
-                    row["state"], row["seed"], living_places(inputs, routine), routine
+                # The choices of every role this engine hosts are receipts asked before this
+                # minute, applied through the living seam; with none, the rule decides for all.
+                roles = decision_roles().hosted_by(row["engine_version"])
+                receipts = (
+                    self._decisions(row, after=self._consumed_decisions(row))
+                    if engine.owner_model_choice
+                    else []
                 )
+                seam, decided = apply_receipts(
+                    roles,
+                    row["state"],
+                    inputs[-1],
+                    receipts,
+                    LivingSeam(row["seed"], living_places(inputs, routine), routine),
+                )
+                state, events = living_step(row["state"], row["seed"], seam)
+                events = append_role_events(
+                    roles, row["state"], state, inputs[-1], receipts, decided, events
+                )
+                processed = [(d.decision_seq, d.disposition) for d in decided]
             elif engine.state_family == "purposeful":
                 inputs = self._pending_inputs(row)
                 # The latest authorized unavailable input must be able to pause the engine
@@ -1005,7 +1041,9 @@ class SocietyRepository:
             return self._snapshot(row) | {"replay_verified": True}
 
     def _replay_living(self, row: dict[str, Any]) -> tuple[dict[str, Any], list[SocietyEvent]]:
-        """Regenerate a v4 society from genesis over every retained input and transition."""
+        """Regenerate a living society from genesis over every retained input, transition and,
+        for an engine whose owner may choose models, every receipt each minute consumed: asked
+        again of nothing, and held to the dispositions the minutes recorded."""
         documents = self._validated_inputs(row)
         with inputs_ahead(self.connection, documents):
             for document in documents:
@@ -1025,6 +1063,14 @@ class SocietyRepository:
             routine,
             branch_id=str(row["version_id"]),
             population=row["state"]["population"]["requested"],
+            profile=row["engine_version"],
+        )
+        engine = society_engine(row["engine_version"])
+        roles = decision_roles().hosted_by(row["engine_version"])
+        role_decisions, role_bindings = (
+            ({d["decision_seq"]: d for d in self._decisions(row)}, self._bindings(row))
+            if engine.owner_model_choice
+            else ({}, {})
         )
         if state["population"]["size"] != row["population_size"]:
             raise ValueError("living society population does not match its genesis")
@@ -1046,8 +1092,23 @@ class SocietyRepository:
             ):
                 raise ValueError("society transition lineage mismatch")
             inputs = documents[transition["from_input_seq"] - 1 : transition["to_input_seq"]]
-            state, events = advance_living_society(
-                state, row["seed"], living_places(inputs, routine, held), routine
+            bindings = role_bindings.get(transition["tick"], [])
+            receipts = [role_decisions[b["decision_seq"]] for b in bindings]
+            previous_state = state
+            seam, decided = apply_receipts(
+                roles,
+                state,
+                inputs[-1],
+                receipts,
+                LivingSeam(row["seed"], living_places(inputs, routine, held), routine),
+            )
+            if [(d.decision_seq, d.disposition) for d in decided] != [
+                (b["decision_seq"], b["disposition"]) for b in bindings
+            ]:
+                raise ValueError("person decision disposition replay mismatch")
+            state, events = living_step(state, row["seed"], seam)
+            events = append_role_events(
+                roles, previous_state, state, inputs[-1], receipts, decided, events
             )
             if (
                 transition["state_sha256"] != society_state_sha256(state)

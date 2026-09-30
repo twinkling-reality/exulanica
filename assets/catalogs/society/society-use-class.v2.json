@@ -1,0 +1,316 @@
+{
+  "schema_version": 1,
+  "catalog_id": "society-use-class",
+  "catalog_version": 2,
+  "entries": [
+    {
+      "key": "bakery",
+      "label": "bakery",
+      "kind": "workplace",
+      "role_key": "baker",
+      "role_label": "baker",
+      "staff_per_unit": 2,
+      "visitor_capacity": 6,
+      "resident_capacity": 0,
+      "visitor_affordances": [
+        "eat",
+        "shop"
+      ],
+      "opening_minute": 390,
+      "closing_minute": 840,
+      "shifts": [
+        "early"
+      ],
+      "reason": "A small bakery: two bakers on the early shift, open 06:30 to 14:00 to the six customers it has room for, half an hour after its bakers arrive.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica living society routine model; see the entry reason"
+      }
+    },
+    {
+      "key": "bench",
+      "label": "bench",
+      "kind": "furniture",
+      "role_key": "none",
+      "role_label": "none",
+      "staff_per_unit": 0,
+      "visitor_capacity": 2,
+      "resident_capacity": 0,
+      "visitor_affordances": [
+        "rest"
+      ],
+      "opening_minute": 0,
+      "closing_minute": 1440,
+      "shifts": [],
+      "reason": "A public bench: two seats, open at every hour, no staff.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica living society routine model; see the entry reason"
+      }
+    },
+    {
+      "key": "bookshop",
+      "label": "bookshop",
+      "kind": "workplace",
+      "role_key": "bookseller",
+      "role_label": "bookseller",
+      "staff_per_unit": 1,
+      "visitor_capacity": 8,
+      "resident_capacity": 0,
+      "visitor_affordances": [
+        "shop",
+        "visit"
+      ],
+      "opening_minute": 570,
+      "closing_minute": 1020,
+      "shifts": [
+        "day"
+      ],
+      "reason": "A bookshop: one bookseller on the day shift, open 09:30 to 17:00 to browsers and buyers.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica living society routine model; see the entry reason"
+      }
+    },
+    {
+      "key": "cafe",
+      "label": "cafe",
+      "kind": "workplace",
+      "role_key": "barista",
+      "role_label": "barista",
+      "staff_per_unit": 2,
+      "visitor_capacity": 12,
+      "resident_capacity": 0,
+      "visitor_affordances": [
+        "eat"
+      ],
+      "opening_minute": 420,
+      "closing_minute": 1200,
+      "shifts": [
+        "early",
+        "late"
+      ],
+      "reason": "A cafe: one barista on the early shift and one on the late, open 07:00 to 20:00 to twelve customers.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica living society routine model; see the entry reason"
+      }
+    },
+    {
+      "key": "grocery",
+      "label": "grocery",
+      "kind": "workplace",
+      "role_key": "grocery_clerk",
+      "role_label": "grocery clerk",
+      "staff_per_unit": 3,
+      "visitor_capacity": 12,
+      "resident_capacity": 0,
+      "visitor_affordances": [
+        "shop"
+      ],
+      "opening_minute": 420,
+      "closing_minute": 1230,
+      "shifts": [
+        "early",
+        "late",
+        "day"
+      ],
+      "reason": "A grocery: three clerks on the early, late and day shifts, open 07:00 to 20:30 to twelve shoppers.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica living society routine model; see the entry reason"
+      }
+    },
+    {
+      "key": "library",
+      "label": "library",
+      "kind": "workplace",
+      "role_key": "librarian",
+      "role_label": "librarian",
+      "staff_per_unit": 2,
+      "visitor_capacity": 20,
+      "resident_capacity": 0,
+      "visitor_affordances": [
+        "visit"
+      ],
+      "opening_minute": 570,
+      "closing_minute": 1020,
+      "shifts": [
+        "day"
+      ],
+      "reason": "A library: two librarians on the day shift, open 09:30 to 17:00 to twenty readers.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica living society routine model; see the entry reason"
+      }
+    },
+    {
+      "key": "office",
+      "label": "office",
+      "kind": "workplace",
+      "role_key": "office_worker",
+      "role_label": "office worker",
+      "staff_per_unit": 8,
+      "visitor_capacity": 0,
+      "resident_capacity": 0,
+      "visitor_affordances": [],
+      "opening_minute": 540,
+      "closing_minute": 1020,
+      "shifts": [
+        "day"
+      ],
+      "reason": "An office: eight workers on the day shift; it takes no visitors, so its hours only say when it is staffed.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica living society routine model; see the entry reason"
+      }
+    },
+    {
+      "key": "pharmacy",
+      "label": "pharmacy",
+      "kind": "workplace",
+      "role_key": "pharmacist",
+      "role_label": "pharmacist",
+      "staff_per_unit": 2,
+      "visitor_capacity": 6,
+      "resident_capacity": 0,
+      "visitor_affordances": [
+        "shop"
+      ],
+      "opening_minute": 570,
+      "closing_minute": 1140,
+      "shifts": [
+        "day",
+        "late"
+      ],
+      "reason": "A pharmacy: one pharmacist on the day shift and one on the late, open 09:30 to 19:00 to six customers.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica living society routine model; see the entry reason"
+      }
+    },
+    {
+      "key": "residential",
+      "label": "home",
+      "kind": "residential",
+      "role_key": "resident",
+      "role_label": "resident",
+      "staff_per_unit": 0,
+      "visitor_capacity": 0,
+      "resident_capacity": 2,
+      "visitor_affordances": [],
+      "opening_minute": 0,
+      "closing_minute": 1440,
+      "shifts": [],
+      "reason": "A dwelling unit housing two residents; nobody works there and nobody visits.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica living society routine model; see the entry reason"
+      }
+    },
+    {
+      "key": "restaurant",
+      "label": "restaurant",
+      "kind": "workplace",
+      "role_key": "cook",
+      "role_label": "cook",
+      "staff_per_unit": 4,
+      "visitor_capacity": 24,
+      "resident_capacity": 0,
+      "visitor_affordances": [
+        "eat"
+      ],
+      "opening_minute": 720,
+      "closing_minute": 1320,
+      "shifts": [
+        "late",
+        "evening"
+      ],
+      "reason": "A restaurant: four cooks alternating the late and evening shifts, open 12:00 to 22:00 to twenty-four diners.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica living society routine model; see the entry reason"
+      }
+    },
+    {
+      "key": "school",
+      "label": "school",
+      "kind": "workplace",
+      "role_key": "teacher",
+      "role_label": "teacher",
+      "staff_per_unit": 6,
+      "visitor_capacity": 0,
+      "resident_capacity": 0,
+      "visitor_affordances": [],
+      "opening_minute": 480,
+      "closing_minute": 960,
+      "shifts": [
+        "day"
+      ],
+      "reason": "A school: six teachers on the day shift; it takes no visitors, so its hours only say when it is staffed.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica living society routine model; see the entry reason"
+      }
+    },
+    {
+      "key": "workshop",
+      "label": "workshop",
+      "kind": "workplace",
+      "role_key": "maker",
+      "role_label": "maker",
+      "staff_per_unit": 3,
+      "visitor_capacity": 2,
+      "resident_capacity": 0,
+      "visitor_affordances": [
+        "shop"
+      ],
+      "opening_minute": 570,
+      "closing_minute": 1020,
+      "shifts": [
+        "day"
+      ],
+      "reason": "A maker's workshop: three makers on the day shift, open 09:30 to 17:00 to two customers at a time.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica living society routine model; see the entry reason"
+      }
+    }
+  ]
+}

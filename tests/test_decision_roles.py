@@ -214,7 +214,7 @@ def test_the_person_is_a_registered_role_read_from_its_catalogs():
     registry = decision_roles()
     person = registry.role("society_decision")
     assert person.adapter.__name__ == f"{ADAPTER_PACKAGE}.person"
-    assert person.engines == ("exulanica-society/v2",)
+    assert person.engines == ("exulanica-society/v2", "exulanica-society/v5")
     assert person.chosen.required_use_cases == ("text",)
     second = person.contract()
     first = person.contract({"society-decision-action": 1, "society-decision-policy": 1})

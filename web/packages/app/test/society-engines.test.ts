@@ -57,13 +57,17 @@ describe('the society engine table', () => {
     expect(engineCreatedOver('district')).toBe(table.creates['district']!.engine);
     const saved = societyEngine(engineCreatedOver('saved_world'));
     expect(saved.creatable && saved.savedWorld).toBe(true);
+    // A town, a saved world whose records state its homes, gets the engine the table names for it.
+    expect(engineCreatedOver('town')).toBe(table.creates['town']!.engine);
+    const town = societyEngine(engineCreatedOver('town'));
+    expect(town.creatable && town.savedWorld && town.stateFamily === 'living').toBe(true);
     expect(SOCIETY_ENGINES.map((engine) => [engine.engine, engine.creatable, engine.ownerModelChoice])).toEqual(
       table.engines.map((row) => [row.engine, row.creatable, row.owner_model_choice]));
   });
 
   it('refuses an engine it does not state, by name', () => {
-    expect(() => societyEngine('exulanica-society/v5')).toThrow('Unknown society engine "exulanica-society/v5"');
-    expect(() => parseSociety(purposeful('exulanica-society/v5', 8))).toThrow('exulanica-society/v5');
+    expect(() => societyEngine('exulanica-society/v9')).toThrow('Unknown society engine "exulanica-society/v9"');
+    expect(() => parseSociety(purposeful('exulanica-society/v9', 8))).toThrow('exulanica-society/v9');
   });
 
   it('reads a v3 society with the purposeful reader, which it could not before', () => {

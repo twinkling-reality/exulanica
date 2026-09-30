@@ -72,13 +72,16 @@ from exulanica.world.society_engines import society_engine
 from exulanica.world.society_input_policy import (
     LEGACY_COMPOSITION,
     LOCAL_INPUT,
+    WALKING_SURFACES_BY_FAMILY,
+    WALKING_SURFACES_COMPOSITION,
+    WALKING_SURFACES_COMPOSITION_V2,
     input_profile,
     is_authored_ground,
 )
 from exulanica.world.society_input_policy import (
     composition_profile as policy_for_input,
 )
-from exulanica.world.society_living import current_routine
+from exulanica.world.society_living import current_routine, town_routine
 from exulanica.world.society_planner import input_sha256, validate_society_input
 from exulanica.world.society_repository import SocietyRepository
 from exulanica.world.society_walking_surfaces import (
@@ -148,11 +151,14 @@ class _ReadFirst:
 @dataclass(frozen=True, slots=True)
 class _TownRead:
     """A generated world's records as its receipt generated them before the asset read lock: the
-    receipt's digest and the place the records make, or the refusal generating them raised."""
+    receipt's digest and the place the records make, under the living routine a district reads
+    and under a town's (the living place a living town's input carries), or the refusal
+    generating them raised."""
 
     receipt_sha256: str | None
     place: Mapping[str, Any] | None
     refusal: str | None
+    living_place: Mapping[str, Any] | None = None
 
 
 #: What a saved world's input says of the edit it follows, not of what its society reads: its
@@ -426,7 +432,8 @@ class SocietyRuntime:
             read.towns[key] = _TownRead(None, None, str(exc))
             return
         place = walking_surfaces_place(ground.place_id, generated.records)
-        read.towns[key] = _TownRead(generated.receipt_sha256, place, None)
+        living = walking_surfaces_place(ground.place_id, generated.records, town_routine())
+        read.towns[key] = _TownRead(generated.receipt_sha256, place, None, living)
 
     def _transaction_read(self, connection: psycopg.Connection) -> _ReadFirst:
         """What this transaction read before the asset read lock; call inside the transaction.
@@ -1061,11 +1068,15 @@ class SocietyRuntime:
         version_id: uuid.UUID,
         place_id: uuid.UUID | None,
         region_id: str,
+        engine: str | None = None,
     ) -> dict:
-        """The first input a new society consumes; ``place_id`` None names a saved world's own."""
+        """The first input a new society consumes; ``place_id`` None names a saved world's own.
+
+        ``engine`` is the engine the society is created with, which says how a world's own
+        walking surfaces are composed for it: the living town reads the living place too."""
         if (session.workspace_id, version_id) not in self._bindings:
             return self._authored_initial_input(
-                connection, session, version_id, place_id, region_id
+                connection, session, version_id, place_id, region_id, engine
             )
         binding = self._binding(session, version_id)
         if place_id != binding.place_id or region_id != binding.region_id:
@@ -1313,8 +1324,13 @@ class SocietyRuntime:
         version: AlternateVersion,
         seq: int,
         read: _ReadFirst,
+        composition: str | None = None,
     ) -> dict:
-        """Compose a saved world's input under the asset read lock, from rows and ``read``."""
+        """Compose a saved world's input under the asset read lock, from rows and ``read``.
+
+        ``composition`` is the composition a world's own walking surfaces are composed under: the
+        purposeful society's, when left out, or the living town's, which also carries the living
+        place; a lattice ground has one composition and names none."""
         registry = json.loads(self._registry_bytes)
         reason = None
         try:
@@ -1362,16 +1378,23 @@ class SocietyRuntime:
                 raise UnavailableSocietyInput(f"the world's records are unreadable: {exc}") from exc
             if digest != town.receipt_sha256:
                 raise UnavailableSocietyInput("the world's receipt changed after it was read")
+            chosen = WALKING_SURFACES_COMPOSITION if composition is None else composition
+            if chosen not in (WALKING_SURFACES_COMPOSITION, WALKING_SURFACES_COMPOSITION_V2):
+                raise UnavailableSocietyInput(
+                    f"no composition {chosen!r} walks a world's own surfaces"
+                )
+            living = chosen == WALKING_SURFACES_COMPOSITION_V2
             return build_walking_surfaces_input(
                 ground=ground,
                 version=version,
-                place=town.place,
+                place=town.living_place if living else town.place,
                 input_seq=seq,
                 dependency_refs=self._authored_refs(binding, ground),
                 availability="available" if reason is None else "unavailable",
                 unavailable_reason=reason,
                 reviewed_affordances=registry,
                 standing=self._standing,
+                living=town_routine() if living else None,
             )
         raise UnavailableSocietyInput(
             f"no society composition walks a {ground.navigation_form!r} ground"
@@ -1384,6 +1407,7 @@ class SocietyRuntime:
         version_id: uuid.UUID,
         place_id: uuid.UUID | None,
         region_id: str,
+        engine: str | None = None,
     ) -> dict:
         with connection.transaction():
             self._lock(connection, session)
@@ -1395,7 +1419,18 @@ class SocietyRuntime:
             self._read_ahead(connection, session, read, composing=binding)
             self._lock_assets(connection, read)
             version = self._authored_version(connection, session, binding)
-            return self._authored_compose(connection, binding, ground, version, 1, read)
+            composition = None
+            if engine is not None and ground.navigation_form == "walking_surfaces":
+                # A world's own walking surfaces are composed as the engine asked for reads them.
+                family = society_engine(engine).state_family
+                composition = WALKING_SURFACES_BY_FAMILY.get(family)
+                if composition is None:
+                    raise UnavailableSocietyInput(
+                        f"no composition of a world's own surfaces is read by a {family} engine"
+                    )
+            return self._authored_compose(
+                connection, binding, ground, version, 1, read, composition
+            )
 
     def _stored_input(
         self,
@@ -1465,7 +1500,16 @@ class SocietyRuntime:
                 if document["input_seq"] != next_seq:
                     raise UnavailableSocietyInput("unpersisted input sequence is not current")
                 expected = self._authored_compose(
-                    connection, binding, ground, version, document["input_seq"], read
+                    connection,
+                    binding,
+                    ground,
+                    version,
+                    document["input_seq"],
+                    read,
+                    # Composed again under its own composition, a town's living one included.
+                    policy_for_input(document["profile"])
+                    if ground.navigation_form == "walking_surfaces"
+                    else None,
                 )
                 if document != expected:
                     raise UnavailableSocietyInput(
@@ -1552,12 +1596,24 @@ class SocietyRuntime:
             self._read_ahead(connection, session, read, composing=binding)
             self._lock_assets(connection, read)
             version = self._authored_version(connection, session, binding)
-            document = self._authored_compose(connection, binding, ground, version, last + 1, read)
             previous = connection.execute(
                 "select document from world_society_input where workspace_id=%s and "
                 "society_id=%s and input_seq=%s",
                 (session.workspace_id, row["society_id"], last),
             ).fetchone()
+            # A society's next input is composed as its last was: a living town's carries its
+            # living place again.
+            document = self._authored_compose(
+                connection,
+                binding,
+                ground,
+                version,
+                last + 1,
+                read,
+                policy_for_input(previous["document"]["profile"])
+                if previous is not None and ground.navigation_form == "walking_surfaces"
+                else None,
+            )
             if previous is not None and _reads_the_same(previous["document"], document):
                 # The edit changed nothing this society reads, such as an object in another
                 # region of the world or a photograph hidden: its people have nothing to notice.

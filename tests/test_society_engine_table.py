@@ -39,7 +39,7 @@ from exulanica.world.society_engines import (
     load_engine_table,
     society_engine,
 )
-from exulanica.world.society_living import LIVING_PROFILE
+from exulanica.world.society_living import LIVING_PROFILE, LIVING_TOWN_PROFILE
 from exulanica.world.society_planner import PURPOSEFUL_PROFILE
 from exulanica.world.society_social import SOCIAL_PROFILE
 
@@ -56,6 +56,7 @@ def test_every_engine_in_the_table_is_implemented_and_every_implementation_is_li
         PURPOSEFUL_PROFILE: "purposeful",
         SOCIAL_PROFILE: "purposeful",
         LIVING_PROFILE: "living",
+        LIVING_TOWN_PROFILE: "living",
     }
     assert {engine.engine: engine.state_family for engine in ENGINES} == implemented
     assert DEFAULT_ENGINE == SOCIETY_ENGINE_VERSION
@@ -66,16 +67,26 @@ def test_each_capability_is_claimed_only_by_engines_that_implement_it():
     # goal-policy seam, model decisions are v2's person decisions over that same seam and v3's
     # stored social proposals, experiments run the living engine.
     assert ACTION_ENGINES == (PURPOSEFUL_PROFILE, SOCIAL_PROFILE)
-    assert DECISION_ENGINES == (PURPOSEFUL_PROFILE, SOCIAL_PROFILE)
-    # Only v2's people take a model their world's owner chose, at the planner's choice points.
-    assert OWNER_MODEL_CHOICE_ENGINES == (PURPOSEFUL_PROFILE,)
+    assert DECISION_ENGINES == (PURPOSEFUL_PROFILE, SOCIAL_PROFILE, LIVING_TOWN_PROFILE)
+    # v2's people take a model their world's owner chose at the planner's choice points, and the
+    # living town's at its engine's own, through its choice seam.
+    assert OWNER_MODEL_CHOICE_ENGINES == (PURPOSEFUL_PROFILE, LIVING_TOWN_PROFILE)
     # v3 is retired: its stored societies read and replay, and nothing new is made with it.
-    assert CREATABLE_ENGINES == (SOCIETY_ENGINE_VERSION, PURPOSEFUL_PROFILE, LIVING_PROFILE)
-    assert CREATES == {"district": LIVING_PROFILE, "saved_world": PURPOSEFUL_PROFILE}
+    assert CREATABLE_ENGINES == (
+        SOCIETY_ENGINE_VERSION,
+        PURPOSEFUL_PROFILE,
+        LIVING_PROFILE,
+        LIVING_TOWN_PROFILE,
+    )
+    assert CREATES == {
+        "district": LIVING_PROFILE,
+        "saved_world": PURPOSEFUL_PROFILE,
+        "town": LIVING_TOWN_PROFILE,
+    }
     assert EXPERIMENT_ENGINES == (LIVING_PROFILE,)
     # A comparison plays the purposeful engine's genesis and minutes with person decisions.
     assert COMPARISON_ENGINES == (PURPOSEFUL_PROFILE,)
-    assert SAVED_WORLD_ENGINES == (PURPOSEFUL_PROFILE, SOCIAL_PROFILE)
+    assert SAVED_WORLD_ENGINES == (PURPOSEFUL_PROFILE, SOCIAL_PROFILE, LIVING_TOWN_PROFILE)
     # Sending people away and bringing them back is the purposeful engine's own transition.
     assert PRESENCE_ENGINES == (PURPOSEFUL_PROFILE,)
     assert LEGACY_ENGINES == (SOCIETY_ENGINE_VERSION,)
@@ -84,10 +95,10 @@ def test_each_capability_is_claimed_only_by_engines_that_implement_it():
 
 
 def test_an_engine_the_table_does_not_state_is_refused_by_name():
-    with pytest.raises(UnknownSocietyEngine, match="exulanica-society/v5"):
-        society_engine("exulanica-society/v5")
-    with pytest.raises(UnknownSocietyEngine, match="exulanica-society/v5"):
-        creatable_engine("exulanica-society/v5")
+    with pytest.raises(UnknownSocietyEngine, match="exulanica-society/v9"):
+        society_engine("exulanica-society/v9")
+    with pytest.raises(UnknownSocietyEngine, match="exulanica-society/v9"):
+        creatable_engine("exulanica-society/v9")
     with pytest.raises(RetiredSocietyEngine, match="exulanica-society/v3 is retired"):
         creatable_engine(SOCIAL_PROFILE)
     assert creatable_engine(PURPOSEFUL_PROFILE).owner_model_choice
@@ -234,14 +245,18 @@ def test_the_population_check_states_each_engine_bounds_from_the_table(repositor
 def test_the_first_table_is_this_one_without_its_new_columns():
     """``society-engines.v1.json`` stays because evaluation records name it; it is held to the
     table, so it never reads as a second statement that disagrees. Reasons are prose and may
-    differ; every capability it states is the current table's."""
+    differ; every capability it states is the current table's, for every engine it states (an
+    engine added after it is the current table's alone)."""
     first = json.loads(ENGINES_PATH.with_name("society-engines.v1.json").read_text("utf-8"))
     current = json.loads(ENGINES_PATH.read_text(encoding="utf-8"))
     assert first["profile"] == "exulanica.society-engines/v1"
     assert first["default_engine"] == current["default_engine"]
     added = {"creatable", "owner_model_choice"}
+    stated = {row["engine"] for row in first["engines"]}
     assert [{k: v for k, v in row.items() if k != "reason"} for row in first["engines"]] == [
-        {k: v for k, v in row.items() if k not in added | {"reason"}} for row in current["engines"]
+        {k: v for k, v in row.items() if k not in added | {"reason"}}
+        for row in current["engines"]
+        if row["engine"] in stated
     ]
 
 

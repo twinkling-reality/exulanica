@@ -45,7 +45,7 @@ from exulanica.world.society_authored_ground import (
     _refused_activity,
     objects_in_region,
 )
-from exulanica.world.society_catalogs import PurposefulRoutine, purposeful_routine
+from exulanica.world.society_catalogs import PurposefulRoutine, RoutineModel, purposeful_routine
 from exulanica.world.society_city_place import place_from_city_records
 from exulanica.world.society_composition import (
     object_dependency_refs,
@@ -61,6 +61,7 @@ from exulanica.world.society_input_policy import (
     NO_AUTHORED_FRAME,
     UNREACHABLE,
     WALKING_SURFACES_COMPOSITION,
+    WALKING_SURFACES_COMPOSITION_V2,
     input_profile,
 )
 from exulanica.world.society_living import current_routine
@@ -177,13 +178,19 @@ def _affordance(destination: Mapping[str, Any]) -> str | None:
     return None
 
 
-def walking_surfaces_place(place_id: str, records: Sequence[object]) -> dict[str, Any]:
+def walking_surfaces_place(
+    place_id: str, records: Sequence[object], routine: RoutineModel | None = None
+) -> dict[str, Any]:
     """The city place a generated world's records make: its walking surfaces, spots, premises and
-    furniture, as the living society reads a city (:func:`place_from_city_records`). The costly
-    half of composing the world's input, so a caller makes it before taking any lock and hands it
-    to :func:`build_walking_surfaces_input`, which does no generation of its own."""
+    furniture, as the living society reads a city (:func:`place_from_city_records`), under
+    ``routine`` (the living routine a new district reads when left out; a town's living input
+    names the routine its place was made under). The costly half of composing the world's input,
+    so a caller makes it before taking any lock and hands it to
+    :func:`build_walking_surfaces_input`, which does no generation of its own."""
     return place_from_city_records(
-        place_id=place_id, records=list(records), routine=current_routine()
+        place_id=place_id,
+        records=list(records),
+        routine=current_routine() if routine is None else routine,
     )
 
 
@@ -208,9 +215,14 @@ def build_walking_surfaces_input(
     reviewed_affordances: Mapping[str, dict[str, Any]],
     standing: StandingPolicy,
     routine: PurposefulRoutine | None = None,
+    living: RoutineModel | None = None,
 ) -> dict[str, Any]:
     """Compose a generated world's input over the walking surfaces its records state, from the
-    place :func:`walking_surfaces_place` made of them for ``ground``."""
+    place :func:`walking_surfaces_place` made of them for ``ground``.
+
+    With ``living``, the living routine ``place`` was made under, the input is a
+    walking-surfaces-v2 input that also carries the place itself, for the living town to walk;
+    without it, the walking-surfaces-v1 input the purposeful society reads."""
     if version_delta_sha256(version) != version.state_sha256:
         raise ValueError("authored delta digest mismatch")
     validate_reviewed_affordances(reviewed_affordances)
@@ -223,7 +235,11 @@ def build_walking_surfaces_input(
     if ground.navigation_form != "walking_surfaces":
         raise ValueError("this composition walks a world's own surfaces")
     chosen = purposeful_routine() if routine is None else routine
-    composition = WALKING_SURFACES_COMPOSITION
+    composition = (
+        WALKING_SURFACES_COMPOSITION if living is None else WALKING_SURFACES_COMPOSITION_V2
+    )
+    if living is not None and place.get("routine_sha256") != living.sha256:
+        raise ValueError("the place was made under another living routine")
     if place.get("place_id") != ground.place_id:
         raise ValueError("the place was made for another ground")
     reason = unavailable_reason
@@ -377,6 +393,11 @@ def build_walking_surfaces_input(
         "routine": chosen.binding(),
         "population": {"rule": "residents", "size": residents},
     }
+    if living is not None:
+        document["living"] = {
+            "routine": living.binding(),
+            "place": dict(place) if reason is None else None,
+        }
     document["document_sha256"] = input_sha256(document)
     validate_society_input(document)
     return document

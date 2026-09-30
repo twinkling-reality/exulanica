@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "catalog_id": "society-shift",
+  "catalog_version": 1,
+  "entries": [
+    {
+      "key": "day",
+      "label": "day shift",
+      "start_minute": 540,
+      "minutes": 480,
+      "reason": "Declared: 09:00 to 17:00, the ordinary office and shop working day, eight hours.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica living society routine model; see the entry reason"
+      }
+    },
+    {
+      "key": "early",
+      "label": "early shift",
+      "start_minute": 360,
+      "minutes": 480,
+      "reason": "Declared: 06:00 to 14:00, the shift that opens a bakery, a cafe or a grocery before the day's first customers, eight hours.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica living society routine model; see the entry reason"
+      }
+    },
+    {
+      "key": "evening",
+      "label": "evening shift",
+      "start_minute": 960,
+      "minutes": 420,
+      "reason": "Declared: 16:00 to 23:00, the shift that serves dinner and closes a restaurant, seven hours.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica living society routine model; see the entry reason"
+      }
+    },
+    {
+      "key": "late",
+      "label": "late shift",
+      "start_minute": 780,
+      "minutes": 480,
+      "reason": "Declared: 13:00 to 21:00, the shift that takes over from the early one and keeps a shop open into the evening, eight hours.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica living society routine model; see the entry reason"
+      }
+    }
+  ]
+}

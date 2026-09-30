@@ -37,13 +37,16 @@ actions. People and ticks are not counted here because they belong to the run, n
 from __future__ import annotations
 
 from collections import Counter
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Any, ClassVar, Final, Protocol
 
 __all__ = [
     "MODEL",
     "RULE",
+    "WAIT",
+    "WAIT_KEY",
+    "AppliedChoices",
     "ChoiceAnswer",
     "ChoiceCounters",
     "ChoiceDecision",
@@ -65,6 +68,19 @@ MODEL: Final = "model"
 
 #: Confidence is milli, like every other fraction in the society, so no float reaches a digest.
 CONFIDENCE_SCALE: Final = 1000
+
+
+class _Waiting:
+    """The outcome of a choice to wait a minute where one is: nothing the rule itself returns."""
+
+    def __repr__(self) -> str:
+        return "WAIT"
+
+
+#: What a choice source returns when whoever chose, never the rule, chose to wait this minute.
+WAIT: Final = _Waiting()
+#: How a choice to wait is named where an option key would be: no option key holds no ``|``.
+WAIT_KEY: Final = "wait"
 
 #: The only option fields a provider is ever shown. Generated world state, and nothing else.
 _SHOWN_OPTION_KEYS: Final = (
@@ -328,6 +344,76 @@ class ModelChoices:
                 answered_outside_the_set=answer is not None and taken is None,
                 provider_silent=answer is None and bool(asked.options),
             )
+        if self.counters is not None:
+            self.counters.record(decision)
+        return decision
+
+
+@dataclass(frozen=True, slots=True)
+class AppliedChoices:
+    """What chosen models chose before the minute, applied where the engine still offers it.
+
+    ``chosen`` maps a person's ordinal to the activity and option key a model chose from the
+    engine's own answer set, or to :data:`WAIT_KEY`. Their choice is taken when their turn comes
+    and the engine's answer set for them still holds that activity at that option; otherwise the
+    rule decides, and ``refused`` says why, by ordinal. Everybody else is the rule's. Holds no
+    provider and calls none: the choices were asked and recorded before the minute, so a replay
+    that reads the same receipts makes the same minute. Only what a model chose is recorded on an
+    event (``records`` is false), so a minute of the rule alone writes its events byte for byte.
+    """
+
+    chosen: Mapping[int, tuple[str, str] | str]
+    counters: ChoiceCounters | None = None
+    records: ClassVar[bool] = False
+    taken: set[int] = field(default_factory=set, compare=False)
+    refused: dict[int, str] = field(default_factory=dict, compare=False)
+
+    def decide(
+        self,
+        question: Callable[[], ChoiceQuestion],
+        deterministic: Callable[[], Any],
+    ) -> ChoiceDecision:
+        asked = question()
+        wanted = self.chosen.get(asked.subject_ordinal)
+        decision: ChoiceDecision | None = None
+        if wanted == WAIT_KEY:
+            decision = ChoiceDecision(
+                outcome=WAIT,
+                decided_by=MODEL,
+                option_key=WAIT_KEY,
+                destination_id=None,
+                blocked_reason=None,
+            )
+        elif wanted is not None:
+            activity, key = wanted
+            match = [
+                o for o in asked.options if o["activity"] == activity and o["option_key"] == key
+            ]
+            if match:
+                decision = ChoiceDecision(
+                    outcome=match[0]["outcome"],
+                    decided_by=MODEL,
+                    option_key=key,
+                    destination_id=match[0].get("destination_id"),
+                    blocked_reason=None,
+                )
+            else:
+                offered = any(o["activity"] == activity for o in asked.options)
+                self.refused[asked.subject_ordinal] = (
+                    "place_taken_this_minute" if offered else "target_disabled_or_removed"
+                )
+        if decision is None:
+            outcome = deterministic()
+            key, destination_id, blocked = _outcome_keys(outcome)
+            decision = ChoiceDecision(
+                outcome=outcome,
+                decided_by=RULE,
+                option_key=key,
+                destination_id=destination_id,
+                blocked_reason=blocked,
+            )
+        elif wanted is not None:
+            self.taken.add(asked.subject_ordinal)
         if self.counters is not None:
             self.counters.record(decision)
         return decision

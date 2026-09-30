@@ -38,9 +38,16 @@ export interface SocietyEngine {
 
 const FAMILIES: readonly SocietyStateFamily[] = ['legacy', 'purposeful', 'living'];
 
-/** The kinds of ground a new society is created over, each with the engine the table names. */
-export type SocietyGroundKind = 'district' | 'saved_world';
-const GROUNDS: readonly SocietyGroundKind[] = ['district', 'saved_world'];
+/**
+ * The kinds of ground a new society is created over, each with the engine the table names: an owned
+ * district, a saved world's own ground, and a saved world whose own records state its walking
+ * surfaces and homes (a town). Which grounds exist is the table's `creates`; a ground here the
+ * table does not state, or one it states that is not here, is refused when the table is read.
+ */
+export type SocietyGroundKind = 'district' | 'saved_world' | 'town';
+const GROUNDS: readonly SocietyGroundKind[] = ['district', 'saved_world', 'town'];
+/** The grounds that are a saved world's own, whose engine must stand on a saved world. */
+const SAVED_WORLD_GROUNDS: readonly SocietyGroundKind[] = ['saved_world', 'town'];
 
 function row(value: unknown): SocietyEngine {
   const held = value as Readonly<Record<string, unknown>> | null;
@@ -94,7 +101,7 @@ function table(text: string): EngineTable {
   }
   const creates = Object.fromEntries(GROUNDS.map((ground) => {
     const engine = creatable(stated[ground]?.engine);
-    if (engine === undefined || (ground === 'saved_world' && !engine.savedWorld)) {
+    if (engine === undefined || (SAVED_WORLD_GROUNDS.includes(ground) && !engine.savedWorld)) {
       throw new Error(`Invalid society engine table creates.${ground}`);
     }
     return [ground, engine.engine];

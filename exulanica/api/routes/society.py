@@ -156,7 +156,10 @@ def create_society(
                     place_id = runtime.saved_world_place(
                         connection, session, version_id, body.region_id
                     )
-                document = provider(connection, session, version_id, place_id, body.region_id)
+                # The engine says how a world's own walking surfaces are composed for it.
+                document = provider(
+                    connection, session, version_id, place_id, body.region_id, body.profile
+                )
             elif place_id is None:
                 raise ValueError("a society without inputs needs a place_id")
             return served_snapshot(

@@ -6,7 +6,8 @@ capacities, the roles and homes its premises support, and what it cannot supply.
 exist. :func:`place_from_society_input` projects the persisted Flatiron society input exactly as
 it is, and ``exulanica.world.society_city_place`` derives a place from the city grammar's
 records. The society never reads either source directly, so another producer only has to
-publish this document.
+publish this document. A town's input carries the place its records made, which
+:func:`place_from_town_input` projects into the input's own frame for the living town.
 
 Nothing here invents a destination, a path or a job. A place that lacks something says so in
 ``unsupported``, and a population is sized to what the place can hold.
@@ -41,12 +42,13 @@ walker. It carries no level identity either, so nothing here tells two places at
 from __future__ import annotations
 
 import math
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from typing import Any, Final
 
 from exulanica.world.society import society_state_sha256
 from exulanica.world.society_catalogs import RoutineModel
-from exulanica.world.society_planner import validate_society_input
+from exulanica.world.society_input_policy import LIVING_INPUTS
+from exulanica.world.society_planner import ARRIVAL_CLEARANCE_MM, validate_society_input
 
 __all__ = [
     "PLACE_PROFILE",
@@ -57,6 +59,7 @@ __all__ = [
     "ceil_distance",
     "place_capacity",
     "place_from_society_input",
+    "place_from_town_input",
     "place_sha256",
     "place_stacks_heights",
     "place_states_heights",
@@ -574,6 +577,80 @@ def place_from_society_input(document: dict[str, Any], routine: RoutineModel) ->
         if document["availability"] == "available" and reason is None
         else reason or "input_unavailable",
     }
+    return seal_place(place)
+
+
+def place_from_town_input(document: dict[str, Any]) -> dict[str, Any]:
+    """The living place a walking-surfaces-v2 input carries, as the living town walks it.
+
+    The city place the input carries is in the city grammar's plan frame; the town walks it in the
+    input's own frame, east and south millimetres about the region's origin, the frame every
+    position of the input is in, with the place bound to the input as its source (a living
+    society's place names the input it projects). Plain standing spots within the arrival
+    clearance of where a person arrives are left out (``ARRIVAL_CLEARANCE_MM``), so nobody in the
+    town stands in front of a person arriving; a seat of a bench there stays a seat. An input that
+    is unavailable projects an unavailable place with nothing to walk.
+    """
+    if document.get("profile") not in LIVING_INPUTS:
+        raise ValueError("this input carries no living place")
+    living = document["living"]
+    source = {
+        "kind": "society-input",
+        "profile": document["profile"],
+        "input_seq": document["input_seq"],
+        "document_sha256": document["document_sha256"],
+    }
+    city = living["place"]
+    frame = {
+        "name": document["frame"]["name"],
+        "axis_order": list(document["frame"]["axis_order"]),
+        "horizontal_unit": "millimetre",
+    }
+    if city is None:
+        return seal_place(
+            {
+                "profile": PLACE_PROFILE,
+                "place_id": document["district_id"],
+                "source": source,
+                "frame": frame,
+                "routine_sha256": living["routine"]["sha256"],
+                "clearance_mm": document["navigation"]["clearance_mm"],
+                "nodes": [],
+                "edges": [],
+                "spots": [],
+                "crossings": [],
+                "destinations": [],
+                "unavailable_destinations": [],
+                "unsupported": [],
+                "availability": "unavailable",
+                "unavailable_reason": document["unavailable_reason"] or "input_unavailable",
+            }
+        )
+    for key in ("vertical_unit", "datum"):
+        if key in city["frame"]:
+            frame[key] = city["frame"][key]
+    ax, az = document["navigation"]["arrival_mm"]
+
+    def point(position: Sequence[int]) -> list[int]:
+        return [position[0], -position[1]]
+
+    spots = []
+    for spot in city["spots"]:
+        east, south = point(spot["position_mm"])
+        if not spot["destination_ids"] and (east - ax) ** 2 + (south - az) ** 2 <= (
+            ARRIVAL_CLEARANCE_MM**2
+        ):
+            continue
+        spots.append({**spot, "position_mm": [east, south]})
+    place = {
+        **city,
+        "place_id": document["district_id"],
+        "source": source,
+        "frame": frame,
+        "nodes": [{**node, "position_mm": point(node["position_mm"])} for node in city["nodes"]],
+        "spots": spots,
+    }
+    place.pop("document_sha256")
     return seal_place(place)
 
 

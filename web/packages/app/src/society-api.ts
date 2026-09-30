@@ -221,7 +221,8 @@ function livingPresentation(row: Readonly<Record<string, unknown>>, state: Reado
     };
   });
   return {
-    profile: 'exulanica-society/v4',
+    // The living engine the state names, as the engine table states it: a district's or a town's.
+    profile: societyEngine(state['profile']).engine,
     society_id: state['society_id'] as string,
     branch_id: state['branch_id'] as string,
     input_seq: state['input_seq'] as number,

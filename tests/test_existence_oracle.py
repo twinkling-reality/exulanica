@@ -224,7 +224,7 @@ def _provide_society_input(existence: Existence):
     refuses a version the caller's workspace does not hold.
     """
 
-    def provide(connection, session, version_id, place_id, region_id):
+    def provide(connection, session, version_id, place_id, region_id, engine=None):
         document = existence.society_inputs.get(version_id)
         if session.workspace_id != existence.workspace_id or document is None:
             raise UnavailableSocietyInput("this workspace holds no authored version by that id")

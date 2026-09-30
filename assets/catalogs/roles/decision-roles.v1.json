@@ -8,7 +8,8 @@
       "subject": "person",
       "adapter": "person",
       "engines": [
-        "exulanica-society/v2"
+        "exulanica-society/v2",
+        "exulanica-society/v5"
       ],
       "required_use_cases": [
         "text"

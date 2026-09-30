@@ -5,7 +5,8 @@ export type SocietyProfile =
   | 'exulanica-society/v1'
   | 'exulanica-society/v2'
   | 'exulanica-society/v3'
-  | 'exulanica-society/v4';
+  | 'exulanica-society/v4'
+  | 'exulanica-society/v5';
 
 /**
  * The v2 goal: one reviewed affordance at one target, a walk that makes room at a busy

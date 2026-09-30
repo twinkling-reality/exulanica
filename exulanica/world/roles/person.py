@@ -1,10 +1,14 @@
-"""The person role's adapter: a person in a purposeful society deciding what to do next.
+"""The person role's adapter: a person in a purposeful or a living society deciding what to do next.
 
 The person's contract lives in :mod:`exulanica.world.society_decision_contract` (what a person may
 be offered, what they see, how a choice is checked again) and its minute in
 :mod:`exulanica.world.society_model_decisions` (what each receipt does to the planner's goal
-policies, and the event it appends). This module binds them to the names the generic decision path
-calls, and declares the role key it serves; its registry entry states the rest as data.
+policies, and the event it appends). A person in a living society (the living town) is offered the
+living engine's own answer set and applied through its choice seam, in
+:mod:`exulanica.world.society_living_decisions`. This module binds them to the names the generic
+decision path calls, by the state family the engine table states for the state's engine, refusing
+any other family by name, and declares the role key it serves; its registry entry states the rest
+as data.
 """
 
 from __future__ import annotations
@@ -13,7 +17,12 @@ from collections.abc import Mapping, Sequence
 from typing import Any, Final
 
 from exulanica.models.manifest import AnsweringMechanism
-from exulanica.world.decision_roles import DecisionContract, DecisionRole, decision_roles
+from exulanica.world.decision_roles import (
+    DecisionContract,
+    DecisionRole,
+    RoleRefused,
+    decision_roles,
+)
 from exulanica.world.role_decisions import written_messages
 from exulanica.world.society_decision_contract import (
     ACTION_FIELDS,
@@ -24,9 +33,19 @@ from exulanica.world.society_decision_contract import (
     observed_context,
     situation,
 )
+from exulanica.world.society_engines import society_engine
+from exulanica.world.society_living_decisions import (
+    apply_living_receipts,
+    living_context,
+    living_decision_events,
+    living_due,
+    living_messages,
+    living_options,
+)
 from exulanica.world.society_model_decisions import append_decision_events, model_goal_policies
 
 __all__ = [
+    "FAMILIES",
     "IDLE_KIND",
     "KINDS",
     "REASONS",
@@ -50,9 +69,25 @@ IDLE_KIND: Final = "wait"
 REASONS: Final = PERSON_REASONS
 
 
+#: The state families whose people this role decides for.
+FAMILIES: Final = ("purposeful", "living")
+
+
 def person_role() -> DecisionRole:
     """The person role, as the production registry states it."""
     return decision_roles().role(ROLE)
+
+
+def _living(profile: object) -> bool:
+    """Whether a state of ``profile``'s engine is a living society's, by the engine table; a
+    family this role does not decide for is refused by name."""
+    family = society_engine(profile).state_family
+    if family not in FAMILIES:
+        raise RoleRefused(
+            "person_family_unsupported",
+            f"a person decides in a {' or '.join(FAMILIES)} society, not a {family} one",
+        )
+    return family == "living"
 
 
 def subjects(state: Mapping[str, Any]) -> list[str]:
@@ -61,6 +96,8 @@ def subjects(state: Mapping[str, Any]) -> list[str]:
 
 
 def due(state: Mapping[str, Any], subject_id: str) -> bool:
+    if _living(state["profile"]):
+        return living_due(state, subject_id)
     person = next(p for p in state["inhabitants"] if p["id"] == subject_id)
     return at_choice_point(person)
 
@@ -74,6 +111,8 @@ def options(
     *,
     seed: str,
 ) -> tuple[DecisionOption, ...]:
+    if _living(state["profile"]):
+        return living_options(state, source, subject_id, contract, seed=seed)
     return choice_options(state, source, subject_id, contract, seed=seed)
 
 
@@ -84,6 +123,8 @@ def context(
     subject_id: str,
     options: Sequence[DecisionOption],
 ) -> dict[str, Any]:
+    if _living(state["profile"]):
+        return living_context(state, source, subject_id, options, profile=role.context_profile)
     return observed_context(state, source, subject_id, options, profile=role.context_profile)
 
 
@@ -94,6 +135,10 @@ def option_from_record(record: Mapping[str, Any]) -> DecisionOption:
 def messages(
     role: DecisionRole, context: Mapping[str, Any], mechanism: AnsweringMechanism
 ) -> list[dict[str, str]]:
+    # A living person's context names its engine; a purposeful person's never did, and every
+    # stored one reads as it was asked.
+    if "engine" in context and _living(context["engine"]):
+        return living_messages(role, context, mechanism)
     return written_messages(role, situation(context), context, mechanism)
 
 
@@ -102,8 +147,10 @@ def apply(
     state: Mapping[str, Any],
     source: Mapping[str, Any],
     receipts: Sequence[Mapping[str, Any]],
-    seam: Mapping[str, dict[str, Any]],
-) -> tuple[dict[str, dict[str, Any]], tuple[Any, ...]]:
+    seam: Any,
+) -> tuple[Any, tuple[Any, ...]]:
+    if _living(state["profile"]):
+        return apply_living_receipts(state, source, receipts, seam, profile=role.receipt_profile)
     return model_goal_policies(state, source, receipts, seam, profile=role.receipt_profile)
 
 
@@ -116,6 +163,10 @@ def events(
     dispositions: Sequence[Any],
     events: tuple[Any, ...],
 ) -> tuple[Any, ...]:
+    if _living(next_state["profile"]):
+        return living_decision_events(
+            previous_state, next_state, source, receipts, dispositions, events
+        )
     return append_decision_events(
         previous_state, next_state, source, receipts, dispositions, events
     )

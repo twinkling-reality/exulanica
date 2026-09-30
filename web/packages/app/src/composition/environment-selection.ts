@@ -85,7 +85,7 @@ import type { AppEnvironment, SessionState } from './session-state.js';
 import { seatingLayout } from './seating-layout.js';
 import type { SeatingLayout } from '@exulanica/atlas-react/playcanvas';
 import type { SocietyPlaces } from '../society-api.js';
-import { societyEngine } from '../society-engines.js';
+import { engineCreatedOver, societyEngine } from '../society-engines.js';
 import type { SavedWorldFlight, SavedWorldFlightStatus } from './saved-world-flight.js';
 
 /** Where the development preview's real-engine society recording is served. */
@@ -1784,8 +1784,10 @@ export function mountEnvironmentSelection(
     liveSociety = createLiveSociety({
       preview: false, credentials: deps.credentials, worldId: entry.worldId,
       versionId: entry.authoredVersionId, placeId: null, regionId,
-      // The engine a saved world's society is created with is the engine table's, which the
-      // server holds it to. Opening the world never creates anything; the person asks.
+      // The engine a saved world's society is created with is the engine table's for its ground:
+      // a town's, where the served entry declares a generated ground, and a saved world's own
+      // otherwise. Opening the world never creates anything; the person asks.
+      profile: engineCreatedOver(entry.generatedGround != null ? 'town' : 'saved_world'),
       createOnConnect: false, places: true,
       ...(deps.societyClient ? { client: deps.societyClient } : {}),
       onChange: reflectSavedWorldSociety,
