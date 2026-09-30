@@ -41,7 +41,7 @@ describe('the documents of a comparison of models', () => {
       readFileSync(new URL('tests/snapshots/society-group-comparison-documents.json', REPOSITORY), 'utf8'),
     ) as { readonly listing: unknown; readonly result: unknown; readonly run: unknown };
     const result = parseComparison(grouped.result);
-    expect(result.scoreVersion).toBe(2);
+    expect(result.scoreVersion).toBe(3);
     expect(result.group.source.kind).toBe('owner_choice');
     expect(result.group.people!.length).toBe(result.group.size);
     const kept = result.others.filter((other) => other.decider.kind === 'model');

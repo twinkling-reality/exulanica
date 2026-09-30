@@ -376,6 +376,9 @@ KEPT = 3
 #: Objects keyed by data rather than by shape: a reason code or an activity's name, each present
 #: only where a run met it.
 DATA_KEYED = frozenset({"minutes_by_activity", "reasons"})
+#: Objects whose keys are fixed and each of whose values is keyed by data: a run's reasons under the
+#: class each left a turn in.
+KEYED_BY_DATA_WITHIN = frozenset({"reasons_by_class"})
 
 
 def _keys(value: Any, name: str | None = None) -> Any:
@@ -385,6 +388,8 @@ def _keys(value: Any, name: str | None = None) -> Any:
     if isinstance(value, dict):
         if name in DATA_KEYED:
             return {}
+        if name in KEYED_BY_DATA_WITHIN:
+            return {key: {} for key in sorted(value)}
         return {key: _keys(item, key) for key, item in sorted(value.items())}
     if isinstance(value, list):
         shapes = [_keys(item) for item in value if isinstance(item, dict | list)]

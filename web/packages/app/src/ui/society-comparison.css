@@ -152,7 +152,13 @@
 .comparison-start p { margin: 0; }
 .comparison-start-role, .comparison-start-note { color: var(--ink-soft, #4e5d64); }
 .comparison-start-note:empty { display: none; }
-.comparison-start-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr)); gap: .6rem .9rem; }
+.comparison-start-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr)); gap: .6rem .9rem; align-items: start; }
+.comparison-start-named { grid-column: 1 / -1; display: grid; gap: .4rem; margin: 0; padding: .5rem .75rem; border: 1px solid var(--edge, #c5cfd2); border-radius: 4px; }
+.comparison-start-named[hidden] { display: none; }
+.comparison-start-named legend { padding: 0 .25rem; color: var(--ink-soft, #4e5d64); font-size: .8rem; }
+.comparison-start-people { display: grid; grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr)); gap: .15rem .75rem; max-height: 14rem; overflow-y: auto; }
+.comparison-start .comparison-start-person { display: flex; align-items: center; gap: .4rem; font-size: .85rem; }
+.comparison-start .comparison-start-person > span { color: inherit; font-size: inherit; }
 .comparison-start-fields select { width: 100%; }
 .comparison-start label { display: grid; gap: .2rem; }
 .comparison-start label > span { color: var(--ink-soft, #4e5d64); font-size: .8rem; }

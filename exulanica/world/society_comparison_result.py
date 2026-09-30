@@ -41,9 +41,11 @@ from exulanica.world import (
     society_comparison_verdict,
     society_score,
     society_score_v2,
+    society_score_v3,
 )
 from exulanica.world.decision_roles import DecisionRole, RoleRefused, decision_roles
 from exulanica.world.society_catalogs import (
+    PERSON_SCORE_CATALOG,
     SEED_PHASES,
     ComparisonCatalogs,
     load_comparison_catalogs,
@@ -58,7 +60,6 @@ from exulanica.world.society_comparison import (
 )
 from exulanica.world.society_comparison_claim import Resamples
 from exulanica.world.society_comparison_verdict import (
-    PROTOCOL_KEYS_BY_VERSION,
     RELIABILITY_THREE,
     ROUTINE_ROLE,
     WAITING_ROLE,
@@ -76,13 +77,13 @@ __all__ = [
     "ANSWERING_SOURCES",
     "ARM_ROLES",
     "BINDING_PROFILE",
+    "BINDING_PROFILES",
     "DECIMAL_PLACES",
     "DEFINITION_PROFILES",
     "FAILURE_PROFILE",
     "GROUP_SOURCES",
     "LISTING_PROFILE",
     "MINUTES_PER_HOUR",
-    "PROTOCOL_KEYS",
     "REPLAY_PROFILE",
     "RESULT_PROFILE",
     "RUN_PROFILE",
@@ -119,9 +120,14 @@ FAILURE_PROFILE: Final = "exulanica.society-comparison-failure/v1"
 LISTING_PROFILE: Final = "exulanica.society-comparisons/v2"
 RESULT_PROFILE: Final = "exulanica.society-comparison-result/v2"
 REPLAY_PROFILE: Final = "exulanica.society-comparison-run-replay/v2"
-#: The binding a second-version comparison registers, naming every module it is scored and judged
-#: by. The first version's binding has no profile: it names its scorer and claim by digest alone.
-BINDING_PROFILE: Final = "exulanica.society-comparison-binding/v2"
+#: The binding a comparison registers by the version of the score it is scored under, naming every
+#: module it is scored and judged by. The first version's binding has no profile: it names its
+#: scorer and claim by digest alone. The third also names the third score's module.
+BINDING_PROFILES: Final = {
+    2: "exulanica.society-comparison-binding/v2",
+    3: "exulanica.society-comparison-binding/v3",
+}
+BINDING_PROFILE: Final = BINDING_PROFILES[3]
 #: What an arm is to its comparison, in the order a reader lists them: a model compared, the same
 #: model run again to bound run-to-run variation, the routine (the score's one) and waiting (its
 #: zero). The page reads exactly these (``ARM_ROLES`` in
@@ -143,8 +149,12 @@ GROUP_SOURCES: Final = (
 )
 #: The decider each anchor role runs with: the routine for the score's one, waiting for its zero.
 _ANCHORS: Final = {ROUTINE_ROLE: "routine", WAITING_ROLE: "wait"}
-#: The definition version a comparison is defined under, and the score version its catalogs hold.
+#: The definition version a comparison is defined under.
 _DEFINED_VERSION: Final = 2
+#: The score versions a definition of that version is scored under: both group the people they
+#: score and report what each model answered apart, the second weighing need relief alone and the
+#: third need relief and variety.
+_DEFINED_SCORES: Final = (2, society_score_v3.CATALOG_VERSION)
 #: Places a decimal the server writes carries. A score is exact until it is written; four places
 #: tell apart seeds whose relief differs by a ten-thousandth of what the routine spares, which is
 #: finer than any difference a comparison of eight seeds can claim.
@@ -152,7 +162,6 @@ DECIMAL_PLACES: Final = 4
 _QUANTUM: Final = Decimal(1).scaleb(-DECIMAL_PLACES)
 #: A unit: what a run's cost is stated per, whatever window the protocol sets.
 MINUTES_PER_HOUR: Final = 60
-PROTOCOL_KEYS: Final = PROTOCOL_KEYS_BY_VERSION[2]
 #: What each binding version holds by digest, by the name its record gives each: the first names
 #: the scorer and the claim; the second every module a second-version score and verdict is read by.
 _BOUND_MODULES: Final[dict[int, dict[str, ModuleType]]] = {
@@ -162,6 +171,16 @@ _BOUND_MODULES: Final[dict[int, dict[str, ModuleType]]] = {
         for module in (
             society_score,
             society_score_v2,
+            society_comparison_claim,
+            society_comparison_verdict,
+        )
+    },
+    3: {
+        module.__name__: module
+        for module in (
+            society_score,
+            society_score_v2,
+            society_score_v3,
             society_comparison_claim,
             society_comparison_verdict,
         )
@@ -185,16 +204,17 @@ def scoring_binding(catalogs: ComparisonCatalogs | None = None) -> dict[str, Any
     modules = {name: _module_sha256(module) for name, module in _BOUND_MODULES[version].items()}
     if version == 1:
         return {"catalogs": recorded, **modules}
-    return {"profile": BINDING_PROFILE, "catalogs": recorded, "modules": modules}
+    return {"profile": BINDING_PROFILES[version], "catalogs": recorded, "modules": modules}
 
 
 def _binding_version(recorded: Mapping[str, Any]) -> int:
-    if recorded.get("profile") == BINDING_PROFILE and set(recorded) == {
-        "profile",
-        "catalogs",
-        "modules",
-    }:
-        return 2
+    for version, profile in BINDING_PROFILES.items():
+        if recorded.get("profile") == profile and set(recorded) == {
+            "profile",
+            "catalogs",
+            "modules",
+        }:
+            return version
     if "profile" not in recorded and set(recorded) == {"catalogs", *_BOUND_MODULES[1]}:
         return 1
     raise ComparisonRefused("binding_unknown", "a comparison names a binding this code cannot read")
@@ -332,10 +352,10 @@ def check_definition_body(body: Mapping[str, Any], catalogs: ComparisonCatalogs)
     phase = body["phase"]
     if phase not in SEED_PHASES:
         raise ComparisonRefused("phase_unknown", f"no phase {phase!r}")
-    if score_version(catalogs) != _DEFINED_VERSION:
+    if score_version(catalogs) not in _DEFINED_SCORES:
         raise ComparisonRefused(
             "catalogs_not_the_definition_version",
-            f"a comparison is defined under score v{_DEFINED_VERSION}, "
+            f"a comparison is defined under a score of {list(_DEFINED_SCORES)}, "
             f"these catalogs hold v{score_version(catalogs)}",
         )
     committed = {
@@ -439,6 +459,7 @@ def _reliability_document(counts: Mapping[str, Any]) -> dict[str, Any]:
         else {key: decimal_text(Fraction(counts[key], points)) for key in RELIABILITY_THREE},
         "routine_choice_points": points,
         "reasons": dict(sorted(counts["reasons"].items())),
+        "reasons_by_class": counts.get("reasons_by_class"),
     }
 
 
@@ -479,7 +500,7 @@ def run_outcome(
             people=people,
             threshold=threshold,
             choice_points=sum(played.choice_points[subject] for subject in people),
-            score=society_score_v2.person_score(catalogs.score),
+            score=_turn_classes(catalogs),
         ).document()
         extra = {"others_calls": None if others_calls is None else dict(others_calls)}
     return {
@@ -495,6 +516,14 @@ def run_outcome(
         "calls": None if calls is None else dict(calls),
         **extra,
     }
+
+
+def _turn_classes(catalogs: ComparisonCatalogs) -> society_score_v2.PersonScore:
+    """The classes a group's turns are counted in, as the score the catalogs hold declares them:
+    the second's own, or the third's, which reports the second's unchanged."""
+    if score_version(catalogs) == society_score_v3.CATALOG_VERSION:
+        return society_score_v3.person_score(catalogs.score).reliability
+    return society_score_v2.person_score(catalogs.score)
 
 
 # -- documents ----------------------------------------------------------------------------------
@@ -698,6 +727,8 @@ def comparison_result(
                 if found is not None and status == "failed"
                 else None,
                 "score": None if value is None else decimal_text(value),
+                "parts": _parts_document(reading.parts.get(arm, {}).get(seed)),
+                "terms": None if outcome is None else _terms_document(outcome["terms"]),
                 "reliability": None if counts is None else _reliability_document(counts),
                 "calls": _calls_document(calls),
                 "others_calls": _calls_document(others_calls),
@@ -777,6 +808,32 @@ def comparison_result(
     }
 
 
+def _parts_document(parts: Mapping[str, Fraction] | None) -> dict[str, str] | None:
+    """Each weighed term of a score that weighs more than one, on one seed, as the score reads it:
+    anchored, unclipped, before its weight."""
+    return None if parts is None else {key: decimal_text(value) for key, value in parts.items()}
+
+
+def _terms_document(terms: Mapping[str, Any]) -> dict[str, Any]:
+    """A run's stored integer terms as a document serves them, with no person named: the need
+    above the threshold summed, the different activity kinds each scored person did summed, the
+    choice points, the turns by class and by the reason they were left, and the person-minutes by
+    what they were. A score rounds; these do not, so two runs a rounded score shows equal can be
+    told apart."""
+    served = {
+        key: terms[key]
+        for key in ("ticks", "threshold", "urgency", "choice_points", "turns", "others_urgency")
+        if key in terms
+    }
+    if "activities" in terms:
+        served["variety"] = sum(int(count) for count in terms["activities"].values())
+        served["people"] = len(terms["activities"])
+    for key in ("classes", "reasons", "person_minutes", "minutes_by_activity"):
+        if key in terms:
+            served[key] = terms[key]
+    return served
+
+
 def _hourly_cost(calls: Sequence[Mapping[str, Any]], definition: Mapping[str, Any]) -> str | None:
     """What the asking of an arm's completed runs cost for the simulated hour, on average; None
     where none of them asked anybody."""
@@ -814,7 +871,11 @@ def listing_document(
                 "comparison_id": str(row["comparison_id"]),
                 "created_at": row["created_at"].isoformat(),
                 "phase": definition["phase"],
-                "score_version": 1 if definition_version(definition) == 1 else 2,
+                # The score it is read under: the one its binding recorded, never inferred from
+                # the definition's version, which two scores share.
+                "score_version": int(
+                    definition["scoring"]["catalogs"]["versions"][PERSON_SCORE_CATALOG]
+                ),
                 "group": {"source": group["source"], "size": group["size"]},
                 "arms": [_arm_document(arm, arms[arm], model_name) for arm in _arm_order(arms)],
                 "seeds": len(definition["seeds"]),

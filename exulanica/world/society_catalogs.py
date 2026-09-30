@@ -111,6 +111,20 @@ __all__ = [
 ROUTINE_DIRECTORY: Final = (
     Path(__file__).resolve().parents[2].joinpath("assets", "catalogs", "society")
 )
+
+
+def _versions_present(catalog_id: str, directory: Path = ROUTINE_DIRECTORY) -> tuple[int, ...]:
+    """Every version of ``catalog_id`` the directory holds a file for, from its file names: a
+    catalog whose versions differ only in their values is claimed by one schema, so a new version
+    of it is a new file and nothing else."""
+    found = []
+    for file in directory.glob(f"{catalog_id}.v*.json"):
+        number = file.name[len(catalog_id) + 2 : -len(".json")]
+        if number.isdigit():
+            found.append(int(number))
+    return tuple(sorted(found))
+
+
 #: The catalog versions a new society's model reads. A society records its model's versions and
 #: digest, and a new routine is a new catalog version listed here, published beside the old one,
 #: so an older society keeps reading the versions it recorded and keeps replaying.
@@ -178,13 +192,14 @@ _DECISION_CATALOG_VERSIONS: Final = {
 PERSON_SCORE_CATALOG: Final = "society-person-score"
 COMPARISON_PROTOCOL_CATALOG: Final = "society-comparison-protocol"
 COMPARISON_SEEDS_CATALOG: Final = "society-comparison-seeds"
-#: The versions a new comparison is defined under: the score of how people fared with what each
-#: model answered reported apart, the protocol whose population bound is derived from a measured
-#: replay, and seeds whose development text is committed.
+#: The versions a new comparison is defined under: the score of how people fared, half the need
+#: they were spared and half the variety of their hour, with what each model answered reported
+#: apart; the protocol whose population bound is derived from a measured replay; and seeds whose
+#: development text is committed, with held-out seeds drawn afresh.
 COMPARISON_VERSIONS: Final = {
-    PERSON_SCORE_CATALOG: 2,
+    PERSON_SCORE_CATALOG: 3,
     COMPARISON_PROTOCOL_CATALOG: 3,
-    COMPARISON_SEEDS_CATALOG: 3,
+    COMPARISON_SEEDS_CATALOG: 4,
 }
 #: Whether a score term is weighed or only reported, and what a term reads: a run's minutes, the
 #: events the engine appended, or the host's record of each call, which only a reader outside the
@@ -594,26 +609,29 @@ SCHEMAS: Final[dict[tuple[str, int], CatalogSchema]] = {
         ),
         entry_check=_score_bounds,
     ),
-    (PERSON_SCORE_CATALOG, 2): CatalogSchema(
-        PERSON_SCORE_CATALOG,
-        2,
-        (
-            ("part", _choice(SCORE_V2_PARTS)),
-            ("weight_milli", integer_field(-1000, 1000)),
-            ("reads", _choice(SCORE_READS)),
-            ("dispositions", key_list_field),
-            ("reasons", key_list_field),
-            ("reason", text_field),
-        ),
-        entry_check=_score_v2_bounds,
-    ),
+    **{
+        (PERSON_SCORE_CATALOG, version): CatalogSchema(
+            PERSON_SCORE_CATALOG,
+            version,
+            (
+                ("part", _choice(SCORE_V2_PARTS)),
+                ("weight_milli", integer_field(-1000, 1000)),
+                ("reads", _choice(SCORE_READS)),
+                ("dispositions", key_list_field),
+                ("reasons", key_list_field),
+                ("reason", text_field),
+            ),
+            entry_check=_score_v2_bounds,
+        )
+        for version in (2, 3)
+    },
     **{
         (COMPARISON_PROTOCOL_CATALOG, version): CatalogSchema(
             COMPARISON_PROTOCOL_CATALOG,
             version,
             (("value", integer_field(0, 10**9)), ("reason", text_field)),
         )
-        for version in (1, 2, 3)
+        for version in _versions_present(COMPARISON_PROTOCOL_CATALOG)
     },
     **{
         (COMPARISON_SEEDS_CATALOG, version): CatalogSchema(
@@ -627,17 +645,20 @@ SCHEMAS: Final[dict[tuple[str, int], CatalogSchema]] = {
         )
         for version in (1, 2)
     },
-    (COMPARISON_SEEDS_CATALOG, 3): CatalogSchema(
-        COMPARISON_SEEDS_CATALOG,
-        3,
-        (
-            ("phase", _choice(SEED_PHASES)),
-            ("seed_digest", _sha256_text),
-            ("seed", _seed_text),
-            ("reason", text_field),
-        ),
-        entry_check=_seed_v3_bounds,
-    ),
+    **{
+        (COMPARISON_SEEDS_CATALOG, version): CatalogSchema(
+            COMPARISON_SEEDS_CATALOG,
+            version,
+            (
+                ("phase", _choice(SEED_PHASES)),
+                ("seed_digest", _sha256_text),
+                ("seed", _seed_text),
+                ("reason", text_field),
+            ),
+            entry_check=_seed_v3_bounds,
+        )
+        for version in (3, 4)
+    },
 }
 
 

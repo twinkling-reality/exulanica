@@ -122,6 +122,8 @@ def test_a_withdrawal_committed_while_a_run_is_replayed_answers_the_read_as_unav
             assert drawn.json()["replay_verified"] is True
             with monkeypatch.context() as patch:
                 patch.setattr(society_comparisons, "verified_replay", withdrawn_while_replayed)
+                # Under a drawing digest nothing is stored under, the read replays the run.
+                patch.setattr(society_comparisons, "drawing_sha256", lambda _profile: "f" * 64)
                 refused = _read(client, world, comparison_id, run_id)
         assert withdrawn == [key], "the withdrawal committed while the run was replayed"
         assert refused.status_code == 424, refused.text

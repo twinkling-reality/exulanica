@@ -785,6 +785,8 @@ export interface ComparisonPlan {
   readonly population: number;
   readonly populationMost: number;
   readonly decidedMost: number;
+  /** Everybody a group the person names may be chosen from, as the society's state names them. */
+  readonly people: readonly NamedPerson[];
   readonly typicalRecord: string;
   readonly plan: PlanFigures | null;
   /** Why a start of the selection would be refused, or null. */
@@ -879,6 +881,7 @@ export function parsePlan(value: unknown): ComparisonPlan {
     population: count(row['population']),
     populationMost: count(row['population_most']),
     decidedMost: count(row['decided_most']),
+    people: list(row['people']).map(namedPerson),
     typicalRecord: text(row['typical_record']),
     plan: maybe(row['plan'], planFigures),
     planRefusal: maybe(row['plan_refusal'], refusal),

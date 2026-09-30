@@ -66,7 +66,14 @@ from exulanica.selection.validation import Session
 from exulanica.world.decision_roles import DecisionRole, RoleOption, decision_roles
 from exulanica.world.society import UnavailableSocietyInput
 from exulanica.world.society_catalogs import ComparisonCatalogs, load_comparison_catalogs
-from exulanica.world.society_comparison import PlayedRun, RunPlan, plan_role, play
+from exulanica.world.society_comparison import (
+    PlayedRun,
+    ReplayMismatch,
+    RunPlan,
+    plan_role,
+    play,
+)
+from exulanica.world.society_comparison_drawing import drawing_sha256, encode
 from exulanica.world.society_comparison_repository import (
     SocietyComparisonRepository,
     run_id_for,
@@ -74,10 +81,13 @@ from exulanica.world.society_comparison_repository import (
 )
 from exulanica.world.society_comparison_result import (
     FAILURE_PROFILE,
+    REPLAY_PROFILE,
     ComparisonRefused,
     definition_version,
     protocol_value,
+    replay_document,
     run_outcome,
+    verified_replay,
 )
 from exulanica.world.society_comparison_verdict import ANCHOR_ROLES
 from exulanica.world.society_decision_contract import DecisionContract
@@ -85,6 +95,7 @@ from exulanica.world.society_model_choice_repository import SocietyModelChoiceRe
 from exulanica.world.society_repository import SocietyRepository
 
 __all__ = [
+    "BOUND_BEFORE_SEED",
     "BOUND_SPENT",
     "PEOPLE",
     "RUN_FAILURE_CODES",
@@ -111,6 +122,7 @@ _LOG = logging.getLogger(__name__)
 RUN_FAILURE_CODES: Final = frozenset(
     {
         "anchor_failed",
+        "comparison_bound_before_seed",
         "comparison_bound_spent",
         "comparison_stopped",
         "input_unavailable",
@@ -129,6 +141,10 @@ RUN_FAILURE_CODES: Final = frozenset(
 #: Why a run with receipts and no outcome is closed: the process that played it stopped part way,
 #: and its hour cannot be played again under the receipts it holds.
 INTERRUPTED: Final = "interrupted"
+#: Why a seed's model runs are closed before they ask: what was left of the comparison's bound did
+#: not hold what one seed like it typically costs and what its runs can hold reserved at once, so
+#: the comparison stopped between seeds and kept every seed it had played.
+BOUND_BEFORE_SEED: Final = "comparison_bound_before_seed"
 #: Why a run failed before anybody was asked in a minute: the rules would change the question.
 QUESTION_CHANGED: Final = "question_changed_by_rules"
 #: Why a model run is closed before it asks: an anchor of its seed failed, so it has no score.
@@ -198,6 +214,10 @@ class RunHost:
     minute: Callable[[], None]
     stopping: Callable[[], bool]
     recorded: Callable[[psycopg.Connection], None]
+    #: Whether a seed's model runs, by id, may start: asked before each seed's model runs, whose
+    #: anchors have played. A seed not admitted closes it and every later seed's model runs as
+    #: :data:`BOUND_BEFORE_SEED`, asking nothing. Left out, every seed is admitted.
+    admit: Callable[[Sequence[uuid.UUID]], bool] = field(default=lambda _runs: True)
 
 
 def call_facts(receipts: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
@@ -611,17 +631,26 @@ class SocietyComparisonRunner:
     ) -> list[dict]:
         """Play every run that has no outcome yet, the protocol's number at a time: every
         anchor first, so each seed's routine run has recorded the group's choice points before any
-        model is asked on that seed. Outcomes come back in the order ``run_ids`` names them.
-        ``host`` is the host that claimed the comparison (:class:`RunHost`); the local command
-        plays with none."""
+        model is asked on that seed, then each seed's model runs, one seed after another, in the
+        order the definition commits its seeds. Before a seed's model runs start, ``host``
+        admits them or stops the comparison there (:attr:`RunHost.admit`): a stop keeps every seed
+        already played, and closes the rest as :data:`BOUND_BEFORE_SEED`. Outcomes come back in
+        the order ``run_ids`` names them. ``host`` is the host that claimed the comparison
+        (:class:`RunHost`); the local command plays with none, admits every seed and plays every
+        seed's model runs in one wave."""
         at_once = protocol_value(self.catalogs, "runs_at_once")
         with self.database.session(self.workspace_id) as connection:
             repository = self._repository(connection)
-            arms = repository._definition(comparison_id)["document"]["arms"]  # type: ignore[index]
-            roles = {run_id: arms[repository._run(run_id)["arm"]]["role"] for run_id in run_ids}
+            definition = repository._definition(comparison_id)["document"]  # type: ignore[index]
+            arms = definition["arms"]
+            reserved = {run_id: repository._run(run_id) for run_id in run_ids}
+            # A run that holds receipts was stopped part way: it asks nothing more, and is closed
+            # as interrupted when it is played, whatever the bound holds.
+            resumed = {run_id for run_id in run_ids if repository.stored(run_id)}
+        roles = {run_id: arms[row["arm"]]["role"] for run_id, row in reserved.items()}
         found: dict[uuid.UUID, dict] = {}
-        for first in (True, False):
-            wave = [run_id for run_id in run_ids if (roles[run_id] in ANCHOR_ROLES) == first]
+
+        def played(wave: Sequence[uuid.UUID]) -> None:
             with ThreadPoolExecutor(max_workers=at_once) as pool:
                 found.update(
                     zip(
@@ -630,6 +659,34 @@ class SocietyComparisonRunner:
                         strict=True,
                     )
                 )
+
+        played([run_id for run_id in run_ids if roles[run_id] in ANCHOR_ROLES])
+        seeds: dict[str, list[uuid.UUID]] = {digest: [] for digest in definition["seeds"]}
+        for run_id in run_ids:
+            if roles[run_id] not in ANCHOR_ROLES:
+                seeds[reserved[run_id]["seed_digest"]].append(run_id)
+        closing: list[uuid.UUID] = []
+        if host is None:
+            # The local command admits every seed, so its model runs share one wave.
+            played([run_id for wave in seeds.values() for run_id in wave])
+        else:
+            for wave in seeds.values():
+                if not wave:
+                    continue
+                fresh = [run_id for run_id in wave if run_id not in resumed]
+                if not closing and (not fresh or host.admit(fresh)):
+                    played(wave)
+                else:
+                    played([run_id for run_id in wave if run_id in resumed])
+                    closing.extend(fresh)
+        if closing:
+            self.fail_open(comparison_id, dict.fromkeys(closing, BOUND_BEFORE_SEED))
+            with self.database.session(self.workspace_id) as connection:
+                repository = self._repository(connection)
+                for run_id in closing:
+                    closed = repository.outcome(run_id)
+                    assert closed is not None, "a closed run has its outcome"
+                    found[run_id] = closed
         return [found[run_id] for run_id in run_ids]
 
     def run(
@@ -753,6 +810,53 @@ class SocietyComparisonRunner:
             return recorded(
                 connection, self._repository(connection).finish(comparison_id, run_id, outcome)
             )
+
+    def draw_all(self, comparison_id: uuid.UUID, run_ids: Sequence[uuid.UUID]) -> int:
+        """Draw every completed run of ``run_ids`` not drawn yet (:meth:`draw`), one after another,
+        and say how many are stored. Asked once a comparison's runs are played, and by a host once
+        it has finished its start: a town's drawing takes a replay of seconds, which no claim's
+        lease is held for, and a run left undrawn is read by a replay as before."""
+        return sum(1 for run_id in run_ids if self.draw(comparison_id, run_id))
+
+    def draw(self, comparison_id: uuid.UUID, run_id: uuid.UUID) -> bool:
+        """Replay a completed run from what it stored, verify it against its outcome, and store
+        the drawing the page reads (:mod:`exulanica.world.society_comparison_drawing`), under the
+        digest of the code that drew it; say whether one is stored.
+
+        Asked once a run's outcome is recorded (:meth:`draw_all`), off the request path, so a read
+        serves the drawing where it would otherwise replay the run. Its inputs are authorised
+        first, as a run's are: a run whose inputs lost their rights is not drawn. A replay that
+        differs from its record is logged and nothing is stored, so a read replays it and refuses
+        it by name. The run's outcome stands whatever happens here."""
+        drawing = drawing_sha256(REPLAY_PROFILE)
+        try:
+            with (
+                self.database.session(self.workspace_id) as connection,
+                connection.transaction(),
+            ):
+                repository = self._repository(connection)
+                outcome = repository.outcome(run_id)
+                if outcome is None or outcome["status"] != "completed":
+                    return False
+                if repository.drawing(run_id, drawing) is not None:
+                    return True
+                plan, definition = repository.plan(comparison_id, run_id)
+                stored = repository.stored(run_id)
+        except UnavailableSocietyInput:
+            return False
+        try:
+            played = verified_replay(plan, stored, outcome)
+        except ReplayMismatch:
+            _LOG.error("A completed comparison run's replay differs from its record; not drawn")
+            return False
+        encoded = encode(
+            replay_document(
+                plan, definition, outcome["arm"], outcome["seed_digest"], played, model_name=str
+            )
+        )
+        with self.database.session(self.workspace_id) as connection, connection.transaction():
+            self._repository(connection).store_drawing(comparison_id, run_id, drawing, encoded)
+        return True
 
     def fail_open(self, comparison_id: uuid.UUID, codes: Mapping[uuid.UUID, str]) -> None:
         """Record each run of ``codes`` that has no outcome yet as failed by its code, asking

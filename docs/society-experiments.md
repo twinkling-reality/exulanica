@@ -96,7 +96,21 @@ its models otherwise (`provider_configuration_changed`).
 
 ### Score
 
-A comparison is scored under the score version it was defined under. The second, declared
+A comparison is scored under the score version it was defined under. A new one is defined under the
+third, declared in `assets/catalogs/society/society-person-score.v3.json` and computed exactly by
+[`exulanica/world/society_score_v3.py`](../exulanica/world/society_score_v3.py): half need relief,
+the second version's term described next, and half variety, how many different kinds of thing each
+of the group's people did in the hour (resting, visiting, standing and talking, the routine's own
+activities; never walking or waiting), summed over them and anchored the same way, waiting 0 and the
+routine 1 on the same seed, unclipped. A kind counts once however often a person returns to it. A
+seed on which the routine's people did no more kinds than waiting's is excluded by name
+(`variety_not_spared`). Variety reads states alone, so what is said below of what reaches the score
+holds for it too; it tells apart models whose people were spared the same need in different hours,
+which need relief alone did not (in the second judged comparison every seed scored the models alike
+to four places while their people spent their hours differently). Every run's integer terms (the need
+above the threshold summed, the kinds summed, its turns by class and each reason under the class it
+left the turn in, so a turn given no answer in time is never read as a refused one) and each term's
+anchored value are served beside its score. The second score, declared
 in `assets/catalogs/society/society-person-score.v2.json` and computed exactly by
 `exulanica/world/society_score_v2.py`, scores how the group's people fared and nothing else: need
 relief, the need above the recorded routine's rest threshold that a run spares them against waiting,
@@ -146,14 +160,16 @@ are `not_judged`, each by name, and one with a run missing or failed is `incompl
 registered is its binding: the first names the three catalogs and the first scorer and claim modules
 by digest; the second also names the second scorer and
 `exulanica/world/society_comparison_verdict.py`, which assembles the verdict from the scores, so a
-change to any of them leaves a comparison registered under it `scored_under_other_code`. That
-module also holds each protocol version's keys, so the module that reads the third protocol
-version is not the one the second binding names by digest (`7114c141...`, in the
-[group comparison's pre-registration](evaluation/2026-09-26-society-group-comparison-preregistration.json)):
-a comparison registered under the second binding and scored from a live database reads
+change to any of them leaves a comparison registered under it `scored_under_other_code`; the third
+also names the third score's module. A protocol version is its catalog's entries: a reader asks for
+each value by name, a version that states none is refused by name (`protocol_keys`), and so is a key
+no reader reads, so a later version that changes its values is a new catalog file and changes no
+bound module. The verdict module on this tree is not the one the second binding names by digest
+(`7114c141...`, in the
+[group comparison's pre-registration](evaluation/2026-09-26-society-group-comparison-preregistration.json)),
+so a comparison registered under the second binding and scored from a live database reads
 `not_judged`, `scored_under_other_code`, while one on development seeds reads `development_seeds`,
-as it did. The committed judged records and their outcomes stand, and the next judged comparison
-registers a binding of the modules as they are. A
+as it did. The committed judged records and their outcomes stand. A
 comparison is read under the catalog versions it recorded, whichever versions a later one is defined
 under, and a binding this code cannot read is refused by name. The verdict also says whether the
 primary pair's answered shares differ by more than the control pair's do, a bound that adds no
@@ -161,12 +177,13 @@ constant of its own, and the page says so in the verdict's own sentence. Held-ou
 committed by the SHA-256 of their text: `society-comparison-seeds.v2.json` keeps the first version's
 development seeds and commits twelve held-out seeds drawn afresh, none of the first version's, whose
 held-out seeds the first judged comparison spent. The held-out seeds themselves stay outside the
-repository until a pre-registered comparison is judged on them. The third version, which a new
-comparison is defined under, commits each development seed's text beside the digest the earlier
-versions commit it by, since a development seed is looked at freely and never judged, and its
-schema holds each text to its digest; its held-out seeds are the second version's twelve, by digest
-alone, which the second judged comparison ran on, and an entry that states a held-out seed's text
-is refused (`held_out_seed_text`).
+repository until a pre-registered comparison is judged on them. The third version commits each
+development seed's text beside the digest the earlier versions commit it by, since a development
+seed is looked at freely and never judged, and its schema holds each text to its digest; its
+held-out seeds are the second version's twelve, by digest alone, which the second judged comparison
+ran on, and an entry that states a held-out seed's text is refused (`held_out_seed_text`). The
+fourth, which a new comparison is defined under, keeps the development seeds and their text and
+commits eight held-out seeds drawn afresh, none of an earlier version's, by digest alone.
 
 ### Judged comparisons
 
@@ -198,9 +215,9 @@ writes anything.
 | Method and path | Permission | Result |
 | --- | --- | --- |
 | `GET /world/versions/{version_id}/society/comparisons` | `world.read` | The version's comparisons, newest first, with their arms, the group they decide for, how far their runs got and, for one started from the application, its start: the bound, what its asks spent, what hosts that stopped are presumed to have spent unrecorded, and where it stands |
-| `GET /world/versions/{version_id}/society/comparisons/plan` | `world.read` | What this server offers a comparison of the version's society, the roles its engine hosts with their groups and models, the most people a comparison runs and the most of the society's people a model may decide for ([what it can read](#running-a-comparison)), and for a selection its runs, the most it can cost, what one like it typically costs and how many of a minute's asks each of its models can have answered, or the refusal a start of it would meet ([running a comparison](#running-a-comparison)) |
+| `GET /world/versions/{version_id}/society/comparisons/plan` | `world.read` | What this server offers a comparison of the version's society, the roles its engine hosts with their groups and models, the most people a comparison runs and the most of the society's people a model may decide for ([what it can read](#running-a-comparison)), the society's people by id and name, from whom a named group is chosen, and for a selection its runs, the most it can cost, what one like it typically costs and how many of a minute's asks each of its models can have answered, or the refusal a start of it would meet ([running a comparison](#running-a-comparison)) |
 | `GET /world/versions/{version_id}/society/comparisons/{comparison_id}` | `world.read` | Scores per seed and per arm with intervals and, beside each, what its arm's model answered; the group and who decides for everybody else; the registered differences and the server's verdict |
-| `GET /world/versions/{version_id}/society/comparisons/{comparison_id}/runs/{run_id}` | `world.read` | One completed run replayed from its stored requests and receipts, with no model call, held to its recorded minute digests, events and receipts, naming who decides for each person; a replay that differs is refused as `run_replay_mismatch`. Its inputs' rights are asked once the replay is done and before anything drawn from them is answered |
+| `GET /world/versions/{version_id}/society/comparisons/{comparison_id}/runs/{run_id}` | `world.read` | One completed run as the page draws it, naming who decides for each person: the drawing the host stored once it had played the comparison's runs, replaying each from its stored requests and receipts with no model call and held to its recorded minute digests, events and receipts, served while it was drawn by the code reading it; otherwise the run replayed and held to them here, and a replay that differs is refused as `run_replay_mismatch`. Either way its inputs' rights are asked before anything drawn from them is answered |
 
 No response carries a run's seed or a raw state. A comparison or run under another workspace or
 world is an unknown reference, and a run whose inputs lost their rights before or while it was
@@ -313,7 +330,16 @@ Companion and the live world. A run asks a minute only while one ask of the dear
 fits what is left of the bound, the rule the host applies to its own budget, and each call's
 reservation is held until its usage is recorded, so calls made at once never take the bound past its
 ceiling between them. A run the bound no longer fits stops before the minute, and a run one of whose
-calls the bound refused stops after it; either fails by name (`comparison_bound_spent`). An attempt
+calls the bound refused stops after it; either fails by name (`comparison_bound_spent`). Between seeds, a host stops rather than start runs the
+bound cannot finish: it plays every seed's anchors first, then each seed's model runs one seed after
+another, and admits a seed's model runs only while what is left of the bound holds what runs like
+them typically cost on the society's kind of ground and what they can hold reserved at once (the
+plan's `suggested_usd` for them). A seed it does not admit closes its model runs and every later
+seed's, asking nothing, as `comparison_bound_before_seed`, and the start closes by that name, so the
+seeds already played are kept and scored ([`tests/test_comparison_seed_admission_postgres.py`](../tests/test_comparison_seed_admission_postgres.py)).
+A seed whose models no measurement covers is admitted, its asks still held to the bound one by one,
+and a run left part way with receipts is closed as `interrupted` whatever the bound holds. The bound
+itself is unchanged: no ask is admitted past it. An attempt
 whose cost is unknown, such as one that timed out, counts at the most it can have cost, so a
 provider slow to answer spends the bound faster than its answers alone would. A comparison writes no
 world decision, so a live world's hourly bounds neither count nor limit it; the comparison and the
@@ -385,13 +411,16 @@ A town's page therefore opens on the group's rows. The page
 shows every number as the server wrote it and never decides whether two arms differ.
 
 Above the list, the world's owner starts a comparison from what the plan route offers: who the
-models decide for (everybody, or the people of one of their choices), a first and a second model
+models decide for (everybody, the people of one of their choices, or people they tick from the
+society's people the plan lists, up to the most a model may decide for, which is how a group larger
+than one choice's eight is chosen), a first and a second model
 with what each typically costs and why one cannot be asked now, whether the first runs a second
 time, and how many seeds. Where a model may decide for fewer than all of the society's people, it
 says how many before Start. For the choice it shows the runs, the most they could cost and what one
 like it typically costs, where a chosen model decides for more people than one minute's asks can
-have answered, that in a busy minute the rest follow their routine, and the bound the person types; Start stays unavailable until the bound is
-above zero and at most that most. A started comparison is listed with its progress, runs finished of
+have answered, that in a busy minute the rest follow their routine, and the bound, filled with the
+least that lets one like it finish until the person types their own; Start stays unavailable until
+the bound is above zero and at most that most. A started comparison is listed with its progress, runs finished of
 runs planned and its spend of its bound, with what a server that stopped may have spent where there
 is any, read again every four seconds while it waits or runs, and opens in the view as its runs
 finish; a refusal and a closed start are said in words by their codes.

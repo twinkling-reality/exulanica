@@ -6,10 +6,12 @@ first, each with its arms, the group they decide for and how far its runs got. `
 intervals, what each arm's model answered beside every score, who decides for everybody outside
 the group, its registered differences and the server's verdict, which is the only source of the
 words a page shows for it. Both name every model a decider asks by ``Manifest.model_name``, as the
-People panel's read does. ``GET .../comparisons/{comparison_id}/runs/{run_id}`` replays one
-completed run from the requests and receipts it stored, with no model call, holds the replay to
-what the run recorded, asks its inputs' rights once the replay is done, and returns what the page
-draws: the place, each person's minutes, who decides for each of them and what every turn did. A
+People panel's read does. ``GET .../comparisons/{comparison_id}/runs/{run_id}`` returns what the
+page draws of one completed run: the place, each person's minutes, who decides for each of them and
+what every turn did. It serves the drawing the host stored once it replayed the run from its stored
+requests and receipts and verified it (:mod:`exulanica.world.society_comparison_drawing`), under the
+digest of the code reading it, and otherwise replays the run itself, with no model call, and holds
+the replay to what the run recorded; either way it asks the inputs' rights before it answers. A
 replay that differs from its record is refused by name (``run_replay_mismatch``), never shown.
 
 None of these asks a model or writes anything. A comparison started from the application also
@@ -65,6 +67,12 @@ from exulanica.world.decision_roles import DecisionRole, RoleRefused, decision_r
 from exulanica.world.society import UnavailableSocietyInput, UnknownSociety
 from exulanica.world.society_catalogs import load_comparison_catalogs
 from exulanica.world.society_comparison import ReplayMismatch
+from exulanica.world.society_comparison_drawing import (
+    DrawingCorrupt,
+    decode,
+    drawing_sha256,
+    with_names,
+)
 from exulanica.world.society_comparison_reading import (
     decided_maximum,
     decided_people,
@@ -76,6 +84,7 @@ from exulanica.world.society_comparison_repository import (
     SocietyComparisonRepository,
 )
 from exulanica.world.society_comparison_result import (
+    REPLAY_PROFILE,
     ComparisonRefused,
     comparison_result,
     listing_document,
@@ -218,6 +227,15 @@ def plan_society_comparison(
         "population": population,
         "population_most": population_maximum(catalogs),
         "decided_most": decided_maximum(catalogs, population),
+        # Everybody a named group may be chosen from, by id and name, as the society's state
+        # names them: a group of more people than one owner's choice holds is chosen from these.
+        "people": sorted(
+            (
+                {"id": person["id"], "name": person["display_name"]}
+                for person in society["state"]["inhabitants"]
+            ),
+            key=lambda person: (person["name"], person["id"]),
+        ),
         "typical_record": TYPICAL_RECORDS.get(navigation, (TYPICAL_RECORD, ""))[0],
         "plan": None,
         "plan_refusal": None,
@@ -323,14 +341,24 @@ def society_comparison_run(
     except ComparisonRefused as exc:
         return _unreadable(exc)
     completed = outcome is not None and outcome["status"] == "completed"
-    played = mismatch = None
+    played = mismatch = drawn = None
     if completed:
-        try:
-            played = verified_replay(plan, comparisons.stored(run_id), outcome)
-        except ReplayMismatch as exc:
-            mismatch = exc
-    # The inputs' rights are asked after the replay, which takes seconds for a town, and before
-    # anything drawn from them is answered, so a withdrawal made while it replayed is seen.
+        # The drawing the host stored once it verified the run, under the digest of the code
+        # reading it; where there is none, the run is replayed and verified here.
+        stored = comparisons.drawing(run_id, drawing_sha256(REPLAY_PROFILE))
+        if stored is not None:
+            try:
+                drawn = decode(stored)
+            except DrawingCorrupt:
+                drawn = None
+        if drawn is None:
+            try:
+                played = verified_replay(plan, comparisons.stored(run_id), outcome)
+            except ReplayMismatch as exc:
+                mismatch = exc
+    # The inputs' rights are asked after the drawing is found or the replay done, which takes
+    # seconds for a town, and before anything drawn from them is answered, so a withdrawal made
+    # while it replayed is seen, and a stored drawing is never served past one.
     try:
         comparisons.authorize_inputs(plan.inputs)
     except UnavailableSocietyInput as exc:
@@ -340,6 +368,8 @@ def society_comparison_run(
             status_code=409,
             content={"code": RUN_NOT_COMPLETED, "detail": "this run has no completed hour"},
         )
+    if drawn is not None:
+        return with_names(drawn, load_manifest().model_name)
     if mismatch is not None:
         return JSONResponse(
             status_code=409, content={"code": mismatch.code, "detail": str(mismatch)}

@@ -17,6 +17,7 @@ function plan(population: number, decidedMost: number): ComparisonPlan {
     population,
     population_most: 110,
     decided_most: decidedMost,
+    people: [],
     typical_record: 'docs/evaluation/2026-09-26-society-group-comparison.json',
     plan: null,
     plan_refusal: null,
@@ -31,7 +32,7 @@ function figures(
   return parsePlan({
     profile: 'exulanica.society-comparison-plan/v1', refusal: null, running: null, roles: [],
     seeds_available: 8, models_most: 2, window_ticks: 60, population: 58, population_most: 110,
-    decided_most: 40, typical_record: 'record', plan_refusal: null,
+    decided_most: 40, people: [], typical_record: 'record', plan_refusal: null,
     plan: {
       runs: 5, asks_most: 100, calls_most: 200, most_usd: '1.0', typical_usd: '0.02',
       typical_record: 'record', minutes, held_usd: '0.0158', suggested_usd: suggested,

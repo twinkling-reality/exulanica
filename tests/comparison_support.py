@@ -15,7 +15,11 @@ from pathlib import Path
 from typing import Any
 
 from exulanica.models.manifest import load_manifest
-from exulanica.world.society_catalogs import ComparisonCatalogs, load_comparison_catalogs
+from exulanica.world.society_catalogs import (
+    COMPARISON_VERSIONS,
+    ComparisonCatalogs,
+    load_comparison_catalogs,
+)
 from exulanica.world.society_decision_contract import (
     PROMPT_VERSION,
     decision_contract,
@@ -34,6 +38,14 @@ FIRST_PREREGISTRATION = (
 FIRST_VERSIONS: dict[str, int] = json.loads(FIRST_PREREGISTRATION.read_text(encoding="utf-8"))[
     "record"
 ]["scoring"]["catalogs"]["versions"]
+#: The catalogs the last comparisons scored under the second score were defined under: that score,
+#: with the seeds whose held-out twelve the second judged comparison spent. What the tests of that
+#: score's reading run under, since a comparison defined under it is still read.
+SECOND_SCORE_VERSIONS: dict[str, int] = {
+    **COMPARISON_VERSIONS,
+    "society-person-score": 2,
+    "society-comparison-seeds": 3,
+}
 #: A group of everybody, as a definition body states it.
 EVERYBODY = {"people": None, "source": {"kind": "everyone"}}
 #: The role a comparison of a society's people asks: the one registered role deciding for them.

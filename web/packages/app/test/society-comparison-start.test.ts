@@ -97,7 +97,7 @@ describe('the words a start is told in', () => {
     expect(dollars('0.00182500')).toBe('$0.001825');
     expect(dollars('2.74310400')).toBe('$2.743104');
     const [finished] = parseComparisons(documents['finished']);
-    expect(progressWords(finished!)).toMatch(/^Finished: 3 of 3 runs finished; \$0\.\d+ of the \$0\.05 bound spent\.$/);
+    expect(progressWords(finished!)).toMatch(/^Finished: 3 of 3 runs finished; \$0\.\d+ of the \$0\.10 bound spent\.$/);
     // What a server that stopped may have spent unrecorded is said beside what was recorded.
     const presumed = { ...finished!, start: { ...finished!.start!, presumedUsd: '0.02000000' } };
     expect(progressWords(presumed)).toMatch(
@@ -129,6 +129,33 @@ describe('the start controls', () => {
     return { form, onSelection, onStart };
   };
 
+  it('chooses a group of more people than one of the owner\'s choices holds, up to the most a model decides for', () => {
+    const raw = documents['planned'] as Record<string, unknown>;
+    const people = Array.from({ length: 52 }, (_, index) => ({
+      id: `00000000-0000-4000-8000-${String(index).padStart(12, '0')}`,
+      name: `Person ${String(index).padStart(2, '0')}`,
+    }));
+    const town = parsePlan({ ...raw, population: 52, decided_most: 25, people });
+    const { form, onSelection } = setUp(town);
+    const who = form.root.querySelector<HTMLSelectElement>('.comparison-start-group')!;
+    const named = Array.from(who.options).findIndex((option) => option.text === 'People you choose');
+    expect(named).toBeGreaterThan(-1);
+    const field = form.root.querySelector<HTMLFieldSetElement>('.comparison-start-named')!;
+    expect(field.hidden).toBe(true);
+    who.value = String(named);
+    who.dispatchEvent(new Event('change'));
+    expect(field.hidden).toBe(false);
+    const boxes = Array.from(form.root.querySelectorAll<HTMLInputElement>('.comparison-start-person input'));
+    expect(boxes).toHaveLength(52);
+    for (const box of boxes.slice(0, 12)) {
+      box.checked = true;
+      box.dispatchEvent(new Event('change'));
+    }
+    expect(form.root.querySelector('.comparison-start-named-count')!.textContent).toBe('12 of at most 25 chosen.');
+    const [selection] = onSelection.mock.calls.at(-1)!;
+    expect(selection.group).toEqual({ kind: 'named', people: people.slice(0, 12).map((person) => person.id) });
+  });
+
   it('shows the most a comparison could cost and what one like it typically costs, as the server wrote them', () => {
     const { form } = setUp(planned);
     const shown = form.root.querySelector<HTMLElement>('.comparison-start-plan')!;
@@ -139,11 +166,17 @@ describe('the start controls', () => {
     expect(shown.title).toBe(planned.plan!.typicalRecord);
   });
 
-  it('starts nothing until the person states a bound, then sends what was chosen with it', () => {
+  it('offers the least bound that lets it finish, then sends what was chosen with the bound stated', () => {
     const { form, onStart } = setUp(planned);
     const start = form.root.querySelector<HTMLButtonElement>('.comparison-start-button')!;
-    expect(start.disabled).toBe(true);
     const bound = form.root.querySelector<HTMLInputElement>('.comparison-start-bound')!;
+    // Until the person types one, the bound is the least the server derived that lets it finish.
+    expect(planned.plan!.suggestedUsd).not.toBeNull();
+    expect(bound.value).toBe(planned.plan!.suggestedUsd);
+    expect(start.disabled).toBe(false);
+    bound.value = '';
+    bound.dispatchEvent(new Event('input'));
+    expect(start.disabled).toBe(true);
     bound.value = '0.05';
     bound.dispatchEvent(new Event('input'));
     expect(start.disabled).toBe(false);

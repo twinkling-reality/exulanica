@@ -31,7 +31,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Final
 
-from exulanica.world.society_catalogs import COMPARISON_PROTOCOL_CATALOG, ComparisonCatalogs
+from exulanica.world.society_catalogs import ComparisonCatalogs
 from exulanica.world.society_comparison_verdict import ComparisonRefused, protocol_values
 
 __all__ = [
@@ -51,8 +51,6 @@ PAIR_RUNS: Final = 2
 #: Microseconds in a millisecond: the protocol states the budget and the fixed cost in whole
 #: milliseconds and what each person adds in whole microseconds.
 _US_PER_MS: Final = 1000
-#: The first protocol version whose population bound is derived from a measured read.
-_DERIVED_FROM: Final = 3
 #: Why a comparison's reading does not fit, by the code it is refused with.
 READING_REFUSALS: Final = ("population_over_comparison_bound", "decided_over_comparison_bound")
 
@@ -94,11 +92,11 @@ class ReadingBound:
 
 
 def reading_bound(catalogs: ComparisonCatalogs) -> ReadingBound | None:
-    """The protocol's bound on reading one run, or None for a protocol that states its population
-    maximum instead."""
-    if int(catalogs.versions[COMPARISON_PROTOCOL_CATALOG]) < _DERIVED_FROM:
-        return None
+    """The protocol's bound on reading one run, or None for a protocol that states no replay line,
+    an earlier one stating its population maximum instead."""
     values = protocol_values(catalogs)
+    if "pair_replay_budget_ms" not in values:
+        return None
     if values["replay_per_person_us"] < 1 or values["replay_per_decided_person_us"] < 1:
         raise ComparisonRefused(
             "protocol_keys", "the protocol's replay line states no cost for a person"

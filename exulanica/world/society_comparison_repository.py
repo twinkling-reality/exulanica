@@ -45,6 +45,7 @@ from exulanica.world.society import (
 )
 from exulanica.world.society_catalogs import ComparisonCatalogs, load_comparison_catalogs
 from exulanica.world.society_comparison import RunPlan
+from exulanica.world.society_comparison_drawing import StoredDrawing
 from exulanica.world.society_comparison_reading import reading_refusal
 from exulanica.world.society_comparison_result import (
     DEFINITION_PROFILES,
@@ -528,6 +529,43 @@ class SocietyComparisonRepository:
             ),
         )
         return sealed
+
+    # -- a completed run's stored drawing ------------------------------------------------------
+
+    def store_drawing(
+        self, comparison_id: uuid.UUID, run_id: uuid.UUID, drawing: str, stored: StoredDrawing
+    ) -> None:
+        """Append a completed run's verified drawing under the digest of the code that drew it; a
+        drawing already stored under that digest is kept as it is."""
+        self.connection.execute(
+            "insert into society_comparison_replay(workspace_id,world_id,comparison_id,run_id,"
+            "drawing_sha256,document_sha256,document_bytes,document_gzip) "
+            "values(%s,%s,%s,%s,%s,%s,%s,%s) "
+            "on conflict (workspace_id,run_id,drawing_sha256) do nothing",
+            (
+                self.workspace_id,
+                self.world_id,
+                comparison_id,
+                run_id,
+                drawing,
+                stored.document_sha256,
+                stored.document_bytes,
+                stored.document_gzip,
+            ),
+        )
+
+    def drawing(self, run_id: uuid.UUID, drawing: str) -> StoredDrawing | None:
+        """The run's drawing stored under the digest ``drawing``, or None where there is none."""
+        row = self.connection.execute(
+            "select document_gzip,document_sha256,document_bytes from society_comparison_replay "
+            "where workspace_id=%s and world_id=%s and run_id=%s and drawing_sha256=%s",
+            (self.workspace_id, self.world_id, run_id, drawing),
+        ).fetchone()
+        if row is None:
+            return None
+        return StoredDrawing(
+            bytes(row["document_gzip"]), row["document_sha256"], row["document_bytes"]
+        )
 
     # -- what a runner and a replay play ------------------------------------------------------
 

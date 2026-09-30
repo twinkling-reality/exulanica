@@ -148,7 +148,7 @@ def test_a_group_is_the_owners_choice_and_everybody_else_keeps_theirs(app):
     assert read.status_code == 200, read.text
     compared._no_seed(read.text)
     result = read.json()
-    assert result["score_version"] == 2
+    assert result["score_version"] == 3
     assert [person["id"] for person in result["group"]["people"]] == people[:2]
     assert result["group"]["source"]["kind"] == "owner_choice"
     assert result["group"]["source"]["choice_seq"] == 1

@@ -2,15 +2,16 @@
 
 The claim itself, paired differences, the bootstrap, Holm's procedure and the control's bound, is
 :mod:`exulanica.world.society_comparison_claim`, and a run's terms are computed by the score of its
-version (:mod:`exulanica.world.society_score` for the first, :mod:`exulanica.world.society_score_v2`
-for the second). This module decides everything between them, from a comparison's definition and
-its runs' outcomes and nothing else (:func:`read_comparison`):
+version (:mod:`exulanica.world.society_score` for the first,
+:mod:`exulanica.world.society_score_v2` for the second, :mod:`exulanica.world.society_score_v3` for
+the third). This module decides everything between them, from a comparison's definition and its
+runs' outcomes and nothing else (:func:`read_comparison`):
 
 *   **Which terms and which floor.** A run's terms are read under the score version its catalogs
     state, and scored against the floor that version's protocol names: the first's whole floor, the
     second's floor per scored person.
-*   **Who scored.** A second-version run scored exactly the comparison's group, or everybody when
-    the group is everybody; an outcome that scored anybody else is refused by name.
+*   **Who scored.** A second- or third-version run scored exactly the comparison's group, or
+    everybody when the group is everybody; an outcome that scored anybody else is refused by name.
 *   **Against which anchors.** Each run is scored against its seed's waiting run, the score's zero,
     and its routine run, the score's one, found by their roles; what each arm's model answered is
     read over that routine run's choice points.
@@ -26,21 +27,22 @@ its runs' outcomes and nothing else (:func:`read_comparison`):
     turns pooled over its completed runs, differ by more than the control pair's do: the same
     model run twice bounds that variation too, with no constant of its own.
 
-A comparison registered under the second binding holds this module's digest, so the rules that
-turned its outcomes into its scores and its verdict are the rules it registered
+A comparison registered under the second or third binding holds this module's digest, so the rules
+that turned its outcomes into its scores and its verdict are the rules it registered
 (:func:`~exulanica.world.society_comparison_result.scoring_binding`). Nothing here reads a world,
 a model or a database: outcomes in, scores and a verdict out.
 """
 
 from __future__ import annotations
 
+import dataclasses
 from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from fractions import Fraction
 from typing import Any, Final
 
-from exulanica.world import society_score, society_score_v2
+from exulanica.world import society_score, society_score_v2, society_score_v3
 from exulanica.world.society_catalogs import (
     COMPARISON_PROTOCOL_CATALOG,
     PERSON_SCORE_CATALOG,
@@ -55,7 +57,7 @@ from exulanica.world.society_comparison_claim import (
 
 __all__ = [
     "ANCHOR_ROLES",
-    "PROTOCOL_KEYS_BY_VERSION",
+    "PROTOCOL_READS",
     "RELIABILITY_THREE",
     "ROUTINE_ROLE",
     "WAITING_ROLE",
@@ -77,46 +79,28 @@ ROUTINE_ROLE: Final = "one"
 ANCHOR_ROLES: Final = frozenset({WAITING_ROLE, ROUTINE_ROLE})
 #: Answered, refused and left to the routine: what a model's turns came to, in that order.
 RELIABILITY_THREE: Final = ("answered", "refused", "left_to_routine")
-#: Every value of each comparison protocol version this code reads.
-PROTOCOL_KEYS_BY_VERSION: Final = {
-    1: frozenset(
-        {
-            "bootstrap_resamples",
-            "family_alpha_per_mille",
-            "interval_per_mille",
-            "need_relief_floor",
-            "population_maximum",
-            "runs_at_once",
-            "window_ticks",
-        }
-    ),
-    2: frozenset(
-        {
-            "bootstrap_resamples",
-            "family_alpha_per_mille",
-            "interval_per_mille",
-            "need_relief_floor_per_person",
-            "population_maximum",
-            "runs_at_once",
-            "window_ticks",
-        }
-    ),
-    3: frozenset(
-        {
-            "bootstrap_resamples",
-            "family_alpha_per_mille",
-            "interval_per_mille",
-            "need_relief_floor_per_person",
-            "pair_replay_budget_ms",
-            "replay_fixed_ms",
-            "replay_per_decided_pair_us",
-            "replay_per_decided_person_us",
-            "replay_per_person_us",
-            "runs_at_once",
-            "window_ticks",
-        }
-    ),
-}
+#: Every protocol value this code reads, whichever version states it. A protocol version is its
+#: catalog's entries: it states the values it holds, and a reader asks for each by name
+#: (:func:`protocol_value`), refused by name where the version states none. A key no reader reads is
+#: refused too, so a misspelt value is never silently left out; a later version that changes values
+#: or states fewer of them is a new catalog file and nothing else.
+PROTOCOL_READS: Final = frozenset(
+    {
+        "bootstrap_resamples",
+        "family_alpha_per_mille",
+        "interval_per_mille",
+        "need_relief_floor",
+        "need_relief_floor_per_person",
+        "pair_replay_budget_ms",
+        "population_maximum",
+        "replay_fixed_ms",
+        "replay_per_decided_pair_us",
+        "replay_per_decided_person_us",
+        "replay_per_person_us",
+        "runs_at_once",
+        "window_ticks",
+    }
+)
 #: Why a comparison is not judged, as :data:`~exulanica.world.society_comparison_claim
 #: .NOT_JUDGED_REASONS` names them.
 _DEVELOPMENT: Final = "development_seeds"
@@ -142,22 +126,23 @@ def _integer(key: str, value: object) -> int:
 
 
 def protocol_values(catalogs: ComparisonCatalogs) -> dict[str, int]:
-    """The protocol's values, refused by name unless they are exactly the ones read here for its
-    version: a key added to the catalog and a key removed from it are both refused, as the decision
-    policy's are."""
-    version = int(catalogs.versions[COMPARISON_PROTOCOL_CATALOG])
-    expected = PROTOCOL_KEYS_BY_VERSION.get(version)
+    """The protocol's values, as its catalog states them, refused by name where it states a key no
+    reader here reads (:data:`PROTOCOL_READS`) or a value that is not a whole number."""
     values = {key: _integer(key, entry["value"]) for key, entry in catalogs.protocol.items()}
-    if expected is None or set(values) != expected:
-        raise ComparisonRefused(
-            "protocol_keys",
-            f"the protocol v{version} states {sorted(values)}; read are {sorted(expected or ())}",
-        )
+    unread = sorted(set(values) - PROTOCOL_READS)
+    if unread:
+        version = int(catalogs.versions[COMPARISON_PROTOCOL_CATALOG])
+        raise ComparisonRefused("protocol_keys", f"the protocol v{version} states unread {unread}")
     return values
 
 
 def protocol_value(catalogs: ComparisonCatalogs, key: str) -> int:
-    return protocol_values(catalogs)[key]
+    """One value of the protocol, refused by name where its version states none."""
+    values = protocol_values(catalogs)
+    if key not in values:
+        version = int(catalogs.versions[COMPARISON_PROTOCOL_CATALOG])
+        raise ComparisonRefused("protocol_keys", f"the protocol v{version} states no {key}")
+    return values[key]
 
 
 def protocol_for(catalogs: ComparisonCatalogs) -> Protocol:
@@ -253,6 +238,11 @@ class _SecondScore:
             "not_answered": counts["not_answered"],
             "not_applied": counts["not_applied"],
             "reasons": dict(sorted(reasons.items())),
+            # Each reason under the class it left the turn in, so a turn given no answer in time
+            # is never read as one whose answer was refused or not applied.
+            "reasons_by_class": {
+                key: dict(sorted(dict(held).items())) for key, held in run.reasons
+            },
             "routine_choice_points": found.routine_choice_points,
         }
 
@@ -261,7 +251,31 @@ class _SecondScore:
         return society_score_v2.state_measures(run)
 
 
-_SCORES: Final = {reader.version: reader for reader in (_FirstScore, _SecondScore)}
+class _ThirdScore(_SecondScore):
+    """The third score: half need relief, half variety, over the group; what each model answered
+    apart, as the second reports it."""
+
+    version: Final = society_score_v3.CATALOG_VERSION  # type: ignore[misc]
+
+    def __init__(self, catalogs: ComparisonCatalogs) -> None:
+        self.score = society_score_v3.person_score(catalogs.score)  # type: ignore[assignment]
+        self.floor = protocol_value(catalogs, "need_relief_floor_per_person")
+
+    def seed(self, run: Any, waiting: Any, routine: Any) -> tuple[str | None, Fraction | None]:
+        scored = self.parts(run, waiting, routine)
+        return scored.excluded, scored.score
+
+    def parts(self, run: Any, waiting: Any, routine: Any) -> society_score_v3.SeedScore:
+        return society_score_v3.seed_score(
+            run,
+            waiting=waiting,
+            routine=routine,
+            score=self.score,  # type: ignore[arg-type]
+            floor_per_person=self.floor,
+        )
+
+
+_SCORES: Final = {reader.version: reader for reader in (_FirstScore, _SecondScore, _ThirdScore)}
 
 
 def _score_reader(catalogs: ComparisonCatalogs) -> _FirstScore | _SecondScore:
@@ -293,7 +307,14 @@ def _pooled(runs: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     reasons: Counter[str] = Counter()
     for run in runs:
         reasons.update(run["reasons"])
+    by_class: dict[str, Counter[str]] = {}
+    for run in runs:
+        for key, held in (run.get("reasons_by_class") or {}).items():
+            by_class.setdefault(key, Counter()).update(held)
     return {
+        "reasons_by_class": {key: dict(sorted(held.items())) for key, held in by_class.items()}
+        if all("reasons_by_class" in run for run in runs)
+        else None,
         "turns": sum(run["turns"] for run in runs),
         **{key: sum(run[key] for run in runs) for key in RELIABILITY_THREE},
         "not_answered": sum(run["not_answered"] for run in runs) if split and runs else None,
@@ -440,6 +461,11 @@ class Reading:
     #: The reported state measures of each arm's completed runs.
     measures: Mapping[str, Sequence[Mapping[str, Any]]]
     assembled: Assembled
+    #: Each weighed term of a score that weighs more than one, per arm and seed, exact; empty for
+    #: a score of one term.
+    parts: Mapping[str, Mapping[str, Mapping[str, Fraction] | None]] = dataclasses.field(
+        default_factory=dict
+    )
 
 
 def read_comparison(
@@ -466,6 +492,7 @@ def read_comparison(
     scores: dict[str, dict[str, Fraction | None]] = {arm: {} for arm in arms}
     counts: dict[str, dict[str, Mapping[str, Any] | None]] = {arm: {} for arm in arms}
     measures: dict[str, list[Mapping[str, Any]]] = {arm: [] for arm in arms}
+    parts: dict[str, dict[str, Mapping[str, Fraction] | None]] = {}
     excluded: dict[str, str | None] = {}
     for seed in seeds:
         held = by_seed[seed]
@@ -474,7 +501,7 @@ def read_comparison(
             for arm, run in held.items()
             if run.get("status") == "completed"
         }
-        if reader.version == _SecondScore.version:
+        if reader.version >= _SecondScore.version:
             for found in terms.values():
                 _scored_exactly_the_group(definition, found)
         excluded[seed] = None
@@ -482,6 +509,16 @@ def read_comparison(
             value = None
             if arm in terms and waiting in terms and routine in terms:
                 excluded[seed], value = reader.seed(terms[arm], terms[waiting], terms[routine])
+                if isinstance(reader, _ThirdScore):
+                    found_parts = reader.parts(terms[arm], terms[waiting], terms[routine])
+                    parts.setdefault(arm, {})[seed] = (
+                        None
+                        if found_parts.score is None
+                        else {
+                            society_score_v3.NEED_RELIEF: found_parts.need_relief,  # type: ignore[dict-item]
+                            society_score_v3.VARIETY: found_parts.variety,  # type: ignore[dict-item]
+                        }
+                    )
             scores[arm][seed] = value
             if arm not in terms:
                 counts[arm][seed] = None
@@ -522,4 +559,5 @@ def read_comparison(
         shares=shares,
         measures=measures,
         assembled=assembled,
+        parts=parts,
     )

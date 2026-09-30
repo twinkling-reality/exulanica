@@ -56,6 +56,7 @@ export const NOT_JUDGED_WORDS: Readonly<Record<string, string>> = {
 /** Why a run failed, by `RUN_FAILURE_CODES` in `exulanica/api/society_comparison_runner.py`. */
 export const FAILURE_WORDS: Readonly<Record<string, string>> = {
   anchor_failed: 'a run of the routine or of waiting on this seed did not complete, so this run could never be scored and asked nothing',
+  comparison_bound_before_seed: 'what was left of the bound you set would not let this seed finish, so the comparison stopped before it and kept the seeds it had played',
   comparison_bound_spent: 'the bound you set for this comparison had too little left for its next ask, so it stopped there',
   comparison_stopped: 'the server stopped running the comparison before this run was played',
   input_unavailable: 'this world\'s places were no longer available to run it on',

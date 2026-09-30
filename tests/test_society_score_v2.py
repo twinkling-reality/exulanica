@@ -51,9 +51,9 @@ from exulanica.world.society_score_v2 import (
 )
 
 import living_square_support as square
-from comparison_support import FIRST_VERSIONS
+from comparison_support import FIRST_VERSIONS, SECOND_SCORE_VERSIONS
 
-CATALOGS = load_comparison_catalogs()
+CATALOGS = load_comparison_catalogs(versions=SECOND_SCORE_VERSIONS)
 SCORE = person_score(CATALOGS.score)
 FLOOR = int(CATALOGS.protocol["need_relief_floor_per_person"]["value"])  # type: ignore[call-overload]
 DOCUMENT = square.compose(square.square_objects())

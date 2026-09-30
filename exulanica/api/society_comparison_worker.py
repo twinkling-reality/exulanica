@@ -32,6 +32,16 @@ count is set back in the transaction that records a run's outcome, so a host tha
 before it stopped, released its lease or was killed, never counts as one that finished none. A
 claim whose bound is spent, or does not fit the process's budget, closes the start with every open
 run failed by that name (``comparison_bound_spent``, ``process_budget_spent``), asking nothing.
+
+Between seeds, a claim stops rather than start runs the bound cannot finish. Every ask is held at
+its model's most until its usage is recorded, so a bound near what a comparison typically spends
+would otherwise stop runs part way and keep nothing of them. Before a seed's model runs start, the
+claim admits them only while what is left of the bound holds what runs like them typically cost on
+this society's ground and what they can hold reserved at once (``suggested_usd``); otherwise it
+closes that seed's and every later seed's model runs as ``comparison_bound_before_seed``, asking
+nothing, and closes the start by that name, keeping every seed already played. A seed with no
+measured figure is admitted, and its asks stay held to the bound one by one. The bound itself is
+unchanged: no ask is ever admitted past it.
 """
 
 from __future__ import annotations
@@ -40,7 +50,7 @@ import dataclasses
 import logging
 import threading
 import uuid
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Sequence
 from decimal import ROUND_CEILING, Decimal
 from typing import Final
 
@@ -48,6 +58,7 @@ import psycopg
 
 from exulanica.api.decision_host import share_kept
 from exulanica.api.society_comparison_runner import (
+    BOUND_BEFORE_SEED,
     BOUND_SPENT,
     ClaimLost,
     HostStopping,
@@ -71,10 +82,12 @@ __all__ = ["CLOSED_REASONS", "SocietyComparisonWorker"]
 
 _LOG = logging.getLogger(__name__)
 #: Why a host closed a start before every run was played, by name: hosts that claimed it kept
-#: stopping, its bound was spent, or this process's model budget could not hold what was left of
-#: it. The page has words for each.
+#: stopping, what was left of its bound did not hold the next seed's typical cost and what its runs
+#: can hold reserved, so it stopped between seeds, its bound was spent, or this process's model
+#: budget could not hold what was left of it. The page has words for each.
 CLOSED_REASONS: Final = (
     "claims_spent",
+    "comparison_bound_before_seed",
     "comparison_bound_spent",
     "process_budget_spent",
 )
@@ -211,10 +224,39 @@ class SocietyComparisonWorker:
                 connection, claim.workspace_id, claim.world_id, claim.comparison_id
             )
 
-        host = RunHost(minute=minute, stopping=stop.is_set, recorded=recorded)
+        with self.database.session(claim.workspace_id) as connection:
+            repository = runner._repository(connection)
+            society = repository.society._row(uuid.UUID(definition["version_id"]))
+            navigation = None if society is None else repository.navigation_profile(society)
+
+        def admit(runs: Sequence[uuid.UUID]) -> bool:
+            """Whether what is left of the bound holds what one seed's model runs like these
+            typically cost and what they can hold reserved at once: the least that lets them
+            finish (``suggested_usd``), from the typical figures of this society's ground. A seed
+            with no typical figure is admitted, and its asks stay held to the bound one by one."""
+            with self.database.session(claim.workspace_id) as connection:
+                repository = runner._repository(connection)
+                left_runs = [repository._run(run_id) for run_id in runs]
+                spent_now = repository.spending([claim.comparison_id]).get(
+                    claim.comparison_id, Decimal(0)
+                )
+            seed = comparison_cost(
+                definition,
+                int(definition["population"]),
+                role,
+                budget if budget is not None else _ESTIMATOR,
+                self.manifest,
+                at_once=protocol_value(runner.catalogs, "runs_at_once"),
+                navigation_profile=navigation,
+                runs_left=[(row["arm"], row["seed_digest"]) for row in left_runs],
+            )
+            needed = seed.suggested_usd
+            return needed is None or claim.bound_usd - spent_now - presumed >= needed
+
+        host = RunHost(minute=minute, stopping=stop.is_set, recorded=recorded, admit=admit)
         order = [run["run_id"] for run in open_runs]
         try:
-            played.run_all(claim.comparison_id, order, host=host)
+            outcomes = played.run_all(claim.comparison_id, order, host=host)
         except HostStopping:
             change("release")
             return
@@ -223,7 +265,13 @@ class SocietyComparisonWorker:
         with self.database.session(claim.workspace_id) as connection:
             left = runner._repository(connection).open_runs(claim.comparison_id)
         if not left:
-            change("finish")
+            stopped = any(
+                outcome.get("code") == BOUND_BEFORE_SEED for outcome in outcomes if outcome
+            )
+            change("finish", closed_reason=BOUND_BEFORE_SEED if stopped else None)
+            # Once the start is finished, with no lease held, each completed run is drawn for its
+            # reads (the runner's ``draw``): a town's drawing takes seconds a lease is not held for.
+            runner.draw_all(claim.comparison_id, order)
 
     def _close(
         self,

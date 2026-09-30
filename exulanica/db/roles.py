@@ -146,6 +146,9 @@ INSERT_ONLY_TABLES: Final = (
     # Migration 0118 appends how a generated world was generated and refuses every update and
     # delete of it.
     "world_generation_receipt",
+    # Migration 0121 appends a completed comparison run's verified drawing and refuses every
+    # update and delete of it.
+    "society_comparison_replay",
 )
 
 #: The vocabulary is administered, not generated. Without revoking this the role could insert a

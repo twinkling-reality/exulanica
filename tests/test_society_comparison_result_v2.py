@@ -37,13 +37,14 @@ from exulanica.world.society_decision_contract import decision_contract
 import living_square_support as square
 from comparison_support import (
     FIRST_VERSIONS,
+    SECOND_SCORE_VERSIONS,
     SEEDS,
     development_body,
     model_arm,
     seeded_catalogs,
 )
 
-CATALOGS = seeded_catalogs()
+CATALOGS = seeded_catalogs(versions=SECOND_SCORE_VERSIONS)
 CONTRACT = decision_contract()
 DOCUMENT = square.compose(square.square_objects())
 NAME = load_manifest().model_name

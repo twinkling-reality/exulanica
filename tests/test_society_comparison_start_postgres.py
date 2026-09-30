@@ -38,6 +38,7 @@ from typing import Any
 
 import psycopg
 import pytest
+from exulanica.api import society_comparison_start as start_module
 from exulanica.api.app import create_app
 from exulanica.api.authorisation import load_token_directory
 from exulanica.api.decision_host import ask_bound_usd
@@ -77,8 +78,10 @@ MANIFEST = load_manifest()
 #: The model the scripted transport answers for: the first the manifest offers a person.
 MODEL = MANIFEST.offered_models(person_role().chosen)[0]
 #: The bound every start here states unless it says otherwise: well above what the scripted
-#: model's asks cost, and below what the hour could cost at most.
-BOUND = "0.05"
+#: model's asks cost, above the least that lets one seed of the small square start (what one like it
+#: typically costs and what its asks can hold at once, $0.0569 for everybody under the first
+#: model), and below what the hour could cost at most.
+BOUND = "0.10"
 
 
 def _second_world(spine_schema, store, registry) -> dict[str, Any]:
@@ -528,9 +531,11 @@ def _model_run(started: dict[str, Any], comparison_id: str) -> tuple[dict, dict]
 
 
 @pytest.mark.parametrize("saved_world", [2], indirect=True)
-def test_a_bound_that_holds_no_ask_stops_the_run_before_it_asks(started):
+def test_a_bound_that_holds_no_ask_stops_the_run_before_it_asks(started, monkeypatch):
     world = started["world"]
     stays._inhabited(world, started["client"])
+    # With no typical figure the seed is admitted, so it is the bound, ask by ask, that stops it.
+    monkeypatch.setattr(start_module, "figures_for", lambda *_args: (None, False))
     body = _body(bound_usd=format((_one_ask() / 2).quantize(Decimal("0.00000001")), "f"))
     assert _start(started, body).status_code == 201, body
     assert _worker(started).run_once(world["workspace"]) is True
@@ -544,9 +549,11 @@ def test_a_bound_that_holds_no_ask_stops_the_run_before_it_asks(started):
 
 
 @pytest.mark.parametrize("saved_world", [2], indirect=True)
-def test_what_a_comparison_spends_stays_within_its_bound(started):
+def test_what_a_comparison_spends_stays_within_its_bound(started, monkeypatch):
     world = started["world"]
     stays._inhabited(world, started["client"])
+    # With no typical figure the seed is admitted, so it is the bound, ask by ask, that stops it.
+    monkeypatch.setattr(start_module, "figures_for", lambda *_args: (None, False))
     bound = (_one_ask() * 3).quantize(Decimal("0.00000001"))
     body = _body(bound_usd=format(bound, "f"))
     assert _start(started, body).status_code == 201, body
@@ -701,6 +708,8 @@ def test_a_host_that_finished_a_run_before_it_stopped_never_counts_as_finishing_
 def test_a_takeover_counts_the_minute_a_stopped_host_may_have_been_asking(started, monkeypatch):
     world = started["world"]
     stays._inhabited(world, started["client"])
+    # With no typical figure the seed is admitted, so the first host reaches the model's run.
+    monkeypatch.setattr(start_module, "figures_for", lambda *_args: (None, False))
     # The most one minute of the model's run can cost: every person asked once.
     minute = (_population(started) * _one_ask()).quantize(
         Decimal("0.00000001"), rounding=ROUND_CEILING

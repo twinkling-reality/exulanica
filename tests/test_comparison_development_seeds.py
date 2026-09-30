@@ -27,6 +27,11 @@ from exulanica.world.society_catalogs import (
 
 SEEDS_V2 = ROUTINE_DIRECTORY / "society-comparison-seeds.v2.json"
 SEEDS_V3 = ROUTINE_DIRECTORY / "society-comparison-seeds.v3.json"
+#: The seeds a new comparison is defined under.
+SEEDS_NOW = (
+    ROUTINE_DIRECTORY
+    / f"society-comparison-seeds.v{COMPARISON_VERSIONS['society-comparison-seeds']}.json"
+)
 
 
 def _entries(path: Path) -> list[dict]:
@@ -53,10 +58,28 @@ def test_each_development_seed_is_the_text_of_its_second_version_digest():
 def _catalogs_with(tmp_path: Path, change) -> Path:
     for path in ROUTINE_DIRECTORY.glob("*.json"):
         shutil.copy(path, tmp_path / path.name)
-    document = json.loads(SEEDS_V3.read_text(encoding="utf-8"))
+    document = json.loads(SEEDS_NOW.read_text(encoding="utf-8"))
     change(document["entries"])
-    (tmp_path / SEEDS_V3.name).write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
+    (tmp_path / SEEDS_NOW.name).write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
     return tmp_path
+
+
+def test_the_fourth_version_keeps_the_development_seeds_and_draws_its_held_out_seeds_afresh():
+    third = _entries(SEEDS_V3)
+    fourth = _entries(SEEDS_NOW)
+    assert [
+        (e["key"], e["seed_digest"], e["seed"]) for e in fourth if e["phase"] == "development"
+    ] == [(e["key"], e["seed_digest"], e["seed"]) for e in third if e["phase"] == "development"]
+    held_out = [entry for entry in fourth if entry["phase"] == "held_out"]
+    assert len(held_out) == 8
+    assert all(entry["seed"] == "none" for entry in held_out)
+    # None of them is a seed an earlier version committed, whose held-out seeds were spent.
+    earlier = {
+        entry["seed_digest"]
+        for path in (SEEDS_V2, SEEDS_V3, ROUTINE_DIRECTORY / "society-comparison-seeds.v1.json")
+        for entry in _entries(path)
+    }
+    assert not {entry["seed_digest"] for entry in held_out} & earlier
 
 
 def test_a_held_out_entry_that_states_its_text_is_refused_by_name(tmp_path):
@@ -81,12 +104,12 @@ def test_the_committed_catalog_reads_and_gives_its_development_seeds_in_order():
     catalogs = load_comparison_catalogs()
     assert (
         catalogs.versions["society-comparison-seeds"]
-        == 3
+        == 4
         == COMPARISON_VERSIONS["society-comparison-seeds"]
     )
     seeds = development_seeds(catalogs)
     assert [hashlib.sha256(seed.encode()).hexdigest() for seed in seeds] == [
-        entry["seed_digest"] for entry in _entries(SEEDS_V3) if entry["phase"] == "development"
+        entry["seed_digest"] for entry in _entries(SEEDS_NOW) if entry["phase"] == "development"
     ]
     # The second version commits no text, so it gives none.
     earlier = load_comparison_catalogs(

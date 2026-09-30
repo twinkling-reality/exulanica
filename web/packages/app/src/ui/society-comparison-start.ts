@@ -58,6 +58,7 @@ export const START_REFUSAL_WORDS: Readonly<Record<string, string>> = {
  */
 export const CLOSED_WORDS: Readonly<Record<string, string>> = {
   claims_spent: 'the server stopped while running it three times in a row, so it was closed',
+  comparison_bound_before_seed: 'what was left of the bound you set would not let the next seed finish, so it stopped between seeds and kept those it had played',
   comparison_bound_spent: 'the bound you set was spent',
   process_budget_spent: 'this server\'s model budget had too little left for it',
 };
@@ -112,6 +113,7 @@ export const inProgress = (listing: ComparisonListing): boolean =>
 
 function groupWords(group: PlanGroup): string {
   if (group.kind === 'everyone') return `Everybody (${group.size} ${group.size === 1 ? 'person' : 'people'})`;
+  if (group.kind === 'named') return 'People you choose';
   const who = `The ${group.size === 1 ? 'person' : `${group.size} people`}`;
   return group.model === null
     ? `${who} you set to follow their routine`
@@ -177,6 +179,22 @@ export interface StartChoices {
   readonly seeds: number;
 }
 
+/**
+ * A group of the people the person names, from everybody the plan offers: the way to compare a
+ * group larger than any one of their choices, up to the most a model may decide for.
+ */
+export function namedGroup(people: readonly { readonly id: string; readonly name: string }[]): PlanGroup {
+  return { kind: 'named', choiceSeq: null, size: people.length, people, model: null };
+}
+
+/** How many people the person has named, in words, against the most a model may decide for. */
+export function namedWords(chosen: number, plan: ComparisonPlan): string {
+  const most = Math.min(plan.decidedMost, plan.population);
+  if (chosen === 0) return `Choose the people the models decide for, up to ${most}.`;
+  if (chosen > most) return `${chosen} chosen: a model can decide for at most ${most} of this world's people in one comparison.`;
+  return `${chosen} of at most ${most} chosen.`;
+}
+
 /** The selection the choices make, as the plan route and the start route take it. */
 export function selectionOf(choices: StartChoices): ComparisonSelection {
   const { group } = choices;
@@ -184,7 +202,9 @@ export function selectionOf(choices: StartChoices): ComparisonSelection {
     role: choices.role.key,
     group: group.kind === 'owner_choice' && group.choiceSeq !== null
       ? { kind: group.kind, choiceSeq: group.choiceSeq }
-      : { kind: group.kind },
+      : group.kind === 'named'
+        ? { kind: group.kind, people: (group.people ?? []).map((person) => person.id) }
+        : { kind: group.kind },
     models: [choices.first, ...(choices.second === null ? [] : [choices.second])]
       .map((model) => ({ provider: model.provider, modelId: model.modelId })),
     control: choices.control,
@@ -221,6 +241,8 @@ export function buildComparisonStartForm(handlers: {
   let startId = handlers.newId();
   /** The bound as the person typed it, kept while the plan is asked for again. */
   let typed = '';
+  /** The people the person named for a group of their own, by id, kept across plans. */
+  const named = new Set<string>();
   /**
    * What the controls were built from, and what a plan's answer changes in place: the plan line and
    * whether Start is available. A plan of the same offer never rebuilds the controls, so nobody loses
@@ -228,7 +250,7 @@ export function buildComparisonStartForm(handlers: {
    */
   let built: { readonly offer: string; readonly update: (plan: ComparisonPlan) => void } | null = null;
   const offerOf = (plan: ComparisonPlan): string =>
-    JSON.stringify([plan.refusal, plan.running, plan.roles, plan.seedsAvailable, plan.population, plan.decidedMost]);
+    JSON.stringify([plan.refusal, plan.running, plan.roles, plan.seedsAvailable, plan.population, plan.decidedMost, plan.people]);
 
   const render = (plan: ComparisonPlan): void => {
     built = null;
@@ -249,8 +271,11 @@ export function buildComparisonStartForm(handlers: {
     const askable = role.models.filter((model) => model.refusal === null);
     const pick = (models: readonly PlanModel[], held: PlanModel | null | undefined): PlanModel | null =>
       held === null || held === undefined ? null : models.find((model) => model.modelId === held.modelId) ?? null;
-    const group = role.groups.find((held) => held.kind === chosen?.group.kind && held.choiceSeq === chosen?.group.choiceSeq)
-      ?? role.groups[0]!;
+    const groups = plan.people.length === 0
+      ? role.groups
+      : [...role.groups, namedGroup(plan.people.filter((person) => named.has(person.id)))];
+    const group = groups.find((held) => held.kind === chosen?.group.kind && held.choiceSeq === chosen?.group.choiceSeq)
+      ?? groups[0]!;
     const first = pick(askable, chosen?.first) ?? askable[0] ?? null;
     const second = pick(askable, chosen?.second);
     const seeds = Math.min(Math.max(1, chosen?.seeds ?? 1), Math.max(1, plan.seedsAvailable));
@@ -261,7 +286,22 @@ export function buildComparisonStartForm(handlers: {
     const option = (value: string, words: string, selected: boolean, disabled = false) =>
       el('option', { value, text: words, selected, disabled });
     const groupSelect = el('select', { class: 'comparison-start-group', 'aria-label': 'Who the models decide for' },
-      role.groups.map((held, index) => option(String(index), groupWords(held), held === group)));
+      groups.map((held, index) => option(String(index), groupWords(held), held === group)));
+    const namedLine = el('p', { class: 'comparison-start-named-count', 'aria-live': 'polite' });
+    const namedBoxes = plan.people.map((person) => {
+      const box = el('input', { type: 'checkbox', value: person.id, checked: named.has(person.id) });
+      return { person, box, label: el('label', { class: 'comparison-start-person' }, [box, el('span', { text: person.name })]) };
+    });
+    const namedField = el('fieldset', { class: 'comparison-start-named' }, [
+      el('legend', { text: 'The people the models decide for' }),
+      namedLine,
+      el('div', { class: 'comparison-start-people' }, namedBoxes.map((held) => held.label)),
+    ]);
+    const namingPicked = () => groups[Number(groupSelect.value)]?.kind === 'named';
+    const showNamed = () => {
+      namedField.hidden = !namingPicked();
+      namedLine.textContent = namedWords(named.size, plan);
+    };
     const modelSelect = (label: string, held: PlanModel | null, none: string | null) => el('select', {
       class: 'comparison-start-model', 'aria-label': label,
     }, [
@@ -289,7 +329,8 @@ export function buildComparisonStartForm(handlers: {
     let latest = plan;
     const enable = () => {
       const figures = latest.plan;
-      start.disabled = figures === null || latest.planRefusal !== null || boundOf(bound.value, figures.mostUsd) === null;
+      start.disabled = figures === null || latest.planRefusal !== null || boundOf(bound.value, figures.mostUsd) === null
+        || (chosen?.group.kind === 'named' && named.size === 0);
     };
     const update = (answer: ComparisonPlan) => {
       latest = answer;
@@ -304,6 +345,8 @@ export function buildComparisonStartForm(handlers: {
               : `One like it typically costs about ${dollars(figures.typicalUsd)}, as measured in a recorded comparison.`)
             + finishingWords(figures);
       bound.placeholder = figures?.suggestedUsd ?? '0.05';
+      // Until the person types a bound, it is the least that lets one like it finish.
+      if (typed === '') bound.value = figures?.suggestedUsd ?? '';
       if (figures === null) planLine.removeAttribute('title');
       else planLine.title = figures.typicalRecord;
       minuteLine.textContent = figures === null || answer.planRefusal !== null ? '' : minuteWords(figures);
@@ -311,15 +354,28 @@ export function buildComparisonStartForm(handlers: {
       enable();
     };
     const changed = () => {
-      const group = role.groups[Number(groupSelect.value)] ?? role.groups[0]!;
+      const picked = groups[Number(groupSelect.value)] ?? groups[0]!;
+      const group = picked.kind === 'named'
+        ? namedGroup(plan.people.filter((person) => named.has(person.id)))
+        : picked;
       const first = role.models.find((model) => model.modelId === firstSelect.value) ?? null;
       const second = role.models.find((model) => model.modelId === secondSelect.value) ?? null;
       if (first === null) return;
       chosen = { role, group, first, second, control: control.checked, seeds: Math.max(1, Number(seedInput.value) || 1) };
+      showNamed();
       startId = handlers.newId();
       handlers.onSelection(selectionOf(chosen));
     };
     for (const input of [groupSelect, firstSelect, secondSelect, control, seedInput]) input.addEventListener('change', changed);
+    for (const { person, box } of namedBoxes) {
+      box.addEventListener('change', () => {
+        if (box.checked) named.add(person.id);
+        else named.delete(person.id);
+        namedLine.textContent = namedWords(named.size, plan);
+        if (namingPicked()) changed();
+      });
+    }
+    showNamed();
     bound.addEventListener('input', () => {
       typed = bound.value;
       enable();
@@ -338,6 +394,7 @@ export function buildComparisonStartForm(handlers: {
       el('p', { class: 'comparison-start-role', text: `The models decide for ${SUBJECT_WORDS[role.subject] ?? role.subject}, one simulated hour on each seed, beside their own routine and waiting.` }),
       el('div', { class: 'comparison-start-fields' }, [
         el('label', {}, [el('span', { text: 'Who' }), groupSelect]),
+        namedField,
         el('label', {}, [el('span', { text: 'First model' }), firstSelect]),
         el('label', {}, [el('span', { text: 'Second model' }), secondSelect]),
         el('label', { class: 'comparison-start-check' }, [control, el('span', { text: 'Run the first model a second time, to see how much it differs from itself' })]),

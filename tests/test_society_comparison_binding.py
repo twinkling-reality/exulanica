@@ -33,7 +33,12 @@ from exulanica.world.society_comparison_result import (
 )
 from exulanica.world.society_comparison_verdict import _answered_differ
 
-from comparison_support import FIRST_PREREGISTRATION, FIRST_VERSIONS, model_arm
+from comparison_support import (
+    FIRST_PREREGISTRATION,
+    FIRST_VERSIONS,
+    SECOND_SCORE_VERSIONS,
+    model_arm,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 FIRST_RECORD = ROOT / "docs" / "evaluation" / "2026-09-26-society-model-comparison.json"
@@ -154,7 +159,7 @@ def test_the_first_judged_comparison_still_reads_as_judged_under_its_own_binding
 
 
 def test_a_second_version_binding_holds_every_module_its_score_and_verdict_are_read_by():
-    binding = scoring_binding()
+    binding = scoring_binding(load_comparison_catalogs(versions=SECOND_SCORE_VERSIONS))
     assert set(binding["modules"]) == {
         "exulanica.world.society_score",
         "exulanica.world.society_score_v2",
