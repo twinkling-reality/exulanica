@@ -102,7 +102,7 @@
     {
       "agents": {
         "catalog": "society-engines",
-        "kinds": ["exulanica-society/v2", "exulanica-society/v3", "exulanica-society/v4"],
+        "kinds": ["exulanica-society/v2", "exulanica-society/v3", "exulanica-society/v4", "exulanica-society/v5"],
         "reason": "The inhabitants of every society engine that routes its people over a graph. Version 1 keeps its frozen seeded motion, which has no routes, and is not moved by any module."
       },
       "clock": {

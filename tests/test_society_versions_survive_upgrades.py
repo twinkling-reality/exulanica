@@ -146,9 +146,20 @@ def test_released_catalog_versions_never_change_in_place():
 #: Read from the files as released with the living society (05120886 and 5acc7cdf), with the
 #: purposeful routine the inputs record, with both versions of the decision contract a person's
 #: requests record, with the score, protocol and seeds a comparison of models records, and with
-#: the codes each kind of activity records and the legacy identities of the first three engines; a
-#: new version adds a line here, and no line ever changes.
+#: the codes each kind of activity records, the legacy identities of the first three engines and
+#: the living town's routine; a new version adds a line here, and no line ever changes.
 RELEASED_CATALOGS = {
+    "society-comparison-seeds.v4.json": (
+        "67626da84f4886c94eb4c0ebdd3948c07718a56aa7eac0db6283f679d613bad6"
+    ),
+    "society-person-score.v3.json": (
+        "26019bddc7e0a23aa296f92b91386ca52df35fdaf91a29ef009c624f11d5e470"
+    ),
+    "society-policy.v2.json": "e7b20915c5f0bbea4feaca4b034ab04cfc0fd8b8e8461401c1b0e4c1eb91fede",
+    "society-shift.v1.json": "924b06ae9184c94c8ff101a69c345acb0761abc73461a1c49ba80facddeb8cf9",
+    "society-use-class.v2.json": (
+        "d0b195f625fb422ff9441a92b0487a7d2fd986d5fbd8dc84bca2b791d64a50aa"
+    ),
     "society-activity.v1.json": "0ac08e1e351bc93adae7e175f0fe07b46b73ccfcfcefc8e2744b540bd39d3a31",
     "society-affordance.v1.json": (
         "ca280468cc1051bd5f4dfadc72625c9b14be9a9fdeec840b72696349a2d0986b"
