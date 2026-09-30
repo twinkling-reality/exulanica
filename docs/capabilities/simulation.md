@@ -73,7 +73,7 @@ outside the group keeps what their owner chose for them in every arm, so two arm
 who decides for the group. Beside each arm's score, the comparison shows the share of turns its
 model answered, refused or left to the routine.
 
-The world's owner starts one from Compare models in the world menu: the models, the group, the
+The world's owner starts one from Compare in the World menu: the models, the group, the
 seeds and a spending bound they state, beside the most the comparison could cost and what one like
 it typically costs, after which the server plays it and the view shows its runs finishing. The same
 comparison can be defined and run by a local command:
@@ -87,7 +87,7 @@ EXULANICA_BUDGET_USD=<bound> uv run python -m exulanica.orchestration.compare \
 The bound is required, and every ask of every run stays within it. `--group` or `--group-choice`
 names the group; without either, the group is everybody. The command runs development seeds, and
 its comparisons are never judged: a judged comparison is pre-registered on held-out seeds and
-recorded under `docs/evaluation/`. In the application, Compare models in the world menu shows a
+recorded under `docs/evaluation/`. In the application, Compare in the World menu shows a
 comparison's verdict and numbers, and one seed's hour from above on each side. A server starts
 comparisons only for the workspaces it asks models for and only where something plays them
 (`EXULANICA_COMPARISON_WORKER`, [running a comparison](../society-experiments.md#running-a-comparison)),

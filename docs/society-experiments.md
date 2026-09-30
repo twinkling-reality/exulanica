@@ -408,7 +408,7 @@ above), refused by the same names.
 
 ### Browser view
 
-An authenticated saved world exposes **Compare models** from the World menu. It
+An authenticated saved world exposes **Compare** from the World menu. It
 lists the version's comparisons and opens the newest: the server's verdict in words, with the
 primary pair's answered shares in the same sentence; who each arm decides for and what decides for
 everybody else, with what a model outside the group means for the score where there is one; each
@@ -559,7 +559,7 @@ external replay, production authentication or real-human-effect claim.
 
 ### Browser result view
 
-An authenticated saved world exposes **Recorded comparison** from the World menu. The view fixes
+An authenticated saved world exposes **Attempts** from the World menu. The view fixes
 the authored version to the active saved-world entry and asks for the experiment and attempt UUIDs
 printed on an existing record receipt. It then uses the two GET routes above to verify and present
 that one compact result. The browser does not offer a record list, preparation, reservation,

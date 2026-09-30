@@ -242,13 +242,13 @@ that moment of the shared clock, away from a change of state, and every press of
 meanwhile must be answered within 200 ms, the Core Web Vitals line for a good Interaction to Next
 Paint.
 
-**A town.** The town session makes a market town from Make a world, with two of its values moved to
+**A town.** The town session makes a market town through Create in the World menu, with two of its values moved to
 the next value inside the ranges the server serves, and waits while the tile worker bakes its tiles
 until the town opens and reopens after a reload. It brings the town's people in and plays: society
 reads a host interval apart must place one person on one tile and then on another, a tile being the
 town's extent over its tiles along it, and within one traffic episode a traffic read must serve a
 vehicle that moves while the page draws them. It chooses Nemotron 3 Nano 30B for four of the town's
-people, pauses the town and starts a comparison in Compare models for that group, against Nemotron
+people, pauses the town and starts a comparison through Compare in the World menu for that group, against Nemotron
 3.5 Lightning with a same-model control run on one development seed, under the bound the plan
 suggests for a typical comparison to finish or 0.05 USD when that is less. It waits until the comparison finishes,
 records any run its bound stopped, and checks that the town is unchanged by it. It asks the

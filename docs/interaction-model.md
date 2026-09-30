@@ -337,10 +337,9 @@ lock in traversal and dismisses the Companion only after its converse-mode excha
 Companion, `M` Map (only the camera changes, into Atlas Map presentation), `O` Customize (the
 world's appearance) and `?` Settings (display, accessibility, movement and the complete controls
 guide). `H` opens the World menu (`web/packages/app/src/ui/world-menu.ts`), which lists the same
-surfaces beside Place & view and, where the host offers them, Compare models and a recorded
-comparison. Customize and Settings are the only centred system surfaces, and only one major surface
-may own the cursor at a time. Closing either returns to the exact surface and detail from which it
-was opened. Neither binds Escape.
+surfaces beside World and, where the host offers them, Compare, Attempts and Create. Customize and Settings are the only centred system surfaces, and only one major surface
+may own the cursor at a time. Customize's Return action opens the world directly; its `O` and Escape shortcuts return to the
+preceding surface. Closing Settings returns to its prior surface and detail.
 
 **DECISION: a world opens in one complete look, not a list of unfinished themes.** Aeroheart
 (`origin-landscape@1`) is the one supported world profile; Survey Relief is an experimental
@@ -446,7 +445,7 @@ In an authenticated configured world, the same panel can read persisted society 
 show saved play/pause and 1x/2x/4x settings, advance one simulated minute while paused, and inspect
 recorded activity/event references. In a person's own saved world those controls are in People
 nearby, beside the inhabitants, and are offered only where the host plays that world; About this
-place points there instead of repeating them. The World menu's Compare models shows two open
+place points there instead of repeating them. The World menu's Compare shows two open
 models' runs of the same hour side by side
 ([society experiments](society-experiments.md#comparisons-of-models)). The development preview instead plays an explicitly labeled
 recording and is not persistence or model evidence. The backend also accepts typed user requests for
