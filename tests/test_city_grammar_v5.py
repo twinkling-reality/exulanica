@@ -517,7 +517,8 @@ def test_a_ground_storey_with_bays_and_no_opening_or_moulding_is_dressed_for_its
     # A small town the specification makes, 140 m blocks, whose ground storeys include two faces
     # carrying bays and no opening, string course or cornice: the tessellator draws trim where
     # their panels step in depth, and material stage 3 dresses it.
-    from exulanica.world.generated_worlds import compose_specified_world
+    from exulanica.world.generated_worlds import compose_generated_world
+    from exulanica.world.world_recipes import load_world_recipes, town_recipe
 
     values = {
         "city_extent_x_mm": 256_000,
@@ -527,8 +528,18 @@ def test_a_ground_storey_with_bays_and_no_opening_or_moulding_is_dressed_for_its
         "high_street_count": 1,
         "cross_street_hierarchy": "local_street",
     }
-    composed = compose_specified_world(
-        "small_town", values, "world:generated:sweep-A-140-256-local-1-4-2-w1"
+    released = next(
+        recipe for recipe in load_world_recipes(catalog_version=3) if recipe.key == "small_town"
+    )
+    current = town_recipe("small_town", values)
+    assert current.specification_name == released.specification_name
+    composed = compose_generated_world(
+        dataclasses.replace(
+            current,
+            catalog_version=released.catalog_version,
+            composer_version=released.composer_version,
+        ),
+        "world:generated:sweep-A-140-256-local-1-4-2-w1",
     )
     records = composed.records
     materials = {(m.surface_identity, m.role) for m in _of(records, SurfaceMaterialRecord)}

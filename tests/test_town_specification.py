@@ -442,7 +442,7 @@ def test_a_schema_is_read_only_when_its_ranges_lie_inside_the_grammar_and_preset
         load_world_recipes(
             directory(
                 edit(
-                    "world-recipe.v3.json",
+                    f"world-recipe.v{recipe_catalog.CATALOG_VERSION}.json",
                     "small_town",
                     "values",
                     {

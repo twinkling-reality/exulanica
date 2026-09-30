@@ -101,7 +101,7 @@ __all__ = [
 
 CATALOG_ID: Final = "world-recipe"
 #: The presets a running server offers.
-CATALOG_VERSION: Final = 3
+CATALOG_VERSION: Final = 4
 #: The specification schemas' catalog: what a preset's values, and a person's, are checked against.
 SCHEMA_ID: Final = "world-specification"
 #: The newest schema the directory holds; every earlier one stays for the presets that name it.

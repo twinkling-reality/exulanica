@@ -21,7 +21,7 @@ Reference photographs can be attached without replacing authored edits; attachme
 reconstruct or place scene geometry. A world can also be made from the person's reviewed
 photographs ([scene reconstruction](scene-reconstruction.md)), or generated as a town from a
 specification. World menu, Create, offers the presets of the [world recipe
-catalog](../../assets/catalogs/world-recipes/world-recipe.v3.json), a small town two 128 m tiles
+catalog](../../assets/catalogs/world-recipes/world-recipe.v4.json), a small town two 128 m tiles
 long and a market town three long, and lets a person change a preset's values within the ranges the
 [world specification](../../assets/catalogs/world-recipes/world-specification.v2.json) states: how
 many tiles long the town is, how far apart its cross streets are, the fewest and most storeys of its

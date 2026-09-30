@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "catalog_id": "world-recipe",
+  "catalog_version": 4,
+  "entries": [
+    {
+      "key": "small_town",
+      "label": "A small town",
+      "composer": "city-grammar-town",
+      "composer_version": 2,
+      "specification": "world-specification.v2",
+      "values": {
+        "city_extent_x_mm": 256000,
+        "block_length_mm": 90000,
+        "storey_band_low": 2,
+        "storey_band_high": 4,
+        "high_street_count": 1,
+        "cross_street_hierarchy": "local_street",
+        "typology_weight_apartment_block_permille": 500,
+        "typology_weight_loft_building_permille": 500,
+        "typology_weight_mansion_block_permille": 500,
+        "typology_weight_rowhouse_permille": 500,
+        "typology_weight_shophouse_permille": 500,
+        "ground_floor_use_weight_bakery_permille": 500,
+        "ground_floor_use_weight_bookshop_permille": 500,
+        "ground_floor_use_weight_cafe_permille": 500,
+        "ground_floor_use_weight_grocery_permille": 500,
+        "ground_floor_use_weight_office_permille": 500,
+        "ground_floor_use_weight_pharmacy_permille": 500,
+        "ground_floor_use_weight_restaurant_permille": 500,
+        "ground_floor_use_weight_workshop_permille": 500
+      },
+      "candidates": 4,
+      "candidates_reason": "Four seed candidates bound a request. A candidate is refused when no walkable footway spot keeps the town arrival policy clearance from street furniture, trees and resident starts; another candidate may offer a clear spot.",
+      "tiles": 2,
+      "reason": "Measured: two 128 m tiles of city grammar version 5 with cross streets 90 m apart, buildings of two to four storeys, one high street, local cross streets and every share even, the smallest town whose streets hold traffic. Its served arrival is a non-seat standing spot selected by composer version 2 under the pinned town-arrival policy.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world recipes; see the entry reasons"
+      }
+    },
+    {
+      "key": "market_town",
+      "label": "A market town",
+      "composer": "city-grammar-town",
+      "composer_version": 2,
+      "specification": "world-specification.v2",
+      "values": {
+        "city_extent_x_mm": 384000,
+        "block_length_mm": 140000,
+        "storey_band_low": 2,
+        "storey_band_high": 4,
+        "high_street_count": 1,
+        "cross_street_hierarchy": "local_street",
+        "typology_weight_apartment_block_permille": 500,
+        "typology_weight_loft_building_permille": 500,
+        "typology_weight_mansion_block_permille": 500,
+        "typology_weight_rowhouse_permille": 500,
+        "typology_weight_shophouse_permille": 500,
+        "ground_floor_use_weight_bakery_permille": 500,
+        "ground_floor_use_weight_bookshop_permille": 500,
+        "ground_floor_use_weight_cafe_permille": 500,
+        "ground_floor_use_weight_grocery_permille": 500,
+        "ground_floor_use_weight_office_permille": 500,
+        "ground_floor_use_weight_pharmacy_permille": 500,
+        "ground_floor_use_weight_restaurant_permille": 500,
+        "ground_floor_use_weight_workshop_permille": 500
+      },
+      "candidates": 4,
+      "candidates_reason": "Four seed candidates bound a request. A candidate is refused when no walkable footway spot keeps the town arrival policy clearance from street furniture, trees and resident starts; another candidate may offer a clear spot.",
+      "tiles": 3,
+      "reason": "Measured: three 128 m tiles of city grammar version 5 with cross streets 140 m apart along a high street, buildings of two to four storeys, local cross streets and every share even, the largest town offered whose homes stay within the people one tick of its society was measured to hold. Its served arrival is a non-seat standing spot selected by composer version 2 under the pinned town-arrival policy.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world recipes; see the entry reasons"
+      }
+    }
+  ]
+}

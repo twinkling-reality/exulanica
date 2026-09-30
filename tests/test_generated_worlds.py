@@ -53,6 +53,7 @@ from exulanica.world.society_authored_ground import authored_ground_from_snapsho
 from exulanica.world.society_city_place import place_from_city_records
 from exulanica.world.society_engines import CREATES
 from exulanica.world.society_living import current_routine
+from exulanica.world.society_place import seal_place
 from exulanica.world.world_recipes import (
     CANDIDATES_MAXIMUM,
     CATALOG_DIRECTORY,
@@ -516,7 +517,8 @@ def _to_piece(point: tuple[float, float], a: tuple[int, ...], b: tuple[int, ...]
 
 
 def test_a_person_arrives_on_the_central_standing_spot_facing_the_nearest_street():
-    recipe = world_recipe("small_town")
+    # Composer v1's central-spot rule belongs to the released recipe edition that names it.
+    recipe = next(r for r in load_world_recipes(catalog_version=3) if r.key == "small_town")
     composed = compose_generated_world(recipe, "world:generated:arrival")
     arrival = composed.receipt["arrival"]
     place = place_from_city_records(
@@ -1051,13 +1053,15 @@ def test_a_town_whose_homes_hold_more_than_the_schema_allows_is_refused_by_name(
 
     def crowded(**kwargs):
         place = make_place(**kwargs)
-        return {
-            **place,
-            "destinations": [
-                {**d, "resident_capacity": d.get("resident_capacity", 0) * 100}
-                for d in place["destinations"]
-            ],
-        }
+        return seal_place(
+            {
+                **place,
+                "destinations": [
+                    {**d, "resident_capacity": d.get("resident_capacity", 0) * 100}
+                    for d in place["destinations"]
+                ],
+            }
+        )
 
     monkeypatch.setattr(walking_surfaces_module, "place_from_city_records", crowded)
     monkeypatch.setattr(generated_worlds_module, "_records_kept", OrderedDict())

@@ -468,9 +468,12 @@ is, because a ground module need not state an edge.
   east and south of the city's origin in plan, in the frame `generated-ground-local-mm`, whose
   altitude reference is `plan-only`: the height a person stands at stays in the records. The walkable
   area is the rectangle the world's tiles cover, a walking clearance beyond each edge, because the
-  surfaces run to the edge. A person arrives at the world's spawn (`arrival: spawn`), which the
-  composer derived by one rule when it made the world: the standing spot nearest the centre of
-  the world's extent. The activities are the world's own: every premises whose use class admits
+  surfaces run to the edge. A person arrives at the world's spawn (`arrival: spawn`). Composer
+  version 1 selects the standing spot nearest the centre of the world's extent; version 2 selects
+  the nearest non-seat footway spot that is at least 2,000 mm from furniture and tree extents and
+  from the home nodes where residents begin, with spot identity breaking ties. The receipt pins
+  the selection policy and town routine so the spawn replays with its original rule. The
+  activities are the world's own: every premises whose use class admits
   visitors is somewhere to visit, stood at at its entrance, and every piece of street furniture
   whose use class seats people is somewhere to rest, one place per seat; a place that cannot keep a
   standing spacing from another, and any object the person placed in the town, is recorded as

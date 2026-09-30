@@ -19,12 +19,12 @@ world it made as a structural snapshot and a receipt:
   output digest. Each element's streaming key names the receipt's SHA-256, so the snapshot's
   digest binds it, and :func:`records` generates the records again and holds them to the output
   digest, so a world's records are never stored twice or read from a copy.
-* **Where a person arrives**, by one rule: the standing spot the city's walking surfaces offer
-  nearest the centre of the world's extent, ties by spot identity. The snapshot states it as the
-  region's destination, the world's own spawn, so every reader reads one point. A person arriving
-  there faces the nearest point of any street's crown line, ties by street segment identity, so
-  they look across the street rather than into a wall; the receipt records that facing as a plan
-  vector, because a structural destination states a point and no direction.
+* **Where a person arrives** is the spot the receipt names. Composer v1 selects the standing spot
+  nearest the centre of the world's extent. Composer v2 selects the nearest non-seat footway spot
+  whose position keeps the declared clearance from furniture and tree extents and from the home
+  nodes at which genesis starts residents. Ties use spot identity. The snapshot states that spot
+  as the world's spawn. A person arriving there faces the nearest point of a street's crown line;
+  the receipt records that plan vector because a structural destination states no direction.
 
 The grammar and its catalogs are not edited here: a receipt names the grammar version and catalog
 digest it was generated under, and a world whose grammar or catalogs no longer match is refused by
@@ -33,9 +33,12 @@ name rather than regenerated into something else.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import re
 from collections.abc import Mapping, Sequence
 from itertools import pairwise
+from pathlib import Path
 from typing import Any, Final
 
 from exulanica.grammar.catalogs import Catalog, catalog_digest
@@ -78,12 +81,14 @@ from exulanica.world.composers import (
     seed_candidate,
 )
 from exulanica.world.errors import InvalidStructuralData
+from exulanica.world.society_catalogs import ROUTINE_DIRECTORY, RoutineModel, load_routine_model
 from exulanica.world.society_city_place import city_navigation
 from exulanica.world.society_grounds import (
     SocietyPopulationRefused,
     refuse_population,
     society_ground_for_composer,
 )
+from exulanica.world.society_living import LivingPlace, _positions, town_routine
 from exulanica.world.society_walking_surfaces import place_residents, walking_surfaces_place
 from exulanica.world.starter import _EMPTY_GRAPH_SHA256, _EMPTY_RECONSTRUCTION_SHA256
 from exulanica.world.structure import SpatialCandidate
@@ -106,7 +111,8 @@ __all__ = [
 ]
 
 COMPOSER_KEY: Final = "city-grammar-town"
-COMPOSER_VERSIONS: Final = (1,)
+COMPOSER_VERSIONS: Final = (1, 2)
+_ARRIVAL_POLICY_PATH: Final = Path(__file__).with_name("town-arrival.v1.json")
 #: The city grammar versions this composer generates: every version the city grammar itself
 #: generates. Each version reads its own catalogs, tile records and descriptor, and this composer
 #: reads them at the version a recipe names or a receipt records, so a world generated under
@@ -165,6 +171,89 @@ def _arrival(place: Mapping[str, Any], tiles: Sequence[Sequence[int]]) -> Any:
             spot["spot_id"],
         ),
     )
+
+
+def _resident_starts(place: dict[str, Any], routine: RoutineModel) -> list[list[int]]:
+    """Home positions from the same destination slots and nodes used by society genesis."""
+    living = LivingPlace(place, routine)
+    return [
+        living.position(living.destinations[home_id]["node_id"])
+        for home_id, _ordinal in _positions(living, "home")
+    ]
+
+
+def _arrival_v2(
+    place: dict[str, Any],
+    tiles: Sequence[Sequence[int]],
+    generated: Sequence[object],
+    routine: RoutineModel,
+) -> Mapping[str, Any]:
+    """Choose a non-seat standing spot clear of street objects and resident starts."""
+    from exulanica.grammar.grammars.city.streetlife import StreetFurnitureRecord, StreetTreeRecord
+
+    policy = json.loads(_ARRIVAL_POLICY_PATH.read_text())
+    if policy.get("profile") != "exulanica.town-arrival/v1":
+        raise InvalidRecordError("town arrival policy has an unsupported profile")
+    object_clearance = policy["minimum_object_clearance_mm"]
+    resident_clearance = policy["minimum_resident_clearance_mm"]
+    if (
+        isinstance(object_clearance, bool)
+        or not isinstance(object_clearance, int)
+        or object_clearance <= 0
+    ):
+        raise InvalidRecordError("town arrival policy has no positive object clearance")
+    if (
+        isinstance(resident_clearance, bool)
+        or not isinstance(resident_clearance, int)
+        or resident_clearance <= 0
+    ):
+        raise InvalidRecordError("town arrival policy has no positive resident clearance")
+    occupied = [
+        record.extent
+        for record in generated
+        if isinstance(record, (StreetFurnitureRecord, StreetTreeRecord))
+    ]
+    residents = _resident_starts(place, routine)
+    west, south, east, north = _extent(tiles)
+    centre = ((west + east) // 2, (south + north) // 2)
+
+    def clear(spot: Mapping[str, Any]) -> bool:
+        x, y = spot["position_mm"]
+        for extent in occupied:
+            dx = max(extent.min_x_mm - x, 0, x - extent.max_x_mm)
+            dy = max(extent.min_y_mm - y, 0, y - extent.max_y_mm)
+            if dx * dx + dy * dy < object_clearance * object_clearance:
+                return False
+        return all(
+            (x - resident[0]) ** 2 + (y - resident[1]) ** 2
+            >= resident_clearance * resident_clearance
+            for resident in residents
+        )
+
+    eligible = [
+        spot
+        for spot in place["spots"]
+        if spot["spot_id"].startswith("footway:")
+        and not spot["destination_ids"]
+        and clear(spot)
+        and any(_facing(spot["position_mm"], generated))
+    ]
+    if not eligible:
+        raise InvalidRecordError("town_arrival_clearance: no clear footway standing spot")
+    return min(
+        eligible,
+        key=lambda spot: (
+            (spot["position_mm"][0] - centre[0]) ** 2 + (spot["position_mm"][1] - centre[1]) ** 2,
+            spot["spot_id"],
+        ),
+    )
+
+
+def _arrival_policy_pin() -> dict[str, str]:
+    return {
+        "profile": "exulanica.town-arrival/v1",
+        "sha256": hashlib.sha256(_ARRIVAL_POLICY_PATH.read_bytes()).hexdigest(),
+    }
 
 
 def _facing(position: Sequence[int], generated: Sequence[object]) -> list[int]:
@@ -309,8 +398,15 @@ def compose(recipe: WorldRecipe, world_id: str) -> ComposedWorld:
             # A world is kept only if every tile document it makes passes the grammar's own
             # checks, so every world a recipe makes can be baked.
             _documents(seed, identity, generated, tiles, catalogs, version)
-            place = walking_surfaces_place(f"generated:{world_id}", generated)
-            arrival = _arrival(place, tiles)
+            arrival_routine = town_routine() if recipe.composer_version == 2 else None
+            place = walking_surfaces_place(
+                f"generated:{world_id}", generated, routine=arrival_routine
+            )
+            arrival = (
+                _arrival_v2(place, tiles, generated, arrival_routine)
+                if recipe.composer_version == 2
+                else _arrival(place, tiles)
+            )
             # A world is kept only if a society can start on it: someone lives there, and no more
             # people than one tick of a society over its ground was measured to hold.
             refuse_population(place_residents(place), ground)
@@ -349,7 +445,18 @@ def compose(recipe: WorldRecipe, world_id: str) -> ComposedWorld:
                 "spot_id": arrival["spot_id"],
                 "position_mm": list(arrival["position_mm"]),
                 "facing_mm": _facing(arrival["position_mm"], generated),
+                **(
+                    {"support_z_mm": arrival["support_z_mm"]}
+                    if recipe.composer_version == 2
+                    else {}
+                ),
             },
+            **({"arrival_policy": _arrival_policy_pin()} if recipe.composer_version == 2 else {}),
+            **(
+                {"arrival_routine": arrival_routine.binding()}
+                if arrival_routine is not None
+                else {}
+            ),
         }
         digest = receipt_sha256(receipt)
         return ComposedWorld(
@@ -394,6 +501,15 @@ def _version(receipt: Mapping[str, Any]) -> int:
 
 
 def _check_current(receipt: Mapping[str, Any], catalogs: Sequence[Catalog]) -> None:
+    composer = receipt.get("composer", {})
+    if composer.get("key") != COMPOSER_KEY or composer.get("version") not in COMPOSER_VERSIONS:
+        raise InvalidStructuralData(
+            "generated_world_composer_changed: unknown town composer version"
+        )
+    if composer["version"] == 2 and receipt.get("arrival_policy") != _arrival_policy_pin():
+        raise InvalidStructuralData(
+            "generated_world_arrival_policy_changed: town arrival policy differs"
+        )
     grammar = receipt["grammar"]
     if grammar["descriptor_sha256"] != descriptor_sha256(CITY_DESCRIPTOR_PATHS[_version(receipt)]):
         raise InvalidStructuralData(
@@ -427,7 +543,36 @@ def records(receipt: Mapping[str, Any]) -> tuple[object, ...]:
             "generated_world_output_changed: generating this world's receipt again produced "
             "other records"
         )
-    return city_records(generation)
+    generated = city_records(generation)
+    if receipt["composer"]["version"] == 2:
+        binding = receipt.get("arrival_routine")
+        if not isinstance(binding, dict) or not isinstance(binding.get("catalog_versions"), dict):
+            raise InvalidStructuralData(
+                "generated_world_arrival_routine_changed: no pinned routine"
+            )
+        routine = load_routine_model(
+            ROUTINE_DIRECTORY,
+            versions={str(key): int(value) for key, value in binding["catalog_versions"].items()},
+        )
+        if routine.binding() != binding:
+            raise InvalidStructuralData(
+                "generated_world_arrival_routine_changed: catalog digest differs"
+            )
+        place = walking_surfaces_place(
+            f"generated:{receipt['world_id']}", generated, routine=routine
+        )
+        spot = _arrival_v2(place, receipt["tiles"], generated, routine)
+        expected = {
+            "spot_id": spot["spot_id"],
+            "position_mm": list(spot["position_mm"]),
+            "support_z_mm": spot["support_z_mm"],
+            "facing_mm": _facing(spot["position_mm"], generated),
+        }
+        if receipt["arrival"] != expected:
+            raise InvalidStructuralData(
+                "generated_world_arrival_changed: receipt names another spot"
+            )
+    return generated
 
 
 def _documents(

@@ -1,0 +1,6 @@
+{
+  "profile": "exulanica.town-arrival/v1",
+  "minimum_object_clearance_mm": 2000,
+  "reason": "A person arrives with two metres between their standing point and the occupied plan extent of a street-furniture item or tree. This is the same declared arrival clearance the society uses for people; the full record extent includes arms, pits and crowns, so checking only a pole or trunk centre would leave an object in the first frame. A resident begins at their home destination node, so the chosen spot also keeps the same two metres from every residential node under the town routine, regardless of the society seed.",
+  "minimum_resident_clearance_mm": 2000
+}
