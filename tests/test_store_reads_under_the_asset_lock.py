@@ -31,6 +31,7 @@ from exulanica.deletion.queue import PurgeTarget, mark_purged
 from exulanica.evidence.blob import BlobId
 from exulanica.ingest.repository import IngestRepository
 from exulanica.selection import execute, validate
+from exulanica.selection.executor import SocietyLeftOut
 from exulanica.world import UnavailableAsset, reviewed_assets
 from exulanica.world.object_repository import WorldObjectRepository
 from exulanica.world.objects import AuthoredObject, ObjectOrigin, Transform
@@ -752,6 +753,14 @@ def test_a_question_whose_society_meets_the_race_is_answered_without_the_society
     assert any(item.origin_kind == "simulated" for item in allowed.content)
     assert answered.content == left_out.content
     assert answered.total_matched == left_out.total_matched < allowed.total_matched
+    # Each says which society it left out and why, so the answer can say so.
+    assert allowed.left_out_societies == ()
+    assert [(s.version_id, s.reason) for s in left_out.left_out_societies] == [
+        (version, SocietyLeftOut.INPUT_UNAVAILABLE)
+    ]
+    assert [(s.version_id, s.reason) for s in answered.left_out_societies] == [
+        (version, SocietyLeftOut.READ_RACED)
+    ]
 
 
 def test_the_selection_executor_announces_every_input_before_authorizing_the_first(memory_place):
@@ -863,3 +872,6 @@ def test_a_society_whose_stored_inputs_do_not_check_is_left_out_unannounced(memo
     assert any(item.origin_kind == "simulated" for item in allowed.content), "positive control"
     assert answered.content == left_out.content
     assert answered.total_matched == left_out.total_matched < allowed.total_matched
+    assert [(s.version_id, s.reason) for s in answered.left_out_societies] == [
+        (version, SocietyLeftOut.INPUTS_DO_NOT_CHECK)
+    ]

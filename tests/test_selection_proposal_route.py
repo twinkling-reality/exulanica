@@ -274,6 +274,10 @@ def test_an_appearance_request_comes_back_as_a_complete_reference_with_its_prove
     assert proposal["prompt_version"] == PROPOSAL_PROMPT_VERSION
     assert proposal["reference_ids"] == [proposal_api.source_ids[0]]
     assert proposal["spoken"]
+    # The version and topology the draft was drawn on, which the page previews it against.
+    current = proposal_api.current()
+    assert proposal["base_style_version_id"] == current["current"]["version_id"]
+    assert proposal["base_topology_digest"] == current["current_topology_digest"]
 
 
 def test_the_execution_block_reports_this_paths_prompt_version_and_not_the_question_paths(

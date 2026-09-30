@@ -39,6 +39,7 @@ __all__ = [
     "StaleObjectBase",
     "StaleStructuralBase",
     "StaleStyleVersion",
+    "StyleWriteBusy",
     "UnavailableAsset",
     "UnknownWorldResource",
     "WorldNotConfigured",
@@ -56,6 +57,12 @@ class InvalidStyleData(WorldStyleError):
 
 class StaleStyleVersion(WorldStyleError):
     """The caller based a mutation on a style version that is no longer current."""
+
+
+class StyleWriteBusy(WorldStyleError):
+    """Another transaction held a lock a write to this world's look needs longer than the write
+    waits for it, so nothing was written; asked again, the write waits again
+    (``STYLE_WRITE_LOCK_WAIT_MS``)."""
 
 
 class ProtectedTopologyConflict(WorldStyleError):

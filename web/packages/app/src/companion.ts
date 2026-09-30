@@ -1,10 +1,12 @@
 import {
   findOption,
+  parseUtterance,
   type CompanionSession,
   type ConfirmationSummary,
   type DraftOp,
   type SelectionOutcome,
   type Turn,
+  type UtteranceParse,
 } from '@exulanica/companion-runtime';
 import type { EvidenceHandle, GraphSnapshot, UpdateProposal } from '@exulanica/graph-client';
 import { AskUnavailable, type CompanionAnswer } from './companion-ask-api.js';
@@ -72,7 +74,9 @@ const QUESTION_REFUSALS: ReadonlySet<string> = new Set([
  * light warmer where she stands, and say who stands there") became a note to record, behind a
  * confirmation, instead of being asked. A draft of notes alone is therefore read as a question,
  * the way a refusal that means "these words describe no change" is: the draft is cancelled, which
- * writes nothing, and the words are asked.
+ * writes nothing, and the words are asked. So are words put as a question or a request (`asks` in
+ * the parse), whatever the parser drew from them: "Is my mother in any of these photographs?"
+ * holds a relation word, and was staged as a relation to record.
  */
 const NOTE: DraftOp = 'note';
 
@@ -87,26 +91,28 @@ const NOTE: DraftOp = 'note';
 const ANSWERED_IN_NOTES: ReadonlySet<string> = new Set(['utterance.relation']);
 
 /**
- * The open turns whose question a yes or a no answers, and how such an answer opens.
+ * The open turns whose question a yes or a no answers.
  *
- * The parser reads a name, a relation word and whatever follows a first comma, and keeps no yes or
- * no, so "No, that's her daughter" typed at "Is this the same person as the one in the earlier
- * photograph?" is a draft of notes alone. It answers the open question all the same, so it is
- * staged as the note it is, for the person to confirm, rather than asked.
+ * "No, that's her daughter" typed at "Is this the same person as the one in the earlier
+ * photograph?" is a draft of notes alone, and it answers the open question all the same, so it is
+ * staged as the note it is, for the person to confirm, rather than asked. The parser reads the
+ * reply's yes, no or maybe (`reply` in `companion-runtime/src/parse.ts`) and keeps it in the note.
  */
 const ANSWERED_YES_OR_NO: ReadonlySet<string> = new Set([
   'utterance.resolveIdentity',
   'utterance.confirmContinuity',
 ]);
-const OPENS_WITH_YES_OR_NO = /^\s*(?:yes|yeah|yep|no|nope|not)\b/iu;
 
-/** Whether words typed on the open turn answer its own question, so the note they make is kept. */
-function answersOpenQuestion(text: string, turn: Turn | null): boolean {
+/**
+ * Whether words typed on the open turn answer its own question, so the draft they make is kept.
+ *
+ * A reply that opens with a yes, a no or a maybe answers a yes-or-no question, whatever else it
+ * says. Words that ask something (`asks`) answer no other turn: they are the person's own question.
+ */
+function answersOpenQuestion(parse: UtteranceParse, turn: Turn | null): boolean {
   const key = turn?.utteranceKey ?? '';
-  return (
-    ANSWERED_IN_NOTES.has(key)
-    || (ANSWERED_YES_OR_NO.has(key) && OPENS_WITH_YES_OR_NO.test(text))
-  );
+  if (ANSWERED_YES_OR_NO.has(key)) return parse.reply !== null;
+  return ANSWERED_IN_NOTES.has(key) && !parse.asks;
 }
 
 /** A staged proposal of notes alone, which records no name, relation or decision. */
@@ -272,10 +278,12 @@ export function createCompanionController(
       void ask(text);
       return;
     }
+    // The same parse the session made of the words, read again for what it says of their form.
+    const parse = parseUtterance(text);
     if (
       outcome.kind === 'awaiting_confirmation' &&
-      onlyNotes(outcome.proposal) &&
-      !answersOpenQuestion(text, turn) &&
+      (onlyNotes(outcome.proposal) || parse.asks) &&
+      !answersOpenQuestion(parse, turn) &&
       options.askQuestion !== undefined
     ) {
       // Nothing was written: a staged proposal is only held until it is confirmed.

@@ -14,8 +14,14 @@ leaves a place's name only where a right releases it for that request's models:
 *   **A saved name is recognised** whole, case-insensitively and only as a whole word. A person's
     or a voice's name is also recognised by any part of at least three letters, because people are
     named by first name: "Maria Estrada" is recognised as "Maria Estrada", "Maria" or "Estrada".
-    Other names are recognised whole only, because their parts are ordinary words: a saved
-    "Lantern House" must not turn "photos of the house" into a filter on one particular place.
+    A part that is a closed-class word, one that refers to no one (:data:`FUNCTION_WORDS`), written
+    in lowercase in a saved name that capitalises another part, is not recognised alone: the "the"
+    of a saved "Joe the Plumber" is part of the whole name, never a name by itself. The saved
+    name's own writing decides it, so "Nguyen The Anh" keeps "The", and a saved name written all in
+    lowercase keeps every part. Other names are recognised whole only, because their parts are
+    ordinary words:
+    a saved "Lantern House" must not turn "photos of the house" into a filter on one particular
+    place.
 *   **Each recognised entity gets a placeholder** of its class, ``[person A]``, ``[place A]``,
     ``[object A]``, stable for the whole request, so the planner can be told which catalogue id a
     placeholder is and the composer refers to the same entity the same way. The browser restores
@@ -24,8 +30,9 @@ leaves a place's name only where a right releases it for that request's models:
 
 What this cannot do, stated rather than hidden: a name the account holder has not saved cannot be
 recognised, so it leaves as the text it was typed as; and a saved name that is also an ordinary
-word is replaced wherever that word appears, which for a person includes each part of their name:
-somebody saved as Rose makes "the rose garden" arrive as "the [person A] garden".
+word is replaced wherever that word appears, which for a person includes each part of their name
+the rule above keeps: somebody saved as Rose makes "the rose garden" arrive as "the [person A]
+garden", because Rose is somebody's name and a word alike.
 """
 
 from __future__ import annotations
@@ -33,8 +40,10 @@ from __future__ import annotations
 import json
 import re
 import uuid
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
+from importlib.resources import files
+from typing import Final
 
 import psycopg
 
@@ -53,6 +62,39 @@ MIN_PART_LETTERS = 3
 
 #: The classes whose names are recognised by their parts as well as whole.
 _BY_PART = frozenset({"person", "voice"})
+
+
+def _function_words() -> frozenset[str]:
+    """The closed-class words ``name-part-function-words.v1.json`` beside this module lists, each
+    with its class and why it refers to no one, refused by name when an entry lacks either."""
+    document = json.loads(
+        files("exulanica.epistemics")
+        .joinpath("name-part-function-words.v1.json")
+        .read_text("utf-8")
+    )
+    if document.get("profile") != "exulanica.name-part-function-words/v1":
+        raise ValueError("name-part-function-words.v1.json states another profile")
+    words = []
+    for entry in document["words"]:
+        word = entry.get("word")
+        if not (
+            isinstance(word, str) and word == word.casefold() and len(word) >= MIN_PART_LETTERS
+        ):
+            raise ValueError(f"name_part_function_word_malformed: {entry!r}")
+        if not (entry.get("class") and entry.get("reason")):
+            raise ValueError(f"name_part_function_word_unexplained: {word}")
+        words.append(word)
+    return frozenset(words)
+
+
+#: Closed-class words (articles, determiners, prepositions and conjunctions) that refer to no one
+#: and are no name part in any major naming culture. A part of a person's or a voice's saved name
+#: that is one of them is not recognised alone where the saved name writes it in lowercase and
+#: capitalises another part (:func:`_written_as_no_name`). Recognised alone, the "the" of a saved
+#: "Joe the Plumber" would make every "the" in every hosted request a placeholder, and a society
+#: decision's fixed question one its rules would change, so nobody in the world would be asked. A
+#: saved name is still recognised whole with such a word in it.
+FUNCTION_WORDS: Final = _function_words()
 
 _CLASSES = ("person", "voice", "place", "object", "conversation", "event")
 
@@ -98,6 +140,18 @@ def _label(entity_class: str, index: int) -> str:
     return f"[{entity_class} {letters}]"
 
 
+def _written_as_no_name(word: str, parts: Sequence[str]) -> bool:
+    """Whether a saved name's own writing says ``word`` is not a name in it: a closed-class word
+    (:data:`FUNCTION_WORDS`) written in lowercase where another part of the name is capitalised.
+    Where the account holder capitalised the word, or wrote the whole name in lowercase, the word
+    is recognised as a part like any other, so a doubt is always a redaction."""
+    return (
+        word.casefold() in FUNCTION_WORDS
+        and word == word.lower()
+        and any(part[:1].isupper() for part in parts)
+    )
+
+
 def _patterns(names: Iterable[SavedName]) -> list[tuple[re.Pattern[str], SavedName]]:
     """One pattern per recognisable form of each name, longest first so whole names win.
 
@@ -112,8 +166,14 @@ def _patterns(names: Iterable[SavedName]) -> list[tuple[re.Pattern[str], SavedNa
             continue
         forms.append((whole, saved))
         if saved.entity_class in _BY_PART:
-            for part in whole.split(" "):
-                if len(re.sub(r"[^\w]", "", part)) >= MIN_PART_LETTERS and part != whole:
+            parts = whole.split(" ")
+            for part in parts:
+                word = re.sub(r"[^\w]", "", part)
+                if (
+                    len(word) >= MIN_PART_LETTERS
+                    and part != whole
+                    and not _written_as_no_name(word, parts)
+                ):
                     forms.append((part, saved))
     forms.extend(
         (spelled, saved)

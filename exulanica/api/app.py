@@ -159,6 +159,7 @@ from exulanica.world import (
     StaleInteractionPolicy,
     StaleSocietyState,
     StaleStyleVersion,
+    StyleWriteBusy,
     UnavailableAsset,
     UnknownSociety,
     UnknownWorldResource,
@@ -573,6 +574,13 @@ def create_app(services: Services | None = None, *, verify: bool = True) -> Fast
     @app.exception_handler(StaleStyleVersion)
     async def _stale_style(_request: Request, exc: StaleStyleVersion) -> JSONResponse:
         return _problem(409, "stale_style_version", str(exc))
+
+    @app.exception_handler(StyleWriteBusy)
+    async def _style_busy(_request: Request, exc: StyleWriteBusy) -> JSONResponse:
+        # Another writer held the world's look past the wait a write gives it; nothing was written,
+        # so the same request is answered once the other write ends. "busy", as the other routes
+        # that meet a held lock say it.
+        return _problem(409, "busy", str(exc))
 
     @app.exception_handler(ProtectedTopologyConflict)
     async def _protected_topology(

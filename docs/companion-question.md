@@ -61,11 +61,15 @@ exact response shapes and refusal codes live in the route models and API schema 
 parsed into the same update proposal draft that a choice would produce and goes through the
 IDENTICAL confirmation flow", and that "No path writes to the graph without a proposal". That holds
 for every utterance the parser can turn into a change. The question branch is what
-happens when it cannot, or when all it makes of the words is a note: the parser keeps whatever
-follows a first comma as a note, so a draft of notes alone, typed while one of the Companion's own
-questions is open, is cancelled unwritten and asked as a question, unless the words answer that
-question: a reply to "How do you know them?", which a person answers in their own words, or one
-that opens with a yes or a no to a question that asks for one (`answersOpenQuestion` in
+happens when it cannot, when all it makes of the words is a note, or when the words ask: the parser
+keeps whatever follows a first comma as a note, and reads whether the words end with a question mark
+or open with a word that asks (`asks` in
+[the parser](../web/packages/companion-runtime/src/parse.ts)). So a draft of notes alone, or any
+draft of words that ask, typed while one of the Companion's own questions is open, is cancelled
+unwritten and asked as a question, unless the words answer that question: a reply to "How do you
+know them?" that does not ask, which a person answers in their own words, or a reply that opens with
+a yes, a no or a maybe to a question that asks for one, which the parser reads (`reply`) and keeps
+whole in the note it records (`answersOpenQuestion` in
 [the controller](../web/packages/app/src/companion.ts)). The guarantee is structural rather than
 promised:
 
@@ -173,8 +177,16 @@ is given, and every request of the question hands that record to the boundary, s
 from a request is written with the same placeholder in the question, the catalogue and the packet.
 A saved name is recognised whole, case-insensitively and as a whole word; a person's or a voice's
 name is also recognised by any part of at least three letters, because people are named by first
-name, while other names are recognised whole only, because their parts are ordinary words and a
-saved "Lantern House" must not turn "photos of the house" into a filter on one place. Every saved
+name, except an article, a determiner, a preposition or a conjunction that refers to no one
+([name-part-function-words.v1.json](../exulanica/epistemics/name-part-function-words.v1.json)) where
+the saved name writes it in lowercase and capitalises another part: the "the" of a saved "Joe the
+Plumber" is no name by itself. The saved name's own writing decides, so a doubt is a redaction:
+"Nguyen The Anh" keeps "The", "Tom With" keeps "With", and a saved name written all in lowercase keeps
+every part. The list holds words that are no given name or surname in any major naming culture, with
+one declared exception, "the", which is also a Vietnamese name part written without its diacritic and
+which the rule keeps wherever it is written as a name. Other names are recognised whole only,
+because their parts are ordinary words and a saved "Lantern House" must not turn "photos of the
+house" into a filter on one place. Every saved
 name is recognised in one pass, longest first, so a person's first name inside a place's name does
 not break the place's name apart. Each entity recognised gets a placeholder of its class,
 `[person A]`, `[place A]`, stable for the whole question. A place whose whole saved name reads as
@@ -300,7 +312,11 @@ own words, as any question does, and the answer says first, in a clause of its o
 were left out; a question about the people themselves is refused as `society_unavailable`. An event
 recorded under an input a withdrawal no longer authorizes is left out alone, among the latest events
 as among those that explain a person's state: the rest of the society still answers, without that
-citation. `POST /selection/plan` reads no society and refuses a `society_context` by name
+citation. An answer about what is at a place says first, in a clause of its own, when a society at
+that place was left out of its content, and why: nothing it is made from is recorded, what it is
+made from no longer checks, something it is made from is not available, or it changed while it was
+read (`SocietyLeftOut` in [the executor](../exulanica/selection/executor.py)). `POST /selection/plan`
+reads no society and refuses a `society_context` by name
 (`society_context_not_planned`).
 
 A question about the world's simulated people is a Selection of intent `society`, with a `scope`

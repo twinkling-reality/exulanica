@@ -1,0 +1,226 @@
+{
+  "profile": "exulanica.name-part-function-words/v1",
+  "note": "Closed-class English words of at least three letters (articles, determiners, prepositions and conjunctions) that refer to no one and are not a given name or a surname in any major naming culture, with one declared exception, \"the\", which is also a Vietnamese name part written without its diacritic (Thế) and which the rule below keeps wherever it is written as a name; where there was doubt a word was left out, because a word left out is only redacted where it need not be, while a word kept could let a name leave. The rule in exulanica/epistemics/saved_names.py: a part of a person's or a voice's saved name is not recognised alone when it is one of these words AND the saved name writes it in lowercase AND capitalises another part, as the \"the\" of a saved \"Joe the Plumber\" is written. The saved name's own writing says the word is not a name there: \"Nguyen The Anh\" keeps \"The\", and a saved name written all in lowercase keeps every part. The whole saved name is recognised either way. tests/test_saved_name_function_words.py holds this list against given names and surnames from many naming cultures.",
+  "words": [
+    {
+      "word": "the",
+      "class": "article",
+      "reason": "An article: it marks a noun and refers to no one. Written \"The\" it can be a Vietnamese name part without its diacritic (Thế), which the rule keeps: only a lowercase \"the\" inside a saved name that capitalises another part is skipped."
+    },
+    {
+      "word": "this",
+      "class": "determiner",
+      "reason": "A determiner: it picks out what a noun names and refers to no one."
+    },
+    {
+      "word": "that",
+      "class": "determiner",
+      "reason": "A determiner: it picks out what a noun names and refers to no one."
+    },
+    {
+      "word": "these",
+      "class": "determiner",
+      "reason": "A determiner: it picks out what a noun names and refers to no one."
+    },
+    {
+      "word": "those",
+      "class": "determiner",
+      "reason": "A determiner: it picks out what a noun names and refers to no one."
+    },
+    {
+      "word": "which",
+      "class": "determiner",
+      "reason": "A determiner: it picks out what a noun names and refers to no one."
+    },
+    {
+      "word": "whose",
+      "class": "determiner",
+      "reason": "A determiner: it picks out what a noun names and refers to no one."
+    },
+    {
+      "word": "whatever",
+      "class": "determiner",
+      "reason": "A determiner: it picks out what a noun names and refers to no one."
+    },
+    {
+      "word": "whichever",
+      "class": "determiner",
+      "reason": "A determiner: it picks out what a noun names and refers to no one."
+    },
+    {
+      "word": "another",
+      "class": "determiner",
+      "reason": "A determiner: it picks out what a noun names and refers to no one."
+    },
+    {
+      "word": "either",
+      "class": "determiner",
+      "reason": "A determiner: it picks out what a noun names and refers to no one."
+    },
+    {
+      "word": "neither",
+      "class": "determiner",
+      "reason": "A determiner: it picks out what a noun names and refers to no one."
+    },
+    {
+      "word": "about",
+      "class": "preposition",
+      "reason": "A preposition: it relates one thing to another in place, time or manner and refers to no one."
+    },
+    {
+      "word": "above",
+      "class": "preposition",
+      "reason": "A preposition: it relates one thing to another in place, time or manner and refers to no one."
+    },
+    {
+      "word": "across",
+      "class": "preposition",
+      "reason": "A preposition: it relates one thing to another in place, time or manner and refers to no one."
+    },
+    {
+      "word": "against",
+      "class": "preposition",
+      "reason": "A preposition: it relates one thing to another in place, time or manner and refers to no one."
+    },
+    {
+      "word": "along",
+      "class": "preposition",
+      "reason": "A preposition: it relates one thing to another in place, time or manner and refers to no one."
+    },
+    {
+      "word": "among",
+      "class": "preposition",
+      "reason": "A preposition: it relates one thing to another in place, time or manner and refers to no one."
+    },
+    {
+      "word": "around",
+      "class": "preposition",
+      "reason": "A preposition: it relates one thing to another in place, time or manner and refers to no one."
+    },
+    {
+      "word": "away",
+      "class": "preposition",
+      "reason": "A preposition that takes no object (the Cambridge Grammar of the English Language counts such words as prepositions), as in the society decision labels' \"12 m away\": it refers to no one."
+    },
+    {
+      "word": "behind",
+      "class": "preposition",
+      "reason": "A preposition: it relates one thing to another in place, time or manner and refers to no one."
+    },
+    {
+      "word": "beneath",
+      "class": "preposition",
+      "reason": "A preposition: it relates one thing to another in place, time or manner and refers to no one."
+    },
+    {
+      "word": "beside",
+      "class": "preposition",
+      "reason": "A preposition: it relates one thing to another in place, time or manner and refers to no one."
+    },
+    {
+      "word": "between",
+      "class": "preposition",
+      "reason": "A preposition: it relates one thing to another in place, time or manner and refers to no one."
+    },
+    {
+      "word": "beyond",
+      "class": "preposition",
+      "reason": "A preposition: it relates one thing to another in place, time or manner and refers to no one."
+    },
+    {
+      "word": "despite",
+      "class": "preposition",
+      "reason": "A preposition: it relates one thing to another in place, time or manner and refers to no one."
+    },
+    {
+      "word": "during",
+      "class": "preposition",
+      "reason": "A preposition: it relates one thing to another in place, time or manner and refers to no one."
+    },
+    {
+      "word": "except",
+      "class": "preposition",
+      "reason": "A preposition: it relates one thing to another in place, time or manner and refers to no one."
+    },
+    {
+      "word": "inside",
+      "class": "preposition",
+      "reason": "A preposition: it relates one thing to another in place, time or manner and refers to no one."
+    },
+    {
+      "word": "onto",
+      "class": "preposition",
+      "reason": "A preposition: it relates one thing to another in place, time or manner and refers to no one."
+    },
+    {
+      "word": "outside",
+      "class": "preposition",
+      "reason": "A preposition: it relates one thing to another in place, time or manner and refers to no one."
+    },
+    {
+      "word": "through",
+      "class": "preposition",
+      "reason": "A preposition: it relates one thing to another in place, time or manner and refers to no one."
+    },
+    {
+      "word": "toward",
+      "class": "preposition",
+      "reason": "A preposition: it relates one thing to another in place, time or manner and refers to no one."
+    },
+    {
+      "word": "towards",
+      "class": "preposition",
+      "reason": "A preposition: it relates one thing to another in place, time or manner and refers to no one."
+    },
+    {
+      "word": "until",
+      "class": "preposition",
+      "reason": "A preposition: it relates one thing to another in place, time or manner and refers to no one."
+    },
+    {
+      "word": "within",
+      "class": "preposition",
+      "reason": "A preposition: it relates one thing to another in place, time or manner and refers to no one."
+    },
+    {
+      "word": "without",
+      "class": "preposition",
+      "reason": "A preposition: it relates one thing to another in place, time or manner and refers to no one."
+    },
+    {
+      "word": "and",
+      "class": "conjunction",
+      "reason": "A conjunction: it joins words or clauses and refers to no one."
+    },
+    {
+      "word": "because",
+      "class": "conjunction",
+      "reason": "A conjunction: it joins words or clauses and refers to no one."
+    },
+    {
+      "word": "although",
+      "class": "conjunction",
+      "reason": "A conjunction: it joins words or clauses and refers to no one."
+    },
+    {
+      "word": "though",
+      "class": "conjunction",
+      "reason": "A conjunction: it joins words or clauses and refers to no one."
+    },
+    {
+      "word": "whereas",
+      "class": "conjunction",
+      "reason": "A conjunction: it joins words or clauses and refers to no one."
+    },
+    {
+      "word": "unless",
+      "class": "conjunction",
+      "reason": "A conjunction: it joins words or clauses and refers to no one."
+    },
+    {
+      "word": "whether",
+      "class": "conjunction",
+      "reason": "A conjunction: it joins words or clauses and refers to no one."
+    }
+  ]
+}

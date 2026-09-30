@@ -79,6 +79,7 @@ const PROPOSAL: CompanionProposal = {
     modelId: DRAFTER,
     promptVersion: 'proposal-3',
     spoken: SPOKEN,
+    base: { styleVersionId: 'v0', topologyDigest: 'topology-a' },
   },
   refusal: null,
   promptVersion: 'proposal-3',

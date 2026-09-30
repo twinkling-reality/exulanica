@@ -83,6 +83,7 @@ from exulanica.selection.society_question import (
 )
 from exulanica.world import (
     StyleReference,
+    StyleVersion,
     WorldNotConfigured,
     WorldStyleRepository,
 )
@@ -949,6 +950,12 @@ class AppearanceProposalView(BaseModel):
     #: What the Companion says about the change. Model output, rendered as speech, never stored
     #: as style data and never interpreted as one.
     spoken: str
+    #: The world style version and topology the draft was drawn on, read once as its model call
+    #: began. The page previews the proposal against them, so a page whose own copy is behind
+    #: previews a change drawn on the live version rather than having it refused as stale, and a
+    #: change drawn before another writer's is still refused by the world authority.
+    base_style_version_id: uuid.UUID
+    base_topology_digest: str
 
 
 class AppearanceRefusalView(BaseModel):
@@ -1002,12 +1009,12 @@ def appearance(
     client = _require_model(request, connection, session)
     require_world(connection, session.workspace_id, world_id)
     current: StyleReference | None = None
+    drawn_on: StyleVersion | None = None
     try:
-        current = (
-            WorldStyleRepository(connection, session.workspace_id, world_id=world_id)
-            .current()
-            .global_style
-        )
+        drawn_on = WorldStyleRepository(
+            connection, session.workspace_id, world_id=world_id
+        ).current()
+        current = drawn_on.global_style
     except WorldNotConfigured:
         # Left as None and refused inside `propose_appearance`, rather than raised as a 409.
         # A person who asked for a warmer world on a workspace with no reviewed world is owed a
@@ -1023,11 +1030,13 @@ def appearance(
         world_id=world_id,
         store=get_services(request).store,
     )
+    # A proposal exists only when a current style was read: without one the request is refused.
+    assert outcome.proposal is None or drawn_on is not None
     return AppearanceView(
         classification=outcome.kind.value,
         proposal=(
             None
-            if outcome.proposal is None
+            if outcome.proposal is None or drawn_on is None
             else AppearanceProposalView(
                 profile=AppearanceProfileView(
                     profile_id=outcome.proposal.profile.profile_id,
@@ -1042,6 +1051,8 @@ def appearance(
                 model_id=outcome.model_id or "",
                 prompt_version=PROPOSAL_PROMPT_VERSION,
                 spoken=outcome.proposal.spoken,
+                base_style_version_id=drawn_on.version_id,
+                base_topology_digest=drawn_on.topology_digest,
             )
         ),
         refusal=(

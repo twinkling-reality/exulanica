@@ -261,6 +261,7 @@ export function mountCompanion(deps: CompanionDependencies): MountedCompanion {
       referenceIds: outcome.proposal.referenceIds,
       modelId: outcome.proposal.modelId,
       promptVersion: outcome.proposal.promptVersion,
+      base: outcome.proposal.base,
     });
     switch (heard.by) {
       case 'authority':

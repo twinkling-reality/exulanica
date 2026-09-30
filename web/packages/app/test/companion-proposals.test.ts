@@ -137,6 +137,8 @@ const wireProposal = (over: object = {}) => ({
     model_id: 'Qwen/Qwen3-235B-A22B-Instruct-2507',
     prompt_version: 'proposal-1',
     spoken: 'The horizon will sit softer, so the far edge reads as distance.',
+    base_style_version_id: 'v0',
+    base_topology_digest: 'topology-a',
   },
   refusal: null,
   execution: {
@@ -786,6 +788,7 @@ const DRAWN: CompanionProposal = {
     modelId: 'Qwen/Qwen3-235B-A22B-Instruct-2507',
     promptVersion: 'proposal-1',
     spoken: 'The horizon will sit softer, so the far edge reads as distance.',
+    base: { styleVersionId: 'v0', topologyDigest: 'topology-a' },
   },
   refusal: null,
   promptVersion: 'proposal-1',

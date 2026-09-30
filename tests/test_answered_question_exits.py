@@ -1,6 +1,6 @@
 """What ``answer_question`` returns on every one of its exits, held whole to a golden document.
 
-``answer_question`` has nineteen ways to return an :class:`AnsweredQuestion` and three to raise, and
+``answer_question`` has twenty ways to return an :class:`AnsweredQuestion` and three to raise, and
 the answer path's split keeps it where it is because tests replace its module globals. Each exit
 is driven here through the product's own code over a workspace with a person and a place saved on
 a photograph's sign, and what it returns is reduced to a document: the answer, the plan, what the
@@ -39,6 +39,7 @@ from exulanica.selection import packet as packet_module
 from exulanica.selection import question as question_module
 from exulanica.selection import society_question as society_module
 from exulanica.selection.answer import Answer, AnswerClause, ClauseType
+from exulanica.selection.executor import LeftOutSociety, SocietyLeftOut
 from exulanica.selection.plan import (
     ContentScope,
     ContentSelector,
@@ -235,6 +236,27 @@ def _about_a_person(context: Context) -> AnsweredQuestion:
     )
 
 
+def _society_left_out(context: Context) -> AnsweredQuestion:
+    """A content answer whose executor left a society at the place out: said first, with why."""
+    executed = question_module.execute
+
+    def leaving_one_out(*args, **kwargs):
+        result = executed(*args, **kwargs)
+        left = LeftOutSociety(uuid.UUID(int=77), uuid.UUID(int=78), SocietyLeftOut.READ_RACED)
+        return dataclasses.replace(result, left_out_societies=(left,))
+
+    context.monkeypatch.setattr(question_module, "execute", leaving_one_out)
+    return context.ask(
+        [],
+        plan=SelectionPlan(
+            intent=Intent.CONTENT,
+            place=PlaceSelector(ids=[context.entities["place"]]),
+            content=ContentSelector(scope=ContentScope.MEMORIES_ONLY),
+        ),
+        client=None,
+    )
+
+
 #: Each exit, and how to reach it. A value that raises is the exit's document.
 EXITS: dict[str, Callable[[Context], AnsweredQuestion]] = {
     "the planner could not fill the form": lambda c: c.ask(
@@ -270,6 +292,7 @@ EXITS: dict[str, Callable[[Context], AnsweredQuestion]] = {
         ),
         client=None,
     ),
+    "a content Selection left a society at its place out": _society_left_out,
     "a content Selection found rows": lambda c: c.ask(
         [],
         plan=SelectionPlan(

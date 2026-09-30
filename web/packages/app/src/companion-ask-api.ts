@@ -900,6 +900,12 @@ export interface ProposedAppearance {
   readonly promptVersion: string;
   /** What the Companion says about the change. Never sent back as style data. */
   readonly spoken: string;
+  /**
+   * The world style version and topology the draft was drawn on, which the proposal is previewed
+   * against: `base_style_version_id` and `base_topology_digest` in `AppearanceProposalView`
+   * (`exulanica/api/routes/selection.py`).
+   */
+  readonly base: { readonly styleVersionId: string; readonly topologyDigest: string };
 }
 
 export interface ProposalRefusal {
@@ -936,6 +942,8 @@ interface WireProposal {
     readonly model_id: string;
     readonly prompt_version: string;
     readonly spoken: string;
+    readonly base_style_version_id: string;
+    readonly base_topology_digest: string;
   } | null;
   readonly refusal: { readonly code: string; readonly detail: string } | null;
   readonly execution: WireExecution;
@@ -1000,6 +1008,10 @@ export class CompanionProposalClient {
               modelId: wire.model_id,
               promptVersion: wire.prompt_version,
               spoken: wire.spoken,
+              base: {
+                styleVersionId: wire.base_style_version_id,
+                topologyDigest: wire.base_topology_digest,
+              },
             },
       // An unrecognised code becomes `not_drafted` rather than being passed through, because
       // the surface picks a reviewed sentence by this value and a key nobody wrote renders as

@@ -560,11 +560,11 @@ describe('a question typed while the Companion\'s own question is open', () => {
     expect(askQuestion).not.toHaveBeenCalled();
   });
 
-  it('keeps an answer to a yes or no question, whose yes or no the parser does not keep', () => {
+  it('keeps an answer to a yes or no question, whose yes or no the parser reads', () => {
     // "No, that's her daughter": no capitalized name after "that's", and "daughter" is not a
-    // relation word the parser knows, so the draft is the words after the comma, as a note.
+    // relation word the parser knows, so the draft is a note: the whole reply, its "No" with it.
     const parsed = parseUtterance("No, that's her daughter");
-    expect([parsed.name, parsed.relation, parsed.residual]).toEqual([null, null, "that's her daughter"]);
+    expect([parsed.name, parsed.relation, parsed.reply]).toEqual([null, null, 'no']);
     for (const [key, words] of [
       ['utterance.resolveIdentity', "No, that's her daughter"],
       ['utterance.confirmContinuity', 'Yes, the same woman, years later'],

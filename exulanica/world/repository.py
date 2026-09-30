@@ -10,13 +10,16 @@ from __future__ import annotations
 import datetime as dt
 import re
 import uuid
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
+from contextlib import contextmanager
 from dataclasses import dataclass, replace
 from typing import Any, Final
 
 import psycopg
+from psycopg.pq import TransactionStatus
 from psycopg.types.json import Jsonb
 
+from exulanica.db.read_check import ConnectionNotIdle
 from exulanica.errors import BlobNotFoundError, IntegrityError
 from exulanica.evidence import BlobId
 from exulanica.store.base import ContentAddressedStore
@@ -27,6 +30,7 @@ from exulanica.world.errors import (
     InvalidStyleData,
     ProtectedTopologyConflict,
     StaleStyleVersion,
+    StyleWriteBusy,
     UnavailableAsset,
     UnknownWorldResource,
     WorldNotConfigured,
@@ -94,6 +98,17 @@ OPEN_PREVIEWS_READ: Final = 8
 #: many tabs and proposals have left them. The age does not protect later changes: a preview made
 #: for an earlier version is refused by its base (``_check_concurrency``) whatever its age.
 OPEN_PREVIEW_LIFETIME: Final = dt.timedelta(days=7)
+
+#: The longest a write to a world's look waits for EACH lock it takes, in milliseconds, before it is
+#: refused as busy (:class:`StyleWriteBusy`) with nothing written: the world's style state, and for
+#: a saved world its entry and the workspace lock the entry's writers share, which a Companion
+#: question also holds while it reads. A declared product figure: each hold is one short
+#: transaction, so a longer one is not another write finishing. It bounds each wait, not the whole
+#: write: ``tests/test_world_style_write_wait.py`` counts the waits of a real Apply on a saved world
+#: and holds their sum under the page's own deadline for a world style request
+#: (``WORLD_STYLE_REQUEST_TIMEOUT_MS`` in ``web/packages/app/src/world-style-api.ts``), so the page
+#: hears the server's answer. PostgreSQL states ``lock_timeout`` in whole milliseconds.
+STYLE_WRITE_LOCK_WAIT_MS: Final = 2_000
 
 #: A preview past ``OPEN_PREVIEW_LIFETIME``, over a preview row named ``v``, with the lifetime as
 #: its one parameter. The one predicate the reads, the closing in ``preview`` and ``apply`` use,
@@ -397,12 +412,37 @@ class WorldStyleRepository:
 
     # -- proposal lifecycle --------------------------------------------------------------
 
+    @contextmanager
+    def _style_write(self) -> Iterator[None]:
+        """One write to this world's look, as its own transaction, that waits for each lock it takes
+        at most :data:`STYLE_WRITE_LOCK_WAIT_MS` and is refused as :class:`StyleWriteBusy` after it.
+
+        Refused on a connection already inside a transaction, as ``final_read_check`` refuses one
+        (:class:`~exulanica.db.read_check.ConnectionNotIdle`): there the write would be a savepoint,
+        and the wait it sets would outlive it and cap every later wait of the caller's transaction,
+        the asset read lock's included."""
+        if self.connection.info.transaction_status != TransactionStatus.IDLE:
+            raise ConnectionNotIdle(
+                "a write to a world's look is its own transaction; commit or roll back first"
+            )
+        try:
+            with self.connection.transaction():
+                self.connection.execute(
+                    f"set local lock_timeout = '{int(STYLE_WRITE_LOCK_WAIT_MS)}ms'"
+                )
+                yield
+        except psycopg.errors.LockNotAvailable as held:
+            raise StyleWriteBusy(
+                f"another change held a lock this write needs for more than "
+                f"{STYLE_WRITE_LOCK_WAIT_MS} ms; nothing was written"
+            ) from held
+
     def preview(self, proposal: StyleProposal) -> StylePreview:
         """Validate and persist one isolated preview, auditing refusals as proposals too."""
         self._validate_proposal_provenance(proposal)
         rejected: Exception | None = None
         result: StylePreview | None = None
-        with self.connection.transaction():
+        with self._style_write():
             state = self._state(for_update=True)
             if state is None:
                 raise WorldNotConfigured("no protected world topology is registered")
@@ -489,7 +529,7 @@ class WorldStyleRepository:
     ) -> StyleVersion:
         failure: Exception | None = None
         applied: StyleVersion | None = None
-        with self.connection.transaction():
+        with self._style_write():
             if before_write is not None:
                 before_write()
             state = self._require_state(for_update=True)
@@ -622,7 +662,7 @@ class WorldStyleRepository:
         return applied
 
     def discard(self, preview_id: uuid.UUID, *, discarded_by: uuid.UUID) -> None:
-        with self.connection.transaction():
+        with self._style_write():
             preview = self._preview_row(preview_id, for_update=True)
             if preview["status"] in ("discarded", "expired"):
                 return
@@ -669,7 +709,7 @@ class WorldStyleRepository:
                 "Companion rollback requires a new explicit proposal with model provenance"
             )
         self._validate_provenance(provenance)
-        with self.connection.transaction():
+        with self._style_write():
             if before_write is not None:
                 before_write()
             state = self._require_state(for_update=True)

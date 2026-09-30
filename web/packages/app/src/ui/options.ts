@@ -113,7 +113,10 @@ export interface WorldStyleAuthorityPresentation {
   readonly versions?: readonly {
     readonly versionId: string;
     readonly label: string;
+    /** The version the world holds as current, which cannot be restored over itself. */
     readonly current: boolean;
+    /** The version this page's saved world names. */
+    readonly saved?: boolean;
   }[];
   readonly proposal?: {
     readonly origin: string;
@@ -693,7 +696,10 @@ export function buildOptions(callbacks: OptionsCallbacks): OptionsView {
         version.versionId,
         version.label,
       )));
-      const selected = (value.versions ?? []).find((version) => version.current) ?? value.versions?.at(-1);
+      // The saved version first when another writer's change is live, so it can be restored.
+      const selected = (value.versions ?? []).find((version) => version.saved === true && !version.current)
+        ?? (value.versions ?? []).find((version) => version.current)
+        ?? value.versions?.at(-1);
       history.value = selected?.versionId ?? '';
       const selectedIsCurrent = (value.versions ?? []).find(
         (version) => version.versionId === history.value,

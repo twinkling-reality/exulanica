@@ -183,6 +183,14 @@ stroke, and focus uses contrast + outline.
 - unknown or removed profile in immutable historical data → display a warned default/ignored
   regional override, discarding the old parameters rather than reinterpreting them;
 - stale style base → reject preview/apply;
+- another transaction holding a lock a style write needs (the world's style state, a saved world's
+  entry, or the workspace lock a Companion question also holds) → each preview, Apply, discard or
+  rollback waits at most `STYLE_WRITE_LOCK_WAIT_MS` for each lock
+  ([repository](../exulanica/world/repository.py)), then is refused as 409 `busy` with nothing
+  written, which the page says in its own words. The waits of one Apply together stay under
+  `WORLD_STYLE_REQUEST_TIMEOUT_MS` ([world style client](../web/packages/app/src/world-style-api.ts)),
+  the page's allowance for an ordinary read, after which it reads the world again before saying
+  whether the change was saved;
 - changed topology digest → reject as a protected conflict;
 - unknown region → reject;
 - missing reconstruction asset → composer resolves the module's honest source-evidence fallback;
@@ -310,19 +318,24 @@ saved world alone, such as an agent writing through the API, the restore goes th
 the next change, with no reload. After another page that advanced the saved world, the restore is
 refused (`stale_saved_world_entry`) with "Reload before trying again", and after the reload the
 saved world is live and the next change goes through. A restore that another change overtook in
-between is refused as stale, and Atlas shows the latest version and asks for the restore target
-again. A reload first would not do: after a writer that left the saved world alone it reopens the
-same saved version, which Version history then marks current and cannot restore.
+between is refused as stale, and Atlas shows the latest version, reads the world's versions again
+and asks for the restore target again. Version history marks the world's live version as current,
+which cannot be restored over itself, and marks the version the saved world names as "your saved
+version"; when the two differ it selects the saved version, so a page reopened after a writer that
+left the saved world alone restores it from there (`versionHistory` in
+`web/packages/app/src/composition/appearance.ts`).
 One Atlas already knows is that old is refused without a request and stays open on the backend until
 its lifetime closes it; until then a page that opens the world again shows it as made for an earlier
 version, and refuses it again on Apply. Otherwise Apply is refused by the backend: its own base
 check closes the preview as stale, and the saved world's checks, which answer first, leave it open
 for its lifetime to close. When another page advanced the saved world's resume point, the backend
 answers `stale_saved_world_entry` and Atlas asks for a reload, after which it finds the proposal
-made for an earlier version and refuses it as above. The draft names no base version, so a proposal
-whose preview meets a newer version than the page has read is refused rather than made on it: a tab
-whose copy of the world is behind refuses its first proposal and asks for the restore above before
-the next. A preview nobody decides within the backend's lifetime for one expires; Apply is refused
+made for an earlier version and refuses it as above. A Companion proposal names the version and
+topology its draft was drawn on (`base_style_version_id` and `base_topology_digest` from
+`POST /selection/appearance`), and Atlas previews it against them: a tab whose copy of the world is
+behind reads the live version first and previews a proposal drawn on it, since that proposal holds
+every other writer's change; a proposal drawn on a version that is no longer live is refused as
+stale without a request. A preview nobody decides within the backend's lifetime for one expires; Apply is refused
 by name (`preview_expired`) and Atlas says the change waited too long, with no number, because the
 lifetime is the backend's. `web/packages/app/src/world-style-api.ts` and
 `web/packages/app/src/composition/appearance.ts` hold these rules, and

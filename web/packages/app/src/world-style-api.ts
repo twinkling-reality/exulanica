@@ -15,6 +15,7 @@
 
 import type { WorldStyleParameterDefinition, WorldStyleParameterValue } from '@exulanica/atlas-core';
 import { ApiError, Transport, type TransportOptions } from '@exulanica/graph-client';
+
 import {
   WORLD_STYLE_RECIPES,
   WORLD_STYLE_REGISTRY_DOCUMENT,
@@ -24,6 +25,29 @@ import {
 } from '@exulanica/presentation';
 import { worldPath } from './world-scope.js';
 import { RESTORE_BEFORE_CHANGING } from './world-style-refusals.js';
+
+/**
+ * How long this client waits for any one world style request. Each is one short read, or one short
+ * write under the world's style lock, so this is the page's allowance for an ordinary read, the same
+ * as `PACKET_TIMEOUT_MS` in `companion-ask-api.ts`; `tests/test_world_style_request_deadline.py`
+ * fails when the two differ. The Companion's own shorter wait for the authority's answer is
+ * `PROPOSAL_ANSWER_WAIT_MS` in `composition/companion.ts`.
+ */
+const WORLD_STYLE_REQUEST_TIMEOUT_MS = 20_000;
+
+/**
+ * Said when a write to the world's look was not answered within `WORLD_STYLE_REQUEST_TIMEOUT_MS`
+ * and the world, read again at once, does not hold it yet. Only this page stopped waiting: the
+ * authority may still save it, so the words say where to look before trying again.
+ */
+export const WORLD_STYLE_NOT_ANSWERED =
+  'Your world did not answer in time, and the change is not among its saved versions yet. '
+  + 'Look in Version history before trying it again.';
+
+/** Whether a request ended because this page stopped waiting for it, its deadline passed. */
+function stoppedWaiting(error: unknown): boolean {
+  return error instanceof DOMException && (error.name === 'TimeoutError' || error.name === 'AbortError');
+}
 
 export type WorldStyleOrigin = 'user' | 'settings' | 'companion';
 export type WorldStyleScope =
@@ -125,6 +149,12 @@ export interface UpstreamWorldStyleProposal {
   readonly modelId?: string;
   readonly promptVersion?: string;
   readonly refinesProposalId?: string;
+  /**
+   * The version and topology a Companion proposal was drawn on. Previewed against them: a page
+   * whose own copy is behind reads the live version first, and a proposal drawn on a version that
+   * is no longer live is refused as stale without a request, since it could undo another change.
+   */
+  readonly base?: { readonly styleVersionId: string; readonly topologyDigest: string };
 }
 
 interface PreviewRequest {
@@ -149,6 +179,13 @@ export interface ActiveWorldStylePreview {
 export interface WorldStyleConnection {
   readonly state: WorldStyleState;
   readonly versions: readonly WorldStyleVersionRecord[];
+  /**
+   * The version the world holds as current, which `state.current` is not while this page shows its
+   * saved version over another writer's change. Absent where the two are the same.
+   */
+  readonly liveVersionId?: string;
+  /** The version this page's saved world names, when the page opened a saved world. */
+  readonly savedVersionId?: string | null;
 }
 
 export interface SavedStyleEntryBinding {
@@ -225,7 +262,7 @@ function savedEntryBody(
 }
 
 export class WorldStyleClient {
-  readonly #transport: Transport;
+  readonly #where: TransportOptions;
   readonly #ids: IdFactory;
   readonly #worldId: string;
   readonly #savedEntry: (() => SavedStyleEntryBinding) | undefined;
@@ -251,7 +288,10 @@ export class WorldStyleClient {
       base: SavedStyleEntryBinding,
     ) => void;
   }) {
-    this.#transport = new Transport(options);
+    // `signal` is dropped: each request sets its own deadline, built per request, because a signal
+    // made once would start counting at construction and expire every later request.
+    const { signal: _unused, ...where } = options;
+    this.#where = where;
     this.#ids = options.ids ?? (() => globalThis.crypto.randomUUID());
     this.#worldId = options.worldId;
     this.#savedEntry = options.savedEntry;
@@ -287,9 +327,9 @@ export class WorldStyleClient {
   async connect(selectedVersionId?: string): Promise<WorldStyleConnection> {
     const [catalog, state, versions] = await Promise.all([
       // The reviewed catalog is the same for every world, so this read names none.
-      this.#transport.getJson<unknown>('/world/styles/catalog'),
-      this.#transport.getJson<unknown>(this.#path('/world/styles/current')),
-      this.#transport.getJson<unknown>(this.#path('/world/styles/versions')),
+      this.#transport().getJson<unknown>('/world/styles/catalog'),
+      this.#transport().getJson<unknown>(this.#path('/world/styles/current')),
+      this.#transport().getJson<unknown>(this.#path('/world/styles/versions')),
     ]);
     validateCatalog(catalog);
     this.#state = parseState(state);
@@ -311,7 +351,19 @@ export class WorldStyleClient {
         current: selected,
       }),
       versions: this.#versions,
+      liveVersionId: this.#state.current.versionId,
+      savedVersionId: this.savedVersionId(),
     });
+  }
+
+  /** The version the page's saved world names, or null when the page opened none. */
+  savedVersionId(): string | null {
+    try {
+      return this.#savedEntry?.().styleVersionId ?? null;
+    } catch {
+      // The saved entry is no longer active: this page names no saved version.
+      return null;
+    }
   }
 
   /**
@@ -350,7 +402,7 @@ export class WorldStyleClient {
     let listed: Record<string, unknown>;
     try {
       listed = record(
-        await this.#transport.getJson<unknown>(this.#path('/world/styles/previews')),
+        await this.#transport().getJson<unknown>(this.#path('/world/styles/previews')),
         'open world style previews',
       );
     } catch {
@@ -391,7 +443,7 @@ export class WorldStyleClient {
 
   async refresh(): Promise<WorldStyleState> {
     const state = parseState(
-      await this.#transport.getJson<unknown>(this.#path('/world/styles/current')),
+      await this.#transport().getJson<unknown>(this.#path('/world/styles/current')),
     );
     this.#state = state;
     this.#requiresReconciliation = this.#displayedVersionId !== null
@@ -402,7 +454,7 @@ export class WorldStyleClient {
   async refreshVersions(): Promise<readonly WorldStyleVersionRecord[]> {
     const before = this.#versions;
     const read = parseVersions(
-      await this.#transport.getJson<unknown>(this.#path('/world/styles/versions')),
+      await this.#transport().getJson<unknown>(this.#path('/world/styles/versions')),
     );
     // A version this client wrote while the read was in flight may be newer than the read.
     this.#versions = this.#versions
@@ -442,7 +494,7 @@ export class WorldStyleClient {
         );
       }
     }
-    return this.#enqueuePreview(() => this.#replacePreview({
+    const request: PreviewRequest = {
       origin: proposal.origin,
       originReference: proposal.originReference ?? null,
       scope: proposal.scope ?? Object.freeze({ kind: 'global' }),
@@ -451,11 +503,29 @@ export class WorldStyleClient {
       modelId: proposal.modelId ?? null,
       promptVersion: proposal.promptVersion ?? null,
       refinesProposalId: proposal.refinesProposalId ?? null,
-    }));
+    };
+    const base = proposal.base;
+    if (base === undefined) return this.#enqueuePreview(() => this.#replacePreview(request));
+    return this.#enqueuePreview(async () => {
+      if (!this.#isLive(base)) {
+        await this.refresh();
+        if (!this.#isLive(base)) throw new StaleProposalError(this.#requiresReconciliation);
+      }
+      // Drawn on the live version, so the whole look it previews holds every other writer's
+      // change, and the page's own older view of the world is no reason to refuse it.
+      return this.#replacePreview(request, true);
+    });
+  }
+
+  /** Whether `base` is the live version and topology, as this client last read them. */
+  #isLive(base: { readonly styleVersionId: string; readonly topologyDigest: string }): boolean {
+    const state = this.#requireState();
+    return state.current.versionId === base.styleVersionId
+      && state.currentTopologyDigest === base.topologyDigest;
   }
 
   async inspectProposal(proposalId: string): Promise<WorldStyleProposalRecord> {
-    return parseProposal(await this.#transport.getJson<unknown>(
+    return parseProposal(await this.#transport().getJson<unknown>(
       this.#path(`/world/styles/proposals/${encodeURIComponent(proposalId)}`),
     ));
   }
@@ -473,7 +543,7 @@ export class WorldStyleClient {
 
   async #discardPreview(preview: ActiveWorldStylePreview): Promise<void> {
     try {
-      await this.#transport.delete(
+      await this.#transport().delete(
         this.#path(`/world/styles/previews/${encodeURIComponent(preview.preview.previewId)}`),
       );
     } catch (error) {
@@ -489,7 +559,7 @@ export class WorldStyleClient {
     }
     const savedEntry = this.#savedEntry?.();
     try {
-      const version = parseVersion(await this.#transport.postJson<unknown>(
+      const version = parseVersion(await this.#transport().postJson<unknown>(
         this.#path(`/world/styles/previews/${encodeURIComponent(active.preview.previewId)}/apply`),
         {
           baseStyleVersionId: active.baseStyleVersionId,
@@ -497,17 +567,17 @@ export class WorldStyleClient {
           ...savedEntryBody(savedEntry),
         },
       ));
-      this.#active = null;
-      this.#state = Object.freeze({
-        currentTopologyDigest: active.baseTopologyDigest,
-        current: version,
-      });
-      this.#versions = appendVersion(this.#versions, version);
-      this.#displayedVersionId = version.versionId;
-      this.#requiresReconciliation = false;
-      if (savedEntry !== undefined) this.#onSavedEntryAdvanced?.(version, savedEntry);
-      return Object.freeze({ kind: 'applied', version });
+      return this.#applied(active, version, savedEntry);
     } catch (error) {
+      if (stoppedWaiting(error)) {
+        // This page stopped waiting, and the authority may have saved the change regardless: the
+        // world is read again before anything is said, so a saved change is never called refused.
+        const state = await this.refresh();
+        if (state.current.appliedFromProposalId === active.preview.proposalId) {
+          return this.#applied(active, state.current, savedEntry);
+        }
+        throw new WorldStyleContractError('not_answered', WORLD_STYLE_NOT_ANSWERED);
+      }
       if (error instanceof ApiError && error.code === 'stale_saved_world_entry') {
         throw new WorldStyleContractError(
           'saved_entry_conflict',
@@ -551,11 +621,29 @@ export class WorldStyleClient {
     }
   }
 
+  /** What an Apply the authority saved leaves this client holding. */
+  #applied(
+    active: ActiveWorldStylePreview,
+    version: WorldStyleVersionRecord,
+    savedEntry: SavedStyleEntryBinding | undefined,
+  ): WorldStyleApplyResult {
+    if (this.#active === active) this.#active = null;
+    this.#state = Object.freeze({
+      currentTopologyDigest: active.baseTopologyDigest,
+      current: version,
+    });
+    this.#versions = appendVersion(this.#versions, version);
+    this.#displayedVersionId = version.versionId;
+    this.#requiresReconciliation = false;
+    if (savedEntry !== undefined) this.#onSavedEntryAdvanced?.(version, savedEntry);
+    return Object.freeze({ kind: 'applied', version });
+  }
+
   async rollback(targetVersionId: string): Promise<WorldStyleRollbackResult> {
     const state = this.#requireState();
     const savedEntry = this.#savedEntry?.();
     try {
-      const version = parseVersion(await this.#transport.postJson<unknown>(
+      const version = parseVersion(await this.#transport().postJson<unknown>(
         this.#path('/world/styles/rollback'),
         {
           targetVersionId,
@@ -576,6 +664,22 @@ export class WorldStyleClient {
       if (savedEntry !== undefined) this.#onSavedEntryAdvanced?.(version, savedEntry);
       return Object.freeze({ kind: 'applied', version });
     } catch (error) {
+      if (stoppedWaiting(error)) {
+        // As for an Apply: the world is read again before the restore is called refused.
+        const now = await this.refresh();
+        const restored = now.current;
+        if (
+          restored.rollbackTargetVersionId === targetVersionId
+          && restored.versionId !== state.current.versionId
+        ) {
+          this.#versions = appendVersion(this.#versions, restored);
+          this.#displayedVersionId = restored.versionId;
+          this.#requiresReconciliation = false;
+          if (savedEntry !== undefined) this.#onSavedEntryAdvanced?.(restored, savedEntry);
+          return Object.freeze({ kind: 'applied', version: restored });
+        }
+        throw new WorldStyleContractError('not_answered', WORLD_STYLE_NOT_ANSWERED);
+      }
       if (error instanceof ApiError && error.code === 'stale_saved_world_entry') {
         throw new WorldStyleContractError(
           'saved_entry_conflict',
@@ -587,8 +691,11 @@ export class WorldStyleClient {
     }
   }
 
-  async #replacePreview(request: PreviewRequest): Promise<ActiveWorldStylePreview> {
-    if (this.#requiresReconciliation) {
+  async #replacePreview(
+    request: PreviewRequest,
+    drawnOnLive = false,
+  ): Promise<ActiveWorldStylePreview> {
+    if (this.#requiresReconciliation && !drawnOnLive) {
       throw new WorldStyleContractError(
         'saved_style_reconciliation_required',
         'Restore this saved appearance before changing it, because another appearance is active.',
@@ -609,11 +716,12 @@ export class WorldStyleClient {
       const rejectedProposalId = this.#lastProposalId;
       await this.refresh();
       /*
-       * The rule `applyActive` holds, one step earlier. A proposal's draft reads the current
-       * version when its model call starts and names no base, so this client cannot tell one drawn
-       * on the version it has just learned of from one drawn before another writer's change, and
-       * the second, made on the new version, would undo that change on Apply. It is refused and
-       * the previous preview stays staged. The read above finds the live appearance moved from
+       * The rule `applyActive` holds, one step earlier. A request that names no base (a Companion
+       * proposal names the one its draft read, and `previewUpstream` previews it against that
+       * version before this is reached) cannot be told apart: one drawn on the version this client
+       * has just learned of, or one drawn before another writer's change, and the second, made on
+       * the new version, would undo that change on Apply. It is refused and the previous preview
+       * stays staged. The read above finds the live appearance moved from
        * the one this page shows, so every change after it is refused until the saved version is
        * restored (`requiresReconciliation`), which the refusal's words say, with the reload that a
        * restore after another page's change asks for (`RESTORE_BEFORE_CHANGING`).
@@ -656,7 +764,7 @@ export class WorldStyleClient {
     const scope = request.scope.kind === 'global'
       ? { kind: 'global' as const }
       : { kind: 'region' as const, islandId: request.scope.islandId };
-    const preview = parsePreview(await this.#transport.postJson<unknown>(
+    const preview = parsePreview(await this.#transport().postJson<unknown>(
       this.#path('/world/styles/previews'),
       {
         proposalId,
@@ -678,6 +786,18 @@ export class WorldStyleClient {
       baseStyleVersionId: state.current.versionId,
       baseTopologyDigest: state.currentTopologyDigest,
       recoveredFromStale,
+    });
+  }
+
+  /**
+   * A transport for one request, which gives up after `WORLD_STYLE_REQUEST_TIMEOUT_MS`: a held
+   * style row, or a request that never comes back, ends in a failure this page can say, not a
+   * wait with no end.
+   */
+  #transport(): Transport {
+    return new Transport({
+      ...this.#where,
+      signal: AbortSignal.timeout(WORLD_STYLE_REQUEST_TIMEOUT_MS),
     });
   }
 

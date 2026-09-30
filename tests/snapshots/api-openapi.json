@@ -13470,6 +13470,15 @@
      "spoken": {
       "type": "string",
       "title": "Spoken"
+     },
+     "base_style_version_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Base Style Version Id"
+     },
+     "base_topology_digest": {
+      "type": "string",
+      "title": "Base Topology Digest"
      }
     },
     "additionalProperties": false,
@@ -13479,7 +13488,9 @@
      "reference_ids",
      "model_id",
      "prompt_version",
-     "spoken"
+     "spoken",
+     "base_style_version_id",
+     "base_topology_digest"
     ],
     "title": "AppearanceProposalView",
     "description": "A proposal the browser may post to the world style lifecycle, with its provenance.\n\n``model_id`` and ``prompt_version`` are the two fields that make this a Companion proposal\nrather than a Settings one, and the world repository refuses an origin of ``companion``\nwithout both plus at least one reference id. They are returned here so the browser sends\nback what actually happened rather than what it assumed: ``model_id`` is the identifier the\nresponse body echoed, which differs from the configured one exactly when the fallback served."

@@ -1191,9 +1191,11 @@ def test_a_person_left_no_place_by_the_workspace_rules_is_asked_nothing_and_noth
 
 @pytest.mark.parametrize("saved_world", [2], indirect=True)
 def test_a_saved_name_sharing_a_word_with_the_question_asks_nobody_and_is_named(app, monkeypatch):
-    """A saved name's part may be a word of the question every person is asked ("the" of "Joe the
-    Plumber"), which the rules would change, so every ask would be refused as it left. The host
-    asks nobody and writes nothing, and the models route names why for each choice."""
+    """A saved name's part may be a word of the question every person is asked ("next", of "Choose
+    what the person does next", in a saved "Joe Next"), which the rules would change, so every ask
+    would be refused as it left. The host asks nobody and writes nothing, and the models route
+    names why for each choice. A closed-class part, such as the "the" of "Joe the Plumber", is no
+    name by itself (``tests/test_saved_name_function_words.py``)."""
     import exulanica.api.services as services_module
 
     world, client = app
@@ -1224,7 +1226,7 @@ def test_a_saved_name_sharing_a_word_with_the_question_asks_nobody_and_is_named(
         identity,
         AssertionWriter(connection, world["workspace"]),
         entity_id=identity.entities.create(entity_class="person"),
-        display_name="Joe the Plumber",
+        display_name="Joe Next",
         actor=world["session"].actor,
     )
     connection.commit()

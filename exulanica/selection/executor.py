@@ -29,6 +29,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
+from enum import StrEnum
 from typing import Any, Final
 
 import psycopg
@@ -147,6 +148,29 @@ class SelectedContent:
     personal_visit_evidence: bool
 
 
+class SocietyLeftOut(StrEnum):
+    """Why a society at the question's place was left out of its content."""
+
+    #: It stores no input, so nothing it recorded can be authorized.
+    INPUTS_MISSING = "inputs_missing"
+    #: Its stored inputs do not check as one chain for its world version.
+    INPUTS_DO_NOT_CHECK = "inputs_do_not_check"
+    #: An input it is built from is not available under current authorization.
+    INPUT_UNAVAILABLE = "input_unavailable"
+    #: Its stored inputs changed between being read and being authorized; asked again, it is read.
+    READ_RACED = "read_raced"
+
+
+@dataclass(frozen=True, slots=True)
+class LeftOutSociety:
+    """A society the question's place holds whose people the content leaves out, and why."""
+
+    society_id: uuid.UUID
+    #: The world version the society belongs to.
+    version_id: uuid.UUID
+    reason: SocietyLeftOut
+
+
 @dataclass(frozen=True, slots=True)
 class SelectionResult:
     """What a Selection resolved to. Deterministic given the same plan and the same data."""
@@ -162,6 +186,9 @@ class SelectionResult:
     includes_proposals: bool
     content: tuple[SelectedContent, ...] = ()
     next_page: ContentPageCursor | None = None
+    #: The societies at the question's place whose people this content leaves out, each with why,
+    #: so an answer can say so rather than answer as though they were not there.
+    left_out_societies: tuple[LeftOutSociety, ...] = ()
 
     @property
     def truncated(self) -> bool:
@@ -205,8 +232,9 @@ def execute(
             sql.SQL("set local statement_timeout = {}").format(sql.Literal(STATEMENT_TIMEOUT_MS))
         )
         connection.execute("set local transaction read only")
+        left_out: tuple[LeftOutSociety, ...] = ()
         if plan.intent is Intent.CONTENT:
-            content, total, next_page = _matching_content(
+            content, total, next_page, left_out = _matching_content(
                 connection, validated, world_id, store, society_authorizer
             )
             captures: tuple[SelectedCapture, ...] = ()
@@ -229,6 +257,7 @@ def execute(
         includes_proposals=plan.epistemic is EpistemicScope.INCLUDE_PROPOSALS,
         content=content,
         next_page=next_page,
+        left_out_societies=left_out,
     )
 
 
@@ -450,14 +479,15 @@ def _authorized_societies(
     validated: ValidatedPlan,
     world_id: str | None,
     authorize: Callable[[dict[str, Any]], None] | None,
-) -> list[uuid.UUID]:
+) -> tuple[list[uuid.UUID], tuple[LeftOutSociety, ...]]:
     """Gate input-driven societies before counts/pagination; events need all input history.
 
     Only the named world's societies are asked about, so no other world's inputs reach the
-    authorizer while this world is being answered for.
+    authorizer while this world is being answered for. Returns the societies allowed, and each one
+    left out with why (:class:`SocietyLeftOut`).
     """
     if authorize is None or world_id is None:
-        return []
+        return [], ()
     connection.execute(
         "select pg_advisory_xact_lock(hashtextextended(%s,880024))",
         (str(validated.workspace_id),),
@@ -471,6 +501,11 @@ def _authorized_societies(
         (validated.workspace_id, world_id, list(validated.place_ids), list(INPUT_ENGINES)),
     ).fetchall()
     chains = []
+    left_out: list[LeftOutSociety] = []
+
+    def leave_out(society: dict[str, Any], reason: SocietyLeftOut) -> None:
+        left_out.append(LeftOutSociety(society["society_id"], society["version_id"], reason))
+
     for society in societies:
         inputs = connection.execute(
             "select input_seq,document,document_sha256 from world_society_input "
@@ -478,6 +513,7 @@ def _authorized_societies(
             (validated.workspace_id, society["society_id"]),
         ).fetchall()
         if not inputs:
+            leave_out(society, SocietyLeftOut.INPUTS_MISSING)
             continue
         documents = []
         try:
@@ -496,6 +532,7 @@ def _authorized_societies(
                     validate_input_successor(documents[-1], document)
                 documents.append(document)
         except ValueError:
+            leave_out(society, SocietyLeftOut.INPUTS_DO_NOT_CHECK)
             continue
         chains.append((society, documents))
     allowed = []
@@ -507,13 +544,17 @@ def _authorized_societies(
             try:
                 for document in documents:
                     authorize(document)
-            except (UnavailableSocietyInput, SocietyBytesNotRead, ValueError):
+            except SocietyBytesNotRead:
                 # A race between reading the society's stored bytes and taking the asset read
                 # lock leaves it out this time, as an unavailable input does; the next question
                 # asks again.
+                leave_out(society, SocietyLeftOut.READ_RACED)
+                continue
+            except (UnavailableSocietyInput, ValueError):
+                leave_out(society, SocietyLeftOut.INPUT_UNAVAILABLE)
                 continue
             allowed.append(society["society_id"])
-    return allowed
+    return allowed, tuple(left_out)
 
 
 def _matching_content(
@@ -522,9 +563,14 @@ def _matching_content(
     world_id: str | None,
     store: ContentAddressedStore | None,
     society_authorizer: Callable[[dict[str, Any]], None] | None,
-) -> tuple[tuple[SelectedContent, ...], int, ContentPageCursor | None]:
+) -> tuple[tuple[SelectedContent, ...], int, ContentPageCursor | None, tuple[LeftOutSociety, ...]]:
     plan = validated.plan
     assert plan.content is not None
+    authorized, left_out = (
+        _authorized_societies(connection, validated, world_id, society_authorizer)
+        if plan.content.scope is not ContentScope.MEMORIES_ONLY
+        else ([], ())
+    )
     candidate_sql = sql.SQL(
         _MEMORY_CONTENT_SQL
         if plan.content.scope is ContentScope.MEMORIES_ONLY
@@ -537,11 +583,7 @@ def _matching_content(
         # Engines that read no input are visible without input authorisation; the engine table
         # says which, so this query never restates a list of engines.
         "legacy_engines": list(LEGACY_ENGINES),
-        "authorized_societies": (
-            _authorized_societies(connection, validated, world_id, society_authorizer)
-            if plan.content.scope is not ContentScope.MEMORIES_ONLY
-            else []
-        ),
+        "authorized_societies": authorized,
     }
     total_row = connection.execute(
         sql.SQL("select count(*) total from ({}) candidates").format(candidate_sql),
@@ -583,7 +625,7 @@ def _matching_content(
             sort_time=last["sort_time"],
             result_key=last["result_key"],
         )
-    return results, total, next_page
+    return results, total, next_page, left_out
 
 
 def _content_from_row(

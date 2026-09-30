@@ -360,6 +360,7 @@ const PROPOSAL: CompanionProposal = {
     modelId: DRAFTER,
     promptVersion: 'proposal-3',
     spoken: 'The horizon will sit softer, so the far edge reads as distance.',
+    base: { styleVersionId: 'v0', topologyDigest: 'topology-a' },
   },
   refusal: null,
   promptVersion: 'proposal-3',

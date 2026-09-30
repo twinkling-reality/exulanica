@@ -26,7 +26,7 @@ import {
 import { writePreferences, type AtlasPreferences } from '../preferences.js';
 import { applyDocumentAppearance, applyDocumentWorldStyle } from '../theme.js';
 import { buildControlsGuide } from '../ui/controls-guide.js';
-import { buildOptions, sameWorldStyle } from '../ui/options.js';
+import { buildOptions, sameWorldStyle, type WorldStyleAuthorityPresentation } from '../ui/options.js';
 import {
   WorldStyleContractError,
   type ActiveWorldStylePreview,
@@ -590,6 +590,8 @@ export function mountAppearance(deps: AppearanceDependencies): MountedAppearance
             'stale',
             'The saved world changed elsewhere. The latest version is shown; choose the restore target again.',
           );
+          // The change that overtook the restore is listed, so the target can be chosen again.
+          showVersionsAfterRefusal(client);
           return null;
         }
         await deps.onStyleSaved?.(result.version);
@@ -983,7 +985,37 @@ function worldStylePreviewMatches(
 function syncWorldStyleConnection(state: SessionState, client: WorldStyleClient): void {
   const worldState = client.state();
   if (worldState === null) return;
-  state.worldStyleConnection = Object.freeze({ state: worldState, versions: client.versions() });
+  state.worldStyleConnection = Object.freeze({
+    state: worldState,
+    versions: client.versions(),
+    liveVersionId: worldState.current.versionId,
+    savedVersionId: client.savedVersionId(),
+  });
+}
+
+/**
+ * Version history as the options panel lists it. Each version is marked current from the world's
+ * live version, not the one this page shows, so a page that shows its saved version over another
+ * writer's change can restore it; and the version the page's saved world names is marked as "your
+ * saved version".
+ */
+export function versionHistory(
+  connection: WorldStyleConnection,
+): NonNullable<WorldStyleAuthorityPresentation['versions']> {
+  const live = connection.liveVersionId ?? connection.state.current.versionId;
+  const saved = connection.savedVersionId ?? null;
+  return connection.versions.map((version) => ({
+    versionId: version.versionId,
+    label: [
+      `Revision ${version.revision}`,
+      version.rollbackTargetVersionId === null ? null : 'rollback',
+      version.provenance?.origin ?? 'authored',
+      version.createdAt.slice(0, 10),
+      version.versionId === saved ? 'your saved version' : null,
+    ].filter((item): item is string => item !== null).join(' · '),
+    current: version.versionId === live,
+    saved: version.versionId === saved,
+  }));
 }
 
 function presentWorldStyleAuthority(
@@ -1019,16 +1051,7 @@ function presentWorldStyleAuthority(
     revision: current.revision,
     provenance,
     warnings: current.warnings,
-    versions: connection.versions.map((version) => ({
-      versionId: version.versionId,
-      label: [
-        `Revision ${version.revision}`,
-        version.rollbackTargetVersionId === null ? null : 'rollback',
-        version.provenance?.origin ?? 'authored',
-        version.createdAt.slice(0, 10),
-      ].filter((item): item is string => item !== null).join(' · '),
-      current: version.versionId === current.versionId,
-    })),
+    versions: versionHistory(connection),
     ...(active === null
       ? {}
       : {
@@ -1058,6 +1081,11 @@ export function describeWorldStyleFailure(error: unknown): string {
     }
     if (error.code === 'invalid_preview_state') {
       return 'That preview is already closed. Create and review a new preview.';
+    }
+    if (error.code === 'busy') {
+      // Another transaction held a lock the write needs: a change to the look, a saved world's
+      // entry, or a question reading the world. Nothing was written, whichever it was.
+      return 'Your world was busy with something else a moment ago, so nothing was saved. Try again.';
     }
     return `${error.code}: ${error.message.replace(`${error.code}: `, '')}`;
   }

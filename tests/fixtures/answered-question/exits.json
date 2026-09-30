@@ -110,6 +110,78 @@
     },
     "society_packet": null
   },
+  "a content Selection left a society at its place out": {
+    "abstention": null,
+    "answer": [
+      {
+        "citations": [],
+        "text": "The people simulated at this place could not be read for this answer, so it leaves them out: what they are made from changed while it was read, so asking again reads them.",
+        "type": "meta",
+        "value_refs": []
+      },
+      {
+        "citations": [],
+        "text": "Authorized memory evidence: a photograph in your library.",
+        "type": "meta",
+        "value_refs": []
+      },
+      {
+        "citations": [],
+        "text": "Only memory captures can support a personal visit. Imported, authored, and simulated records cannot.",
+        "type": "meta",
+        "value_refs": []
+      }
+    ],
+    "calls": [],
+    "content_packet": {
+      "items": [
+        [
+          "TOKEN00001",
+          "authorized_memory",
+          "memory_capture",
+          null
+        ]
+      ],
+      "total_matched": 1
+    },
+    "deterministic": true,
+    "names": [],
+    "packet": null,
+    "plan": {
+      "capture": null,
+      "content": {
+        "after": null,
+        "scope": "memories_only"
+      },
+      "entities": null,
+      "epistemic": "confirmed",
+      "intent": "content",
+      "limit": 24,
+      "place": {
+        "ids": [
+          "<id 1>"
+        ]
+      },
+      "semantic_query": null,
+      "society": null,
+      "time": []
+    },
+    "rejections": [],
+    "repaired": false,
+    "result": {
+      "captures": [],
+      "content": [
+        [
+          "memory_capture",
+          "<id 2>"
+        ]
+      ],
+      "includes_proposals": false,
+      "intent": "content",
+      "total_matched": 1
+    },
+    "society_packet": null
+  },
   "a name is a saved person's and an unselected inhabitant's": {
     "abstention": "UNANSWERABLE_NOT_CAPTURED",
     "answer": [

@@ -118,7 +118,7 @@ export { PREDICATES, applicableIntents, buildPool, prune, subjectFootprint, topM
 export type { PhrasingRequest, PhrasingRequestOption, PhrasingResponse } from './phrasing.js';
 export { PhrasingError, applyPhrasing, phrasingRequest } from './phrasing.js';
 
-export type { ParseDraftContext, UtteranceParse } from './parse.js';
+export type { ParseDraftContext, Reply, UtteranceParse } from './parse.js';
 export { draftFromParse, parseUtterance } from './parse.js';
 
 export type {

@@ -54,8 +54,9 @@ __all__ = [
 
 MAX_CLAUSES: Final = 12
 #: Clauses code writes before an answer, outside the composer's limit and never merged into one
-#: of its clauses: that the world's people were left out, and that someone in the world shares a
-#: name the question uses (``exulanica/selection/question.py``).
+#: of its clauses: that the world's people were left out, that someone in the world shares a name
+#: the question uses, and that a society at the question's place could not be read
+#: (``exulanica/selection/question.py``). The first two never come together, so two at most.
 MAX_NOTES: Final = 2
 #: The longest a clause's text may be, as :class:`AnswerClause` declares it.
 MAX_CLAUSE_CHARACTERS: Final = 600

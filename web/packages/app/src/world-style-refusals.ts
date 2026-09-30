@@ -10,10 +10,11 @@
  *   trying again", and after the reload the saved world is live and the next change goes through.
  *
  * A restore that another change overtook in between is refused as stale, and the page shows the
- * latest version and asks for the restore target again. A reload first would not do: after a
- * writer that left the saved world alone it reopens the same saved version, which Version history
- * then marks current and cannot restore. The client's refusals (`StaleProposalError`) and the
- * page's (`composition/appearance.ts`) end with this sentence, so it lives here, once.
+ * latest version and asks for the restore target again. After a reload the page shows the saved
+ * version again, and Version history selects it as "your saved version" beside the live one, so the
+ * restore is there too (`versionHistory` in `composition/appearance.ts`). The client's refusals
+ * (`StaleProposalError`) and the page's (`composition/appearance.ts`) end with this sentence, so it
+ * lives here, once.
  */
 export const RESTORE_BEFORE_CHANGING =
   'To keep changing your world here, restore your saved version in Version history, which replaces '

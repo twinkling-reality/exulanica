@@ -78,7 +78,13 @@ from exulanica.selection.answer import (
 )
 from exulanica.selection.calls import CallLog, ModelCall
 from exulanica.selection.embeddings import embed_query, has_embeddings
-from exulanica.selection.executor import SelectedContent, SelectionResult, execute
+from exulanica.selection.executor import (
+    LeftOutSociety,
+    SelectedContent,
+    SelectionResult,
+    SocietyLeftOut,
+    execute,
+)
 from exulanica.selection.packet import (
     ContentEvidencePacket,
     EvidencePacket,
@@ -767,7 +773,34 @@ def _answered(
         # who has it: it was read as the saved one, the library's by default. Not said of an
         # answer about the world's people, which is not about anybody saved.
         notes.append(_SHARED_NAME["person" if scene.shared_name == "person" else "other"])
+    left_out = () if answered.result is None else answered.result.left_out_societies
+    if left_out:
+        # The content leaves out the people of a society at the question's place: said, with why,
+        # rather than answered as though they were not there.
+        notes.append(_societies_left_out(left_out))
     return _led_by_notes(answered, notes)
+
+
+#: Why a society at the question's place was left out of a content answer, in words, by reason.
+_SOCIETY_LEFT_OUT_WHY: Final[Mapping[SocietyLeftOut, str]] = {
+    SocietyLeftOut.INPUTS_MISSING: "nothing they are made from is recorded",
+    SocietyLeftOut.INPUTS_DO_NOT_CHECK: "what they are made from no longer checks",
+    SocietyLeftOut.INPUT_UNAVAILABLE: "something they are made from is not available now",
+    SocietyLeftOut.READ_RACED: (
+        "what they are made from changed while it was read, so asking again reads them"
+    ),
+}
+
+
+def _societies_left_out(left_out: Sequence[LeftOutSociety]) -> str:
+    """The note that says which societies at the question's place were left out, and why."""
+    who = (
+        "The people simulated at this place"
+        if len(left_out) == 1
+        else "The people of more than one society simulated at this place"
+    )
+    why = "; ".join(dict.fromkeys(_SOCIETY_LEFT_OUT_WHY[society.reason] for society in left_out))
+    return f"{who} could not be read for this answer, so it leaves them out: {why}."
 
 
 #: Said first when the world's people could not be read and the question was asked without them.

@@ -10,6 +10,7 @@ import {
   WorldStyleClient,
   WorldStyleContractError,
   validateLocalReference,
+  WORLD_STYLE_NOT_ANSWERED,
 } from '../src/world-style-api.js';
 import { RESTORE_BEFORE_CHANGING } from '../src/world-style-refusals.js';
 
@@ -497,6 +498,108 @@ const COMPANION_PROPOSAL = {
   promptVersion: 'world-style-proposal-v1',
 };
 
+describe('a saved world opened over another writer\'s change', () => {
+  it('names the live version and the saved one apart', async () => {
+    const fetch = connectedFetch((url) => {
+      if (url.pathname.endsWith('/world/styles/current')) return json(state('v1', 1, 0.55));
+      if (url.pathname.endsWith('/world/styles/versions')) {
+        return json([version('v0', 0, 0.82), version('v1', 1, 0.55)]);
+      }
+      return undefined;
+    });
+    const client = new WorldStyleClient({
+      worldId: TEST_WORLD,
+      baseUrl: 'https://exulanica.test/api', token: 't', fetch,
+      savedEntry: () => ({
+        entryId: 'entry-1', revision: 1, authoredStateSha256: 'a'.repeat(64), authoredEditSeq: 0,
+        styleVersionId: 'v0',
+      }),
+    });
+
+    const connection = await client.connect('v0');
+
+    expect(connection.state.current.versionId).toBe('v0');
+    expect(connection.liveVersionId).toBe('v1');
+    expect(connection.savedVersionId).toBe('v0');
+    expect(client.requiresReconciliation()).toBe(true);
+  });
+});
+
+describe('a write this page stopped waiting for', () => {
+  const stoppedWaiting = (savedMeanwhile: boolean) => {
+    let currentReads = 0;
+    return connectedFetch((url, init) => {
+      if (url.pathname.endsWith('/world/styles/current')) {
+        currentReads += 1;
+        return json(currentReads > 1 && savedMeanwhile ? state('v1', 1, 0.4) : state());
+      }
+      if (url.pathname.endsWith('/world/styles/previews') && init.method === 'POST') {
+        return json(preview('preview-1', 'proposal-1'), 201);
+      }
+      if (url.pathname.endsWith('/apply')) {
+        throw new DOMException('The operation timed out.', 'TimeoutError');
+      }
+      return undefined;
+    });
+  };
+
+  it('is read back from the world, and one the world saved is applied, not refused', async () => {
+    const client = new WorldStyleClient({
+      worldId: TEST_WORLD,
+      baseUrl: 'https://exulanica.test/api', token: 't', fetch: stoppedWaiting(true),
+      ids: () => 'proposal-1',
+    });
+    await client.connect();
+    await client.previewSettings({
+      profileId: 'origin-landscape', profileVersion: 1, parameters: { vitality: 0.4 },
+    });
+
+    const result = await client.applyActive();
+
+    expect(result).toMatchObject({ kind: 'applied', version: { versionId: 'v1' } });
+    expect(client.activePreview()).toBeNull();
+    expect(client.requiresReconciliation()).toBe(false);
+  });
+
+  it('says it is not saved yet, and where to look, when the world does not hold it', async () => {
+    const client = new WorldStyleClient({
+      worldId: TEST_WORLD,
+      baseUrl: 'https://exulanica.test/api', token: 't', fetch: stoppedWaiting(false),
+      ids: () => 'proposal-1',
+    });
+    await client.connect();
+    await client.previewSettings({
+      profileId: 'origin-landscape', profileVersion: 1, parameters: { vitality: 0.4 },
+    });
+
+    await expect(client.applyActive()).rejects.toMatchObject({
+      code: 'not_answered', message: WORLD_STYLE_NOT_ANSWERED,
+    });
+  });
+});
+
+describe('each world style request', () => {
+  it('carries a deadline of its own, made when it is sent, never one made with the client', async () => {
+    const signals: (AbortSignal | undefined)[] = [];
+    const fetch = connectedFetch((_url, init) => {
+      signals.push(init.signal ?? undefined);
+      return undefined;
+    });
+    const client = new WorldStyleClient({
+      worldId: TEST_WORLD,
+      baseUrl: 'https://exulanica.test/api', token: 't', fetch,
+      // A signal given to the client is not every request's: it would expire them all together.
+      signal: AbortSignal.abort(),
+    });
+    await client.connect();
+    await client.refresh();
+
+    expect(signals.length).toBeGreaterThanOrEqual(2);
+    expect(signals.every((signal) => signal !== undefined && !signal.aborted)).toBe(true);
+    expect(new Set(signals).size).toBe(signals.length);
+  });
+});
+
 describe('a proposal from another origin than Settings', () => {
   /** The world as the first read finds it, then as another writer has left it. */
   const movedOn = () => {
@@ -647,6 +750,78 @@ describe('a proposal from another origin than Settings', () => {
       ...COMPANION_PROPOSAL, originReference: 'companion-utterance:3c3c',
     })).rejects.toMatchObject({ code: 'saved_style_reconciliation_required' });
     expect(bodies).toHaveLength(2);
+  });
+
+  it('is previewed on the version its draft was drawn on, when that is live and this page is behind', async () => {
+    const bodies: Record<string, unknown>[] = [];
+    const current = movedOn();
+    const fetch = connectedFetch((url, init) => {
+      if (url.pathname.endsWith('/world/styles/current')) return current();
+      if (url.pathname.endsWith('/world/styles/previews') && init.method === 'POST') {
+        const body = JSON.parse(String(init.body)) as Record<string, unknown>;
+        bodies.push(body);
+        return body['baseStyleVersionId'] === 'v1'
+          ? json(preview('preview-1', String(body['proposalId']), 1), 201)
+          : json({ code: 'stale_style_version', detail: 'another writer won' }, 409);
+      }
+      return undefined;
+    });
+    const client = new WorldStyleClient({
+      worldId: TEST_WORLD,
+      baseUrl: 'https://exulanica.test/api', token: 't', fetch, ids: () => 'proposal-first',
+    });
+    await client.connect();
+    expect(client.state()?.current.versionId).toBe('v0');
+
+    // Another writer moved the world to v1 after this page read it, and the draft read v1.
+    const active = await client.previewUpstream({
+      ...COMPANION_PROPOSAL, base: { styleVersionId: 'v1', topologyDigest: 'topology-a' },
+    });
+
+    expect(bodies.map((body) => body['baseStyleVersionId'])).toEqual(['v1']);
+    expect(active.baseStyleVersionId).toBe('v1');
+    expect(client.state()?.current.versionId).toBe('v1');
+    // Positive control: without its base, the same proposal is refused as stale.
+    const other = new WorldStyleClient({
+      worldId: TEST_WORLD,
+      baseUrl: 'https://exulanica.test/api', token: 't',
+      fetch: connectedFetch((url, init) => {
+        if (url.pathname.endsWith('/world/styles/current')) return movedOnAgain();
+        if (url.pathname.endsWith('/world/styles/previews') && init.method === 'POST') {
+          return json({ code: 'stale_style_version', detail: 'another writer won' }, 409);
+        }
+        return undefined;
+      }),
+      ids: () => 'proposal-second',
+    });
+    const movedOnAgain = movedOn();
+    await other.connect();
+    await expect(other.previewUpstream(COMPANION_PROPOSAL)).rejects.toBeInstanceOf(StaleProposalError);
+  });
+
+  it('is refused as stale without a request when the version its draft was drawn on is no longer live', async () => {
+    const bodies: Record<string, unknown>[] = [];
+    const current = movedOn();
+    const fetch = connectedFetch((url, init) => {
+      if (url.pathname.endsWith('/world/styles/current')) return current();
+      if (url.pathname.endsWith('/world/styles/previews') && init.method === 'POST') {
+        bodies.push(JSON.parse(String(init.body)) as Record<string, unknown>);
+        return json({ code: 'stale_style_version', detail: 'another writer won' }, 409);
+      }
+      return undefined;
+    });
+    const client = new WorldStyleClient({
+      worldId: TEST_WORLD,
+      baseUrl: 'https://exulanica.test/api', token: 't', fetch, ids: () => 'proposal-first',
+    });
+    await client.connect();
+
+    // Drawn on a version this page never had, and the live world is v1: it could undo v1.
+    const refused = client.previewUpstream({
+      ...COMPANION_PROPOSAL, base: { styleVersionId: 'v-earlier', topologyDigest: 'topology-a' },
+    });
+    await expect(refused).rejects.toBeInstanceOf(StaleProposalError);
+    expect(bodies).toEqual([]);
   });
 
   it('is let go when the authority says it expired, from either origin, and nothing is made again', async () => {

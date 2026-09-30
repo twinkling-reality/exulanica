@@ -33,7 +33,46 @@ export interface UtteranceParse {
    * capture could not know and the schema has no column for.
    */
   readonly residual: string | null;
+  /**
+   * The yes, no or maybe the words open with, or null when they open with none of them. A reply to
+   * a question that a yes or a no answers is read by it (`REPLY_PATTERNS`), and the draft keeps the
+   * whole reply as its note, so the "No" of "No, that's her daughter" is never dropped.
+   */
+  readonly reply: Reply | null;
+  /**
+   * Whether the words are put as a question or a request rather than as a statement: they end with
+   * a question mark, or open with a word that asks (`ASKING_OPENERS`). Words that ask are the
+   * person's own question, not an answer to one the Companion asked.
+   */
+  readonly asks: boolean;
 }
+
+/** What a reply to a yes-or-no question says. */
+export type Reply = 'yes' | 'no' | 'maybe';
+
+/**
+ * How a reply opens, by what it says, tried in this order: a hedged no before the maybe it opens
+ * with, and a maybe before a yes. The words a person uses to answer a yes-or-no question, not names:
+ * each pattern must end at a word boundary, so "Nobody" and "Yesterday" are neither.
+ */
+const REPLY_PATTERNS: readonly (readonly [RegExp, Reply])[] = Object.freeze([
+  [
+    /^(?:no|nope|nah|not really|maybe not|probably not|definitely not|certainly not|i don't think so|i do not think so)\b/iu,
+    'no',
+  ],
+  [/^(?:maybe|perhaps|not sure|i'm not sure|i am not sure|i don't know|i do not know|hard to say)\b/iu, 'maybe'],
+  [
+    /^(?:yes|yeah|yep|yup|sure|correct|right|that's right|that is right|probably|i think so|definitely|certainly)\b/iu,
+    'yes',
+  ],
+]);
+
+/**
+ * The words that open a question or a request: the interrogatives, the auxiliaries a yes-or-no
+ * question opens with, and the verbs a person asks the Companion to do something with.
+ */
+const ASKING_OPENERS =
+  /^(?:what|who|whom|whose|where|when|why|how|which|is|are|was|were|do|does|did|can|could|would|should|has|have|show|tell|find|make|list)\b/iu;
 
 /** The closed relation vocabulary. Longest phrases first so "close friend" beats "friend". */
 const RELATION_PATTERNS: readonly (readonly [RegExp, string])[] = Object.freeze([
@@ -79,11 +118,16 @@ export function parseUtterance(rawUtterance: string): UtteranceParse {
   const comma = text.indexOf(',');
   const residual = comma >= 0 ? text.slice(comma + 1).trim() : null;
 
+  const reply = REPLY_PATTERNS.find(([pattern]) => pattern.test(text))?.[1] ?? null;
+  const asks = /\?["'\u201d)]*$/u.test(text) || ASKING_OPENERS.test(text);
+
   return Object.freeze({
     rawUtterance,
     name: name === '' ? null : name,
     relation,
     residual: residual === null || residual === '' ? null : residual,
+    reply,
+    asks,
   });
 }
 
@@ -128,10 +172,11 @@ export function draftFromParse(
       }),
     );
   }
-  if (parse.residual !== null) {
-    operations.push(
-      draftOperation('note', [], [], { predicateKey: 'note', text: parse.residual }),
-    );
+  // A reply is kept whole, its yes, no or maybe with it: the words after its comma alone would
+  // record "that's her daughter" as though the person had agreed.
+  const note = parse.reply !== null ? parse.rawUtterance.trim() : parse.residual;
+  if (note !== null) {
+    operations.push(draftOperation('note', [], [], { predicateKey: 'note', text: note }));
   }
 
   if (operations.length === 0) return null;
