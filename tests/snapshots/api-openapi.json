@@ -11057,6 +11057,100 @@
     }
    }
   },
+  "/world/versions/{version_id}/traffic": {
+   "get": {
+    "tags": [
+     "world"
+    ],
+    "summary": "The vehicles a saved world's roads hold, second by second, for a page to draw.",
+    "operationId": "world_traffic_world_versions__version_id__traffic_get",
+    "parameters": [
+     {
+      "name": "version_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Version Id"
+      }
+     },
+     {
+      "name": "from_second",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "From Second"
+      }
+     },
+     {
+      "name": "seconds",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "default": 60,
+       "title": "Seconds"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/world/interactions/catalog": {
    "get": {
     "tags": [
@@ -12486,13 +12580,65 @@
     }
    }
   },
+  "/worlds/specification": {
+   "get": {
+    "tags": [
+     "world"
+    ],
+    "summary": "What a generated world may be made from: every value, its range, presets, refusals.",
+    "description": "The specification schema this server offers, with its presets and every refusal by name.",
+    "operationId": "specification_worlds_specification_get",
+    "parameters": [
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Specification Worlds Specification Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/worlds/generated": {
    "post": {
     "tags": [
      "world"
     ],
     "summary": "Generate a world from a recipe and save it as yours.",
-    "description": "Generate the recipe's world for a new identity, save it and its entry, and queue its bakes.\n\nAn unknown recipe, a recipe its composer does not generate, a recipe that generates no world\nfrom any of its seed candidates, and a workspace that already holds as many generated worlds\nas the count policy allows are each refused by name, and nothing is written.",
+    "description": "Generate the preset's world with the values asked for, for a new identity, save it and its\nentry, and queue its bakes.\n\nAn unknown preset, a value its schema does not offer (422, naming the key, the value and the\nrange), a preset its composer does not generate, a specification that generates no world from\nany of its seed candidates, and a workspace that already holds as many generated worlds as the\ncount policy allows are each refused by name, and nothing is written.",
     "operationId": "create_generated_world_worlds_generated_post",
     "parameters": [
      {
@@ -15955,6 +16101,19 @@
       "maxLength": 200,
       "minLength": 1,
       "title": "Title"
+     },
+     "values": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object",
+        "maxProperties": 64
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Values"
      }
     },
     "additionalProperties": false,

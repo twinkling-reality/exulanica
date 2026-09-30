@@ -1,10 +1,12 @@
 /**
- * DEVELOPMENT EVALUATION: the traffic of the generated city a baked tile walk draws.
+ * A generated world's traffic, drawn while its tiles are attached.
  *
- * The walk's tile is a mount the binding attaches; this wraps it so that attaching it also draws
- * the city's vehicles (`TrafficLayer`), read from `GET /tiles/traffic` with the walk's credential,
- * and disposing it stops them. It is reached only from `generated-tile.ts`, so only from the
- * development preview, and a production build carries none of it.
+ * The tiles a walk draws are a mount the binding attaches; `withTraffic` wraps it so that attaching
+ * it also draws the world's vehicles (`TrafficLayer`), read window by window from a
+ * `TrafficReader`, and disposing it stops them. There are two readers: a saved world's own traffic
+ * (`GET /world/versions/{version_id}/traffic`, `worldTrafficReader` in `generated-world.ts`), drawn
+ * in every generated world the page opens, and, on the development preview only, a baked city's
+ * (`GET /tiles/traffic`, `withTileTraffic`, reached only from `generated-tile.ts`).
  *
  * The traffic keeps shared real time. The first read names no second: the server answers from its
  * clock and says where that clock was, and the layer's copy of the clock starts there. While the
@@ -21,6 +23,7 @@
 
 import { ApiError, type TransportOptions } from '@exulanica/graph-client';
 import type { GeneratedTileAttachment, GeneratedTileHost, LoadedGeneratedTile } from '@exulanica/atlas-react/generated-tile';
+import type { TrafficWindow } from '@exulanica/atlas-react/traffic';
 import { TrafficClient, TrafficContractError } from '../traffic-api.js';
 import type { AppEnvironment } from './session-state.js';
 
@@ -44,9 +47,14 @@ export interface TileTrafficState {
   readonly reason: string | null;
 }
 
+/** Reads a world's traffic, a window at a time. */
+export interface TrafficReader {
+  /** The window of `seconds` seconds from `fromSecond`, or from the server's clock when null. */
+  window(fromSecond: number | null, seconds: number, signal?: AbortSignal): Promise<{ readonly window: TrafficWindow }>;
+}
+
 export interface TileTrafficDeps {
-  readonly client: Pick<TrafficClient, 'window'>;
-  readonly worldSeed: string;
+  readonly reader: TrafficReader;
   readonly now?: () => number;
   readonly setTimer?: (callback: () => void, ms: number) => unknown;
   readonly clearTimer?: (handle: unknown) => void;
@@ -59,8 +67,9 @@ function lasting(error: unknown): boolean {
 }
 
 /**
- * The tile, with its city's traffic drawn while it is attached. `access` is the credential the
- * walk fetched its tiles with.
+ * DEVELOPMENT EVALUATION: the tile a baked city's walk draws, with the city's traffic
+ * (`GET /tiles/traffic`) drawn while it is attached. `access` is the credential the walk fetched
+ * its tiles with.
  */
 export function withTileTraffic(
   tile: LoadedGeneratedTile,
@@ -68,15 +77,25 @@ export function withTileTraffic(
   worldSeed: string,
   env: AppEnvironment,
 ): LoadedGeneratedTile {
+  const client = new TrafficClient(access);
+  return withTraffic(
+    tile,
+    { window: (fromSecond, seconds, signal) => client.window(worldSeed, fromSecond, seconds, signal) },
+    (state) => env.shell.setAttribute(TILE_TRAFFIC_ATTRIBUTE, JSON.stringify(state)),
+  );
+}
+
+/** The tile, with the traffic `reader` reads drawn while it is attached, each state reported. */
+export function withTraffic(
+  tile: LoadedGeneratedTile,
+  reader: TrafficReader,
+  report: (state: TileTrafficState) => void,
+): LoadedGeneratedTile {
   return {
     ...tile,
     attach(host: GeneratedTileHost): GeneratedTileAttachment {
       const attachment = tile.attach(host);
-      const traffic = startTileTraffic(host, tile, {
-        client: new TrafficClient(access),
-        worldSeed,
-        report: (state) => env.shell.setAttribute(TILE_TRAFFIC_ATTRIBUTE, JSON.stringify(state)),
-      });
+      const traffic = startTileTraffic(host, tile, { reader, report });
       return {
         metrics: attachment.metrics,
         get animating() {
@@ -149,7 +168,7 @@ export function startTileTraffic(
     const abort = new AbortController();
     reading = abort;
     try {
-      const answer = await deps.client.window(deps.worldSeed, fromSecond, WINDOW_SECONDS, abort.signal);
+      const answer = await deps.reader.window(fromSecond, WINDOW_SECONDS, abort.signal);
       if (stopped || layer === null) return;
       layer.setWindow(answer.window, now());
       vehicles = answer.window.vehicles.length;

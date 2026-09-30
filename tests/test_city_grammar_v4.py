@@ -28,6 +28,7 @@ from exulanica.grammar.grammars.city.catalogs import (
     entry_fields,
     load_city_catalogs,
 )
+from exulanica.grammar.grammars.city.corners import corner_box, strip_box
 from exulanica.grammar.grammars.city.descriptor import (
     CITY_MIGRATION_PATHS,
     CITY_SURFACE,
@@ -57,7 +58,11 @@ from exulanica.grammar.grammars.city.generation.tiles import (
     tile_document,
 )
 from exulanica.grammar.grammars.city.roads import JunctionRecord, LaneRecord
-from exulanica.grammar.grammars.city.streets import CrossingRecord, StreetSegmentRecord
+from exulanica.grammar.grammars.city.streets import (
+    CrossingRecord,
+    CurbEdgeRecord,
+    StreetSegmentRecord,
+)
 from exulanica.grammar.migration import ParameterMigration
 from exulanica.traffic.catalogs import CATALOG_DIRECTORY as TRAFFIC_CATALOG_DIRECTORY
 from exulanica.traffic.catalogs import load_traffic_catalogs
@@ -76,6 +81,10 @@ V3_TILE_DOCUMENTS = {
     (3, 0): "16baf55687e3aa6d0d6a87f00804687e31e1d7d21c083e90fcac50a2114bba91",
     (4, 0): "6fdbd1da273b2b57c4f2d9fe5dba0a04ee34d5f0766b887c83697f0f8149b54c",
 }
+#: What the corridor specification generates at version 4, once each curb's box also holds the
+#: corners other curbs turn into it. Towns are stored at version 4 from here on, so a change to its
+#: output is a new version, not an edit to this one.
+V4_OUTPUT_DIGEST = "f968e5c2f07418229ce57a7004d8b99b0380db0fd1259d8ed4a1ffccf65b49b3"
 #: MUTCD 2009 Section 3B.16's 4 feet, rounded up to the streets stage's 50 mm module, and the most
 #: version 4's descriptor admits.
 SETBACK_RANGE_MM = (1_250, 3_000)
@@ -161,6 +170,51 @@ def test_version_3_generates_exactly_what_it_generated_before_version_4():
         key: hashlib.sha256(document_bytes(document)).hexdigest()
         for key, document in documents.items()
     } == V3_TILE_DOCUMENTS
+
+
+def test_version_4_generates_exactly_what_the_towns_stored_at_it_were_made_from():
+    """A town made at version 4 is regenerated from its receipt and held to its output digest, so
+    version 4 keeps generating these bytes; a change meant for it moves this digest and must become
+    another version."""
+    records, output_digest, _documents = _corridor(4)
+    assert output_digest == V4_OUTPUT_DIGEST
+    assert len(records) == 6527
+
+
+def test_a_curb_states_a_box_that_holds_every_corner_another_curb_turns_into_it():
+    """The case the tessellator refused (11 of 50 generated town tiles before this rule): a street
+    turns a corner into a high street, whose wider carriageway lays its kerb line lower under the
+    camber, and the curb turned into draws the joining mitre at the turning curb's heights, above
+    the box of its own straight kerb and footway. Each curb's stated extent holds every corner it
+    meets, whichever of the two curbs it is, so no curb draws outside the extent it states."""
+    curbs = {record.identity: record for record in _of(_corridor(4)[0], CurbEdgeRecord)}
+    corners = [
+        (curb, curbs[identity], box)
+        for curb in curbs.values()
+        for identity in curb.next_curb_identity
+        if (box := corner_box(curb, curbs[identity])) is not None
+    ]
+    higher = [
+        (curb, follower)
+        for curb, follower, box in corners
+        if box.max_z_mm > strip_box(follower).max_z_mm
+    ]
+    # The control: the corridor meets the case, at kerb lines of other heights.
+    assert higher
+    assert all(curb.kerb_line_mm[-1][2] != follower.kerb_line_mm[0][2] for curb, follower in higher)
+
+    def holds(extent: object, box: object) -> bool:
+        return all(
+            getattr(extent, f"min_{axis}_mm") <= getattr(box, f"min_{axis}_mm")
+            and getattr(box, f"max_{axis}_mm") <= getattr(extent, f"max_{axis}_mm")
+            for axis in "xyz"
+        )
+
+    assert [
+        (curb.identity, follower.identity)
+        for curb, follower, box in corners
+        if not (holds(curb.extent, box) and holds(follower.extent, box))
+    ] == []
 
 
 def test_a_caller_naming_no_version_generates_version_3():

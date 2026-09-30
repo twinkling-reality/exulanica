@@ -28,6 +28,7 @@ import { el } from '../ui/dom.js';
 import type { FirstUseGuidance } from '../ui/first-use-guidance.js';
 import type { buildRegionPlan } from '../ui/region-plan.js';
 import { withDeclaredFloors } from './declared-floors.js';
+import { GENERATED_WORLD_WAITING_ATTRIBUTE } from './generated-world-ready.js';
 import { reconstructionRungsFor } from './session-and-geometry.js';
 import type { AppEnvironment, SessionState } from './session-state.js';
 import type { MountedStatusAndInspector } from './status-and-inspector.js';
@@ -102,6 +103,8 @@ export async function mountRenderer(deps: RendererDependencies): Promise<Mounted
       : import.meta.env.DEV && bakedTile !== null
         ? await (await import('./generated-tile.js')).prepareBakedTileWalk(env, bakedTile)
         : undefined;
+    // Words saying a world is being built belong to that world: opening any world takes them down.
+    env.shell.querySelector(`[${GENERATED_WORLD_WAITING_ATTRIBUTE}]`)?.remove();
     // A saved world generated from a recipe draws the tiles its entry declares, read through its
     // own version, once every one is baked; while one is not, the page says so and draws none.
     const generatedWorld = generatedTile === undefined && state.activeWorldEntry?.generatedGround != null

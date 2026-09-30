@@ -13,8 +13,13 @@ version, through one function per kind of world that states them:
   merged by identity, where two copies of one record must agree. The world is the seed; its
   version is the digest over the tiles' coordinates and container digests, so a rebake is a new
   version. A tile is read, never delivered, so no tile quota is spent;
-- a saved world made from the city grammar reads its records through the world's own generated
-  records (``town_records``) when that world kind exists; this module holds no reader for it yet.
+- :func:`saved_world_roads`, a saved world: the records its snapshot states, read through the
+  one interface a generated world's records are read by (``town_records``), which generates them
+  again from the world's receipt and holds them to its output digest. The world is the saved
+  world; its version is the receipt's digest, so every version of one world drives the same
+  traffic, and a world generated again under other records is other traffic. Nothing is read from
+  the store. A world whose snapshot states no records, or whose records state no lane, is refused
+  as ``roads_not_stated``: the rule is the world's records, never its kind or its name.
 
 **The clock** is shared real time (:func:`traffic_clock`): second ``n`` is the ``n``\\ th second
 since the Unix epoch, so every page showing a world shows its vehicles in the same places.
@@ -31,10 +36,13 @@ import json
 import struct
 import threading
 import time
+import uuid
 from collections import OrderedDict
 from collections.abc import Callable, Mapping
 from concurrent.futures import Executor
 from typing import Any, Final
+
+import psycopg
 
 from exulanica.canonical import canonical_json
 from exulanica.db.read_check import final_read_check
@@ -42,6 +50,7 @@ from exulanica.evidence.blob import BlobId
 from exulanica.grammar import shapes
 from exulanica.grammar.grammars.city import CITY_SHAPES_BY_TYPE
 from exulanica.grammar.grammars.city.descriptor import CITY_GENERATING_VERSIONS, CITY_GRAMMAR_ID
+from exulanica.grammar.grammars.city.roads import LaneRecord
 from exulanica.movement.flight_episodes import watch_parent
 from exulanica.world.baked_tiles import BakedTile, BakedTileRepository, TileBytesMissing
 from exulanica.world.episode_worker import (
@@ -52,6 +61,7 @@ from exulanica.world.episode_worker import (
     Line,
     worker_pool,
 )
+from exulanica.world.generated_worlds import states_records, town_records
 from exulanica.world.traffic_episodes import (
     EPISODE,
     PackedTrafficEpisode,
@@ -70,6 +80,7 @@ __all__ = [
     "TrafficWorkerUnavailable",
     "close_traffic_worker",
     "generated_tile_roads",
+    "saved_world_roads",
     "served_window",
     "traffic_clock",
     "traffic_process_pool",
@@ -252,6 +263,48 @@ def generated_tile_roads(repository: BakedTileRepository, world_seed: str) -> Tr
         city_identity=city_identity,
         grammar_version=grammar_version,
         records=road_records([record for _, record in records.values()]),
+    )
+    with _inputs_lock:
+        _inputs[key] = made
+        _inputs.move_to_end(key)
+        while len(_inputs) > _INPUT_LIMIT:
+            _inputs.popitem(last=False)
+    return made
+
+
+# -- the road source of a saved world ------------------------------------------------------------
+
+
+def saved_world_roads(
+    connection: psycopg.Connection, workspace_id: uuid.UUID, world_id: str, snapshot_id: uuid.UUID
+) -> TrafficInput:
+    """The road records a saved world's snapshot states, keyed by the world and its receipt.
+
+    ``roads_not_stated`` when the snapshot states no records or its records state no lane; a
+    world whose receipt no longer generates its records raises ``InvalidStructuralData``, named
+    by the reader (``unreadable_reason``).
+    """
+    if not states_records(connection, workspace_id, world_id, snapshot_id):
+        raise TrafficRefused(
+            "roads_not_stated", f"world {world_id} states no records, so no roads to drive"
+        )
+    generated = town_records(connection, workspace_id, world_id, snapshot_id)
+    key = ("saved", str(workspace_id), world_id, generated.receipt_sha256)
+    with _inputs_lock:
+        found = _inputs.get(key)
+        if found is not None:
+            _inputs.move_to_end(key)
+            return found
+    records = road_records(generated.records)
+    if not any(isinstance(record, LaneRecord) for record in records):
+        raise TrafficRefused("roads_not_stated", f"world {world_id}'s records state no lane")
+    grammar = generated.receipt["grammar"]
+    made = traffic_input(
+        world_id=world_id,
+        version_id=generated.receipt_sha256,
+        city_identity=str(generated.receipt["subject_identity"]),
+        grammar_version=int(grammar["grammar_version"]),
+        records=records,
     )
     with _inputs_lock:
         _inputs[key] = made

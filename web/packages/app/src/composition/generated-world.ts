@@ -14,16 +14,30 @@
  * the region origin the city's origin. The tile runtime draws every tile at its absolute city
  * position under the environment root, so the world's people hang from a root at that origin
  * (`hostGeneratedSociety` in `@exulanica/atlas-react/playcanvas`), and a person opens at the
- * served arrival point, facing the way the entry says a person arriving faces.
+ * served arrival point, facing the way the entry says a person arriving faces. The served point is a
+ * standing spot of the world's records, and the drawn ground (the tiles' `nav_envelope`) carves a
+ * capsule's clearance round every obstruction on a footway, so a spot beside a tree can lie in the
+ * tree pit's carve: a person then opens on the nearest drawn ground (`groundNear`), rather than on
+ * none, which the walk would recover to the first tile's middle.
+ *
+ * Every generated world the page opens also draws its own traffic while its tiles are attached
+ * (`withTraffic` in `tile-traffic.ts`), read through the world's version
+ * (`GET /world/versions/{version}/traffic`). A world whose roads hold no traffic is refused by name,
+ * and the page then says why in words chosen by the refusal's code (`trafficRefusalWords`), never
+ * a blank; the shell's `data-tile-traffic` attribute states what was served and drawn.
  */
 
-import type { LoadedGeneratedTile } from '@exulanica/atlas-react/generated-tile';
+import type { GeneratedTileAttachment, GeneratedTileHost, LoadedGeneratedTile } from '@exulanica/atlas-react/generated-tile';
 import type { Credentials } from '../config.js';
 import { fill, say } from '../ui/copy.js';
 import { el } from '../ui/dom.js';
 import type { GeneratedGround, SavedWorldEntry } from '../world-entry-api.js';
 import type { AppEnvironment } from './session-state.js';
-import { GENERATED_WORLD_READY_EVENT } from './generated-world-ready.js';
+import {
+  GENERATED_WORLD_READY_EVENT,
+  GENERATED_WORLD_WAITING_ATTRIBUTE,
+  type GeneratedWorldReady,
+} from './generated-world-ready.js';
 import { committedTextureLibrary } from '../texture-library.js';
 
 /** The media type a baked tile's container is served as. */
@@ -35,8 +49,25 @@ const CONTAINER_MEDIA_TYPE = 'application/vnd.exulanica.owd';
  * that is still baking a dozen times a minute at most.
  */
 const WAITING_POLL_MS = 5_000;
+/**
+ * The spacing of the rings the page searches for ground round a served arrival: the city grammar's
+ * 50 mm dimension module, the finest step its surfaces are laid on.
+ */
+const GROUND_SEARCH_STEP_MM = 50;
+/**
+ * How far from the served arrival the page looks for ground: five metres, which keeps a person on
+ * the footway the arrival names and in sight of it. Measured on a three-tile town whose arrival lay
+ * in a tree pit's carve, ground was 570 mm east of the served point, 900 mm north and 1,600 mm south.
+ */
+const GROUND_SEARCH_REACH_MM = 5_000;
 /** Marks the notice a page waiting for its world shows, so a later mount replaces it. */
-export const GENERATED_WORLD_WAITING_ATTRIBUTE = 'data-generated-world-waiting';
+export { GENERATED_WORLD_WAITING_ATTRIBUTE };
+/** Marks the note saying why a world shows no vehicles; it names the refusal's code. */
+export const WORLD_TRAFFIC_NOTE_ATTRIBUTE = 'data-world-traffic-note';
+/** The prefix every refusal to read a generated world's records carries. */
+const UNREADABLE_PREFIX = 'generated_world_';
+/** What the note names when the page could not load its own traffic code. */
+const TRAFFIC_NOT_LOADED = 'traffic_not_loaded';
 
 
 /** What the page draws of a saved generated world, once every tile it names is baked. */
@@ -81,6 +112,36 @@ async function worldTileBytes(
 }
 
 /**
+ * The drawn ground nearest a served point, in the region's frame (east and south millimetres), with
+ * its height in metres: the point itself when ground is drawn there, or else the first point with
+ * ground on rings `GROUND_SEARCH_STEP_MM` apart, each walked from the way a person arriving faces and
+ * alternately either side of it; null when none lies within `GROUND_SEARCH_REACH_MM`.
+ */
+export function groundNear(
+  surface: { sample(x: number, z: number): { readonly height: number } | null },
+  eastMm: number,
+  southMm: number,
+  facing: readonly [east: number, south: number],
+): { readonly eastMm: number; readonly southMm: number; readonly heightM: number } | null {
+  const at = (east: number, south: number) => surface.sample(east / 1000, south / 1000);
+  const here = at(eastMm, southMm);
+  if (here !== null) return { eastMm, southMm, heightM: here.height };
+  const ahead = Math.atan2(facing[1], facing[0]);
+  for (let radius = GROUND_SEARCH_STEP_MM; radius <= GROUND_SEARCH_REACH_MM; radius += GROUND_SEARCH_STEP_MM) {
+    const count = Math.ceil((2 * Math.PI * radius) / GROUND_SEARCH_STEP_MM);
+    for (let turn = 0; turn < count; turn += 1) {
+      const side = turn % 2 === 0 ? 1 : -1;
+      const angle = ahead + side * Math.ceil(turn / 2) * ((2 * Math.PI) / count);
+      const east = eastMm + radius * Math.cos(angle);
+      const south = southMm + radius * Math.sin(angle);
+      const found = at(east, south);
+      if (found !== null) return { eastMm: east, southMm: south, heightM: found.height };
+    }
+  }
+  return null;
+}
+
+/**
  * The world an entry declares, loaded and ready to mount, or why it is not drawn yet. Null for an
  * entry that declares no generated ground.
  */
@@ -116,10 +177,11 @@ export async function loadGeneratedWorld(
   // yaw = atan2(-east, -south).
   const [east, height, south] = ground.arrivalMm;
   const [facingEast, facingSouth] = ground.arrivalFacingMm;
+  const stand = groundNear(loaded.navigationWorld.surface, east, south, [facingEast, facingSouth]);
   const start = {
-    x: east / 1000,
-    y: height / 1000 + loaded.navigationWorld.eyeHeight,
-    z: south / 1000,
+    x: (stand?.eastMm ?? east) / 1000,
+    y: (stand?.heightM ?? height / 1000) + loaded.navigationWorld.eyeHeight,
+    z: (stand?.southMm ?? south) / 1000,
     yaw: Math.atan2(-facingEast, -facingSouth),
     pitch: 0,
   };
@@ -133,21 +195,139 @@ export function isGeneratedWorld(
   return value !== null && 'tile' in value;
 }
 
-/** Every tile of the entry's world is baked, as the server now says, read from its entry. */
-async function allBaked(access: Credentials, entry: SavedWorldEntry): Promise<boolean> {
+/** Where the entry's tiles stand, as the server now says: all baked, one failed, or still baking. */
+async function bakeState(
+  access: Credentials,
+  entry: SavedWorldEntry,
+): Promise<'baked' | 'failed' | 'baking'> {
   const response = await fetch(`${access.baseUrl}/world-entries/${encodeURIComponent(entry.entryId)}`, {
     headers: { Authorization: `Bearer ${access.token}`, Accept: 'application/json' },
     credentials: 'same-origin',
   });
-  if (!response.ok) return false;
+  if (!response.ok) return 'baking';
   const body = await response.json() as { generated_ground?: { tiles?: readonly { state?: string }[] } };
   const tiles = body.generated_ground?.tiles ?? [];
-  return tiles.length > 0 && tiles.every((tile) => tile.state === 'baked');
+  if (tiles.some((tile) => tile.state === 'failed')) return 'failed';
+  return tiles.length > 0 && tiles.every((tile) => tile.state === 'baked') ? 'baked' : 'baking';
 }
 
 /**
- * The tile to mount for a saved generated world, or null while the world is not drawn yet, in
- * which case the page says why and, while tiles are baking, opens the world again once they are.
+ * While a world's tiles bake, reads its entry every `WAITING_POLL_MS`, and at once whenever the page
+ * is shown again, since a hidden page's timers are held back. Once every tile is baked or one has
+ * failed it stops and announces the world can be opened again, which then draws it or says why
+ * not. It stops as well once its words are taken down, when another world is opened.
+ */
+function watchBakes(env: AppEnvironment, access: Credentials, entry: SavedWorldEntry, words: Element): void {
+  let done = false;
+  let reading = false;
+  const stop = (): void => {
+    done = true;
+    window.clearInterval(timer);
+    document.removeEventListener('visibilitychange', shown);
+  };
+  const check = (): void => {
+    if (done || reading) return;
+    if (!words.isConnected) {
+      stop();
+      return;
+    }
+    reading = true;
+    void bakeState(access, entry).then((state) => {
+      reading = false;
+      if (done || state === 'baking') return;
+      stop();
+      const detail: GeneratedWorldReady = { entryId: entry.entryId };
+      env.shell.dispatchEvent(new CustomEvent(GENERATED_WORLD_READY_EVENT, { bubbles: true, detail }));
+    }, () => {
+      reading = false;
+    });
+  };
+  const shown = (): void => {
+    if (document.visibilityState === 'visible') check();
+  };
+  const timer = window.setInterval(check, WAITING_POLL_MS);
+  document.addEventListener('visibilitychange', shown);
+}
+
+/**
+ * Why a world shows no vehicles, in words, from the traffic route's refusal code: the words the
+ * copy states for that code, one sentence for every refusal to read the world's records, and the
+ * code itself inside a general sentence for any other, so the page is never blank about it.
+ */
+export function trafficRefusalWords(code: string): string {
+  if (code.startsWith(UNREADABLE_PREFIX)) return say('world.traffic.unreadable');
+  const key = `world.traffic.${code}`;
+  const words = say(key);
+  return words === key ? fill('world.traffic.other', { reason: code }) : words;
+}
+
+/**
+ * The world's tiles, with the world's own traffic drawn while they are attached. A refusal the
+ * server will keep giving is said in words on the shell until the tiles are taken down.
+ */
+async function withWorldTraffic(
+  env: AppEnvironment,
+  access: Credentials,
+  entry: SavedWorldEntry,
+  tile: LoadedGeneratedTile,
+): Promise<LoadedGeneratedTile> {
+  const note = (): Element | null => env.shell.querySelector(`[${WORLD_TRAFFIC_NOTE_ATTRIBUTE}]`);
+  const explain = (code: string): void => {
+    note()?.remove();
+    env.shell.append(el('p', {
+      class: 'world-traffic-note', role: 'status', text: trafficRefusalWords(code),
+      [WORLD_TRAFFIC_NOTE_ATTRIBUTE]: code,
+    }));
+  };
+  // Taking the tiles down takes the note down, and the drawn state when there is one.
+  const cleared = (drawn: LoadedGeneratedTile, stated: string | null): LoadedGeneratedTile => ({
+    ...drawn,
+    attach(host: GeneratedTileHost): GeneratedTileAttachment {
+      const attachment = drawn.attach(host);
+      return {
+        metrics: attachment.metrics,
+        get animating() {
+          return attachment.animating ?? false;
+        },
+        dispose() {
+          attachment.dispose();
+          note()?.remove();
+          if (stated !== null) env.shell.removeAttribute(stated);
+        },
+      };
+    },
+  });
+  let modules: [typeof import('./tile-traffic.js'), typeof import('../traffic-api.js')];
+  try {
+    modules = await Promise.all([import('./tile-traffic.js'), import('../traffic-api.js')]);
+  } catch {
+    // The world opens without its vehicles rather than not at all, and says so.
+    explain(TRAFFIC_NOT_LOADED);
+    return cleared(tile, null);
+  }
+  const [{ TILE_TRAFFIC_ATTRIBUTE, withTraffic }, { WorldTrafficClient }] = modules;
+  const client = new WorldTrafficClient(access);
+  return cleared(withTraffic(
+    tile,
+    {
+      window: (fromSecond, seconds, signal) =>
+        client.window(entry.worldId, entry.authoredVersionId, fromSecond, seconds, signal),
+    },
+    (state) => {
+      env.shell.setAttribute(TILE_TRAFFIC_ATTRIBUTE, JSON.stringify(state));
+      if (state.state !== 'refused' || state.reason === null) {
+        note()?.remove();
+        return;
+      }
+      explain(state.reason);
+    },
+  ), TILE_TRAFFIC_ATTRIBUTE);
+}
+
+/**
+ * The tile to mount for a saved generated world, with its traffic, or null while the world is not
+ * drawn yet, in which case the page says why and, while tiles are baking, opens the world again
+ * once every one is baked or one has failed.
  */
 export async function openGeneratedWorld(
   env: AppEnvironment,
@@ -157,22 +337,15 @@ export async function openGeneratedWorld(
   env.shell.querySelector(`[${GENERATED_WORLD_WAITING_ATTRIBUTE}]`)?.remove();
   const loaded = await loadGeneratedWorld(access, entry);
   if (loaded === null) return null;
-  if (isGeneratedWorld(loaded)) return loaded.tile;
+  if (isGeneratedWorld(loaded)) return withWorldTraffic(env, access, entry, loaded.tile);
   const words = loaded.waiting === 'baking'
     ? fill('world.generated.baking', { recipe: loaded.ground.recipeLabel })
     : say('world.generated.failed');
-  env.shell.append(el('p', {
+  const note = el('p', {
     class: 'reconstruction-loading', role: 'status', text: words,
     [GENERATED_WORLD_WAITING_ATTRIBUTE]: loaded.waiting,
-  }));
-  if (loaded.waiting === 'baking') {
-    const timer = window.setInterval(() => {
-      void allBaked(access, entry).then((baked) => {
-        if (!baked) return;
-        window.clearInterval(timer);
-        env.shell.dispatchEvent(new CustomEvent(GENERATED_WORLD_READY_EVENT, { bubbles: true }));
-      });
-    }, WAITING_POLL_MS);
-  }
+  });
+  env.shell.append(note);
+  if (loaded.waiting === 'baking') watchBakes(env, access, entry, note);
   return null;
 }

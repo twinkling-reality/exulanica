@@ -1,9 +1,10 @@
 """A world generated from a recipe: made through the API, saved, and read back through its receipt.
 
-The small town is the catalog's one recipe. These tests make it through ``POST /worlds/generated``
-as a person's browser would, and hold what the server writes: a ``generated`` world, the receipt
-its snapshot names, the saved entry that declares what the page draws, and one bake job per tile.
-A recipe of two tiles, read from a catalog of the tests' own, holds that nothing assumes one.
+The small town is a preset of two tiles. These tests make it through ``POST /worlds/generated`` as
+a person's browser would, and hold what the server writes: a ``generated`` world, the receipt its
+snapshot names, the saved entry that declares what the page draws, and one bake job per tile. The
+tests of one tile's bake job make their world from version 1's small town, one tile of city grammar
+version 3, which the catalog keeps for the worlds made from it.
 """
 
 from __future__ import annotations
@@ -98,16 +99,32 @@ def _town(api, title: str) -> dict:
 
 @pytest.fixture(autouse=True)
 def _every_town_a_test_makes_is_made(monkeypatch):
-    """A test's towns are tried with the catalog's most candidates, not the recipe's four.
+    """A test's towns are tried with the catalog's most candidates, not a preset's four.
 
-    About one identity in six hundred has none of the small town's four candidates generate (the
-    recipe's measured rate, stated in its reason), and the server then refuses the world by name.
-    A run making dozens of towns would meet that now and then as a refusal it did not ask for.
-    The seed of each candidate is unchanged, and a test that names the recipe's own count reads
-    it from the recipe it is given."""
-    small = world_recipe("small_town")
-    generous = dataclasses.replace(small, candidates=CANDIDATES_MAXIMUM)
-    monkeypatch.setattr(recipe_catalog, "_by_key", lambda: MappingProxyType({small.key: generous}))
+    Now and then an identity has none of a preset's four candidates generate, and the server then
+    refuses the world by name. A run making dozens of towns would meet that as a refusal it did
+    not ask for. The seed of each candidate is unchanged, and a test that names a preset's own
+    count reads it from the preset it is given."""
+    generous = {
+        recipe.key: dataclasses.replace(recipe, candidates=CANDIDATES_MAXIMUM)
+        for recipe in recipe_catalog.world_recipes()
+    }
+    monkeypatch.setattr(recipe_catalog, "_by_key", lambda: MappingProxyType(generous))
+
+
+def _version_1(key: str):
+    """Version 1's recipe of ``key``: a whole specification file, one tile of city grammar 3."""
+    return next(recipe for recipe in load_world_recipes(catalog_version=1) if recipe.key == key)
+
+
+@pytest.fixture
+def one_tile_town(monkeypatch):
+    """Worlds made through the API from version 1's small town, one tile, for the tests of one
+    tile's bake job; the preset of the same key is two tiles. Its candidates are the catalog's
+    most, as every test's are."""
+    recipe = dataclasses.replace(_version_1("small_town"), candidates=CANDIDATES_MAXIMUM)
+    monkeypatch.setattr(recipe_catalog, "town_recipe", lambda key, values=None: recipe)
+    return recipe
 
 
 def _society_input(api, entry) -> dict:
@@ -130,7 +147,8 @@ def test_a_recipe_makes_a_generated_world_with_its_receipt_entry_and_bakes(objec
     ground = entry["generated_ground"]
     assert ground["recipe_key"] == "small_town"
     assert ground["region_id"] == "region:generated"
-    assert [tile["state"] for tile in ground["tiles"]] == ["baking"]
+    tiles = world_recipe("small_town").tiles
+    assert [tile["state"] for tile in ground["tiles"]] == ["baking"] * len(tiles)
     connection, workspace = repository.connection, repository.workspace_id
     kinds = {world.world_id: world.kind for world in workspace_worlds(connection, workspace)}
     assert kinds[entry["world_id"]] == GENERATED
@@ -148,7 +166,8 @@ def test_a_recipe_makes_a_generated_world_with_its_receipt_entry_and_bakes(objec
         "select payload from job where workspace_id=%s and kind=%s",
         (workspace, BAKE_JOB_KIND),
     ).fetchall()
-    assert [job["payload"]["tile"] for job in jobs] == receipt["tiles"]
+    assert sorted(job["payload"]["tile"] for job in jobs) == sorted(receipt["tiles"])
+    assert receipt["tiles"] == [list(tile) for tile in tiles]
 
 
 def test_a_town_s_people_are_its_residents_walking_its_own_surfaces(made):
@@ -196,7 +215,8 @@ def test_a_recipe_of_a_grammar_version_its_composer_does_not_generate_is_refused
     response = _make(objects_api)
     assert response.status_code == 409, response.text
     assert response.json()["code"] == "unknown_world_composer"
-    assert "recipe small_town names version 3" in response.json()["detail"]
+    version = world_recipe("small_town").specification["grammar_version"]
+    assert f"recipe small_town names version {version}" in response.json()["detail"]
     assert workspace_worlds(repository.connection, repository.workspace_id) == before
 
 
@@ -234,7 +254,7 @@ def test_each_world_of_a_recipe_draws_its_own_seed_and_one_world_always_the_same
 def test_a_recipe_none_of_whose_candidates_generate_is_refused_with_every_refusal(monkeypatch):
     """Blocks a 140 m long cannot fit a one-tile district (measured: 0 of 16 seeds), so every
     candidate is refused by the grammar, and the world is refused with each one's sentence."""
-    recipe = world_recipe("small_town")
+    recipe = _version_1("small_town")
     specification = copy.deepcopy(recipe.specification)
     specification["bindings"][0]["values"]["block_length_mm"] = 140_000
     narrow = dataclasses.replace(recipe, specification=specification)
@@ -249,7 +269,8 @@ def test_a_receipt_is_held_to_the_records_it_generates_and_its_snapshot_to_the_r
     composed = compose_generated_world(recipe, "world:generated:held")
     module = composer_module(recipe.composer_key, recipe.composer_version)
     assert module.records(composed.receipt) == composed.records
-    tampered = {**composed.receipt, "seed": seed_candidate(recipe, "world:generated:held", 1)}
+    other = 1 if composed.receipt["candidate"] != 1 else 2
+    tampered = {**composed.receipt, "seed": seed_candidate(recipe, "world:generated:held", other)}
     with pytest.raises(InvalidStructuralData, match="generated_world_output_changed"):
         module.records(tampered)
     assert module.receipt_digest_of(composed.candidate.topology) == composed.receipt_sha256
@@ -321,16 +342,23 @@ def test_a_generated_world_s_tile_is_baked_off_the_request_and_served_only_to_it
     api.client.app.state.services = dataclasses.replace(api.client.app.state.services, tiles=store)
     entry = _town(api, "Baked")
     neighbour = _town(api, "Next")
-    [waiting] = entry["generated_ground"]["tiles"]
-    assert (waiting["state"], waiting["baked_tile_id"]) == ("baking", None)
+    count = len(world_recipe("small_town").tiles)
+    waiting = entry["generated_ground"]["tiles"]
+    assert [(one["state"], one["baked_tile_id"]) for one in waiting] == [("baking", None)] * count
     baker = _baker(api, store, tmp_path, monkeypatch)
     outcomes = baker.drain([api.repository.workspace_id])
-    assert [(o.status, o.detail) for o in outcomes] == [("baked", "stored then identical")] * 2
+    assert [(o.status, o.detail) for o in outcomes] == [("baked", "stored then identical")] * (
+        2 * count
+    )
     assert baker.drain([api.repository.workspace_id]) == []
 
-    [tile] = api.entry(entry["entry_id"])["generated_ground"]["tiles"]
-    [next_tile] = api.entry(neighbour["entry_id"])["generated_ground"]["tiles"]
-    assert tile["state"] == next_tile["state"] == "baked"
+    tile, *_ = api.entry(entry["entry_id"])["generated_ground"]["tiles"]
+    next_tile, *_ = api.entry(neighbour["entry_id"])["generated_ground"]["tiles"]
+    assert {
+        one["state"]
+        for world in (entry, neighbour)
+        for one in api.entry(world["entry_id"])["generated_ground"]["tiles"]
+    } == {"baked"}
     assert tile["baked_tile_id"] != next_tile["baked_tile_id"]
     # The stored bake is a row of a table no workspace owns, so it does not name the world.
     stored = api.repository.connection.execute(
@@ -372,10 +400,12 @@ def test_a_world_is_never_left_being_built_when_a_bake_fails_or_is_stranded(
 
     monkeypatch.setattr(GeneratedTileBaker, "_bake", refuse)
     refused = _town(api, "Refused")
-    [outcome] = baker.drain([workspace])
-    assert outcome.status == "failed" and "planted" in outcome.detail
-    [tile] = api.entry(refused["entry_id"])["generated_ground"]["tiles"]
-    assert (tile["state"], tile["baked_tile_id"]) == ("failed", None)
+    count = len(world_recipe("small_town").tiles)
+    outcomes = baker.drain([workspace])
+    assert len(outcomes) == count
+    assert all(outcome.status == "failed" and "planted" in outcome.detail for outcome in outcomes)
+    tiles = api.entry(refused["entry_id"])["generated_ground"]["tiles"]
+    assert [(tile["state"], tile["baked_tile_id"]) for tile in tiles] == [("failed", None)] * count
 
     stranded = _town(api, "Stranded")
     owner = api.repository.connection
@@ -387,13 +417,16 @@ def test_a_world_is_never_left_being_built_when_a_bake_fails_or_is_stranded(
         (MAXIMUM_CLAIMS, workspace, BAKE_JOB_KIND),
     )
     owner.commit()
-    [tile] = api.entry(stranded["entry_id"])["generated_ground"]["tiles"]
-    assert tile["state"] == "baking"
-    [ended] = baker.drain([workspace])
-    assert (ended.status, ended.world_id) == ("failed", stranded["world_id"])
-    assert ended.detail == f"claimed {MAXIMUM_CLAIMS} times and stranded every time"
-    [tile] = api.entry(stranded["entry_id"])["generated_ground"]["tiles"]
-    assert tile["state"] == "failed"
+    tiles = api.entry(stranded["entry_id"])["generated_ground"]["tiles"]
+    assert [tile["state"] for tile in tiles] == ["baking"] * count
+    ended = baker.drain([workspace])
+    failed = ("failed", stranded["world_id"])
+    assert [(one.status, one.world_id) for one in ended] == [failed] * count
+    assert {one.detail for one in ended} == {
+        f"claimed {MAXIMUM_CLAIMS} times and stranded every time"
+    }
+    tiles = api.entry(stranded["entry_id"])["generated_ground"]["tiles"]
+    assert [tile["state"] for tile in tiles] == ["failed"] * count
     assert baker.drain([workspace]) == []
 
 
@@ -491,8 +524,13 @@ def test_a_person_arrives_on_the_central_standing_spot_facing_the_nearest_street
     )
     spots = {spot["spot_id"]: spot["position_mm"] for spot in place["spots"]}
     assert spots[arrival["spot_id"]] == arrival["position_mm"]
-    # The central spot: no standing spot is nearer the middle of the town's one tile.
-    middle = (TILE_SIZE_MM / 2, TILE_SIZE_MM / 2)
+    # The central spot: no standing spot is nearer the middle of the tiles the town covers.
+    xs = [tile[0] for tile in recipe.tiles]
+    ys = [tile[1] for tile in recipe.tiles]
+    middle = (
+        (min(xs) + max(xs) + 1) * TILE_SIZE_MM / 2,
+        (min(ys) + max(ys) + 1) * TILE_SIZE_MM / 2,
+    )
     nearest = min(math.dist(position, middle) for position in spots.values())
     assert math.dist(arrival["position_mm"], middle) == nearest
     # The snapshot states the same point as the world's spawn, in the region's frame.
@@ -544,7 +582,7 @@ def test_a_candidate_whose_tile_documents_the_grammar_refuses_is_not_kept():
     documents fail the grammar's own checks is refused with the grammar's sentence and the next
     candidate is tried. For this identity the first two candidates each place a street tree
     reaching outside its owner's extent, found by composing identities until one did."""
-    composed = compose_generated_world(world_recipe("small_town"), "world:generated:measured-2")
+    composed = compose_generated_world(_version_1("small_town"), "world:generated:measured-2")
     refused = composed.receipt["refused_candidates"]
     assert composed.receipt["candidate"] == 2
     assert [r["candidate"] for r in refused] == [0, 1]
@@ -579,31 +617,33 @@ def test_a_recipe_is_read_only_when_the_tiles_it_states_are_the_tiles_it_covers(
     specification covers another count or the count is above the most a recipe may state, so no
     world is made whose bakes, entry and page could disagree on its tiles."""
     [wide] = load_world_recipes(
-        _wide_catalog(tmp_path / "two", tiles=2, extent_x_mm=2 * TILE_SIZE_MM)
+        _wide_catalog(tmp_path / "two", tiles=2, extent_x_mm=2 * TILE_SIZE_MM), catalog_version=1
     )
     assert wide.tiles == ((0, 0), (1, 0))
     with pytest.raises(CatalogError, match=r"states 1 tiles and its specification wide-town\.v1"):
-        load_world_recipes(_wide_catalog(tmp_path / "one", tiles=1, extent_x_mm=2 * TILE_SIZE_MM))
+        load_world_recipes(
+            _wide_catalog(tmp_path / "one", tiles=1, extent_x_mm=2 * TILE_SIZE_MM),
+            catalog_version=1,
+        )
     over = TILES_MAXIMUM + 1
     with pytest.raises(CatalogError, match=rf"tiles is an int in \[1, {TILES_MAXIMUM}\]"):
         load_world_recipes(
-            _wide_catalog(tmp_path / "over", tiles=over, extent_x_mm=over * TILE_SIZE_MM)
+            _wide_catalog(tmp_path / "over", tiles=over, extent_x_mm=over * TILE_SIZE_MM),
+            catalog_version=1,
         )
 
 
 def test_a_world_of_two_tiles_is_drawn_once_both_are_baked_and_its_people_cross_the_seam(
     made, tmp_path, monkeypatch
 ):
-    """Nothing assumes a world is one tile. A recipe covering two queues a bake for each, the
-    world's entry says it is being built until both are stored (and the page draws nothing until
-    then, ``web/packages/app/test/generated-world.test.ts``), each tile is then served through
-    the world, and its people's ground runs across the seam between the two. The street layout
-    centres the district's one column of blocks on the city's middle, which for two tiles from
-    west to east is the seam, so the town's premises stand on both tiles."""
-    [wide] = load_world_recipes(
-        _wide_catalog(tmp_path / "recipes", tiles=2, extent_x_mm=2 * TILE_SIZE_MM)
-    )
-    monkeypatch.setattr(recipe_catalog, "_by_key", lambda: MappingProxyType({wide.key: wide}))
+    """Nothing assumes a world is one tile. The small town covers two, so it queues a bake for
+    each, the world's entry says it is being built until both are stored (and the page draws
+    nothing until then, ``web/packages/app/test/generated-world.test.ts``), each tile is then
+    served through the world, and its people's ground runs across the seam between the two: the
+    town's walking graph is its whole city's records, so its premises and paths stand on both
+    tiles and an edge crosses the seam."""
+    wide = world_recipe("small_town")
+    assert wide.tiles == ((0, 0), (1, 0))
     api = made
     store = tile_store(tmp_path / "data")
     api.client.app.state.services = dataclasses.replace(api.client.app.state.services, tiles=store)
@@ -698,7 +738,7 @@ def _asset_lock_held(probe: psycopg.Connection) -> int:
 
 
 def test_a_publish_refused_while_a_reader_holds_the_asset_lock_is_tried_again(
-    made, spine_schema, tmp_path, monkeypatch
+    made, spine_schema, tmp_path, monkeypatch, one_tile_town
 ):
     """Migration 0041's guard refuses a baked tile's publish (40001) while any session holds the
     asset read lock, as every final read check does. The worker waits and tries the same write
@@ -726,7 +766,7 @@ def test_a_publish_refused_while_a_reader_holds_the_asset_lock_is_tried_again(
 
 
 def test_a_tile_whose_determinism_check_was_refused_waits_and_is_not_drawn(
-    made, spine_schema, tmp_path, monkeypatch
+    made, spine_schema, tmp_path, monkeypatch, one_tile_town
 ):
     """A second bake that disagrees with the first is recorded by a write the asset read lock
     guards; an identical one writes nothing. A reader that arrives between the two publishes and
@@ -811,7 +851,7 @@ def test_a_tile_whose_determinism_check_was_refused_waits_and_is_not_drawn(
 
 
 def test_a_publish_refused_through_every_claim_is_failed_by_name_and_bounded(
-    made, spine_schema, tmp_path, monkeypatch
+    made, spine_schema, tmp_path, monkeypatch, one_tile_town
 ):
     """A reader that held the lock through every try of every claim is the one lock race a tile
     fails for: after :data:`MAXIMUM_CLAIMS` claims, named ``retry_exhausted``, so a stuck lock
@@ -952,7 +992,7 @@ def test_a_generated_world_its_grammar_no_longer_generates_is_listed_unavailable
     assert starter.status_code == 200, starter.text
     town = _town(api, "Moved")
     for patched, value, reason in (
-        ("descriptor_sha256", lambda: "0" * 64, "generated_world_grammar_changed"),
+        ("descriptor_sha256", lambda path=None: "0" * 64, "generated_world_grammar_changed"),
         ("catalog_digest", lambda catalogs: "1" * 64, "generated_world_catalogs_changed"),
     ):
         with monkeypatch.context() as moved:
@@ -972,7 +1012,9 @@ def test_a_generated_world_its_grammar_no_longer_generates_is_listed_unavailable
     assert listed[town["entry_id"]]["availability"] == "available"
 
 
-def test_a_tile_names_its_current_bake_when_two_tessellators_baked_it(made, tmp_path, monkeypatch):
+def test_a_tile_names_its_current_bake_when_two_tessellators_baked_it(
+    made, tmp_path, monkeypatch, one_tile_town
+):
     """A tile document baked by two tessellators has two rows (migration 0077); the entry names
     the current one, the most recently published, not whichever row a plan yields."""
     api = made
@@ -1001,7 +1043,10 @@ def test_a_tile_names_its_current_bake_when_two_tessellators_baked_it(made, tmp_
 
 def test_a_town_whose_homes_hold_more_than_the_schema_allows_is_refused_by_name(made, monkeypatch):
     """A town whose homes hold more people than any input may record (512) is refused as the
-    population past the ground's bound it is, by name, and not as a malformed input."""
+    population past the ground's bound it is, by name, and not as a malformed input. The town is
+    made first, since its composer refuses a town whose homes hold more than its ground does."""
+    api = made
+    entry = _town(api, "Crowded")
     make_place = walking_surfaces_module.place_from_city_records
 
     def crowded(**kwargs):
@@ -1015,8 +1060,7 @@ def test_a_town_whose_homes_hold_more_than_the_schema_allows_is_refused_by_name(
         }
 
     monkeypatch.setattr(walking_surfaces_module, "place_from_city_records", crowded)
-    api = made
-    entry = _town(api, "Crowded")
+    monkeypatch.setattr(generated_worlds_module, "_records_kept", OrderedDict())
     society = f"/world/versions/{entry['authored_version_id']}/society?world_id={entry['world_id']}"
     refused = api.post(society, {"region_id": "region:generated", "profile": PURPOSEFUL})
     assert refused.status_code == 409, refused.text

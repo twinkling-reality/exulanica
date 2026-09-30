@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import datetime as dt
 import uuid
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Final, Literal
 
@@ -359,27 +360,34 @@ class SavedWorldEntryRepository:
             )
 
     def create_generated(
-        self, *, title: str, recipe_key: str, created_by: uuid.UUID
+        self,
+        *,
+        title: str,
+        recipe_key: str,
+        created_by: uuid.UUID,
+        values: Mapping[str, object] | None = None,
     ) -> SavedWorldEntry:
-        """Generate a world from a recipe and save its entry, in one transaction.
+        """Generate a world from a preset, with ``values`` in place of its own, and save its entry,
+        in one transaction.
 
         The world is generated for a fresh identity before the transaction, so no lock is held
-        while it runs; everything it writes is written together or not at all. An unknown recipe,
-        a recipe none of whose seed candidates generate, and a workspace already holding as many
-        generated worlds as the count policy allows are each refused by name, and nothing is
-        written. The count is asked before generating, so a workspace at its limit costs no
-        generation, and again under the workspace lock, where its answer holds.
+        while it runs; everything it writes is written together or not at all. An unknown preset,
+        a value its specification schema does not offer, a specification none of whose seed
+        candidates generate, and a workspace already holding as many generated worlds as the count
+        policy allows are each refused by name, and nothing is written. The count is asked before
+        generating, so a workspace at its limit costs no generation, and again under the workspace
+        lock, where its answer holds.
         """
         from exulanica.world.generated_worlds import (
             compose_generated_world,
             create_generated_authorities,
         )
-        from exulanica.world.world_recipes import world_recipe
+        from exulanica.world.world_recipes import town_recipe
 
         clean_title = title.strip()
         if not 1 <= len(clean_title) <= 200:
             raise ValueError("title must contain between 1 and 200 characters")
-        recipe = world_recipe(recipe_key)
+        recipe = town_recipe(recipe_key, values)
         refuse_past_limit(self.connection, self.workspace_id, GENERATED)
         world_id = new_world_id(GENERATED)
         composed = compose_generated_world(recipe, world_id)

@@ -1,11 +1,17 @@
-"""Worlds the server generates from a reviewed recipe, and the baked tiles a generated world draws.
+"""Worlds the server generates from a reviewed specification, and the baked tiles a generated world
+draws.
 
-A person asks for a recipe by its key and nothing else (:mod:`exulanica.world.world_recipes`); the
-server generates the world through the one generation path ``POST /world-generation/worlds`` also
-takes, saves it as a ``generated`` world with its receipt and its saved entry, and queues one bake
-per tile off the request. The two doors differ in authority and metering only: this one asks for
-``world.write`` and is bounded by the world-count policy's ``generated`` limit and the recipes'
-stated tile counts; the other states any specification and charges the workspace tile quota.
+``GET /worlds/specification`` serves the specification schema, its presets and every refusal as
+one document (:func:`exulanica.world.world_recipes.specification_document`). A person, or an open
+model drafting on a person's behalf, asks for a preset by its key with values for any of its
+adjustable parameters, and nothing else; every request passes one gate
+(:func:`~exulanica.world.world_recipes.town_recipe`), which refuses a value the schema does not
+offer by name with its key, the value and the range. The server generates the world through the one
+generation path ``POST /world-generation/worlds`` also takes, saves it as a ``generated`` world with
+its receipt and its saved entry, and queues one bake per tile off the request. The two doors
+differ in authority and metering only: this one asks for ``world.write`` and is bounded by the
+world-count policy's ``generated`` limit and the schema's ranges, which bound the tiles a world
+covers; the other states any specification and charges the workspace tile quota.
 
 A generated world's page reads each baked tile through the world it belongs to: the tile's bytes
 are served only when the version's own snapshot names it, held to their digest under the final read
@@ -15,7 +21,7 @@ check, and never charged (``exulanica/api/permissions.py`` says why).
 from __future__ import annotations
 
 import uuid
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse, Response
@@ -43,7 +49,12 @@ from exulanica.world.composers import GeneratedWorldRefused, UnknownWorldCompose
 from exulanica.world.errors import InvalidStructuralData
 from exulanica.world.generated_worlds import generated_tiles
 from exulanica.world.saved_entries import SavedWorldEntryRepository
-from exulanica.world.world_recipes import UnknownWorldRecipe, world_recipes
+from exulanica.world.world_recipes import (
+    SpecificationRefused,
+    UnknownWorldRecipe,
+    specification_document,
+    world_recipes,
+)
 from exulanica.world.worlds import WorldLimitReached, require_world
 
 __all__ = ["router", "tiles_router"]
@@ -67,8 +78,12 @@ class WorldRecipeView(BaseModel):
 class CreateGeneratedWorldBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    #: The preset the world is made from.
     recipe: Annotated[str, Field(min_length=1, max_length=100)]
     title: Annotated[str, Field(min_length=1, max_length=200)]
+    #: Values for any of the preset's adjustable parameters, by the schema's keys; each is held to
+    #: its range by the gate, which refuses by name, so they are taken as the JSON sent.
+    values: Annotated[dict[str, Any] | None, Field(max_length=64)] = None
 
 
 def _problem(status: int, code: str, detail: str) -> JSONResponse:
@@ -84,6 +99,15 @@ def recipes(_connection: ReadOnlyConnection, _session: CurrentSession) -> list[W
     ]
 
 
+@router.get(
+    "/specification",
+    summary="What a generated world may be made from: every value, its range, presets, refusals.",
+)
+def specification(_connection: ReadOnlyConnection, _session: CurrentSession) -> dict[str, Any]:
+    """The specification schema this server offers, with its presets and every refusal by name."""
+    return specification_document()
+
+
 @router.post(
     "/generated",
     response_model=SavedWorldEntryView,
@@ -97,18 +121,27 @@ def create_generated_world(
     session: CurrentSession,
     services: Annotated[Services, Depends(get_services)],
 ) -> SavedWorldEntryView | JSONResponse:
-    """Generate the recipe's world for a new identity, save it and its entry, and queue its bakes.
+    """Generate the preset's world with the values asked for, for a new identity, save it and its
+    entry, and queue its bakes.
 
-    An unknown recipe, a recipe its composer does not generate, a recipe that generates no world
-    from any of its seed candidates, and a workspace that already holds as many generated worlds
-    as the count policy allows are each refused by name, and nothing is written.
+    An unknown preset, a value its schema does not offer (422, naming the key, the value and the
+    range), a preset its composer does not generate, a specification that generates no world from
+    any of its seed candidates, and a workspace that already holds as many generated worlds as the
+    count policy allows are each refused by name, and nothing is written.
     """
     try:
         created = SavedWorldEntryRepository(
             connection, session.workspace_id, services.store
-        ).create_generated(title=body.title, recipe_key=body.recipe, created_by=session.actor)
+        ).create_generated(
+            title=body.title,
+            recipe_key=body.recipe,
+            created_by=session.actor,
+            values=body.values,
+        )
     except UnknownWorldRecipe as exc:
         return _problem(404, exc.code, str(exc))
+    except SpecificationRefused as exc:
+        return JSONResponse(status_code=422, content=exc.document())
     except (GeneratedWorldRefused, UnknownWorldComposer, WorldLimitReached) as exc:
         return _problem(409, exc.code, str(exc))
     return _view(created)

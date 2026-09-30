@@ -67,14 +67,14 @@ found exactly that.
 
 from __future__ import annotations
 
-import json
 import uuid
-from typing import Annotated, Final
+from typing import Annotated
 
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import JSONResponse, Response
 
 from exulanica.api.dependencies import CurrentSession, ScopedConnection, get_services
+from exulanica.api.traffic_answer import refusal_status, vehicles_encoded
 from exulanica.traffic.errors import UnsupportedNetworkError
 from exulanica.world.baked_tiles import (
     TILE_MEDIA_TYPE,
@@ -86,12 +86,7 @@ from exulanica.world.baked_tiles import (
     UnknownBakedTile,
 )
 from exulanica.world.traffic_episodes import TrafficRefused, check_clock, check_request
-from exulanica.world.traffic_host import (
-    TrafficWorkerUnavailable,
-    generated_tile_roads,
-    served_window,
-    traffic_clock,
-)
+from exulanica.world.traffic_host import generated_tile_roads, served_window, traffic_clock
 
 __all__ = ["router"]
 
@@ -155,33 +150,8 @@ def list_tiles(
     )
 
 
-#: A window a request did not bound: the roads module's refusals, a caller's to correct.
-_TRAFFIC_REQUEST_REFUSALS: Final = frozenset(
-    {"traffic_second_out_of_range", "traffic_window_too_long"}
-)
-
-
 def _traffic_refusal(error: TrafficRefused) -> JSONResponse:
-    if isinstance(error, TrafficWorkerUnavailable):
-        return _problem(503, error.code, error.detail)
-    if error.code == "roads_not_stated":
-        return _problem(404, error.code, error.detail)
-    status = 422 if error.code in _TRAFFIC_REQUEST_REFUSALS else 409
-    return _problem(status, error.code, error.detail)
-
-
-def _vehicles_encoded(answer: dict[str, object]) -> bytes:
-    """The answer as JSON, a vehicle at a time, so a request answered beside this one waits for at
-    most one vehicle's seconds rather than the whole window's."""
-
-    def encode(value: object) -> bytes:
-        return json.dumps(
-            value, ensure_ascii=False, allow_nan=False, separators=(",", ":")
-        ).encode()
-
-    rest = encode({key: value for key, value in answer.items() if key != "vehicles"})
-    vehicles = b",".join(encode(row) for row in answer["vehicles"])  # type: ignore[attr-defined]
-    return b'{"vehicles":[' + vehicles + b"]," + rest[1:]
+    return _problem(refusal_status(error), error.code, error.detail)
 
 
 @router.get(
@@ -216,7 +186,7 @@ def tile_traffic(
         "world_seed": world_seed,
         "version_id": value.version_id,
     }
-    return Response(_vehicles_encoded(answer), media_type="application/json", headers=_HEADERS)
+    return Response(vehicles_encoded(answer), media_type="application/json", headers=_HEADERS)
 
 
 def _revalidates(header: str | None, digest: str) -> bool:

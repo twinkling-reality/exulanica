@@ -8,6 +8,7 @@ import {
   TrafficClient,
   TrafficContractError,
   VEHICLE_MODES,
+  WorldTrafficClient,
   parseTrafficRead,
 } from '../src/traffic-api.js';
 
@@ -108,5 +109,22 @@ describe('the traffic answer', () => {
     expect(asked).toContain(`world_seed=${'d'.repeat(64)}`);
     expect(asked).toContain('from_second=100');
     await expect(client.window('d'.repeat(64), 150, 2)).rejects.toThrow(TrafficContractError);
+  });
+
+  it('reads a saved world\'s traffic through its world and version, and refuses an answer for another', async () => {
+    let asked = '';
+    const world = { world_id: 'world:generated:town', version_id: 'version-1', roads_version: 'e'.repeat(64) };
+    const fetch = (async (url: string) => {
+      asked = url;
+      return new Response(JSON.stringify({ ...answer(), ...world }), { status: 200, headers: { 'content-type': 'application/json' } });
+    }) as unknown as typeof globalThis.fetch;
+    const client = new WorldTrafficClient({ baseUrl: 'https://example.invalid/api', token: 't', fetch });
+    const read = await client.window('world:generated:town', 'version-1', 100, 2);
+    expect(read.roadsVersion).toBe('e'.repeat(64));
+    expect([read.worldId, read.versionId]).toEqual(['world:generated:town', 'version-1']);
+    expect(asked).toContain('/world/versions/version-1/traffic?');
+    expect(asked).toContain('world_id=world%3Agenerated%3Atown');
+    await expect(client.window('world:generated:town', 'version-2', 100, 2)).rejects.toThrow(TrafficContractError);
+    await expect(client.window('world:generated:other', 'version-1', 100, 2)).rejects.toThrow(TrafficContractError);
   });
 });

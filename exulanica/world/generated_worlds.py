@@ -46,7 +46,7 @@ from exulanica.world.models import StyleVersion
 from exulanica.world.object_repository import WorldObjectRepository
 from exulanica.world.repository import WorldStyleRepository
 from exulanica.world.structure_repository import WorldStructureRepository
-from exulanica.world.world_recipes import WorldRecipe, world_recipes
+from exulanica.world.world_recipes import WorldRecipe, town_recipe, world_recipes
 from exulanica.world.worlds import GENERATED, register_world
 
 __all__ = [
@@ -55,12 +55,14 @@ __all__ = [
     "GeneratedRecords",
     "GeneratedTile",
     "compose_generated_world",
+    "compose_specified_world",
     "create_generated_authorities",
     "generated_composer_keys",
     "generated_extent",
     "generated_ground",
     "generated_tiles",
     "generation_receipt",
+    "states_records",
     "town_records",
     "unreadable_reason",
 ]
@@ -131,6 +133,19 @@ def generated_composer_keys() -> frozenset[str]:
 def compose_generated_world(recipe: WorldRecipe, world_id: str) -> ComposedWorld:
     """The world a recipe makes for ``world_id``, before anything is written."""
     return composer_module(recipe.composer_key, recipe.composer_version).compose(recipe, world_id)
+
+
+def compose_specified_world(
+    preset: str, values: Mapping[str, object] | None, world_id: str
+) -> ComposedWorld:
+    """The world ``preset`` makes with ``values`` in place of its own for ``world_id``: its
+    receipt, its structure and its records, generated and nothing written.
+
+    What ``POST /worlds/generated`` makes before its transaction, through the same gate
+    (:func:`~exulanica.world.world_recipes.town_recipe`), so a caller may show a world before a
+    person asks for it. Refused as the gate and the composer refuse, by name.
+    """
+    return compose_generated_world(town_recipe(preset, values), world_id)
 
 
 def create_generated_authorities(
@@ -213,6 +228,23 @@ def _snapshot(
     if row["composer_key"] not in generated_composer_keys():
         raise InvalidStructuralData(f"world {world_id!r} was not generated from a recipe")
     return row
+
+
+def states_records(
+    connection: psycopg.Connection, workspace_id: uuid.UUID, world_id: str, snapshot_id: uuid.UUID
+) -> bool:
+    """Whether a world's snapshot states records: whether a recipe's composer composed it, so its
+    records are read through :func:`town_records`. A world of any other kind is composed from its
+    person's objects and photographs, and states none."""
+    with connection.cursor(row_factory=dict_row) as cursor:
+        row = cursor.execute(
+            "select composer_key from world_structure_snapshot where workspace_id=%s and "
+            "world_id=%s and snapshot_id=%s",
+            (workspace_id, world_id, snapshot_id),
+        ).fetchone()
+    if row is None:
+        raise UnknownWorldResource("no such structural snapshot")
+    return str(row["composer_key"]) in generated_composer_keys()
 
 
 def generation_receipt(

@@ -41,12 +41,14 @@ const MARKERS = [
 /**
  * What the tile runtime carries, which a production build holds because a saved world generated
  * from a recipe is drawn from its own baked tiles (`composition/generated-world.ts`): the runtime's
- * refusal text and sky name, and tess's triangle digest domain.
+ * refusal text and sky name, and tess's triangle digest domain; and the traffic window's profile,
+ * because such a world also draws its own traffic (`composition/tile-traffic.ts`).
  */
 const RUNTIME_MARKERS = [
   'No surface_material record dresses this surface: the tile states that none exists.',
   'generated-tile-sky',
   'exulanica/owd-triangle-digest',
+  'exulanica.traffic-window/v1',
 ] as const;
 
 // Relative to web/, where the suite runs.

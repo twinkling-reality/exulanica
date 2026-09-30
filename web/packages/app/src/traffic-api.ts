@@ -1,5 +1,7 @@
 /**
- * A generated city's traffic, read: `GET /tiles/traffic?world_seed=<seed>`.
+ * A generated world's traffic, read: a saved world's own (`GET /world/versions/{version_id}/traffic
+ * ?world_id=<world>`, `WorldTrafficClient`), or a baked city's on the development preview
+ * (`GET /tiles/traffic?world_seed=<seed>`, `TrafficClient`).
  *
  * The server drives the city's stored roads with the traffic simulation (`exulanica/traffic`) and
  * computes each window of seconds; nothing here computes a second. The traffic keeps shared real
@@ -22,6 +24,15 @@ export class TrafficContractError extends Error {}
 export interface TrafficRead {
   readonly worldSeed: string;
   readonly versionId: string;
+  readonly window: TrafficWindow;
+}
+
+/** A saved world's traffic: the world and version asked for, and the version of its roads. */
+export interface WorldTrafficRead {
+  readonly worldId: string;
+  readonly versionId: string;
+  /** The digest of the receipt the world's records come from, which every version shares. */
+  readonly roadsVersion: string;
   readonly window: TrafficWindow;
 }
 
@@ -89,6 +100,27 @@ function vehicle(value: unknown, seconds: number, modes: number, where: string):
 /** A route's answer, read strictly, or a `TrafficContractError` naming what does not hold. */
 export function parseTrafficRead(value: unknown): TrafficRead {
   const body = object(value, 'the traffic');
+  const window = parseWindow(body);
+  return {
+    worldSeed: text(body['world_seed'], 'world_seed'),
+    versionId: text(body['version_id'], 'version_id'),
+    window,
+  };
+}
+
+/** A saved world's answer, read strictly, or a `TrafficContractError` naming what does not hold. */
+export function parseWorldTrafficRead(value: unknown): WorldTrafficRead {
+  const body = object(value, 'the traffic');
+  const window = parseWindow(body);
+  return {
+    worldId: text(body['world_id'], 'world_id'),
+    versionId: text(body['version_id'], 'version_id'),
+    roadsVersion: text(body['roads_version'], 'roads_version'),
+    window,
+  };
+}
+
+function parseWindow(body: Json): TrafficWindow {
   if (body['profile'] !== TRAFFIC_WINDOW_PROFILE) throw new TrafficContractError(`the traffic is not ${TRAFFIC_WINDOW_PROFILE}`);
   if (body['module'] !== ROADS_MODULE) throw new TrafficContractError(`the traffic is not ${ROADS_MODULE}'s`);
   const modes = body['modes'];
@@ -101,25 +133,21 @@ export function parseTrafficRead(value: unknown): TrafficRead {
   const late = body['late_home'];
   if (!Array.isArray(vehicles) || !Array.isArray(late)) throw new TrafficContractError('the traffic lists vehicles and late ones');
   return {
-    worldSeed: text(body['world_seed'], 'world_seed'),
-    versionId: text(body['version_id'], 'version_id'),
-    window: {
-      inputSha256: text(body['input_sha256'], 'input_sha256'),
-      clockSecond: whole(body['clock_second'], 'clock_second'),
-      stepMs: whole(body['step_ms'], 'step_ms'),
-      fromSecond: whole(body['from_second'], 'from_second'),
-      seconds,
-      modes: VEHICLE_MODES,
-      crossingsFed: false,
-      vehicles: vehicles.map((row, index) => vehicle(row, seconds, VEHICLE_MODES.length, `vehicles[${index}]`)),
-      lateHome: late.map((row, index) => {
-        const item = object(row, `late_home[${index}]`);
-        return {
-          second: whole(item['second'], `late_home[${index}].second`),
-          vehicleId: text(item['vehicle_id'], `late_home[${index}].vehicle_id`),
-        };
-      }),
-    },
+    inputSha256: text(body['input_sha256'], 'input_sha256'),
+    clockSecond: whole(body['clock_second'], 'clock_second'),
+    stepMs: whole(body['step_ms'], 'step_ms'),
+    fromSecond: whole(body['from_second'], 'from_second'),
+    seconds,
+    modes: VEHICLE_MODES,
+    crossingsFed: false,
+    vehicles: vehicles.map((row, index) => vehicle(row, seconds, VEHICLE_MODES.length, `vehicles[${index}]`)),
+    lateHome: late.map((row, index) => {
+      const item = object(row, `late_home[${index}]`);
+      return {
+        second: whole(item['second'], `late_home[${index}].second`),
+        vehicleId: text(item['vehicle_id'], `late_home[${index}].vehicle_id`),
+      };
+    }),
   };
 }
 
@@ -135,6 +163,32 @@ export class TrafficClient {
     const read = parseTrafficRead(await transport.getJson<unknown>('/tiles/traffic', query));
     if (read.worldSeed !== worldSeed || (fromSecond !== null && read.window.fromSecond !== fromSecond)) {
       throw new TrafficContractError('the traffic answered for another city or second');
+    }
+    return read;
+  }
+}
+
+/** Reads windows of a saved world's traffic, through the world and version it belongs to. */
+export class WorldTrafficClient {
+  constructor(private readonly options: TransportOptions) {}
+
+  /** The window of `seconds` seconds from `fromSecond`, or from the server's clock when null. */
+  async window(
+    worldId: string,
+    versionId: string,
+    fromSecond: number | null,
+    seconds: number,
+    signal?: AbortSignal,
+  ): Promise<WorldTrafficRead> {
+    const transport = new Transport(signal === undefined ? this.options : { ...this.options, signal });
+    const query: Record<string, string> = { world_id: worldId, seconds: String(seconds) };
+    if (fromSecond !== null) query['from_second'] = String(fromSecond);
+    const read = parseWorldTrafficRead(await transport.getJson<unknown>(
+      `/world/versions/${encodeURIComponent(versionId)}/traffic`, query,
+    ));
+    if (read.worldId !== worldId || read.versionId !== versionId
+      || (fromSecond !== null && read.window.fromSecond !== fromSecond)) {
+      throw new TrafficContractError('the traffic answered for another world, version or second');
     }
     return read;
   }

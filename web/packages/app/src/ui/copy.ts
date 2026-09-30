@@ -407,12 +407,25 @@ const COPY: Readonly<Record<string, string>> = Object.freeze({
   'worldMenu.make.detail': 'Generated from a recipe, then saved as yours',
   'worldRecipes.heading': 'Make a world',
   'worldRecipes.introduction':
-    'Each recipe generates a world of its own: its streets, buildings and shops are generated, '
-    + 'not recorded from a real place, and its people live there. It is saved beside your other worlds.',
-  'worldRecipes.loading': 'Reading the recipes…',
+    'Start from a town, then change what you like. Its streets, buildings and shops are generated, '
+    + 'not recorded from a real place; its people live there and its vehicles drive its streets. '
+    + 'It is saved beside your other worlds.',
+  'worldRecipes.loading': 'Reading what a world can be made from…',
+  'worldRecipes.make': 'Make this town',
+  'worldRecipes.metres': '{metres} m',
+  'worldRecipes.refused': 'Not offered: {reason}',
   'worldRecipes.making': 'Making {recipe}…',
   'worldRecipes.close': 'Close',
   'worldRecipes.failed': 'The world was not made: {reason}',
+  // Why a generated world shows no vehicles, by the traffic route's refusal code.
+  'world.traffic.roads_unavailable':
+    'No cars drive this town: its traffic cannot use one of its junctions.',
+  'world.traffic.roads_not_stated': 'No cars drive this world: it has no roads.',
+  'world.traffic.roads_world_too_large':
+    'No cars drive this town: it has more parking places than the traffic drives.',
+  'world.traffic.unreadable': 'No cars drive this world: its streets could not be read.',
+  'world.traffic.traffic_not_loaded': 'No cars are shown: this page could not load its traffic. Reload to try again.',
+  'world.traffic.other': 'No cars drive this world ({reason}).',
   // A saved world generated from a recipe, before and while its tiles are baked.
   'world.entry.generated': 'Generated world · {recipe} · saved changes and appearance',
   'world.entry.generated-unreadable':

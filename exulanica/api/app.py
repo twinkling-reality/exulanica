@@ -102,6 +102,7 @@ from exulanica.api.routes import (
     world_generation,
     world_objects,
     world_read,
+    world_traffic,
     world_versions,
     world_write,
     worlds,
@@ -367,6 +368,7 @@ def create_app(services: Services | None = None, *, verify: bool = True) -> Fast
     app.include_router(world_arrangements.router)
     app.include_router(world_entries.router)
     app.include_router(world_flight.router)
+    app.include_router(world_traffic.router)
     app.include_router(interaction.router)
     app.include_router(world_read.router)
     app.include_router(world_write.router)

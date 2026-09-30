@@ -1,9 +1,12 @@
 """A world generated from the city grammar: its streets, buildings, premises and walking surfaces.
 
 The composer for recipes that name ``city-grammar-town``. It generates the recipe's specification
-through the one generation path (:mod:`exulanica.grammar.grammars.specified`), trying the recipe's
-seed candidates in order and keeping the first that generates, and states the world it made as a
-structural snapshot and a receipt:
+through the one generation path (:mod:`exulanica.grammar.grammars.specified`), at the city grammar
+version the specification names, trying the recipe's seed candidates in order and keeping the first
+that generates, whose tile documents pass the grammar's own checks, and on which a society can
+start: its homes hold at least one person and no more than the society ground stated for this
+composer holds (``refuse_population`` in :mod:`exulanica.world.society_grounds`). It states the
+world it made as a structural snapshot and a receipt:
 
 * **One region**, :data:`REGION_ID`, whose frame is the city's own: the region origin is the
   city frame's origin, east is the city's ``x`` and south its negative ``y``, heights stay the
@@ -39,6 +42,11 @@ from exulanica.grammar.catalogs import Catalog, catalog_digest
 from exulanica.grammar.errors import InvalidParameterError, InvalidRecordError
 from exulanica.grammar.grammars.city.catalogs import load_city_catalogs
 from exulanica.grammar.grammars.city.common import TILE_SIZE_MM
+from exulanica.grammar.grammars.city.descriptor import (
+    CITY_DESCRIPTOR_PATHS,
+    CITY_GENERATING_VERSIONS,
+    CITY_GRAMMAR_ID,
+)
 from exulanica.grammar.grammars.city.document import (
     TileDocument,
     descriptor_sha256,
@@ -70,8 +78,13 @@ from exulanica.world.composers import (
     seed_candidate,
 )
 from exulanica.world.errors import InvalidStructuralData
-from exulanica.world.society_city_place import city_navigation, place_from_city_records
-from exulanica.world.society_living import current_routine
+from exulanica.world.society_city_place import city_navigation
+from exulanica.world.society_grounds import (
+    SocietyPopulationRefused,
+    refuse_population,
+    society_ground_for_composer,
+)
+from exulanica.world.society_walking_surfaces import place_residents, walking_surfaces_place
 from exulanica.world.starter import _EMPTY_GRAPH_SHA256, _EMPTY_RECONSTRUCTION_SHA256
 from exulanica.world.structure import SpatialCandidate
 from exulanica.world.world_recipes import WorldRecipe, read_specification
@@ -94,10 +107,12 @@ __all__ = [
 
 COMPOSER_KEY: Final = "city-grammar-town"
 COMPOSER_VERSIONS: Final = (1,)
-#: The city grammar versions this composer generates. Each grammar version reads its own catalogs,
-#: tile records and descriptor, and this composer reads version 3's, so a recipe naming another
-#: version is refused by name rather than generated against another version's catalogs.
-GRAMMAR_VERSIONS: Final = (3,)
+#: The city grammar versions this composer generates: every version the city grammar itself
+#: generates. Each version reads its own catalogs, tile records and descriptor, and this composer
+#: reads them at the version a recipe names or a receipt records, so a world generated under
+#: version 3 is read again under version 3 after later versions exist, and a recipe naming a version
+#: the grammar does not generate is refused by name.
+GRAMMAR_VERSIONS: Final = CITY_GENERATING_VERSIONS
 REGION_ID: Final = "region:generated"
 DESTINATION_ID: Final = "destination:region:generated"
 #: The module a generated tile element names: drawn from its baked tile, walked by its records.
@@ -136,11 +151,8 @@ def _extent(tiles: Sequence[Sequence[int]]) -> tuple[int, int, int, int]:
     )
 
 
-def _arrival(world_id: str, generated: Sequence[object], tiles: Sequence[Sequence[int]]) -> Any:
+def _arrival(place: Mapping[str, Any], tiles: Sequence[Sequence[int]]) -> Any:
     """The standing spot nearest the centre of the world's extent, as a spot of the place."""
-    place = place_from_city_records(
-        place_id=f"generated:{world_id}", records=list(generated), routine=current_routine()
-    )
     west, south, east, north = _extent(tiles)
     centre = ((west + east) // 2, (south + north) // 2)
     spots = place["spots"]
@@ -269,9 +281,9 @@ def compose(recipe: WorldRecipe, world_id: str) -> ComposedWorld:
     """The world ``recipe`` makes for ``world_id``: the first seed candidate that generates.
 
     A candidate the grammar refuses (a stage that cannot build what its values ask, a range a
-    stage narrows, or a tile document its own checks refuse) is recorded with the grammar's own
-    sentence and the next is tried; a recipe none of whose candidates generate is refused by name
-    with every refusal.
+    stage narrows, or a tile document its own checks refuse), or whose homes hold nobody or more
+    people than its society ground holds, is recorded with its own sentence and the next is tried;
+    a recipe none of whose candidates generate is refused by name with every refusal.
     """
     if recipe.composer_key != COMPOSER_KEY or recipe.composer_version not in COMPOSER_VERSIONS:
         raise ValueError(f"recipe {recipe.key} is not composed by {COMPOSER_KEY}")
@@ -282,7 +294,9 @@ def compose(recipe: WorldRecipe, world_id: str) -> ComposedWorld:
             f"{', '.join(map(str, GRAMMAR_VERSIONS))}, and recipe {recipe.key} names version "
             f"{spec.grammar.key.grammar_version}"
         )
-    catalogs = load_city_catalogs()
+    version = spec.grammar.key.grammar_version
+    catalogs = load_city_catalogs(grammar_version=version)
+    ground = society_ground_for_composer(COMPOSER_KEY)
     refused: list[dict[str, object]] = []
     for candidate in range(recipe.candidates):
         seed = seed_candidate(recipe, world_id, candidate)
@@ -294,10 +308,18 @@ def compose(recipe: WorldRecipe, world_id: str) -> ComposedWorld:
             check_piece_lengths(generated)
             # A world is kept only if every tile document it makes passes the grammar's own
             # checks, so every world a recipe makes can be baked.
-            _documents(seed, identity, generated, tiles, catalogs)
-            arrival = _arrival(world_id, generated, tiles)
+            _documents(seed, identity, generated, tiles, catalogs, version)
+            place = walking_surfaces_place(f"generated:{world_id}", generated)
+            arrival = _arrival(place, tiles)
+            # A world is kept only if a society can start on it: someone lives there, and no more
+            # people than one tick of a society over its ground was measured to hold.
+            refuse_population(place_residents(place), ground)
         except (InvalidParameterError, InvalidRecordError) as exc:
             sentence = f"{type(exc).__name__}: {exc}"
+            refused.append({"candidate": candidate, "refusal": sentence[:_REFUSAL_CHARACTERS]})
+            continue
+        except SocietyPopulationRefused as exc:
+            sentence = f"{exc.code}: {exc.detail}"
             refused.append({"candidate": candidate, "refusal": sentence[:_REFUSAL_CHARACTERS]})
             continue
         if len(tiles) != len(recipe.tiles):
@@ -313,7 +335,7 @@ def compose(recipe: WorldRecipe, world_id: str) -> ComposedWorld:
             "grammar": {
                 "grammar_id": spec.grammar.key.grammar_id,
                 "grammar_version": spec.grammar.key.grammar_version,
-                "descriptor_sha256": descriptor_sha256(),
+                "descriptor_sha256": descriptor_sha256(CITY_DESCRIPTOR_PATHS[version]),
             },
             "catalog_digest": catalog_digest(catalogs),
             "candidate": candidate,
@@ -358,9 +380,22 @@ def receipt_digest_of(topology: Mapping[str, Any]) -> str:
     return digests.pop()
 
 
+def _version(receipt: Mapping[str, Any]) -> int:
+    """The city grammar version a receipt records, refused by name when this server generates none
+    such, so a receipt is never read against another version's catalogs."""
+    grammar = receipt["grammar"]
+    version = grammar["grammar_version"]
+    if grammar["grammar_id"] != CITY_GRAMMAR_ID or version not in GRAMMAR_VERSIONS:
+        raise InvalidStructuralData(
+            "generated_world_grammar_changed: this world was generated under city grammar "
+            f"version {version}, which this server does not generate"
+        )
+    return int(version)
+
+
 def _check_current(receipt: Mapping[str, Any], catalogs: Sequence[Catalog]) -> None:
     grammar = receipt["grammar"]
-    if (grammar["grammar_id"], grammar["descriptor_sha256"]) != ("city", descriptor_sha256()):
+    if grammar["descriptor_sha256"] != descriptor_sha256(CITY_DESCRIPTOR_PATHS[_version(receipt)]):
         raise InvalidStructuralData(
             "generated_world_grammar_changed: this world was generated under city grammar "
             f"version {grammar['grammar_version']}, which this server does not generate"
@@ -374,7 +409,7 @@ def _check_current(receipt: Mapping[str, Any], catalogs: Sequence[Catalog]) -> N
 
 def records(receipt: Mapping[str, Any]) -> tuple[object, ...]:
     """The records a stored receipt generates again, held to its output digest."""
-    catalogs = load_city_catalogs()
+    catalogs = load_city_catalogs(grammar_version=_version(receipt))
     _check_current(receipt, catalogs)
     specification = receipt["specification"]
     spec = read_specification(
@@ -401,6 +436,7 @@ def _documents(
     generated: Sequence[object],
     tiles: Sequence[Sequence[int]],
     catalogs: Sequence[Catalog],
+    version: int,
 ) -> tuple[TileDocument, ...]:
     documents = []
     for tile_x, tile_y in tiles:
@@ -412,6 +448,7 @@ def _documents(
             tile_x=tile_x,
             tile_y=tile_y,
             lod=GENERATED_LOD,
+            grammar_version=version,
         )
         validate_city_document(document, catalogs=catalogs)
         documents.append(document)
@@ -423,10 +460,11 @@ def tile_documents(
     receipt: Mapping[str, Any], generated: Sequence[object]
 ) -> tuple[TileDocument, ...]:
     """Every tile document the world covers, each checked by the grammar and closed together."""
-    catalogs = load_city_catalogs()
+    version = _version(receipt)
+    catalogs = load_city_catalogs(grammar_version=version)
     _check_current(receipt, catalogs)
     return _documents(
-        receipt["seed"], receipt["subject_identity"], generated, receipt["tiles"], catalogs
+        receipt["seed"], receipt["subject_identity"], generated, receipt["tiles"], catalogs, version
     )
 
 
@@ -475,7 +513,8 @@ def stated_extent(topology: Mapping[str, Any], placement: Mapping[str, Any]) -> 
 def tile_inputs(receipt: Mapping[str, Any]) -> tuple[tuple[tuple[int, int], str], ...]:
     """Each tile the world covers, with the digest over its bake's inputs: the city seed, the
     grammar pins, the catalog digest and the tile's coordinate and level of detail."""
-    catalogs = load_city_catalogs()
+    version = _version(receipt)
+    catalogs = load_city_catalogs(grammar_version=version)
     _check_current(receipt, catalogs)
     return tuple(
         (
@@ -487,6 +526,7 @@ def tile_inputs(receipt: Mapping[str, Any]) -> tuple[tuple[tuple[int, int], str]
                     tile_x=tile_x,
                     tile_y=tile_y,
                     lod=GENERATED_LOD,
+                    grammar_version=version,
                 )
             ),
         )

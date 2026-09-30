@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { isGeneratedWorld, loadGeneratedWorld } from '../src/composition/generated-world.js';
+import { groundNear, isGeneratedWorld, loadGeneratedWorld } from '../src/composition/generated-world.js';
 import type { GeneratedGround, GeneratedTile, SavedWorldEntry } from '../src/world-entry-api.js';
 
 // The tile runtime and the texture library are replaced, so a test sees what the page hands the
@@ -61,7 +61,7 @@ function tileRoute(bytes: Readonly<Record<string, Uint8Array>>, stated: (id: str
 describe('a saved generated world of several tiles', () => {
   beforeEach(() => {
     loadGeneratedTile.mockReset();
-    loadGeneratedTile.mockResolvedValue({ navigationWorld: { eyeHeight: 1.6 } });
+    loadGeneratedTile.mockResolvedValue({ navigationWorld: { eyeHeight: 1.6, surface: { sample: () => ({ height: 0.105 }) } } });
   });
   afterEach(() => vi.unstubAllGlobals());
 
@@ -104,6 +104,23 @@ describe('a saved generated world of several tiles', () => {
     expect(loaded.tile.start).toMatchObject({ x: 128, z: -58.75 });
   });
 
+  it('opens beside the served arrival when the drawn ground carves the point itself', async () => {
+    const tiles = [tile(0, 'baked'), tile(1, 'baked')];
+    const [west, east] = tiles.map((one) => one.bakedTileId!);
+    const { fetch } = tileRoute({ [west!]: new Uint8Array([1]), [east!]: new Uint8Array([2]) });
+    vi.stubGlobal('fetch', fetch);
+    // No ground within 300 mm of the arrival (128,000, -58,750), ground everywhere else.
+    loadGeneratedTile.mockResolvedValue({ navigationWorld: { eyeHeight: 1.6, surface: {
+      sample: (x: number, z: number) => (Math.hypot(x * 1000 - 128000, z * 1000 + 58750) < 300 ? null : { height: 0.2 }),
+    } } });
+    const loaded = await loadGeneratedWorld(access, entry(tiles));
+    if (!isGeneratedWorld(loaded)) throw new Error('not loaded');
+    const { x, y, z } = loaded.tile.start as { x: number; y: number; z: number };
+    expect(Math.hypot(x * 1000 - 128000, z * 1000 + 58750)).toBeGreaterThanOrEqual(300);
+    expect(Math.hypot(x * 1000 - 128000, z * 1000 + 58750)).toBeLessThanOrEqual(350);
+    expect(y).toBeCloseTo(0.2 + 1.6, 9);
+  });
+
   it('refuses a tile whose bytes are not the ones the route named', async () => {
     const tiles = [tile(0, 'baked'), tile(1, 'baked')];
     const [west, east] = tiles.map((one) => one.bakedTileId!);
@@ -114,5 +131,27 @@ describe('a saved generated world of several tiles', () => {
     vi.stubGlobal('fetch', fetch);
     await expect(loadGeneratedWorld(access, entry(tiles))).rejects.toThrow('not the ones the route named');
     expect(loadGeneratedTile).not.toHaveBeenCalled();
+  });
+});
+
+describe('where a person opens in a generated world', () => {
+  it('opens on the served arrival where ground is drawn there, else on the nearest drawn ground', () => {
+    // Ground everywhere but a carve 1,150 mm east to west and 2,500 mm north to south round the
+    // served point, as a tree pit's carve lay round a three-tile town's arrival.
+    const carve = { west: 193556, east: 194706, north: -71084, south: -68584 };
+    const surface = {
+      sample: (x: number, z: number) => {
+        const [east, south] = [x * 1000, z * 1000];
+        const inside = east > carve.west && east < carve.east && south > carve.north && south < carve.south;
+        return inside ? null : { height: 0.035 };
+      },
+    };
+    expect(groundNear(surface, 100000, -50000, [0, 1])).toEqual({ eastMm: 100000, southMm: -50000, heightM: 0.035 });
+    const stand = groundNear(surface, 194126, -70184, [0, 6184])!;
+    expect(stand).not.toBeNull();
+    expect(surface.sample(stand.eastMm / 1000, stand.southMm / 1000)).not.toBeNull();
+    // The nearest ground lies east or west of the point, 580 mm at most, within a ring's step.
+    expect(Math.hypot(stand.eastMm - 194126, stand.southMm + 70184)).toBeLessThanOrEqual(650);
+    expect(groundNear({ sample: () => null }, 0, 0, [1, 0])).toBeNull();
   });
 });

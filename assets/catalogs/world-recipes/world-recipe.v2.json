@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "catalog_id": "world-recipe",
+  "catalog_version": 2,
+  "entries": [
+    {
+      "key": "small_town",
+      "label": "A small town",
+      "composer": "city-grammar-town",
+      "composer_version": 1,
+      "specification": "world-specification.v1",
+      "values": {
+        "city_extent_x_mm": 256000,
+        "block_length_mm": 90000,
+        "storey_band_low": 2,
+        "storey_band_high": 4
+      },
+      "candidates": 4,
+      "candidates_reason": "A world's seed is drawn from this preset, the values it is made with and the world's own identity, trying candidates 0, 1, 2 and 3 in that order and keeping the first that generates, whose tile documents pass the grammar's own checks and whose homes hold people a society can start with; a world none of them makes is refused by name rather than given a seed chosen any other way. Measured over 20 world identities, the first candidate was kept for 16 and the second for 4, whose first placed a street tree outside its owner's extent (2), a rooftop object whose clearance was above its range (1) or a door its storey left no room for (1). Four is also the request's bound: generation runs inside the request that makes a world.",
+      "tiles": 2,
+      "reason": "Measured: two 128 m tiles of city grammar version 4 with cross streets 90 m apart and buildings of two to four storeys, the smallest town whose streets hold traffic. Over 20 world identities every one was made, holding 30 to 56 people, and the traffic of every one drove, with 2 to 16 vehicles, and every one of their 274 trips arrived.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world recipes; see the entry reasons"
+      }
+    },
+    {
+      "key": "market_town",
+      "label": "A market town",
+      "composer": "city-grammar-town",
+      "composer_version": 1,
+      "specification": "world-specification.v1",
+      "values": {
+        "city_extent_x_mm": 384000,
+        "block_length_mm": 140000,
+        "storey_band_low": 2,
+        "storey_band_high": 4
+      },
+      "candidates": 4,
+      "candidates_reason": "A world's seed is drawn from this preset, the values it is made with and the world's own identity, trying candidates 0, 1, 2 and 3 in that order and keeping the first that generates, whose tile documents pass the grammar's own checks and whose homes hold people a society can start with; a world none of them makes is refused by name rather than given a seed chosen any other way. Measured over 20 world identities, every one was made from its first two candidates, the first for 13 and the second for 7; the candidates passed over placed a rooftop object whose clearance was above its range (5) or a street tree outside its owner's extent (2). Four is also the request's bound: generation runs inside the request that makes a world.",
+      "tiles": 3,
+      "reason": "Measured: three 128 m tiles with cross streets 140 m apart along a high street, the largest town offered whose homes stay within the people one tick of its society was measured to hold. Over 20 world identities every one was made, holding 50 to 86 people; the traffic of 17 drove, with 8 to 25 vehicles, and 520 of their 521 trips arrived, one finding the space it drove for taken; the other 3 were made without vehicles, their roads refused by name.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world recipes; see the entry reasons"
+      }
+    }
+  ]
+}

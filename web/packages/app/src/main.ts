@@ -50,7 +50,8 @@ import type { AtlasCommand } from './ui/atlas-commands.js';
 import { buildWorldChrome } from './ui/world-chrome.js';
 import { buildWorldMenu } from './ui/world-menu.js';
 import { buildWorldRecipes } from './ui/world-recipes.js';
-import { GENERATED_WORLD_READY_EVENT } from './composition/generated-world-ready.js';
+import { WorldSpecificationClient } from './world-specification.js';
+import { GENERATED_WORLD_READY_EVENT, type GeneratedWorldReady } from './composition/generated-world-ready.js';
 import { buildWorldIdentity } from './ui/world-identity.js';
 import {
   CompanionAskClient,
@@ -343,12 +344,14 @@ function personalWorldControl(): PersonalWorldControl | undefined {
 
 /**
  * A generated world whose tiles were still baking when it opened is opened again, in place, once
- * they are baked (`GENERATED_WORLD_READY_EVENT`): its entry is read again and the world mounted.
+ * they are baked or one has failed (`GENERATED_WORLD_READY_EVENT`): its entry is read again and the
+ * world mounted, if it is still the world open.
  */
-shell.addEventListener(GENERATED_WORLD_READY_EVENT, () => {
+shell.addEventListener(GENERATED_WORLD_READY_EVENT, (event) => {
   const client = state.worldEntries;
   const active = state.activeWorldEntry;
-  if (client === null || active === null) return;
+  const ready = (event as CustomEvent<GeneratedWorldReady | null>).detail;
+  if (client === null || active === null || ready?.entryId !== active.entryId) return;
   void (async () => {
     const entry = await client.entry(active.entryId);
     state.savedWorldEntries = Object.freeze(state.savedWorldEntries.map((candidate) =>
@@ -359,16 +362,19 @@ shell.addEventListener(GENERATED_WORLD_READY_EVENT, () => {
 });
 
 /**
- * The recipes a new world can be generated from. A world made from one is opened the way a chosen
- * saved world is: its entry becomes the active one and the world is mounted afresh.
+ * The presets a new world can be generated from, and the values a person may change. A world made
+ * from one is opened the way a chosen saved world is: its entry becomes the active one and the
+ * world is mounted afresh.
  */
 function showWorldRecipes(): void {
   const client = state.worldEntries;
-  if (client === null) return;
+  const credentials = state.credentials;
+  if (client === null || credentials === null) return;
   shell.querySelector('.world-recipes')?.remove();
+  const specification = new WorldSpecificationClient(credentials);
   const panel = buildWorldRecipes({
-    recipes: () => client.recipes(),
-    make: (recipe) => client.makeGenerated(recipe.key, recipe.label),
+    specification: () => specification.specification(),
+    make: (preset, values) => client.makeGenerated(preset.key, preset.label, values),
     open: async (entry) => {
       panel.root.remove();
       state.savedWorldEntries = await client.entries();

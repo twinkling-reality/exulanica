@@ -110,8 +110,9 @@ def test_the_discovery_finds_every_family_and_no_unknown_shape():
     # Companion say of a simulated person and of each kind of activity, the world object
     # catalog's three versions and its arrangements, the flight kind catalog, the local
     # detector's vocabulary, the decision role registry, the society ground catalog's second
-    # version (the grounds' navigation forms and population rules) and the world recipes.
-    assert len(found[ENTRY_SHAPE]) == 52
+    # version (the grounds' navigation forms and population rules), the world recipes in two
+    # versions and the specification schema their presets are points in.
+    assert len(found[ENTRY_SHAPE]) == 54
     # The traffic catalogs: vehicle classes, right-of-way policies, signal plans, the two access
     # mappings and the road derivation.
     assert len(found[CITED_SHAPE]) == 6

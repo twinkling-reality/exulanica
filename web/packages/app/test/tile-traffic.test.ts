@@ -13,8 +13,8 @@ import {
 import type { TrafficRead } from '../src/traffic-api.js';
 
 /**
- * The development tile's traffic, kept drawn: windows read ahead of the shared clock and handed to
- * the layer, refusals stated. Driven with a fake client and a fake clock.
+ * A world's traffic, kept drawn: windows read ahead of the shared clock and handed to the layer,
+ * refusals stated. Driven with a fake reader and a fake clock.
  */
 
 /** A host with the parts the traffic reads: an update event and a root the layer adds itself to. */
@@ -73,9 +73,8 @@ describe('the tile traffic', { timeout: 3 * EVENTUALLY.timeout }, () => {
     const states: TileTrafficState[] = [];
     let timer: (() => void) | null = null;
     const traffic = startTileTraffic(host(), tile, {
-      worldSeed: 'd'.repeat(64),
-      client: {
-        window: async (_city: string, from: number | null) => {
+      reader: {
+        window: async (from: number | null) => {
           asked.push(from);
           return read(from ?? 1000, 1000);
         },
@@ -108,9 +107,8 @@ describe('the tile traffic', { timeout: 3 * EVENTUALLY.timeout }, () => {
     let timer: (() => void) | null = null;
     let calls = 0;
     startTileTraffic(host(), tile, {
-      worldSeed: 'd'.repeat(64),
-      client: {
-        window: async (_city: string, from: number | null) => {
+      reader: {
+        window: async (from: number | null) => {
           asked.push(from);
           calls += 1;
           if (calls === 2) throw new ApiError(422, 'traffic_second_out_of_range', 'too far');

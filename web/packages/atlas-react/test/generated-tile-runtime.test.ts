@@ -863,6 +863,50 @@ describe('a world of more than one tile', () => {
     expect(heightAt(composed, 1000, 1000)?.height).toBe(heightAt(alone, 1000, 1000)?.height);
   });
 
+  it('reads a point on the line two tiles share as ground, whichever tile holds it', () => {
+    // The triangles either side of a three-tile town's first seam, at x 128,000, as its bake states
+    // them: at (128,000, 13) each tile's triangle took its third weight as 1 - wa - wb, which came
+    // out -5.551e-17 and -1.110e-16, so both refused ground that is continuous.
+    const triangles = (digest: string, points: readonly (readonly [number, number])[]): DecodedProjection => {
+      const vertices = points.flatMap(([x, y]) => [x, y, 0]);
+      const origin = [120000, 0, 0] as const;
+      const positionMm = new Int32Array(vertices.map((value, index) => value - origin[index % 3]!));
+      return {
+        header: {
+          name: 'nav_envelope', contract: PROJECTION_DEFINITIONS.find((definition) => definition.name === 'nav_envelope')!.contract,
+          triangle_digest: digest.repeat(64), origin_mm: origin,
+          vertex_count: points.length, triangle_count: points.length / 3, entries: [],
+        },
+        positionMm,
+        position: new Float32Array(positionMm.length),
+        index: new Uint32Array(points.map((_, index) => index)),
+      };
+    };
+    const west = triangles('0', [
+      [120000, 1400], [120000, 0], [128000, 0],
+      [128000, 0], [128000, 1400], [122000, 1400],
+      [128000, 0], [122000, 1400], [120000, 1400],
+    ]);
+    const east = triangles('1', [
+      [128000, 1400], [128000, 0], [136000, 0],
+      [136000, 0], [136000, 1400], [128000, 1400],
+    ]);
+    const { surface } = composedSupport([
+      { tile: 'the tile', projection: west },
+      { tile: 'the tile east', projection: east },
+    ]);
+    const at = (x: number, y: number) => {
+      const [rx, , rz] = tileToRenderer(x, y, 0);
+      return surface.sample(rx, rz);
+    };
+    for (const y of [13, 65, 98, 117, 169, 700, 1399]) {
+      expect(at(128000, y), `x 128000, y ${y}`).not.toBeNull();
+      expect(at(127999, y)).not.toBeNull();
+      expect(at(128001, y)).not.toBeNull();
+    }
+    expect(at(128000, 1401)).toBeNull();
+  });
+
   it('is exactly its tiles added up, which is the count that can fail', () => {
     const own = envelope(150);
     const east = eastNeighbour(550);

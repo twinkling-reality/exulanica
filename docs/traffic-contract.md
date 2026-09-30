@@ -1,9 +1,11 @@
 # Traffic simulation
 
-Status: **TRAFFIC V1, SERVED FOR A BAKED CITY ON THE DEVELOPMENT PREVIEW**. `GET /tiles/traffic`
+Status: **TRAFFIC V1, SERVED FOR A BAKED CITY AND FOR A SAVED TOWN**. `GET /tiles/traffic`
 drives a baked city's streets on shared real time and the development page draws its vehicles on the
-tile it walks ([Served traffic](#served-traffic)). No saved world's traffic is served, nothing feeds
-it the society's crossings, and nothing reads its events.
+tile it walks; `GET /world/versions/{version_id}/traffic` drives the streets a saved world's own
+records state, and the application draws them in a town a person made
+([Served traffic](#served-traffic)). Nothing feeds traffic the society's crossings, and nothing
+reads its events.
 
 In this simulation, cars, vans, buses and bicycles drive a generated city's streets second by second: they keep their lanes, stop at stop lines, take turns at junctions by the junction's rule,
 wait for people on crosswalks, and park. The same inputs always give the same bytes. This document
@@ -344,7 +346,7 @@ The body families and colours the catalog states:
 ### The page's reader
 
 `@exulanica/atlas-react/traffic` (`web/packages/atlas-react/src/playcanvas/traffic/`) is the reader
-the development page uses. `TrafficLayer` draws each vehicle as the figure of boxes its looks
+both pages use. `TrafficLayer` draws each vehicle as the figure of boxes its looks
 (`vehicle-looks.ts`, `exulanica.vehicle-looks/v1`) state for its body family, proportioned to the
 record's own dimensions and coloured by its colour, and refuses a body family or colour the looks
 do not state (`VehicleLookError`) before it draws anything; a test holds the looks to exactly the
@@ -354,12 +356,17 @@ stands each body on the tile's walking surface at the body's centre, and keeps a
 no ground for undrawn and counted. A vehicle named late at an episode's end is held where that
 episode left it. While a drawn vehicle moves, the page draws every frame rather than its idle cadence.
 
-`web/packages/app/src/composition/tile-traffic.ts` attaches the layer to the development page's
-baked tile walk, reached from one call in `composition/generated-tile.ts`. It reads windows with the
-walk's credential, first from the server's clock, then the next minute whenever fewer than 30 served
-seconds are left ahead of it; it stops on a refusal the server will keep giving, and tries again
-later on any other failure. The shell's `data-tile-traffic` attribute states the vehicles served,
-drawn and held without ground, the clock's second and that no walker's crossing is fed.
+`web/packages/app/src/composition/tile-traffic.ts` attaches the layer to a walk's tiles and reads
+windows through the reader it is given: the development page's baked tile walk, reached from one
+call in `composition/generated-tile.ts`, reads `GET /tiles/traffic`, and a saved town
+(`composition/generated-world.ts`) reads its own world's route with the world's credential. It reads
+first from the server's clock, then the next minute whenever fewer than 30 served seconds are left
+ahead of it; it stops on a refusal the server will keep giving, and tries again later on any other
+failure. The shell's `data-tile-traffic` attribute states the vehicles served, drawn and held
+without ground, the clock's second and that no walker's crossing is fed; its counts change when a
+window is read, not every frame. In a saved town a refusal the server will keep giving is said in
+words on the page (`trafficRefusalWords`, the `world.traffic.*` copy), never left blank, and a page
+that cannot load its traffic code opens the town without vehicles and says so.
 
 ## Catalogs
 
@@ -413,7 +420,7 @@ Code*'s 20 feet from a crosswalk and 30 feet before a stop sign or signal withou
 
 `exulanica/world/traffic_host.py` and `traffic_episodes.py` sit above the traffic simulation and
 the movement package and run the roads module, `exulanica-movement/roads/v1`
-([movement modules](movement-modules-contract.md#roads)), for a generated city.
+([movement modules](movement-modules-contract.md#roads)), for a generated city and for a saved town.
 
 - **The road source.** `generated_tile_roads(repository, world_seed)` reads the current bake of
   every tile of a city seed from the tile store, holds each container to the digest its row records
@@ -421,7 +428,14 @@ the movement package and run the roads module, `exulanica-movement/roads/v1`
   carries; two copies of one record must agree. The city must be of a grammar version the city
   grammar generates. The input's version is the SHA-256 over the tiles' coordinates and container
   digests, so a rebake is a new input. Tiles are read, never delivered, so no tile quota is spent.
-  No reader serves a saved world's roads.
+- **A saved world's road source.** `saved_world_roads(connection, workspace_id, world_id,
+  snapshot_id)` reads the records a saved world's snapshot states, by the same converter, with no
+  code for any one world. A world generated from a recipe states them through its receipt
+  (`town_records` in `exulanica/world/generated_worlds.py`, generated again and held to the
+  receipt's output digest); any other kind of world states none and is refused as
+  `roads_not_stated`, as are records that state no lane. The input's version is the receipt's
+  digest, its city identity the receipt's subject identity and its grammar version the receipt's, so
+  every version of one world shares its roads.
 - **The clock.** Second `n` is the `n`th second since the Unix epoch, so every page showing a city
   shows its vehicles in the same places.
 - **The fleet**, by rule from the home places the derived network holds: in every parking kind, the
@@ -456,6 +470,17 @@ with 422, a seed with no stored tiles with 404 `roads_not_stated`, roads traffic
 `traffic_worker_unavailable`. The development page draws the answer on the tile it walks with
 [the page's reader](#the-pages-reader).
 
+`GET /world/versions/{version_id}/traffic?world_id=<world>&from_second=<n>&seconds=<1 to 60>`
+answers the same window for a version of a saved world, from that world's own road source, and adds
+the `world_id` and `version_id` asked for and `roads_version`, the receipt's digest. It requires
+`world.read` and charges nothing. It refuses a window as the tiles route does, a version the world
+does not hold with 404 `unknown_reference`, a world that states no roads with 404
+`roads_not_stated`, roads traffic cannot drive with 409 `roads_unavailable` or
+`roads_world_too_large`, a world whose receipt no longer generates its records with 409 by the
+reader's name (`generated_world_grammar_changed`, `generated_world_catalogs_changed`,
+`generated_world_output_changed` or `generated_world_unreadable`), and an unavailable worker with
+503 `traffic_worker_unavailable`. The application draws the answer in the saved town.
+
 ## The layer
 
 `exulanica.traffic` sits below the database, the store and the model client in the import-linter
@@ -481,9 +506,10 @@ the city grammar, so a new city version changes those two files.
 - **Parking manoeuvres are stops on the lane**, with no path between the lane and the bay.
 - **Society destinations are frontage by segment ordinal**: a trip to a society destination parks in
   the first free space on that segment, in identity order, that admits its class, not the nearest.
-- **Served for a baked city only.** A generated city's stored tiles are the one road source; no
-  saved world's traffic is served, no store keeps a run's states, and nothing feeds traffic the
-  society's crossings or reads its events. A vehicle never waits for a walker the page shows.
+- **Served from generated streets only.** A generated city's stored tiles and a saved town's own
+  records are the road sources, and no other kind of world states roads. No store keeps a run's
+  states, and nothing feeds traffic the society's crossings or reads its events. A vehicle never
+  waits for a walker the page shows.
 - **Connections are derived only where legs meet along the plan axes**, and spaces only as kerbside
   bays and cycle stands; no signal, loading bay or bus layover is derived.
 
@@ -501,8 +527,9 @@ the city grammar, so a new city version changes those two files.
 | `exulanica/traffic/metrics.py`, `presentation.py` | The metrics report and the presentation records. |
 | `exulanica/world/traffic_host.py`, `traffic_episodes.py`, `episode_worker.py` | The road source, clock, fleet, trip rule, episodes, windows and their worker. |
 | `exulanica/api/routes/tiles.py` | `GET /tiles/traffic`. |
+| `exulanica/api/routes/world_traffic.py`, `exulanica/api/traffic_answer.py` | `GET /world/versions/{version_id}/traffic`, and the refusal statuses and vehicle encoding both routes share. |
 
-Tests are `tests/test_traffic_*.py` and `tests/test_tile_traffic_route.py`, with the test network in `tests/traffic_network_fixture.py` and
+Tests are `tests/test_traffic_*.py`, `tests/test_tile_traffic_route.py` and `tests/test_world_traffic_route.py`, with the test network in `tests/traffic_network_fixture.py` and
 its scenarios in `tests/traffic_scenarios.py`. `tests/test_traffic_city_roads.py` also reads the city
 vocabulary's fixture tile, `tests/fixtures/city-v2/tile-document.json`, and records what traffic
 refuses in it and why.

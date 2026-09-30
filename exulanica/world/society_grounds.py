@@ -337,13 +337,21 @@ def society_population(document: Mapping[str, Any]) -> int:
             f"an input over the {ground.key} ground records the population its "
             f"{ground.population_rule} rule derived",
         )
+    refuse_population(size, ground)
+    return size
+
+
+def refuse_population(size: int, ground: SocietyGroundKind) -> None:
+    """Refuse, by name, a population no society over ``ground`` may start with: nobody
+    (``world_holds_no_residents``), or more than one of its ticks was measured to hold
+    (``population_over_tick_budget``). A world's composer asks it of each candidate, so a world
+    whose society could not start is never made."""
     if size < 1:
         raise SocietyPopulationRefused(
             "world_holds_no_residents",
             "this world's premises offer no place in a home, so its society would hold nobody",
         )
     refuse_population_over_budget(size, ground)
-    return size
 
 
 def refuse_population_over_budget(size: int, ground: SocietyGroundKind) -> None:

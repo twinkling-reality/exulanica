@@ -272,7 +272,11 @@ falls back to the district's ground.
 
 Support comes only from `nav_envelope` (`tile-navigation.ts`): the height of the highest envelope
 triangle over a plan point, exact on its plane, with its normal; walls and downward faces support
-nothing. Navigation is never derived from the render mesh; Melbourne failed capsule clearance there.
+nothing. A point on an axis-aligned edge two triangles share, such as a terrain grid line or the
+line two tiles of a world share, is supported by both: each barycentric weight is its own plan
+sub-area, exactly zero on such an edge, rather than one minus the other two, which rounds just below
+zero there and would refuse both triangles. Navigation is never derived from the render mesh;
+Melbourne failed capsule clearance there.
 The player is the capsule the tile's grammar states for the envelope's `capsule_clearance`, because
 that is the capsule the envelope was carved for: `tileCapsule` reads the radius, height and eye
 height from tess's grammar table (city version 2: 340 mm, 1900 mm and 1620 mm, which is also the gate
@@ -407,8 +411,9 @@ proof is retained in `evidence/tile-route-loader.log.txt`.
 On the second entry the page also draws the city's vehicles on the tile it walks:
 `composition/tile-traffic.ts` wraps the loaded tile, reads `GET /tiles/traffic` with the walk's
 credential and draws each window with `@exulanica/atlas-react/traffic`, and the shell's
-`data-tile-traffic` attribute says what it served and drew. The golden path draws none. The route,
-its windows and the page's reader are the [traffic contract](traffic-contract.md#served-traffic)'s.
+`data-tile-traffic` attribute says what it served and drew. The golden path draws none. A saved
+town draws its own world's vehicles the same way (section 7.3). The route, its windows and the
+page's reader are the [traffic contract](traffic-contract.md#served-traffic)'s.
 
 ### 7.3 A saved world's own tiles
 
@@ -424,9 +429,16 @@ from the committed texture library (`web/packages/app/src/texture-library.ts`), 
 emits as assets fetched only for the sets a tile cites. A world of several tiles is drawn only once
 every one is baked, and then all of them: the first as the tile the walk is laid on and every other
 as a neighbour, drawn and composed into the ground the walk stands on (`neighbours` in
-`GeneratedTileSources`). The camera opens at the served arrival point, facing the way the entry says
-a person arriving faces: toward the nearest point of any street's crown line, the rule the world's
-composer applied when it made the world. While a tile is still baking, the page draws nothing in its
+`GeneratedTileSources`), and the walk crosses from one tile to the next on continuous ground. The
+camera opens at the served arrival point, facing the way the entry says a person arriving faces:
+toward the nearest point of any street's crown line, the rule the world's composer applied when it
+made the world. Where the drawn ground has no surface at that point, as in the carve of a tree pit,
+the camera opens on the nearest point that has one within 5 m, searched on rings 50 mm apart from
+the way the person faces (`groundNear`), rather than on the world's middle. The world's vehicles
+are read from its own route, `GET /world/versions/{version_id}/traffic`, and drawn with the traffic
+layer; a refusal the server will keep giving is said in words beside the world, and a page that
+cannot load its traffic code opens the world without vehicles and says so
+([the page's reader](traffic-contract.md#the-pages-reader)). While a tile is still baking, the page draws nothing in its
 place, says the world is being built (`world.generated.baking` in `ui/copy.ts`) and asks for the
 entry again every five seconds, reopening the world once every tile is baked. A tile is drawn only
 once its bake job is done, both of its bakes having agreed. A tile whose two bakes differed is never
@@ -478,13 +490,3 @@ carve leaves the walked line supported.
 - Data view selection through `registerRepresentationSubjects` is not wired for tiles.
 - No route serves the published texture library; the development page reads the committed one
   (section 7.1).
-- **The support sampler can refuse a point on a shared edge.** At a plan point lying exactly on an
-  edge two envelope triangles share, `navEnvelopeSupport` (`tile-navigation.ts`) can return no
-  surface: the third barycentric weight, computed as one minus the other two, comes out at about
-  -5.6e-17 rather than 0, and both triangles are refused, although the sampler's own comment says a
-  point on an edge belongs to the triangle. On the corridor tile's north-south midline, x 320,000,
-  a terrain grid line and so a shared edge for its whole length, a 1 mm sampling found 260 stretches
-  of 1 or 2 mm with no surface, all on flat ground outside every footway and carriageway
-  ([walking-lines-runtime.log.txt](artifacts/society/walking-lines-runtime.log.txt)). The opening
-  stance probes that same midline from its southern edge and finds support at its first probe on
-  that tile.

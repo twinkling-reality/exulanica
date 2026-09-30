@@ -708,6 +708,39 @@
 #shell .world-recipes-list { display: grid; gap: 7px; }
 #shell .world-recipes-choice,
 #shell .world-recipes-close { justify-self: start; }
+/* A preset's values: a control per adjustable value, its reason beneath in two lines at most. */
+#shell .world-recipes { max-height: 86vh; overflow: auto; }
+#shell .world-recipes-choice[aria-pressed='true'] { border-color: var(--ink); }
+#shell .world-recipes-values { display: grid; gap: 10px; }
+#shell .world-recipes-value { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; font-size: 13px; }
+#shell .world-recipes-value > span,
+#shell .world-recipes-reason { grid-column: 1 / -1; }
+#shell .world-recipes-value output { font-variant-numeric: tabular-nums; }
+#shell .world-recipes-reason {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--ink-soft);
+  font-size: 11px;
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+#shell .world-recipes-actions { display: flex; gap: 8px; }
+/* Why a generated world shows no vehicles, said over the world's lower left edge. */
+#shell .world-traffic-note {
+  position: fixed;
+  left: var(--gap);
+  bottom: 1rem;
+  z-index: 30;
+  max-width: min(420px, 80vw);
+  margin: 0;
+  padding: 8px 12px;
+  color: var(--ink);
+  font-size: 13px;
+  background: color-mix(in srgb, var(--raised) 88%, transparent);
+  border: 1px solid color-mix(in srgb, var(--raised) 64%, var(--edge));
+  border-radius: 3px;
+}
 #shell .world-menu-world { grid-column: span 2; }
 #shell .world-menu-character { grid-column: span 2; grid-row: span 2; }
 #shell .world-menu-settings { grid-column: span 2; }

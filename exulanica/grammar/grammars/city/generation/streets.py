@@ -141,10 +141,19 @@ class _Rules:
 
     stop_line_setback: bool
     kerbside_parking: bool
+    #: Whether a curb's box also covers the corner another curb turns into it. The curb draws the
+    #: joining mitre there, at the turning curb's heights; where the two streets' carriageways
+    #: differ in width (a high street with parking lanes, a local street without), their kerb
+    #: lines stand at other heights under the camber, and the mitre rises past the curb's strip.
+    followers_cover_met_corners: bool
 
 
-_VERSION_2_RULES: Final = _Rules(stop_line_setback=False, kerbside_parking=False)
-_VERSION_3_RULES: Final = _Rules(stop_line_setback=True, kerbside_parking=True)
+_VERSION_2_RULES: Final = _Rules(
+    stop_line_setback=False, kerbside_parking=False, followers_cover_met_corners=False
+)
+_VERSION_3_RULES: Final = _Rules(
+    stop_line_setback=True, kerbside_parking=True, followers_cover_met_corners=True
+)
 
 
 def _modular(context: StageContext, name: str, ordinal: int, low: int, high: int) -> int:
@@ -773,14 +782,19 @@ def _generate(context: StageContext, rules: _Rules = _VERSION_2_RULES) -> Iterat
             corner_radius_mm=face.radius_mm if nxt is not None and nxt[1] else 0,
             extent=Extent(0, 0, 0, 0, 0, 0),
         )
-    for key, curb in list(curbs.items()):
-        extent = strip_box(curb)
+    boxes = {key: strip_box(curb) for key, curb in curbs.items()}
+    key_of = {curb.identity: key for key, curb in curbs.items()}
+    for key, curb in curbs.items():
         for next_identity in curb.next_curb_identity:
-            other = next(record for record in curbs.values() if record.identity == next_identity)
+            other = curbs[key_of[next_identity]]
             box = corner_box(curb, other)
-            if box is not None:
-                extent = covering(extent, box)
-        curbs[key] = dataclasses.replace(curb, extent=extent)
+            if box is None:
+                continue
+            boxes[key] = covering(boxes[key], box)
+            if rules.followers_cover_met_corners:
+                boxes[key_of[next_identity]] = covering(boxes[key_of[next_identity]], box)
+    for key, curb in list(curbs.items()):
+        curbs[key] = dataclasses.replace(curb, extent=boxes[key])
 
     blocks = []
     for face in faces:

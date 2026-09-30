@@ -70,6 +70,7 @@ from exulanica.world.society_planner import CLEARANCE_MM, input_sha256, validate
 __all__ = [
     "SEAT_NODE_PREFIX",
     "build_walking_surfaces_input",
+    "place_residents",
     "walking_surfaces_ground",
     "walking_surfaces_place",
 ]
@@ -186,6 +187,15 @@ def walking_surfaces_place(place_id: str, records: Sequence[object]) -> dict[str
     )
 
 
+def place_residents(place: Mapping[str, Any]) -> int:
+    """The population the ``residents`` rule gives a place: one inhabitant for each place in a home,
+    the resident capacity of every destination the place reaches. The society's input records it,
+    and a world's composer refuses a candidate whose count no society over its ground may hold."""
+    return sum(
+        int(destination.get("resident_capacity", 0)) for destination in place["destinations"]
+    )
+
+
 def build_walking_surfaces_input(
     *,
     ground: SocietyGround,
@@ -252,9 +262,8 @@ def build_walking_surfaces_input(
     targets: list[dict[str, Any]] = []
     records_list: list[dict[str, Any]] = []
     kept: list[list[int]] = []
-    residents = 0
+    residents = place_residents(place)
     for destination in sorted(place["destinations"], key=lambda d: d["destination_id"]):
-        residents += destination.get("resident_capacity", 0)
         affordance = _affordance(destination)
         if affordance is None or not destination["enabled"]:
             continue

@@ -2,10 +2,13 @@
 """Measure what a world generated from a recipe costs to make, read and live in.
 
     uv run python scripts/measure_generated_world.py --worlds 20 --out PATH
+    uv run python scripts/measure_generated_world.py --recipe market_town \
+        --values '{"block_length_mm": 90000}' --worlds 20 --out PATH
 
-Pure: no database, no store and no model. For ``--worlds`` fresh world identities of one recipe
-(``--recipe``, the small town by default) it measures, each with the wall-clock and the process CPU
-time it took on this machine:
+Pure: no database, no store and no model. For ``--worlds`` fresh world identities of one preset
+(``--recipe``, the small town by default), made with ``--values`` in place of the preset's own
+through the gate every request passes (``town_recipe``), it measures, each with the wall-clock and
+the process CPU time it took on this machine:
 
 * **Generation**: the recipe's composer making the world for that identity, as
   ``POST /worlds/generated`` does before its transaction (``compose_generated_world``): the seed
@@ -20,6 +23,9 @@ time it took on this machine:
   model); and one simulated hour, ``--ticks`` minutes from genesis, at the median and the largest
   population the recipe produced. A comparison replays a run's hour from its receipts through the
   same step, so the hour is what one replayed run of that population costs, less its receipts.
+* **The bound**: one tick of the most people the town's society ground admits, on the largest
+  walking graph any world measured has, the worst case a specification of these values can reach
+  at play. A world none of whose candidates the composer keeps is counted as refused, with why.
 
 Before and after the whole run it samples the machine's CPU idle share over ten seconds (``top``),
 and writes both into the output, so a run made on a busy machine says so. Run it inside
@@ -42,10 +48,10 @@ from pathlib import Path
 from typing import Any
 
 from exulanica.world.authored_delta import AlternateVersion, version_delta_sha256
-from exulanica.world.composers import composer_module
+from exulanica.world.composers import GeneratedWorldRefused, composer_module
 from exulanica.world.generated_worlds import compose_generated_world
 from exulanica.world.society_authored_ground import StandingPolicy, authored_ground_from_snapshot
-from exulanica.world.society_grounds import society_population
+from exulanica.world.society_grounds import society_ground_for_composer, society_population
 from exulanica.world.society_living import current_routine
 from exulanica.world.society_planner import (
     advance_purposeful_society,
@@ -55,7 +61,7 @@ from exulanica.world.society_walking_surfaces import (
     build_walking_surfaces_input,
     walking_surfaces_place,
 )
-from exulanica.world.world_recipes import world_recipe
+from exulanica.world.world_recipes import town_recipe
 
 #: The stated populations one tick is measured at on the median world's graph: the comparison
 #: protocol's eight and doublings of it up to the ground's bound.
@@ -134,20 +140,29 @@ def ticks(document: dict[str, Any], population: int, count: int) -> tuple[list[f
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--recipe", default="small_town")
+    parser.add_argument("--values", default=None, help="a JSON object of the preset's values")
     parser.add_argument("--worlds", type=int, default=20)
     parser.add_argument("--ticks", type=int, default=60)
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
-    recipe = world_recipe(args.recipe)
+    recipe = town_recipe(args.recipe, json.loads(args.values) if args.values else None)
+    bound = society_ground_for_composer(recipe.composer_key).population
     module = composer_module(recipe.composer_key, recipe.composer_version)
     policy = current_routine().policy
     standing = StandingPolicy(policy["standing_spacing_mm"], policy["standing_radius_mm"])
     idle_before = idle_share()
     load_before = subprocess.run(["uptime"], capture_output=True, text=True).stdout.strip()
     worlds = []
+    refused: list[str] = []
     for index in range(args.worlds):
         world_id = f"world:generated:measured-{index}"
-        composed, gen_wall, gen_cpu = timed(lambda w=world_id: compose_generated_world(recipe, w))
+        try:
+            composed, gen_wall, gen_cpu = timed(
+                lambda w=world_id: compose_generated_world(recipe, w)
+            )
+        except GeneratedWorldRefused as exc:
+            refused.append(str(exc)[:400])
+            continue
         _, read_wall, read_cpu = timed(lambda c=composed: module.records(c.receipt))
         snapshot_id = uuid.uuid5(uuid.NAMESPACE_URL, composed.receipt_sha256)
         ground = authored_ground_from_snapshot(
@@ -191,6 +206,7 @@ def main() -> int:
     by_population = sorted(worlds, key=lambda world: (world["population"], world["world_id"]))
     median_world = by_population[len(by_population) // 2]
     largest_world = by_population[-1]
+    largest_graph = max(worlds, key=lambda world: (world["nodes"], world["world_id"]))
     living = {}
     for label, world in (("median", median_world), ("largest", largest_world)):
         each, hour = ticks(world["_document"], world["population"], args.ticks)
@@ -201,6 +217,14 @@ def main() -> int:
             "tick_s": spread(each),
             "hour_s": round(hour, 3),
         }
+    each, hour = ticks(largest_graph["_document"], bound, args.ticks)
+    living["bound_on_largest_graph"] = {
+        "world_id": largest_graph["world_id"],
+        "population": bound,
+        "nodes": largest_graph["nodes"],
+        "tick_s": spread(each),
+        "hour_s": round(hour, 3),
+    }
     stated = {}
     for population in STATED_POPULATIONS:
         each, hour = ticks(median_world["_document"], population, args.ticks)
@@ -218,6 +242,7 @@ def main() -> int:
         "load_before": load_before,
         "load_after": load_after,
         "candidates_kept": sorted(world["candidate"] for world in worlds),
+        "refused": refused,
         "generation_s": spread([world["generation_s"] for world in worlds]),
         "generation_cpu_s": spread([world["generation_cpu_s"] for world in worlds]),
         "records_again_s": spread([world["records_again_s"] for world in worlds]),

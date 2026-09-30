@@ -517,8 +517,10 @@ _WORLD_READS: Final = _every(
     "GET /world/versions/{version_id}/society/models",
     "GET /world/versions/{version_id}/society/replay",
     "GET /world/versions/{version_id}/tiles/{baked_tile_id}/bytes",
+    "GET /world/versions/{version_id}/traffic",
     "GET /worlds",
     "GET /worlds/recipes",
+    "GET /worlds/specification",
 )
 
 #: Metered against the workspace tile quota, by being declared here: the baked tiles of a generated

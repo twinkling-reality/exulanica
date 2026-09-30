@@ -407,9 +407,18 @@ export class WorldEntryClient {
     }));
   }
 
-  /** Generate a world from a recipe and save it; its tiles are baked after this returns. */
-  async makeGenerated(recipe: string, title: string): Promise<SavedWorldEntry> {
-    return parseEntry(await this.#transport.postJson<unknown>('/worlds/generated', { recipe, title }));
+  /**
+   * Generate a world from a preset, with `values` for any of its adjustable parameters, and save
+   * it; its tiles are baked after this returns.
+   */
+  async makeGenerated(
+    recipe: string,
+    title: string,
+    values?: Readonly<Record<string, number | string>>,
+  ): Promise<SavedWorldEntry> {
+    return parseEntry(await this.#transport.postJson<unknown>(
+      '/worlds/generated', values === undefined ? { recipe, title } : { recipe, title, values },
+    ));
   }
 
   /** Create or exact-idempotently reopen this workspace's source-independent starter. */

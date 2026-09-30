@@ -467,9 +467,15 @@ is, because a ground module need not state an edge.
   placed to the world's surfaces. The population is the entry's rule, `residents`: one inhabitant
   per place in a home the world's premises offer (each premises' use class's resident capacity),
   recorded in the input, and a world whose homes hold nobody, or more than the entry's figure of
-  128 (the tick budget: one tick of 128 people on the small town's graph took 62 ms at the median
-  and 78 ms at the 95th percentile, measured with `scripts/measure_generated_world.py`), starts no
-  society (`409 world_holds_no_residents`, `409 population_over_tick_budget`). The ground builder
+  128 (the town's tick budget, 200 ms at the 95th percentile, a tenth of the 2,000 ms fastest play
+  interval, within which one tick of 128 people on the largest walking graph the world
+  specification admits, 936 places, took 135.8 ms at the median and 171.0 ms at the 95th
+  percentile, measured with `scripts/measure_generated_world.py`), starts no
+  society (`409 world_holds_no_residents`, `409 population_over_tick_budget`). The town's composer
+  holds each seed candidate to the same rule before it keeps one (`refuse_population`), so a town
+  is made only if its society can start. A town of several tiles is one walking graph, read from
+  all its records, whose footways run on across the lines its tiles share, so its people walk from
+  one tile to the next. The ground builder
   reads a ground by its entry's navigation and floor forms, never by the entry's name
   (`tests/test_generated_worlds.py`). A comparison of a town's society is held to how long reading
   one of its runs may take, which bounds how many of its people a model may decide for

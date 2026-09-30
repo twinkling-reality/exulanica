@@ -328,7 +328,7 @@ Each parameter holds one value:
 | Parameter | Value | What it bounds |
 | --- | --- | --- |
 | `episode_steps` | 1,200 | Seconds in an episode, each computed whole from the fleet parked at home |
-| `departure_steps` | 300 | The first seconds of an episode, in which each vehicle leaves home once |
+| `departure_steps` | 300 | The first seconds of an episode, in which each vehicle leaves home once; measured so that no town's traffic locks at a junction and every vehicle is home before the episode ends |
 | `dwell_steps_minimum`, `dwell_steps_maximum` | 30, 90 | How long a vehicle stays where it drove before it drives home |
 | `fleet_share_permille` | 500 | The share of each parking kind's places that hosts a vehicle |
 | `max_vehicles` | 120 | The most vehicles one city's traffic drives; more is refused, never trimmed |
@@ -338,9 +338,9 @@ Each parameter holds one value:
 The host, its road source, fleet and trip rules, the route and the page's reader are the traffic
 contract's ([served traffic](traffic-contract.md#served-traffic)). Its episodes are computed in a
 worker process by the episode worker the flight's serving uses
-([`episode_worker.py`](../exulanica/world/episode_worker.py)). No saved world's roads are served,
-the society's crossings are not fed to traffic, and vehicles keep driving at normal speed while the
-people are paused or sped up.
+([`episode_worker.py`](../exulanica/world/episode_worker.py)). A saved town's own roads are
+served as a baked city's are. The society's crossings are not fed to traffic, and vehicles keep
+driving at normal speed while the people are paused or sped up.
 
 ## A model choosing for a flyer
 
@@ -384,7 +384,7 @@ viewers could share them.
 | Perches and hosts | `exulanica/world/object_catalog.py`, `world-object.v3.json` | `tests/test_world_object_perches.py` |
 | Composition, route | `exulanica/world/flight_input.py`, `exulanica/api/routes/world_flight.py` | `tests/test_world_flight_api.py` |
 | Page and renderer | `web/packages/app/src/flight-api.ts`, `composition/saved-world-flight.ts`, `web/packages/atlas-react/src/playcanvas/flight/` | `flight-api.test.ts`, `saved-world-flight.test.ts`, `environment-selection-flight.test.ts`, `flight-flock.test.ts`, `authored-society-flight-assets.test.ts`, `tests/test_flight_page_words.py` (the page's words against the server's codes) |
-| Roads host, route and page | `exulanica/world/traffic_episodes.py`, `traffic_host.py`, `exulanica/api/routes/tiles.py`, `web/packages/app/src/traffic-api.ts`, `composition/tile-traffic.ts`, `web/packages/atlas-react/src/playcanvas/traffic/` | `tests/test_traffic_episodes.py` (a real worker process), `tests/test_tile_traffic_route.py`, `traffic-api.test.ts`, `tile-traffic.test.ts`, `traffic-layer.test.ts`, `traffic-looks.test.ts`, `binding/tile-animating.test.ts` |
+| Roads host, route and page | `exulanica/world/traffic_episodes.py`, `traffic_host.py`, `exulanica/api/routes/tiles.py`, `exulanica/api/routes/world_traffic.py`, `web/packages/app/src/traffic-api.ts`, `composition/tile-traffic.ts`, `composition/generated-world.ts`, `web/packages/atlas-react/src/playcanvas/traffic/` | `tests/test_traffic_episodes.py` (a real worker process), `tests/test_tile_traffic_route.py`, `tests/test_world_traffic_route.py`, `traffic-api.test.ts`, `tile-traffic.test.ts`, `generated-world-traffic.test.ts`, `traffic-layer.test.ts`, `traffic-looks.test.ts`, `binding/tile-animating.test.ts` |
 | Measurement | `scripts/measure_flight_bounds.py` | `tests/test_flight_bounds_record.py`, `tests/test_flight_worker_record.py` |
 
 **Evidence.** Each flight record was pre-registered before its seeds were run:

@@ -265,10 +265,15 @@ export function composedSupport(tiles: readonly NavigationTile[]): ComposedSuppo
       let best: { height: number; normal: SurfaceSample['normal'] } | null = null;
       for (const index of list) {
         const { a, b, c, area2, normal } = triangles[index]!;
-        // Barycentric weights from plan sub-areas; a point on an edge belongs to the triangle.
+        // Barycentric weights from plan sub-areas; a point on an edge belongs to the triangle. Each
+        // weight is its own sub-area rather than one minus the others: on the line two tiles share
+        // (x 128,000 between a town's first two tiles), 1 - wa - wb came out -5.551e-17 on the
+        // west tile's triangle and -1.110e-16 on the east one's, so both refused ground that is
+        // continuous (322 of 128,000 points along each seam of a three-tile town). A seam is
+        // axis-aligned, so its own sub-area is exactly zero there.
         const wa = cross2(b[0] - x, b[1] - y, c[0] - x, c[1] - y) / area2;
         const wb = cross2(c[0] - x, c[1] - y, a[0] - x, a[1] - y) / area2;
-        const wc = 1 - wa - wb;
+        const wc = cross2(a[0] - x, a[1] - y, b[0] - x, b[1] - y) / area2;
         if (wa < 0 || wb < 0 || wc < 0) continue;
         const height = (wa * a[2] + wb * b[2] + wc * c[2]) / MILLIMETRES;
         if (best === null || height > best.height) best = { height, normal };
