@@ -9,9 +9,11 @@ on:
   pull_request:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
   # Cancel superseded pull request runs, never a push to main: a cancelled main run leaves no
-  # record of whether that commit was ever green.
+  # record of whether that commit was ever green. A push gets a group of its own commit, because
+  # GitHub cancels a queued run whenever a newer run queues in the same group, whatever
+  # cancel-in-progress says.
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
