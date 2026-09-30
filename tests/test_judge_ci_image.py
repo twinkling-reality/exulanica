@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
+from exulanica.api.services import _comparison_player
 
 WORKFLOW = (
     Path(__file__).resolve().parents[1] / ".github" / "workflows" / "check.yml"
@@ -38,6 +40,12 @@ def _check_image_job(workflow: str) -> None:
 
 def test_ci_builds_both_judge_images_and_boots_the_real_api():
     _check_image_job(WORKFLOW)
+
+
+def test_ci_disables_comparisons_with_a_supported_runtime_setting():
+    setting = re.search(r"--env EXULANICA_COMPARISON_WORKER=(\S+)", _image_job(WORKFLOW))
+    assert setting is not None
+    assert _comparison_player(setting.group(1)) == "none"
 
 
 @pytest.mark.parametrize(

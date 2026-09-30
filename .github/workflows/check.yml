@@ -192,7 +192,7 @@ jobs:
             --env EXULANICA_DATABASE_URL="postgresql://exulanica_judge:${EXULANICA_JUDGE_ROLE_PASSWORD}@judge-ci-postgres:5432/exulanica" \
             --env EXULANICA_READONLY_DATABASE_URL="postgresql://exulanica_ro:${EXULANICA_EXECUTOR_ROLE_PASSWORD}@judge-ci-postgres:5432/exulanica" \
             --env EXULANICA_API_TOKENS --env EXULANICA_DERIVATIVE_WORKER=off \
-            --env EXULANICA_COMPARISON_WORKER=none \
+            --env EXULANICA_COMPARISON_WORKER=off \
             exulanica-judge-backend:ci
           for attempt in {1..60}; do
             if curl --fail --silent --output /dev/null http://127.0.0.1:18080/healthz; then
