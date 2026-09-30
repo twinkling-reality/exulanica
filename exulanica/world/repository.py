@@ -661,6 +661,25 @@ class WorldStyleRepository:
         assert applied is not None
         return applied
 
+    def close_stale_preview(
+        self, preview_id: uuid.UUID, failure: Exception, *, error_code: str | None = None
+    ) -> None:
+        """Close an open preview after a saved entry check refused its Apply.
+
+        The failed Apply transaction has rolled back. This follow-up takes the preview lock and
+        changes only a still-open preview; another decision that closed it first remains intact.
+        """
+        with self._style_write():
+            try:
+                preview = self._preview_row(preview_id, for_update=True)
+            except UnknownWorldResource:
+                return
+            if preview["status"] != "open":
+                return
+            self._close_stale(
+                preview, _provenance_from_row(preview), failure, error_code=error_code
+            )
+
     def discard(self, preview_id: uuid.UUID, *, discarded_by: uuid.UUID) -> None:
         with self._style_write():
             preview = self._preview_row(preview_id, for_update=True)
@@ -1089,6 +1108,8 @@ class WorldStyleRepository:
         preview: Mapping[str, Any],
         provenance: ProposalProvenance,
         failure: Exception,
+        *,
+        error_code: str | None = None,
     ) -> None:
         self.connection.execute(
             "update world_style_preview set status='stale',closed_at=now() "
@@ -1105,7 +1126,7 @@ class WorldStyleRepository:
             provenance,
             proposal_id=preview["proposal_id"],
             preview_id=preview["preview_id"],
-            details={"error": _error_code(failure), "detail": str(failure)},
+            details={"error": error_code or _error_code(failure), "detail": str(failure)},
         )
 
     def _close_expired(self, *, preview_id: uuid.UUID | None = None) -> None:

@@ -6,6 +6,7 @@ import { StarterWorldOpeningError } from '../src/composition/session-and-geometr
 import { buildWorldEntrySurface } from '../src/composition/world-entry.js';
 import {
   buildWorldOpeningFailure,
+  worldOpeningCanRetry,
   worldOpeningReason,
 } from '../src/ui/startup-state.js';
 import type { SavedWorldEntry } from '../src/world-entry-api.js';
@@ -107,6 +108,7 @@ describe('one world that did not open', () => {
     }))).toBe('The server did not answer.');
     expect(worldOpeningReason(new ApiError(401, 'unauthenticated', 'no token')))
       .toBe('This session is no longer signed in.');
+    expect(worldOpeningCanRetry(new ApiError(503, 'unavailable', 'temporarily down'))).toBe(true);
     // A refusal the server gave a reason for is not a dropped connection, and must not be
     // reported as one.
     expect(worldOpeningReason(new ApiError(409, 'saved_world_conflict', 'no'))).toBeNull();
@@ -120,12 +122,14 @@ describe('one world that did not open', () => {
       detail: 'this instance\'s database role may not do what this request asked',
     }), { status: 403, headers: { 'content-type': 'application/json' } }));
     const reason = worldOpeningReason(new StarterWorldOpeningError(refusal));
+    expect(worldOpeningCanRetry(new StarterWorldOpeningError(refusal))).toBe(false);
     expect(reason).toBe('This server is not set up to save new worlds, so none was made.');
-    const panel = buildWorldOpeningFailure({ reason, retry: vi.fn(async () => undefined) });
+    const panel = buildWorldOpeningFailure({ reason, retry: null });
     expect(panel.querySelector('h1')?.textContent).toBe('Your world did not open');
     const note = panel.querySelector('.gate-note') as HTMLElement;
     expect(note.hidden).toBe(false);
     expect(note.textContent).toBe('This server is not set up to save new worlds, so none was made.');
+    expect(panel.querySelector('button')).toBeNull();
     // The words, not the code or the server's engineering sentence.
     expect(panel.textContent).not.toContain('database_privilege_refused');
     expect(panel.textContent).not.toContain('database role');

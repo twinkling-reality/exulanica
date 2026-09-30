@@ -21,6 +21,7 @@ from exulanica.world import (
     ProtectedTopologyConflict,
     SavedWorldEntryRepository,
     StaleSavedWorldEntry,
+    StyleWriteBusy,
     Transform,
     WorldObjectRepository,
     WorldStructureRepository,
@@ -1096,10 +1097,24 @@ def test_bound_style_write_and_entry_pointer_commit_or_rollback_together(objects
     assert refused.status_code == 409, refused.text
     assert refused.json()["code"] == "stale_saved_world_entry"
     assert objects_api.get(current).json() == initial
+    closed = repository.connection.execute(
+        "select status from world_style_preview "
+        "where workspace_id=%s and world_id=%s and preview_id=%s",
+        (repository.workspace_id, objects_api.world_id, preview.json()["preview_id"]),
+    ).fetchone()
+    assert closed["status"] == "stale"
+    refusal_audit = repository.connection.execute(
+        "select details from world_style_audit_event "
+        "where workspace_id=%s and world_id=%s and preview_id=%s and event_type='preview_stale'",
+        (repository.workspace_id, objects_api.world_id, preview.json()["preview_id"]),
+    ).fetchone()
+    assert refusal_audit["details"]["error"] == "stale_saved_world_entry"
 
     binding["base_revision"] = entry["revision"]
+    replacement = _appearance_preview(objects_api, initial, vitality=0.25)
+    assert replacement.status_code == 201, replacement.text
     applied = objects_api.post(
-        objects_api.in_world(f"/world/styles/previews/{preview.json()['preview_id']}/apply"),
+        objects_api.in_world(f"/world/styles/previews/{replacement.json()['preview_id']}/apply"),
         {
             "base_style_version_id": initial["current"]["version_id"],
             "base_topology_digest": initial["current_topology_digest"],
@@ -1178,6 +1193,18 @@ def test_bound_appearance_edit_refuses_a_historical_saved_style_until_restore(
     assert refused.json()["detail"] == (
         "restore the visible saved appearance before editing; another appearance is active"
     )
+    closed = repository.connection.execute(
+        "select status from world_style_preview "
+        "where workspace_id=%s and world_id=%s and preview_id=%s",
+        (repository.workspace_id, objects_api.world_id, later_preview.json()["preview_id"]),
+    ).fetchone()
+    assert closed["status"] == "stale"
+    refusal_audit = repository.connection.execute(
+        "select details from world_style_audit_event "
+        "where workspace_id=%s and world_id=%s and preview_id=%s and event_type='preview_stale'",
+        (repository.workspace_id, objects_api.world_id, later_preview.json()["preview_id"]),
+    ).fetchone()
+    assert refusal_audit["details"]["error"] == "stale_style_version"
     assert (
         objects_api.get(current).json()["current"]["version_id"] == (live["current"]["version_id"])
     )
@@ -1227,6 +1254,56 @@ def test_bound_appearance_edit_refuses_a_historical_saved_style_until_restore(
     assert saved_edit["style_version_id"] == edited.json()["version_id"]
     assert saved_edit["revision"] == reopened["revision"] + 1
 
+
+def test_already_closed_stale_apply_does_not_take_a_second_preview_lock(
+    objects_api, repository, monkeypatch
+):
+    entry, _version, _style = _create_entry(objects_api, repository)
+    current = objects_api.get(objects_api.in_world("/world/styles/current")).json()
+    first = _appearance_preview(objects_api, current, vitality=0.25)
+    second = _appearance_preview(objects_api, current, vitality=0.75)
+    assert first.status_code == 201, first.text
+    assert second.status_code == 201, second.text
+    binding = {
+        "entry_id": entry["entry_id"],
+        "base_revision": entry["revision"],
+        "authored_state_sha256": entry["authored_state_sha256"],
+        "authored_edit_seq": entry["authored_edit_seq"],
+        "style_version_id": entry["style_version_id"],
+    }
+    first_applied = objects_api.post(
+        objects_api.in_world(f"/world/styles/previews/{first.json()['preview_id']}/apply"),
+        {
+            "base_style_version_id": current["current"]["version_id"],
+            "base_topology_digest": current["current_topology_digest"],
+            "saved_entry": binding,
+        },
+    )
+    assert first_applied.status_code == 200, first_applied.text
+    advanced = objects_api.get(f"/world-entries/{entry['entry_id']}").json()
+    binding["base_revision"] = advanced["revision"]
+    binding["style_version_id"] = advanced["style_version_id"]
+
+    def contested_second_lock(*_args, **_kwargs):
+        raise StyleWriteBusy("a second preview lock was contested")
+
+    monkeypatch.setattr(WorldStyleRepository, "close_stale_preview", contested_second_lock)
+    refused = objects_api.post(
+        objects_api.in_world(f"/world/styles/previews/{second.json()['preview_id']}/apply"),
+        {
+            "base_style_version_id": current["current"]["version_id"],
+            "base_topology_digest": current["current_topology_digest"],
+            "saved_entry": binding,
+        },
+    )
+    assert refused.status_code == 409, refused.text
+    assert refused.json()["code"] == "stale_style_version"
+    closed = repository.connection.execute(
+        "select status from world_style_preview "
+        "where workspace_id=%s and world_id=%s and preview_id=%s",
+        (repository.workspace_id, objects_api.world_id, second.json()["preview_id"]),
+    ).fetchone()
+    assert closed["status"] == "stale"
 
 def test_entry_is_not_an_existence_oracle_across_workspaces(objects_api, repository):
     entry, _version, _style = _create_entry(objects_api, repository)

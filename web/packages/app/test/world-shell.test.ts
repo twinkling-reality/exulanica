@@ -15,6 +15,12 @@ describe('the Atlas shell', () => {
     expect(updateWorldShell(menu, { type: 'toggle-menu' })).toEqual(initialWorldShell());
   });
 
+  it('lets Customize close directly to the world even when opened from the World menu', () => {
+    const menu = updateWorldShell(initialWorldShell(), { type: 'toggle-menu' });
+    const options = updateWorldShell(menu, { type: 'toggle-options' });
+    expect(updateWorldShell(options, { type: 'show-world' })).toEqual(initialWorldShell());
+  });
+
   it('opens a recorded comparison as a temporary menu destination', () => {
     const menu = updateWorldShell(initialWorldShell(), { type: 'toggle-menu' });
     const experiment = updateWorldShell(menu, { type: 'toggle-experiment' });

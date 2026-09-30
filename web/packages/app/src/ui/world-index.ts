@@ -256,8 +256,10 @@ export function buildWorldIndex(
       search.select();
     },
     closeSearch() {
+      if (root.dataset['searchOpen'] !== 'true') return false;
       if (search.value.trim().length > 0) return false;
       root.dataset['searchOpen'] = 'false';
+      if (document.activeElement === search) close.focus();
       return true;
     },
     render(snapshot, state, selected) {

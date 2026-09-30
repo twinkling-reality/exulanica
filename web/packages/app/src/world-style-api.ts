@@ -579,6 +579,7 @@ export class WorldStyleClient {
         throw new WorldStyleContractError('not_answered', WORLD_STYLE_NOT_ANSWERED);
       }
       if (error instanceof ApiError && error.code === 'stale_saved_world_entry') {
+        if (this.#active === active) this.#active = null;
         throw new WorldStyleContractError(
           'saved_entry_conflict',
           'This saved world changed elsewhere. The appearance was not saved. Reload before trying again.',
@@ -598,11 +599,9 @@ export class WorldStyleClient {
        * is the whole design as drafted against its base, every control included, so a preview of
        * it on the new version would save that old design over each control the other writer
        * changed. Nothing is posted and nothing is discarded: the authority closed it as stale when
-       * its own base check refused it, and when the saved world's check that its style is live
-       * refused first, the preview stays open until its lifetime closes it, and a page that finds
-       * it shows it made for an earlier version. It is let go BEFORE the read that follows, so a
-       * read that fails leaves nothing holding it. Only the panel's own Settings draft is made
-       * again, because that draft is what the person is looking at and reviews before Apply.
+       * its own base check refused it, or when the saved world's check refused the Apply. It is
+       * let go BEFORE the read that follows, so a failed read leaves nothing holding it. The
+       * panel's own Settings draft is made again only while its saved version is still live.
        */
       if (active.request.origin !== 'settings') {
         if (this.#active === active) this.#active = null;
@@ -611,7 +610,11 @@ export class WorldStyleClient {
           kind: 'stale', state, reconciliationRequired: this.#requiresReconciliation,
         });
       }
-      await this.refresh();
+      if (this.#active === active) this.#active = null;
+      const state = await this.refresh();
+      if (savedEntry !== undefined && this.#requiresReconciliation) {
+        return Object.freeze({ kind: 'stale', state, reconciliationRequired: true });
+      }
       const recovered = await this.#createPreview({
         ...active.request,
         refinesProposalId: active.preview.proposalId,

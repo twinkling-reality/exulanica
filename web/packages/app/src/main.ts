@@ -66,6 +66,7 @@ import { PlaceNameRightsClient } from './place-name-rights-api.js';
 import {
   buildStartupState,
   buildWorldOpeningFailure,
+  worldOpeningCanRetry,
   worldOpeningReason,
 } from './ui/startup-state.js';
 import { el, replace } from './ui/dom.js';
@@ -194,7 +195,9 @@ async function start(token: string, csrfToken?: string): Promise<void> {
     await openAppSession(env, state, token, csrfToken);
   } catch (error) {
     if (!(error instanceof StarterWorldOpeningError)) throw error;
-    showWorldOpeningFailure(worldOpeningReason(error), () => start(token, csrfToken));
+    showWorldOpeningFailure(
+      worldOpeningReason(error), worldOpeningCanRetry(error) ? () => start(token, csrfToken) : null,
+    );
     return;
   }
   if (!preview && state.activeWorldEntry === null) {
@@ -248,7 +251,10 @@ async function mountNoWorld(deps: {
     );
     return;
   }
-  showWorldOpeningFailure(worldOpeningReason(state.worldEntryError), deps.retry);
+  showWorldOpeningFailure(
+    worldOpeningReason(state.worldEntryError),
+    worldOpeningCanRetry(state.worldEntryError) ? deps.retry : null,
+  );
 }
 
 function showWorldOpeningFailure(
@@ -1051,7 +1057,7 @@ async function mount(): Promise<void> {
     state,
     applyProofLens: () => status.applyProofLens(),
     setCompanionAppearance: () => companion.applyAppearance(),
-    onCloseOptions: () => dispatchShell({ type: 'toggle-options' }),
+    onCloseOptions: () => dispatchShell({ type: 'show-world' }),
     onShowControls: () => dispatchShell({ type: 'toggle-controls' }),
     onCloseControls: () => dispatchShell({ type: 'toggle-controls' }),
     onShowCustomize: () => dispatchShell({ type: 'toggle-options' }),

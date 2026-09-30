@@ -81,6 +81,18 @@ export function worldOpeningReason(error: unknown): string | null {
   return null;
 }
 
+/** A server grant refusal cannot change when the person presses the same action again. */
+export function worldOpeningCanRetry(error: unknown): boolean {
+  const seen = new Set<Error>();
+  let cause: unknown = error;
+  while (cause instanceof Error && !seen.has(cause)) {
+    if (cause instanceof ApiError && cause.code === 'database_privilege_refused') return false;
+    seen.add(cause);
+    cause = cause.cause;
+  }
+  return true;
+}
+
 /**
  * One world that did not open, said the way every other refusal is said.
  *

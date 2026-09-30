@@ -13,7 +13,7 @@ describe('World menu', () => {
     menu.setVisible(true);
 
     expect(menu.root.textContent).toContain('Development preview');
-    expect(document.activeElement?.textContent).toContain('Place & view');
+    expect(document.activeElement?.textContent).toContain('World');
     menu.root.dispatchEvent(new KeyboardEvent('keydown', { code: 'ArrowRight', bubbles: true }));
     expect(document.activeElement?.textContent).toContain('Character');
     menu.root.querySelector<HTMLButtonElement>('[data-command=world]')!.click();
@@ -46,9 +46,41 @@ describe('World menu', () => {
       preview: false, onResume: vi.fn(), onWorld: vi.fn(), onCompare, onCommand: vi.fn(),
     });
     const entry = menu.root.querySelector<HTMLButtonElement>('[data-command=compare]')!;
-    expect(entry.textContent).toContain('Compare models');
+    expect(entry.querySelector('.world-menu-entry-label')?.textContent).toBe('Compare');
+    expect(entry.getAttribute('aria-label')).toBe('Compare models');
     entry.click();
     expect(onCompare).toHaveBeenCalledOnce();
+  });
+
+  it('names and opens the recipe action as making a world', () => {
+    const onMakeWorld = vi.fn();
+    const menu = buildWorldMenu({
+      preview: false, onResume: vi.fn(), onWorld: vi.fn(), onMakeWorld,
+      onCommand: vi.fn(),
+    });
+    const make = menu.root.querySelector<HTMLButtonElement>('[data-command=make]')!;
+    expect(make.querySelector('.world-menu-entry-label')?.textContent).toBe('Create');
+    expect(make.querySelector('.world-menu-entry-detail')?.textContent).toBe('Make a world');
+    expect(make.getAttribute('aria-label')).toBe('Make a world');
+    make.click();
+    expect(onMakeWorld).toHaveBeenCalledOnce();
+  });
+
+  it('keeps the short menu titles distinct and names each action', () => {
+    const menu = buildWorldMenu({
+      preview: false, onResume: vi.fn(), onWorld: vi.fn(), onExperiment: vi.fn(),
+      onCompare: vi.fn(), onMakeWorld: vi.fn(), onCommand: vi.fn(),
+    });
+    const labels = [...menu.root.querySelectorAll('.world-menu-entry-label')]
+      .map((node) => node.textContent);
+    expect(labels).toEqual([
+      'World', 'Character', 'Library', 'Map', 'Attempts', 'Compare', 'Create',
+      'Companion', 'Design', 'Settings',
+    ]);
+    expect(menu.root.querySelector('[data-command=options]')?.getAttribute('aria-label'))
+      .toBe('Customize world');
+    expect(menu.root.textContent).toContain('ArrowsMove');
+    expect(menu.root.textContent).toContain('EnterOpen');
   });
 
   it('is hidden and inert outside the menu state', () => {

@@ -57,6 +57,7 @@ from exulanica.world import (
     ProposalProvenance,
     SavedWorldEntryRepository,
     StaleSavedWorldEntry,
+    StaleStyleVersion,
     StyleProposal,
     StyleProposalRecord,
     StyleReference,
@@ -485,6 +486,7 @@ def apply(
             before_write=before,
             after_write=after,
         ),
+        preview_id=preview_id,
     )
 
 
@@ -533,15 +535,18 @@ def _commit_style(
     ],
     *,
     restoring: bool = False,
+    preview_id: uuid.UUID | None = None,
 ) -> StyleVersionView | JSONResponse:
     """Commit a style and its saved resume pointer together when an entry is bound."""
 
     entries = SavedWorldEntryRepository(repository.connection, repository.workspace_id)
     before: Callable[[], None] | None = None
     after: Callable[[StyleVersion], None] | None = None
+    saved_style_precheck_failed = False
     if saved_entry is not None:
 
         def before() -> None:
+            nonlocal saved_style_precheck_failed
             entries.lock_style_advance_base(
                 saved_entry.entry_id,
                 base_revision=saved_entry.base_revision,
@@ -551,10 +556,14 @@ def _commit_style(
                 style_version_id=saved_entry.style_version_id,
             )
             if not restoring:
-                entries.require_saved_style_is_live_write_base(
-                    world_id=repository.world_id,
-                    style_version_id=saved_entry.style_version_id,
-                )
+                try:
+                    entries.require_saved_style_is_live_write_base(
+                        world_id=repository.world_id,
+                        style_version_id=saved_entry.style_version_id,
+                    )
+                except StaleStyleVersion:
+                    saved_style_precheck_failed = True
+                    raise
 
         def after(version: StyleVersion) -> None:
             entries.advance_style_locked(
@@ -567,10 +576,18 @@ def _commit_style(
     try:
         version = operation(before, after)
     except StaleSavedWorldEntry as exc:
+        if preview_id is not None:
+            repository.close_stale_preview(
+                preview_id, exc, error_code="stale_saved_world_entry"
+            )
         return JSONResponse(
             status_code=409,
             content={"code": "stale_saved_world_entry", "detail": str(exc)},
         )
+    except StaleStyleVersion as exc:
+        if preview_id is not None and saved_style_precheck_failed:
+            repository.close_stale_preview(preview_id, exc)
+        raise
     return _version_view(version)
 
 

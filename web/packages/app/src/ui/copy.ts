@@ -404,12 +404,10 @@ const COPY: Readonly<Record<string, string>> = Object.freeze({
     + 'generated, not recorded from a real place.',
   // Making a world from a recipe: the World menu's offer, and the panel that lists the recipes.
   'worldMenu.make': 'Make a world',
-  'worldMenu.make.detail': 'Generated from a recipe, then saved as yours',
+  'worldMenu.make.detail': 'Make a world',
   'worldRecipes.heading': 'Make a world',
   'worldRecipes.introduction':
-    'Start from a town, then change what you like. Its streets, buildings and shops are generated, '
-    + 'not recorded from a real place; its people live there and its vehicles drive its streets. '
-    + 'It is saved beside your other worlds.',
+    'Choose a town recipe, adjust its values, and save it as your world.',
   'worldRecipes.loading': 'Reading what a world can be made from…',
   'worldRecipes.make': 'Make this town',
   'worldRecipes.metres': '{metres} m',

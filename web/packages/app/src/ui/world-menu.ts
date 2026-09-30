@@ -34,11 +34,13 @@ export function buildWorldMenu(options: {
     detail: string,
     key: string,
     className = '',
+    accessibleName?: string,
   ): HTMLButtonElement => {
     const button = el('button', {
       type: 'button',
       class: `world-menu-entry ${className}`.trim(),
       'data-command': command,
+      'aria-label': accessibleName,
     }, [
       el('span', { class: 'world-menu-entry-label', text: label }),
       el('span', { class: 'world-menu-entry-detail', text: detail }),
@@ -62,30 +64,30 @@ export function buildWorldMenu(options: {
   resume.addEventListener('click', () => activate(options.onResume));
 
   const grid = el('div', { class: 'world-menu-grid' }, [
-    entry('world', 'Place & view', 'Nearby people, creation, camera, and source context', '', 'world-menu-world'),
+    entry('world', 'World', 'Explore and build', '', 'world-menu-world'),
     entry('character', 'Character', 'Appearance and identity', 'K', 'world-menu-character'),
-    entry('index', 'Library', 'People, places, and sources', 'I', 'world-menu-library'),
+    entry('index', 'Library', 'People and sources', 'I', 'world-menu-library'),
     entry('map', 'Map', 'Regions and orientation', 'M', 'world-menu-map'),
     ...(options.onExperiment === undefined ? [] : [
-      entry('experiment', 'Recorded comparison', 'Read one existing society attempt', '', 'world-menu-experiment'),
+      entry('experiment', 'Attempts', 'Recorded runs', '', 'world-menu-experiment', 'Recorded comparison'),
     ]),
     ...(options.onCompare === undefined ? [] : [
-      entry('compare', 'Compare models', 'Two open models, the same hour', '', 'world-menu-compare'),
+      entry('compare', 'Compare', 'Models, same starting world', '', 'world-menu-compare', 'Compare models'),
     ]),
     ...(options.onMakeWorld === undefined ? [] : [
-      entry('make', say('worldMenu.make'), say('worldMenu.make.detail'), '', 'world-menu-make'),
+      entry('make', 'Create', say('worldMenu.make.detail'), '', 'world-menu-make', say('worldMenu.make')),
     ]),
-    entry('companion', 'Companion', 'Call the Unnamed Companion', 'X', 'world-menu-companion'),
-    entry('options', 'Customize world', 'Light, material, and atmosphere', 'O', 'world-menu-customize'),
-    entry('controls', 'Settings', 'Display, accessibility, movement, and controls', '?', 'world-menu-settings'),
+    entry('companion', 'Companion', 'Ask and act', 'X', 'world-menu-companion'),
+    entry('options', 'Design', 'Light and material', 'O', 'world-menu-customize', 'Customize world'),
+    entry('controls', 'Settings', 'Display and controls', '?', 'world-menu-settings'),
   ]);
   const rail = el('footer', { class: 'world-menu-rail' }, [
     resume,
     el('span', { class: 'world-menu-rail-hint' }, [
-      el('kbd', { text: '← ↑ ↓ →' }), 'Navigate',
+      el('kbd', { text: 'Arrows' }), 'Move',
     ]),
     el('span', { class: 'world-menu-rail-hint' }, [
-      el('kbd', { text: 'Enter' }), 'Select',
+      el('kbd', { text: 'Enter' }), 'Open',
     ]),
     el('span', {
       class: 'world-menu-session',

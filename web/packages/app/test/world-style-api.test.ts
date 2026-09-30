@@ -411,6 +411,113 @@ describe('world style API boundary', () => {
     });
   });
 
+  it('holds a Settings draft when the saved appearance needs restoring', async () => {
+    let currentReads = 0;
+    let previewWrites = 0;
+    const fetch = connectedFetch((url, init) => {
+      if (url.pathname.endsWith('/world/styles/current')) {
+        currentReads += 1;
+        return json(currentReads === 1 ? state() : state('v1', 1, 0.55));
+      }
+      if (url.pathname.endsWith('/world/styles/versions')) {
+        return json([version('v0', 0), version('v1', 1, 0.55)]);
+      }
+      if (url.pathname.endsWith('/world/styles/previews') && init.method === 'POST') {
+        previewWrites += 1;
+        return json(preview('preview-1', 'proposal-1'), 201);
+      }
+      if (url.pathname.endsWith('/apply')) {
+        return json({ code: 'stale_style_version', detail: 'restore saved appearance' }, 409);
+      }
+      return undefined;
+    });
+    const client = new WorldStyleClient({
+      worldId: TEST_WORLD,
+      baseUrl: 'https://exulanica.test/api', token: 't', fetch,
+      ids: () => 'proposal-1',
+      savedEntry: () => ({
+        entryId: 'entry-1', revision: 1, authoredStateSha256: 'a'.repeat(64), authoredEditSeq: 0,
+        styleVersionId: 'v0',
+      }),
+    });
+    await client.connect('v0');
+    await client.previewSettings({
+      profileId: 'origin-landscape', profileVersion: 1, parameters: { vitality: 0.4 },
+    });
+    const result = await client.applyActive();
+    expect(result).toMatchObject({
+      kind: 'stale', state: { current: { versionId: 'v1' } }, reconciliationRequired: true,
+    });
+    expect(previewWrites).toBe(1);
+    expect(client.activePreview()).toBeNull();
+    expect(client.requiresReconciliation()).toBe(true);
+  });
+
+  it('releases the server-closed Settings preview before a failed stale refresh', async () => {
+    let currentReads = 0;
+    const fetch = connectedFetch((url, init) => {
+      if (url.pathname.endsWith('/world/styles/current')) {
+        currentReads += 1;
+        return currentReads === 1
+          ? json(state())
+          : json({ code: 'world_unavailable', detail: 'read failed' }, 503);
+      }
+      if (url.pathname.endsWith('/world/styles/previews') && init.method === 'POST') {
+        return json(preview('preview-1', 'proposal-1'), 201);
+      }
+      if (url.pathname.endsWith('/apply')) {
+        return json({ code: 'stale_style_version', detail: 'another writer won' }, 409);
+      }
+      return undefined;
+    });
+    const client = new WorldStyleClient({
+      worldId: TEST_WORLD,
+      baseUrl: 'https://exulanica.test/api', token: 't', fetch,
+      ids: () => 'proposal-1',
+      savedEntry: () => ({
+        entryId: 'entry-1', revision: 1, authoredStateSha256: 'a'.repeat(64), authoredEditSeq: 0,
+        styleVersionId: 'v0',
+      }),
+    });
+    await client.connect('v0');
+    await client.previewSettings({
+      profileId: 'origin-landscape', profileVersion: 1, parameters: { vitality: 0.4 },
+    });
+    await expect(client.applyActive()).rejects.toMatchObject({ code: 'world_unavailable' });
+    expect(client.activePreview()).toBeNull();
+  });
+
+  it('releases a preview refused by a changed saved entry', async () => {
+    let previewWrites = 0;
+    const fetch = connectedFetch((url, init) => {
+      if (url.pathname.endsWith('/world/styles/previews') && init.method === 'POST') {
+        previewWrites += 1;
+        return json(preview('preview-1', 'proposal-1'), 201);
+      }
+      if (url.pathname.endsWith('/apply')) {
+        return json({ code: 'stale_saved_world_entry', detail: 'saved entry changed' }, 409);
+      }
+      return undefined;
+    });
+    const client = new WorldStyleClient({
+      worldId: TEST_WORLD,
+      baseUrl: 'https://exulanica.test/api', token: 't', fetch,
+      ids: () => 'proposal-1',
+      savedEntry: () => ({
+        entryId: 'entry-1', revision: 1, authoredStateSha256: 'a'.repeat(64), authoredEditSeq: 0,
+        styleVersionId: 'v0',
+      }),
+    });
+    await client.connect('v0');
+    await client.previewSettings({
+      profileId: 'origin-landscape', profileVersion: 1, parameters: { vitality: 0.4 },
+    });
+    await expect(client.applyActive()).rejects.toMatchObject({ code: 'saved_entry_conflict' });
+    expect(client.activePreview()).toBeNull();
+    await expect(client.applyActive()).rejects.toMatchObject({ code: 'missing_preview' });
+    expect(previewWrites).toBe(1);
+  });
+
   it('preserves Companion provenance and explicit refinement lineage', async () => {
     let proposalBody: Record<string, unknown> | null = null;
     const fetch = connectedFetch((url, init) => {
