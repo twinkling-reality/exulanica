@@ -1,4 +1,4 @@
-import type { AtlasCommand } from './atlas-commands.js';
+import { commandIcon, type AtlasCommand } from './atlas-commands.js';
 import { say } from './copy.js';
 import { el } from './dom.js';
 import { createModalFocus } from './modal-focus.js';
@@ -6,6 +6,60 @@ import { createModalFocus } from './modal-focus.js';
 export interface WorldMenu {
   readonly root: HTMLElement;
   setVisible(visible: boolean): void;
+}
+
+type MenuArrow = 'ArrowLeft' | 'ArrowRight' | 'ArrowUp' | 'ArrowDown';
+
+/** Follow the tiles as drawn, including tiles that span more than one mosaic cell. */
+function nextMenuEntry(
+  entries: readonly HTMLButtonElement[], current: number, arrow: MenuArrow,
+): HTMLButtonElement | undefined {
+  const here = entries[current];
+  if (here === undefined) return undefined;
+  const boxes = entries.map((entry) => entry.getBoundingClientRect());
+  if (boxes.some((box) => box.width <= 0 || box.height <= 0)) {
+    const step = arrow === 'ArrowLeft' || arrow === 'ArrowUp' ? -1 : 1;
+    return entries[(current + step + entries.length) % entries.length];
+  }
+  const vertical = arrow === 'ArrowUp' || arrow === 'ArrowDown';
+  const positive = arrow === 'ArrowRight' || arrow === 'ArrowDown';
+  const position = (box: DOMRect, main: boolean) => main
+    ? (vertical ? (box.top + box.bottom) / 2 : (box.left + box.right) / 2)
+    : (vertical ? (box.left + box.right) / 2 : (box.top + box.bottom) / 2);
+  const near = (box: DOMRect, main: boolean) => main
+    ? (vertical ? box.top : box.left)
+    : (vertical ? box.left : box.top);
+  const far = (box: DOMRect, main: boolean) => main
+    ? (vertical ? box.bottom : box.right)
+    : (vertical ? box.right : box.bottom);
+  const origin = boxes[current]!;
+  const candidates = boxes.map((box, index) => ({ box, index }))
+    .filter(({ index }) => index !== current);
+  const inDirection = candidates.filter(({ box }) => positive
+    ? position(box, true) > position(origin, true)
+    : position(box, true) < position(origin, true));
+  if (inDirection.length === 0) {
+    const edge = Math[positive ? 'min' : 'max'](
+      ...candidates.map(({ box }) => position(box, true)),
+    );
+    const wrapped = candidates.filter(({ box }) => position(box, true) === edge)
+      .sort((left, right) =>
+        Math.abs(position(left.box, false) - position(origin, false))
+        - Math.abs(position(right.box, false) - position(origin, false)));
+    return entries[wrapped[0]?.index ?? current];
+  }
+  inDirection.sort((left, right) => {
+    const rank = (box: DOMRect): readonly number[] => [
+      Math.max(0, near(box, false) - far(origin, false), near(origin, false) - far(box, false)),
+      positive ? Math.max(0, near(box, true) - far(origin, true))
+        : Math.max(0, near(origin, true) - far(box, true)),
+      Math.abs(position(box, false) - position(origin, false)),
+    ];
+    const a = rank(left.box);
+    const b = rank(right.box);
+    return (a[0]! - b[0]!) || (a[1]! - b[1]!) || (a[2]! - b[2]!);
+  });
+  return entries[inDirection[0]!.index];
 }
 
 export function buildWorldMenu(options: {
@@ -36,12 +90,15 @@ export function buildWorldMenu(options: {
     className = '',
     accessibleName?: string,
   ): HTMLButtonElement => {
+    const icon = command === 'world' || command === 'experiment' || command === 'compare'
+      || command === 'make' ? [] : [commandIcon(command)];
     const button = el('button', {
       type: 'button',
       class: `world-menu-entry ${className}`.trim(),
       'data-command': command,
       'aria-label': accessibleName,
     }, [
+      ...icon,
       el('span', { class: 'world-menu-entry-label', text: label }),
       el('span', { class: 'world-menu-entry-detail', text: detail }),
       el('kbd', { text: key }),
@@ -109,11 +166,7 @@ export function buildWorldMenu(options: {
     const current = entries.indexOf(document.activeElement as HTMLButtonElement);
     if (current < 0) return;
     event.preventDefault();
-    const columns = 4;
-    const delta = event.code === 'ArrowLeft' ? -1
-      : event.code === 'ArrowRight' ? 1
-        : event.code === 'ArrowUp' ? -columns : columns;
-    entries[(current + delta + entries.length) % entries.length]?.focus();
+    nextMenuEntry(entries, current, event.code as MenuArrow)?.focus();
   });
 
   const firstEntry = grid.querySelector<HTMLButtonElement>('.world-menu-entry')!;

@@ -79,8 +79,53 @@ describe('World menu', () => {
     ]);
     expect(menu.root.querySelector('[data-command=options]')?.getAttribute('aria-label'))
       .toBe('Customize world');
+    expect([...menu.root.querySelectorAll('.world-menu-entry:has(svg)')]
+      .map((node) => node.getAttribute('data-command'))).toEqual([
+      'character', 'index', 'map', 'companion', 'options', 'controls',
+    ]);
+    expect(menu.root.querySelectorAll('.world-menu-entry svg[aria-hidden=true]')).toHaveLength(6);
     expect(menu.root.textContent).toContain('ArrowsMove');
     expect(menu.root.textContent).toContain('EnterOpen');
+  });
+
+  it('moves focus through the visible mosaic rather than four fixed list positions', () => {
+    const menu = buildWorldMenu({
+      preview: false, onResume: vi.fn(), onWorld: vi.fn(), onExperiment: vi.fn(),
+      onCompare: vi.fn(), onMakeWorld: vi.fn(), onCommand: vi.fn(),
+    });
+    document.body.append(menu.root);
+    const entries = [...menu.root.querySelectorAll<HTMLButtonElement>('.world-menu-entry')];
+    const boxes = [
+      [0, 0, 200, 200], [200, 0, 400, 100], [200, 100, 300, 200],
+      [300, 100, 400, 200], [0, 200, 100, 300], [100, 200, 200, 300],
+      [200, 200, 300, 300], [0, 300, 200, 400], [300, 200, 400, 300],
+      [200, 300, 400, 400],
+    ];
+    entries.forEach((entry, index) => {
+      const [left, top, right, bottom] = boxes[index]!;
+      vi.spyOn(entry, 'getBoundingClientRect').mockReturnValue({
+        left, top, right, bottom, width: right! - left!, height: bottom! - top!,
+      } as DOMRect);
+    });
+    menu.setVisible(true);
+    const move = (code: string) => menu.root.dispatchEvent(new KeyboardEvent('keydown', {
+      code, bubbles: true,
+    }));
+    move('ArrowRight');
+    expect(document.activeElement).toBe(entries[1]);
+    move('ArrowDown');
+    expect(document.activeElement).toBe(entries[2]);
+    move('ArrowLeft');
+    expect(document.activeElement).toBe(entries[0]);
+    move('ArrowDown');
+    expect(document.activeElement).toBe(entries[4]);
+    move('ArrowUp');
+    expect(document.activeElement).toBe(entries[0]);
+    entries[6]!.focus();
+    move('ArrowRight');
+    expect(document.activeElement).toBe(entries[8]);
+    move('ArrowDown');
+    expect(document.activeElement).toBe(entries[9]);
   });
 
   it('is hidden and inert outside the menu state', () => {

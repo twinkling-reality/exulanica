@@ -9,7 +9,7 @@ export interface AtlasCommands {
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
-function commandIcon(command: AtlasCommand): SVGSVGElement {
+export function commandIcon(command: AtlasCommand): SVGSVGElement {
   const svg = document.createElementNS(SVG_NS, 'svg');
   svg.setAttribute('class', 'atlas-command-icon');
   svg.setAttribute('viewBox', '0 0 24 24');
