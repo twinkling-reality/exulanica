@@ -1,0 +1,2830 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "bound_usd": "0.65",
+    "comparison_id": "bee01cfa-675a-4ad4-b390-c7ca0a483e8f",
+    "database": {
+      "asks": 1999,
+      "attempts": 1999,
+      "defined_utc": "2026-09-30T03:04:32.452693+00:00",
+      "drawn_runs": 24,
+      "first_outcome_utc": "2026-09-30T03:05:07.778424+00:00",
+      "last_outcome_utc": "2026-09-30T03:25:59.895003+00:00",
+      "runs": [
+        {
+          "arm": "model_a",
+          "code": null,
+          "runs": 3,
+          "status": "completed"
+        },
+        {
+          "arm": "model_a",
+          "code": "process_budget_spent",
+          "runs": 5,
+          "status": "failed"
+        },
+        {
+          "arm": "model_a_again",
+          "code": null,
+          "runs": 3,
+          "status": "completed"
+        },
+        {
+          "arm": "model_a_again",
+          "code": "process_budget_spent",
+          "runs": 5,
+          "status": "failed"
+        },
+        {
+          "arm": "model_b",
+          "code": null,
+          "runs": 2,
+          "status": "completed"
+        },
+        {
+          "arm": "model_b",
+          "code": "process_budget_spent",
+          "runs": 6,
+          "status": "failed"
+        },
+        {
+          "arm": "routine",
+          "code": null,
+          "runs": 8,
+          "status": "completed"
+        },
+        {
+          "arm": "wait",
+          "code": null,
+          "runs": 8,
+          "status": "completed"
+        }
+      ]
+    },
+    "kind": "exulanica.town-comparison/v1",
+    "means_over": "each arm's mean_score is over its completed runs only; a failed run carries no score",
+    "measured": {},
+    "notes": {
+      "call_ceiling": "The run's process made its calls under the default process call ceiling, 2000 calls (EXULANICA_BUDGET_MAX_CALLS unset; DEFAULT_MAX_CALLS in exulanica/models/budget.py). Once the calls reached it, every remaining model run failed process_budget_spent before asking anything (database.runs), with the spend in spend of the bound in bound_usd. The pre-registration and the admission between seeds counted dollars only.",
+      "held_out_seeds": "The held-out seeds of society-comparison-seeds.v4 are spent: every seed's anchors and three seeds' model runs were played. A comparison judged after this one runs on seeds drawn afresh.",
+      "means": "Each arm's mean score is over its completed runs only, which differ in number between arms; the means are not comparable as a claim.",
+      "outer_profile": "Before landing, the records of this comparison were carried under the outer profile every retained record under docs/evaluation carries, exulanica.digest-bound-record/v1 (tests/test_retained_evaluation_records.py), with what each is as its own kind. The pre-registration was re-wrapped with its record unchanged: record_sha256 3a247342da261270fb61f4b9f00eb90ec385daa6d6010bf701e021046c2d2f57, which the comparison's definition binds; its file digest went from fbaa0e71dc164cd5b6208d3e9804ea1fe983ffd4979748ff5701cee39a12d7b4 (outer profile exulanica.town-comparison-preregistration/v1) to d0eb0526e858e9db5240ecfbff93b629345acf8230a1f3d0c1f0c4ea2819ed2c. This record was first written under the outer profile exulanica.town-comparison/v1 by the script's second version (sha256 8cc3d28590837f0edfbccd8dd6d11de133d4c3989f59d44356b3b73dd4dd94f6), file 887982fa069a27008f981ea7e848a40dc6049565e061bf4e18b5c2fbf301e69f, record_sha256 729d282c213ffa7417cd2ece0709f7fb153c0f749062af9f07417c24b2c21b45; it is written again here, from the same stored runs, by the third version, which differs from the second only in the outer profile, the kind and the re-wrap step, so its record_sha256 differs. Nothing measured changed.",
+      "run_step": "The run step, the first version of this script (run_script_sha256), played every run of this comparison and drew every completed run, then raised before writing its record: the record held the run's seconds as a float (runs_s), which a record refuses. This record is written from the comparison's stored runs by the third version (record_script_sha256), through the result the application's route serves.",
+      "times": "Times are the database's: when the comparison was defined and when its first and last outcome were recorded.",
+      "verdict": "incomplete, as the application serves it: a comparison with a run missing or failed claims nothing, and no difference between the models is claimed from this one."
+    },
+    "preregistration": "docs/evaluation/2026-09-30-town-comparison-preregistration.json",
+    "preregistration_record_sha256": "3a247342da261270fb61f4b9f00eb90ec385daa6d6010bf701e021046c2d2f57",
+    "record_script_as_run": "docs/evaluation/artifacts/2026-09-30-town-comparison/record-as-run.py.txt",
+    "record_script_sha256": "262bb60ed82919a68655fdb177486df62ccb2c0b603b134cd3c7d1185c6fd2de",
+    "result": {
+      "arms": [
+        {
+          "answering": {
+            "mechanism": "json_schema",
+            "order": [
+              "json_schema",
+              "tool_call"
+            ],
+            "record": "docs/evaluation/2026-09-26-society-model-actions-probe.json",
+            "source": "model"
+          },
+          "decider": {
+            "kind": "model",
+            "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+            "name": "Nemotron 3 Nano 30B",
+            "provider": "nebius_token_factory"
+          },
+          "description": "Nemotron 3 Nano 30B, an open reasoning model from NVIDIA.",
+          "key": "model_a",
+          "role": "candidate"
+        },
+        {
+          "answering": {
+            "mechanism": "tool_call",
+            "order": [
+              "tool_call",
+              "json_schema"
+            ],
+            "record": null,
+            "source": "contract"
+          },
+          "decider": {
+            "kind": "model",
+            "model_id": "nvidia/Nemotron-3_5-Lightning",
+            "name": "Nemotron 3.5 Lightning",
+            "provider": "nebius_token_factory"
+          },
+          "description": "Nemotron 3.5 Lightning, an open reasoning model from NVIDIA.",
+          "key": "model_b",
+          "role": "candidate"
+        },
+        {
+          "answering": {
+            "mechanism": "json_schema",
+            "order": [
+              "json_schema",
+              "tool_call"
+            ],
+            "record": "docs/evaluation/2026-09-26-society-model-actions-probe.json",
+            "source": "model"
+          },
+          "decider": {
+            "kind": "model",
+            "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+            "name": "Nemotron 3 Nano 30B",
+            "provider": "nebius_token_factory"
+          },
+          "description": "Nemotron 3 Nano 30B, an open reasoning model from NVIDIA.",
+          "key": "model_a_again",
+          "role": "control"
+        },
+        {
+          "answering": null,
+          "decider": {
+            "kind": "routine"
+          },
+          "description": "Their own routine",
+          "key": "routine",
+          "role": "one"
+        },
+        {
+          "answering": null,
+          "decider": {
+            "kind": "wait"
+          },
+          "description": "Waiting where they are",
+          "key": "wait",
+          "role": "zero"
+        }
+      ],
+      "comparison_id": "bee01cfa-675a-4ad4-b390-c7ca0a483e8f",
+      "control": [
+        "model_a",
+        "model_a_again"
+      ],
+      "control_bound": null,
+      "created_at": "2026-09-30T03:04:32.452693+00:00",
+      "differences": [],
+      "group": {
+        "people": [
+          {
+            "id": "1420a25d-f224-5417-b542-1770aeb5ee0a",
+            "name": "Bela Ash 2"
+          },
+          {
+            "id": "36ce27ea-1544-5f0e-97ff-b8cf36a8ed8a",
+            "name": "Ari Ash 1"
+          },
+          {
+            "id": "3d7ec463-641c-55bc-9ff5-59bec91590f3",
+            "name": "Ari Cove 17"
+          },
+          {
+            "id": "4061efad-3bf3-5331-bea8-bd606a2651c8",
+            "name": "Ari Elm 33"
+          },
+          {
+            "id": "5640f58d-b332-58a7-95dc-60c456bdc61e",
+            "name": "Bela Cove 18"
+          },
+          {
+            "id": "9e665c2f-0a79-531b-9ca5-a3ebf019fd6f",
+            "name": "Ari Fox 41"
+          },
+          {
+            "id": "c0c30589-b959-55dd-b796-97e489bb2980",
+            "name": "Bela Dawn 26"
+          },
+          {
+            "id": "c6c0391e-a725-5182-a8a2-93bde48ee05b",
+            "name": "Ari Grove 49"
+          },
+          {
+            "id": "d99dc3d0-8d8c-56ce-a400-aacc1f041b9a",
+            "name": "Bela Elm 34"
+          },
+          {
+            "id": "d9e956d0-e4c6-5cae-bcc2-dd56db93ecf6",
+            "name": "Ari Dawn 25"
+          },
+          {
+            "id": "db41ca4f-5df3-53e8-917b-c85c94594066",
+            "name": "Bela Bell 10"
+          },
+          {
+            "id": "fafec293-68af-5a3b-aa61-1cfac4370c90",
+            "name": "Ari Bell 9"
+          }
+        ],
+        "size": 12,
+        "source": {
+          "kind": "named"
+        }
+      },
+      "others": [
+        {
+          "answering": null,
+          "choice": null,
+          "decider": {
+            "kind": "routine"
+          },
+          "id": "090acbc7-e654-569f-bac8-773175b51a27",
+          "name": "Juno Fox 48"
+        },
+        {
+          "answering": null,
+          "choice": null,
+          "decider": {
+            "kind": "routine"
+          },
+          "id": "0da4379c-a9b3-5005-9818-562e794083fd",
+          "name": "Cleo Cove 19"
+        },
+        {
+          "answering": null,
+          "choice": null,
+          "decider": {
+            "kind": "routine"
+          },
+          "id": "166e7533-bc19-5167-992c-87c273c2b74d",
+          "name": "Emi Dawn 29"
+        },
+        {
+          "answering": null,
+          "choice": null,
+          "decider": {
+            "kind": "routine"
+          },
+          "id": "22145ac9-7261-5175-a3f7-e9ea82c9df58",
+          "name": "Bela Fox 42"
+        },
+        {
+          "answering": null,
+          "choice": null,
+          "decider": {
+            "kind": "routine"
+          },
+          "id": "27b8acfb-5119-54f0-9a38-a095c9b2da5c",
+          "name": "Bela Grove 50"
+        },
+        {
+          "answering": null,
+          "choice": null,
+          "decider": {
+            "kind": "routine"
+          },
+          "id": "36bbe142-30e1-55c2-8a34-e553f1fe4dc4",
+          "name": "Ivo Fox 47"
+        },
+        {
+          "answering": null,
+          "choice": null,
+          "decider": {
+            "kind": "routine"
+          },
+          "id": "3999ed3e-b13b-58ff-9b59-adbbb5089c00",
+          "name": "Cleo Grove 51"
+        },
+        {
+          "answering": null,
+          "choice": null,
+          "decider": {
+            "kind": "routine"
+          },
+          "id": "3b4d6a8e-7546-5574-8c33-250a609ca6ed",
+          "name": "Dara Fox 44"
+        },
+        {
+          "answering": null,
+          "choice": null,
+          "decider": {
+            "kind": "routine"
+          },
+          "id": "3f45ca3e-8bae-505d-8205-955b5918d455",
+          "name": "Ivo Cove 23"
+        },
+        {
+          "answering": null,
+          "choice": null,
+          "decider": {
+            "kind": "routine"
+          },
+          "id": "4cf872cb-9b90-5a95-a2d3-fc3db4aa447e",
+          "name": "Cleo Elm 35"
+        },
+        {
+          "answering": null,
+          "choice": null,
+          "decider": {
+            "kind": "routine"
+          },
+          "id": "505acd5a-548d-59e7-a7d1-c58508b81f18",
+          "name": "Dara Ash 4"
+        },
+        {
+          "answering": null,
+          "choice": null,
+          "decider": {
+            "kind": "routine"
+          },
+          "id": "58dd1514-7005-5ce5-8981-ca70e576c5b4",
+          "name": "Dara Dawn 28"
+        },
+        {
+          "answering": null,
+          "choice": null,
+          "decider": {
+            "kind": "routine"
+          },
+          "id": "5988450d-ff6a-50db-87c3-08913c4bc057",
+          "name": "Ivo Elm 39"
+        },
+        {
+          "answering": null,
+          "choice": null,
+          "decider": {
+            "kind": "routine"
+          },
+          "id": "5be24ed8-bf92-51a2-bed1-6739bf2d5734",
+          "name": "Emi Elm 37"
+        },
+        {
+          "answering": null,
+          "choice": null,
+          "decider": {
+            "kind": "routine"
+          },
+          "id": "5fa5d668-380b-51a4-8888-98ab366082c2",
+          "name": "Faye Cove 22"
+        },
+        {
+          "answering": null,
+          "choice": null,
+          "decider": {
+            "kind": "routine"
+          },
+          "id": "6247e6d4-f4dd-50ac-a1c7-381179af9424",
+          "name": "Dara Grove 52"
+        },
+        {
+          "answering": null,
+          "choice": null,
+          "decider": {
+            "kind": "routine"
+          },
+          "id": "79b8d107-c15a-5161-afa7-d4748d6afed6",
+          "name": "Cleo Bell 11"
+        },
+        {
+          "answering": null,
+          "choice": null,
+          "decider": {
+            "kind": "routine"
+          },
+          "id": "7e80f35f-6d3d-52f7-9c3d-db1dc88cbda6",
+          "name": "Emi Bell 13"
+        },
+        {
+          "answering": null,
+          "choice": null,
+          "decider": {
+            "kind": "routine"
+          },
+          "id": "8390ea55-ada4-5190-bfa8-dba72ef8af82",
+          "name": "Faye Ash 6"
+        },
+        {
+          "answering": null,
+          "choice": null,
+          "decider": {
+            "kind": "routine"
+          },
+          "id": "86fa7ddb-1983-56e8-b07e-de6d67dbad3d",
+          "name": "Cleo Fox 43"
+        },
+        {
+          "answering": null,
+          "choice": null,
+          "decider": {
+            "kind": "routine"
+          },
+          "id": "8c94df10-7fe8-5aa2-aad3-8603fd762a83",
+          "name": "Cleo Ash 3"
+        },
+        {
+          "answering": null,
+          "choice": null,
+          "decider": {
+            "kind": "routine"
+          },
+          "id": "8fe8c131-dad0-5176-9642-11d924715035",
+          "name": "Dara Bell 12"
+        },
+        {
+          "answering": null,
+          "choice": null,
+          "decider": {
+            "kind": "routine"
+          },
+          "id": "95b7be69-65d0-5c04-8e35-1f69edd79d2a",
+          "name": "Juno Dawn 32"
+        },
+        {
+          "answering": null,
+          "choice": null,
+          "decider": {
+            "kind": "routine"
+          },
+          "id": "9f3a916b-d9e5-550e-b244-16fd9ad8ade7",
+          "name": "Ivo Ash 7"
+        },
+        {
+          "answering": null,
+          "choice": null,
+          "decider": {
+            "kind": "routine"
+          },
+          "id": "a3f8a7f0-32e6-5374-832d-789bf1d8c3a0",
+          "name": "Juno Cove 24"
+        },
+        {
+          "answering": null,
+          "choice": null,
+          "decider": {
+            "kind": "routine"
+          },
+          "id": "b23899ee-e658-5dee-812f-b9b4482d6f23",
+          "name": "Emi Cove 21"
+        },
+        {
+          "answering": null,
+          "choice": null,
+          "decider": {
+            "kind": "routine"
+          },
+          "id": "b3d4401b-3cde-5e83-ba20-da1f4576f3ee",
+          "name": "Emi Ash 5"
+        },
+        {
+          "answering": null,
+          "choice": null,
+          "decider": {
+            "kind": "routine"
+          },
+          "id": "ba785335-a5a5-5b2d-bb58-f879c9679804",
+          "name": "Emi Fox 45"
+        },
+        {
+          "answering": null,
+          "choice": null,
+          "decider": {
+            "kind": "routine"
+          },
+          "id": "c2569a63-619e-54e3-8b92-60012da30dfb",
+          "name": "Dara Elm 36"
+        },
+        {
+          "answering": null,
+          "choice": null,
+          "decider": {
+            "kind": "routine"
+          },
+          "id": "c7d98f72-74a7-50f7-99b8-936099f66478",
+          "name": "Juno Bell 16"
+        },
+        {
+          "answering": null,
+          "choice": null,
+          "decider": {
+            "kind": "routine"
+          },
+          "id": "cb34e57a-5d7c-5f5a-bd55-4a31cf6b69b5",
+          "name": "Faye Elm 38"
+        },
+        {
+          "answering": null,
+          "choice": null,
+          "decider": {
+            "kind": "routine"
+          },
+          "id": "d2fe5d5e-5b57-561f-bcd2-f897a10a8ac6",
+          "name": "Faye Fox 46"
+        },
+        {
+          "answering": null,
+          "choice": null,
+          "decider": {
+            "kind": "routine"
+          },
+          "id": "d5ae93b2-f050-579e-ad6c-ea23e94dc1d1",
+          "name": "Dara Cove 20"
+        },
+        {
+          "answering": null,
+          "choice": null,
+          "decider": {
+            "kind": "routine"
+          },
+          "id": "d602998c-c613-5dfa-8404-52f0a949c3f3",
+          "name": "Ivo Dawn 31"
+        },
+        {
+          "answering": null,
+          "choice": null,
+          "decider": {
+            "kind": "routine"
+          },
+          "id": "dad1c8f7-7e14-5734-a49c-dec99b651458",
+          "name": "Cleo Dawn 27"
+        },
+        {
+          "answering": null,
+          "choice": null,
+          "decider": {
+            "kind": "routine"
+          },
+          "id": "dee8c8d3-8f7a-58a4-9391-cfa67657f93a",
+          "name": "Juno Elm 40"
+        },
+        {
+          "answering": null,
+          "choice": null,
+          "decider": {
+            "kind": "routine"
+          },
+          "id": "ecba958c-5f61-50a4-9817-59897b06b365",
+          "name": "Faye Bell 14"
+        },
+        {
+          "answering": null,
+          "choice": null,
+          "decider": {
+            "kind": "routine"
+          },
+          "id": "f6fc4217-0599-5c9a-987c-e7694d5f45c9",
+          "name": "Juno Ash 8"
+        },
+        {
+          "answering": null,
+          "choice": null,
+          "decider": {
+            "kind": "routine"
+          },
+          "id": "f9252fa8-8214-5e95-86f8-95621ed375b0",
+          "name": "Faye Dawn 30"
+        },
+        {
+          "answering": null,
+          "choice": null,
+          "decider": {
+            "kind": "routine"
+          },
+          "id": "fabad070-67f7-5766-ae47-788750d44c7c",
+          "name": "Ivo Bell 15"
+        }
+      ],
+      "others_asked": false,
+      "phase": "held_out",
+      "population": 52,
+      "preregistration": {
+        "record": "docs/evaluation/2026-09-30-town-comparison-preregistration.json",
+        "record_sha256": "3a247342da261270fb61f4b9f00eb90ec385daa6d6010bf701e021046c2d2f57"
+      },
+      "primary": [
+        "model_a",
+        "model_b"
+      ],
+      "profile": "exulanica.society-comparison-result/v2",
+      "score_version": 3,
+      "seeds": [
+        {
+          "excluded": null,
+          "name": "held_out_1",
+          "runs": {
+            "model_a": {
+              "calls": {
+                "asked": 234,
+                "cost_known": false,
+                "cost_usd": "0.01641642",
+                "first_answers_refused": 0,
+                "latency_ms": {
+                  "p50": 2259,
+                  "p95": 4113
+                }
+              },
+              "failure": null,
+              "others_calls": null,
+              "parts": {
+                "need_relief": "0.9378",
+                "variety": "0.9048"
+              },
+              "reliability": {
+                "answered": 219,
+                "left_to_routine": 15,
+                "not_answered": 1,
+                "not_applied": 14,
+                "per_routine_choice": {
+                  "answered": "1.4797",
+                  "left_to_routine": "0.1014",
+                  "refused": "0.0000"
+                },
+                "reasons": {
+                  "model_timed_out": 1,
+                  "partner_busy": 8,
+                  "place_taken_this_minute": 6
+                },
+                "reasons_by_class": {
+                  "not_answered": {
+                    "model_timed_out": 1
+                  },
+                  "not_applied": {
+                    "partner_busy": 8,
+                    "place_taken_this_minute": 6
+                  },
+                  "refused": {}
+                },
+                "refused": 0,
+                "routine_choice_points": 148,
+                "shares": {
+                  "answered": "0.9359",
+                  "left_to_routine": "0.0641",
+                  "refused": "0.0000"
+                },
+                "turns": 234
+              },
+              "run_id": "49cc3ec6-9baf-58db-a6f3-ddf2aff8f753",
+              "score": "0.9213",
+              "status": "completed",
+              "terms": {
+                "choice_points": 234,
+                "classes": {
+                  "answered": 219,
+                  "not_answered": 1,
+                  "not_applied": 14,
+                  "refused": 0
+                },
+                "minutes_by_activity": {
+                  "rest": 93,
+                  "stand": 21,
+                  "talk": 203,
+                  "visit": 158
+                },
+                "others_urgency": 4259,
+                "people": 12,
+                "person_minutes": {
+                  "doing": 475,
+                  "waiting": 85,
+                  "walking": 160
+                },
+                "reasons": {
+                  "not_answered": {
+                    "model_timed_out": 1
+                  },
+                  "not_applied": {
+                    "partner_busy": 8,
+                    "place_taken_this_minute": 6
+                  },
+                  "refused": {}
+                },
+                "threshold": 750,
+                "ticks": 60,
+                "turns": 234,
+                "urgency": 5636,
+                "variety": 38
+              }
+            },
+            "model_a_again": {
+              "calls": {
+                "asked": 252,
+                "cost_known": true,
+                "cost_usd": "0.01713696",
+                "first_answers_refused": 0,
+                "latency_ms": {
+                  "p50": 2188,
+                  "p95": 4356
+                }
+              },
+              "failure": null,
+              "others_calls": null,
+              "parts": {
+                "need_relief": "0.7893",
+                "variety": "0.9762"
+              },
+              "reliability": {
+                "answered": 244,
+                "left_to_routine": 8,
+                "not_answered": 0,
+                "not_applied": 8,
+                "per_routine_choice": {
+                  "answered": "1.6486",
+                  "left_to_routine": "0.0541",
+                  "refused": "0.0000"
+                },
+                "reasons": {
+                  "partner_busy": 5,
+                  "place_taken_this_minute": 3
+                },
+                "reasons_by_class": {
+                  "not_answered": {},
+                  "not_applied": {
+                    "partner_busy": 5,
+                    "place_taken_this_minute": 3
+                  },
+                  "refused": {}
+                },
+                "refused": 0,
+                "routine_choice_points": 148,
+                "shares": {
+                  "answered": "0.9683",
+                  "left_to_routine": "0.0317",
+                  "refused": "0.0000"
+                },
+                "turns": 252
+              },
+              "run_id": "6a944037-bb76-5582-9df5-5b3c154483b1",
+              "score": "0.8827",
+              "status": "completed",
+              "terms": {
+                "choice_points": 252,
+                "classes": {
+                  "answered": 244,
+                  "not_answered": 0,
+                  "not_applied": 8,
+                  "refused": 0
+                },
+                "minutes_by_activity": {
+                  "rest": 132,
+                  "stand": 13,
+                  "talk": 189,
+                  "visit": 129
+                },
+                "others_urgency": 4013,
+                "people": 12,
+                "person_minutes": {
+                  "doing": 463,
+                  "waiting": 112,
+                  "walking": 145
+                },
+                "reasons": {
+                  "not_answered": {},
+                  "not_applied": {
+                    "partner_busy": 5,
+                    "place_taken_this_minute": 3
+                  },
+                  "refused": {}
+                },
+                "threshold": 750,
+                "ticks": 60,
+                "turns": 252,
+                "urgency": 10125,
+                "variety": 41
+              }
+            },
+            "model_b": {
+              "calls": {
+                "asked": 237,
+                "cost_known": true,
+                "cost_usd": "0.02770422",
+                "first_answers_refused": 0,
+                "latency_ms": {
+                  "p50": 2548,
+                  "p95": 5036
+                }
+              },
+              "failure": null,
+              "others_calls": null,
+              "parts": {
+                "need_relief": "1.0015",
+                "variety": "0.8333"
+              },
+              "reliability": {
+                "answered": 218,
+                "left_to_routine": 19,
+                "not_answered": 0,
+                "not_applied": 19,
+                "per_routine_choice": {
+                  "answered": "1.4730",
+                  "left_to_routine": "0.1284",
+                  "refused": "0.0000"
+                },
+                "reasons": {
+                  "partner_busy": 6,
+                  "place_taken_this_minute": 13
+                },
+                "reasons_by_class": {
+                  "not_answered": {},
+                  "not_applied": {
+                    "partner_busy": 6,
+                    "place_taken_this_minute": 13
+                  },
+                  "refused": {}
+                },
+                "refused": 0,
+                "routine_choice_points": 148,
+                "shares": {
+                  "answered": "0.9198",
+                  "left_to_routine": "0.0802",
+                  "refused": "0.0000"
+                },
+                "turns": 237
+              },
+              "run_id": "b329a190-e174-5521-b5e2-8e4d24c6f3e4",
+              "score": "0.9174",
+              "status": "completed",
+              "terms": {
+                "choice_points": 237,
+                "classes": {
+                  "answered": 218,
+                  "not_answered": 0,
+                  "not_applied": 19,
+                  "refused": 0
+                },
+                "minutes_by_activity": {
+                  "rest": 103,
+                  "stand": 20,
+                  "talk": 46,
+                  "visit": 271
+                },
+                "others_urgency": 3513,
+                "people": 12,
+                "person_minutes": {
+                  "doing": 440,
+                  "waiting": 62,
+                  "walking": 218
+                },
+                "reasons": {
+                  "not_answered": {},
+                  "not_applied": {
+                    "partner_busy": 6,
+                    "place_taken_this_minute": 13
+                  },
+                  "refused": {}
+                },
+                "threshold": 750,
+                "ticks": 60,
+                "turns": 237,
+                "urgency": 3712,
+                "variety": 35
+              }
+            },
+            "routine": {
+              "calls": null,
+              "failure": null,
+              "others_calls": null,
+              "parts": {
+                "need_relief": "1.0000",
+                "variety": "1.0000"
+              },
+              "reliability": {
+                "answered": 0,
+                "left_to_routine": 0,
+                "not_answered": 0,
+                "not_applied": 0,
+                "per_routine_choice": null,
+                "reasons": {},
+                "reasons_by_class": {
+                  "not_answered": {},
+                  "not_applied": {},
+                  "refused": {}
+                },
+                "refused": 0,
+                "routine_choice_points": null,
+                "shares": null,
+                "turns": 0
+              },
+              "run_id": "f7a9ae48-efaa-59c9-89fa-b8fc411b4c23",
+              "score": "1.0000",
+              "status": "completed",
+              "terms": {
+                "choice_points": 148,
+                "classes": {
+                  "answered": 0,
+                  "not_answered": 0,
+                  "not_applied": 0,
+                  "refused": 0
+                },
+                "minutes_by_activity": {
+                  "rest": 181,
+                  "stand": 52,
+                  "talk": 70,
+                  "visit": 164
+                },
+                "others_urgency": 3477,
+                "people": 12,
+                "person_minutes": {
+                  "doing": 467,
+                  "waiting": 0,
+                  "walking": 253
+                },
+                "reasons": {
+                  "not_answered": {},
+                  "not_applied": {},
+                  "refused": {}
+                },
+                "threshold": 750,
+                "ticks": 60,
+                "turns": 0,
+                "urgency": 3756,
+                "variety": 42
+              }
+            },
+            "wait": {
+              "calls": null,
+              "failure": null,
+              "others_calls": null,
+              "parts": {
+                "need_relief": "0.0000",
+                "variety": "0.0000"
+              },
+              "reliability": {
+                "answered": 0,
+                "left_to_routine": 0,
+                "not_answered": 0,
+                "not_applied": 0,
+                "per_routine_choice": null,
+                "reasons": {},
+                "reasons_by_class": {
+                  "not_answered": {},
+                  "not_applied": {},
+                  "refused": {}
+                },
+                "refused": 0,
+                "routine_choice_points": null,
+                "shares": null,
+                "turns": 0
+              },
+              "run_id": "49658df3-bb3d-55c6-b950-4500d3474e66",
+              "score": "0.0000",
+              "status": "completed",
+              "terms": {
+                "choice_points": 720,
+                "classes": {
+                  "answered": 0,
+                  "not_answered": 0,
+                  "not_applied": 0,
+                  "refused": 0
+                },
+                "minutes_by_activity": {},
+                "others_urgency": 4231,
+                "people": 12,
+                "person_minutes": {
+                  "doing": 0,
+                  "waiting": 720,
+                  "walking": 0
+                },
+                "reasons": {
+                  "not_answered": {},
+                  "not_applied": {},
+                  "refused": {}
+                },
+                "threshold": 750,
+                "ticks": 60,
+                "turns": 0,
+                "urgency": 33981,
+                "variety": 0
+              }
+            }
+          },
+          "seed_digest": "736c049d64ff97b959263607076f08535035c78aa697bfff0ffe145ea5f987ec"
+        },
+        {
+          "excluded": null,
+          "name": "held_out_2",
+          "runs": {
+            "model_a": {
+              "calls": {
+                "asked": 245,
+                "cost_known": true,
+                "cost_usd": "0.01678518",
+                "first_answers_refused": 0,
+                "latency_ms": {
+                  "p50": 2310,
+                  "p95": 4359
+                }
+              },
+              "failure": null,
+              "others_calls": null,
+              "parts": {
+                "need_relief": "0.9430",
+                "variety": "0.9756"
+              },
+              "reliability": {
+                "answered": 234,
+                "left_to_routine": 11,
+                "not_answered": 0,
+                "not_applied": 11,
+                "per_routine_choice": {
+                  "answered": "1.4182",
+                  "left_to_routine": "0.0667",
+                  "refused": "0.0000"
+                },
+                "reasons": {
+                  "partner_busy": 8,
+                  "place_taken_this_minute": 3
+                },
+                "reasons_by_class": {
+                  "not_answered": {},
+                  "not_applied": {
+                    "partner_busy": 8,
+                    "place_taken_this_minute": 3
+                  },
+                  "refused": {}
+                },
+                "refused": 0,
+                "routine_choice_points": 165,
+                "shares": {
+                  "answered": "0.9551",
+                  "left_to_routine": "0.0449",
+                  "refused": "0.0000"
+                },
+                "turns": 245
+              },
+              "run_id": "df3c694b-44bf-58e0-af3d-f8bcf761ddc8",
+              "score": "0.9593",
+              "status": "completed",
+              "terms": {
+                "choice_points": 245,
+                "classes": {
+                  "answered": 234,
+                  "not_answered": 0,
+                  "not_applied": 11,
+                  "refused": 0
+                },
+                "minutes_by_activity": {
+                  "rest": 123,
+                  "stand": 15,
+                  "talk": 170,
+                  "visit": 162
+                },
+                "others_urgency": 21992,
+                "people": 12,
+                "person_minutes": {
+                  "doing": 470,
+                  "waiting": 96,
+                  "walking": 154
+                },
+                "reasons": {
+                  "not_answered": {},
+                  "not_applied": {
+                    "partner_busy": 8,
+                    "place_taken_this_minute": 3
+                  },
+                  "refused": {}
+                },
+                "threshold": 750,
+                "ticks": 60,
+                "turns": 245,
+                "urgency": 6095,
+                "variety": 40
+              }
+            },
+            "model_a_again": {
+              "calls": {
+                "asked": 237,
+                "cost_known": true,
+                "cost_usd": "0.01624104",
+                "first_answers_refused": 0,
+                "latency_ms": {
+                  "p50": 2286,
+                  "p95": 4070
+                }
+              },
+              "failure": null,
+              "others_calls": null,
+              "parts": {
+                "need_relief": "0.9897",
+                "variety": "1.0244"
+              },
+              "reliability": {
+                "answered": 220,
+                "left_to_routine": 17,
+                "not_answered": 0,
+                "not_applied": 17,
+                "per_routine_choice": {
+                  "answered": "1.3333",
+                  "left_to_routine": "0.1030",
+                  "refused": "0.0000"
+                },
+                "reasons": {
+                  "partner_busy": 11,
+                  "place_taken_this_minute": 6
+                },
+                "reasons_by_class": {
+                  "not_answered": {},
+                  "not_applied": {
+                    "partner_busy": 11,
+                    "place_taken_this_minute": 6
+                  },
+                  "refused": {}
+                },
+                "refused": 0,
+                "routine_choice_points": 165,
+                "shares": {
+                  "answered": "0.9283",
+                  "left_to_routine": "0.0717",
+                  "refused": "0.0000"
+                },
+                "turns": 237
+              },
+              "run_id": "f7edb51f-7dc0-536b-8715-f6f936768136",
+              "score": "1.0071",
+              "status": "completed",
+              "terms": {
+                "choice_points": 237,
+                "classes": {
+                  "answered": 220,
+                  "not_answered": 0,
+                  "not_applied": 17,
+                  "refused": 0
+                },
+                "minutes_by_activity": {
+                  "rest": 123,
+                  "stand": 30,
+                  "talk": 148,
+                  "visit": 163
+                },
+                "others_urgency": 22745,
+                "people": 12,
+                "person_minutes": {
+                  "doing": 464,
+                  "waiting": 85,
+                  "walking": 171
+                },
+                "reasons": {
+                  "not_answered": {},
+                  "not_applied": {
+                    "partner_busy": 11,
+                    "place_taken_this_minute": 6
+                  },
+                  "refused": {}
+                },
+                "threshold": 750,
+                "ticks": 60,
+                "turns": 237,
+                "urgency": 4544,
+                "variety": 42
+              }
+            },
+            "model_b": {
+              "calls": {
+                "asked": 259,
+                "cost_known": true,
+                "cost_usd": "0.03172614",
+                "first_answers_refused": 0,
+                "latency_ms": {
+                  "p50": 2924,
+                  "p95": 5515
+                }
+              },
+              "failure": null,
+              "others_calls": null,
+              "parts": {
+                "need_relief": "1.0271",
+                "variety": "0.9268"
+              },
+              "reliability": {
+                "answered": 245,
+                "left_to_routine": 14,
+                "not_answered": 0,
+                "not_applied": 14,
+                "per_routine_choice": {
+                  "answered": "1.4848",
+                  "left_to_routine": "0.0848",
+                  "refused": "0.0000"
+                },
+                "reasons": {
+                  "partner_busy": 3,
+                  "place_taken_this_minute": 11
+                },
+                "reasons_by_class": {
+                  "not_answered": {},
+                  "not_applied": {
+                    "partner_busy": 3,
+                    "place_taken_this_minute": 11
+                  },
+                  "refused": {}
+                },
+                "refused": 0,
+                "routine_choice_points": 165,
+                "shares": {
+                  "answered": "0.9459",
+                  "left_to_routine": "0.0541",
+                  "refused": "0.0000"
+                },
+                "turns": 259
+              },
+              "run_id": "6d3a1cd1-032b-5f2b-8956-21169fd58b40",
+              "score": "0.9770",
+              "status": "completed",
+              "terms": {
+                "choice_points": 259,
+                "classes": {
+                  "answered": 245,
+                  "not_answered": 0,
+                  "not_applied": 14,
+                  "refused": 0
+                },
+                "minutes_by_activity": {
+                  "rest": 90,
+                  "stand": 26,
+                  "talk": 58,
+                  "visit": 252
+                },
+                "others_urgency": 26540,
+                "people": 12,
+                "person_minutes": {
+                  "doing": 426,
+                  "waiting": 87,
+                  "walking": 207
+                },
+                "reasons": {
+                  "not_answered": {},
+                  "not_applied": {
+                    "partner_busy": 3,
+                    "place_taken_this_minute": 11
+                  },
+                  "refused": {}
+                },
+                "threshold": 750,
+                "ticks": 60,
+                "turns": 259,
+                "urgency": 3304,
+                "variety": 38
+              }
+            },
+            "routine": {
+              "calls": null,
+              "failure": null,
+              "others_calls": null,
+              "parts": {
+                "need_relief": "1.0000",
+                "variety": "1.0000"
+              },
+              "reliability": {
+                "answered": 0,
+                "left_to_routine": 0,
+                "not_answered": 0,
+                "not_applied": 0,
+                "per_routine_choice": null,
+                "reasons": {},
+                "reasons_by_class": {
+                  "not_answered": {},
+                  "not_applied": {},
+                  "refused": {}
+                },
+                "refused": 0,
+                "routine_choice_points": null,
+                "shares": null,
+                "turns": 0
+              },
+              "run_id": "5c019615-4381-5cdb-850c-e1a6ea0e7dab",
+              "score": "1.0000",
+              "status": "completed",
+              "terms": {
+                "choice_points": 165,
+                "classes": {
+                  "answered": 0,
+                  "not_answered": 0,
+                  "not_applied": 0,
+                  "refused": 0
+                },
+                "minutes_by_activity": {
+                  "rest": 135,
+                  "stand": 61,
+                  "talk": 103,
+                  "visit": 173
+                },
+                "others_urgency": 25151,
+                "people": 12,
+                "person_minutes": {
+                  "doing": 472,
+                  "waiting": 0,
+                  "walking": 248
+                },
+                "reasons": {
+                  "not_answered": {},
+                  "not_applied": {},
+                  "refused": {}
+                },
+                "threshold": 750,
+                "ticks": 60,
+                "turns": 0,
+                "urgency": 4203,
+                "variety": 41
+              }
+            },
+            "wait": {
+              "calls": null,
+              "failure": null,
+              "others_calls": null,
+              "parts": {
+                "need_relief": "0.0000",
+                "variety": "0.0000"
+              },
+              "reliability": {
+                "answered": 0,
+                "left_to_routine": 0,
+                "not_answered": 0,
+                "not_applied": 0,
+                "per_routine_choice": null,
+                "reasons": {},
+                "reasons_by_class": {
+                  "not_answered": {},
+                  "not_applied": {},
+                  "refused": {}
+                },
+                "refused": 0,
+                "routine_choice_points": null,
+                "shares": null,
+                "turns": 0
+              },
+              "run_id": "4e11a63c-5e35-5464-b1c0-f62b17278f00",
+              "score": "0.0000",
+              "status": "completed",
+              "terms": {
+                "choice_points": 720,
+                "classes": {
+                  "answered": 0,
+                  "not_answered": 0,
+                  "not_applied": 0,
+                  "refused": 0
+                },
+                "minutes_by_activity": {},
+                "others_urgency": 20478,
+                "people": 12,
+                "person_minutes": {
+                  "doing": 0,
+                  "waiting": 720,
+                  "walking": 0
+                },
+                "reasons": {
+                  "not_answered": {},
+                  "not_applied": {},
+                  "refused": {}
+                },
+                "threshold": 750,
+                "ticks": 60,
+                "turns": 0,
+                "urgency": 37380,
+                "variety": 0
+              }
+            }
+          },
+          "seed_digest": "50dd5034c5d7eb65d0f4acc3f53828ffa3e8c740ef2702dc76b2b154c63ed14a"
+        },
+        {
+          "excluded": null,
+          "name": "held_out_3",
+          "runs": {
+            "model_a": {
+              "calls": {
+                "asked": 245,
+                "cost_known": true,
+                "cost_usd": "0.01667688",
+                "first_answers_refused": 0,
+                "latency_ms": {
+                  "p50": 2191,
+                  "p95": 3981
+                }
+              },
+              "failure": null,
+              "others_calls": null,
+              "parts": {
+                "need_relief": "0.9144",
+                "variety": "0.9524"
+              },
+              "reliability": {
+                "answered": 232,
+                "left_to_routine": 13,
+                "not_answered": 1,
+                "not_applied": 12,
+                "per_routine_choice": {
+                  "answered": "1.4777",
+                  "left_to_routine": "0.0828",
+                  "refused": "0.0000"
+                },
+                "reasons": {
+                  "model_call_failed": 1,
+                  "partner_busy": 7,
+                  "place_taken_this_minute": 5
+                },
+                "reasons_by_class": {
+                  "not_answered": {
+                    "model_call_failed": 1
+                  },
+                  "not_applied": {
+                    "partner_busy": 7,
+                    "place_taken_this_minute": 5
+                  },
+                  "refused": {}
+                },
+                "refused": 0,
+                "routine_choice_points": 157,
+                "shares": {
+                  "answered": "0.9469",
+                  "left_to_routine": "0.0531",
+                  "refused": "0.0000"
+                },
+                "turns": 245
+              },
+              "run_id": "6776eea1-06d9-540f-9312-47f8de711ae2",
+              "score": "0.9334",
+              "status": "completed",
+              "terms": {
+                "choice_points": 245,
+                "classes": {
+                  "answered": 232,
+                  "not_answered": 1,
+                  "not_applied": 12,
+                  "refused": 0
+                },
+                "minutes_by_activity": {
+                  "rest": 100,
+                  "stand": 16,
+                  "talk": 166,
+                  "visit": 179
+                },
+                "others_urgency": 17034,
+                "people": 12,
+                "person_minutes": {
+                  "doing": 461,
+                  "waiting": 90,
+                  "walking": 169
+                },
+                "reasons": {
+                  "not_answered": {
+                    "model_call_failed": 1
+                  },
+                  "not_applied": {
+                    "partner_busy": 7,
+                    "place_taken_this_minute": 5
+                  },
+                  "refused": {}
+                },
+                "threshold": 750,
+                "ticks": 60,
+                "turns": 245,
+                "urgency": 8021,
+                "variety": 40
+              }
+            },
+            "model_a_again": {
+              "calls": {
+                "asked": 241,
+                "cost_known": false,
+                "cost_usd": "0.01715766",
+                "first_answers_refused": 0,
+                "latency_ms": {
+                  "p50": 2214,
+                  "p95": 4724
+                }
+              },
+              "failure": null,
+              "others_calls": null,
+              "parts": {
+                "need_relief": "0.8691",
+                "variety": "0.9524"
+              },
+              "reliability": {
+                "answered": 223,
+                "left_to_routine": 18,
+                "not_answered": 1,
+                "not_applied": 17,
+                "per_routine_choice": {
+                  "answered": "1.4204",
+                  "left_to_routine": "0.1146",
+                  "refused": "0.0000"
+                },
+                "reasons": {
+                  "model_timed_out": 1,
+                  "partner_busy": 7,
+                  "place_taken_this_minute": 10
+                },
+                "reasons_by_class": {
+                  "not_answered": {
+                    "model_timed_out": 1
+                  },
+                  "not_applied": {
+                    "partner_busy": 7,
+                    "place_taken_this_minute": 10
+                  },
+                  "refused": {}
+                },
+                "refused": 0,
+                "routine_choice_points": 157,
+                "shares": {
+                  "answered": "0.9253",
+                  "left_to_routine": "0.0747",
+                  "refused": "0.0000"
+                },
+                "turns": 241
+              },
+              "run_id": "dd1d4c66-b8ee-54d2-9012-f8f260b7b6fc",
+              "score": "0.9107",
+              "status": "completed",
+              "terms": {
+                "choice_points": 241,
+                "classes": {
+                  "answered": 223,
+                  "not_answered": 1,
+                  "not_applied": 17,
+                  "refused": 0
+                },
+                "minutes_by_activity": {
+                  "rest": 107,
+                  "stand": 27,
+                  "talk": 168,
+                  "visit": 163
+                },
+                "others_urgency": 17449,
+                "people": 12,
+                "person_minutes": {
+                  "doing": 465,
+                  "waiting": 90,
+                  "walking": 165
+                },
+                "reasons": {
+                  "not_answered": {
+                    "model_timed_out": 1
+                  },
+                  "not_applied": {
+                    "partner_busy": 7,
+                    "place_taken_this_minute": 10
+                  },
+                  "refused": {}
+                },
+                "threshold": 750,
+                "ticks": 60,
+                "turns": 241,
+                "urgency": 9682,
+                "variety": 40
+              }
+            },
+            "model_b": {
+              "calls": null,
+              "failure": "process_budget_spent",
+              "others_calls": null,
+              "parts": null,
+              "reliability": null,
+              "run_id": "0dd0f699-841a-5a0c-8d77-7d18e38bfcbe",
+              "score": null,
+              "status": "failed",
+              "terms": null
+            },
+            "routine": {
+              "calls": null,
+              "failure": null,
+              "others_calls": null,
+              "parts": {
+                "need_relief": "1.0000",
+                "variety": "1.0000"
+              },
+              "reliability": {
+                "answered": 0,
+                "left_to_routine": 0,
+                "not_answered": 0,
+                "not_applied": 0,
+                "per_routine_choice": null,
+                "reasons": {},
+                "reasons_by_class": {
+                  "not_answered": {},
+                  "not_applied": {},
+                  "refused": {}
+                },
+                "refused": 0,
+                "routine_choice_points": null,
+                "shares": null,
+                "turns": 0
+              },
+              "run_id": "4ee285bc-fa9e-59c0-bea8-e7f15e165733",
+              "score": "1.0000",
+              "status": "completed",
+              "terms": {
+                "choice_points": 157,
+                "classes": {
+                  "answered": 0,
+                  "not_answered": 0,
+                  "not_applied": 0,
+                  "refused": 0
+                },
+                "minutes_by_activity": {
+                  "rest": 160,
+                  "stand": 63,
+                  "talk": 73,
+                  "visit": 170
+                },
+                "others_urgency": 19976,
+                "people": 12,
+                "person_minutes": {
+                  "doing": 466,
+                  "waiting": 0,
+                  "walking": 254
+                },
+                "reasons": {
+                  "not_answered": {},
+                  "not_applied": {},
+                  "refused": {}
+                },
+                "threshold": 750,
+                "ticks": 60,
+                "turns": 0,
+                "urgency": 4879,
+                "variety": 42
+              }
+            },
+            "wait": {
+              "calls": null,
+              "failure": null,
+              "others_calls": null,
+              "parts": {
+                "need_relief": "0.0000",
+                "variety": "0.0000"
+              },
+              "reliability": {
+                "answered": 0,
+                "left_to_routine": 0,
+                "not_answered": 0,
+                "not_applied": 0,
+                "per_routine_choice": null,
+                "reasons": {},
+                "reasons_by_class": {
+                  "not_answered": {},
+                  "not_applied": {},
+                  "refused": {}
+                },
+                "refused": 0,
+                "routine_choice_points": null,
+                "shares": null,
+                "turns": 0
+              },
+              "run_id": "2ec674cb-8951-5669-be7f-09a87d46f7a8",
+              "score": "0.0000",
+              "status": "completed",
+              "terms": {
+                "choice_points": 720,
+                "classes": {
+                  "answered": 0,
+                  "not_answered": 0,
+                  "not_applied": 0,
+                  "refused": 0
+                },
+                "minutes_by_activity": {},
+                "others_urgency": 16045,
+                "people": 12,
+                "person_minutes": {
+                  "doing": 0,
+                  "waiting": 720,
+                  "walking": 0
+                },
+                "reasons": {
+                  "not_answered": {},
+                  "not_applied": {},
+                  "refused": {}
+                },
+                "threshold": 750,
+                "ticks": 60,
+                "turns": 0,
+                "urgency": 41572,
+                "variety": 0
+              }
+            }
+          },
+          "seed_digest": "52837c599733011cfa6ddabb8a96514ad0810b29c8ed92f5edc3a51d2e51f664"
+        },
+        {
+          "excluded": null,
+          "name": "held_out_4",
+          "runs": {
+            "model_a": {
+              "calls": null,
+              "failure": "process_budget_spent",
+              "others_calls": null,
+              "parts": null,
+              "reliability": null,
+              "run_id": "961e455d-53a5-52ab-b7a8-da79328c2f60",
+              "score": null,
+              "status": "failed",
+              "terms": null
+            },
+            "model_a_again": {
+              "calls": null,
+              "failure": "process_budget_spent",
+              "others_calls": null,
+              "parts": null,
+              "reliability": null,
+              "run_id": "ee2223d3-6f5d-5ede-864e-681545de44a0",
+              "score": null,
+              "status": "failed",
+              "terms": null
+            },
+            "model_b": {
+              "calls": null,
+              "failure": "process_budget_spent",
+              "others_calls": null,
+              "parts": null,
+              "reliability": null,
+              "run_id": "d11b2155-9dda-5fe3-87ab-0b5ff1f5028f",
+              "score": null,
+              "status": "failed",
+              "terms": null
+            },
+            "routine": {
+              "calls": null,
+              "failure": null,
+              "others_calls": null,
+              "parts": {
+                "need_relief": "1.0000",
+                "variety": "1.0000"
+              },
+              "reliability": {
+                "answered": 0,
+                "left_to_routine": 0,
+                "not_answered": 0,
+                "not_applied": 0,
+                "per_routine_choice": null,
+                "reasons": {},
+                "reasons_by_class": {
+                  "not_answered": {},
+                  "not_applied": {},
+                  "refused": {}
+                },
+                "refused": 0,
+                "routine_choice_points": null,
+                "shares": null,
+                "turns": 0
+              },
+              "run_id": "8253c6d7-a6b8-5fb6-bd25-d75fa9d29ea4",
+              "score": "1.0000",
+              "status": "completed",
+              "terms": {
+                "choice_points": 147,
+                "classes": {
+                  "answered": 0,
+                  "not_answered": 0,
+                  "not_applied": 0,
+                  "refused": 0
+                },
+                "minutes_by_activity": {
+                  "rest": 187,
+                  "stand": 53,
+                  "talk": 106,
+                  "visit": 131
+                },
+                "others_urgency": 12544,
+                "people": 12,
+                "person_minutes": {
+                  "doing": 477,
+                  "waiting": 0,
+                  "walking": 243
+                },
+                "reasons": {
+                  "not_answered": {},
+                  "not_applied": {},
+                  "refused": {}
+                },
+                "threshold": 750,
+                "ticks": 60,
+                "turns": 0,
+                "urgency": 5807,
+                "variety": 45
+              }
+            },
+            "wait": {
+              "calls": null,
+              "failure": null,
+              "others_calls": null,
+              "parts": {
+                "need_relief": "0.0000",
+                "variety": "0.0000"
+              },
+              "reliability": {
+                "answered": 0,
+                "left_to_routine": 0,
+                "not_answered": 0,
+                "not_applied": 0,
+                "per_routine_choice": null,
+                "reasons": {},
+                "reasons_by_class": {
+                  "not_answered": {},
+                  "not_applied": {},
+                  "refused": {}
+                },
+                "refused": 0,
+                "routine_choice_points": null,
+                "shares": null,
+                "turns": 0
+              },
+              "run_id": "f2d3149b-3cf4-5071-9c66-c6977ddddc14",
+              "score": "0.0000",
+              "status": "completed",
+              "terms": {
+                "choice_points": 720,
+                "classes": {
+                  "answered": 0,
+                  "not_answered": 0,
+                  "not_applied": 0,
+                  "refused": 0
+                },
+                "minutes_by_activity": {},
+                "others_urgency": 10409,
+                "people": 12,
+                "person_minutes": {
+                  "doing": 0,
+                  "waiting": 720,
+                  "walking": 0
+                },
+                "reasons": {
+                  "not_answered": {},
+                  "not_applied": {},
+                  "refused": {}
+                },
+                "threshold": 750,
+                "ticks": 60,
+                "turns": 0,
+                "urgency": 31468,
+                "variety": 0
+              }
+            }
+          },
+          "seed_digest": "3e5b1a71ed1b68e4acd63a4bc53342324c94ef13edcc7e95b0d7635e4a2f4ee2"
+        },
+        {
+          "excluded": null,
+          "name": "held_out_5",
+          "runs": {
+            "model_a": {
+              "calls": null,
+              "failure": "process_budget_spent",
+              "others_calls": null,
+              "parts": null,
+              "reliability": null,
+              "run_id": "268d1689-25be-5ad7-a757-37ed6e597188",
+              "score": null,
+              "status": "failed",
+              "terms": null
+            },
+            "model_a_again": {
+              "calls": null,
+              "failure": "process_budget_spent",
+              "others_calls": null,
+              "parts": null,
+              "reliability": null,
+              "run_id": "4b9dee3b-2856-5230-a8a0-eb6decbbf3b7",
+              "score": null,
+              "status": "failed",
+              "terms": null
+            },
+            "model_b": {
+              "calls": null,
+              "failure": "process_budget_spent",
+              "others_calls": null,
+              "parts": null,
+              "reliability": null,
+              "run_id": "5c71c0e3-9c80-5503-ab3c-46e7f83cf33a",
+              "score": null,
+              "status": "failed",
+              "terms": null
+            },
+            "routine": {
+              "calls": null,
+              "failure": null,
+              "others_calls": null,
+              "parts": {
+                "need_relief": "1.0000",
+                "variety": "1.0000"
+              },
+              "reliability": {
+                "answered": 0,
+                "left_to_routine": 0,
+                "not_answered": 0,
+                "not_applied": 0,
+                "per_routine_choice": null,
+                "reasons": {},
+                "reasons_by_class": {
+                  "not_answered": {},
+                  "not_applied": {},
+                  "refused": {}
+                },
+                "refused": 0,
+                "routine_choice_points": null,
+                "shares": null,
+                "turns": 0
+              },
+              "run_id": "da9fde42-4080-5603-b5f4-1e3f104b22ff",
+              "score": "1.0000",
+              "status": "completed",
+              "terms": {
+                "choice_points": 159,
+                "classes": {
+                  "answered": 0,
+                  "not_answered": 0,
+                  "not_applied": 0,
+                  "refused": 0
+                },
+                "minutes_by_activity": {
+                  "rest": 183,
+                  "stand": 41,
+                  "talk": 71,
+                  "visit": 167
+                },
+                "others_urgency": 10652,
+                "people": 12,
+                "person_minutes": {
+                  "doing": 462,
+                  "waiting": 0,
+                  "walking": 258
+                },
+                "reasons": {
+                  "not_answered": {},
+                  "not_applied": {},
+                  "refused": {}
+                },
+                "threshold": 750,
+                "ticks": 60,
+                "turns": 0,
+                "urgency": 2031,
+                "variety": 44
+              }
+            },
+            "wait": {
+              "calls": null,
+              "failure": null,
+              "others_calls": null,
+              "parts": {
+                "need_relief": "0.0000",
+                "variety": "0.0000"
+              },
+              "reliability": {
+                "answered": 0,
+                "left_to_routine": 0,
+                "not_answered": 0,
+                "not_applied": 0,
+                "per_routine_choice": null,
+                "reasons": {},
+                "reasons_by_class": {
+                  "not_answered": {},
+                  "not_applied": {},
+                  "refused": {}
+                },
+                "refused": 0,
+                "routine_choice_points": null,
+                "shares": null,
+                "turns": 0
+              },
+              "run_id": "28eb0c8b-0647-5f85-9d62-35dd2afc3c5c",
+              "score": "0.0000",
+              "status": "completed",
+              "terms": {
+                "choice_points": 720,
+                "classes": {
+                  "answered": 0,
+                  "not_answered": 0,
+                  "not_applied": 0,
+                  "refused": 0
+                },
+                "minutes_by_activity": {},
+                "others_urgency": 7733,
+                "people": 12,
+                "person_minutes": {
+                  "doing": 0,
+                  "waiting": 720,
+                  "walking": 0
+                },
+                "reasons": {
+                  "not_answered": {},
+                  "not_applied": {},
+                  "refused": {}
+                },
+                "threshold": 750,
+                "ticks": 60,
+                "turns": 0,
+                "urgency": 24631,
+                "variety": 0
+              }
+            }
+          },
+          "seed_digest": "b74d4dd06e6ab93f01ffe80378624ded4918e2c664109e1222f790201df3d79f"
+        },
+        {
+          "excluded": null,
+          "name": "held_out_6",
+          "runs": {
+            "model_a": {
+              "calls": null,
+              "failure": "process_budget_spent",
+              "others_calls": null,
+              "parts": null,
+              "reliability": null,
+              "run_id": "b1af1c6c-101a-5af9-8bfc-2a63f872c844",
+              "score": null,
+              "status": "failed",
+              "terms": null
+            },
+            "model_a_again": {
+              "calls": null,
+              "failure": "process_budget_spent",
+              "others_calls": null,
+              "parts": null,
+              "reliability": null,
+              "run_id": "aa1f8608-9415-51e2-9c1d-33058cf98fcc",
+              "score": null,
+              "status": "failed",
+              "terms": null
+            },
+            "model_b": {
+              "calls": null,
+              "failure": "process_budget_spent",
+              "others_calls": null,
+              "parts": null,
+              "reliability": null,
+              "run_id": "21525324-a334-53c2-80ff-0fab656f03d4",
+              "score": null,
+              "status": "failed",
+              "terms": null
+            },
+            "routine": {
+              "calls": null,
+              "failure": null,
+              "others_calls": null,
+              "parts": {
+                "need_relief": "1.0000",
+                "variety": "1.0000"
+              },
+              "reliability": {
+                "answered": 0,
+                "left_to_routine": 0,
+                "not_answered": 0,
+                "not_applied": 0,
+                "per_routine_choice": null,
+                "reasons": {},
+                "reasons_by_class": {
+                  "not_answered": {},
+                  "not_applied": {},
+                  "refused": {}
+                },
+                "refused": 0,
+                "routine_choice_points": null,
+                "shares": null,
+                "turns": 0
+              },
+              "run_id": "c61f65be-8f20-5ff9-815b-60b7d08018fd",
+              "score": "1.0000",
+              "status": "completed",
+              "terms": {
+                "choice_points": 161,
+                "classes": {
+                  "answered": 0,
+                  "not_answered": 0,
+                  "not_applied": 0,
+                  "refused": 0
+                },
+                "minutes_by_activity": {
+                  "rest": 131,
+                  "stand": 60,
+                  "talk": 137,
+                  "visit": 148
+                },
+                "others_urgency": 11564,
+                "people": 12,
+                "person_minutes": {
+                  "doing": 476,
+                  "waiting": 0,
+                  "walking": 244
+                },
+                "reasons": {
+                  "not_answered": {},
+                  "not_applied": {},
+                  "refused": {}
+                },
+                "threshold": 750,
+                "ticks": 60,
+                "turns": 0,
+                "urgency": 1260,
+                "variety": 45
+              }
+            },
+            "wait": {
+              "calls": null,
+              "failure": null,
+              "others_calls": null,
+              "parts": {
+                "need_relief": "0.0000",
+                "variety": "0.0000"
+              },
+              "reliability": {
+                "answered": 0,
+                "left_to_routine": 0,
+                "not_answered": 0,
+                "not_applied": 0,
+                "per_routine_choice": null,
+                "reasons": {},
+                "reasons_by_class": {
+                  "not_answered": {},
+                  "not_applied": {},
+                  "refused": {}
+                },
+                "refused": 0,
+                "routine_choice_points": null,
+                "shares": null,
+                "turns": 0
+              },
+              "run_id": "cb27c0cb-84e8-525a-bfaa-88b17fba5fe1",
+              "score": "0.0000",
+              "status": "completed",
+              "terms": {
+                "choice_points": 720,
+                "classes": {
+                  "answered": 0,
+                  "not_answered": 0,
+                  "not_applied": 0,
+                  "refused": 0
+                },
+                "minutes_by_activity": {},
+                "others_urgency": 9470,
+                "people": 12,
+                "person_minutes": {
+                  "doing": 0,
+                  "waiting": 720,
+                  "walking": 0
+                },
+                "reasons": {
+                  "not_answered": {},
+                  "not_applied": {},
+                  "refused": {}
+                },
+                "threshold": 750,
+                "ticks": 60,
+                "turns": 0,
+                "urgency": 11602,
+                "variety": 0
+              }
+            }
+          },
+          "seed_digest": "077925d0da8b3412c00f24cb92f52a9ad4d7d9696eb785738ec827d3bd0f3acd"
+        },
+        {
+          "excluded": null,
+          "name": "held_out_7",
+          "runs": {
+            "model_a": {
+              "calls": null,
+              "failure": "process_budget_spent",
+              "others_calls": null,
+              "parts": null,
+              "reliability": null,
+              "run_id": "0583ff97-62a4-5817-bfd2-85719874cc36",
+              "score": null,
+              "status": "failed",
+              "terms": null
+            },
+            "model_a_again": {
+              "calls": null,
+              "failure": "process_budget_spent",
+              "others_calls": null,
+              "parts": null,
+              "reliability": null,
+              "run_id": "4333ea29-ff56-51da-9b55-5a41b3302dad",
+              "score": null,
+              "status": "failed",
+              "terms": null
+            },
+            "model_b": {
+              "calls": null,
+              "failure": "process_budget_spent",
+              "others_calls": null,
+              "parts": null,
+              "reliability": null,
+              "run_id": "a8744924-4f6a-5c4d-9028-bbb84e380aef",
+              "score": null,
+              "status": "failed",
+              "terms": null
+            },
+            "routine": {
+              "calls": null,
+              "failure": null,
+              "others_calls": null,
+              "parts": {
+                "need_relief": "1.0000",
+                "variety": "1.0000"
+              },
+              "reliability": {
+                "answered": 0,
+                "left_to_routine": 0,
+                "not_answered": 0,
+                "not_applied": 0,
+                "per_routine_choice": null,
+                "reasons": {},
+                "reasons_by_class": {
+                  "not_answered": {},
+                  "not_applied": {},
+                  "refused": {}
+                },
+                "refused": 0,
+                "routine_choice_points": null,
+                "shares": null,
+                "turns": 0
+              },
+              "run_id": "926b6c45-e0ba-55e2-ba33-a2328e28b7ab",
+              "score": "1.0000",
+              "status": "completed",
+              "terms": {
+                "choice_points": 154,
+                "classes": {
+                  "answered": 0,
+                  "not_answered": 0,
+                  "not_applied": 0,
+                  "refused": 0
+                },
+                "minutes_by_activity": {
+                  "rest": 173,
+                  "stand": 57,
+                  "talk": 94,
+                  "visit": 152
+                },
+                "others_urgency": 6742,
+                "people": 12,
+                "person_minutes": {
+                  "doing": 476,
+                  "waiting": 0,
+                  "walking": 244
+                },
+                "reasons": {
+                  "not_answered": {},
+                  "not_applied": {},
+                  "refused": {}
+                },
+                "threshold": 750,
+                "ticks": 60,
+                "turns": 0,
+                "urgency": 4528,
+                "variety": 45
+              }
+            },
+            "wait": {
+              "calls": null,
+              "failure": null,
+              "others_calls": null,
+              "parts": {
+                "need_relief": "0.0000",
+                "variety": "0.0000"
+              },
+              "reliability": {
+                "answered": 0,
+                "left_to_routine": 0,
+                "not_answered": 0,
+                "not_applied": 0,
+                "per_routine_choice": null,
+                "reasons": {},
+                "reasons_by_class": {
+                  "not_answered": {},
+                  "not_applied": {},
+                  "refused": {}
+                },
+                "refused": 0,
+                "routine_choice_points": null,
+                "shares": null,
+                "turns": 0
+              },
+              "run_id": "da5ae531-b3ea-5375-9cb0-1fd7196494ed",
+              "score": "0.0000",
+              "status": "completed",
+              "terms": {
+                "choice_points": 720,
+                "classes": {
+                  "answered": 0,
+                  "not_answered": 0,
+                  "not_applied": 0,
+                  "refused": 0
+                },
+                "minutes_by_activity": {},
+                "others_urgency": 6444,
+                "people": 12,
+                "person_minutes": {
+                  "doing": 0,
+                  "waiting": 720,
+                  "walking": 0
+                },
+                "reasons": {
+                  "not_answered": {},
+                  "not_applied": {},
+                  "refused": {}
+                },
+                "threshold": 750,
+                "ticks": 60,
+                "turns": 0,
+                "urgency": 38810,
+                "variety": 0
+              }
+            }
+          },
+          "seed_digest": "9cd5bad1b2332ee128c34ecb730b512ea8fe3242793d5d66df3bd29fcb6791a2"
+        },
+        {
+          "excluded": null,
+          "name": "held_out_8",
+          "runs": {
+            "model_a": {
+              "calls": null,
+              "failure": "process_budget_spent",
+              "others_calls": null,
+              "parts": null,
+              "reliability": null,
+              "run_id": "de14538b-1e0b-5d75-8a19-d543ca74f8d0",
+              "score": null,
+              "status": "failed",
+              "terms": null
+            },
+            "model_a_again": {
+              "calls": null,
+              "failure": "process_budget_spent",
+              "others_calls": null,
+              "parts": null,
+              "reliability": null,
+              "run_id": "b2648aad-02bc-5f86-9f81-e5cc18e30cea",
+              "score": null,
+              "status": "failed",
+              "terms": null
+            },
+            "model_b": {
+              "calls": null,
+              "failure": "process_budget_spent",
+              "others_calls": null,
+              "parts": null,
+              "reliability": null,
+              "run_id": "2d0db8a5-6040-5dc3-8fd0-5ef9f00dc152",
+              "score": null,
+              "status": "failed",
+              "terms": null
+            },
+            "routine": {
+              "calls": null,
+              "failure": null,
+              "others_calls": null,
+              "parts": {
+                "need_relief": "1.0000",
+                "variety": "1.0000"
+              },
+              "reliability": {
+                "answered": 0,
+                "left_to_routine": 0,
+                "not_answered": 0,
+                "not_applied": 0,
+                "per_routine_choice": null,
+                "reasons": {},
+                "reasons_by_class": {
+                  "not_answered": {},
+                  "not_applied": {},
+                  "refused": {}
+                },
+                "refused": 0,
+                "routine_choice_points": null,
+                "shares": null,
+                "turns": 0
+              },
+              "run_id": "0eed4211-d47d-5a8c-bf87-be0269e818dc",
+              "score": "1.0000",
+              "status": "completed",
+              "terms": {
+                "choice_points": 163,
+                "classes": {
+                  "answered": 0,
+                  "not_answered": 0,
+                  "not_applied": 0,
+                  "refused": 0
+                },
+                "minutes_by_activity": {
+                  "rest": 173,
+                  "stand": 96,
+                  "talk": 40,
+                  "visit": 156
+                },
+                "others_urgency": 13836,
+                "people": 12,
+                "person_minutes": {
+                  "doing": 465,
+                  "waiting": 0,
+                  "walking": 255
+                },
+                "reasons": {
+                  "not_answered": {},
+                  "not_applied": {},
+                  "refused": {}
+                },
+                "threshold": 750,
+                "ticks": 60,
+                "turns": 0,
+                "urgency": 5131,
+                "variety": 40
+              }
+            },
+            "wait": {
+              "calls": null,
+              "failure": null,
+              "others_calls": null,
+              "parts": {
+                "need_relief": "0.0000",
+                "variety": "0.0000"
+              },
+              "reliability": {
+                "answered": 0,
+                "left_to_routine": 0,
+                "not_answered": 0,
+                "not_applied": 0,
+                "per_routine_choice": null,
+                "reasons": {},
+                "reasons_by_class": {
+                  "not_answered": {},
+                  "not_applied": {},
+                  "refused": {}
+                },
+                "refused": 0,
+                "routine_choice_points": null,
+                "shares": null,
+                "turns": 0
+              },
+              "run_id": "5286378e-580d-56b4-b39c-a6e2c3853bf9",
+              "score": "0.0000",
+              "status": "completed",
+              "terms": {
+                "choice_points": 720,
+                "classes": {
+                  "answered": 0,
+                  "not_answered": 0,
+                  "not_applied": 0,
+                  "refused": 0
+                },
+                "minutes_by_activity": {},
+                "others_urgency": 13946,
+                "people": 12,
+                "person_minutes": {
+                  "doing": 0,
+                  "waiting": 720,
+                  "walking": 0
+                },
+                "reasons": {
+                  "not_answered": {},
+                  "not_applied": {},
+                  "refused": {}
+                },
+                "threshold": 750,
+                "ticks": 60,
+                "turns": 0,
+                "urgency": 38955,
+                "variety": 0
+              }
+            }
+          },
+          "seed_digest": "e3eefa4322419e7b003c8b3035ca9ebd99ea8b9770d1a3f72b2b8ea1ca2a941f"
+        }
+      ],
+      "start": null,
+      "summaries": {
+        "model_a": {
+          "cost_known": false,
+          "cost_usd_per_hour": "0.0166",
+          "held_out": {
+            "activities_per_person": "3.2778",
+            "first_answers_refused": "0.0000",
+            "minutes_by_activity": {
+              "rest": "0.1463",
+              "stand": "0.0241",
+              "talk": "0.2495",
+              "visit": "0.2310"
+            },
+            "waiting_share": "0.1255",
+            "walking_share": "0.2236"
+          },
+          "interval": {
+            "high": "0.9593",
+            "low": "0.9213"
+          },
+          "latency_ms": {
+            "p50": 2248,
+            "p95": 4113
+          },
+          "mean_score": "0.9380",
+          "others_cost_known": true,
+          "others_cost_usd_per_hour": null,
+          "reliability": {
+            "answered": 685,
+            "left_to_routine": 39,
+            "not_answered": 2,
+            "not_applied": 37,
+            "per_routine_choice": {
+              "answered": "1.4574",
+              "left_to_routine": "0.0830",
+              "refused": "0.0000"
+            },
+            "reasons": {
+              "model_call_failed": 1,
+              "model_timed_out": 1,
+              "partner_busy": 23,
+              "place_taken_this_minute": 14
+            },
+            "reasons_by_class": {
+              "not_answered": {
+                "model_call_failed": 1,
+                "model_timed_out": 1
+              },
+              "not_applied": {
+                "partner_busy": 23,
+                "place_taken_this_minute": 14
+              },
+              "refused": {}
+            },
+            "refused": 0,
+            "routine_choice_points": 470,
+            "shares": {
+              "answered": "0.9461",
+              "left_to_routine": "0.0539",
+              "refused": "0.0000"
+            },
+            "turns": 724
+          }
+        },
+        "model_a_again": {
+          "cost_known": false,
+          "cost_usd_per_hour": "0.0168",
+          "held_out": {
+            "activities_per_person": "3.4167",
+            "first_answers_refused": "0.0000",
+            "minutes_by_activity": {
+              "rest": "0.1676",
+              "stand": "0.0324",
+              "talk": "0.2338",
+              "visit": "0.2106"
+            },
+            "waiting_share": "0.1329",
+            "walking_share": "0.2227"
+          },
+          "interval": {
+            "high": "1.0071",
+            "low": "0.8827"
+          },
+          "latency_ms": {
+            "p50": 2226,
+            "p95": 4478
+          },
+          "mean_score": "0.9335",
+          "others_cost_known": true,
+          "others_cost_usd_per_hour": null,
+          "reliability": {
+            "answered": 687,
+            "left_to_routine": 43,
+            "not_answered": 1,
+            "not_applied": 42,
+            "per_routine_choice": {
+              "answered": "1.4617",
+              "left_to_routine": "0.0915",
+              "refused": "0.0000"
+            },
+            "reasons": {
+              "model_timed_out": 1,
+              "partner_busy": 23,
+              "place_taken_this_minute": 19
+            },
+            "reasons_by_class": {
+              "not_answered": {
+                "model_timed_out": 1
+              },
+              "not_applied": {
+                "partner_busy": 23,
+                "place_taken_this_minute": 19
+              },
+              "refused": {}
+            },
+            "refused": 0,
+            "routine_choice_points": 470,
+            "shares": {
+              "answered": "0.9411",
+              "left_to_routine": "0.0589",
+              "refused": "0.0000"
+            },
+            "turns": 730
+          }
+        },
+        "model_b": {
+          "cost_known": true,
+          "cost_usd_per_hour": "0.0297",
+          "held_out": {
+            "activities_per_person": "3.0417",
+            "first_answers_refused": "0.0000",
+            "minutes_by_activity": {
+              "rest": "0.1340",
+              "stand": "0.0319",
+              "talk": "0.0722",
+              "visit": "0.3632"
+            },
+            "waiting_share": "0.1035",
+            "walking_share": "0.2951"
+          },
+          "interval": {
+            "high": "0.9770",
+            "low": "0.9174"
+          },
+          "latency_ms": {
+            "p50": 2682,
+            "p95": 5273
+          },
+          "mean_score": "0.9472",
+          "others_cost_known": true,
+          "others_cost_usd_per_hour": null,
+          "reliability": {
+            "answered": 463,
+            "left_to_routine": 33,
+            "not_answered": 0,
+            "not_applied": 33,
+            "per_routine_choice": {
+              "answered": "1.4792",
+              "left_to_routine": "0.1054",
+              "refused": "0.0000"
+            },
+            "reasons": {
+              "partner_busy": 9,
+              "place_taken_this_minute": 24
+            },
+            "reasons_by_class": {
+              "not_answered": {},
+              "not_applied": {
+                "partner_busy": 9,
+                "place_taken_this_minute": 24
+              },
+              "refused": {}
+            },
+            "refused": 0,
+            "routine_choice_points": 313,
+            "shares": {
+              "answered": "0.9335",
+              "left_to_routine": "0.0665",
+              "refused": "0.0000"
+            },
+            "turns": 496
+          }
+        },
+        "routine": {
+          "cost_known": true,
+          "cost_usd_per_hour": null,
+          "held_out": {
+            "activities_per_person": "3.5833",
+            "first_answers_refused": null,
+            "minutes_by_activity": {
+              "rest": "0.2297",
+              "stand": "0.0839",
+              "talk": "0.1205",
+              "visit": "0.2189"
+            },
+            "waiting_share": "0.0000",
+            "walking_share": "0.3470"
+          },
+          "interval": {
+            "high": "1.0000",
+            "low": "1.0000"
+          },
+          "latency_ms": {
+            "p50": null,
+            "p95": null
+          },
+          "mean_score": "1.0000",
+          "others_cost_known": true,
+          "others_cost_usd_per_hour": null,
+          "reliability": {
+            "answered": 0,
+            "left_to_routine": 0,
+            "not_answered": 0,
+            "not_applied": 0,
+            "per_routine_choice": null,
+            "reasons": {},
+            "reasons_by_class": {
+              "not_answered": {},
+              "not_applied": {},
+              "refused": {}
+            },
+            "refused": 0,
+            "routine_choice_points": null,
+            "shares": null,
+            "turns": 0
+          }
+        },
+        "wait": {
+          "cost_known": true,
+          "cost_usd_per_hour": null,
+          "held_out": {
+            "activities_per_person": "0.0000",
+            "first_answers_refused": null,
+            "minutes_by_activity": {},
+            "waiting_share": "1.0000",
+            "walking_share": "0.0000"
+          },
+          "interval": {
+            "high": "0.0000",
+            "low": "0.0000"
+          },
+          "latency_ms": {
+            "p50": null,
+            "p95": null
+          },
+          "mean_score": "0.0000",
+          "others_cost_known": true,
+          "others_cost_usd_per_hour": null,
+          "reliability": {
+            "answered": 0,
+            "left_to_routine": 0,
+            "not_answered": 0,
+            "not_applied": 0,
+            "per_routine_choice": null,
+            "reasons": {},
+            "reasons_by_class": {
+              "not_answered": {},
+              "not_applied": {},
+              "refused": {}
+            },
+            "refused": 0,
+            "routine_choice_points": null,
+            "shares": null,
+            "turns": 0
+          }
+        }
+      },
+      "verdict": {
+        "answered_shares_differ": true,
+        "code": "incomplete",
+        "higher": null,
+        "reason": null
+      },
+      "window_ticks": 60
+    },
+    "run_script_as_run": "docs/evaluation/artifacts/2026-09-30-town-comparison/measure_town_comparison-as-run.py.txt",
+    "run_script_sha256": "10a1dcf9e0cf0c8bc53ce5036f8a8c50f4ad3f9ce2f1997f8d51f3674be80c66",
+    "spend": [
+      {
+        "asks": 1454,
+        "cost_unknown": 0,
+        "cost_usd": "0.10041414",
+        "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+        "provider": "nebius_token_factory"
+      },
+      {
+        "asks": 545,
+        "cost_unknown": 0,
+        "cost_usd": "0.06550392",
+        "model_id": "nvidia/Nemotron-3_5-Lightning",
+        "provider": "nebius_token_factory"
+      }
+    ],
+    "tree": {
+      "files_sha256": {
+        "assets/catalogs/society/society-comparison-seeds.v4.json": "9109916fdb7047b388428a12efa9a13788f2108bdae7a849af79bc2c7a8bd793",
+        "assets/catalogs/society/society-comparison-seeds.v5.json": "be36181dc2183c42dec917b26fc6eaddb9b5b09aade198ea13e0c538e179e024",
+        "assets/catalogs/society/society-person-score.v3.json": "406544dcd643d14f5d34301362e4e9db0009618852c418525bfc4d4754ebc9a7",
+        "docs/society-experiments.md": "2ab380f9d4bf7efc48e5824e1c7e4decdc7f3393623843befeabc8f2ea08ce75",
+        "exulanica/api/routes/society_comparisons.py": "b93217fa92eb144095d88203f7c7c5e04a7d003ffeaa0694e44223754313b318",
+        "exulanica/api/society_comparison_runner.py": "b207300f1cf76e88dbd9ee2c569f336d733f2059464148a63eabf40bf429b412",
+        "exulanica/api/society_comparison_worker.py": "88fb4fb77eb580c9fb538fb4603cb06b7c61dccb5ab0adc27a7db512e4dd9ba1",
+        "exulanica/db/roles.py": "620737d84766cbd5065d2f97bf205df2d837a180e4ac81a016a2dde8ab6b6d4e",
+        "exulanica/migrations/0121_a_comparison_run_s_verified_drawing_is_stored.sql": "25cfa3721ab51977bab90ef76f230bee6e3a059fda9fd56f98f5e43b09d0a0a9",
+        "exulanica/orchestration/compare.py": "b1c0c30e66d02aace49fa1b40265cedd58489238235f51756fc5d3316850f2ab",
+        "exulanica/world/society_catalogs.py": "2daa232495c46af7dec8a6e65a4265e717cd0c8c950cfdb3495d21f9cdcf0f33",
+        "exulanica/world/society_comparison_drawing.py": "f7f2e4b5d868197e6d273044e0a49f58c102d857048d5a452c6a328cc767be2b",
+        "exulanica/world/society_comparison_reading.py": "e2bcea373358ebb8ffbd9bf04b633805c4bafa23991877775ec95509ca885027",
+        "exulanica/world/society_comparison_repository.py": "a664eba0028a8e07818ff840084f5e951a344b188da030bb4bf3c02821eb0d95",
+        "exulanica/world/society_comparison_result.py": "22f2330d1551e1f51bb9d9bce6b98b7d70de06699deff38f58d73d7a9a25ef76",
+        "exulanica/world/society_comparison_verdict.py": "a8ed6e639ad6ad2f3a5e30788a6a0c951396ea102cc9936ab61b05fc1bf44b47",
+        "exulanica/world/society_score_v3.py": "9fd6402972feeec0d5f3174be3ae94fcaddf1b249660578d0255b91727c3cea8",
+        "pyproject.toml": "af8f1fe8e75400706371e8d625bce809a0bf33c4c6337683446494e0ea475687",
+        "tests/comparison_support.py": "0aed8d26b13aef3e464542f0d1b170cdd9ec6ffc5d0edd0020be03ec977cb935",
+        "tests/migration_reservations/0120.txt": "86a41be38051c31ee5c02001c4ac22d98279f7b190f5420500e0759b57c0d0fe",
+        "tests/snapshots/society-comparison-documents.json": "66322b0e5d350f80d15c688a2df3014ba072c21da8bb0a2347506de260cc49bb",
+        "tests/snapshots/society-comparison-start-documents.json": "5e45bcafe274899a01bfe688bf1e7aa9e6559b0894b1a83ac70a839820002ef2",
+        "tests/snapshots/society-group-comparison-documents.json": "aab7c8a4aa08fbd738622e5f8fcd473f1e7b8d44d0c0e0ea1f9601fb1519c546",
+        "tests/test_catalog_provenance.py": "0deef122c3e3edccc07115bdb908ac33dbf813eb7717d35ef610f9175ba83901",
+        "tests/test_comparison_development_seeds.py": "51909ad1f59d2675d67e13220fd0f632b18be6d5d691fc8222131c73f1e7e2a4",
+        "tests/test_comparison_drawing.py": "e056171e618c5ab986050fa8b54d5da7113c39224336e240abc94c8e526f0e19",
+        "tests/test_comparison_run_route_authorizes_last.py": "8720617e59e1895867229ce2cffa75604e31f3fa092fcdb8e1cdaa5580e3a778",
+        "tests/test_comparison_seed_admission_postgres.py": "0ff4debd10cbaf817fe88ddec6008355df2ee07adc0fcbe1e6846a4dd667e658",
+        "tests/test_society_comparison_binding.py": "d2b9a52548d1ac5da7cafd1630a8491b9b306707d2762ec3499cc574b57e18ff",
+        "tests/test_society_comparison_postgres.py": "0c8af3f37058d59b7e0fbdcc79935639b19204a81a7e665ad10736cb9a8bf568",
+        "tests/test_society_comparison_result_v2.py": "763684405e96dc164ab5a09d95febcdff4cd9ebc7d59fbf2ed927b9e366e8883",
+        "tests/test_society_comparison_start_postgres.py": "e9021b1b728d994d30f64c6cb70aac717400c08794ec9844319bb99694339f9f",
+        "tests/test_society_group_comparison_postgres.py": "58f3df3bce21397366b28f67d59d7536e25ad67b6a8c3593e50c9b372e190111",
+        "tests/test_society_score_v2.py": "b4a987c229a6e142d521aefdd9a53bf44b716c12f5816c253945ed74bef7a34d",
+        "tests/test_society_score_v3.py": "0aabfd1c490ad0ae25045bec93517d25d92534f5e5a60e0daa2b45a1d595265d",
+        "web/packages/app/src/society-comparison-api.ts": "67ea65b7e48d8e7efb8f831271baf9211a3297f54d70373c493203eb801b0181",
+        "web/packages/app/src/ui/society-comparison-start.ts": "e6b93521eb7b6999940f12186ce0b3b6ff509b55aa7ebde865112fb56f6a6136",
+        "web/packages/app/src/ui/society-comparison.css": "336017836710c8df6512f0f30ea6692acbf80a86bdd1edce7746bab7c4165a56",
+        "web/packages/app/src/ui/society-comparison.ts": "016a450270e0fdb1ede68036eedd4408f208a4bf9b70562e8188477048aa85a9",
+        "web/packages/app/test/society-comparison-api.test.ts": "cf4c32f338c4a20257c8e497f7932580c72fa651525e7ec85c20f4ed4ade36cb",
+        "web/packages/app/test/society-comparison-start-bounds.test.ts": "24ed4365bac2d896d958acb7ddf3ca2ace912eb3ab9fca47bbf404a3a8c974ec",
+        "web/packages/app/test/society-comparison-start.test.ts": "1f9095563479d0108a8a7d8443e81cfb1cc1520ef6c2353a5fd083008f7abcfb"
+      },
+      "head": "731066f81832076caa341f3c4615845697c758fa"
+    },
+    "verdict": {
+      "answered_shares_differ": true,
+      "code": "incomplete",
+      "higher": null,
+      "reason": null
+    }
+  },
+  "record_sha256": "c7373a72baded815b9549fec150a6669ad30493929fdded29984fcc71065e4ef"
+}

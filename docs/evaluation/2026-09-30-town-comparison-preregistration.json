@@ -1,0 +1,982 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "arms": {
+      "model_a": "Nemotron 3 Nano 30B",
+      "model_a_again": "Nemotron 3 Nano 30B, the control",
+      "model_b": "Nemotron 3.5 Lightning",
+      "routine": "one",
+      "wait": "zero"
+    },
+    "bound": {
+      "bound_usd": "0.65",
+      "held_usd": "0.03136320",
+      "least_every_seed_finishes_usd": "0.55960608",
+      "typical_record": "docs/evaluation/2026-09-29-town-comparison-cost.json",
+      "typical_usd": "0.52824288"
+    },
+    "catalogs": {
+      "society-comparison-protocol": 3,
+      "society-comparison-seeds": 4,
+      "society-person-score": 3
+    },
+    "claim": {
+      "control": [
+        "model_a",
+        "model_a_again"
+      ],
+      "family": [
+        [
+          "model_a",
+          "model_b"
+        ],
+        [
+          "routine",
+          "model_a"
+        ],
+        [
+          "routine",
+          "model_b"
+        ]
+      ],
+      "primary": [
+        "model_a",
+        "model_b"
+      ]
+    },
+    "group": {
+      "people": [
+        {
+          "id": "36ce27ea-1544-5f0e-97ff-b8cf36a8ed8a",
+          "name": "Ari Ash 1"
+        },
+        {
+          "id": "fafec293-68af-5a3b-aa61-1cfac4370c90",
+          "name": "Ari Bell 9"
+        },
+        {
+          "id": "3d7ec463-641c-55bc-9ff5-59bec91590f3",
+          "name": "Ari Cove 17"
+        },
+        {
+          "id": "d9e956d0-e4c6-5cae-bcc2-dd56db93ecf6",
+          "name": "Ari Dawn 25"
+        },
+        {
+          "id": "4061efad-3bf3-5331-bea8-bd606a2651c8",
+          "name": "Ari Elm 33"
+        },
+        {
+          "id": "9e665c2f-0a79-531b-9ca5-a3ebf019fd6f",
+          "name": "Ari Fox 41"
+        },
+        {
+          "id": "c6c0391e-a725-5182-a8a2-93bde48ee05b",
+          "name": "Ari Grove 49"
+        },
+        {
+          "id": "1420a25d-f224-5417-b542-1770aeb5ee0a",
+          "name": "Bela Ash 2"
+        },
+        {
+          "id": "db41ca4f-5df3-53e8-917b-c85c94594066",
+          "name": "Bela Bell 10"
+        },
+        {
+          "id": "5640f58d-b332-58a7-95dc-60c456bdc61e",
+          "name": "Bela Cove 18"
+        },
+        {
+          "id": "c0c30589-b959-55dd-b796-97e489bb2980",
+          "name": "Bela Dawn 26"
+        },
+        {
+          "id": "d99dc3d0-8d8c-56ce-a400-aacc1f041b9a",
+          "name": "Bela Elm 34"
+        }
+      ],
+      "rule": "the first 12 of the town's people in the plan route's order, by name then identity; everybody else follows their routine"
+    },
+    "held_out_seeds": [
+      {
+        "key": "held_out_1",
+        "seed_digest": "736c049d64ff97b959263607076f08535035c78aa697bfff0ffe145ea5f987ec"
+      },
+      {
+        "key": "held_out_2",
+        "seed_digest": "50dd5034c5d7eb65d0f4acc3f53828ffa3e8c740ef2702dc76b2b154c63ed14a"
+      },
+      {
+        "key": "held_out_3",
+        "seed_digest": "52837c599733011cfa6ddabb8a96514ad0810b29c8ed92f5edc3a51d2e51f664"
+      },
+      {
+        "key": "held_out_4",
+        "seed_digest": "3e5b1a71ed1b68e4acd63a4bc53342324c94ef13edcc7e95b0d7635e4a2f4ee2"
+      },
+      {
+        "key": "held_out_5",
+        "seed_digest": "b74d4dd06e6ab93f01ffe80378624ded4918e2c664109e1222f790201df3d79f"
+      },
+      {
+        "key": "held_out_6",
+        "seed_digest": "077925d0da8b3412c00f24cb92f52a9ad4d7d9696eb785738ec827d3bd0f3acd"
+      },
+      {
+        "key": "held_out_7",
+        "seed_digest": "9cd5bad1b2332ee128c34ecb730b512ea8fe3242793d5d66df3bd29fcb6791a2"
+      },
+      {
+        "key": "held_out_8",
+        "seed_digest": "e3eefa4322419e7b003c8b3035ca9ebd99ea8b9770d1a3f72b2b8ea1ca2a941f"
+      }
+    ],
+    "models": [
+      {
+        "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+        "provider": "nebius_token_factory"
+      },
+      {
+        "model_id": "nvidia/Nemotron-3_5-Lightning",
+        "provider": "nebius_token_factory"
+      }
+    ],
+    "positive_control": {
+      "comparisons": [
+        {
+          "comparison_id": "b1c527ae-ac21-47cf-a24a-df73dae10bf2",
+          "control_difference": "0.0357",
+          "phase": "development",
+          "primary_difference": "0.0302",
+          "runs": {
+            "model_a": {
+              "parts": {
+                "need_relief": "0.9083",
+                "variety": "0.9500"
+              },
+              "score": "0.9292",
+              "status": "completed",
+              "terms": {
+                "choice_points": 261,
+                "classes": {
+                  "answered": 247,
+                  "not_answered": 1,
+                  "not_applied": 13,
+                  "refused": 0
+                },
+                "minutes_by_activity": {
+                  "rest": 95,
+                  "stand": 26,
+                  "talk": 179,
+                  "visit": 158
+                },
+                "others_urgency": 15395,
+                "people": 12,
+                "person_minutes": {
+                  "doing": 458,
+                  "waiting": 111,
+                  "walking": 151
+                },
+                "reasons": {
+                  "not_answered": {
+                    "model_timed_out": 1
+                  },
+                  "not_applied": {
+                    "partner_busy": 5,
+                    "place_taken_this_minute": 8
+                  },
+                  "refused": {}
+                },
+                "threshold": 750,
+                "ticks": 60,
+                "turns": 261,
+                "urgency": 7683,
+                "variety": 38
+              }
+            },
+            "model_a_again": {
+              "parts": {
+                "need_relief": "0.8871",
+                "variety": "0.9000"
+              },
+              "score": "0.8935",
+              "status": "completed",
+              "terms": {
+                "choice_points": 244,
+                "classes": {
+                  "answered": 237,
+                  "not_answered": 0,
+                  "not_applied": 7,
+                  "refused": 0
+                },
+                "minutes_by_activity": {
+                  "rest": 65,
+                  "stand": 30,
+                  "talk": 218,
+                  "visit": 159
+                },
+                "others_urgency": 15782,
+                "people": 12,
+                "person_minutes": {
+                  "doing": 472,
+                  "waiting": 86,
+                  "walking": 162
+                },
+                "reasons": {
+                  "not_answered": {},
+                  "not_applied": {
+                    "partner_busy": 3,
+                    "place_taken_this_minute": 4
+                  },
+                  "refused": {}
+                },
+                "threshold": 750,
+                "ticks": 60,
+                "turns": 244,
+                "urgency": 8328,
+                "variety": 36
+              }
+            },
+            "model_b": {
+              "parts": {
+                "need_relief": "0.9688",
+                "variety": "0.9500"
+              },
+              "score": "0.9594",
+              "status": "completed",
+              "terms": {
+                "choice_points": 261,
+                "classes": {
+                  "answered": 245,
+                  "not_answered": 0,
+                  "not_applied": 16,
+                  "refused": 0
+                },
+                "minutes_by_activity": {
+                  "rest": 106,
+                  "stand": 22,
+                  "talk": 78,
+                  "visit": 225
+                },
+                "others_urgency": 14756,
+                "people": 12,
+                "person_minutes": {
+                  "doing": 431,
+                  "waiting": 97,
+                  "walking": 192
+                },
+                "reasons": {
+                  "not_answered": {},
+                  "not_applied": {
+                    "partner_busy": 4,
+                    "place_taken_this_minute": 12
+                  },
+                  "refused": {}
+                },
+                "threshold": 750,
+                "ticks": 60,
+                "turns": 261,
+                "urgency": 5845,
+                "variety": 38
+              }
+            },
+            "routine": {
+              "parts": {
+                "need_relief": "1.0000",
+                "variety": "1.0000"
+              },
+              "score": "1.0000",
+              "status": "completed",
+              "terms": {
+                "choice_points": 148,
+                "classes": {
+                  "answered": 0,
+                  "not_answered": 0,
+                  "not_applied": 0,
+                  "refused": 0
+                },
+                "minutes_by_activity": {
+                  "rest": 191,
+                  "stand": 32,
+                  "talk": 82,
+                  "visit": 165
+                },
+                "others_urgency": 15340,
+                "people": 12,
+                "person_minutes": {
+                  "doing": 470,
+                  "waiting": 0,
+                  "walking": 250
+                },
+                "reasons": {
+                  "not_answered": {},
+                  "not_applied": {},
+                  "refused": {}
+                },
+                "threshold": 750,
+                "ticks": 60,
+                "turns": 0,
+                "urgency": 4899,
+                "variety": 40
+              }
+            },
+            "wait": {
+              "parts": {
+                "need_relief": "0.0000",
+                "variety": "0.0000"
+              },
+              "score": "0.0000",
+              "status": "completed",
+              "terms": {
+                "choice_points": 720,
+                "classes": {
+                  "answered": 0,
+                  "not_answered": 0,
+                  "not_applied": 0,
+                  "refused": 0
+                },
+                "minutes_by_activity": {},
+                "others_urgency": 15187,
+                "people": 12,
+                "person_minutes": {
+                  "doing": 0,
+                  "waiting": 720,
+                  "walking": 0
+                },
+                "reasons": {
+                  "not_answered": {},
+                  "not_applied": {},
+                  "refused": {}
+                },
+                "threshold": 750,
+                "ticks": 60,
+                "turns": 0,
+                "urgency": 35268,
+                "variety": 0
+              }
+            }
+          },
+          "score_version": 3,
+          "seed": "development_1",
+          "spend": [
+            {
+              "asks": 505,
+              "cost_unknown": 0,
+              "cost_usd": "0.03459294",
+              "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+              "provider": "nebius_token_factory"
+            },
+            {
+              "asks": 261,
+              "cost_unknown": 0,
+              "cost_usd": "0.03130086",
+              "model_id": "nvidia/Nemotron-3_5-Lightning",
+              "provider": "nebius_token_factory"
+            }
+          ]
+        },
+        {
+          "comparison_id": "9d68a7b2-37c3-4c32-8754-62307d6c146d",
+          "control_difference": "0.0291",
+          "phase": "development",
+          "primary_difference": "0.0725",
+          "runs": {
+            "model_a": {
+              "parts": {
+                "need_relief": "1.0105",
+                "variety": "0.8837"
+              },
+              "score": "0.9471",
+              "status": "completed",
+              "terms": {
+                "choice_points": 249,
+                "classes": {
+                  "answered": 232,
+                  "not_answered": 0,
+                  "not_applied": 17,
+                  "refused": 0
+                },
+                "minutes_by_activity": {
+                  "rest": 87,
+                  "stand": 22,
+                  "talk": 152,
+                  "visit": 199
+                },
+                "others_urgency": 13836,
+                "people": 12,
+                "person_minutes": {
+                  "doing": 460,
+                  "waiting": 87,
+                  "walking": 173
+                },
+                "reasons": {
+                  "not_answered": {},
+                  "not_applied": {
+                    "partner_busy": 11,
+                    "place_taken_this_minute": 6
+                  },
+                  "refused": {}
+                },
+                "threshold": 750,
+                "ticks": 60,
+                "turns": 249,
+                "urgency": 9069,
+                "variety": 38
+              }
+            },
+            "model_a_again": {
+              "parts": {
+                "need_relief": "0.9755",
+                "variety": "0.8605"
+              },
+              "score": "0.9180",
+              "status": "completed",
+              "terms": {
+                "choice_points": 253,
+                "classes": {
+                  "answered": 248,
+                  "not_answered": 1,
+                  "not_applied": 4,
+                  "refused": 0
+                },
+                "minutes_by_activity": {
+                  "rest": 73,
+                  "stand": 15,
+                  "talk": 157,
+                  "visit": 212
+                },
+                "others_urgency": 14485,
+                "people": 12,
+                "person_minutes": {
+                  "doing": 457,
+                  "waiting": 85,
+                  "walking": 178
+                },
+                "reasons": {
+                  "not_answered": {
+                    "model_timed_out": 1
+                  },
+                  "not_applied": {
+                    "partner_busy": 1,
+                    "place_taken_this_minute": 3
+                  },
+                  "refused": {}
+                },
+                "threshold": 750,
+                "ticks": 60,
+                "turns": 253,
+                "urgency": 10376,
+                "variety": 37
+              }
+            },
+            "model_b": {
+              "parts": {
+                "need_relief": "1.1555",
+                "variety": "0.8837"
+              },
+              "score": "1.0196",
+              "status": "completed",
+              "terms": {
+                "choice_points": 258,
+                "classes": {
+                  "answered": 250,
+                  "not_answered": 0,
+                  "not_applied": 8,
+                  "refused": 0
+                },
+                "minutes_by_activity": {
+                  "rest": 125,
+                  "stand": 25,
+                  "talk": 65,
+                  "visit": 220
+                },
+                "others_urgency": 16622,
+                "people": 12,
+                "person_minutes": {
+                  "doing": 435,
+                  "waiting": 95,
+                  "walking": 190
+                },
+                "reasons": {
+                  "not_answered": {},
+                  "not_applied": {
+                    "partner_busy": 1,
+                    "place_taken_this_minute": 7
+                  },
+                  "refused": {}
+                },
+                "threshold": 750,
+                "ticks": 60,
+                "turns": 258,
+                "urgency": 3654,
+                "variety": 38
+              }
+            },
+            "routine": {
+              "parts": {
+                "need_relief": "1.0000",
+                "variety": "1.0000"
+              },
+              "score": "1.0000",
+              "status": "completed",
+              "terms": {
+                "choice_points": 148,
+                "classes": {
+                  "answered": 0,
+                  "not_answered": 0,
+                  "not_applied": 0,
+                  "refused": 0
+                },
+                "minutes_by_activity": {
+                  "rest": 191,
+                  "stand": 42,
+                  "talk": 113,
+                  "visit": 130
+                },
+                "others_urgency": 16826,
+                "people": 12,
+                "person_minutes": {
+                  "doing": 476,
+                  "waiting": 0,
+                  "walking": 244
+                },
+                "reasons": {
+                  "not_answered": {},
+                  "not_applied": {},
+                  "refused": {}
+                },
+                "threshold": 750,
+                "ticks": 60,
+                "turns": 0,
+                "urgency": 9462,
+                "variety": 43
+              }
+            },
+            "wait": {
+              "parts": {
+                "need_relief": "0.0000",
+                "variety": "0.0000"
+              },
+              "score": "0.0000",
+              "status": "completed",
+              "terms": {
+                "choice_points": 720,
+                "classes": {
+                  "answered": 0,
+                  "not_answered": 0,
+                  "not_applied": 0,
+                  "refused": 0
+                },
+                "minutes_by_activity": {},
+                "others_urgency": 14429,
+                "people": 12,
+                "person_minutes": {
+                  "doing": 0,
+                  "waiting": 720,
+                  "walking": 0
+                },
+                "reasons": {
+                  "not_answered": {},
+                  "not_applied": {},
+                  "refused": {}
+                },
+                "threshold": 750,
+                "ticks": 60,
+                "turns": 0,
+                "urgency": 46806,
+                "variety": 0
+              }
+            }
+          },
+          "score_version": 3,
+          "seed": "development_2",
+          "spend": [
+            {
+              "asks": 502,
+              "cost_unknown": 0,
+              "cost_usd": "0.03508554",
+              "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+              "provider": "nebius_token_factory"
+            },
+            {
+              "asks": 258,
+              "cost_unknown": 0,
+              "cost_usd": "0.03052014",
+              "model_id": "nvidia/Nemotron-3_5-Lightning",
+              "provider": "nebius_token_factory"
+            }
+          ]
+        },
+        {
+          "comparison_id": "ef3b25e8-f4f1-43ec-806c-7aafb2505763",
+          "control_difference": "0.0386",
+          "phase": "development",
+          "primary_difference": "0.0562",
+          "runs": {
+            "model_a": {
+              "parts": {
+                "need_relief": "0.9237",
+                "variety": "1.0513"
+              },
+              "score": "0.9875",
+              "status": "completed",
+              "terms": {
+                "choice_points": 262,
+                "classes": {
+                  "answered": 248,
+                  "not_answered": 1,
+                  "not_applied": 13,
+                  "refused": 0
+                },
+                "minutes_by_activity": {
+                  "rest": 86,
+                  "stand": 22,
+                  "talk": 174,
+                  "visit": 174
+                },
+                "others_urgency": 13458,
+                "people": 12,
+                "person_minutes": {
+                  "doing": 456,
+                  "waiting": 111,
+                  "walking": 153
+                },
+                "reasons": {
+                  "not_answered": {
+                    "model_timed_out": 1
+                  },
+                  "not_applied": {
+                    "partner_busy": 11,
+                    "place_taken_this_minute": 2
+                  },
+                  "refused": {}
+                },
+                "threshold": 750,
+                "ticks": 60,
+                "turns": 262,
+                "urgency": 7315,
+                "variety": 41
+              }
+            },
+            "model_a_again": {
+              "parts": {
+                "need_relief": "0.7953",
+                "variety": "1.1026"
+              },
+              "score": "0.9489",
+              "status": "completed",
+              "terms": {
+                "choice_points": 244,
+                "classes": {
+                  "answered": 230,
+                  "not_answered": 0,
+                  "not_applied": 14,
+                  "refused": 0
+                },
+                "minutes_by_activity": {
+                  "rest": 78,
+                  "stand": 37,
+                  "talk": 204,
+                  "visit": 155
+                },
+                "others_urgency": 16659,
+                "people": 12,
+                "person_minutes": {
+                  "doing": 474,
+                  "waiting": 89,
+                  "walking": 157
+                },
+                "reasons": {
+                  "not_answered": {},
+                  "not_applied": {
+                    "partner_busy": 7,
+                    "place_taken_this_minute": 7
+                  },
+                  "refused": {}
+                },
+                "threshold": 750,
+                "ticks": 60,
+                "turns": 244,
+                "urgency": 11778,
+                "variety": 43
+              }
+            },
+            "model_b": {
+              "parts": {
+                "need_relief": "1.0361",
+                "variety": "1.0513"
+              },
+              "score": "1.0437",
+              "status": "completed",
+              "terms": {
+                "choice_points": 269,
+                "classes": {
+                  "answered": 253,
+                  "not_answered": 0,
+                  "not_applied": 16,
+                  "refused": 0
+                },
+                "minutes_by_activity": {
+                  "rest": 102,
+                  "stand": 31,
+                  "talk": 67,
+                  "visit": 202
+                },
+                "others_urgency": 16363,
+                "people": 12,
+                "person_minutes": {
+                  "doing": 402,
+                  "waiting": 112,
+                  "walking": 206
+                },
+                "reasons": {
+                  "not_answered": {},
+                  "not_applied": {
+                    "partner_busy": 5,
+                    "place_taken_this_minute": 11
+                  },
+                  "refused": {}
+                },
+                "threshold": 750,
+                "ticks": 60,
+                "turns": 269,
+                "urgency": 3412,
+                "variety": 41
+              }
+            },
+            "routine": {
+              "parts": {
+                "need_relief": "1.0000",
+                "variety": "1.0000"
+              },
+              "score": "1.0000",
+              "status": "completed",
+              "terms": {
+                "choice_points": 149,
+                "classes": {
+                  "answered": 0,
+                  "not_answered": 0,
+                  "not_applied": 0,
+                  "refused": 0
+                },
+                "minutes_by_activity": {
+                  "rest": 197,
+                  "stand": 38,
+                  "talk": 84,
+                  "visit": 168
+                },
+                "others_urgency": 17382,
+                "people": 12,
+                "person_minutes": {
+                  "doing": 487,
+                  "waiting": 0,
+                  "walking": 233
+                },
+                "reasons": {
+                  "not_answered": {},
+                  "not_applied": {},
+                  "refused": {}
+                },
+                "threshold": 750,
+                "ticks": 60,
+                "turns": 0,
+                "urgency": 4665,
+                "variety": 39
+              }
+            },
+            "wait": {
+              "parts": {
+                "need_relief": "0.0000",
+                "variety": "0.0000"
+              },
+              "score": "0.0000",
+              "status": "completed",
+              "terms": {
+                "choice_points": 720,
+                "classes": {
+                  "answered": 0,
+                  "not_answered": 0,
+                  "not_applied": 0,
+                  "refused": 0
+                },
+                "minutes_by_activity": {},
+                "others_urgency": 13718,
+                "people": 12,
+                "person_minutes": {
+                  "doing": 0,
+                  "waiting": 720,
+                  "walking": 0
+                },
+                "reasons": {
+                  "not_answered": {},
+                  "not_applied": {},
+                  "refused": {}
+                },
+                "threshold": 750,
+                "ticks": 60,
+                "turns": 0,
+                "urgency": 39406,
+                "variety": 0
+              }
+            }
+          },
+          "score_version": 3,
+          "seed": "development_3",
+          "spend": [
+            {
+              "asks": 506,
+              "cost_unknown": 0,
+              "cost_usd": "0.03562158",
+              "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+              "provider": "nebius_token_factory"
+            },
+            {
+              "asks": 269,
+              "cost_unknown": 0,
+              "cost_usd": "0.03249876",
+              "model_id": "nvidia/Nemotron-3_5-Lightning",
+              "provider": "nebius_token_factory"
+            }
+          ]
+        }
+      ],
+      "note": "scores as served, four places; every run's integer terms are beside them",
+      "pooled_control_difference": "0.0344666666666666666666666667",
+      "pooled_means": {
+        "model_a": "0.9546",
+        "model_a_again": "0.9201333333333333333333333333",
+        "model_b": "1.007566666666666666666666667"
+      },
+      "pooled_primary_difference": "0.052966666666666666666666667",
+      "rule": "the judged score must separate the development town runs of this design beyond the control pair: pooled over the development seeds, the Lightning and Nano difference exceeds the Nano pair's"
+    },
+    "protocol": {
+      "bootstrap_resamples": 10000,
+      "family_alpha_per_mille": 50,
+      "interval_per_mille": 950,
+      "need_relief_floor_per_person": 575,
+      "pair_replay_budget_ms": 10000,
+      "replay_fixed_ms": 241,
+      "replay_per_decided_pair_us": 131,
+      "replay_per_decided_person_us": 93133,
+      "replay_per_person_us": 41588,
+      "runs_at_once": 2,
+      "window_ticks": 60
+    },
+    "question": "**The question.** A town made from the ``small_town`` recipe, its people brought into its\npurposeful society, one simulated hour. The first twelve of its people in the order the plan route\nlists them (by name, then identity) are the group; everybody else keeps their routine in every arm.\nWith the group decided by Nemotron 3 Nano 30B, run twice so its second run bounds run-to-run\nvariation, or by Nemotron 3.5 Lightning, how did the group's people fare under the third score of\na person in a world (``society-person-score.v3``: half the need they were spared, half how many\ndifferent kinds of thing they did, each as a share of what their own routine gives them against\nwaiting on the same seed), and is Lightning's difference from Nano larger than the protocol lets\na comparison claim and than the control pair's?",
+    "registered_utc": "2026-09-30T03:03:02+00:00",
+    "run_window": {
+      "simulated_minutes": 60,
+      "starts_before_utc": "2026-09-30T12:00:00+00:00"
+    },
+    "scoring": {
+      "catalogs": {
+        "sha256": "ef239e264c1137c31e2b38befa28d0dbe1eb2633a053846f5f144aa593e1ba90",
+        "versions": {
+          "society-comparison-protocol": 3,
+          "society-comparison-seeds": 4,
+          "society-person-score": 3
+        }
+      },
+      "modules": {
+        "exulanica.world.society_comparison_claim": "7f3ff0152129e64c501acbf4067514d694e4eb5ef644b48b25b319f73cff000a",
+        "exulanica.world.society_comparison_verdict": "a8ed6e639ad6ad2f3a5e30788a6a0c951396ea102cc9936ab61b05fc1bf44b47",
+        "exulanica.world.society_score": "561e6242bdb601559215e234a40e29429b9d26967a548e5bfdf166006194c010",
+        "exulanica.world.society_score_v2": "a75bc8f3dae5f61a9202acf5097224aecf807676a7260b3eba88c6e99592b110",
+        "exulanica.world.society_score_v3": "9fd6402972feeec0d5f3174be3ae94fcaddf1b249660578d0255b91727c3cea8"
+      },
+      "profile": "exulanica.society-comparison-binding/v3"
+    },
+    "script_sha256": "10a1dcf9e0cf0c8bc53ce5036f8a8c50f4ad3f9ce2f1997f8d51f3674be80c66",
+    "town": {
+      "frozen_input": {
+        "document_sha256": "ec95187786e71a2e85314a7814e2736c857c6809efa03a322dc50d7f286f1149",
+        "input_seq": 1
+      },
+      "ground": {
+        "arrival_facing_mm": [
+          0,
+          -5774
+        ],
+        "arrival_mm": [
+          130242,
+          -7,
+          -58226
+        ],
+        "recipe_key": "small_town",
+        "recipe_label": "A small town",
+        "region_id": "region:generated",
+        "tiles": [
+          {
+            "baked_tile_id": "3c1ee7f3-1965-5d4f-8861-471fa4b94919",
+            "state": "baked",
+            "tile_inputs_digest": "85d3e28486e8aec76219a8fec1bbf9e10cce35a987fabae7350109026c3bbe24",
+            "tile_x": 0,
+            "tile_y": 0
+          },
+          {
+            "baked_tile_id": "51043871-2754-5ab4-9461-faa0341aa4bf",
+            "state": "baked",
+            "tile_inputs_digest": "e254b8a4712173af34a491c55e8c68c1cc29e1d3b55e4cbfc3c2bba3b70a4a7f",
+            "tile_x": 1,
+            "tile_y": 0
+          }
+        ]
+      },
+      "population": 52,
+      "recipe": "small_town",
+      "society_id": "af1ca267-7a8e-5e14-9e69-c9af6395f1af",
+      "version_id": "40528507-57d2-4b29-bcc7-e9caaaba601d",
+      "world_id": "world:generated:d406162c-f5a1-4770-afb7-45305a19336c"
+    },
+    "tree": {
+      "files_sha256": {
+        "assets/catalogs/society/society-comparison-seeds.v4.json": "9109916fdb7047b388428a12efa9a13788f2108bdae7a849af79bc2c7a8bd793",
+        "assets/catalogs/society/society-person-score.v3.json": "406544dcd643d14f5d34301362e4e9db0009618852c418525bfc4d4754ebc9a7",
+        "docs/society-experiments.md": "6e250da4b794abb7362ced7ffe63a0ad9b90c6b66512b6ec7df17eed73fd194a",
+        "exulanica/api/routes/society_comparisons.py": "b93217fa92eb144095d88203f7c7c5e04a7d003ffeaa0694e44223754313b318",
+        "exulanica/api/society_comparison_runner.py": "b207300f1cf76e88dbd9ee2c569f336d733f2059464148a63eabf40bf429b412",
+        "exulanica/api/society_comparison_worker.py": "88fb4fb77eb580c9fb538fb4603cb06b7c61dccb5ab0adc27a7db512e4dd9ba1",
+        "exulanica/db/roles.py": "620737d84766cbd5065d2f97bf205df2d837a180e4ac81a016a2dde8ab6b6d4e",
+        "exulanica/migrations/0121_a_comparison_run_s_verified_drawing_is_stored.sql": "25cfa3721ab51977bab90ef76f230bee6e3a059fda9fd56f98f5e43b09d0a0a9",
+        "exulanica/orchestration/compare.py": "b1c0c30e66d02aace49fa1b40265cedd58489238235f51756fc5d3316850f2ab",
+        "exulanica/world/society_catalogs.py": "2670571fa70618e73295fa38c6ae682927873553e467fcef3a471b53512c23e4",
+        "exulanica/world/society_comparison_drawing.py": "f7f2e4b5d868197e6d273044e0a49f58c102d857048d5a452c6a328cc767be2b",
+        "exulanica/world/society_comparison_reading.py": "e2bcea373358ebb8ffbd9bf04b633805c4bafa23991877775ec95509ca885027",
+        "exulanica/world/society_comparison_repository.py": "a664eba0028a8e07818ff840084f5e951a344b188da030bb4bf3c02821eb0d95",
+        "exulanica/world/society_comparison_result.py": "22f2330d1551e1f51bb9d9bce6b98b7d70de06699deff38f58d73d7a9a25ef76",
+        "exulanica/world/society_comparison_verdict.py": "a8ed6e639ad6ad2f3a5e30788a6a0c951396ea102cc9936ab61b05fc1bf44b47",
+        "exulanica/world/society_score_v3.py": "9fd6402972feeec0d5f3174be3ae94fcaddf1b249660578d0255b91727c3cea8",
+        "pyproject.toml": "af8f1fe8e75400706371e8d625bce809a0bf33c4c6337683446494e0ea475687",
+        "tests/comparison_support.py": "0aed8d26b13aef3e464542f0d1b170cdd9ec6ffc5d0edd0020be03ec977cb935",
+        "tests/migration_reservations/0120.txt": "86a41be38051c31ee5c02001c4ac22d98279f7b190f5420500e0759b57c0d0fe",
+        "tests/snapshots/society-comparison-documents.json": "66322b0e5d350f80d15c688a2df3014ba072c21da8bb0a2347506de260cc49bb",
+        "tests/snapshots/society-comparison-start-documents.json": "5e45bcafe274899a01bfe688bf1e7aa9e6559b0894b1a83ac70a839820002ef2",
+        "tests/snapshots/society-group-comparison-documents.json": "aab7c8a4aa08fbd738622e5f8fcd473f1e7b8d44d0c0e0ea1f9601fb1519c546",
+        "tests/test_catalog_provenance.py": "f28944a454fe40da3c379dbaaa2414cf1601915f8398daa347e29a9e0f50acb9",
+        "tests/test_comparison_development_seeds.py": "c2b5cb29d242d198fe487fb0cdf5e05c14f088f3a495c8dda1dd682d338057e6",
+        "tests/test_comparison_drawing.py": "e056171e618c5ab986050fa8b54d5da7113c39224336e240abc94c8e526f0e19",
+        "tests/test_comparison_run_route_authorizes_last.py": "8720617e59e1895867229ce2cffa75604e31f3fa092fcdb8e1cdaa5580e3a778",
+        "tests/test_comparison_seed_admission_postgres.py": "0ff4debd10cbaf817fe88ddec6008355df2ee07adc0fcbe1e6846a4dd667e658",
+        "tests/test_society_comparison_binding.py": "d2b9a52548d1ac5da7cafd1630a8491b9b306707d2762ec3499cc574b57e18ff",
+        "tests/test_society_comparison_postgres.py": "0c8af3f37058d59b7e0fbdcc79935639b19204a81a7e665ad10736cb9a8bf568",
+        "tests/test_society_comparison_result_v2.py": "763684405e96dc164ab5a09d95febcdff4cd9ebc7d59fbf2ed927b9e366e8883",
+        "tests/test_society_comparison_start_postgres.py": "e9021b1b728d994d30f64c6cb70aac717400c08794ec9844319bb99694339f9f",
+        "tests/test_society_group_comparison_postgres.py": "58f3df3bce21397366b28f67d59d7536e25ad67b6a8c3593e50c9b372e190111",
+        "tests/test_society_score_v2.py": "b4a987c229a6e142d521aefdd9a53bf44b716c12f5816c253945ed74bef7a34d",
+        "tests/test_society_score_v3.py": "0aabfd1c490ad0ae25045bec93517d25d92534f5e5a60e0daa2b45a1d595265d",
+        "web/packages/app/src/society-comparison-api.ts": "67ea65b7e48d8e7efb8f831271baf9211a3297f54d70373c493203eb801b0181",
+        "web/packages/app/src/ui/society-comparison-start.ts": "e6b93521eb7b6999940f12186ce0b3b6ff509b55aa7ebde865112fb56f6a6136",
+        "web/packages/app/src/ui/society-comparison.css": "336017836710c8df6512f0f30ea6692acbf80a86bdd1edce7746bab7c4165a56",
+        "web/packages/app/src/ui/society-comparison.ts": "016a450270e0fdb1ede68036eedd4408f208a4bf9b70562e8188477048aa85a9",
+        "web/packages/app/test/society-comparison-api.test.ts": "cf4c32f338c4a20257c8e497f7932580c72fa651525e7ec85c20f4ed4ade36cb",
+        "web/packages/app/test/society-comparison-start-bounds.test.ts": "24ed4365bac2d896d958acb7ddf3ca2ace912eb3ab9fca47bbf404a3a8c974ec",
+        "web/packages/app/test/society-comparison-start.test.ts": "1f9095563479d0108a8a7d8443e81cfb1cc1520ef6c2353a5fd083008f7abcfb"
+      },
+      "head": "731066f81832076caa341f3c4615845697c758fa"
+    },
+    "verdict_rule": "Pooled over seeds, as the server's verdict (exulanica/world/society_comparison_verdict.py and exulanica/world/society_comparison_claim.py under binding v3). For each registered pair, the per-seed differences of the v3 score over the seeds both arms scored, their mean and a percentile bootstrap interval (bootstrap_resamples, interval_per_mille); Holm's procedure over the family at family_alpha_per_mille. The control's bound is the larger magnitude of the two ends of the control pair's (Nano, Nano again) interval. The verdict is different, naming the higher arm, only where Holm rejects the primary difference (Nano, Lightning) and the magnitude of its mean exceeds the control's bound; otherwise no_measured_difference. Per-seed differences are reported beside it and never decide it. A comparison with any run missing or failed, including a seed the bound did not admit (comparison_bound_before_seed), reads incomplete and claims nothing; one with fewer than two seeds every judged arm scored reads not_judged (too_few_seeds_scored); a seed excluded by name (need_below_floor, variety_not_spared) carries no score.",
+    "written_before_any_held_out_call": true
+  },
+  "record_sha256": "3a247342da261270fb61f4b9f00eb90ec385daa6d6010bf701e021046c2d2f57"
+}

@@ -206,6 +206,13 @@ receipts with no billed call.
   while the other four kept their routine, over twelve fresh held-out seeds, scored under the
   second version. No measured difference in how the group fared, while the models answered
   different shares of the group's turns and spent the hour on different activities.
+- [2026-09-30-town-comparison.json](evaluation/2026-09-30-town-comparison.json)
+  ([pre-registration](evaluation/2026-09-30-town-comparison-preregistration.json)): the first twelve
+  of a 52-person generated town's people, decided by Nemotron 3 Nano 30B (twice, as the control) or
+  Nemotron 3.5 Lightning while everybody else kept their routine, over eight held-out seeds, scored
+  under the third version. Incomplete, so it claims nothing: the process that ran it made its asks
+  under its default ceiling of 2000 calls, which the pre-registration did not count, and 13 of the
+  24 model runs failed before asking anything once it was reached. Its held-out seeds are spent.
 
 ### Reads
 
