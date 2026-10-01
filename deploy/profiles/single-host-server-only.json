@@ -1,0 +1,89 @@
+{
+  "profile": "exulanica.installation-profile/v1",
+  "id": "single-host-server-only",
+  "version": 1,
+  "description": "single-host built with the server extra only: the derivative and pose workers are installed but cannot run.",
+  "store": {
+    "kind": "local"
+  },
+  "components": {
+    "database": {
+      "installed": true
+    },
+    "schema": {
+      "installed": true
+    },
+    "api": {
+      "installed": true
+    },
+    "client": {
+      "installed": true
+    },
+    "maintenance": {
+      "installed": true
+    },
+    "ingestion": {
+      "installed": true
+    },
+    "derivatives": {
+      "installed": true,
+      "unavailable_reason": "image_built_without_extra"
+    },
+    "pose_scene": {
+      "installed": true,
+      "unavailable_reason": "image_built_without_extra"
+    },
+    "preparation": {
+      "installed": false
+    },
+    "materials": {
+      "installed": false
+    },
+    "generated_tiles": {
+      "installed": false
+    },
+    "simulation": {
+      "installed": true
+    },
+    "comparison": {
+      "installed": true,
+      "queue_bound_seconds": 600
+    }
+  },
+  "recovery": {
+    "export_interval_seconds": 300,
+    "max_export_lag_seconds": 600,
+    "backup_interval_seconds": 86400,
+    "backup_retention_days": 30,
+    "verification_interval_seconds": 604800,
+    "restore_state_path": "/var/lib/exulanica-restore/restore.json"
+  },
+  "settings_owners": {
+    "B1": [
+      "EXULANICA_SPENDING",
+      "EXULANICA_SPENDING_WITNESS_DIR",
+      "EXULANICA_BUDGET_USD",
+      "EXULANICA_BUDGET_MAX_CALLS"
+    ],
+    "D3": [
+      "EXULANICA_INSTALLATION_PROFILE",
+      "EXULANICA_MAINTENANCE_STATUS_PATH",
+      "EXULANICA_CODE_REVISION",
+      "EXULANICA_IMAGE_BACKEND",
+      "EXULANICA_IMAGE_CLIENT",
+      "EXULANICA_BACKUP_ROLE_PASSWORD"
+    ],
+    "R1": [
+      "EXULANICA_API_THREADS",
+      "EXULANICA_API_REQUESTS",
+      "EXULANICA_API_UPLOADS",
+      "EXULANICA_API_STREAMS",
+      "EXULANICA_API_WORKSPACE_REQUESTS",
+      "EXULANICA_API_WORKSPACE_UPLOADS",
+      "EXULANICA_API_WORKSPACE_STREAMS",
+      "EXULANICA_API_DECODES",
+      "EXULANICA_INTAKE_QUEUED_JOBS"
+    ],
+    "ST1": []
+  }
+}

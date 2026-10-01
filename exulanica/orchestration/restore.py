@@ -12,6 +12,12 @@ catalog uses, and is the command an operator runs:
     python -m exulanica.orchestration.restore prepare --checkpoint <file> --marker <file>
     python -m exulanica.orchestration.restore replay --checkpoint <file> --marker <file>
 
+A crash recovery, whose source is lost and was never sealed, replays the newest export instead:
+
+    python -m exulanica.orchestration.restore export --directory <custody directory>
+    python -m exulanica.orchestration.restore prepare --checkpoint <export> --marker <file> \
+        --declaration <file> --max-export-lag-seconds <n>
+
 ADR-0019 states the procedure around these commands.
 """
 
@@ -19,6 +25,8 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import json
+import os
 import uuid
 from collections.abc import Mapping
 from pathlib import Path
@@ -26,15 +34,26 @@ from typing import Any, Final
 
 import psycopg
 
+from exulanica.api.installation import load_installation
 from exulanica.consent.place_name_rights import withdraw_place_name_chain
 from exulanica.db.session import Database
-from exulanica.deletion.restore import checkpoint, prepare_restore, replay
+from exulanica.deletion.restore import (
+    checkpoint,
+    export_withdrawals,
+    loss_window,
+    prepare_restore,
+    replay,
+)
 from exulanica.deletion.withdrawals import Writer
 from exulanica.env import env_get, resolve_data_dir
 from exulanica.epistemics.assertions import AssertionWriter
 from exulanica.models.handoff import ModelIdentity
-from exulanica.store.local import LocalContentAddressedStore
-from exulanica.store.namespaces import BLOB_NAMESPACE, material_stores
+from exulanica.orchestration.installation.custody import (
+    DEFAULT_KEEP,
+    prune_exports,
+    require_newest,
+)
+from exulanica.store.configured import purging_content_stores
 
 __all__ = ["WRITERS", "main"]
 
@@ -89,31 +108,133 @@ WRITERS: Final[Mapping[str, Writer]] = {
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=("checkpoint", "prepare", "replay"))
-    parser.add_argument("--checkpoint", required=True, type=Path)
+    parser.add_argument("action", choices=("checkpoint", "export", "prepare", "replay"))
+    parser.add_argument("--checkpoint", type=Path)
+    parser.add_argument("--directory", type=Path, help="where export writes a fresh file")
     parser.add_argument("--marker", type=Path)
+    parser.add_argument("--declaration", type=Path, help="a crash recovery's declaration")
+    parser.add_argument(
+        "--keep",
+        type=int,
+        default=DEFAULT_KEEP,
+        help="how many of the newest exports custody keeps after an export",
+    )
+    parser.add_argument(
+        "--max-export-lag-seconds",
+        type=int,
+        help="the installation's bound between the newest export and the declared incident",
+    )
     args = parser.parse_args(argv)
+    if args.action == "export":
+        if args.directory is None:
+            parser.error("export requires --directory outside both backup domains")
+        installation = load_installation(os.environ)
+        data_dir = resolve_data_dir()
+        # The content store and, where configured, the database's backup sets and stored-byte copy:
+        # custody may lie inside none of them.
+        domains = [data_dir] + [
+            Path(value)
+            for name in ("BACKUP_DIRECTORY", "BACKUP_STORE_DIRECTORY")
+            if (value := env_get(name))
+        ]
+        path, _digest = export_withdrawals(
+            Database.from_env(),
+            args.directory,
+            restore_state_path=installation.restore_state_path or args.marker,
+            backup_domains=domains,
+        )
+        print(path)
+        backups = env_get("BACKUP_DIRECTORY")
+        referenced = _referenced_exports(Path(backups)) if backups else set()
+        identity = json.loads(path.read_bytes())["record"]["source_identity"]
+        for removed in prune_exports(
+            args.directory, source_identity=identity, keep=args.keep, referenced=referenced
+        ):
+            print(f"removed {removed.name}")
+        return 0
+    if args.checkpoint is None:
+        parser.error(f"{args.action} requires --checkpoint")
+    # The API reads the profile's marker at startup: a restore that wrote another could leave a
+    # failed restore served.
+    declared = load_installation(os.environ).restore_state_path
+    if (
+        args.marker is not None
+        and declared is not None
+        and args.marker.resolve() != declared.resolve()
+    ):
+        parser.error("--marker differs from the profile's restore marker")
+    if args.marker is None and declared is not None:
+        args.marker = declared
     if args.action == "checkpoint":
         checkpoint(Database.from_env(), args.checkpoint)
     elif args.marker is None:
         parser.error("prepare and replay require --marker outside both backup domains")
     elif args.action == "prepare":
-        prepare_restore(args.checkpoint, args.marker)
+        if args.declaration is not None:
+            # A crash recovery replays the newest export in custody, whatever file was named.
+            custody = env_get("CUSTODY_DIRECTORY")
+            if not custody:
+                parser.error(
+                    "a declared recovery needs EXULANICA_CUSTODY_DIRECTORY, the custody whose "
+                    "newest export it must replay"
+                )
+            require_newest(args.checkpoint, Path(custody))
+        prepare_restore(
+            args.checkpoint,
+            args.marker,
+            declaration_path=args.declaration,
+            max_export_lag=_lag_bound(parser, args),
+        )
+        if (window := loss_window(args.marker)) is not None:
+            print(window)
     else:
         purge_url = env_get("PURGE_DATABASE_URL")
         if not purge_url:
             parser.error("PURGE_DATABASE_URL must name the separately provisioned purge role")
-        data_dir = resolve_data_dir()
+        # Replay erases, so it uses the purge identity's stores: on an object store they are
+        # built from credentials no runtime process holds.
         replay(
             Database.from_env(),
             Database(purge_url),
-            LocalContentAddressedStore(data_dir / BLOB_NAMESPACE),
+            None,
             args.checkpoint,
             args.marker,
             writers=WRITERS,
-            materials=material_stores(data_dir),
+            stores=purging_content_stores(),
         )
+        if (window := loss_window(args.marker)) is not None:
+            print(window)
     return 0
+
+
+def _lag_bound(parser: argparse.ArgumentParser, args: argparse.Namespace) -> dt.timedelta | None:
+    """The export lag bound: the profile's, which ``--max-export-lag-seconds`` may only lower."""
+    given = args.max_export_lag_seconds
+    profile = load_installation(os.environ).profile
+    if args.declaration is None:
+        return None if given is None else dt.timedelta(seconds=given)
+    if profile is None:
+        parser.error(
+            "a declared recovery takes its export lag bound from EXULANICA_INSTALLATION_PROFILE"
+        )
+    bound = profile.recovery.max_export_lag_seconds
+    if given is not None and given > bound:
+        parser.error(f"--max-export-lag-seconds may lower the profile's {bound}, never raise it")
+    return dt.timedelta(seconds=bound if given is None else given)
+
+
+def _referenced_exports(backups: Path) -> set[str]:
+    """The exports the backup sets in ``backups`` name, which custody must keep."""
+    from exulanica.orchestration.installation.backup_set import BackupSetRefused, read_backup_set
+
+    referenced = set()
+    for directory in sorted(backups.iterdir()) if backups.exists() else ():
+        try:
+            record = read_backup_set(directory).manifest["record"]
+        except BackupSetRefused:
+            continue
+        referenced.add(record["withdrawal_export"]["sha256"])
+    return referenced
 
 
 if __name__ == "__main__":  # pragma: no cover

@@ -226,10 +226,12 @@ def test_every_kind_is_stated_in_the_schemas_own_terms(repository, spine_schema)
                 assert admitted, (kind.kind, condition.column, value)
 
 
-#: A value of each column type, for a row whose identity nobody holds.
+#: A value of each column type, for a row whose identity nobody holds. The text is one the
+#: schema's text keys accept, a digest and a lowercase code alike, because a kind that carries an
+#: absent end writes the row rather than only reading.
 _SYNTHETIC = {
     "uuid": lambda: str(uuid.uuid4()),
-    "text": lambda: "held by nobody",
+    "text": lambda: "f" * 64,
     "bytea": lambda: "\\x00",
     "int4": lambda: 0,
     "int8": lambda: 0,
@@ -269,7 +271,8 @@ def test_every_kinds_statements_run_against_the_schema(repository, spine_schema)
             elif type_name in _SYNTHETIC:
                 row[column] = _SYNTHETIC[type_name]()
         with connection.transaction(force_rollback=True):
-            assert reapply(connection, Carried(kind.kind, row), WRITERS) == "absent", kind.kind
+            written = "carried" if kind.carry_absent else "absent"
+            assert reapply(connection, Carried(kind.kind, row), WRITERS) == written, kind.kind
 
 
 # -- one write's branches ---------------------------------------------------------------------

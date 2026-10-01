@@ -18,6 +18,9 @@ to other bytes); each prepared body's preparation receipt is put in the store; e
 checked against the registry and the store; and only then is the publication row written
 (migration 0131). A document already published is left as it is; a different document under a
 published catalog id and revision is refused, as is a revision older than one already published.
+A document whose digest the host withdrew is recorded and stays withdrawn: a restore carries the
+withdrawal even when the backup holds no publication of it (migration 0135), so the image's copy is
+never served again.
 Without ``--apply`` nothing is written and the documents are only derived and checked.
 """
 
@@ -87,7 +90,10 @@ class PublishOutcome:
     catalog_id: str
     revision: int
     kind: str
-    #: ``published`` when this call wrote the row, ``unchanged`` when it was already there.
+    #: ``published`` when this call wrote the row, ``unchanged`` when it was already there, and
+    #: ``withdrawn`` when the host withdrew this digest: the publication is held, written now if it
+    #: was missing, and never served. A restore carries a withdrawal even when the backup holds no
+    #: publication of it (0135), so the image's copy of a withdrawn document lands here.
     state: str
 
 
@@ -233,8 +239,15 @@ def _insert(connection: psycopg.Connection, publication: CatalogPublication) -> 
         "where catalog_sha256=%s or (catalog_id=%s and revision=%s)",
         (publication.catalog_sha256, publication.catalog_id, publication.revision),
     ).fetchall()
+    withdrawn = (
+        connection.execute(
+            "select 1 from character_catalog_withdrawal where catalog_sha256=%s",
+            (publication.catalog_sha256,),
+        ).fetchone()
+        is not None
+    )
     if any(row["catalog_sha256"] == publication.catalog_sha256 for row in existing):
-        return "unchanged"
+        return "withdrawn" if withdrawn else "unchanged"
     if existing:
         raise PublicationRefused(
             f"{publication.catalog_id} revision {publication.revision} is already published "
@@ -254,7 +267,7 @@ def _insert(connection: psycopg.Connection, publication: CatalogPublication) -> 
             PRODUCER,
         ),
     )
-    return "published"
+    return "withdrawn" if withdrawn else "published"
 
 
 def publish_catalogs(

@@ -205,9 +205,18 @@ def test_a_real_predeletion_restore_replays_bytes_spans_graph_and_aggregates(pur
     assert receipt["restore_id"] == attempt and receipt["checkpoint_sha256"] == digest
     assert receipt["tombstone_count"] == 1
     count = purged.rows("select count(*) as n from tombstone")[0]["n"]
-    replay(
-        purged.database(), _purge_database(purged), purged.store, source, marker, writers=WRITERS
-    )
+    # A completed restore is never replayed again: a database that has not served since, such as
+    # a set-aside source, would otherwise serve with every later deletion undone.
+    with pytest.raises(RestoreRefused, match="already complete"):
+        replay(
+            purged.database(),
+            _purge_database(purged),
+            purged.store,
+            source,
+            marker,
+            writers=WRITERS,
+        )
+    assert json.loads(marker.read_bytes())["state"] == "complete"
     assert purged.rows("select count(*) as n from tombstone")[0]["n"] == count
     assert purged.rows("select * from restore_replay_receipt") == [receipt]
 
@@ -311,10 +320,12 @@ def test_corrupt_checkpoint_and_restored_receipt_cannot_authorize_a_new_attempt(
     replay(
         purged.database(), _purge_database(purged), purged.store, source, marker, writers=WRITERS
     )
-    # A fresh attempt invalidates a real previous receipt, even if a restore would retain it.
-    prepare_restore(source, marker)
+    # The completed restore is never reopened from its own checkpoint.
+    with pytest.raises(RestoreRefused, match="already complete"):
+        prepare_restore(source, marker)
+    # Another attempt's marker is not authorised by this receipt, even one a restore retained.
     state = json.loads(marker.read_bytes())
-    state["state"] = "complete"
+    state["restore_id"] = str(uuid.uuid4())
     marker.write_text(json.dumps(state))
     with pytest.raises(RestoreRefused, match="receipt"):
         verify_restore(purged.database(), marker)
@@ -390,3 +401,29 @@ def test_backup_older_than_blocklisted_capture_refuses_missing_address_binding(p
     assert not purged.rows("select * from restore_replay_receipt")
     with pytest.raises(RestoreRefused, match="pending"):
         verify_restore(purged.database(), marker)
+
+
+def test_a_completed_restore_is_remembered_after_a_later_one(purged, tmp_path):
+    """The marker carries every completed restore forward, so a checkpoint completed before a
+    later restore cannot be prepared again, which would let a set-aside source be replayed."""
+    marker = tmp_path / "restore.json"
+    done = []
+    for name in ("first.json", "second.json"):
+        source = tmp_path / name
+        checkpoint(purged.database(), source)
+        prepare_restore(source, marker)
+        replay(
+            purged.database(),
+            _purge_database(purged),
+            purged.store,
+            source,
+            marker,
+            writers=WRITERS,
+        )
+        done.append(json.loads(source.read_bytes())["record_sha256"])
+    state = json.loads(marker.read_bytes())
+    assert state["state"] == "complete" and state["checkpoint_sha256"] == done[1]
+    assert [item["checkpoint_sha256"] for item in state["completed"]] == done
+    with pytest.raises(RestoreRefused, match="already complete"):
+        prepare_restore(tmp_path / "first.json", marker)
+    assert json.loads(marker.read_bytes()) == state

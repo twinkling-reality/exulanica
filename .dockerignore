@@ -28,6 +28,8 @@
 !assets/characters/parametric-catalog.json
 !assets/characters/makehuman-people-v1
 !assets/characters/makehuman-parametric-v1
+# The installation profiles an installation names (docs/deployment.md 9.1).
+!deploy/profiles
 # The gsplat trainer recipe under deploy/gsplat is its own build; it needs only its pinned
 # requirements from this directory.
 !deploy/gsplat/requirements.txt

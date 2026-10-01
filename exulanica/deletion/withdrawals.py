@@ -18,7 +18,9 @@ with it for a checkpoint of profile ``exulanica.restore-tombstone-checkpoint/v2`
   catalog names one (a retraction also retracts its claim). A chain the backup ends at a grant made
   before one the carried withdrawal follows is continued with a withdrawal of its own, by the writer
   the catalog names. A row the backup does not hold needs nothing, because a restore never brings
-  back a row its backup lacks.
+  back a row its backup lacks, except for a kind whose catalog entry says ``"absent": "carry"``:
+  the installation makes what it ends again after a restore (the catalogs job publishes from the
+  image), so its withdrawal row is written whether or not the end is held.
 * :func:`stale_withdrawals` names a withdrawal the restored database holds that the checkpoint
   does not, which means the checkpoint is older than the backup.
 
@@ -53,6 +55,7 @@ __all__ = [
     "WithdrawalKind",
     "Writer",
     "kind_of",
+    "open_withdrawals",
     "read_withdrawals",
     "reapply",
     "stale_withdrawals",
@@ -130,6 +133,9 @@ class WithdrawalKind:
     writer: str | None = None
     #: The name of the writer that continues a chain the carried row cannot follow.
     continues: str | None = None
+    #: Whether the withdrawal row is written when the restored database holds nothing it ends,
+    #: because the installation makes that end again after a restore (``"absent": "carry"``).
+    carry_absent: bool = False
 
     def carried(self, alias: str) -> sql.Composable:
         """The rows a checkpoint carries: withdrawn, and whatever else the catalog requires."""
@@ -179,6 +185,13 @@ def _condition(value: dict[str, Any]) -> Condition:
 Writer = Callable[[psycopg.Connection[Any], Mapping[str, Any]], None]
 
 
+def _absent(entry: Mapping[str, Any]) -> bool:
+    value = entry.get("absent")
+    if value not in (None, "carry"):
+        raise ValueError(f"{entry['kind']}: unknown absent {value!r}; the only value is 'carry'")
+    return value == "carry"
+
+
 def _load(path: Path) -> tuple[tuple[WithdrawalKind, ...], tuple[Exclusion, ...], dict[str, Any]]:
     document = json.loads(path.read_text(encoding="utf-8"))
     if document.get("profile") != CATALOG_PROFILE:
@@ -202,6 +215,7 @@ def _load(path: Path) -> tuple[tuple[WithdrawalKind, ...], tuple[Exclusion, ...]
                 order=entry.get("order"),
                 writer=entry.get("writer"),
                 continues=entry.get("continues"),
+                carry_absent=_absent(entry),
             )
         )
     names = [kind.kind for kind in kinds]
@@ -218,6 +232,11 @@ def _load(path: Path) -> tuple[tuple[WithdrawalKind, ...], tuple[Exclusion, ...]
             raise ValueError(f"{kind.kind}: a column kind is written by its own update")
         if kind.continues is not None and not (kind.chained and kind.order):
             raise ValueError(f"{kind.kind}: only an ordered chain can be continued")
+        if kind.carry_absent and (kind.shape != "event" or kind.chained):
+            raise ValueError(
+                f"{kind.kind}: only an event kind that ends rows of another table carries its "
+                "row when the end is absent"
+            )
     exclusions = tuple(Exclusion(e["table"], e["reason"]) for e in document["excluded"])
     return tuple(kinds), exclusions, document
 
@@ -322,7 +341,8 @@ def reapply(
 
     Returns ``carried`` when this wrote it, ``continued`` when it withdrew the chain the carried
     row ended after a decision the backup holds and the carried row cannot follow, ``present`` when
-    the database already held it exactly, ``absent`` when the database holds nothing it ends, and
+    the database already held it exactly, ``absent`` when the database holds nothing it ends (a
+    kind that carries an absent end is written and returns ``carried``), and
     ``already`` when an event withdrawal's chain already ends withdrawn here. Raises
     :class:`CarryRefused` when the database holds the row with another withdrawal than the
     checkpoint records, refuses the write, or ``writers`` is not exactly the catalog's.
@@ -400,23 +420,23 @@ def _reapply_event(
                 f"the restored {kind.table} row differs from the withdrawal the checkpoint records"
             )
         return "present"
-    ordered = kind.chained and kind.order is not None
+    order = kind.order if kind.chained else None
     ends = sql.SQL("select {} as withdrawn, {} as position from {} e join {} r on {}").format(
         kind.withdrawn.over("e") if kind.chained else sql.SQL("true"),
-        sql.Identifier("e", kind.order) if ordered else sql.SQL("null"),
+        sql.Identifier("e", order) if order is not None else sql.SQL("null"),
         sql.Identifier(kind.ends.table),
         _record(kind),
         _matches(kind.ends.columns, "e", "r"),
     )
     ends = (
-        sql.SQL("{} order by {} desc limit 1").format(ends, sql.Identifier("e", kind.order))
-        if ordered
+        sql.SQL("{} order by {} desc limit 1").format(ends, sql.Identifier("e", order))
+        if order is not None
         else sql.SQL("{} limit 1").format(ends)
     )
     found = connection.execute(ends, parameters).fetchone()
-    if found is None or found["withdrawn"] is None:
+    if (found is None or found["withdrawn"] is None) and not kind.carry_absent:
         return "absent"
-    if kind.chained and found["withdrawn"]:
+    if found is not None and kind.chained and found["withdrawn"]:
         return "already"
     # A chain whose last decision here comes more than one before the carried row's lacks the
     # decisions made after the backup, so the carried row cannot follow it: the chain is
@@ -425,6 +445,7 @@ def _reapply_event(
     continues, writer = kind.continues, kind.writer
     if (
         continues is not None
+        and found is not None
         and kind.order is not None
         and carried.row[kind.order] > found["position"] + 1
     ):
@@ -473,6 +494,80 @@ def _write(
             f"the checkpoint's {kind.kind} withdrawal cannot {verb} what this backup holds: "
             f"{error.diag.message_primary or error}"
         ) from error
+
+
+def open_withdrawals(
+    connection: psycopg.Connection[Any], carried: list[Carried]
+) -> list[tuple[str, dict[str, Any]]]:
+    """Every carried withdrawal this database does not honour: what replaying it would still write.
+
+    Read only, and the same decision :func:`reapply` makes. A column kind is open when the database
+    holds its row and that row is not withdrawn, or is withdrawn differently; an event kind when
+    the database lacks the row and holds what it ends, still not withdrawn. A row the database does
+    not hold at all (``absent``: created after a backup, or a sign-in session a backup does not
+    carry) is honoured, because nothing here is current that the withdrawal ended.
+    """
+    found: list[tuple[str, dict[str, Any]]] = []
+    for item in carried:
+        kind = kind_of(item)
+        parameters = {"row": Jsonb(item.row)}
+        if kind.shape == "column":
+            held = connection.execute(
+                sql.SQL(
+                    "select {same} as same from {table} t "
+                    "join {record} r on ({identity_t}) = ({identity_r})"
+                ).format(
+                    same=_matches(kind.columns, "t", "r"),
+                    table=sql.Identifier(kind.table),
+                    record=_record(kind),
+                    identity_t=_names(kind.identity, "t"),
+                    identity_r=_names(kind.identity, "r"),
+                ),
+                parameters,
+            ).fetchone()
+            if held is not None and not held["same"]:
+                found.append((item.kind, item.row))
+            continue
+        assert kind.ends is not None  # an event kind names what it ends; _load refuses otherwise
+        present = connection.execute(
+            sql.SQL(
+                "select to_jsonb(t) = to_jsonb(r) as same from {table} t join {record} r "
+                "on ({identity_t}) = ({identity_r})"
+            ).format(
+                table=sql.Identifier(kind.table),
+                record=_record(kind),
+                identity_t=_names(kind.identity, "t"),
+                identity_r=_names(kind.identity, "r"),
+            ),
+            parameters,
+        ).fetchone()
+        if present is not None:
+            if not present["same"]:
+                found.append((item.kind, item.row))
+            continue
+        if kind.carry_absent:
+            # Replay writes this row whatever the end, so a missing row is open.
+            found.append((item.kind, item.row))
+            continue
+        order = kind.order if kind.chained else None
+        ends = sql.SQL("select {} as withdrawn from {} e join {} r on {}").format(
+            kind.withdrawn.over("e") if kind.chained else sql.SQL("true"),
+            sql.Identifier(kind.ends.table),
+            _record(kind),
+            _matches(kind.ends.columns, "e", "r"),
+        )
+        ends = (
+            sql.SQL("{} order by {} desc limit 1").format(ends, sql.Identifier("e", order))
+            if order is not None
+            else sql.SQL("{} limit 1").format(ends)
+        )
+        chain = connection.execute(ends, parameters).fetchone()
+        if chain is None or chain["withdrawn"] is None:
+            continue
+        if kind.chained and chain["withdrawn"]:
+            continue
+        found.append((item.kind, item.row))
+    return found
 
 
 def stale_withdrawals(

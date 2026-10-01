@@ -75,6 +75,7 @@ from exulanica.errors import ExulanicaError
 
 __all__ = [
     "ACCOUNT_ONLY_TABLES",
+    "BACKUP_ROLE",
     "EXECUTOR_ROLE",
     "INSERT_ONLY_TABLES",
     "PURGE_CROSS_WORKSPACE_TABLES",
@@ -87,7 +88,9 @@ __all__ = [
     "SPENDING_TABLES",
     "RuntimeRoleUnsafe",
     "assert_runtime_role",
+    "backup_role_gaps",
     "grant_workspace_partition",
+    "provision_backup_role",
     "provision_purge_role",
     "provision_runtime_role",
 ]
@@ -124,6 +127,9 @@ SPENDING_ADMIN_TABLES: Final = (
     "spending_authority_revocation",
     "spending_event",
 )
+#: The role unattended maintenance reads a complete backup and withdrawal export as. It reads
+#: every row of every workspace and writes nothing: see :func:`provision_backup_role`.
+BACKUP_ROLE: Final = "exulanica_backup"
 
 #: Tables the runtime may read and may not write. See the module docstring for why each. Every
 #: registry table in :data:`exulanica.db.registries.REGISTRY_TABLES` is one; the rest are these.
@@ -680,6 +686,111 @@ def provision_purge_role(
             )
 
 
+def provision_backup_role(
+    connection: psycopg.Connection, *, role: str = BACKUP_ROLE, password: str | None = None
+) -> None:
+    """Create the role a backup and a withdrawal export read as: everything, and write nothing.
+
+    A backup and an export are only worth having complete, so this role reads through row-level
+    security (``BYPASSRLS``), across every workspace and the account tables. That is the reason it
+    exists apart from the owner, which the maintenance process that runs unattended must never
+    hold: an owner can write, alter and drop, and this role can do none of those.
+
+    *   **SELECT on every table and sequence in the schema, and nothing else.** Every privilege is
+        revoked first, so a grant made by hand does not survive the next deployment.
+    *   **No superuser, no CREATEDB, no CREATEROLE, no replication, no membership in any role.**
+        Membership would lend it a writer's privileges; any it holds is revoked.
+    *   **Read only by default**, ``default_transaction_read_only``. This is defense in depth,
+        not a barrier: a session can turn it off, begin a read-write transaction, or alter its own
+        role setting. The grants are the barrier.
+    *   **No SECURITY DEFINER function.** Their EXECUTE is revoked from PUBLIC where each is
+        created, and this role is granted none, so it cannot seal, purge or administer spending.
+
+    What the grants cannot take away, because PostgreSQL gives it to PUBLIC or to every role: with
+    read only lifted, a session can create temporary tables, which vanish with it, and large
+    objects (``lo_from_bytea``), which persist. The product stores no large object, so
+    :func:`backup_role_gaps` reports any that exist. A holder can also take advisory locks and
+    send NOTIFY, which can stall migrations and writers, and can change its own password. The
+    credential reads every row of every workspace: protect it as a read-all secret, give it to the
+    maintenance process alone, and rotate it by reprovisioning.
+
+    Tables and sequences the provisioning owner creates later grant SELECT to this role by default
+    privilege. One created by another role does not, and :func:`backup_role_gaps` names it, so a
+    backup refuses rather than silently leaving it out. Partitions made for a workspace are
+    granted when made (:func:`grant_workspace_partition`).
+    Idempotent. ``role`` is a parameter for the reason given in :func:`provision_purge_role`.
+    """
+    role_name = sql.Identifier(role)
+    row = connection.execute("select current_schema()").fetchone()
+    assert row is not None
+    schema = sql.Identifier(row["current_schema"] if isinstance(row, dict) else row[0])
+    attributes = sql.SQL(
+        "login bypassrls nosuperuser nocreatedb nocreaterole noreplication noinherit"
+    )
+    with connection.transaction():
+        connection.execute("select pg_advisory_xact_lock(%s)", (_ROLE_LOCK_KEY,))
+        exists = connection.execute("select 1 from pg_roles where rolname = %s", (role,)).fetchone()
+        verb = sql.SQL("alter") if exists is not None else sql.SQL("create")
+        connection.execute(sql.SQL("{} role {} {}").format(verb, role_name, attributes))
+        if password is not None:
+            connection.execute(
+                sql.SQL("alter role {} password {}").format(role_name, sql.Literal(password))
+            )
+        for held in connection.execute(
+            "select r.rolname from pg_auth_members m join pg_roles r on r.oid = m.roleid "
+            "join pg_roles me on me.oid = m.member where me.rolname = %s",
+            (role,),
+        ).fetchall():
+            name = held["rolname"] if isinstance(held, dict) else held[0]
+            connection.execute(sql.SQL("revoke {} from {}").format(sql.Identifier(name), role_name))
+        connection.execute(
+            sql.SQL("alter role {} set default_transaction_read_only = on").format(role_name)
+        )
+        connection.execute(sql.SQL("grant usage on schema {} to {}").format(schema, role_name))
+        for kind in (sql.SQL("tables"), sql.SQL("sequences")):
+            connection.execute(
+                sql.SQL("revoke all on all {} in schema {} from {}").format(kind, schema, role_name)
+            )
+            connection.execute(
+                sql.SQL("grant select on all {} in schema {} to {}").format(kind, schema, role_name)
+            )
+            connection.execute(
+                sql.SQL("alter default privileges in schema {} grant select on {} to {}").format(
+                    schema, kind, role_name
+                )
+            )
+
+
+def backup_role_gaps(connection: psycopg.Connection, role: str = BACKUP_ROLE) -> list[str]:
+    """Every table or sequence in the schema ``role`` cannot read, or that it could write, and
+    ``large objects`` when any exist, which the product never stores.
+
+    Empty for a correctly provisioned role. A backup asks first and refuses, by name, anything
+    listed, because a dump that skipped a table would restore a database missing rows, and
+    maintenance reports it every pass.
+    """
+    large = connection.execute("select exists (select 1 from pg_largeobject_metadata)").fetchone()
+    found = (
+        ["large objects"]
+        if large and (large["exists"] if isinstance(large, dict) else large[0])
+        else []
+    )
+    return found + [
+        row["relname"] if isinstance(row, dict) else row[0]
+        for row in connection.execute(
+            "select c.relname from pg_class c join pg_namespace n on n.oid = c.relnamespace "
+            "where n.nspname = current_schema() and c.relkind in ('r', 'p', 'S') and ("
+            "not has_table_privilege(%(role)s, c.oid, 'SELECT') "
+            "or (c.relkind <> 'S' and (has_table_privilege(%(role)s, c.oid, "
+            "'INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER') "
+            "or has_any_column_privilege(%(role)s, c.oid, 'INSERT, UPDATE, REFERENCES'))) "
+            "or (c.relkind = 'S' and has_sequence_privilege(%(role)s, c.oid, 'USAGE, UPDATE'))) "
+            "order by c.relname",
+            {"role": role},
+        ).fetchall()
+    ]
+
+
 def _present_tables(connection: psycopg.Connection, tables: tuple[str, ...]) -> set[str]:
     """Which of ``tables`` exist in the current schema yet."""
     return {
@@ -695,7 +806,7 @@ def _present_tables(connection: psycopg.Connection, tables: tuple[str, ...]) -> 
 
 
 def grant_workspace_partition(connection: psycopg.Connection, partition: str) -> None:
-    """Give both runtime roles access to one per-workspace partition, if they exist.
+    """Give the runtime roles and the backup role access to one workspace partition, if they exist.
 
     Access, not exemption: the partition carries its own ``ws_isolation`` policy, so this grants
     the right to run a query that the policy then filters. A deployment that has not provisioned
@@ -704,6 +815,7 @@ def grant_workspace_partition(connection: psycopg.Connection, partition: str) ->
     for role, privileges in (
         (RUNTIME_ROLE, sql.SQL("select, insert, update")),
         (EXECUTOR_ROLE, sql.SQL("select")),
+        (BACKUP_ROLE, sql.SQL("select")),
     ):
         present = connection.execute(
             "select 1 from pg_roles where rolname = %s", (role,)

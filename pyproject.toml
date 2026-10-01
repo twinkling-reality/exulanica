@@ -177,6 +177,14 @@ exulanica-asset-preparation = "exulanica.world.asset_preparation_command:main"
 # generated from a recipe are waiting for, off the request: claims each job as the runtime role and
 # publishes each bake through the owner connection migration 0072 requires. Needs Node and web/.
 exulanica-generated-tile-worker = "exulanica.ingest.generated_tiles_command:main"
+# `uv run exulanica-installation check|facts|backup|verify|maintenance|restore`. A complete
+# installation's profile facts, backup sets, unattended maintenance and declared crash recovery;
+# docs/deployment.md section 9 owns its settings and procedures.
+exulanica-installation = "exulanica.orchestration.installation.cli:main"
+# `uv run exulanica-comparison-worker`. Plays comparisons started from the application for the
+# workspaces EXULANICA_SOCIETY_CONTROL_WORKSPACES lists, when the API runs with
+# EXULANICA_COMPARISON_WORKER=process.
+exulanica-comparison-worker = "exulanica.orchestration.comparison_worker:main"
 # `uv run exulanica-wmp project ...` creates a signed, independently verifiable World Memory
 # Package; verify, inspect, and diff never open PostgreSQL.
 exulanica-wmp = "exulanica.world_package.cli:main"

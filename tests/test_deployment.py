@@ -235,8 +235,11 @@ def test_the_derivative_worker_is_a_separate_restartable_command():
 def test_the_pose_worker_is_separate_restartable_and_provenance_configured():
     assert "scene-worker:" in COMPOSE
     assert "exulanica-scene-worker" in COMPOSE
-    assert "EXULANICA_CODE_REVISION: ${EXULANICA_CODE_REVISION:?" in COMPOSE
-    assert "EXULANICA_POSE_RUNTIME_IMAGE: ${EXULANICA_POSE_RUNTIME_IMAGE:?" in COMPOSE
+    # Started only with the reconstruction profile; the worker itself refuses to start without
+    # either provenance value, because Compose would demand them of a server-only installation.
+    assert COMPOSE.count('profiles: ["reconstruction"]') == 2
+    assert "EXULANICA_CODE_REVISION: ${EXULANICA_CODE_REVISION:-}" in COMPOSE
+    assert "EXULANICA_POSE_RUNTIME_IMAGE: ${EXULANICA_POSE_RUNTIME_IMAGE:-}" in COMPOSE
     assert "EXULANICA_CODE_REVISION=" in ENV_EXAMPLE
     assert "EXULANICA_POSE_RUNTIME_IMAGE=" in ENV_EXAMPLE
     assert "--extra server --extra pose" in DOCKERFILE

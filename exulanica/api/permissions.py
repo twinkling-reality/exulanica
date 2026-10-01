@@ -470,6 +470,7 @@ _OPERATIONS_READS: Final = _every(
     "GET /operations/derivative-jobs",
     "GET /operations/derivative-jobs/{job_id}",
     "GET /operations/derivative-jobs/{job_id}/events",
+    "GET /operations/installation",
     "GET /operations/reconstruction-scenes",
     "GET /operations/reconstruction-scenes/{job_id}",
     "GET /spending",

@@ -27,18 +27,22 @@ so a backup never carries one: a restore gives the roles new passwords, in its o
 
 from __future__ import annotations
 
+import contextlib
 import datetime as dt
 import hashlib
 import json
 import os
 import re
-from collections.abc import Mapping
+import shutil
+import tempfile
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Final
 
 import psycopg
 from psycopg import sql
+from psycopg.conninfo import conninfo_to_dict, make_conninfo
 from psycopg.rows import dict_row
 
 from exulanica.db.load_functions import pin_loading_functions
@@ -57,9 +61,12 @@ __all__ = [
     "Backup",
     "check_digest",
     "compare_with_manifest",
+    "dump_database",
     "list_backups",
+    "manifest_sha256",
     "read_backup",
     "restore_database",
+    "restore_database_at",
     "row_counts",
     "take_backup",
     "verify_backup",
@@ -141,6 +148,12 @@ class Backup:
 
 def _manifest_path(dump: Path) -> Path:
     return dump.with_suffix(MANIFEST_SUFFIX)
+
+
+def manifest_sha256(backup: Backup) -> str:
+    """The SHA-256 of the manifest file beside the dump: what a backup set binds of it, since a
+    restore acts on its roles, memberships and counts."""
+    return sha256_of(_manifest_path(backup.dump))
 
 
 def _digest_path(dump: Path) -> Path:
@@ -225,6 +238,40 @@ def _memberships(connection: psycopg.Connection[Any]) -> list[dict[str, Any]]:
     ]
 
 
+@contextlib.contextmanager
+def _passwordless(*urls: str) -> Iterator[list[str]]:
+    """``urls`` with any password moved into one private password file libpq reads.
+
+    A program's arguments are visible to every process on the host, and a password in
+    ``--dbname`` is a password on display for as long as the dump or restore runs. Each URL that
+    carries one becomes a connection string naming a temporary 0600 file instead; the file is
+    removed when the block ends. URLs without a password are passed through unchanged.
+    """
+    rewritten: list[str] = []
+    folder = Path(tempfile.mkdtemp(prefix="exulanica-pass-"))
+    try:
+        for index, url in enumerate(urls):
+            parameters = conninfo_to_dict(url)
+            password = parameters.pop("password", None)
+            if password is None:
+                rewritten.append(url)
+                continue
+            # Any host and port: libpq looks a Unix socket up as localhost, and a file of its own
+            # for each URL serves only this invocation, so nothing else can match it.
+            user = str(parameters.get("user", "*"))
+            line = ":".join(
+                f.replace("\\", "\\\\").replace(":", "\\:") for f in (user, str(password))
+            )
+            passfile = folder / f"pgpass-{index}"
+            descriptor = os.open(passfile, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+                handle.write(f"*:*:*:{line}\n")
+            rewritten.append(make_conninfo("", **parameters, passfile=str(passfile)))
+        yield rewritten
+    finally:
+        shutil.rmtree(folder, ignore_errors=True)
+
+
 def _file_name(reason: str) -> str:
     stamp = dt.datetime.now(dt.UTC).strftime("%Y%m%dT%H%M%S%fZ")
     slug = _REASON_CHARACTERS.sub("-", reason.lower()).strip("-")[:_REASON_LENGTH] or "manual"
@@ -240,34 +287,76 @@ def take_backup(
     can serve on it too. It is the cluster's configured port unless the caller states it: an
     adoption backs up before it records the port in the cluster's settings, so it says which.
     """
-    database.backups.mkdir(mode=0o700, parents=True, exist_ok=True)
-    dump = database.backups / _file_name(reason)
+    return dump_database(
+        database.owner_url(port),
+        database.backups,
+        reason,
+        database_name=database.database_name,
+        service_port=(
+            service_port if service_port is not None else database.cluster.configured_port()
+        ),
+    )
+
+
+def dump_database(
+    url: str,
+    directory: Path,
+    reason: str,
+    *,
+    database_name: str,
+    service_port: int,
+    exclude_table_data: tuple[str, ...] = (),
+) -> Backup:
+    """Dump the database ``url`` reaches into ``directory``, with its digest and manifest.
+
+    The connection needs to read every row and every role, which the owner can and so can an
+    installation's read-only backup role. The manifest names the database's owner, which owns
+    every object the dump creates, whoever took it.
+
+    ``exclude_table_data`` names tables, in any schema, whose definitions are dumped and whose rows
+    are not; the manifest records them and counts them as empty, which is what a restore holds.
+    """
+    directory.mkdir(mode=0o700, parents=True, exist_ok=True)
+    dump = directory / _file_name(reason)
     partial = dump.with_name(dump.name + ".partial")
     if dump.exists() or partial.exists():
         raise LocalDatabaseRefused(Refusal.BACKUP_FAILED, f"{dump} already exists")
-    owner_url = database.owner_url(port)
-    with psycopg.connect(owner_url, row_factory=dict_row) as connection:
+    with psycopg.connect(url, row_factory=dict_row) as connection:
         connection.isolation_level = psycopg.IsolationLevel.REPEATABLE_READ
         connection.read_only = True
-        exported = connection.execute("select pg_export_snapshot() as snapshot").fetchone()
+        exported = connection.execute(
+            "select pg_export_snapshot() as snapshot, transaction_timestamp() as taken_in"
+        ).fetchone()
         assert exported is not None
         try:
-            run(
-                "pg_dump",
-                "--format=custom",
-                "--create",
-                "--no-password",
-                f"--snapshot={exported['snapshot']}",
-                f"--file={partial}",
-                f"--dbname={owner_url}",
-                refusal=Refusal.BACKUP_FAILED,
-            )
-            counts = row_counts(connection)
+            with _passwordless(url) as (dbname,):
+                run(
+                    "pg_dump",
+                    "--format=custom",
+                    "--create",
+                    "--no-password",
+                    f"--snapshot={exported['snapshot']}",
+                    *(f"--exclude-table-data=*.{table}" for table in exclude_table_data),
+                    f"--file={partial}",
+                    f"--dbname={dbname}",
+                    refusal=Refusal.BACKUP_FAILED,
+                )
+            counts = {
+                name: 0 if name.rsplit(".", 1)[-1] in exclude_table_data else count
+                for name, count in row_counts(connection).items()
+            }
             versions = applied_versions(connection)
+            # The schema those versions were read from: a deployment may live in a schema other
+            # than public, and a restored copy is read without the dumping connection's path.
+            schema_row = connection.execute("select current_schema() as name").fetchone()
+            assert schema_row is not None
             roles = _roles(connection)
             memberships = _memberships(connection)
             identity = server_identity(connection)
-            owner = connection.execute("select current_user as owner").fetchone()
+            owner = connection.execute(
+                "select pg_get_userbyid(datdba) as owner from pg_database "
+                "where datname = current_database()"
+            ).fetchone()
             assert owner is not None
         except BaseException:
             partial.unlink(missing_ok=True)
@@ -284,15 +373,16 @@ def take_backup(
         "sha256": digest,
         "bytes": partial.stat().st_size,
         "taken_at": utc_now(),
+        "snapshot_taken_in": exported["taken_in"].astimezone(dt.UTC).isoformat(),
         "reason": reason,
-        "database": database.database_name,
+        "database": database_name,
         "owner_role": owner["owner"],
         "server": identity,
-        "service_port": (
-            service_port if service_port is not None else database.cluster.configured_port()
-        ),
+        "service_port": service_port,
         "migrations": versions,
+        "migrations_schema": schema_row["name"],
         "row_counts": counts,
+        "excluded_table_data": sorted(exclude_table_data),
         "roles": roles,
         "memberships": memberships,
     }
@@ -352,8 +442,23 @@ def check_digest(backup: Backup) -> None:
         )
 
 
-def _create_roles(connection: psycopg.Connection[Any], backup: Backup) -> None:
+def _create_roles(
+    connection: psycopg.Connection[Any], backup: Backup, *, keep_existing: bool = False
+) -> None:
+    """The backup's roles and memberships. With ``keep_existing``, a role the server already has is
+    left as it is: roles belong to the whole server, and a restore beside a set-aside database on
+    the same server finds them, to be reprovisioned afterwards."""
+    present = (
+        {
+            row["rolname"] if isinstance(row, dict) else row[0]
+            for row in connection.execute("select rolname from pg_roles").fetchall()
+        }
+        if keep_existing
+        else set()
+    )
     for role in backup.manifest["roles"]:
+        if role["name"] in present:
+            continue
         keywords = [
             sql.SQL(on if role[name] else off) for name, (on, off) in ROLE_ATTRIBUTES.items()
         ]
@@ -365,6 +470,10 @@ def _create_roles(connection: psycopg.Connection[Any], backup: Backup) -> None:
             )
         )
     for membership in backup.manifest["memberships"]:
+        if membership["member"] in present:
+            # The server's own memberships stand: re-granting the backup's would bring back one
+            # revoked after it, and reprovisioning sets the application roles' own.
+            continue
         connection.execute(
             sql.SQL("grant {} to {} with admin {}, inherit {}, set {}").format(
                 sql.Identifier(membership["role"]),
@@ -388,25 +497,41 @@ def restore_database(cluster: Cluster, port: int, backup: Backup) -> None:
     empty path. A dump taken before migration 0106 holds ``privacy_canonical`` without one, and
     without this step its first model right stops the restore. A newer dump has none to pin.
     """
-    maintenance_url = cluster.url(port, backup.owner_role, "postgres")
+    restore_database_at(
+        cluster.url(port, backup.owner_role, "postgres"),
+        cluster.url(port, backup.owner_role, backup.database),
+        backup,
+    )
+
+
+def restore_database_at(
+    maintenance_url: str, restored_url: str, backup: Backup, *, keep_existing_roles: bool = False
+) -> None:
+    """Load ``backup`` into the empty server ``maintenance_url`` reaches, as its owner role.
+
+    ``restored_url`` names the database the dump creates there. The server's connecting role must
+    be the backup's owner and a superuser, because the dump names that role as the owner of
+    everything in it and its roles are created before its rows. ``keep_existing_roles`` keeps
+    roles the server already has, for a restore onto a server that still holds a set-aside copy.
+    """
     try:
         with psycopg.connect(maintenance_url, autocommit=True, row_factory=dict_row) as connection:
-            _create_roles(connection, backup)
+            _create_roles(connection, backup, keep_existing=keep_existing_roles)
     except psycopg.Error as error:
         raise LocalDatabaseRefused(
             Refusal.RESTORE_FAILED, f"creating the roles {backup.dump.name} needs failed: {error}"
         ) from error
-    run(
-        "pg_restore",
-        "--create",
-        "--exit-on-error",
-        "--no-password",
-        "--section=pre-data",
-        f"--dbname={maintenance_url}",
-        str(backup.dump),
-        refusal=Refusal.RESTORE_FAILED,
-    )
-    restored_url = cluster.url(port, backup.owner_role, backup.database)
+    with _passwordless(maintenance_url) as (maintenance,):
+        run(
+            "pg_restore",
+            "--create",
+            "--exit-on-error",
+            "--no-password",
+            "--section=pre-data",
+            f"--dbname={maintenance}",
+            str(backup.dump),
+            refusal=Refusal.RESTORE_FAILED,
+        )
     try:
         with psycopg.connect(restored_url, autocommit=True) as connection:
             pin_loading_functions(connection)
@@ -415,22 +540,39 @@ def restore_database(cluster: Cluster, port: int, backup: Backup) -> None:
             Refusal.RESTORE_FAILED,
             f"giving the functions {backup.dump.name} loads rows with a path failed: {error}",
         ) from error
-    run(
-        "pg_restore",
-        "--exit-on-error",
-        "--no-password",
-        "--section=data",
-        "--section=post-data",
-        f"--dbname={restored_url}",
-        str(backup.dump),
-        refusal=Refusal.RESTORE_FAILED,
-    )
+    with _passwordless(restored_url) as (restored,):
+        run(
+            "pg_restore",
+            "--exit-on-error",
+            "--no-password",
+            "--section=data",
+            "--section=post-data",
+            f"--dbname={restored}",
+            str(backup.dump),
+            refusal=Refusal.RESTORE_FAILED,
+        )
+
+
+def _versions_in(connection: psycopg.Connection[Any], schema: str | None) -> tuple[str, ...]:
+    """The migration versions recorded in ``schema``, the one the dump read them from, or in the
+    connection's own schema for a manifest that names none. The connection's path is restored."""
+    if schema is None:
+        return tuple(applied_versions(connection))
+    cursor = connection.cursor(row_factory=dict_row)
+    previous = cursor.execute("select current_setting('search_path') as path").fetchone()
+    assert previous is not None
+    path = sql.SQL("{}, public").format(sql.Identifier(schema)).as_string(connection)
+    cursor.execute("select set_config('search_path', %s, false)", (path,))
+    try:
+        return tuple(applied_versions(connection))
+    finally:
+        cursor.execute("select set_config('search_path', %s, false)", (previous["path"],))
 
 
 def compare_with_manifest(connection: psycopg.Connection[Any], backup: Backup) -> dict[str, int]:
     """The restored copy's row counts, when they and its migrations equal the manifest's."""
     counts = row_counts(connection)
-    versions = tuple(applied_versions(connection))
+    versions = _versions_in(connection, backup.manifest.get("migrations_schema"))
     expected = backup.row_counts
     names = sorted(set(counts) | set(expected))
     differ = [name for name in names if counts.get(name) != expected.get(name)]

@@ -8,8 +8,19 @@
 
 name: exulanica
 
+# One backend build for every backend service. EXULANICA_BACKEND_EXTRAS selects the image's extras:
+# "--extra server" by default, for the default profile single-host-server-only, which runs no
+# reconstruction worker; "--extra server --extra pose" (linux/amd64) for single-host.
+x-backend-build: &backend-build
+  context: .
+  args:
+    EXULANICA_SYNC_EXTRAS: ${EXULANICA_BACKEND_EXTRAS:---extra server}
+
 services:
   postgres:
+    # Restarted when its process exits. Docker does not restart a container whose health check
+    # fails; it only marks it unhealthy (docs/deployment.md section 9).
+    restart: unless-stopped
     # The documented target, matched exactly: PostgreSQL 18 with pgvector 0.8.6, which is what
     # `tests/pg_harness.py` refuses to run without. A different tag here means the suite is
     # verifying a schema the deployment does not run.
@@ -32,24 +43,31 @@ services:
   # Runs once, to completion, before the API starts. Migrations and role grants are one command
   # because there is one correct order; see exulanica/db/cli.py.
   migrate:
-    build: .
+    build: *backend-build
     command: ["exulanica-db"]
     environment:
       EXULANICA_DATABASE_URL: postgresql://${POSTGRES_USER:-exulanica}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-exulanica}
       EXULANICA_APP_ROLE_PASSWORD: ${EXULANICA_APP_ROLE_PASSWORD:?set EXULANICA_APP_ROLE_PASSWORD; the runtime must not use the owner}
       EXULANICA_EXECUTOR_ROLE_PASSWORD: ${EXULANICA_EXECUTOR_ROLE_PASSWORD:?set EXULANICA_EXECUTOR_ROLE_PASSWORD; the executor has its own read-only role}
       EXULANICA_ACCOUNT_ROLE_PASSWORD: ${EXULANICA_ACCOUNT_ROLE_PASSWORD:-}
+      # The purge role destroys stored bytes and the backup role reads every row for a backup;
+      # only the maintenance service below connects as either (docs/deployment.md 9.2, 9.3).
+      EXULANICA_PURGE_ROLE_PASSWORD: ${EXULANICA_PURGE_ROLE_PASSWORD:?set EXULANICA_PURGE_ROLE_PASSWORD; maintenance purges as its own role}
+      EXULANICA_BACKUP_ROLE_PASSWORD: ${EXULANICA_BACKUP_ROLE_PASSWORD:?set EXULANICA_BACKUP_ROLE_PASSWORD; maintenance backs up as its own read-only role}
     depends_on:
       postgres:
         condition: service_healthy
+      restore-marker:
+        condition: service_completed_successfully
 
   # Runs to completion after `migrate`, before the API: publishes the character catalogs the image
   # carries (migration 0131), the people every world draws and the parametric family a person may
-  # wear. Publication is host administration, so this job and `migrate` are the two that hold the
-  # owner connection. It runs on every `up`: an identical catalog is answered `unchanged`, and a
-  # newer image serves its newer revision. Without it nobody is drawn and /readyz says so.
+  # wear. Publication is host administration, so it connects as the owner, as `migrate` does, and
+  # writes into the store the API serves. It runs on every `up`, a restored installation's included:
+  # an identical catalog is answered `unchanged`, and a newer image serves its newer revision.
+  # Without it nobody is drawn and /readyz says so.
   catalogs:
-    build: .
+    build: *backend-build
     command: ["exulanica-character-catalog", "publish", "--apply"]
     environment:
       EXULANICA_DATABASE_URL: postgresql://${POSTGRES_USER:-exulanica}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-exulanica}
@@ -64,7 +82,13 @@ services:
         condition: service_completed_successfully
 
   api:
-    build: .
+    # The image's command, with a bounded shutdown: without it a stop waits for every open
+    # progress stream, which ends only at its thirty-minute cap.
+    command: ["uvicorn", "--factory", "exulanica.api.app:create_app", "--host", "0.0.0.0", "--port", "8000", "--timeout-graceful-shutdown", "10"]
+    # Restarted when its process exits. Docker does not restart a container whose health check
+    # fails; it only marks it unhealthy (docs/deployment.md section 9).
+    restart: unless-stopped
+    build: *backend-build
     environment:
       # Runtime processes never receive the bootstrap owner credential. PostgreSQL superusers
       # bypass row-level security even on FORCE tables, so this role choice is a data boundary.
@@ -96,9 +120,20 @@ services:
       # process shares the witness volume, which is never restored with the database.
       EXULANICA_SPENDING: ${EXULANICA_SPENDING:-}
       EXULANICA_SPENDING_WITNESS_DIR: /var/lib/exulanica-spending-witness
+      # The installation this API belongs to and what it reports about itself (docs/deployment.md
+      # 9.1). The revision and image digests are the ones deployed; unset, facts say so.
+      EXULANICA_INSTALLATION_PROFILE: /app/deploy/profiles/${EXULANICA_PROFILE:-single-host-server-only}.json
+      EXULANICA_MAINTENANCE_STATUS_PATH: /var/lib/exulanica-status/maintenance.json
+      EXULANICA_CODE_REVISION: ${EXULANICA_CODE_REVISION:-}
+      EXULANICA_IMAGE_BACKEND: ${EXULANICA_IMAGE_BACKEND:-}
+      EXULANICA_IMAGE_CLIENT: ${EXULANICA_IMAGE_CLIENT:-}
     volumes:
       - media:/var/lib/exulanica
       - spending-witness:/var/lib/exulanica-spending-witness
+      - maintenance-status:/var/lib/exulanica-status:ro
+      # The restore marker the profile names (ADR-0019): read here, written by restore-marker and
+      # by an operator's declared restore, never by the API.
+      - restore-control:/var/lib/exulanica-restore:ro
     ports:
       - "${EXULANICA_PORT:-8000}:8000"
     depends_on:
@@ -106,8 +141,14 @@ services:
         condition: service_completed_successfully
       catalogs:
         condition: service_completed_successfully
+      restore-marker:
+        condition: service_completed_successfully
 
+  # The reconstruction workers start only with `--profile reconstruction`, on a linux/amd64 host
+  # whose image carries the reconstruction and pose extras (installation profile single-host). The
+  # default composition is single-host-server-only, whose profile reports them unavailable.
   derivative-worker:
+    profiles: ["reconstruction"]
     build:
       context: .
       args:
@@ -146,7 +187,8 @@ services:
         condition: service_completed_successfully
 
   scene-worker:
-    build: .
+    profiles: ["reconstruction"]
+    build: *backend-build
     command: ["exulanica-scene-worker"]
     restart: unless-stopped
     healthcheck:
@@ -159,17 +201,134 @@ services:
       EXULANICA_WORKSPACE_IDS: ${EXULANICA_WORKSPACE_IDS:?set EXULANICA_WORKSPACE_IDS to the comma-separated workspaces this worker may drain}
       EXULANICA_DATA_DIR: /var/lib/exulanica
       # Both values enter the signed-by-content pose manifest. No mutable image tag or guessed
-      # checkout is accepted as provenance for geometry that reaches the renderer.
-      EXULANICA_CODE_REVISION: ${EXULANICA_CODE_REVISION:?set the exact 40-character Git revision}
-      EXULANICA_POSE_RUNTIME_IMAGE: ${EXULANICA_POSE_RUNTIME_IMAGE:?set an image reference pinned by sha256 digest}
+      # checkout is accepted as provenance for geometry that reaches the renderer. Compose checks
+      # a required value for every service, started or not, so the worker itself refuses to start
+      # without either (exulanica/ingest/scene_worker_command.py) rather than a server-only
+      # installation having to invent a pose image it never runs.
+      EXULANICA_CODE_REVISION: ${EXULANICA_CODE_REVISION:-}
+      EXULANICA_POSE_RUNTIME_IMAGE: ${EXULANICA_POSE_RUNTIME_IMAGE:-}
     volumes:
       - media:/var/lib/exulanica
     depends_on:
       migrate:
         condition: service_completed_successfully
 
+  # Unattended maintenance: withdrawal exports on change, purges, backup sets, their purge and
+  # verification, retention and queue ages, one bounded pass at a time (docs/deployment.md 9.3).
+  # Backups and custody are bind mounts the operator names, because they belong on storage apart
+  # from pgdata and media; custody must not be inside the backup directory.
+  maintenance:
+    build:
+      context: .
+      dockerfile: deploy/installation/maintenance.Dockerfile
+      # The API's backend image, with the PostgreSQL programs a backup needs added.
+      additional_contexts:
+        backend: service:api
+    command: ["exulanica-installation", "maintenance", "--loop"]
+    restart: unless-stopped
+    environment:
+      EXULANICA_BACKUP_DATABASE_URL: postgresql://exulanica_backup:${EXULANICA_BACKUP_ROLE_PASSWORD}@postgres:5432/${POSTGRES_DB:-exulanica}
+      EXULANICA_PURGE_DATABASE_URL: postgresql://exulanica_purge:${EXULANICA_PURGE_ROLE_PASSWORD}@postgres:5432/${POSTGRES_DB:-exulanica}
+      EXULANICA_INSTALLATION_PROFILE: /app/deploy/profiles/${EXULANICA_PROFILE:-single-host-server-only}.json
+      EXULANICA_DATA_DIR: /var/lib/exulanica
+      EXULANICA_BACKUP_DIRECTORY: /var/lib/exulanica-backup/sets
+      EXULANICA_BACKUP_STORE_DIRECTORY: /var/lib/exulanica-backup/store
+      EXULANICA_CUSTODY_DIRECTORY: /var/lib/exulanica-custody
+      EXULANICA_MAINTENANCE_STATUS_PATH: /var/lib/exulanica-status/maintenance.json
+    volumes:
+      - media:/var/lib/exulanica
+      - maintenance-status:/var/lib/exulanica-status
+      - restore-control:/var/lib/exulanica-restore:ro
+      # Read only: maintenance copies witness records out as evidence and never writes them.
+      - spending-witness:/var/lib/exulanica-spending-witness:ro
+      - ${EXULANICA_BACKUP_PATH:?set EXULANICA_BACKUP_PATH to a directory apart from the database and media storage}:/var/lib/exulanica-backup
+      - ${EXULANICA_CUSTODY_PATH:?set EXULANICA_CUSTODY_PATH to a directory apart from the backup directory}:/var/lib/exulanica-custody
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      restore-marker:
+        condition: service_completed_successfully
+
+  # Runs once, before migrate: on a first install (an empty database) writes the profile's
+  # restore marker in state none. On an installed database a missing marker is lost custody: it
+  # refuses, and the API, which needs it, does not start.
+  restore-marker:
+    build: *backend-build
+    command: ["exulanica-installation", "init"]
+    environment:
+      EXULANICA_RESTORE_DATABASE_URL: postgresql://${POSTGRES_USER:-exulanica}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-exulanica}
+      EXULANICA_INSTALLATION_PROFILE: /app/deploy/profiles/${EXULANICA_PROFILE:-single-host-server-only}.json
+    volumes:
+      - restore-control:/var/lib/exulanica-restore
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # An operator's restore, run by hand, never on its own (docs/deployment.md 9.4):
+  # `docker compose --profile recovery run --rm restore declared --backup-set DIR --export FILE
+  # --declaration FILE --marker /var/lib/exulanica-restore/restore.json` into an empty server, or
+  # `... restore planned --backup-set DIR --checkpoint FILE --marker ... --set-aside` with every
+  # other service stopped.
+  # Like migrate, it is a one-shot job and the only kind that holds the owner connection.
+  restore:
+    profiles: ["recovery"]
+    build:
+      context: .
+      dockerfile: deploy/installation/maintenance.Dockerfile
+      additional_contexts:
+        backend: service:api
+    entrypoint: ["exulanica-installation", "restore"]
+    environment:
+      EXULANICA_RESTORE_MAINTENANCE_URL: postgresql://${POSTGRES_USER:-exulanica}:${POSTGRES_PASSWORD}@postgres:5432/postgres
+      EXULANICA_RESTORE_DATABASE_URL: postgresql://${POSTGRES_USER:-exulanica}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-exulanica}
+      # A planned restore's source: on one host, the same database, sealed then set aside.
+      EXULANICA_SOURCE_DATABASE_URL: postgresql://${POSTGRES_USER:-exulanica}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-exulanica}
+      EXULANICA_PURGE_DATABASE_URL: postgresql://exulanica_purge:${EXULANICA_PURGE_ROLE_PASSWORD}@postgres:5432/${POSTGRES_DB:-exulanica}
+      EXULANICA_APP_ROLE_PASSWORD: ${EXULANICA_APP_ROLE_PASSWORD}
+      EXULANICA_EXECUTOR_ROLE_PASSWORD: ${EXULANICA_EXECUTOR_ROLE_PASSWORD}
+      EXULANICA_PURGE_ROLE_PASSWORD: ${EXULANICA_PURGE_ROLE_PASSWORD}
+      EXULANICA_BACKUP_ROLE_PASSWORD: ${EXULANICA_BACKUP_ROLE_PASSWORD}
+      EXULANICA_ACCOUNT_ROLE_PASSWORD: ${EXULANICA_ACCOUNT_ROLE_PASSWORD:-}
+      EXULANICA_INSTALLATION_PROFILE: /app/deploy/profiles/${EXULANICA_PROFILE:-single-host-server-only}.json
+      EXULANICA_DATA_DIR: /var/lib/exulanica
+      EXULANICA_BACKUP_STORE_DIRECTORY: /var/lib/exulanica-backup/store
+      # A declared recovery replays the newest export in custody, whatever file is named.
+      EXULANICA_CUSTODY_DIRECTORY: /var/lib/exulanica-custody
+    volumes:
+      - media:/var/lib/exulanica
+      - restore-control:/var/lib/exulanica-restore
+      - ${EXULANICA_BACKUP_PATH:?set EXULANICA_BACKUP_PATH to a directory apart from the database and media storage}:/var/lib/exulanica-backup
+      - ${EXULANICA_CUSTODY_PATH:?set EXULANICA_CUSTODY_PATH to a directory apart from the backup directory}:/var/lib/exulanica-custody
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # The browser client: the app's production bundle, built on the host, served by nginx, which
+  # proxies /api to the API (deploy/installation/client.Dockerfile). Bound to loopback, as the
+  # reviewer stack's is: a public address needs TLS in front of it.
+  client:
+    # Restarted when its process exits. Docker does not restart a container whose health check
+    # fails; it only marks it unhealthy (docs/deployment.md section 9).
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: deploy/installation/client.Dockerfile
+      args:
+        EXULANICA_CODE_REVISION: ${EXULANICA_CODE_REVISION:-}
+        EXULANICA_CLIENT_TREE_SHA256: ${EXULANICA_CLIENT_TREE_SHA256:-}
+        EXULANICA_NODE_VERSION: ${EXULANICA_NODE_VERSION:-}
+        EXULANICA_PNPM_VERSION: ${EXULANICA_PNPM_VERSION:-}
+    ports:
+      - "127.0.0.1:${EXULANICA_CLIENT_PORT:-8080}:8080"
+    depends_on:
+      - api
+
 volumes:
   pgdata:
+  # What maintenance last did, read by the API's installation facts.
+  maintenance-status:
+  # The external restore marker, outside both the database and the media backups.
+  restore-control:
   # The spending witness: what every authority's ledger has committed, kept apart from pgdata so a
   # database restore cannot hand spent allowance back. Never back it up as restorable data.
   spending-witness:

@@ -1,0 +1,7 @@
+# The client image's context is an allowlist: the host-built bundle and the nginx configuration.
+# Never a `.env`.
+*
+!web/packages/app/dist
+!deploy/installation/client-nginx.conf
+**/.env
+**/.env.*

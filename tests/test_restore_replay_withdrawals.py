@@ -27,7 +27,7 @@ from exulanica.api.account_repository import AccountRejected, AccountRepository,
 from exulanica.canonical import canonical_json
 from exulanica.consent.training import TrainingTerms
 from exulanica.deletion.restore import RestoreRefused, verify_restore
-from exulanica.deletion.withdrawals import CATALOG
+from exulanica.deletion.withdrawals import CATALOG, read_withdrawals
 from exulanica.identity import rename_entity
 from exulanica.ingest.person_review import create_subject, record_consent
 from exulanica.ingest.repository import IngestRepository
@@ -349,6 +349,69 @@ def test_a_character_catalog_withdrawn_after_the_backup_stays_withdrawn(purged, 
         connection.commit()
 
 
+def test_a_character_catalog_published_and_withdrawn_after_the_backup_stays_withdrawn(
+    purged, commands, tmp_path
+):
+    """The backup predates the publication, so the restored database holds nothing the withdrawal
+    ends. Replay writes it all the same (0135, "absent": "carry"), and the catalogs job's next
+    publish records the image's copy as withdrawn instead of serving it again."""
+    connection = purged.repository.connection
+    layered = catalog_documents()[0]
+    digest = read_publication_document(layered).catalog_sha256
+    keys = sorted({item.manifest.asset_key for item in catalog_imports(layered)})
+    held = {
+        row["asset_key"]
+        for row in purged.rows(
+            "select asset_key from world_reviewed_asset where asset_key = any(%s)", keys
+        )
+    }
+    registry = CatalogRegistry()
+    store = LocalContentAddressedStore(tmp_path / "people")
+
+    def publish() -> str:
+        """What the catalogs job runs on every start."""
+        with connection.transaction():
+            [outcome] = publish_catalogs(connection, store, [layered])
+        connection.commit()
+        return outcome.state
+
+    def served() -> bool:
+        return digest in {p.catalog_sha256 for p in registry.served(connection).publications}
+
+    try:
+        dump, blobs = _backup(purged, tmp_path)
+        assert publish() == "published" and served(), "the positive control: served at the source"
+        with connection.transaction():
+            assert withdraw_catalog(connection, digest, "licence_withdrawn") == "withdrawn"
+        connection.commit()
+        assert not served(), "the withdrawal took effect at the source"
+        carried = read_withdrawals(connection)
+        source, marker = _seal(tmp_path)
+        _restore(purged, dump, blobs)
+        assert purged.rows("select 1 from character_catalog_publication") == [], (
+            "the backup holds no publication of it"
+        )
+        _replay(source, marker)
+        verify_restore(purged.database(), marker)
+        assert [
+            r["catalog_sha256"]
+            for r in purged.rows("select catalog_sha256 from character_catalog_withdrawal")
+        ] == [digest], "replay wrote the withdrawal with nothing to end"
+        assert publish() == "withdrawn", "the next start records it and keeps it withdrawn"
+        assert not served()
+        # The custody rule asks the same question of every export after this restore.
+        from exulanica.deletion.withdrawals import open_withdrawals
+
+        assert open_withdrawals(connection, carried) == []
+    finally:
+        with connection.transaction():
+            connection.execute(
+                "delete from world_reviewed_asset where asset_key = any(%s)",
+                (sorted(set(keys) - held),),
+            )
+        connection.commit()
+
+
 def _signed_in(purged) -> tuple[str, uuid.UUID]:
     """An account holder with one browser session, written as sign-in writes them."""
     token = secrets.token_urlsafe(32)
@@ -594,8 +657,15 @@ def test_a_continued_chain_is_continued_once_when_the_replay_resumes(
     class Interrupted(RuntimeError):
         pass
 
-    def stopped(*args, **kwargs):
-        raise Interrupted("the purge never started")
+    class stopped:
+        """However replay builds its worker, the purge never starts."""
+
+        def __init__(self, *args, **kwargs):
+            raise Interrupted("the purge never started")
+
+        @classmethod
+        def over(cls, *args, **kwargs):
+            raise Interrupted("the purge never started")
 
     with monkeypatch.context() as patched:
         patched.setattr(restore, "PurgeWorker", stopped)

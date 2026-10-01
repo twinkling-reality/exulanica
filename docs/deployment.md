@@ -58,6 +58,11 @@ worker. The repository holds the recipes; no cloud account, host or domain is pr
 - [8. A seeded deployment for a reviewer](#8-a-seeded-deployment-for-a-reviewer)
   - [8.1 Serving it over HTTPS from one host](#81-serving-it-over-https-from-one-host)
 - [9. Backups and recovery](#9-backups-and-recovery)
+  - [9.0 Sizing one host](#90-sizing-one-host)
+  - [9.1 Installation profiles and facts](#91-installation-profiles-and-facts)
+  - [9.2 Backup sets](#92-backup-sets)
+  - [9.3 Unattended maintenance](#93-unattended-maintenance)
+  - [9.4 Recovery](#94-recovery)
 - [10. Hosting options researched and not built](#10-hosting-options-researched-and-not-built)
 - [11. Open items](#11-open-items)
 - [12. Changes declined](#12-changes-declined)
@@ -389,7 +394,9 @@ Google sign-in is optional, and its six settings are required together:
 The account tables (migration 0058) sit outside workspace scope. `exulanica-db` provisions
 `exulanica_accounts`, a non-owner NOINHERIT role that reaches them and no world record, and the
 application roles cannot read them. Startup checks that separation against the application's own
-connection. Provider requests run outside database transactions and are held to
+connection. An installation's backup sets carry the account tables except the rows of
+`account_login_attempt` and `account_browser_session` (9.2). Provider requests run outside database
+transactions and are held to
 `EXULANICA_EGRESS_ALLOWLIST`, which must include `https://accounts.google.com` (discovery),
 `https://oauth2.googleapis.com` (token) and `https://www.googleapis.com` (JWKS), or startup stops
 and names the origins it lacks. The endpoint URLs are pinned in `exulanica/api/account_runtime.py`:
@@ -462,8 +469,9 @@ directory, or object-store settings, that the API serves its store from.
 - **Which paths run it.** `compose.yaml` and `deploy/judge/compose.yaml` each run it as their
   `catalogs` job, after `migrate` and before `api`.
 - **Running it again.** It is idempotent: an identical catalog is answered `unchanged`, and an
-  image carrying a newer catalog publishes the newer revision. Without `--apply` it checks every
-  document and container and writes nothing.
+  image carrying a newer catalog publishes the newer revision. A catalog the host withdrew is
+  answered `withdrawn` and stays withdrawn, even after a restore from a backup that never held it.
+  Without `--apply` it checks every document and container and writes nothing.
 
 #### 5.2.2 The derivative worker
 
@@ -566,12 +574,21 @@ says what it checks.
 
 #### 5.2.8 The restore command
 
-`python -m exulanica.orchestration.restore checkpoint`, `prepare` and `replay` read
-`EXULANICA_DATABASE_URL` (the administrative connection of the source or restored database),
-`EXULANICA_PURGE_DATABASE_URL` (replay) and the content store. The API then reads
-`EXULANICA_RESTORE_STATE_PATH` (5.1). The procedure is [ADR-0019](adr/0019-offline-restore-tombstone-replay.md)'s,
-and [ADR-0026](adr/0026-a-restore-carries-every-withdrawal.md) states which withdrawals a restore
+`python -m exulanica.orchestration.restore checkpoint`, `export`, `prepare` and `replay` read
+`EXULANICA_DATABASE_URL` (a connection with the complete view: the administrative connection of the
+source or restored database, or any role with `BYPASSRLS`), `EXULANICA_PURGE_DATABASE_URL` (replay)
+and the content store. The API then reads `EXULANICA_RESTORE_STATE_PATH` (5.1). The procedure is
+[ADR-0019](adr/0019-offline-restore-tombstone-replay.md)'s, and
+[ADR-0026](adr/0026-a-restore-carries-every-withdrawal.md) states which withdrawals a restore
 carries.
+
+| Action | What it does |
+| --- | --- |
+| `checkpoint --checkpoint FILE` | Locks and seals a stopped source and writes its complete record, for a planned restore |
+| `export --directory DIR [--keep N]` | Writes the same record from a running source to a fresh file in `DIR`, in one read-only snapshot, without a seal, with `covered_through` (the transaction's start), for a crash recovery, then keeps this source's newest `N` exports there (3 by default) and every export a backup set in `EXULANICA_BACKUP_DIRECTORY` names. Refused: `DIR` inside the content store or the backup directories, a standby, a sealed or replaying source, a declared restore (the profile's marker, or `--marker` without a profile) not yet complete, and a database older than the newest export in `DIR`. Its reads make a concurrent checkpoint or schema change wait |
+| `prepare --checkpoint FILE --marker FILE` | Writes the pending external marker before anything is restored. A sealed checkpoint takes no declaration. A checkpoint the marker records among its completed restores is refused, while the marker is kept: the marker carries that record forward through every later restore |
+| `prepare ... --declaration FILE --max-export-lag-seconds N` | The same for an export, which requires both: the declaration (`exulanica.recovery-declaration/v1`: `declaration_id`, `export_sha256`, `incident_at` with its zone, `reason`) must name that export, and `incident_at` must be after `covered_through` and within the bound of it, and the export must be the newest valid export in `EXULANICA_CUSTODY_DIRECTORY`, which is required, wherever the file given lies. The bound is the profile's `max_export_lag_seconds`, which `N` may lower and never raise; a declared `prepare` without a profile is refused. It is at most 86400, and never the declaration's. A declaration states exactly those five fields, each as text, with a reason. The marker records the declaration and the bound, and the command prints the window that is not restored |
+| `replay --checkpoint FILE --marker FILE` | Replays withdrawals and tombstones, purges, and completes the marker. An export replays only when the declaration its marker records validates again; the receipt records the window, and the command prints it. A marker already complete is refused: replaying it again would let a database that has not served since (a set-aside source) serve with every later deletion undone |
 
 #### 5.2.9 The reviewer seed command
 
@@ -1025,21 +1042,229 @@ value:
 
 `EXULANICA_BUDGET_USD` is a ceiling for one API process life: a restart of `api`, or of the host,
 starts a fresh one, so the model provider's own balance is what bounds spend across restarts. The
-stack has no per-judge spend limit, no backup of its volumes (D-3) and no monitoring beyond
-Docker's liveness check and `status`; a revoked token stays valid until the next `up`.
+stack has no per-judge spend limit, no backup of its volumes (D-3) and no monitoring beyond the
+health status Docker records, which nothing acts on, and `status`; a revoked token stays valid
+until the next `up`.
 
 ## 9. Backups and recovery
 
 - **Personal install:** `exulanica-local-db` backs up on every stop and around every upgrade, and
   `verify` proves a backup restores (section 3.2).
-- **Composed deployment:** no backup job exists for the database or the media volume, and no restore
-  of a composed deployment has been timed (open item D-3). No one-command redeploy exists (D-2).
-- **Restoring over withdrawals:** a database restored from a backup taken before a deletion must
-  replay every withdrawal before it serves. The restore command does that (5.2.8), and the API
-  refuses to serve while a declared restore is sealed or replaying.
-- **Workers:** `compose.yaml` restarts the derivative and scene workers (`restart: unless-stopped`).
-  A worker's shutdown, lease recovery and retry are in
-  [worker operations](derivative-worker-operations.md).
+- **Installation:** `exulanica-installation` takes backup sets, runs unattended maintenance and
+  recovers a lost source (9.1 to 9.4). `compose.yaml` runs its maintenance service and holds the
+  operator's restore job behind `--profile recovery`; a composed restore has been timed only on a
+  small fixture, not at production size (open item D-3).
+- **Restarts:** `restart: unless-stopped` restarts a process that exits, within seconds. Docker and
+  Compose do not restart a container whose health check fails; they only mark it unhealthy. And
+  any `docker kill`, whatever its signal, marks a container as stopped by hand, after which its
+  restart policy no longer applies until it is recreated: never send a running installation a
+  signal with `docker kill` to diagnose it. A worker killed with queued work leaves that work
+  queued, and the work completes once the worker runs again. A worker's shutdown, lease recovery
+  and retry are in [worker operations](derivative-worker-operations.md).
+
+### 9.0 Sizing one host
+
+The request limits are the API's own settings, per API process, with measured defaults (the API's
+runtime capacity contract owns them). At those defaults one API process holds up to 58 PostgreSQL
+connections (twice its request and upload slots, four stream pollers and two readiness checks),
+which fits PostgreSQL's default of 100 beside maintenance and the workers; a second API process
+does not. Decoding and upload bodies take about 1.2 GB at the defaults, and each worker process
+about 512 MB more. These were measured on one 18-core, 64 GiB development machine; a smaller host
+is not covered. The composition gives uvicorn `--timeout-graceful-shutdown 10`, so a stop does not
+wait for open progress streams.
+
+### 9.1 Installation profiles and facts
+
+An installation declares its profile (`EXULANICA_INSTALLATION_PROFILE`, a file under
+`deploy/profiles/`, profile `exulanica.installation-profile/v1`): which of thirteen components it
+runs, the reason one it runs cannot work here, the queue bound past which a component is reported
+degraded, and its recovery bounds (9.4). `reviewer` is the seeded stack of section 8 and is not a
+complete installation; `single-host` runs every component on one host; `single-host-server-only` is
+the same built without the reconstruction and pose extras, whose workers then report unavailable,
+and is what `compose.yaml` and `.env.example` select by default (`EXULANICA_PROFILE`);
+`shared-store` keeps its bytes in an S3-compatible bucket, composed by adding
+`deploy/installation/compose.shared-store.yaml`, which gives the runtime object-store identity to the
+API and workers and the purge identity to maintenance and the restore job alone. A process whose
+`EXULANICA_STORE_KIND` differs from its profile's store refuses to start (`store_kind_conflict`): its
+bytes would be outside the installation's backups. A profile names processes, not features, and
+holds no secret, host or account. Every profile names its restore marker
+(`recovery.restore_state_path`), which every process of the installation reads, and
+`exulanica-installation init` writes it in state `none` only on a first install, a database with
+no applied schema, before the API first starts; a marker missing on an installed database is lost
+custody, and both `init` and the API refuse.
+
+`exulanica.api.installation.installation_facts` answers `exulanica.installation-facts/v1` in process
+for the capability projection: each component's state (`not_installed`, `unavailable`, `configured`,
+`ready`, `degraded` or `refused`) with a stable reason, the model mode and paid admission, the store,
+the restore state and the serving gate, and the installation's identity (profile digest, code
+revision, image digests, schema, a digest of which settings are set). Database-derived parts are
+at most 5 seconds old. `GET /operations/installation` serves the document to an operator holding
+`operations.read`; unauthenticated `/readyz` carries only each component's state and reason. Queue
+progress across workspaces comes from the maintenance status file (9.3), because the API's role
+cannot see other workspaces' queues; a status older than two export intervals is reported, not
+trusted. Paid admission states how model spending is bounded: `process` (one process's ceilings,
+started again with it) or `durable`, with each spending authority's state and witness and never an
+amount; a durable process with no active authority is `blocked`, `spending_suspended` with the
+suspension codes when a restored ledger is behind its witness, so a restore never hands spent
+allowance back. It also states this process's own witness directory (`process_witness`): a process
+whose directory has no witness directory marker, or which has none, cannot spend under a witnessed
+authority and is refused alone (`process_refusal`, such as `witness_directory_mismatch`) while the
+authority stays active for every other process. The store section states the profile's store, the kind this process built and that
+store's own description (kinds and bucket-check codes, never an endpoint, bucket or credential).
+Request capacity is not copied into the facts: `/readyz` states the configured limits and
+`GET /operations/capacity` the load, for an operator holding `operations.read`.
+
+### 9.2 Backup sets
+
+A backup set (`exulanica.installation-backup/v1`) is a directory under `EXULANICA_BACKUP_DIRECTORY`,
+written in this order, each step checked before the next:
+
+1. The database, dumped in one exported snapshot as `exulanica_backup`, after refusing any table
+   that role cannot read; the same dump and manifest a personal install takes.
+2. The stored bytes of every namespace the store registry lists (`ContentStores.namespaces()`:
+   `blobs`, `tiles`, then each workspace's `materials/<workspace hex>`, and any namespace registered
+   later), copied key for key into `EXULANICA_BACKUP_STORE_DIRECTORY` under the same names, each
+   re-derived from its bytes as it is written; a set records the sorted list of keys it holds. The
+   copy is a host directory whether the live store is local or an object store, and one that lies
+   inside the live store, or holds it, is refused.
+3. A withdrawal export into `EXULANICA_CUSTODY_DIRECTORY`, taken after the dump's snapshot.
+   Every export records its source (the database server and database it came from), and refuses a
+   database that lacks a tombstone the newest export of any source holds, or still holds a row whose
+   withdrawal that export records as applied, as a restored database that has not replayed does. A
+   row the database does not hold at all (a sign-in session no backup carries, or a row made after
+   the backup) is honoured. Custody keeps this source's newest three exports, every other source's
+   newest one (the one the rule above compares with) and every export a retained backup set names.
+4. The manifest, last and digest-bound. It binds the dump's digest and the digest of the dump's
+   own manifest, whose roles and memberships a restore acts on; a restore and verification refuse a
+   set whose dump or dump manifest is another. A directory without it is not a backup set.
+
+`exulanica-installation verify --backup-set DIR` loads the dump into a scratch PostgreSQL server
+and compares its rows with the manifest, and re-hashes every listed object; a missing or damaged
+object is refused by name, except one that the newest export in `EXULANICA_CUSTODY_DIRECTORY` names
+as a completed purge's target, which maintenance erases from the backup copy (9.3). The maintenance image (`deploy/installation/maintenance.Dockerfile`) carries the
+PostgreSQL 18 programs this needs, taken from the database's own image. Backup sets, the backup store and custody must be outside the data
+directory, and custody outside the backup directory. No password reaches a program's arguments:
+`pg_dump` and `pg_restore` read theirs from a temporary private password file of their own, which
+matches any host and port.
+
+The dump carries the definitions of `account_login_attempt` and `account_browser_session` and not
+their rows, which hold plaintext sign-in nonces, verifiers and CSRF tokens: a restored installation
+asks everyone to sign in again.
+
+`exulanica_backup` is provisioned by `exulanica-db` with `EXULANICA_BACKUP_ROLE_PASSWORD`: BYPASSRLS,
+SELECT on every table and sequence (and, by default privilege, on those the owner creates later)
+and nothing else, no role membership and no SECURITY DEFINER function. Its read-only default is
+defense in depth, not a barrier: a session can lift it, and can then create temporary tables and
+large objects, which PostgreSQL grants to every role; the product stores no large object, and
+maintenance reports any as `backup_role_incomplete`, with any table the role cannot read. The
+credential also allows advisory locks, NOTIFY and changing its own password, and it reads every
+row: only the maintenance process receives it, and it is protected as a read-all secret.
+
+### 9.3 Unattended maintenance
+
+`exulanica-installation maintenance --loop` runs one bounded pass at a time: a withdrawal export
+when a tombstone or catalogued withdrawal may have changed and at least every export interval, a
+purge of at most 500 jobs as `exulanica_purge`, a backup set when the newest is older than the backup
+interval, the destruction in the backup store of bytes a completed purge destroyed (unless the live
+store holds them again, and only once the newest export names that purge, so verification and a
+crash recovery accept exactly the same gaps; the local copy is checked first, so a purge already
+erased there costs the live store no request), verification of the newest set, removal of sets older than the retention
+bound (the newest is always kept), and the age of the oldest queued item of each component. Each
+step's failure is a stable code in `failures`, and the rest of the pass still runs, except that a
+failed export skips the backup set and the backup-copy purge, which both depend on it. A database
+set aside by a planned restore is reported as `set_aside_database_present` until it is discarded,
+and the number of keys restores listed as written after their backups (9.4) is stated as
+`objects_not_in_backup_listed`, counted from the listings alone, with no store request. The pass writes
+`exulanica.maintenance-status/v1` to `EXULANICA_MAINTENANCE_STATUS_PATH`, which the API reads.
+
+Withdrawn content leaves backups by two bounds: stored bytes within one maintenance pass of their
+purge, and database rows when their backup set passes the retention bound.
+
+### 9.4 Recovery
+
+A database restored from a backup taken before a deletion must replay every withdrawal before it
+serves. The restore command does that (5.2.8), and the API refuses to serve while a declared
+restore is sealed or replaying. Two cases are kept apart
+([ADR-0028](adr/0028-a-crash-recovery-replays-a-declared-withdrawal-export.md)):
+
+- **Planned restore**, with the source available: stop every writer, then
+  `exulanica-installation restore planned --backup-set DIR --checkpoint FILE` seals a checkpoint,
+  writes the profile's marker, loads the set into the target and replays. No withdrawal is lost. On
+  one host, `--set-aside` renames the sealed source database instead of needing another server. It
+  sets aside only the source itself: before sealing, the target's database must be the source by
+  the identity every export records (server and database), and after sealing, sealed for this
+  checkpoint; anything else is refused and nothing is renamed. Without `--set-aside`, a target that
+  already holds the source's name is refused before anything is sealed. Until the restore
+  completes, `restore return-to-source --checkpoint FILE [--set-aside]` abandons it and lets the
+  source serve again; without `--set-aside` it replays only into a database sealed for this
+  checkpoint, so it refuses a partial copy that took the source's name after the source was set
+  aside. It replays with the installation's own purge connection and stores, so it returns a
+  source on the installation's server; a source on another server fails closed (its re-queued
+  purges cannot complete there) and is returned with that server's own settings. Once it completes, the set-aside source lacks every deletion made since and
+  lies outside every deletion path, so it can never serve again:
+  `restore discard-set-aside --checkpoint FILE` drops it, and only a database that is that sealed
+  source, found through the marker's record of completed restores, so it stays discardable after a
+  later restore. The marker records every restore that completes and carries the record through
+  every later write, and while it is kept, preparing, resuming or replaying a recorded checkpoint
+  again is refused as already complete; a lost marker loses that record. A rerun classifies the
+  target before it writes the marker, and a database in which a restore completed is refused as
+  live, never offered as a partial copy.
+- **Crash recovery**, with the source lost: `exulanica-installation restore declared --backup-set DIR
+  --export FILE --declaration FILE` writes the marker first, loads the backup set into an empty
+  target, copies its bytes back, migrates and reprovisions, and replays the export under the
+  operator's recovery declaration. It refuses when the export is not the newest valid export in
+  `EXULANICA_CUSTODY_DIRECTORY`, wherever the file given lies, does not match its digest or catalog, is older than the backup set's own
+  export, or ends further before the declared incident than the profile's `max_export_lag_seconds`;
+  there is no override. A withdrawal made after that export is not recovered, and the marker and the
+  restore receipt record the window it fell in. The export names its withdrawal catalog, and a replay
+  refuses another release's, so a crash recovery runs on the release the export came from and
+  upgrades afterwards. A pending declared recovery is abandoned, for example for a newer export, by
+  `restore abandon --export FILE`, once the target holds no database of that name: the marker
+  becomes `abandoned`, which still refuses serving, as pending did, and accepts a new restore.
+
+Both restores check the set's key list, its dump's digest and the target database's name before
+anything else, then write the marker before loading anything, and keep the API refusing until
+replay completes. A failed restore is resumed by running the same command again: a pending marker
+for the same checkpoint or export resumes that attempt without sealing again, and replays only when
+the load had completed. The target is classified first: a database left by this attempt resumes;
+an empty database is refused with the instruction to drop it and rerun; a sealed source, a database
+replaying a restore no pending marker names, and any other database without a pending attempt are
+refused with "do not drop it"; with a pending attempt, another database is refused as a possible
+partial copy, to be dropped only if it is that copy. A damaged marker is refused by name. Roles already on the target server are kept, the backup's memberships are
+granted only to roles the restore creates, and every role is then reprovisioned. A backup copy may
+lack objects that a completed purge erased (9.3); a restore accepts a missing object only when the
+checkpoint or export it replays names it as a purge target, and refuses any other. Backup,
+verification, restore and the backup-copy purge take every namespace from the store registry, so a
+namespace registered later needs no change here; the live purge reaches the namespaces the purge
+worker is built over (`PurgeWorker.over`), and a stored kind it cannot reach leaves its tombstone
+incomplete, which the replay refuses. The restore marker is always the one the API reads:
+`exulanica-installation restore` refuses to run unless the profile (or `EXULANICA_RESTORE_STATE_PATH`)
+declares it, a different `--marker` is refused, and `init` writes it only on a first install.
+
+Bytes written after the backup stay in a store the restore reuses, and the restored database never
+references them, so no tombstone will name them and later backup sets would copy them. A restore
+counts them (`objects_not_in_backup`) and lists their keys in a private file beside the marker, and
+maintenance states how many keys are listed (9.3). The listing is not a list of what may be removed:
+keys are content digests, and the restored installation may hold the same bytes again, when a person
+uploads what the restore lost or a derivative is made again, so removing a listed key can destroy
+bytes in use. Removing them is OPEN: it needs a check that nothing references a key, which does not
+exist. A listing that fails is recorded in the result and never fails a completed restore.
+
+The profile states the recovery point: authored data back to the newest backup set (at most one
+`backup_interval_seconds`), withdrawals back to the newest export (at most one
+`export_interval_seconds` while maintenance runs). The declared recovery's bound is the profile's
+`max_export_lag_seconds`; the restore command's `--max-export-lag-seconds` may lower it, never raise
+it. Recovery time is measured, not promised.
+
+| Setting | Read by | Purpose |
+| --- | --- | --- |
+| `EXULANICA_INSTALLATION_PROFILE` | every process | The profile file |
+| `EXULANICA_CODE_REVISION`, `EXULANICA_IMAGE_BACKEND`, `EXULANICA_IMAGE_CLIENT` | API | The identity facts report: a 40-character revision and `sha256:` image digests |
+| `EXULANICA_MAINTENANCE_STATUS_PATH` | API, maintenance | The maintenance status file |
+| `EXULANICA_BACKUP_DATABASE_URL` | maintenance | The `exulanica_backup` connection |
+| `EXULANICA_BACKUP_DIRECTORY`, `EXULANICA_BACKUP_STORE_DIRECTORY`, `EXULANICA_CUSTODY_DIRECTORY` | maintenance, restore | Backup sets, the stored-byte copy, and withdrawal exports |
+| `EXULANICA_RESTORE_MAINTENANCE_URL`, `EXULANICA_RESTORE_DATABASE_URL` | restore | A superuser, as the backup's owner, on the empty target server, and the database the restore creates there |
+| `EXULANICA_BACKUP_ROLE_PASSWORD` | `exulanica-db` | The backup role's password |
 
 ## 10. Hosting options researched and not built
 
@@ -1066,7 +1291,7 @@ stopped virtual machine's compute is not charged.
 | --- | --- | --- |
 | D-1 | No test asserts that `/readyz`'s schema check reports a stale schema rather than only a missing one | Writing one |
 | D-2 | No one-command redeploy exists | Writing it and running it from a clean shell |
-| D-3 | No backup job exists for a composed deployment's database and media volume, and no restore of one has been timed | Building both and restoring once |
+| D-3 | Maintenance takes backup sets and a declared recovery restores one (9.2 to 9.4), but a composed restore has been timed only on one development host with a small fixture, not at production size or on a chosen host | Restoring a production-sized backup set on the chosen host |
 | D-5 | The preflight treats an unreachable catalog as a failure, which is right for a deployment step and wrong for a scheduled check | Retry with backoff, and distinguish the two outcomes in the report |
 | D-6 | The embedding role has no fallback and no recovery path | Precomputing the vectors a deployment needs, or accepting the single dependency and saying so |
 | D-7 | The fallback rule has never run against the live platform | Forcing a primary to fail |

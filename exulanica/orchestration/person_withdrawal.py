@@ -142,9 +142,7 @@ def exercise_synthetic_person_withdrawal(spec: PersonWithdrawalExercise) -> dict
         repository = IngestRepository(connection, spec.workspace_id)
         target = _target(repository, spec, require_clean=not resuming)
         if resuming:
-            occurrence_id, named, tombstone_id = _existing_simulated_identity(
-                connection, spec
-            )
+            occurrence_id, named, tombstone_id = _existing_simulated_identity(connection, spec)
         else:
             occurrence_id, named = _install_simulated_identity(repository, spec, target)
             tombstone_id = None
@@ -390,9 +388,7 @@ def _target(
     if require_clean and (existing is None or int(existing["n"]) != 0):
         raise ValueError("the target already has a person occurrence and is not a clean fixture")
 
-    point_maps = {
-        value["capture_ref"]: value for value in row["build_inputs"]["point_maps"]
-    }
+    point_maps = {value["capture_ref"]: value for value in row["build_inputs"]["point_maps"]}
     point_map = point_maps.get(str(spec.capture_id))
     if point_map is None:
         raise ValueError("the current build input does not bind the target point map")
@@ -442,9 +438,7 @@ def _install_simulated_identity(
             presence=[(0, 1)],
             produced_by_run=row["run_id"],
             detector_version=_SIMULATION_PROFILE,
-            identity_key=occurrence_identity_key(
-                EvidenceAddress.photograph(source), "person"
-            ),
+            identity_key=occurrence_identity_key(EvidenceAddress.photograph(source), "person"),
             emit_key=f"evaluation:person-withdrawal:{spec.scene_id}:{spec.capture_id}",
             quality={
                 "evaluation_fixture": True,
@@ -575,8 +569,7 @@ def _project_package(
         "signing_public_key_sha256": result.signing_public_key_sha256,
         "scene_count": len(reconstruction["scenes"]),
         "scene_rung_claim_count": sum(
-            item["predicate"] == "reconstruction_scene_rung_is"
-            for item in graph["assertions"]
+            item["predicate"] == "reconstruction_scene_rung_is" for item in graph["assertions"]
         ),
         "all_reconstruction_rung_claim_count": len(reconstruction["rung_claims"]),
         "artifact_descriptor_count": len(reconstruction["items"]),
@@ -598,8 +591,7 @@ def _read_package(output: Path) -> dict[str, Any]:
         "signing_public_key_sha256": hashlib.sha256(public_key).hexdigest(),
         "scene_count": len(reconstruction["scenes"]),
         "scene_rung_claim_count": sum(
-            item["predicate"] == "reconstruction_scene_rung_is"
-            for item in graph["assertions"]
+            item["predicate"] == "reconstruction_scene_rung_is" for item in graph["assertions"]
         ),
         "all_reconstruction_rung_claim_count": len(reconstruction["rung_claims"]),
         "artifact_descriptor_count": len(reconstruction["items"]),
@@ -611,8 +603,7 @@ def _graph_from_package(output: Path, spec: PersonWithdrawalExercise) -> dict[st
     reconstruction = json.loads((output / "reconstruction/artifacts.json").read_bytes())
     graph = json.loads((output / "memory/graph.json").read_bytes())
     scene_rungs = sum(
-        item["predicate"] == "reconstruction_scene_rung_is"
-        for item in graph["assertions"]
+        item["predicate"] == "reconstruction_scene_rung_is" for item in graph["assertions"]
     )
     if len(reconstruction["scenes"]) != 1 or scene_rungs != 1:
         raise RuntimeError(
@@ -666,9 +657,7 @@ def _retained_controls(
     }
 
 
-def _withdrawal_receipt(
-    connection: psycopg.Connection, tombstone_id: uuid.UUID
-) -> dict[str, Any]:
+def _withdrawal_receipt(connection: psycopg.Connection, tombstone_id: uuid.UUID) -> dict[str, Any]:
     row = connection.execute(
         "select record,record_digest,created_at from person_withdrawal_receipt "
         "where tombstone_id=%s",
@@ -688,9 +677,7 @@ def _withdrawal_receipt(
     }
 
 
-def _late_publication_refusal(
-    repository: IngestRepository, scene_id: uuid.UUID
-) -> dict[str, Any]:
+def _late_publication_refusal(repository: IngestRepository, scene_id: uuid.UUID) -> dict[str, Any]:
     try:
         with repository.transaction():
             repository.insert_scene_artifact(
@@ -743,9 +730,7 @@ def _final_state(
         (tombstone_id,),
     ).fetchall()
     artifact_ids = [
-        uuid.UUID(item["target_id"])
-        for item in dependencies
-        if item["target_kind"] == "artifact"
+        uuid.UUID(item["target_id"]) for item in dependencies if item["target_kind"] == "artifact"
     ]
     artifacts = connection.execute(
         "select artifact_id,purged_at,content_sha256 from artifact where workspace_id=%s "
@@ -812,10 +797,7 @@ def _require_success(
         failures.append("World Memory Package lacked the live scene before withdrawal")
     if immediate_graph["target_scene_present"] or immediate_graph["target_rung_present"]:
         failures.append("graph or rung still served the withdrawn scene")
-    if (
-        after_package["scene_count"] != 0
-        or after_package["scene_rung_claim_count"] != 0
-    ):
+    if after_package["scene_count"] != 0 or after_package["scene_rung_claim_count"] != 0:
         failures.append("World Memory Package retained the withdrawn scene")
     if not late_refusal["refused"] or "tombstoned" not in late_refusal["reason"]:
         failures.append("late publication was not refused by the tombstone guard")

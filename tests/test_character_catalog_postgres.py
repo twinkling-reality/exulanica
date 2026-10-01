@@ -235,6 +235,38 @@ def test_withdrawal_is_final_and_stops_serving(repository, catalogs, documents):
         withdraw_catalog(repository.connection, "e" * 64, "test")
 
 
+def test_a_withdrawal_stands_for_a_digest_before_its_publication(repository, catalogs, documents):
+    """A restore carries a withdrawal even when the backup never held its publication (0135): the
+    row names the digest alone, and publishing that document then records it, answers withdrawn
+    and leaves the catalog's older revision current."""
+    withdrawn = read_publication_document(documents.b).catalog_sha256
+    with repository.connection.transaction():
+        repository.connection.execute(
+            "insert into character_catalog_withdrawal(catalog_sha256,reason) values(%s,%s)",
+            (withdrawn, "carried_by_restore"),
+        )
+    repository.connection.commit()
+    with (
+        pytest.raises(psycopg.errors.CheckViolation),
+        repository.connection.transaction(),
+    ):
+        repository.connection.execute(
+            "insert into character_catalog_withdrawal(catalog_sha256,reason) values(%s,%s)",
+            ("not-a-digest", "test"),
+        )
+    outcomes = catalogs.publish(documents.a, documents.b)
+    assert [(o.revision, o.state) for o in outcomes] == [(2, "published"), (3, "withdrawn")]
+    served = catalogs.registry.served(repository.connection)
+    assert [p.revision for p in served.publications] == [2]
+    assert [p.revision for p in served.current()] == [2]
+    publication, is_withdrawn = catalogs.registry.document(repository.connection, withdrawn)
+    assert is_withdrawn and publication is not None
+    assert [o.state for o in catalogs.publish(documents.a, documents.b)] == [
+        "unchanged",
+        "withdrawn",
+    ]
+
+
 # -- what a saved look reads ------------------------------------------------------------------
 
 

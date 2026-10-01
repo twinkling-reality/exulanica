@@ -137,8 +137,10 @@ holds `catalog.json` with its designed looks (layered people), and
 ([below](#parametric-bodies)). A catalog's revisions only increase. The newest revision of each
 catalog is **current**, older ones stay **retained** until the host withdraws them
 (`exulanica-character-catalog withdraw`), and a withdrawal is final. Publishing the same document
-again leaves it withdrawn, and a restore from an older backup keeps it withdrawn: the restore
-withdrawal catalog (`exulanica/deletion/withdrawals.v2.json`, kind `character_catalog`) carries it.
+again records it, answers `withdrawn` and leaves it withdrawn. A restore from an older backup keeps
+it withdrawn, even when the backup holds no publication of it: the restore withdrawal catalog
+(`exulanica/deletion/withdrawals.v2.json`, kind `character_catalog`) carries the withdrawal, which
+names the digest on its own (migration 0135).
 
 There is no fallback catalog. A serving database that was never given a publication draws nobody,
 and every saved look on it reads as unavailable. So every path that creates or upgrades one

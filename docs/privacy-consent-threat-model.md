@@ -426,6 +426,43 @@ Rules:
    and a place-name right resting on it stays ended (`tests/test_restore_replay_retractions.py`); a
    place-name withdrawal whose chain gained a grant after the backup withdraws the chain the backup
    holds as its next decision.
+6. **Crash recovery**: a source that is lost cannot be stopped and sealed, so its authority is the
+   newest withdrawal export (`export_withdrawals`, profile
+   `exulanica.restore-withdrawal-export/v1`): the same record as a checkpoint, read from the running
+   source in one repeatable-read snapshot without a lock or a seal, with the time it covers. An
+   export is replayed only under an operator's recovery declaration naming it and the time the source
+   was lost, and only when that time is after the export and within the installation's configured
+   bound of it; otherwise the restore refuses and the API keeps refusing traffic. There is no
+   override. The restore marker records the window between the export and the declared incident. A
+   withdrawal the source accepted inside that window is not in the export and is in force again after
+   the recovery; the window is reported at prepare and replay, in the marker and in the restore
+   receipt (migration 0129), never silent (`tests/test_restore_withdrawal_export.py`). The window
+   is in commit time: a withdrawal that began before the export and committed after it is outside
+   it. A sealed checkpoint takes no declaration, so a planned restore and a crash recovery never
+   mix. An export refuses a standby, a sealed or replaying source, a declared restore not yet
+   complete, and a database lacking a tombstone the newest export of any source holds or still
+   holding a row whose withdrawal that export records as applied, which is what a restored database
+   that has not replayed looks like; a row the database does not hold at all, such as a sign-in
+   session no backup carries, is honoured. Each export records its source; custody keeps a source's
+   newest exports, only the newest of every other source, and those a retained backup names. [ADR-0028](adr/0028-a-crash-recovery-replays-a-declared-withdrawal-export.md) records
+   the decision and its rejected alternatives.
+7. **What an export and a checkpoint hold**: every tombstone row except its purge completion time
+   (who asked, why, the subject's identifiers, any interval and any blocklist hash), each purge
+   target's kind and content hash, and every withdrawal the catalog carries, as its identity and
+   withdrawal columns or, for an event kind, its whole row, which can include a retraction's reason,
+   a consent receipt, a model right's licensee and a browser session's hash. They are cross-workspace
+   copies of personal data, so custody sits outside the content-store backup domain, keeps only the
+   newest few exports of the database writing it, the newest one of any other source, and those a
+   retained backup names, and is operator trust: its digest detects damage, not a custodian who
+   rewrites it. Sealed checkpoints and recovery declarations are the operator's files at the
+   operator's paths; nothing prunes them, and an operator removes a checkpoint once its restore is
+   complete and any set-aside source discarded. Another source's newest export, once a restore has
+   replaced that source, is kept with no time bound; nothing reads it after the restored database's
+   first export, and later deletions never reach it. Bytes written after a backup that a restore
+   replaced are listed by the restore and counted by maintenance; no tombstone names them, so no
+   product path deletes them, and removing them is OPEN, because a listed key may be held again by
+   the restored installation (the same bytes uploaded or derived again) and no reference check
+   exists to tell which.
 
 ### 5.5 The honest limits
 
@@ -433,7 +470,7 @@ These belong in the product copy, not only in this document.
 
 | Limit | Why it exists | What is promised |
 | --- | --- | --- |
-| Backups predate the deletion | A restore from a backup taken before a deletion reintroduces the deleted rows, and the backup file itself is not rewritten | A declared offline restore replays a sealed checkpoint of every tombstone and withdrawal before it serves ([ADR-0019](adr/0019-offline-restore-tombstone-replay.md), [ADR-0026](adr/0026-a-restore-carries-every-withdrawal.md), section 5.4). A personal install keeps its backups on the same disk until they are copied elsewhere; no hosted backup policy exists, and a production restore rehearsal is OPEN |
+| Backups predate the deletion | A restore from a backup taken before a deletion reintroduces the deleted rows, and the backup file itself is not rewritten | A declared offline restore replays a sealed checkpoint of every tombstone and withdrawal before it serves ([ADR-0019](adr/0019-offline-restore-tombstone-replay.md), [ADR-0026](adr/0026-a-restore-carries-every-withdrawal.md), section 5.4). A crash recovery replays the newest withdrawal export under a declaration and refuses when it is not current; a withdrawal made after that export and before the source was lost is not recovered, and the recovery reports that window (section 5.4, rule 6). A personal install keeps its backups on the same disk until they are copied elsewhere; no hosted backup policy exists, and a production restore rehearsal is OPEN |
 | Object versions persist | Object storage without WORM, Object Lock or Legal Hold makes append-only a policy enforced by access rights, and the versioning that protects originals also preserves them against erasure | **Requirement, not implemented:** crypto-shredding as the primary erasure mechanism (a per-capture key wrapped by a per-person key wrapped by a per-workspace KMS key), so destroying the key makes retained versions unreadable ciphertext. Say exactly that, never "the bytes are gone". Neither implemented store holds keys. The S3-compatible store (`exulanica/store/object.py`) purges every version and delete marker of a key and fails the purge while any remains, and refuses a bucket that reports object lock or replication ([deployment](deployment.md#4-the-content-store)): what that establishes is that no version can be retrieved through the endpoint, not what the provider does with the storage underneath |
 | Vector index residency | A row deleted from a table may persist inside an approximate index until compaction | Caption vectors carry no approximate index (exact search over `halfvec(4096)`, section 5.3). If one is added, the vector-residency experiment (X-11 in the [domain and evidence model](domain-and-evidence-model.md)) must show a deleted vector is physically absent before any residency number is published |
 | Inference provider | Nebius Token Factory receives what the boundary of section 4.4 lets through | Whether the provider retains it depends on the account's zero-data-retention setting, which **Exulanica relies on and cannot verify** (OPEN below) |

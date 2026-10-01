@@ -1,0 +1,2 @@
+# The maintenance image copies from images, not from the checkout. Never a `.env`.
+*

@@ -1,4 +1,4 @@
-"""Authorised operational visibility for the caller's own derivative queue."""
+"""Authorised operational visibility: the caller's own queues, and the installation they run on."""
 
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 
 from exulanica.api.dependencies import CurrentSession, ScopedConnection
+from exulanica.api.installation import installation_facts
 from exulanica.corpus.decode import decode_counts
 from exulanica.ingest.operations import (
     derivative_job,
@@ -45,6 +46,20 @@ def capacity(request: Request, session: CurrentSession) -> dict[str, Any]:
     admission = getattr(request.app.state, "admission", None)
     counts = admission.snapshot(session.workspace_id) if admission is not None else {}
     return {**counts, "decodes": decode_counts()}
+
+
+@router.get(
+    "/installation",
+    summary="What this installation runs, its identity, and what each component can do now.",
+)
+def installation(request: Request, _session: CurrentSession) -> dict[str, Any]:
+    """The installation facts document, ``exulanica.installation-facts/v1``.
+
+    Installation-wide rather than one workspace's: code revision, image digests, the configuration
+    fingerprint, component states and recovery times. None of it is workspace content, and none
+    of it is a setting's value. Unauthenticated readiness carries only the component states.
+    """
+    return installation_facts(request.app.state.services)
 
 
 @router.get("/derivative-jobs", summary="Measured derivative queue health for this workspace.")

@@ -8077,6 +8077,58 @@
     }
    }
   },
+  "/operations/installation": {
+   "get": {
+    "tags": [
+     "operations"
+    ],
+    "summary": "What this installation runs, its identity, and what each component can do now.",
+    "description": "The installation facts document, ``exulanica.installation-facts/v1``.\n\nInstallation-wide rather than one workspace's: code revision, image digests, the configuration\nfingerprint, component states and recovery times. None of it is workspace content, and none\nof it is a setting's value. Unauthenticated readiness carries only the component states.",
+    "operationId": "installation_operations_installation_get",
+    "parameters": [
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Installation Operations Installation Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/operations/derivative-jobs": {
    "get": {
     "tags": [

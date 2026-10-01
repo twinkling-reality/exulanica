@@ -49,6 +49,7 @@ import anyio.to_thread
 from anyio.lowlevel import RunVar
 from fastapi import APIRouter, FastAPI, Request, Response
 
+from exulanica.api.installation import installation_summary
 from exulanica.api.services import Services, describe_configuration
 from exulanica.corpus.decode import decode_counts
 from exulanica.db.migrate import applied_migrations
@@ -215,6 +216,10 @@ def _evaluate(request: Request) -> dict[str, Any]:
         "warnings": list(services.warnings),
         "configuration": describe_configuration(),
         "checked_at": dt.datetime.now(dt.UTC).isoformat(timespec="milliseconds"),
+        # What this installation runs and whether each part can work; never identity, digests or
+        # recovery times, which an operator reads at GET /operations/installation. It never
+        # changes ``ready``.
+        "installation": installation_summary(services),
     }
 
 

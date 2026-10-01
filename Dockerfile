@@ -62,9 +62,15 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/* \
  && groupadd --system --gid 10001 exulanica \
  && useradd --system --uid 10001 --gid 10001 --home-dir /app --no-create-home exulanica \
- && mkdir -p /app /var/lib/exulanica \
- && chown exulanica:exulanica /app /var/lib/exulanica
+ && mkdir -p /app /var/lib/exulanica /var/lib/exulanica-restore /var/lib/exulanica-status \
+    /var/lib/exulanica-spending-witness /var/lib/exulanica-backup /var/lib/exulanica-custody \
+ && chown exulanica:exulanica /app /var/lib/exulanica /var/lib/exulanica-restore \
+    /var/lib/exulanica-status /var/lib/exulanica-spending-witness /var/lib/exulanica-backup \
+    /var/lib/exulanica-custody
 
+# A named volume first mounted over one of these directories takes the directory's owner from
+# the image, so the restore marker, the maintenance status and the spending witness are writable by
+# the process that writes them and by no other user.
 COPY --from=builder --chown=exulanica:exulanica /app/.venv /app/.venv
 # The published material catalog, read-only: the makers a person's recipe is checked against,
 # and the baked texture sets the reviewed furniture embeds. The API verifies every set the
@@ -82,13 +88,17 @@ COPY assets/textures/blobs /app/assets/textures/blobs
 # cannot start any process. `tests/test_image_ships_import_reads.py` holds both lines.
 COPY assets/catalogs /app/assets/catalogs
 # The character catalogs the image publishes (`exulanica-character-catalog publish --apply`, which
-# every serving database runs after `exulanica-db`, as deploy/judge's `catalogs` job does): the
-# people and the parametric family, with every container and licence they name. About 22 MB. The
-# development preview's stylized examples stay out. `tests/test_image_ships_character_catalogs.py`
-# holds these lines to what publishing reads.
-COPY assets/characters/catalog.json assets/characters/looks.json assets/characters/parametric-catalog.json /app/assets/characters/
+# every serving database runs after `exulanica-db`, as the `catalogs` jobs do): the people and the
+# parametric family, with every container and licence they name. About 22 MB. The development
+# preview's stylized examples stay out. `tests/test_image_ships_character_catalogs.py` holds these
+# lines to what publishing reads.
+COPY assets/characters/catalog.json assets/characters/looks.json /app/assets/characters/
+COPY assets/characters/parametric-catalog.json /app/assets/characters/
 COPY assets/characters/makehuman-people-v1 /app/assets/characters/makehuman-people-v1
 COPY assets/characters/makehuman-parametric-v1 /app/assets/characters/makehuman-parametric-v1
+# The installation profiles an installation names by EXULANICA_INSTALLATION_PROFILE
+# (docs/deployment.md 9.1).
+COPY deploy/profiles /app/deploy/profiles
 RUN ln -s /app/assets "$(/app/.venv/bin/python -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')/assets"
 
 ENV PATH=/app/.venv/bin:$PATH \
@@ -102,9 +112,10 @@ USER exulanica
 EXPOSE 8000
 
 # LIVENESS, never readiness. `/healthz` touches no dependency; `/readyz` opens a connection and
-# an object store call, and a container restarted because its database blinked is a container
-# that makes an incident worse. Written in Python because this image has no curl and does not
-# need one.
+# an object store call. Docker and Compose only record a failing health check, they do not restart
+# on it; an orchestrator that does would otherwise restart a container because its database
+# blinked, which makes an incident worse. Written in Python because this image has no curl and
+# does not need one.
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
   CMD ["python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=2).status == 200 else 1)"]
 

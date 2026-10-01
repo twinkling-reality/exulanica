@@ -52,6 +52,12 @@ from exulanica.api.decision_host import (
     question_refusal,
     share_kept,
 )
+from exulanica.api.installation import (
+    MAINTENANCE_STATUS_ENV,
+    PROFILE_ENV,
+    Installation,
+    load_installation,
+)
 from exulanica.api.signal_comparison_runner import SignalComparisonRunner
 from exulanica.api.society_comparison_runner import SocietyComparisonRunner
 from exulanica.api.society_comparison_start import development_seeds
@@ -208,6 +214,9 @@ class Services:
     runs_derivative_worker: bool = False
     #: Independent of the database and blob backups, set by the offline restore protocol.
     restore_state_path: Path | None = None
+    #: The installation this process belongs to (``exulanica.api.installation``): its declared
+    #: profile, identity and fact cache. None in tests and one-off tools that declare nothing.
+    installation: Installation | None = None
     #: The society composition and authorization adapter. ``build_services`` always configures
     #: one; district bindings and host saved-world registrations are the host's to add.
     society_runtime: SocietyRuntime | None = None
@@ -227,6 +236,9 @@ class Services:
     #: pure function of public inputs (migration 0072). None in a hand-built Services, which
     #: makes the tile routes answer 503 rather than reach a store nobody configured.
     tiles: ContentAddressedStore | None = None
+    #: Every namespace's store, as built for this process: the installation facts report its
+    #: kind and description (no endpoint, bucket or credential).
+    content_stores: ContentStores | None = None
     #: Dedicated account persistence and verified Google browser sessions, when configured.
     accounts: AccountRuntime | None = None
     #: Explicit host allowlist. Empty leaves automatic society playback disabled.
@@ -742,6 +754,7 @@ def build_services(
         if mode == DURABLE
         else None
     )
+    installation = load_installation(environ)
     client = model_client
     if client is None and _role_credentials_set(environ):
         client = ModelClient()
@@ -766,6 +779,7 @@ def build_services(
         ),
         character_appearance=_character_appearance_runtime(store, environ, stores.workspace_assets),
         tiles=stores.tiles,
+        content_stores=stores,
         society_runtime=_society_runtime(store, environ),
         runs_derivative_worker=_enabled(env_get("DERIVATIVE_WORKER", environ)),
         runs_society_control_worker=_explicitly_enabled(env_get("SOCIETY_CONTROL_WORKER", environ)),
@@ -778,9 +792,9 @@ def build_services(
         comparison_seeds=development_seeds(load_comparison_catalogs()),
         runs_comparison_worker=comparison_player == "here",
         comparisons_played_elsewhere=comparison_player == "process",
-        restore_state_path=(
-            Path(value) if (value := env_get("RESTORE_STATE_PATH", environ)) else None
-        ),
+        # A declared installation's marker is its profile's; otherwise the setting, if any.
+        restore_state_path=installation.restore_state_path,
+        installation=installation,
         released_place_names=released_place_names,
         admission=AdmissionSettings.from_env(environ),
         spending_mode=mode,
@@ -1001,6 +1015,11 @@ def describe_configuration(environ: Mapping[str, str] | None = None) -> dict[str
         "EXULANICA_ACCOUNT_BROWSER_ORIGINS",
         "EXULANICA_ACCOUNT_DATABASE_URL",
         EGRESS_ALLOWLIST_ENV,
+        PROFILE_ENV,
+        MAINTENANCE_STATUS_ENV,
+        "EXULANICA_CODE_REVISION",
+        "EXULANICA_IMAGE_BACKEND",
+        "EXULANICA_IMAGE_CLIENT",
     )
     return {
         name: (

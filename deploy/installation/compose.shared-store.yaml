@@ -1,0 +1,47 @@
+# The shared-store installation profile: the same services as compose.yaml, with their bytes in one
+# S3-compatible bucket instead of the media volume (docs/deployment.md sections 4 and 9).
+#
+#   docker compose -f compose.yaml -f deploy/installation/compose.shared-store.yaml up -d
+#
+# The object store itself is the operator's and is not composed here. The runtime identity reads,
+# writes and lists; the purge identity also erases, and only maintenance and the operator's restore
+# job hold it. Every other process refuses to start with a purge credential. The backup copy of the
+# stored bytes stays a host directory (EXULANICA_BACKUP_PATH), outside the bucket.
+
+x-object-store: &object-store
+  EXULANICA_INSTALLATION_PROFILE: /app/deploy/profiles/shared-store.json
+  EXULANICA_STORE_KIND: object
+  EXULANICA_OBJECT_STORE_ENDPOINT: ${EXULANICA_OBJECT_STORE_ENDPOINT:?set EXULANICA_OBJECT_STORE_ENDPOINT for the shared-store profile}
+  EXULANICA_OBJECT_STORE_BUCKET: ${EXULANICA_OBJECT_STORE_BUCKET:?set EXULANICA_OBJECT_STORE_BUCKET for the shared-store profile}
+  EXULANICA_OBJECT_STORE_REGION: ${EXULANICA_OBJECT_STORE_REGION:?set EXULANICA_OBJECT_STORE_REGION for the shared-store profile}
+  EXULANICA_OBJECT_STORE_PREFIX: ${EXULANICA_OBJECT_STORE_PREFIX:-}
+  EXULANICA_OBJECT_STORE_ADDRESSING: ${EXULANICA_OBJECT_STORE_ADDRESSING:-path}
+  EXULANICA_OBJECT_STORE_PLAINTEXT: ${EXULANICA_OBJECT_STORE_PLAINTEXT:-}
+
+x-runtime-identity: &runtime-identity
+  <<: *object-store
+  EXULANICA_OBJECT_STORE_ACCESS_KEY_ID: ${EXULANICA_OBJECT_STORE_ACCESS_KEY_ID:?set the object store's runtime access key}
+  EXULANICA_OBJECT_STORE_SECRET_ACCESS_KEY: ${EXULANICA_OBJECT_STORE_SECRET_ACCESS_KEY:?set the object store's runtime secret key}
+
+x-purge-identity: &purge-identity
+  <<: *object-store
+  EXULANICA_OBJECT_STORE_PURGE_ACCESS_KEY_ID: ${EXULANICA_OBJECT_STORE_PURGE_ACCESS_KEY_ID:?set the object store's purge access key}
+  EXULANICA_OBJECT_STORE_PURGE_SECRET_ACCESS_KEY: ${EXULANICA_OBJECT_STORE_PURGE_SECRET_ACCESS_KEY:?set the object store's purge secret key}
+
+services:
+  api:
+    environment: *runtime-identity
+  # Publishes the character catalogs into the bucket the API reads, with the API's identity.
+  catalogs:
+    environment: *runtime-identity
+  derivative-worker:
+    environment: *runtime-identity
+  scene-worker:
+    environment: *runtime-identity
+  maintenance:
+    environment: *purge-identity
+  restore:
+    environment: *purge-identity
+  # Reads the profile, so it states the same store; it touches no bytes and holds no credential.
+  restore-marker:
+    environment: *object-store
