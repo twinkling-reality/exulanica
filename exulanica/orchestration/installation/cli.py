@@ -20,8 +20,10 @@ Every location is a setting, never a guess (deployment.md section 9 lists them):
 sets and the stored-byte copy go, each outside the data directory; ``EXULANICA_PURGE_DATABASE_URL``
 is the purge role. A restore reads the target from ``EXULANICA_RESTORE_MAINTENANCE_URL`` (a
 superuser on the empty target server), ``EXULANICA_RESTORE_DATABASE_URL`` (the database it
-creates, as its owner), ``EXULANICA_PURGE_DATABASE_URL`` and ``EXULANICA_DATA_DIR``. Each
-command exits 0 on success, 1 on a named refusal, 2 on a missing setting.
+creates, as its owner), ``EXULANICA_PURGE_DATABASE_URL`` and ``EXULANICA_DATA_DIR``, and the
+source from ``EXULANICA_SOURCE_DATABASE_URL`` (which a planned restore seals and a return without
+``--set-aside`` replays into). Each command exits 0 on success, 1 on a named refusal, 2 on a
+missing setting.
 """
 
 from __future__ import annotations
@@ -194,8 +196,9 @@ def _run(args: argparse.Namespace) -> int:
                 )
             if row is not None and row["installed"]:
                 raise RestoreRefused(
-                    "the restore marker is missing on an installed database: restore it from "
-                    "custody, or complete the restore it belonged to; nothing was written"
+                    "the restore marker is missing on an installed database: restore its newest "
+                    "copy from custody (an older copy can name a restore that has since "
+                    "completed), or complete the restore it belonged to; nothing was written"
                 )
         written = initialise_restore_state(path)
         _print({"restore_state_path": str(path), "written": written})
@@ -337,7 +340,7 @@ def _database_name(database: Database) -> str:
     restore it has already been set aside under another name."""
     name = conninfo_to_dict(database.url).get("dbname")
     if not name:
-        raise _Missing("EXULANICA_SOURCE_DATABASE_URL names no database")
+        raise _Missing("EXULANICA_RESTORE_DATABASE_URL names no database")
     return str(name)
 
 

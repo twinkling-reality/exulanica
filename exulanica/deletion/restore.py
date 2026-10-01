@@ -42,7 +42,12 @@ from psycopg.types.json import Jsonb
 
 from exulanica.canonical import canonical_json
 from exulanica.db.session import Database, set_workspace
-from exulanica.deletion.queue import DESTROYABLE_KINDS, STORED_KINDS, stored_target_store
+from exulanica.deletion.queue import (
+    DESTROYABLE_KINDS,
+    STORED_KINDS,
+    PurgeTarget,
+    stored_target_store,
+)
 from exulanica.deletion.withdrawals import (
     CATALOG,
     CATALOG_IDENTITY,
@@ -56,7 +61,7 @@ from exulanica.deletion.withdrawals import (
     require_writers,
     stale_withdrawals,
 )
-from exulanica.deletion.worker import PurgeWorker
+from exulanica.deletion.worker import HELD_BY_A_LIVE_RECORD, PurgeWorker, still_held
 from exulanica.evidence.blob import BlobId
 from exulanica.store.base import ContentAddressedStore
 from exulanica.store.namespaces import WorkspaceStores
@@ -75,6 +80,7 @@ __all__ = [
     "export_withdrawals",
     "initialise_restore_state",
     "loss_window",
+    "mark_returning",
     "prepare_restore",
     "replay",
     "source_identity",
@@ -266,6 +272,49 @@ def _carry_withdrawals(
                         reapply(connection, carried, writers)
                 except CarryRefused as refused:
                     raise RestoreRefused(str(refused)) from refused
+
+
+def _held_open(
+    connection: psycopg.Connection, workspace_id: uuid.UUID, tombstone_id: uuid.UUID
+) -> list[str] | None:
+    """The targets an incomplete tombstone has left because a live record here still holds their
+    bytes, or None when it has left anything else: a job failed or not run, a skip for another
+    reason, bytes nothing holds any more, or caption vectors not yet erased."""
+    cursor = connection.cursor(row_factory=dict_row)
+    captions = cursor.execute(
+        "select caption_vector_purge_is_complete(%s, %s) as complete", (workspace_id, tombstone_id)
+    ).fetchone()
+    # As tombstone_purge_is_complete reads it: only false is incomplete; null is nothing to erase.
+    if captions is not None and captions["complete"] is False:
+        return None
+    rows = cursor.execute(
+        "select pj.purge_id, pj.workspace_id, pj.target_kind, pj.target_ref, pj.attempts, "
+        "pj.state, pj.last_error, t.requested_by, t.reason, t.scope::text as scope "
+        "from purge_job pj join tombstone t on t.tombstone_id = pj.tombstone_id "
+        "where pj.tombstone_id = %s",
+        (tombstone_id,),
+    ).fetchall()
+    held = []
+    for row in rows:
+        if row["state"] == "done":
+            continue
+        if row["state"] != "skipped" or row["last_error"] != HELD_BY_A_LIVE_RECORD:
+            return None
+        target = PurgeTarget(
+            purge_id=row["purge_id"],
+            tombstone_id=tombstone_id,
+            workspace_id=row["workspace_id"],
+            target_kind=row["target_kind"],
+            target_ref=row["target_ref"],
+            attempts=row["attempts"],
+            requested_by=row["requested_by"],
+            reason=row["reason"],
+            scope=row["scope"],
+        )
+        if not still_held(connection, target):
+            return None
+        held.append(f"{row['target_kind']}:{row['target_ref']}")
+    return held
 
 
 def _refuse_entries_left(
@@ -756,6 +805,17 @@ def abandon_declared_restore(marker_path: Path, export_sha256: str) -> dict[str,
     return abandoned
 
 
+def mark_returning(marker_path: Path, checkpoint_sha256: str, database: str) -> None:
+    """Record, in a marker pending for this checkpoint, the database a return to the source is
+    replaying into, before that replay begins: a later run resumes a replay only in that database,
+    never in the restore's own copy, which carries the same attempt and checkpoint. ``database``
+    names it by its server and oid, which a rename keeps."""
+    marker = _marker(marker_path)
+    if marker.get("state") != "pending" or marker.get("checkpoint_sha256") != checkpoint_sha256:
+        raise RestoreRefused("the marker is not pending for this checkpoint: no return to record")
+    _write(marker_path, {**marker, "returning": database})
+
+
 def initialise_restore_state(path: Path) -> bool:
     """Write the marker an installation starts with, state ``none``, unless one exists.
 
@@ -986,12 +1046,16 @@ def replay(
         if stores is not None
         else PurgeWorker(purge_database, store, workspaces, material_stores=materials)
     )
+    # A skipped job is not terminal: it is tried again after queue.RETRY_AFTER, so it is not claimed
+    # again here and the loop ends once a pass handles nothing. Whether each skip is one normal
+    # operation reaches (bytes a live record still holds) is judged per tombstone below.
     while True:
         outcome = worker.drain()
-        if outcome.blocked or outcome.failed or outcome.skipped or outcome.exhausted:
+        if outcome.blocked or outcome.failed or outcome.exhausted:
             raise RestoreRefused(f"tombstone replay purge incomplete: {outcome}")
         if outcome.handled == 0:
             break
+    left_open: dict[str, list[str]] = {}
     with database.unscoped() as connection:
         _admin(connection)
         for workspace_id, tombstone_id, item in applied:
@@ -999,8 +1063,16 @@ def replay(
             complete = connection.execute(
                 "select tombstone_purge_is_complete(%s) as complete", (tombstone_id,)
             ).fetchone()
+            held: list[str] = []
             if not complete or not complete["complete"]:
-                raise RestoreRefused("a replayed tombstone is not completely purged")
+                # Open only on bytes a live record in this database still holds, as a tombstone
+                # stays open in normal operation; those jobs stay queued for the ordinary purger.
+                found = _held_open(connection, workspace_id, tombstone_id)
+                if found is None:
+                    raise RestoreRefused("a replayed tombstone is not completely purged")
+                held = found
+                # Named by the tombstone the checkpoint carries: the one the operator knows.
+                left_open[str(item["tombstone"]["tombstone_id"])] = held
             _refuse_entries_left(connection, workspace_id, item)
             targets = connection.execute(
                 "select target_kind, target_ref from purge_job where tombstone_id=%s "
@@ -1009,6 +1081,8 @@ def replay(
             ).fetchall()
             for row in targets:
                 blob_id, kind = BlobId.from_hex(row["target_ref"]), row["target_kind"]
+                if f"{kind}:{blob_id.hex}" in held:
+                    continue  # rightly kept: a live record holds these bytes
                 if stores is not None:
                     present = stored_target_store(stores, kind, workspace_id).exists(blob_id)
                 elif kind == "material_bake":
@@ -1042,7 +1116,10 @@ def replay(
             "update restore_control set state='complete',updated_at=now() where restore_id=%s",
             (restore_id,),
         )
-    _write(marker_path, {**marker, "state": "complete", "completed": _completing(marker)})
+    _write(
+        marker_path,
+        {**marker, "state": "complete", "completed": _completing(marker), "left_open": left_open},
+    )
     verify_restore(database, marker_path)
     return restore_id
 

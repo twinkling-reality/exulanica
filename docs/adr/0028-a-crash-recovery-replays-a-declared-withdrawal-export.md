@@ -47,7 +47,9 @@ it can exist, and a restored backup alone would bring back every withdrawal made
   completed restore and carries the record forward; while it is kept, preparing, resuming or
   replaying a recorded checkpoint again is refused, and a lost marker loses that record. A source
   is set aside only when its identity proves it is the source before the seal and it is sealed for
-  the checkpoint before the rename; returning to it and dropping it check that seal.
+  the checkpoint before the rename. Returning to it checks that seal, or resumes a return
+  that this command began in that same database, recorded in the marker by server, oid and a
+  one-off token the return wrote into it; dropping it checks the seal.
 - A withdrawal whose end the installation makes again after a restore (a published character
   catalog, which the catalogs job publishes from the image) is carried even when the backup lacks
   the end (`"absent": "carry"` in the withdrawal catalog), so it is neither served again nor left

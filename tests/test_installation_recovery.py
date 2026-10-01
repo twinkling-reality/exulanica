@@ -982,10 +982,16 @@ def test_the_refusals_never_tell_the_operator_to_drop_a_source():
         ("occupied", False),
         ("replaying", False),
         ("live", True),
+        ("completed_here", True),
+        ("completed_here", False),
     ):
         with pytest.raises(RestoreRefused) as refused:
             _refuse_target(state, "exulanica", attempt_pending=pending)
         assert "do not drop it" in str(refused.value)
+    # The one "drop it" a replaying database gets: this attempt's copy, never completed.
+    with pytest.raises(RestoreRefused) as refused:
+        _refuse_target("replaying", "exulanica", attempt_pending=True)
+    assert "never completed, so it has never served: drop it" in str(refused.value)
     # Under a pending attempt, written only after the target was found empty, an occupied target
     # is that attempt's partial copy, and the refusal still guards against a live one.
     with pytest.raises(RestoreRefused) as refused:
@@ -1061,7 +1067,7 @@ def test_a_rerun_classifies_the_target_before_writing_a_marker(purged, source, t
         try:
             # The live database a restore completed in; the attempt that completed it is its own.
             assert _target_state(target, database, digest) == "live"
-            assert _target_state(target, database, digest, completed) == "replaying"
+            assert _target_state(target, database, digest, completed) == "completed_here"
             with pytest.raises(
                 RestoreRefused, match="is a live database, in which a restore completed"
             ):
@@ -1194,8 +1200,33 @@ def test_a_return_whose_replay_began_resumes(purged, source, tmp_path, monkeypat
                 patched.setattr(restore, "PurgeWorker", stopped)
                 with pytest.raises(Interrupted):
                     return_to_source(set_aside=True, **arguments)
-        # And without the flag, the same attempt's replay is resumed and completed.
-        return_to_source(set_aside=False, **arguments)
+        # The source is mid-return under its own name. abandon, given the planned checkpoint,
+        # refuses before it looks at that database: never "drop it".
+        from exulanica.orchestration.installation.recovery import abandon_declared
+
+        with pytest.raises(RestoreRefused) as refused:
+            abandon_declared(target=target, export=sealed, marker=marker)
+        assert "a planned restore is abandoned with return-to-source" in str(refused.value)
+        assert "drop it" not in str(refused.value)
+        # Without the flag the same return is resumed, and stops again.
+        with monkeypatch.context() as patched:
+            patched.setattr(restore, "PurgeWorker", stopped)
+            with pytest.raises(Interrupted):
+                return_to_source(set_aside=False, **arguments)
+        # Its replay commits and the host stops before the marker is written; with --set-aside the
+        # return then finishes the replay it recorded, now complete in the database.
+        written = restore._write
+
+        def crash_before_completion(path, value):
+            if value.get("state") == "complete":
+                raise OSError("the host stopped before the marker was written")
+            written(path, value)
+
+        with monkeypatch.context() as patched:
+            patched.setattr(restore, "_write", crash_before_completion)
+            with pytest.raises(OSError, match="before the marker"):
+                return_to_source(set_aside=True, **arguments)
+        return_to_source(set_aside=True, **arguments)
         verify_restore(Database(target.database_url), marker)
 
 
@@ -1304,3 +1335,364 @@ def test_a_hand_edited_complete_marker_is_a_named_refusal():
 
     with pytest.raises(RestoreRefused, match="no completed attempt it can record"):
         _completing({"profile": "exulanica.restore-state/v1", "state": "complete"})
+
+
+def test_a_source_on_another_server_is_returned_without_the_target_server(
+    purged, source, tmp_path, monkeypatch
+):
+    """The restore into another server stopped mid-replay. --set-aside must not finish that copy
+    as if it were the source; the source is returned without the flag, even with the target server
+    down, and a source connection naming no database is refused by name."""
+    from dataclasses import replace
+
+    from exulanica.deletion import restore
+    from exulanica.orchestration.installation.recovery import restore_planned, return_to_source
+
+    from test_restore_replay import _purge_database
+
+    taken, backup_store = source
+    loaded = read_backup_set(taken.directory)
+    owner, database = loaded.database.owner_role, loaded.database.database
+    sealed = tmp_path / "custody" / "checkpoint.json"
+    marker = tmp_path / "control" / "restore.json"
+
+    class Interrupted(RuntimeError):
+        pass
+
+    class stopped:
+        def __init__(self, *args, **kwargs):
+            raise Interrupted("the restore's purge never started")
+
+        @classmethod
+        def over(cls, *args, **kwargs):
+            raise Interrupted("the restore's purge never started")
+
+    with scratch_cluster(owner=owner) as (cluster, port):
+        target = _target(cluster, port, owner, database, purged.scratch, tmp_path)
+        with monkeypatch.context() as patched:
+            patched.setattr(restore, "PurgeWorker", stopped)
+            with pytest.raises(Interrupted):
+                restore_planned(
+                    source=purged.database(),
+                    checkpoint_path=sealed,
+                    backup_set=taken.directory,
+                    backup_stores={"blobs": backup_store},
+                    marker=marker,
+                    target=target,
+                    provision=_provision(purged.scratch),
+                )
+        arguments = {
+            "name": database,
+            "source_purge": _purge_database(purged),
+            "checkpoint_path": sealed,
+            "marker": marker,
+        }
+        # The target's copy is replaying the same attempt and checkpoint: not a source set aside.
+        with pytest.raises(RestoreRefused, match="the restore's own copy"):
+            return_to_source(target=target, set_aside=True, **arguments)
+        # Nor without the flag, if the source connection names that copy: no return began in it.
+        with pytest.raises(RestoreRefused, match="no return began in it"):
+            return_to_source(target=target, set_aside=False, **arguments)
+        with psycopg.connect(cluster.url(port, owner, "postgres"), autocommit=True) as c:
+            c.execute(f'drop database "{database}"')
+        with pytest.raises(RestoreRefused, match="holds neither"):
+            return_to_source(target=target, set_aside=True, **arguments)
+        assert json.loads(marker.read_bytes())["state"] == "pending"
+        missing = replace(target, database_url=cluster.url(port, owner, "no_such_database"))
+        with pytest.raises(RestoreRefused, match="names no database that can be reached"):
+            return_to_source(target=missing, set_aside=False, **arguments)
+    # The target server is gone now; the source is returned on its own server.
+    unreachable = "postgresql://nobody@127.0.0.1:1/postgres"
+    back = Target(
+        maintenance_url=unreachable,
+        database_url=purged.database().url,
+        purge_url=unreachable,
+        stores=local_content_stores(purged.store.root.parent),
+    )
+    with pytest.raises(RestoreRefused, match="target server cannot be reached"):
+        return_to_source(target=back, set_aside=True, **arguments)
+    # The first return stops after its replay began; the second stops after its replay committed
+    # and before the marker was written; each run resumes only because the first recorded the
+    # source.
+    with monkeypatch.context() as patched:
+        patched.setattr(restore, "PurgeWorker", stopped)
+        with pytest.raises(Interrupted):
+            return_to_source(target=back, set_aside=False, **arguments)
+    assert json.loads(marker.read_bytes())["returning"]
+    written = restore._write
+
+    def crash_before_completion(path, value):
+        if value.get("state") == "complete":
+            raise OSError("the host stopped before the marker was written")
+        written(path, value)
+
+    with monkeypatch.context() as patched:
+        patched.setattr(restore, "_write", crash_before_completion)
+        with pytest.raises(OSError, match="before the marker"):
+            return_to_source(target=back, set_aside=False, **arguments)
+    return_to_source(target=back, set_aside=False, **arguments)
+    verify_restore(purged.database(), marker)
+
+
+def test_abandon_after_the_replay_began_names_the_copy_to_drop(
+    purged, source, tmp_path, monkeypatch
+):
+    from exulanica.deletion import restore
+    from exulanica.orchestration.installation.recovery import abandon_declared
+
+    taken, backup_store = source
+    export, _ = _export(purged, tmp_path)
+    loaded = read_backup_set(taken.directory)
+    owner, database = loaded.database.owner_role, loaded.database.database
+    marker = tmp_path / "control" / "restore.json"
+
+    class Interrupted(RuntimeError):
+        pass
+
+    class stopped:
+        def __init__(self, *args, **kwargs):
+            raise Interrupted("the replay's purge never started")
+
+        @classmethod
+        def over(cls, *args, **kwargs):
+            raise Interrupted("the replay's purge never started")
+
+    with scratch_cluster(owner=owner) as (cluster, port):
+        target = _target(cluster, port, owner, database, purged.scratch, tmp_path)
+        with monkeypatch.context() as patched:
+            patched.setattr(restore, "PurgeWorker", stopped)
+            with pytest.raises(Interrupted):
+                recover_declared(
+                    backup_set=taken.directory,
+                    backup_stores={"blobs": backup_store},
+                    export=export,
+                    custody=export.parent,
+                    declaration=_declare(tmp_path, export, dt.datetime.now(dt.UTC)),
+                    max_export_lag=_LAG,
+                    marker=marker,
+                    target=target,
+                    provision=_provision(purged.scratch),
+                )
+        with pytest.raises(RestoreRefused) as refused:
+            abandon_declared(target=target, export=export, marker=marker)
+        assert "this attempt's own copy, whose replay began" in str(refused.value)
+        assert "drop it, then rerun or return from the attempt (or abandon" in str(refused.value)
+        with psycopg.connect(cluster.url(port, owner, "postgres"), autocommit=True) as c:
+            c.execute(f'drop database "{database}"')
+        abandon_declared(target=target, export=export, marker=marker)
+    assert json.loads(marker.read_bytes())["state"] == "abandoned"
+
+
+def test_a_return_token_tells_the_source_from_a_database_with_the_same_server_and_oid(tmp_path):
+    """A database another server cloned from the same data directory created can share the
+    source's server identifier and oid. The return writes a one-off token into the source before
+    its replay; the recorded identity includes it, and a rename keeps it."""
+    from exulanica.orchestration.installation.recovery import _database_identity, _mark_the_source
+
+    with scratch_cluster(owner="exulanica") as (cluster, port):
+        url = cluster.url(port, "exulanica", "postgres")
+        before = _database_identity(url)
+        recorded = _mark_the_source(url)
+        assert recorded != before and before.endswith(":")
+        assert _database_identity(url) == recorded
+        # A second return writes a fresh token: an older record no longer matches.
+        assert _mark_the_source(url) != recorded
+
+
+def _stale(marker):
+    """The pending copy of a completed marker, as a marker restored from an older copy would be."""
+    state = json.loads(marker.read_bytes())
+    state["state"] = "pending"
+    state["completed"] = [
+        item for item in state.get("completed", []) if item["restore_id"] != state["restore_id"]
+    ]
+    marker.write_text(json.dumps(state))
+
+
+def test_a_stale_pending_marker_never_has_a_served_planned_restore_dropped(
+    purged, source, tmp_path
+):
+    """A set-aside restore completed and its copy served; the marker was then replaced by its
+    pending copy. return-to-source --set-aside must not call the live copy one to drop."""
+    from exulanica.orchestration.installation.recovery import restore_planned, return_to_source
+
+    taken, backup_store = source
+    loaded = read_backup_set(taken.directory)
+    with scratch_cluster(owner=loaded.database.owner_role) as (cluster, port):
+        target, _owner, database = _source_on_the_target_server(
+            purged, source, tmp_path, cluster, port
+        )
+        sealed = tmp_path / "custody" / "planned.json"
+        marker = tmp_path / "control" / "planned.json"
+        arguments = {
+            "source": Database(target.database_url),
+            "checkpoint_path": sealed,
+            "backup_set": taken.directory,
+            "backup_stores": {"blobs": backup_store},
+            "marker": marker,
+            "target": target,
+            "provision": _provision(purged.scratch),
+            "set_aside": True,
+        }
+        restore_planned(**arguments)
+        _stale(marker)
+        with pytest.raises(RestoreRefused) as refused:
+            return_to_source(
+                target=target,
+                name=database,
+                source_purge=Database(target.purge_url),
+                checkpoint_path=sealed,
+                marker=marker,
+                set_aside=True,
+            )
+        assert "may have served since: do not drop it" in str(refused.value)
+        assert "never served" not in str(refused.value)
+        # The rerun the refusal names completes the marker again.
+        result = restore_planned(**arguments)
+        assert result["resumed"] is True
+        assert json.loads(marker.read_bytes())["state"] == "complete"
+
+
+def test_a_stale_pending_marker_never_has_a_served_recovery_dropped(purged, source, tmp_path):
+    from exulanica.orchestration.installation.recovery import abandon_declared
+
+    taken, backup_store = source
+    export, _ = _export(purged, tmp_path)
+    loaded = read_backup_set(taken.directory)
+    owner, database = loaded.database.owner_role, loaded.database.database
+    marker = tmp_path / "control" / "restore.json"
+    with scratch_cluster(owner=owner) as (cluster, port):
+        target = _target(cluster, port, owner, database, purged.scratch, tmp_path)
+        arguments = {
+            "backup_set": taken.directory,
+            "backup_stores": {"blobs": backup_store},
+            "export": export,
+            "custody": export.parent,
+            "declaration": _declare(tmp_path, export, dt.datetime.now(dt.UTC)),
+            "max_export_lag": _LAG,
+            "marker": marker,
+            "target": target,
+            "provision": _provision(purged.scratch),
+        }
+        recover_declared(**arguments)
+        _stale(marker)
+        with pytest.raises(RestoreRefused) as refused:
+            abandon_declared(target=target, export=export, marker=marker)
+        assert "may have served since: do not drop it" in str(refused.value)
+        assert "never served" not in str(refused.value)
+        result = recover_declared(**arguments)
+    assert result["resumed"] is True and json.loads(marker.read_bytes())["state"] == "complete"
+
+
+def test_a_return_refuses_by_name_when_its_connection_cannot_comment_on_the_source():
+    from exulanica.orchestration.installation.recovery import _mark_the_source
+
+    with scratch_cluster(owner="exulanica") as (cluster, port):
+        with psycopg.connect(cluster.url(port, "exulanica", "postgres"), autocommit=True) as c:
+            c.execute("create role reader login bypassrls password 'reader-not-owner'")
+        reader = f"postgresql://reader:reader-not-owner@127.0.0.1:{port}/postgres"
+        with pytest.raises(RestoreRefused, match="needs its owner or a superuser"):
+            _mark_the_source(reader)
+
+
+def _identical_probes(purged, tmp_path, photo_dir):
+    """Q10's fixture: two EXIF-free 64x48 JPEGs of different colours, whose intake probe artifacts
+    are identical bytes, both captured before the set is taken. Returns the set, its backup copy and
+    the two captures."""
+    import hashlib as _hashlib
+
+    from exulanica.ingest.pipeline import PhotoIngestPipeline
+    from PIL import Image
+
+    from conftest import CountingVisionModel, ingest_observed
+
+    pipeline = PhotoIngestPipeline(purged.repository, purged.store, vision=CountingVisionModel())
+    captures = []
+    for index, colour in enumerate(((200, 30, 30), (30, 200, 30))):
+        path = photo_dir / f"plain-{index}.jpg"
+        Image.new("RGB", (64, 48), colour).save(path, "JPEG")
+        outcome = ingest_observed(pipeline, purged.repository, path)
+        assert outcome.error is None, outcome.error
+        digest = _hashlib.sha256(path.read_bytes()).digest()
+        captures.append(
+            purged.rows("select capture_id from capture where blob_sha256=%s", digest)[0][
+                "capture_id"
+            ]
+        )
+    shared = purged.rows(
+        "select content_sha256 from artifact where kind='probe' and content_sha256 is not null "
+        "group by content_sha256 having count(distinct source_blob_sha256) > 1"
+    )
+    assert shared, "the two probes are the same bytes"
+    with purged.database().unscoped() as connection:
+        connection.execute(f'set search_path to "{purged.scratch}", public')
+        provision_backup_role(connection, role=_ROLE, password=_PASSWORD)
+    backup_store = LocalContentAddressedStore(tmp_path / "backup-store" / "blobs")
+    taken = take_backup_set(
+        backup_url=purged.database(role=_ROLE, password=_PASSWORD).url,
+        directory=tmp_path / "backup-sets",
+        namespaces=[Namespace("blobs", purged.store, backup_store)],
+        custody=tmp_path / "custody",
+        restore_state_path=None,
+        backup_domains=[purged.store.root, tmp_path / "backup-store"],
+        identity={"profile": "single-host"},
+        role=_ROLE,
+    )
+    return taken, backup_store, captures, bytes(shared[0]["content_sha256"]).hex()
+
+
+def test_a_recovery_completes_when_a_live_capture_shares_a_withdrawn_ones_probe(
+    purged, tmp_path, photo_dir
+):
+    taken, backup_store, (withdrawn, live), probe = _identical_probes(purged, tmp_path, photo_dir)
+    tombstone = purged.tombstone_the_capture(withdrawn)
+    purged.worker().drain()
+    export, _ = _export(purged, tmp_path)
+    loaded = read_backup_set(taken.directory)
+    owner, database = loaded.database.owner_role, loaded.database.database
+    marker = tmp_path / "control" / "restore.json"
+    with scratch_cluster(owner=owner) as (cluster, port):
+        result = recover_declared(
+            backup_set=taken.directory,
+            backup_stores={"blobs": backup_store},
+            export=export,
+            custody=export.parent,
+            declaration=_declare(tmp_path, export, dt.datetime.now(dt.UTC)),
+            max_export_lag=_LAG,
+            marker=marker,
+            target=_target(cluster, port, owner, database, purged.scratch, tmp_path),
+            provision=_provision(purged.scratch),
+        )
+    left = result["tombstones_left_open"]
+    assert list(left) == [str(tombstone)] and f"artifact:{probe}" in left[str(tombstone)]
+    assert json.loads(marker.read_bytes())["state"] == "complete"
+    assert live  # the live capture is the holder
+
+
+def test_a_planned_restore_completes_when_a_live_capture_shares_a_withdrawn_ones_probe(
+    purged, tmp_path, photo_dir
+):
+    from exulanica.orchestration.installation.recovery import restore_planned
+
+    taken, backup_store, (withdrawn, _live), probe = _identical_probes(purged, tmp_path, photo_dir)
+    tombstone = purged.tombstone_the_capture(withdrawn)
+    purged.worker().drain()
+    sealed = tmp_path / "custody" / "checkpoint.json"
+    marker = tmp_path / "control" / "restore.json"
+    loaded = read_backup_set(taken.directory)
+    owner, database = loaded.database.owner_role, loaded.database.database
+    try:
+        with scratch_cluster(owner=owner) as (cluster, port):
+            result = restore_planned(
+                source=purged.database(),
+                checkpoint_path=sealed,
+                backup_set=taken.directory,
+                backup_stores={"blobs": backup_store},
+                marker=marker,
+                target=_target(cluster, port, owner, database, purged.scratch, tmp_path),
+                provision=_provision(purged.scratch),
+            )
+        left = result["tombstones_left_open"]
+        assert list(left) == [str(tombstone)] and f"artifact:{probe}" in left[str(tombstone)]
+    finally:
+        _unseal(purged, sealed, tmp_path)

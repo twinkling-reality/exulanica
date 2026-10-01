@@ -75,6 +75,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Final
 
 import psycopg
+from psycopg.rows import dict_row
 
 from exulanica.db.session import Database
 from exulanica.deletion import queue
@@ -85,7 +86,7 @@ from exulanica.store.namespaces import WorkspaceStores, workspace_asset_lock_key
 if TYPE_CHECKING:
     from exulanica.store.configured import ContentStores
 
-__all__ = ["PurgeOutcome", "PurgeWorker"]
+__all__ = ["HELD_BY_A_LIVE_RECORD", "PurgeOutcome", "PurgeWorker", "still_held"]
 
 #: How often an idle purger asks again. Deletion is not latency-sensitive: a tombstone is
 #: authoritative from the moment it commits, every guard refuses on it immediately, and this is
@@ -331,7 +332,7 @@ class PurgeWorker:
                     target.workspace_id,
                     purge_id=target.purge_id,
                     state="skipped",
-                    error="something live still holds these bytes",
+                    error=HELD_BY_A_LIVE_RECORD,
                 )
                 return
 
@@ -483,6 +484,10 @@ class PurgeWorker:
 #: artefact's own content hash, with its capture live, answers false, so a job enqueued without a
 #: question of its own skips, spends its eight attempts and is reported exhausted while the bytes
 #: are still there.
+#: The error a job is skipped with while something live still holds its bytes: not terminal, it is
+#: tried again after ``queue.RETRY_AFTER`` and keeps its tombstone open (migration 0013).
+HELD_BY_A_LIVE_RECORD: Final = "something live still holds these bytes"
+
 _ARTIFACT_QUESTION: Final = {
     "entity": "person_withdrawal_releases_artifact(%(tombstone)s,decode(%(ref)s,'hex'))",
     "scene_training": (
@@ -509,6 +514,21 @@ def _releases(target: queue.PurgeTarget) -> str:
     if target.target_kind != "artifact":
         return _GENERAL_QUESTION
     return _ARTIFACT_QUESTION.get(target.scope, _GENERAL_QUESTION)
+
+
+def still_held(connection: psycopg.Connection, target: queue.PurgeTarget) -> bool:
+    """Whether something live still holds a target's bytes: the destroy question its job is asked,
+    read only. Restore replay asks it of a job left skipped, which keeps its tombstone open."""
+    row = (
+        connection.cursor(row_factory=dict_row)
+        .execute(
+            f"select {_releases(target)} as releases",
+            {"tombstone": target.tombstone_id, "ref": target.target_ref},
+        )
+        .fetchone()
+    )
+    assert row is not None
+    return not row["releases"]
 
 
 def _exhausted(connection: psycopg.Connection, workspace_id: uuid.UUID) -> int:

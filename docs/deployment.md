@@ -588,7 +588,7 @@ carries.
 | `export --directory DIR [--keep N]` | Writes the same record from a running source to a fresh file in `DIR`, in one read-only snapshot, without a seal, with `covered_through` (the transaction's start), for a crash recovery, then keeps this source's newest `N` exports there (3 by default) and every export a backup set in `EXULANICA_BACKUP_DIRECTORY` names. Refused: `DIR` inside the content store or the backup directories, a standby, a sealed or replaying source, a declared restore (the profile's marker, or `--marker` without a profile) not yet complete, and a database older than the newest export in `DIR`. Its reads make a concurrent checkpoint or schema change wait |
 | `prepare --checkpoint FILE --marker FILE` | Writes the pending external marker before anything is restored. A sealed checkpoint takes no declaration. A checkpoint the marker records among its completed restores is refused, while the marker is kept: the marker carries that record forward through every later restore |
 | `prepare ... --declaration FILE --max-export-lag-seconds N` | The same for an export, which requires both: the declaration (`exulanica.recovery-declaration/v1`: `declaration_id`, `export_sha256`, `incident_at` with its zone, `reason`) must name that export, and `incident_at` must be after `covered_through` and within the bound of it, and the export must be the newest valid export in `EXULANICA_CUSTODY_DIRECTORY`, which is required, wherever the file given lies. The bound is the profile's `max_export_lag_seconds`, which `N` may lower and never raise; a declared `prepare` without a profile is refused. It is at most 86400, and never the declaration's. A declaration states exactly those five fields, each as text, with a reason. The marker records the declaration and the bound, and the command prints the window that is not restored |
-| `replay --checkpoint FILE --marker FILE` | Replays withdrawals and tombstones, purges, and completes the marker. An export replays only when the declaration its marker records validates again; the receipt records the window, and the command prints it. A marker already complete is refused: replaying it again would let a database that has not served since (a set-aside source) serve with every later deletion undone |
+| `replay --checkpoint FILE --marker FILE` | Replays withdrawals and tombstones, purges, and completes the marker. An export replays only when the declaration its marker records validates again; the receipt records the window, and the command prints it. A marker already complete is refused: replaying it again would let a database that has not served since (a set-aside source) serve with every later deletion undone. A marker of an abandoned recovery is refused too |
 
 #### 5.2.9 The reviewer seed command
 
@@ -1079,7 +1079,12 @@ An installation declares its profile (`EXULANICA_INSTALLATION_PROFILE`, a file u
 `deploy/profiles/`, profile `exulanica.installation-profile/v1`): which of thirteen components it
 runs, the reason one it runs cannot work here, the queue bound past which a component is reported
 degraded, and its recovery bounds (9.4). `reviewer` is the seeded stack of section 8 and is not a
-complete installation; `single-host` runs every component on one host; `single-host-server-only` is
+complete installation: it runs the database, schema, API, client, ingestion and simulation.
+`single-host` runs on one host the database, schema, API, client, maintenance, ingestion,
+derivatives, pose and scene reconstruction (`pose_scene`), simulation and comparison. No shipped
+profile installs asset and body preparation (`preparation`), material bakes (`materials`) or
+generated tiles (`generated_tiles`): each reports not installed, and `compose.yaml` runs no worker
+for them. `single-host-server-only` is
 the same built without the reconstruction and pose extras, whose workers then report unavailable,
 and is what `compose.yaml` and `.env.example` select by default (`EXULANICA_PROFILE`);
 `shared-store` keeps its bytes in an S3-compatible bucket, composed by adding
@@ -1196,14 +1201,30 @@ restore is sealed or replaying. Two cases are kept apart
   checkpoint; anything else is refused and nothing is renamed. Without `--set-aside`, a target that
   already holds the source's name is refused before anything is sealed. Until the restore
   completes, `restore return-to-source --checkpoint FILE [--set-aside]` abandons it and lets the
-  source serve again. Without `--set-aside` it refuses while the source is still set aside, and
-  replays only into a database sealed for this checkpoint or one whose replay this attempt already
-  began, so it refuses a partial copy that took the source's name; with `--set-aside` it renames
-  back only a set-aside database sealed for this checkpoint. A return whose replay began and
-  stopped is resumed by running it again, with or without `--set-aside`. It replays with the installation's own purge connection and stores, so it returns a
-  source on the installation's server; a source on another server fails closed (its re-queued
-  purges cannot complete there) and is returned with that server's own settings. Once it completes, the set-aside source lacks every deletion made since and
-  lies outside every deletion path, so it can never serve again:
+  source serve again. Without `--set-aside` it replays into the database
+  `EXULANICA_SOURCE_DATABASE_URL` names: it refuses while the source is still set aside, refuses a
+  database it cannot reach by name, and replays only into a database sealed for this checkpoint,
+  or one in which a return of this attempt already began, its replay begun or committed, so it
+  refuses a partial copy that took the source's name and the restore's own copy. With
+  `--set-aside` it renames back only a set-aside database sealed for this checkpoint, on the
+  target server. Before its replay begins, a return writes a one-off token into the source (as its
+  database comment) and records in the marker the database it replays into, by server, oid and
+  that token, all of which a rename keeps. A stopped return is resumed by running a return again,
+  and only in that database: on one host in either form, and for a source on another server
+  without `--set-aside`. A return does not resume a replaying database the marker records no
+  return into, and refuses it with "do not drop it", except the restore's own copy under the
+  source's name while the source is still set aside, which is this attempt's copy whose replay
+  never completed: drop it, then return. A database in which a restore completed under the pending
+  attempt, as after a marker was put back from an older copy, is never offered for dropping, and a
+  rerun of the restore completes the marker again. The return token replaces any comment the
+  source database had, and writing it needs the database owner or a superuser, so
+  `EXULANICA_SOURCE_DATABASE_URL` connects as one of them; another role is refused by name before
+  anything is replayed. It replays with the installation's own purge connection and
+  stores, so it completes a source on the installation's server; a source on another server fails
+  closed (its re-queued purges cannot complete there) and is returned with that server's own purge
+  connection and stores. Without `--set-aside` it does not need the target server: one it cannot
+  connect to is taken as holding no set-aside source. Once it completes, the set-aside source lacks
+  every deletion made since and lies outside every deletion path, so it can never serve again:
   `restore discard-set-aside --checkpoint FILE` drops it: the database under the set-aside name
   found through the marker's record of completed restores, and only while it is sealed for that
   checkpoint (the drop checks the seal, not the identity), so it stays discardable after a later
@@ -1217,8 +1238,9 @@ restore is sealed or replaying. Two cases are kept apart
   --export FILE --declaration FILE` writes the marker first, loads the backup set into an empty
   target, copies its bytes back, migrates and reprovisions, and replays the export under the
   operator's recovery declaration. It refuses when the export is not the newest valid export in
-  `EXULANICA_CUSTODY_DIRECTORY`, wherever the file given lies, does not match its digest or catalog, is older than the backup set's own
-  export, or ends further before the declared incident than the profile's `max_export_lag_seconds`;
+  `EXULANICA_CUSTODY_DIRECTORY`, wherever the file given lies, does not match its digest or
+  catalog, is older than the backup set's own export, or ends further before the declared incident
+  than the profile's `max_export_lag_seconds`;
   there is no override. A withdrawal made after that export is not recovered, and the marker and the
   restore receipt record the window it fell in. The export names its withdrawal catalog, and a replay
   refuses another release's, so a crash recovery runs on the release the export came from and
@@ -1269,6 +1291,7 @@ it. Recovery time is measured, not promised.
 | `EXULANICA_BACKUP_DATABASE_URL` | maintenance | The `exulanica_backup` connection |
 | `EXULANICA_BACKUP_DIRECTORY`, `EXULANICA_BACKUP_STORE_DIRECTORY`, `EXULANICA_CUSTODY_DIRECTORY` | maintenance, restore | Backup sets, the stored-byte copy, and withdrawal exports |
 | `EXULANICA_RESTORE_MAINTENANCE_URL`, `EXULANICA_RESTORE_DATABASE_URL` | restore | A superuser, as the backup's owner, on the empty target server, and the database the restore creates there |
+| `EXULANICA_SOURCE_DATABASE_URL` | restore | The source database, which a planned restore seals and `return-to-source` without `--set-aside` replays into; as its owner or a superuser, since a return writes the database comment |
 | `EXULANICA_BACKUP_ROLE_PASSWORD` | `exulanica-db` | The backup role's password |
 
 ## 10. Hosting options researched and not built

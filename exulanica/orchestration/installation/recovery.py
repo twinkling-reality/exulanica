@@ -48,6 +48,7 @@ from exulanica.deletion.restore import (
     checkpoint,
     completed_restores,
     loss_window,
+    mark_returning,
     prepare_restore,
     replay,
     source_identity,
@@ -138,6 +139,51 @@ def _pending(marker: Path, authority_sha256: str) -> uuid.UUID | None:
     return None
 
 
+#: The database comment a return writes into the source before its replay, as a one-off token.
+_RETURN_TOKEN: Final = "exulanica return "
+
+
+def _database_identity(url: str) -> str:
+    """The database at ``url`` by its server, its oid and the return token its comment holds, if
+    any: a rename keeps all three. The token tells the source from a database another server
+    cloned from the same data directory created with the same oid. It is never cleared, and a
+    backup set (pg_dump --create) carries database comments, so a later restore's copy can hold an
+    old token; matching is unaffected, because each return writes a fresh token after the seal,
+    and no backup set is taken from a sealed source or under a pending marker."""
+    with psycopg.connect(url, autocommit=True) as connection:
+        row = connection.execute(
+            "select (select system_identifier from pg_control_system())::text || ':' || oid::text, "
+            "coalesce(shobj_description(oid, 'pg_database'), '') "
+            "from pg_database where datname = current_database()"
+        ).fetchone()
+    assert row is not None
+    comment = str(row[1])
+    token = comment.removeprefix(_RETURN_TOKEN) if comment.startswith(_RETURN_TOKEN) else ""
+    return f"{row[0]}:{token}"
+
+
+def _mark_the_source(url: str) -> str:
+    """Write a fresh return token into the database at ``url`` as its comment (replacing any comment
+    it had) and return its identity with it. Commenting on a database needs its owner or a
+    superuser, so the connection that returns to a source must be one of them."""
+    with psycopg.connect(url, autocommit=True) as connection:
+        name = connection.execute("select current_database()").fetchone()
+        assert name is not None
+        try:
+            connection.execute(
+                sql.SQL("comment on database {} is {}").format(
+                    sql.Identifier(name[0]), sql.Literal(f"{_RETURN_TOKEN}{uuid.uuid4().hex}")
+                )
+            )
+        except psycopg.errors.InsufficientPrivilege as exc:
+            raise RestoreRefused(
+                f"the connection that returns to the source cannot comment on {name[0]}: a return "
+                "records itself in the source's database comment, which needs its owner or a "
+                "superuser; nothing was replayed"
+            ) from exc
+    return _database_identity(url)
+
+
 def _is_the_source(source: Database, target: Target, name: str) -> bool:
     """Whether the target server's ``name`` is the source database itself: the same server and
     the same database, by the identity every export records."""
@@ -185,10 +231,10 @@ def _target_state(
 
 def _state_at(url: str, authority_sha256: str, attempt: uuid.UUID | None = None) -> str:
     """What the database at ``url`` is to this restore, by its own restore_control: sealed_source
-    (sealed for this authority), replaying (this authority's replay, loaded; or this attempt's
-    replay committed before its marker was), live (a restore completed in it, and no attempt is
-    pending), empty (no table) or occupied (anything else, including a copy this attempt loaded
-    whose backup carried an earlier restore's complete row)."""
+    (sealed for this authority), replaying (this authority's replay, loaded and begun),
+    completed_here (a restore completed in it under this pending attempt), live (a restore
+    completed in it, and no attempt is pending), empty (no table) or occupied (anything else,
+    including a copy this attempt loaded whose backup carried an earlier restore's complete row)."""
     with psycopg.connect(url, autocommit=True) as connection:
         tables = connection.execute(
             "select count(*) from pg_tables where schemaname not in ('pg_catalog', "
@@ -208,10 +254,14 @@ def _state_at(url: str, authority_sha256: str, attempt: uuid.UUID | None = None)
     if state == "complete":
         if attempt is None:
             return "live"
-        # Under a pending attempt, written only after the target held nothing of this name, a
-        # complete row is either this attempt's own committed replay or a row the loaded backup
-        # carried from an earlier restore: the copy this attempt loaded, never a live database.
-        return "replaying" if restore_id == attempt else "occupied"
+        # Under a pending attempt a complete row is either completed under this attempt or one the
+        # loaded backup carried from an earlier restore. Completed under this attempt: its replay
+        # committed before its marker was written, or the marker was restored from an older copy
+        # after the attempt completed and the database has served since; it is never offered for
+        # dropping, and the callers resume it where they may. A carried row is treated as the copy
+        # this attempt loaded, which holds while the restore settings name the server the marker
+        # was written against.
+        return "completed_here" if restore_id == attempt else "occupied"
     if digest == authority_sha256:
         if state == "sealed":
             return "sealed_source"
@@ -221,6 +271,18 @@ def _state_at(url: str, authority_sha256: str, attempt: uuid.UUID | None = None)
 
 
 def _refuse_target(state: str, name: str, *, attempt_pending: bool) -> None:
+    if state == "completed_here":
+        raise RestoreRefused(
+            f"{name} on the target server holds a restore this attempt completed, so it may have "
+            "served since: do not drop it; if the marker was restored from an older copy, put back "
+            "the marker this attempt completed, or rerun the restore, which completes it"
+        )
+    if state == "replaying" and attempt_pending:
+        raise RestoreRefused(
+            f"{name} on the target server is this attempt's own copy, whose replay began and which "
+            "never completed, so it has never served: drop it, then rerun or return from the "
+            "attempt (or abandon a declared recovery)"
+        )
     if state == "replaying":
         raise RestoreRefused(
             f"{name} on the target server is replaying a restore that no pending marker names: "
@@ -246,10 +308,11 @@ def _refuse_target(state: str, name: str, *, attempt_pending: bool) -> None:
         raise RestoreRefused(
             f"the target server holds {name} with tables"
             + (
-                " and this attempt is pending, which was written only after the target held no "
-                f"{name}: if this attempt created it, it is a partial copy (the load failed "
-                "before replay): drop it and rerun; if it is a live database, do not drop it, and "
-                "abandon or return from the attempt instead"
+                " and this attempt is pending, whose marker was written only after the target "
+                f"was checked: if this attempt created {name}, it is a partial copy (the load "
+                "failed before replay): drop it and rerun; if it is a live database, do not drop "
+                "it (nor a sealed source), and return from the attempt or abandon a declared "
+                "recovery instead"
                 if attempt_pending
                 else ": it may be a live database or a sealed source; do not drop it; restore into "
                 "an empty server, or set the source aside"
@@ -381,7 +444,10 @@ def _finish(
         stores=target.stores,
     )
     verify_restore(Database(target.database_url), marker)
-    return loaded
+    # Tombstones left open on bytes a live record in the restored database still holds, with their
+    # targets: queued for the ordinary purger, as they would be without a restore.
+    left_open = json.loads(marker.read_bytes()).get("left_open", {})
+    return {**loaded, "tombstones_left_open": left_open}
 
 
 def recover_declared(
@@ -416,7 +482,8 @@ def recover_declared(
         )
     attempt = _pending(marker, digest)
     state = _target_state(target, loaded.database.database, digest, attempt)
-    if state not in ("absent", "replaying") or (state == "replaying" and attempt is None):
+    resumable = ("absent", "replaying", "completed_here")
+    if state not in resumable or (state == "replaying" and attempt is None):
         _refuse_target(state, loaded.database.database, attempt_pending=attempt is not None)
     restore_id = attempt or prepare_restore(
         export, marker, declaration_path=declaration, max_export_lag=max_export_lag
@@ -543,7 +610,7 @@ def restore_planned(
                     )
                 )
     state = _target_state(target, name, digest, attempt)
-    if state not in ("absent", "replaying"):
+    if state not in ("absent", "replaying", "completed_here"):
         _refuse_target(state, name, attempt_pending=True)
     result = _finish(
         target,
@@ -579,8 +646,12 @@ def return_to_source(
     Allowed only while the marker is pending for this checkpoint: once the restored database has
     served, the source lacks every deletion made there, and no path may serve it. A set-aside
     source is renamed back first; a partial restore under its name is refused by name. The
-    source's own seal is completed by replaying its checkpoint into it under the pending attempt,
-    which finds every tombstone already present and writes only the receipt.
+    source's own seal is completed by replaying its checkpoint into it under the pending attempt:
+    it adds a replay copy of each checkpoint tombstone, resets their purge jobs and purge
+    completion and runs them again, marks every derived artifact in each affected workspace stale,
+    writes every carried withdrawal again, and writes the receipt.
+    The database a return replays into is recorded in the marker before that replay begins (its
+    server, oid and a token written into it), and a later run resumes a replay only there.
     """
     digest = _record_sha256(checkpoint_path)
     attempt = _pending(marker, digest)
@@ -590,10 +661,21 @@ def return_to_source(
             "restored database has served, so the source would bring back deletions made since; "
             "discard it instead"
         )
+    # The restore's own copy and the source carry the same attempt and checkpoint once a replay
+    # has begun in either, so a replaying database is resumed only if a return began in it.
+    returning = json.loads(marker.read_bytes()).get("returning")
     # Whether the source is still set aside decides what the source's name holds: while it is,
     # the name holds the restore's own copy, which is never the source.
     kept = _kept_name(name, attempt)
-    aside = _target_state(target, kept, digest, attempt)
+    try:
+        aside = _target_state(target, kept, digest, attempt)
+    except psycopg.OperationalError as exc:
+        if set_aside:
+            raise RestoreRefused(
+                "the target server cannot be reached, and --set-aside renames back a source set "
+                "aside there"
+            ) from exc
+        aside = "absent"  # a source on its own server is returned without the target server
     if aside not in ("absent", "sealed_source"):
         raise RestoreRefused(
             f"{kept} on the target server is not the source this restore sealed; nothing is renamed"
@@ -605,22 +687,32 @@ def return_to_source(
             )
         try:
             held = _state_at(target.database_url, digest, attempt)
+            here = _database_identity(target.database_url)
         except psycopg.OperationalError as exc:
             raise RestoreRefused(
                 "the source connection names no database that can be reached; if the source was "
                 "set aside, run return-to-source --set-aside"
             ) from exc
-        # The seal, or this attempt's own replay of it, begun or committed by an earlier run.
-        if held not in ("sealed_source", "replaying"):
+        if held in ("replaying", "completed_here") and returning != here:
+            raise RestoreRefused(
+                "the database the source connection names is replaying this checkpoint, but the "
+                "marker records no return into it, so no return began in it that this command can "
+                "resume: it is the restore's own copy, or a source whose return began unrecorded "
+                "(before returns were recorded, or reloaded since); do not drop it"
+            )
+        if held not in ("sealed_source", "replaying", "completed_here"):
             # A partial copy loaded under the source's name would otherwise be completed and served.
             raise RestoreRefused(
                 "the database the source connection names is not the source this restore sealed; "
                 "if the source was set aside, run return-to-source --set-aside"
             )
+        if held == "sealed_source":
+            mark_returning(marker, digest, _mark_the_source(target.database_url))
     elif aside == "sealed_source":
         state = _target_state(target, name, digest, attempt)
         if state != "absent":
             _refuse_target(state, name, attempt_pending=True)
+        mark_returning(marker, digest, _mark_the_source(_on_target(target, kept)))
         with psycopg.connect(target.maintenance_url, autocommit=True) as connection:
             connection.execute(
                 sql.SQL("alter database {} rename to {}").format(
@@ -628,15 +720,28 @@ def return_to_source(
                 )
             )
     else:
-        # Renamed back by an earlier run: resume its replay; or the source was never set aside.
+        # Renamed back by an earlier run of this return: resume its replay. Anything else under the
+        # name is not a source set aside on this server.
         state = _target_state(target, name, digest, attempt)
+        if state == "absent":
+            raise RestoreRefused(
+                f"the target server holds neither {kept} nor {name}: nothing was set aside there; "
+                "a source on another server is returned without --set-aside"
+            )
         if state == "sealed_source":
             raise RestoreRefused(
                 f"{name} on the target server is still the sealed source: it was never set aside; "
                 "run return-to-source without --set-aside"
             )
-        if state != "replaying":
+        if state not in ("replaying", "completed_here"):
             _refuse_target(state, name, attempt_pending=True)
+        if returning != _database_identity(_on_target(target, name)):
+            raise RestoreRefused(
+                f"{name} on the target server is replaying this checkpoint and the marker records "
+                "no return into it: it is the restore's own copy, or a source whose return began "
+                "unrecorded; do not drop it. A source on another server is returned without "
+                "--set-aside"
+            )
     source = Database(target.database_url)
     replay(
         source, source_purge, None, checkpoint_path, marker, writers=WRITERS, stores=target.stores
@@ -656,6 +761,10 @@ def abandon_declared(*, target: Target, export: Path, marker: Path) -> dict[str,
     attempt = _pending(marker, digest)
     if attempt is None:
         raise RestoreRefused("the marker is not pending for this export: nothing to abandon")
+    recorded = json.loads(marker.read_bytes())
+    if "recovery" not in recorded:
+        # Checked before the target: under a planned restore the database there may be the source.
+        raise RestoreRefused("a planned restore is abandoned with return-to-source")
     name = str(conninfo_to_dict(target.database_url).get("dbname") or "")
     state = _target_state(target, name, digest, attempt)
     if state != "absent":

@@ -335,7 +335,10 @@ def test_corrupt_checkpoint_and_restored_receipt_cannot_authorize_a_new_attempt(
         pass
 
 
-def test_shared_live_bytes_leave_restore_refusing_and_foreign_capture_intact(purged, tmp_path):
+def test_shared_live_bytes_leave_the_tombstone_open_and_foreign_capture_intact(purged, tmp_path):
+    """A live record holds the bytes a replayed tombstone names: the purge rightly skips them, as
+    in normal operation, so the replay completes with that tombstone left open, names it, and
+    leaves the bytes and the foreign capture as they are; the job stays queued for the purger."""
     from exulanica.evidence.blob import BlobId
 
     capture = _capture(purged)
@@ -345,26 +348,33 @@ def test_shared_live_bytes_leave_restore_refusing_and_foreign_capture_intact(pur
         "insert into capture (workspace_id,blob_sha256) values (%s,%s) returning capture_id",
         (foreign, blob.digest),
     ).fetchone()["capture_id"]
-    purged.tombstone_the_capture(capture)
+    tombstone = purged.tombstone_the_capture(capture)
     source, marker = tmp_path / "checkpoint.json", tmp_path / "restore.json"
     checkpoint(purged.database(), source)
     prepare_restore(source, marker)
-    with pytest.raises(RestoreRefused, match="purge incomplete"):
-        replay(
-            purged.database(),
-            _purge_database(purged),
-            purged.store,
-            source,
-            marker,
-            writers=WRITERS,
-        )
+    replay(
+        purged.database(),
+        _purge_database(purged),
+        purged.store,
+        source,
+        marker,
+        writers=WRITERS,
+    )
     assert purged.store.exists(blob)
     assert purged.rows("select deleted_at from capture where capture_id=%s", foreign_capture) == [
         {"deleted_at": None}
     ]
-    assert not purged.rows("select * from restore_replay_receipt")
-    with pytest.raises(RestoreRefused, match="pending"):
-        verify_restore(purged.database(), marker)
+    state = json.loads(marker.read_bytes())
+    assert state["state"] == "complete"
+    open_tombstones = state["left_open"]
+    assert f"blob:{blob.hex}" in next(iter(open_tombstones.values()))
+    assert purged.rows(
+        "select state from purge_job where target_ref=%s and state <> 'done'", blob.hex
+    ), "the job stays for the ordinary purger"
+    assert purged.rows(
+        "select purge_completed_at from tombstone where tombstone_id=%s", tombstone
+    ) == [{"purge_completed_at": None}]
+    verify_restore(purged.database(), marker)
 
 
 def test_backup_older_than_blocklisted_capture_refuses_missing_address_binding(purged, tmp_path):
@@ -427,3 +437,48 @@ def test_a_completed_restore_is_remembered_after_a_later_one(purged, tmp_path):
     with pytest.raises(RestoreRefused, match="already complete"):
         prepare_restore(tmp_path / "first.json", marker)
     assert json.loads(marker.read_bytes()) == state
+
+
+def test_only_a_skip_on_bytes_a_live_record_holds_leaves_a_tombstone_open(purged):
+    """The acceptance is that narrow: a job skipped because a live record holds its bytes, while it
+    still does. Any other skip, a failed job, or bytes nothing holds any more refuses."""
+    from exulanica.deletion.restore import _held_open
+    from exulanica.evidence.blob import BlobId
+
+    capture = _capture(purged)
+    blob = BlobId(bytes(purged.rows("select blob_sha256 from capture")[0]["blob_sha256"]))
+    foreign = uuid.uuid4()
+    holder = purged.repository.connection.execute(
+        "insert into capture (workspace_id,blob_sha256) values (%s,%s) returning capture_id",
+        (foreign, blob.digest),
+    ).fetchone()["capture_id"]
+    tombstone = purged.tombstone_the_capture(capture)
+    purged.worker().drain()
+
+    def held():
+        from exulanica.db.session import set_workspace
+
+        with purged.database().unscoped() as connection:
+            connection.execute(f'set search_path to "{purged.scratch}", public')
+            set_workspace(connection, purged.workspace_id)  # as replay does before it asks
+            return _held_open(connection, purged.workspace_id, tombstone)
+
+    def job(sql_text):
+        with purged.database().unscoped() as connection:
+            connection.execute(f'set search_path to "{purged.scratch}", public')
+            connection.execute(
+                sql_text + " where tombstone_id=%s and target_ref=%s", (tombstone, blob.hex)
+            )
+
+    assert f"blob:{blob.hex}" in held()
+    job("update purge_job set last_error='another reason'")
+    assert held() is None
+    job("update purge_job set last_error='something live still holds these bytes'")
+    job("update purge_job set state='failed'")
+    assert held() is None
+    job("update purge_job set state='skipped'")
+    assert held() is not None
+    purged.repository.connection.execute(
+        "update capture set deleted_at=now() where capture_id=%s", (holder,)
+    )
+    assert held() is None, "nothing holds the bytes now: the purge should have destroyed them"
