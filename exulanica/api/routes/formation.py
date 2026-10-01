@@ -27,10 +27,14 @@ is built for that: the reducer holds its last state and nothing advances without
 closed connection looks to the client exactly like a pipeline that stopped. The heartbeat is a
 comment line rather than an event so it cannot reach the reducer.
 
-**It resumes exactly, and refuses a token it did not issue.** A resume token is the id of an event
-this stream sent: ``received``, a ledger event id, or the batch's terminal id. Resuming from the
-terminal id answers 200 with no events, so a client that already has the outcome is not sent it
-twice. Anything else is 422 ``invalid_resume_token`` before a stream opens.
+**It resumes exactly, and refuses a token that cannot be one.** A resume token is the id of an
+event this stream sends: ``received``, a ledger event id, or the batch's terminal id. ``received``
+and any well-formed ledger event id (a UUID) are read as a position, and the stream sends what
+follows it in id order, so a well-formed id this stream never sent is a position too rather than a
+refusal. Resuming from the terminal id answers 200 with no events once the batch has ended with
+that status, so a client that already has the outcome is not sent it twice. A malformed token, a
+terminal id for another batch, and a terminal id the batch has not ended with are each 422
+``invalid_resume_token`` before a stream opens.
 
 **A stream that ends without a terminal event means "reconnect".** It does that at its time cap,
 and after :data:`FAILED_POLLS` polls in a row have failed; a single failed poll sends nothing and
