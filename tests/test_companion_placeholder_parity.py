@@ -9,7 +9,7 @@ and the naming predicate, because the browser tells a withdrawn person's withhel
 never given by the naming claim the graph keeps (``exulanica/graph/entities.py``).
 
 ``typescript_constant`` is the parser ``tests/test_consent_wording_is_one_text.py`` controls with a
-pair that agrees independently of these.
+source of its own, independently of these.
 """
 
 from pathlib import Path
