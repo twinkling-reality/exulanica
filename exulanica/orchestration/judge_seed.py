@@ -80,6 +80,7 @@ __all__ = [
     "classify_tables",
     "export_seed",
     "iter_row_tables",
+    "judge_grant_mismatches",
     "judge_grants",
     "mint_judge_token",
     "prepare_sandbox_world",
@@ -1677,6 +1678,29 @@ def judge_grants(connection: psycopg.Connection, *, role: str = JUDGE_ROLE) -> d
     for row in rows:
         grants.setdefault(row["name"], set()).add(row["privilege"])
     return grants
+
+
+def judge_grant_mismatches(grants: Mapping[str, set[str]]) -> list[str]:
+    """Each table whose privileges beyond SELECT differ from what the judge is granted.
+
+    Exactly INSERT and UPDATE on :data:`JUDGE_WRITE_TABLES`, exactly INSERT on
+    :data:`JUDGE_INSERT_ONLY_TABLES`, and nothing beyond SELECT on any other table. Empty when
+    ``grants``, read back by :func:`judge_grants`, is exactly that.
+    """
+    granted = {
+        **{table: {"INSERT", "UPDATE"} for table in JUDGE_WRITE_TABLES},
+        **{table: {"INSERT"} for table in JUDGE_INSERT_ONLY_TABLES},
+    }
+    mismatches = []
+    for table in sorted(set(granted) | set(grants)):
+        held = set(grants.get(table, set())) - {"SELECT"}
+        allowed = granted.get(table, set())
+        if held != allowed:
+            mismatches.append(
+                f"{table} holds {', '.join(sorted(held)) or 'nothing'} beyond SELECT; "
+                f"the allowlist grants {', '.join(sorted(allowed)) or 'nothing'}"
+            )
+    return mismatches
 
 
 def mint_judge_token(*, workspace_id: uuid.UUID, actor: uuid.UUID, token: str) -> dict[str, Any]:

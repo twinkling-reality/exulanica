@@ -24,8 +24,10 @@ own ``exulanica_judge`` here would rewrite the grants on a developer's live role
 from __future__ import annotations
 
 import hashlib
+import io
 import json
 import uuid
+from contextlib import contextmanager
 
 import psycopg
 import pytest
@@ -39,6 +41,7 @@ from exulanica.db.roles import (
     SPENDING_TABLES,
     provision_runtime_role,
 )
+from exulanica.orchestration import judge_seed_cli
 from exulanica.orchestration.judge_seed import (
     GLOBAL_TABLES,
     INSTANCE_TABLES,
@@ -50,6 +53,7 @@ from exulanica.orchestration.judge_seed import (
     SeedRefused,
     classify_tables,
     export_seed,
+    judge_grant_mismatches,
     judge_grants,
     mint_judge_token,
     provision_judge_role,
@@ -480,6 +484,79 @@ def test_the_judge_only_appends_where_the_runtime_only_appends(judged):
     grants = judge_grants(judged.connection, role=_JUDGE_ROLE)
     for table in JUDGE_INSERT_ONLY_TABLES:
         assert grants.get(table) == {"SELECT", "INSERT"}, f"{table}: {grants.get(table)}"
+
+
+def _role_command(judged, monkeypatch, capsys) -> tuple[int, str, str]:
+    """Run ``exulanica-seed role`` over the suite's connection; only its source is replaced."""
+
+    class _Database:
+        @classmethod
+        def from_env(cls):
+            return cls()
+
+        @contextmanager
+        def unscoped(self):
+            yield judged.connection
+
+    monkeypatch.setattr(judge_seed_cli, "Database", _Database)
+    out = io.StringIO()
+    code = judge_seed_cli.main(["role", "--role", _JUDGE_ROLE, "--no-password"], stream=out)
+    return code, out.getvalue(), capsys.readouterr().err
+
+
+def test_the_role_command_reports_success_for_the_grants_it_makes(judged, monkeypatch, capsys):
+    """The judge stack's seeding job and CI's image check run this command, and it once compared
+    the grants it had just made with the update allowlist alone, so it refused every one of them.
+    """
+    code, out, err = _role_command(judged, monkeypatch, capsys)
+
+    assert (code, err) == (0, "")
+    assert f"writable    {len(JUDGE_WRITE_TABLES)} tables" in out
+    assert f"appendable  {len(JUDGE_INSERT_ONLY_TABLES)} tables" in out
+    assert "deletable   0 tables" in out
+
+
+def test_the_role_command_refuses_a_grant_beyond_the_allowlists(judged, monkeypatch, capsys):
+    table = JUDGE_INSERT_ONLY_TABLES[0]
+
+    def rewritable(connection, *, role):
+        grants = judge_grants(connection, role=role)
+        grants[table] = grants[table] | {"UPDATE"}
+        return grants
+
+    monkeypatch.setattr(judge_seed_cli, "judge_grants", rewritable)
+    code, _, err = _role_command(judged, monkeypatch, capsys)
+
+    assert code == 1
+    assert f"{table} holds INSERT, UPDATE beyond SELECT; the allowlist grants INSERT" in err
+
+
+@pytest.mark.parametrize(
+    ("table", "change"),
+    [
+        pytest.param(JUDGE_INSERT_ONLY_TABLES[0], {"UPDATE"}, id="append-only-rewritten"),
+        pytest.param(JUDGE_WRITE_TABLES[0], {"DELETE"}, id="write-table-deletable"),
+        pytest.param("capture", {"INSERT"}, id="unlisted-table-written"),
+    ],
+)
+def test_each_grant_beyond_the_allowlists_is_named(judged, table, change):
+    grants = judge_grants(judged.connection, role=_JUDGE_ROLE)
+    assert judge_grant_mismatches(grants) == [], "the positive control: the live grants match"
+
+    grants[table] = grants.get(table, set()) | change
+    (mismatch,) = judge_grant_mismatches(grants)
+
+    assert mismatch.startswith(f"{table} holds ")
+
+
+def test_a_write_table_without_its_update_is_named(judged):
+    grants = judge_grants(judged.connection, role=_JUDGE_ROLE)
+    table = JUDGE_WRITE_TABLES[0]
+    grants[table] = grants[table] - {"UPDATE"}
+
+    assert judge_grant_mismatches(grants) == [
+        f"{table} holds INSERT beyond SELECT; the allowlist grants INSERT, UPDATE"
+    ]
 
 
 def test_the_judge_role_may_delete_nothing_at_all(judged):

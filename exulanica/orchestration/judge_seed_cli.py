@@ -33,9 +33,9 @@ from exulanica.db.session import Database
 from exulanica.env import env_get, env_name
 from exulanica.orchestration.judge_seed import (
     JUDGE_ROLE,
-    JUDGE_WRITE_TABLES,
     SeedRefused,
     export_seed,
+    judge_grant_mismatches,
     judge_grants,
     mint_judge_token,
     provision_judge_role,
@@ -163,15 +163,22 @@ def _role(arguments: argparse.Namespace, stream: Any) -> int:
     with database.unscoped() as connection:
         provision_judge_role(connection, role=arguments.role, password=password or None)
         grants = judge_grants(connection, role=arguments.role)
-    writable = sorted(name for name, values in grants.items() if values - {"SELECT"})
+    writable = sorted(name for name, values in grants.items() if "UPDATE" in values)
+    appendable = sorted(
+        name for name, values in grants.items() if "INSERT" in values and "UPDATE" not in values
+    )
     deletable = sorted(name for name, values in grants.items() if "DELETE" in values)
     print(f"role        {arguments.role}", file=stream)
     print(f"readable    {len(grants)} tables", file=stream)
     print(f"writable    {len(writable)} tables: {', '.join(writable)}", file=stream)
+    print(f"appendable  {len(appendable)} tables: {', '.join(appendable)}", file=stream)
     print(f"deletable   {len(deletable)} tables", file=stream)
-    if deletable or sorted(writable) != sorted(JUDGE_WRITE_TABLES):
+    mismatches = judge_grant_mismatches(grants)
+    if mismatches:
         print(
             "the live grants do not match the allowlist; refusing to report success",
+            *mismatches,
+            sep="\n",
             file=sys.stderr,
         )
         return 1
