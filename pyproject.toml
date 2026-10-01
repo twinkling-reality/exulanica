@@ -208,6 +208,9 @@ dev = [
   "ruff>=0.7",
   # One process per worker, each with a private PostgreSQL server: see scripts/test_postgres.py.
   "pytest-xdist>=3.6",
+  # The installation deployment tests read the Compose files as YAML. PyYAML otherwise arrives only
+  # through the model extras, which the test environment does not install.
+  "pyyaml>=6.0",
 ]
 
 [build-system]

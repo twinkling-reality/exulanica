@@ -298,6 +298,7 @@ dev = [
     { name = "import-linter" },
     { name = "pytest" },
     { name = "pytest-xdist" },
+    { name = "pyyaml" },
     { name = "ruff" },
     { name = "uvicorn" },
 ]
@@ -342,6 +343,7 @@ dev = [
     { name = "import-linter", specifier = ">=2.0" },
     { name = "pytest", specifier = ">=8.3" },
     { name = "pytest-xdist", specifier = ">=3.6" },
+    { name = "pyyaml", specifier = ">=6.0" },
     { name = "ruff", specifier = ">=0.7" },
     { name = "uvicorn", specifier = ">=0.30" },
 ]
