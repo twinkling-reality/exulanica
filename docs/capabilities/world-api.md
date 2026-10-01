@@ -147,8 +147,27 @@ model. All describe each operation with the same descriptor:
 | `options` | The reads that list its choices, such as `GET /world/assets` or `GET /world/arrangements` |
 | `writes`, `spends` | Whether success records state, and whether it may call a model or commit the world to one |
 | `effects` | A later consequence this server may not produce: whether the world's people use what was placed (`society`), whether this host asks a chosen model (`decisions`), whether the world advances on its own once played (`playback`), whether an admitted asset is prepared on this installation (`preparation`) |
+| `dependencies` | The installation's components the operation needs that are not configured or ready, each with the installation's state and reason (`component`, `state`, `code`) |
 
 Availability is not permission: an operation can be available and not permitted to this caller.
+
+Where the serving process was composed with an installation, each read also reads the
+installation's facts once ([installation profiles and facts](../deployment.md#91-installation-profiles-and-facts))
+and states them:
+- While the installation refuses to serve because a restore is not complete, every write is
+  `unavailable` by the installation's reason (`restore_pending` or `restore_state_unknown`).
+- Otherwise an operation keeps its own refusal. One its own checks allow is `unavailable` by the
+  first component it needs that the installation does not install, cannot run or refuses: by the
+  installation's reason, or `<component>_not_installed` where it gives none.
+- A comparison's start needs `comparison`. A preparation request, of a workspace asset or of a
+  character's body, needs `preparation`, and the `preparation` effect takes that component's state.
+  The routes themselves do not read the installation: one the read calls unavailable for a
+  component may still accept a request, which waits until the installation runs that component.
+- `dependencies` lists each component an operation needs that is not configured or ready. A
+  `degraded` one is listed and changes nothing.
+- A process without an installation profile cannot see other processes. It lists such a component
+  as `not_installed` with `undeclared_installation`, which changes nothing, and states the
+  `preparation` effect `unknown`. A process composed with no installation lists no dependency.
 Units are part of field names across the API (`_mm`, `_ms`, `_seconds`, `_usd`, `_microradians`,
 `_milli`), and bounds are the OpenAPI schema's or the domain read's; a descriptor restates neither.
 Where an operation answers a family code with the reason in `detail` (`409 arrangement_refused`,

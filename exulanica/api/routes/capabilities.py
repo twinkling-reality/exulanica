@@ -39,6 +39,7 @@ from exulanica.api.capabilities import (
     Subjects,
     VersionContext,
     describe,
+    installation_facts_of,
     surface,
     unavailable,
     unknown,
@@ -262,6 +263,7 @@ def world_creation(
     policy = current_world_count_policy()
     counts = Counter(world.kind for world in workspace_worlds(connection, session.workspace_id))
     routes = surface(request.app)
+    facts = installation_facts_of(services)
     kinds = []
     for kind in WORLD_KINDS:
         creator = CREATORS.get(kind.name)
@@ -273,7 +275,9 @@ def world_creation(
                 "kind_facts": _kind_facts(kind),
                 "create": None
                 if creator is None
-                else describe(creator(connection, session, services, request, held), routes, held),
+                else describe(
+                    creator(connection, session, services, request, held), routes, held, facts
+                ),
             }
         )
     return {
@@ -679,6 +683,7 @@ def version_capabilities_document(
     process, such as the Companion's planner, that holds the request's own connection and grant."""
     context = version_context(version_id, connection, session, held, request, world_id)
     routes = surface(request.app)
+    facts = installation_facts_of(context.services)
     source = context.source
     return {
         "profile": VERSION_PROFILE,
@@ -696,7 +701,7 @@ def version_capabilities_document(
             "engine": None if context.engine is None else context.engine.engine,
         },
         "operations": [
-            describe(operation, routes, held)
+            describe(operation, routes, held, facts)
             for adapter in VERSION_ADAPTERS
             for operation in adapter(context)
         ],

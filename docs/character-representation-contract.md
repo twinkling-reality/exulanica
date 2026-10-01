@@ -333,9 +333,14 @@ preparation with class `quota_exceeded` and that code, and nothing is recorded; 
 are the queue's, passed through as they are. A world's capability read describes requesting a body
 and cancelling a preparation as these routes answer: requesting is unavailable with
 `appearance_unavailable` where no family is served and with `preparer_unavailable` where this host
-has no queue, no preparer or no inputs that verify for a served parametric family; its effect, the
-body being prepared, is stated `preparation` with an unknown state, because the worker that
-prepares it is a process this server cannot see.
+has no queue, no preparer or no inputs that verify for a served parametric family. A request needs
+the installation's `preparation` component. Where the installation states that component not
+installed, unavailable or refused, the read describes requesting as unavailable with the
+installation's reason (for example `preparation_not_installed`), after this host's own refusals.
+The route itself does not read the installation and still queues such a request, which waits until
+a worker runs. Its effect, the body being prepared, is stated `preparation` with that component's
+state ([world API](capabilities/world-api.md)); where the process states no installation, or has no
+profile to see the worker by, the state is unknown.
 A saved parametric look is worn by the player through the native character runtime with the measured
 descriptor. Parametric bodies are for the player only: they have no postures, no distant form and no
 population draw. The loopback development builder (`scripts/parametric_character/preview_server.py`)

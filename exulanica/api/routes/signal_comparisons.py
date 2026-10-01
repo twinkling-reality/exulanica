@@ -765,7 +765,9 @@ def capability_operations(context: VersionContext) -> list[Operation]:
     (``Services.signal_comparison_refusal``). Where a durable spending authority admits this
     server's calls, it is also unavailable by the authority's reason once the allowance of every
     provider the signal role can ask is spent: every start would then be refused
-    (``Services.require_allowance``). The plan read is its preview and lists what a start may name.
+    (``Services.require_allowance``). A start needs the installation's ``comparison`` component,
+    which a capability read takes from the installation's facts. The plan read is its preview and
+    lists what a start may name.
     A cancel acts on a comparison the listing names and is available while a start of the world has
     not finished, else ``comparison_not_started``; it holds ``model.invoke`` only so that whoever
     may start a paid comparison may stop it, and calls no model, so no allowance is read for it.
@@ -804,6 +806,7 @@ def capability_operations(context: VersionContext) -> list[Operation]:
             idempotency="comparison_id",
             preview=Preview(plan_signal_comparison, required=False),
             options=(plan_signal_comparison,),
+            needs=("comparison",),
         ),
         Operation(
             endpoint=cancel_signal_comparison,

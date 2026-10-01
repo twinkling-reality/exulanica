@@ -373,7 +373,12 @@ it runs is `EXULANICA_COMPARISON_WORKER`: absent, the API's process runs it in a
 `python -m exulanica.orchestration.comparison_worker` runs the same worker in a process of its own
 and the API only serves starts; off, nothing plays them, and the API refuses every start
 (`comparisons_not_played`) rather than accept one no host would ever claim, which would keep its
-world from starting another. Development seeds are the seed catalog's own: from its third version
+world from starting another. It refuses them by the same name where it leaves them to a process of
+its own that the installation's profile declares not installed, or unavailable, as the
+installation's facts state the `comparison` component
+([deployment](deployment.md#91-installation-profiles-and-facts)); a capability read and a plan read
+say so first. The API's own thread plays them whatever its profile declares, so the default path is
+unchanged. Development seeds are the seed catalog's own: from its third version
 it commits their text, so a server holds them with no file beside it, and none is printed or
 served.
 

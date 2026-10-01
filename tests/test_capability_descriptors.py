@@ -21,10 +21,17 @@ from exulanica.api.decision_host import offered_providers
 from exulanica.api.permissions import ROUTE_RULES, Permission, Requires
 from exulanica.api.role_hosts import ROLE_HOSTS, RoleContext, choice_status
 from exulanica.api.routes import capabilities as reads
-from exulanica.api.routes import world_models
+from exulanica.api.routes import (
+    character_appearance,
+    signal_comparisons,
+    society_comparisons,
+    workspace_assets,
+    world_models,
+)
 from exulanica.api.routes.society_models import CHOICE_CONFLICTS
 from exulanica.api.routes.world_models import choose_world_model
 from exulanica.api.routes.world_objects import add_authored_object
+from exulanica.api.routes.world_traffic import world_traffic
 from exulanica.api.surface import routing_only_application
 from exulanica.models.manifest import load_manifest
 from exulanica.models.spending import SpendingRefused
@@ -371,6 +378,182 @@ def test_each_decision_role_asks_one_provider():
     manifest = load_manifest()
     for role in decision_roles():
         assert len(offered_providers(role, manifest, role.contract())) == 1, role.key
+
+
+def _facts(serving: str = "open", **components: tuple[str, str | None]) -> dict[str, Any]:
+    """Installation facts as the installation states them, for the components named."""
+    return {
+        "components": [
+            {"component": name, "state": state, **({} if reason is None else {"reason": reason})}
+            for name, (state, reason) in components.items()
+        ],
+        "serving": {"state": "open"}
+        if serving == "open"
+        else {"state": "refused", "reason": serving},
+    }
+
+
+def _start(
+    availability: capabilities.Availability = capabilities.AVAILABLE,
+) -> capabilities.Operation:
+    return capabilities.Operation(
+        society_comparisons.start_society_comparison,
+        availability,
+        "version",
+        needs=("comparison",),
+    )
+
+
+@pytest.mark.parametrize(
+    ("comparison", "state", "dependencies"),
+    [
+        (("ready", None), ("available", None), []),
+        (("configured", None), ("available", None), []),
+        (
+            ("degraded", "queue_progress_exceeds_bound"),
+            ("available", None),
+            [("degraded", "queue_progress_exceeds_bound")],
+        ),
+        (
+            ("unavailable", "comparisons_not_run_here"),
+            ("unavailable", "comparisons_not_run_here"),
+            [("unavailable", "comparisons_not_run_here")],
+        ),
+        (
+            ("refused", "restore_pending"),
+            ("unavailable", "restore_pending"),
+            [("refused", "restore_pending")],
+        ),
+        (
+            ("not_installed", None),
+            ("unavailable", "comparison_not_installed"),
+            [("not_installed", None)],
+        ),
+        (
+            ("not_installed", "undeclared_installation"),
+            ("available", None),
+            [("not_installed", "undeclared_installation")],
+        ),
+    ],
+    ids=[
+        "ready",
+        "configured",
+        "degraded",
+        "unavailable",
+        "refused",
+        "declared not installed",
+        "undeclared",
+    ],
+)
+def test_a_component_an_operation_needs_decides_it_by_the_installations_state(
+    comparison, state, dependencies
+):
+    described = capabilities.describe(_start(), ROUTES, EVERYTHING, _facts(comparison=comparison))
+    assert (described["state"], described["code"]) == state
+    assert described["dependencies"] == [
+        {"component": "comparison", "state": listed, "code": code} for listed, code in dependencies
+    ]
+
+
+def test_an_operations_own_refusal_comes_before_a_component_and_none_without_facts():
+    facts = _facts(comparison=("unavailable", "comparisons_not_run_here"))
+    refused = capabilities.describe(
+        _start(capabilities.unavailable("society_unavailable")), ROUTES, EVERYTHING, facts
+    )
+    assert (refused["state"], refused["code"]) == ("unavailable", "society_unavailable")
+    assert [d["component"] for d in refused["dependencies"]] == ["comparison"]
+    # A process composed with no installation names no dependency and changes nothing.
+    alone = capabilities.describe(_start(), ROUTES, EVERYTHING)
+    assert (alone["state"], alone["dependencies"]) == ("available", [])
+
+
+def test_an_installation_that_refuses_to_serve_closes_every_write_and_no_read():
+    facts = _facts("restore_pending", comparison=("ready", None))
+    for availability in (capabilities.AVAILABLE, capabilities.unavailable("society_unavailable")):
+        start = capabilities.describe(_start(availability), ROUTES, EVERYTHING, facts)
+        assert (start["state"], start["code"]) == ("unavailable", "restore_pending")
+    read = capabilities.Operation(world_traffic, capabilities.AVAILABLE, "version", writes=False)
+    assert capabilities.describe(read, ROUTES, EVERYTHING, facts)["state"] == "available"
+
+
+@pytest.mark.parametrize(
+    ("preparation", "effect"),
+    [
+        (("not_installed", "undeclared_installation"), ("unknown", "undeclared_installation")),
+        (("not_installed", None), ("unavailable", "preparation_not_installed")),
+        (("unavailable", "preparer_absent"), ("unavailable", "preparer_absent")),
+        (("degraded", "queue_progress_unobserved"), ("available", None)),
+        (("ready", None), ("available", None)),
+        (None, ("unknown", None)),
+    ],
+    ids=["undeclared", "declared not installed", "unavailable", "degraded", "ready", "not stated"],
+)
+def test_the_preparation_effect_takes_the_preparation_components_state(preparation, effect):
+    facts = _facts(**({} if preparation is None else {"preparation": preparation}))
+    admission = capabilities.describe(
+        workspace_assets.admission_operation(None), ROUTES, EVERYTHING, facts
+    )
+    (stated,) = admission["effects"]
+    assert (stated["on"], stated["state"], stated["code"]) == ("preparation", *effect)
+
+
+@pytest.mark.parametrize(
+    ("prepares", "state"),
+    [
+        (True, ("unavailable", "preparation_not_installed")),
+        (False, ("unavailable", "preparer_unavailable")),
+    ],
+    ids=["with verified preparer inputs", "without them"],
+)
+def test_a_body_request_states_this_hosts_refusal_before_the_installations(
+    monkeypatch, prepares, state
+):
+    monkeypatch.setattr(character_appearance, "_serves_a_family", lambda *_args: True)
+    monkeypatch.setattr(character_appearance, "_prepares_a_body", lambda *_args: prepares)
+    town = _context(
+        "generated_town",
+        society="exulanica-society/v5",
+        character_appearance=SimpleNamespace(preparations=object()),
+    )
+    (request,) = [
+        operation
+        for operation in character_appearance.capability_operations(town)
+        if operation.endpoint is character_appearance.request_preparation
+    ]
+    facts = _facts(preparation=("not_installed", None))
+    described = capabilities.describe(request, ROUTES, EVERYTHING, facts)
+    assert (described["state"], described["code"]) == state
+
+
+def test_each_adapter_names_the_components_it_needs():
+    starts = {
+        society_comparisons.start_society_comparison,
+        signal_comparisons.start_signal_comparison,
+    }
+    preparing = {character_appearance.request_preparation}
+    town = _context("generated_town", society="exulanica-society/v5")
+    for operation in _operations(town):
+        expected = (
+            ("comparison",)
+            if operation.endpoint in starts
+            else ("preparation",)
+            if operation.endpoint in preparing
+            else ()
+        )
+        assert operation.needs == expected, operation.endpoint
+    (request, cancel, withdraw) = workspace_assets.asset_operations(uuid.uuid4(), None, True, None)
+    assert (request.needs, cancel.needs, withdraw.needs) == (("preparation",), (), ())
+    for operation in (request, workspace_assets.admission_operation(None)):
+        assert [effect.component for effect in operation.effects] == ["preparation"]
+
+
+def test_a_component_name_is_the_installations_own():
+    with pytest.raises(ValueError, match="not installation components"):
+        capabilities.Operation(
+            add_authored_object, capabilities.AVAILABLE, "version", needs=("workers",)
+        )
+    with pytest.raises(ValueError, match="not an installation component"):
+        capabilities.Effect("preparation", capabilities.AVAILABLE, component="workers")
 
 
 def test_a_choice_is_refused_with_the_status_its_code_has_on_every_route():

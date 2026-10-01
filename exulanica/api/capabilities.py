@@ -19,6 +19,11 @@ supported here but prevented now by a dependency or a state, **unsupported** is 
 this world, engine or role, and **unknown** is deciding it needs a fact the caller may not read.
 Each but the first carries the stable code the operation answers with. Permission is a separate
 answer (``permitted``), so an operation can be available and not permitted to this caller.
+
+Where a process was composed with an installation, each read also reads the installation's facts
+(:func:`exulanica.api.installation.installation_facts`) once and hands them to :func:`describe`.
+An operation names the components it needs to succeed (``Operation.needs``) and an effect the
+component that decides it (``Effect.component``), by the installation's own component names.
 """
 
 from __future__ import annotations
@@ -33,6 +38,7 @@ from typing import Any, Final, Literal
 import psycopg
 from fastapi import FastAPI, Request
 
+from exulanica.api.installation import COMPONENTS, installation_facts
 from exulanica.api.permissions import Permission, Requires, rule_for
 from exulanica.api.routes import mounted_routes
 from exulanica.api.services import Services
@@ -60,6 +66,7 @@ __all__ = [
     "Surface",
     "VersionContext",
     "describe",
+    "installation_facts_of",
     "surface",
     "unavailable",
     "unknown",
@@ -146,6 +153,13 @@ class Effect:
 
     on: EffectOn
     availability: Availability
+    #: The installation component whose state decides the effect where the installation's facts
+    #: state it; ``availability`` stands where they do not.
+    component: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.component is not None and self.component not in COMPONENTS:
+            raise ValueError(f"{self.component!r} is not an installation component")
 
 
 @dataclass(frozen=True, slots=True)
@@ -173,10 +187,16 @@ class Operation:
     #: only to decide who may act and calls no model: a reviewed exception the descriptor tests
     #: list. It is never widened.
     spends: Literal[False] | None = None
+    #: The installation components the operation needs to succeed, by the installation's names
+    #: (:data:`~exulanica.api.installation.COMPONENTS`).
+    needs: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if self.spends is not None and self.spends is not False:
             raise ValueError("an operation may narrow spends to False, never widen it")
+        unknown_names = [name for name in self.needs if name not in COMPONENTS]
+        if unknown_names:
+            raise ValueError(f"{unknown_names!r} are not installation components")
 
 
 @dataclass(frozen=True, slots=True)
@@ -321,8 +341,98 @@ def surface(app: FastAPI) -> Surface:
         return found
 
 
-def describe(operation: Operation, routes: Surface, held: frozenset[Permission]) -> dict[str, Any]:
-    """One operation as a capability read serves it, for a caller holding ``held``."""
+#: The component states that keep an operation which needs the component from succeeding. A
+#: ``degraded`` component is listed and changes nothing; ``configured`` and ``ready`` are not
+#: listed.
+_PREVENTING: Final = frozenset({"not_installed", "unavailable", "refused"})
+_UNLISTED: Final = frozenset({"configured", "ready"})
+#: Why a process with no installation profile states a component it cannot see: listed, and never a
+#: reason to refuse, since the process cannot tell whether another runs it.
+_UNDECLARED: Final = "undeclared_installation"
+
+
+def installation_facts_of(services: Services) -> Mapping[str, Any] | None:
+    """The installation facts a capability read projects, read once for the whole read; None in a
+    process composed with no installation (a ``Services`` built by hand), whose descriptors then
+    name no dependency."""
+    if services.installation is None:
+        return None
+    return installation_facts(services)
+
+
+def _component_refusal(component: str, entry: Mapping[str, Any]) -> str:
+    """The code a component's state refuses by: the installation's reason, else its state."""
+    reason = entry.get("reason")
+    return reason if isinstance(reason, str) else f"{component}_{entry['state']}"
+
+
+def _installed(
+    operation: Operation, facts: Mapping[str, Any] | None
+) -> tuple[Availability, list[dict[str, Any]], tuple[Effect, ...]]:
+    """The operation's availability, dependencies and effects under the installation's facts.
+
+    A write is unavailable while the installation refuses to serve (a restore not complete), by the
+    facts' reason. Otherwise the operation's own refusal stands, as its route answers it first; an
+    operation its own predicate allows is unavailable by the first component it needs that is not
+    installed, unavailable or refused. Each component it needs that is not configured or ready is
+    listed by its state and reason; one a process cannot see without a profile is listed and
+    decides nothing. An effect that names a component takes the component's state.
+    """
+    if facts is None:
+        return operation.availability, [], operation.effects
+    components = {entry["component"]: entry for entry in facts["components"]}
+    needed = [
+        (name, entry)
+        for name in operation.needs
+        if (entry := components.get(name)) is not None and entry["state"] not in _UNLISTED
+    ]
+    availability = operation.availability
+    serving = facts["serving"]
+    if operation.writes and serving["state"] == "refused":
+        availability = unavailable(serving["reason"])
+    elif availability.state == "available":
+        blocking = next(
+            (
+                (name, entry)
+                for name, entry in needed
+                if entry["state"] in _PREVENTING and entry.get("reason") != _UNDECLARED
+            ),
+            None,
+        )
+        if blocking is not None:
+            availability = unavailable(_component_refusal(*blocking))
+    dependencies = [
+        {"component": name, "state": entry["state"], "code": entry.get("reason")}
+        for name, entry in needed
+    ]
+    effects = tuple(_effect(effect, components) for effect in operation.effects)
+    return availability, dependencies, effects
+
+
+def _effect(effect: Effect, components: Mapping[str, Mapping[str, Any]]) -> Effect:
+    """``effect`` as its component's state decides it: unknown where a process without a profile
+    cannot see the component, unavailable where it is not installed, unavailable or refused, and
+    available otherwise; as the adapter stated it where the facts say nothing of the component."""
+    entry = None if effect.component is None else components.get(effect.component)
+    if effect.component is None or entry is None:
+        return effect
+    if entry.get("reason") == _UNDECLARED:
+        decided = unknown(_UNDECLARED)
+    elif entry["state"] in _PREVENTING:
+        decided = unavailable(_component_refusal(effect.component, entry))
+    else:
+        decided = AVAILABLE
+    return Effect(effect.on, decided, effect.component)
+
+
+def describe(
+    operation: Operation,
+    routes: Surface,
+    held: frozenset[Permission],
+    facts: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """One operation as a capability read serves it, for a caller holding ``held``, under the
+    installation's ``facts`` where the process has them (:func:`installation_facts_of`)."""
     route = routes.route(operation.endpoint)
     rule = rule_for(route.method, route.path)
     required = rule.permissions if isinstance(rule, Requires) else frozenset()
@@ -332,13 +442,14 @@ def describe(operation: Operation, routes: Surface, held: frozenset[Permission])
             f"{route.key} requires no {Permission.MODEL_INVOKE}, so there is no spending to narrow"
         )
     preview = operation.preview
+    availability, dependencies, effects = _installed(operation, facts)
     return {
         "operation": route.key,
         "bind": dict(operation.bind),
         "requires": sorted(str(permission) for permission in required),
         "permitted": required <= held,
-        "state": operation.availability.state,
-        "code": operation.availability.code,
+        "state": availability.state,
+        "code": availability.code,
         "subject": operation.subject,
         "subjects": None
         if operation.subjects is None
@@ -366,11 +477,9 @@ def describe(operation: Operation, routes: Surface, held: frozenset[Permission])
         # A consequence of success is stated only for an operation that can succeed now.
         "effects": [
             {"on": effect.on, "state": effect.availability.state, "code": effect.availability.code}
-            for effect in operation.effects
+            for effect in effects
         ]
-        if operation.availability.state == "available"
+        if availability.state == "available"
         else [],
-        # Installation components an operation needs, from the installation facts once they are
-        # served (D3); none are read yet, so none are named.
-        "dependencies": [],
+        "dependencies": dependencies,
     }

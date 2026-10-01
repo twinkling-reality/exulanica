@@ -254,8 +254,12 @@ taken from the predicate its own write path checks:
 | `POST /workspace-assets/{asset_id}/withdraw` | each asset | never |
 
 The byte total and two requests racing for the last place are still refused 429 by the write
-itself. Admission and preparation carry the `preparation` effect, whose state is `unknown`: whether
-a preparation process runs is a fact of the installation this server does not read. An instance
+itself. Admission and preparation carry the `preparation` effect, which takes the state of the
+installation's `preparation` component, and a preparation request needs that component
+([world API](capabilities/world-api.md)). The route itself does not read the installation: where
+the installation runs no preparation process, it still queues a request, which waits until one
+runs. Where the process states no installation, or has no profile to see a preparation process by,
+the effect's state is `unknown`. An instance
 without asset namespaces serves no descriptor; every asset route answers it 503
 `workspace_assets_unavailable`. Composition preview and apply name `GET /workspace-assets` beside
 `GET /world/assets` among the reads that list their sources.

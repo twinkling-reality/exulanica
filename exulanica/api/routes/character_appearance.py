@@ -319,8 +319,9 @@ def families(
 
 #: Whether a requested body is prepared depends on a preparation process this server cannot see,
 #: as for a workspace asset (``exulanica/api/routes/workspace_assets.py``): the installation facts
-#: will state it, and until they do the effect's state is not known.
-_PREPARATION_EFFECT: Final = Effect("preparation", unknown())
+#: state it (their ``preparation`` component), and where a process has none the effect's state is
+#: not known.
+_PREPARATION_EFFECT: Final = Effect("preparation", unknown(), component="preparation")
 
 
 def capability_operations(context: VersionContext) -> list[Operation]:
@@ -337,7 +338,9 @@ def capability_operations(context: VersionContext) -> list[Operation]:
     state, a request is unavailable as it answers (``preparer_unavailable``) where this host has no
     preparation queue, no preparer, or no inputs that verify for any parametric family it serves;
     whether the named subject and family take a prepared body is decided when they are named. A
-    cancel acts on one preparation, which the request's answer names, and needs the queue.
+    request needs the installation's ``preparation`` component, which a capability read takes from
+    the installation's facts. A cancel acts on one preparation, which the request's answer names,
+    and needs the queue.
     """
     runtime = getattr(context.services, "character_appearance", None)
     state = (
@@ -382,6 +385,7 @@ def capability_operations(context: VersionContext) -> list[Operation]:
             bind=context.bind,
             options=(families,),
             effects=(_PREPARATION_EFFECT,),
+            needs=("preparation",),
         ),
         Operation(
             endpoint=cancel_preparation,

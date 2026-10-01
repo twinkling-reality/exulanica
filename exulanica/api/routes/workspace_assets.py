@@ -32,6 +32,7 @@ checks (:func:`~exulanica.world.workspace_preparations.queues_a_run`,
 from __future__ import annotations
 
 import uuid
+from collections.abc import Mapping
 from typing import Annotated, Any, Final
 
 import psycopg
@@ -44,6 +45,7 @@ from exulanica.api.capabilities import (
     Operation,
     Subjects,
     describe,
+    installation_facts_of,
     surface,
     unavailable,
     unknown,
@@ -329,8 +331,9 @@ def _limits(connection: psycopg.Connection) -> dict[str, Any]:
 # -- capabilities --------------------------------------------------------------------------------
 
 #: Whether an admitted asset is prepared here depends on a preparation process this server cannot
-#: see; the installation facts will state it, and until they do the effect's state is not known.
-_PREPARATION: Final = Effect("preparation", unknown())
+#: see: the installation facts state it (their ``preparation`` component), and where a process has
+#: none the effect's state is not known.
+_PREPARATION: Final = Effect("preparation", unknown(), component="preparation")
 #: The code every count bound is refused with, whichever bound it is.
 _QUOTA: Final = "workspace_asset_quota_exceeded"
 
@@ -374,6 +377,7 @@ def asset_operations(
             bind=bind,
             subjects=subjects,
             effects=(_PREPARATION,),
+            needs=("preparation",),
         ),
         Operation(
             endpoint=cancel_workspace_preparation,
@@ -393,10 +397,13 @@ def asset_operations(
 
 
 def _described(
-    request: Request, held: frozenset[Permission], operations: tuple[Operation, ...]
+    request: Request,
+    held: frozenset[Permission],
+    operations: tuple[Operation, ...],
+    facts: Mapping[str, Any] | None,
 ) -> list[dict[str, Any]]:
     routes = surface(request.app)
-    return [describe(operation, routes, held) for operation in operations]
+    return [describe(operation, routes, held, facts) for operation in operations]
 
 
 # -- routes --------------------------------------------------------------------------------------
@@ -435,6 +442,7 @@ def list_workspace_assets(
     try:
         repository = _repository(request, connection, session)
         requests_spent = repository.spent(admission=False)
+        facts = installation_facts_of(get_services(request))
         views = []
         for asset, preparation in repository.assets():
             present = _present(repository, preparation)
@@ -443,6 +451,7 @@ def list_workspace_assets(
                 request,
                 held,
                 asset_operations(asset.asset_id, preparation, present, requests_spent),
+                facts,
             )
             views.append(view)
         admission = admission_operation(repository.spent(admission=True))
@@ -453,7 +462,7 @@ def list_workspace_assets(
             "profile": LIST_PROFILE,
             "assets": views,
             "admission": _limits(connection),
-            "capabilities": _described(request, held, (admission,)),
+            "capabilities": _described(request, held, (admission,), facts),
         }
     )
 
@@ -476,7 +485,9 @@ def read_workspace_asset(
     except (PreparationError, _Unavailable) as error:
         return _refused(error)
     view = _asset_view(asset, preparation, present)
-    view["capabilities"] = _described(request, held, operations)
+    view["capabilities"] = _described(
+        request, held, operations, installation_facts_of(get_services(request))
+    )
     return _json(view)
 
 

@@ -133,7 +133,9 @@ TYPICAL_FALLBACK: Final = (
 START_REFUSALS: Final = {
     # This server: the seed catalog it defines comparisons under commits no development seed's text.
     "comparisons_not_set_up": 409,
-    # Nothing plays the comparisons started here (EXULANICA_COMPARISON_WORKER is off).
+    # Nothing plays the comparisons started here: EXULANICA_COMPARISON_WORKER is off, or it leaves
+    # them to a process of its own that the installation's profile declares not installed or
+    # unavailable (Services.comparison_process_absent).
     "comparisons_not_played": 409,
     # This server does not ask models for this workspace (EXULANICA_SOCIETY_CONTROL_WORKSPACES).
     "comparisons_not_run_here": 409,

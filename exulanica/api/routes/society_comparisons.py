@@ -978,11 +978,13 @@ def capability_operations(context: VersionContext) -> list[Operation]:
     (``Services.comparison_refusal``), and an engine that takes no comparison. Where a durable
     spending authority admits this server's calls, it is also unavailable by the authority's
     reason once the allowance of every provider the engine's roles can ask is spent: every start
-    would then be refused (``Services.require_allowance``). The plan read is its preview and lists
-    what a start may name. A cancel acts on a comparison the listing names and is available while a
-    start of the world has not finished, else ``comparison_not_started``. It holds ``model.invoke``
-    only so that whoever may start a paid comparison may stop it, and calls no model, so it is
-    described as spending nothing, and no allowance is read for it.
+    would then be refused (``Services.require_allowance``). A start needs the installation's
+    ``comparison`` component, which a capability read takes from the installation's facts. The
+    plan read is its preview and lists what a start may name. A cancel acts on a comparison the
+    listing names and is available while a start of the world has not finished, else
+    ``comparison_not_started``. It holds ``model.invoke`` only so that whoever may start a paid
+    comparison may stop it, and calls no model, so it is described as spending nothing, and no
+    allowance is read for it.
     """
     running = (
         None
@@ -1012,6 +1014,7 @@ def capability_operations(context: VersionContext) -> list[Operation]:
             idempotency="comparison_id",
             preview=Preview(plan_society_comparison, required=False),
             options=(plan_society_comparison,),
+            needs=("comparison",),
         ),
         Operation(
             endpoint=cancel_society_comparison,

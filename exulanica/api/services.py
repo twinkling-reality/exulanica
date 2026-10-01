@@ -57,6 +57,7 @@ from exulanica.api.installation import (
     MAINTENANCE_STATUS_ENV,
     PROFILE_ENV,
     Installation,
+    installation_facts,
     load_installation,
 )
 from exulanica.api.signal_comparison_runner import SignalComparisonRunner
@@ -153,6 +154,13 @@ SOCIETY_CONTROL_WORKSPACES_ENV: Final = env_name("SOCIETY_CONTROL_WORKSPACES")
 #: ``0``, ``false``, ``off`` or ``no``, nobody, and every start is refused
 #: (``comparisons_not_played``), since a start nothing plays would hold its world until the end.
 COMPARISON_WORKER_ENV: Final = env_name("COMPARISON_WORKER")
+#: The states of the installation's ``comparison`` component, as its facts state it, in which a
+#: process that leaves its comparisons to another refuses every start (``comparisons_not_played``):
+#: the installation's profile declares that process not installed, or unavailable here.
+_COMPARISON_PROCESS_ABSENT: Final = frozenset({"not_installed", "unavailable"})
+#: How the facts of a process with no profile state a component it cannot see: never a reason to
+#: refuse, since that process cannot tell whether another one runs it.
+_UNDECLARED: Final = "undeclared_installation"
 
 #: The base wait between simulated minutes, in whole milliseconds, within the bounds
 #: ``exulanica.world.society_controls`` declares. Absent means its declared default.
@@ -398,13 +406,17 @@ class Services:
             return "comparisons_not_run_here"
         if self.model_client is None:
             return PROVIDER_CREDENTIAL_ABSENT
+        if self.comparison_process_absent():
+            return "comparisons_not_played"
         return None
 
     def comparison_refusal(self, workspace_id: uuid.UUID) -> str | None:
         """Why this server starts no comparison for a workspace, or None when it may: its seed
         catalog commits no development seed's text (``comparisons_not_set_up``), nothing plays the
         comparisons started here (``comparisons_not_played``), it asks no model for the workspace
-        (``comparisons_not_run_here``), or it has no model client."""
+        (``comparisons_not_run_here``), it has no model client, or it leaves them to another
+        process the installation does not run (:meth:`comparison_process_absent`), which nothing
+        plays either (``comparisons_not_played``)."""
         if not self.comparison_seeds:
             return "comparisons_not_set_up"
         if not (self.runs_comparison_worker or self.comparisons_played_elsewhere):
@@ -413,7 +425,35 @@ class Services:
             return "comparisons_not_run_here"
         if self.model_client is None:
             return PROVIDER_CREDENTIAL_ABSENT
+        if self.comparison_process_absent():
+            return "comparisons_not_played"
         return None
+
+    def comparison_process_absent(self) -> bool:
+        """Whether this process leaves its comparisons to another one (``process`` in
+        :data:`COMPARISON_WORKER_ENV`) that the installation's profile declares not installed or
+        unavailable, read from the installation's facts as a capability read reads them
+        (:func:`~exulanica.api.installation.installation_facts`): a start would wait for a process
+        the installation does not run. Never where this process plays them itself, whatever its
+        profile declares, nor in a process composed with no installation, nor where a process with
+        no profile cannot see the component."""
+        if self.runs_comparison_worker or not self.comparisons_played_elsewhere:
+            return False
+        if self.installation is None:
+            return False
+        component = next(
+            (
+                entry
+                for entry in installation_facts(self)["components"]
+                if entry["component"] == "comparison"
+            ),
+            None,
+        )
+        return (
+            component is not None
+            and component["state"] in _COMPARISON_PROCESS_ABSENT
+            and component.get("reason") != _UNDECLARED
+        )
 
     def comparison_room(self, role: DecisionRole) -> Decimal | None:
         """What this process's model budget has left for a comparison it plays itself, beside

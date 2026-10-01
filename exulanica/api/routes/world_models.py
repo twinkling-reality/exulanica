@@ -34,6 +34,7 @@ from exulanica.api.capabilities import (
     Effect,
     Operation,
     describe,
+    installation_facts_of,
     surface,
     unavailable,
     unsupported,
@@ -175,6 +176,7 @@ def world_models(
     services = get_services(request)
     routes = surface(request.app)
     spending = services.spending_refusals(connection, session.workspace_id)
+    facts = installation_facts_of(services)
     roles = []
     for role in decision_roles():
         host = ROLE_HOSTS.get(role.subject)
@@ -197,6 +199,7 @@ def world_models(
                     _operation(context, role, state, host_refusal, _spent(role, spending)),
                     routes,
                     held,
+                    facts,
                 ),
             }
         )
