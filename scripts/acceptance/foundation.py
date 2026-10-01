@@ -1995,8 +1995,27 @@ def journey(stack: Stack, w2: Client, entry_id: str, out: Path) -> list[Row]:
     explain = Row(
         "N1.e",
         "journey.explain",
-        "The Companion explains the person's rest from stored events, citing the bench and the "
-        "edit.",
+        "Asked why the person went to the bench, with the society plan a page sends for a "
+        "selected inhabitant, the Companion answers from stored events without a model; its "
+        "simulation citations name the bench, the input the person acted under and the edit that "
+        "placed the bench (its id and sequence); the answer, remembered in Companion memory, "
+        "returns the same citations after an API restart. Asked in words with no model, the "
+        "question is refused by code.",
+    )
+    _, held_version = w2.call("N1.e", "GET", version_path(entry), query=world_query(entry))
+    bench_edit = next(
+        (e for e in held_version.get("edits", []) if e.get("object_id") == "bench"), {}
+    )
+    status_words, words = w2.call(
+        "N1.e",
+        "POST",
+        "/selection/ask",
+        query=world_query(entry),
+        body={"question": "Why did this person go to the bench?"},
+    )
+    explain.expect(
+        status_words == 503 and problem_code(words) == "provider_credential_absent",
+        f"a question in words answered {status_words} {problem_code(words)}",
     )
     status_ask, asked = w2.call(
         "N1.e",
@@ -2005,17 +2024,96 @@ def journey(stack: Stack, w2: Client, entry_id: str, out: Path) -> list[Row]:
         query=world_query(entry),
         body={
             "question": "Why did this person go to the bench?",
+            "plan": {"intent": "society", "society": {"scope": "selected", "aspect": "why"}},
             "society_context": {
                 "version_id": entry["authored_version_id"],
                 "inhabitant_id": found.get("subject_id"),
             },
         },
     )
-    explain.observed = {"status": status_ask, "body": asked}
-    explain.blocked_by += [
-        "no-model answers 503; a scripted plan answering each request kind of the question path is not yet written",
-        "N-G3 (M6/M7): citations lack object_id, input_seq and edit reference",
-    ]
+    citations = list((asked.get("simulation") or {}).values()) if isinstance(asked, dict) else []
+    at_bench = [c for c in citations if c.get("object_id") == "bench"]
+    explain.expect(status_ask == 200, f"the planned question answered {status_ask}")
+    explain.expect(bool(at_bench), "no citation names the bench")
+    for citation in at_bench:
+        explain.expect(
+            citation.get("result_kind") == "simulation_event",
+            f"a bench citation is a {citation.get('result_kind')}",
+        )
+        explain.expect(citation.get("input_seq") is not None, "a bench citation names no input")
+        explain.expect(
+            (citation.get("edit_id"), citation.get("edit_seq"))
+            == (bench_edit.get("edit_id"), bench_edit.get("edit_seq")),
+            "a bench citation names another edit",
+        )
+    remembered_fields = (
+        "result_kind",
+        "version_id",
+        "inhabitant_id",
+        "event_id",
+        "tick",
+        "input_seq",
+        "object_id",
+        "edit_seq",
+        "edit_id",
+    )
+    memory = {
+        "question": "Why did this person go to the bench?",
+        "answer_text": " ".join(
+            clause.get("text", "") for clause in (asked.get("answer") or {}).get("clauses", [])
+        )[:2000],
+        "prompt_version": (asked.get("execution") or {}).get("prompt_version") or "society",
+        "latency_ms": 0,
+        "composed": "none",
+        "used_fallback": False,
+        "unanswered_attempts": 0,
+        "unanswered_cost_unknown": False,
+        "deterministic": bool(asked.get("deterministic")),
+        "world_id": entry["world_id"],
+        "simulation_citations": [
+            {"ordinal": index, **{k: c.get(k) for k in remembered_fields if c.get(k) is not None}}
+            for index, c in enumerate(citations)
+        ],
+        "inhabitants": {
+            label: {"version_id": v.get("version_id"), "inhabitant_id": v.get("inhabitant_id")}
+            for label, v in (asked.get("inhabitants") or {}).items()
+            if isinstance(v, dict)
+        },
+        "spots": {
+            label: v for label, v in (asked.get("spots") or {}).items() if isinstance(v, str)
+        },
+    }
+    status_saved, saved = w2.call("N1.e", "POST", "/companion/memory/answers", body=memory)
+    explain.expect(
+        status_saved == 201,
+        f"remembering the answer answered {status_saved} {problem_code(saved) or saved}",
+    )
+    restart = stack.restart_api()
+    _, recent = w2.call("N1.e", "GET", "/companion/memory/recent")
+    kept = next(
+        (
+            a
+            for a in (recent or {}).get("answers", [])
+            if a.get("answer_id") == (saved or {}).get("answer_id")
+        ),
+        {},
+    )
+    kept_bench = [c for c in kept.get("simulation_citations", []) if c.get("object_id") == "bench"]
+    explain.expect(
+        [(c.get("edit_id"), c.get("input_seq")) for c in kept_bench]
+        == [(c.get("edit_id"), c.get("input_seq")) for c in at_bench],
+        "the remembered answer lost or changed its bench citations",
+    )
+    explain.observed = {
+        "words": [status_words, problem_code(words)],
+        "status": status_ask,
+        "deterministic": asked.get("deterministic") if isinstance(asked, dict) else None,
+        "bench_citations": at_bench,
+        "bench_edit": {k: bench_edit.get(k) for k in ("edit_id", "edit_seq")},
+        "remembered": [status_saved, (saved or {}).get("answer_id")],
+        "restart": restart,
+        "kept_bench_citations": kept_bench,
+    }
     rows.append(explain.close())
 
     cause = Row(
@@ -2124,19 +2222,8 @@ def journey(stack: Stack, w2: Client, entry_id: str, out: Path) -> list[Row]:
     }
     rows.append(reopen.close())
 
-    # N1.h and N1.i run on scripted stacks of their own: `foundation.py alternative` (A-28) and
-    # `foundation.py companion`.
-    for identity, check, expected, blockers in (
-        (
-            "N1.j",
-            "journey.browser",
-            "The production browser performs preview, confirm, response and explanation.",
-            ["the production browser step is not yet written"],
-        ),
-    ):
-        pending = Row(identity, check, expected)
-        pending.blocked_by += blockers
-        rows.append(pending.close())
+    # N1.h, N1.i and N1.j run on stacks of their own: `foundation.py alternative` (A-28),
+    # `foundation.py companion` and `foundation.py browser`.
     return rows
 
 
@@ -3645,6 +3732,147 @@ def companion(arguments: argparse.Namespace) -> int:
     return 0 if results["counts"]["failed"] == 0 else 1
 
 
+# -- the production browser journey (N1.j) -------------------------------------------------------------
+
+JOURNEY_RUNNER = HERE / "journey_browser.mjs"
+JOURNEY_BUDGET_SECONDS = 1200
+JOURNEY_STEPS = (
+    "journey-open",
+    "journey-stall",
+    "journey-people",
+    "journey-bench",
+    "journey-response",
+    "journey-why",
+)
+
+
+def _rehearsal() -> Any:
+    """The rehearsal driver's own helpers (slots, Chrome flags, the page's deadlines)."""
+    sys.path.insert(0, str(REPOSITORY / "scripts" / "rehearsal"))
+    spec = importlib.util.spec_from_file_location(
+        "exulanica_rehearsal_rehearse", REPOSITORY / "scripts" / "rehearsal" / "rehearse.py"
+    )
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def browser(arguments: argparse.Namespace) -> int:
+    worktree = LAUNCH.checkout(arguments.worktree)
+    stack = Stack.read(worktree)
+    app = stack.state.get("app") or {}
+    if app.get("mode") != "production" or not stack.state.get("society_playback"):
+        raise SystemExit("browser needs a stack started with --production --society-playback")
+    rehearse = _rehearsal()
+    steps = json.loads((REPOSITORY / "scripts" / "rehearsal" / "steps.json").read_text())
+    out = Path(arguments.out).resolve()
+    session_dir = out / "session"
+    session_dir.mkdir(parents=True, exist_ok=True)
+    started = dt.datetime.now(dt.UTC).isoformat()
+    ports = stack.state["ports"]
+    plan = {
+        "session": {"id": "n1j", "budget_seconds": JOURNEY_BUDGET_SECONDS},
+        "out": str(session_dir),
+        "runtime": {
+            "app_url": f"http://localhost:{ports['vite']}/",
+            "api_base": f"http://127.0.0.1:{ports['api']}",
+            "token_file": str(stack.token_file("token")),
+            "browser_port": ports["browser"],
+            "chrome_flags": list(rehearse.CHROME_GPU_FLAGS),
+            "page_deadlines_ms": rehearse.page_deadlines(
+                worktree, steps["runtime"]["answer_deadlines"]
+            ),
+        },
+    }
+    plan_file = session_dir / "plan.json"
+    plan_file.write_text(json.dumps(plan, indent=2))
+    checkout = rehearse.main_checkout(worktree)
+    gpu, quiet = checkout / ".exulanica/bin/gpu-slot", checkout / ".exulanica/bin/quiet-slot"
+    command = rehearse.browser_slot_command(
+        gpu if gpu.exists() else None,
+        quiet if quiet.exists() else None,
+        ["node", str(JOURNEY_RUNNER), str(plan_file)],
+    )
+    completed = subprocess.run(
+        command,
+        cwd=worktree,
+        env=LAUNCH.clean_environment(),
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=JOURNEY_BUDGET_SECONDS + rehearse.GPU_SLOT_WAIT_SECONDS + 120,
+    )
+    (out / "runner.txt").write_text(completed.stdout + completed.stderr)
+    session = (
+        json.loads((session_dir / "session.json").read_text())
+        if (session_dir / "session.json").exists()
+        else {}
+    )
+    row = Row(
+        "N1.j",
+        "journey.browser",
+        "In the production build, through the product's own controls and with the page's own "
+        "recorded requests as evidence: the starter opens past the credential gate; a stall and "
+        "then a bench are placed, each previewed and confirmed (preview 200, apply 201, nothing "
+        "written before Confirm); the people are brought in; Advance one minute is pressed until "
+        "a person completes a rest at the bench the server named; that person, selected in the "
+        "inspector, is asked about with 'Why are they there?', which sends the society plan and "
+        "receives citations naming the bench, its input and its edit. Functional only; visual "
+        "and content acceptance stay with the experience owner.",
+    )
+    outcomes = session.get("outcomes") or {}
+    for step in JOURNEY_STEPS:
+        outcome = outcomes.get(step) or {}
+        row.expect(
+            outcome.get("status") == "passed",
+            f"{step}: {outcome.get('status') or 'not reached'} {outcome.get('reason') or ''}".strip(),
+        )
+    row.observed = {
+        "runner_exit": completed.returncode,
+        "steps": {step: (outcomes.get(step) or {}).get("status") for step in JOURNEY_STEPS},
+        "observations": {
+            step: (outcomes.get(step) or {}).get("observations") for step in JOURNEY_STEPS
+        },
+        "facts": session.get("facts"),
+        "unreached": session.get("unreached"),
+        "build": app.get("build", {}).get("index_html_sha256"),
+    }
+    row.close()
+    results = {
+        "profile": "q10-foundation-acceptance-results/v1",
+        "candidate": stack.state["tree"],
+        "launcher_run": stack.state["run_id"],
+        "started_at": started,
+        "finished_at": dt.datetime.now(dt.UTC).isoformat(),
+        "timing_claims": False,
+        "rows": [row.document()],
+        "counts": {state: int(row.status == state) for state in STATES},
+    }
+    (out / "results.json").write_text(json.dumps(results, indent=2, sort_keys=True))
+    (out / "manifest.json").write_text(
+        json.dumps(
+            {
+                "driver_sha256": DRIVER_SHA256_AT_START,
+                "driver_changed_during_run": hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
+                != DRIVER_SHA256_AT_START,
+                "runner_sha256": hashlib.sha256(JOURNEY_RUNNER.read_bytes()).hexdigest(),
+                "handlers_sha256": hashlib.sha256(
+                    (REPOSITORY / "scripts" / "rehearsal" / "handlers.mjs").read_bytes()
+                ).hexdigest(),
+                "launcher_sha256": hashlib.sha256((HERE / "launch.py").read_bytes()).hexdigest(),
+                "command": ["foundation.py", *sys.argv[1:]],
+                "launcher_state": {k: v for k, v in stack.state.items() if k != "database"},
+            },
+            indent=2,
+            sort_keys=True,
+        )
+    )
+    print(f"{row.row:16} {row.status:8} {'; '.join(row.failures or row.blocked_by)}")
+    return 0 if row.status != "failed" else 1
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     commands = parser.add_subparsers(dest="command", required=True)
@@ -3668,6 +3896,9 @@ def build_parser() -> argparse.ArgumentParser:
     reopen = commands.add_parser("reopen-client")
     for name in ("--base-url", "--token-file", "--entry", "--out"):
         reopen.add_argument(name, required=True)
+    page = commands.add_parser("browser")
+    page.add_argument("--worktree", required=True)
+    page.add_argument("--out", required=True)
     talk = commands.add_parser("companion")
     talk.add_argument("--worktree", required=True)
     talk.add_argument("--out", required=True)
@@ -3693,6 +3924,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "spending": spending,
         "alternative": alternative,
         "companion": companion,
+        "browser": browser,
         "spend-client": spend_client,
     }[arguments.command](arguments)
 

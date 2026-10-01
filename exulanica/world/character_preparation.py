@@ -22,8 +22,10 @@ module is everything around that build, in the order the material bake path esta
     and the queue can hold; no float the build printed reaches either.
 
 Publication, the queue, claims, leases, cancellation and the workspace store belong to the
-preparation queue (lane A2's ``workspace_preparation``); this module is the preparer registered
-there for ``character_recipe`` inputs.
+preparation queue (:mod:`exulanica.world.workspace_preparations` and
+:mod:`exulanica.world.asset_preparation`); :class:`CharacterBodyPreparer` is the preparer registered
+there for ``character_recipe`` inputs. It imports the queue's types inside its methods, so the
+queue's registry can import it without a cycle.
 """
 
 from __future__ import annotations
@@ -36,15 +38,20 @@ import os
 import shutil
 import subprocess
 import tempfile
+import threading
 import time
-from collections.abc import Mapping
+import uuid
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from types import ModuleType
-from typing import Any, Final
+from typing import TYPE_CHECKING, Any, Final
+
+from pydantic import ValidationError
 
 from exulanica.canonical import canonical_json
-from exulanica.world.character_bodies import BodyRefused, measure_prepared_body
+from exulanica.world.character_appearance import CHARACTER_DIRECTORY
+from exulanica.world.character_bodies import BodyRefused, measure_prepared_body, rest_bounds_mm
 from exulanica.world.character_parametric import (
     PREPARER_ID,
     PREPARER_VERSION,
@@ -56,13 +63,21 @@ from exulanica.world.character_parametric import (
     recipe_input_sha256,
 )
 
+if TYPE_CHECKING:
+    import psycopg
+
+    from exulanica.world.asset_preparation import PreparationInput, PreparationOutput
+
 __all__ = [
     "PREPARATION_RECEIPT_PROFILE",
+    "CharacterBodyPreparer",
     "PreparationFailed",
     "PreparedBody",
     "PreparerHost",
     "PreparerLimits",
     "PreparerUnavailable",
+    "environment_host",
+    "family_root",
     "prepare_body",
 ]
 
@@ -377,3 +392,193 @@ def _material_slots(payload: bytes) -> dict[str, tuple[str, ...]]:
     length = struct.unpack_from("<I", payload, 12)[0]
     document = json.loads(payload[20 : 20 + length])
     return {m["name"]: (m["name"],) for m in document.get("materials", []) if m.get("name")}
+
+
+# -- the preparer the workspace preparation queue runs -------------------------------------------
+
+
+def _family_folders(directory: Path) -> dict[str, Path]:
+    """Each parametric family this checkout publishes, by family id, to its authored folder."""
+    try:
+        index = json.loads((directory / "parametric-catalog.json").read_text())
+    except (OSError, ValueError):
+        return {}
+    folders: dict[str, Path] = {}
+    for entry in index.get("families", ()):
+        folder = directory / entry["folder"]
+        with contextlib.suppress(OSError, ValueError, KeyError):
+            folders[json.loads((folder / "family.json").read_text())["familyId"]] = folder
+    return folders
+
+
+def family_root(family_id: str, directory: Path = CHARACTER_DIRECTORY) -> Path | None:
+    """The authored folder of a parametric family this checkout publishes, by its family id."""
+    return _family_folders(directory).get(family_id)
+
+
+def environment_host(
+    family_id: str, environ: Mapping[str, str] | None = None, directory: Path = CHARACTER_DIRECTORY
+) -> PreparerHost | None:
+    """The host's pinned inputs for one family, from ``EXULANICA_CHARACTER_PREPARER_*``."""
+    root = family_root(family_id, directory)
+    if root is None:
+        return None
+    return PreparerHost.from_environment(os.environ if environ is None else environ, root)
+
+
+def _published_family_ids() -> tuple[str, ...]:
+    return tuple(_family_folders(CHARACTER_DIRECTORY))
+
+
+class CharacterBodyPreparer:
+    """Fits one parametric body per ``character_recipe`` preparation, under the queue's lease.
+
+    The preparation pins its recipe (``family_id``, ``family_sha256``, ``values``, ``seed``) and its
+    inputs: the publication that served the family (``catalog_sha256``), that publication's
+    declaration of the family (``family``) and the preparer identity it was requested against
+    (``identity_sha256``). Everything the build and its checks read is in those pins or in the
+    host's verified inputs, so a re-run makes the same bytes or fails ``nondeterministic``.
+    """
+
+    preparer_id: Final = PREPARER_ID
+    preparer_version: Final = PREPARER_VERSION
+    input_kind: Final = "character_recipe"
+    #: The build's own wall clock, plus the identity checks on either side of it and the measure.
+    timeout_seconds: Final = PreparerLimits().timeout_seconds + 120.0
+    lease_seconds: Final = PreparerLimits().timeout_seconds + 420.0  # outlasts the timeout
+    runs_child_process: Final = True
+
+    def __init__(
+        self,
+        hosts: Callable[[str], PreparerHost | None] = environment_host,
+        limits: PreparerLimits | None = None,
+        *,
+        families: Callable[[], tuple[str, ...]] = _published_family_ids,
+        identity_seconds: float = 300.0,
+    ) -> None:
+        self._hosts = hosts
+        self._limits = limits or PreparerLimits()
+        self._families = families
+        self._identity_seconds = identity_seconds
+        self._identities: dict[str, tuple[float, str]] = {}
+        self._lock = threading.Lock()
+
+    def available(self) -> bool:
+        """Whether this process can prepare any family it publishes: its inputs verify."""
+        for family_id in self._families():
+            with contextlib.suppress(PreparerUnavailable):
+                self.identity_sha256(family_id, fresh=True)
+                return True
+        return False
+
+    def identity_sha256(self, family_id: str, *, fresh: bool = False) -> str:
+        """The verified identity this host prepares ``family_id`` with, reused for a few minutes.
+
+        A request pins it; the build verifies the inputs again before and after it runs, so an
+        identity that changed in between fails that preparation ``stale`` rather than building a
+        body for other inputs.
+        """
+        with self._lock:
+            held = self._identities.get(family_id)
+        if not fresh and held is not None and time.monotonic() - held[0] < self._identity_seconds:
+            return held[1]
+        host = self._hosts(family_id)
+        if host is None:
+            raise PreparerUnavailable(f"no preparer for {family_id} is configured on this host")
+        digest = host.identity_sha256()
+        with self._lock:
+            self._identities[family_id] = (time.monotonic(), digest)
+        return digest
+
+    def source_sha256(self) -> str:
+        import sys
+
+        from exulanica.world import character_bodies, character_parametric
+        from exulanica.world.asset_preparation import preparer_source_sha256
+
+        return preparer_source_sha256(character_bodies, character_parametric, sys.modules[__name__])
+
+    def prepare(self, request: PreparationInput) -> PreparationOutput:
+        from exulanica.world.asset_preparation import PreparationOutput, PreparationRefused
+
+        try:
+            family = ParametricFamily.model_validate(request.inputs["family"])
+            family_id = request.parameters["family_id"]
+            family_sha256 = request.parameters["family_sha256"]
+            values = request.parameters["values"]
+            identity_sha256 = request.inputs["identity_sha256"]
+        except (KeyError, TypeError, ValidationError) as exc:
+            raise PreparationRefused("malformed_request", f"the pins do not read: {exc}") from None
+        if family.familyId != family_id:
+            raise PreparationRefused("family_mismatch", "the pinned family is another family")
+        host = self._hosts(family_id)
+        if host is None:
+            raise PreparationRefused(
+                "preparer_unavailable",
+                "no character preparer is configured on this host",
+                failure_class="preparer_failed",
+            )
+        try:
+            body = prepare_body(
+                host,
+                family,
+                family_sha256,
+                values,
+                limits=self._limits,
+                expected_identity_sha256=identity_sha256,
+            )
+            dimensions = rest_bounds_mm(body.payload, body.descriptor.unitScaleMillionths)
+        except PreparerUnavailable as exc:
+            raise PreparationRefused(
+                "preparer_unavailable", str(exc), failure_class="preparer_failed"
+            ) from None
+        except PreparationFailed as failed:
+            raise PreparationRefused(
+                failed.code, str(failed)[:2000], failure_class=failed.failure_class
+            ) from None
+        except BodyRefused as refused:
+            raise PreparationRefused(
+                refused.code, str(refused), failure_class=refused.failure_class
+            ) from None
+        except ValueError as exc:
+            raise PreparationRefused("invalid_recipe", str(exc)) from None
+        return PreparationOutput(
+            output=body.payload,
+            output_sha256=body.output_sha256,
+            dimensions_mm=dimensions,
+            placeable=False,
+            steps=(
+                {
+                    "step": "fit",
+                    "tool": "blender",
+                    "identity_sha256": identity_sha256,
+                    "recipe_input_sha256": recipe_input_sha256(values),
+                    "elapsed_ms": body.elapsed_ms,
+                    "peak_memory_bytes": body.peak_memory_bytes,
+                },
+                {"step": "measure", "measurements": dict(body.measurements)},
+            ),
+            compatibility=({"rig_id": family.rig.rigId, "joints": len(family.rig.joints)},),
+            descriptor=body.descriptor.model_dump(mode="json"),
+        )
+
+    def recheck(
+        self, connection: psycopg.Connection, workspace_id: uuid.UUID, request: PreparationInput
+    ) -> str | None:
+        """Whether the family is still served by the publication the preparation pinned."""
+        del workspace_id
+        if not _REGISTRY.served(connection).derives(
+            str(request.inputs.get("catalog_sha256")), str(request.parameters.get("family_sha256"))
+        ):
+            return "the publication this body was requested from no longer serves its family"
+        return None
+
+
+def _registry() -> Any:
+    from exulanica.world.character_catalogs import CatalogRegistry
+
+    return CatalogRegistry()
+
+
+#: Parsed publications, kept for the life of the process; a document is checked when first read.
+_REGISTRY: Final = _registry()

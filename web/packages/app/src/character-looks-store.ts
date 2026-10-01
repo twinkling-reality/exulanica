@@ -18,6 +18,7 @@ import {
   validateLook,
   type CharacterCatalog,
   type CharacterLook,
+  type ParametricDescriptor,
   type ServedCharacterCatalog,
 } from '@exulanica/atlas-react/playcanvas';
 import type { CharacterSelection } from './character-catalog.js';
@@ -278,6 +279,17 @@ interface WireFamily {
   readonly publication?: { readonly catalog_sha256: string; readonly state: string } | null;
 }
 
+/** A body prepared for this workspace, as the character routes read it. */
+export interface WirePreparation {
+  readonly preparation_id: string | null;
+  readonly state: 'requested' | 'running' | 'prepared' | 'failed' | 'cancelled';
+  readonly representation_id: string | null;
+  readonly family_id: string;
+  readonly descriptor: ParametricDescriptor | null;
+  readonly output: { readonly sha256: string; readonly byte_size: number; readonly present: boolean | null } | null;
+  readonly failure: { readonly class: string; readonly code: string | null; readonly message: string | null } | null;
+}
+
 /** Where a signed-in person's saved looks live: one world version, as one actor. */
 export interface WorkspaceLookTarget {
   readonly worldId: string;
@@ -382,6 +394,16 @@ export class WorkspaceLookStore implements LookStore {
 
   async read(): Promise<SavedLooks> {
     return this.looks(await this.transport.getJson(this.at()));
+  }
+
+  /** A body prepared for this workspace, by the preparation a saved look names. */
+  preparation(preparationId: string): Promise<WirePreparation> {
+    return this.transport.getJson<WirePreparation>(this.at(`/preparations/${encodeURIComponent(preparationId)}`));
+  }
+
+  /** Where that body's bytes are delivered, while its family is served. */
+  preparationBytes(preparationId: string): string {
+    return this.at(`/preparations/${encodeURIComponent(preparationId)}/bytes`);
   }
 
   async history(): Promise<readonly SavedRevision[]> {

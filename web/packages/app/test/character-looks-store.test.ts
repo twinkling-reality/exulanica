@@ -170,4 +170,17 @@ describe('the signed-in look store', () => {
     const refused = store.save({ kind: 'catalog', look: look('suit-masculine') }, 3);
     await expect(refused).rejects.not.toBeInstanceOf(StaleLookError);
   });
+
+  it('reads a body prepared for the workspace, and names where its bytes are delivered', async () => {
+    const prepared = {
+      preparation_id: 'p 1', state: 'prepared', representation_id: 'preparation:p 1', family_id: 'makehuman-parametric/v1',
+      descriptor: null, output: { sha256: 'b'.repeat(64), byte_size: 2502012, present: true }, failure: null,
+    };
+    const calls: string[] = [];
+    const fetch = vi.fn(async (input: RequestInfo | URL) => { calls.push(String(input)); return Response.json(prepared); });
+    const store = new WorkspaceLookStore({ baseUrl: 'https://world.example/api', token: 't', fetch }, { worldId: 'w', versionId: 'v', actor: 'a' }, served);
+    expect(await store.preparation('p 1')).toEqual(prepared);
+    expect(calls).toEqual(['https://world.example/api/world/versions/v/characters/avatar/a/appearance/preparations/p%201?world_id=w']);
+    expect(store.preparationBytes('p 1')).toBe('/world/versions/v/characters/avatar/a/appearance/preparations/p%201/bytes?world_id=w');
+  });
 });

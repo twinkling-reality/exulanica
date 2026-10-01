@@ -207,6 +207,11 @@ class ServedCatalogs:
     def by_digest(self, catalog_sha256: str) -> CatalogPublication | None:
         return next((p for p in self.publications if p.catalog_sha256 == catalog_sha256), None)
 
+    def derives(self, catalog_sha256: str, family_sha256: str) -> bool:
+        """Whether that publication is served and derives exactly that family."""
+        publication = self.by_digest(catalog_sha256)
+        return publication is not None and family_sha256 in publication.family_digests
+
     def listing(self) -> list[dict[str, Any]]:
         """The served publications as the catalog list read answers them, oldest catalog first."""
         rows = []

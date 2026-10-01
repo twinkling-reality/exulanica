@@ -96,15 +96,26 @@ export function characterByteLoader(generated: readonly CharacterLook[]): Charac
   };
 }
 
+/** How a saved look names a body prepared for its workspace: `preparation:<preparation id>`. */
+export const PREPARATION_PREFIX = 'preparation:';
+
 /**
- * A signed-in world's loader: every character container is a reviewed asset, fetched by its key
- * from `/world/assets/<asset key>/bytes`. The character host refuses bytes whose length or SHA-256
- * differ from the catalog, so the key only says where to look, never what to trust.
+ * A signed-in world's loader: every catalog container is a reviewed asset, fetched by its key from
+ * `/world/assets/<asset key>/bytes`, and a body prepared for this workspace is fetched from the
+ * character route `prepared` names for it. The character host refuses bytes whose length or
+ * SHA-256 differ from what was published or prepared, so the key only says where to look, never
+ * what to trust.
  */
-export function workspaceCharacterLoader(options: TransportOptions): CharacterByteLoader {
+export function workspaceCharacterLoader(
+  options: TransportOptions,
+  prepared: (preparationId: string) => string | null = () => null,
+): CharacterByteLoader {
   return async (reference, signal) => {
-    const response = await new Transport({ ...options, signal })
-      .getBytes(`/world/assets/${encodeURIComponent(reference.assetKey)}/bytes`);
+    const path = reference.assetKey.startsWith(PREPARATION_PREFIX)
+      ? prepared(reference.assetKey.slice(PREPARATION_PREFIX.length))
+      : `/world/assets/${encodeURIComponent(reference.assetKey)}/bytes`;
+    if (path === null) throw new Error('preparation_unavailable');
+    const response = await new Transport({ ...options, signal }).getBytes(path);
     return response.arrayBuffer();
   };
 }

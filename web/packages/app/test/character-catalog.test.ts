@@ -57,4 +57,20 @@ describe('signed-in character bytes', () => {
     expect(bytes.byteLength).toBe(4);
     expect(seen).toEqual([{ url: 'https://world.example/api/world/assets/makehuman.people.feminine.base.v1/bytes', authorization: 'Bearer session' }]);
   });
+
+  it('fetch a body prepared for the workspace from where its look store says it is delivered', async () => {
+    const { workspaceCharacterLoader } = await import('../src/character-catalog.js');
+    const seen: string[] = [];
+    const fetch = async (input: RequestInfo | URL) => { seen.push(String(input)); return new Response(new Uint8Array([1, 2])); };
+    const reference = { assetKey: 'preparation:p-1', mediaType: 'model/gltf-binary', contentSha256: 'b'.repeat(64), byteSize: 2 };
+    const signal = new AbortController().signal;
+    const load = workspaceCharacterLoader({ baseUrl: 'https://world.example/api', token: 'session', fetch },
+      (preparationId) => `/world/versions/v/characters/avatar/a/appearance/preparations/${preparationId}/bytes?world_id=w`);
+    expect((await load(reference, signal)).byteLength).toBe(2);
+    expect(seen).toEqual(['https://world.example/api/world/versions/v/characters/avatar/a/appearance/preparations/p-1/bytes?world_id=w']);
+    // With nowhere to fetch it from, a prepared body is unavailable by name, never another body.
+    const nowhere = workspaceCharacterLoader({ baseUrl: 'https://world.example/api', token: 'session', fetch });
+    await expect(nowhere(reference, signal)).rejects.toThrow('preparation_unavailable');
+    expect(seen).toHaveLength(1);
+  });
 });

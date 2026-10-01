@@ -4485,6 +4485,487 @@
     }
    }
   },
+  "/world/versions/{version_id}/characters/{subject_kind}/{subject_id}/appearance/preparations": {
+   "post": {
+    "tags": [
+     "character-appearance"
+    ],
+    "summary": "Prepare a body for a recipe over a parametric family, or answer the one prepared.",
+    "operationId": "request_preparation_world_versions__version_id__characters__subject_kind___subject_id__appearance_preparations_post",
+    "parameters": [
+     {
+      "name": "version_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Version Id"
+      }
+     },
+     {
+      "name": "subject_kind",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "enum": [
+        "avatar",
+        "synthetic-inhabitant"
+       ],
+       "type": "string",
+       "title": "Subject Kind"
+      }
+     },
+     {
+      "name": "subject_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Subject Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "society_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "uuid"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Society Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/PreparationBody"
+       }
+      }
+     }
+    },
+    "responses": {
+     "202": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Request Preparation World Versions  Version Id  Characters  Subject Kind   Subject Id  Appearance Preparations Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/world/versions/{version_id}/characters/{subject_kind}/{subject_id}/appearance/preparations/{preparation_id}": {
+   "get": {
+    "tags": [
+     "character-appearance"
+    ],
+    "summary": "One character body preparation: its state, its body once prepared, or its failure.",
+    "operationId": "read_preparation_world_versions__version_id__characters__subject_kind___subject_id__appearance_preparations__preparation_id__get",
+    "parameters": [
+     {
+      "name": "version_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Version Id"
+      }
+     },
+     {
+      "name": "subject_kind",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "enum": [
+        "avatar",
+        "synthetic-inhabitant"
+       ],
+       "type": "string",
+       "title": "Subject Kind"
+      }
+     },
+     {
+      "name": "subject_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Subject Id"
+      }
+     },
+     {
+      "name": "preparation_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Preparation Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "society_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "uuid"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Society Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Read Preparation World Versions  Version Id  Characters  Subject Kind   Subject Id  Appearance Preparations  Preparation Id  Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/world/versions/{version_id}/characters/{subject_kind}/{subject_id}/appearance/preparations/{preparation_id}/cancel": {
+   "post": {
+    "tags": [
+     "character-appearance"
+    ],
+    "summary": "Stop a character body preparation that has not finished.",
+    "operationId": "cancel_preparation_world_versions__version_id__characters__subject_kind___subject_id__appearance_preparations__preparation_id__cancel_post",
+    "parameters": [
+     {
+      "name": "version_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Version Id"
+      }
+     },
+     {
+      "name": "subject_kind",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "enum": [
+        "avatar",
+        "synthetic-inhabitant"
+       ],
+       "type": "string",
+       "title": "Subject Kind"
+      }
+     },
+     {
+      "name": "subject_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Subject Id"
+      }
+     },
+     {
+      "name": "preparation_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Preparation Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "society_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "uuid"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Society Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Cancel Preparation World Versions  Version Id  Characters  Subject Kind   Subject Id  Appearance Preparations  Preparation Id  Cancel Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/world/versions/{version_id}/characters/{subject_kind}/{subject_id}/appearance/preparations/{preparation_id}/bytes": {
+   "get": {
+    "tags": [
+     "character-appearance"
+    ],
+    "summary": "A prepared character body's bytes, while the family it was prepared over is served.",
+    "operationId": "read_preparation_bytes_world_versions__version_id__characters__subject_kind___subject_id__appearance_preparations__preparation_id__bytes_get",
+    "parameters": [
+     {
+      "name": "version_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Version Id"
+      }
+     },
+     {
+      "name": "subject_kind",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "enum": [
+        "avatar",
+        "synthetic-inhabitant"
+       ],
+       "type": "string",
+       "title": "Subject Kind"
+      }
+     },
+     {
+      "name": "subject_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Subject Id"
+      }
+     },
+     {
+      "name": "preparation_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Preparation Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "society_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "uuid"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Society Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Read Preparation Bytes World Versions  Version Id  Characters  Subject Kind   Subject Id  Appearance Preparations  Preparation Id  Bytes Get"
+        }
+       },
+       "model/gltf-binary": {}
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/materials/makers": {
    "get": {
     "tags": [
@@ -26618,6 +27099,19 @@
     ],
     "title": "PointMapArrivalPin",
     "description": "One exact standalone estimate of an owned photograph."
+   },
+   "PreparationBody": {
+    "properties": {
+     "recipe": {
+      "$ref": "#/components/schemas/CharacterRecipe"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "recipe"
+    ],
+    "title": "PreparationBody"
    },
    "PrepareExperimentBody": {
     "properties": {

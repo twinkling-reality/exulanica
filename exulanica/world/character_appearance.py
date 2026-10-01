@@ -40,6 +40,14 @@ class StaleAppearance(ValueError):
     """Another committed appearance revision changed the caller's base."""
 
 
+class RepresentationNotPrepared(ValueError):
+    """A recipe names a body of this workspace that is requested or running, not yet prepared."""
+
+
+class PreparationNotApplicable(ValueError):
+    """A body is prepared only for a person's own avatar over a parametric family."""
+
+
 class Record(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 

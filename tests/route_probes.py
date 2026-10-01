@@ -372,6 +372,18 @@ PROBE_OVERRIDES: Final[dict[str, dict[str, Any]]] = {
             },
         },
     },
+    "POST /world/versions/{version_id}/characters/{subject_kind}/{subject_id}/appearance"
+    "/preparations": {
+        **_IN_WORLD,
+        "json": {
+            "recipe": {
+                "family_id": "probe-family/v1",
+                "family_sha256": _ZERO_DIGEST,
+                "parameters": {"height": 175},
+                "seed": 0,
+            },
+        },
+    },
     "POST /world/versions/{version_id}/characters/{subject_kind}/{subject_id}/appearance/reset": {
         **_IN_WORLD,
         "json": {"base_revision": 0},
@@ -802,6 +814,8 @@ EXISTENCE_BUILDERS: Final[Mapping[str, Owned | Shared]] = {
     "/world/versions/{version_id}": Owned(build.world_version),
     # The sweep fills {subject_kind} with "avatar", whose subject is the actor it belongs to.
     "/world/versions/{version_id}/characters/{subject_kind}/{subject_id}": Owned(build.avatar),
+    "/world/versions/{version_id}/characters/{subject_kind}/{subject_id}/appearance/preparations"
+    "/{preparation_id}": Owned(build.character_preparation),
     "/world/versions/{version_id}/environment-instances/{instance_id}": Owned(
         build.environment_instance, build.invented_environment_instance
     ),

@@ -16,11 +16,13 @@ import {
   type CharacterCatalog,
   type CharacterLook as PersonLook,
   type NativeCharacterRuntime,
+  type ParametricDescriptor,
   type ServedCharacterCatalog,
   type ServedLayeredCatalog,
 } from '@exulanica/atlas-react/playcanvas';
 import { readBrowserAccount } from '../account-session.js';
 import {
+  PREPARATION_PREFIX,
   characterByteLoader,
   characterCatalogList,
   parseCharacterLooks,
@@ -154,7 +156,7 @@ export function mountCharacter(deps: { env: AppEnvironment; state: SessionState;
     if (previewLoader !== null && previewFiles.has(reference.contentSha256)) return previewLoader(reference, signal);
     const generated = [...generatedLooks.values()];
     const isGenerated = generated.some(item => item.generated && item.descriptor.asset.contentSha256 === reference.contentSha256);
-    if (!isGenerated && !env.preview && state.credentials) return workspaceCharacterLoader(state.credentials)(reference, signal);
+    if (!isGenerated && !env.preview && state.credentials) return workspaceCharacterLoader(state.credentials, preparedBytes)(reference, signal);
     return characterByteLoader(generated)(reference, signal);
   };
   let catalogPromise: Promise<readonly CharacterLook[]> | null = null;
@@ -367,20 +369,49 @@ export function mountCharacter(deps: { env: AppEnvironment; state: SessionState;
     if (choice.kind === 'unavailable') view.setPeopleStatus(choice.code, true);
     else if (choice.kind === 'catalog') view.setPeopleStatus('catalog_unavailable', true);
   }
-  /** A prepared body of a parametric family, drawn by the native runtime from its publication. */
+  /** Where a body prepared for this workspace is delivered, while the world keeps its looks. */
+  function preparedBytes(preparationId: string): string | null {
+    return lookStore instanceof WorkspaceLookStore ? lookStore.preparationBytes(preparationId) : null;
+  }
+  /**
+   * A prepared body of a parametric family, as its publication reviews it or as this workspace's
+   * preparation queue made it: the descriptor measured from its bytes and the address of exactly
+   * those bytes. Nothing else stands in for it.
+   */
+  async function preparedBody(choice: Extract<SavedChoice, { kind: 'prepared' }>): Promise<{
+    readonly descriptor: ParametricDescriptor;
+    readonly asset: { readonly assetKey: string; readonly mediaType: string; readonly contentSha256: string; readonly byteSize: number };
+  } | null> {
+    if (choice.representationId.startsWith(PREPARATION_PREFIX)) {
+      if (!(lookStore instanceof WorkspaceLookStore)) return null;
+      const prepared = await lookStore.preparation(choice.representationId.slice(PREPARATION_PREFIX.length)).catch(() => null);
+      if (prepared?.state !== 'prepared' || prepared.descriptor === null || prepared.output === null) return null;
+      return {
+        descriptor: prepared.descriptor,
+        asset: { assetKey: choice.representationId, mediaType: 'model/gltf-binary', contentSha256: prepared.output.sha256, byteSize: prepared.output.byte_size },
+      };
+    }
+    const publication = served.get(choice.catalogSha256);
+    const family = publication?.kind === 'parametric-body'
+      ? publication.document.families.find((candidate) => candidate.familyId === choice.familyId)
+      : undefined;
+    const reviewed = family?.representations.find((candidate) => candidate.representationId === choice.representationId);
+    return reviewed ? { descriptor: reviewed.descriptor, asset: reviewed.asset } : null;
+  }
+  /** A prepared body of a parametric family, drawn by the native runtime. */
   async function wearPrepared(choice: Extract<SavedChoice, { kind: 'prepared' }>): Promise<void> {
     const publication = served.get(choice.catalogSha256);
     const family = publication?.kind === 'parametric-body'
       ? publication.document.families.find((candidate) => candidate.familyId === choice.familyId)
       : undefined;
-    const body = family?.representations.find((candidate) => candidate.representationId === choice.representationId);
+    const body = family ? await preparedBody(choice) : null;
     if (!family || !body || !binding) {
       if (binding) CharacterChoices.forApp(binding.app).set(PLAYER, { kind: 'abstract' });
       view.setPeopleStatus('preparation_unavailable', true);
       return;
     }
     const look: CharacterLook = {
-      lookId: body.representationId,
+      lookId: choice.representationId,
       label: family.label,
       file: `${body.asset.assetKey}.glb`,
       creator: family.sources.map((source) => source.title).join(' · '),
@@ -581,7 +612,7 @@ export function mountCharacter(deps: { env: AppEnvironment; state: SessionState;
       if (!env.preview) {
         // A signed-in world draws the people its host serves from its reviewed assets, and the
         // player wears what this world keeps for them, else the served designed default.
-        if (state.credentials) native = atlas.enableNativeCharacters(workspaceCharacterLoader(state.credentials));
+        if (state.credentials) native = atlas.enableNativeCharacters(workspaceCharacterLoader(state.credentials, preparedBytes));
         try {
           await ensureServed();
           if (disposed || binding !== atlas) return;

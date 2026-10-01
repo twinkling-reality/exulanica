@@ -1313,3 +1313,35 @@ def style_apply_request(owner) -> dict[str, Any]:
             "base_topology_digest": current["current_topology_digest"],
         },
     }
+
+
+def character_preparation(owner) -> uuid.UUID:
+    """A body the owner asked to prepare, still waiting for a preparer (domain: the queue).
+
+    Requested as the character routes request one, and left requested: the sweep asks who may
+    read and cancel a preparation, not what a preparer makes of it.
+    """
+    from exulanica.store.namespaces import LocalWorkspaceStores
+    from exulanica.world.character_parametric import PREPARER_ID, PREPARER_VERSION
+    from exulanica.world.workspace_preparations import WorkspacePreparationRepository
+
+    queue = WorkspacePreparationRepository(
+        owner.repository.connection,
+        owner.workspace_id,
+        owner.actor,
+        stores=LocalWorkspaceStores(owner.tmp_path / "workspace-assets"),
+    )
+    zero = "0" * 64
+    record = queue.request(
+        input_kind="character_recipe",
+        preparer_id=PREPARER_ID,
+        preparer_version=PREPARER_VERSION,
+        parameters={
+            "family_id": "makehuman-parametric/v1",
+            "family_sha256": zero,
+            "values": {},
+            "seed": 0,
+        },
+        inputs={"catalog_sha256": zero, "family": {}, "identity_sha256": zero},
+    )
+    return record.preparation_id

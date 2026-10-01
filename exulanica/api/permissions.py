@@ -534,6 +534,10 @@ _WORLD_READS: Final = _every(
     "GET /world/versions/{version_id}/characters/{subject_kind}/{subject_id}/appearance",
     "GET /world/versions/{version_id}/characters/{subject_kind}/{subject_id}/appearance/families",
     "GET /world/versions/{version_id}/characters/{subject_kind}/{subject_id}/appearance/history",
+    "GET /world/versions/{version_id}/characters/{subject_kind}/{subject_id}/appearance"
+    "/preparations/{preparation_id}",
+    "GET /world/versions/{version_id}/characters/{subject_kind}/{subject_id}/appearance"
+    "/preparations/{preparation_id}/bytes",
     "GET /world/versions/{version_id}/clock",
     "GET /world/versions/{version_id}/clock/events",
     "GET /world/versions/{version_id}/clock/verify",
@@ -614,6 +618,10 @@ _WORLD_WRITES: Final = _every(
     "POST /world/versions/{version_id}/arrangements/apply",
     "POST /world/versions/{version_id}/arrangements/preview",
     "PUT /world/versions/{version_id}/characters/{subject_kind}/{subject_id}/appearance",
+    "POST /world/versions/{version_id}/characters/{subject_kind}/{subject_id}/appearance"
+    "/preparations",
+    "POST /world/versions/{version_id}/characters/{subject_kind}/{subject_id}/appearance"
+    "/preparations/{preparation_id}/cancel",
     "POST /world/versions/{version_id}/characters/{subject_kind}/{subject_id}/appearance/reset",
     "PUT /world/versions/{version_id}/clock",
     "POST /world/versions/{version_id}/compositions/apply",

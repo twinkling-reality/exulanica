@@ -302,6 +302,38 @@ writes an integer receipt; a failure is reported with its class (`preparer_faile
 One build of the reviewed default recipe (2026-09-30, one machine at load average 4) reproduced the
 committed body byte for byte in 4.8 s of wall time and 347 MiB of peak resident memory; a build may
 use at most 180 s and 1 GiB.
+
+Any other recipe is prepared in the workspace's own preparation queue
+(`exulanica/world/workspace_preparations.py`, migration 0126), whose worker runs
+`CharacterBodyPreparer` (`exulanica.makehuman-parametric-preparer` version 1) where the pinned inputs
+verify (`EXULANICA_CHARACTER_PREPARER_BLENDER` and `EXULANICA_CHARACTER_PREPARER_SOURCE`).
+`POST .../appearance/preparations` with a recipe records one preparation that pins the recipe, the
+publication that served the family, the family as that publication declares it and the verified
+preparer identity, and answers 202 while it is requested or running. An identical request in the
+same workspace is the same preparation and is answered as it stands, so a body is fitted once; a
+recipe whose values the publication already reviews is answered with that body and queues nothing.
+The record step asks whether the pinned publication still serves the family, and the build verifies
+its inputs before and after it runs; either failing ends the preparation `stale` with no body
+written. A prepared body is named `preparation:<preparation id>`, and a look saved with it is bound
+to exactly its output digest and receipt. `GET .../preparations/{preparation_id}` reads a
+preparation with its render descriptor once prepared, `POST .../cancel` stops one that has not
+finished, and `GET .../bytes` delivers the body while its family is served (`ETag` the output
+digest). A saved look whose prepared body was cancelled, failed, is being prepared again, or whose
+bytes are missing or do not hash to their digest reads `preparation_unavailable`,
+`asset_bytes_unavailable` or `asset_integrity_unavailable`, and is never drawn as another body.
+Refusals: 409 `representation_not_prepared` (a look names a body still being prepared), 422
+`preparation_not_applicable` (not a person's own avatar, or a family that needs no preparation),
+503 `preparer_unavailable`, 409 `preparation_not_ready`, `prepared_bytes_missing`,
+`prepared_bytes_corrupt` or `preparation_finished`, 410 `withdrawn` and 429
+`workspace_asset_quota_exceeded`. A prepared body counts against the workspace's retained bytes as
+every output in its asset namespace does, so a body that would cross the limit fails the
+preparation with class `quota_exceeded` and that code, and nothing is recorded; the failure classes
+are the queue's, passed through as they are. A world's capability read describes requesting a body
+and cancelling a preparation as these routes answer: requesting is unavailable with
+`appearance_unavailable` where no family is served and with `preparer_unavailable` where this host
+has no queue, no preparer or no inputs that verify for a served parametric family; its effect, the
+body being prepared, is stated `preparation` with an unknown state, because the worker that
+prepares it is a process this server cannot see.
 A saved parametric look is worn by the player through the native character runtime with the measured
 descriptor. Parametric bodies are for the player only: they have no postures, no distant form and no
 population draw. The loopback development builder (`scripts/parametric_character/preview_server.py`)
@@ -592,9 +624,9 @@ Not built, and not claimed:
   publication, so publishing a new population changes how every world's inhabitants look (what they
   do is unaffected);
 - parametric bodies for inhabitants, seated parametric bodies, or a distant form for them;
-- preparing a parametric body for a new recipe from a request: the preparer and its checks exist,
-  and joining them to the workspace preparation queue is the remaining step, so until then only a
-  published reviewed body can be saved and worn;
+- a studio control for requesting a parametric body; the routes and the queue exist, and the
+  control and its words belong to the experience owner;
+- a preparation measurement beyond one recipe on one machine, or any claim of preparation capacity;
 - a frame measurement on a weaker machine, and saved looks for a session that names no account;
 - a scene-person adapter that represents a confirmed or unresolved observation from a photograph,
   starting from a source-linked abstract character, without requiring a photoreal likeness;

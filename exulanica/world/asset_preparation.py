@@ -59,6 +59,7 @@ from exulanica.errors import BlobNotFoundError, IntegrityError
 from exulanica.evidence.blob import BlobId
 from exulanica.store.namespaces import WorkspaceStores, workspace_asset_lock_key
 from exulanica.world import asset_import, static_glb
+from exulanica.world.character_preparation import CharacterBodyPreparer
 from exulanica.world.workspace_preparations import (
     DEFAULT_RETAINED_BYTES,
     RECEIPT_PROFILE,
@@ -237,7 +238,13 @@ class StaticGlbPreparer:
 
 #: Every preparer a worker may run, keyed by the pin a preparation row carries. Fixed in code.
 PREPARERS: Final[Mapping[tuple[str, int], Preparer]] = MappingProxyType(
-    {(StaticGlbPreparer.preparer_id, StaticGlbPreparer.preparer_version): StaticGlbPreparer()}
+    {
+        (StaticGlbPreparer.preparer_id, StaticGlbPreparer.preparer_version): StaticGlbPreparer(),
+        (
+            CharacterBodyPreparer.preparer_id,
+            CharacterBodyPreparer.preparer_version,
+        ): CharacterBodyPreparer(),
+    }
 )
 
 

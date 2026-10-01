@@ -85,6 +85,7 @@ from exulanica.spending import (
 )
 from exulanica.store.base import ContentAddressedStore
 from exulanica.store.configured import ContentStores, content_stores
+from exulanica.store.namespaces import WorkspaceStores
 from exulanica.world.decision_roles import DecisionRole, decision_roles
 from exulanica.world.material_recipes import MaterialRuntime
 from exulanica.world.society import world_society_seed
@@ -733,7 +734,7 @@ def build_services(
         workspace_assets=WorkspaceAssetRuntime(
             stores=stores.workspace_assets, retained_bytes_limit=retained_bytes_limit(environ)
         ),
-        character_appearance=_character_appearance_runtime(store, environ),
+        character_appearance=_character_appearance_runtime(store, environ, stores.workspace_assets),
         tiles=stores.tiles,
         society_runtime=_society_runtime(store, environ),
         runs_derivative_worker=_enabled(env_get("DERIVATIVE_WORKER", environ)),
@@ -818,7 +819,9 @@ def _material_runtime(stores: ContentStores, environ: Mapping[str, str]) -> Mate
 
 
 def _character_appearance_runtime(
-    store: ContentAddressedStore, environ: Mapping[str, str]
+    store: ContentAddressedStore,
+    environ: Mapping[str, str],
+    workspace_stores: WorkspaceStores | None = None,
 ) -> CharacterAppearanceRuntime | None:
     """Saved looks over the character catalogs this host publishes (migration 0131).
 
@@ -829,16 +832,34 @@ def _character_appearance_runtime(
     publication with the owner connection, so this instance reads the catalogs from the database
     on every request and a publication or withdrawal takes effect without a restart. With nothing
     published, the families read is empty and saving a look answers 424.
+
+    Bodies a parametric family does not publish are prepared in the workspace's own preparation
+    queue, in the workspace asset namespaces (``workspace_stores``; without them no body is
+    prepared here). ``EXULANICA_CHARACTER_PREPARER_BLENDER`` and
+    ``EXULANICA_CHARACTER_PREPARER_SOURCE`` name the pinned preparation inputs; without them, or
+    when they do not verify, a request for a body answers 503 and nothing is queued.
     """
     from exulanica.api.routes.character_appearance import CharacterAppearanceRuntime
+    from exulanica.world.character_body_preparations import QueuedCharacterPreparations
     from exulanica.world.character_catalogs import CatalogRegistry
+    from exulanica.world.character_preparation import CharacterBodyPreparer, environment_host
+    from exulanica.world.workspace_preparations import WorkspacePreparationRepository
 
-    del environ
     return CharacterAppearanceRuntime(
         families=(),
         authorize_family=lambda _connection, _session, _family: False,
         store=store,
         catalogs=CatalogRegistry(),
+        preparations=None
+        if workspace_stores is None
+        else lambda connection, session: QueuedCharacterPreparations(
+            WorkspacePreparationRepository(
+                connection, session.workspace_id, session.actor, stores=workspace_stores
+            )
+        ),
+        preparer=None
+        if workspace_stores is None
+        else CharacterBodyPreparer(hosts=lambda family_id: environment_host(family_id, environ)),
     )
 
 

@@ -15,6 +15,7 @@ from __future__ import annotations
 import hashlib
 import uuid
 from collections.abc import Callable, Mapping
+from dataclasses import dataclass
 from typing import Any, Protocol
 
 import psycopg
@@ -29,6 +30,7 @@ from exulanica.world.character_appearance import (
     CharacterFamily,
     CharacterRecipe,
     CharacterSubject,
+    PreparationNotApplicable,
     RepresentationBinding,
     StaleAppearance,
     catalog_family_base,
@@ -59,6 +61,20 @@ class CharacterPreparations(Protocol):
     ) -> RepresentationBinding | None: ...
 
     def render_status(self, binding: RepresentationBinding) -> str: ...
+
+
+@dataclass(frozen=True, slots=True)
+class PreparationPlan:
+    """What a request for a body over one recipe pins, once the subject and recipe are checked.
+
+    ``reviewed`` names the body the family's publication already reviews for exactly these
+    values, when it reviews one; then nothing needs preparing.
+    """
+
+    family: CharacterFamily
+    publication: CatalogPublication
+    family_document: Mapping[str, Any]
+    reviewed: str | None
 
 
 class CharacterAppearanceRepository:
@@ -474,6 +490,44 @@ class CharacterAppearanceRepository:
                         }
                     )
             return listed
+
+    def authorize(self, version_id: uuid.UUID, subject: CharacterSubject) -> None:
+        """Refuse a subject this caller may not act for in this world version."""
+        with self.connection.transaction():
+            self._authorize(version_id, subject)
+
+    def preparation_plan(
+        self, version_id: uuid.UUID, subject: CharacterSubject, recipe: CharacterRecipe
+    ) -> PreparationPlan:
+        """Check a request to prepare a body over ``recipe``, and say what it would pin.
+
+        Only a person's own avatar wears a prepared body and only a parametric family has one
+        to prepare; the recipe must be exactly over a served family, with the family's own seed
+        (a body does not depend on it, so two seeds would be one body prepared twice), and must
+        name no body.
+        """
+        with self.connection.transaction():
+            self._authorize(version_id, subject)
+            if subject.kind != "avatar":
+                raise PreparationNotApplicable("only a person's own avatar wears a prepared body")
+            family = self._family(recipe)
+            if not is_parametric_family(family):
+                raise PreparationNotApplicable("this family's looks need no prepared body")
+            if recipe.representation_id is not None or recipe.seed != family.default_seed:
+                raise ValueError("a preparation request names no body and keeps the family seed")
+            validate_recipe(recipe, family, subject)
+            publication = self._publication(family)
+            if publication is None:
+                raise AppearanceUnavailable("no served publication derives this family")
+            document = next(
+                f for f in publication.document["families"] if f["familyId"] == family.family_id
+            )
+            return PreparationPlan(
+                family=family,
+                publication=publication,
+                family_document=document,
+                reviewed=self._default_representation(family, recipe.parameters),
+            )
 
     def read(self, version_id: uuid.UUID, subject: CharacterSubject) -> dict:
         with self.connection.transaction():

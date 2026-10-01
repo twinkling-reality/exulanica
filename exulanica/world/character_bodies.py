@@ -43,6 +43,7 @@ __all__ = [
     "BodyMeasurements",
     "BodyRefused",
     "measure_prepared_body",
+    "rest_bounds_mm",
 ]
 
 #: Failure classes a body check answers, as the preparation queue records them.
@@ -574,3 +575,26 @@ def measure_prepared_body(payload: bytes, declaration: BodyDeclaration) -> BodyM
         max_weight_error_millionths=round(weight_error * 1_000_000),
         sampled_vertices=sampled,
     )
+
+
+def rest_bounds_mm(payload: bytes, unit_scale_millionths: int) -> dict[str, int]:
+    """The rest-pose extent of every primitive together, in whole millimetres once scaled.
+
+    Read from the stored vertex positions, the frame the rest height is measured in, so ask it of a
+    body :func:`measure_prepared_body` accepted, with the unit scale it measured. The preparation
+    queue records it as the output's dimensions: x is the width, y the height and z the depth.
+    """
+    document, binary = _chunks(payload)
+    low, high = [math.inf] * 3, [-math.inf] * 3
+    for mesh in document.get("meshes", []):
+        for primitive in mesh.get("primitives", []):
+            for position in _accessor(document, binary, primitive["attributes"]["POSITION"]):
+                for axis in range(3):
+                    low[axis] = min(low[axis], position[axis])
+                    high[axis] = max(high[axis], position[axis])
+    if not all(math.isfinite(value) for value in (*low, *high)):
+        raise BodyRefused("unverified_output", "positions_not_finite")
+    width, height, depth = (
+        round((high[axis] - low[axis]) * unit_scale_millionths / 1000) for axis in range(3)
+    )
+    return {"width": width, "height": height, "depth": depth}

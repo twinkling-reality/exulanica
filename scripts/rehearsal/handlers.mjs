@@ -231,11 +231,11 @@ async function exploreWalk(ctx) {
 
 // -- creation ------------------------------------------------------------------------------------
 
-const ROW = `document.querySelector('aside.object-placement li.object-placement-item')`;
+export const ROW = `document.querySelector('aside.object-placement li.object-placement-item')`;
 const rowButton = (text) => `[...(${ROW})?.querySelectorAll('button') ?? []].find(b => b.textContent.trim() === ${JSON.stringify(text)})`;
 const motionWord = (page) => page.evaluate(`(${ROW})?.querySelector('.object-placement-motion')?.textContent.trim() ?? null`);
 
-async function waitForEdit(ctx, beyondSeq, what) {
+export async function waitForEdit(ctx, beyondSeq, what) {
   return until(what, SETTLE_MS, async () => {
     const read = await savedWorld(ctx);
     return read.version?.edit_seq > beyondSeq ? read : null;
@@ -770,15 +770,15 @@ async function furnishSmallSquare(ctx) {
 }
 
 // People nearby: the inhabitants' panel, reached from the World menu's local navigation.
-const NEARBY = `document.getElementById('world-panel-nearby')`;
-const PEOPLE = `document.querySelector('section.world-inhabitants')`;
+export const NEARBY = `document.getElementById('world-panel-nearby')`;
+export const PEOPLE = `document.querySelector('section.world-inhabitants')`;
 const PLAYBACK = `${PEOPLE}?.querySelector('button[data-action]')`;
-const INSPECT = `document.querySelector('select[aria-label="Inspect nearby inhabitant"]')`;
-const INSPECTOR = `document.querySelector('.living-world-inspector')`;
+export const INSPECT = `document.querySelector('select[aria-label="Inspect nearby inhabitant"]')`;
+export const INSPECTOR = `document.querySelector('.living-world-inspector')`;
 // After the square is confirmed, time for the page to draw its objects before the screenshot.
 const SQUARE_DRAWN_MS = 3_000;
 
-async function openPeopleNearby(page) {
+export async function openPeopleNearby(page) {
   if (await page.evaluate(`${NEARBY}?.checkVisibility() ?? false`)) return;
   if (!await page.evaluate(`[...document.querySelectorAll('nav.world-local-nav button')].some(b => b.checkVisibility())`)) {
     await chooseMenu(page, 'world');
@@ -798,7 +798,7 @@ const peopleSeen = (page) => page.evaluate(`(() => { const p = ${PEOPLE}; if (!p
     control: (() => { const b = p.querySelector('button[data-action]'); return b && !b.hidden ? { action: b.dataset.action, text: b.textContent.trim(), disabled: b.disabled } : null; })() }; })()`);
 
 /** A society route of the starter's saved version. */
-const societyPath = (entry, suffix = '', query = '') =>
+export const societyPath = (entry, suffix = '', query = '') =>
   `/world/versions/${entry.authored_version_id}/society${suffix}?world_id=${encodeURIComponent(entry.world_id)}${query}`;
 
 async function bringInInhabitants(ctx) {
@@ -884,7 +884,7 @@ async function playAndWatchWalking(ctx) {
 const FIRST_MINUTE_INTERVALS = 3;
 
 /** The inspector's words about the one it shows, and the subject it names. */
-const inspectorSeen = (page) => page.evaluate(`(() => { const i = ${INSPECTOR}; if (!i || !i.checkVisibility()) return null;
+export const inspectorSeen = (page) => page.evaluate(`(() => { const i = ${INSPECTOR}; if (!i || !i.checkVisibility()) return null;
   return { subject: i.dataset.subjectId ?? null, who: i.querySelector('h3')?.textContent.trim() ?? null,
     what: i.querySelector(':scope > p:not(.living-world-activity)')?.textContent.trim() ?? null,
     doing: i.querySelector('.living-world-activity')?.textContent.trim() ?? null }; })()`);
