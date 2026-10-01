@@ -837,11 +837,13 @@ another host or about more than one process.
   client treats a reset during an upload as "send it again later". Behind the installation's own
   client proxy (`deploy/installation/client-nginx.conf`), which reads a request's body before
   passing it on, an acceptance run on the same host sent 40 uploads of about 3.35 MB from four
-  workspaces at once through a running installation, and none met a reset: the proxy's
-  per-address write limit answered 19 with its own HTML 429, the API admitted 2 and refused 19, and
-  the client received 18 of those refusals as 503 `capacity_exhausted` and one as the proxy's HTML
-  502, where the API closed before the proxy had relayed its answer. A client therefore treats a 502
-  or an HTML 429 during an upload as "send it again later" too.
+  workspaces at once through a running installation, and none met a reset: the proxy's per-address
+  write limit answered 19 with its own HTML 429, the API admitted 2 and refused 19, and the client
+  received 18 of those refusals as 503 `capacity_exhausted` and one as the proxy's HTML 502. The run
+  kept no proxy log; the likeliest cause of the 502 is the API answering and closing while the proxy
+  was still sending it the body. A client therefore treats a 502 or an HTML 429 during an upload as
+  "send it again later" too. The proxy's 429 carries no `Retry-After`: its limit admits one write
+  every two seconds per address after a burst of twenty.
 - **Inhabited worlds beside the supported load:** eight towns whose societies the API process plays
   at four times speed, each town's traffic read every five seconds, beside the supported load for
   three minutes. The towns advanced 72 to 73 percent of the ticks their speed sets (85 to 87 of
