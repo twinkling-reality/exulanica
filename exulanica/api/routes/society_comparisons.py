@@ -45,6 +45,14 @@ from fastapi import APIRouter, Query, Request, Response
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
+from exulanica.api.capabilities import (
+    AVAILABLE,
+    Operation,
+    Preview,
+    VersionContext,
+    unavailable,
+    unsupported,
+)
 from exulanica.api.dependencies import CurrentSession, ScopedConnection, get_services
 from exulanica.api.services import Services
 from exulanica.api.society_comparison_runner import ComparisonArm, SocietyComparisonRunner
@@ -109,7 +117,7 @@ from exulanica.world.worlds import require_world
 _LOG = logging.getLogger(__name__)
 router = APIRouter(prefix="/world/versions/{version_id}/society/comparisons", tags=["society"])
 
-__all__ = ["router"]
+__all__ = ["capability_operations", "router"]
 
 #: A run that has no completed hour to draw, answered by name rather than as a missing run.
 RUN_NOT_COMPLETED: Final = "run_not_completed"
@@ -750,3 +758,42 @@ def start_society_comparison(
         model_name=load_manifest().model_name,
         starts=_starts(connection, session, world_id, ids, comparisons),
     )
+
+
+# -- a world's capability read --------------------------------------------------------------------
+
+
+def capability_operations(context: VersionContext) -> list[Operation]:
+    """Starting a comparison of the version's society, as a world's capability read lists it.
+
+    Refused in the order a start refuses before it reads its body: a version with no society, a
+    comparison of the world that has not finished, this server's own refusal
+    (``Services.comparison_refusal``), and an engine that takes no comparison. The plan read is its
+    preview and lists what a start may name.
+    """
+    if context.society is None:
+        state = unavailable("society_unavailable")
+    elif (
+        SocietyComparisonStarts(context.connection, context.session.workspace_id).unfinished(
+            context.world_id
+        )
+        is not None
+    ):
+        state = unavailable("comparison_running")
+    elif (refusal := context.services.comparison_refusal(context.session.workspace_id)) is not None:
+        state = unavailable(refusal)
+    elif not society_engine(str(context.society["engine_version"])).comparisons:
+        state = unsupported("engine_takes_no_comparison")
+    else:
+        state = AVAILABLE
+    return [
+        Operation(
+            endpoint=start_society_comparison,
+            availability=state,
+            subject="version",
+            bind=context.bind,
+            idempotency="comparison_id",
+            preview=Preview(plan_society_comparison, required=False),
+            options=(plan_society_comparison,),
+        )
+    ]

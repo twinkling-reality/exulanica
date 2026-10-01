@@ -37,6 +37,7 @@ from exulanica.grammar.catalogs import CatalogSchema, integer_field, load_catalo
 from exulanica.grammar.errors import CatalogError
 from exulanica.world.society_composition import REVIEWED_REACH_MM
 from exulanica.world.society_engines import CREATES, society_engine
+from exulanica.world.society_input_policy import UNREACHABLE
 from exulanica.world.society_planner import CLEARANCE_MM
 
 __all__ = [
@@ -50,7 +51,9 @@ __all__ = [
     "SocietyGroundKind",
     "SocietyPopulationRefused",
     "UnknownSocietyGround",
+    "created_engine",
     "load_society_grounds",
+    "placed_affordance_refusal",
     "refuse_population_over_budget",
     "society_ground_for_composer",
     "society_ground_for_navigation",
@@ -312,6 +315,28 @@ def society_ground_for_navigation(navigation_profile: str) -> SocietyGroundKind:
     raise UnknownSocietyGround(
         f"no society ground is stated for the navigation profile {navigation_profile!r}"
     )
+
+
+def placed_affordance_refusal(ground: SocietyGroundKind) -> str | None:
+    """Why the people of a society over this ground never use an object a person places, or None.
+
+    On the walking surfaces a world's own records state, people walk only the records' footways
+    and doors, so when an input is composed every placed object with a reviewed affordance is
+    recorded as refused by this code (:mod:`exulanica.world.society_walking_surfaces`). On a
+    lattice, reach is decided for each object then. A capability read states it per world, by the
+    world's ground, never by the name of the world's kind.
+    """
+    return UNREACHABLE if ground.navigation == "walking_surfaces" else None
+
+
+def created_engine(ground: SocietyGroundKind) -> str:
+    """The engine the engine table creates a new society with over a saved world on this ground.
+
+    The table states one engine for a saved world whose own records state its walking surfaces
+    and homes (``town``), and one for a saved world whose people walk a lattice (``saved_world``).
+    A creation still names its engine; this is the one the table says a person's own world takes.
+    """
+    return CREATES["town" if ground.navigation == "walking_surfaces" else "saved_world"]
 
 
 def society_population(document: Mapping[str, Any]) -> int:

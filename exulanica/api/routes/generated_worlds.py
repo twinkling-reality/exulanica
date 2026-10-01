@@ -48,7 +48,7 @@ from exulanica.world.baked_tiles import (
 from exulanica.world.composers import GeneratedWorldRefused, UnknownWorldComposer
 from exulanica.world.errors import InvalidStructuralData
 from exulanica.world.generated_worlds import generated_tiles
-from exulanica.world.saved_entries import SavedWorldEntryRepository
+from exulanica.world.saved_entries import InvalidSavedWorldTitle, SavedWorldEntryRepository
 from exulanica.world.world_recipes import (
     SpecificationRefused,
     UnknownWorldRecipe,
@@ -125,9 +125,10 @@ def create_generated_world(
     entry, and queue its bakes.
 
     An unknown preset, a value its schema does not offer (422, naming the key, the value and the
-    range), a preset its composer does not generate, a specification that generates no world from
-    any of its seed candidates, and a workspace that already holds as many generated worlds as the
-    count policy allows are each refused by name, and nothing is written.
+    range), a title that is empty once trimmed (422), a preset its composer does not generate, a
+    specification that generates no world from any of its seed candidates, and a workspace that
+    already holds as many generated worlds as the count policy allows are each refused by name, and
+    nothing is written.
     """
     try:
         created = SavedWorldEntryRepository(
@@ -140,6 +141,9 @@ def create_generated_world(
         )
     except UnknownWorldRecipe as exc:
         return _problem(404, exc.code, str(exc))
+    except InvalidSavedWorldTitle as exc:
+        # The code PUT /world-entries/{entry_id} answers the same title with.
+        return _problem(422, "invalid_saved_world_entry", str(exc))
     except SpecificationRefused as exc:
         return JSONResponse(status_code=422, content=exc.document())
     except (GeneratedWorldRefused, UnknownWorldComposer, WorldLimitReached) as exc:

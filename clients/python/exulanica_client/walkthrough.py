@@ -34,6 +34,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from .capabilities import descriptor_checks, exercise, print_capabilities, read_capabilities
 from .client import ApiRefusal, ClientError, Exchange, WorldClient
 from .comparisons import ComparisonStop, read_comparison
 from .discovery import (
@@ -247,10 +248,24 @@ def _parameters(behaviour: Behaviour, overrides: Sequence[str]) -> dict[str, Any
     return values
 
 
-def _region(world: Mapping[str, Any], version: Mapping[str, Any], region: str | None) -> str:
-    """An explicit region, else the saved world's authored region, else one an object uses."""
+def _region(
+    client: WorldClient, world: Mapping[str, Any], version: Mapping[str, Any], region: str | None
+) -> str:
+    """An explicit region, else the first the server lists for the version, else, from a server
+    that serves no capability read, the saved world's authored region or one an object uses."""
     if region:
         return region
+    try:
+        listed = client.get(
+            f"/world/versions/{version['version_id']}/capabilities",
+            query={"world_id": version["world_id"]},
+        )["regions"]["region_ids"]
+    except ApiRefusal as refused:
+        if refused.status != 404:
+            raise
+        listed = []
+    if listed:
+        return listed[0]
     scene = world.get("authored_scene") or {}
     if scene.get("region", {}).get("region_id"):
         return scene["region"]["region_id"]
@@ -345,7 +360,7 @@ def walkthrough(
         "yaw_microradians": UPRIGHT_YAW_MICRORADIANS,
         "scale_milli": REVIEWED_SIZE_SCALE_MILLI,
     }
-    region = _region(world, version, args.region)
+    region = _region(client, world, version, args.region)
     object_id = args.object_id or f"developer-client:{secrets.token_hex(4)}"
 
     transcript.step = "place"
@@ -491,7 +506,9 @@ def _arguments(argv: Sequence[str] | None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="python -m exulanica_client", description=__doc__.split("\n\n")[0]
     )
-    parser.add_argument("command", choices=("discover", "walkthrough", "comparisons"))
+    parser.add_argument(
+        "command", choices=("discover", "walkthrough", "comparisons", "capabilities")
+    )
     parser.add_argument("--base-url", default=os.environ.get("EXULANICA_API_URL"))
     parser.add_argument(
         "--token-env",
@@ -524,12 +541,20 @@ def _arguments(argv: Sequence[str] | None) -> argparse.Namespace:
     )
     parser.add_argument("--world", help="with --version, the world whose comparisons to read")
     parser.add_argument("--version", help="with --world, the version whose comparisons to read")
+    parser.add_argument(
+        "--exercise",
+        action="store_true",
+        help="with capabilities: make one available edit in each saved world, have it refused "
+        "against the base it replaced, and read the base again",
+    )
     parser.add_argument("--transcript", type=Path, help="write the transcript as JSON here")
     args = parser.parse_args(argv)
     if not args.base_url:
         parser.error("--base-url (or EXULANICA_API_URL) is required")
     if args.command == "walkthrough" and (args.place is None or args.origin_role is None):
         parser.error("walkthrough needs --place and --origin-role")
+    if args.exercise and (args.command != "capabilities" or args.origin_role is None):
+        parser.error("--exercise goes with capabilities and needs --origin-role")
     return args
 
 
@@ -548,6 +573,32 @@ def main(argv: Sequence[str] | None = None) -> int:
             _print_discovery(*discover(client))
             record["result"] = "discovered"
             code = _EXIT_CONFIRMED
+        elif args.command == "capabilities":
+            transcript.step = "read"
+            read = read_capabilities(client)
+            print_capabilities(read)
+            checks = descriptor_checks(client.openapi(), read)
+            record["capabilities"] = read
+            if args.exercise:
+                entries = {entry["entry_id"]: entry for entry in client.saved_worlds()}
+                record["exercised"] = [
+                    exercise(
+                        client,
+                        world,
+                        entries[world["entry_id"]],
+                        origin_role=args.origin_role,
+                        step=lambda name: setattr(transcript, "step", name),
+                    )
+                    for world in read["worlds"]
+                ]
+                checks += [check for done in record["exercised"] for check in done["checks"]]
+            record["checks"] = checks
+            failed = [check["check"] for check in checks if not check["holds"]]
+            record["result"] = "confirmed" if not failed else "not confirmed"
+            for check in checks:
+                if not check["holds"] or args.exercise:
+                    print(f"  {'holds' if check['holds'] else 'FAILS'}: {check['check']}")
+            code = _EXIT_CONFIRMED if not failed else _EXIT_STOPPED
         elif args.command == "comparisons":
             transcript.step = "read"
             world = (

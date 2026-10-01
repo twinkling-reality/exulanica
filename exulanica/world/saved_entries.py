@@ -53,6 +53,7 @@ from exulanica.world.worlds import (
 )
 
 __all__ = [
+    "InvalidSavedWorldTitle",
     "SavedWorldCandidate",
     "SavedWorldEntry",
     "SavedWorldEntryRepository",
@@ -96,6 +97,25 @@ class WorldTakesNoPhotographs(ValueError):
     """A photograph offered to a world whose kind is never composed with photographs."""
 
     code: Final = "world_takes_no_photographs"
+
+
+class InvalidSavedWorldTitle(ValueError):
+    """A title that is empty once trimmed, or longer than a saved world's title may be.
+
+    A ``ValueError``, so a route that answers a plain one answers this one the same way.
+    """
+
+
+#: The most characters a saved world's title holds, once trimmed.
+TITLE_MAXIMUM: Final = 200
+
+
+def _clean_title(title: str) -> str:
+    """``title`` trimmed, or :class:`InvalidSavedWorldTitle` when nothing or too much is left."""
+    clean = title.strip()
+    if not 1 <= len(clean) <= TITLE_MAXIMUM:
+        raise InvalidSavedWorldTitle(f"title must contain between 1 and {TITLE_MAXIMUM} characters")
+    return clean
 
 
 @dataclass(frozen=True, slots=True)
@@ -293,11 +313,9 @@ class SavedWorldEntryRepository:
         source_kind: Literal["personal", "authored", "generated"] = "personal",
     ) -> SavedWorldEntry:
         clean_world_id = world_id.strip()
-        clean_title = title.strip()
         if not 1 <= len(clean_world_id) <= 200:
             raise ValueError("world_id must contain between 1 and 200 characters")
-        if not 1 <= len(clean_title) <= 200:
-            raise ValueError("title must contain between 1 and 200 characters")
+        clean_title = _clean_title(title)
         try:
             with self.connection.transaction():
                 self._lock_workspace()
@@ -330,12 +348,23 @@ class SavedWorldEntryRepository:
         assert row is not None
         return self.entry(row["entry_id"])
 
+    def holds_entry(self) -> bool:
+        """Whether this workspace holds any saved entry.
+
+        :meth:`create_starter` makes a starter only in a workspace that holds none; once one is
+        held, a retry naming the starter's own title returns it and anything else is refused. This
+        is that rule's early answer for a read: unlocked, so a concurrent write may overtake it,
+        and never a permission.
+        """
+        row = self.connection.execute(
+            "select 1 from saved_world_entry where workspace_id=%s limit 1", (self.workspace_id,)
+        ).fetchone()
+        return row is not None
+
     def create_starter(self, *, title: str, created_by: uuid.UUID) -> SavedWorldEntry:
         """Atomically create or return this workspace's one controlled authored starter."""
 
-        clean_title = title.strip()
-        if not 1 <= len(clean_title) <= 200:
-            raise ValueError("title must contain between 1 and 200 characters")
+        clean_title = _clean_title(title)
         with self.connection.transaction():
             self._lock_workspace()
             existing = self.entries()
@@ -403,9 +432,7 @@ class SavedWorldEntryRepository:
         )
         from exulanica.world.world_recipes import town_recipe
 
-        clean_title = title.strip()
-        if not 1 <= len(clean_title) <= 200:
-            raise ValueError("title must contain between 1 and 200 characters")
+        clean_title = _clean_title(title)
         recipe = town_recipe(recipe_key, values)
         refuse_past_limit(self.connection, self.workspace_id, GENERATED)
         refused: dict[str, GeneratedWorldRefused] = {}

@@ -39,7 +39,7 @@ import uuid
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Any, Final, Literal
 
 import psycopg
 from psycopg import pq
@@ -96,6 +96,7 @@ from exulanica.world.style_structure import (
 
 __all__ = [
     "BLOCKED_REASONS",
+    "SOURCE_INVALIDATED",
     "CompositionBlocked",
     "CompositionPlacement",
     "CompositionPreview",
@@ -351,8 +352,10 @@ class _Resolution:
     subject: AuthoredObject | EnvironmentPlacement | PointMapInstance | None
 
 
+#: The code a preview and apply give every request on a version whose source was invalidated.
+SOURCE_INVALIDATED: Final = "source_invalidated"
 _BASE_REFUSALS: tuple[tuple[type[Exception], str], ...] = (
-    (InvalidatedSourceVersion, "source_invalidated"),
+    (InvalidatedSourceVersion, SOURCE_INVALIDATED),
     (StaleObjectBase, "stale_base"),
 )
 _ENVIRONMENT_SOURCE_REFUSALS: tuple[tuple[type[Exception], str], ...] = (

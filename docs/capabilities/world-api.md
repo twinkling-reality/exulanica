@@ -1,9 +1,10 @@
 # World API
 
 A program reads and changes a world through the same authenticated routes the application uses:
-its versions and objects, its people and the models that decide for them. Edits carry the version
-state they were made against and pass the same permission and acceptance rules as changes made in
-the application.
+its versions and objects, its people, its traffic signals and the models that decide for them. It
+can ask the server which operations a world supports and which are available to it now, with the
+reason for any that are not. Edits carry the version state they were made against and pass the same
+permission and acceptance rules as changes made in the application.
 
 ## Routes
 
@@ -23,6 +24,7 @@ and world generation are routes of their own contracts, listed with every other 
 | Method and path | Responsibility |
 | --- | --- |
 | `GET /worlds` | The worlds the workspace holds, each with its kind, and how many of each it may hold |
+| `GET /worlds/capabilities` | For each kind of world: how many the workspace holds, the count policy's limit, what the kind supports, and whether making one is available to this caller now ([discovery](#discovering-what-a-world-supports)) |
 | `GET /worlds/personal-source` | Whether the account holder's reviewed photographs can make or update the personal-source world now, or be added to the made world's places with a preview, or the named refusal; writes nothing |
 | `POST /worlds/personal-source` | Compose the selection that read showed, by its `topology_digest`, or add the photographs its confirmed preview showed, by its `preview_sha256`, and return the world's `world_id` |
 | `GET /world-read/scenes/{scene_id}` | Read an authorized scene bundle, placed in the regions of the named world |
@@ -31,6 +33,7 @@ and world generation are routes of their own contracts, listed with every other 
 | `GET /world/versions` | Every alternate world version in the workspace, newest first |
 | `POST /world/versions` | Create an alternate version from a structural snapshot or another version |
 | `GET /world/versions/{version_id}` | One version with its objects, overrides, edit history and `state_sha256` |
+| `GET /world/versions/{version_id}/capabilities` | The version's kind, the regions an edit may place into, its society, and each operation it supports with its state ([discovery](#discovering-what-a-world-supports)) |
 | `POST /world/versions/{version_id}/objects` | Add one authored object from the reviewed registry |
 | `POST /world/versions/{version_id}/objects/{object_id}/move` | Replace one object's region-local transform |
 | `POST /world/versions/{version_id}/objects/{object_id}/remove` | Store a removal |
@@ -38,6 +41,7 @@ and world generation are routes of their own contracts, listed with every other 
 | `POST /world/versions/{version_id}/objects/undo` | Reverse the newest edit not already reversed |
 | `POST /world/versions/{version_id}/arrangements/preview` | Where an arrangement's objects, such as the small square's, would stand; writes nothing |
 | `POST /world/versions/{version_id}/arrangements/apply` | Add exactly the resolved objects as ordinary edits, or refuse with the reason |
+| `GET /world/arrangements` | The published arrangements, each with the key and version a preview or apply names it by |
 | `GET /world/assets` | The reviewed asset registry, with whether each asset's bytes are present |
 | `GET /world/assets/{asset_key}/bytes` | The reviewed GLB bytes |
 | `GET /world/behaviours` | The reviewed behaviours an object may be given, with each parameter's bounds |
@@ -57,21 +61,26 @@ and their full contract, including every problem code, is
 ### People and models
 
 These routes read and drive a world's society, the people described in the
-[people and models guide](simulation.md), and take `world_id` like the routes above. A step and a
-directed action name the tick and state digest they were made against, and a stale base is refused.
+[people and models guide](simulation.md), a town's traffic and the models that decide for its
+people and its signals, and take `world_id` like the routes above. A step and a directed action name
+the tick and state digest they were made against, and a stale base is refused.
 
 | Method and path | Responsibility |
 | --- | --- |
 | `POST /world/versions/{version_id}/society` | Bring a society into a saved version |
 | `GET /world/versions/{version_id}/society` | Its state, with the places its people can go |
-| `GET /world/versions/{version_id}/society/events` | Its recorded events |
+| `GET /world/versions/{version_id}/society/events` | Its recorded events, newest first, in pages: `limit` (at most 256) and `before`, the `next` cursor the previous page answered with, `null` when no older event is left |
+| `GET /world/versions/{version_id}/society/inputs/{input_seq}` | One stored input's identity and the authored state it was composed after (`authored_state`: the version's `edit_seq` and state digest), never the input itself |
 | `GET /world/versions/{version_id}/society/replay` | Its history replayed from stored records, calling no model |
 | `GET`, `PUT /world/versions/{version_id}/society/control` | Playback: play or pause at 1x, 2x or 4x speed |
 | `POST /world/versions/{version_id}/society/control/steps` | Advance a paused society by one step |
 | `POST /world/versions/{version_id}/society/presence` | One recorded minute in which everyone leaves, or the same people arrive again |
 | `POST /world/versions/{version_id}/society/actions` | Direct one person to go somewhere or use a place |
+| `GET /world/versions/{version_id}/models` | Every registered decision role (a person, a junction signal): its subjects, offered models, choices and host refusal, with the same declared semantics on each role |
+| `POST /world/versions/{version_id}/models/{role_key}` | Choose a model for some subjects of one role, or none; needs `model.invoke` beside `world.write` |
 | `GET /world/versions/{version_id}/society/models` | The offered models, each person's choice and each model's decisions |
-| `POST /world/versions/{version_id}/society/models` | Choose a model for some people, or their routine; needs `model.invoke` beside `world.write` |
+| `POST /world/versions/{version_id}/society/models` | Choose a model for some people, or their routine, as the route above does for the person role; needs `model.invoke` beside `world.write` |
+| `GET /world/versions/{version_id}/traffic` | A town's vehicles, second by second, from the roads its own records state |
 | `GET /world/versions/{version_id}/society/decisions/{request_id}` | One stored decision: what the model was asked and what it answered |
 | `GET /world/versions/{version_id}/society/comparisons` | The comparisons of models run on this version, with the start and progress of one started from the application |
 | `GET /world/versions/{version_id}/society/comparisons/plan` | What a comparison of this version may be given, and for a selection its runs, the most it can cost and what one like it typically costs |
@@ -94,6 +103,74 @@ The whole surface, every route with its permission rule and every schema, is pin
 `tests/snapshots/api-routes.json` and `tests/snapshots/api-openapi.json`; a change to either reaches
 review as a diff, as the [developer client guide](developer-client.md#the-contract-it-is-written-against)
 describes.
+
+## Discovering what a world supports
+
+Two reads say what a caller can do, each from the checks the operations themselves make:
+`GET /worlds/capabilities` for making each kind of world, and
+`GET /world/versions/{version_id}/capabilities` for one version of one world. Neither writes or asks
+a model. Both describe each operation with the same descriptor:
+
+| Field | Meaning |
+| --- | --- |
+| `operation` | The route that performs it, `"METHOD /path"`, the key the pinned surface uses |
+| `bind` | The path values of this subject; `world_id` is the read's own |
+| `requires`, `permitted` | The permissions the route declares, and whether this caller's grant holds them all |
+| `state`, `code` | `available`: the server would attempt it; `unavailable`: supported, but a dependency or state prevents it now; `unsupported`: this kind, engine or role never supports it; `unknown`: deciding it needs a fact this caller may not read. Every state but `available` carries the stable code the operation answers with |
+| `subject`, `subjects` | What it acts on, and the read and field that list those subjects |
+| `input`, `output` | The OpenAPI schemas of its body and answer |
+| `base` | Each stale-base token its body carries, with the read and field that give the current value |
+| `idempotency` | The body field that makes a retry answer with the first result |
+| `preview` | The operation that shows the effect without writing, and whether the write needs it |
+| `options` | The reads that list its choices, such as `GET /world/assets` or `GET /world/arrangements` |
+| `writes`, `spends` | Whether success records state, and whether it may call a model or commit the world to one |
+| `effects` | A later consequence this server may not produce: whether the world's people use what was placed (`society`), whether this host asks a chosen model (`decisions`), whether the world advances on its own once played (`playback`) |
+
+Availability is not permission: an operation can be available and not permitted to this caller.
+Units are part of field names across the API (`_mm`, `_ms`, `_seconds`, `_usd`, `_microradians`,
+`_milli`), and bounds are the OpenAPI schema's or the domain read's; a descriptor restates neither.
+Where an operation answers a family code with the reason in `detail` (`409 arrangement_refused`,
+`409 composition_blocked`), the descriptor's `code` is that reason.
+
+A version's read also states:
+
+- `kind` and `kind_facts`: the world's kind and what the kind supports (`takes_photographs`,
+  `draws_generated_tiles`, `source_independent`).
+- `regions`: the regions an edit may place into, from the one check every placement makes. A
+  region in the list is accepted by `POST .../objects`; any other is refused
+  `422 invalid_object_data`. An invalidated source lists none, as `unavailable`.
+- `society`: whether the version holds a society, and its engine, or the engine the engine table
+  creates for this world's ground: `exulanica-society/v2` for a starter or a world from photographs,
+  `exulanica-society/v5` for a generated town. A society creation names its engine, so a client
+  sends the one named here.
+
+What differs by kind, as the reads state it:
+
+| Kind | Regions | Arrangements | Placed objects used by people | Society engine | Directed actions and presence | Traffic |
+| --- | --- | --- | --- | --- | --- | --- |
+| Authored starter | `region:starter` | available | yes, by reach | v2 | available once a society is brought | `roads_not_stated` |
+| Generated town | its one generated region | `unsupported`, `arrangement_needs_authored_ground` | no, `authored_affordance_unreachable` | v5 | `unsupported` (`engine_takes_no_directed_actions`, `engine_keeps_its_people`) | available |
+| From photographs | one per place | available; a world of several places names the viewer's region | yes, by reach | v2 | available once a society is brought | `roads_not_stated` |
+
+Making worlds: a starter is refused `saved_world_conflict` once the workspace holds any saved world,
+although the count policy sets no starter limit, and the read says so. A generated world is refused
+`world_limit_reached` at the policy's limit. A world from photographs takes the state and code of the
+`GET /worlds/personal-source` plan, which needs `admission.read`; without it the state is `unknown`.
+
+Choosing a model for a role (`POST /world/versions/{version_id}/models/{role_key}`) answers a refused
+choice with the status the person's own route gives the same code: 409 for `choice_key_reused`,
+`engine_takes_no_model_choice` and `roads_unavailable`, 503 when this server cannot take a choice
+now (`traffic_controller_unavailable`, `traffic_worker_unavailable`), and 422 for a body naming
+something the world does not offer. A model the manifest does not hold is refused
+`model_not_declared` for a person and `model_not_offered` for a signal, each role's own code. A
+choice is recorded even when this host asks no model; the choice's `decisions` effect says so. A
+registered role whose subject this server has no host for is listed as `unsupported` with
+`role_subject_unsupported`, and a choice of it is refused by that code.
+
+A society's events name the input they were played under (`document.input_seq`). The input's
+provenance read gives the authored `edit_seq` it followed and the version's state digest after that
+edit (`delta_sha256`), which is the `result_state_sha256` of that edit in the version's history, so
+an event joins to the edit, and the object, it followed.
 
 ## Making an edit from another tool
 
@@ -131,9 +208,10 @@ move on purpose, so the refusal and the re-read are shown rather than asserted.
   [the recorded developer-client run](../evaluation/2026-09-23-developer-client.json) began in an
   empty synthetic workspace. Otherwise a version is created from an existing structural snapshot or
   from another version.
-- No route lists a source snapshot's regions. An authored starter world names its region in the
-  saved world's `authored_scene`; otherwise a client learns a region id from an object that already
-  uses one, or from `GET /world/source-media`. The server refuses a region its source lacks.
+- The regions an edit may place into are in the version's capability read, for every kind of world.
+- Environment instances and photo point maps place admitted resources that no read lists for a
+  world; their descriptors name no options. Styles and interaction policy are world-scoped and are
+  not in the version's capability read; their own reads state what they offer.
 
 ## Carrying a version elsewhere
 
@@ -159,6 +237,11 @@ Definitions: [World Read](../../exulanica/api/routes/world_read.py),
 [reviewed assets](../../exulanica/api/routes/world_assets.py) and
 [reviewed behaviours](../../exulanica/api/routes/world_behaviours.py), with the shared edit bodies
 and problem codes in [world_edit.py](../../exulanica/api/world_edit.py); the
+[capability reads](../../exulanica/api/routes/capabilities.py) and their
+[descriptor](../../exulanica/api/capabilities.py); the
+[decision roles](../../exulanica/api/routes/world_models.py) and the
+[host of each role](../../exulanica/api/role_hosts.py);
+[traffic](../../exulanica/api/routes/world_traffic.py); the
 [society](../../exulanica/api/routes/society.py),
 [playback control](../../exulanica/api/routes/society_control.py),
 [directed actions](../../exulanica/api/routes/society_actions.py),

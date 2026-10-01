@@ -104,6 +104,10 @@ ALLOWED_WORLDLESS_QUERIES: dict[str, str] = {
             "update",
         )
     },
+    "exulanica/world/saved_entries.py::SavedWorldEntryRepository.holds_entry [saved_world_entry]": (
+        "whether the workspace holds a saved entry in any world: the rule it answers early, a "
+        "starter only in a workspace that holds none (create_starter), is the workspace's"
+    ),
     "exulanica/world/society_experiment_repository.py::SocietyExperimentRepository._definition_row"
     " [society_experiment_definition]": _BY_EXPERIMENT,
 }

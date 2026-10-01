@@ -723,6 +723,17 @@ def comparison_run(owner) -> dict[str, Any]:
     return _comparison(owner)
 
 
+def society_input_seq(owner) -> int:
+    """The genesis input of the default version's living society: every society holds input 1."""
+    owner.real("/world/versions/{version_id}")
+    return 1
+
+
+def invented_input_seq() -> str:
+    """An input sequence no society reaches, inside the bound the route's path accepts."""
+    return "2147483000"
+
+
 def experiment(owner) -> str:
     """A no-op experiment over the default version's living society (API)."""
     version_id = owner.real("/world/versions/{version_id}")

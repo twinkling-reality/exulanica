@@ -206,6 +206,17 @@ def test_an_unknown_recipe_is_refused_by_name_and_nothing_is_written(objects_api
     assert workspace_worlds(repository.connection, repository.workspace_id) == before
 
 
+def test_a_title_empty_once_trimmed_is_refused_by_name_and_nothing_is_written(
+    objects_api, repository
+):
+    """A title of only spaces is refused with the code a saved entry's edit answers it with."""
+    before = workspace_worlds(repository.connection, repository.workspace_id)
+    response = _make(objects_api, title="   ")
+    assert response.status_code == 422, response.text
+    assert response.json()["code"] == "invalid_saved_world_entry"
+    assert workspace_worlds(repository.connection, repository.workspace_id) == before
+
+
 def test_a_recipe_of_a_grammar_version_its_composer_does_not_generate_is_refused_by_name(
     objects_api, repository, monkeypatch
 ):

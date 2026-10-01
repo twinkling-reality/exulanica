@@ -116,6 +116,17 @@ def test_human_review_binds_named_attestation_and_exact_personal_authority(uploa
     } == {"personal"}
 
 
+def test_the_status_read_serves_the_words_a_review_sends_back(upload):
+    """A client shows the attestation the server holds, and sending those words back is accepted."""
+    status = upload.client.get("/personal-admission", headers={"Authorization": f"Bearer {_TOKEN}"})
+    assert status.status_code == 200, status.text
+    served = status.json()["attestation"]
+    assert served == HUMAN_ATTESTATION
+    body = reviewing(batch(upload))
+    assert body["attestation"] == served
+    assert post(upload, "/personal-admission", body).status_code == 202
+
+
 @pytest.mark.parametrize(
     "refusal", ["unnamed", "future", "bytes", "digest", "attestation", "actor"]
 )

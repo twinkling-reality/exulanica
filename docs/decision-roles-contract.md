@@ -121,10 +121,17 @@ What a role in a world also needs:
   applying receipts through the generic seam. The living society over a district (`v4`) consumes
   no receipts. Traffic's separate controller persists choices, requests, receipts and segment
   continuations under the saved world and version; flight is derived and has no decision host.
-- **A route and a panel.** `GET /world/versions/{version_id}/models` serves registered person and
-  signal roles with offered models, subjects and choices. `POST` at its role-key child records an
-  owner's choice. The Who decides panel renders the served roles. The person-specific society
-  models route remains available to its existing callers.
+- **A route and a panel.** `GET /world/versions/{version_id}/models` serves every registered role
+  with offered models, subjects and choices, and the same declared semantics on each: whether a
+  choice can be recorded now (`capability`, the descriptor of the choice route bound to the role),
+  why this host asks no chosen model (`host_refusal`), how many subjects models may run at once
+  (`model_subjects_maximum`) and the contract a new choice records (`contract`). `POST` at its
+  role-key child records an owner's choice and answers a refusal with the status its code has on
+  the person-specific route. Each role's host is named in code for the word its subjects are known
+  by (`exulanica/api/role_hosts.py`); a registered role with no host is listed as unsupported and
+  refused as `role_subject_unsupported`, so a new role is served only once its host is written. The
+  Who decides panel renders the served roles. The person-specific society models route remains
+  available to its existing callers.
 - **Comparisons.** A comparison names the role it asks by the contract its definition records,
   which the registry resolves to one role (`RoleRegistry.for_contract`), and asks it through the
   generic path, and the start controls offer the roles the society's engine hosts. Its waiting

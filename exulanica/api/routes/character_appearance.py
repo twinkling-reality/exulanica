@@ -21,6 +21,7 @@ from fastapi import APIRouter, Query, Request
 from fastapi.responses import JSONResponse
 from pydantic import Field, StrictInt
 
+from exulanica.api.capabilities import AVAILABLE, Base, Operation, VersionContext, unavailable
 from exulanica.api.dependencies import CurrentSession, ScopedConnection, get_services
 from exulanica.api.world_scope import WorldId
 from exulanica.selection.validation import Session
@@ -248,3 +249,33 @@ def families(
         society_id,
         lambda repo, subject: repo.available_families(version_id, subject),
     )
+
+
+def capability_operations(context: VersionContext) -> list[Operation]:
+    """Saving and resetting a character's appearance, as a world's capability read lists them.
+
+    Unavailable, as every appearance route answers, where this host configured no character
+    runtime (``appearance_unavailable``). A subject's own dependencies are decided when one is
+    named; the families read lists what a look may be made from.
+    """
+    configured = getattr(context.services, "character_appearance", None) is not None
+    state = AVAILABLE if configured else unavailable("appearance_unavailable")
+    base = (Base("base_revision", read, "revision"),)
+    return [
+        Operation(
+            endpoint=save,
+            availability=state,
+            subject="character",
+            bind=context.bind,
+            base=base,
+            options=(families,),
+        ),
+        Operation(
+            endpoint=reset,
+            availability=state,
+            subject="character",
+            bind=context.bind,
+            base=base,
+            options=(history,),
+        ),
+    ]

@@ -14,7 +14,7 @@ refusal has: clients keep only a problem's code and detail.
 from __future__ import annotations
 
 import uuid
-from typing import Annotated, Literal
+from typing import Annotated, Final, Literal
 
 from fastapi import APIRouter, Path, Request, Response
 from fastapi.responses import JSONResponse
@@ -28,6 +28,7 @@ from exulanica.world.arrangements import (
     ArrangementRefused,
     ArrangementRequest,
     apply_arrangement,
+    arrangement_catalog,
     preview_arrangement,
 )
 from exulanica.world.authored_delta import AlternateVersion
@@ -88,6 +89,22 @@ class ArrangementView(BaseModel):
     summary: str
 
 
+#: What the catalog read answers, versioned apart from the catalog it reads.
+CATALOG_PROFILE: Final = "exulanica.world-arrangements/v1"
+
+
+class ArrangementCatalogView(BaseModel):
+    """The published arrangements, each by what a preview or apply names it by and its words."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    profile: Literal["exulanica.world-arrangements/v1"]
+    catalog_version: int
+    catalog_sha256: str
+    #: Each arrangement a request may name: ``arrangement_key`` and ``arrangement_version``.
+    arrangements: list[ArrangementView]
+
+
 class ArrangementApplyView(BaseModel):
     """What apply added, named by the arrangement it came from, and the version it left."""
 
@@ -100,6 +117,26 @@ class ArrangementApplyView(BaseModel):
 def _refused(exc: ArrangementRefused) -> JSONResponse:
     return JSONResponse(
         status_code=409, content={"code": "arrangement_refused", "detail": exc.reason}
+    )
+
+
+@router.get(
+    "/arrangements",
+    response_model=ArrangementCatalogView,
+    summary="The published arrangements a preview or apply may name, with their words.",
+)
+def arrangement_catalog_route(_session: CurrentSession) -> ArrangementCatalogView:
+    catalog = arrangement_catalog()
+    return ArrangementCatalogView(
+        profile=CATALOG_PROFILE,
+        catalog_version=catalog.version,
+        catalog_sha256=catalog.sha256,
+        arrangements=[
+            ArrangementView(
+                key=item.key, version=item.version, title=item.title, summary=item.summary
+            )
+            for item in catalog.arrangements
+        ],
     )
 
 

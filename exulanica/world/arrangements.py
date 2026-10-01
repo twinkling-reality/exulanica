@@ -108,10 +108,12 @@ __all__ = [
     "PlacedObject",
     "apply_arrangement",
     "arrangement_catalog",
+    "ground_refusal",
     "lay_out",
     "load_arrangement_catalog",
     "placed_at",
     "preview_arrangement",
+    "version_refusal",
 ]
 
 CATALOG_ID: Final = "world-arrangement"
@@ -757,6 +759,31 @@ def _read_ground(
         return None
 
 
+def ground_refusal(navigation: str | None) -> str | None:
+    """Why no arrangement can be laid on a ground whose people walk it this way, or None.
+
+    An arrangement meets the society's lattice, so a world with no ground the society can read
+    (None) or one whose people walk anything else, such as the surfaces a town's own records
+    state, is ``arrangement_needs_authored_ground``. The preview asks this of the ground it read,
+    and a capability read of the ground the society ground catalog states for the version's
+    composer, which is the entry that chose that ground's reader.
+    """
+    return None if navigation == "lattice" else "arrangement_needs_authored_ground"
+
+
+def version_refusal(*, source_invalidated: bool, navigation: str | None) -> str | None:
+    """The refusal every arrangement request on a version meets before its own checks, or None.
+
+    The edit base check comes first, so an invalidated source is refused as a write is
+    (``source_invalidated``); then the ground (:func:`ground_refusal`). A version this answers
+    None for may still refuse a particular request: an unknown arrangement, a world of several
+    regions with none named, or a layout that does not fit.
+    """
+    if source_invalidated:
+        return next(reason for kind, reason in _WRITE_REFUSALS if kind is InvalidatedSourceVersion)
+    return ground_refusal(navigation)
+
+
 def _reason(exc: Exception) -> str | None:
     for kind, reason in _WRITE_REFUSALS:
         if isinstance(exc, kind):
@@ -820,9 +847,10 @@ def _resolve(
             "arrangement_needs_authored_ground",
             "the version's snapshot is not an authored ground the society can read",
         )
-    if ground.navigation_form != "lattice":
+    refused = ground_refusal(ground.navigation_form)
+    if refused is not None:
         return frame.blocked(
-            "arrangement_needs_authored_ground",
+            refused,
             "an arrangement meets the society's lattice, and this world's people walk the "
             "surfaces its own records state",
         )

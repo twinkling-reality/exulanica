@@ -1,4 +1,5 @@
-"""``python -m exulanica_client discover|walkthrough``: see :mod:`exulanica_client.walkthrough`."""
+"""``python -m exulanica_client discover|walkthrough|comparisons|capabilities``: see
+:mod:`exulanica_client.walkthrough`."""
 
 from __future__ import annotations
 

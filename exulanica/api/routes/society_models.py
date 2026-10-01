@@ -30,6 +30,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from exulanica.api.decision_host import HOST_REFUSALS
 from exulanica.api.dependencies import CurrentSession, ScopedConnection, get_services
+from exulanica.api.services import Services
 from exulanica.api.world_scope import WorldId
 from exulanica.models.manifest import load_manifest
 from exulanica.models.usage import usd_string
@@ -46,14 +47,22 @@ from exulanica.world.worlds import require_world
 
 router = APIRouter(prefix="/world/versions/{version_id}/society/models", tags=["society"])
 
-__all__ = ["HOST_REFUSALS", "PROFILE", "router"]
+__all__ = [
+    "CHOICE_CONFLICTS",
+    "HOST_REFUSALS",
+    "PROFILE",
+    "offered_models",
+    "router",
+    "society_models_view",
+]
 
 PROFILE: Final = "exulanica.society-models/v1"
 #: How many of a society's latest person decisions one read counts, so a read never grows with
 #: the world's age: at the contract's hourly bound, some hours of a world's decisions.
 DECISIONS_READ: Final = 2000
-#: A refusal the route answers with 409 rather than 422: the society or the key, not the body.
-_CONFLICTS: Final = frozenset({"engine_takes_no_model_choice", "choice_key_reused"})
+#: A refusal of a choice answered with 409 rather than 422: the society or the key, not the body.
+#: ``/world/versions/{version_id}/models/{role_key}`` answers a choice of any role by this too.
+CHOICE_CONFLICTS: Final = frozenset({"engine_takes_no_model_choice", "choice_key_reused"})
 #: What the People panel shows: a society's people, so these routes serve the role that decides
 #: for them, as its registry entry names what it decides for.
 SUBJECT: Final = "person"
@@ -177,38 +186,21 @@ def society_models(
     world_id: WorldId,
 ) -> Any:
     try:
-        society = _society(connection, session, request, world_id)
-        role = _people_role()
-        snapshot = society.snapshot(version_id)
-        engine = society_engine(snapshot["profile"])
-        choices = SocietyModelChoiceRepository(
-            connection, session.workspace_id, world_id=world_id
-        ).current(version_id, role)
-        decisions = (
-            SocietyDecisionRepository(society).role_decisions(
-                role, version_id, latest=DECISIONS_READ
-            )
-            if engine.owner_model_choice
-            else []
-        )
+        return society_models_view(version_id, connection, session, request, world_id)
     except UnavailableSocietyInput as exc:
         return JSONResponse(
             status_code=424, content={"code": "unavailable_society_input", "detail": str(exc)}
         )
     except RoleRefused as exc:
         return _role_refused(exc)
+
+
+def offered_models(role: DecisionRole, services: Services) -> list[dict[str, Any]]:
+    """Every model the manifest offers ``role`` that its contract can ask, each in the words a
+    read names it by and with why this process asks nothing its provider serves, if it asks
+    nothing. The world's own models read names every role's models this way."""
     manifest = load_manifest()
     contract = role.contract()
-    services = get_services(request)
-    refusals: dict[tuple[str, str], str | None] = {}
-
-    def refusal(model: dict[str, str]) -> str | None:
-        """Each chosen model's refusal, judged once for however many people it runs."""
-        key = (model["provider"], model["model_id"])
-        if key not in refusals:
-            refusals[key] = services.choice_refusal(role, model, connection, session.workspace_id)
-        return refusals[key]
-
     models = []
     for spec in manifest.offered_models(role.chosen):
         mechanism = contract.mechanism_for(spec)
@@ -229,6 +221,44 @@ def society_models(
                 "refusal": services.provider_refusal(spec.provider),
             }
         )
+    return models
+
+
+def society_models_view(
+    version_id: uuid.UUID,
+    connection: ScopedConnection,
+    session: CurrentSession,
+    request: Request,
+    world_id: str,
+) -> dict[str, Any]:
+    """What the read answers, or the refusal it answers by name: :class:`UnavailableSocietyInput`
+    when the society's inputs may not be read now, :class:`RoleRefused` when the registry states
+    no one role deciding for people. The world's own models read serves the same view."""
+    society = _society(connection, session, request, world_id)
+    role = _people_role()
+    snapshot = society.snapshot(version_id)
+    engine = society_engine(snapshot["profile"])
+    choices = SocietyModelChoiceRepository(
+        connection, session.workspace_id, world_id=world_id
+    ).current(version_id, role)
+    decisions = (
+        SocietyDecisionRepository(society).role_decisions(role, version_id, latest=DECISIONS_READ)
+        if engine.owner_model_choice
+        else []
+    )
+    manifest = load_manifest()
+    contract = role.contract()
+    services = get_services(request)
+    refusals: dict[tuple[str, str], str | None] = {}
+
+    def refusal(model: dict[str, str]) -> str | None:
+        """Each chosen model's refusal, judged once for however many people it runs."""
+        key = (model["provider"], model["model_id"])
+        if key not in refusals:
+            refusals[key] = services.choice_refusal(role, model, connection, session.workspace_id)
+        return refusals[key]
+
+    models = offered_models(role, services)
     latest: dict[str, dict[str, Any]] = {}
     for decision in decisions:
         latest[decision["subject_id"]] = decision
@@ -315,6 +345,6 @@ def choose_society_model(
         )
     except ModelChoiceRefused as exc:
         return JSONResponse(
-            status_code=409 if exc.code in _CONFLICTS else 422,
+            status_code=409 if exc.code in CHOICE_CONFLICTS else 422,
             content={"code": exc.code, "detail": exc.detail},
         )

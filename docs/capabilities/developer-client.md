@@ -74,6 +74,32 @@ the client: its request body carries `base_state_sha256` and its answer is the s
 the society's state, and answer with something else, so they are not counted
 ([`discovery.py`](../../clients/python/exulanica_client/discovery.py)).
 
+## Reading what each world supports
+
+```bash
+EXULANICA_TOKEN=<token> python3 -m exulanica_client capabilities --base-url https://<api> \
+  [--exercise --origin-role fictional] --transcript capabilities.json
+```
+
+It reads `GET /worlds/capabilities` and, for each saved world of the token's workspace, the
+capability read of the version it opens at ([World API](world-api.md#discovering-what-a-world-supports)).
+It prints, per kind of world, whether one can be made, and per saved world its kind, its regions and
+each operation's state with the code of any refusal and whether this token may use it. It checks every
+route a descriptor names against the server's own `/openapi.json`, so a descriptor naming a route the
+server does not document fails a check rather than being trusted.
+
+With `--exercise` it makes one edit in each saved world, chosen from what the read calls available
+rather than from anything written into the client: an arrangement, previewed and then applied, where
+one is available and the preview shows it ready where the person arrives; otherwise one reviewed object
+placed in a region the read lists. It then sends the same request again against the base it replaced,
+which the server must refuse by name, and reads the base again from the read the descriptor names. It
+needs only `world.read` and `world.write`; operations that need another permission are listed as not
+permitted, and whether a world can be made from photographs is `unknown` to it, because that needs
+`admission.read`. The exit code is 0 when every check holds.
+
+The walkthrough takes its region from the same read when `--region` is not given, so it places into
+a generated town, whose saved world names no authored region, as it does into a starter world.
+
 ## Reading a comparison of models
 
 ```bash
@@ -133,7 +159,7 @@ review as a diff.
 
 ## What it does not do
 
-- It does not create saved worlds, versions or tokens. It edits the saved world the person has.
+- It does not create saved worlds, versions or tokens. It edits the saved worlds the person has.
 - It does not retry a refused edit. On a stale base (`409 stale_object_base`) it stops with the
   server's reason, because a blind retry is the lost update the base exists to prevent.
   [`scripts/world_client_example.py`](../../scripts/world_client_example.py) shows re-reading and
@@ -154,6 +180,10 @@ in the repository rather than in the client's own report.
 [The recorded run](../evaluation/2026-09-23-developer-client.json) did the same against the
 acceptance runtime with a synthetic workspace, and binds the transcript and the application's view
 of the saved world afterwards, with the object drawn where the client placed it.
+[`tests/test_developer_client_capabilities.py`](../../tests/test_developer_client_capabilities.py)
+runs `capabilities --exercise` as a separate process against the application as a deployment runs
+it, with a runtime role and row-level security, over a starter world, a generated town and a world
+from two photographs, and holds the edits it made to the repository.
 [`tests/test_developer_client_comparisons.py`](../../tests/test_developer_client_comparisons.py)
 runs the comparison reading with a token granted `world.read` alone, over a comparison started
 through the start route and played by the host's worker, and holds the asks it counted to the

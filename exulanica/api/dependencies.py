@@ -59,12 +59,14 @@ from exulanica.selection.validation import Session
 __all__ = [
     "TILES_PER_REQUEST",
     "CurrentSession",
+    "HeldPermissions",
     "ReadOnlyConnection",
     "ScopedConnection",
     "WorkspaceIdentity",
     "authorise_route",
     "current_session",
     "get_services",
+    "held_permissions",
 ]
 
 
@@ -81,6 +83,9 @@ TILES_PER_REQUEST = 1
 #: declaration, so :func:`current_session` does not resolve the caller a second time. Request state
 #: is per request and set only by server code; nothing a client sends can reach it.
 _AUTHORISED = "exulanica_authorised_session"
+#: Where it leaves the grant it held the route to, beside the session, for a read that says which
+#: other routes the caller may use (:func:`held_permissions`).
+_AUTHORISED_GRANT = "exulanica_authorised_grant"
 
 
 def _matched_path(request: Request) -> str | None:
@@ -153,6 +158,7 @@ def authorise_route(request: Request) -> None:
         with services.database.session(session.workspace_id) as connection:
             charge_tiles(connection, session.workspace_id, TILES_PER_REQUEST)
     setattr(request.state, _AUTHORISED, session)
+    setattr(request.state, _AUTHORISED_GRANT, held)
 
 
 def current_session(
@@ -176,6 +182,24 @@ def current_session(
 
 
 CurrentSession = Annotated[Session, Depends(current_session)]
+
+
+def held_permissions(request: Request, _session: CurrentSession) -> frozenset[Permission]:
+    """Everything the caller's grant holds, once the route's own declaration has held it.
+
+    A capability read says whether the caller may use other routes, which needs the whole grant
+    rather than the permissions its own route required. In an application ``create_app`` built,
+    :func:`authorise_route` left the grant beside the session. Anywhere else
+    :func:`current_session` has resolved the caller and applied the route's declaration, and the
+    same grant is resolved again here. Request state is set only by server code.
+    """
+    held = getattr(request.state, _AUTHORISED_GRANT, None)
+    if held is None:
+        _, held = _grant(request, request.headers.get("authorization"))
+    return held
+
+
+HeldPermissions = Annotated[frozenset[Permission], Depends(held_permissions)]
 
 
 def scoped_connection(request: Request, session: CurrentSession) -> Iterator[psycopg.Connection]:

@@ -130,8 +130,11 @@ cross streets, since a town one tile deep has no room for a second high street a
 shops its kind fits: a rowhouse or a shophouse fits a narrower lot than most a town lays, a high
 street's ground floors are shops whatever the shares say, and upper floors are homes. Every corner
 is one 4 m radius, because radii drawn per block left some towns' roads refused by traffic or a cross
-street too short for a car. Its people follow the purposeful routine (visiting shops,
-resting on benches, standing and talking), not the living society's homes and shifts. Traffic
+street too short for a car. Its people live the living town's routine (`exulanica-society/v5`): they live in its homes, work
+its premises' shifts and run errands while its shops are open; a town whose society was brought in
+before that engine keeps the purposeful routine. Objects placed in a town are not used by its
+people, whose routes follow the town's own footways and doors, and a world's capability read says
+so. Traffic
 compiled the roads of every one of the 720 towns the specification's sweep made (two towns at every
 point of its lengths, storeys, high streets and cross streets with every share even, and at 24 of
 those points one town with each share alone at its most and one with every share at none), and in
@@ -139,7 +142,9 @@ the 192 driven for an episode 7 to 29 vehicles made 6,566 of 6,567 trips; a town
 traffic cannot drive is still made, without vehicles, and the page says why by the refusal's name.
 A town's people are compared
 from the Compare view, a model deciding for a group of them within the most a comparison lets it
-([what a comparison can read](../society-experiments.md#running-a-comparison)). The page still
+([what a comparison can read](../society-experiments.md#running-a-comparison)). The owner may also
+hand a town's traffic lights to an open model ([people and models](simulation.md)); fixed timing
+decides whenever the model does not, and no evaluation record measures whether that helps traffic. The page still
 offers Add photos in a generated world, which the server refuses by name.
 
 A description sets only the values the specification offers; water, hills, a particular building

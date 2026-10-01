@@ -71,6 +71,29 @@ from exulanica.world.society_social import (
 
 #: Profiles that consume authorized inputs and record transition receipts, from the engine table.
 INPUT_PROFILES = INPUT_ENGINES
+#: The most events one read returns: the read's own bound, a page of a society's history.
+EVENTS_READ_MAXIMUM = 256
+
+
+class InvalidEventCursor(ValueError):
+    """A cursor that names no event of this society, or is not one this repository wrote."""
+
+    code = "invalid_event_cursor"
+
+
+def event_cursor(event: dict[str, Any]) -> str:
+    """Where a page of events ends, as the next page names it: the last event's tick, its order
+    within the tick (empty where it states none) and its id. Opaque to a client."""
+    order = event["document"].get("order")
+    return f"{event['tick']}:{'' if order is None else order}:{event['event_id']}"
+
+
+def _cursor_parts(cursor: str) -> tuple[int, int | None, uuid.UUID]:
+    try:
+        tick, order, event_id = cursor.split(":", 2)
+        return int(tick), None if order == "" else int(order), uuid.UUID(event_id)
+    except ValueError as exc:
+        raise InvalidEventCursor("this is not a cursor an events read gave") from exc
 
 
 def consumed_places(document: dict[str, Any]) -> dict[str, Any]:
@@ -868,22 +891,96 @@ class SocietyRepository:
             requests[value["tick"]] = document
         return requests
 
+    def input_provenance(self, version_id: uuid.UUID, input_seq: int) -> dict[str, Any]:
+        """One stored input's identity and the authored state it followed, never the input itself.
+
+        Authorized as :meth:`events` authorizes the inputs it shows: the society's current rights
+        first (:meth:`snapshot`), then this input's own. ``authored_state`` is the input's own
+        record of the version's ``edit_seq`` and state digest (``delta_sha256``), which names the
+        edit it followed in the version's history, or None for an input that records none. A
+        society that takes no inputs, or a sequence its chain does not hold, is
+        :class:`UnknownSociety`.
+        """
+        self.snapshot(version_id)
+        row = self._row(version_id)
+        if row is None or row["engine_version"] not in INPUT_PROFILES:
+            raise UnknownSociety("society input is unavailable")
+        if not 1 <= input_seq <= self._chain(row):
+            raise UnknownSociety("society input is unavailable")
+        document = self._inputs(row, [input_seq])[input_seq]
+        self._authorize(document)
+        authored = document.get("authored_state")
+        return {
+            "version_id": str(version_id),
+            "society_id": str(row["society_id"]),
+            "input_seq": input_seq,
+            "input_sha256": document["document_sha256"],
+            "input_profile": document["profile"],
+            "authored_state": None
+            if authored is None
+            else {"edit_seq": authored["edit_seq"], "delta_sha256": authored["delta_sha256"]},
+        }
+
     def events(self, version_id: uuid.UUID, *, limit: int = 256) -> tuple[dict[str, Any], ...]:
+        return self.events_page(version_id, limit=limit)[0]
+
+    def events_page(
+        self, version_id: uuid.UUID, *, limit: int = EVENTS_READ_MAXIMUM, before: str | None = None
+    ) -> tuple[tuple[dict[str, Any], ...], str | None]:
+        """A page of the society's events, newest first, and the cursor that reads on from it.
+
+        The order is the one every events read has: tick, newest first, then the order the
+        engine gave events within a tick, then id. ``before`` is a cursor a previous page gave
+        (:func:`event_cursor`); the page holds the events after it in that order. The cursor that
+        comes back is None when no older event is left. The inputs of the events a page shows are
+        authorized before it is answered, as the first page's are.
+        """
         self.snapshot(version_id)  # Current authorization applies to event materialization too.
         row = self._row(version_id)
+        bound = max(1, min(limit, EVENTS_READ_MAXIMUM))
+        after = ""
+        values: dict[str, Any] = {
+            "workspace": self.workspace_id,
+            "society": row["society_id"],
+            "rows": bound + 1,
+        }
+        if before is not None:
+            tick, order, event_id = _cursor_parts(before)
+            named = self.connection.execute(
+                "select 1 from world_society_event where workspace_id=%s and society_id=%s "
+                "and event_id=%s and tick=%s "
+                "and (document->>'order')::integer is not distinct from %s::integer",
+                (self.workspace_id, row["society_id"], event_id, tick, order),
+            ).fetchone()
+            if named is None:
+                raise InvalidEventCursor("the cursor names no event of this society")
+            values |= {"tick": tick, "order": order, "event": event_id}
+            after = (
+                " and (tick<%(tick)s or (tick=%(tick)s and ("
+                "(%(order)s::integer is not null and ((document->>'order')::integer>%(order)s "
+                "or document->>'order' is null or ((document->>'order')::integer=%(order)s "
+                "and event_id>%(event)s))) "
+                "or (%(order)s::integer is null and document->>'order' is null "
+                "and event_id>%(event)s))))"
+            )
         rows = self.connection.execute(
             "select "
             "event_id,tick,event_kind,subject_id,object_id,place_id,document,document_sha256,"
-            "recorded_at from world_society_event where workspace_id=%s and society_id=%s "
-            "order by tick desc, (document->>'order')::integer nulls last,event_id limit %s",
-            (self.workspace_id, row["society_id"], max(1, min(limit, 256))),
+            "recorded_at from world_society_event "
+            "where workspace_id=%(workspace)s and society_id=%(society)s"
+            + after
+            + " order by tick desc, (document->>'order')::integer nulls last,event_id "
+            "limit %(rows)s",
+            values,
         ).fetchall()
+        page, more = rows[:bound], len(rows) > bound
         if row["engine_version"] in INPUT_PROFILES:
-            shown = {value["document"]["input_seq"] for value in rows}
+            shown = {value["document"]["input_seq"] for value in page}
             documents = self._inputs(row, shown)
             for sequence in sorted(shown):
                 self._authorize(documents[sequence])
-        return tuple(dict(value) for value in rows)
+        events = tuple(dict(value) for value in page)
+        return events, event_cursor(events[-1]) if more else None
 
     def replay(self, version_id: uuid.UUID) -> dict[str, Any]:
         # Hold the same lock as advances so state, inputs, and transitions cannot straddle a tick.

@@ -748,6 +748,9 @@ EXISTENCE_BUILDERS: Final[Mapping[str, Owned | Shared]] = {
     "/world/versions/{version_id}/society/experiments/{experiment_id}/attempts/{attempt_id}": (
         Owned(build.experiment_attempt)
     ),
+    "/world/versions/{version_id}/society/inputs/{input_seq}": Owned(
+        build.society_input_seq, build.invented_input_seq
+    ),
     "/world/versions/{version_id}/tiles/{baked_tile_id}": Owned(build.generated_tile),
 }
 

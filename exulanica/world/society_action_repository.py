@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Callable
-from typing import Any
+from typing import Any, Final
 
 import psycopg
 from psycopg.types.json import Jsonb
@@ -25,6 +25,11 @@ from exulanica.world.society_actions import (
 )
 from exulanica.world.society_engines import society_engine
 from exulanica.world.society_planner import validate_society_input
+
+#: Why a society's engine takes no directed action, the reason ``409 invalid_society_action``
+#: carries as its detail. Its siblings in the engine table are ``engine_keeps_its_people`` and
+#: ``engine_takes_no_model_choice``.
+ENGINE_TAKES_NO_DIRECTED_ACTIONS: Final = "engine_takes_no_directed_actions"
 
 
 class SocietyActionRepository:
@@ -62,7 +67,9 @@ class SocietyActionRepository:
         if row is None:
             raise UnknownSociety("society is unavailable")
         if not society_engine(row["engine_version"]).directed_actions:
-            raise ValueError(f"{row['engine_version']} takes no user actions")
+            # The reason is the whole detail, as an arrangement's is: a client keeps only a
+            # problem's code and detail, and a capability read states the same reason.
+            raise ValueError(ENGINE_TAKES_NO_DIRECTED_ACTIONS)
         if society_state_sha256(row["state"]) != row["state_sha256"]:
             raise ValueError("stored society state digest mismatch")
         return row

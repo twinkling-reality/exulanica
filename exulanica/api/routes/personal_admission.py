@@ -16,7 +16,7 @@ from exulanica.api.dependencies import (
 from exulanica.api.services import Services
 from exulanica.errors import BlobNotFoundError, PrivacyAdmissionError
 from exulanica.ingest.model_rights import withdraw_model_right
-from exulanica.ingest.personal_admission import PersonalBatch, admit_batch
+from exulanica.ingest.personal_admission import HUMAN_ATTESTATION, PersonalBatch, admit_batch
 from exulanica.ingest.personal_requests import admission_status, personal_request
 from exulanica.ingest.pipeline import PhotoIngestPipeline
 from exulanica.ingest.repository import IngestRepository
@@ -59,7 +59,12 @@ def admit_personal(
 
 @router.get("")
 def personal_status(connection: ReadOnlyConnection, session: CurrentSession) -> dict[str, Any]:
-    return admission_status(connection, session.workspace_id, session.actor)
+    return {
+        **admission_status(connection, session.workspace_id, session.actor),
+        # The words a review sends back exactly, from the one constant it is checked against, so
+        # no client keeps a copy of its own.
+        "attestation": HUMAN_ATTESTATION,
+    }
 
 
 @router.post("/model-rights/{right_id}/withdraw")

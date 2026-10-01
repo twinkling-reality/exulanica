@@ -112,6 +112,7 @@ __all__ = [
     "CarryPlan",
     "ResolvedEnvironmentSource",
     "ReviewedAssetRow",
+    "SourceFacts",
     "StayReason",
     "WorldObjectRepository",
 ]
@@ -197,6 +198,19 @@ class CarryPlan:
     @property
     def change_list_carries(self) -> bool:
         return all(part.outcome is CarryOutcome.CARRIED for part in self.parts)
+
+
+@dataclass(frozen=True, slots=True)
+class SourceFacts:
+    """What every edit of one version is checked against, read without making an edit."""
+
+    snapshot_id: uuid.UUID
+    #: The composer that made the source snapshot, which names the ground its society stands on.
+    composer_key: str
+    #: Every region an object, environment instance or point map of the version may be placed in.
+    region_ids: frozenset[str]
+    #: A committed deletion invalidated the source, so every edit of the version is refused first.
+    invalidated: bool
 
 
 class WorldObjectRepository:
@@ -2480,6 +2494,30 @@ class WorldObjectRepository:
             (self.workspace_id, self.world_id, snapshot_id),
         ).fetchone()
         return row is not None
+
+    def source_facts(self, version_id: uuid.UUID) -> SourceFacts:
+        """What an edit of this version is checked against, read without an edit.
+
+        The regions are :meth:`_source_region_ids`, the one check every placement makes, and the
+        invalidation is the one :meth:`_require_edit_base` refuses every edit with first, so a
+        read that states them states what an edit will meet. Another workspace's version and an
+        invented one are the same :class:`UnknownWorldResource`.
+        """
+        row = self._version_row(version_id)
+        snapshot_id = row["source_snapshot_id"]
+        source = self.connection.execute(
+            "select composer_key from world_structure_snapshot "
+            "where workspace_id=%s and world_id=%s and snapshot_id=%s",
+            (self.workspace_id, self.world_id, snapshot_id),
+        ).fetchone()
+        if source is None:
+            raise UnknownWorldResource("no such structural snapshot")
+        return SourceFacts(
+            snapshot_id=snapshot_id,
+            composer_key=str(source["composer_key"]),
+            region_ids=self._source_region_ids(snapshot_id),
+            invalidated=self._source_invalidated(snapshot_id),
+        )
 
     def _source_region_ids(self, snapshot_id: uuid.UUID) -> frozenset[str]:
         rows = self.connection.execute(

@@ -67,6 +67,7 @@ from exulanica.api.permissions import PermissionRefused, require_complete_declar
 from exulanica.api.quotas import TileQuotaExceeded, TileQuotaUndeclared
 from exulanica.api.routes import (
     accounts,
+    capabilities,
     character_appearance,
     companion,
     environment_sources,
@@ -393,6 +394,7 @@ def create_app(services: Services | None = None, *, verify: bool = True) -> Fast
     app.include_router(world_flight.router)
     app.include_router(world_traffic.router)
     app.include_router(world_models.router)
+    app.include_router(capabilities.router)
     app.include_router(interaction.router)
     app.include_router(world_read.router)
     app.include_router(world_write.router)

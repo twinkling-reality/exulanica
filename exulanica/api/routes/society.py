@@ -13,7 +13,7 @@ import uuid
 from collections.abc import Callable
 from typing import Annotated, Any, Final, Literal
 
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, Path, Query, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -36,7 +36,11 @@ from exulanica.world.society_engines import (
 from exulanica.world.society_grounds import SocietyPopulationRefused
 from exulanica.world.society_planner import SocietyStartRefused
 from exulanica.world.society_presence import PresenceRefused
-from exulanica.world.society_repository import SocietyRepository
+from exulanica.world.society_repository import (
+    EVENTS_READ_MAXIMUM,
+    InvalidEventCursor,
+    SocietyRepository,
+)
 from exulanica.world.worlds import require_world
 
 router = APIRouter(prefix="/world", tags=["society"])
@@ -46,6 +50,8 @@ EngineProfile = Literal[tuple(engine.engine for engine in ENGINES)]  # type: ign
 #: Why a request for a model's proposal is refused: the one engine that took such requests is
 #: retired, and a model decides for a person only as the world's owner chose.
 PROPOSALS_RETIRED: Final = "society_proposals_retired"
+#: What one input's provenance read answers: its identity and the authored state it followed.
+INPUT_PROVENANCE_PROFILE: Final = "exulanica.society-input-provenance/v1"
 
 
 class CreateSocietyBody(BaseModel):
@@ -114,6 +120,8 @@ def _call(operation: Callable[[], Any], *, invalid_status: int = 422) -> Any:
     except SocietyPopulationRefused as exc:
         # The world's own premises imply a population no society over its ground may start with.
         return JSONResponse(status_code=409, content={"code": exc.code, "detail": exc.detail})
+    except InvalidEventCursor as exc:
+        return JSONResponse(status_code=422, content={"code": exc.code, "detail": str(exc)})
     except ValueError as exc:
         return JSONResponse(
             status_code=invalid_status,
@@ -305,13 +313,38 @@ def society_events(
     session: CurrentSession,
     request: Request,
     world_id: WorldId,
-    limit: Annotated[int, Query(ge=1, le=256)] = 256,
+    limit: Annotated[int, Query(ge=1, le=EVENTS_READ_MAXIMUM)] = EVENTS_READ_MAXIMUM,
+    before: Annotated[str | None, Query(min_length=1, max_length=120)] = None,
 ) -> Any:
+    def page() -> dict[str, Any]:
+        events, following = _repository(connection, session, request, world_id).events_page(
+            version_id, limit=limit, before=before
+        )
+        return {"events": served_events(events), "next": following}
+
+    return _call(page, invalid_status=409)
+
+
+@router.get("/versions/{version_id}/society/inputs/{input_seq}")
+def society_input_provenance(
+    version_id: uuid.UUID,
+    input_seq: Annotated[int, Path(ge=1, le=2**31 - 1)],
+    connection: ScopedConnection,
+    session: CurrentSession,
+    request: Request,
+    world_id: WorldId,
+) -> Any:
+    """One stored input of the version's society: its identity and the authored state it was
+    composed after, the version's ``edit_seq`` and state digest as the input records them, never
+    the input itself. An event names its input by ``input_seq``, so this read joins an event to the
+    edit in the version's history that it followed. Its rights are asked as the events read asks
+    them."""
     return _call(
         lambda: {
-            "events": served_events(
-                _repository(connection, session, request, world_id).events(version_id, limit=limit)
-            )
+            "profile": INPUT_PROVENANCE_PROFILE,
+            **_repository(connection, session, request, world_id).input_provenance(
+                version_id, input_seq
+            ),
         },
         invalid_status=409,
     )

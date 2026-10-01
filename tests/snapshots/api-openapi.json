@@ -1658,6 +1658,24 @@
       }
      },
      {
+      "name": "before",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "minLength": 1,
+         "maxLength": 120
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Before"
+      }
+     },
+     {
       "name": "authorization",
       "in": "header",
       "required": false,
@@ -1681,6 +1699,88 @@
        "application/json": {
         "schema": {
          "title": "Response Society Events World Versions  Version Id  Society Events Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/world/versions/{version_id}/society/inputs/{input_seq}": {
+   "get": {
+    "tags": [
+     "society"
+    ],
+    "summary": "Society Input Provenance",
+    "description": "One stored input of the version's society: its identity and the authored state it was\ncomposed after, the version's ``edit_seq`` and state digest as the input records them, never\nthe input itself. An event names its input by ``input_seq``, so this read joins an event to the\nedit in the version's history that it followed. Its rights are asked as the events read asks\nthem.",
+    "operationId": "society_input_provenance_world_versions__version_id__society_inputs__input_seq__get",
+    "parameters": [
+     {
+      "name": "version_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Version Id"
+      }
+     },
+     {
+      "name": "input_seq",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "maximum": 2147483647,
+       "minimum": 1,
+       "title": "Input Seq"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Society Input Provenance World Versions  Version Id  Society Inputs  Input Seq  Get"
         }
        }
       }
@@ -10244,6 +10344,55 @@
     }
    }
   },
+  "/world/arrangements": {
+   "get": {
+    "tags": [
+     "world"
+    ],
+    "summary": "The published arrangements a preview or apply may name, with their words.",
+    "operationId": "arrangement_catalog_route_world_arrangements_get",
+    "parameters": [
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ArrangementCatalogView"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/world/versions/{version_id}/arrangements/preview": {
    "post": {
     "tags": [
@@ -11361,6 +11510,129 @@
        "application/json": {
         "schema": {
          "title": "Response Choose World Model World Versions  Version Id  Models  Role Key  Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/worlds/capabilities": {
+   "get": {
+    "tags": [
+     "world"
+    ],
+    "summary": "Whether each kind of world can be made in this workspace now, and how.",
+    "operationId": "world_creation_worlds_capabilities_get",
+    "parameters": [
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response World Creation Worlds Capabilities Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/world/versions/{version_id}/capabilities": {
+   "get": {
+    "tags": [
+     "world"
+    ],
+    "summary": "What can be done with this version of the world now: its regions, its society and each supported operation with its state.",
+    "operationId": "version_capabilities_world_versions__version_id__capabilities_get",
+    "parameters": [
+     {
+      "name": "version_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Version Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Version Capabilities World Versions  Version Id  Capabilities Get"
         }
        }
       }
@@ -12865,7 +13137,7 @@
      "world"
     ],
     "summary": "Generate a world from a recipe and save it as yours.",
-    "description": "Generate the preset's world with the values asked for, for a new identity, save it and its\nentry, and queue its bakes.\n\nAn unknown preset, a value its schema does not offer (422, naming the key, the value and the\nrange), a preset its composer does not generate, a specification that generates no world from\nany of its seed candidates, and a workspace that already holds as many generated worlds as the\ncount policy allows are each refused by name, and nothing is written.",
+    "description": "Generate the preset's world with the values asked for, for a new identity, save it and its\nentry, and queue its bakes.\n\nAn unknown preset, a value its schema does not offer (422, naming the key, the value and the\nrange), a title that is empty once trimmed (422), a preset its composer does not generate, a\nspecification that generates no world from any of its seed candidates, and a workspace that\nalready holds as many generated worlds as the count policy allows are each refused by name, and\nnothing is written.",
     "operationId": "create_generated_world_worlds_generated_post",
     "parameters": [
      {
@@ -14032,6 +14304,40 @@
     ],
     "title": "ArrangementApplyView",
     "description": "What apply added, named by the arrangement it came from, and the version it left."
+   },
+   "ArrangementCatalogView": {
+    "properties": {
+     "profile": {
+      "type": "string",
+      "const": "exulanica.world-arrangements/v1",
+      "title": "Profile"
+     },
+     "catalog_version": {
+      "type": "integer",
+      "title": "Catalog Version"
+     },
+     "catalog_sha256": {
+      "type": "string",
+      "title": "Catalog Sha256"
+     },
+     "arrangements": {
+      "items": {
+       "$ref": "#/components/schemas/ArrangementView"
+      },
+      "type": "array",
+      "title": "Arrangements"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "profile",
+     "catalog_version",
+     "catalog_sha256",
+     "arrangements"
+    ],
+    "title": "ArrangementCatalogView",
+    "description": "The published arrangements, each by what a preview or apply names it by and its words."
    },
    "ArrangementPreviewBody": {
     "properties": {

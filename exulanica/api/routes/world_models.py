@@ -5,6 +5,13 @@ target effective second and first sealed model-controlled second are separate, s
 cannot be presented as a light a model already runs. Choosing never asks a model; the background
 traffic controller owns that work. The person-specific society route remains available to its
 existing callers.
+
+Every role carries the same declared semantics beside its own fields: whether its owner may choose
+a model for its subjects now (``capability``, the descriptor of this route's ``POST`` bound to the
+role), why this host asks no chosen model (``host_refusal``), how many of its subjects models may
+run at once (``model_subjects_maximum``) and the contract a new choice records (``contract``). Each
+role's host is named in code (:mod:`exulanica.api.role_hosts`); a registered role no host serves is
+listed as unsupported, and a choice of any role is refused with the status its code has everywhere.
 """
 
 from __future__ import annotations
@@ -16,23 +23,35 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
-from exulanica.api.dependencies import CurrentSession, ScopedConnection, get_services
-from exulanica.api.routes.society_models import society_models
-from exulanica.api.world_scope import WorldId
-from exulanica.models.manifest import load_manifest
-from exulanica.traffic.errors import UnsupportedNetworkError
-from exulanica.world.decision_roles import DecisionRole, RoleRefused, decision_roles
-from exulanica.world.errors import InvalidStructuralData
-from exulanica.world.society_model_choice_repository import (
-    ModelChoiceRefused,
-    SocietyModelChoiceRepository,
+from exulanica.api.capabilities import (
+    AVAILABLE,
+    Availability,
+    Effect,
+    Operation,
+    describe,
+    surface,
+    unavailable,
+    unsupported,
 )
-from exulanica.world.traffic_episodes import TrafficRefused
-from exulanica.world.traffic_host import saved_world_roads, traffic_clock
-from exulanica.world.traffic_signal_repository import SignalChoiceRefused, TrafficSignalRepository
+from exulanica.api.dependencies import (
+    CurrentSession,
+    HeldPermissions,
+    ScopedConnection,
+    get_services,
+)
+from exulanica.api.role_hosts import (
+    ROLE_HOSTS,
+    ROLE_SUBJECT_UNSUPPORTED,
+    RoleChoiceRefused,
+    RoleContext,
+    choice_status,
+)
+from exulanica.api.world_scope import WorldId
+from exulanica.world.decision_roles import DecisionRole, RoleRefused, decision_roles
+from exulanica.world.traffic_host import traffic_clock
 from exulanica.world.worlds import require_world
 
-__all__ = ["PROFILE", "router"]
+__all__ = ["PROFILE", "role_operations", "router"]
 
 PROFILE: Final = "exulanica.world-models/v1"
 router = APIRouter(prefix="/world/versions/{version_id}/models", tags=["world"])
@@ -61,129 +80,48 @@ def _version(
     ).fetchone()
 
 
-def _signal_role(
-    role: DecisionRole,
-    connection: ScopedConnection,
-    session: CurrentSession,
-    request: Request,
-    world_id: str,
-    version_id: uuid.UUID,
-    snapshot_id: uuid.UUID,
-) -> dict[str, Any]:
-    contract = role.contract()
-    manifest = load_manifest()
-    services = get_services(request)
-    controller = getattr(request.app.state, "traffic_signal_controller", None)
-    if controller is None:
-        return {
-            "key": role.key,
-            "subject": role.subject,
-            "label": "Traffic lights",
-            "available": False,
-            "reason": "traffic_controller_unavailable",
-            "subjects": [],
-            "models": [],
-            "choices": [],
-        }
-    try:
-        value = saved_world_roads(connection, session.workspace_id, world_id, snapshot_id)
-        subjects = [
-            {**signal, "label": f"High street crossing {index}"}
-            for index, signal in enumerate(controller.signals(value), 1)
-        ]
-        availability = None
-    except (
-        InvalidStructuralData,
-        TrafficRefused,
-        UnsupportedNetworkError,
-        SignalChoiceRefused,
-    ) as exc:
-        # A world without roads still has the registered role; its subjects are unavailable by
-        # the traffic compiler's named refusal, without concealing the People role beside it.
-        subjects = []
-        availability = getattr(exc, "code", "roads_unavailable")
-    repository = TrafficSignalRepository(connection, session.workspace_id, world_id, version_id)
-    latest = repository.current_choices()
-    active = repository.activations()
-    now = traffic_clock()
-    effective = repository.choices_at(now)
-    choices = []
-    for signal_id, choice in sorted(latest.items()):
-        model = choice["model"]
-        target = choice["effective_second"]
-        activated = active.get(choice["choice_seq"])
-        running = effective.get(signal_id)
-        running_active = None if running is None else active.get(running["choice_seq"])
-        running_model = (
-            None
-            if running is None
-            or running["model"] is None
-            or running_active is None
-            or running_active > now
-            else {
-                **running["model"],
-                "name": manifest.model_name(running["model"]["model_id"]),
-            }
+def _operation(
+    context: RoleContext, role: DecisionRole, state: Availability, host_refusal: str | None
+) -> Operation:
+    """The choice of ``role``'s model as a capability read names it: this route's ``POST``."""
+    host = ROLE_HOSTS.get(role.subject)
+    return Operation(
+        endpoint=choose_world_model,
+        availability=state,
+        subject=role.subject,
+        bind={"version_id": str(context.version_id), "role_key": role.key},
+        subjects=None if host is None else host.subjects(role, world_models),
+        idempotency="idempotency_key",
+        options=(world_models,),
+        # A choice is recorded whether or not this host asks the model; which it does is said here.
+        effects=()
+        if state.state != "available"
+        else (
+            Effect("decisions", AVAILABLE if host_refusal is None else unavailable(host_refusal)),
+        ),
+    )
+
+
+def role_operations(context: RoleContext) -> list[Operation]:
+    """Each registered role's model choice, as a world's capability read lists it."""
+    services = get_services(context.request)
+    found = []
+    for role in decision_roles():
+        host = ROLE_HOSTS.get(role.subject)
+        state = (
+            unsupported(ROLE_SUBJECT_UNSUPPORTED)
+            if host is None
+            else host.availability(context, role)
         )
-        if target > now:
-            status = "pending"
-        elif model is None:
-            status = "fixed"
-        elif activated is None or activated > now:
-            status = "preparing"
-        else:
-            status = "active"
-        choices.append(
-            {
-                "subject_id": signal_id,
-                "choice_seq": choice["choice_seq"],
-                "model": None
-                if model is None
-                else {
-                    **model,
-                    "name": manifest.model_name(model["model_id"]),
-                },
-                "effective_second": target,
-                "active_second": activated,
-                "running_model": running_model,
-                "running_choice_seq": None if running_model is None else running["choice_seq"],
-                "status": status,
-                "refusal": None
-                if model is None
-                else services.choice_refusal(role, model, connection, session.workspace_id),
-            }
+        found.append(
+            _operation(
+                context,
+                role,
+                state,
+                services.model_host_refusal(context.session.workspace_id, role),
+            )
         )
-    models = []
-    for spec in manifest.offered_models(role.chosen):
-        mechanism = contract.mechanism_for(spec)
-        if mechanism is None:
-            continue
-        models.append(
-            {
-                "provider": spec.provider,
-                "model_id": spec.model_id,
-                "name": manifest.model_name(spec.model_id),
-                "description": spec.description,
-                "mechanism": mechanism.value,
-                "refusal": services.provider_refusal(spec.provider),
-            }
-        )
-    return {
-        "key": role.key,
-        "subject": role.subject,
-        "label": "Traffic lights",
-        "available": availability is None,
-        "reason": availability,
-        "host_refusal": services.model_host_refusal(session.workspace_id, role),
-        "subjects": subjects,
-        "models": models,
-        "choices": choices,
-        "model_subjects_maximum": contract.value(role.subjects_bound),
-        "timing": {
-            "segment_seconds": 60,
-            "target_preparation_seconds": 60,
-        },
-    }
+    return found
 
 
 @router.get("")
@@ -191,6 +129,7 @@ def world_models(
     version_id: uuid.UUID,
     connection: ScopedConnection,
     session: CurrentSession,
+    held: HeldPermissions,
     request: Request,
     world_id: WorldId,
 ) -> Any:
@@ -200,41 +139,34 @@ def world_models(
         return JSONResponse(
             status_code=404, content={"code": "unknown_reference", "detail": "world version"}
         )
+    context = RoleContext(
+        connection, session, request, world_id, version_id, version["source_snapshot_id"]
+    )
+    services = get_services(request)
+    routes = surface(request.app)
     roles = []
     for role in decision_roles():
-        if role.subject == "signal":
-            roles.append(
-                _signal_role(
-                    role,
-                    connection,
-                    session,
-                    request,
-                    world_id,
-                    version_id,
-                    version["source_snapshot_id"],
-                )
-            )
-        elif role.subject == "person":
-            exists = connection.execute(
-                "select 1 from world_society where workspace_id=%s and world_id=%s "
-                "and version_id=%s limit 1",
-                (session.workspace_id, world_id, version_id),
-            ).fetchone()
-            person = (
-                society_models(version_id, connection, session, request, world_id)
-                if exists is not None
-                else None
-            )
-            roles.append(
-                {
-                    "key": role.key,
-                    "subject": role.subject,
-                    "label": "People",
-                    "available": isinstance(person, dict),
-                    "reason": None if person else "society_unavailable",
-                    "view": person if isinstance(person, dict) else None,
-                }
-            )
+        host = ROLE_HOSTS.get(role.subject)
+        host_refusal = services.model_host_refusal(session.workspace_id, role)
+        if host is None:
+            state = unsupported(ROLE_SUBJECT_UNSUPPORTED)
+            fields: dict[str, Any] = {"available": False, "reason": ROLE_SUBJECT_UNSUPPORTED}
+        else:
+            read = host.read(context, role)
+            state, fields = read.availability, dict(read.fields)
+        roles.append(
+            {
+                "key": role.key,
+                "subject": role.subject,
+                **fields,
+                "host_refusal": host_refusal,
+                "model_subjects_maximum": role.contract().value(role.subjects_bound),
+                "contract": role.contract().binding(),
+                "capability": describe(
+                    _operation(context, role, state, host_refusal), routes, held
+                ),
+            }
+        )
     return {
         "profile": PROFILE,
         "world_id": world_id,
@@ -264,74 +196,24 @@ def choose_world_model(
         role = decision_roles().role(role_key)
     except RoleRefused as exc:
         return JSONResponse(status_code=404, content={"code": exc.code, "detail": str(exc)})
-    model = None if body.model is None else body.model.model_dump()
-    if role.subject == "person":
-        try:
-            subjects = [str(uuid.UUID(value)) for value in body.subjects]
-        except ValueError:
-            return JSONResponse(
-                status_code=422,
-                content={"code": "person_id_invalid", "detail": "A person id is a UUID."},
-            )
-        repository = SocietyModelChoiceRepository(
-            connection, session.workspace_id, world_id=world_id
+    host = ROLE_HOSTS.get(role.subject)
+    if host is None:
+        return JSONResponse(
+            status_code=409,
+            content={"code": ROLE_SUBJECT_UNSUPPORTED, "detail": role.subject},
         )
-        try:
-            return repository.record_choice(
-                version_id,
-                role,
-                request_id=body.idempotency_key,
-                subjects=subjects,
-                model=model,
-                chosen_by=session.actor,
-                manifest=load_manifest(),
-                contract=role.contract(),
-            )
-        except ModelChoiceRefused as exc:
-            return JSONResponse(status_code=409, content={"code": exc.code, "detail": exc.detail})
-    if role.subject == "signal":
-        if len(body.subjects) != 1:
-            return JSONResponse(
-                status_code=422,
-                content={"code": "one_signal_per_choice", "detail": "Choose one traffic light."},
-            )
-        controller = getattr(request.app.state, "traffic_signal_controller", None)
-        if controller is None:
-            return JSONResponse(
-                status_code=503,
-                content={
-                    "code": "traffic_controller_unavailable",
-                    "detail": "Traffic preparation is unavailable.",
-                },
-            )
-        try:
-            value = saved_world_roads(
-                connection, session.workspace_id, world_id, version["source_snapshot_id"]
-            )
-            signals = controller.signals(value)
-            repository = TrafficSignalRepository(
-                connection, session.workspace_id, world_id, version_id
-            )
-            return repository.record_choice(
-                role,
-                load_manifest(),
-                request_id=body.idempotency_key,
-                signal_id=body.subjects[0],
-                known_signals=[row["signal_id"] for row in signals],
-                model=model,
-                chosen_by=session.actor,
-            )
-        except SignalChoiceRefused as exc:
-            return JSONResponse(
-                status_code=503 if exc.code == "traffic_worker_unavailable" else 409,
-                content={"code": exc.code, "detail": exc.code},
-            )
-        except (InvalidStructuralData, TrafficRefused, UnsupportedNetworkError) as exc:
-            return JSONResponse(
-                status_code=409,
-                content={"code": "roads_unavailable", "detail": type(exc).__name__},
-            )
-    return JSONResponse(
-        status_code=409,
-        content={"code": "role_subject_unsupported", "detail": role.subject},
+    context = RoleContext(
+        connection, session, request, world_id, version_id, version["source_snapshot_id"]
     )
+    try:
+        return host.record_choice(
+            context,
+            role,
+            request_id=body.idempotency_key,
+            subjects=body.subjects,
+            model=None if body.model is None else body.model.model_dump(),
+        )
+    except RoleChoiceRefused as exc:
+        return JSONResponse(
+            status_code=choice_status(exc.code), content={"code": exc.code, "detail": exc.detail}
+        )

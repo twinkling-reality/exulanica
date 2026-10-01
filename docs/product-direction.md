@@ -109,20 +109,23 @@ Capability guides and living contracts own detailed inventories. This map says w
 where each boundary lies, without competing copies of runtime flags, model selections or
 deployment prerequisites.
 
-The people in a saved world follow a deterministic planner
-([`society_planner.py`](../exulanica/world/society_planner.py)) unless its owner chooses an open
-model for one person or a group; each such choice is validated, stored and replayed without calling
-the model again. A person is the only role a model decides for. Several open models serve hosted
-roles through one policy boundary (the [model manifest](../exulanica/models/models.manifest.json)).
-Walking and flight are movement modules chosen by data, and road movement exists as a module that
-nothing in the application calls ([`exulanica/traffic`](../exulanica/traffic)). Objects, vehicles
-and society activities are versioned catalogs under [`assets/catalogs`](../assets/catalogs).
+The people in a saved world follow a deterministic routine (the purposeful planner
+[`society_planner.py`](../exulanica/world/society_planner.py) in a starter or a world made from
+photographs, the living town's homes, shifts and errands in a generated town) unless its owner
+chooses an open model for one person or a group; each such choice is validated, stored and replayed
+without calling the model again. Two roles are registered for a model to decide for: a person, and a
+generated town's junction signal, which a model may keep green one second longer or switch to amber
+within its plan's bounds. Several open models serve hosted roles through one policy boundary (the
+[model manifest](../exulanica/models/models.manifest.json)). Walking, flight and roads are movement
+modules chosen by data; a generated town's own roads are driven on a clock every viewer shares
+([`exulanica/traffic`](../exulanica/traffic)). Objects, vehicles and society activities are
+versioned catalogs under [`assets/catalogs`](../assets/catalogs).
 
 | Surface | Contract and acceptance boundary |
 | --- | --- |
-| Models deciding | [Decision roles](decision-roles-contract.md) and the [society contract](synthetic-society-contract.md#a-person-run-by-a-model-their-worlds-owner-chose): a world's owner chooses an open model for a person or a group, and each choice is validated, receipted and replayed without a call. A role is registry data with one adapter module; the person is the only registered role. |
+| Models deciding | [Decision roles](decision-roles-contract.md) and the [society contract](synthetic-society-contract.md#a-person-run-by-a-model-their-worlds-owner-chose): a world's owner chooses an open model for a person or a group, and each choice is validated, receipted and replayed without a call. A role is registry data with one adapter module; two are registered, a person and a junction signal, each chosen through `/world/versions/{version_id}/models`. |
 | Comparisons | [Comparisons of models](society-experiments.md#comparisons-of-models): the same simulated hour once per model for one group, scored against the routine and waiting, bounded by a same-model control and shown side by side in the application's Compare view, where the world's owner starts one within a spending bound they state; a local command defines and runs one by the same definition. |
-| Movement | [Movement modules](movement-modules-contract.md): walking, and flight for small birds on a clock every viewer shares. Road movement is built and connected to nothing. |
+| Movement | [Movement modules](movement-modules-contract.md): walking, flight for small birds, and roads, whose vehicles drive a generated town's streets on a clock every viewer shares. |
 | Worlds made from photographs | [Saved-world entry](saved-world-entry.md#which-photographs-a-personal-source-world-is-composed-from): a world composed from the person's reviewed photographs, one region per place, with later photographs added on confirmation. Each region has a declared floor, and the world hosts eight people on one of them, whose models its owner can choose. |
 | World entry and persistence | [Saved-world entry](saved-world-entry.md): owned authored starters, saved versions and reference photographs. Attaching a photograph does not create recovered scene geometry. |
 | Creation and editing | [World objects](world-objects-contract.md), [appearance](atlas-world-customization-contract.md) and [composition](world-composition-contract.md): supported assets, edits, versions and explicit gaps in general structural creation. |
@@ -136,8 +139,9 @@ and society activities are versioned catalogs under [`assets/catalogs`](../asset
 A fixture, test or recorded run establishes its stated boundary. Package verification is not
 runnable import; a successful upload is not a reconstructed place; a renderer is not a simulator.
 
-Not built: model roles other than a person, traffic, weather or an economy run by models, a model
-choice in the owned district's living society, and a retraining loop.
+Not built: roles beyond a person and a junction signal; vehicles, weather or an economy run by
+models; a model choice in the owned district's living society; and a retraining loop. No evaluation
+record measures whether a model-run signal improves traffic, and no improvement is claimed.
 
 ## First milestone
 
@@ -149,7 +153,7 @@ what accepts it and where the implementation stands.
 
 | Deliverable | Acceptance evidence | Status |
 | --- | --- | --- |
-| A world to run | A small town from the catalogs opens as a saved version in the application, with its people visible and moving under the deterministic planner. | Implemented for towns two and three tiles long. A person makes a small town or a market town from the presets of a specification and changes its values within the ranges the served schema states, its street mix and the shares of its kinds of building and shop included (World menu, Create); the server holds the values to the schema, generates the town from the city grammar, saves it as a generated world, bakes its tiles off the request, and the application draws the town once its tiles are baked, with its vehicles driving its streets ([ADR-0027](adr/0027-a-generated-world-is-drawn-in-its-own-world.md)). Its people, one per place in a home its premises offer (30 to 56 in 20 small towns and 56 to 98 in 20 market towns), walk its footways from tile to tile and visit its shops and benches under the deterministic planner, and the owner can choose a model for a group of them. The [living-world rehearsal](evaluation/2026-09-25-rehearsal-living-world.json) passed the small square's version of this deliverable in part. |
+| A world to run | A small town from the catalogs opens as a saved version in the application, with its people visible and moving under the deterministic planner. | Implemented for towns two and three tiles long. A person makes a small town or a market town from the presets of a specification and changes its values within the ranges the served schema states, its street mix and the shares of its kinds of building and shop included (World menu, Create); the server holds the values to the schema, generates the town from the city grammar, saves it as a generated world, bakes its tiles off the request, and the application draws the town once its tiles are baked, with its vehicles driving its streets ([ADR-0027](adr/0027-a-generated-world-is-drawn-in-its-own-world.md)). Its people, one per place in a home its premises offer (30 to 56 in 20 small towns and 56 to 98 in 20 market towns), walk its footways from tile to tile and live the living town's routine, at home, at their premises' shifts and on errands while its shops are open, and the owner can choose a model for a group of them. The [living-world rehearsal](evaluation/2026-09-25-rehearsal-living-world.json) passed the small square's version of this deliverable in part. |
 | A model per group | The people are split into named groups, and each group's decisions come from the open model chosen for it, through the one hosted policy boundary. The engine validates every proposed action; an invalid proposal is refused with its reason and the person keeps a valid state. | Implemented. The owner chooses a model for a person or a group, asked through the policy boundary; an answer the engine refuses is recorded with its reason, and the routine decides that turn. |
 | Recorded decisions | Every decision stores the model that served it, the observation it saw and the validated action. A run replays exactly from those records without calling a model. | Implemented. Every request and receipt is stored with the model that served it, and replay reads them without a call. |
 | Swap and compare | Two runs start from the same saved version and differ only in one group's model. The application shows them side by side, with the people and events that differ. | Implemented for one simulated hour, started from the application's Compare view within a bound its owner states, or from a local command, for a small town's group as for the small square. The Compare view shows the runs finishing, then the verdict and numbers, then one seed's hour from above on each side with what each person did minute by minute, the group first and the people whose hours differed most at the top. |
@@ -160,8 +164,10 @@ The gap between the implementation and the milestone as stated: a town's people 
 the Compare view, but in one comparison a model decides for only part of a large town (at most 24
 of a 56-person small town and 11 of an 86-person market town, fewer the more people a town holds,
 derived from how long reading a run may take;
-[what a comparison can read](society-experiments.md#running-a-comparison)), the judged comparisons
-ran over the small square, and a comparison covers one simulated hour rather than a day.
+[what a comparison can read](society-experiments.md#running-a-comparison)), and a comparison covers
+one simulated hour rather than a day. Besides the small square's, two judged comparisons ran over a
+small town of 52 people for a group of 12: the first stopped incomplete, and the second found no
+measured difference ([record](evaluation/2026-09-30-town-comparison-2.json)).
 
 Two judged comparisons found no measured difference in how people fared between Qwen3 235B
 Instruct and Nemotron 3.5 Lightning, first for all eight people of the small square and then for a
@@ -223,9 +229,9 @@ acceptance criterion, accepted only when its measured evidence exists.
 
 | Milestone | What exists | What remains | Acceptance |
 | --- | --- | --- | --- |
-| 1. People move convincingly | Routines as data (rest, visit, stand, talk), furniture people use and sit on, and a living society over the owned district. The small square passed its declared targets for walking share, stays, standing and talking ([record](evaluation/2026-09-25-living-square.json)). | A simulated day against a declared bound, and a person judging it in the application | People go to distinct places for their own reasons and do not gather on the same points: where they are and what they do over a simulated day, against a declared bound, judged by a person watching the world in the application |
-| 2. The control loop | Decision roles as registry data with one adapter module each and one decision path; providers as data in the [model manifest](../exulanica/models/models.manifest.json) (address, credential variable and catalog); a model chosen per person or group through the one policy boundary | Roles other than a person; adapters per model family beyond language models, such as vision-language models and driving or robot policies; a per-provider egress declaration and budget, where egress is derived from each provider's address and the budget is one per process | Each acting kind declares what it observes and which actions it may take, each model declares its inputs and outputs, and the engine validates every action; a second role runs through the same path |
-| 3. Movement modules | Walking and flight, each one engine module driven by catalog data ([movement modules contract](movement-modules-contract.md)); small birds fly and perch on the objects that host them | Road movement: [`exulanica/traffic`](../exulanica/traffic) is complete and has no caller; flying kinds beyond the small bird | A dragon, a plane and a bird are content that use the flight module, not code written for each; a world that needs vehicles runs roads through the module |
+| 1. People move convincingly | Routines as data (rest, visit, stand, talk), furniture people use and sit on, a living society over the owned district, and the living town in generated towns. The small square passed its declared targets for walking share, stays, standing and talking ([record](evaluation/2026-09-25-living-square.json)). | A simulated day against a declared bound, and a person judging it in the application | People go to distinct places for their own reasons and do not gather on the same points: where they are and what they do over a simulated day, against a declared bound, judged by a person watching the world in the application |
+| 2. The control loop | Decision roles as registry data with one adapter module each and one decision path; providers as data in the [model manifest](../exulanica/models/models.manifest.json) (address, credential variable and catalog); a model chosen per person or group through the one policy boundary | Roles beyond a person and a junction signal; adapters per model family beyond language models, such as vision-language models and driving or robot policies; a per-provider egress declaration and budget, where egress is derived from each provider's address and the budget is one per process | Each acting kind declares what it observes and which actions it may take, each model declares its inputs and outputs, and the engine validates every action; a second role runs through the same path |
+| 3. Movement modules | Walking, flight and roads, each one engine module driven by catalog data ([movement modules contract](movement-modules-contract.md)); small birds fly and perch on the objects that host them, and a generated town's vehicles drive its roads | Roads for worlds other than generated towns; flying kinds beyond the small bird | A dragon, a plane and a bird are content that use the flight module, not code written for each; a world that needs vehicles runs roads through the module |
 | 4. Measured results per model | The person's score, computed exactly from what the engine recorded and declared as reviewed catalog data; judged comparisons pre-registered on held-out seeds | Scores for any role other than the person | Each role's result is computed exactly from world data, with what counts as good declared per role as reviewed data; comparisons use a pre-registered held-out set, as the [model selection](#model-selection-and-compute-priorities) rules require |
 | 5. The retraining loop | No export of runs for training | Runs exported in an existing open environment format, for example Prime Intellect's verifiers, so that existing open training tools retrain a model; Exulanica does not build a trainer. Running uses a hosted API; retraining needs a model's open weights on a GPU. Reward design per role and guards against reward gaming are the hard part. | One role, one score, one retraining and a measured improvement on held-out runs |
 

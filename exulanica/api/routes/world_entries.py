@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import datetime as dt
 import uuid
-from typing import Annotated, Literal
+from typing import Annotated, Final, Literal
 
 from fastapi import APIRouter, Depends, Path, Response
 from fastapi.responses import JSONResponse
@@ -42,6 +42,8 @@ from exulanica.world.source_membership_events import (
 from exulanica.world.starter import AuthoredStarterScene
 
 router = APIRouter(prefix="/world-entries", tags=["world-entries"])
+#: What a creation this workspace cannot make is answered with, whatever its reason.
+SAVED_WORLD_CONFLICT: Final = "saved_world_conflict"
 
 
 class AuthoredModuleView(BaseModel):
@@ -400,7 +402,7 @@ def create_starter_entry(
     except (InvalidStructuralData, ValueError) as exc:
         return JSONResponse(
             status_code=409,
-            content={"code": "saved_world_conflict", "detail": str(exc)},
+            content={"code": SAVED_WORLD_CONFLICT, "detail": str(exc)},
         )
     return _view(created)
 
@@ -425,7 +427,7 @@ def create_entry(
     except (InvalidStructuralData, ValueError) as exc:
         return JSONResponse(
             status_code=409,
-            content={"code": "saved_world_conflict", "detail": str(exc)},
+            content={"code": SAVED_WORLD_CONFLICT, "detail": str(exc)},
         )
     return _view(created)
 

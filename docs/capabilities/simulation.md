@@ -7,23 +7,27 @@ contracts it links own the exact rules.
 
 ## Which worlds have people
 
-A saved world has people once a society is brought into it. Two kinds of saved world can hold one:
+A saved world has people once a society is brought into it. Each kind of saved world can hold one:
 
 | World | Ground its people walk | Where they arrive |
 | --- | --- | --- |
 | Started from the empty authored starter | The ground the starter states | The starter's spawn point |
 | Made from photographs | A floor the world declares in the region its society lives in, drawn as a floor | The region's origin |
+| Generated from a recipe | The footways and doors the town's own records state | The town's spawn point |
 
-Either way the society starts with eight people on a square about 24 metres across, routed over a
-2 metre lattice, as the ground catalog
-[`society-ground.v1.json`](../../assets/catalogs/society-ground/society-ground.v1.json) states. A
+In a starter or a world made from photographs the society starts with eight people on a square
+about 24 metres across, routed over a 2 metre lattice; a generated town holds one person for each
+place in a home its premises offer, at most 128, as the ground catalog
+[`society-ground.v2.json`](../../assets/catalogs/society-ground/society-ground.v2.json) states. A
 world made from photographs holds one society, in one region. The owned district built from New York
 open data runs a larger living society of its own and appears only in the development preview.
 
 Which engine runs a society is data. The engine table
 [`society-engines.v2.json`](../../exulanica/world/society-engines.v2.json) states what each engine
-can do, and a society in a saved world is created with the purposeful engine,
-`exulanica-society/v2`: the one whose people an owner may hand to a model and a comparison may run.
+can do. A starter or a world made from photographs is given the purposeful engine,
+`exulanica-society/v2`, and a generated town the living town, `exulanica-society/v5`; both let an
+owner hand people to a model and a comparison run them. A world's capability read names the engine
+([World API](world-api.md#discovering-what-a-world-supports)).
 The server gives every world its own seed.
 
 ## What people do
@@ -40,7 +44,7 @@ relationships.
 Small birds live in a saved world too: every planter tree hosts three, which fly and perch on the
 objects that declare perches. Their flight is computed in a worker process on a clock every viewer
 shares, so everyone watching a world sees the birds in the same places, and it is derived from the
-world version rather than stored. Walking and flight are the two built
+world version rather than stored. Walking, flight and roads are the three built
 [movement modules](../movement-modules-contract.md).
 
 ## Choosing a model for a person or a group
@@ -58,7 +62,7 @@ decision contract offers: go somewhere, wait, stand or talk. The engine checks e
 before applying it; a refused answer, like a turn the model leaves unanswered, is decided by the
 routine. Every request and receipt is stored, so a run replays exactly without calling a model.
 
-How a model decides, for the person and for any later role, is the
+How a model decides, for the person and for a town's junction signal, is the
 [decision roles contract](../decision-roles-contract.md). The person's own rules, the routes and the
 refusals are in the society contract's section
 [a person run by a model their world's owner chose](../synthetic-society-contract.md#a-person-run-by-a-model-their-worlds-owner-chose).
@@ -110,15 +114,18 @@ outcomes, a control and replay ([society experiments](../society-experiments.md)
 
 A society, its events and replay, the owner's model choices, each stored decision and each
 comparison can be read through the authenticated API; the
-[World API guide](world-api.md#people-and-models) lists the routes. No recorded run of a client
-other than the browser has read a comparison.
+[World API guide](world-api.md#people-and-models) lists the routes. The
+[developer client](developer-client.md#reading-a-comparison-of-models) has read a comparison
+started from the application, its runs and their stored decisions with `world.read` alone
+([record](../evaluation/2026-09-29-developer-client-comparison.json)).
 
 ## What is not built
 
-- Starting a comparison from the application.
-- Any model role other than a person. Traffic, animals, weather and an economy are not run by
-  models: the birds follow their flight module, and road traffic exists as a deterministic
-  simulation, `exulanica/traffic`, that nothing in the application calls.
+- Model roles beyond a person and a junction signal. Vehicles, animals, weather and an economy are
+  not run by models: the birds follow their flight module and a town's vehicles follow the roads
+  module. A signal whose owner chose a model may extend its green one second at a time, with fixed
+  timing deciding whenever the model does not; no evaluation record measures whether that helps
+  traffic, and no improvement or ranking is claimed.
 - A model choice in the owned district's living society, whose engine takes none.
 - Relationships that evolve and shape later choices, and world rules a person configures.
 - A retraining loop: runs are not exported for training.

@@ -25,7 +25,8 @@ specialist contracts own operation details.
 
 A modular monolith keeps request handling and domain validation within one application. Expensive
 perception, reconstruction and asset work use asynchronous jobs with retained outputs; a society's
-playback and a world's bird flight run in workers of their own. The
+playback, a world's bird flight and a town's traffic run in workers of their own, and a controller
+thread prepares the traffic minutes whose signals a model was chosen for. The
 [application](../exulanica/api/app.py) assembles routes and lifecycle hooks;
 [Services](../exulanica/api/services.py) supplies database, store, model and worker configuration.
 This separation supports independent execution of workers without requiring a service per feature.
@@ -46,6 +47,8 @@ flowchart LR
     Host --> Models[Model client and policy boundary]
     Domain --> Models
     API --> Flight[Flight worker]
+    API --> Traffic[Traffic worker and signal controller]
+    Traffic --> Host
 ```
 
 The Companion is an AI partner exposed through world interaction tools. Its model outputs are
@@ -106,19 +109,20 @@ The contract in `pyproject.toml` owns the exact order.
 | Responsibility | Entry points |
 | --- | --- |
 | Society engines, chosen by what each can do | `exulanica/world/society_engines.py`, reading the engine table [`society-engines.v2.json`](../exulanica/world/society-engines.v2.json); the purposeful planner `exulanica/world/society_planner.py` |
-| The ground a society stands on | [`society-ground.v1.json`](../assets/catalogs/society-ground/society-ground.v1.json), read by `exulanica/world/society_grounds.py` |
+| The ground a society stands on | [`society-ground.v2.json`](../assets/catalogs/society-ground/society-ground.v2.json), read by `exulanica/world/society_grounds.py` |
 | Composing and serving a society | `exulanica/api/society_runtime.py` and the routes in `exulanica/api/routes/society.py` |
 | Playback | `exulanica/api/society_control_worker.py` |
-| Decision roles | The registry [`decision-roles.v1.json`](../assets/catalogs/roles/decision-roles.v1.json), `exulanica/world/decision_roles.py`, one adapter per role in `exulanica/world/roles/`, the one path in `exulanica/world/role_decisions.py`, and the decision tables of migration `0117_a_decision_role_s_documents_are_admitted_by_their_shape.sql` |
-| Asking the chosen models | `exulanica/api/decision_host.py` and `exulanica/api/society_person_decisions.py` |
-| Comparisons of models | The loop `exulanica/world/society_comparison.py`, the runner `exulanica/api/society_comparison_runner.py`, the one definition path `exulanica/api/society_comparison_start.py`, the start's claim and lease `exulanica/world/society_comparison_start_repository.py` played by `exulanica/api/society_comparison_worker.py`, the command `exulanica/orchestration/compare.py` and the Compare view `web/packages/app/src/ui/society-comparison.ts` with its start controls `society-comparison-start.ts` |
+| Decision roles | The registry [`decision-roles.v2.json`](../assets/catalogs/roles/decision-roles.v2.json), `exulanica/world/decision_roles.py`, one adapter per role in `exulanica/world/roles/`, the one path in `exulanica/world/role_decisions.py`, the decision tables of migrations `0117_a_decision_role_s_documents_are_admitted_by_their_shape.sql` and `0122_a_model_may_decide_a_town_s_signal.sql`, and each role's host in `exulanica/api/role_hosts.py`, served by `exulanica/api/routes/world_models.py` |
+| Asking the chosen models | `exulanica/api/decision_host.py` and `exulanica/api/society_person_decisions.py` for people; `exulanica/api/traffic_signal_controller.py` for signals |
+| Comparisons of models | The loop `exulanica/world/society_comparison.py`, the runner `exulanica/api/society_comparison_runner.py`, the one definition path `exulanica/api/society_comparison_start.py`, each verified run's stored drawing `exulanica/world/society_comparison_drawing.py` (migration 0121), the start's claim and lease `exulanica/world/society_comparison_start_repository.py` played by `exulanica/api/society_comparison_worker.py`, the command `exulanica/orchestration/compare.py` and the Compare view `web/packages/app/src/ui/society-comparison.ts` with its start controls `society-comparison-start.ts` |
 | Movement | The registry `exulanica/movement/registry.py`, reading [`movement-modules.v1.json`](../exulanica/movement/movement-modules.v1.json), with `walking.py` and `flight.py` beside it |
 | Flight serving | `exulanica/world/flight_worker.py`, binding the episode worker `exulanica/world/episode_worker.py`: one worker process computes flight episodes on a clock every viewer shares |
-| Road traffic | `exulanica/traffic`, a pure deterministic simulation; `exulanica/world/traffic_host.py` serves a baked city's traffic (`GET /tiles/traffic`) for the development preview to draw |
+| Road traffic | `exulanica/traffic`, a pure deterministic simulation; `exulanica/world/traffic_host.py` serves a saved town's own roads (`saved_world_roads`, `GET /world/versions/{version_id}/traffic`) and a baked city's traffic (`GET /tiles/traffic`) for the development preview, with signal minutes sealed by `exulanica/api/traffic_signal_controller.py` |
 
 A society's engine is chosen by what the engine table says it can do, never by a list in code.
 A decision role is registry data plus one adapter module, so requests, receipts, their checks, the
-host's asking and replay are one path for every role; the person is the only registered role. A
+host's asking and replay are one path for every role; two roles are registered, a person and a
+junction signal. A
 chosen model proposes, the engine validates, and replay reads stored receipts without a call. The
 [society contract](synthetic-society-contract.md), the [decision roles contract](decision-roles-contract.md),
 the [movement modules contract](movement-modules-contract.md) and
