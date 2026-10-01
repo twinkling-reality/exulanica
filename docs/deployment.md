@@ -766,14 +766,16 @@ stream. A stream also ends at 30 minutes. Either end comes without a terminal ev
 `retry: 5000` (the delay a browser `EventSource` reconnects after), and means "reconnect with the last
 event id". A heartbeat comment every 7 polls keeps a proxy from closing a quiet stream.
 
-A stream resumes from `Last-Event-ID` (which wins) or `since`. Resuming from the batch's terminal id
-answers 200 with no events, so a client that already has the outcome is not sent it twice, and a
-token the stream did not issue answers 422 `invalid_resume_token` before a stream opens. Event ids
-are uuidv7 values PostgreSQL assigns at insert, and a resume reads events after the token. One batch
-has one writer at a time except while a derivative job's lease is reclaimed from a claimant that was
-silent but alive: events that claimant commits after its lease was taken, at most one capture's, can
-be missed by a live stream. Counters and the outcome stay correct, because each is folded from the
-whole ledger.
+A stream resumes from `Last-Event-ID` (which wins) or `since`. `received` and any well-formed event
+id are positions, including an id the stream never sent: event ids are uuidv7 values PostgreSQL
+assigns at insert, and a resume reads the events after the token. Resuming from the batch's terminal
+id answers 200 with no events once the batch has ended with that status, so a client that already
+has the outcome is not sent it twice. A malformed token, another batch's terminal id and a terminal
+id the batch has not ended with each answer 422 `invalid_resume_token` before a stream opens. One
+batch has one writer at a time except while a derivative job's lease is reclaimed from a claimant
+that was silent but alive: events that claimant commits after its lease was taken, at most one
+capture's, can be missed by a live stream. Counters and the outcome stay correct, because each is
+folded from the whole ledger.
 
 #### 5.4.6 The derivative queue
 

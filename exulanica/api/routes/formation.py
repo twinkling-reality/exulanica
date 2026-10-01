@@ -252,8 +252,9 @@ def _invalid_token() -> JSONResponse:
         content={
             "code": "invalid_resume_token",
             "detail": (
-                "the resume token is not an event id this stream sent; resume from an event id it "
-                "sent, or subscribe without one to receive the batch from the beginning"
+                "the resume token is malformed, or names another batch's end or an end this batch "
+                "has not reached; resume from an event id, or subscribe without one to receive the "
+                "batch from the beginning"
             ),
         },
     )

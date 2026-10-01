@@ -338,7 +338,7 @@ def resumes(row: Row, api: Api, first: dict[str, Any]) -> None:
         f"a malformed token answered {shaped.status}",
     )
     # An event id the stream never sent is a position, not a refusal (R1's
-    # test_a_token_the_stream_did_not_issue_is_refused_before_a_stream_opens): whatever follows.
+    # test_a_token_that_cannot_be_a_position_is_refused_before_a_stream_opens): whatever follows.
     row.expect(
         unissued.status == 200
         and set(unissued.ids) <= set(ids)

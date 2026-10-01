@@ -144,7 +144,7 @@ export class HttpFormationEventSource implements FormationEventSource {
       }
       const final = response.status >= 400 && response.status < 500;
       if (final && !RETRIABLE_REFUSALS.has(response.status)) {
-        // Unknown batch, a token the server did not issue, a credential it will not accept:
+        // Unknown batch, a token that cannot be a position, a credential it will not accept:
         // sending the same request again gets the same answer, so the subscription stops here.
         onStreamState('lost');
         return;

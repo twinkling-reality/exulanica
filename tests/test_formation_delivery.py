@@ -162,7 +162,7 @@ def test_resuming_from_the_terminal_event_sends_nothing(served):
         "batch:{batch}:running",
     ],
 )
-def test_a_token_the_stream_did_not_issue_is_refused_before_a_stream_opens(served, token):
+def test_a_token_that_cannot_be_a_position_is_refused_before_a_stream_opens(served, token):
     app = served.app()
     batch = served.upload(app)["batch_id"]
     served.drain()
