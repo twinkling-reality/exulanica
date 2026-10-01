@@ -60,6 +60,10 @@ SPENT = {
     "requested": "1",
     "retry": "never",
 }
+#: The calls a grant holds where a start must start: more than either comparison here can make at
+#: most (two seeds of the town's signals can make 2080), which the start's durable bound of the
+#: provider is opened with, so a grant must hold them.
+ROOMY_CALLS = 10_000
 
 
 @dataclasses.dataclass
@@ -115,7 +119,7 @@ def _durable(app: FastAPI, spine_schema, tmp_path, workspace: uuid.UUID) -> Allo
     authority = operator.issue(
         provider=PROVIDER,
         ceiling_usd=Decimal("1"),
-        max_calls=1000,
+        max_calls=100_000,
         valid_until=dt.datetime.now(dt.UTC) + dt.timedelta(days=30),
         operator="test-operator",
         reason="a test authority",
@@ -220,7 +224,7 @@ def test_a_start_of_people_with_allowance_left_is_available_and_starts(
     world = started["world"]
     stays._inhabited(world, started["client"])
     allowance = _durable(started["client"].app, spine_schema, tmp_path, world["workspace"])
-    allowance.grant(calls=1000)
+    allowance.grant(calls=ROOMY_CALLS)
     document = _people_capabilities(started)
     start = _operation(document, START_PEOPLE)
     assert (start["state"], start["code"]) == ("available", None)
@@ -286,7 +290,7 @@ def test_a_start_of_signals_with_allowance_left_is_available_and_starts(
 ):
     workspace = town["repository"].workspace_id
     allowance = _durable(town["api"].client.app, spine_schema, tmp_path, workspace)
-    allowance.grant(calls=1000)
+    allowance.grant(calls=ROOMY_CALLS)
     document = _signal_capabilities(town)
     start = _operation(document, START_SIGNALS)
     assert (start["state"], start["code"]) == ("available", None)

@@ -53,6 +53,7 @@ from typing import Any, Final
 
 import psycopg
 
+from exulanica.api.comparison_spending import BoundGate, ComparisonBounds
 from exulanica.api.decision_host import RoleAsk, ask, ask_bound_usd, sendable_labels, share_kept
 from exulanica.api.society_runtime import SocietyRuntime
 from exulanica.db.session import Database
@@ -61,6 +62,7 @@ from exulanica.models.client import ModelClient
 from exulanica.models.errors import ManifestError
 from exulanica.models.manifest import AnsweringMechanism, Manifest, ModelSpec
 from exulanica.models.policy import HostedRequestPolicy
+from exulanica.models.spending import SPENDING_REFUSALS, SpendingRefused
 from exulanica.models.usage import usd_string
 from exulanica.selection.validation import Session
 from exulanica.world.decision_roles import DecisionRole, RoleOption, decision_roles
@@ -111,6 +113,7 @@ __all__ = [
     "RunHost",
     "SocietyComparisonRunner",
     "call_facts",
+    "stopped_by_bound",
 ]
 
 _LOG = logging.getLogger(__name__)
@@ -293,6 +296,7 @@ class _Asking:
         run_bound: BoundedBudget | None = None,
         keeps_share: bool = False,
         cancelled: Callable[[], bool] = lambda: False,
+        gate: BoundGate | None = None,
     ) -> None:
         self.client = client
         self.manifest = manifest
@@ -313,6 +317,8 @@ class _Asking:
         self.keep = share_kept(client.budget, contract) if keeps_share else (Decimal(0), 0)
         #: Whether the comparison was cancelled, asked before every minute's asks are sent.
         self.cancelled = cancelled
+        #: This run's gate under the start's durable bounds, where the authority holds them.
+        self.gate = gate
 
     def offerable(
         self, tick: int, due: Mapping[str, Sequence[RoleOption]]
@@ -370,6 +376,11 @@ class _Asking:
         refused an ask, and the bound is a part of the process's budget."""
         return self.run_bound is not None and self.run_bound.refusals > 0
 
+    def durable_bound_refused(self) -> SpendingRefused | None:
+        """The authority's refusal of one of this run's asks by the start's durable bound itself,
+        or None: a receipt names the authority's reason, not which of its levels refused."""
+        return None if self.gate is None else self.gate.bound_refusal
+
     def answers(self, requests: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
         ends_at = time.monotonic() + self.contract.value("decision_deadline_ms") / 1000
         workers = max(1, min(self.contract.value("concurrent_calls_maximum"), len(requests)))
@@ -423,6 +434,21 @@ class _Anchor:
     def bound_refused(self) -> bool:
         return False
 
+    def durable_bound_refused(self) -> SpendingRefused | None:
+        return None
+
+
+def stopped_by_bound(reason: str, cancelled: Callable[[], bool] | None) -> str:
+    """Why a run stopped whose ask the authority refused by the start's durable bound (``reason``,
+    the authority's own): its owner cancelled the comparison, whose cancel closed the bound; or
+    what every host that played it committed reached the bound; else the authority's reason, a
+    bound a restore closed or one no longer under the workspace's live grant among them."""
+    if cancelled is not None and cancelled():
+        return CANCELLED
+    if reason == "spending_limit_reached":
+        return BOUND_SPENT
+    return reason
+
 
 @dataclass(frozen=True)
 class SocietyComparisonRunner:
@@ -451,6 +477,9 @@ class SocietyComparisonRunner:
     #: Whether its asks leave the contract's share of the process's budget for other work, as a
     #: host serving the application does; the local command's process does no other work.
     keeps_share: bool = False
+    #: The start's durable bounds, one for each provider it asks, where a durable spending
+    #: authority admits the host's calls: every ask of a run is admitted under its provider's.
+    spending_bounds: ComparisonBounds | None = None
 
     def _repository(self, connection: Any) -> SocietyComparisonRepository:
         session = Session(workspace_id=self.workspace_id, actor=self.actor)
@@ -847,6 +876,12 @@ class SocietyComparisonRunner:
                 # another run sharing the bound, held what was left. The receipt names a budget
                 # that refused, and the run the bound it was started under.
                 stopped = BOUND_SPENT
+            elif (
+                stopped in SPENDING_REFUSALS
+                and asking is not None
+                and asking.durable_bound_refused() is not None
+            ):
+                stopped = stopped_by_bound(stopped, None if host is None else host.cancelled)
             if stopped is not None:
                 raise _RunStopped(stopped)
             if host is not None:
@@ -1044,6 +1079,11 @@ class SocietyComparisonRunner:
             return str(config["model_id"])
 
         client = self.client.with_policy(self.policy_for(self.workspace_id))
+        # Each ask is admitted under its provider's durable bound, where the authority holds the
+        # start's bounds, by a gate of this run's own.
+        gate = None if self.spending_bounds is None else self.spending_bounds.gate()
+        if gate is not None:
+            client = client.with_spending(gate)
         run_bound = (
             None
             if self.bound is None
@@ -1062,6 +1102,7 @@ class SocietyComparisonRunner:
             run_bound=run_bound,
             keeps_share=self.keeps_share,
             cancelled=cancelled if cancelled is not None else (lambda: False),
+            gate=gate,
         )
 
     @staticmethod

@@ -74,12 +74,14 @@ __all__ = [
     "TypicalFigures",
     "answers_per_minute",
     "asked_providers",
+    "bound_range_refusal",
     "comparison_body",
     "comparison_cost",
     "definition_body",
     "development_seeds",
     "development_seeds_in",
     "figures_for",
+    "spending_plan_refusal",
     "stopped_host_usd",
     "typical_figures",
     "typical_latency_ms",
@@ -161,10 +163,13 @@ START_REFUSALS: Final = {
     # The input it freezes: a sequence the society holds no input at.
     "input_not_in_society": 422,
     # The bound: above the most the comparison can cost, or more than this server's model budget
-    # has left beside the part its decision contract keeps for other work.
+    # has left beside the part its decision contract keeps for other work, or, where a durable
+    # spending authority admits this server's calls, more than the live grant of a provider it
+    # asks has left (exulanica/api/comparison_spending.py).
     "bound_out_of_range": 422,
     "bound_over_budget": 409,
     "calls_over_budget": 409,
+    "bound_exceeds_grant": 409,
 }
 
 
@@ -540,16 +545,29 @@ def spending_plan_refusal(refused: SpendingRefused) -> dict[str, Any]:
 
 
 def asked_providers(body: Mapping[str, Any]) -> tuple[str, ...]:
-    """Every provider a comparison ``body`` asks, each once and sorted: each model arm's, and in
-    every arm the provider of the model an owner chose for somebody outside the group."""
+    """Every provider a comparison ``body`` asks, each once and sorted: each model arm's, and, in a
+    comparison of people, in every arm the provider of the model an owner chose for somebody
+    outside the group. A comparison of a town's signals names nobody outside its arms."""
     return tuple(
         sorted(
             {
                 str(held["provider_config"]["provider"])
-                for held in [*body["arms"].values(), *body["others"]]
+                for held in [*body["arms"].values(), *body.get("others", ())]
                 if held.get("provider_config") is not None
             }
         )
+    )
+
+
+def bound_range_refusal(bound: Decimal, most_usd: Decimal) -> tuple[str, str] | None:
+    """``bound_out_of_range`` and why, for a bound that is not above $0 and at most ``most_usd``,
+    the most the comparison can cost; None for one that is. A start and a plan naming a bound
+    are judged alike, for a comparison of people or of a town's signals."""
+    if Decimal(0) < bound <= most_usd:
+        return None
+    return (
+        "bound_out_of_range",
+        f"a bound above $0 and at most ${most_usd}, the most it can cost",
     )
 
 

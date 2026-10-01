@@ -289,6 +289,24 @@ is refused before anything is defined, as admission would refuse that model's fi
 refusal for a selection whose start would meet it, as its `plan_refusal` with that `spending`
 member, by the same predicate.
 
+**Durable bounds.** Where that authority admits this server's calls, a comparison also spends under
+a bound of its own at the authority, one for each provider it asks, under the workspace's grant of
+that provider, with the bound its owner stated and the most calls it can make
+([model spending](model-spending-contract.md#2-authorities-grants-and-bounds)). A start whose bound, or whose calls,
+is more than such a grant has left is refused `bound_exceeds_grant` (409) before anything is
+written; the bound is never made smaller to fit. A plan naming the bound it would start with
+(`bound_usd`) states the same refusal, and one naming none judges the calls alone. The host that
+plays the start opens the bounds before its first ask, or finds the ones a host before it opened,
+and admits every ask under its provider's bound, so what every host that played the comparison
+committed never passes its bound, a takeover's presumption that fell short included. A run the
+authority refuses by its bound fails as `comparison_bound_spent` where the bound is committed, as
+`comparison_cancelled` where its owner cancelled the comparison, and otherwise by the authority's
+reason; a provider whose bound the authority would not open, its grant revoked or replaced, fails
+its model's asks by the authority's reason, before anything is sent. The bounds are closed when the
+start is finished, whatever finished it, and by the cancel, so an ask a host sends after the cancel
+is refused at the authority. In a process no durable authority admits, the bound is held in the
+host's process alone.
+
 **What it can cost.** The most is derived: a run asks each subject a model decides for at most once
 a minute, so its asks are at most the protocol's window times those subjects (the arm's group under
 a model arm and, in every arm, anybody outside the group whose owner chose a model), and each ask

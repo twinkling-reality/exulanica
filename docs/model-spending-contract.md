@@ -40,9 +40,14 @@ admission:
 - **Workspace grant.** An operator grants one workspace an allowance under an authority
   (`spending_grant` with no parent). A workspace holds at most one live grant per provider.
 - **Bound.** A piece of work (a comparison, a run) opens a bound under the workspace's grant,
-  idempotently by its key, and may close it; it cannot open a grant. No production path opens one
-  yet: a comparison holds its bound in its own process (`BoundedBudget`), and the durable bound is
-  the mechanism its planned use takes ([section 12](#12-what-this-does-not-provide)).
+  idempotently by its key, and may close it; it cannot open a grant. A comparison started from the
+  application opens one for each provider it asks, keyed `comparison:<comparison id>:<provider>`,
+  with the bound its owner stated and the most calls it can make, valid while the grant is, and
+  admits every ask under its provider's bound; it closes them when it is finished and when it is
+  cancelled (`exulanica/api/comparison_spending.py`,
+  [comparisons](society-experiments.md#running-a-comparison)). A start whose bound or calls the
+  grant has not left room for is refused before anything is written; it is never given a smaller
+  bound. Comparisons are the only work that opens one.
 
 Nothing is granted because a workspace exists: a workspace with no live grant refuses every attempt
 as `spending_not_granted`, and no import, seed or restore creates a grant (spending tables never
@@ -358,8 +363,8 @@ taken effect, so asking again would repeat the step.
   worker or comparison path passes `spending_request_key`, so a request replayed after a crash is
   admitted as new attempts, within the allowance, and may be sent and billed again (section 4). The
   decision host, by its decision request, and derivative jobs, by job and stage, are its planned
-  first users. Durable bounds likewise have no production caller yet; comparisons are their
-  planned first user.
+  first users. Comparisons, which open durable bounds (section 2), pass no request key either: a
+  takeover's replayed ask is admitted as a new attempt, within the comparison's bound.
 - OPEN. An attempt admitted and never dispatched holds its reservation against the authority until
   an admission of its workspace takes the authority's row or an operator runs `expire`. An admission
   refused before the row (no live grant, an authority that changed or is suspended, a witness that

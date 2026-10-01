@@ -42,6 +42,17 @@ closes that seed's and every later seed's model runs as ``comparison_bound_befor
 nothing, and closes the start by that name, keeping every seed already played. A seed with no
 measured figure is admitted, and its asks stay held to the bound one by one. The bound itself is
 unchanged: no ask is ever admitted past it.
+
+Where a durable spending authority admits this host's calls, the bound is held at the authority as
+well (:mod:`exulanica.api.comparison_spending`): before a claim's first ask it opens a bound for
+each provider the comparison asks, under the workspace's grant, with the bound and the calls the
+start recorded, or finds the one a host before it opened, and every ask of its runs is admitted
+under its provider's bound. What every host that played the start committed never passes it, a
+presumption that fell short included. A run the authority refuses by that bound fails as
+``comparison_bound_spent`` where the bound is committed, as ``comparison_cancelled`` where its
+owner cancelled the comparison (the cancel closes the bounds), and by the authority's own reason
+otherwise; a provider whose bound the authority refused to open fails its asks by that refusal,
+before anything is sent. Every bound is closed once the start is finished, whatever finished it.
 """
 
 from __future__ import annotations
@@ -56,6 +67,11 @@ from typing import Any, Final
 
 import psycopg
 
+from exulanica.api.comparison_spending import (
+    ComparisonBounds,
+    close_comparison_bounds,
+    open_comparison_bounds,
+)
 from exulanica.api.decision_host import share_kept
 from exulanica.api.signal_comparison_runner import SignalComparisonRunner
 from exulanica.api.signal_comparison_start import (
@@ -71,11 +87,16 @@ from exulanica.api.society_comparison_runner import (
     RunHost,
     SocietyComparisonRunner,
 )
-from exulanica.api.society_comparison_start import comparison_cost, stopped_host_usd
+from exulanica.api.society_comparison_start import (
+    asked_providers,
+    comparison_cost,
+    stopped_host_usd,
+)
 from exulanica.db.session import Database
 from exulanica.models.budget import BoundedBudget, BudgetGuard
 from exulanica.models.client import ModelClient
 from exulanica.models.manifest import Manifest
+from exulanica.spending import DurableSpending
 from exulanica.world.comparison_facts import ComparisonFacts
 from exulanica.world.society_comparison_result import definition_role
 from exulanica.world.society_comparison_start_repository import (
@@ -101,6 +122,8 @@ CLOSED_REASONS: Final = (
 #: Why a start was closed when whoever may start one cancelled it, the code its open runs fail by
 #: too, whether or not they asked.
 CANCELLED_REASON: Final = CANCELLED
+#: Why a start's durable bounds are closed when every run was played, as the authority records it.
+_FINISHED: Final = "comparison_finished"
 #: How a run a closed start left open fails: one that asked something was stopped part way;
 #: one that asked nothing was never played.
 _STOPPED_PART_WAY = "interrupted"
@@ -243,7 +266,12 @@ class SocietyComparisonWorker:
                 self._close(runner, claim, open_runs, "process_budget_spent", change)
                 return
             bound = BoundedBudget(budget, ceiling_usd=ceiling, max_calls=max(1, cost.calls))
-        played = dataclasses.replace(runner, bound=bound, keeps_share=self.keeps_share)
+        played = dataclasses.replace(
+            runner,
+            bound=bound,
+            keeps_share=self.keeps_share,
+            spending_bounds=self._bounds(claim, asked_providers(definition)),
+        )
 
         def minute() -> None:
             if not change("renew"):
@@ -327,7 +355,9 @@ class SocietyComparisonWorker:
                 for run in repository.runs(claim.comparison_id)
             )
         if not left:
-            change("finish", closed_reason=BOUND_BEFORE_SEED if stopped else None)
+            closed_reason = BOUND_BEFORE_SEED if stopped else None
+            if change("finish", closed_reason=closed_reason):
+                self._close_bounds(claim, closed_reason)
             # Once the start is finished, with no lease held, each completed run not drawn yet
             # is drawn for its reads, whichever claim played it (the runner's ``draw_all``).
             runner.draw_all(claim.comparison_id, stopping=stop.is_set)
@@ -405,7 +435,12 @@ class SocietyComparisonWorker:
                 self._close(runner, claim, open_runs, "process_budget_spent", change)
                 return
             bound = BoundedBudget(budget, ceiling_usd=ceiling, max_calls=max(1, cost.calls))
-        played = dataclasses.replace(runner, bound=bound, keeps_share=self.keeps_share)
+        played = dataclasses.replace(
+            runner,
+            bound=bound,
+            keeps_share=self.keeps_share,
+            spending_bounds=self._bounds(claim, asked_providers(definition)),
+        )
 
         def minute() -> None:
             if not change("renew"):
@@ -435,8 +470,8 @@ class SocietyComparisonWorker:
         if self._cancelled(claim):
             self._close(runner, claim, left, CANCELLED_REASON, change)
             return
-        if not left:
-            change("finish", closed_reason=None)
+        if not left and change("finish", closed_reason=None):
+            self._close_bounds(claim, None)
 
     def _close(
         self,
@@ -459,4 +494,45 @@ class SocietyComparisonWorker:
                 for run in open_runs
             }
         runner.fail_open(claim.comparison_id, codes)
-        change("finish", closed_reason=reason)
+        if change("finish", closed_reason=reason):
+            self._close_bounds(claim, reason)
+
+    def _spending(self) -> DurableSpending | None:
+        """The durable spending authority this host's asks are admitted by, or None where none
+        is: its comparisons' bounds are then held in its process alone."""
+        source = None if self.client is None else self.client.spending_source
+        return source if isinstance(source, DurableSpending) else None
+
+    def _bounds(self, claim: ComparisonClaim, providers: Sequence[str]) -> ComparisonBounds | None:
+        """The start's durable bounds the claim plays under, one for each of ``providers``,
+        opened or found before its first ask with the bound and calls the start recorded, where
+        a durable authority admits this host's calls."""
+        spending = self._spending()
+        if spending is None:
+            return None
+        with self.database.session(claim.workspace_id) as connection:
+            return open_comparison_bounds(
+                spending,
+                connection,
+                claim.workspace_id,
+                claim.comparison_id,
+                providers,
+                usd=claim.bound_usd,
+                calls=claim.bound_calls,
+            )
+
+    def _close_bounds(self, claim: ComparisonClaim, closed_reason: str | None) -> None:
+        """Close the finished start's durable bounds, so the authority admits nothing more under
+        them, on any host; the authority records why, by the start's closing reason where it was
+        closed before every run was played."""
+        spending = self._spending()
+        if spending is None:
+            return
+        with self.database.session(claim.workspace_id) as connection:
+            close_comparison_bounds(
+                spending,
+                connection,
+                claim.workspace_id,
+                claim.comparison_id,
+                reason=closed_reason or _FINISHED,
+            )

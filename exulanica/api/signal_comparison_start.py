@@ -64,10 +64,11 @@ START_REFUSALS: Final = {
     "model_named_twice": 422,
     "model_not_askable_here": 409,
     "seeds_out_of_range": 422,
-    # The bound.
+    # The bound, as a comparison of people's is refused.
     "bound_out_of_range": 422,
     "bound_over_budget": 409,
     "calls_over_budget": 409,
+    "bound_exceeds_grant": 409,
 }
 
 

@@ -53,6 +53,8 @@ export const START_REFUSAL_WORDS: Readonly<Record<string, string>> = {
   calls_over_budget: 'This server\'s model budget allows fewer calls than this comparison can make. Choose fewer people, models or seeds.',
   // Placeholder words: the page's own wording for this code is not written yet.
   input_not_in_society: 'This world\'s people hold no input with that number.',
+  // Placeholder words: the page's own wording for this code is not written yet.
+  bound_exceeds_grant: 'The bound you set is more than this workspace\'s spending grant has left. Set a smaller bound.',
 };
 
 /**

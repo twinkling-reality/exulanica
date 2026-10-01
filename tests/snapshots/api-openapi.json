@@ -2782,7 +2782,7 @@
      "society"
     ],
     "summary": "Plan Society Comparison",
-    "description": "What a start would do, writing nothing: the roles, groups, models and development seeds\nthis server offers a comparison of the version's society, and, for the selection the query\nnames (``model`` as ``<provider>/<model id>``, once or twice; ``person`` for a named group;\n``input_seq`` for an earlier stored input to freeze), the runs it plans, the input it\nfreezes, the most it can cost and what one like it typically cost, or the refusal a start of\nit would meet, by the same predicate a start's allowance check reads\n(``Services.allowance_refusal``).",
+    "description": "What a start would do, writing nothing: the roles, groups, models and development seeds\nthis server offers a comparison of the version's society, and, for the selection the query\nnames (``model`` as ``<provider>/<model id>``, once or twice; ``person`` for a named group;\n``input_seq`` for an earlier stored input to freeze; ``bound_usd`` for the bound a start\nwould state), the runs it plans, the input it freezes, the most it can cost and what one like\nit typically cost, or the refusal a start of it would meet, by the same predicates a start's\nallowance and grant checks read (``Services.allowance_refusal``,\n``Services.bound_room_refusal``). Without a bound, the grant is judged on the calls the\nselection can make alone.",
     "operationId": "plan_society_comparison_world_versions__version_id__society_comparisons_plan_get",
     "parameters": [
      {
@@ -2928,6 +2928,23 @@
         }
        ],
        "title": "Input Seq"
+      }
+     },
+     {
+      "name": "bound_usd",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "pattern": "^[0-9]{1,6}(\\.[0-9]{1,8})?$"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Bound Usd"
       }
      },
      {
@@ -3147,7 +3164,7 @@
      "society"
     ],
     "summary": "Cancel Society Comparison",
-    "description": "Cancel a comparison started from the application, once. A start no host holds closes now:\nevery run left open fails as ``comparison_cancelled``, asking nothing, and what a host whose\nlease ran out may have spent is presumed as a takeover presumes it. A start a host is playing\nis closed by that host before its next dispatch. A repeated cancel changes nothing, and a\nfinished start keeps its own closing. Answers the comparison as the listing states it.",
+    "description": "Cancel a comparison started from the application, once. A start no host holds closes now:\nevery run left open fails as ``comparison_cancelled``, asking nothing, and what a host whose\nlease ran out may have spent is presumed as a takeover presumes it. A start a host is playing\nis closed by that host before its next dispatch. Its durable bounds, where it spends under\nthem, are closed once the cancellation is recorded, so the authority refuses an ask a host\nsends after it. A repeated cancel changes nothing, and a finished start keeps its own\nclosing. Answers the comparison as the listing states it.",
     "operationId": "cancel_society_comparison_world_versions__version_id__society_comparisons__comparison_id__cancel_post",
     "parameters": [
      {
@@ -13610,7 +13627,7 @@
      "world"
     ],
     "summary": "Plan Signal Comparison",
-    "description": "What a start would do, writing nothing and playing no episode: the town's signals, the\nmodels offered for a signal's decisions, the development seeds this server holds and, for the\nselection the query names (``model`` as ``<provider>/<model id>``, once or twice; ``signal``\nfor a named group, every signal where none is named), the runs it plans and the most it can\ncost, or the refusal a start of it would meet, by the same predicate a start's allowance check\nreads (``Services.allowance_refusal``).",
+    "description": "What a start would do, writing nothing and playing no episode: the town's signals, the\nmodels offered for a signal's decisions, the development seeds this server holds and, for the\nselection the query names (``model`` as ``<provider>/<model id>``, once or twice; ``signal``\nfor a named group, every signal where none is named; ``bound_usd`` for the bound a start\nwould state), the runs it plans and the most it can cost, or the refusal a start of it would\nmeet, by the same predicates a start's allowance and grant checks read\n(``Services.allowance_refusal``, ``Services.bound_room_refusal``). Without a bound, the grant\nis judged on the calls the selection can make alone.",
     "operationId": "plan_signal_comparison_world_versions__version_id__traffic_comparisons_plan_get",
     "parameters": [
      {
@@ -13682,6 +13699,23 @@
        "maxItems": 64,
        "default": [],
        "title": "Signal"
+      }
+     },
+     {
+      "name": "bound_usd",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "pattern": "^[0-9]{1,6}(\\.[0-9]{1,8})?$"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Bound Usd"
       }
      },
      {
@@ -13993,7 +14027,7 @@
      "world"
     ],
     "summary": "Cancel Signal Comparison",
-    "description": "Cancel a signal comparison started from the application, once, as a comparison of people\nis cancelled: a start no host holds closes now, its open runs failed as\n``comparison_cancelled`` asking nothing, with what a host whose lease ran out may have spent\npresumed; a host playing it stops before its next ask. A repeated cancel changes nothing, and\na finished start keeps its own closing. Answers the comparison as the listing states it.",
+    "description": "Cancel a signal comparison started from the application, once, as a comparison of people\nis cancelled: a start no host holds closes now, its open runs failed as\n``comparison_cancelled`` asking nothing, with what a host whose lease ran out may have spent\npresumed; a host playing it stops before its next ask. Its durable bounds, where it spends\nunder them, are closed once the cancellation is recorded. A repeated cancel changes nothing,\nand a finished start keeps its own closing. Answers the comparison as the listing states it.",
     "operationId": "cancel_signal_comparison_world_versions__version_id__traffic_comparisons__comparison_id__cancel_post",
     "parameters": [
      {

@@ -32,7 +32,7 @@ from exulanica.models.client import ModelClient
 import test_signal_comparison_postgres as signals
 import test_society_comparison_start_postgres as people
 import test_society_stay_requests_api as stays
-from test_comparison_start_allowance_postgres import SPENT, _durable
+from test_comparison_start_allowance_postgres import ROOMY_CALLS, SPENT, _durable
 from test_signal_comparison_postgres import _presets_try_every_candidate, town
 from test_society_comparison_start_postgres import saved_world, started
 
@@ -105,7 +105,7 @@ def test_a_plan_of_people_with_allowance_left_plans_and_its_start_starts(
     world = started["world"]
     stays._inhabited(world, started["client"])
     allowance = _durable(started["client"].app, spine_schema, tmp_path, world["workspace"])
-    allowance.grant(calls=1000)
+    allowance.grant(calls=ROOMY_CALLS)
     plan = _plan_people(started)
     assert plan.status_code == 200, plan.text
     assert plan.json()["plan_refusal"] is None
@@ -131,7 +131,7 @@ def test_a_plan_of_signals_with_allowance_left_plans_and_its_start_starts(
 ):
     workspace = town["repository"].workspace_id
     allowance = _durable(town["api"].client.app, spine_schema, tmp_path, workspace)
-    allowance.grant(calls=1000)
+    allowance.grant(calls=ROOMY_CALLS)
     plan = _plan_signals(town)
     assert plan.status_code == 200, plan.text
     assert plan.json()["plan_refusal"] is None
@@ -197,7 +197,7 @@ def test_an_outside_persons_provider_without_allowance_refuses_plan_and_start(
         ),
     )
     allowance = _durable(app, spine_schema, tmp_path, world["workspace"])
-    allowance.grant(calls=1000)
+    allowance.grant(calls=ROOMY_CALLS)
     group = sorted(person["id"] for person in snapshot["state"]["inhabitants"])
     first = {"provider": people.MODEL.provider, "model_id": people.MODEL.model_id}
     _choose(started, group[:2], first)
@@ -217,7 +217,7 @@ def test_an_outside_persons_provider_without_allowance_refuses_plan_and_start(
     second = allowance.operator.issue(
         provider=SECOND_PROVIDER,
         ceiling_usd=Decimal("1"),
-        max_calls=1000,
+        max_calls=100_000,
         valid_until=dt.datetime.now(dt.UTC) + dt.timedelta(days=30),
         operator="test-operator",
         reason="a test authority",
@@ -226,7 +226,7 @@ def test_an_outside_persons_provider_without_allowance_refuses_plan_and_start(
         second,
         world["workspace"],
         ceiling_usd=Decimal("1"),
-        max_calls=1000,
+        max_calls=ROOMY_CALLS,
         valid_until=dt.datetime.now(dt.UTC) + dt.timedelta(days=29),
         operator="test-operator",
         reason="a test grant",

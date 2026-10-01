@@ -607,9 +607,9 @@ choices or its sealed minutes.
 `GET /world/versions/{version_id}/traffic/comparisons?world_id=<world>` lists a version's signal
 comparisons, newest first, with how far their runs got and their starts. `GET .../plan` names the
 town's signals, the models offered with why one cannot be asked here and the development seeds held
-and, for `model=<provider>/<model id>` (once or twice), `seeds`, `control` and `signal` (repeated,
-for a named group), the runs a start would plan and the most it could cost, or its refusal; it
-plays no episode. `GET .../{comparison_id}` serves per seed and arm each run's status, measure,
+and, for `model=<provider>/<model id>` (once or twice), `seeds`, `control`, `signal` (repeated,
+for a named group) and `bound_usd` (the bound a start would state), the runs a start would plan and
+the most it could cost, or its refusal; it plays no episode. `GET .../{comparison_id}` serves per seed and arm each run's status, measure,
 terms and asking, with each unfinished run's progress, the differences and the verdict.
 `GET .../{comparison_id}/runs/{run_id}` serves a run's outcome and every choice point's receipt;
 `GET .../runs/{run_id}/replay` replays it. These require `world.read`, ask no model and return no
@@ -623,7 +623,11 @@ server's calls, a new start naming a model whose provider's allowance is spent i
 anything is defined, as admission would refuse that model's first ask: 429 `budget_exceeded` with
 the authority's `spending` member ([model spending](model-spending-contract.md#11-what-a-client-sees)).
 The plan states the same refusal for a selection whose start would meet it, as its `plan_refusal`
-with that `spending` member, by the same predicate.
+with that `spending` member, by the same predicate. A comparison of signals spends under a durable
+bound for its models' providers as a comparison of people does
+([durable bounds](society-experiments.md#running-a-comparison)): a start whose bound or calls such a
+grant cannot hold is refused `bound_exceeds_grant`, and a plan naming that bound says so; the bound
+is closed when the start is finished and by its cancel.
 
 ## The layer
 

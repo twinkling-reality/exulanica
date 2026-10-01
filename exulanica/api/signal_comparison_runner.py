@@ -31,6 +31,7 @@ from typing import Any, Final
 
 import psycopg
 
+from exulanica.api.comparison_spending import BoundGate, ComparisonBounds
 from exulanica.api.decision_host import (
     RoleAsk,
     ask,
@@ -43,6 +44,7 @@ from exulanica.api.society_comparison_runner import (
     ComparisonArm,
     HostStopping,
     RunHost,
+    stopped_by_bound,
 )
 from exulanica.api.society_comparison_runner import (
     RUN_FAILURE_CODES as PERSON_RUN_FAILURE_CODES,
@@ -53,6 +55,7 @@ from exulanica.models.client import ModelClient
 from exulanica.models.errors import ManifestError
 from exulanica.models.manifest import AnsweringMechanism, Manifest, ModelSpec
 from exulanica.models.policy import HostedRequestPolicy
+from exulanica.models.spending import SPENDING_REFUSALS, SpendingRefused
 from exulanica.traffic.signal_actuation import signal_actuation
 from exulanica.world.decision_roles import DecisionRole, decision_roles
 from exulanica.world.errors import InvalidStructuralData
@@ -140,12 +143,15 @@ class _Asking:
         run_bound: BoundedBudget | None,
         keeps_share: bool,
         cancelled: Callable[[], bool],
+        gate: BoundGate | None = None,
     ) -> None:
         self.client, self.role, self.spec, self.mechanism = client, role, spec, mechanism
         self.contract = role.contract()
         self.bound, self.run_bound = bound, run_bound
         self.keep = share_kept(client.budget, self.contract) if keeps_share else (Decimal(0), 0)
         self.cancelled = cancelled
+        #: This run's gate under the start's durable bounds, where the authority holds them.
+        self.gate = gate
 
     def answer(self, request: dict[str, Any]) -> dict[str, Any]:
         # The last point before an ask is sent: a cancelled comparison sends none.
@@ -195,6 +201,10 @@ class _Asking:
     def bound_refused(self) -> bool:
         return self.run_bound is not None and self.run_bound.refusals > 0
 
+    def durable_bound_refused(self) -> SpendingRefused | None:
+        """The authority's refusal of one of this run's asks by the start's durable bound."""
+        return None if self.gate is None else self.gate.bound_refusal
+
 
 @dataclass(frozen=True)
 class SignalComparisonRunner:
@@ -213,6 +223,9 @@ class SignalComparisonRunner:
     #: The bound a comparison started from the application runs under, a part of the process's
     #: budget; None where the caller holds no bound.
     bound: BoundedBudget | None = None
+    #: The start's durable bounds, one for each provider it asks, where a durable spending
+    #: authority admits the host's calls: every ask of a run is admitted under its provider's.
+    spending_bounds: ComparisonBounds | None = None
     #: Whether its asks leave the contract's share of the process's budget for other work.
     keeps_share: bool = False
 
@@ -500,6 +513,12 @@ class SignalComparisonRunner:
                     and asking.bound_refused()
                 ):
                     reason = _BOUND_SPENT
+                elif (
+                    reason in SPENDING_REFUSALS
+                    and isinstance(asking, _Asking)
+                    and asking.durable_bound_refused() is not None
+                ):
+                    reason = stopped_by_bound(reason, None if host is None else host.cancelled)
                 raise _RunStopped(reason)
             if host is not None:
                 host.minute()
@@ -544,6 +563,11 @@ class SignalComparisonRunner:
         client = self.client.with_policy(self.policy_for(self.workspace_id))
         if question_refusal(self.role, client, spec.model_id) is not None:
             raise _RunStopped(_QUESTION_CHANGED)
+        # Each ask is admitted under its provider's durable bound, where the authority holds the
+        # start's bounds, by a gate of this run's own.
+        gate = None if self.spending_bounds is None else self.spending_bounds.gate()
+        if gate is not None:
+            client = client.with_spending(gate)
         run_bound = (
             None
             if self.bound is None
@@ -560,6 +584,7 @@ class SignalComparisonRunner:
             run_bound=run_bound,
             keeps_share=self.keeps_share,
             cancelled=host.cancelled if host is not None else (lambda: False),
+            gate=gate,
         )
 
     def fail_open(

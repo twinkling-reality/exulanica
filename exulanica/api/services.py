@@ -44,6 +44,7 @@ import psycopg
 from exulanica.api.account_runtime import AccountRuntime, load_account_runtime
 from exulanica.api.admission import AdmissionSettings
 from exulanica.api.authorisation import API_TOKENS_ENV, TokenDirectory, load_token_directory
+from exulanica.api.comparison_spending import bound_room_refusal
 from exulanica.api.composer_rights import photograph_text_right
 from exulanica.api.decision_host import (
     DecisionHost,
@@ -503,6 +504,24 @@ class Services:
         refused = self.allowance_refusal(connection, workspace_id, providers)
         if refused is not None:
             raise refused
+
+    def bound_room_refusal(
+        self,
+        connection: psycopg.Connection,
+        workspace_id: uuid.UUID,
+        providers: Iterable[str],
+        *,
+        usd: Decimal | None,
+        calls: int,
+    ) -> tuple[str, str] | None:
+        """``bound_exceeds_grant`` and why, where a comparison's bound ``usd`` or the ``calls`` it
+        can make are more than the live grant of one of ``providers`` has left
+        (:func:`~exulanica.api.comparison_spending.bound_room_refusal`); None while each grant
+        holds both, or in a process no durable authority admits, where no bound is opened. A plan
+        states it and a start is refused by it, after the allowance."""
+        if self.spending is None:
+            return None
+        return bound_room_refusal(connection, workspace_id, providers, usd=usd, calls=calls)
 
     def choice_refusal(
         self,

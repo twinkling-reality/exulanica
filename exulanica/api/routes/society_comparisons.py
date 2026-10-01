@@ -36,14 +36,19 @@ answered with the start it made, and every refusal is named (``START_REFUSALS``)
 spending authority admits this host's calls, a new start that would ask a provider whose allowance
 is spent, an arm's model or the model an owner chose for somebody outside the group, is refused as
 admission would refuse that first ask, 429 ``budget_exceeded`` with its ``spending`` member, before
-anything is defined (``Services.require_allowance``).
+anything is defined (``Services.require_allowance``); one whose bound, or the calls it can make, is
+more than such a provider's live grant has left is refused ``bound_exceeds_grant``, and a plan
+naming that bound (``bound_usd``) states the same. The comparison then spends under a durable bound
+for each provider it asks (:mod:`exulanica.api.comparison_spending`).
 
 ``POST .../comparisons/{comparison_id}/cancel`` cancels a comparison started from the application,
 once (:mod:`exulanica.world.comparison_facts`): a start no host holds is closed by the cancellation
 itself, every run left open failed as ``comparison_cancelled`` asking nothing, with what a host
 whose lease ran out may have spent presumed as a takeover presumes it; a start a host is playing
-is closed by that host before its next dispatch. A repeated cancel changes nothing, and a start
-that already finished keeps its own closing. The reads serve the cancellation on the start, and
+is closed by that host before its next dispatch. Where the comparison spends under durable
+bounds, the cancel closes them too, so an ask a host sends after it is refused by the authority. A
+repeated cancel changes nothing, and a start that already finished keeps its own closing. The reads
+serve the cancellation on the start, and
 each unfinished run's progress: running while a host plays it under the start's live lease, else
 queued.
 """
@@ -70,6 +75,7 @@ from exulanica.api.capabilities import (
     unavailable,
     unsupported,
 )
+from exulanica.api.comparison_spending import close_comparison_bounds
 from exulanica.api.decision_host import offered_providers
 from exulanica.api.dependencies import CurrentSession, ScopedConnection, get_services
 from exulanica.api.services import Services
@@ -88,6 +94,7 @@ from exulanica.api.society_comparison_start import (
     StartRefused,
     answers_per_minute,
     asked_providers,
+    bound_range_refusal,
     comparison_cost,
     definition_body,
     spending_plan_refusal,
@@ -273,14 +280,17 @@ def plan_society_comparison(
     control: bool = False,
     seeds: Annotated[int, Query(ge=1, le=_SEEDS_MOST)] = 1,
     input_seq: Annotated[int | None, Query(ge=1)] = None,
+    bound_usd: Annotated[str | None, Query(pattern=_BOUND_PATTERN)] = None,
 ) -> Any:
     """What a start would do, writing nothing: the roles, groups, models and development seeds
     this server offers a comparison of the version's society, and, for the selection the query
     names (``model`` as ``<provider>/<model id>``, once or twice; ``person`` for a named group;
-    ``input_seq`` for an earlier stored input to freeze), the runs it plans, the input it
-    freezes, the most it can cost and what one like it typically cost, or the refusal a start of
-    it would meet, by the same predicate a start's allowance check reads
-    (``Services.allowance_refusal``)."""
+    ``input_seq`` for an earlier stored input to freeze; ``bound_usd`` for the bound a start
+    would state), the runs it plans, the input it freezes, the most it can cost and what one like
+    it typically cost, or the refusal a start of it would meet, by the same predicates a start's
+    allowance and grant checks read (``Services.allowance_refusal``,
+    ``Services.bound_room_refusal``). Without a bound, the grant is judged on the calls the
+    selection can make alone."""
     comparisons = _comparisons(connection, session, request, world_id)
     society = _society(comparisons, version_id)
     navigation = comparisons.navigation_profile(society)
@@ -355,11 +365,21 @@ def plan_society_comparison(
     except StartRefused as exc:
         document["plan_refusal"] = {"code": exc.code, "detail": exc.detail}
         return document
-    spent = services.allowance_refusal(
-        connection, session.workspace_id, asked_providers(prepared.body)
-    )
+    bound = None if bound_usd is None else Decimal(bound_usd)
+    out_of_range = None if bound is None else bound_range_refusal(bound, prepared.cost.most_usd)
+    if out_of_range is not None:
+        document["plan_refusal"] = {"code": out_of_range[0], "detail": out_of_range[1]}
+        return document
+    providers = asked_providers(prepared.body)
+    spent = services.allowance_refusal(connection, session.workspace_id, providers)
     if spent is not None:
         document["plan_refusal"] = spending_plan_refusal(spent)
+        return document
+    room = services.bound_room_refusal(
+        connection, session.workspace_id, providers, usd=bound, calls=prepared.cost.calls
+    )
+    if room is not None:
+        document["plan_refusal"] = {"code": room[0], "detail": room[1]}
         return document
     document["plan"] = {
         **prepared.cost.document(),
@@ -782,11 +802,9 @@ def start_society_comparison(
             bound = Decimal(body.bound_usd)
         except InvalidOperation as exc:  # pragma: no cover - the pattern admits decimals only
             raise StartRefused("bound_out_of_range", "a bound is a decimal") from exc
-        if not Decimal(0) < bound <= prepared.cost.most_usd:
-            raise StartRefused(
-                "bound_out_of_range",
-                f"a bound above $0 and at most ${prepared.cost.most_usd}, the most it can cost",
-            )
+        out_of_range = bound_range_refusal(bound, prepared.cost.most_usd)
+        if out_of_range is not None:
+            raise StartRefused(*out_of_range)
         room = services.comparison_room(prepared.role)
         if existing is None and room is not None and bound > room:
             raise StartRefused(
@@ -803,10 +821,15 @@ def start_society_comparison(
         if existing is None:
             # Each model the definition asks, an arm's or an outside person's owner's choice,
             # asks its own provider alone: refused here as admission would refuse that first ask,
-            # before anything is defined.
-            services.require_allowance(
-                connection, session.workspace_id, asked_providers(prepared.body)
+            # before anything is defined. Then each provider's grant must hold the bound and the
+            # calls, which the comparison's durable bound of it is opened with.
+            providers = asked_providers(prepared.body)
+            services.require_allowance(connection, session.workspace_id, providers)
+            short = services.bound_room_refusal(
+                connection, session.workspace_id, providers, usd=bound, calls=prepared.cost.calls
             )
+            if short is not None:
+                raise StartRefused(*short)
         with connection.transaction():
             prepared.runner.define(
                 version_id,
@@ -864,8 +887,10 @@ def cancel_society_comparison(
     """Cancel a comparison started from the application, once. A start no host holds closes now:
     every run left open fails as ``comparison_cancelled``, asking nothing, and what a host whose
     lease ran out may have spent is presumed as a takeover presumes it. A start a host is playing
-    is closed by that host before its next dispatch. A repeated cancel changes nothing, and a
-    finished start keeps its own closing. Answers the comparison as the listing states it."""
+    is closed by that host before its next dispatch. Its durable bounds, where it spends under
+    them, are closed once the cancellation is recorded, so the authority refuses an ask a host
+    sends after it. A repeated cancel changes nothing, and a finished start keeps its own
+    closing. Answers the comparison as the listing states it."""
     comparisons = _comparisons(connection, session, request, world_id)
     row = comparisons.definition(version_id, comparison_id)
     services = get_services(request)
@@ -909,6 +934,14 @@ def cancel_society_comparison(
             starts.close_unclaimed(
                 world_id, comparison_id, closed_reason=CANCELLED_REASON, presumed_usd=presumed
             )
+    if services.spending is not None:
+        close_comparison_bounds(
+            services.spending,
+            connection,
+            session.workspace_id,
+            comparison_id,
+            reason=CANCELLED_REASON,
+        )
     ids = [comparison_id]
     return listing_document(
         [comparisons.definition(version_id, comparison_id)],
