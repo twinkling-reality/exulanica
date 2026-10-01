@@ -7,7 +7,7 @@ Start from the [documentation hub](README.md). Each document has one subject hom
 an explicit responsibility. A role describes how to use a document, not whether a feature
 is implemented. Contracts and scoped evidence establish capability claims.
 
-**92 documents** in the public catalog.
+**94 documents** in the public catalog.
 
 - [Product and architecture](#orientation)
 - [Capability guides](#capabilities)
@@ -107,6 +107,7 @@ Follow user controls, the browser world runtime, the Companion and appearance ch
 | --- | --- | --- |
 | [Interaction and spatial model](interaction-model.md) | contract | The Atlas browser runtime's interaction, navigation, Companion encounter and proposal confirmation |
 | [Companion questions, memory and proposals](companion-question.md) | contract | Grounded question, conversation and appearance-proposal path |
+| [World project context](project-context.md) | contract | World projects: identity and binding, kept items and their bases, named records, sharing, bounded context assembly, deletion and audit residue |
 | [Atlas world customization contract](atlas-world-customization-contract.md) | contract | Browser appearance customization, protected values and review lifecycle |
 | [Atlas reconstruction inspection](atlas-reconstruction-inspection.md) | contract | Reconstructed geometry delivery, display frame and inspection |
 | [Atlas spatial architecture](atlas-spatial-architecture.md) | contract | Atlas region layout, navigation, grounds and residency |
@@ -140,7 +141,8 @@ Configure services and keep permission, resource and provider boundaries.
 | [Deployment](deployment.md) | guide | Processes, per-process settings, health, catalog preflight, reviewer stack, backups and recovery |
 | [Local database](local-database.md) | guide | A personal install's durable PostgreSQL database: create, back up, verify, restore, upgrade, adopt, require passwords |
 | [Derivative worker operations](derivative-worker-operations.md) | guide | Running the photograph derivative worker: delivery, stages, progress, shutdown and recovery |
-| [Security floor](security-floor.md) | contract | Route permissions, tile quotas, egress, model spend budgets and database roles |
+| [Security floor](security-floor.md) | contract | Route permissions, tile quotas, egress, each process's model spend fuse and database roles |
+| [Model spending](model-spending-contract.md) | contract | The durable spending authority: authorities, workspace grants and bounds, admission and settlement, idempotency, revocation, restore protection and reconciliation |
 | [Privacy, consent, deletion, and threat model](privacy-consent-threat-model.md) | contract | Processing, consent and rights records, the hosted-request boundary, deletion and restore, disclosure, injection and misuse |
 | [Model and service selection](model-and-service-selection.md) | reference | Model roles, models offered for decisions, selection evidence, judged comparisons and candidates |
 | [License matrix](license-matrix.md) | reference | Model, dependency and asset license decisions |
