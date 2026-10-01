@@ -65,8 +65,13 @@ CONTRACTS = {
     "second": {"society-decision-action": 2, "society-decision-policy": 2},
 }
 PROBE_RECORD = "docs/evaluation/2026-09-25-society-person-models-probe.json"
-#: A clock that never moves, so every latency a receipt records is zero on every run.
+#: A clock that never moves, so every latency a receipt records is zero on every run. The asks
+#: give it to the client as well as to the host, since the client measures each call's latency
+#: on its own clock.
 CLOCK = 1000.0
+#: How long the slow transport of the control below takes to answer: real time that must not
+#: reach anything the asks record.
+SLOW_ANSWER_S = 0.005
 #: What an answer outside the offer reads as, in every script below.
 NOT_OFFERED = "fly to the moon"
 
@@ -407,17 +412,27 @@ class _Scripted(FakeTransport):
         return HttpResponse(200, json.dumps(body))
 
 
-def test_the_person_role_sends_and_records_the_same_bytes(monkeypatch):
-    monkeypatch.setattr(time, "monotonic", lambda: CLOCK)
+class _Slow(_Scripted):
+    """The scripted model, answering only after some real time has passed."""
+
+    def post_json(self, url, *, headers, payload, timeout):
+        time.sleep(SLOW_ANSWER_S)
+        return super().post_json(url, headers=headers, payload=payload, timeout=timeout)
+
+
+def _asks(transport: _Scripted, *, frozen: bool = True) -> dict[str, Any]:
+    """The first sixteen asks of the second contract's run, through the real client behind
+    ``transport``: what was sent, what was recorded, and their counts. With ``frozen`` the client
+    reads the test's clock; without it, its own default, the real monotonic clock."""
     manifest = _manifest()
     contract = decision_contract(CONTRACTS["second"])
     requests = _run(CONTRACTS["second"])["requests"][:16]
-    transport = _Scripted()
     client = ModelClient(
         api_key="test-key-not-real",
         manifest=manifest,
         transport=transport,
         budget=BudgetGuard(ceiling_usd=Decimal("5"), max_calls=1000),
+        **({"clock": lambda: CLOCK} if frozen else {}),
     ).with_policy(RecordingPolicy())
     results = []
     for index, request in enumerate(requests):
@@ -431,7 +446,7 @@ def test_the_person_role_sends_and_records_the_same_bytes(monkeypatch):
         {key: request["payload"][key] for key in sorted(request["payload"])}
         for request in transport.requests
     ]
-    found = {
+    return {
         "sent": _wire_digest(sent),
         "results": _wire_digest(results),
         "counts": {
@@ -443,9 +458,25 @@ def test_the_person_role_sends_and_records_the_same_bytes(monkeypatch):
             ),
         },
     }
+
+
+def test_the_person_role_sends_and_records_the_same_bytes(monkeypatch):
+    monkeypatch.setattr(time, "monotonic", lambda: CLOCK)
+    found = _asks(_Scripted())
     _report("asks", found)
     # The script exercised a retry that was answered, one that was not, and both mechanisms.
     assert found["counts"]["outcomes"].keys() == {"validated_choice", "answer_not_offered"}
     assert found["counts"]["mechanisms"].keys() == {"tool_call", "json_schema"}
     assert found["counts"]["sent"] > found["counts"]["asks"]
     assert found == EXPECTED_ASKS
+
+
+def test_the_asks_record_no_real_time(monkeypatch):
+    """A control for the golden above: real time passes during and between the calls, and nothing
+    the asks record moves. Its other arm is the client on its own clock, the real one, which the
+    same slow answers do reach: the control can see what it says is absent."""
+    monkeypatch.setattr(time, "monotonic", lambda: CLOCK)
+    assert _asks(_Slow()) == EXPECTED_ASKS
+    unfrozen = _asks(_Slow(), frozen=False)
+    assert unfrozen["sent"] == EXPECTED_ASKS["sent"]
+    assert unfrozen["results"] != EXPECTED_ASKS["results"]

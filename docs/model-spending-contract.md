@@ -100,7 +100,7 @@ Refusals, raised as `SpendingRefused` (a `BudgetExceededError`) before anything 
 | --- | --- |
 | `spending_scope_missing` | A client composed with the authority reached a request with no workspace: a composition fault |
 | `spending_not_granted` | No live grant covers the workspace and provider |
-| `spending_revoked` / `spending_expired` | The authority, grant or bound was revoked or has expired |
+| `spending_revoked` / `spending_expired` | The authority, grant or bound was revoked or has expired; for a workspace with no live grant, as its latest grant stands, never an older one |
 | `spending_limit_reached` | A ceiling of the authority, grant or bound would be crossed |
 | `spending_suspended` | The authority is held closed until an operator acts ([section 7](#7-restore-the-spending-witness)) |
 | `spending_unavailable` | The database or the witness did not answer; nothing was let through |

@@ -567,3 +567,23 @@ def test_an_admission_refused_before_the_authority_row_releases_nothing_until_ex
     rows = {row["reservation_id"]: row for row in bench.reservations(workspace)}
     assert rows[stale.reservation_id]["state"] == "released"
     assert bench.state(authority)["committed_calls"] == 0
+
+
+def test_a_refusal_names_the_state_of_the_workspace_s_latest_grant(bench):
+    """A workspace whose grant expired after an older grant was revoked is told its allowance has
+    expired: the refusal names its latest grant, never an older one (acceptance amendment A-24)."""
+    authority = bench.issue()
+    workspace = uuid.uuid4()
+    older = bench.grant(authority, workspace)
+    bench.operator.revoke(
+        authority,
+        workspace_id=workspace,
+        grant_id=older,
+        operator="test-operator",
+        reason="replaced by a shorter grant",
+    )
+    bench.grant(authority, workspace, until=dt.datetime.now(dt.UTC) + dt.timedelta(seconds=1.2))
+    time.sleep(1.3)  # the later grant expires
+    with pytest.raises(SpendingRefused) as refused:
+        bench.durable().for_workspace(workspace).admit(_request())
+    assert (refused.value.reason, refused.value.scope) == ("spending_expired", "workspace")
