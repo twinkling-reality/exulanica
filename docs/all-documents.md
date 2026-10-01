@@ -7,7 +7,7 @@ Start from the [documentation hub](README.md). Each document has one subject hom
 an explicit responsibility. A role describes how to use a document, not whether a feature
 is implemented. Contracts and scoped evidence establish capability claims.
 
-**94 documents** in the public catalog.
+**95 documents** in the public catalog.
 
 - [Product and architecture](#orientation)
 - [Capability guides](#capabilities)
@@ -63,6 +63,7 @@ How a world's people live, how open models decide for them, how runs are compare
 | [Movement modules contract](movement-modules-contract.md) | contract | Movement modules and their dispatch: walking, flight through a world's air, flying kinds and roads |
 | [Character representation and movement](character-representation-contract.md) | contract | Character appearance, rigging, subject bindings, movement and how a society's people are drawn |
 | [Traffic simulation](traffic-contract.md) | contract | Traffic simulation inputs, derived road records, state transitions and invariants, and its serving for a baked city |
+| [World clock](world-clock-contract.md) | contract | A world version's clock: legacy and coupled timing, the transition, pausing, stepping and catching up, crossing occupancy and the order between walkers and traffic |
 
 <a id="world-state"></a>
 
