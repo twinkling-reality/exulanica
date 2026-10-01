@@ -79,6 +79,7 @@ from exulanica.ingest.worker import DerivativeWorker, lease_seconds_for
 from exulanica.models.client import PROVIDER_CREDENTIAL_ABSENT, ModelClient
 from exulanica.models.egress import EGRESS_ALLOWLIST_ENV
 from exulanica.models.manifest import MANIFEST_PATH, Role, load_manifest
+from exulanica.models.spending import SpendingRefused
 from exulanica.spending import (
     DURABLE,
     PROCESS,
@@ -484,14 +485,22 @@ class Services:
             connection, workspace_id, witness_configured=self.spending.witness is not None
         )
 
+    def allowance_refusal(
+        self, connection: psycopg.Connection, workspace_id: uuid.UUID, providers: Iterable[str]
+    ) -> SpendingRefused | None:
+        """The refusal admission would give the first ask of the first of ``providers`` whose
+        allowance is spent (:meth:`spending_refusals`), or None while each has allowance left, or
+        in a process no durable authority admits. A plan states it and a start raises it, so the
+        two never differ."""
+        refusals = self.spending_refusals(connection, workspace_id)
+        return None if refusals is None else refusals.first(providers)
+
     def require_allowance(
         self, connection: psycopg.Connection, workspace_id: uuid.UUID, providers: Iterable[str]
     ) -> None:
-        """Raise the refusal admission would give the first ask of the first of ``providers``
-        whose allowance is spent (:meth:`spending_refusals`), before anything is written; return
-        while each has allowance left, or in a process no durable authority admits."""
-        refusals = self.spending_refusals(connection, workspace_id)
-        refused = None if refusals is None else refusals.first(providers)
+        """Raise :meth:`allowance_refusal`'s refusal, before anything is written; return while
+        each of ``providers`` has allowance left, or in a process no durable authority admits."""
+        refused = self.allowance_refusal(connection, workspace_id, providers)
         if refused is not None:
             raise refused
 

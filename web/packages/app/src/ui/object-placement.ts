@@ -187,7 +187,16 @@ export interface ObjectPlacementPanel {
   setBusy(busy: boolean): void;
   /** The current form values, or null when no placeable asset is chosen. */
   draft(): ObjectPlacementDraft | null;
+  /**
+   * What the world says each write is available for: the reason a write is not offered, in words,
+   * or null when it is. The panel disables a refused control and says why on it; it never
+   * enables one the server refuses.
+   */
+  setOperationGate(gate: ObjectOperationGate): void;
 }
+
+export type ObjectOperation = 'place' | 'arrange' | 'move' | 'remove' | 'behaviour' | 'undo';
+export type ObjectOperationGate = (operation: ObjectOperation) => string | null;
 
 const MOTION_STATE_WORDS: Readonly<Record<PlacedObjectRow['motion'], string>> = Object.freeze({
   running: 'travelling',
@@ -219,6 +228,8 @@ const PERIOD_STEP_MILLISECONDS = 100;
  * the panel stops being busy, only the controls without such a reason come back.
  */
 const UNAVAILABLE = 'unavailable';
+/** The server refused this control's write; the reason is the control's title. */
+const REFUSED = 'refused';
 
 export function buildObjectPlacement(
   handlers: ObjectPlacementHandlers,
@@ -271,7 +282,7 @@ export function buildObjectPlacement(
   };
   const reflectAsset = (): void => {
     const chosen = assetSelect.selectedOptions[0];
-    placeButton.disabled = chosen === undefined || chosen.disabled;
+    placeButton.disabled = chosen === undefined || chosen.disabled || placeButton.dataset[REFUSED] === 'yes';
     assetSummary.textContent = chosen === undefined ? '' : summaries.get(chosen.value) ?? '';
     const use = chosen === undefined ? null : uses.get(chosen.value) ?? null;
     assetUse.textContent = use ?? '';
@@ -455,6 +466,31 @@ export function buildObjectPlacement(
     }
   }
 
+  let gate: ObjectOperationGate = () => null;
+  let undoable = false;
+  /** Disable each control whose write the world refuses, and say why on it. */
+  const applyGate = (): void => {
+    const mark = (control: HTMLButtonElement, operation: ObjectOperation): void => {
+      const reason = gate(operation);
+      if (reason === null) {
+        if (control.dataset[REFUSED] === 'yes') {
+          delete control.dataset[REFUSED];
+          control.removeAttribute('title');
+        }
+        return;
+      }
+      control.dataset[REFUSED] = 'yes';
+      control.title = reason;
+      control.disabled = true;
+    };
+    mark(placeButton, 'place');
+    mark(arrangeButton, 'arrange');
+    mark(undoButton, 'undo');
+    mark(saveMove, 'move');
+    for (const control of objectList.querySelectorAll<HTMLButtonElement>('button.object-placement-remove')) mark(control, 'remove');
+    for (const control of objectList.querySelectorAll<HTMLButtonElement>('button.object-placement-motion-edit')) mark(control, 'behaviour');
+  };
+
   let restoreFocus: HTMLElement | null = null;
   return {
     root,
@@ -503,7 +539,10 @@ export function buildObjectPlacement(
       reflectAsset();
     },
 
-    showObjects,
+    showObjects(rows, selectedId) {
+      showObjects(rows, selectedId);
+      applyGate();
+    },
 
     closeMotionEditor() {
       if (editing === null) return;
@@ -511,8 +550,10 @@ export function buildObjectPlacement(
       showObjects(rendered.rows, rendered.selectedId);
     },
 
-    setUndoable(undoable) {
-      undoButton.disabled = !undoable;
+    setUndoable(next) {
+      undoable = next;
+      undoButton.disabled = !next;
+      applyGate();
     },
 
     setPendingMove(summary) {
@@ -535,9 +576,28 @@ export function buildObjectPlacement(
       }
       saveMove.disabled = next;
       discardMove.disabled = next;
+      applyGate();
     },
 
     draft: currentDraft,
+    setOperationGate(next) {
+      gate = next;
+      // Start from what the panel itself allows, then let the world refuse.
+      for (const control of root.querySelectorAll<HTMLButtonElement>('button[data-refused]')) {
+        delete control.dataset[REFUSED];
+        control.removeAttribute('title');
+      }
+      undoButton.disabled = !undoable;
+      if (!busy) {
+        arrangeButton.disabled = false;
+        saveMove.disabled = false;
+        for (const control of objectList.querySelectorAll<HTMLButtonElement>('button')) {
+          control.disabled = control.dataset[UNAVAILABLE] === 'yes';
+        }
+      }
+      reflectAsset();
+      applyGate();
+    },
   };
 }
 

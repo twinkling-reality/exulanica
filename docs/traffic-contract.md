@@ -622,6 +622,8 @@ as the saved world's traffic read refuses them. Where a durable spending authori
 server's calls, a new start naming a model whose provider's allowance is spent is refused before
 anything is defined, as admission would refuse that model's first ask: 429 `budget_exceeded` with
 the authority's `spending` member ([model spending](model-spending-contract.md#11-what-a-client-sees)).
+The plan states the same refusal for a selection whose start would meet it, as its `plan_refusal`
+with that `spending` member, by the same predicate.
 
 ## The layer
 

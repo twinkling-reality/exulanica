@@ -62,6 +62,7 @@ import {
   inhabitantWords,
   placeRows,
   type InhabitedObject,
+  type PeopleOperation,
   type MovedWithoutWalking,
   type Noticing,
 } from '../ui/world-inhabitants.js';
@@ -174,6 +175,37 @@ export interface MountedEnvironmentSelection {
    * placeholder drawn as `references`, the answer's own maps, say.
    */
   showSimulation(cited: SimulationCitation, references: SimulatedReferences): void;
+  /**
+   * The people of this world and its clock, for surfaces other than the People panel (the top
+   * bar, the command palette). Each call is the same request the panel's own buttons make.
+   */
+  readonly people: PeopleControls;
+}
+
+/** What the world clock shows: the saved playback control and whether a request is in flight. */
+export interface PeopleClock {
+  /** `absent`: nobody lives here yet; `unconnected`: this world shows no society of its own. */
+  readonly society: 'unconnected' | 'loading' | 'absent' | 'present' | 'unavailable';
+  readonly mode: SocietyPlaybackMode | null;
+  readonly speed: SocietyPlaybackSpeed | null;
+  readonly minute: number | null;
+  readonly busy: boolean;
+  /** Why one minute cannot be advanced by hand now, in the panel's own words, or null. */
+  readonly advanceBlocked: string | null;
+  readonly playEligible: boolean;
+}
+
+export interface PeopleControls {
+  clock(): PeopleClock;
+  /** Called after every change the People panel draws; returns the unsubscribe. */
+  onChange(listener: () => void): () => void;
+  /** What the world's capability descriptors allow; the People panel draws refused writes so. */
+  setGate(gate: (operation: PeopleOperation) => string | null): void;
+  bringIn(): Promise<void>;
+  play(): Promise<void>;
+  pause(): Promise<void>;
+  setSpeed(speed: SocietyPlaybackSpeed): Promise<void>;
+  advance(): Promise<void>;
 }
 
 const instanceId = (feature: NYCLocalFeature): string =>
@@ -327,6 +359,9 @@ export function mountEnvironmentSelection(
   const environmentClient = deps.environmentClient ?? new EnvironmentSelectionClient(deps.credentials);
   const worldClient = deps.worldClient ?? new WorldObjectsClient(deps.credentials);
   let liveSociety: LiveSociety | null = null;
+  /** Surfaces outside the People panel that draw the people and the clock (see `people`). */
+  const peopleListeners = new Set<() => void>();
+  let peopleGate: (operation: PeopleOperation) => string | null = () => null;
   // The flyers a saved world's objects host, read from its flight while the world is open.
   let savedFlight: SavedWorldFlight | null = null;
   /** Why the saved world's flight stopped, as the inhabitants panel says it, or null. */
@@ -499,6 +534,7 @@ export function mountEnvironmentSelection(
         getSubjectId: () => selectedInhabitant,
         targetId: destination.destination_id,
         affordance: destination.affordance,
+        serverGate: () => peopleGate('direct'),
       });
       inspector.addAction(directedAction.root);
     }
@@ -763,6 +799,7 @@ export function mountEnvironmentSelection(
           label: filled(objectActivity(affordance).directLabel, { place: row.label }),
           describeRecord: plainRecord(row.label, affordance),
           idleText: 'Asks this simulated person to go there next. It is recorded as simulation, never as something that happened.',
+          serverGate: () => peopleGate('direct'),
         });
         control.root.classList.add('world-inhabitants-action');
         savedWorldActions.set(targetId, control);
@@ -1365,6 +1402,7 @@ export function mountEnvironmentSelection(
   }
 
   function renderInhabitantsPanel(): void {
+    for (const listener of peopleListeners) listener();
     if (savedWorld === null || liveSociety === null) return;
     const view = liveSociety.view;
     const walked = view.snapshot?.state.inhabitants
@@ -1372,7 +1410,7 @@ export function mountEnvironmentSelection(
     inhabitantsPanel.render({
       society: view, objects: savedObjects(), walked, advanceBlocked: advanceBlocked(),
       playback: { control: societyControl, busy: controlBusy }, moved, noticing, flight: flightWords,
-      flightUnplaced,
+      flightUnplaced, gate: peopleGate,
     });
   }
 
@@ -2047,6 +2085,50 @@ export function mountEnvironmentSelection(
       return { versionId: society.versionId, inhabitantId };
     },
     societyNames,
+    people: {
+      clock: (): PeopleClock => {
+        const view = liveSociety?.view ?? null;
+        const control = societyControl;
+        const societyState: PeopleClock['society'] = savedWorld === null || view === null ? 'unconnected'
+          : view.status === 'absent' ? 'absent'
+            : view.snapshot !== null ? 'present'
+              : view.status === 'loading' || view.status === 'idle' ? 'loading' : 'unavailable';
+        return {
+          society: societyState,
+          mode: control?.mode ?? null,
+          speed: control?.speed ?? null,
+          minute: view?.snapshot?.currentTick ?? control?.currentTick ?? null,
+          busy: controlBusy || view?.busy === true,
+          advanceBlocked: advanceBlocked(),
+          playEligible: control?.playEligible === true,
+        };
+      },
+      onChange: (listener) => { peopleListeners.add(listener); return () => peopleListeners.delete(listener); },
+      setGate: (gate) => {
+        peopleGate = gate;
+        for (const control of savedWorldActions.values()) control.reflect();
+        directedAction?.reflect();
+        if (savedWorld === null || liveSociety === null) return;
+        const view = liveSociety.view;
+        const walked = view.snapshot?.state.inhabitants
+          .filter((person) => (person.motion_path_mm?.length ?? 0) > 1).length ?? 0;
+        inhabitantsPanel.render({
+          society: view, objects: savedObjects(), walked, advanceBlocked: advanceBlocked(),
+          playback: { control: societyControl, busy: controlBusy }, moved, noticing, flight: flightWords,
+          flightUnplaced, gate: peopleGate,
+        });
+      },
+      bringIn: async () => {
+        await bringInInhabitants();
+        // The panel draws a refusal itself; a caller elsewhere hears it as the server's problem.
+        const refusal = liveSociety?.view.refusal ?? null;
+        if (refusal !== null) throw new ApiError(refusal.status, refusal.code, refusal.detail);
+      },
+      play: () => configurePlayback('playing'),
+      pause: () => configurePlayback('paused'),
+      setSpeed: (speed) => configurePlayback(societyControl?.mode ?? 'paused', speed),
+      advance: () => stepPlayback(),
+    },
     showSimulation: (cited, references) => {
       const names = societyNames();
       const line = drawSimulated([{ kind: 'text', text: cited.line }], references, names)

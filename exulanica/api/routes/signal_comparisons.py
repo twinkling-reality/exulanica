@@ -22,7 +22,9 @@ model, writes anything or returns a run's seed.
 ``GET .../comparisons/plan`` answers what a start would, and writes nothing: the town's signals,
 the models offered with why one cannot be asked here, the development seeds this server holds and,
 for a selection, the runs it plans and the most it can cost, or the refusal a start of it would
-meet. It plays no episode. ``POST .../comparisons`` starts one
+meet, a provider it would ask whose durable allowance is spent included (``budget_exceeded`` with
+the authority's ``spending`` member, as the start is answered). It plays no episode.
+``POST .../comparisons`` starts one
 (:mod:`exulanica.api.signal_comparison_start`): in one transaction it defines the comparison over
 the version's roads as they are, reserves every run and records the start with the bound its owner
 stated, at most the most it can cost. A host's comparison worker plays it off the request path, as
@@ -76,6 +78,7 @@ from exulanica.api.signal_comparison_start import (
     stopped_signal_host_usd,
 )
 from exulanica.api.society_comparison_runner import CANCELLED, ComparisonArm
+from exulanica.api.society_comparison_start import spending_plan_refusal
 from exulanica.api.society_comparison_worker import CANCELLED_REASON
 from exulanica.api.traffic_answer import refusal_status
 from exulanica.api.world_scope import WorldId
@@ -358,7 +361,8 @@ def plan_signal_comparison(
     models offered for a signal's decisions, the development seeds this server holds and, for the
     selection the query names (``model`` as ``<provider>/<model id>``, once or twice; ``signal``
     for a named group, every signal where none is named), the runs it plans and the most it can
-    cost, or the refusal a start of it would meet."""
+    cost, or the refusal a start of it would meet, by the same predicate a start's allowance check
+    reads (``Services.allowance_refusal``)."""
     repository = _repository(connection, session, world_id)
     services = get_services(request)
     try:
@@ -405,8 +409,14 @@ def plan_signal_comparison(
         )
     except SignalStartRefused as exc:
         document["plan_refusal"] = {"code": exc.code, "detail": exc.detail}
-    else:
-        document["plan"] = prepared.cost.document()
+        return document
+    spent = services.allowance_refusal(
+        connection, session.workspace_id, [model.provider for model in chosen]
+    )
+    if spent is not None:
+        document["plan_refusal"] = spending_plan_refusal(spent)
+        return document
+    document["plan"] = prepared.cost.document()
     return document
 
 

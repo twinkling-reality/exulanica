@@ -2782,7 +2782,7 @@
      "society"
     ],
     "summary": "Plan Society Comparison",
-    "description": "What a start would do, writing nothing: the roles, groups, models and development seeds\nthis server offers a comparison of the version's society, and, for the selection the query\nnames (``model`` as ``<provider>/<model id>``, once or twice; ``person`` for a named group;\n``input_seq`` for an earlier stored input to freeze), the runs it plans, the input it\nfreezes, the most it can cost and what one like it typically cost, or the refusal a start of\nit would meet.",
+    "description": "What a start would do, writing nothing: the roles, groups, models and development seeds\nthis server offers a comparison of the version's society, and, for the selection the query\nnames (``model`` as ``<provider>/<model id>``, once or twice; ``person`` for a named group;\n``input_seq`` for an earlier stored input to freeze), the runs it plans, the input it\nfreezes, the most it can cost and what one like it typically cost, or the refusal a start of\nit would meet, by the same predicate a start's allowance check reads\n(``Services.allowance_refusal``).",
     "operationId": "plan_society_comparison_world_versions__version_id__society_comparisons_plan_get",
     "parameters": [
      {
@@ -13610,7 +13610,7 @@
      "world"
     ],
     "summary": "Plan Signal Comparison",
-    "description": "What a start would do, writing nothing and playing no episode: the town's signals, the\nmodels offered for a signal's decisions, the development seeds this server holds and, for the\nselection the query names (``model`` as ``<provider>/<model id>``, once or twice; ``signal``\nfor a named group, every signal where none is named), the runs it plans and the most it can\ncost, or the refusal a start of it would meet.",
+    "description": "What a start would do, writing nothing and playing no episode: the town's signals, the\nmodels offered for a signal's decisions, the development seeds this server holds and, for the\nselection the query names (``model`` as ``<provider>/<model id>``, once or twice; ``signal``\nfor a named group, every signal where none is named), the runs it plans and the most it can\ncost, or the refusal a start of it would meet, by the same predicate a start's allowance check\nreads (``Services.allowance_refusal``).",
     "operationId": "plan_signal_comparison_world_versions__version_id__traffic_comparisons_plan_get",
     "parameters": [
      {

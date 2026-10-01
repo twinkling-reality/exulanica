@@ -336,3 +336,50 @@
   line-height: var(--text-sm-line);
 }
 .x-spends > .x-icon { color: var(--color-caution); }
+
+/* -- Command palette ------------------------------------------------------------------------- */
+.x-palette {
+  position: absolute;
+  top: 12vh;
+  left: 50%;
+  translate: -50% 0;
+  display: flex;
+  flex-direction: column;
+  width: min(560px, calc(100vw - 2 * var(--space-4)));
+  max-height: min(70dvh, 560px);
+  overflow: hidden;
+  box-shadow: var(--elevation-4);
+}
+.x-palette-search {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+}
+.x-palette-input { border: 0; background: none; min-height: var(--control-lg); font-size: var(--text-lg); }
+.x-palette-input:focus-visible { outline: none; }
+.x-palette-list { margin: 0; padding: var(--space-2); overflow-y: auto; list-style: none; }
+.x-palette-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+.x-palette-row > .x-icon { color: var(--color-text-muted); }
+.x-palette-row[aria-selected='true'] { background: var(--color-surface-selected); }
+.x-palette-row[aria-selected='true'] > .x-icon { color: var(--color-accent); }
+.x-palette-row[aria-disabled='true'] { color: var(--color-text-faint); }
+.x-palette-text { display: grid; flex: 1; min-width: 0; }
+.x-palette-label { font-weight: var(--weight-medium); }
+.x-palette-hint { overflow: hidden; color: var(--color-text-muted); font-size: var(--text-sm); text-overflow: ellipsis; white-space: nowrap; }
+.x-palette-empty { padding: var(--space-4); color: var(--color-text-muted); }
+
+/* -- World clock ------------------------------------------------------------------------------- */
+.x-clock { gap: var(--space-1); padding: 0 var(--space-2); border-right: 1px solid var(--color-border); margin-right: var(--space-1); }
+.x-clock[hidden] { display: none; }
+.x-clock-speed { width: auto; min-height: var(--control-sm); padding: 0 var(--space-2); font-size: var(--text-sm); }
+.x-technical { margin-top: var(--space-1); }

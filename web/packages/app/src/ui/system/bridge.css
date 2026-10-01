@@ -13,6 +13,12 @@
  * When a module is migrated onto components.ts its rules here are deleted. This file only shrinks.
  */
 
+/* -- 0. The earlier tilt and spectrum headers follow the two retuning tokens ------------------- */
+#shell {
+  --ui-plane-transform: perspective(1400px) rotateY(var(--panel-tilt));
+  --chromatic-head: var(--panel-header-fill);
+}
+
 /* -- 1. Regions own position ------------------------------------------------------------------- */
 #shell .x-region[data-region] > :is(
   .world-identity, .object-placement, .world-panel, .world-local-nav, .reconstruction-inspector,

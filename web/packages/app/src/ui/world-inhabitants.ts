@@ -295,6 +295,9 @@ export function inhabitantWords(
   );
 }
 
+/** The writes the People panel offers. */
+export type PeopleOperation = 'create' | 'presence' | 'control' | 'step' | 'direct';
+
 export interface WorldInhabitantsPanel {
   readonly root: HTMLElement;
   readonly bringIn: HTMLButtonElement;
@@ -325,6 +328,11 @@ export interface WorldInhabitantsPanel {
     readonly flight?: string | null;
     /** Flyers this world's objects host that have no home, in words a person reads, or null. */
     readonly flightUnplaced?: string | null;
+    /**
+     * Why the world refuses one of this panel's writes, from its capability descriptors, or null
+     * when it does not. A refused control is disabled and says why on itself.
+     */
+    readonly gate?: (operation: PeopleOperation) => string | null;
   }): void;
   /** Say that nothing can be shown here, and why. */
   unavailable(reason: string): void;
@@ -423,7 +431,7 @@ export function buildWorldInhabitants(handlers: {
   };
 
   const render: WorldInhabitantsPanel['render'] = ({
-    society, objects, walked, advanceBlocked, playback, moved, noticing, flight, flightUnplaced,
+    society, objects, walked, advanceBlocked, playback, moved, noticing, flight, flightUnplaced, gate,
   }) => {
     // A stopped flight is said whether or not anyone lives here: the birds are the world's own,
     // and so are flyers with no home.
@@ -464,6 +472,14 @@ export function buildWorldInhabitants(handlers: {
     sendAway.disabled = society.busy;
     bringBack.hidden = !away;
     bringBack.disabled = society.busy;
+    for (const [control, operation] of [
+      [bringIn, 'create'], [sendAway, 'presence'], [bringBack, 'presence'], [play, 'control'], [pace, 'control'],
+      [advance, 'step'],
+    ] as const) {
+      const refused = gate?.(operation) ?? null;
+      if (refused === null) control.removeAttribute('title');
+      else { control.disabled = true; control.title = refused; }
+    }
     presenceHelp.hidden = !movable;
     presenceHelp.textContent = away
       ? 'Bringing them back is a new arrival: the same people come in at spread starting places in '

@@ -1,0 +1,278 @@
+/**
+ * The action registry: every action a person can take, declared once.
+ *
+ * An entry says what the action is called, its icon, its group, where it may be offered (the tool
+ * rail, the top bar, a panel, the command palette), its keyboard shortcut, and, for an action that
+ * changes the world, the route key of the operation it performs and the words for each refusal
+ * that operation can answer. Surfaces render entries; they do not declare buttons of their own.
+ * A new backend operation becomes one entry here plus its run binding in the composition root.
+ *
+ * Availability is the server's. An action with an operation takes its state from that operation's
+ * capability descriptor (`GET /world/versions/{v}/capabilities`); an action with none (opening a
+ * panel, the map) is local and available whenever its binding exists. The interface never guesses
+ * that a write is possible; the operation still decides when it runs.
+ */
+
+import type { CapabilityDescriptor, WorldCapabilities } from '../../capabilities-api.js';
+import type { InterfaceState } from '../system/components.js';
+import type { IconName } from '../system/icon.js';
+
+export type ActionGroup = 'build' | 'people' | 'ask' | 'explore' | 'system';
+export type ActionPlacement = 'rail' | 'top-bar' | 'palette' | 'panel:people' | 'panel:objects';
+
+/** A refusal as a person reads it: what happened, then what to do next. */
+export interface RefusalWords {
+  readonly happened: string;
+  readonly next: string;
+}
+
+export interface ActionSpec {
+  readonly id: string;
+  readonly label: string;
+  /** One line for the palette and tooltips: what the action does. */
+  readonly hint: string;
+  readonly icon: IconName;
+  readonly group: ActionGroup;
+  readonly placement: readonly ActionPlacement[];
+  readonly shortcut?: string;
+  /** The route key of the operation it performs; absent for an action that only shows something. */
+  readonly operation?: string;
+  /** The descriptor's `bind` values that pick this action's operation when a route has several. */
+  readonly bind?: Readonly<Record<string, string>>;
+  /** Words for each refusal code the operation can answer, as a descriptor state or a response. */
+  readonly refusals?: Readonly<Record<string, RefusalWords>>;
+}
+
+export const GROUP_LABEL: Readonly<Record<ActionGroup, string>> = {
+  build: 'Build',
+  people: 'People',
+  ask: 'Ask',
+  explore: 'Explore',
+  system: 'Settings',
+};
+
+const SOCIETY = 'POST /world/versions/{version_id}/society';
+const CONTROL = 'PUT /world/versions/{version_id}/society/control';
+const CONTROL_STEP = 'POST /world/versions/{version_id}/society/control/steps';
+const OBJECT_UNDO = 'POST /world/versions/{version_id}/objects/undo';
+
+const NOBODY_HERE: RefusalWords = {
+  happened: 'Nobody lives in this world yet.',
+  next: 'Bring people in first.',
+};
+const STALE_WORLD: RefusalWords = {
+  happened: 'This world changed while you were deciding, so nothing was changed.',
+  next: 'Look at it again, then try once more.',
+};
+const SOURCE_GONE: RefusalWords = {
+  happened: 'The place this world was built on was deleted, so it can no longer be changed.',
+  next: 'What you already made is kept.',
+};
+const CLOCK_REFUSED: RefusalWords = {
+  happened: 'The world’s clock did not change.',
+  next: 'Look at People for what the world is doing now, then try again.',
+};
+
+export const ACTIONS: readonly ActionSpec[] = Object.freeze([
+  {
+    id: 'objects.open', label: 'Add object', hint: 'Add, move and arrange objects in this world',
+    icon: 'object', group: 'build', placement: ['top-bar', 'palette'], shortcut: 'P',
+  },
+  {
+    id: 'objects.undo', label: 'Take back', hint: 'Take back the last change to this world',
+    icon: 'undo', group: 'build', placement: ['rail', 'palette'], operation: OBJECT_UNDO,
+    refusals: {
+      invalid_object_state: { happened: 'There is nothing left to take back.', next: 'Add or move something first.' },
+      stale_object_base: STALE_WORLD,
+      invalidated_source_version: SOURCE_GONE,
+    },
+  },
+  {
+    id: 'people.open', label: 'People', hint: 'See who lives here and what they are doing',
+    icon: 'people', group: 'people', placement: ['rail', 'palette'],
+  },
+  {
+    id: 'people.bring-in', label: 'Bring people in', hint: 'Bring simulated people into this world',
+    icon: 'add', group: 'people', placement: ['palette', 'panel:people'], operation: SOCIETY,
+    refusals: {
+      no_reachable_targets: {
+        happened: 'Nobody came in: there is nowhere here they could reach yet.',
+        next: 'Add something to rest on or visit near where you arrive, such as a bench or a small square, then try again.',
+      },
+      engine_not_for_this_ground: {
+        happened: 'Nobody came in: this page asked for another kind of people than this world takes.',
+        next: 'Reload the page, then bring them in again.',
+      },
+      unavailable_society_input: {
+        happened: 'People cannot be brought into this world.',
+        next: 'Its source photos were withdrawn, so there is nowhere for them to start.',
+      },
+    },
+  },
+  {
+    id: 'clock.play', label: 'Play', hint: 'Let the world run on its own',
+    icon: 'play', group: 'people', placement: ['top-bar', 'palette'], operation: CONTROL,
+    refusals: { society_unavailable: NOBODY_HERE, invalid_society_control: CLOCK_REFUSED },
+  },
+  {
+    id: 'clock.pause', label: 'Pause', hint: 'Stop the world where it is',
+    icon: 'pause', group: 'people', placement: ['top-bar', 'palette'], operation: CONTROL,
+    refusals: { society_unavailable: NOBODY_HERE, invalid_society_control: CLOCK_REFUSED },
+  },
+  {
+    id: 'clock.advance', label: 'Next minute', hint: 'Advance the world by one minute',
+    icon: 'next-minute', group: 'people', placement: ['top-bar', 'palette'], operation: CONTROL_STEP,
+    refusals: { society_unavailable: NOBODY_HERE, invalid_society_control: CLOCK_REFUSED },
+  },
+  {
+    id: 'compare.open', label: 'Compare', hint: 'See what different models chose for the same people',
+    icon: 'compare', group: 'people', placement: ['rail', 'palette'],
+  },
+  {
+    id: 'companion.open', label: 'Companion', hint: 'Ask your Companion about this world',
+    icon: 'companion', group: 'ask', placement: ['rail', 'palette'], shortcut: 'X',
+  },
+  {
+    id: 'map.open', label: 'Map', hint: 'See this world from above',
+    icon: 'map', group: 'explore', placement: ['rail', 'palette'], shortcut: 'M',
+  },
+  {
+    id: 'library.open', label: 'Library', hint: 'People, places and photos you have',
+    icon: 'library', group: 'explore', placement: ['rail', 'palette'], shortcut: 'I',
+  },
+  {
+    id: 'character.open', label: 'Character', hint: 'Choose how you look in this world',
+    icon: 'character', group: 'explore', placement: ['rail', 'palette'], shortcut: 'K',
+  },
+  {
+    id: 'photos.open', label: 'Add photos', hint: 'Add and review photos for this world',
+    icon: 'photos', group: 'build', placement: ['top-bar', 'palette'],
+  },
+  {
+    id: 'about.open', label: 'About this place', hint: 'Camera, movement and where this world comes from',
+    icon: 'info', group: 'explore', placement: ['palette'],
+  },
+  {
+    id: 'world.make', label: 'Make a world', hint: 'Start a new town from a recipe',
+    icon: 'world', group: 'system', placement: ['palette'],
+  },
+  {
+    id: 'design.open', label: 'Design', hint: 'Light, colour and material of this world',
+    icon: 'design', group: 'system', placement: ['palette'], shortcut: 'O',
+  },
+  {
+    id: 'settings.open', label: 'Settings', hint: 'Display, movement and controls',
+    icon: 'settings', group: 'system', placement: ['palette'], shortcut: '?',
+  },
+  {
+    id: 'menu.open', label: 'World menu', hint: 'Every place in the app',
+    icon: 'menu', group: 'system', placement: ['top-bar'], shortcut: 'H',
+  },
+] satisfies readonly ActionSpec[]);
+
+export type ActionId = typeof ACTIONS[number]['id'];
+
+export function actionSpec(id: string): ActionSpec {
+  const spec = ACTIONS.find((candidate) => candidate.id === id);
+  if (spec === undefined) throw new Error(`no action ${id}`);
+  return spec;
+}
+
+/**
+ * Refusals any operation may answer at request time (interface packet 5a): the same words for
+ * every action, under the action's own.
+ */
+export const COMMON_REFUSALS: Readonly<Record<string, RefusalWords>> = {
+  busy: { happened: 'The world was busy for a moment, so nothing was changed.', next: 'Try again.' },
+  capacity_exhausted: {
+    happened: 'This installation is at its limit right now, so nothing was changed.',
+    next: 'Try again in a minute.',
+  },
+  workspace_capacity_exhausted: {
+    happened: 'Your workspace is doing as much as it may at once, so nothing was changed.',
+    next: 'Try again when something you started has finished.',
+  },
+  budget_exceeded: {
+    happened: 'The spending allowance for models refused this, so nothing was spent.',
+    next: 'Ask the owner of this workspace about its allowance.',
+  },
+  provider_credential_absent: {
+    happened: 'No model can be asked on this installation.',
+    next: 'Ask the person who runs it to add one.',
+  },
+};
+
+/** The generic words for a refusal the action has no words for; its code goes to the record. */
+export const UNRECOGNISED_REFUSAL: RefusalWords = {
+  happened: 'That could not be done just now.',
+  next: 'Nothing was changed. Try again, or look at the technical details.',
+};
+
+/** Words for each descriptor state, when the action has none more precise for its code. */
+const STATE_WORDS: Readonly<Partial<Record<InterfaceState, RefusalWords>>> = {
+  unavailable: { happened: 'Not available right now.', next: 'Something it needs is not ready.' },
+  unsupported: { happened: 'Not in this world.', next: 'This kind of world does not offer it.' },
+  'not-permitted': { happened: 'Your access does not include this.', next: 'Ask the owner of this workspace.' },
+  unknown: { happened: 'Can’t tell yet whether this is possible.', next: 'Try again in a moment.' },
+};
+
+export interface ActionAvailability {
+  readonly state: InterfaceState;
+  /** The descriptor's code, for the technical record; never shown as the message. */
+  readonly code: string | null;
+  readonly words: RefusalWords | null;
+  readonly spends: boolean;
+  readonly descriptor: CapabilityDescriptor | null;
+}
+
+export function descriptorFor(spec: ActionSpec, capabilities: WorldCapabilities | null): CapabilityDescriptor | null {
+  if (spec.operation === undefined || capabilities === null) return null;
+  return capabilities.operations.find((descriptor) => descriptor.operation === spec.operation
+    && Object.entries(spec.bind ?? {}).every(([key, value]) => descriptor.bind[key] === value)) ?? null;
+}
+
+/**
+ * How available an action is: local actions are available; an action with an operation takes its
+ * descriptor's state (unsupported first, then permission, then the state). Without a capability
+ * read yet, an operation's state is unknown, never assumed available.
+ */
+export function availability(spec: ActionSpec, capabilities: WorldCapabilities | null): ActionAvailability {
+  if (spec.operation === undefined) {
+    return { state: 'available', code: null, words: null, spends: false, descriptor: null };
+  }
+  const descriptor = descriptorFor(spec, capabilities);
+  if (descriptor === null) {
+    return { state: 'unknown', code: null, words: STATE_WORDS.unknown ?? null, spends: false, descriptor: null };
+  }
+  const state: InterfaceState = descriptor.state === 'unsupported' ? 'unsupported'
+    : !descriptor.permitted ? 'not-permitted'
+      : descriptor.state === 'available' ? 'available'
+        : descriptor.state === 'unavailable' ? 'unavailable' : 'unknown';
+  const words = state === 'available' ? null
+    : (descriptor.code === null ? undefined : spec.refusals?.[descriptor.code] ?? COMMON_REFUSALS[descriptor.code])
+      ?? STATE_WORDS[state] ?? null;
+  return { state, code: descriptor.code, words, spends: descriptor.spends, descriptor };
+}
+
+/**
+ * The availability of one operation by its route key, for a panel control that is not itself a
+ * registry entry (a row's Remove): the same reading as `availability`, with the shared words.
+ */
+export function operationAvailability(
+  operation: string, capabilities: WorldCapabilities | null, bind: Readonly<Record<string, string>> = {},
+): ActionAvailability {
+  return availability({
+    id: `operation:${operation}`, label: operation, hint: operation, icon: 'info', group: 'build',
+    placement: [], operation, bind,
+  }, capabilities);
+}
+
+/** The words for a refusal an operation answered when it ran. */
+export function refusalWords(spec: ActionSpec, code: string | null): RefusalWords {
+  if (code === null) return UNRECOGNISED_REFUSAL;
+  return spec.refusals?.[code] ?? COMMON_REFUSALS[code] ?? UNRECOGNISED_REFUSAL;
+}
+
+export function actionsFor(placement: ActionPlacement): readonly ActionSpec[] {
+  return ACTIONS.filter((spec) => spec.placement.includes(placement));
+}

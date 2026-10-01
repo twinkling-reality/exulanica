@@ -140,9 +140,12 @@
   --region-gap: 12px;
   --bottombar-height: 64px;
 
-  /* Retuning switches for the earlier look (0deg and none keep panels flat and plain). */
+  /*
+   * Retuning switches for the earlier look. 0deg keeps panels flat (the earlier plates used -10deg);
+   * transparent keeps headers plain (the earlier look used the world profile's --chromatic-head).
+   */
   --panel-tilt: 0deg;
-  --panel-header-fill: none;
+  --panel-header-fill: transparent;
 
   /* The one stacking table. No other z-index value appears in app CSS. */
   --z-world: 0;

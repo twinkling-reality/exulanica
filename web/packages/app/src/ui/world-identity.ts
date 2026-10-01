@@ -1,6 +1,7 @@
 import type { SavedWorldEntry } from '../world-entry-api.js';
 import { say } from './copy.js';
 import { el } from './dom.js';
+import { actionSpec } from './actions/registry.js';
 import { button } from './system/components.js';
 
 export interface WorldIdentity {
@@ -30,16 +31,17 @@ export function buildWorldIdentity(deps: {
     class: 'world-title-status', role: 'status', 'aria-live': 'polite',
   });
   const form = el('form', { class: 'world-title-form' }, [title, save, status]);
-  const photos = button({
-    label: say('worldControls.addPhotos'), icon: 'photos', variant: 'quiet', className: 'world-add-photos',
-  });
-  const addObject = button({
-    label: say('worldControls.addObject'), icon: 'object', variant: 'quiet', className: 'world-add-object',
-  });
-  const world = button({
-    label: say('worldControls.world'), icon: 'menu', variant: 'quiet', shortcut: 'H',
-    className: 'world-open-menu',
-  });
+  // The top bar's verbs are the registry's entries: their words, icons and keys live there once.
+  const fromRegistry = (id: string, className: string, label?: string) => {
+    const spec = actionSpec(id);
+    return button({
+      label: label ?? spec.label, icon: spec.icon, variant: 'quiet', className,
+      ...(spec.shortcut === undefined ? {} : { shortcut: spec.shortcut }),
+    });
+  };
+  const photos = fromRegistry('photos.open', 'world-add-photos');
+  const addObject = fromRegistry('objects.open', 'world-add-object');
+  const world = fromRegistry('menu.open', 'world-open-menu', say('worldControls.world'));
   world.setAttribute('aria-label', say('worldControls.openWorld'));
   const root = el('aside', { class: 'world-identity', 'aria-label': say('worldControls.label') }, [
     form,

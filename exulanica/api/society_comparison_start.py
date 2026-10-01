@@ -45,6 +45,7 @@ from exulanica.api.decision_host import ask_bound_usd
 from exulanica.api.society_comparison_runner import ComparisonArm, SocietyComparisonRunner
 from exulanica.models.budget import BudgetGuard
 from exulanica.models.manifest import Manifest
+from exulanica.models.spending import SpendingRefused
 from exulanica.models.usage import USD_QUANTUM
 from exulanica.world.decision_roles import DecisionContract, DecisionRole
 from exulanica.world.society_catalogs import ComparisonCatalogs
@@ -525,6 +526,17 @@ class ComparisonCost:
             "suggested_usd": None if suggested is None else format(suggested, "f"),
             "typical_matches": self.typical_matches,
         }
+
+
+def spending_plan_refusal(refused: SpendingRefused) -> dict[str, Any]:
+    """A plan's statement of the refusal a start of it would be answered with where the durable
+    spending authority refuses a provider it would ask: the 429 problem's code and detail, with the
+    authority's ``spending`` member (``Services.allowance_refusal``)."""
+    return {
+        "code": "budget_exceeded",
+        "detail": str(refused),
+        "spending": refused.problem_member(),
+    }
 
 
 def asked_providers(body: Mapping[str, Any]) -> tuple[str, ...]:

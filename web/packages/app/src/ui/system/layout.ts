@@ -46,6 +46,8 @@ export interface Layout {
   adopt(selector: string, region: RegionName, options?: PlaceOptions): void;
   /** Re-apply the region rules now (after a change the observer cannot see, such as CSS). */
   reflect(): void;
+  /** Called after every change in what the regions show; returns the unsubscribe. */
+  onChange(listener: () => void): () => void;
   dispose(): void;
 }
 
@@ -71,6 +73,7 @@ export function createLayout(shell: HTMLElement): Layout {
     regions[name] = node;
   }
   const placements = new Map<HTMLElement, Placement>();
+  const changeListeners = new Set<() => void>();
 
   let reflecting = false;
   const reflect = (): void => {
@@ -97,6 +100,7 @@ export function createLayout(shell: HTMLElement): Layout {
     } finally {
       reflecting = false;
     }
+    for (const listener of changeListeners) listener();
   };
 
   const observer = new MutationObserver(() => reflect());
@@ -130,7 +134,12 @@ export function createLayout(shell: HTMLElement): Layout {
       route();
     },
     reflect,
+    onChange(listener) {
+      changeListeners.add(listener);
+      return () => changeListeners.delete(listener);
+    },
     dispose() {
+      changeListeners.clear();
       observer.disconnect();
       arrivals.disconnect();
       placements.clear();

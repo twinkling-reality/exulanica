@@ -20,10 +20,12 @@ carries a run's seed. A comparison this code cannot read, one naming a binding, 
 definition or a score version it does not hold, or whose outcomes scored other people than its
 group, is answered by name as a conflict (409), never as a server error.
 
-``POST .../comparisons/plan`` answers what a start would, and writes nothing: the roles, groups,
+``GET .../comparisons/plan`` answers what a start would, and writes nothing: the roles, groups,
 models and development seeds this server offers a comparison of the version's society, with why a
 model cannot be asked here, and, for a selection, the runs it plans, the most it can cost and what
-one like it typically cost, or the refusal a start of it would meet. ``POST .../comparisons``
+one like it typically cost, or the refusal a start of it would meet, a provider it would ask whose
+durable allowance is spent included (``budget_exceeded`` with the authority's ``spending`` member,
+as the start is answered). ``POST .../comparisons``
 starts one (:mod:`exulanica.api.society_comparison_start`): in one transaction it defines the
 comparison through the one definition path the local command defines by, frozen at the society's
 newest input or at an earlier stored one the caller names (``input_seq``), reserves every run and
@@ -88,6 +90,7 @@ from exulanica.api.society_comparison_start import (
     asked_providers,
     comparison_cost,
     definition_body,
+    spending_plan_refusal,
     stopped_host_usd,
     typical_per_person_hour,
 )
@@ -276,7 +279,8 @@ def plan_society_comparison(
     names (``model`` as ``<provider>/<model id>``, once or twice; ``person`` for a named group;
     ``input_seq`` for an earlier stored input to freeze), the runs it plans, the input it
     freezes, the most it can cost and what one like it typically cost, or the refusal a start of
-    it would meet."""
+    it would meet, by the same predicate a start's allowance check reads
+    (``Services.allowance_refusal``)."""
     comparisons = _comparisons(connection, session, request, world_id)
     society = _society(comparisons, version_id)
     navigation = comparisons.navigation_profile(society)
@@ -350,12 +354,18 @@ def plan_society_comparison(
         )
     except StartRefused as exc:
         document["plan_refusal"] = {"code": exc.code, "detail": exc.detail}
-    else:
-        document["plan"] = {
-            **prepared.cost.document(),
-            "input_seq": prepared.input_seq,
-            "minutes": _minutes(prepared, population, navigation),
-        }
+        return document
+    spent = services.allowance_refusal(
+        connection, session.workspace_id, asked_providers(prepared.body)
+    )
+    if spent is not None:
+        document["plan_refusal"] = spending_plan_refusal(spent)
+        return document
+    document["plan"] = {
+        **prepared.cost.document(),
+        "input_seq": prepared.input_seq,
+        "minutes": _minutes(prepared, population, navigation),
+    }
     return document
 
 

@@ -137,6 +137,11 @@ export function buildSocietyDirectedAction(options: {
   readonly describeRecord?: (record: SocietyActionRecord) => string;
   /** What the status says while the control is available and nothing has been asked yet. */
   readonly idleText?: string;
+  /**
+   * Why the world's capability descriptor refuses directed actions now, in words, or null when it
+   * does not. Read on every reflect; a refusal disables the control and is said in its status.
+   */
+  readonly serverGate?: () => string | null;
 }): SocietyDirectedActionControl {
   const label = options.label ?? objectActivity(options.affordance).directDefault;
   const describe = options.describeRecord ?? describeSocietyActionRecord;
@@ -155,7 +160,9 @@ export function buildSocietyDirectedAction(options: {
     `${options.getSnapshot()?.societyId ?? ''}:${options.getSubjectId() ?? ''}`;
 
   const reflect = (): void => {
-    const gate = societyDirectedActionGate(options.getSnapshot(), options.getSubjectId());
+    const local = societyDirectedActionGate(options.getSnapshot(), options.getSubjectId());
+    const refused = options.serverGate?.() ?? null;
+    const gate = refused !== null ? { ok: false as const, reason: refused } : local;
     button.disabled = busy || !gate.ok;
     if (busy) return;
     if (outcome !== null && outcome.heldFor !== held()) outcome = null;

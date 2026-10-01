@@ -118,6 +118,7 @@ import {
   type MotionAxisKey,
   type MotionDraft,
   type ObjectPlacementDraft,
+  type ObjectOperationGate,
   type ObjectPlacementPanel,
   type PlacedObjectRow,
 } from '../ui/object-placement.js';
@@ -225,6 +226,12 @@ export interface MountedObjects {
   smallSquareOffered(): boolean;
   /** The Create panel's own small square, asked for from elsewhere with the role the person chose. */
   arrangeSmallSquare(role: ObjectRole): void;
+  /** Stage taking back the last change, through the same confirmation as the panel's own control. */
+  undo(): void;
+  /** Whether this world holds a change that can still be taken back. */
+  undoable(): boolean;
+  /** What the world's capability descriptors allow; see `ObjectPlacementPanel.setOperationGate`. */
+  setOperationGate(gate: ObjectOperationGate): void;
   /** Read the authority and draw what it holds. Awaited by tests; fire and forget in the app. */
   begin(versionId?: string): Promise<void>;
   dispose(): void;
@@ -1304,11 +1311,16 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
    * undo and must not: a client's memory of an edit is exactly what `before_document` exists to
    * replace.
    */
-  function proposeUndo(): void {
-    if (version === null) return;
-    const last = [...version.edits].reverse()
+  function lastUndoable(): AlternateVersion['edits'][number] | undefined {
+    if (version === null) return undefined;
+    return [...version.edits].reverse()
       .find((edit) => edit.kind !== 'undo'
         && !version!.edits.some((other) => other.undoneEditId === edit.editId));
+  }
+
+  function proposeUndo(): void {
+    if (version === null) return;
+    const last = lastUndoable();
     if (last === undefined) {
       panel.report('There is nothing left to take back in this world.', 'failure');
       return;
@@ -1745,6 +1757,9 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
       setPanelVisible(!panel.visible());
     },
     smallSquareOffered: () => client !== null && (deps.authoredRegion !== undefined || deps.declaredFloor !== undefined),
+    undo: () => proposeUndo(),
+    setOperationGate: (gate) => panel.setOperationGate(gate),
+    undoable: () => lastUndoable() !== undefined,
     arrangeSmallSquare(role) {
       // Open the panel first: it holds "Take back the last change", which the confirmation names.
       setPanelVisible(true);

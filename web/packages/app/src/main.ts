@@ -72,6 +72,8 @@ import {
 } from './ui/startup-state.js';
 import { el, replace } from './ui/dom.js';
 import { createLayout, type Layout } from './ui/system/layout.js';
+import { mountActions, type MountedActions } from './composition/actions.js';
+import { perform } from './ui/actions/surfaces.js';
 import { createFirstUseGuidance, type FirstUseMode } from './ui/first-use-guidance.js';
 import { buildWorldIndex } from './ui/world-index.js';
 import { MapPeek } from './ui/map-peek.js';
@@ -400,6 +402,8 @@ let afterEntryAdvanced = (): void => undefined;
 
 /** The layout of the mounted world; replaced on every mount, with the surfaces it places. */
 let layout: Layout | null = null;
+/** The action registry's host for the mounted world; replaced on every mount. */
+let actions: MountedActions | null = null;
 
 async function recordAuthoredEntryAdvance(
   version: AlternateVersion,
@@ -606,7 +610,7 @@ async function mount(): Promise<void> {
   });
   let inputMode: FirstUseMode = 'converse';
   let reflectFirstUse = (): void => undefined;
-  afterEntryAdvanced = () => reflectFirstUse();
+  afterEntryAdvanced = () => { reflectFirstUse(); actions?.refresh(); };
   const finishFirstUse = (): void => {
     firstUse.complete();
     // `complete` also clears the per-page arrival prompt. That can change while the durable phase
@@ -964,12 +968,9 @@ async function mount(): Promise<void> {
     onOpenPhotos: () => dispatchShell({ type: 'toggle-photos' }),
     onClosePhotos: () => dispatchShell({ type: 'toggle-photos' }),
   });
-  openStarterObjects = () => {
-    environmentSelection.closePanels();
-    dispatchShell({ type: 'show-world' });
-    objects.toggle();
-  };
-  openStarterPhotos = () => dispatchShell({ type: 'toggle-photos' });
+  // The Companion's starter offers are the registry's actions, run through the same path as a click.
+  openStarterObjects = () => { if (actions !== null) void perform(actions.host, 'objects.open'); };
+  openStarterPhotos = () => { if (actions !== null) void perform(actions.host, 'photos.open'); };
   const handleAtlasCommand = (command: AtlasCommand): void => {
     environmentSelection.closePanels();
     objects.close();
@@ -1128,6 +1129,112 @@ async function mount(): Promise<void> {
   layout.place('hud', formation.root);
   if (segments !== null) layout.place('hud', segments.root);
   layout.adopt('.world-traffic-note, .reconstruction-loading', 'hud');
+
+  // Every action the rail, the top bar's clock and the palette offer is a registry entry bound
+  // here to the same call its older control makes (ui/actions/registry.ts).
+  actions?.dispose();
+  const inspectorPanel = (id: string): HTMLElement | null => layout?.regions.inspector.querySelector(`#${id}`) ?? null;
+  const panelOpen = (id: string): boolean => inspectorPanel(id)?.hidden === false;
+  const offerPhotos = (): boolean => state.activeWorldEntry !== null && state.activeWorldEntry.takesPhotographs !== false;
+  actions = mountActions({
+    layout,
+    credentials: currentCredentials,
+    worldId: state.activeWorldEntry?.worldId ?? null,
+    versionId: () => state.activeWorldEntry?.authoredVersionId ?? null,
+    people: environmentSelection.people,
+    clockSlot: worldIdentity?.root.querySelector<HTMLElement>('.world-add-object') ?? null,
+    searchSlot: worldIdentity?.root.querySelector<HTMLElement>('.world-open-menu') ?? null,
+    bindings: {
+      'objects.open': {
+        run: () => {
+          companion.dismiss();
+          environmentSelection.closePanels();
+          dispatchShell({ type: 'show-world' });
+          objects.toggle();
+        },
+        active: () => !objects.panel.root.hidden,
+      },
+      'objects.undo': {
+        run: () => objects.undo(),
+        blocked: () => (objects.undoable() ? null : 'There is nothing left to take back.'),
+      },
+      'people.open': {
+        run: () => {
+          if (panelOpen('world-panel-nearby')) environmentSelection.closePanels();
+          else { dispatchShell({ type: 'show-world' }); environmentSelection.openPanel('nearby'); }
+        },
+        active: () => panelOpen('world-panel-nearby'),
+      },
+      'people.bring-in': {
+        // Open People first, so whoever arrives, or the reason nobody did, is in view.
+        run: () => {
+          dispatchShell({ type: 'show-world' });
+          if (!panelOpen('world-panel-nearby')) environmentSelection.openPanel('nearby');
+          return environmentSelection.people.bringIn();
+        },
+        offered: () => environmentSelection.people.clock().society !== 'unconnected',
+        blocked: () => (environmentSelection.people.clock().society === 'present' ? 'People already live here.' : null),
+      },
+      'clock.play': {
+        run: () => environmentSelection.people.play(),
+        offered: () => environmentSelection.people.clock().society === 'present',
+        blocked: () => {
+          const clock = environmentSelection.people.clock();
+          return clock.busy ? 'Working.' : clock.playEligible ? null : 'This world cannot play on its own here.';
+        },
+      },
+      'clock.pause': {
+        run: () => environmentSelection.people.pause(),
+        offered: () => environmentSelection.people.clock().society === 'present',
+        blocked: () => (environmentSelection.people.clock().busy ? 'Working.' : null),
+      },
+      'clock.advance': {
+        run: () => environmentSelection.people.advance(),
+        offered: () => environmentSelection.people.clock().society === 'present',
+        blocked: () => environmentSelection.people.clock().advanceBlocked,
+      },
+      ...(societyComparison === null ? {} : {
+        'compare.open': {
+          run: () => dispatchShell({ type: 'toggle-compare' }),
+          active: () => shellState.primary === 'compare',
+        },
+      }),
+      'companion.open': {
+        run: () => handleAtlasCommand('companion'),
+        active: () => companion.panel.state() === 'open',
+      },
+      'map.open': { run: () => handleAtlasCommand('map'), active: () => shellState.camera === 'map' },
+      'library.open': { run: () => handleAtlasCommand('index'), active: () => shellState.primary === 'index' },
+      'character.open': {
+        run: () => handleAtlasCommand('character'),
+        active: () => shellState.primary === 'character',
+      },
+      'photos.open': {
+        run: () => dispatchShell({ type: 'toggle-photos' }),
+        offered: offerPhotos,
+        active: () => shellState.primary === 'photos',
+      },
+      'about.open': {
+        run: () => { dispatchShell({ type: 'show-world' }); environmentSelection.openPanel('details'); },
+      },
+      ...(state.worldEntries === null ? {} : {
+        'world.make': { run: () => dispatchShell({ type: 'toggle-make' }) },
+      }),
+      'design.open': { run: () => handleAtlasCommand('options'), active: () => shellState.primary === 'options' },
+      'settings.open': {
+        run: () => handleAtlasCommand('controls'),
+        active: () => shellState.primary === 'controls',
+      },
+      'menu.open': { run: () => dispatchShell({ type: 'toggle-menu' }), active: () => shellState.primary === 'menu' },
+    },
+  });
+  // The objects panel's own writes follow the same descriptors as the registry's actions.
+  const gateObjects = (): void => {
+    objects.setOperationGate((operation) => actions?.objectGate(operation) ?? null);
+    environmentSelection.people.setGate((operation) => actions?.peopleGate(operation) ?? null);
+  };
+  actions.host.onChange(gateObjects);
+  gateObjects();
   void intake.begin();
 
   reflectShell = (): void => {
@@ -1137,6 +1244,7 @@ async function mount(): Promise<void> {
       state.atlas?.binding.endSceneInspection();
       status.hideInspector();
     }
+    actions?.changed();
     shell.setAttribute('data-primary', shellState.primary);
     shell.setAttribute('data-camera', shellState.camera);
     chrome.setIndexOpen(shellState.primary === 'index');
