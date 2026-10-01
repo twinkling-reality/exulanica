@@ -26,6 +26,22 @@ describe('world workspace interaction ownership', () => {
     expect(document.activeElement?.getAttribute('aria-controls')).toBe('world-panel-details');
     camera.click(); expect(action).toHaveBeenCalledOnce();
   });
+  it('gives the keyboard back to the control that opened a panel, such as the tool rail', () => {
+    const { root, view } = mount();
+    const rail = document.createElement('button');
+    document.body.append(rail);
+    rail.focus();
+    view.openPanel('nearby');
+    expect(root.querySelector<HTMLElement>('#world-panel-nearby')!.contains(document.activeElement)).toBe(true);
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', cancelable: true }));
+    expect(document.activeElement).toBe(rail);
+  });
+  it('holds no live region inside another, so a status is announced once', () => {
+    const { root } = mount();
+    const live = '[role="status"], [role="alert"], [aria-live]:not([aria-live="off"])';
+    const nested = [...root.querySelectorAll(live)].filter((node) => node.parentElement?.closest(live));
+    expect(nested.map((node) => node.className)).toEqual([]);
+  });
   it('focuses inspection and releases its listener on disposal', () => {
     const { root, view } = mount();
     view.inspect();

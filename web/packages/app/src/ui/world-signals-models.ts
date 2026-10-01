@@ -2,7 +2,7 @@
 
 import type { ModelRef } from '../society-models-api.js';
 import type { SignalChoice, SignalRole } from '../world-models-api.js';
-import { el, replace } from './dom.js';
+import { el, replace, setText } from './dom.js';
 
 const optionValue = (model: ModelRef): string => `${model.provider} ${model.modelId}`;
 const optionModel = (value: string): ModelRef | null => {
@@ -89,9 +89,9 @@ export function buildSignalModels(handlers: {
     ]);
     if ([...model.options].some((option) => option.value === previousModel)) model.value = previousModel;
     const refusal = view.hostRefusal;
-    host.textContent = refusal === null
+    setText(host, refusal === null
       ? 'This server prepares model decisions before a traffic minute is shown.'
-      : `Fixed timing continues because ${why(refusal)}.`;
+      : `Fixed timing continues because ${why(refusal)}.`);
     signal.disabled = busy;
     model.disabled = busy;
     choose.disabled = busy;

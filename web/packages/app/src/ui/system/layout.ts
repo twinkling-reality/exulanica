@@ -22,6 +22,11 @@ export type RegionName = typeof REGION_NAMES[number];
 
 const EXCLUSIVE: ReadonlySet<RegionName> = new Set(['inspector', 'sheet']);
 const OPENS_INSPECTOR: ReadonlySet<RegionName> = new Set(['inspector', 'sheet']);
+/**
+ * The regions a major surface (the World menu, Compare, Settings and the rest) covers: made inert
+ * while one is open so Tab stays in it. Toasts stay outside so a notice is still read.
+ */
+export const MODAL_BACKGROUND_REGIONS: readonly RegionName[] = REGION_NAMES.filter((region) => region !== 'toast');
 
 export interface PlaceOptions {
   /** How the layout closes this surface when another takes its exclusive region. */

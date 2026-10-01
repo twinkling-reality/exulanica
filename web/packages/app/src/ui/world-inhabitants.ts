@@ -23,7 +23,7 @@ import {
 import { societyEngine } from '../society-engines.js';
 import { inhabitantWordsFrom, type InhabitantWords } from '../society-inhabitant-words.js';
 import { say } from './copy.js';
-import { el, replace } from './dom.js';
+import { el, replace, setText } from './dom.js';
 import './world-inhabitants.css';
 
 /** What the panel reads of the persisted society view the mount holds. */
@@ -424,9 +424,9 @@ export function buildWorldInhabitants(handlers: {
       }
     }
     playbackStatus.hidden = !words?.status;
-    playbackStatus.textContent = words?.status ?? '';
+    setText(playbackStatus, words?.status ?? '');
     playbackWhy.hidden = !words?.why;
-    playbackWhy.textContent = words?.why ?? '';
+    setText(playbackWhy, words?.why ?? '');
     return playing;
   };
 
@@ -488,9 +488,9 @@ export function buildWorldInhabitants(handlers: {
       : 'Sending everyone away is kept in this world\'s history. You can bring the same people back later.';
     select.hidden = !here;
     if (!present) {
-      summary.textContent = society.status === 'absent' || society.status === 'idle'
+      setText(summary, society.status === 'absent' || society.status === 'idle'
         ? 'Nobody lives here yet.'
-        : society.message;
+        : society.message);
       area.hidden = true;
       placesHeading.hidden = true;
       placesList.hidden = true;
@@ -498,10 +498,10 @@ export function buildWorldInhabitants(handlers: {
       return;
     }
     const people = snapshot.populationSize;
-    summary.textContent = away
+    setText(summary, away
       ? `Nobody lives here now: you sent everyone away at minute ${snapshot.presence.sinceTick}.`
       : `${people === 1 ? 'One person lives' : `${people} people live`} here. Minute ${snapshot.currentTick}; `
-        + `${walked === 0 ? 'nobody' : walked} walked in the last minute.`;
+        + `${walked === 0 ? 'nobody' : walked} walked in the last minute.`);
     const places = snapshot.places;
     const words = places === null ? null : areaWords(places);
     area.hidden = words === null;
@@ -529,7 +529,7 @@ export function buildWorldInhabitants(handlers: {
     render,
     unavailable(reason) {
       root.dataset['state'] = 'unavailable';
-      summary.textContent = reason;
+      setText(summary, reason);
       for (const node of [need, refusal, refusalDetails, bringIn, bringBack, play, paceLabel, playbackStatus, playbackWhy,
         advance, advanceWhy, movedLine, noticeLine, flightLine, unplacedLine, sendAway, presenceHelp, area, placesHeading, placesList, select]) {
         node.hidden = true;

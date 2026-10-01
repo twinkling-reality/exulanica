@@ -25,6 +25,14 @@ export function el<K extends keyof HTMLElementTagNameMap>(
   return node;
 }
 
+/**
+ * Set a node's words only when they differ. Writing the same words again replaces the text node,
+ * which a live region announces as news; a status that is redrawn every second would repeat itself.
+ */
+export function setText(node: Node, text: string): void {
+  if (node.textContent !== text) node.textContent = text;
+}
+
 export function clear(node: Element): void {
   while (node.firstChild) node.removeChild(node.firstChild);
 }

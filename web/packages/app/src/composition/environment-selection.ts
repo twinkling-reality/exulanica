@@ -51,7 +51,7 @@ import {
   type EnvironmentProposal,
 } from '../environment-selection-api.js';
 import { say } from '../ui/copy.js';
-import { el } from '../ui/dom.js';
+import { el, setText } from '../ui/dom.js';
 import { characterDisplayDetails } from '../ui/character-details.js';
 import { buildRepresentationInspector } from '../ui/representation-inspector.js';
 import {
@@ -1408,9 +1408,9 @@ export function mountEnvironmentSelection(
     playbackSpeed.value = String(control.speed);
     playbackMode.textContent = control.mode === 'playing' ? 'Pause society' : 'Play society';
     const eligibility = control.playEligible ? '' : ` ${control.playIneligibleReason ?? 'Playback is unavailable.'}`;
-    playbackStatus.textContent = control.mode === 'playing'
-      ? `Saved as playing at ${control.speed}×. When the playback worker is online, it waits at least ${control.tickIntervalMs} ms after each completed batch. Persisted tick ${control.currentTick}.${control.reason ? ` ${control.reason}` : ''}`
-      : `Paused at persisted tick ${control.currentTick}. Speed is set to ${control.speed}×.${eligibility}`;
+    setText(playbackStatus, control.mode === 'playing'
+      ? `Saved as playing at ${control.speed}×. When the playback worker is online, it waits at least ${control.tickIntervalMs} ms after each completed batch. Saved at minute ${control.currentTick}.${control.reason ? ` ${control.reason}` : ''}`
+      : `Paused at minute ${control.currentTick}. Speed is set to ${control.speed}×.${eligibility}`);
     playbackMode.disabled = controlBusy || !scopeReady()
       || (!control.playEligible && control.mode === 'paused');
     playbackSpeed.disabled = controlBusy;
@@ -1662,7 +1662,7 @@ export function mountEnvironmentSelection(
     if (!atlas?.ownedDistrict) return;
     if (fromClient && view.snapshot === null && ['unauthorized', 'unavailable'].includes(view.status)) { districtFailure = view.message; clearDistrict(); }
     society = districtView ? view.snapshot : null;
-    liveStatus.textContent = `${society ? `Persisted tick ${society.currentTick}. ` : ''}${districtView ? view.message : districtFailure}`;
+    setText(liveStatus, `${society ? `Saved at minute ${society.currentTick}. ` : ''}${districtView ? view.message : districtFailure}`);
     liveControls.dataset['state'] = view.status;
     advanceSociety.disabled = view.busy || !society || !view.eventsAvailable || !['ready', 'stale'].includes(view.status);
     refreshSociety.disabled = view.busy;
@@ -1700,7 +1700,7 @@ export function mountEnvironmentSelection(
     const atlas = deps.state.atlas?.binding;
     const runtime = atlas?.authoredSociety ?? null;
     society = view.snapshot;
-    liveStatus.textContent = `${society ? `Persisted tick ${society.currentTick}. ` : ''}${view.message}`;
+    setText(liveStatus, `${society ? `Saved at minute ${society.currentTick}. ` : ''}${view.message}`);
     liveControls.dataset['state'] = view.status;
     refreshSociety.disabled = view.busy;
     const canvas = deps.env.canvas;

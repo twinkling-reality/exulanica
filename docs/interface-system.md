@@ -60,8 +60,14 @@ surface keeps its own open and close behaviour; the layout watches its `hidden` 
 
 The World menu, Library, Character, Compare, Design, Settings, Make a world and Photos are major
 surfaces that the shell state (`web/packages/app/src/world-shell.ts`) opens one at a time; they sit
-on the overlay layer. While anything is visible in `inspector` or `sheet`, `#shell` carries
+on the overlay layer. While one is open every region except `toast` is inert
+(`MODAL_BACKGROUND_REGIONS`), so Tab stays in the open surface; the Library is inert whenever it is
+not the one open. While anything is visible in `inspector` or `sheet`, `#shell` carries
 `data-inspector-open` and the dock, toasts and heads-up stack centre themselves in what is left.
+
+Compare and the recorded-result reader load when first opened
+(`web/packages/app/src/composition/lazy-panel.ts`): until then a stand-in says "Opening Compare."
+and a load that fails says so with Try again.
 
 Below 60rem the application shows its narrow-window notice; the region rules for narrow screens
 (a bottom bar and a bottom sheet) exist in `layout.css` for when that notice is lifted.

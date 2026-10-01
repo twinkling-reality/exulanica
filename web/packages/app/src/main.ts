@@ -71,7 +71,7 @@ import {
   worldOpeningReason,
 } from './ui/startup-state.js';
 import { el, replace } from './ui/dom.js';
-import { createLayout, type Layout } from './ui/system/layout.js';
+import { createLayout, MODAL_BACKGROUND_REGIONS, type Layout } from './ui/system/layout.js';
 import { mountActions, type MountedActions } from './composition/actions.js';
 import { perform } from './ui/actions/surfaces.js';
 import { createFirstUseGuidance, type FirstUseMode } from './ui/first-use-guidance.js';
@@ -94,8 +94,7 @@ import {
 } from './composition/world-entry.js';
 import { mountEnvironmentSelection } from './composition/environment-selection.js';
 import { createSavedWorldFlight } from './composition/saved-world-flight.js';
-import { mountSocietyComparison } from './composition/society-comparison-mount.js';
-import { mountSocietyExperimentResult } from './composition/society-experiment-result.js';
+import { lazyPanel } from './composition/lazy-panel.js';
 import { createSegmentSession, mountSegments, segmentsFirst } from './composition/segments.js';
 import { mountWritePath, type MountedWritePath } from './composition/write-path.js';
 import { disposeCompanionStage, mountCompanion } from './composition/companion.js';
@@ -1004,22 +1003,25 @@ async function mount(): Promise<void> {
     }),
     onCommand: handleAtlasCommand,
   });
-  const societyExperiment = state.activeWorldEntry === null ? null : mountSocietyExperimentResult({
-    getWorldId: () => state.activeWorldEntry?.worldId ?? null,
-    getVersionId: () => state.activeWorldEntry?.authoredVersionId ?? null,
-    credentials: currentCredentials,
-    onClose: () => dispatchShell({ type: 'toggle-experiment' }),
-  });
+  // Compare and the recorded-result reader load when first opened (composition/lazy-panel.ts).
+  const societyExperiment = state.activeWorldEntry === null ? null : lazyPanel('Recorded result', async () =>
+    (await import('./composition/society-experiment-result.js')).mountSocietyExperimentResult({
+      getWorldId: () => state.activeWorldEntry?.worldId ?? null,
+      getVersionId: () => state.activeWorldEntry?.authoredVersionId ?? null,
+      credentials: currentCredentials,
+      onClose: () => dispatchShell({ type: 'toggle-experiment' }),
+    }));
   state.disposeSocietyExperiment = societyExperiment === null
     ? null
     : () => societyExperiment.dispose();
-  const societyComparison = state.activeWorldEntry === null ? null : mountSocietyComparison({
-    getWorldId: () => state.activeWorldEntry?.worldId ?? null,
-    getVersionId: () => state.activeWorldEntry?.authoredVersionId ?? null,
-    credentials: currentCredentials,
-    onClose: () => dispatchShell({ type: 'toggle-compare' }),
-    onRecordedResult: () => dispatchShell({ type: 'toggle-experiment' }),
-  });
+  const societyComparison = state.activeWorldEntry === null ? null : lazyPanel('Compare', async () =>
+    (await import('./composition/society-comparison-mount.js')).mountSocietyComparison({
+      getWorldId: () => state.activeWorldEntry?.worldId ?? null,
+      getVersionId: () => state.activeWorldEntry?.authoredVersionId ?? null,
+      credentials: currentCredentials,
+      onClose: () => dispatchShell({ type: 'toggle-compare' }),
+      onRecordedResult: () => dispatchShell({ type: 'toggle-experiment' }),
+    }));
   state.disposeSocietyComparison = societyComparison === null
     ? null
     : () => societyComparison.dispose();
@@ -1237,7 +1239,10 @@ async function mount(): Promise<void> {
   gateObjects();
   void intake.begin();
 
+  let reflectedPrimary = shellState.primary;
   reflectShell = (): void => {
+    const libraryOpened = shellState.primary === 'index' && reflectedPrimary !== 'index';
+    reflectedPrimary = shellState.primary;
     if (shellState.primary !== 'world') {
       environmentSelection.closePanels();
       objects.close();
@@ -1248,7 +1253,6 @@ async function mount(): Promise<void> {
     shell.setAttribute('data-primary', shellState.primary);
     shell.setAttribute('data-camera', shellState.camera);
     chrome.setIndexOpen(shellState.primary === 'index');
-    worldIndex.root.inert = shellState.primary !== 'index';
     worldIndex.root.setAttribute('aria-hidden', shellState.primary === 'index' ? 'false' : 'true');
     appearance.options.setVisible(shellState.primary === 'options');
     appearance.settings.setVisible(shellState.primary === 'controls');
@@ -1268,9 +1272,10 @@ async function mount(): Promise<void> {
       shellState.primary === 'controls' || shellState.primary === 'character' ||
       shellState.primary === 'experiment' || shellState.primary === 'compare' ||
       shellState.primary === 'photos' || shellState.primary === 'make';
+    // Every region but the toasts sits behind a major surface, so Tab cannot reach the rail or an
+    // inspector panel under it.
     const modalBackground = [
       stage,
-      worldIndex.root,
       detail.root,
       formation.root,
       companion.panel.root,
@@ -1278,6 +1283,7 @@ async function mount(): Promise<void> {
       mapCaption,
       travelStatus,
       ...(worldIdentity === null ? [] : [worldIdentity.root]),
+      ...(layout === null ? [] : MODAL_BACKGROUND_REGIONS.map((region) => layout!.regions[region])),
     ];
     // On close, release the command bar before the dialog restores focus to its trigger. On open,
     // move focus into the dialog before making that same trigger inert.
@@ -1286,6 +1292,10 @@ async function mount(): Promise<void> {
     appearance.settings.setVisible(shellState.primary === 'controls');
     character.setVisible(shellState.primary === 'character');
     if (systemSurfaceOpen) for (const surface of modalBackground) surface.inert = true;
+    // The closed Library is transparent, not hidden, so it stays inert unless it is the one open.
+    worldIndex.root.inert = shellState.primary !== 'index' || systemSurfaceOpen;
+    // Opened from the rail, the palette or I, the Library takes the keyboard with it.
+    if (libraryOpened) worldIndex.root.querySelector<HTMLElement>('button, input')?.focus({ preventScroll: true });
     mapCaption.hidden = shellState.camera !== 'map';
     // Only while traversing the ground: the Map is already the whole answer, and a plate has the
     // world behind it rather than under it.

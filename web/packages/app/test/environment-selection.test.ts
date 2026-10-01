@@ -818,7 +818,7 @@ describe('persisted living world controls',()=>{
   });
   it('inspects actual persisted event documents and discloses missing references',async()=>{
     const {mount,button,controls}=liveMount();await mount.begin();button('Next minute').click();
-    await vi.waitFor(()=>expect(mount.root.textContent).toContain('Persisted tick 1'));
+    await vi.waitFor(()=>expect(mount.root.textContent).toContain('Saved at minute 1'));
     controls.onInteract?.();
     expect(mount.root.textContent).toContain('Recorded target removal.');
     expect(mount.root.textContent).toContain('Referenced events unavailable in the latest event window: outside-window');

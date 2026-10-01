@@ -306,6 +306,8 @@ export function statusLine(className?: string): StatusLine {
   return {
     root,
     say(message, tone = 'neutral') {
+      // The same words again are not news: leave the region alone so it is not announced twice.
+      if (root.dataset['tone'] === tone && root.textContent === message && root.hidden === (message.length === 0)) return;
       const glyph = TONE_ICON[tone];
       root.replaceChildren(...(glyph === null ? [] : [icon(glyph, 'sm')]), el('span', { text: message }));
       root.dataset['tone'] = tone;

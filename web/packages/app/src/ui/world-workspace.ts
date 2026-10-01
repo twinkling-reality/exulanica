@@ -1,5 +1,5 @@
 import { say } from './copy.js';
-import { el } from './dom.js';
+import { el, setText } from './dom.js';
 
 /** Presentation only: existing nodes retain their listeners and contract ownership. */
 export function buildWorldWorkspace(parts: {
@@ -21,7 +21,8 @@ export function buildWorldWorkspace(parts: {
   root.classList.add('world-workspace');
   root.setAttribute('aria-label', 'World exploration');
   parts.title.textContent = 'Your world';
-  const availability = el('span', { class: 'world-source-label', role: 'status', text: 'Loading…' });
+  // Inside the arrival line, which is the live region; a second one inside it would say this twice.
+  const availability = el('span', { class: 'world-source-label', text: 'Loading…' });
   const nearbyState = el('p', { class: 'world-help', role: 'status', text: 'Loading nearby people…' });
   const heading = el('header', { class: 'world-heading' }, [
     el('div', { class: 'world-heading-meta' }, [
@@ -34,16 +35,26 @@ export function buildWorldWorkspace(parts: {
   const panels = new Map<string, HTMLElement>();
   const buttons = new Map<string, HTMLButtonElement>();
   let active: string | null = null;
+  // The control a panel was opened from (the tool rail, the palette's target, the panel's own tab),
+  // which gets the keyboard back when the panel closes.
+  let opener: HTMLElement | null = null;
   const close = (restore = true) => {
     const previous = active;
     active = null;
     for (const panel of panels.values()) panel.hidden = true;
     for (const button of buttons.values()) button.setAttribute('aria-expanded', 'false');
     root.removeAttribute('data-panel');
-    if (restore && previous) (buttons.get(previous) ?? buttons.get('nearby'))?.focus();
+    if (!restore || !previous) return;
+    const back = opener?.isConnected === true && opener.getClientRects().length > 0
+      ? opener : (buttons.get(previous) ?? buttons.get('nearby'));
+    opener = null;
+    back?.focus();
   };
   const open = (name: string, focus = true) => {
     if (document.pointerLockElement != null) document.exitPointerLock();
+    const from = document.activeElement;
+    if (from instanceof HTMLElement && from !== document.body
+      && ![...panels.values()].some((panel) => panel.contains(from))) opener = from;
     parts.onOpen?.();
     close(false);
     active = name;
@@ -162,7 +173,7 @@ export function buildWorldWorkspace(parts: {
     /** `saidElsewhere`: another section of this panel already says nobody is here. */
     setNearby(count: number, saidElsewhere = false) {
       nearbyState.hidden = count > 0 || saidElsewhere;
-      nearbyState.textContent = 'No people are in the nearby display. Move through the world to explore.';
+      setText(nearbyState, 'No people are in the nearby display. Move through the world to explore.');
     },
     /** The camera controls the open world offers, laid out; the group is hidden while it holds none. */
     setCamera(controls: readonly HTMLElement[]) {

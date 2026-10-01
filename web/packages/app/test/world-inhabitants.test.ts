@@ -105,6 +105,23 @@ describe('the inhabitants panel', () => {
     expect(onBringIn).toHaveBeenCalledTimes(1);
   });
 
+  it('leaves its live lines alone when a redraw says the same thing, so nothing is announced twice', async () => {
+    const panel = buildWorldInhabitants({ onBringIn: vi.fn(), onAdvance: vi.fn(), onSendAway: vi.fn(), onBringBack: vi.fn() });
+    panel.render({ society: view({}), objects: [], walked: 0, advanceBlocked: null });
+    let changes = 0;
+    const observer = new MutationObserver((records) => { changes += records.length; });
+    for (const live of panel.root.querySelectorAll('[role="status"], [aria-live]')) {
+      observer.observe(live, { childList: true, characterData: true, subtree: true });
+    }
+    panel.render({ society: view({}), objects: [], walked: 0, advanceBlocked: null });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(changes).toBe(0);
+    panel.render({ society: view({ message: 'x', status: 'unavailable' }), objects: [], walked: 0, advanceBlocked: null });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(changes).toBeGreaterThan(0);
+    observer.disconnect();
+  });
+
   it('shows a refusal until the next request, with its code only in the details', () => {
     const panel = buildWorldInhabitants({ onBringIn: vi.fn(), onAdvance: vi.fn() , onSendAway: vi.fn(), onBringBack: vi.fn() });
     panel.render({

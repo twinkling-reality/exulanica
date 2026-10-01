@@ -15,7 +15,7 @@ import type {
   SocietyModels,
 } from '../society-models-api.js';
 import { DECISION_WORDS } from '../society-inhabitant-words.js';
-import { el, replace } from './dom.js';
+import { el, replace, setText } from './dom.js';
 import './society-models.css';
 
 /**
@@ -221,7 +221,7 @@ export function buildSocietyModels(handlers: {
     root.hidden = peopleGroup.hidden;
     result.textContent = message;
     if (view === null || !view.takesModelChoices) return;
-    host.textContent = hostWords(view.hostRefusal);
+    setText(host, hostWords(view.hostRefusal));
     // The options are rebuilt only when the models change, so a choice in progress is kept.
     if (shown === null || shown.models !== view.models) {
       const previous = model.value;

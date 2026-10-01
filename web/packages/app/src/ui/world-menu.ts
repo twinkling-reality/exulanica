@@ -180,7 +180,22 @@ export function buildWorldMenu(options: {
       { opacity: 1, translate: '0 0', filter: 'brightness(1)' },
       { opacity: 0, translate: '32px 0', filter: 'brightness(1.16)' },
     ], { duration: 150, easing: 'cubic-bezier(.4,0,1,1)' });
-    void animation.finished.then(action).catch(() => { leaving = false; });
+    // The choice never waits on the animation: a page whose frames are throttled (a background
+    // tab, a busy machine) may not finish it, and the menu would ignore every key after.
+    let done = false;
+    const finish = (): void => {
+      if (done) return;
+      done = true;
+      action();
+    };
+    const fallback = window.setTimeout(finish, 300);
+    void animation.finished.then(() => {
+      window.clearTimeout(fallback);
+      finish();
+    }).catch(() => {
+      window.clearTimeout(fallback);
+      leaving = false;
+    });
   };
   return {
     root,

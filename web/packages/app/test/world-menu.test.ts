@@ -143,4 +143,24 @@ describe('World menu', () => {
     expect(menu.root.hidden).toBe(true);
     expect(document.activeElement).toBe(opener);
   });
+
+  it('closes on Escape even when its closing animation never finishes', () => {
+    vi.useFakeTimers();
+    try {
+      const onResume = vi.fn();
+      const menu = buildWorldMenu({ preview: false, onResume, onWorld: vi.fn(), onCommand: vi.fn() });
+      document.body.append(menu.root);
+      menu.setVisible(true);
+      const plane = menu.root.querySelector<HTMLElement>('.world-menu-plane')!;
+      // A throttled page: the animation is created but its finished promise never settles.
+      plane.animate = (() => ({ finished: new Promise(() => undefined) })) as unknown as typeof plane.animate;
+      menu.root.dispatchEvent(new KeyboardEvent('keydown', { code: 'Escape', bubbles: true }));
+      expect(onResume).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(300);
+      expect(onResume).toHaveBeenCalledOnce();
+      menu.root.remove();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
