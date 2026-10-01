@@ -45,7 +45,7 @@ from fastapi.testclient import TestClient
 
 from conftest import photo_bytes
 from object_store_double import S3Double, serve
-from test_material_recipes import METAL, _small
+from test_material_recipes import METAL, _real_runtime, _small
 from tests_support_api import EVERY_PERMISSION, scratch_database
 
 pytestmark = pytest.mark.postgres
@@ -311,6 +311,9 @@ def test_a_worker_process_reads_the_api_s_original_and_the_purger_erases_both(sh
 
 
 def test_the_api_serves_a_texture_a_worker_process_baked(shared):
+    # The worker process bakes with the real baker, which needs web/node_modules; without it the
+    # test skips under the reason tests/expected_skips.toml accepts only where that is missing.
+    _real_runtime()
     created = shared.call(
         "POST",
         "/materials/recipes",
