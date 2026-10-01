@@ -834,8 +834,14 @@ another host or about more than one process.
 - **A refused upload can arrive as a reset connection.** An upload is refused before its body is
   read and its connection is then closed, so a client still sending a large body can see the close
   before the 503: in the run above, 23 of the 27 refused uploads reached the client that way. A
-  client treats a reset during an upload as "send it again later". A proxy in front that reads the
-  whole body before passing it on hands the client the 503 instead; that is not measured here.
+  client treats a reset during an upload as "send it again later". Behind the installation's own
+  client proxy (`deploy/installation/client-nginx.conf`), which reads a request's body before
+  passing it on, an acceptance run on the same host sent 40 uploads of about 3.35 MB from four
+  workspaces at once through a running installation, and none met a reset: the proxy's
+  per-address write limit answered 19 with its own HTML 429, the API admitted 2 and refused 19, and
+  the client received 18 of those refusals as 503 `capacity_exhausted` and one as the proxy's HTML
+  502, where the API closed before the proxy had relayed its answer. A client therefore treats a 502
+  or an HTML 429 during an upload as "send it again later" too.
 - **Inhabited worlds beside the supported load:** eight towns whose societies the API process plays
   at four times speed, each town's traffic read every five seconds, beside the supported load for
   three minutes. The towns advanced 72 to 73 percent of the ticks their speed sets (85 to 87 of
