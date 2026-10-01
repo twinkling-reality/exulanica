@@ -1,0 +1,6056 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "answers": {
+      "path": "docs/evaluation/2026-09-30-world-clock-crossings-preregistration.json",
+      "record_sha256": "da434303a5170b1dce7ffeeaf94578786b55e709dc0ab95bc209a1176ca44db5"
+    },
+    "judgment": {
+      "P1": {
+        "passed": true,
+        "violations": {}
+      },
+      "P2": {
+        "inside_blocked_for_walkers": 0,
+        "inside_waits": 330,
+        "longest_inside_wait_seconds": 29,
+        "passed": true
+      },
+      "P3": {
+        "passed": true,
+        "towns_with_unmapped_crossings": []
+      },
+      "passed": true,
+      "reported": {
+        "excluded_towns": [],
+        "longest_outside_wait_seconds": 26,
+        "outside_waits": 450
+      }
+    },
+    "kind": "exulanica.world-clock-crossings/v1",
+    "limits": [
+      "Mechanics on generated towns through the pure chain the coupled follower runs; the database path, its ordering and its sealing are held by tests, not by this record.",
+      "The envelope judges the whole town at once: a wait counts as inside only when every crossing of the town is inside the envelope over its span.",
+      "No timing is measured, and nothing here is a capacity or intelligence claim."
+    ],
+    "python": "3.11.6",
+    "script_sha256": "f57033b9f3ee5fc6631892cae814394ab864af3f405c19f4d355264b5afa97b5",
+    "towns": [
+      {
+        "bands": 20,
+        "crossings_walked": 19,
+        "episodes": [
+          {
+            "blocked": [],
+            "episode": 1000,
+            "fed_entries": 12,
+            "longest_occupied_run_seconds": 24,
+            "outside_envelope_window_starts": [],
+            "trips": {
+              "arrived": 18,
+              "blocked": {},
+              "requested": 18,
+              "unfinished": 0
+            },
+            "vehicles": 9,
+            "violations": {},
+            "waits": []
+          },
+          {
+            "blocked": [],
+            "episode": 1001,
+            "fed_entries": 35,
+            "longest_occupied_run_seconds": 17,
+            "outside_envelope_window_starts": [
+              [
+                597,
+                601
+              ]
+            ],
+            "trips": {
+              "arrived": 18,
+              "blocked": {},
+              "requested": 18,
+              "unfinished": 0
+            },
+            "vehicles": 9,
+            "violations": {},
+            "waits": [
+              {
+                "from_local_second": 505,
+                "inside_envelope": true,
+                "seconds": 6
+              }
+            ]
+          },
+          {
+            "blocked": [],
+            "episode": 1002,
+            "fed_entries": 23,
+            "longest_occupied_run_seconds": 24,
+            "outside_envelope_window_starts": [
+              [
+                0,
+                5
+              ]
+            ],
+            "trips": {
+              "arrived": 18,
+              "blocked": {},
+              "requested": 18,
+              "unfinished": 0
+            },
+            "vehicles": 9,
+            "violations": {},
+            "waits": [
+              {
+                "from_local_second": 257,
+                "inside_envelope": true,
+                "seconds": 4
+              },
+              {
+                "from_local_second": 421,
+                "inside_envelope": true,
+                "seconds": 12
+              },
+              {
+                "from_local_second": 620,
+                "inside_envelope": true,
+                "seconds": 5
+              },
+              {
+                "from_local_second": 631,
+                "inside_envelope": true,
+                "seconds": 9
+              }
+            ]
+          },
+          {
+            "blocked": [],
+            "episode": 1003,
+            "fed_entries": 13,
+            "longest_occupied_run_seconds": 16,
+            "outside_envelope_window_starts": [],
+            "trips": {
+              "arrived": 18,
+              "blocked": {},
+              "requested": 18,
+              "unfinished": 0
+            },
+            "vehicles": 9,
+            "violations": {},
+            "waits": [
+              {
+                "from_local_second": 632,
+                "inside_envelope": true,
+                "seconds": 7
+              }
+            ]
+          },
+          {
+            "blocked": [],
+            "episode": 1004,
+            "fed_entries": 11,
+            "longest_occupied_run_seconds": 16,
+            "outside_envelope_window_starts": [],
+            "trips": {
+              "arrived": 18,
+              "blocked": {},
+              "requested": 18,
+              "unfinished": 0
+            },
+            "vehicles": 9,
+            "violations": {},
+            "waits": [
+              {
+                "from_local_second": 721,
+                "inside_envelope": true,
+                "seconds": 6
+              }
+            ]
+          },
+          {
+            "blocked": [],
+            "episode": 1005,
+            "fed_entries": 19,
+            "longest_occupied_run_seconds": 16,
+            "outside_envelope_window_starts": [],
+            "trips": {
+              "arrived": 18,
+              "blocked": {},
+              "requested": 18,
+              "unfinished": 0
+            },
+            "vehicles": 9,
+            "violations": {},
+            "waits": [
+              {
+                "from_local_second": 151,
+                "inside_envelope": true,
+                "seconds": 18
+              },
+              {
+                "from_local_second": 374,
+                "inside_envelope": true,
+                "seconds": 15
+              }
+            ]
+          }
+        ],
+        "junction_bands": 20,
+        "occupancy_intervals": {
+          "entered": 92,
+          "on_crossing_at_minute_start": 13
+        },
+        "population": 32,
+        "preset": "small_town",
+        "stress": {
+          "blocked_reasons": {
+            "pedestrian_due": 1,
+            "queued": 7,
+            "signal_amber": 1
+          },
+          "episode": 1000,
+          "longest_wait_seconds": 24,
+          "trips": {
+            "arrived": 1,
+            "blocked": {
+              "pedestrian_due": 1,
+              "queued": 7,
+              "signal_amber": 1
+            },
+            "requested": 10,
+            "unfinished": 0
+          },
+          "violations": {},
+          "waits": 36
+        },
+        "unmapped_crossings": [],
+        "world_id": "world:generated:w7-held-out-small_town-1"
+      },
+      {
+        "bands": 20,
+        "crossings_walked": 17,
+        "episodes": [
+          {
+            "blocked": [],
+            "episode": 1000,
+            "fed_entries": 12,
+            "longest_occupied_run_seconds": 16,
+            "outside_envelope_window_starts": [],
+            "trips": {
+              "arrived": 22,
+              "blocked": {},
+              "requested": 22,
+              "unfinished": 0
+            },
+            "vehicles": 11,
+            "violations": {},
+            "waits": [
+              {
+                "from_local_second": 181,
+                "inside_envelope": true,
+                "seconds": 11
+              },
+              {
+                "from_local_second": 331,
+                "inside_envelope": true,
+                "seconds": 3
+              },
+              {
+                "from_local_second": 395,
+                "inside_envelope": true,
+                "seconds": 20
+              },
+              {
+                "from_local_second": 751,
+                "inside_envelope": true,
+                "seconds": 9
+              },
+              {
+                "from_local_second": 752,
+                "inside_envelope": true,
+                "seconds": 8
+              }
+            ]
+          },
+          {
+            "blocked": [],
+            "episode": 1001,
+            "fed_entries": 31,
+            "longest_occupied_run_seconds": 27,
+            "outside_envelope_window_starts": [
+              [
+                911,
+                937
+              ]
+            ],
+            "trips": {
+              "arrived": 22,
+              "blocked": {},
+              "requested": 22,
+              "unfinished": 0
+            },
+            "vehicles": 11,
+            "violations": {},
+            "waits": [
+              {
+                "from_local_second": 162,
+                "inside_envelope": true,
+                "seconds": 2
+              },
+              {
+                "from_local_second": 181,
+                "inside_envelope": true,
+                "seconds": 24
+              },
+              {
+                "from_local_second": 314,
+                "inside_envelope": true,
+                "seconds": 3
+              },
+              {
+                "from_local_second": 469,
+                "inside_envelope": true,
+                "seconds": 3
+              },
+              {
+                "from_local_second": 532,
+                "inside_envelope": true,
+                "seconds": 3
+              },
+              {
+                "from_local_second": 691,
+                "inside_envelope": true,
+                "seconds": 6
+              },
+              {
+                "from_local_second": 921,
+                "inside_envelope": false,
+                "seconds": 4
+              }
+            ]
+          },
+          {
+            "blocked": [],
+            "episode": 1002,
+            "fed_entries": 20,
+            "longest_occupied_run_seconds": 16,
+            "outside_envelope_window_starts": [],
+            "trips": {
+              "arrived": 22,
+              "blocked": {},
+              "requested": 22,
+              "unfinished": 0
+            },
+            "vehicles": 11,
+            "violations": {},
+            "waits": [
+              {
+                "from_local_second": 421,
+                "inside_envelope": true,
+                "seconds": 20
+              },
+              {
+                "from_local_second": 617,
+                "inside_envelope": true,
+                "seconds": 8
+              }
+            ]
+          },
+          {
+            "blocked": [],
+            "episode": 1003,
+            "fed_entries": 9,
+            "longest_occupied_run_seconds": 16,
+            "outside_envelope_window_starts": [],
+            "trips": {
+              "arrived": 22,
+              "blocked": {},
+              "requested": 22,
+              "unfinished": 0
+            },
+            "vehicles": 11,
+            "violations": {},
+            "waits": [
+              {
+                "from_local_second": 631,
+                "inside_envelope": true,
+                "seconds": 7
+              },
+              {
+                "from_local_second": 631,
+                "inside_envelope": true,
+                "seconds": 7
+              }
+            ]
+          },
+          {
+            "blocked": [],
+            "episode": 1004,
+            "fed_entries": 12,
+            "longest_occupied_run_seconds": 16,
+            "outside_envelope_window_starts": [],
+            "trips": {
+              "arrived": 22,
+              "blocked": {},
+              "requested": 22,
+              "unfinished": 0
+            },
+            "vehicles": 11,
+            "violations": {},
+            "waits": [
+              {
+                "from_local_second": 301,
+                "inside_envelope": true,
+                "seconds": 24
+              },
+              {
+                "from_local_second": 483,
+                "inside_envelope": true,
+                "seconds": 17
+              },
+              {
+                "from_local_second": 601,
+                "inside_envelope": true,
+                "seconds": 20
+              }
+            ]
+          },
+          {
+            "blocked": [],
+            "episode": 1005,
+            "fed_entries": 30,
+            "longest_occupied_run_seconds": 16,
+            "outside_envelope_window_starts": [
+              [
+                709,
+                723
+              ]
+            ],
+            "trips": {
+              "arrived": 22,
+              "blocked": {},
+              "requested": 22,
+              "unfinished": 0
+            },
+            "vehicles": 11,
+            "violations": {},
+            "waits": [
+              {
+                "from_local_second": 421,
+                "inside_envelope": true,
+                "seconds": 11
+              },
+              {
+                "from_local_second": 497,
+                "inside_envelope": true,
+                "seconds": 14
+              },
+              {
+                "from_local_second": 637,
+                "inside_envelope": true,
+                "seconds": 4
+              },
+              {
+                "from_local_second": 642,
+                "inside_envelope": true,
+                "seconds": 13
+              },
+              {
+                "from_local_second": 781,
+                "inside_envelope": false,
+                "seconds": 5
+              },
+              {
+                "from_local_second": 811,
+                "inside_envelope": false,
+                "seconds": 24
+              }
+            ]
+          }
+        ],
+        "junction_bands": 20,
+        "occupancy_intervals": {
+          "entered": 98,
+          "on_crossing_at_minute_start": 13
+        },
+        "population": 28,
+        "preset": "small_town",
+        "stress": {
+          "blocked_reasons": {
+            "lane_occupied": 1,
+            "pedestrian_due": 2,
+            "queued": 7,
+            "signal_amber": 1
+          },
+          "episode": 1000,
+          "longest_wait_seconds": 789,
+          "trips": {
+            "arrived": 1,
+            "blocked": {
+              "lane_occupied": 1,
+              "pedestrian_due": 2,
+              "queued": 7,
+              "signal_amber": 1
+            },
+            "requested": 12,
+            "unfinished": 0
+          },
+          "violations": {},
+          "waits": 34
+        },
+        "unmapped_crossings": [],
+        "world_id": "world:generated:w7-held-out-small_town-2"
+      },
+      {
+        "bands": 20,
+        "crossings_walked": 17,
+        "episodes": [
+          {
+            "blocked": [],
+            "episode": 1000,
+            "fed_entries": 13,
+            "longest_occupied_run_seconds": 15,
+            "outside_envelope_window_starts": [
+              [
+                1048,
+                1053
+              ]
+            ],
+            "trips": {
+              "arrived": 22,
+              "blocked": {},
+              "requested": 22,
+              "unfinished": 0
+            },
+            "vehicles": 11,
+            "violations": {},
+            "waits": [
+              {
+                "from_local_second": 61,
+                "inside_envelope": true,
+                "seconds": 16
+              },
+              {
+                "from_local_second": 901,
+                "inside_envelope": true,
+                "seconds": 17
+              }
+            ]
+          },
+          {
+            "blocked": [],
+            "episode": 1001,
+            "fed_entries": 35,
+            "longest_occupied_run_seconds": 19,
+            "outside_envelope_window_starts": [
+              [
+                780,
+                796
+              ],
+              [
+                973,
+                988
+              ]
+            ],
+            "trips": {
+              "arrived": 22,
+              "blocked": {},
+              "requested": 22,
+              "unfinished": 0
+            },
+            "vehicles": 11,
+            "violations": {},
+            "waits": [
+              {
+                "from_local_second": 286,
+                "inside_envelope": true,
+                "seconds": 17
+              },
+              {
+                "from_local_second": 391,
+                "inside_envelope": true,
+                "seconds": 21
+              },
+              {
+                "from_local_second": 556,
+                "inside_envelope": true,
+                "seconds": 2
+              },
+              {
+                "from_local_second": 601,
+                "inside_envelope": true,
+                "seconds": 19
+              }
+            ]
+          },
+          {
+            "blocked": [],
+            "episode": 1002,
+            "fed_entries": 36,
+            "longest_occupied_run_seconds": 26,
+            "outside_envelope_window_starts": [
+              [
+                143,
+                145
+              ],
+              [
+                307,
+                313
+              ]
+            ],
+            "trips": {
+              "arrived": 22,
+              "blocked": {},
+              "requested": 22,
+              "unfinished": 0
+            },
+            "vehicles": 11,
+            "violations": {},
+            "waits": [
+              {
+                "from_local_second": 181,
+                "inside_envelope": false,
+                "seconds": 18
+              },
+              {
+                "from_local_second": 241,
+                "inside_envelope": false,
+                "seconds": 24
+              },
+              {
+                "from_local_second": 301,
+                "inside_envelope": false,
+                "seconds": 24
+              },
+              {
+                "from_local_second": 572,
+                "inside_envelope": true,
+                "seconds": 3
+              }
+            ]
+          },
+          {
+            "blocked": [],
+            "episode": 1003,
+            "fed_entries": 45,
+            "longest_occupied_run_seconds": 26,
+            "outside_envelope_window_starts": [],
+            "trips": {
+              "arrived": 22,
+              "blocked": {},
+              "requested": 22,
+              "unfinished": 0
+            },
+            "vehicles": 11,
+            "violations": {},
+            "waits": [
+              {
+                "from_local_second": 360,
+                "inside_envelope": true,
+                "seconds": 15
+              },
+              {
+                "from_local_second": 361,
+                "inside_envelope": true,
+                "seconds": 14
+              },
+              {
+                "from_local_second": 481,
+                "inside_envelope": true,
+                "seconds": 2
+              },
+              {
+                "from_local_second": 547,
+                "inside_envelope": true,
+                "seconds": 4
+              },
+              {
+                "from_local_second": 552,
+                "inside_envelope": true,
+                "seconds": 13
+              },
+              {
+                "from_local_second": 573,
+                "inside_envelope": true,
+                "seconds": 2
+              },
+              {
+                "from_local_second": 649,
+                "inside_envelope": true,
+                "seconds": 9
+              },
+              {
+                "from_local_second": 697,
+                "inside_envelope": true,
+                "seconds": 4
+              },
+              {
+                "from_local_second": 703,
+                "inside_envelope": true,
+                "seconds": 12
+              },
+              {
+                "from_local_second": 931,
+                "inside_envelope": true,
+                "seconds": 2
+              }
+            ]
+          },
+          {
+            "blocked": [],
+            "episode": 1004,
+            "fed_entries": 21,
+            "longest_occupied_run_seconds": 26,
+            "outside_envelope_window_starts": [],
+            "trips": {
+              "arrived": 22,
+              "blocked": {},
+              "requested": 22,
+              "unfinished": 0
+            },
+            "vehicles": 11,
+            "violations": {},
+            "waits": [
+              {
+                "from_local_second": 631,
+                "inside_envelope": true,
+                "seconds": 23
+              }
+            ]
+          },
+          {
+            "blocked": [],
+            "episode": 1005,
+            "fed_entries": 48,
+            "longest_occupied_run_seconds": 28,
+            "outside_envelope_window_starts": [
+              [
+                10,
+                52
+              ],
+              [
+                770,
+                791
+              ]
+            ],
+            "trips": {
+              "arrived": 22,
+              "blocked": {},
+              "requested": 22,
+              "unfinished": 0
+            },
+            "vehicles": 11,
+            "violations": {},
+            "waits": [
+              {
+                "from_local_second": 151,
+                "inside_envelope": false,
+                "seconds": 3
+              },
+              {
+                "from_local_second": 241,
+                "inside_envelope": true,
+                "seconds": 9
+              },
+              {
+                "from_local_second": 250,
+                "inside_envelope": true,
+                "seconds": 1
+              },
+              {
+                "from_local_second": 306,
+                "inside_envelope": true,
+                "seconds": 4
+              },
+              {
+                "from_local_second": 311,
+                "inside_envelope": true,
+                "seconds": 14
+              }
+            ]
+          }
+        ],
+        "junction_bands": 20,
+        "occupancy_intervals": {
+          "entered": 171,
+          "on_crossing_at_minute_start": 23
+        },
+        "population": 40,
+        "preset": "small_town",
+        "unmapped_crossings": [],
+        "world_id": "world:generated:w7-held-out-small_town-3"
+      },
+      {
+        "bands": 20,
+        "crossings_walked": 19,
+        "episodes": [
+          {
+            "blocked": [],
+            "episode": 1000,
+            "fed_entries": 33,
+            "longest_occupied_run_seconds": 18,
+            "outside_envelope_window_starts": [
+              [
+                3,
+                23
+              ],
+              [
+                45,
+                53
+              ],
+              [
+                830,
+                843
+              ]
+            ],
+            "trips": {
+              "arrived": 22,
+              "blocked": {},
+              "requested": 22,
+              "unfinished": 0
+            },
+            "vehicles": 11,
+            "violations": {},
+            "waits": [
+              {
+                "from_local_second": 151,
+                "inside_envelope": false,
+                "seconds": 22
+              },
+              {
+                "from_local_second": 391,
+                "inside_envelope": true,
+                "seconds": 2
+              },
+              {
+                "from_local_second": 398,
+                "inside_envelope": true,
+                "seconds": 15
+              },
+              {
+                "from_local_second": 399,
+                "inside_envelope": true,
+                "seconds": 13
+              },
+              {
+                "from_local_second": 423,
+                "inside_envelope": true,
+                "seconds": 6
+              },
+              {
+                "from_local_second": 541,
+                "inside_envelope": true,
+                "seconds": 24
+              },
+              {
+                "from_local_second": 601,
+                "inside_envelope": true,
+                "seconds": 6
+              },
+              {
+                "from_local_second": 644,
+                "inside_envelope": true,
+                "seconds": 11
+              },
+              {
+                "from_local_second": 961,
+                "inside_envelope": false,
+                "seconds": 2
+              }
+            ]
+          },
+          {
+            "blocked": [],
+            "episode": 1001,
+            "fed_entries": 52,
+            "longest_occupied_run_seconds": 16,
+            "outside_envelope_window_starts": [
+              [
+                246,
+                364
+              ]
+            ],
+            "trips": {
+              "arrived": 22,
+              "blocked": {},
+              "requested": 22,
+              "unfinished": 0
+            },
+            "vehicles": 11,
+            "violations": {},
+            "waits": [
+              {
+                "from_local_second": 169,
+                "inside_envelope": true,
+                "seconds": 6
+              },
+              {
+                "from_local_second": 278,
+                "inside_envelope": false,
+                "seconds": 11
+              },
+              {
+                "from_local_second": 331,
+                "inside_envelope": false,
+                "seconds": 20
+              },
+              {
+                "from_local_second": 361,
+                "inside_envelope": false,
+                "seconds": 2
+              },
+              {
+                "from_local_second": 461,
+                "inside_envelope": false,
+                "seconds": 14
+              },
+              {
+                "from_local_second": 481,
+                "inside_envelope": false,
+                "seconds": 3
+              },
+              {
+                "from_local_second": 541,
+                "inside_envelope": false,
+                "seconds": 4
+              },
+              {
+                "from_local_second": 601,
+                "inside_envelope": true,
+                "seconds": 2
+              },
+              {
+                "from_local_second": 635,
+                "inside_envelope": true,
+                "seconds": 10
+              },
+              {
+                "from_local_second": 871,
+                "inside_envelope": true,
+                "seconds": 12
+              },
+              {
+                "from_local_second": 931,
+                "inside_envelope": true,
+                "seconds": 12
+              }
+            ]
+          },
+          {
+            "blocked": [],
+            "episode": 1002,
+            "fed_entries": 34,
+            "longest_occupied_run_seconds": 16,
+            "outside_envelope_window_starts": [
+              [
+                928,
+                933
+              ]
+            ],
+            "trips": {
+              "arrived": 22,
+              "blocked": {},
+              "requested": 22,
+              "unfinished": 0
+            },
+            "vehicles": 11,
+            "violations": {},
+            "waits": [
+              {
+                "from_local_second": 511,
+                "inside_envelope": true,
+                "seconds": 24
+              },
+              {
+                "from_local_second": 811,
+                "inside_envelope": true,
+                "seconds": 1
+              }
+            ]
+          },
+          {
+            "blocked": [],
+            "episode": 1003,
+            "fed_entries": 36,
+            "longest_occupied_run_seconds": 16,
+            "outside_envelope_window_starts": [
+              [
+                557,
+                570
+              ]
+            ],
+            "trips": {
+              "arrived": 22,
+              "blocked": {},
+              "requested": 22,
+              "unfinished": 0
+            },
+            "vehicles": 11,
+            "violations": {},
+            "waits": [
+              {
+                "from_local_second": 337,
+                "inside_envelope": true,
+                "seconds": 14
+              },
+              {
+                "from_local_second": 429,
+                "inside_envelope": true,
+                "seconds": 5
+              },
+              {
+                "from_local_second": 781,
+                "inside_envelope": true,
+                "seconds": 9
+              },
+              {
+                "from_local_second": 848,
+                "inside_envelope": true,
+                "seconds": 11
+              }
+            ]
+          },
+          {
+            "blocked": [],
+            "episode": 1004,
+            "fed_entries": 47,
+            "longest_occupied_run_seconds": 27,
+            "outside_envelope_window_starts": [
+              [
+                45,
+                63
+              ]
+            ],
+            "trips": {
+              "arrived": 22,
+              "blocked": {},
+              "requested": 22,
+              "unfinished": 0
+            },
+            "vehicles": 11,
+            "violations": {},
+            "waits": [
+              {
+                "from_local_second": 109,
+                "inside_envelope": false,
+                "seconds": 6
+              },
+              {
+                "from_local_second": 211,
+                "inside_envelope": false,
+                "seconds": 19
+              },
+              {
+                "from_local_second": 344,
+                "inside_envelope": true,
+                "seconds": 18
+              },
+              {
+                "from_local_second": 360,
+                "inside_envelope": true,
+                "seconds": 2
+              },
+              {
+                "from_local_second": 377,
+                "inside_envelope": true,
+                "seconds": 7
+              },
+              {
+                "from_local_second": 458,
+                "inside_envelope": true,
+                "seconds": 18
+              },
+              {
+                "from_local_second": 571,
+                "inside_envelope": true,
+                "seconds": 6
+              },
+              {
+                "from_local_second": 729,
+                "inside_envelope": true,
+                "seconds": 16
+              },
+              {
+                "from_local_second": 759,
+                "inside_envelope": true,
+                "seconds": 4
+              },
+              {
+                "from_local_second": 875,
+                "inside_envelope": true,
+                "seconds": 2
+              },
+              {
+                "from_local_second": 889,
+                "inside_envelope": true,
+                "seconds": 20
+              },
+              {
+                "from_local_second": 991,
+                "inside_envelope": true,
+                "seconds": 16
+              }
+            ]
+          },
+          {
+            "blocked": [],
+            "episode": 1005,
+            "fed_entries": 16,
+            "longest_occupied_run_seconds": 16,
+            "outside_envelope_window_starts": [
+              [
+                428,
+                498
+              ]
+            ],
+            "trips": {
+              "arrived": 22,
+              "blocked": {},
+              "requested": 22,
+              "unfinished": 0
+            },
+            "vehicles": 11,
+            "violations": {},
+            "waits": [
+              {
+                "from_local_second": 391,
+                "inside_envelope": true,
+                "seconds": 18
+              },
+              {
+                "from_local_second": 481,
+                "inside_envelope": false,
+                "seconds": 24
+              },
+              {
+                "from_local_second": 541,
+                "inside_envelope": false,
+                "seconds": 20
+              },
+              {
+                "from_local_second": 558,
+                "inside_envelope": false,
+                "seconds": 7
+              },
+              {
+                "from_local_second": 601,
+                "inside_envelope": false,
+                "seconds": 15
+              },
+              {
+                "from_local_second": 601,
+                "inside_envelope": false,
+                "seconds": 17
+              },
+              {
+                "from_local_second": 691,
+                "inside_envelope": true,
+                "seconds": 5
+              },
+              {
+                "from_local_second": 751,
+                "inside_envelope": true,
+                "seconds": 24
+              }
+            ]
+          }
+        ],
+        "junction_bands": 20,
+        "occupancy_intervals": {
+          "entered": 185,
+          "on_crossing_at_minute_start": 28
+        },
+        "population": 34,
+        "preset": "small_town",
+        "unmapped_crossings": [],
+        "world_id": "world:generated:w7-held-out-small_town-4"
+      },
+      {
+        "bands": 20,
+        "crossings_walked": 16,
+        "episodes": [
+          {
+            "blocked": [],
+            "episode": 1000,
+            "fed_entries": 14,
+            "longest_occupied_run_seconds": 19,
+            "outside_envelope_window_starts": [],
+            "trips": {
+              "arrived": 22,
+              "blocked": {},
+              "requested": 22,
+              "unfinished": 0
+            },
+            "vehicles": 11,
+            "violations": {},
+            "waits": [
+              {
+                "from_local_second": 421,
+                "inside_envelope": true,
+                "seconds": 18
+              },
+              {
+                "from_local_second": 811,
+                "inside_envelope": true,
+                "seconds": 9
+              }
+            ]
+          },
+          {
+            "blocked": [],
+            "episode": 1001,
+            "fed_entries": 26,
+            "longest_occupied_run_seconds": 22,
+            "outside_envelope_window_starts": [
+              [
+                123,
+                157
+              ],
+              [
+                723,
+                746
+              ]
+            ],
+            "trips": {
+              "arrived": 22,
+              "blocked": {},
+              "requested": 22,
+              "unfinished": 0
+            },
+            "vehicles": 11,
+            "violations": {},
+            "waits": [
+              {
+                "from_local_second": 264,
+                "inside_envelope": false,
+                "seconds": 1
+              },
+              {
+                "from_local_second": 271,
+                "inside_envelope": false,
+                "seconds": 6
+              },
+              {
+                "from_local_second": 301,
+                "inside_envelope": false,
+                "seconds": 21
+              },
+              {
+                "from_local_second": 451,
+                "inside_envelope": true,
+                "seconds": 8
+              },
+              {
+                "from_local_second": 781,
+                "inside_envelope": false,
+                "seconds": 20
+              }
+            ]
+          },
+          {
+            "blocked": [],
+            "episode": 1002,
+            "fed_entries": 24,
+            "longest_occupied_run_seconds": 18,
+            "outside_envelope_window_starts": [
+              [
+                242,
+                326
+              ]
+            ],
+            "trips": {
+              "arrived": 22,
+              "blocked": {},
+              "requested": 22,
+              "unfinished": 0
+            },
+            "vehicles": 11,
+            "violations": {},
+            "waits": [
+              {
+                "from_local_second": 121,
+                "inside_envelope": true,
+                "seconds": 20
+              },
+              {
+                "from_local_second": 315,
+                "inside_envelope": false,
+                "seconds": 5
+              },
+              {
+                "from_local_second": 481,
+                "inside_envelope": false,
+                "seconds": 16
+              },
+              {
+                "from_local_second": 631,
+                "inside_envelope": true,
+                "seconds": 2
+              },
+              {
+                "from_local_second": 691,
+                "inside_envelope": true,
+                "seconds": 11
+              }
+            ]
+          },
+          {
+            "blocked": [],
+            "episode": 1003,
+            "fed_entries": 18,
+            "longest_occupied_run_seconds": 17,
+            "outside_envelope_window_starts": [],
+            "trips": {
+              "arrived": 22,
+              "blocked": {},
+              "requested": 22,
+              "unfinished": 0
+            },
+            "vehicles": 11,
+            "violations": {},
+            "waits": [
+              {
+                "from_local_second": 391,
+                "inside_envelope": true,
+                "seconds": 11
+              },
+              {
+                "from_local_second": 691,
+                "inside_envelope": true,
+                "seconds": 11
+              }
+            ]
+          },
+          {
+            "blocked": [],
+            "episode": 1004,
+            "fed_entries": 25,
+            "longest_occupied_run_seconds": 17,
+            "outside_envelope_window_starts": [
+              [
+                861,
+                890
+              ],
+              [
+                922,
+                932
+              ]
+            ],
+            "trips": {
+              "arrived": 22,
+              "blocked": {},
+              "requested": 22,
+              "unfinished": 0
+            },
+            "vehicles": 11,
+            "violations": {},
+            "waits": [
+              {
+                "from_local_second": 192,
+                "inside_envelope": true,
+                "seconds": 13
+              },
+              {
+                "from_local_second": 229,
+                "inside_envelope": true,
+                "seconds": 8
+              },
+              {
+                "from_local_second": 398,
+                "inside_envelope": true,
+                "seconds": 5
+              },
+              {
+                "from_local_second": 399,
+                "inside_envelope": true,
+                "seconds": 4
+              },
+              {
+                "from_local_second": 571,
+                "inside_envelope": true,
+                "seconds": 11
+              },
+              {
+                "from_local_second": 828,
+                "inside_envelope": true,
+                "seconds": 2
+              }
+            ]
+          },
+          {
+            "blocked": [],
+            "episode": 1005,
+            "fed_entries": 37,
+            "longest_occupied_run_seconds": 17,
+            "outside_envelope_window_starts": [
+              [
+                81,
+                91
+              ],
+              [
+                566,
+                651
+              ],
+              [
+                951,
+                980
+              ]
+            ],
+            "trips": {
+              "arrived": 22,
+              "blocked": {},
+              "requested": 22,
+              "unfinished": 0
+            },
+            "vehicles": 11,
+            "violations": {},
+            "waits": [
+              {
+                "from_local_second": 191,
+                "inside_envelope": false,
+                "seconds": 14
+              },
+              {
+                "from_local_second": 434,
+                "inside_envelope": true,
+                "seconds": 13
+              },
+              {
+                "from_local_second": 437,
+                "inside_envelope": true,
+                "seconds": 10
+              },
+              {
+                "from_local_second": 631,
+                "inside_envelope": false,
+                "seconds": 10
+              },
+              {
+                "from_local_second": 631,
+                "inside_envelope": false,
+                "seconds": 10
+              },
+              {
+                "from_local_second": 663,
+                "inside_envelope": false,
+                "seconds": 22
+              },
+              {
+                "from_local_second": 721,
+                "inside_envelope": false,
+                "seconds": 18
+              }
+            ]
+          }
+        ],
+        "junction_bands": 20,
+        "occupancy_intervals": {
+          "entered": 125,
+          "on_crossing_at_minute_start": 14
+        },
+        "population": 34,
+        "preset": "small_town",
+        "unmapped_crossings": [],
+        "world_id": "world:generated:w7-held-out-small_town-5"
+      },
+      {
+        "bands": 20,
+        "crossings_walked": 18,
+        "episodes": [
+          {
+            "blocked": [],
+            "episode": 1000,
+            "fed_entries": 16,
+            "longest_occupied_run_seconds": 17,
+            "outside_envelope_window_starts": [],
+            "trips": {
+              "arrived": 22,
+              "blocked": {},
+              "requested": 22,
+              "unfinished": 0
+            },
+            "vehicles": 11,
+            "violations": {},
+            "waits": [
+              {
+                "from_local_second": 421,
+                "inside_envelope": true,
+                "seconds": 19
+              },
+              {
+                "from_local_second": 645,
+                "inside_envelope": true,
+                "seconds": 4
+              }
+            ]
+          },
+          {
+            "blocked": [],
+            "episode": 1001,
+            "fed_entries": 34,
+            "longest_occupied_run_seconds": 17,
+            "outside_envelope_window_starts": [
+              [
+                104,
+                105
+              ],
+              [
+                429,
+                444
+              ]
+            ],
+            "trips": {
+              "arrived": 22,
+              "blocked": {},
+              "requested": 22,
+              "unfinished": 0
+            },
+            "vehicles": 11,
+            "violations": {},
+            "waits": [
+              {
+                "from_local_second": 301,
+                "inside_envelope": true,
+                "seconds": 24
+              },
+              {
+                "from_local_second": 317,
+                "inside_envelope": true,
+                "seconds": 11
+              },
+              {
+                "from_local_second": 421,
+                "inside_envelope": true,
+                "seconds": 8
+              },
+              {
+                "from_local_second": 448,
+                "inside_envelope": false,
+                "seconds": 18
+              },
+              {
+                "from_local_second": 541,
+                "inside_envelope": false,
+                "seconds": 23
+              },
+              {
+                "from_local_second": 818,
+                "inside_envelope": true,
+                "seconds": 1
+              }
+            ]
+          },
+          {
+            "blocked": [],
+            "episode": 1002,
+            "fed_entries": 16,
+            "longest_occupied_run_seconds": 17,
+            "outside_envelope_window_starts": [
+              [
+                729,
+                756
+              ],
+              [
+                871,
+                915
+              ]
+            ],
+            "trips": {
+              "arrived": 22,
+              "blocked": {},
+              "requested": 22,
+              "unfinished": 0
+            },
+            "vehicles": 11,
+            "violations": {},
+            "waits": [
+              {
+                "from_local_second": 197,
+                "inside_envelope": true,
+                "seconds": 4
+              },
+              {
+                "from_local_second": 361,
+                "inside_envelope": true,
+                "seconds": 19
+              },
+              {
+                "from_local_second": 541,
+                "inside_envelope": true,
+                "seconds": 22
+              },
+              {
+                "from_local_second": 788,
+                "inside_envelope": false,
+                "seconds": 17
+              },
+              {
+                "from_local_second": 931,
+                "inside_envelope": false,
+                "seconds": 14
+              },
+              {
+                "from_local_second": 991,
+                "inside_envelope": false,
+                "seconds": 7
+              }
+            ]
+          },
+          {
+            "blocked": [],
+            "episode": 1003,
+            "fed_entries": 23,
+            "longest_occupied_run_seconds": 29,
+            "outside_envelope_window_starts": [],
+            "trips": {
+              "arrived": 22,
+              "blocked": {},
+              "requested": 22,
+              "unfinished": 0
+            },
+            "vehicles": 11,
+            "violations": {},
+            "waits": [
+              {
+                "from_local_second": 241,
+                "inside_envelope": true,
+                "seconds": 9
+              },
+              {
+                "from_local_second": 541,
+                "inside_envelope": true,
+                "seconds": 1
+              },
+              {
+                "from_local_second": 563,
+                "inside_envelope": true,
+                "seconds": 2
+              },
+              {
+                "from_local_second": 571,
+                "inside_envelope": true,
+                "seconds": 9
+              },
+              {
+                "from_local_second": 701,
+                "inside_envelope": true,
+                "seconds": 8
+              },
+              {
+                "from_local_second": 811,
+                "inside_envelope": true,
+                "seconds": 9
+              }
+            ]
+          },
+          {
+            "blocked": [],
+            "episode": 1004,
+            "fed_entries": 23,
+            "longest_occupied_run_seconds": 25,
+            "outside_envelope_window_starts": [
+              [
+                304,
+                395
+              ]
+            ],
+            "trips": {
+              "arrived": 22,
+              "blocked": {},
+              "requested": 22,
+              "unfinished": 0
+            },
+            "vehicles": 11,
+            "violations": {},
+            "waits": [
+              {
+                "from_local_second": 151,
+                "inside_envelope": true,
+                "seconds": 16
+              },
+              {
+                "from_local_second": 361,
+                "inside_envelope": false,
+                "seconds": 24
+              },
+              {
+                "from_local_second": 421,
+                "inside_envelope": false,
+                "seconds": 20
+              }
+            ]
+          },
+          {
+            "blocked": [],
+            "episode": 1005,
+            "fed_entries": 25,
+            "longest_occupied_run_seconds": 26,
+            "outside_envelope_window_starts": [],
+            "trips": {
+              "arrived": 22,
+              "blocked": {},
+              "requested": 22,
+              "unfinished": 0
+            },
+            "vehicles": 11,
+            "violations": {},
+            "waits": [
+              {
+                "from_local_second": 828,
+                "inside_envelope": true,
+                "seconds": 7
+              }
+            ]
+          }
+        ],
+        "junction_bands": 20,
+        "occupancy_intervals": {
+          "entered": 119,
+          "on_crossing_at_minute_start": 15
+        },
+        "population": 34,
+        "preset": "small_town",
+        "unmapped_crossings": [],
+        "world_id": "world:generated:w7-held-out-small_town-6"
+      },
+      {
+        "bands": 20,
+        "crossings_walked": 19,
+        "episodes": [
+          {
+            "blocked": [],
+            "episode": 1000,
+            "fed_entries": 64,
+            "longest_occupied_run_seconds": 30,
+            "outside_envelope_window_starts": [
+              [
+                193,
+                206
+              ],
+              [
+                427,
+                500
+              ],
+              [
+                707,
+                721
+              ],
+              [
+                905,
+                1014
+              ]
+            ],
+            "trips": {
+              "arrived": 36,
+              "blocked": {},
+              "requested": 36,
+              "unfinished": 0
+            },
+            "vehicles": 18,
+            "violations": {},
+            "waits": [
+              {
+                "from_local_second": 61,
+                "inside_envelope": true,
+                "seconds": 2
+              },
+              {
+                "from_local_second": 211,
+                "inside_envelope": false,
+                "seconds": 3
+              },
+              {
+                "from_local_second": 370,
+                "inside_envelope": false,
+                "seconds": 1
+              },
+              {
+                "from_local_second": 399,
+                "inside_envelope": true,
+                "seconds": 4
+              },
+              {
+                "from_local_second": 490,
+                "inside_envelope": false,
+                "seconds": 10
+              },
+              {
+                "from_local_second": 601,
+                "inside_envelope": false,
+                "seconds": 19
+              },
+              {
+                "from_local_second": 631,
+                "inside_envelope": false,
+                "seconds": 15
+              },
+              {
+                "from_local_second": 991,
+                "inside_envelope": false,
+                "seconds": 24
+              }
+            ]
+          },
+          {
+            "blocked": [],
+            "episode": 1001,
+            "fed_entries": 123,
+            "longest_occupied_run_seconds": 40,
+            "outside_envelope_window_starts": [
+              [
+                0,
+                458
+              ],
+              [
+                621,
+                649
+              ],
+              [
+                788,
+                899
+              ],
+              [
+                1035,
+                1053
+              ]
+            ],
+            "trips": {
+              "arrived": 34,
+              "blocked": {},
+              "requested": 36,
+              "unfinished": 2
+            },
+            "vehicles": 18,
+            "violations": {},
+            "waits": [
+              {
+                "from_local_second": 61,
+                "inside_envelope": false,
+                "seconds": 24
+              },
+              {
+                "from_local_second": 121,
+                "inside_envelope": false,
+                "seconds": 19
+              },
+              {
+                "from_local_second": 137,
+                "inside_envelope": false,
+                "seconds": 10
+              },
+              {
+                "from_local_second": 161,
+                "inside_envelope": false,
+                "seconds": 3
+              },
+              {
+                "from_local_second": 165,
+                "inside_envelope": false,
+                "seconds": 13
+              },
+              {
+                "from_local_second": 181,
+                "inside_envelope": false,
+                "seconds": 24
+              },
+              {
+                "from_local_second": 233,
+                "inside_envelope": false,
+                "seconds": 2
+              },
+              {
+                "from_local_second": 241,
+                "inside_envelope": false,
+                "seconds": 24
+              },
+              {
+                "from_local_second": 273,
+                "inside_envelope": false,
+                "seconds": 5
+              },
+              {
+                "from_local_second": 282,
+                "inside_envelope": false,
+                "seconds": 2
+              },
+              {
+                "from_local_second": 301,
+                "inside_envelope": false,
+                "seconds": 24
+              },
+              {
+                "from_local_second": 370,
+                "inside_envelope": false,
+                "seconds": 1
+              },
+              {
+                "from_local_second": 377,
+                "inside_envelope": false,
+                "seconds": 14
+              },
+              {
+                "from_local_second": 421,
+                "inside_envelope": false,
+                "seconds": 3
+              },
+              {
+                "from_local_second": 421,
+                "inside_envelope": false,
+                "seconds": 24
+              },
+              {
+                "from_local_second": 451,
+                "inside_envelope": false,
+                "seconds": 24
+              },
+              {
+                "from_local_second": 481,
+                "inside_envelope": false,
+                "seconds": 24
+              },
+              {
+                "from_local_second": 487,
+                "inside_envelope": false,
+                "seconds": 4
+              },
+              {
+                "from_local_second": 497,
+                "inside_envelope": false,
+                "seconds": 11
+              },
+              {
+                "from_local_second": 502,
+                "inside_envelope": false,
+                "seconds": 3
+              },
+              {
+                "from_local_second": 517,
+                "inside_envelope": false,
+                "seconds": 4
+              },
+              {
+                "from_local_second": 522,
+                "inside_envelope": false,
+                "seconds": 13
+              },
+              {
+                "from_local_second": 542,
+                "inside_envelope": false,
+                "seconds": 12
+              },
+              {
+                "from_local_second": 600,
+                "inside_envelope": false,
+                "seconds": 9
+              },
+              {
+                "from_local_second": 618,
+                "inside_envelope": false,
+                "seconds": 8
+              },
+              {
+                "from_local_second": 619,
+                "inside_envelope": false,
+                "seconds": 7
+              },
+              {
+                "from_local_second": 642,
+                "inside_envelope": false,
+                "seconds": 13
+              },
+              {
+                "from_local_second": 648,
+                "inside_envelope": false,
+                "seconds": 7
+              },
+              {
+                "from_local_second": 649,
+                "inside_envelope": false,
+                "seconds": 3
+              },
+              {
+                "from_local_second": 691,
+                "inside_envelope": false,
+                "seconds": 3
+              },
+              {
+                "from_local_second": 691,
+                "inside_envelope": false,
+                "seconds": 3
+              },
+              {
+                "from_local_second": 691,
+                "inside_envelope": false,
+                "seconds": 17
+              },
+              {
+                "from_local_second": 717,
+                "inside_envelope": false,
+                "seconds": 4
+              },
+              {
+                "from_local_second": 721,
+                "inside_envelope": false,
+                "seconds": 4
+              },
+              {
+                "from_local_second": 751,
+                "inside_envelope": false,
+                "seconds": 18
+              },
+              {
+                "from_local_second": 768,
+                "inside_envelope": false,
+                "seconds": 3
+              },
+              {
+                "from_local_second": 827,
+                "inside_envelope": false,
+                "seconds": 8
+              },
+              {
+                "from_local_second": 841,
+                "inside_envelope": false,
+                "seconds": 24
+              },
+              {
+                "from_local_second": 882,
+                "inside_envelope": false,
+                "seconds": 8
+              },
+              {
+                "from_local_second": 885,
+                "inside_envelope": false,
+                "seconds": 10
+              },
+              {
+                "from_local_second": 944,
+                "inside_envelope": false,
+                "seconds": 2
+              },
+              {
+                "from_local_second": 961,
+                "inside_envelope": false,
+                "seconds": 11
+              },
+              {
+                "from_local_second": 1111,
+                "inside_envelope": false,
+                "seconds": 1
+              },
+              {
+                "from_local_second": 1171,
+                "inside_envelope": false,
+                "seconds": 2
+              },
+              {
+                "from_local_second": 1180,
+                "inside_envelope": false,
+                "seconds": 15
+              }
+            ]
+          },
+          {
+            "blocked": [],
+            "episode": 1002,
+            "fed_entries": 63,
+            "longest_occupied_run_seconds": 24,
+            "outside_envelope_window_starts": [
+              [
+                638,
+                728
+              ],
+              [
+                1039,
+                1055
+              ]
+            ],
+            "trips": {
+              "arrived": 35,
+              "blocked": {},
+              "requested": 36,
+              "unfinished": 1
+            },
+            "vehicles": 18,
+            "violations": {},
+            "waits": [
+              {
+                "from_local_second": 291,
+                "inside_envelope": true,
+                "seconds": 1
+              },
+              {
+                "from_local_second": 394,
+                "inside_envelope": true,
+                "seconds": 21
+              },
+              {
+                "from_local_second": 495,
+                "inside_envelope": true,
+                "seconds": 12
+              },
+              {
+                "from_local_second": 520,
+                "inside_envelope": true,
+                "seconds": 15
+              },
+              {
+                "from_local_second": 620,
+                "inside_envelope": true,
+                "seconds": 7
+              },
+              {
+                "from_local_second": 626,
+                "inside_envelope": true,
+                "seconds": 1
+              },
+              {
+                "from_local_second": 648,
+                "inside_envelope": false,
+                "seconds": 7
+              },
+              {
+                "from_local_second": 703,
+                "inside_envelope": false,
+                "seconds": 12
+              },
+              {
+                "from_local_second": 751,
+                "inside_envelope": false,
+                "seconds": 1
+              },
+              {
+                "from_local_second": 751,
+                "inside_envelope": false,
+                "seconds": 8
+              },
+              {
+                "from_local_second": 751,
+                "inside_envelope": false,
+                "seconds": 8
+              },
+              {
+                "from_local_second": 770,
+                "inside_envelope": false,
+                "seconds": 5
+              },
+              {
+                "from_local_second": 961,
+                "inside_envelope": true,
+                "seconds": 24
+              },
+              {
+                "from_local_second": 991,
+                "inside_envelope": true,
+                "seconds": 11
+              },
+              {
+                "from_local_second": 1127,
+                "inside_envelope": false,
+                "seconds": 7
+              },
+              {
+                "from_local_second": 1171,
+                "inside_envelope": false,
+                "seconds": 24
+              }
+            ]
+          },
+          {
+            "blocked": [],
+            "episode": 1003,
+            "fed_entries": 75,
+            "longest_occupied_run_seconds": 25,
+            "outside_envelope_window_starts": [
+              [
+                128,
+                229
+              ],
+              [
+                350,
+                387
+              ],
+              [
+                646,
+                788
+              ],
+              [
+                925,
+                994
+              ]
+            ],
+            "trips": {
+              "arrived": 36,
+              "blocked": {},
+              "requested": 36,
+              "unfinished": 0
+            },
+            "vehicles": 18,
+            "violations": {},
+            "waits": [
+              {
+                "from_local_second": 181,
+                "inside_envelope": false,
+                "seconds": 23
+              },
+              {
+                "from_local_second": 241,
+                "inside_envelope": false,
+                "seconds": 24
+              },
+              {
+                "from_local_second": 286,
+                "inside_envelope": false,
+                "seconds": 13
+              },
+              {
+                "from_local_second": 301,
+                "inside_envelope": false,
+                "seconds": 19
+              },
+              {
+                "from_local_second": 310,
+                "inside_envelope": false,
+                "seconds": 1
+              },
+              {
+                "from_local_second": 342,
+                "inside_envelope": false,
+                "seconds": 7
+              },
+              {
+                "from_local_second": 451,
+                "inside_envelope": false,
+                "seconds": 15
+              },
+              {
+                "from_local_second": 451,
+                "inside_envelope": false,
+                "seconds": 23
+              },
+              {
+                "from_local_second": 484,
+                "inside_envelope": false,
+                "seconds": 21
+              },
+              {
+                "from_local_second": 511,
+                "inside_envelope": false,
+                "seconds": 12
+              },
+              {
+                "from_local_second": 547,
+                "inside_envelope": false,
+                "seconds": 4
+              },
+              {
+                "from_local_second": 649,
+                "inside_envelope": false,
+                "seconds": 14
+              },
+              {
+                "from_local_second": 701,
+                "inside_envelope": false,
+                "seconds": 5
+              },
+              {
+                "from_local_second": 702,
+                "inside_envelope": false,
+                "seconds": 7
+              },
+              {
+                "from_local_second": 721,
+                "inside_envelope": false,
+                "seconds": 3
+              },
+              {
+                "from_local_second": 721,
+                "inside_envelope": false,
+                "seconds": 18
+              },
+              {
+                "from_local_second": 760,
+                "inside_envelope": false,
+                "seconds": 1
+              },
+              {
+                "from_local_second": 763,
+                "inside_envelope": false,
+                "seconds": 12
+              },
+              {
+                "from_local_second": 811,
+                "inside_envelope": false,
+                "seconds": 24
+              },
+              {
+                "from_local_second": 893,
+                "inside_envelope": false,
+                "seconds": 2
+              },
+              {
+                "from_local_second": 901,
+                "inside_envelope": false,
+                "seconds": 7
+              },
+              {
+                "from_local_second": 1051,
+                "inside_envelope": false,
+                "seconds": 19
+              },
+              {
+                "from_local_second": 1111,
+                "inside_envelope": false,
+                "seconds": 3
+              }
+            ]
+          },
+          {
+            "blocked": [],
+            "episode": 1004,
+            "fed_entries": 56,
+            "longest_occupied_run_seconds": 36,
+            "outside_envelope_window_starts": [
+              [
+                3,
+                27
+              ],
+              [
+                681,
+                753
+              ],
+              [
+                991,
+                1017
+              ]
+            ],
+            "trips": {
+              "arrived": 36,
+              "blocked": {},
+              "requested": 36,
+              "unfinished": 0
+            },
+            "vehicles": 18,
+            "violations": {},
+            "waits": [
+              {
+                "from_local_second": 70,
+                "inside_envelope": false,
+                "seconds": 11
+              },
+              {
+                "from_local_second": 121,
+                "inside_envelope": false,
+                "seconds": 24
+              },
+              {
+                "from_local_second": 187,
+                "inside_envelope": false,
+                "seconds": 12
+              },
+              {
+                "from_local_second": 271,
+                "inside_envelope": true,
+                "seconds": 4
+              },
+              {
+                "from_local_second": 462,
+                "inside_envelope": true,
+                "seconds": 13
+              },
+              {
+                "from_local_second": 487,
+                "inside_envelope": true,
+                "seconds": 4
+              },
+              {
+                "from_local_second": 492,
+                "inside_envelope": true,
+                "seconds": 13
+              },
+              {
+                "from_local_second": 557,
+                "inside_envelope": true,
+                "seconds": 5
+              },
+              {
+                "from_local_second": 566,
+                "inside_envelope": true,
+                "seconds": 23
+              },
+              {
+                "from_local_second": 576,
+                "inside_envelope": true,
+                "seconds": 15
+              },
+              {
+                "from_local_second": 641,
+                "inside_envelope": true,
+                "seconds": 10
+              },
+              {
+                "from_local_second": 642,
+                "inside_envelope": true,
+                "seconds": 9
+              },
+              {
+                "from_local_second": 691,
+                "inside_envelope": false,
+                "seconds": 24
+              },
+              {
+                "from_local_second": 721,
+                "inside_envelope": false,
+                "seconds": 24
+              },
+              {
+                "from_local_second": 751,
+                "inside_envelope": false,
+                "seconds": 1
+              },
+              {
+                "from_local_second": 751,
+                "inside_envelope": false,
+                "seconds": 7
+              },
+              {
+                "from_local_second": 768,
+                "inside_envelope": false,
+                "seconds": 7
+              },
+              {
+                "from_local_second": 791,
+                "inside_envelope": false,
+                "seconds": 14
+              },
+              {
+                "from_local_second": 841,
+                "inside_envelope": false,
+                "seconds": 24
+              },
+              {
+                "from_local_second": 876,
+                "inside_envelope": false,
+                "seconds": 16
+              },
+              {
+                "from_local_second": 926,
+                "inside_envelope": false,
+                "seconds": 23
+              }
+            ]
+          },
+          {
+            "blocked": [],
+            "episode": 1005,
+            "fed_entries": 33,
+            "longest_occupied_run_seconds": 31,
+            "outside_envelope_window_starts": [
+              [
+                0,
+                36
+              ],
+              [
+                148,
+                165
+              ],
+              [
+                547,
+                583
+              ],
+              [
+                708,
+                754
+              ]
+            ],
+            "trips": {
+              "arrived": 36,
+              "blocked": {},
+              "requested": 36,
+              "unfinished": 0
+            },
+            "vehicles": 18,
+            "violations": {},
+            "waits": [
+              {
+                "from_local_second": 125,
+                "inside_envelope": false,
+                "seconds": 20
+              },
+              {
+                "from_local_second": 260,
+                "inside_envelope": false,
+                "seconds": 5
+              },
+              {
+                "from_local_second": 500,
+                "inside_envelope": true,
+                "seconds": 5
+              },
+              {
+                "from_local_second": 511,
+                "inside_envelope": true,
+                "seconds": 23
+              },
+              {
+                "from_local_second": 541,
+                "inside_envelope": false,
+                "seconds": 11
+              },
+              {
+                "from_local_second": 601,
+                "inside_envelope": false,
+                "seconds": 24
+              },
+              {
+                "from_local_second": 631,
+                "inside_envelope": false,
+                "seconds": 13
+              },
+              {
+                "from_local_second": 665,
+                "inside_envelope": false,
+                "seconds": 20
+              },
+              {
+                "from_local_second": 680,
+                "inside_envelope": false,
+                "seconds": 5
+              },
+              {
+                "from_local_second": 702,
+                "inside_envelope": false,
+                "seconds": 1
+              },
+              {
+                "from_local_second": 766,
+                "inside_envelope": false,
+                "seconds": 9
+              },
+              {
+                "from_local_second": 860,
+                "inside_envelope": false,
+                "seconds": 5
+              }
+            ]
+          }
+        ],
+        "junction_bands": 20,
+        "occupancy_intervals": {
+          "entered": 337,
+          "on_crossing_at_minute_start": 52
+        },
+        "population": 100,
+        "preset": "market_town",
+        "stress": {
+          "blocked_reasons": {
+            "lane_occupied": 2,
+            "pedestrian_due": 2,
+            "queued": 12,
+            "signal_red": 2
+          },
+          "episode": 1000,
+          "longest_wait_seconds": 757,
+          "trips": {
+            "arrived": 3,
+            "blocked": {
+              "lane_occupied": 2,
+              "pedestrian_due": 2,
+              "queued": 12,
+              "signal_red": 2
+            },
+            "requested": 21,
+            "unfinished": 0
+          },
+          "violations": {},
+          "waits": 40
+        },
+        "unmapped_crossings": [],
+        "world_id": "world:generated:w7-held-out-market_town-1"
+      },
+      {
+        "bands": 20,
+        "crossings_walked": 20,
+        "episodes": [
+          {
+            "blocked": [],
+            "episode": 1000,
+            "fed_entries": 40,
+            "longest_occupied_run_seconds": 31,
+            "outside_envelope_window_starts": [
+              [
+                0,
+                44
+              ],
+              [
+                246,
+                291
+              ],
+              [
+                750,
+                784
+              ]
+            ],
+            "trips": {
+              "arrived": 36,
+              "blocked": {},
+              "requested": 36,
+              "unfinished": 0
+            },
+            "vehicles": 18,
+            "violations": {},
+            "waits": [
+              {
+                "from_local_second": 61,
+                "inside_envelope": false,
+                "seconds": 15
+              },
+              {
+                "from_local_second": 151,
+                "inside_envelope": false,
+                "seconds": 13
+              },
+              {
+                "from_local_second": 211,
+                "inside_envelope": false,
+                "seconds": 13
+              },
+              {
+                "from_local_second": 301,
+                "inside_envelope": false,
+                "seconds": 24
+              },
+              {
+                "from_local_second": 331,
+                "inside_envelope": false,
+                "seconds": 11
+              },
+              {
+                "from_local_second": 384,
+                "inside_envelope": false,
+                "seconds": 1
+              },
+              {
+                "from_local_second": 391,
+                "inside_envelope": false,
+                "seconds": 20
+              },
+              {
+                "from_local_second": 393,
+                "inside_envelope": false,
+                "seconds": 18
+              },
+              {
+                "from_local_second": 511,
+                "inside_envelope": true,
+                "seconds": 12
+              },
+              {
+                "from_local_second": 901,
+                "inside_envelope": false,
+                "seconds": 20
+              }
+            ]
+          },
+          {
+            "blocked": [],
+            "episode": 1001,
+            "fed_entries": 69,
+            "longest_occupied_run_seconds": 18,
+            "outside_envelope_window_starts": [
+              [
+                799,
+                861
+              ],
+              [
+                1025,
+                1044
+              ]
+            ],
+            "trips": {
+              "arrived": 36,
+              "blocked": {},
+              "requested": 36,
+              "unfinished": 0
+            },
+            "vehicles": 18,
+            "violations": {},
+            "waits": [
+              {
+                "from_local_second": 69,
+                "inside_envelope": true,
+                "seconds": 16
+              },
+              {
+                "from_local_second": 231,
+                "inside_envelope": true,
+                "seconds": 29
+              },
+              {
+                "from_local_second": 266,
+                "inside_envelope": true,
+                "seconds": 4
+              },
+              {
+                "from_local_second": 271,
+                "inside_envelope": true,
+                "seconds": 14
+              },
+              {
+                "from_local_second": 301,
+                "inside_envelope": true,
+                "seconds": 19
+              },
+              {
+                "from_local_second": 374,
+                "inside_envelope": true,
+                "seconds": 5
+              },
+              {
+                "from_local_second": 394,
+                "inside_envelope": true,
+                "seconds": 1
+              },
+              {
+                "from_local_second": 430,
+                "inside_envelope": true,
+                "seconds": 4
+              },
+              {
+                "from_local_second": 558,
+                "inside_envelope": true,
+                "seconds": 18
+              },
+              {
+                "from_local_second": 631,
+                "inside_envelope": true,
+                "seconds": 20
+              },
+              {
+                "from_local_second": 632,
+                "inside_envelope": true,
+                "seconds": 2
+              },
+              {
+                "from_local_second": 779,
+                "inside_envelope": true,
+                "seconds": 7
+              },
+              {
+                "from_local_second": 780,
+                "inside_envelope": true,
+                "seconds": 6
+              },
+              {
+                "from_local_second": 871,
+                "inside_envelope": false,
+                "seconds": 4
+              },
+              {
+                "from_local_second": 944,
+                "inside_envelope": false,
+                "seconds": 16
+              },
+              {
+                "from_local_second": 991,
+                "inside_envelope": false,
+                "seconds": 4
+              }
+            ]
+          },
+          {
+            "blocked": [],
+            "episode": 1002,
+            "fed_entries": 36,
+            "longest_occupied_run_seconds": 25,
+            "outside_envelope_window_starts": [
+              [
+                9,
+                32
+              ]
+            ],
+            "trips": {
+              "arrived": 35,
+              "blocked": {},
+              "requested": 36,
+              "unfinished": 1
+            },
+            "vehicles": 18,
+            "violations": {},
+            "waits": [
+              {
+                "from_local_second": 127,
+                "inside_envelope": false,
+                "seconds": 4
+              },
+              {
+                "from_local_second": 132,
+                "inside_envelope": false,
+                "seconds": 13
+              },
+              {
+                "from_local_second": 151,
+                "inside_envelope": false,
+                "seconds": 1
+              },
+              {
+                "from_local_second": 311,
+                "inside_envelope": true,
+                "seconds": 14
+              },
+              {
+                "from_local_second": 341,
+                "inside_envelope": true,
+                "seconds": 6
+              },
+              {
+                "from_local_second": 368,
+                "inside_envelope": true,
+                "seconds": 3
+              },
+              {
+                "from_local_second": 372,
+                "inside_envelope": true,
+                "seconds": 13
+              },
+              {
+                "from_local_second": 391,
+                "inside_envelope": true,
+                "seconds": 6
+              },
+              {
+                "from_local_second": 481,
+                "inside_envelope": true,
+                "seconds": 24
+              },
+              {
+                "from_local_second": 511,
+                "inside_envelope": true,
+                "seconds": 10
+              },
+              {
+                "from_local_second": 551,
+                "inside_envelope": true,
+                "seconds": 14
+              },
+              {
+                "from_local_second": 755,
+                "inside_envelope": true,
+                "seconds": 17
+              },
+              {
+                "from_local_second": 794,
+                "inside_envelope": true,
+                "seconds": 15
+              },
+              {
+                "from_local_second": 808,
+                "inside_envelope": true,
+                "seconds": 1
+              },
+              {
+                "from_local_second": 991,
+                "inside_envelope": true,
+                "seconds": 19
+              },
+              {
+                "from_local_second": 1051,
+                "inside_envelope": true,
+                "seconds": 20
+              }
+            ]
+          },
+          {
+            "blocked": [],
+            "episode": 1003,
+            "fed_entries": 53,
+            "longest_occupied_run_seconds": 17,
+            "outside_envelope_window_starts": [
+              [
+                469,
+                503
+              ],
+              [
+                714,
+                734
+              ],
+              [
+                1011,
+                1063
+              ]
+            ],
+            "trips": {
+              "arrived": 36,
+              "blocked": {},
+              "requested": 36,
+              "unfinished": 0
+            },
+            "vehicles": 18,
+            "violations": {},
+            "waits": [
+              {
+                "from_local_second": 375,
+                "inside_envelope": true,
+                "seconds": 3
+              },
+              {
+                "from_local_second": 379,
+                "inside_envelope": true,
+                "seconds": 6
+              },
+              {
+                "from_local_second": 391,
+                "inside_envelope": true,
+                "seconds": 2
+              },
+              {
+                "from_local_second": 398,
+                "inside_envelope": true,
+                "seconds": 2
+              },
+              {
+                "from_local_second": 412,
+                "inside_envelope": true,
+                "seconds": 1
+              },
+              {
+                "from_local_second": 451,
+                "inside_envelope": true,
+                "seconds": 14
+              },
+              {
+                "from_local_second": 451,
+                "inside_envelope": true,
+                "seconds": 14
+              },
+              {
+                "from_local_second": 508,
+                "inside_envelope": false,
+                "seconds": 10
+              },
+              {
+                "from_local_second": 522,
+                "inside_envelope": false,
+                "seconds": 13
+              },
+              {
+                "from_local_second": 533,
+                "inside_envelope": false,
+                "seconds": 2
+              },
+              {
+                "from_local_second": 542,
+                "inside_envelope": false,
+                "seconds": 5
+              },
+              {
+                "from_local_second": 601,
+                "inside_envelope": false,
+                "seconds": 24
+              },
+              {
+                "from_local_second": 631,
+                "inside_envelope": false,
+                "seconds": 8
+              },
+              {
+                "from_local_second": 631,
+                "inside_envelope": false,
+                "seconds": 19
+              },
+              {
+                "from_local_second": 672,
+                "inside_envelope": false,
+                "seconds": 11
+              },
+              {
+                "from_local_second": 728,
+                "inside_envelope": false,
+                "seconds": 5
+              },
+              {
+                "from_local_second": 743,
+                "inside_envelope": false,
+                "seconds": 6
+              },
+              {
+                "from_local_second": 778,
+                "inside_envelope": false,
+                "seconds": 10
+              },
+              {
+                "from_local_second": 781,
+                "inside_envelope": false,
+                "seconds": 24
+              },
+              {
+                "from_local_second": 941,
+                "inside_envelope": true,
+                "seconds": 14
+              },
+              {
+                "from_local_second": 943,
+                "inside_envelope": true,
+                "seconds": 12
+              }
+            ]
+          },
+          {
+            "blocked": [],
+            "episode": 1004,
+            "fed_entries": 45,
+            "longest_occupied_run_seconds": 18,
+            "outside_envelope_window_starts": [
+              [
+                224,
+                229
+              ]
+            ],
+            "trips": {
+              "arrived": 36,
+              "blocked": {},
+              "requested": 36,
+              "unfinished": 0
+            },
+            "vehicles": 18,
+            "violations": {},
+            "waits": [
+              {
+                "from_local_second": 169,
+                "inside_envelope": true,
+                "seconds": 2
+              },
+              {
+                "from_local_second": 311,
+                "inside_envelope": false,
+                "seconds": 14
+              },
+              {
+                "from_local_second": 421,
+                "inside_envelope": true,
+                "seconds": 11
+              },
+              {
+                "from_local_second": 451,
+                "inside_envelope": true,
+                "seconds": 11
+              },
+              {
+                "from_local_second": 451,
+                "inside_envelope": true,
+                "seconds": 11
+              },
+              {
+                "from_local_second": 462,
+                "inside_envelope": true,
+                "seconds": 13
+              },
+              {
+                "from_local_second": 467,
+                "inside_envelope": true,
+                "seconds": 6
+              },
+              {
+                "from_local_second": 474,
+                "inside_envelope": true,
+                "seconds": 1
+              },
+              {
+                "from_local_second": 875,
+                "inside_envelope": true,
+                "seconds": 4
+              }
+            ]
+          },
+          {
+            "blocked": [],
+            "episode": 1005,
+            "fed_entries": 56,
+            "longest_occupied_run_seconds": 29,
+            "outside_envelope_window_starts": [
+              [
+                6,
+                8
+              ],
+              [
+                84,
+                97
+              ],
+              [
+                144,
+                164
+              ],
+              [
+                300,
+                314
+              ],
+              [
+                400,
+                418
+              ],
+              [
+                1016,
+                1041
+              ]
+            ],
+            "trips": {
+              "arrived": 36,
+              "blocked": {},
+              "requested": 36,
+              "unfinished": 0
+            },
+            "vehicles": 18,
+            "violations": {},
+            "waits": [
+              {
+                "from_local_second": 215,
+                "inside_envelope": false,
+                "seconds": 6
+              },
+              {
+                "from_local_second": 271,
+                "inside_envelope": false,
+                "seconds": 13
+              },
+              {
+                "from_local_second": 305,
+                "inside_envelope": false,
+                "seconds": 19
+              },
+              {
+                "from_local_second": 397,
+                "inside_envelope": false,
+                "seconds": 5
+              },
+              {
+                "from_local_second": 403,
+                "inside_envelope": false,
+                "seconds": 12
+              },
+              {
+                "from_local_second": 431,
+                "inside_envelope": false,
+                "seconds": 3
+              },
+              {
+                "from_local_second": 451,
+                "inside_envelope": false,
+                "seconds": 24
+              },
+              {
+                "from_local_second": 481,
+                "inside_envelope": false,
+                "seconds": 20
+              },
+              {
+                "from_local_second": 511,
+                "inside_envelope": false,
+                "seconds": 11
+              },
+              {
+                "from_local_second": 527,
+                "inside_envelope": false,
+                "seconds": 8
+              },
+              {
+                "from_local_second": 528,
+                "inside_envelope": false,
+                "seconds": 7
+              },
+              {
+                "from_local_second": 647,
+                "inside_envelope": true,
+                "seconds": 8
+              },
+              {
+                "from_local_second": 668,
+                "inside_envelope": true,
+                "seconds": 12
+              },
+              {
+                "from_local_second": 718,
+                "inside_envelope": true,
+                "seconds": 4
+              },
+              {
+                "from_local_second": 758,
+                "inside_envelope": true,
+                "seconds": 17
+              },
+              {
+                "from_local_second": 811,
+                "inside_envelope": true,
+                "seconds": 12
+              },
+              {
+                "from_local_second": 913,
+                "inside_envelope": true,
+                "seconds": 3
+              },
+              {
+                "from_local_second": 917,
+                "inside_envelope": true,
+                "seconds": 8
+              }
+            ]
+          }
+        ],
+        "junction_bands": 20,
+        "occupancy_intervals": {
+          "entered": 249,
+          "on_crossing_at_minute_start": 37
+        },
+        "population": 60,
+        "preset": "market_town",
+        "stress": {
+          "blocked_reasons": {
+            "lane_occupied": 2,
+            "pedestrian_due": 3,
+            "queued": 12,
+            "signal_red": 1
+          },
+          "episode": 1000,
+          "longest_wait_seconds": 1100,
+          "trips": {
+            "arrived": 5,
+            "blocked": {
+              "lane_occupied": 2,
+              "pedestrian_due": 3,
+              "queued": 12,
+              "signal_red": 1
+            },
+            "requested": 23,
+            "unfinished": 0
+          },
+          "violations": {},
+          "waits": 38
+        },
+        "unmapped_crossings": [],
+        "world_id": "world:generated:w7-held-out-market_town-2"
+      },
+      {
+        "bands": 20,
+        "crossings_walked": 20,
+        "episodes": [
+          {
+            "blocked": [],
+            "episode": 1000,
+            "fed_entries": 31,
+            "longest_occupied_run_seconds": 32,
+            "outside_envelope_window_starts": [
+              [
+                429,
+                560
+              ]
+            ],
+            "trips": {
+              "arrived": 38,
+              "blocked": {},
+              "requested": 38,
+              "unfinished": 0
+            },
+            "vehicles": 19,
+            "violations": {},
+            "waits": [
+              {
+                "from_local_second": 160,
+                "inside_envelope": true,
+                "seconds": 6
+              },
+              {
+                "from_local_second": 403,
+                "inside_envelope": true,
+                "seconds": 15
+              },
+              {
+                "from_local_second": 481,
+                "inside_envelope": false,
+                "seconds": 24
+              },
+              {
+                "from_local_second": 521,
+                "inside_envelope": false,
+                "seconds": 14
+              },
+              {
+                "from_local_second": 560,
+                "inside_envelope": false,
+                "seconds": 5
+              },
+              {
+                "from_local_second": 571,
+                "inside_envelope": false,
+                "seconds": 24
+              },
+              {
+                "from_local_second": 571,
+                "inside_envelope": false,
+                "seconds": 24
+              },
+              {
+                "from_local_second": 601,
+                "inside_envelope": false,
+                "seconds": 24
+              },
+              {
+                "from_local_second": 661,
+                "inside_envelope": false,
+                "seconds": 19
+              },
+              {
+                "from_local_second": 871,
+                "inside_envelope": true,
+                "seconds": 10
+              },
+              {
+                "from_local_second": 871,
+                "inside_envelope": true,
+                "seconds": 10
+              }
+            ]
+          },
+          {
+            "blocked": [
+              {
+                "blocked_second": 234,
+                "inside_envelope": false,
+                "reason": "destination_space_taken"
+              }
+            ],
+            "episode": 1001,
+            "fed_entries": 59,
+            "longest_occupied_run_seconds": 26,
+            "outside_envelope_window_starts": [
+              [
+                301,
+                301
+              ],
+              [
+                506,
+                553
+              ],
+              [
+                844,
+                880
+              ]
+            ],
+            "trips": {
+              "arrived": 36,
+              "blocked": {
+                "destination_space_taken": 1
+              },
+              "requested": 37,
+              "unfinished": 0
+            },
+            "vehicles": 19,
+            "violations": {},
+            "waits": [
+              {
+                "from_local_second": 21,
+                "inside_envelope": true,
+                "seconds": 1
+              },
+              {
+                "from_local_second": 64,
+                "inside_envelope": true,
+                "seconds": 10
+              },
+              {
+                "from_local_second": 402,
+                "inside_envelope": false,
+                "seconds": 13
+              },
+              {
+                "from_local_second": 498,
+                "inside_envelope": true,
+                "seconds": 3
+              },
+              {
+                "from_local_second": 502,
+                "inside_envelope": true,
+                "seconds": 3
+              },
+              {
+                "from_local_second": 511,
+                "inside_envelope": false,
+                "seconds": 10
+              },
+              {
+                "from_local_second": 582,
+                "inside_envelope": false,
+                "seconds": 2
+              },
+              {
+                "from_local_second": 593,
+                "inside_envelope": false,
+                "seconds": 2
+              },
+              {
+                "from_local_second": 601,
+                "inside_envelope": false,
+                "seconds": 24
+              },
+              {
+                "from_local_second": 624,
+                "inside_envelope": false,
+                "seconds": 6
+              },
+              {
+                "from_local_second": 648,
+                "inside_envelope": false,
+                "seconds": 5
+              },
+              {
+                "from_local_second": 649,
+                "inside_envelope": false,
+                "seconds": 18
+              },
+              {
+                "from_local_second": 654,
+                "inside_envelope": false,
+                "seconds": 1
+              },
+              {
+                "from_local_second": 661,
+                "inside_envelope": false,
+                "seconds": 12
+              },
+              {
+                "from_local_second": 691,
+                "inside_envelope": false,
+                "seconds": 13
+              },
+              {
+                "from_local_second": 740,
+                "inside_envelope": true,
+                "seconds": 19
+              },
+              {
+                "from_local_second": 781,
+                "inside_envelope": true,
+                "seconds": 19
+              },
+              {
+                "from_local_second": 913,
+                "inside_envelope": false,
+                "seconds": 14
+              }
+            ]
+          },
+          {
+            "blocked": [],
+            "episode": 1002,
+            "fed_entries": 46,
+            "longest_occupied_run_seconds": 25,
+            "outside_envelope_window_starts": [
+              [
+                62,
+                162
+              ],
+              [
+                911,
+                932
+              ]
+            ],
+            "trips": {
+              "arrived": 38,
+              "blocked": {},
+              "requested": 38,
+              "unfinished": 0
+            },
+            "vehicles": 19,
+            "violations": {},
+            "waits": [
+              {
+                "from_local_second": 151,
+                "inside_envelope": false,
+                "seconds": 8
+              },
+              {
+                "from_local_second": 225,
+                "inside_envelope": false,
+                "seconds": 10
+              },
+              {
+                "from_local_second": 241,
+                "inside_envelope": false,
+                "seconds": 24
+              },
+              {
+                "from_local_second": 271,
+                "inside_envelope": false,
+                "seconds": 2
+              },
+              {
+                "from_local_second": 271,
+                "inside_envelope": false,
+                "seconds": 11
+              },
+              {
+                "from_local_second": 304,
+                "inside_envelope": false,
+                "seconds": 20
+              },
+              {
+                "from_local_second": 366,
+                "inside_envelope": true,
+                "seconds": 5
+              },
+              {
+                "from_local_second": 377,
+                "inside_envelope": true,
+                "seconds": 9
+              },
+              {
+                "from_local_second": 596,
+                "inside_envelope": true,
+                "seconds": 9
+              },
+              {
+                "from_local_second": 613,
+                "inside_envelope": true,
+                "seconds": 2
+              },
+              {
+                "from_local_second": 616,
+                "inside_envelope": true,
+                "seconds": 13
+              }
+            ]
+          },
+          {
+            "blocked": [],
+            "episode": 1003,
+            "fed_entries": 39,
+            "longest_occupied_run_seconds": 17,
+            "outside_envelope_window_starts": [
+              [
+                418,
+                431
+              ]
+            ],
+            "trips": {
+              "arrived": 38,
+              "blocked": {},
+              "requested": 38,
+              "unfinished": 0
+            },
+            "vehicles": 19,
+            "violations": {},
+            "waits": [
+              {
+                "from_local_second": 177,
+                "inside_envelope": true,
+                "seconds": 5
+              },
+              {
+                "from_local_second": 178,
+                "inside_envelope": true,
+                "seconds": 4
+              },
+              {
+                "from_local_second": 211,
+                "inside_envelope": true,
+                "seconds": 19
+              },
+              {
+                "from_local_second": 331,
+                "inside_envelope": true,
+                "seconds": 6
+              },
+              {
+                "from_local_second": 481,
+                "inside_envelope": false,
+                "seconds": 11
+              },
+              {
+                "from_local_second": 550,
+                "inside_envelope": false,
+                "seconds": 1
+              },
+              {
+                "from_local_second": 626,
+                "inside_envelope": true,
+                "seconds": 15
+              },
+              {
+                "from_local_second": 862,
+                "inside_envelope": true,
+                "seconds": 3
+              }
+            ]
+          },
+          {
+            "blocked": [],
+            "episode": 1004,
+            "fed_entries": 44,
+            "longest_occupied_run_seconds": 19,
+            "outside_envelope_window_starts": [
+              [
+                241,
+                262
+              ],
+              [
+                921,
+                937
+              ],
+              [
+                1006,
+                1040
+              ]
+            ],
+            "trips": {
+              "arrived": 38,
+              "blocked": {},
+              "requested": 38,
+              "unfinished": 0
+            },
+            "vehicles": 19,
+            "violations": {},
+            "waits": [
+              {
+                "from_local_second": 113,
+                "inside_envelope": true,
+                "seconds": 2
+              },
+              {
+                "from_local_second": 222,
+                "inside_envelope": true,
+                "seconds": 13
+              },
+              {
+                "from_local_second": 257,
+                "inside_envelope": false,
+                "seconds": 11
+              },
+              {
+                "from_local_second": 299,
+                "inside_envelope": false,
+                "seconds": 14
+              },
+              {
+                "from_local_second": 301,
+                "inside_envelope": false,
+                "seconds": 19
+              },
+              {
+                "from_local_second": 369,
+                "inside_envelope": false,
+                "seconds": 13
+              },
+              {
+                "from_local_second": 391,
+                "inside_envelope": false,
+                "seconds": 6
+              },
+              {
+                "from_local_second": 421,
+                "inside_envelope": false,
+                "seconds": 16
+              },
+              {
+                "from_local_second": 431,
+                "inside_envelope": false,
+                "seconds": 10
+              },
+              {
+                "from_local_second": 437,
+                "inside_envelope": false,
+                "seconds": 5
+              },
+              {
+                "from_local_second": 795,
+                "inside_envelope": true,
+                "seconds": 10
+              },
+              {
+                "from_local_second": 841,
+                "inside_envelope": true,
+                "seconds": 24
+              },
+              {
+                "from_local_second": 924,
+                "inside_envelope": false,
+                "seconds": 3
+              },
+              {
+                "from_local_second": 928,
+                "inside_envelope": false,
+                "seconds": 26
+              },
+              {
+                "from_local_second": 991,
+                "inside_envelope": false,
+                "seconds": 21
+              },
+              {
+                "from_local_second": 1064,
+                "inside_envelope": false,
+                "seconds": 11
+              }
+            ]
+          },
+          {
+            "blocked": [],
+            "episode": 1005,
+            "fed_entries": 44,
+            "longest_occupied_run_seconds": 31,
+            "outside_envelope_window_starts": [
+              [
+                401,
+                403
+              ],
+              [
+                688,
+                688
+              ],
+              [
+                971,
+                983
+              ]
+            ],
+            "trips": {
+              "arrived": 38,
+              "blocked": {},
+              "requested": 38,
+              "unfinished": 0
+            },
+            "vehicles": 19,
+            "violations": {},
+            "waits": [
+              {
+                "from_local_second": 368,
+                "inside_envelope": true,
+                "seconds": 3
+              },
+              {
+                "from_local_second": 372,
+                "inside_envelope": true,
+                "seconds": 13
+              },
+              {
+                "from_local_second": 490,
+                "inside_envelope": false,
+                "seconds": 1
+              },
+              {
+                "from_local_second": 519,
+                "inside_envelope": false,
+                "seconds": 4
+              },
+              {
+                "from_local_second": 613,
+                "inside_envelope": true,
+                "seconds": 16
+              },
+              {
+                "from_local_second": 707,
+                "inside_envelope": false,
+                "seconds": 4
+              },
+              {
+                "from_local_second": 833,
+                "inside_envelope": false,
+                "seconds": 2
+              },
+              {
+                "from_local_second": 931,
+                "inside_envelope": true,
+                "seconds": 24
+              },
+              {
+                "from_local_second": 1056,
+                "inside_envelope": false,
+                "seconds": 8
+              }
+            ]
+          }
+        ],
+        "junction_bands": 20,
+        "occupancy_intervals": {
+          "entered": 222,
+          "on_crossing_at_minute_start": 26
+        },
+        "population": 60,
+        "preset": "market_town",
+        "unmapped_crossings": [],
+        "world_id": "world:generated:w7-held-out-market_town-3"
+      },
+      {
+        "bands": 20,
+        "crossings_walked": 20,
+        "episodes": [
+          {
+            "blocked": [],
+            "episode": 1000,
+            "fed_entries": 53,
+            "longest_occupied_run_seconds": 28,
+            "outside_envelope_window_starts": [
+              [
+                682,
+                704
+              ],
+              [
+                789,
+                793
+              ],
+              [
+                921,
+                1080
+              ]
+            ],
+            "trips": {
+              "arrived": 46,
+              "blocked": {},
+              "requested": 46,
+              "unfinished": 0
+            },
+            "vehicles": 23,
+            "violations": {},
+            "waits": [
+              {
+                "from_local_second": 83,
+                "inside_envelope": true,
+                "seconds": 2
+              },
+              {
+                "from_local_second": 181,
+                "inside_envelope": true,
+                "seconds": 24
+              },
+              {
+                "from_local_second": 218,
+                "inside_envelope": true,
+                "seconds": 6
+              },
+              {
+                "from_local_second": 241,
+                "inside_envelope": true,
+                "seconds": 17
+              },
+              {
+                "from_local_second": 421,
+                "inside_envelope": true,
+                "seconds": 24
+              },
+              {
+                "from_local_second": 751,
+                "inside_envelope": false,
+                "seconds": 24
+              },
+              {
+                "from_local_second": 762,
+                "inside_envelope": false,
+                "seconds": 5
+              },
+              {
+                "from_local_second": 781,
+                "inside_envelope": false,
+                "seconds": 7
+              },
+              {
+                "from_local_second": 811,
+                "inside_envelope": false,
+                "seconds": 13
+              },
+              {
+                "from_local_second": 871,
+                "inside_envelope": false,
+                "seconds": 10
+              }
+            ]
+          },
+          {
+            "blocked": [],
+            "episode": 1001,
+            "fed_entries": 91,
+            "longest_occupied_run_seconds": 30,
+            "outside_envelope_window_starts": [
+              [
+                0,
+                57
+              ],
+              [
+                281,
+                426
+              ],
+              [
+                773,
+                801
+              ]
+            ],
+            "trips": {
+              "arrived": 46,
+              "blocked": {},
+              "requested": 46,
+              "unfinished": 0
+            },
+            "vehicles": 23,
+            "violations": {},
+            "waits": [
+              {
+                "from_local_second": 121,
+                "inside_envelope": false,
+                "seconds": 4
+              },
+              {
+                "from_local_second": 166,
+                "inside_envelope": false,
+                "seconds": 10
+              },
+              {
+                "from_local_second": 241,
+                "inside_envelope": true,
+                "seconds": 17
+              },
+              {
+                "from_local_second": 253,
+                "inside_envelope": true,
+                "seconds": 9
+              },
+              {
+                "from_local_second": 331,
+                "inside_envelope": false,
+                "seconds": 24
+              },
+              {
+                "from_local_second": 342,
+                "inside_envelope": false,
+                "seconds": 5
+              },
+              {
+                "from_local_second": 397,
+                "inside_envelope": false,
+                "seconds": 4
+              },
+              {
+                "from_local_second": 409,
+                "inside_envelope": false,
+                "seconds": 4
+              },
+              {
+                "from_local_second": 414,
+                "inside_envelope": false,
+                "seconds": 2
+              },
+              {
+                "from_local_second": 417,
+                "inside_envelope": false,
+                "seconds": 18
+              },
+              {
+                "from_local_second": 421,
+                "inside_envelope": false,
+                "seconds": 15
+              },
+              {
+                "from_local_second": 439,
+                "inside_envelope": false,
+                "seconds": 6
+              },
+              {
+                "from_local_second": 481,
+                "inside_envelope": false,
+                "seconds": 23
+              },
+              {
+                "from_local_second": 504,
+                "inside_envelope": false,
+                "seconds": 1
+              },
+              {
+                "from_local_second": 511,
+                "inside_envelope": false,
+                "seconds": 20
+              },
+              {
+                "from_local_second": 529,
+                "inside_envelope": false,
+                "seconds": 6
+              },
+              {
+                "from_local_second": 534,
+                "inside_envelope": false,
+                "seconds": 1
+              },
+              {
+                "from_local_second": 536,
+                "inside_envelope": false,
+                "seconds": 10
+              },
+              {
+                "from_local_second": 601,
+                "inside_envelope": false,
+                "seconds": 24
+              },
+              {
+                "from_local_second": 626,
+                "inside_envelope": true,
+                "seconds": 28
+              },
+              {
+                "from_local_second": 629,
+                "inside_envelope": true,
+                "seconds": 6
+              },
+              {
+                "from_local_second": 660,
+                "inside_envelope": true,
+                "seconds": 19
+              },
+              {
+                "from_local_second": 691,
+                "inside_envelope": true,
+                "seconds": 6
+              },
+              {
+                "from_local_second": 709,
+                "inside_envelope": true,
+                "seconds": 6
+              },
+              {
+                "from_local_second": 721,
+                "inside_envelope": true,
+                "seconds": 11
+              },
+              {
+                "from_local_second": 751,
+                "inside_envelope": true,
+                "seconds": 14
+              },
+              {
+                "from_local_second": 811,
+                "inside_envelope": false,
+                "seconds": 9
+              }
+            ]
+          },
+          {
+            "blocked": [],
+            "episode": 1002,
+            "fed_entries": 49,
+            "longest_occupied_run_seconds": 21,
+            "outside_envelope_window_starts": [
+              [
+                30,
+                55
+              ]
+            ],
+            "trips": {
+              "arrived": 46,
+              "blocked": {},
+              "requested": 46,
+              "unfinished": 0
+            },
+            "vehicles": 23,
+            "violations": {},
+            "waits": [
+              {
+                "from_local_second": 85,
+                "inside_envelope": false,
+                "seconds": 10
+              },
+              {
+                "from_local_second": 121,
+                "inside_envelope": false,
+                "seconds": 3
+              },
+              {
+                "from_local_second": 121,
+                "inside_envelope": false,
+                "seconds": 24
+              },
+              {
+                "from_local_second": 151,
+                "inside_envelope": false,
+                "seconds": 3
+              },
+              {
+                "from_local_second": 164,
+                "inside_envelope": false,
+                "seconds": 11
+              },
+              {
+                "from_local_second": 320,
+                "inside_envelope": true,
+                "seconds": 5
+              },
+              {
+                "from_local_second": 333,
+                "inside_envelope": true,
+                "seconds": 9
+              },
+              {
+                "from_local_second": 345,
+                "inside_envelope": true,
+                "seconds": 5
+              },
+              {
+                "from_local_second": 421,
+                "inside_envelope": true,
+                "seconds": 3
+              },
+              {
+                "from_local_second": 498,
+                "inside_envelope": true,
+                "seconds": 7
+              },
+              {
+                "from_local_second": 541,
+                "inside_envelope": true,
+                "seconds": 16
+              },
+              {
+                "from_local_second": 544,
+                "inside_envelope": true,
+                "seconds": 7
+              },
+              {
+                "from_local_second": 581,
+                "inside_envelope": true,
+                "seconds": 6
+              },
+              {
+                "from_local_second": 684,
+                "inside_envelope": true,
+                "seconds": 1
+              },
+              {
+                "from_local_second": 691,
+                "inside_envelope": true,
+                "seconds": 5
+              },
+              {
+                "from_local_second": 991,
+                "inside_envelope": true,
+                "seconds": 24
+              }
+            ]
+          },
+          {
+            "blocked": [],
+            "episode": 1003,
+            "fed_entries": 58,
+            "longest_occupied_run_seconds": 32,
+            "outside_envelope_window_starts": [
+              [
+                765,
+                875
+              ]
+            ],
+            "trips": {
+              "arrived": 46,
+              "blocked": {},
+              "requested": 46,
+              "unfinished": 0
+            },
+            "vehicles": 23,
+            "violations": {},
+            "waits": [
+              {
+                "from_local_second": 192,
+                "inside_envelope": true,
+                "seconds": 8
+              },
+              {
+                "from_local_second": 251,
+                "inside_envelope": true,
+                "seconds": 14
+              },
+              {
+                "from_local_second": 257,
+                "inside_envelope": true,
+                "seconds": 15
+              },
+              {
+                "from_local_second": 271,
+                "inside_envelope": true,
+                "seconds": 7
+              },
+              {
+                "from_local_second": 298,
+                "inside_envelope": true,
+                "seconds": 15
+              },
+              {
+                "from_local_second": 369,
+                "inside_envelope": true,
+                "seconds": 2
+              },
+              {
+                "from_local_second": 372,
+                "inside_envelope": true,
+                "seconds": 13
+              },
+              {
+                "from_local_second": 421,
+                "inside_envelope": true,
+                "seconds": 19
+              },
+              {
+                "from_local_second": 463,
+                "inside_envelope": true,
+                "seconds": 2
+              },
+              {
+                "from_local_second": 466,
+                "inside_envelope": true,
+                "seconds": 17
+              },
+              {
+                "from_local_second": 541,
+                "inside_envelope": true,
+                "seconds": 24
+              },
+              {
+                "from_local_second": 677,
+                "inside_envelope": true,
+                "seconds": 8
+              },
+              {
+                "from_local_second": 691,
+                "inside_envelope": true,
+                "seconds": 10
+              },
+              {
+                "from_local_second": 691,
+                "inside_envelope": true,
+                "seconds": 24
+              },
+              {
+                "from_local_second": 721,
+                "inside_envelope": true,
+                "seconds": 7
+              },
+              {
+                "from_local_second": 730,
+                "inside_envelope": true,
+                "seconds": 21
+              },
+              {
+                "from_local_second": 737,
+                "inside_envelope": true,
+                "seconds": 14
+              },
+              {
+                "from_local_second": 881,
+                "inside_envelope": false,
+                "seconds": 6
+              },
+              {
+                "from_local_second": 931,
+                "inside_envelope": false,
+                "seconds": 22
+              }
+            ]
+          },
+          {
+            "blocked": [],
+            "episode": 1004,
+            "fed_entries": 63,
+            "longest_occupied_run_seconds": 36,
+            "outside_envelope_window_starts": [
+              [
+                391,
+                423
+              ],
+              [
+                632,
+                715
+              ],
+              [
+                891,
+                918
+              ],
+              [
+                1077,
+                1080
+              ]
+            ],
+            "trips": {
+              "arrived": 46,
+              "blocked": {},
+              "requested": 46,
+              "unfinished": 0
+            },
+            "vehicles": 23,
+            "violations": {},
+            "waits": [
+              {
+                "from_local_second": 121,
+                "inside_envelope": true,
+                "seconds": 2
+              },
+              {
+                "from_local_second": 151,
+                "inside_envelope": true,
+                "seconds": 17
+              },
+              {
+                "from_local_second": 211,
+                "inside_envelope": true,
+                "seconds": 16
+              },
+              {
+                "from_local_second": 331,
+                "inside_envelope": true,
+                "seconds": 14
+              },
+              {
+                "from_local_second": 331,
+                "inside_envelope": true,
+                "seconds": 14
+              },
+              {
+                "from_local_second": 343,
+                "inside_envelope": true,
+                "seconds": 2
+              },
+              {
+                "from_local_second": 374,
+                "inside_envelope": true,
+                "seconds": 11
+              },
+              {
+                "from_local_second": 391,
+                "inside_envelope": false,
+                "seconds": 4
+              },
+              {
+                "from_local_second": 451,
+                "inside_envelope": false,
+                "seconds": 18
+              },
+              {
+                "from_local_second": 457,
+                "inside_envelope": false,
+                "seconds": 12
+              },
+              {
+                "from_local_second": 504,
+                "inside_envelope": false,
+                "seconds": 7
+              },
+              {
+                "from_local_second": 522,
+                "inside_envelope": false,
+                "seconds": 13
+              },
+              {
+                "from_local_second": 691,
+                "inside_envelope": false,
+                "seconds": 20
+              }
+            ]
+          },
+          {
+            "blocked": [],
+            "episode": 1005,
+            "fed_entries": 18,
+            "longest_occupied_run_seconds": 24,
+            "outside_envelope_window_starts": [
+              [
+                290,
+                562
+              ]
+            ],
+            "trips": {
+              "arrived": 46,
+              "blocked": {},
+              "requested": 46,
+              "unfinished": 0
+            },
+            "vehicles": 23,
+            "violations": {},
+            "waits": [
+              {
+                "from_local_second": 336,
+                "inside_envelope": false,
+                "seconds": 5
+              },
+              {
+                "from_local_second": 342,
+                "inside_envelope": false,
+                "seconds": 13
+              },
+              {
+                "from_local_second": 343,
+                "inside_envelope": false,
+                "seconds": 12
+              },
+              {
+                "from_local_second": 391,
+                "inside_envelope": false,
+                "seconds": 7
+              },
+              {
+                "from_local_second": 391,
+                "inside_envelope": false,
+                "seconds": 7
+              },
+              {
+                "from_local_second": 421,
+                "inside_envelope": false,
+                "seconds": 15
+              },
+              {
+                "from_local_second": 451,
+                "inside_envelope": false,
+                "seconds": 3
+              },
+              {
+                "from_local_second": 490,
+                "inside_envelope": false,
+                "seconds": 1
+              },
+              {
+                "from_local_second": 492,
+                "inside_envelope": false,
+                "seconds": 13
+              },
+              {
+                "from_local_second": 541,
+                "inside_envelope": false,
+                "seconds": 23
+              },
+              {
+                "from_local_second": 601,
+                "inside_envelope": false,
+                "seconds": 16
+              },
+              {
+                "from_local_second": 661,
+                "inside_envelope": false,
+                "seconds": 21
+              }
+            ]
+          }
+        ],
+        "junction_bands": 20,
+        "occupancy_intervals": {
+          "entered": 268,
+          "on_crossing_at_minute_start": 44
+        },
+        "population": 90,
+        "preset": "market_town",
+        "unmapped_crossings": [],
+        "world_id": "world:generated:w7-held-out-market_town-4"
+      },
+      {
+        "bands": 20,
+        "crossings_walked": 20,
+        "episodes": [
+          {
+            "blocked": [],
+            "episode": 1000,
+            "fed_entries": 60,
+            "longest_occupied_run_seconds": 29,
+            "outside_envelope_window_starts": [
+              [
+                78,
+                219
+              ],
+              [
+                542,
+                575
+              ],
+              [
+                729,
+                766
+              ],
+              [
+                910,
+                1080
+              ]
+            ],
+            "trips": {
+              "arrived": 36,
+              "blocked": {},
+              "requested": 36,
+              "unfinished": 0
+            },
+            "vehicles": 18,
+            "violations": {},
+            "waits": [
+              {
+                "from_local_second": 62,
+                "inside_envelope": true,
+                "seconds": 12
+              },
+              {
+                "from_local_second": 184,
+                "inside_envelope": false,
+                "seconds": 18
+              },
+              {
+                "from_local_second": 195,
+                "inside_envelope": false,
+                "seconds": 10
+              },
+              {
+                "from_local_second": 211,
+                "inside_envelope": false,
+                "seconds": 6
+              },
+              {
+                "from_local_second": 211,
+                "inside_envelope": false,
+                "seconds": 6
+              },
+              {
+                "from_local_second": 228,
+                "inside_envelope": false,
+                "seconds": 7
+              },
+              {
+                "from_local_second": 241,
+                "inside_envelope": false,
+                "seconds": 10
+              },
+              {
+                "from_local_second": 323,
+                "inside_envelope": false,
+                "seconds": 2
+              },
+              {
+                "from_local_second": 331,
+                "inside_envelope": false,
+                "seconds": 13
+              },
+              {
+                "from_local_second": 577,
+                "inside_envelope": false,
+                "seconds": 4
+              },
+              {
+                "from_local_second": 582,
+                "inside_envelope": false,
+                "seconds": 13
+              },
+              {
+                "from_local_second": 601,
+                "inside_envelope": false,
+                "seconds": 19
+              },
+              {
+                "from_local_second": 691,
+                "inside_envelope": false,
+                "seconds": 4
+              },
+              {
+                "from_local_second": 781,
+                "inside_envelope": false,
+                "seconds": 24
+              },
+              {
+                "from_local_second": 841,
+                "inside_envelope": false,
+                "seconds": 24
+              }
+            ]
+          },
+          {
+            "blocked": [],
+            "episode": 1001,
+            "fed_entries": 118,
+            "longest_occupied_run_seconds": 33,
+            "outside_envelope_window_starts": [
+              [
+                0,
+                87
+              ],
+              [
+                175,
+                191
+              ],
+              [
+                213,
+                615
+              ],
+              [
+                768,
+                844
+              ],
+              [
+                854,
+                870
+              ],
+              [
+                908,
+                1032
+              ],
+              [
+                1059,
+                1072
+              ],
+              [
+                1075,
+                1080
+              ]
+            ],
+            "trips": {
+              "arrived": 35,
+              "blocked": {},
+              "requested": 36,
+              "unfinished": 1
+            },
+            "vehicles": 18,
+            "violations": {},
+            "waits": [
+              {
+                "from_local_second": 78,
+                "inside_envelope": false,
+                "seconds": 7
+              },
+              {
+                "from_local_second": 127,
+                "inside_envelope": false,
+                "seconds": 4
+              },
+              {
+                "from_local_second": 132,
+                "inside_envelope": false,
+                "seconds": 13
+              },
+              {
+                "from_local_second": 137,
+                "inside_envelope": false,
+                "seconds": 6
+              },
+              {
+                "from_local_second": 184,
+                "inside_envelope": false,
+                "seconds": 21
+              },
+              {
+                "from_local_second": 228,
+                "inside_envelope": false,
+                "seconds": 7
+              },
+              {
+                "from_local_second": 241,
+                "inside_envelope": false,
+                "seconds": 2
+              },
+              {
+                "from_local_second": 253,
+                "inside_envelope": false,
+                "seconds": 6
+              },
+              {
+                "from_local_second": 260,
+                "inside_envelope": false,
+                "seconds": 17
+              },
+              {
+                "from_local_second": 307,
+                "inside_envelope": false,
+                "seconds": 4
+              },
+              {
+                "from_local_second": 312,
+                "inside_envelope": false,
+                "seconds": 13
+              },
+              {
+                "from_local_second": 331,
+                "inside_envelope": false,
+                "seconds": 24
+              },
+              {
+                "from_local_second": 383,
+                "inside_envelope": false,
+                "seconds": 2
+              },
+              {
+                "from_local_second": 391,
+                "inside_envelope": false,
+                "seconds": 7
+              },
+              {
+                "from_local_second": 401,
+                "inside_envelope": false,
+                "seconds": 12
+              },
+              {
+                "from_local_second": 404,
+                "inside_envelope": false,
+                "seconds": 8
+              },
+              {
+                "from_local_second": 405,
+                "inside_envelope": false,
+                "seconds": 7
+              },
+              {
+                "from_local_second": 407,
+                "inside_envelope": false,
+                "seconds": 17
+              },
+              {
+                "from_local_second": 481,
+                "inside_envelope": false,
+                "seconds": 24
+              },
+              {
+                "from_local_second": 511,
+                "inside_envelope": false,
+                "seconds": 5
+              },
+              {
+                "from_local_second": 522,
+                "inside_envelope": false,
+                "seconds": 13
+              },
+              {
+                "from_local_second": 523,
+                "inside_envelope": false,
+                "seconds": 12
+              },
+              {
+                "from_local_second": 541,
+                "inside_envelope": false,
+                "seconds": 16
+              },
+              {
+                "from_local_second": 576,
+                "inside_envelope": false,
+                "seconds": 6
+              },
+              {
+                "from_local_second": 592,
+                "inside_envelope": false,
+                "seconds": 3
+              },
+              {
+                "from_local_second": 592,
+                "inside_envelope": false,
+                "seconds": 3
+              },
+              {
+                "from_local_second": 601,
+                "inside_envelope": false,
+                "seconds": 23
+              },
+              {
+                "from_local_second": 631,
+                "inside_envelope": false,
+                "seconds": 24
+              },
+              {
+                "from_local_second": 634,
+                "inside_envelope": false,
+                "seconds": 21
+              },
+              {
+                "from_local_second": 635,
+                "inside_envelope": false,
+                "seconds": 20
+              },
+              {
+                "from_local_second": 661,
+                "inside_envelope": false,
+                "seconds": 24
+              },
+              {
+                "from_local_second": 711,
+                "inside_envelope": false,
+                "seconds": 4
+              },
+              {
+                "from_local_second": 774,
+                "inside_envelope": false,
+                "seconds": 3
+              },
+              {
+                "from_local_second": 778,
+                "inside_envelope": false,
+                "seconds": 14
+              },
+              {
+                "from_local_second": 814,
+                "inside_envelope": false,
+                "seconds": 21
+              },
+              {
+                "from_local_second": 841,
+                "inside_envelope": false,
+                "seconds": 21
+              },
+              {
+                "from_local_second": 920,
+                "inside_envelope": false,
+                "seconds": 5
+              },
+              {
+                "from_local_second": 961,
+                "inside_envelope": false,
+                "seconds": 3
+              },
+              {
+                "from_local_second": 991,
+                "inside_envelope": false,
+                "seconds": 20
+              },
+              {
+                "from_local_second": 1062,
+                "inside_envelope": false,
+                "seconds": 13
+              }
+            ]
+          },
+          {
+            "blocked": [],
+            "episode": 1002,
+            "fed_entries": 38,
+            "longest_occupied_run_seconds": 16,
+            "outside_envelope_window_starts": [
+              [
+                295,
+                334
+              ],
+              [
+                572,
+                594
+              ],
+              [
+                843,
+                849
+              ]
+            ],
+            "trips": {
+              "arrived": 36,
+              "blocked": {},
+              "requested": 36,
+              "unfinished": 0
+            },
+            "vehicles": 18,
+            "violations": {},
+            "waits": [
+              {
+                "from_local_second": 451,
+                "inside_envelope": false,
+                "seconds": 3
+              },
+              {
+                "from_local_second": 691,
+                "inside_envelope": false,
+                "seconds": 23
+              },
+              {
+                "from_local_second": 708,
+                "inside_envelope": false,
+                "seconds": 7
+              },
+              {
+                "from_local_second": 865,
+                "inside_envelope": false,
+                "seconds": 12
+              },
+              {
+                "from_local_second": 901,
+                "inside_envelope": false,
+                "seconds": 18
+              },
+              {
+                "from_local_second": 991,
+                "inside_envelope": false,
+                "seconds": 15
+              }
+            ]
+          },
+          {
+            "blocked": [],
+            "episode": 1003,
+            "fed_entries": 62,
+            "longest_occupied_run_seconds": 32,
+            "outside_envelope_window_starts": [
+              [
+                181,
+                267
+              ],
+              [
+                270,
+                285
+              ],
+              [
+                859,
+                869
+              ]
+            ],
+            "trips": {
+              "arrived": 36,
+              "blocked": {},
+              "requested": 36,
+              "unfinished": 0
+            },
+            "vehicles": 18,
+            "violations": {},
+            "waits": [
+              {
+                "from_local_second": 241,
+                "inside_envelope": false,
+                "seconds": 18
+              },
+              {
+                "from_local_second": 272,
+                "inside_envelope": false,
+                "seconds": 3
+              },
+              {
+                "from_local_second": 319,
+                "inside_envelope": false,
+                "seconds": 2
+              },
+              {
+                "from_local_second": 361,
+                "inside_envelope": false,
+                "seconds": 24
+              },
+              {
+                "from_local_second": 491,
+                "inside_envelope": true,
+                "seconds": 14
+              },
+              {
+                "from_local_second": 560,
+                "inside_envelope": true,
+                "seconds": 1
+              },
+              {
+                "from_local_second": 574,
+                "inside_envelope": true,
+                "seconds": 3
+              },
+              {
+                "from_local_second": 578,
+                "inside_envelope": true,
+                "seconds": 13
+              },
+              {
+                "from_local_second": 601,
+                "inside_envelope": true,
+                "seconds": 24
+              },
+              {
+                "from_local_second": 607,
+                "inside_envelope": true,
+                "seconds": 4
+              },
+              {
+                "from_local_second": 612,
+                "inside_envelope": true,
+                "seconds": 13
+              },
+              {
+                "from_local_second": 651,
+                "inside_envelope": true,
+                "seconds": 4
+              },
+              {
+                "from_local_second": 661,
+                "inside_envelope": true,
+                "seconds": 5
+              },
+              {
+                "from_local_second": 668,
+                "inside_envelope": true,
+                "seconds": 10
+              },
+              {
+                "from_local_second": 677,
+                "inside_envelope": true,
+                "seconds": 1
+              },
+              {
+                "from_local_second": 696,
+                "inside_envelope": true,
+                "seconds": 5
+              },
+              {
+                "from_local_second": 702,
+                "inside_envelope": true,
+                "seconds": 13
+              },
+              {
+                "from_local_second": 702,
+                "inside_envelope": true,
+                "seconds": 13
+              },
+              {
+                "from_local_second": 811,
+                "inside_envelope": true,
+                "seconds": 3
+              },
+              {
+                "from_local_second": 947,
+                "inside_envelope": false,
+                "seconds": 6
+              },
+              {
+                "from_local_second": 1111,
+                "inside_envelope": true,
+                "seconds": 2
+              }
+            ]
+          },
+          {
+            "blocked": [],
+            "episode": 1004,
+            "fed_entries": 100,
+            "longest_occupied_run_seconds": 29,
+            "outside_envelope_window_starts": [
+              [
+                0,
+                127
+              ],
+              [
+                159,
+                233
+              ],
+              [
+                337,
+                448
+              ],
+              [
+                669,
+                689
+              ],
+              [
+                695,
+                706
+              ],
+              [
+                980,
+                991
+              ],
+              [
+                1008,
+                1080
+              ]
+            ],
+            "trips": {
+              "arrived": 36,
+              "blocked": {},
+              "requested": 36,
+              "unfinished": 0
+            },
+            "vehicles": 18,
+            "violations": {},
+            "waits": [
+              {
+                "from_local_second": 241,
+                "inside_envelope": false,
+                "seconds": 21
+              },
+              {
+                "from_local_second": 273,
+                "inside_envelope": false,
+                "seconds": 5
+              },
+              {
+                "from_local_second": 278,
+                "inside_envelope": false,
+                "seconds": 22
+              },
+              {
+                "from_local_second": 331,
+                "inside_envelope": false,
+                "seconds": 5
+              },
+              {
+                "from_local_second": 340,
+                "inside_envelope": false,
+                "seconds": 9
+              },
+              {
+                "from_local_second": 368,
+                "inside_envelope": false,
+                "seconds": 6
+              },
+              {
+                "from_local_second": 383,
+                "inside_envelope": false,
+                "seconds": 2
+              },
+              {
+                "from_local_second": 384,
+                "inside_envelope": false,
+                "seconds": 1
+              },
+              {
+                "from_local_second": 405,
+                "inside_envelope": false,
+                "seconds": 10
+              },
+              {
+                "from_local_second": 436,
+                "inside_envelope": false,
+                "seconds": 4
+              },
+              {
+                "from_local_second": 493,
+                "inside_envelope": false,
+                "seconds": 1
+              },
+              {
+                "from_local_second": 522,
+                "inside_envelope": false,
+                "seconds": 13
+              },
+              {
+                "from_local_second": 541,
+                "inside_envelope": false,
+                "seconds": 10
+              },
+              {
+                "from_local_second": 564,
+                "inside_envelope": false,
+                "seconds": 1
+              },
+              {
+                "from_local_second": 581,
+                "inside_envelope": false,
+                "seconds": 3
+              },
+              {
+                "from_local_second": 585,
+                "inside_envelope": false,
+                "seconds": 21
+              },
+              {
+                "from_local_second": 631,
+                "inside_envelope": true,
+                "seconds": 7
+              },
+              {
+                "from_local_second": 631,
+                "inside_envelope": true,
+                "seconds": 7
+              },
+              {
+                "from_local_second": 637,
+                "inside_envelope": true,
+                "seconds": 4
+              },
+              {
+                "from_local_second": 643,
+                "inside_envelope": true,
+                "seconds": 12
+              },
+              {
+                "from_local_second": 659,
+                "inside_envelope": false,
+                "seconds": 15
+              },
+              {
+                "from_local_second": 660,
+                "inside_envelope": false,
+                "seconds": 14
+              },
+              {
+                "from_local_second": 721,
+                "inside_envelope": false,
+                "seconds": 24
+              },
+              {
+                "from_local_second": 759,
+                "inside_envelope": false,
+                "seconds": 16
+              },
+              {
+                "from_local_second": 781,
+                "inside_envelope": false,
+                "seconds": 24
+              },
+              {
+                "from_local_second": 879,
+                "inside_envelope": false,
+                "seconds": 2
+              },
+              {
+                "from_local_second": 1007,
+                "inside_envelope": false,
+                "seconds": 22
+              },
+              {
+                "from_local_second": 1051,
+                "inside_envelope": false,
+                "seconds": 6
+              },
+              {
+                "from_local_second": 1059,
+                "inside_envelope": false,
+                "seconds": 9
+              }
+            ]
+          },
+          {
+            "blocked": [],
+            "episode": 1005,
+            "fed_entries": 45,
+            "longest_occupied_run_seconds": 21,
+            "outside_envelope_window_starts": [],
+            "trips": {
+              "arrived": 36,
+              "blocked": {},
+              "requested": 36,
+              "unfinished": 0
+            },
+            "vehicles": 18,
+            "violations": {},
+            "waits": [
+              {
+                "from_local_second": 304,
+                "inside_envelope": true,
+                "seconds": 21
+              },
+              {
+                "from_local_second": 367,
+                "inside_envelope": true,
+                "seconds": 4
+              },
+              {
+                "from_local_second": 372,
+                "inside_envelope": true,
+                "seconds": 13
+              },
+              {
+                "from_local_second": 391,
+                "inside_envelope": true,
+                "seconds": 2
+              },
+              {
+                "from_local_second": 541,
+                "inside_envelope": true,
+                "seconds": 14
+              },
+              {
+                "from_local_second": 571,
+                "inside_envelope": true,
+                "seconds": 1
+              },
+              {
+                "from_local_second": 571,
+                "inside_envelope": true,
+                "seconds": 18
+              },
+              {
+                "from_local_second": 581,
+                "inside_envelope": true,
+                "seconds": 2
+              },
+              {
+                "from_local_second": 581,
+                "inside_envelope": true,
+                "seconds": 2
+              },
+              {
+                "from_local_second": 582,
+                "inside_envelope": true,
+                "seconds": 7
+              },
+              {
+                "from_local_second": 604,
+                "inside_envelope": true,
+                "seconds": 21
+              },
+              {
+                "from_local_second": 620,
+                "inside_envelope": true,
+                "seconds": 2
+              },
+              {
+                "from_local_second": 653,
+                "inside_envelope": true,
+                "seconds": 2
+              },
+              {
+                "from_local_second": 691,
+                "inside_envelope": true,
+                "seconds": 16
+              },
+              {
+                "from_local_second": 849,
+                "inside_envelope": true,
+                "seconds": 15
+              },
+              {
+                "from_local_second": 864,
+                "inside_envelope": true,
+                "seconds": 1
+              },
+              {
+                "from_local_second": 871,
+                "inside_envelope": true,
+                "seconds": 24
+              }
+            ]
+          }
+        ],
+        "junction_bands": 20,
+        "occupancy_intervals": {
+          "entered": 345,
+          "on_crossing_at_minute_start": 61
+        },
+        "population": 82,
+        "preset": "market_town",
+        "unmapped_crossings": [],
+        "world_id": "world:generated:w7-held-out-market_town-5"
+      },
+      {
+        "bands": 20,
+        "crossings_walked": 19,
+        "episodes": [
+          {
+            "blocked": [],
+            "episode": 1000,
+            "fed_entries": 45,
+            "longest_occupied_run_seconds": 18,
+            "outside_envelope_window_starts": [],
+            "trips": {
+              "arrived": 40,
+              "blocked": {},
+              "requested": 40,
+              "unfinished": 0
+            },
+            "vehicles": 20,
+            "violations": {},
+            "waits": [
+              {
+                "from_local_second": 121,
+                "inside_envelope": true,
+                "seconds": 10
+              },
+              {
+                "from_local_second": 125,
+                "inside_envelope": true,
+                "seconds": 13
+              },
+              {
+                "from_local_second": 301,
+                "inside_envelope": true,
+                "seconds": 22
+              },
+              {
+                "from_local_second": 481,
+                "inside_envelope": true,
+                "seconds": 4
+              },
+              {
+                "from_local_second": 541,
+                "inside_envelope": true,
+                "seconds": 10
+              },
+              {
+                "from_local_second": 649,
+                "inside_envelope": true,
+                "seconds": 5
+              },
+              {
+                "from_local_second": 811,
+                "inside_envelope": true,
+                "seconds": 22
+              },
+              {
+                "from_local_second": 871,
+                "inside_envelope": true,
+                "seconds": 24
+              }
+            ]
+          },
+          {
+            "blocked": [],
+            "episode": 1001,
+            "fed_entries": 99,
+            "longest_occupied_run_seconds": 45,
+            "outside_envelope_window_starts": [
+              [
+                169,
+                216
+              ],
+              [
+                232,
+                306
+              ],
+              [
+                336,
+                573
+              ],
+              [
+                701,
+                847
+              ]
+            ],
+            "trips": {
+              "arrived": 40,
+              "blocked": {},
+              "requested": 40,
+              "unfinished": 0
+            },
+            "vehicles": 20,
+            "violations": {},
+            "waits": [
+              {
+                "from_local_second": 61,
+                "inside_envelope": true,
+                "seconds": 23
+              },
+              {
+                "from_local_second": 211,
+                "inside_envelope": false,
+                "seconds": 7
+              },
+              {
+                "from_local_second": 221,
+                "inside_envelope": false,
+                "seconds": 19
+              },
+              {
+                "from_local_second": 222,
+                "inside_envelope": false,
+                "seconds": 4
+              },
+              {
+                "from_local_second": 227,
+                "inside_envelope": false,
+                "seconds": 8
+              },
+              {
+                "from_local_second": 280,
+                "inside_envelope": false,
+                "seconds": 15
+              },
+              {
+                "from_local_second": 301,
+                "inside_envelope": false,
+                "seconds": 9
+              },
+              {
+                "from_local_second": 331,
+                "inside_envelope": false,
+                "seconds": 5
+              },
+              {
+                "from_local_second": 354,
+                "inside_envelope": false,
+                "seconds": 8
+              },
+              {
+                "from_local_second": 380,
+                "inside_envelope": false,
+                "seconds": 5
+              },
+              {
+                "from_local_second": 403,
+                "inside_envelope": false,
+                "seconds": 9
+              },
+              {
+                "from_local_second": 403,
+                "inside_envelope": false,
+                "seconds": 12
+              },
+              {
+                "from_local_second": 421,
+                "inside_envelope": false,
+                "seconds": 5
+              },
+              {
+                "from_local_second": 433,
+                "inside_envelope": false,
+                "seconds": 12
+              },
+              {
+                "from_local_second": 451,
+                "inside_envelope": false,
+                "seconds": 3
+              },
+              {
+                "from_local_second": 504,
+                "inside_envelope": false,
+                "seconds": 3
+              },
+              {
+                "from_local_second": 505,
+                "inside_envelope": false,
+                "seconds": 2
+              },
+              {
+                "from_local_second": 523,
+                "inside_envelope": false,
+                "seconds": 8
+              },
+              {
+                "from_local_second": 571,
+                "inside_envelope": false,
+                "seconds": 24
+              },
+              {
+                "from_local_second": 589,
+                "inside_envelope": false,
+                "seconds": 4
+              },
+              {
+                "from_local_second": 631,
+                "inside_envelope": false,
+                "seconds": 24
+              },
+              {
+                "from_local_second": 631,
+                "inside_envelope": false,
+                "seconds": 24
+              },
+              {
+                "from_local_second": 691,
+                "inside_envelope": false,
+                "seconds": 2
+              },
+              {
+                "from_local_second": 691,
+                "inside_envelope": false,
+                "seconds": 2
+              },
+              {
+                "from_local_second": 763,
+                "inside_envelope": false,
+                "seconds": 12
+              },
+              {
+                "from_local_second": 817,
+                "inside_envelope": false,
+                "seconds": 5
+              },
+              {
+                "from_local_second": 823,
+                "inside_envelope": false,
+                "seconds": 12
+              },
+              {
+                "from_local_second": 846,
+                "inside_envelope": false,
+                "seconds": 5
+              },
+              {
+                "from_local_second": 852,
+                "inside_envelope": false,
+                "seconds": 13
+              },
+              {
+                "from_local_second": 871,
+                "inside_envelope": false,
+                "seconds": 12
+              },
+              {
+                "from_local_second": 901,
+                "inside_envelope": false,
+                "seconds": 3
+              },
+              {
+                "from_local_second": 910,
+                "inside_envelope": false,
+                "seconds": 10
+              },
+              {
+                "from_local_second": 946,
+                "inside_envelope": false,
+                "seconds": 9
+              }
+            ]
+          },
+          {
+            "blocked": [],
+            "episode": 1002,
+            "fed_entries": 32,
+            "longest_occupied_run_seconds": 17,
+            "outside_envelope_window_starts": [
+              [
+                23,
+                78
+              ],
+              [
+                270,
+                303
+              ],
+              [
+                399,
+                399
+              ]
+            ],
+            "trips": {
+              "arrived": 40,
+              "blocked": {},
+              "requested": 40,
+              "unfinished": 0
+            },
+            "vehicles": 20,
+            "violations": {},
+            "waits": [
+              {
+                "from_local_second": 22,
+                "inside_envelope": false,
+                "seconds": 3
+              },
+              {
+                "from_local_second": 81,
+                "inside_envelope": false,
+                "seconds": 4
+              },
+              {
+                "from_local_second": 121,
+                "inside_envelope": false,
+                "seconds": 19
+              },
+              {
+                "from_local_second": 223,
+                "inside_envelope": false,
+                "seconds": 9
+              },
+              {
+                "from_local_second": 259,
+                "inside_envelope": false,
+                "seconds": 18
+              },
+              {
+                "from_local_second": 271,
+                "inside_envelope": false,
+                "seconds": 1
+              },
+              {
+                "from_local_second": 403,
+                "inside_envelope": false,
+                "seconds": 12
+              },
+              {
+                "from_local_second": 406,
+                "inside_envelope": false,
+                "seconds": 9
+              },
+              {
+                "from_local_second": 421,
+                "inside_envelope": false,
+                "seconds": 2
+              },
+              {
+                "from_local_second": 497,
+                "inside_envelope": false,
+                "seconds": 22
+              },
+              {
+                "from_local_second": 508,
+                "inside_envelope": false,
+                "seconds": 21
+              },
+              {
+                "from_local_second": 701,
+                "inside_envelope": true,
+                "seconds": 9
+              }
+            ]
+          },
+          {
+            "blocked": [],
+            "episode": 1003,
+            "fed_entries": 48,
+            "longest_occupied_run_seconds": 17,
+            "outside_envelope_window_starts": [
+              [
+                61,
+                88
+              ],
+              [
+                293,
+                318
+              ],
+              [
+                565,
+                565
+              ],
+              [
+                1044,
+                1059
+              ]
+            ],
+            "trips": {
+              "arrived": 38,
+              "blocked": {},
+              "requested": 40,
+              "unfinished": 2
+            },
+            "vehicles": 20,
+            "violations": {},
+            "waits": [
+              {
+                "from_local_second": 127,
+                "inside_envelope": false,
+                "seconds": 4
+              },
+              {
+                "from_local_second": 133,
+                "inside_envelope": false,
+                "seconds": 12
+              },
+              {
+                "from_local_second": 181,
+                "inside_envelope": false,
+                "seconds": 24
+              },
+              {
+                "from_local_second": 251,
+                "inside_envelope": false,
+                "seconds": 14
+              },
+              {
+                "from_local_second": 370,
+                "inside_envelope": false,
+                "seconds": 15
+              },
+              {
+                "from_local_second": 421,
+                "inside_envelope": false,
+                "seconds": 17
+              },
+              {
+                "from_local_second": 551,
+                "inside_envelope": true,
+                "seconds": 14
+              },
+              {
+                "from_local_second": 631,
+                "inside_envelope": false,
+                "seconds": 12
+              },
+              {
+                "from_local_second": 635,
+                "inside_envelope": false,
+                "seconds": 8
+              },
+              {
+                "from_local_second": 737,
+                "inside_envelope": false,
+                "seconds": 8
+              },
+              {
+                "from_local_second": 901,
+                "inside_envelope": true,
+                "seconds": 22
+              },
+              {
+                "from_local_second": 901,
+                "inside_envelope": true,
+                "seconds": 24
+              },
+              {
+                "from_local_second": 1121,
+                "inside_envelope": false,
+                "seconds": 1
+              },
+              {
+                "from_local_second": 1123,
+                "inside_envelope": false,
+                "seconds": 12
+              }
+            ]
+          },
+          {
+            "blocked": [],
+            "episode": 1004,
+            "fed_entries": 59,
+            "longest_occupied_run_seconds": 18,
+            "outside_envelope_window_starts": [
+              [
+                126,
+                146
+              ],
+              [
+                444,
+                455
+              ],
+              [
+                471,
+                511
+              ],
+              [
+                817,
+                840
+              ],
+              [
+                968,
+                991
+              ]
+            ],
+            "trips": {
+              "arrived": 40,
+              "blocked": {},
+              "requested": 40,
+              "unfinished": 0
+            },
+            "vehicles": 20,
+            "violations": {},
+            "waits": [
+              {
+                "from_local_second": 181,
+                "inside_envelope": false,
+                "seconds": 22
+              },
+              {
+                "from_local_second": 241,
+                "inside_envelope": false,
+                "seconds": 24
+              },
+              {
+                "from_local_second": 331,
+                "inside_envelope": true,
+                "seconds": 12
+              },
+              {
+                "from_local_second": 337,
+                "inside_envelope": true,
+                "seconds": 22
+              },
+              {
+                "from_local_second": 451,
+                "inside_envelope": false,
+                "seconds": 11
+              },
+              {
+                "from_local_second": 451,
+                "inside_envelope": false,
+                "seconds": 11
+              },
+              {
+                "from_local_second": 521,
+                "inside_envelope": false,
+                "seconds": 14
+              },
+              {
+                "from_local_second": 541,
+                "inside_envelope": false,
+                "seconds": 8
+              },
+              {
+                "from_local_second": 560,
+                "inside_envelope": false,
+                "seconds": 1
+              },
+              {
+                "from_local_second": 563,
+                "inside_envelope": false,
+                "seconds": 2
+              },
+              {
+                "from_local_second": 571,
+                "inside_envelope": false,
+                "seconds": 4
+              },
+              {
+                "from_local_second": 579,
+                "inside_envelope": false,
+                "seconds": 3
+              },
+              {
+                "from_local_second": 579,
+                "inside_envelope": false,
+                "seconds": 5
+              },
+              {
+                "from_local_second": 583,
+                "inside_envelope": false,
+                "seconds": 17
+              },
+              {
+                "from_local_second": 585,
+                "inside_envelope": false,
+                "seconds": 10
+              },
+              {
+                "from_local_second": 601,
+                "inside_envelope": false,
+                "seconds": 8
+              },
+              {
+                "from_local_second": 611,
+                "inside_envelope": false,
+                "seconds": 14
+              },
+              {
+                "from_local_second": 617,
+                "inside_envelope": false,
+                "seconds": 14
+              },
+              {
+                "from_local_second": 691,
+                "inside_envelope": false,
+                "seconds": 22
+              },
+              {
+                "from_local_second": 785,
+                "inside_envelope": true,
+                "seconds": 3
+              },
+              {
+                "from_local_second": 789,
+                "inside_envelope": true,
+                "seconds": 13
+              },
+              {
+                "from_local_second": 828,
+                "inside_envelope": false,
+                "seconds": 18
+              },
+              {
+                "from_local_second": 871,
+                "inside_envelope": false,
+                "seconds": 12
+              },
+              {
+                "from_local_second": 889,
+                "inside_envelope": false,
+                "seconds": 4
+              },
+              {
+                "from_local_second": 890,
+                "inside_envelope": false,
+                "seconds": 3
+              },
+              {
+                "from_local_second": 931,
+                "inside_envelope": false,
+                "seconds": 24
+              },
+              {
+                "from_local_second": 1051,
+                "inside_envelope": false,
+                "seconds": 14
+              },
+              {
+                "from_local_second": 1063,
+                "inside_envelope": false,
+                "seconds": 12
+              },
+              {
+                "from_local_second": 1074,
+                "inside_envelope": false,
+                "seconds": 1
+              }
+            ]
+          },
+          {
+            "blocked": [],
+            "episode": 1005,
+            "fed_entries": 41,
+            "longest_occupied_run_seconds": 17,
+            "outside_envelope_window_starts": [
+              [
+                239,
+                269
+              ],
+              [
+                287,
+                300
+              ]
+            ],
+            "trips": {
+              "arrived": 40,
+              "blocked": {},
+              "requested": 40,
+              "unfinished": 0
+            },
+            "vehicles": 20,
+            "violations": {},
+            "waits": [
+              {
+                "from_local_second": 294,
+                "inside_envelope": false,
+                "seconds": 18
+              },
+              {
+                "from_local_second": 299,
+                "inside_envelope": false,
+                "seconds": 13
+              },
+              {
+                "from_local_second": 391,
+                "inside_envelope": false,
+                "seconds": 7
+              },
+              {
+                "from_local_second": 403,
+                "inside_envelope": false,
+                "seconds": 12
+              },
+              {
+                "from_local_second": 404,
+                "inside_envelope": false,
+                "seconds": 11
+              },
+              {
+                "from_local_second": 474,
+                "inside_envelope": false,
+                "seconds": 1
+              },
+              {
+                "from_local_second": 511,
+                "inside_envelope": true,
+                "seconds": 2
+              },
+              {
+                "from_local_second": 511,
+                "inside_envelope": true,
+                "seconds": 2
+              },
+              {
+                "from_local_second": 547,
+                "inside_envelope": true,
+                "seconds": 4
+              },
+              {
+                "from_local_second": 553,
+                "inside_envelope": true,
+                "seconds": 12
+              },
+              {
+                "from_local_second": 619,
+                "inside_envelope": true,
+                "seconds": 17
+              },
+              {
+                "from_local_second": 706,
+                "inside_envelope": true,
+                "seconds": 7
+              },
+              {
+                "from_local_second": 871,
+                "inside_envelope": true,
+                "seconds": 11
+              },
+              {
+                "from_local_second": 991,
+                "inside_envelope": true,
+                "seconds": 8
+              }
+            ]
+          }
+        ],
+        "junction_bands": 20,
+        "occupancy_intervals": {
+          "entered": 260,
+          "on_crossing_at_minute_start": 45
+        },
+        "population": 72,
+        "preset": "market_town",
+        "unmapped_crossings": [],
+        "world_id": "world:generated:w7-held-out-market_town-6"
+      }
+    ],
+    "tree": {
+      "files": 843,
+      "files_sha256": "958fc0be79527105394690e0d512b945efcf35d6969823de08b5f1465bc4af38",
+      "head": "43446a05e2a709fd6ac84604dd59f7c888ecd02b"
+    },
+    "written_utc": "2026-09-30T23:51:25+00:00"
+  },
+  "record_sha256": "3ef2a78b5695a9a862f4cc8fa76b7cb753e76eb581fbfe7857d6d5c1368a773a"
+}

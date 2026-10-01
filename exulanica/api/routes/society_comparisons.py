@@ -25,7 +25,8 @@ models and development seeds this server offers a comparison of the version's so
 model cannot be asked here, and, for a selection, the runs it plans, the most it can cost and what
 one like it typically cost, or the refusal a start of it would meet. ``POST .../comparisons``
 starts one (:mod:`exulanica.api.society_comparison_start`): in one transaction it defines the
-comparison through the one definition path the local command defines by, reserves every run and
+comparison through the one definition path the local command defines by, frozen at the society's
+newest input or at an earlier stored one the caller names (``input_seq``), reserves every run and
 records the start with the bound its owner stated, at most the most it can cost. A host's
 comparison worker plays it off the request path (:mod:`exulanica.api.society_comparison_worker`).
 The comparison's id is the caller's, keyed within its workspace: the same start sent again is
@@ -261,12 +262,14 @@ def plan_society_comparison(
     model: Annotated[list[str], Query(max_length=MODELS_MOST)] = [],  # noqa: B006
     control: bool = False,
     seeds: Annotated[int, Query(ge=1, le=_SEEDS_MOST)] = 1,
+    input_seq: Annotated[int | None, Query(ge=1)] = None,
 ) -> Any:
     """What a start would do, writing nothing: the roles, groups, models and development seeds
     this server offers a comparison of the version's society, and, for the selection the query
-    names (``model`` as ``<provider>/<model id>``, once or twice; ``person`` for a named group),
-    the runs it plans, the most it can cost and what one like it typically cost, or the refusal a
-    start of it would meet."""
+    names (``model`` as ``<provider>/<model id>``, once or twice; ``person`` for a named group;
+    ``input_seq`` for an earlier stored input to freeze), the runs it plans, the input it
+    freezes, the most it can cost and what one like it typically cost, or the refusal a start of
+    it would meet."""
     comparisons = _comparisons(connection, session, request, world_id)
     society = _society(comparisons, version_id)
     navigation = comparisons.navigation_profile(society)
@@ -336,12 +339,14 @@ def plan_society_comparison(
             control=control,
             seed_count=seeds,
             navigation=navigation,
+            input_seq=input_seq,
         )
     except StartRefused as exc:
         document["plan_refusal"] = {"code": exc.code, "detail": exc.detail}
     else:
         document["plan"] = {
             **prepared.cost.document(),
+            "input_seq": prepared.input_seq,
             "minutes": _minutes(prepared, population, navigation),
         }
     return document
@@ -494,6 +499,8 @@ class ComparisonStartBody(BaseModel):
     control: bool = False
     seeds: Annotated[int, Field(ge=1, le=_SEEDS_MOST)]
     bound_usd: Annotated[str, Field(pattern=_BOUND_PATTERN)]
+    #: An earlier stored input of the society to freeze; left out, its newest.
+    input_seq: Annotated[int, Field(ge=1)] | None = None
 
 
 #: What a host refusal says, where this server starts no comparison for the workspace.
@@ -526,8 +533,11 @@ class _Prepared:
         seeds: tuple[str, ...],
         body: dict[str, Any],
         cost: ComparisonCost,
+        input_seq: int,
     ) -> None:
         self.runner, self.role, self.seeds, self.body, self.cost = runner, role, seeds, body, cost
+        #: The society's input a start of it freezes.
+        self.input_seq = input_seq
 
 
 def _prepare(
@@ -544,6 +554,7 @@ def _prepare(
     control: bool,
     seed_count: int,
     navigation: str | None,
+    input_seq: int | None = None,
 ) -> _Prepared:
     """What a start of this selection would define, through the one definition path, or the
     refusal it would meet (:class:`StartRefused`); reads only."""
@@ -588,6 +599,9 @@ def _prepare(
             "seeds_out_of_range",
             f"this server holds {len(services.comparison_seeds)} development seeds",
         )
+    newest = SocietyRepository(connection, session.workspace_id, world_id=world_id)._chain(society)
+    if input_seq is not None and not 1 <= input_seq <= newest:
+        raise StartRefused("input_not_in_society", f"this society holds inputs 1 to {newest}")
     here = {person["id"] for person in society["state"]["inhabitants"]}
     people: tuple[str, ...] | None = None
     if group.kind == "named":
@@ -628,7 +642,7 @@ def _prepare(
         at_once=protocol_value(runner.catalogs, "runs_at_once"),
         navigation_profile=navigation,
     )
-    return _Prepared(runner, role, seeds, body, cost)
+    return _Prepared(runner, role, seeds, body, cost, newest if input_seq is None else input_seq)
 
 
 def _choices(
@@ -745,6 +759,7 @@ def start_society_comparison(
             control=body.control,
             seed_count=body.seeds,
             navigation=comparisons.navigation_profile(society),
+            input_seq=body.input_seq,
         )
         try:
             bound = Decimal(body.bound_usd)
@@ -774,6 +789,7 @@ def start_society_comparison(
                 comparison_id=body.comparison_id,
                 body=prepared.body,
                 connection=connection,
+                input_seq=prepared.input_seq,
             )
             prepared.runner.reserve_all(body.comparison_id, prepared.seeds, connection=connection)
             starts.record(
@@ -797,6 +813,9 @@ def start_society_comparison(
             status_code=START_REFUSALS.get(exc.code, 409),
             content={"code": exc.code, "detail": str(exc)},
         )
+    except UnavailableSocietyInput as exc:
+        # The input it would freeze lost its rights: answered as every society read answers one.
+        return _unavailable(exc)
     if existing is not None:
         response.status_code = 200
     row = comparisons.definition(version_id, body.comparison_id)

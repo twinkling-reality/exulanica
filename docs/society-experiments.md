@@ -416,6 +416,24 @@ and, for each run with no outcome yet, where it stands (`progress`): `running` w
 it under the start's live lease, since a host records each run it starts (migration 0130), and
 `queued` otherwise.
 
+**Stored drawings.** A host draws a completed run once, when it records the run's outcome, under
+the digest of the drawing code and the data that code reads (migration 0121). A server whose drawing
+code or data differ finds no drawing under its own digest and replays the run on each read instead,
+held to the run's record. Nothing draws stored runs again, so every run drawn before such a change
+is served by replay; the rows drawn under the earlier digest are kept.
+
+**An earlier input.** A start may name `input_seq`, an earlier stored input of the society, to
+freeze instead of its newest; the plan takes the same parameter and states the input a start of
+its selection freezes (`plan.input_seq`), and the comparison's read serves the input it froze
+(`input`: its sequence and digest). An input the society does not hold is refused by name
+(`input_not_in_society`, 422), and one that lost its rights is answered 424
+`unavailable_society_input`, as a read of the society answers it. Every run starts at the
+society's genesis and consumes its inputs up to the frozen one, so two comparisons with the same
+models and seeds, one frozen before an edit and one at it, differ only by that edit
+([`tests/test_comparison_frozen_input_postgres.py`](../tests/test_comparison_frozen_input_postgres.py)).
+Neither is a branch of the live society at the edit's tick, which would need a replay to that tick
+and a new run start, and the live history is never written.
+
 **From the local command.** The command defines and runs one in its own process:
 
 ```

@@ -11,6 +11,15 @@ normal interface, erasure only through ``privileged_purger`` with a tombstone's 
 The local layout is ``<root>/<workspace hex>/sha-256/<aa>/<bb>/<digest>``, a prefix an
 S3-compatible backend serves unchanged. The root must lie outside the shared blob store, and
 :func:`material_stores` places it beside that store under the data directory.
+
+**Every namespace is registered here, once.** :data:`SHARED_NAMESPACES` hold one store for
+everybody; :data:`WORKSPACE_NAMESPACES` hold one per workspace, under ``<name>/<workspace hex>``.
+The stores a process builds (:mod:`exulanica.store.configured`), their listing for backup and
+restore, the sweep of unfinished writes and the object store's check of which keys are its own all
+read these two tuples, so a namespace added to one of them is built, listed, swept and recognised
+with no other change. The names are stable: each is a directory under the data directory, a segment
+of every object key and the name a backup set records, so renaming one would orphan everything
+stored under it. A name is one lower-case segment of letters, digits and ``-``.
 """
 
 from __future__ import annotations
@@ -28,7 +37,9 @@ from exulanica.store.local import LocalContentAddressedStore
 __all__ = [
     "BLOB_NAMESPACE",
     "MATERIAL_NAMESPACE",
+    "SHARED_NAMESPACES",
     "TILE_NAMESPACE",
+    "WORKSPACE_NAMESPACES",
     "LocalWorkspaceStores",
     "WorkspaceStores",
     "material_stores",
@@ -43,6 +54,11 @@ MATERIAL_NAMESPACE: Final = "materials"
 #: tile is a pure function of public inputs, so the same key names the same bytes for everyone
 #: (migration 0072).
 TILE_NAMESPACE: Final = "tiles"
+
+#: The namespaces holding one store for every workspace, in the order they are listed.
+SHARED_NAMESPACES: Final[tuple[str, ...]] = (BLOB_NAMESPACE, TILE_NAMESPACE)
+#: The namespaces holding one store per workspace, each under ``<name>/<workspace hex>``.
+WORKSPACE_NAMESPACES: Final[tuple[str, ...]] = (MATERIAL_NAMESPACE,)
 
 
 class WorkspaceStores(abc.ABC):

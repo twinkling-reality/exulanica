@@ -1,0 +1,119 @@
+{
+  "schema_version": 1,
+  "catalog_id": "signal-comparison-seeds",
+  "catalog_version": 1,
+  "entries": [
+    {
+      "key": "development_1",
+      "phase": "development",
+      "seed_digest": "b89ea9e84b789cbbdd8d240db953d923e621db4940f0347479d1767349a1eae8",
+      "seed": "658c6b39fc044132bdf09b2dbc3e710beaf6085f7e9c6f23219df8e3633fbe1c",
+      "reason": "A development seed, with its text beside its digest: a development seed is looked at freely and never judged, so it is no secret, and a signal comparison started from the application runs on it with no file of seeds beside the server. The episode it names is drawn from a SHA-256 of its text under the comparison's own prefix, which its digest does not reveal, so its departures and dwells are drawn apart from every other seed's.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica signal comparison protocol; see the entry reason"
+      }
+    },
+    {
+      "key": "development_2",
+      "phase": "development",
+      "seed_digest": "7ad48ad3304af274f4d9a45ec21e41b7b402a46ad973eff9848e56d062d20ac0",
+      "seed": "7d593fa0a8e7dd3cf4767aa893ddfed3187201cae692697edc08b0158f0a37fa",
+      "reason": "A development seed, with its text beside its digest: a development seed is looked at freely and never judged, so it is no secret, and a signal comparison started from the application runs on it with no file of seeds beside the server. The episode it names is drawn from a SHA-256 of its text under the comparison's own prefix, which its digest does not reveal, so its departures and dwells are drawn apart from every other seed's.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica signal comparison protocol; see the entry reason"
+      }
+    },
+    {
+      "key": "development_3",
+      "phase": "development",
+      "seed_digest": "d3a47a54c77779abc94e0cf8e4b52e8db5f70dc3f209007895bbc432ca32b2f7",
+      "seed": "1c1a324ce000f2903d3d4ae82cdc3d79d2f85bb6aebae93f2b75905885c662dd",
+      "reason": "A development seed, with its text beside its digest: a development seed is looked at freely and never judged, so it is no secret, and a signal comparison started from the application runs on it with no file of seeds beside the server. The episode it names is drawn from a SHA-256 of its text under the comparison's own prefix, which its digest does not reveal, so its departures and dwells are drawn apart from every other seed's.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica signal comparison protocol; see the entry reason"
+      }
+    },
+    {
+      "key": "development_4",
+      "phase": "development",
+      "seed_digest": "bd38375bfe773d8c739f1e7b34100cc862090b36ef546d8e2eeb4161c2ca4c1e",
+      "seed": "569268d7bf0426fa4b8f381e6f728e61b03a3cb83d557aef5efcc42a1b226229",
+      "reason": "A development seed, with its text beside its digest: a development seed is looked at freely and never judged, so it is no secret, and a signal comparison started from the application runs on it with no file of seeds beside the server. The episode it names is drawn from a SHA-256 of its text under the comparison's own prefix, which its digest does not reveal, so its departures and dwells are drawn apart from every other seed's.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica signal comparison protocol; see the entry reason"
+      }
+    },
+    {
+      "key": "development_5",
+      "phase": "development",
+      "seed_digest": "c499abca79df88d32de257d69dbe9ec8e9a65a90ffe9416573652b88031dc6a5",
+      "seed": "b24796721190dd3ffa1a0d529fb10bfd7a1c6d44805db76b431f93cdb4d999ee",
+      "reason": "A development seed, with its text beside its digest: a development seed is looked at freely and never judged, so it is no secret, and a signal comparison started from the application runs on it with no file of seeds beside the server. The episode it names is drawn from a SHA-256 of its text under the comparison's own prefix, which its digest does not reveal, so its departures and dwells are drawn apart from every other seed's.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica signal comparison protocol; see the entry reason"
+      }
+    },
+    {
+      "key": "development_6",
+      "phase": "development",
+      "seed_digest": "04564ef2734802d76e5711fa360c873d42d1dffbb4a78015cb36a09e5e8e73e1",
+      "seed": "08f87f3d050d81d733e52a4a8ade6a287030edbc11a3e694ad8fa640ffea00b8",
+      "reason": "A development seed, with its text beside its digest: a development seed is looked at freely and never judged, so it is no secret, and a signal comparison started from the application runs on it with no file of seeds beside the server. The episode it names is drawn from a SHA-256 of its text under the comparison's own prefix, which its digest does not reveal, so its departures and dwells are drawn apart from every other seed's.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica signal comparison protocol; see the entry reason"
+      }
+    },
+    {
+      "key": "development_7",
+      "phase": "development",
+      "seed_digest": "088136cc60b102979f4ecca699df0a9250793a5740469dbca17ca5625ed2cd29",
+      "seed": "adbb06d31cd6762d09ea453042d95edbfa22e9281dbd59e3c78ce49255f7bdab",
+      "reason": "A development seed, with its text beside its digest: a development seed is looked at freely and never judged, so it is no secret, and a signal comparison started from the application runs on it with no file of seeds beside the server. The episode it names is drawn from a SHA-256 of its text under the comparison's own prefix, which its digest does not reveal, so its departures and dwells are drawn apart from every other seed's.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica signal comparison protocol; see the entry reason"
+      }
+    },
+    {
+      "key": "development_8",
+      "phase": "development",
+      "seed_digest": "2a8b4ebd497c066097ef3af70bdb53e9298c8cb072e632b7d940f0eb4c11b7ab",
+      "seed": "d01e85716a59c9bc393dd9f604e8200efc2c0899b9d73e911fc26533c935a45a",
+      "reason": "A development seed, with its text beside its digest: a development seed is looked at freely and never judged, so it is no secret, and a signal comparison started from the application runs on it with no file of seeds beside the server. The episode it names is drawn from a SHA-256 of its text under the comparison's own prefix, which its digest does not reveal, so its departures and dwells are drawn apart from every other seed's.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica signal comparison protocol; see the entry reason"
+      }
+    }
+  ]
+}

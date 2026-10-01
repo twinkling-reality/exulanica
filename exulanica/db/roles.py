@@ -206,6 +206,11 @@ INSERT_ONLY_TABLES: Final = (
     "world_traffic_signal_decision_request",
     "world_traffic_signal_decision",
     "world_traffic_signal_segment",
+    # Migration 0125 appends a world clock's receipts, each committed minute's crossing occupancy
+    # and each sealed coupled traffic minute, and refuses every update and delete of each.
+    "world_clock_event",
+    "world_crossing_occupancy",
+    "world_clock_traffic_minute",
     # Migration 0127 appends a project's bindings and what each item was drawn from, and refuses
     # every update and delete of either. An item's revisions are appended by the runtime and
     # erased only by the owner-rights trigger that deletes the item, never updated by the runtime.
@@ -220,6 +225,12 @@ INSERT_ONLY_TABLES: Final = (
     # and refuses every update and delete of either.
     "comparison_cancellation",
     "comparison_run_start",
+    # Migration 0132 appends a comparison of the models that decide a town's signals, its runs,
+    # their receipts and outcomes, and refuses every update and delete of each.
+    "signal_comparison",
+    "signal_comparison_run",
+    "signal_comparison_decision",
+    "signal_comparison_outcome",
 )
 
 #: The vocabulary is administered, not generated. Without revoking this the role could insert a

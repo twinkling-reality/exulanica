@@ -33,6 +33,8 @@ from exulanica.world.society_controls import (
 )
 from exulanica.world.society_engines import PLAYABLE_ENGINES, society_engine
 from exulanica.world.society_repository import SocietyRepository
+from exulanica.world.world_clock import lead_room
+from exulanica.world.world_clock_repository import ClockLeadExhausted, WorldClockRepository
 
 #: Profiles an explicitly enabled playback worker may advance.
 #: The engines the playback worker may play, from the engine table.
@@ -215,13 +217,23 @@ class SocietyControlRepository:
             return [row["document"] for row in rows]
 
     def configure(
-        self, version_id: uuid.UUID, *, actor: uuid.UUID, base_revision: int, mode: str, speed: int
+        self,
+        version_id: uuid.UUID,
+        *,
+        actor: uuid.UUID,
+        base_revision: int,
+        mode: str,
+        speed: int,
+        base_clock_revision: int | None = None,
     ) -> dict:
         validate_settings(mode, speed, self.base_tick_interval_ms)
         if type(base_revision) is not int or base_revision < 0:
             raise ValueError("base_revision must be a nonnegative integer")
         with self.connection.transaction():
             society = self._scope(version_id)
+            WorldClockRepository(self.connection, self.workspace_id, self.world_id).check_revision(
+                version_id, base_clock_revision
+            )
             prior = self._control(society["society_id"])
             if base_revision != (0 if prior is None else prior["revision"]):
                 raise StaleSocietyState("playback controls changed; reload before saving")
@@ -278,6 +290,7 @@ class SocietyControlRepository:
         base_revision: int,
         base_tick: int,
         base_state_sha256: str,
+        base_clock_revision: int | None = None,
     ) -> dict:
         if type(base_revision) is not int or base_revision < 0:
             raise ValueError("base_revision must be a nonnegative integer")
@@ -291,7 +304,10 @@ class SocietyControlRepository:
             if control is None:
                 self.configure(version_id, actor=actor, base_revision=0, mode="paused", speed=1)
             after = self._society(actor).advance(
-                version_id, base_tick=base_tick, base_state_sha256=base_state_sha256
+                version_id,
+                base_tick=base_tick,
+                base_state_sha256=base_state_sha256,
+                base_clock_revision=base_clock_revision,
             )
             receipt = self._event(
                 society,
@@ -331,12 +347,19 @@ class SocietyControlRepository:
             ).fetchone()["held"]
             if not locked:
                 return None
+            # A coupled world whose society already leads its sealed traffic by the clock's lead
+            # waits: claiming it would run no minute (world/world_clock.py).
             row = connection.execute(
                 "select c.*,s.version_id,s.world_id from world_society_control c join "
                 "world_society s using(workspace_id,society_id) "
+                "left join world_clock k on k.workspace_id=c.workspace_id "
+                "and k.society_id=c.society_id "
                 "where c.workspace_id=%s and "
                 "c.mode='playing' and c.next_due_at<=clock_timestamp() "
                 "and (c.lease_token is null or c.lease_expires_at<=clock_timestamp()) "
+                "and (k.society_id is null or k.traffic_state is null "
+                "or k.traffic_state='unavailable' "
+                "or k.society_tick-k.traffic_sealed_through_tick<k.lead_ticks) "
                 "order by c.next_due_at,c.society_id for update of c skip locked limit 1",
                 (workspace_id,),
             ).fetchone()
@@ -438,6 +461,22 @@ class SocietyControlRepository:
             interval = control["base_tick_interval_ms"] // control["speed"]
             due = ticks_due(started, control["next_due_at"], interval)
             count = min(MAX_CATCHUP_TICKS if max_ticks is None else max_ticks, due)
+            # A coupled world runs no further ahead of its sealed traffic than its clock's lead;
+            # the minutes past it are discarded with the rest of the debt.
+            clock = self.connection.execute(
+                "select lead_ticks,traffic_state,traffic_sealed_through_tick from world_clock "
+                "where workspace_id=%s and world_id=%s and society_id=%s",
+                (self.workspace_id, self.world_id, claim.society_id),
+            ).fetchone()
+            if clock is not None and clock["traffic_state"] in ("running", "blocked"):
+                count = min(
+                    count,
+                    lead_room(
+                        clock["lead_ticks"],
+                        society["current_tick"],
+                        clock["traffic_sealed_through_tick"],
+                    ),
+                )
             before_tick = society["current_tick"]
             before_hash = society["state_sha256"]
             details = {
@@ -455,18 +494,26 @@ class SocietyControlRepository:
                 with self.connection.transaction():
                     self._ready(society, claim.actor)
                     current = society
+                    executed = 0
                     for _ in range(count):
                         self._check_lease(control, claim)
-                        after = self._society(claim.actor).advance(
-                            claim.version_id,
-                            base_tick=current["current_tick"],
-                            base_state_sha256=current["state_sha256"],
-                        )
+                        try:
+                            after = self._society(claim.actor).advance(
+                                claim.version_id,
+                                base_tick=current["current_tick"],
+                                base_state_sha256=current["state_sha256"],
+                            )
+                        except ClockLeadExhausted:
+                            # The count above keeps inside the lead, so this is a guard: stop at
+                            # the minutes committed rather than pause a world that only waits.
+                            break
+                        executed += 1
                         current = {
                             **current,
                             "current_tick": after["current_tick"],
                             "state_sha256": after["state_sha256"],
                         }
+                    count = executed
                     self._check_lease(control, claim)
             except (UnavailableSocietyInput, ValueError) as exc:
                 self._check_lease(control, claim)

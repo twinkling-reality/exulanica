@@ -23,7 +23,9 @@ from the episodes it spans. This module holds that, in the pattern the flight's 
   of its class that is nobody's home and has a free place, reached and returned from; staying
   there for a dwell drawn from the seed; and driving home. The trip requests are decided second by
   second by this rule and recorded as the run's inputs, so the episode replays exactly. The
-  crossing feed is empty: no walker's crossing is fed to traffic, and the window says so;
+  crossing feed is empty unless a caller hands one in: a world whose clock is legacy feeds no
+  walker's crossing to traffic, and the window says so; a coupled world's traffic host hands in
+  the feeds its society's crossing occupancy projects (:mod:`exulanica.world.world_clock`);
 - **a window** (:func:`window_of`): the presentation frames of its seconds
   (``exulanica.traffic-presentation-frame/v1``), grouped by vehicle, packed as integers, and each
   signal's groups with where their heads stand and the indication each shows every second
@@ -39,7 +41,7 @@ import hashlib
 import uuid
 from array import array
 from collections import OrderedDict
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, dataclass, replace
 from typing import Any, Final
 
@@ -55,7 +57,14 @@ from exulanica.movement.registry import ROADS, MovementError, built_module
 from exulanica.traffic.catalogs import TrafficCatalogs, load_traffic_catalogs
 from exulanica.traffic.city_derivation import PLACEMENT_KEY, DerivedRoads, derive_road_records
 from exulanica.traffic.city_roads import READ_KINDS, road_input_from_city
-from exulanica.traffic.inputs import LOOKAHEAD_S, CrossingFeed, TrafficInputs, TripRequest
+from exulanica.traffic.inputs import (
+    CROSSING_FEED_PROFILE,
+    LOOKAHEAD_S,
+    CrossingEntry,
+    CrossingFeed,
+    TrafficInputs,
+    TripRequest,
+)
 from exulanica.traffic.network import RoadNetwork, compile_network
 from exulanica.traffic.presentation import presentation_frame, signal_codes, signal_heads
 from exulanica.traffic.routing import plan_route
@@ -64,6 +73,7 @@ from exulanica.traffic.signals import PEDESTRIAN_INDICATIONS, VEHICLE_INDICATION
 from exulanica.traffic.simulation import advance_traffic, initial_traffic, state_sha256
 
 __all__ = [
+    "COUPLED_WINDOW_PROFILE",
     "EPISODE",
     "INPUT_PROFILE",
     "MODES",
@@ -72,10 +82,15 @@ __all__ = [
     "TrafficInput",
     "TrafficRefused",
     "check_request",
+    "compute_band_identities",
+    "compute_coupled_segments",
     "compute_episode",
     "compute_signal_catalog",
     "compute_signal_probe",
     "compute_signal_replay",
+    "coupled_frames_sha256",
+    "feeds_from_wire",
+    "feeds_wire",
     "from_wire",
     "home_segment",
     "road_records",
@@ -88,6 +103,10 @@ __all__ = [
 ROADS_MODULE: Final = built_module(ROADS)
 INPUT_PROFILE: Final = "exulanica.traffic-input/v1"
 WINDOW_PROFILE: Final = ROADS_MODULE.output_profile
+#: A window of a coupled world's traffic: its seconds are on the world's traffic timeline and its
+#: crossings are fed. Its own profile, so a reader of the shared-real-time window refuses it rather
+#: than reading its seconds as Unix seconds.
+COUPLED_WINDOW_PROFILE: Final = "exulanica.traffic-window/v3"
 EPISODE: Final = ROADS_MODULE.value("episode_steps")
 _DEPARTURE: Final = ROADS_MODULE.value("departure_steps")
 _DWELL: Final = (
@@ -119,6 +138,10 @@ _CARRIED: Final = (*READ_KINDS, CurbEdgeRecord, StreetFurnitureRecord)
 _SHAPES_BY_KIND: Final = {shape.kind: shape for shape in CITY_SHAPES_BY_TYPE.values()}
 #: Networks kept in a worker process, by input digest: a page reads one world at a time.
 _PREPARED_LIMIT: Final = 4
+#: Continuations of a coupled world's sealed minutes kept in a worker process, by input, episode,
+#: the segment they begin and the digest they carry. A coupled minute stores no continuation, so a
+#: read that finds none here computes its episode again from genesis and checks every sealed digest.
+_CONTINUATIONS_KEPT: Final = 64
 
 
 class TrafficRefused(MovementError):
@@ -370,12 +393,23 @@ def home_segment(
     *,
     signal_timelines: Mapping[str, SignalTimeline] | None = None,
     chosen_signals: Sequence[str] = (),
+    feeds: Sequence[CrossingFeed] | None = None,
+    observe: Callable[[Mapping[str, Any], Sequence[Mapping[str, Any]]], None] | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, Any], dict[str, Any], dict[str, Any] | None]:
     """Run to an exclusive episode-local second, carrying every trip-rule fact across a seam.
 
     The continuation is sealed over the exact road input and episode. A later worker can resume
     it without replaying the prefix or drawing a different departure, destination or dwell.
     A segment returns only its own states; the first also returns the genesis state.
+
+    ``feeds`` are the episode's crossing feeds, in episode-local seconds, reaching at least the
+    lookahead past ``end_second``; without them no walker is on any crossing, as a legacy world's
+    traffic has always run. The continuation does not carry them: the caller binds the feeds it
+    handed in to what it seals.
+
+    ``observe``, where given, is called with the state after each second this call advances and
+    that second's events, each second once however the episode is cut into calls; it changes
+    nothing the call returns.
     """
     if type(episode) is not int or episode < 0 or type(end_second) is not int:
         raise TrafficRefused("traffic_second_out_of_range", "invalid segment coordinates")
@@ -395,7 +429,7 @@ def home_segment(
         vehicle_id: draw_integer(seed, "traffic_host.departure", salt + ordinal, 0, _DEPARTURE - 1)
         for vehicle_id, ordinal in ordinals.items()
     }
-    feeds = (CrossingFeed(1, EPISODE + LOOKAHEAD_S, ()),)
+    feeds = (CrossingFeed(1, EPISODE + LOOKAHEAD_S, ()),) if feeds is None else tuple(feeds)
     if continuation is None:
         returning: dict[str, int] = {}
         trips: list[TripRequest] = []
@@ -572,6 +606,8 @@ def home_segment(
         )
         state = step.state
         states.append(state)
+        if observe is not None:
+            observe(state, step.events)
         for event in step.events:
             document = event["document"]
             if document.get("kind") != "trip_arrived":
@@ -659,12 +695,21 @@ def compute_signal_probe(
     choices: Mapping[str, Mapping[int, str]],
     initial_cursors: Mapping[str, Sequence[int]],
     chosen_signals: Sequence[str],
+    feeds: Sequence[Mapping[str, Any]] | None = None,
+    digests: bool = False,
+    *,
+    observe: Callable[[Mapping[str, Any], Sequence[Mapping[str, Any]]], None] | None = None,
 ) -> dict[str, Any]:
     """One released-worker probe, stopping before a live model choice when one is due.
 
     The caller supplies only recorded actions and a prior sealed phase cursor. No model client,
     clock or database is present in this worker job. Its continuation binds the road input and
     every traffic rule fact; the controller persists and validates it before another probe.
+    ``feeds`` is the wire form of a coupled world's crossing feeds (:func:`feeds_wire`), or None.
+    ``digests`` answers each second's state digest in place of the state, all a coupled seal
+    binds (:func:`coupled_frames_sha256`), so a minute's states never cross the process boundary.
+    ``observe`` is :func:`home_segment`'s, for a caller probing in its own process (a comparison
+    reading the traffic metrics); a worker job is sent none.
     """
     value = from_wire(data)
     ready = prepared(value)
@@ -696,14 +741,44 @@ def compute_signal_probe(
         continuation,
         signal_timelines=timelines,
         chosen_signals=chosen_signals,
+        feeds=feeds_from_wire(feeds),
+        observe=observe,
     )
     return {
-        "states": states,
+        ("state_sha256s" if digests else "states"): (
+            [state_sha256(state) for state in states] if digests else states
+        ),
         "continuation": following,
         "summary": summary,
         "point": point,
         "network_sha256": ready.network.digest,
     }
+
+
+def coupled_frames_sha256(
+    state_sha256s: Sequence[str],
+    signal_choices: Mapping[str, Any],
+    initial_signal_cursors: Mapping[str, Any],
+) -> str:
+    """What a coupled world's sealed minute binds its frames by: each second's state digest, in
+    order, with the minute's recorded signal choices and the episode's initial phase cursors."""
+    return hashlib.sha256(
+        canonical_json(
+            {
+                "state_sha256s": list(state_sha256s),
+                "signal_choices": dict(signal_choices),
+                "initial_signal_cursors": dict(initial_signal_cursors),
+            }
+        )
+    ).hexdigest()
+
+
+def compute_band_identities(data: Mapping[str, Any]) -> dict[str, str]:
+    """Each band's ``society_crossing_id`` by the crossing record identity it keeps: how a
+    coupled world's walkers, named by record, reach the bands traffic's feed names."""
+    value = from_wire(data)
+    ready = prepared(value)
+    return {band.identity: band.society_crossing_id for band in ready.network.bands}
 
 
 def compute_signal_catalog(data: Mapping[str, Any]) -> list[dict[str, str]]:
@@ -723,10 +798,28 @@ def compute_signal_replay(
     continuation: Mapping[str, Any] | None,
     choices: Mapping[str, Mapping[int, str]],
     initial_cursors: Mapping[str, Sequence[int]],
+    feeds: Sequence[Mapping[str, Any]] | None = None,
 ) -> tuple[PackedTrafficEpisode, dict[str, Any], str]:
     """Rebuild a sealed minute without a client, returning its packed frames and state digest."""
     value = from_wire(data)
     ready = prepared(value)
+    return _replayed_segment(
+        value,
+        ready,
+        episode,
+        segment,
+        continuation,
+        _timelines(ready, choices, initial_cursors),
+        feeds_from_wire(feeds),
+    )
+
+
+def _timelines(
+    ready: Prepared,
+    choices: Mapping[str, Mapping[int, str]],
+    initial_cursors: Mapping[str, Sequence[int]],
+) -> dict[str, SignalTimeline]:
+    """The recorded schedule of every signal a replay names, from its choices and phase cursor."""
     signals = {
         junction.signal.identity: junction.signal
         for junction in ready.network.junctions.values()
@@ -735,7 +828,7 @@ def compute_signal_replay(
     named = set(choices) | set(initial_cursors)
     if not named <= signals.keys():
         raise TrafficRefused("signal_not_in_world", "a replay signal is not in these roads")
-    timelines = {
+    return {
         signal_id: SignalTimeline(
             ready.catalogs.plan(signals[signal_id].plan),
             signals[signal_id].offset_s,
@@ -747,6 +840,19 @@ def compute_signal_replay(
         )
         for signal_id in sorted(named)
     }
+
+
+def _replayed_segment(
+    value: TrafficInput,
+    ready: Prepared,
+    episode: int,
+    segment: int,
+    continuation: Mapping[str, Any] | None,
+    timelines: Mapping[str, SignalTimeline],
+    feeds: Sequence[CrossingFeed] | None,
+    *,
+    coupled: bool = False,
+) -> tuple[PackedTrafficEpisode, dict[str, Any], str]:
     states, following, summary, point = home_segment(
         value,
         ready,
@@ -754,21 +860,132 @@ def compute_signal_replay(
         (segment + 1) * signal_actuation().segment_seconds,
         continuation,
         signal_timelines=timelines,
+        feeds=feeds,
     )
     assert point is None
     packed = _pack_states(value, ready, episode, states, summary, timelines)
     if segment != EPISODE // signal_actuation().segment_seconds - 1:
         packed = replace(packed, late_home=())
-    frames_sha = hashlib.sha256(
-        canonical_json(
-            {
-                "states": states,
-                "signal_choices": following["signal_choices"],
-                "initial_signal_cursors": following["initial_signal_cursors"],
-            }
+    if coupled:
+        frames_sha = coupled_frames_sha256(
+            [state_sha256(state) for state in states],
+            following["signal_choices"],
+            following["initial_signal_cursors"],
         )
-    ).hexdigest()
+    else:
+        frames_sha = hashlib.sha256(
+            canonical_json(
+                {
+                    "states": states,
+                    "signal_choices": following["signal_choices"],
+                    "initial_signal_cursors": following["initial_signal_cursors"],
+                }
+            )
+        ).hexdigest()
     return packed, following, frames_sha
+
+
+def feeds_wire(feeds: Sequence[CrossingFeed]) -> list[dict[str, Any]]:
+    """Plain data from which :func:`feeds_from_wire` rebuilds ``feeds`` exactly."""
+    return [feed.document() for feed in feeds]
+
+
+def feeds_from_wire(data: Sequence[Mapping[str, Any]] | None) -> tuple[CrossingFeed, ...] | None:
+    """The crossing feeds :func:`feeds_wire` describes, each checked as the step's input is."""
+    if data is None:
+        return None
+    feeds = []
+    for item in data:
+        if item.get("profile") != CROSSING_FEED_PROFILE:
+            raise TrafficRefused("crossing_feed_invalid", "a crossing feed of another profile")
+        feeds.append(
+            CrossingFeed(
+                item["feed_seq"],
+                item["covers_through_second"],
+                tuple(
+                    CrossingEntry(
+                        crossing_id=entry["crossing_id"],
+                        arrival_second=entry["arrival_second"],
+                        duration_seconds=entry["duration_seconds"],
+                        source=entry["source"],
+                    )
+                    for entry in item["entries"]
+                ),
+            )
+        )
+    return tuple(feeds)
+
+
+_continuations: OrderedDict[tuple[str, int, int, str], dict[str, Any]] = OrderedDict()
+
+
+def compute_coupled_segments(
+    data: Mapping[str, Any],
+    episode: int,
+    sealed: Sequence[Mapping[str, Any]],
+    feeds: Sequence[Mapping[str, Any]],
+    initial_cursors: Mapping[str, Sequence[int]],
+    first: int,
+    fresh: bool = False,
+) -> dict[str, Any]:
+    """Rebuild a coupled world's sealed minutes ``first`` to the last of ``sealed``, packed.
+
+    ``fresh`` starts from the episode's genesis whatever this process keeps, as a verification
+    does.
+
+    ``sealed`` holds, for every segment of the episode from 0 to the last one wanted, its sealed
+    ``continuation_sha256``, ``frames_sha256``, ``signal_choices`` and ``signal_cursors``. The work
+    starts from the
+    latest continuation this process keeps at or before ``first``, else from the episode's
+    genesis, and every minute it computes must digest to what was sealed, or the read is refused
+    (``traffic_replay_mismatch``): what a viewer is shown is what was sealed. Answers the packed
+    minutes from ``first`` on and the last continuation, so the follower can go on from it.
+    """
+    value = from_wire(data)
+    ready = prepared(value)
+    last = len(sealed) - 1
+    if not 0 <= first <= last or [row["segment"] for row in sealed] != list(range(last + 1)):
+        raise TrafficRefused("traffic_second_out_of_range", "sealed minutes of this episode")
+    crossing = feeds_from_wire(feeds)
+    start, continuation = 0, None
+    for segment in range(0 if fresh else first, 0, -1):
+        kept = _continuations.get(
+            (value.sha256, episode, segment, sealed[segment - 1]["continuation_sha256"])
+        )
+        if kept is not None:
+            start, continuation = segment, kept
+            break
+    packed: dict[int, PackedTrafficEpisode] = {}
+    for segment in range(start, last + 1):
+        # A minute's continuation carries the episode's choices recorded through that minute, so
+        # each minute is rebuilt with exactly those, as it was sealed.
+        choices = {
+            signal_id: {int(second): action for second, action in made.items()}
+            for signal_id, made in sealed[segment]["signal_choices"].items()
+        }
+        for signal_id in sealed[segment]["signal_cursors"]:
+            choices.setdefault(signal_id, {})
+        timelines = _timelines(ready, choices, initial_cursors)
+        section, following, frames_sha = _replayed_segment(
+            value, ready, episode, segment, continuation, timelines, crossing, coupled=True
+        )
+        if (
+            following["document_sha256"] != sealed[segment]["continuation_sha256"]
+            or frames_sha != sealed[segment]["frames_sha256"]
+        ):
+            raise TrafficRefused(
+                "traffic_replay_mismatch",
+                f"minute {segment} of episode {episode} does not rebuild what was sealed",
+            )
+        key = (value.sha256, episode, segment + 1, following["document_sha256"])
+        _continuations[key] = following
+        _continuations.move_to_end(key)
+        while len(_continuations) > _CONTINUATIONS_KEPT:
+            _continuations.popitem(last=False)
+        continuation = following
+        if segment >= first:
+            packed[segment] = section
+    return {"packed": packed, "continuation": continuation}
 
 
 def compute_episode(data: Mapping[str, Any], episode: int) -> PackedTrafficEpisode:
@@ -888,8 +1105,14 @@ def window_of_segments(
     segments: Mapping[tuple[int, int], PackedTrafficEpisode],
     from_second: int,
     seconds: int,
+    *,
+    coupled: bool = False,
 ) -> dict[str, Any]:
-    """Cut a page window across sealed minutes, including a 1,200-second episode boundary."""
+    """Cut a page window across sealed minutes, including a 1,200-second episode boundary.
+
+    ``coupled`` answers a coupled world's window (:data:`COUPLED_WINDOW_PROFILE`): its seconds are
+    on the world's traffic timeline and its crossings are fed. Otherwise the window is the shared
+    real-time one, byte for byte."""
     check_request(from_second, seconds)
     end = from_second + seconds
     span_seconds = signal_actuation().segment_seconds
@@ -907,7 +1130,7 @@ def window_of_segments(
         spans.append(
             (packed, max(from_second, first) - first, min(end, first + span_seconds) - first)
         )
-    return _window_spans(value, spans, from_second, seconds)
+    return _window_spans(value, spans, from_second, seconds, coupled=coupled)
 
 
 def _window_spans(
@@ -915,6 +1138,8 @@ def _window_spans(
     spans: Sequence[tuple[PackedTrafficEpisode, int, int]],
     from_second: int,
     seconds: int,
+    *,
+    coupled: bool = False,
 ) -> dict[str, Any]:
     """The common packed-frame projection of whole episodes and sealed minute segments."""
     head = spans[0][0]
@@ -961,8 +1186,8 @@ def _window_spans(
         signals.append(
             {"signal_id": heads["signal_id"], "junction_id": heads["junction_id"], "groups": groups}
         )
-    return {
-        "profile": WINDOW_PROFILE,
+    window = {
+        "profile": COUPLED_WINDOW_PROFILE if coupled else WINDOW_PROFILE,
         "module": ROADS,
         "input_sha256": value.sha256,
         "network_sha256": head.network_sha256,
@@ -972,7 +1197,7 @@ def _window_spans(
         "from_second": from_second,
         "seconds": seconds,
         "modes": list(MODES),
-        "crossings_fed": False,
+        "crossings_fed": coupled,
         "vehicles": vehicles,
         "late_home": late,
         "indications": {
@@ -991,3 +1216,6 @@ def _window_spans(
             }.values()
         ),
     }
+    if coupled:
+        window["timebase"] = "world"
+    return window

@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "catalog_id": "world-clock-profile",
+  "catalog_version": 1,
+  "entries": [
+    {
+      "key": "coupled",
+      "profile": "exulanica.world-clock/coupled-v1",
+      "time_authority": "society_tick",
+      "traffic_module": "exulanica-movement/roads/v2",
+      "flight_module": "exulanica-movement/flight/v2",
+      "crossings_fed": 1,
+      "seconds_per_tick": 60,
+      "lead_ticks": 2,
+      "crossing_lookahead_seconds": 60,
+      "catchup_ticks_maximum": 3,
+      "follower_minutes_per_turn": 2,
+      "legacy_signal_catchup_episodes": 1,
+      "verify_society_ticks_maximum": 720,
+      "verify_traffic_minutes_maximum": 60,
+      "reason": "One simulated timeline for a world version, opened by an explicit transition. The society's tick is the only authority: a tick is sixty simulated seconds, and traffic and flight take their positions from the era the transition opened, never from the wall clock. Traffic reads the crossing occupancy the society committed, and the traffic step admits a vehicle only when no pedestrian is due for the next sixty seconds, so a traffic minute needs the society's following minute. Two ticks of lead is the least that lets traffic advance, and more would put further simulated time between the society's head and what a person is shown. Catch-up keeps the playback worker's three minutes per claim. The follower seals at most two minutes a turn, one legacy episode is how far a model-controlled signal may catch up after downtime, and a verification replays at most twelve simulated hours of the society and one hour of traffic, which bounds its cost.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the world clock; see the entry reason"
+      }
+    },
+    {
+      "key": "legacy",
+      "profile": "exulanica.world-clock/legacy-v1",
+      "time_authority": "each_system",
+      "traffic_module": "exulanica-movement/roads/v1",
+      "flight_module": "exulanica-movement/flight/v1",
+      "crossings_fed": 0,
+      "seconds_per_tick": 60,
+      "lead_ticks": 0,
+      "crossing_lookahead_seconds": 60,
+      "catchup_ticks_maximum": 3,
+      "follower_minutes_per_turn": 2,
+      "legacy_signal_catchup_episodes": 1,
+      "verify_society_ticks_maximum": 720,
+      "verify_traffic_minutes_maximum": 60,
+      "reason": "The timing every world version has until a transition says otherwise: the society advances its own minutes, while traffic and flight keep shared real time and nothing couples them, so no walker's crossing is fed to traffic. It is recorded as a profile so that a reader is told which timing a world keeps, rather than inferring it from what is absent. A model-controlled signal that falls behind the wall clock by more than one episode starts again at the current episode instead of sealing every minute it missed.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the world clock; see the entry reason"
+      }
+    }
+  ]
+}

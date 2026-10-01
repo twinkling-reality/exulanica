@@ -1121,6 +1121,13 @@ batch immediately and persists paused `source_unavailable`; invalid state record
 under composition/v2 produce their per-action reasons and do not pause an otherwise available
 district.
 
+In a world whose clock is coupled ([world clock](world-clock-contract.md)), a society with roads
+to follow commits no minute more than the clock's lead ahead of its sealed traffic: such a minute,
+by a step or a playback batch, is refused `409 clock_lead_exhausted` and changes nothing, the worker
+does not claim such a world, and a batch runs no more minutes than the lead allows. A presence
+minute is a minute of that clock too. A configuration or a step may pin the clock's revision
+(`base_clock_revision`), refused `409 stale_clock_revision` when the clock has changed.
+
 Playback receipts reference completed engine transitions; wall timestamps and random lease tokens
 are not replay inputs to the engine. Exact state replay uses the original ordered inputs, authored
 edits and persisted decision receipts, including intervening input changes. It neither reads
@@ -1522,6 +1529,9 @@ in the [decision roles contract](decision-roles-contract.md#implementation-and-e
 ## Traffic boundary
 
 Vehicles are outside the society: road movement is the movement module
-`exulanica-movement/roads/v1`, stated and refused as `roads_not_connected`
-([movement modules](movement-modules-contract.md#roads)), and the traffic simulation, which nothing
-in the application calls, is the [traffic contract](traffic-contract.md)'s.
+`exulanica-movement/roads/v1` ([movement modules](movement-modules-contract.md#roads)), and the
+traffic simulation and its served windows are the [traffic contract](traffic-contract.md)'s. A
+society's walkers never read a vehicle or a signal and are never held at a kerb. In a world whose
+clock is coupled ([world clock](world-clock-contract.md)), each committed minute of a living society
+also records its crossing occupancy, where its walkers may stand on a crossing, and traffic yields to
+it; that record is derived from the minute and changes no byte of the society's state or events.

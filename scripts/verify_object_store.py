@@ -56,6 +56,7 @@ from exulanica.store.configured import (
     object_content_stores,
     sweep_incomplete_writes,
 )
+from exulanica.store.namespaces import SHARED_NAMESPACES, WORKSPACE_NAMESPACES
 from exulanica.store.object import (
     ObjectPurgeRequests,
     ObjectRequests,
@@ -231,9 +232,10 @@ def key_parity(run: Run) -> dict[str, Any]:
     local = local_content_stores(local_root)
     workspace = uuid.uuid4()
     for target in (stores, local):
-        target.blobs.put_bytes(b"parity photograph")
-        target.materials.for_workspace(workspace).put_bytes(b"parity bake")
-        target.tiles.put_bytes(b"parity tile")
+        for name in SHARED_NAMESPACES:
+            target.shared(name).put_bytes(f"parity {name}".encode())
+        for name in WORKSPACE_NAMESPACES:
+            target.per_workspace(name).for_workspace(workspace).put_bytes(f"parity {name}".encode())
     local_keys = sorted(
         p.relative_to(local_root).as_posix() for p in local_root.rglob("*") if p.is_file()
     )
@@ -243,8 +245,10 @@ def key_parity(run: Run) -> dict[str, Any]:
         for key, _size in requests.iter_keys(f"{run.prefix}/parity/")
     )
     assert object_keys == local_keys, (object_keys, local_keys)
-    assert list(stores.materials.iter_workspace_ids()) == [workspace]
-    return {"keys": len(object_keys)}
+    listed = [name for name, _store in stores.namespaces()]
+    expected = [*SHARED_NAMESPACES, *(f"{name}/{workspace.hex}" for name in WORKSPACE_NAMESPACES)]
+    assert listed == expected == [name for name, _store in local.namespaces()], listed
+    return {"keys": len(object_keys), "namespaces": len(listed)}
 
 
 def concurrent_identical_puts(run: Run) -> dict[str, Any]:
@@ -273,6 +277,7 @@ _CHILD = """
 import hashlib, json, os, sys
 from exulanica.evidence.blob import BlobId
 from exulanica.store.configured import content_stores
+from exulanica.store.namespaces import SHARED_NAMESPACES, WORKSPACE_NAMESPACES
 stores = content_stores()
 action, value = sys.argv[1], sys.argv[2]
 if action == "put":
@@ -280,7 +285,7 @@ if action == "put":
 else:
     data = stores.blobs.get(BlobId.from_hex(value))
     print(hashlib.sha256(data).hexdigest(), stores.blobs.put_bytes(data + b" seen").blob_id.hex)
-local = [n for n in ("blobs", "materials", "tiles") if os.path.exists(n)]
+local = [n for n in (*SHARED_NAMESPACES, *WORKSPACE_NAMESPACES) if os.path.exists(n)]
 assert not local, local
 """
 

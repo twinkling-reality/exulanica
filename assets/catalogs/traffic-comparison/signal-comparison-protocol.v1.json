@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "catalog_id": "signal-comparison-protocol",
+  "catalog_version": 1,
+  "entries": [
+    {
+      "key": "bootstrap_resamples",
+      "value": 10000,
+      "reason": "Resamples of the seeds, with replacement, from which an interval and a two-sided test are read: the person comparison protocol's figure, kept so that both roles' differences are read by the same procedure at the same resolution.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica signal comparison protocol; see the entry reason"
+      }
+    },
+    {
+      "key": "family_alpha_per_mille",
+      "value": 50,
+      "reason": "The chance of calling any registered difference real when none is, held for the whole family a signal comparison registers by Holm's step-down procedure: five percent, the level the interval is read at, as for people.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica signal comparison protocol; see the entry reason"
+      }
+    },
+    {
+      "key": "interval_per_mille",
+      "value": 950,
+      "reason": "The share of resampled means an interval holds, the middle ninety-five percent, the level every comparison's interval is read at.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica signal comparison protocol; see the entry reason"
+      }
+    },
+    {
+      "key": "runs_at_once",
+      "value": 1,
+      "reason": "How many runs a host plays at the same time: one. A signal's choice points are asked one after another, since each answer changes the next second of its episode, so a run asks at most one model call at a time and a comparison holds at most one open request to a provider.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica signal comparison protocol; see the entry reason"
+      }
+    },
+    {
+      "key": "seeds_most",
+      "value": 8,
+      "reason": "The most seeds one signal comparison runs: the eight development seeds this protocol's seed catalog commits, each one episode of the town's traffic, so an arm plays two hours and forty minutes of simulated traffic at most.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica signal comparison protocol; see the entry reason"
+      }
+    }
+  ]
+}

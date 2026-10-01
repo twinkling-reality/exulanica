@@ -148,6 +148,7 @@ VERSION_TABLES: Final[Mapping[str, str]] = {
     "world_society": "stays in the previous version; inhabitants who are here refuse",
     "society_experiment_definition": "stays in the previous version with its society",
     "society_comparison": "stays in the previous version with its society",
+    "signal_comparison": "stays in the previous version with the roads it compared",
     "saved_world_entry": "moved to the new version",
     "world_traffic_signal_choice": "stays with the previous version's traffic history",
     "world_traffic_signal_decision_request": "stays with the previous version's traffic history",
@@ -155,6 +156,10 @@ VERSION_TABLES: Final[Mapping[str, str]] = {
     "world_project": "stays bound to the previous version until its owner binds it to another",
     "world_project_binding": "stays: each binding records the version as it was bound",
     "companion_answer_simulation_citation": "stays: an answer cites the version it read",
+    "world_clock": "stays in the previous version; the new version keeps legacy timing",
+    "world_clock_event": "stays with the previous version's clock",
+    "world_crossing_occupancy": "stays with the previous version's society",
+    "world_clock_traffic_minute": "stays with the previous version's traffic history",
 }
 
 

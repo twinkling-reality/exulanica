@@ -42,6 +42,7 @@ from exulanica.world.society_controls import LEASE_SECONDS, MAX_CLAIM_ATTEMPTS
 
 __all__ = [
     "START_STATES",
+    "START_TABLES",
     "ComparisonClaim",
     "ComparisonRunning",
     "SocietyComparisonStarts",
@@ -49,6 +50,13 @@ __all__ = [
     "start_document",
     "start_state",
 ]
+
+#: The start table of each kind of comparison a host plays by this claim: a society comparison of
+#: who decides for a world's people (migration 0119), and a signal comparison of a town's lights
+#: (migration 0132). Both have the same columns, guard and claim, and each claim takes its own
+#: workspace lock.
+START_TABLES: Final = {"society": "society_comparison_start", "signal": "signal_comparison_start"}
+_CLAIM_LOCKS: Final = {"society": 880119, "signal": 880132}
 
 #: Where a start stands, as a reader is told: waiting for a host to claim it, being played by one,
 #: finished with every run's outcome, or closed by a host before every run was played.
@@ -90,6 +98,8 @@ class ComparisonClaim:
     took_over: bool
     #: What claims before this one presumed hosts spent and never recorded.
     presumed_usd: Decimal
+    #: The kind of comparison claimed, a key of :data:`START_TABLES`.
+    kind: str = "society"
 
 
 def start_state(row: Mapping[str, Any] | None, now: dt.datetime) -> str | None:
@@ -133,8 +143,14 @@ def start_document(
 class SocietyComparisonStarts:
     """Record, read and claim the comparisons started from the application in one workspace."""
 
-    def __init__(self, connection: psycopg.Connection, workspace_id: uuid.UUID) -> None:
-        self.connection, self.workspace_id = connection, workspace_id
+    def __init__(
+        self, connection: psycopg.Connection, workspace_id: uuid.UUID, kind: str = "society"
+    ) -> None:
+        if kind not in START_TABLES:
+            raise ValueError(f"no kind of comparison {kind!r}")
+        self.connection, self.workspace_id, self.kind = connection, workspace_id, kind
+        #: This kind's start table, from the closed mapping above, never from a caller's text.
+        self.table = START_TABLES[kind]
         connection.row_factory = dict_row
         set_workspace(connection, workspace_id)
 
@@ -159,7 +175,7 @@ class SocietyComparisonStarts:
         try:
             with self.connection.transaction():
                 self.connection.execute(
-                    "insert into society_comparison_start(workspace_id,world_id,comparison_id,"
+                    f"insert into {self.table}(workspace_id,world_id,comparison_id,"
                     "requested_by,bound_usd,bound_calls,runs_planned) values(%s,%s,%s,%s,%s,%s,%s) "
                     "on conflict (workspace_id,comparison_id) do nothing",
                     (
@@ -173,7 +189,7 @@ class SocietyComparisonStarts:
                     ),
                 )
         except psycopg.errors.UniqueViolation as exc:
-            if exc.diag.constraint_name != "society_comparison_start_one_unfinished_per_world":
+            if exc.diag.constraint_name != f"{self.table}_one_unfinished_per_world":
                 raise
             running = self.unfinished(world_id)
             raise ComparisonRunning(
@@ -195,7 +211,7 @@ class SocietyComparisonStarts:
         """The starts of these comparisons of the world, by comparison id; a comparison nobody
         started from the application has none."""
         rows = self.connection.execute(
-            "select * from society_comparison_start where workspace_id=%s and world_id=%s "
+            f"select * from {self.table} where workspace_id=%s and world_id=%s "
             "and comparison_id=any(%s)",
             (self.workspace_id, world_id, list(comparison_ids)),
         ).fetchall()
@@ -206,7 +222,7 @@ class SocietyComparisonStarts:
         meanwhile (a claim skips a locked start), or None for a comparison nobody started from
         the application."""
         return self.connection.execute(
-            "select * from society_comparison_start where workspace_id=%s and world_id=%s "
+            f"select * from {self.table} where workspace_id=%s and world_id=%s "
             "and comparison_id=%s for update",
             (self.workspace_id, world_id, comparison_id),
         ).fetchone()
@@ -219,7 +235,7 @@ class SocietyComparisonStarts:
         been asking. Say whether it was still unfinished. Asked by a cancellation, in the
         transaction that locked the start (:meth:`lock`)."""
         changed = self.connection.execute(
-            "update society_comparison_start set presumed_usd=presumed_usd+%s,"
+            f"update {self.table} set presumed_usd=presumed_usd+%s,"
             "lease_token=null,claimed_at=null,lease_expires_at=null,"
             "finished_at=clock_timestamp(),closed_reason=%s "
             "where workspace_id=%s and world_id=%s and comparison_id=%s and finished_at is null "
@@ -231,7 +247,7 @@ class SocietyComparisonStarts:
     def unfinished(self, world_id: str) -> dict[str, Any] | None:
         """The world's start that has not finished, or None."""
         return self.connection.execute(
-            "select * from society_comparison_start where workspace_id=%s and world_id=%s "
+            f"select * from {self.table} where workspace_id=%s and world_id=%s "
             "and finished_at is null",
             (self.workspace_id, world_id),
         ).fetchone()
@@ -246,14 +262,14 @@ class SocietyComparisonStarts:
         out, so this claim takes it over."""
         with self.connection.transaction():
             locked = self.connection.execute(
-                "select pg_try_advisory_xact_lock(hashtextextended(%s,880119)) as held",
-                (str(self.workspace_id),),
+                "select pg_try_advisory_xact_lock(hashtextextended(%s,%s)) as held",
+                (str(self.workspace_id), _CLAIM_LOCKS[self.kind]),
             ).fetchone()["held"]
             if not locked:
                 return None
             row = self.connection.execute(
                 "select workspace_id,world_id,comparison_id,requested_by,bound_usd,bound_calls,"
-                "claim_attempts,lease_token,presumed_usd from society_comparison_start "
+                f"claim_attempts,lease_token,presumed_usd from {self.table} "
                 "where workspace_id=%s "
                 "and finished_at is null "
                 "and (lease_token is null or lease_expires_at<=clock_timestamp()) "
@@ -264,7 +280,7 @@ class SocietyComparisonStarts:
                 return None
             token = uuid.uuid4()
             self.connection.execute(
-                "update society_comparison_start set lease_token=%s,claimed_at=clock_timestamp(),"
+                f"update {self.table} set lease_token=%s,claimed_at=clock_timestamp(),"
                 "lease_expires_at=clock_timestamp()+make_interval(secs=>%s),"
                 "claim_attempts=claim_attempts+1 "
                 "where workspace_id=%s and world_id=%s and comparison_id=%s",
@@ -281,6 +297,7 @@ class SocietyComparisonStarts:
                 attempts_before=row["claim_attempts"],
                 took_over=row["lease_token"] is not None,
                 presumed_usd=row["presumed_usd"],
+                kind=self.kind,
             )
 
     def _held(self, claim: ComparisonClaim, statement: str, values: tuple[Any, ...]) -> bool:
@@ -299,7 +316,7 @@ class SocietyComparisonStarts:
         holds it, its lease having run out or been taken over."""
         return self._held(
             claim,
-            "update society_comparison_start "
+            f"update {self.table} "
             "set lease_expires_at=clock_timestamp()+make_interval(secs=>%s) "
             "where workspace_id=%s and world_id=%s and comparison_id=%s and lease_token=%s "
             "and lease_expires_at>clock_timestamp() and finished_at is null",
@@ -311,7 +328,7 @@ class SocietyComparisonStarts:
         the most the minutes a host whose lease ran out may have been asking can have cost."""
         return self._held(
             claim,
-            "update society_comparison_start set presumed_usd=presumed_usd+%s "
+            f"update {self.table} set presumed_usd=presumed_usd+%s "
             "where workspace_id=%s and world_id=%s and comparison_id=%s and lease_token=%s "
             "and lease_expires_at>clock_timestamp() and finished_at is null",
             (usd,),
@@ -323,12 +340,13 @@ class SocietyComparisonStarts:
         workspace_id: uuid.UUID,
         world_id: str,
         comparison_id: uuid.UUID,
+        kind: str = "society",
     ) -> None:
         """A run of the start was given an outcome, in the caller's transaction on
         ``connection``: the count of claims in a row that finished no run is set back, whichever
         host recorded the outcome and whether or not its lease still holds."""
         connection.execute(
-            "update society_comparison_start set claim_attempts=0 where workspace_id=%s "
+            f"update {START_TABLES[kind]} set claim_attempts=0 where workspace_id=%s "
             "and world_id=%s and comparison_id=%s and finished_at is null",
             (workspace_id, world_id, comparison_id),
         )
@@ -338,7 +356,7 @@ class SocietyComparisonStarts:
         claim need not wait for it to run out."""
         return self._held(
             claim,
-            "update society_comparison_start "
+            f"update {self.table} "
             "set lease_token=null,claimed_at=null,lease_expires_at=null "
             "where workspace_id=%s and world_id=%s and comparison_id=%s and lease_token=%s "
             "and lease_expires_at>clock_timestamp() and finished_at is null",
@@ -350,7 +368,7 @@ class SocietyComparisonStarts:
         finished, and its lease let go."""
         return self._held(
             claim,
-            "update society_comparison_start "
+            f"update {self.table} "
             "set lease_token=null,claimed_at=null,lease_expires_at=null,"
             "finished_at=clock_timestamp(),closed_reason=%s "
             "where workspace_id=%s and world_id=%s and comparison_id=%s and lease_token=%s "

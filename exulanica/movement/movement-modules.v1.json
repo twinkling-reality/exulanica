@@ -8,7 +8,7 @@
       },
       "clock": {
         "kind": "wall",
-        "reason": "Shared real time: step n is the nth 100 ms since the Unix epoch, read from the server's clock, so every page showing a world shows its birds in the same places at the same moment, and one computation of an episode serves them all; the birds keep flying at normal speed while the people are paused or sped up. Nothing is stored: a flight is derived from a world version and its episode, with each flyer's choices drawn from the seed. When a model decides for a flyer, its choices must be recorded before viewers can share them.",
+        "reason": "Shared real time: step n is the nth 100 ms since the Unix epoch, read from the server's clock, so every page showing a world shows its birds in the same places at the same moment, and one computation of an episode serves them all; the birds keep flying at normal speed while the people are paused or sped up. A world whose clock is coupled reads the same flight on its own timeline, so its birds stop when its people stop (docs/world-clock-contract.md). Nothing is stored: a flight is derived from a world version and its episode, with each flyer's choices drawn from the seed. When a model decides for a flyer, its choices must be recorded before viewers can share them.",
         "step_ms": 100
       },
       "module": "exulanica-movement/flight/v1",
@@ -72,7 +72,7 @@
       },
       "clock": {
         "kind": "wall",
-        "reason": "Shared real time: second n is the nth second since the Unix epoch, read from the server's clock, as the flight's step n is its nth 100 ms, so every page showing a world shows its vehicles in the same places at the same moment, and one computation of an episode serves them all. Nothing is stored: traffic is derived from a world's road records and version, with every choice drawn from the seed. The society's one-minute tick is not this clock and does not move it: vehicles keep driving at normal speed while the people are paused or sped up, and no crossing a walker makes is fed to traffic.",
+        "reason": "Shared real time: second n is the nth second since the Unix epoch, read from the server's clock, as the flight's step n is its nth 100 ms, so every page showing a world shows its vehicles in the same places at the same moment, and one computation of an episode serves them all. Nothing is stored: traffic is derived from a world's road records and version, with every choice drawn from the seed. Under a legacy world clock the society's one-minute tick is not this clock and does not move it: vehicles keep driving at normal speed while the people are paused or sped up, and no crossing a walker makes is fed to traffic. A world whose clock is coupled moves this module on its own traffic timeline, after its society's minutes, and feeds it the crossings its walkers occupy (docs/world-clock-contract.md).",
         "step_ms": 1000
       },
       "module": "exulanica-movement/roads/v1",

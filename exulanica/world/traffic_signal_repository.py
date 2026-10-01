@@ -31,6 +31,7 @@ from exulanica.world.role_decisions import (
     validate_role_receipt,
 )
 from exulanica.world.traffic_episodes import EPISODE
+from exulanica.world.world_clock import Era
 
 __all__ = ["SignalChoiceRefused", "TrafficSignalRepository"]
 
@@ -43,6 +44,17 @@ class SignalChoiceRefused(ValueError):
     def __init__(self, code: str) -> None:
         super().__init__(code)
         self.code = code
+
+
+def _sealed_end(clock: Mapping[str, Any]) -> int:
+    """Where a coupled version's sealed traffic ends, on its traffic timeline."""
+    era = Era(
+        clock["era"],
+        clock["era_start_tick"],
+        clock["seconds_per_tick"],
+        clock["timeline_origin_second"],
+    )
+    return era.traffic_second(era.world_second_of_tick(clock["traffic_sealed_through_tick"]))
 
 
 class TrafficSignalRepository:
@@ -77,6 +89,24 @@ class TrafficSignalRepository:
         if held is None:
             raise SignalChoiceRefused("world_version_unavailable")
 
+    def clock(self) -> dict[str, Any] | None:
+        """The version's coupled clock with traffic, or None while its traffic keeps shared real
+        time (:mod:`exulanica.world.world_clock`)."""
+        return self.connection.execute(
+            "select * from world_clock where workspace_id=%s and world_id=%s and version_id=%s "
+            "and roads_version is not null",
+            (self.workspace_id, self.world_id, self.version_id),
+        ).fetchone()
+
+    def present(self, wall_second: int) -> tuple[int, str]:
+        """The second the version's traffic stands at, and the timeline it is on, which every
+        choice's and activation's seconds share: ``wall_second`` while the traffic keeps shared
+        real time (``unix``), or where its coupled traffic is sealed (``world``)."""
+        clock = self.clock()
+        if clock is None:
+            return wall_second, "unix"
+        return _sealed_end(clock), "world"
+
     def current_choices(self) -> dict[str, dict[str, Any]]:
         """The last owner choice for each signal, including its future effective second."""
         result = {}
@@ -85,7 +115,8 @@ class TrafficSignalRepository:
         return result
 
     def choices_at(self, second: int) -> dict[str, dict[str, Any]]:
-        """Owner generations effective at this wall-clock second, per signal."""
+        """Owner generations effective at this second of the version's traffic timeline, per
+        signal (:meth:`present`)."""
         result = {}
         for row in self._choices():
             if row["effective_second"] <= second:
@@ -157,17 +188,24 @@ class TrafficSignalRepository:
         return int(row["asked"]), Decimal(row["spent"])
 
     def activations(self) -> dict[int, int]:
-        """First sealed accepted choice point for each owner generation."""
+        """First sealed accepted choice point for each owner generation, in a legacy segment or
+        a coupled minute."""
         rows = self.connection.execute(
             "select r.choice_seq,min(r.choice_second) as active_second "
             "from world_traffic_signal_decision_request r "
             "join world_traffic_signal_decision d "
             "using(workspace_id,world_id,version_id,request_id) "
-            "join world_traffic_signal_segment s on s.workspace_id=r.workspace_id "
-            "and s.world_id=r.world_id and s.version_id=r.version_id and s.episode=r.episode "
-            "and s.start_second<=r.choice_second and r.choice_second<s.end_second "
             "where r.workspace_id=%s and r.world_id=%s and r.version_id=%s "
-            "and d.document->>'status'='accepted' group by r.choice_seq",
+            "and d.document->>'status'='accepted' and ("
+            "exists (select 1 from world_traffic_signal_segment s "
+            "where s.workspace_id=r.workspace_id and s.world_id=r.world_id "
+            "and s.version_id=r.version_id and s.episode=r.episode "
+            "and s.start_second<=r.choice_second and r.choice_second<s.end_second) "
+            "or exists (select 1 from world_clock_traffic_minute m "
+            "where m.workspace_id=r.workspace_id and m.world_id=r.world_id "
+            "and m.version_id=r.version_id and m.episode=r.episode "
+            "and m.start_second<=r.choice_second and r.choice_second<m.end_second)) "
+            "group by r.choice_seq",
             (self.workspace_id, self.world_id, self.version_id),
         ).fetchall()
         return {int(row["choice_seq"]): int(row["active_second"]) for row in rows}
@@ -228,15 +266,23 @@ class TrafficSignalRepository:
                 )
                 if running > contract.value(role.subjects_bound):
                     raise SignalChoiceRefused("too_many_model_signals")
-            now = self.connection.execute(
-                "select floor(extract(epoch from clock_timestamp()))::bigint as second"
-            ).fetchone()["second"]
             policy = signal_actuation()
             segment = policy.segment_seconds
-            target = ((now + policy.preparation_lead_seconds + segment - 1) // segment) * segment
-            latest = self.latest_any_segment()
-            if latest is not None:
-                target = max(target, latest["end_second"])
+            clock = self.clock()
+            if clock is not None:
+                # A coupled version's traffic seconds are simulated: the choice takes effect one
+                # minute of preparation after the traffic already sealed, never by the wall clock.
+                target = _sealed_end(clock) + policy.preparation_lead_seconds
+            else:
+                now = self.connection.execute(
+                    "select floor(extract(epoch from clock_timestamp()))::bigint as second"
+                ).fetchone()["second"]
+                target = (
+                    (now + policy.preparation_lead_seconds + segment - 1) // segment
+                ) * segment
+                latest = self.latest_any_segment()
+                if latest is not None:
+                    target = max(target, latest["end_second"])
             sequence = 1 if not rows else rows[-1]["choice_seq"] + 1
             document = seal(
                 {
@@ -459,6 +505,190 @@ class TrafficSignalRepository:
             )
             return receipt
 
+    def check_generations(
+        self, absolute_start: int, selected_generations: Mapping[str, int]
+    ) -> None:
+        """Refuse a minute prepared under owner choices other than those effective at its start."""
+        current_generations = {
+            signal: row["choice_seq"] for signal, row in self.choices_at(absolute_start).items()
+        }
+        if current_generations != dict(selected_generations):
+            raise SignalChoiceRefused("segment_choice_changed")
+
+    def finalize_requests(
+        self,
+        role: DecisionRole,
+        *,
+        episode: int,
+        absolute_start: int,
+        absolute_end: int,
+        selected_generations: Mapping[str, int],
+        signal_choices: Mapping[str, Mapping[str, str]],
+    ) -> dict[str, Any]:
+        """Finish every reserved point of one minute before it is sealed, and digest them.
+
+        A reservation of a superseded choice, or one unanswered past its deadline, receives its
+        fallback receipt; one still inside its deadline refuses the seal (``point_pending``); each
+        recorded action must be what its receipt decided. The caller holds the version row.
+        Answers the minute's first accepted choice second and generation and the decisions digest.
+        """
+        requests = self.connection.execute(
+            "select r.choice_seq,r.signal_id,r.choice_second,r.request_id,"
+            "r.document as request,r.document_sha256 as request_sha,"
+            "r.deadline_at,d.document as decision,d.document_sha256 as decision_sha "
+            "from world_traffic_signal_decision_request r left join "
+            "world_traffic_signal_decision d "
+            "using(workspace_id,world_id,version_id,request_id) "
+            "where r.workspace_id=%s and r.world_id=%s and r.version_id=%s and r.episode=%s "
+            "and r.choice_second >= %s and r.choice_second < %s "
+            "order by r.choice_second,r.signal_id",
+            (
+                self.workspace_id,
+                self.world_id,
+                self.version_id,
+                episode,
+                absolute_start,
+                absolute_end,
+            ),
+        ).fetchall()
+        # A changed choice can supersede a reserved future point before this minute
+        # seals. Finish that reservation too: the seal trigger forbids later receipts.
+        selected_requests = []
+        for row in requests:
+            if selected_generations.get(row["signal_id"]) == row["choice_seq"]:
+                selected_requests.append(row)
+                continue
+            if row["decision"] is None:
+                fallback = role_receipt(
+                    role,
+                    row["request"],
+                    1,
+                    {
+                        "status": "unavailable",
+                        "reason": "point_stale",
+                        "proposal": None,
+                        "provider": None,
+                    },
+                )
+                validate_role_receipt(role, fallback, row["request"])
+                self.connection.execute(
+                    "insert into world_traffic_signal_decision(workspace_id,world_id,"
+                    "version_id,request_id,document,document_sha256) "
+                    "values(%s,%s,%s,%s,%s,%s)",
+                    (
+                        self.workspace_id,
+                        self.world_id,
+                        self.version_id,
+                        row["request_id"],
+                        Jsonb(fallback),
+                        fallback["document_sha256"],
+                    ),
+                )
+        requests = []
+        unreachable = []
+        for row in selected_requests:
+            recorded = signal_choices.get(row["signal_id"], {})
+            if str(row["choice_second"] - episode * EPISODE) in recorded:
+                requests.append(row)
+                continue
+            # A point the traffic never stopped at: the green it would extend had no extension
+            # left, and a worker that offered it anyway left its request behind. Its answer
+            # moved no light, so it is finished by that name and kept out of the choices.
+            if row["decision"] is None:
+                fallback = role_receipt(
+                    role,
+                    row["request"],
+                    1,
+                    {
+                        "status": "unavailable",
+                        "reason": "green_not_eligible",
+                        "proposal": None,
+                        "provider": None,
+                    },
+                )
+                validate_role_receipt(role, fallback, row["request"])
+                self.connection.execute(
+                    "insert into world_traffic_signal_decision(workspace_id,world_id,"
+                    "version_id,request_id,document,document_sha256) "
+                    "values(%s,%s,%s,%s,%s,%s)",
+                    (
+                        self.workspace_id,
+                        self.world_id,
+                        self.version_id,
+                        row["request_id"],
+                        Jsonb(fallback),
+                        fallback["document_sha256"],
+                    ),
+                )
+                row = {**row, "decision": fallback, "decision_sha": fallback["document_sha256"]}
+            unreachable.append(row)
+        now = self.connection.execute("select clock_timestamp() as now").fetchone()["now"]
+        active = None
+        generation = None
+        for index, row in enumerate(requests):
+            if row["decision"] is None and now < row["deadline_at"]:
+                raise SignalChoiceRefused("point_pending")
+            if row["decision"] is None:
+                fallback = role_receipt(
+                    role,
+                    row["request"],
+                    1,
+                    {
+                        "status": "unavailable",
+                        "reason": "unanswered_in_its_minute",
+                        "proposal": None,
+                        "provider": None,
+                    },
+                )
+                validate_role_receipt(role, fallback, row["request"])
+                self.connection.execute(
+                    "insert into world_traffic_signal_decision(workspace_id,world_id,"
+                    "version_id,request_id,document,document_sha256) "
+                    "values(%s,%s,%s,%s,%s,%s)",
+                    (
+                        self.workspace_id,
+                        self.world_id,
+                        self.version_id,
+                        row["request_id"],
+                        Jsonb(fallback),
+                        fallback["document_sha256"],
+                    ),
+                )
+                row = {**row, "decision": fallback, "decision_sha": fallback["document_sha256"]}
+                requests[index] = row
+            action = signal_choices.get(row["signal_id"], {}).get(
+                str(row["choice_second"] - episode * EPISODE)
+            )
+            expected = (
+                row["decision"]["proposal"]["option"]["kind"]
+                if row["decision"] is not None and row["decision"]["status"] == "accepted"
+                else "switch"
+            )
+            if action != expected:
+                raise SignalChoiceRefused("segment_decisions_changed")
+            if (
+                active is None
+                and row["decision"] is not None
+                and (row["decision"]["status"] == "accepted")
+            ):
+                active = row["choice_second"]
+                generation = row["choice_seq"]
+        facts: dict[str, Any] = {
+            "choices": signal_choices,
+            "requests": [[row["request_sha"], row["decision_sha"]] for row in requests],
+        }
+        if unreachable:
+            # Named only when present, so every minute sealed without one digests as before.
+            facts["not_applied"] = [
+                [row["request_sha"], row["decision_sha"]] for row in unreachable
+            ]
+        decisions_sha = hashlib.sha256(canonical_json(facts)).hexdigest()
+        return {
+            "active_second": active,
+            "choice_seq": generation,
+            "decisions_sha256": decisions_sha,
+        }
+
     def seal_segment(
         self,
         *,
@@ -506,11 +736,10 @@ class TrafficSignalRepository:
         ).hexdigest()
         with self.connection.transaction():
             self._lock_version()
-            current_generations = {
-                signal: row["choice_seq"] for signal, row in self.choices_at(absolute_start).items()
-            }
-            if current_generations != dict(selected_generations):
-                raise SignalChoiceRefused("segment_choice_changed")
+            coupled = self.clock()
+            if coupled is not None and absolute_end > coupled["timeline_origin_second"]:
+                raise SignalChoiceRefused("segment_after_clock_transition")
+            self.check_generations(absolute_start, selected_generations)
             previous_sha = None
             if segment:
                 previous = self.segment(episode, segment - 1)
@@ -522,120 +751,19 @@ class TrafficSignalRepository:
                 ):
                     raise SignalChoiceRefused("segment_input_changed")
                 previous_sha = previous["continuation_sha256"]
-            requests = self.connection.execute(
-                "select r.choice_seq,r.signal_id,r.choice_second,r.request_id,"
-                "r.document as request,r.document_sha256 as request_sha,"
-                "r.deadline_at,d.document as decision,d.document_sha256 as decision_sha "
-                "from world_traffic_signal_decision_request r left join "
-                "world_traffic_signal_decision d "
-                "using(workspace_id,world_id,version_id,request_id) "
-                "where r.workspace_id=%s and r.world_id=%s and r.version_id=%s and r.episode=%s "
-                "and r.choice_second >= %s and r.choice_second < %s "
-                "order by r.choice_second,r.signal_id",
-                (
-                    self.workspace_id,
-                    self.world_id,
-                    self.version_id,
-                    episode,
-                    absolute_start,
-                    absolute_end,
-                ),
-            ).fetchall()
-            # A changed choice can supersede a reserved future point before this minute
-            # seals. Finish that reservation too: the seal trigger forbids later receipts.
-            selected_requests = []
-            for row in requests:
-                if selected_generations.get(row["signal_id"]) == row["choice_seq"]:
-                    selected_requests.append(row)
-                    continue
-                if row["decision"] is None:
-                    fallback = role_receipt(
-                        role,
-                        row["request"],
-                        1,
-                        {
-                            "status": "unavailable",
-                            "reason": "point_stale",
-                            "proposal": None,
-                            "provider": None,
-                        },
-                    )
-                    validate_role_receipt(role, fallback, row["request"])
-                    self.connection.execute(
-                        "insert into world_traffic_signal_decision(workspace_id,world_id,"
-                        "version_id,request_id,document,document_sha256) "
-                        "values(%s,%s,%s,%s,%s,%s)",
-                        (
-                            self.workspace_id,
-                            self.world_id,
-                            self.version_id,
-                            row["request_id"],
-                            Jsonb(fallback),
-                            fallback["document_sha256"],
-                        ),
-                    )
-            requests = selected_requests
-            now = self.connection.execute("select clock_timestamp() as now").fetchone()["now"]
-            active = None
-            generation = None
-            for index, row in enumerate(requests):
-                if row["decision"] is None and now < row["deadline_at"]:
-                    raise SignalChoiceRefused("point_pending")
-                if row["decision"] is None:
-                    fallback = role_receipt(
-                        role,
-                        row["request"],
-                        1,
-                        {
-                            "status": "unavailable",
-                            "reason": "unanswered_in_its_minute",
-                            "proposal": None,
-                            "provider": None,
-                        },
-                    )
-                    validate_role_receipt(role, fallback, row["request"])
-                    self.connection.execute(
-                        "insert into world_traffic_signal_decision(workspace_id,world_id,"
-                        "version_id,request_id,document,document_sha256) "
-                        "values(%s,%s,%s,%s,%s,%s)",
-                        (
-                            self.workspace_id,
-                            self.world_id,
-                            self.version_id,
-                            row["request_id"],
-                            Jsonb(fallback),
-                            fallback["document_sha256"],
-                        ),
-                    )
-                    row = {**row, "decision": fallback, "decision_sha": fallback["document_sha256"]}
-                    requests[index] = row
-                action = (
-                    document["signal_choices"]
-                    .get(row["signal_id"], {})
-                    .get(str(row["choice_second"] - episode * EPISODE))
-                )
-                expected = (
-                    row["decision"]["proposal"]["option"]["kind"]
-                    if row["decision"] is not None and row["decision"]["status"] == "accepted"
-                    else "switch"
-                )
-                if action != expected:
-                    raise SignalChoiceRefused("segment_decisions_changed")
-                if (
-                    active is None
-                    and row["decision"] is not None
-                    and (row["decision"]["status"] == "accepted")
-                ):
-                    active = row["choice_second"]
-                    generation = row["choice_seq"]
-            decisions_sha = hashlib.sha256(
-                canonical_json(
-                    {
-                        "choices": document["signal_choices"],
-                        "requests": [[row["request_sha"], row["decision_sha"]] for row in requests],
-                    }
-                )
-            ).hexdigest()
+            decided = self.finalize_requests(
+                role,
+                episode=episode,
+                absolute_start=absolute_start,
+                absolute_end=absolute_end,
+                selected_generations=selected_generations,
+                signal_choices=document["signal_choices"],
+            )
+            active, generation, decisions_sha = (
+                decided["active_second"],
+                decided["choice_seq"],
+                decided["decisions_sha256"],
+            )
             existing = self.segment(episode, segment)
             if existing is not None:
                 if (

@@ -72,6 +72,7 @@ def test_roles_are_served_and_a_choice_stays_pending_until_a_sealed_decision(req
     ][0]
     assert choice["subject_id"] == subject
     assert choice["status"] == "pending"
+    assert choice["timebase"] == "unix"
     assert choice["active_second"] is None
     assert choice["effective_second"] == chosen.json()["effective_second"]
     controller = api.client.app.state.traffic_signal_controller

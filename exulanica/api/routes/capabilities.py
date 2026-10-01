@@ -54,7 +54,9 @@ from exulanica.api.permissions import Permission, Requires, rule_for
 from exulanica.api.role_hosts import RoleContext
 from exulanica.api.routes import (
     character_appearance,
+    signal_comparisons,
     society_comparisons,
+    world_clock,
     world_models,
 )
 from exulanica.api.routes.generated_worlds import create_generated_world, recipes, specification
@@ -292,12 +294,15 @@ def _version_base() -> tuple[Base, ...]:
     return (Base("base_state_sha256", alternate_version, "state_sha256"),)
 
 
-def _society_base(*, control: bool = False) -> tuple[Base, ...]:
+def _society_base(*, control: bool = False, clock: bool = False) -> tuple[Base, ...]:
     bases = (Base("base_revision", read_control, "revision"),) if control else ()
+    # A minute may pin the world clock's revision; another is refused stale_clock_revision.
+    pinned = (Base("base_clock_revision", world_clock.read_clock, "revision"),) if clock else ()
     return (
         *bases,
         Base("base_tick", society, "current_tick"),
         Base("base_state_sha256", society, "state_sha256"),
+        *pinned,
     )
 
 
@@ -504,7 +509,7 @@ def _society_operations(context: VersionContext) -> list[Operation]:
             AVAILABLE if held else unavailable(_SOCIETY_UNAVAILABLE),
             "version",
             context.bind,
-            base=_society_base(),
+            base=_society_base(clock=True),
         ),
         Operation(
             change_society_presence,
@@ -528,10 +533,19 @@ def _society_operations(context: VersionContext) -> list[Operation]:
             playback,
             "version",
             context.bind,
-            base=(Base("base_revision", read_control, "revision"),),
+            base=(
+                Base("base_revision", read_control, "revision"),
+                Base("base_clock_revision", world_clock.read_clock, "revision"),
+            ),
             effects=_playback_effect(context) if playback.state == "available" else (),
         ),
-        Operation(manual_step, playback, "version", context.bind, base=_society_base(control=True)),
+        Operation(
+            manual_step,
+            playback,
+            "version",
+            context.bind,
+            base=_society_base(control=True, clock=True),
+        ),
     ]
 
 
@@ -579,6 +593,8 @@ VERSION_ADAPTERS: Final[tuple[Callable[[VersionContext], list[Operation]], ...]]
     society_comparisons.capability_operations,
     character_appearance.capability_operations,
     _traffic_operations,
+    world_clock.capability_operations,
+    signal_comparisons.capability_operations,
 )
 
 #: Mutating routes of a version no adapter projects, each with why. A test holds this table and the

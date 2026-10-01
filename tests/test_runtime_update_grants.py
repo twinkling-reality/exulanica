@@ -67,6 +67,11 @@ RUNTIME_UPDATES: dict[str, str] = {
         "takeover presumes spent, and a run's outcome sets its claim count back "
         "(world/society_comparison_start_repository.py); migration 0119 refuses every other change"
     ),
+    "signal_comparison_start": (
+        "the same claim, lease, presumption and finishing over a signal comparison's start, and a "
+        "cancellation locks it (world/society_comparison_start_repository.py, kind signal); "
+        "migration 0132 refuses every other change"
+    ),
     "stage_registry": "registering a stage moves its current version (stage_registry.py)",
     "workspace_tile_quota": "tile use is counted against the quota (api/quotas.py)",
     "world_alternate_environment_instance": "an instance moves and is removed",
@@ -94,6 +99,10 @@ RUNTIME_UPDATES: dict[str, str] = {
     "world_project_share": "stopping a share sets withdrawn_at (world/project_context.py)",
     "world_society": "a society advances its tick and state; request triggers lock it",
     "world_society_control": "playback leases, pauses and schedules; event triggers lock it",
+    "world_clock": (
+        "a transition, each committed society minute and each sealed traffic minute move a "
+        "coupled world's positions forward (world/world_clock_repository.py)"
+    ),
     "world_structure_preview": "a preview is applied, discarded or made stale, under a lock",
     "world_structure_state": "the current snapshot moves, under a lock",
     "world_style_preview": "a preview is applied, discarded or made stale, under a lock",

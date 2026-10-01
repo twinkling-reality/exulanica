@@ -290,7 +290,9 @@ class _Signals:
         )
         latest = repository.current_choices()
         active = repository.activations()
-        now = traffic_clock()
+        # A coupled version's seconds are on its traffic timeline, whose present is sealed
+        # traffic.
+        now, timebase = repository.present(traffic_clock())
         effective = repository.choices_at(now)
         choices = []
         for signal_id, choice in sorted(latest.items()):
@@ -321,6 +323,7 @@ class _Signals:
                     "choice_seq": choice["choice_seq"],
                     "model": None if model is None else _named(model),
                     "effective_second": target,
+                    "timebase": timebase,
                     "active_second": activated,
                     "running_model": running_model,
                     "running_choice_seq": None if running_model is None else running["choice_seq"],

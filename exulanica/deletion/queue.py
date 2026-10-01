@@ -40,12 +40,19 @@ from __future__ import annotations
 
 import datetime as dt
 import uuid
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Final
+from types import MappingProxyType
+from typing import TYPE_CHECKING, Final
 
 import psycopg
 
 from exulanica.db.roles import PURGE_CROSS_WORKSPACE_TABLES
+from exulanica.store.namespaces import BLOB_NAMESPACE, MATERIAL_NAMESPACE, WORKSPACE_NAMESPACES
+
+if TYPE_CHECKING:
+    from exulanica.store.base import ContentAddressedStore
+    from exulanica.store.configured import ContentStores
 
 __all__ = [
     "CROSS_WORKSPACE_POLICY",
@@ -53,6 +60,7 @@ __all__ = [
     "MAX_ATTEMPTS",
     "RETRY_AFTER",
     "STORED_KINDS",
+    "STORED_KIND_NAMESPACES",
     "PurgeTarget",
     "Visibility",
     "claim_purge",
@@ -60,6 +68,7 @@ __all__ = [
     "is_purge_complete",
     "mark_purged",
     "read_visibility",
+    "stored_target_store",
 ]
 
 #: How long a job waits before it is tried again, whether it was skipped, failed, or stranded in
@@ -94,12 +103,20 @@ MAX_ATTEMPTS: Final = 8
 #: and says so rather than completing over bytes nobody destroyed.
 DESTROYABLE_KINDS: Final = ("blob", "artifact", "embedding", "material_bake")
 
+#: The namespace each stored kind's bytes live in (:mod:`exulanica.store.namespaces`); in a
+#: per-workspace namespace, the target's own workspace. A kind is stored by adding it here with its
+#: namespace, and :data:`STORED_KINDS` follows. Whoever must find a target's bytes, in the live
+#: stores or in a backup's, asks :func:`stored_target_store`, which reads this one table.
+STORED_KIND_NAMESPACES: Final[Mapping[str, str]] = MappingProxyType(
+    {"blob": BLOB_NAMESPACE, "artifact": BLOB_NAMESPACE, "material_bake": MATERIAL_NAMESPACE}
+)
+
 #: The destroyable kinds whose target names bytes in an object store, outside the database. A
 #: restore can pair a database with older store bytes, so :mod:`exulanica.deletion.restore`
 #: queues these again from its checkpoint and looks for the bytes after the purge. The one kind
 #: left, ``embedding``, names a row of the database itself, a search entry, which the restored
 #: database's own tombstone cascade finds and records as that purge's authorization.
-STORED_KINDS: Final = ("blob", "artifact", "material_bake")
+STORED_KINDS: Final = tuple(STORED_KIND_NAMESPACES)
 
 
 #: The policy `provision_purge_role` creates. Named here as well as there because this module is
@@ -185,6 +202,23 @@ class PurgeTarget:
     #: denied", including jobs of an ordinary capture tombstone that would never have reached that
     #: arm. Choosing in Python keeps each statement naming only the function it needs.
     scope: str
+
+
+def stored_target_store(
+    stores: ContentStores, kind: str, workspace_id: uuid.UUID
+) -> ContentAddressedStore:
+    """The store in ``stores`` that holds a stored target's bytes: its kind's namespace, and in a
+    per-workspace namespace, the target's own workspace's store.
+
+    Asked of an installation's live stores it names where a purge destroys the target; asked of
+    a backup's stores, where the copy is that the completed purge must reach too.
+    """
+    namespace = STORED_KIND_NAMESPACES.get(kind)
+    if namespace is None:
+        raise ValueError(f"a {kind!r} target names no stored bytes")
+    if namespace in WORKSPACE_NAMESPACES:
+        return stores.per_workspace(namespace).for_workspace(workspace_id)
+    return stores.shared(namespace)
 
 
 def claim_purge(

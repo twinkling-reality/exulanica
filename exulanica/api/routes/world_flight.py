@@ -6,13 +6,18 @@ steps asked for from whole episodes the flight's worker process computes
 (:mod:`exulanica.world.flight_worker`), so no request waits on another's flight; the page draws
 what it is handed and runs no steering of its own.
 
-The flight keeps shared real time: step n is the nth 100 ms since the Unix epoch, read from this
-server's clock, so every page showing a world shows its birds in the same places at the same
-moment. A read that names no ``from_step`` starts at the clock's step; every answer carries
-``clock_step``, the clock's step as it was answered, which the page keeps. A window more than
-``clock_reach_steps`` from the clock, or beyond the module's bounds, is refused before anything is
-composed, and a worker that has stopped answers 503 ``flight_worker_unavailable``, which a page
-tries again. The answer is encoded once, by the standard library's JSON encoder, straight to bytes.
+A version whose clock is legacy keeps shared real time: step n is the nth 100 ms since the Unix
+epoch, read from this server's clock, so every page showing a world shows its birds in the same
+places at the same moment. A read that names no ``from_step`` starts at the clock's step; every
+answer carries ``clock_step``, the clock's step as it was answered, which the page keeps. A version
+whose clock is coupled (:mod:`exulanica.world.world_clock`) answers ``exulanica.flight-window/v2``:
+its steps are on the version's flight timeline, ten to a traffic timeline second, so its birds pause
+and move with its people; ``clock_step`` is the step at the end of the minute the world presents, a
+read that names no ``from_step`` starts a minute before it and no earlier than the era's first step,
+and a window may reach at most one minute past it. A window more than ``clock_reach_steps`` from the
+clock, or beyond the module's bounds, is refused before anything is composed, and a worker that has
+stopped answers 503 ``flight_worker_unavailable``, which a page tries again. The answer is encoded
+once, by the standard library's JSON encoder, straight to bytes.
 Each flying kind's body and wing are reviewed components, named with their registry rows so the
 page fetches the exact bytes by key.
 """
@@ -34,11 +39,16 @@ from exulanica.world.flight_input import flight_clock, saved_world_flight, serve
 from exulanica.world.flight_kinds import flight_kind_catalog
 from exulanica.world.flight_worker import FlightWorkerUnavailable
 from exulanica.world.reviewed_catalog import ReviewedCatalog
+from exulanica.world.world_clock_repository import WorldClockRepository, era_of
 
 router = APIRouter(prefix="/world", tags=["world"])
 
 #: A window a request did not bound: the module's refusals, a caller's to correct.
 _REQUEST_REFUSALS = frozenset({"flight_step_out_of_range", "flight_window_too_long"})
+#: A coupled version's flight window: its steps are on the world's own timeline.
+COUPLED_WINDOW_PROFILE = "exulanica.flight-window/v2"
+#: How far past the presented step a coupled window may reach: the one minute a page reads ahead.
+_COUPLED_AHEAD_STEPS = 600
 
 
 def _refusal(error: FlightRefused) -> JSONResponse:
@@ -57,11 +67,26 @@ def world_flight(
     from_step: Annotated[int | None, Query()] = None,
     steps: Annotated[int, Query()] = 600,
 ) -> Any:
-    clock = flight_clock()
-    start = clock if from_step is None else from_step
+    coupled = WorldClockRepository(
+        repository.connection, repository.workspace_id, repository.world_id
+    ).row(version_id)
+    if coupled is None:
+        clock = flight_clock()
+        start = clock if from_step is None else from_step
+    else:
+        era = era_of(coupled)
+        clock = era.flight_step(era.world_second_of_tick(coupled["presented_through_tick"]))
+        first = era.flight_step(era.start_world_second)
+        start = max(clock - _COUPLED_AHEAD_STEPS, first) if from_step is None else from_step
     try:
         check_request(start, steps)
         check_clock(start, clock)
+        if coupled is not None and (start < first or start + steps > clock + _COUPLED_AHEAD_STEPS):
+            raise FlightRefused(
+                "flight_step_out_of_range",
+                f"steps {start} to {start + steps} are outside the world's era or more than a "
+                f"minute past the step it presents, {clock}",
+            )
     except FlightRefused as error:
         return _refusal(error)
     rows = ReviewedCatalog(repository.connection).assets(get_services(request).store)
@@ -103,9 +128,23 @@ def world_flight(
         for kind in flight_kind_catalog().kinds
         if kind.key in flight.kinds
     ]
+    timing: dict[str, Any] = (
+        {"clock_step": flight_clock()}
+        if coupled is None
+        else {
+            "profile": COUPLED_WINDOW_PROFILE,
+            "timebase": "world",
+            "clock_step": clock,
+            "clock": {
+                "era": era.era,
+                "start_world_second": era.start_world_second,
+                "timeline_origin_second": era.timeline_origin_second,
+            },
+        }
+    )
     answer = {
         **window,
-        "clock_step": flight_clock(),
+        **timing,
         "world_id": flight.world_id,
         "version_id": flight.version_id,
         "kinds": kinds,

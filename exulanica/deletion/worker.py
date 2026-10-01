@@ -69,7 +69,7 @@ from __future__ import annotations
 import threading
 import uuid
 from dataclasses import dataclass, field
-from typing import Final
+from typing import TYPE_CHECKING, Final
 
 import psycopg
 
@@ -78,6 +78,9 @@ from exulanica.deletion import queue
 from exulanica.evidence.blob import BlobId
 from exulanica.store.base import ContentAddressedStore, PurgeAuthorization, privileged_purger
 from exulanica.store.namespaces import WorkspaceStores
+
+if TYPE_CHECKING:
+    from exulanica.store.configured import ContentStores
 
 __all__ = ["PurgeOutcome", "PurgeWorker"]
 
@@ -146,6 +149,35 @@ class PurgeWorker:
         self._thread: threading.Thread | None = None
         self._last_error: str | None = None
         self._failed_passes = 0
+
+    @classmethod
+    def over(
+        cls,
+        database: Database,
+        stores: ContentStores,
+        workspaces: frozenset[uuid.UUID],
+        *,
+        name: str = "purge",
+        poll_seconds: float = _POLL_SECONDS,
+        limit_per_pass: int = 500,
+        require_cross_workspace_view: bool = True,
+    ) -> PurgeWorker:
+        """A worker reaching every namespace of one installation's stores, so it claims every
+        destroyable kind and leaves no tombstone open because a namespace was left out.
+
+        For the purge command, restore replay and maintenance, which hold the purge identity's
+        stores. A namespace that holds a stored kind's bytes is handed to the worker here.
+        """
+        return cls(
+            database,
+            stores.blobs,
+            workspaces,
+            name=name,
+            poll_seconds=poll_seconds,
+            limit_per_pass=limit_per_pass,
+            require_cross_workspace_view=require_cross_workspace_view,
+            material_stores=stores.materials,
+        )
 
     # -- driving it ---------------------------------------------------------------------
 

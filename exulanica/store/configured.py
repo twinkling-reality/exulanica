@@ -43,9 +43,11 @@ import hashlib
 import itertools
 import json
 import os
+import re
 import threading
+import uuid
 import weakref
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Iterable, Iterator, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -58,11 +60,11 @@ from exulanica.store.local import LocalContentAddressedStore
 from exulanica.store.namespaces import (
     BLOB_NAMESPACE,
     MATERIAL_NAMESPACE,
+    SHARED_NAMESPACES,
     TILE_NAMESPACE,
+    WORKSPACE_NAMESPACES,
     LocalWorkspaceStores,
     WorkspaceStores,
-    material_stores,
-    tile_store,
 )
 
 if TYPE_CHECKING:
@@ -116,6 +118,7 @@ OBJECT_STORE_SETTINGS: Final = (
     *PURGE_CREDENTIAL_SETTINGS,
 )
 _TEMPORARY_PREFIX: Final = "put-"
+_WORKSPACE_HEX: Final = re.compile(r"[0-9a-f]{32}")
 
 
 #: Each ContentStores replaces its lock in a forked child (see exulanica.store.object).
@@ -147,7 +150,7 @@ class IncompleteWritesSwept:
 
 
 class ContentStores:
-    """The three namespaces a process uses: shared blobs, per-workspace materials, one tile store.
+    """Every namespace a process uses, as :mod:`exulanica.store.namespaces` registers them.
 
     Each is built on first use, so a process touches only what it reads or writes, as the direct
     constructions it replaces did (a local store creates its directory when it is built).
@@ -157,9 +160,8 @@ class ContentStores:
         self,
         kind: str,
         *,
-        blobs: Callable[[], ContentAddressedStore],
-        materials: Callable[[], WorkspaceStores],
-        tiles: Callable[[], ContentAddressedStore],
+        shared: Callable[[str], ContentAddressedStore],
+        per_workspace: Callable[[str], WorkspaceStores],
         describe: Callable[[], dict[str, Any]],
         sweep: Callable[[datetime], IncompleteWritesSwept],
         location: tuple[str, ...],
@@ -167,11 +169,8 @@ class ContentStores:
     ) -> None:
         self.kind = kind
         self._location = location
-        self._factories: dict[str, Callable[[], Any]] = {
-            "blobs": blobs,
-            "materials": materials,
-            "tiles": tiles,
-        }
+        self._build_shared = shared
+        self._build_per_workspace = per_workspace
         self._built: dict[str, Any] = {}
         self._lock = threading.Lock()
         _FORK_SENSITIVE.add(self)
@@ -185,26 +184,66 @@ class ContentStores:
     def _reset_after_fork(self) -> None:
         self._lock = threading.Lock()
 
-    def _get(self, name: str) -> Any:
+    def _get(self, name: str, build: Callable[[str], Any]) -> Any:
         with self._lock:
             if name not in self._built:
-                self._built[name] = self._factories[name]()
+                self._built[name] = build(name)
             return self._built[name]
 
-    @property
-    def blobs(self) -> ContentAddressedStore:
-        store: ContentAddressedStore = self._get("blobs")
+    def shared(self, name: str) -> ContentAddressedStore:
+        """The store of a namespace every workspace shares, by its registered name."""
+        if name not in SHARED_NAMESPACES:
+            raise KeyError(f"{name!r} is not a registered shared namespace")
+        store: ContentAddressedStore = self._get(name, self._build_shared)
         return store
 
-    @property
-    def materials(self) -> WorkspaceStores:
-        stores: WorkspaceStores = self._get("materials")
+    def per_workspace(self, name: str) -> WorkspaceStores:
+        """The stores of a namespace each workspace has its own of, by its registered name."""
+        if name not in WORKSPACE_NAMESPACES:
+            raise KeyError(f"{name!r} is not a registered per-workspace namespace")
+        stores: WorkspaceStores = self._get(name, self._build_per_workspace)
         return stores
 
     @property
+    def blobs(self) -> ContentAddressedStore:
+        return self.shared(BLOB_NAMESPACE)
+
+    @property
+    def materials(self) -> WorkspaceStores:
+        return self.per_workspace(MATERIAL_NAMESPACE)
+
+    @property
     def tiles(self) -> ContentAddressedStore:
-        store: ContentAddressedStore = self._get("tiles")
-        return store
+        return self.shared(TILE_NAMESPACE)
+
+    def namespaces(self) -> Iterator[tuple[str, ContentAddressedStore]]:
+        """Every store that holds bytes here, with the name a backup set records for it.
+
+        The shared namespaces come first, as ``blobs``; then each per-workspace namespace's
+        workspaces, as ``materials/<workspace hex>``, every one its ``iter_workspace_ids`` reports,
+        in order of the hex. For backup, verification and restore, which must reach every byte; a
+        namespace registered in :mod:`exulanica.store.namespaces` is listed with no other change.
+        """
+        for name in SHARED_NAMESPACES:
+            yield name, self.shared(name)
+        for name in WORKSPACE_NAMESPACES:
+            stores = self.per_workspace(name)
+            for workspace in sorted(stores.iter_workspace_ids()):
+                yield f"{name}/{workspace.hex}", stores.for_workspace(workspace)
+
+    def namespace(self, name: str) -> ContentAddressedStore | None:
+        """The store a name from :meth:`namespaces` refers to, or ``None`` for a name that is not
+        registered or does not name a workspace as 32 lower-case hex digits.
+
+        Resolved from the name alone, without listing, so it serves a restore target that holds
+        nothing yet.
+        """
+        if name in SHARED_NAMESPACES:
+            return self.shared(name)
+        base, _, workspace = name.partition("/")
+        if base not in WORKSPACE_NAMESPACES or not _WORKSPACE_HEX.fullmatch(workspace):
+            return None
+        return self.per_workspace(base).for_workspace(uuid.UUID(hex=workspace))
 
     def describe(self) -> dict[str, Any]:
         """Facts for readiness reports: codes and kinds, never an endpoint, bucket or credential.
@@ -297,16 +336,17 @@ def local_content_stores(data_dir: str | os.PathLike[str]) -> ContentStores:
 
     def sweep(before: datetime) -> IncompleteWritesSwept:
         cutoff = before.timestamp()
-        roots = [base.resolve() / BLOB_NAMESPACE, base.resolve() / TILE_NAMESPACE]
-        materials = LocalWorkspaceStores(base.resolve() / MATERIAL_NAMESPACE)
-        roots.extend(materials.root / workspace.hex for workspace in materials.iter_workspace_ids())
+        roots = [base.resolve() / name for name in SHARED_NAMESPACES]
+        for name in WORKSPACE_NAMESPACES:
+            stores = LocalWorkspaceStores(base.resolve() / name)
+            roots.extend(stores.root / workspace.hex for workspace in stores.iter_workspace_ids())
         return IncompleteWritesSwept(uploads_aborted=0, files_removed=_remove_stale(roots, cutoff))
 
+    # Every name is one registered segment, so no namespace's directory can lie inside another's.
     return ContentStores(
         "local",
-        blobs=lambda: LocalContentAddressedStore(base / BLOB_NAMESPACE),
-        materials=lambda: material_stores(base),
-        tiles=lambda: tile_store(base),
+        shared=lambda name: LocalContentAddressedStore(base / name),
+        per_workspace=lambda name: LocalWorkspaceStores(base / name),
         describe=lambda: {"kind": "local", "purge_capable": True},
         sweep=sweep,
         location=(str(base.resolve()),),
@@ -373,11 +413,10 @@ def object_content_stores(
 
     return ContentStores(
         "object",
-        blobs=lambda: store(BLOB_NAMESPACE),
-        materials=lambda: ObjectWorkspaceStores(
-            requests, location.namespace(MATERIAL_NAMESPACE), spool=spool, guard=guard
+        shared=store,
+        per_workspace=lambda name: ObjectWorkspaceStores(
+            requests, location.namespace(name), spool=spool, guard=guard
         ),
-        tiles=lambda: store(TILE_NAMESPACE),
         describe=describe,
         sweep=sweep,
         location=location.identity,

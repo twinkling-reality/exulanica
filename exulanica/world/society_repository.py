@@ -68,6 +68,7 @@ from exulanica.world.society_social import (
     advance_social_society,
     initial_social_society,
 )
+from exulanica.world.world_clock_repository import WorldClockRepository
 
 #: Profiles that consume authorized inputs and record transition receipts, from the engine table.
 INPUT_PROFILES = INPUT_ENGINES
@@ -584,7 +585,12 @@ class SocietyRepository:
         return actions
 
     def advance(
-        self, version_id: uuid.UUID, *, base_tick: int, base_state_sha256: str
+        self,
+        version_id: uuid.UUID,
+        *,
+        base_tick: int,
+        base_state_sha256: str,
+        base_clock_revision: int | None = None,
     ) -> dict[str, Any]:
         with self.connection.transaction(), ExitStack() as ahead:
             self._lock()
@@ -595,8 +601,14 @@ class SocietyRepository:
                 raise StaleSocietyState("society changed; reload before advancing")
             if society_state_sha256(row["state"]) != row["state_sha256"]:
                 raise ValueError("stored society state digest mismatch")
+            # A coupled world's minute waits while its society leads sealed traffic by the clock's
+            # lead; a legacy world has no clock row and runs as it always has.
+            clocks = WorldClockRepository(self.connection, self.workspace_id, self.world_id)
+            clocks.check_revision(version_id, base_clock_revision)
+            clock = clocks.before_minute(version_id, row["current_tick"])
             ahead.enter_context(inputs_ahead(self.connection, self.named_inputs(row)))
             engine = society_engine(row["engine_version"])
+            places = None
             if engine.state_family == "legacy":
                 state, events = advance_society(row["state"], row["seed"])
             elif engine.state_family == "living":
@@ -611,12 +623,13 @@ class SocietyRepository:
                     if engine.owner_model_choice
                     else []
                 )
+                places = living_places(inputs, routine)
                 seam, decided = apply_receipts(
                     roles,
                     row["state"],
                     inputs[-1],
                     receipts,
-                    LivingSeam(row["seed"], living_places(inputs, routine), routine),
+                    LivingSeam(row["seed"], places, routine),
                 )
                 state, events = living_step(row["state"], row["seed"], seam)
                 events = append_role_events(
@@ -688,7 +701,17 @@ class SocietyRepository:
                     )
             else:
                 raise UnknownSocietyEngine(f"unsupported society engine {row['engine_version']!r}")
-            self._record(row, state, events)
+            digest = self._record(row, state, events)
+            if clock is not None:
+                clocks.after_minute(
+                    clock,
+                    before=row["state"],
+                    after=state,
+                    previous_state_sha256=row["state_sha256"],
+                    state_sha256=digest,
+                    events=[event.document for event in events],
+                    places=None if places is None else [place.document for place in places],
+                )
             if engine.takes_inputs:
                 if engine.model_decisions:
                     for sequence, disposition in processed:
@@ -713,8 +736,9 @@ class SocietyRepository:
                     )
             return self.snapshot(version_id)
 
-    def _record(self, row: dict, state: dict[str, Any], events: tuple[SocietyEvent, ...]) -> None:
-        """Commit one minute: the new state, its events and, for an input engine, its receipt."""
+    def _record(self, row: dict, state: dict[str, Any], events: tuple[SocietyEvent, ...]) -> str:
+        """Commit one minute: the new state, its events and, for an input engine, its receipt.
+        Answers the new state's digest."""
         digest = society_state_sha256(state)
         self.connection.execute(
             "update world_society set current_tick=%s,state=%s,state_sha256=%s "
@@ -765,6 +789,7 @@ class SocietyRepository:
                     society_state_sha256(ordered_events_document(events)),
                 ),
             )
+        return digest
 
     def change_presence(
         self,
@@ -811,6 +836,9 @@ class SocietyRepository:
                 raise StaleSocietyState("society changed; reload before asking")
             if society_state_sha256(row["state"]) != row["state_sha256"]:
                 raise ValueError("stored society state digest mismatch")
+            # A presence minute is a minute of a coupled world's clock like any other.
+            clocks = WorldClockRepository(self.connection, self.workspace_id, self.world_id)
+            clock = clocks.before_minute(version_id, row["current_tick"])
             waiting = self.connection.execute(
                 "select 1 from world_society_action_request request "
                 "left join world_society_transition_action consumed "
@@ -853,7 +881,17 @@ class SocietyRepository:
             state, events = change_presence(
                 row["state"], row["seed"], inputs, request, population=row["population_size"]
             )
-            self._record(row, state, events)
+            digest = self._record(row, state, events)
+            if clock is not None:
+                clocks.after_minute(
+                    clock,
+                    before=row["state"],
+                    after=state,
+                    previous_state_sha256=row["state_sha256"],
+                    state_sha256=digest,
+                    events=[event.document for event in events],
+                    places=None,
+                )
             self.connection.execute(
                 "insert into world_society_presence(workspace_id,society_id,tick,request_id,"
                 "requested_by,presence,document,document_sha256) "
@@ -1150,7 +1188,33 @@ class SocietyRepository:
                 raise ValueError("stored society state does not match deterministic replay")
             return self._snapshot(row) | {"replay_verified": True}
 
-    def _replay_living(self, row: dict[str, Any]) -> tuple[dict[str, Any], list[SocietyEvent]]:
+    def replay_living_minutes(
+        self,
+        version_id: uuid.UUID,
+        observe: Callable[[dict[str, Any], dict[str, Any], list[dict[str, Any]], list[dict]], None],
+    ) -> dict[str, Any]:
+        """Replay a living society as :meth:`replay` does, under the same lock, handing ``observe``
+        each regenerated minute: the state before it, the state after it, its event documents and
+        the place documents it read. Asks no model. Answers the replayed state's digest."""
+        with self.connection.transaction():
+            self._lock()
+            row = self._row(version_id, lock=True)
+            if row is None:
+                raise UnknownSociety("society is unavailable")
+            if society_engine(row["engine_version"]).state_family != "living":
+                raise ValueError("only a living society's minutes are replayed with their places")
+            state, _events = self._replay_living(row, observe)
+            digest = society_state_sha256(state)
+            if digest != row["state_sha256"]:
+                raise ValueError("society replay final state mismatch")
+            return {"tick": state["tick"], "state_sha256": digest}
+
+    def _replay_living(
+        self,
+        row: dict[str, Any],
+        observe: Callable[[dict[str, Any], dict[str, Any], list[dict[str, Any]], list[dict]], None]
+        | None = None,
+    ) -> tuple[dict[str, Any], list[SocietyEvent]]:
         """Regenerate a living society from genesis over every retained input, transition and,
         for an engine whose owner may choose models, every receipt each minute consumed: asked
         again of nothing, and held to the dispositions the minutes recorded."""
@@ -1205,12 +1269,13 @@ class SocietyRepository:
             bindings = role_bindings.get(transition["tick"], [])
             receipts = [role_decisions[b["decision_seq"]] for b in bindings]
             previous_state = state
+            places = living_places(inputs, routine, held)
             seam, decided = apply_receipts(
                 roles,
                 state,
                 inputs[-1],
                 receipts,
-                LivingSeam(row["seed"], living_places(inputs, routine, held), routine),
+                LivingSeam(row["seed"], places, routine),
             )
             if [(d.decision_seq, d.disposition) for d in decided] != [
                 (b["decision_seq"], b["disposition"]) for b in bindings
@@ -1227,6 +1292,13 @@ class SocietyRepository:
                 != society_state_sha256(ordered_events_document(events))
             ):
                 raise ValueError("society transition replay mismatch")
+            if observe is not None:
+                observe(
+                    previous_state,
+                    state,
+                    [event.document for event in events],
+                    [place.document for place in places],
+                )
             expected.extend(events)
         return state, expected
 

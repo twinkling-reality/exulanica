@@ -1,15 +1,15 @@
 """The records of a comparison: its definition, its runs, their receipts and their outcomes.
 
 A comparison is defined over one world's purposeful society as it stands: the repository reads the
-society and the inputs it holds, never a caller's copy of either, freezes the newest input by
-sequence and digest, and records a definition naming the window, the arms, the phase, the seeds it
-committed to by digest, the group its arms decide for, who decides for everybody else, and
-everything it is scored and judged under. The group and everybody else are checked against the
-world's own records: every person is one of the society's, named as its state names them, a group
-taken from an owner's choice is exactly the people that choice named, and each other person keeps
-exactly the model or routine the owner's latest choice for them names. Runs are reserved before
-anything is asked, their receipts are appended as they are paid for, and each run ends in one
-outcome.
+society and the inputs it holds, never a caller's copy of either, freezes the newest input, or an
+earlier stored one the caller names, by sequence and digest, and records a definition naming the
+window, the arms, the phase, the seeds it committed to by digest, the group its arms decide for,
+who decides for everybody else, and everything it is scored and judged under. The group and
+everybody else are checked against the world's own records: every person is one of the society's,
+named as its state names them, a group taken from an owner's choice is exactly the people that
+choice named, and each other person keeps exactly the model or routine the owner's latest choice
+for them names. Runs are reserved before anything is asked, their receipts are appended as they are
+paid for, and each run ends in one outcome.
 
 Nothing here runs a minute or asks a model. :meth:`SocietyComparisonRepository.plan` gives the
 runner the :class:`~exulanica.world.society_comparison.RunPlan` it plays, with the stored inputs
@@ -174,9 +174,12 @@ class SocietyComparisonRepository:
         created_by: uuid.UUID,
         role: DecisionRole,
         catalogs: ComparisonCatalogs | None = None,
+        input_seq: int | None = None,
     ) -> dict[str, Any]:
-        """Record a comparison over this version's society, frozen at its newest input, asking
-        ``role``, whose contract the definition records and so names it by.
+        """Record a comparison over this version's society, frozen at its newest input or at the
+        earlier stored input ``input_seq`` names, asking ``role``, whose contract the definition
+        records and so names it by. Every run of it starts at the society's genesis and consumes
+        the inputs up to the frozen one; it is not a branch of the live society at any tick.
 
         ``body`` is everything the definition states that the society does not: ``window_ticks``,
         ``phase``, ``seeds`` (digests), ``group`` (the people the arms decide for, or None for
@@ -214,7 +217,12 @@ class SocietyComparisonRepository:
         if refused is not None:
             raise ComparisonRefused(*refused)
         latest = self.society._chain(row)
-        frozen = self.society._inputs(row, [latest])[latest]
+        chosen = latest if input_seq is None else input_seq
+        if not 1 <= chosen <= latest:
+            raise ComparisonRefused(
+                "input_not_in_society", f"this society holds inputs 1 to {latest}"
+            )
+        frozen = self.society._inputs(row, [chosen])[chosen]
         # One input alone: its own stored bytes are read before the lock its authorization takes.
         self.society._authorize(frozen)
         contract = role.contract()
@@ -227,7 +235,7 @@ class SocietyComparisonRepository:
                 "version_id": str(version_id),
                 "society_id": str(row["society_id"]),
                 "population": int(row["population_size"]),
-                "input": {"input_seq": latest, "document_sha256": frozen["document_sha256"]},
+                "input": {"input_seq": chosen, "document_sha256": frozen["document_sha256"]},
                 "window_ticks": body["window_ticks"],
                 "phase": body["phase"],
                 "seeds": list(body["seeds"]),
@@ -260,7 +268,7 @@ class SocietyComparisonRepository:
                         comparison_id,
                         version_id,
                         row["society_id"],
-                        latest,
+                        chosen,
                         frozen["document_sha256"],
                         Jsonb(document),
                         document["document_sha256"],

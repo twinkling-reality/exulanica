@@ -17,6 +17,7 @@ from exulanica.selection.validation import Session
 from exulanica.world.society import UnavailableSocietyInput, served_snapshot
 from exulanica.world.society_control_repository import SocietyControlRepository
 from exulanica.world.society_controls import DEFAULT_BASE_TICK_INTERVAL_MS, effective_interval_ms
+from exulanica.world.world_clock import ClockRefused
 from exulanica.world.worlds import require_world
 
 router = APIRouter(prefix="/world/versions/{version_id}/society/control", tags=["society"])
@@ -27,6 +28,9 @@ class ConfigureBody(BaseModel):
     base_revision: Annotated[StrictInt, Field(ge=0)]
     mode: Literal["playing", "paused"]
     speed: StrictInt
+    #: The world clock's revision the request was made against (``GET .../clock``), when the
+    #: caller pins it: another revision is refused, 409 ``stale_clock_revision``.
+    base_clock_revision: Annotated[StrictInt, Field(ge=0)] | None = None
 
 
 class StepBody(BaseModel):
@@ -34,6 +38,8 @@ class StepBody(BaseModel):
     base_revision: Annotated[StrictInt, Field(ge=0)]
     base_tick: Annotated[StrictInt, Field(ge=0)]
     base_state_sha256: Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
+    #: As :class:`ConfigureBody`'s.
+    base_clock_revision: Annotated[StrictInt, Field(ge=0)] | None = None
 
 
 class HostPlayback(BaseModel):
@@ -85,6 +91,11 @@ class ControlRead(BaseModel):
     play_ineligible_reason: str | None
     play_eligible: bool
     host_playback: HostPlayback
+    #: Why this host does not play the world, by code (the key of ``HOST_PLAYBACK_REFUSALS``), or
+    #: null while it does. ``host_playback.reason`` keeps the sentence.
+    host_playback_code: (
+        Literal["no_playback_worker", "playback_worker_stopped", "workspace_not_played"] | None
+    )
 
 
 def host_base_tick_interval_ms(request: Request) -> int:
@@ -112,6 +123,9 @@ def with_host_playback(control: dict, request: Request, workspace: uuid.UUID) ->
             "interval_ms": effective_interval_ms(base, control["speed"]),
             "reason": None if refusal is None else HOST_PLAYBACK_REFUSALS[refusal],
         },
+        # The stable code beside the sentence, for a client to branch on. Beside, not inside:
+        # the browser's reader of host_playback refuses a key it does not know.
+        "host_playback_code": refusal,
     }
 
 
@@ -143,6 +157,9 @@ def call(operation: Callable[[], Any]) -> Any:
         return JSONResponse(
             status_code=424, content={"code": "unavailable_society_input", "detail": str(exc)}
         )
+    except ClockRefused as exc:
+        # A coupled world's society waits for its traffic (clock_lead_exhausted): retry later.
+        return JSONResponse(status_code=409, content={"code": exc.code, "detail": exc.detail})
     except ValueError as exc:
         return JSONResponse(
             status_code=409, content={"code": "invalid_society_control", "detail": str(exc)}

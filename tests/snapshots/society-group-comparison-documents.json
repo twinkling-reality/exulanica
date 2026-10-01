@@ -168,6 +168,10 @@
         "kind": "owner_choice"
       }
     },
+    "input": {
+      "document_sha256": "37a5b46b59420c3d5fb82fc8cc62579123350b53d72def6c347b1d792e70e3a9",
+      "input_seq": 1
+    },
     "others": [
       {
         "answering": {

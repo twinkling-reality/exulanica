@@ -24,7 +24,7 @@ import hashlib
 import json
 import uuid
 from pathlib import Path
-from typing import Any
+from typing import Any, Final
 
 from exulanica.environment import (
     DerivedEnvironmentAsset,
@@ -1104,6 +1104,18 @@ def feature_index_request(owner) -> dict[str, Any]:
     }
 
 
+def _generated(owner) -> dict[str, Any]:
+    """A world generated from the small-town recipe, made once per test (API)."""
+    if "generated" not in owner.memo:
+        owner.memo["generated"] = _ok(
+            owner.request(
+                "POST", "/worlds/generated", json={"recipe": "small_town", "title": "A town"}
+            ),
+            201,
+        )
+    return owner.memo["generated"]
+
+
 def generated_tile(owner) -> dict[str, Any]:
     """A world generated from the small-town recipe (API), and the key its first tile's bake is
     stored under. No test bakes it, so the owner is answered that the world names no such baked
@@ -1114,14 +1126,7 @@ def generated_tile(owner) -> dict[str, Any]:
     from exulanica.ingest.stages import STAGES, baked_tile_id
     from exulanica.world.generated_worlds import generation_receipt
 
-    if "generated" not in owner.memo:
-        owner.memo["generated"] = _ok(
-            owner.request(
-                "POST", "/worlds/generated", json={"recipe": "small_town", "title": "A town"}
-            ),
-            201,
-        )
-    entry = owner.memo["generated"]
+    entry = _generated(owner)
     _, receipt = generation_receipt(
         owner.repository.connection,
         owner.workspace_id,
@@ -1147,6 +1152,82 @@ def generated_tile(owner) -> dict[str, Any]:
 def generated_tile_request(owner) -> dict[str, Any]:
     """A request in the generated world the tile belongs to."""
     generated_tile(owner)
+    return {"params": {"world_id": owner.memo["generated"]["world_id"]}}
+
+
+#: The signal a fixture comparison's group names. No read of a comparison or its runs compiles the
+#: roads, so the town need not be one whose roads the traffic drives.
+_FIXTURE_SIGNAL: Final = {"signal_id": "fixture-signal", "junction_id": "fixture-junction"}
+
+
+def _signal_comparison(owner) -> dict[str, Any]:
+    """A development signal comparison over the generated town's roads, assembled as the runner
+    assembles one over a fixture signal, with its fixed-timing run reserved (domain)."""
+    from exulanica.api.signal_comparison_runner import SignalComparisonRunner
+    from exulanica.api.society_comparison_runner import ComparisonArm
+    from exulanica.models.manifest import load_manifest
+    from exulanica.world.decision_roles import decision_roles
+    from exulanica.world.signal_comparison_repository import SignalComparisonRepository
+
+    if "signal_comparison" not in owner.memo:
+        entry = _generated(owner)
+        version_id = uuid.UUID(entry["authored_version_id"])
+        repository = SignalComparisonRepository(
+            owner.repository.connection, owner.workspace_id, entry["world_id"]
+        )
+        runner = SignalComparisonRunner(
+            database=None,
+            client=None,
+            policy_for=lambda _workspace: None,
+            manifest=load_manifest(),
+            manifest_sha256="a" * 64,
+            workspace_id=owner.workspace_id,
+            world_id=entry["world_id"],
+            actor=owner.actor,
+        )
+        model = load_manifest().offered_models(decision_roles().deciding_for("signal").chosen)[0]
+        seed = runner.catalogs.development_seeds()[0]
+        body = runner.body(
+            [ComparisonArm(model.provider, model.model_id)], [seed], control=False, group=None
+        )
+        comparison_id = uuid.uuid4()
+        repository.define(
+            comparison_id,
+            runner.definition(
+                version_id, repository.roads(version_id), [_FIXTURE_SIGNAL], body=body
+            ),
+            created_by=owner.actor,
+        )
+        run_id = repository.reserve(comparison_id, arm="fixed", seed=seed, created_by=owner.actor)
+        owner.repository.connection.commit()
+        owner.memo["signal_comparison"] = {
+            "/world/versions/{version_id}": str(version_id),
+            "/world/versions/{version_id}/traffic/comparisons/{comparison_id}": comparison_id,
+            "/world/versions/{version_id}/traffic/comparisons/{comparison_id}/runs/{run_id}": (
+                run_id
+            ),
+        }
+    return owner.memo["signal_comparison"]
+
+
+def signal_comparison(owner) -> dict[str, Any]:
+    made = _signal_comparison(owner)
+    return {
+        address: made[address]
+        for address in (
+            "/world/versions/{version_id}",
+            "/world/versions/{version_id}/traffic/comparisons/{comparison_id}",
+        )
+    }
+
+
+def signal_comparison_run(owner) -> dict[str, Any]:
+    return _signal_comparison(owner)
+
+
+def signal_comparison_request(owner) -> dict[str, Any]:
+    """A request in the generated world the signal comparison belongs to."""
+    _signal_comparison(owner)
     return {"params": {"world_id": owner.memo["generated"]["world_id"]}}
 
 

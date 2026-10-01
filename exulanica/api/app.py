@@ -108,6 +108,7 @@ from exulanica.api.routes import (
     selection,
     selection_actions,
     selection_environment,
+    signal_comparisons,
     society,
     society_actions,
     society_comparisons,
@@ -121,6 +122,7 @@ from exulanica.api.routes import (
     world_arrangements,
     world_assets,
     world_behaviours,
+    world_clock,
     world_compositions,
     world_drafts,
     world_entries,
@@ -427,8 +429,10 @@ def create_app(services: Services | None = None, *, verify: bool = True) -> Fast
     app.include_router(world_compositions.router)
     app.include_router(world_arrangements.router)
     app.include_router(world_entries.router)
+    app.include_router(world_clock.router)
     app.include_router(world_flight.router)
     app.include_router(world_traffic.router)
+    app.include_router(signal_comparisons.router)
     app.include_router(world_models.router)
     app.include_router(capabilities.router)
     app.include_router(interaction.router)

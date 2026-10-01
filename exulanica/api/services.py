@@ -52,6 +52,7 @@ from exulanica.api.decision_host import (
     question_refusal,
     share_kept,
 )
+from exulanica.api.signal_comparison_runner import SignalComparisonRunner
 from exulanica.api.society_comparison_runner import SocietyComparisonRunner
 from exulanica.api.society_comparison_start import development_seeds
 from exulanica.api.society_comparison_worker import SocietyComparisonWorker
@@ -350,6 +351,33 @@ class Services:
             catalogs=self.comparison_catalogs or load_comparison_catalogs(),
         )
 
+    def signal_comparison_runner(
+        self, workspace_id: uuid.UUID, world_id: str, actor: uuid.UUID
+    ) -> SignalComparisonRunner:
+        """What defines and runs a comparison of the models that decide for a town's signals, in
+        one workspace and world as ``actor``."""
+        return SignalComparisonRunner(
+            database=self.database,
+            client=self.model_client,
+            policy_for=self.person_decision_policy,
+            manifest=load_manifest(),
+            manifest_sha256=hashlib.sha256(MANIFEST_PATH.read_bytes()).hexdigest(),
+            workspace_id=workspace_id,
+            world_id=world_id,
+            actor=actor,
+        )
+
+    def signal_comparison_refusal(self, workspace_id: uuid.UUID) -> str | None:
+        """Why this server starts no signal comparison for a workspace, or None when it may: the
+        same host facts a comparison of people is refused by, its seeds the signal catalog's."""
+        if not (self.runs_comparison_worker or self.comparisons_played_elsewhere):
+            return "comparisons_not_played"
+        if workspace_id not in self.society_control_workspaces:
+            return "comparisons_not_run_here"
+        if self.model_client is None:
+            return PROVIDER_CREDENTIAL_ABSENT
+        return None
+
     def comparison_refusal(self, workspace_id: uuid.UUID) -> str | None:
         """Why this server starts no comparison for a workspace, or None when it may: its seed
         catalog commits no development seed's text (``comparisons_not_set_up``), nothing plays the
@@ -397,6 +425,7 @@ class Services:
             manifest=load_manifest(),
             workspaces=self.society_control_workspaces,
             keeps_share=keeps_share,
+            signal_runner_for=self.signal_comparison_runner,
         )
 
     def model_host_refusal(self, workspace_id: uuid.UUID, role: DecisionRole) -> str | None:

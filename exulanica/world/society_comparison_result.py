@@ -844,6 +844,9 @@ def comparison_result(
         "start": None if start is None else dict(start),
         "window_ticks": definition["window_ticks"],
         "population": definition["population"],
+        # The society's input the comparison froze: every run starts at the society's genesis and
+        # consumes the inputs up to this one. Migration 0113 holds every stored definition to one.
+        "input": _input_document(definition.get("input")),
         "preregistration": definition["preregistration"],
         "group": _group_document(definition),
         "others": _others_document(definition, model_name),
@@ -863,6 +866,17 @@ def comparison_result(
             "reason": assembled.reason,
             "answered_shares_differ": assembled.answered_shares_differ,
         },
+    }
+
+
+def _input_document(frozen: Mapping[str, Any] | None) -> dict[str, Any] | None:
+    """The input a definition froze, by sequence and digest, or None for a document that names
+    none, which no stored definition is."""
+    if frozen is None:
+        return None
+    return {
+        "input_seq": int(frozen["input_seq"]),
+        "document_sha256": str(frozen["document_sha256"]),
     }
 
 

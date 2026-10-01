@@ -136,7 +136,9 @@ What a role in a world also needs:
   which the registry resolves to one role (`RoleRegistry.for_contract`), and asks it through the
   generic path, and the start controls offer the roles the society's engine hosts. Its waiting
   anchor applies the person's wait, and migration 0113 admits only the person's request and receipt
-  profiles in a comparison's decisions, so a second role's comparison needs both.
+  profiles in a comparison's decisions, so another person-hosted role's comparison needs both. The
+  junction signal role is compared by its own records (migration 0132,
+  [signal comparisons](traffic-contract.md#signal-comparisons)).
 - **Words.** The page and the Companion have words for the person's reason codes only, the
   `decision_reason` entries of `assets/catalogs/society-words/society-inhabitant-words.v1.json`,
   held to the person's reasons by `tests/test_companion_decision_model.py` and
@@ -187,9 +189,13 @@ person's model, the page says the person follows their own routine for now, and 
 ## The signal's contract
 
 A saved town's owner may choose one offered model for each signal at a high street junction, or
-restore fixed timing. The choice takes effect at a 60-second boundary at least one minute ahead.
-The route serves that target and the first sealed second at which an accepted model answer took
-effect separately. Pending and preparing choices do not claim that a model controls the light.
+restore fixed timing. The choice takes effect at a 60-second boundary at least one minute ahead,
+or, in a version whose clock is coupled, one minute after the traffic it has sealed. The route
+serves that target and the first sealed second at which an accepted model answer took effect
+separately, with the timeline both are on (`timebase`: `unix` for shared real time, `world` for a
+coupled version's traffic timeline, [world clock](world-clock-contract.md#coupled-traffic)), and
+judges each choice pending, preparing, active or fixed by that timeline's present. Pending and
+preparing choices do not claim that a model controls the light.
 
 At the end of a plan's minimum green, and after each permitted one-second extension, the traffic
 step derives nearby vehicle counts, queued vehicles and longest waits on the active and other
@@ -201,9 +207,11 @@ The controller stores a versioned, digest-bound continuation every 60 seconds, i
 signal state, and replay verifies the stored decision and frame digests without a model call
 (`exulanica/api/traffic_signal_controller.py`, migration 0122).
 
-Comparing signal models would need a paired run over the same towns and episode seeds, with each
-model's sealed decisions, delays, trip arrivals, unanswered points, spend and health timing kept
-as separate evidence. The society comparison runner does not compare this role.
+Signal models are compared over a saved town's own episodes, each model beside the plan's fixed
+timing on the same seeds, with every choice point's request and receipt, the junction delay
+measure, trips, unanswered points and spend kept per run
+([signal comparisons](traffic-contract.md#signal-comparisons)). No benefit of a model over fixed
+timing has been measured, and none is claimed.
 
 ## The person's contract
 

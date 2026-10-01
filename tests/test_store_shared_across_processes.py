@@ -38,6 +38,7 @@ from exulanica.env import env_get
 from exulanica.evidence.blob import BlobId
 from exulanica.migrations import migrations
 from exulanica.store.configured import content_stores
+from exulanica.store.namespaces import SHARED_NAMESPACES, WORKSPACE_NAMESPACES
 from exulanica.store.object import ObjectRequests, ObjectStoreCredentials, ObjectStoreLocation
 from exulanica.world.material_recipes import MaterialRuntime
 from exulanica.world.texture_assets import load_material_catalog
@@ -56,6 +57,8 @@ _PURGER = f"{PURGE_ROLE}_shared_store"
 #: Generated for the run, never committed, as tests/test_purge.py does for its roles.
 _APP_PASSWORD = secrets.token_urlsafe(24)
 _PURGER_PASSWORD = secrets.token_urlsafe(24)
+#: The directories a local store would create; a process sharing the bucket creates none.
+_NAMESPACES = (*SHARED_NAMESPACES, *WORKSPACE_NAMESPACES)
 
 
 class Shared:
@@ -110,9 +113,7 @@ class Shared:
             timeout=300,
         )
         assert completed.returncode == expect, completed.stdout + completed.stderr
-        local = sorted(
-            p.name for p in directory.iterdir() if p.name in ("blobs", "materials", "tiles")
-        )
+        local = sorted(p.name for p in directory.iterdir() if p.name in _NAMESPACES)
         assert local == [], f"{name} built a local store: {local}"
         return {"stdout": completed.stdout, "stderr": completed.stderr}
 
@@ -225,7 +226,7 @@ def _serving(double, endpoint, settings, *, prefix, owner, repository, scratch, 
         yield Shared(
             client, double, repository, scratch, tmp_path, environment, peek, purge_environment
         )
-    assert not (api_directory / "blobs").exists() and not (api_directory / "tiles").exists()
+    assert not any((api_directory / name).exists() for name in _NAMESPACES)
 
 
 def _screen(shared: Shared) -> None:

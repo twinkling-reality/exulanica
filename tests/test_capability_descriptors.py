@@ -20,6 +20,7 @@ from exulanica.api import capabilities
 from exulanica.api.permissions import ROUTE_RULES, Permission, Requires
 from exulanica.api.role_hosts import ROLE_HOSTS, choice_status
 from exulanica.api.routes import capabilities as reads
+from exulanica.api.routes import signal_comparisons as signal_reads
 from exulanica.api.routes.society_models import CHOICE_CONFLICTS
 from exulanica.api.routes.world_models import choose_world_model
 from exulanica.api.routes.world_objects import add_authored_object
@@ -46,6 +47,8 @@ NARROWED_SPENDS: frozenset[str] = frozenset(
         # tests/test_comparison_cancel_postgres.py: a cancel closes a waiting start with no
         # request sent, and a host it stops sends nothing after its minute in flight.
         "POST /world/versions/{version_id}/society/comparisons/{comparison_id}/cancel",
+        # tests/test_signal_comparison_postgres.py: the same, for a comparison of a town's signals.
+        "POST /world/versions/{version_id}/traffic/comparisons/{comparison_id}/cancel",
     }
 )
 
@@ -121,6 +124,7 @@ def _no_roads(monkeypatch):
         raise TrafficRefused("roads_not_stated", "no records in a test without a database")
 
     monkeypatch.setattr(reads, "saved_world_roads", refused)
+    monkeypatch.setattr(signal_reads, "saved_world_roads", refused)
 
 
 def _operations(context: capabilities.VersionContext) -> list[capabilities.Operation]:

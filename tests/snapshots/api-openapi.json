@@ -1716,7 +1716,7 @@
      "content": {
       "application/json": {
        "schema": {
-        "$ref": "#/components/schemas/AdvanceSocietyBody"
+        "$ref": "#/components/schemas/StepSocietyBody"
        }
       }
      }
@@ -2782,7 +2782,7 @@
      "society"
     ],
     "summary": "Plan Society Comparison",
-    "description": "What a start would do, writing nothing: the roles, groups, models and development seeds\nthis server offers a comparison of the version's society, and, for the selection the query\nnames (``model`` as ``<provider>/<model id>``, once or twice; ``person`` for a named group),\nthe runs it plans, the most it can cost and what one like it typically cost, or the refusal a\nstart of it would meet.",
+    "description": "What a start would do, writing nothing: the roles, groups, models and development seeds\nthis server offers a comparison of the version's society, and, for the selection the query\nnames (``model`` as ``<provider>/<model id>``, once or twice; ``person`` for a named group;\n``input_seq`` for an earlier stored input to freeze), the runs it plans, the input it\nfreezes, the most it can cost and what one like it typically cost, or the refusal a start of\nit would meet.",
     "operationId": "plan_society_comparison_world_versions__version_id__society_comparisons_plan_get",
     "parameters": [
      {
@@ -2911,6 +2911,23 @@
        "minimum": 1,
        "default": 1,
        "title": "Seeds"
+      }
+     },
+     {
+      "name": "input_seq",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "integer",
+         "minimum": 1
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Input Seq"
       }
      },
      {
@@ -11900,6 +11917,326 @@
     }
    }
   },
+  "/world/versions/{version_id}/clock": {
+   "get": {
+    "tags": [
+     "world"
+    ],
+    "summary": "Which timeline each of a world version's systems runs on, and where it is.",
+    "operationId": "read_clock_world_versions__version_id__clock_get",
+    "parameters": [
+     {
+      "name": "version_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Version Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Read Clock World Versions  Version Id  Clock Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "put": {
+    "tags": [
+     "world"
+    ],
+    "summary": "Couple a world version's clock: one timeline for its people, traffic and birds.",
+    "operationId": "transition_clock_world_versions__version_id__clock_put",
+    "parameters": [
+     {
+      "name": "version_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Version Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/TransitionBody"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Transition Clock World Versions  Version Id  Clock Put"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/world/versions/{version_id}/clock/events": {
+   "get": {
+    "tags": [
+     "world"
+    ],
+    "summary": "A world version's clock receipts, newest first.",
+    "operationId": "clock_events_world_versions__version_id__clock_events_get",
+    "parameters": [
+     {
+      "name": "version_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Version Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 128,
+       "minimum": 1,
+       "default": 64,
+       "title": "Limit"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Clock Events World Versions  Version Id  Clock Events Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/world/versions/{version_id}/clock/verify": {
+   "get": {
+    "tags": [
+     "world"
+    ],
+    "summary": "Replay a coupled world's minutes from what was stored and check them.",
+    "operationId": "verify_clock_world_versions__version_id__clock_verify_get",
+    "parameters": [
+     {
+      "name": "version_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Version Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "from_tick",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "minimum": 1,
+       "title": "From Tick"
+      }
+     },
+     {
+      "name": "to_tick",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "minimum": 1,
+       "title": "To Tick"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Verify Clock World Versions  Version Id  Clock Verify Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/world/versions/{version_id}/flight": {
    "get": {
     "tags": [
@@ -12074,6 +12411,618 @@
       "content": {
        "application/json": {
         "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/world/versions/{version_id}/traffic/comparisons": {
+   "get": {
+    "tags": [
+     "world"
+    ],
+    "summary": "Signal Comparisons",
+    "operationId": "signal_comparisons_world_versions__version_id__traffic_comparisons_get",
+    "parameters": [
+     {
+      "name": "version_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Version Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Signal Comparisons World Versions  Version Id  Traffic Comparisons Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "world"
+    ],
+    "summary": "Start Signal Comparison",
+    "operationId": "start_signal_comparison_world_versions__version_id__traffic_comparisons_post",
+    "parameters": [
+     {
+      "name": "version_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Version Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/SignalComparisonStartBody"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Start Signal Comparison World Versions  Version Id  Traffic Comparisons Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/world/versions/{version_id}/traffic/comparisons/plan": {
+   "get": {
+    "tags": [
+     "world"
+    ],
+    "summary": "Plan Signal Comparison",
+    "description": "What a start would do, writing nothing and playing no episode: the town's signals, the\nmodels offered for a signal's decisions, the development seeds this server holds and, for the\nselection the query names (``model`` as ``<provider>/<model id>``, once or twice; ``signal``\nfor a named group, every signal where none is named), the runs it plans and the most it can\ncost, or the refusal a start of it would meet.",
+    "operationId": "plan_signal_comparison_world_versions__version_id__traffic_comparisons_plan_get",
+    "parameters": [
+     {
+      "name": "version_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Version Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "model",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "maxItems": 2,
+       "default": [],
+       "title": "Model"
+      }
+     },
+     {
+      "name": "control",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "boolean",
+       "default": false,
+       "title": "Control"
+      }
+     },
+     {
+      "name": "seeds",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 64,
+       "minimum": 1,
+       "default": 1,
+       "title": "Seeds"
+      }
+     },
+     {
+      "name": "signal",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "maxItems": 64,
+       "default": [],
+       "title": "Signal"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Plan Signal Comparison World Versions  Version Id  Traffic Comparisons Plan Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/world/versions/{version_id}/traffic/comparisons/{comparison_id}": {
+   "get": {
+    "tags": [
+     "world"
+    ],
+    "summary": "Signal Comparison",
+    "operationId": "signal_comparison_world_versions__version_id__traffic_comparisons__comparison_id__get",
+    "parameters": [
+     {
+      "name": "version_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Version Id"
+      }
+     },
+     {
+      "name": "comparison_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Comparison Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Signal Comparison World Versions  Version Id  Traffic Comparisons  Comparison Id  Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/world/versions/{version_id}/traffic/comparisons/{comparison_id}/runs/{run_id}": {
+   "get": {
+    "tags": [
+     "world"
+    ],
+    "summary": "Signal Comparison Run",
+    "description": "One run's outcome and every choice point's receipt, as recorded; no replay.",
+    "operationId": "signal_comparison_run_world_versions__version_id__traffic_comparisons__comparison_id__runs__run_id__get",
+    "parameters": [
+     {
+      "name": "version_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Version Id"
+      }
+     },
+     {
+      "name": "comparison_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Comparison Id"
+      }
+     },
+     {
+      "name": "run_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Run Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Signal Comparison Run World Versions  Version Id  Traffic Comparisons  Comparison Id  Runs  Run Id  Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/world/versions/{version_id}/traffic/comparisons/{comparison_id}/runs/{run_id}/replay": {
+   "get": {
+    "tags": [
+     "world"
+    ],
+    "summary": "Replay Signal Comparison Run",
+    "description": "A completed run played again from what it stored, asking no model, held to its record.",
+    "operationId": "replay_signal_comparison_run_world_versions__version_id__traffic_comparisons__comparison_id__runs__run_id__replay_get",
+    "parameters": [
+     {
+      "name": "version_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Version Id"
+      }
+     },
+     {
+      "name": "comparison_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Comparison Id"
+      }
+     },
+     {
+      "name": "run_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Run Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Replay Signal Comparison Run World Versions  Version Id  Traffic Comparisons  Comparison Id  Runs  Run Id  Replay Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/world/versions/{version_id}/traffic/comparisons/{comparison_id}/cancel": {
+   "post": {
+    "tags": [
+     "world"
+    ],
+    "summary": "Cancel Signal Comparison",
+    "description": "Cancel a signal comparison started from the application, once, as a comparison of people\nis cancelled: a start no host holds closes now, its open runs failed as\n``comparison_cancelled`` asking nothing, with what a host whose lease ran out may have spent\npresumed; a host playing it stops before its next ask. A repeated cancel changes nothing, and\na finished start keeps its own closing. Answers the comparison as the listing states it.",
+    "operationId": "cancel_signal_comparison_world_versions__version_id__traffic_comparisons__comparison_id__cancel_post",
+    "parameters": [
+     {
+      "name": "version_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Version Id"
+      }
+     },
+     {
+      "name": "comparison_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Comparison Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Cancel Signal Comparison World Versions  Version Id  Traffic Comparisons  Comparison Id  Cancel Post"
+        }
        }
       }
      },
@@ -16247,27 +17196,6 @@
     ],
     "title": "AddObjectBody"
    },
-   "AdvanceSocietyBody": {
-    "properties": {
-     "base_tick": {
-      "type": "integer",
-      "minimum": 0.0,
-      "title": "Base Tick"
-     },
-     "base_state_sha256": {
-      "type": "string",
-      "pattern": "^[0-9a-f]{64}$",
-      "title": "Base State Sha256"
-     }
-    },
-    "additionalProperties": false,
-    "type": "object",
-    "required": [
-     "base_tick",
-     "base_state_sha256"
-    ],
-    "title": "AdvanceSocietyBody"
-   },
    "AlternateVersionView": {
     "properties": {
      "schema_version": {
@@ -18887,6 +19815,18 @@
       "type": "string",
       "pattern": "^[0-9]{1,6}(\\.[0-9]{1,8})?$",
       "title": "Bound Usd"
+     },
+     "input_seq": {
+      "anyOf": [
+       {
+        "type": "integer",
+        "minimum": 1.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Input Seq"
      }
     },
     "additionalProperties": false,
@@ -19182,6 +20122,18 @@
      "speed": {
       "type": "integer",
       "title": "Speed"
+     },
+     "base_clock_revision": {
+      "anyOf": [
+       {
+        "type": "integer",
+        "minimum": 0.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Base Clock Revision"
      }
     },
     "additionalProperties": false,
@@ -19566,6 +20518,22 @@
      },
      "host_playback": {
       "$ref": "#/components/schemas/HostPlayback"
+     },
+     "host_playback_code": {
+      "anyOf": [
+       {
+        "type": "string",
+        "enum": [
+         "no_playback_worker",
+         "playback_worker_stopped",
+         "workspace_not_played"
+        ]
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Host Playback Code"
      }
     },
     "additionalProperties": false,
@@ -19592,7 +20560,8 @@
      "state_sha256",
      "play_ineligible_reason",
      "play_eligible",
-     "host_playback"
+     "host_playback",
+     "host_playback_code"
     ],
     "title": "ControlRead",
     "description": "``exulanica.society-control/v1`` as the routes return it. Undeclared keys fail loudly."
@@ -30918,6 +31887,68 @@
     ],
     "title": "SetObjectBehaviourBody"
    },
+   "SignalComparisonStartBody": {
+    "properties": {
+     "comparison_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Comparison Id"
+     },
+     "models": {
+      "items": {
+       "$ref": "#/components/schemas/ChosenModel"
+      },
+      "type": "array",
+      "maxItems": 2,
+      "minItems": 1,
+      "title": "Models"
+     },
+     "control": {
+      "type": "boolean",
+      "title": "Control",
+      "default": false
+     },
+     "seeds": {
+      "type": "integer",
+      "maximum": 64.0,
+      "minimum": 1.0,
+      "title": "Seeds"
+     },
+     "signals": {
+      "anyOf": [
+       {
+        "items": {
+         "type": "string",
+         "maxLength": 500,
+         "minLength": 1
+        },
+        "type": "array",
+        "maxItems": 64,
+        "minItems": 1
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Signals"
+     },
+     "bound_usd": {
+      "type": "string",
+      "pattern": "^[0-9]{1,6}(\\.[0-9]{1,8})?$",
+      "title": "Bound Usd"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "comparison_id",
+     "models",
+     "seeds",
+     "bound_usd"
+    ],
+    "title": "SignalComparisonStartBody",
+    "description": "A signal comparison started: the models it compares with the plan's fixed timing, its id\n(the caller's, keyed within its workspace), the signals its arms decide for (every signal of\nthe town where none is named) and the most its asks may spend, in US dollars."
+   },
    "SimulationCitationView": {
     "properties": {
      "truth_class": {
@@ -31749,6 +32780,18 @@
       "type": "string",
       "pattern": "^[0-9a-f]{64}$",
       "title": "Base State Sha256"
+     },
+     "base_clock_revision": {
+      "anyOf": [
+       {
+        "type": "integer",
+        "minimum": 0.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Base Clock Revision"
      }
     },
     "additionalProperties": false,
@@ -31759,6 +32802,40 @@
      "base_state_sha256"
     ],
     "title": "StepBody"
+   },
+   "StepSocietyBody": {
+    "properties": {
+     "base_tick": {
+      "type": "integer",
+      "minimum": 0.0,
+      "title": "Base Tick"
+     },
+     "base_state_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Base State Sha256"
+     },
+     "base_clock_revision": {
+      "anyOf": [
+       {
+        "type": "integer",
+        "minimum": 0.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Base Clock Revision"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "base_tick",
+     "base_state_sha256"
+    ],
+    "title": "StepSocietyBody",
+    "description": "A minute, against the state the person was shown and, when pinned, the world clock's\nrevision (``GET .../clock``): another revision is refused, 409 ``stale_clock_revision``."
    },
    "StyleProposalView": {
     "properties": {
@@ -32392,6 +33469,27 @@
      "scale_milli"
     ],
     "title": "TransformView"
+   },
+   "TransitionBody": {
+    "properties": {
+     "base_revision": {
+      "type": "integer",
+      "minimum": 0.0,
+      "title": "Base Revision"
+     },
+     "profile": {
+      "type": "string",
+      "const": "coupled",
+      "title": "Profile"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "base_revision",
+     "profile"
+    ],
+    "title": "TransitionBody"
    },
    "TypedActionBody": {
     "properties": {

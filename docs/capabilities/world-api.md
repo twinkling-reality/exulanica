@@ -88,6 +88,12 @@ the tick and state digest they were made against, and a stale base is refused.
 | `GET /world/versions/{version_id}/society/comparisons/{comparison_id}` | One comparison: its arms, scores and verdict |
 | `GET /world/versions/{version_id}/society/comparisons/{comparison_id}/runs/{run_id}` | One run of one arm on one seed |
 | `GET /world/versions/{version_id}/flight` | The birds a saved version's objects host, as steps of their flight |
+| `GET`, `PUT /world/versions/{version_id}/clock` | Which timeline the version's people, traffic and birds run on and where it stands; couple them, once, to the people's minutes ([world clock](../world-clock-contract.md)) |
+| `GET /world/versions/{version_id}/clock/events` | The clock's receipts, newest first |
+| `GET /world/versions/{version_id}/clock/verify` | Replay a coupled version's minutes from what was stored and check them, calling no model |
+
+In a coupled version a step may answer `409 clock_lead_exhausted` while its traffic catches up,
+and a step or a playback change may pin the clock's revision (`base_clock_revision`).
 
 A comparison started here is played by the server off the request, within the bound its owner
 stated; a local command defines and runs one the same way

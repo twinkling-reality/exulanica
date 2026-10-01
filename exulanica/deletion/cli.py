@@ -77,13 +77,7 @@ def main(argv: list[str] | None = None, stream: Any = None) -> int:
     # The purge identity's stores: on an object store, built from its own credentials, which no
     # runtime process holds.
     stores = purging_content_stores(data_dir=args.data_dir)
-    worker = PurgeWorker(
-        Database(url=url),
-        stores.blobs,
-        workspaces,
-        limit_per_pass=args.limit,
-        material_stores=stores.materials,
-    )
+    worker = PurgeWorker.over(Database(url=url), stores, workspaces, limit_per_pass=args.limit)
     outcome = worker.drain()
 
     if outcome.blocked is not None:

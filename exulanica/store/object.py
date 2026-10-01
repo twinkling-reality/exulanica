@@ -78,7 +78,7 @@ from exulanica.store.base import (
     PurgeAuthorization,
     PutResult,
 )
-from exulanica.store.namespaces import WorkspaceStores
+from exulanica.store.namespaces import SHARED_NAMESPACES, WORKSPACE_NAMESPACES, WorkspaceStores
 from exulanica.store.sigv4 import (
     EMPTY_PAYLOAD_SHA256,
     RequestSigner,
@@ -1712,12 +1712,17 @@ def abort_stale_uploads(requests: ObjectRequests, prefix: str, *, before: dateti
 
     A process killed mid-upload leaves its parts on the endpoint, and those parts are bytes of a
     photograph that no key names and no purge reaches. Only keys with this store's shape under
-    ``prefix`` are touched; anything else in the bucket is somebody else's. Returns how many were
-    abandoned.
+    ``prefix`` are touched: a registered namespace, with its workspace for a per-workspace one,
+    then the layout ``key_for`` writes. Anything else in the bucket is somebody else's. Returns how
+    many were abandoned.
     """
+    namespaces = [re.escape(name) for name in SHARED_NAMESPACES] + [
+        f"{re.escape(name)}/[0-9a-f]{{32}}" for name in WORKSPACE_NAMESPACES
+    ]
     shape = re.compile(
         re.escape(prefix)
-        + r"(?:blobs|tiles|materials/[0-9a-f]{32})/sha-256/[0-9a-f]{2}/[0-9a-f]{2}/[0-9a-f]{64}"
+        + f"(?:{'|'.join(namespaces)})"
+        + r"/sha-256/[0-9a-f]{2}/[0-9a-f]{2}/[0-9a-f]{64}"
     )
     aborted = 0
     # Aborting while listing is safe: the next page starts after the markers of the last one.

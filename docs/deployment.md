@@ -160,14 +160,27 @@ checks, because holding a digest is not permission to read.
 ### 4.1 Local directories, the default
 
 With `EXULANICA_STORE_KIND` unset or `local`, the store is directories under `EXULANICA_DATA_DIR`
-(`exulanica/store/local.py`): `blobs/`, shared by every workspace; `materials/<workspace>/`, one
-namespace per workspace for its bakes; and `tiles/`. The default is `.exulanica/local`; the image
-sets `/var/lib/exulanica`, and `compose.yaml` mounts the `media` volume there for the API and both
-workers. Processes on separate hosts cannot share it.
+(`exulanica/store/local.py`), one for each namespace:
+
+- `blobs/`: shared by every workspace, so two people who import the same photograph hold one
+  object.
+- `tiles/`: baked tiles, one store for everybody, because a tile is a pure function of public
+  inputs.
+- `materials/<workspace>/`: each workspace's material bakes.
+
+`<workspace>` is the workspace id as 32 lower-case hex digits. These names are stable: each is a
+directory here, a segment of every object key in 4.2 and the name a backup set records, so renaming
+one would orphan what is stored under it. `exulanica/store/namespaces.py` registers every namespace
+once. The stores a process builds, `ContentStores.namespaces()` (every namespace by these names,
+for backup and restore), the sweep of unfinished writes and the object store's check of which
+uploads are its own all read that registry, so a new namespace needs no other change to be reached.
+
+The default is `.exulanica/local`; the image sets `/var/lib/exulanica`, and `compose.yaml` mounts
+the `media` volume there for the API and both workers. Processes on separate hosts cannot share it.
 
 ### 4.2 An S3-compatible bucket for several hosts
 
-With `EXULANICA_STORE_KIND=object`, the same three namespaces are key prefixes in one bucket
+With `EXULANICA_STORE_KIND=object`, the same namespaces are key prefixes in one bucket
 (`exulanica/store/object.py`), so processes on separate hosts share them. An object's key is the
 optional prefix followed by the path the local store would use,
 `<prefix>/blobs/sha-256/<aa>/<bb>/<hex>`. Rows record the key without the prefix and namespace,

@@ -4,8 +4,9 @@ Status: **TRAFFIC V1, SERVED FOR A BAKED CITY AND FOR A SAVED TOWN**. `GET /tile
 drives a baked city's streets on shared real time and the development page draws its vehicles on the
 tile it walks; `GET /world/versions/{version_id}/traffic` drives the streets a saved world's own
 records state, and the application draws them in a town a person made
-([Served traffic](#served-traffic)). Nothing feeds traffic the society's crossings, and nothing
-reads its events.
+([Served traffic](#served-traffic)). A saved world whose clock is coupled feeds its traffic the
+crossings its society records ([world clock](world-clock-contract.md)); a legacy world's traffic,
+and a baked city's, is fed none.
 
 In this simulation, cars, vans, buses and bicycles drive a generated city's streets second by second: they keep their lanes, stop at stop lines, take turns at junctions by the junction's rule,
 wait for people on crosswalks, and park. The same inputs always give the same bytes. This document
@@ -28,6 +29,7 @@ draws a vehicle from.
   - [The page's reader](#the-pages-reader)
 - [Catalogs](#catalogs)
 - [Served traffic](#served-traffic)
+- [Signal comparisons](#signal-comparisons)
 - [The layer](#the-layer)
 - [Limits of v1](#limits-of-v1)
 - [Where to look](#where-to-look)
@@ -58,7 +60,7 @@ A vehicle here is always synthetic. No record, event or presentation of it is ev
 | Seed | A string. Its SHA-256 is written into the state; the only draws are the fleet's placement, body family and colour at the start. |
 | Fleet | A count per vehicle class. Vehicles start parked in spaces that admit their class. |
 | Trip requests | `exulanica.traffic-trip-request/v1`: a vehicle, the second it wants to leave, and a destination, either a parking space by record identity or a society destination by its `destination_id` and frontage `street_segment_ordinal`. Numbered from 1 with no gaps. |
-| Crossing feed | `exulanica.traffic-crossing-feed/v1`: which crosswalk each walker steps onto, when, and for how long, as the living society's `route_progressed` events record crossings; nothing produces a feed from them. Each feed states the last second it covers. |
+| Crossing feed | `exulanica.traffic-crossing-feed/v1`: which crosswalk each walker occupies, from when and for how long. In a coupled world it is projected, per episode, from the crossing occupancy its society's minutes record ([world clock](world-clock-contract.md#the-crossing-feed)); a legacy world's feed is empty. Each feed states the last second it covers. |
 
 A step at second `t` refuses to run unless the crossing feeds cover `t + 60`: traffic runs one society
 minute behind, so no pedestrian can step onto a crosswalk a vehicle has already committed to. A
@@ -157,8 +159,9 @@ junction:
   second; every lane connection of the junction goes with the phase of the street it comes from.
 - **Walks.** A crosswalk of the junction's region walks beside the phase of the street it does not
   cross, the pairing the plan's intervals state (a walk shows while one phase is green), so a
-  straight movement never crosses a walking crosswalk. Each crosswalk is a society crossing
-  (`crossing:<segment ordinal>:<offset>`), so the society's walkers are named on the same crossings.
+  straight movement never crosses a walking crosswalk. Each crosswalk keeps its crossing record's
+  identity, which the society's walkers name, beside the society crossing id the crossing feed names
+  (`crossing:<segment ordinal>:<offset>`); the world clock's projection maps one to the other.
 - **What it is.** The signal is traffic's own control, not a city record: the junction takes the
   one right-of-way policy whose rule is `signal`, its approaches that policy's control, and its
   crosswalks become signalised, all in the road input the compiler reads. Its identity is the city's
@@ -480,7 +483,8 @@ the movement package and run the roads module, `exulanica-movement/roads/v1`
   digest, its city identity the receipt's subject identity and its grammar version the receipt's, so
   every version of one world shares its roads.
 - **The clock.** Second `n` is the `n`th second since the Unix epoch, so every page showing a city
-  shows its vehicles in the same places.
+  shows its vehicles in the same places. A saved world whose clock is coupled keys its traffic by
+  its own traffic timeline instead ([world clock](world-clock-contract.md#coupled-traffic)).
 - **The fleet**, by rule from the home places the derived network holds: in every parking kind, the
   roads module's `fleet_share_permille` of its places, divided among the classes the kind admits in
   the catalog's order, any remainder one each to the first. No rule gives a bus a route or a layover, so no
@@ -503,7 +507,12 @@ the movement package and run the roads module, `exulanica-movement/roads/v1`
   and verifies their digests without asking a model; a missing segment is unavailable by name.
   A saved-world traffic window made from sealed segments names each segment's world, version,
   second interval, accepted choice sequence and first active second when present, plus the
-  decision, frame and continuation digests (`sealed_segments`).
+  decision, frame and continuation digests (`sealed_segments`). A model-controlled signal that
+  falls more than one episode behind the wall clock leaves the minutes it missed unsealed, records
+  the gap once as a clock receipt and starts again at the current episode. A coupled world's
+  traffic is sealed minute by minute after its society commits the minute after it, from the
+  crossing occupancy it recorded, and read only from those sealed minutes
+  ([world clock](world-clock-contract.md#coupled-traffic)).
 
 `GET /tiles/traffic?world_seed=<64 hex>&from_second=<n>&seconds=<1 to 60>` answers a window,
 `exulanica.traffic-window/v2`: for every vehicle its class, body family, colour and dimensions and,
@@ -532,7 +541,84 @@ does not hold with 404 `unknown_reference`, a world that states no roads with 40
 `roads_world_too_large`, a world whose receipt no longer generates its records with 409 by the
 reader's name (`generated_world_grammar_changed`, `generated_world_catalogs_changed`,
 `generated_world_output_changed` or `generated_world_unreadable`), and an unavailable worker with
-503 `traffic_worker_unavailable`. The application draws the answer in the saved town.
+503 `traffic_worker_unavailable`. The application draws the answer in the saved town. A version
+whose clock is coupled answers `exulanica.traffic-window/v3` from its sealed minutes instead:
+`timebase: "world"`, `crossings_fed` true, `sealed_minutes`, and a second not yet sealed refused
+409 `traffic_not_yet_sealed` ([world clock](world-clock-contract.md#coupled-traffic)); the page's
+reader refuses that profile by name rather than reading its seconds as Unix seconds.
+
+## Signal comparisons
+
+A signal comparison asks how a model deciding a town's signals compares with the signal plan's fixed
+timing, over episodes of the town's own roads (`exulanica/world/signal_comparison.py`,
+`exulanica/api/signal_comparison_runner.py`, migration 0132). It reads a saved version's roads and
+nothing else of the live world, and writes nothing the live world reads: not its traffic, its signal
+choices or its sealed minutes.
+
+- **What it compares.** A definition records the version's roads as they are, by version and
+  digest, with the city identity and grammar version; the timebase, legacy episodes with
+  `crossings_fed: false`, so vehicles do not see walkers; the group of signals its arms decide for,
+  every signal of the roads unless named; the arms; the seeds, by digest; the protocol and seed
+  catalogs under `assets/catalogs/traffic-comparison/`; and the junction signal role's contract. The
+  arm `fixed` is the plan's fixed timing, asks nobody and is the measure's baseline; `model_a` and
+  an optional `model_b` are models asked as the live controller asks an owner's chosen model; an
+  optional `model_a_again` runs the first model again as a control. Signals outside the group keep
+  fixed timing in every arm.
+- **A run.** One arm on one seed plays one episode. The seed names the episode by a SHA-256 of its
+  text under a fixed prefix, so the digest a catalog commits a held-out seed by does not reveal its
+  episode. Every arm of one seed starts from the same departures and dwell draws; where a vehicle
+  goes depends on the places free when it leaves, and it is called home a dwell after it arrives,
+  so its later trips follow each arm's own traffic. A model run is asked at every choice point the
+  step offers its group, as the live controller is: an accepted keep extends that green by one
+  second, and a switch, a refusal or a late, failed or unanswered ask lets it end as the plan does.
+  Each point's request and receipt is appended in its own transaction before the episode goes on,
+  so a host that stops never loses an answer it paid for. A seed's fixed run plays before its model
+  runs, and a model run whose fixed run failed does not start (`anchor_failed`).
+- **The measure.** The mean delay per entry at the group's signalled junctions, in milliseconds:
+  the exact fraction of the step's own terms (`exulanica.signal-comparison-terms/v1`), each group
+  signal's entries into its junction and their summed delay. Lower is less waiting. Trips requested,
+  arrived, blocked by reason and unfinished, door-to-door seconds and vehicles away at the episode's
+  end are reported beside it, never folded into it, and it never shares a scale with a person
+  comparison's score. Each run also states what its model was asked: points, kept and let end,
+  receipts by status and reason, cost and each ask's latency.
+- **Differences and verdict.** Each registered difference (each model less fixed timing, and the
+  first model less the second where there are two) is paired over the seeds every arm measured and
+  read by the person comparison's claim module (percentile bootstrap, Holm), never judged here: a
+  comparison on development seeds is `not_judged` with `development_seeds`. No benefit of a model
+  over fixed timing has been measured, and none is claimed.
+- **Replay.** A completed run plays again from its stored requests and receipts with no model
+  client, held to the stored bytes, the episode's end and its measure; a difference is
+  `run_replay_mismatch`. It plays the whole episode in the request, so its cost grows with the
+  episode and the run's choice points; no gated measurement of that cost exists.
+- **Failures.** A run fails by the person runner's codes, keeping every receipt, or by
+  `roads_changed` where the version's roads no longer digest to the roads the comparison recorded,
+  checked before the run plays. A choice point the model answers late, wrongly or not at all is the
+  plan's switch, with its receipt saying why; only the host ends a run.
+- **Start, cost and cancellation.** A start is recorded and played as a comparison of people's is
+  ([comparisons of models](society-experiments.md#comparisons-of-models)): one unfinished start a
+  world, a host's comparison worker claiming it under the same lease, presumption and closing
+  rules, a bound its owner states and a cancellation that stops it before its next ask. The most it
+  can cost is derived: a signal has at most one choice point at each green's minimum and one at
+  each extension the plan allows, for each of the plan's greens in an episode, and each ask costs
+  at most its model's bound. No measurement of what a signal comparison typically costs exists, so
+  none is served. A host whose lease ran out is presumed to have spent one ask of the dearest of its
+  open model runs.
+
+`GET /world/versions/{version_id}/traffic/comparisons?world_id=<world>` lists a version's signal
+comparisons, newest first, with how far their runs got and their starts. `GET .../plan` names the
+town's signals, the models offered with why one cannot be asked here and the development seeds held
+and, for `model=<provider>/<model id>` (once or twice), `seeds`, `control` and `signal` (repeated,
+for a named group), the runs a start would plan and the most it could cost, or its refusal; it
+plays no episode. `GET .../{comparison_id}` serves per seed and arm each run's status, measure,
+terms and asking, with each unfinished run's progress, the differences and the verdict.
+`GET .../{comparison_id}/runs/{run_id}` serves a run's outcome and every choice point's receipt;
+`GET .../runs/{run_id}/replay` replays it. These require `world.read`, ask no model and return no
+seed. `POST .../comparisons` (`comparison_id`, `models`, `control`, `seeds`, `signals`,
+`bound_usd`) starts one, and `POST .../{comparison_id}/cancel` cancels it; both require
+`world.write` and `model.invoke`, and the cancel asks no model. A start is refused by name
+(`START_REFUSALS` in `exulanica/api/signal_comparison_start.py`); an id the workspace does not hold,
+or a credential that may not use the route, is answered 404 `unknown_reference`; roads are refused
+as the saved world's traffic read refuses them.
 
 ## The layer
 
@@ -540,9 +626,10 @@ reader's name (`generated_world_grammar_changed`, `generated_world_catalogs_chan
 layers, and a forbidden contract keeps it from `psycopg`, the database and store, the evidence spine,
 ingest, migrations, identity, selection, reconstruction, capture, the world package, models, the API,
 `numpy` and `torch`. It may import the grammar, because the road records are grammar records, and only
-`exulanica/traffic/city_roads.py` and `city_derivation.py` do. A composition above both would pass the
-society's crossing events down as data; none does. A test holds that no other traffic module imports
-the city grammar, so a new city version changes those two files.
+`exulanica/traffic/city_roads.py` and `city_derivation.py` do. The world clock
+(`exulanica/world/world_clock.py`), above both, passes a coupled world's crossing occupancy down as
+data. A test holds that no other traffic module imports the city grammar, so a new city version
+changes those two files.
 
 ## Limits of v1
 
@@ -563,9 +650,9 @@ the city grammar, so a new city version changes those two files.
   the first free space on that segment, in identity order, that admits its class, not the nearest.
 - **Served from generated streets only.** A generated city's stored tiles and a saved town's own
   records are the road sources, and no other kind of world states roads. Model-controlled traffic
-  stores sealed continuations and decision receipts, not every frame. Nothing feeds traffic the
-  society's crossings or reads its events. A vehicle never
-  waits for a walker the page shows.
+  stores sealed continuations and decision receipts, not every frame. A legacy world's traffic is
+  fed no crossing, so its vehicles never wait for a walker the page shows; a coupled world's yield
+  to every walker its society records on a crossing ([world clock](world-clock-contract.md)).
 - **Connections are derived only where legs meet along the plan axes**, spaces only as kerbside
   bays and cycle stands, and signals only where the placement names a junction, with no signal head
   a renderer could draw from records; no loading bay or bus layover is derived.
@@ -583,10 +670,12 @@ the city grammar, so a new city version changes those two files.
 | `exulanica/traffic/checks.py` | The transition checker. |
 | `exulanica/traffic/metrics.py`, `presentation.py` | The metrics report and the presentation records. |
 | `exulanica/world/traffic_host.py`, `traffic_episodes.py`, `episode_worker.py` | The road source, clock, fleet, trip rule, episodes, windows and their worker. |
+| `exulanica/world/world_clock.py`, `exulanica/api/traffic_signal_controller.py` | A coupled world's crossing feed, and its sealed traffic minutes. |
 | `exulanica/api/routes/tiles.py` | `GET /tiles/traffic`. |
 | `exulanica/api/routes/world_traffic.py`, `exulanica/api/traffic_answer.py` | `GET /world/versions/{version_id}/traffic`, and the refusal statuses and vehicle encoding both routes share. |
+| `exulanica/world/signal_comparison*.py`, `exulanica/api/signal_comparison_*.py`, `exulanica/api/routes/signal_comparisons.py` | Signal comparisons: a run, its records and result, its runner, start and routes. |
 
-Tests are `tests/test_traffic_*.py`, `tests/test_tile_traffic_route.py` and `tests/test_world_traffic_route.py`, with the test network in `tests/traffic_network_fixture.py` and
+Tests are `tests/test_traffic_*.py`, `tests/test_tile_traffic_route.py`, `tests/test_world_traffic_route.py` and `tests/test_signal_comparison_*.py`, with the test network in `tests/traffic_network_fixture.py` and
 its scenarios in `tests/traffic_scenarios.py`. `tests/test_traffic_city_roads.py` also reads the city
 vocabulary's fixture tile, `tests/fixtures/city-v2/tile-document.json`, and records what traffic
 refuses in it and why.

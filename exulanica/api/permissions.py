@@ -388,15 +388,18 @@ _WORLD_READS_WITH_A_MODEL: Final = _every(
 )
 
 #: World writes that commit the world to a model: a choice of the model that runs a world's
-#: people commits the world's host to asking it, and a comparison started from the application
-#: commits it to asking the models compared, within the bound its owner stated. Cancelling a
-#: comparison takes the same grants as starting one, so nobody else ends an owner's paid run.
+#: people commits the world's host to asking it, and a comparison started from the application,
+#: of who decides for a world's people or for a town's signals, commits it to asking the models
+#: compared, within the bound its owner stated. Cancelling a comparison takes the same grants as
+#: starting one, so nobody else ends an owner's paid run.
 _WORLD_WRITES_WITH_A_MODEL: Final = _every(
     _requires(_P.WORLD_WRITE, _P.MODEL_INVOKE),
     "POST /world/versions/{version_id}/models/{role_key}",
     "POST /world/versions/{version_id}/society/comparisons",
     "POST /world/versions/{version_id}/society/comparisons/{comparison_id}/cancel",
     "POST /world/versions/{version_id}/society/models",
+    "POST /world/versions/{version_id}/traffic/comparisons",
+    "POST /world/versions/{version_id}/traffic/comparisons/{comparison_id}/cancel",
 )
 
 #: The only way new photographs arrive.
@@ -521,6 +524,9 @@ _WORLD_READS: Final = _every(
     "GET /world/versions/{version_id}/characters/{subject_kind}/{subject_id}/appearance",
     "GET /world/versions/{version_id}/characters/{subject_kind}/{subject_id}/appearance/families",
     "GET /world/versions/{version_id}/characters/{subject_kind}/{subject_id}/appearance/history",
+    "GET /world/versions/{version_id}/clock",
+    "GET /world/versions/{version_id}/clock/events",
+    "GET /world/versions/{version_id}/clock/verify",
     "GET /world/versions/{version_id}/flight",
     "GET /world/versions/{version_id}/models",
     "GET /world/versions/{version_id}/society",
@@ -542,6 +548,11 @@ _WORLD_READS: Final = _every(
     "GET /world/versions/{version_id}/society/replay",
     "GET /world/versions/{version_id}/tiles/{baked_tile_id}/bytes",
     "GET /world/versions/{version_id}/traffic",
+    "GET /world/versions/{version_id}/traffic/comparisons",
+    "GET /world/versions/{version_id}/traffic/comparisons/plan",
+    "GET /world/versions/{version_id}/traffic/comparisons/{comparison_id}",
+    "GET /world/versions/{version_id}/traffic/comparisons/{comparison_id}/runs/{run_id}",
+    "GET /world/versions/{version_id}/traffic/comparisons/{comparison_id}/runs/{run_id}/replay",
     "GET /worlds",
     "GET /worlds/capabilities",
     "GET /worlds/recipes",
@@ -594,6 +605,7 @@ _WORLD_WRITES: Final = _every(
     "POST /world/versions/{version_id}/arrangements/preview",
     "PUT /world/versions/{version_id}/characters/{subject_kind}/{subject_id}/appearance",
     "POST /world/versions/{version_id}/characters/{subject_kind}/{subject_id}/appearance/reset",
+    "PUT /world/versions/{version_id}/clock",
     "POST /world/versions/{version_id}/compositions/apply",
     "POST /world/versions/{version_id}/compositions/preview",
     "POST /world/versions/{version_id}/environment-instances",

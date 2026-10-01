@@ -271,10 +271,12 @@ thread instead, the same measurement found 136 to 197 ms beside cold reads of 0.
 the freeze, the API process's resident memory 10 s after startup was 184,464 to 203,056 KiB, and
 189,008 to 203,392 KiB without it, three starts each.
 
-Nothing is stored. The flight keeps shared real time: step n is the nth 100 ms since the Unix epoch,
-and birds keep flying at normal speed while the people are paused or sped up. Every page showing a
-world shows its birds in the same places at the same moment, and one computation of an episode serves
-them all. The page's first read names no step, and its copy of the clock starts where the answer
+Nothing is stored. Under a legacy clock the flight keeps shared real time: step n is the nth 100 ms
+since the Unix epoch, and birds keep flying at normal speed while the people are paused or sped up.
+Every page showing a world shows its birds in the same places at the same moment, and one computation
+of an episode serves them all. A world whose clock is coupled reads the same flight on its own
+timeline, `exulanica.flight-window/v2`, so its birds stop when its people stop
+([world clock](world-clock-contract.md#coupled-flight)). The page's first read names no step, and its copy of the clock starts where the answer
 says the server's was; every later answer sets it again when the two differ by more than two steps,
 as after a sleep that stopped the page's own clock. It reads the next window while less than 30
 seconds of served steps are left, from where the served steps end or, when its clock has passed
@@ -318,7 +320,9 @@ not in storage is named in `data-flight-undrawn` and not drawn.
 ([`exulanica/traffic`](../exulanica/traffic), [traffic contract](traffic-contract.md)) compiles from a
 city's street and road records and the connections and spaces it derives from them; its agents are
 the vehicle classes of `assets/catalogs/traffic/vehicle-class.v1.json` with their cited bounds; its
-clock is shared real time, one second a step; and its output is `exulanica.traffic-window/v2`, the
+clock is shared real time, one second a step, under a legacy world clock, and a coupled world's own
+traffic timeline under a coupled one ([world clock](world-clock-contract.md)); and its output is
+`exulanica.traffic-window/v2`, or `exulanica.traffic-window/v3` for a coupled world, the
 traffic presentation frames of a window's seconds grouped by vehicle, and what each signal shows each
 second. Its step is the simulation's
 `advance_traffic`, which this package may not import, so the step runs in its host,
@@ -340,8 +344,9 @@ The host, its road source, fleet and trip rules, the route and the page's reader
 contract's ([served traffic](traffic-contract.md#served-traffic)). Its episodes are computed in a
 worker process by the episode worker the flight's serving uses
 ([`episode_worker.py`](../exulanica/world/episode_worker.py)). A saved town's own roads are
-served as a baked city's are. The society's crossings are not fed to traffic, and vehicles keep
-driving at normal speed while the people are paused or sped up.
+served as a baked city's are. Under a legacy clock the society's crossings are not fed to traffic,
+and vehicles keep driving at normal speed while the people are paused or sped up; under a coupled
+clock both follow the society's minutes.
 
 ## A model choosing for a flyer
 
@@ -357,8 +362,8 @@ viewers could share them.
 
 ## What movement modules do not do
 
-- Flight is not stored. Its clock is shared real time, not the society's minute: birds keep flying
-  at normal speed while the people are paused or sped up.
+- Flight is not stored. Under a legacy clock it keeps shared real time, not the society's minute:
+  birds keep flying at normal speed while the people are paused or sped up.
 - Flyers do not avoid each other; two can pass through the same point in the air. A perch holds one
   flyer at a time.
 - Flyers do not see people. They keep above the society's walker capsule by their band, and every
@@ -368,8 +373,8 @@ viewers could share them.
   or for a world made from photographs, which has no authored scene.
 - The flight renderer draws a kind's body and one wing turned for each side; there is no skeleton or
   animation clip.
-- Roads are served for a baked city on the development preview only, and vehicles do not see people:
-  no walker's crossing is fed to traffic.
+- Vehicles see people only in a world whose clock is coupled, and there only as the crossing
+  occupancy the society records: walkers never see vehicles.
 
 ## Implementation and evidence
 

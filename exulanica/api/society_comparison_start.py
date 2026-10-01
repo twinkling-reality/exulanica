@@ -156,6 +156,8 @@ START_REFUSALS: Final = {
     "group_empty": 422,
     "group_person_unknown": 422,
     "seeds_out_of_range": 422,
+    # The input it freezes: a sequence the society holds no input at.
+    "input_not_in_society": 422,
     # The bound: above the most the comparison can cost, or more than this server's model budget
     # has left beside the part its decision contract keeps for other work.
     "bound_out_of_range": 422,

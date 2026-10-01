@@ -1,0 +1,114 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "artifacts": [
+      {
+        "byte_size": 25388,
+        "is": "the script that writes this pre-registration and runs the held-out towns",
+        "path": "docs/evaluation/artifacts/2026-09-30-world-clock-crossings-preregistration/measure_world_clock_crossings.py.txt",
+        "sha256": "f57033b9f3ee5fc6631892cae814394ab864af3f405c19f4d355264b5afa97b5"
+      }
+    ],
+    "design": {
+      "envelope": {
+        "gap_seconds": 62,
+        "rule": "a crossing is inside the envelope over a span when every window of window_seconds starting in it holds a run of at least gap_seconds with no walker on the crossing; a vehicle's wait for walkers (consecutive seconds whose wait reason is pedestrian_due) is inside the envelope when every crossing of the town is inside it over the span from window_seconds before the wait began to the wait's last second",
+        "wait_bound_seconds": 240,
+        "window_seconds": 180
+      },
+      "pass_rules": {
+        "P1": "no checker violation of any kind in any town or stress run",
+        "P2": "every wait for walkers inside the envelope lasts at most wait_bound_seconds, and no trip is blocked for pedestrian_due whose wait began inside the envelope",
+        "P3": "every crossing a town's walkers occupy is a band of its roads",
+        "excluded": "a held-out identity the generator refuses is excluded and named, never replaced",
+        "reported_not_judged": [
+          "waits and blocked trips outside the envelope",
+          "the stress arm's waits and blocked trips"
+        ]
+      },
+      "question": "On held-out generated towns whose clock is coupled, does traffic driven by the crossing occupancy the living town records ever let a vehicle's body meet a crossing a walker is on, and inside a declared demand envelope do vehicles waiting for walkers go on within a bound?",
+      "society": {
+        "engine": "exulanica-society/v5",
+        "measured_minutes": 120,
+        "seed_rule": "world_society_seed of the town's world id in a fixed evaluation workspace",
+        "starts": "06:00",
+        "warm_minutes": 120,
+        "workspace": "94bcd402-cccc-5d68-b355-a2d061ed7882"
+      },
+      "stress": {
+        "bands": "every band of the town's roads",
+        "episode": "the era's first",
+        "from_local_second": 60,
+        "identities_per_preset": 2,
+        "occupied_seconds": 15,
+        "period_seconds": 20
+      },
+      "towns": [
+        {
+          "preset": "small_town",
+          "world_id": "world:generated:w7-held-out-small_town-1"
+        },
+        {
+          "preset": "small_town",
+          "world_id": "world:generated:w7-held-out-small_town-2"
+        },
+        {
+          "preset": "small_town",
+          "world_id": "world:generated:w7-held-out-small_town-3"
+        },
+        {
+          "preset": "small_town",
+          "world_id": "world:generated:w7-held-out-small_town-4"
+        },
+        {
+          "preset": "small_town",
+          "world_id": "world:generated:w7-held-out-small_town-5"
+        },
+        {
+          "preset": "small_town",
+          "world_id": "world:generated:w7-held-out-small_town-6"
+        },
+        {
+          "preset": "market_town",
+          "world_id": "world:generated:w7-held-out-market_town-1"
+        },
+        {
+          "preset": "market_town",
+          "world_id": "world:generated:w7-held-out-market_town-2"
+        },
+        {
+          "preset": "market_town",
+          "world_id": "world:generated:w7-held-out-market_town-3"
+        },
+        {
+          "preset": "market_town",
+          "world_id": "world:generated:w7-held-out-market_town-4"
+        },
+        {
+          "preset": "market_town",
+          "world_id": "world:generated:w7-held-out-market_town-5"
+        },
+        {
+          "preset": "market_town",
+          "world_id": "world:generated:w7-held-out-market_town-6"
+        }
+      ],
+      "traffic": {
+        "episodes": 6,
+        "judge": "exulanica.traffic.checks.TransitionChecker over every transition, against the feeds",
+        "lookahead_seconds": 60,
+        "timeline_origin_second": 1200000
+      }
+    },
+    "kind": "exulanica.world-clock-crossings-preregistration/v1",
+    "registered_utc": "2026-09-30T20:17:45+00:00",
+    "script_sha256": "f57033b9f3ee5fc6631892cae814394ab864af3f405c19f4d355264b5afa97b5",
+    "tree": {
+      "files": 843,
+      "files_sha256": "958fc0be79527105394690e0d512b945efcf35d6969823de08b5f1465bc4af38",
+      "head": "43446a05e2a709fd6ac84604dd59f7c888ecd02b"
+    },
+    "written_before_any_held_out_run": true
+  },
+  "record_sha256": "da434303a5170b1dce7ffeeaf94578786b55e709dc0ab95bc209a1176ca44db5"
+}

@@ -594,14 +594,20 @@ class SocietyComparisonRunner:
         comparison_id: uuid.UUID,
         body: Mapping[str, Any],
         connection: Any = None,
+        input_seq: int | None = None,
     ) -> dict[str, Any]:
         """Record ``body`` as a comparison of this version's society asking this runner's role,
-        in a transaction of its own, or inside the caller's on ``connection``."""
+        frozen at its newest input or at the earlier stored one ``input_seq`` names, in a
+        transaction of its own, or inside the caller's on ``connection``."""
         self._answering_held(body)
         if connection is None:
             with self.database.session(self.workspace_id) as held:
                 return self.define(
-                    version_id, comparison_id=comparison_id, body=body, connection=held
+                    version_id,
+                    comparison_id=comparison_id,
+                    body=body,
+                    connection=held,
+                    input_seq=input_seq,
                 )
         with connection.transaction():
             return self._repository(connection).define(
@@ -611,6 +617,7 @@ class SocietyComparisonRunner:
                 created_by=self.actor,
                 role=self.decision_role,
                 catalogs=self.catalogs,
+                input_seq=input_seq,
             )
 
     def _answering_held(self, body: Mapping[str, Any]) -> None:

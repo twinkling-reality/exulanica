@@ -42,6 +42,7 @@ from exulanica.store.configured import (
     object_content_stores,
     sweep_incomplete_writes,
 )
+from exulanica.store.namespaces import SHARED_NAMESPACES, WORKSPACE_NAMESPACES
 from exulanica.store.object import (
     BucketGuard,
     ObjectContentAddressedStore,
@@ -317,45 +318,94 @@ def test_a_missing_blob_raises_rather_than_returning_empty(backend):
 # -- key parity and namespaces ---------------------------------------------------------------------
 
 
-def _write_everything(stores: ContentStores, workspaces: list[uuid.UUID]) -> None:
-    for payload in (b"photo one", b"photo two", b""):
-        stores.blobs.put_bytes(payload)
-    for index, workspace in enumerate(workspaces):
-        stores.materials.for_workspace(workspace).put_bytes(b"shared bake")
-        stores.materials.for_workspace(workspace).put_bytes(f"bake {index}".encode())
-    stores.tiles.put_bytes(b"a baked tile")
+def _write_everything(stores: ContentStores, workspaces: list[uuid.UUID]) -> int:
+    """Write into every registered namespace and return how many objects that stored: the empty
+    object in each shared namespace, and in each per-workspace one the same bytes in every
+    workspace beside bytes of that workspace's own."""
+    stored = 0
+    for name in SHARED_NAMESPACES:
+        for payload in (f"{name} one".encode(), f"{name} two".encode(), b""):
+            stored += stores.shared(name).put_bytes(payload).created
+    for name in WORKSPACE_NAMESPACES:
+        for index, workspace in enumerate(workspaces):
+            store = stores.per_workspace(name).for_workspace(workspace)
+            stored += store.put_bytes(b"in every workspace").created
+            stored += store.put_bytes(f"{name} {index}".encode()).created
+    return stored
 
 
 def test_every_object_key_is_the_local_path_under_the_data_directory(runtime, double, tmp_path):
     workspaces = [uuid.uuid4(), uuid.uuid4()]
     data = tmp_path / "data"
-    _write_everything(local_content_stores(data), workspaces)
-    _write_everything(runtime, workspaces)
+    stored = _write_everything(local_content_stores(data), workspaces)
+    assert _write_everything(runtime, workspaces) == stored
     local_paths = sorted(
         path.relative_to(data).as_posix() for path in data.rglob("*") if path.is_file()
     )
     assert [key.removeprefix("exu/") for key in double.stored_keys()] == local_paths
-    assert len(local_paths) == 3 + 2 * 2 + 1
+    expected = 3 * len(SHARED_NAMESPACES) + 2 * 2 * len(WORKSPACE_NAMESPACES)
+    assert len(local_paths) == stored == expected
 
 
 def test_namespaces_keep_workspaces_apart(runtime, double):
     first, second = uuid.uuid4(), uuid.uuid4()
     _write_everything(runtime, [first, second])
     one, two = runtime.materials.for_workspace(first), runtime.materials.for_workspace(second)
-    shared = BlobId.of_bytes(b"shared bake")
+    shared = BlobId.of_bytes(b"in every workspace")
     assert one.key_for(shared) == two.key_for(shared)
     assert f"exu/materials/{first.hex}/{one.key_for(shared)}" in double.stored_keys()
     assert f"exu/materials/{second.hex}/{two.key_for(shared)}" in double.stored_keys()
-    assert set(one.iter_blob_ids()) == {shared, BlobId.of_bytes(b"bake 0")}
+    assert set(one.iter_blob_ids()) == {shared, BlobId.of_bytes(b"materials 0")}
     assert not runtime.blobs.exists(shared) and not runtime.tiles.exists(shared)
     assert sorted(runtime.materials.iter_workspace_ids()) == sorted([first, second])
-    assert sorted(local_workspaces := list(_local_workspace_ids(runtime, first, second))) == sorted(
-        local_workspaces
-    )
 
 
-def _local_workspace_ids(runtime, *workspaces):
-    return workspaces
+@pytest.fixture(params=["local", "object"])
+def either(request, tmp_path, double, location, clock) -> ContentStores:
+    if request.param == "local":
+        return local_content_stores(tmp_path / "data")
+    return _stores(double, location, tmp_path, clock)
+
+
+def test_every_namespace_is_listed_by_the_name_a_backup_records(either):
+    workspaces = sorted([uuid.uuid4(), uuid.uuid4()])
+    _write_everything(either, workspaces)
+    listed = list(either.namespaces())
+    assert [name for name, _store in listed] == [
+        *SHARED_NAMESPACES,
+        *(f"{name}/{workspace.hex}" for name in WORKSPACE_NAMESPACES for workspace in workspaces),
+    ]
+    for name, store in listed:
+        resolved = either.namespace(name)
+        assert resolved is not None, name
+        assert set(resolved.iter_blob_ids()) == set(store.iter_blob_ids()) != set(), name
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "",
+        "unregistered",
+        "materials",
+        "materials/",
+        "blobs/" + "a" * 32,
+        "materials/" + "A" * 32,
+        "materials/" + "a" * 31,
+        "materials/" + "a" * 32 + "/sha-256",
+        f"materials/{uuid.UUID(int=1)}",
+    ],
+)
+def test_a_name_no_namespace_registers_resolves_to_nothing(either, name):
+    assert either.namespace(name) is None
+
+
+def test_a_name_resolves_without_a_request_so_an_empty_target_can_be_restored(runtime, double):
+    workspace = uuid.uuid4()
+    before = len(double.log)
+    store = runtime.namespace(f"materials/{workspace.hex}")
+    assert store is not None and len(double.log) == before
+    assert store.put_bytes(b"restored into an empty store").created
+    assert list(runtime.materials.iter_workspace_ids()) == [workspace]
 
 
 def test_local_workspace_namespaces_are_listed(tmp_path):

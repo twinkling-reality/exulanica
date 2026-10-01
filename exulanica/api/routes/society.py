@@ -41,6 +41,7 @@ from exulanica.world.society_repository import (
     InvalidEventCursor,
     SocietyRepository,
 )
+from exulanica.world.world_clock import ClockRefused
 from exulanica.world.worlds import require_world
 
 router = APIRouter(prefix="/world", tags=["society"])
@@ -69,6 +70,13 @@ class AdvanceSocietyBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
     base_tick: Annotated[int, Field(ge=0)]
     base_state_sha256: Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
+
+
+class StepSocietyBody(AdvanceSocietyBody):
+    """A minute, against the state the person was shown and, when pinned, the world clock's
+    revision (``GET .../clock``): another revision is refused, 409 ``stale_clock_revision``."""
+
+    base_clock_revision: Annotated[int, Field(ge=0)] | None = None
 
 
 class PresenceBody(AdvanceSocietyBody):
@@ -122,6 +130,9 @@ def _call(operation: Callable[[], Any], *, invalid_status: int = 422) -> Any:
         return JSONResponse(status_code=409, content={"code": exc.code, "detail": exc.detail})
     except InvalidEventCursor as exc:
         return JSONResponse(status_code=422, content={"code": exc.code, "detail": str(exc)})
+    except ClockRefused as exc:
+        # A coupled world's society waits for its traffic (clock_lead_exhausted): retry later.
+        return JSONResponse(status_code=409, content={"code": exc.code, "detail": exc.detail})
     except ValueError as exc:
         return JSONResponse(
             status_code=invalid_status,
@@ -255,7 +266,7 @@ def society(
 @router.post("/versions/{version_id}/society/steps")
 def advance_society(
     version_id: uuid.UUID,
-    body: AdvanceSocietyBody,
+    body: StepSocietyBody,
     connection: ScopedConnection,
     session: CurrentSession,
     request: Request,
@@ -264,7 +275,10 @@ def advance_society(
     return _call(
         lambda: served_snapshot(
             _repository(connection, session, request, world_id).advance(
-                version_id, base_tick=body.base_tick, base_state_sha256=body.base_state_sha256
+                version_id,
+                base_tick=body.base_tick,
+                base_state_sha256=body.base_state_sha256,
+                base_clock_revision=body.base_clock_revision,
             )
         ),
         invalid_status=409,

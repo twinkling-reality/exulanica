@@ -57,6 +57,11 @@ from typing import Any, Final
 import psycopg
 
 from exulanica.api.decision_host import share_kept
+from exulanica.api.signal_comparison_runner import SignalComparisonRunner
+from exulanica.api.signal_comparison_start import (
+    signal_comparison_cost,
+    stopped_signal_host_usd,
+)
 from exulanica.api.society_comparison_runner import (
     BOUND_BEFORE_SEED,
     BOUND_SPENT,
@@ -117,10 +122,15 @@ class SocietyComparisonWorker:
         manifest: Manifest,
         workspaces: Iterable[uuid.UUID],
         keeps_share: bool,
+        signal_runner_for: Callable[[uuid.UUID, str, uuid.UUID], SignalComparisonRunner]
+        | None = None,
     ) -> None:
         self.database = database
         #: The runner of a workspace and world, as the actor who started the comparison.
         self.runner_for = runner_for
+        #: The runner of a signal comparison, for a host that plays those too: the same claim,
+        #: lease and closing rules, over migration 0132's start.
+        self.signal_runner_for = signal_runner_for
         self.client = client
         self.manifest = manifest
         self.workspaces = tuple(sorted(frozenset(workspaces), key=str))
@@ -147,13 +157,21 @@ class SocietyComparisonWorker:
                 stop.wait(poll_seconds)
 
     def run_once(self, workspace: uuid.UUID, stop: threading.Event | None = None) -> bool:
-        """Claim the workspace's oldest unfinished start and play it as far as this host can;
-        False when there was none to claim."""
+        """Claim the workspace's oldest unfinished start, of a comparison of people's deciders
+        and then of a town's signals, and play it as far as this host can; False when there was
+        none to claim."""
         with self.database.session(workspace) as connection:
             claim = SocietyComparisonStarts(connection, workspace).claim()
+        if claim is not None:
+            self._play(claim, stop or threading.Event())
+            return True
+        if self.signal_runner_for is None:
+            return False
+        with self.database.session(workspace) as connection:
+            claim = SocietyComparisonStarts(connection, workspace, "signal").claim()
         if claim is None:
             return False
-        self._play(claim, stop or threading.Event())
+        self._play_signals(claim, stop or threading.Event())
         return True
 
     def _starts(self, claim: ComparisonClaim) -> Callable[..., bool]:
@@ -162,7 +180,7 @@ class SocietyComparisonWorker:
 
         def change(name: str, **kwargs: object) -> bool:
             with self.database.session(claim.workspace_id) as connection:
-                starts = SocietyComparisonStarts(connection, claim.workspace_id)
+                starts = SocietyComparisonStarts(connection, claim.workspace_id, claim.kind)
                 return bool(getattr(starts, name)(claim, **kwargs))
 
         return change
@@ -317,19 +335,112 @@ class SocietyComparisonWorker:
     def _cancelled(self, claim: ComparisonClaim) -> bool:
         """Whether the claimed comparison was cancelled, read in a short session of its own."""
         with self.database.session(claim.workspace_id) as connection:
-            facts = ComparisonFacts(connection, claim.workspace_id, claim.world_id, "society")
+            facts = ComparisonFacts(connection, claim.workspace_id, claim.world_id, claim.kind)
             return facts.cancellation(claim.comparison_id) is not None
 
     def _started(self, claim: ComparisonClaim, run_id: uuid.UUID) -> None:
         """Record that this host starts playing a run under its claim's lease."""
         with self.database.session(claim.workspace_id) as connection, connection.transaction():
-            ComparisonFacts(connection, claim.workspace_id, claim.world_id, "society").run_started(
+            ComparisonFacts(connection, claim.workspace_id, claim.world_id, claim.kind).run_started(
                 claim.comparison_id, run_id, claim.token
             )
 
+    def _play_signals(self, claim: ComparisonClaim, stop: threading.Event) -> None:
+        """Play a signal comparison's start under the same claim rules a society comparison's
+        start is played by: claims that finish nothing, a takeover's presumed spend, a
+        cancellation, the bound and this process's budget each close it by name, asking
+        nothing; its runs are played one after another, each seed's fixed-timing anchor first."""
+        assert self.signal_runner_for is not None
+        change = self._starts(claim)
+        runner = self.signal_runner_for(claim.workspace_id, claim.world_id, claim.requested_by)
+        with self.database.session(claim.workspace_id) as connection:
+            repository = runner._repository(connection)
+            definition = repository._definition(claim.comparison_id)["document"]  # type: ignore[index]
+            open_runs = repository.open_runs(claim.comparison_id)
+            spent = repository.spending([claim.comparison_id]).get(claim.comparison_id, Decimal(0))
+        cancelled = self._cancelled(claim)
+        if not cancelled and SocietyComparisonStarts.attempts_spent(claim):
+            self._close(runner, claim, open_runs, "claims_spent", change)
+            return
+        budget = None if self.client is None else self.client.budget
+        cost = signal_comparison_cost(
+            definition,
+            len(definition["group"]),
+            runner.role,
+            budget if budget is not None else _ESTIMATOR,
+            self.manifest,
+            runs_left=[(run["arm"], run["seed_digest"]) for run in open_runs],
+        )
+        presumed = claim.presumed_usd
+        if claim.took_over and open_runs:
+            # The host whose lease ran out may have been asking one point and never recorded it.
+            more = stopped_signal_host_usd(
+                definition,
+                runner.role,
+                budget if budget is not None else _ESTIMATOR,
+                self.manifest,
+                open_runs,
+            )
+            if more > 0:
+                if not change("presume", usd=more):
+                    return
+                presumed += more
+        if cancelled:
+            self._close(runner, claim, open_runs, CANCELLED_REASON, change)
+            return
+        ceiling = claim.bound_usd - spent - presumed
+        if ceiling <= 0:
+            self._close(runner, claim, open_runs, BOUND_SPENT, change)
+            return
+        bound = None
+        keep_usd, keep_calls = (
+            share_kept(budget, runner.role.contract())
+            if budget is not None and self.keeps_share
+            else (Decimal(0), 0)
+        )
+        if budget is not None:
+            if budget.ceiling_usd - budget.spent_usd - keep_usd < min(ceiling, cost.most_usd) or (
+                budget.max_calls - budget.billed_calls - keep_calls < 1
+            ):
+                self._close(runner, claim, open_runs, "process_budget_spent", change)
+                return
+            bound = BoundedBudget(budget, ceiling_usd=ceiling, max_calls=max(1, cost.calls))
+        played = dataclasses.replace(runner, bound=bound, keeps_share=self.keeps_share)
+
+        def minute() -> None:
+            if not change("renew"):
+                raise ClaimLost
+
+        def recorded(connection: psycopg.Connection) -> None:
+            SocietyComparisonStarts.ran(
+                connection, claim.workspace_id, claim.world_id, claim.comparison_id, claim.kind
+            )
+
+        host = RunHost(
+            minute=minute,
+            stopping=stop.is_set,
+            recorded=recorded,
+            cancelled=lambda: self._cancelled(claim),
+            started=lambda run_id: self._started(claim, run_id),
+        )
+        try:
+            played.run_all(claim.comparison_id, [run["run_id"] for run in open_runs], host=host)
+        except HostStopping:
+            change("release")
+            return
+        except ClaimLost:
+            return
+        with self.database.session(claim.workspace_id) as connection:
+            left = runner._repository(connection).open_runs(claim.comparison_id)
+        if self._cancelled(claim):
+            self._close(runner, claim, left, CANCELLED_REASON, change)
+            return
+        if not left:
+            change("finish", closed_reason=None)
+
     def _close(
         self,
-        runner: SocietyComparisonRunner,
+        runner: SocietyComparisonRunner | SignalComparisonRunner,
         claim: ComparisonClaim,
         open_runs: Sequence[Mapping[str, Any]],
         reason: str,

@@ -117,6 +117,10 @@ _IN_WORLD: Final = {"params": {"world_id": FIXTURE_WORLD_ID}}
 _PERSON_MODEL: Final = load_manifest().offered_models(
     decision_roles().deciding_for("person").chosen
 )[0]
+#: A model the manifest offers a signal's decisions, which a signal comparison's start may name.
+_SIGNAL_MODEL: Final = load_manifest().offered_models(
+    decision_roles().deciding_for("signal").chosen
+)[0]
 _PHOTO_POINT_MAP: Final = {
     "kind": "photo_point_map",
     "entry_id": str(uuid.uuid4()),
@@ -368,6 +372,13 @@ PROBE_OVERRIDES: Final[dict[str, dict[str, Any]]] = {
         **_IN_WORLD,
         "json": {"base_revision": 0},
     },
+    "PUT /world/versions/{version_id}/clock": {
+        **_IN_WORLD,
+        "json": {"base_revision": 0, "profile": "coupled"},
+    },
+    "GET /world/versions/{version_id}/clock/verify": {
+        "params": {"world_id": FIXTURE_WORLD_ID, "from_tick": 1, "to_tick": 1},
+    },
     "POST /world/versions/{version_id}/compositions/apply": {
         **_IN_WORLD,
         "json": {
@@ -559,6 +570,15 @@ PROBE_OVERRIDES: Final[dict[str, dict[str, Any]]] = {
     "POST /world/versions/{version_id}/society/steps": {
         **_IN_WORLD,
         "json": {"base_tick": 0, "base_state_sha256": _ZERO_DIGEST},
+    },
+    "POST /world/versions/{version_id}/traffic/comparisons": {
+        **_IN_WORLD,
+        "json": {
+            "comparison_id": str(uuid.uuid4()),
+            "models": [{"provider": _SIGNAL_MODEL.provider, "model_id": _SIGNAL_MODEL.model_id}],
+            "seeds": 1,
+            "bound_usd": "0.05",
+        },
     },
     "POST /worlds/personal-source": {"json": {"topology_digest": _ZERO_DIGEST}},
 }
@@ -791,6 +811,12 @@ EXISTENCE_BUILDERS: Final[Mapping[str, Owned | Shared]] = {
         build.society_input_seq, build.invented_input_seq
     ),
     "/world/versions/{version_id}/tiles/{baked_tile_id}": Owned(build.generated_tile),
+    "/world/versions/{version_id}/traffic/comparisons/{comparison_id}": Owned(
+        build.signal_comparison
+    ),
+    "/world/versions/{version_id}/traffic/comparisons/{comparison_id}/runs/{run_id}": Owned(
+        build.signal_comparison_run
+    ),
 }
 
 #: Routes that ask about a narrower kind than their address names, each with the builder that makes
@@ -815,6 +841,18 @@ EXISTENCE_REQUESTS: Final[Mapping[str, Callable[[Any], dict[str, Any]]]] = {
     "PUT /world-entries/{entry_id}": build.entry_update_request,
     "POST /world/styles/previews/{preview_id}/apply": build.style_apply_request,
     "GET /world/versions/{version_id}/tiles/{baked_tile_id}/bytes": build.generated_tile_request,
+    "GET /world/versions/{version_id}/traffic/comparisons/{comparison_id}": (
+        build.signal_comparison_request
+    ),
+    "POST /world/versions/{version_id}/traffic/comparisons/{comparison_id}/cancel": (
+        build.signal_comparison_request
+    ),
+    "GET /world/versions/{version_id}/traffic/comparisons/{comparison_id}/runs/{run_id}": (
+        build.signal_comparison_request
+    ),
+    "GET /world/versions/{version_id}/traffic/comparisons/{comparison_id}/runs/{run_id}/replay": (
+        build.signal_comparison_request
+    ),
 }
 
 

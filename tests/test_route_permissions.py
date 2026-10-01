@@ -296,10 +296,11 @@ def test_every_route_that_can_reach_a_model_requires_model_invoke():
         ("POST", "/selection/ask"),
         ("POST", "/selection/environment"),
         ("POST", "/selection/plan"),
-        # Asks no model: it reads the model client's budget to presume what a host whose lease
-        # ran out may have spent, and holds model.invoke so whoever may start a paid comparison
-        # may stop it.
+        # The two comparison cancels ask no model: each reads the model client's budget to presume
+        # what a host whose lease ran out may have spent, and holds model.invoke so whoever may
+        # start a paid comparison may stop it.
         ("POST", "/world/versions/{version_id}/society/comparisons/{comparison_id}/cancel"),
+        ("POST", "/world/versions/{version_id}/traffic/comparisons/{comparison_id}/cancel"),
         ("POST", "/worlds/specification/drafts"),
     ]
     assert found <= set(SWEPT)
