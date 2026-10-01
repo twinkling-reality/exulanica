@@ -7,7 +7,7 @@ Start from the [documentation hub](README.md). Each document has one subject hom
 an explicit responsibility. A role describes how to use a document, not whether a feature
 is implemented. Contracts and scoped evidence establish capability claims.
 
-**95 documents** in the public catalog.
+**96 documents** in the public catalog.
 
 - [Product and architecture](#orientation)
 - [Capability guides](#capabilities)
@@ -77,6 +77,7 @@ Read the contract for the state or operation being changed.
 | [Saved world entry](saved-world-entry.md) | contract | World registry and count policy, starter and made-world creation, saved-world reopening and reference photographs |
 | [Authored world versions and created objects](world-objects-contract.md) | contract | Authored versions, objects, arrangements, environment placements, edit log, undo and concurrency |
 | [Unified world composition and retrieval](world-composition-contract.md) | contract | Composition preview and apply, unified place retrieval, and composition of imports, personal and authored content |
+| [Workspace asset admission](workspace-asset-admission.md) | contract | A person's own uploaded 3D assets: profile, declaration and rights, preparation, delivery, withdrawal and erasure |
 | [World version authorities](world-version-authorities.md) | contract | Versioned structure, appearance and comfort-settings authorities |
 | [One place across captures and time](place-identity.md) | contract | Place identity, coordinate frames and cross-capture alignment |
 | [World Memory Package v1](world-memory-package.md) | contract | Portable package profiles, integrity, projections and permissions |
