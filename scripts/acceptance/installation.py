@@ -1228,10 +1228,54 @@ def row_l2b(installation: Installation, l2a: Row, l1: Row) -> Row:
         seen["w2_tombstones"] == 0 and seen["w2_live_captures"] == 1, "W2 is not as declared"
     )
     row.expect(seen["w2_inside_window"], "W2 is not inside the stated loss window")
+    left_open(row, installation, first, result)
     checked, _, _ = installation.operator("check", service="api")
     row.observed["check"] = checked
     row.expect(checked == 0, f"check exited {checked}")
     return row.close()
+
+
+def left_open(row: Row, installation: Installation, first: dict[str, Any], result: Any) -> None:
+    """What a recovery leaves open, and why: a withdrawn photograph's derived bytes that a record
+    live in the recovered database still holds stay stored, their purge job skipped and their
+    tombstone open, named in the result; with no such holder nothing is left open (fix-7)."""
+    named = (result or {}).get("tombstones_left_open", {}) if isinstance(result, dict) else {}
+    shared = installation.sql(SHARED.format(blob=first["blob_sha256"]))
+    held = [line.split(" ", 1)[0] for line in shared if not line.endswith("live_sharers=0")]
+    tombstones = installation.sql(
+        "select tombstone_id || ' ' || (purge_completed_at is not null) from tombstone "
+        f"where capture_id = '{first['capture_id']}'"
+    )
+    jobs = installation.sql(
+        "select j.target_kind || ' ' || j.state || ' ' || coalesce(j.last_error, '') "
+        "from purge_job j join tombstone t on t.tombstone_id = j.tombstone_id "
+        f"where t.capture_id = '{first['capture_id']}' order by 1"
+    )
+    ids = {line.split(" ", 1)[0] for line in tombstones}
+    row.observed["left_open"] = {
+        "result": named,
+        "held_by_live_records": held,
+        "tombstones_complete": tombstones,
+        "purge_jobs": jobs,
+        "held_bytes_stored": {digest: stored(installation, digest) for digest in held},
+    }
+    if not held:
+        row.expect(not named, f"a recovery with nothing held left {named} open")
+        row.expect(all(line.endswith(" true") for line in tombstones), "a tombstone stayed open")
+        return
+    open_here = [tombstone for tombstone in named if tombstone in ids]
+    row.expect(bool(open_here), f"the result names none of W1's tombstones open: {named}")
+    # Targets are named "<kind>:<digest>", as the purge queue names them.
+    targets = {target.split(":", 1)[-1] for t in open_here for target in named[t]}
+    row.expect(set(held) <= targets, f"the held bytes {held} are not the targets named open")
+    row.expect(
+        any(line.endswith(" false") for line in tombstones), "W1's tombstone was marked complete"
+    )
+    row.expect(any(" skipped " in line for line in jobs), "no purge job of W1's was skipped")
+    row.expect(
+        all(count > 0 for count in row.observed["left_open"]["held_bytes_stored"].values()),
+        "bytes a live record holds were destroyed",
+    )
 
 
 # -- commands --------------------------------------------------------------------------------------
