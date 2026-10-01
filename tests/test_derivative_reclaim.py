@@ -302,17 +302,20 @@ def test_a_slow_stage_renews_its_lease_on_an_independent_connection(queued):
     """A model call longer than the lease is live work, not a process-death signal."""
     blocking = _BlockingVision()
     queued.vision = blocking
-    worker = queued.worker(lease_seconds=0.18, heartbeat_seconds=0.03)
+    # Beats twenty times a lease, so a loaded machine's scheduling delay (a CI run measured one past
+    # 0.15 s) cannot let the lease lapse between them, and a wait past the lease, so a claim that
+    # succeeds can only mean the renewals stopped.
+    worker = queued.worker(lease_seconds=1.0, heartbeat_seconds=0.05)
     with ThreadPoolExecutor(max_workers=1) as pool:
         running = pool.submit(worker.drain)
         assert blocking.entered.wait(5)
-        time.sleep(0.25)
+        time.sleep(1.3)
         assert (
             derivative_queue.claim(
                 queued.connection,
                 queued.workspace_id,
                 worker="would-be-reclaimer",
-                lease_seconds=0.18,
+                lease_seconds=1.0,
             )
             is None
         )
