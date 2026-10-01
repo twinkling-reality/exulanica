@@ -1217,8 +1217,11 @@ restore is sealed or replaying. Two cases are kept apart
   return into, and refuses it with "do not drop it", except the restore's own copy under the
   source's name while the source is still set aside, which is this attempt's copy whose replay
   never completed: drop it, then return. A database in which a restore completed under the pending
-  attempt, as after a marker was put back from an older copy, is never offered for dropping, and a
-  rerun of the restore completes the marker again. The return token replaces any comment the
+  attempt, as after a marker was put back from an older copy or a replay committed before its
+  marker write, is never offered for dropping. A rerun of the restore, or of a return recorded into
+  it, completes the marker from that database without replaying again: it checks that the database
+  holds this attempt's complete row and receipt for this checkpoint, reads which of the
+  checkpoint's tombstones are still open there into the marker, and verifies. The return token replaces any comment the
   source database had, and writing it needs the database owner or a superuser, so
   `EXULANICA_SOURCE_DATABASE_URL` connects as one of them; another role is refused by name before
   anything is replayed. It replays with the installation's own purge connection and
@@ -1234,8 +1237,8 @@ restore is sealed or replaying. Two cases are kept apart
   every later write, and while it is kept, preparing, resuming or replaying a recorded checkpoint
   again is refused; a lost marker loses that record. A rerun classifies the target before it writes
   the marker. With no attempt pending, a database in which a restore completed is refused as live
-  ("do not drop it"); under a pending attempt a completed restore's row may be one the loaded
-  backup carried, so that database is refused as a possible partial copy of this attempt.
+  ("do not drop it"); under a pending attempt a row completed under another restore id may be one
+  the loaded backup carried, so that database is refused as a possible partial copy of this attempt.
 - **Crash recovery**, with the source lost: `exulanica-installation restore declared --backup-set DIR
   --export FILE --declaration FILE` writes the marker first, loads the backup set into an empty
   target, copies its bytes back, migrates and reprovisions, and replays the export under the

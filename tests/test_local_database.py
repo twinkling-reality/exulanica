@@ -265,6 +265,22 @@ def test_no_client_program_new_enough_is_refused_naming_what_was_checked(tmp_pat
     assert f"{older}: psql (PostgreSQL) 16.4" in refused.value.detail
 
 
+def test_a_dump_or_restore_runs_where_only_the_client_is_installed(tmp_path, monkeypatch):
+    """A backup dumps a running server and a recovery restores into one; neither needs the
+    server programs on the machine that runs it, as a runner with its database in a container."""
+    configured, on_path = tmp_path / "client-only", tmp_path / "on-path"
+    for name in sorted(cluster.CLIENT_PROGRAMS):
+        _program(configured, name, "18.6")
+    on_path.mkdir()
+    _only_these_places(monkeypatch, configured, on_path)
+    with pytest.raises(LocalDatabaseRefused):
+        cluster.binaries()
+
+    for name in sorted(cluster.CLIENT_PROGRAMS):
+        ran = cluster.run(name, "--version", refusal=Refusal.BACKUP_FAILED)
+        assert ran.stdout.strip() == f"{name} (PostgreSQL) 18.6"
+
+
 def test_serve_and_start_refuse_a_data_directory_the_local_command_made(machine):
     helper = _test_postgres_helper()
     server = helper.lane_server()

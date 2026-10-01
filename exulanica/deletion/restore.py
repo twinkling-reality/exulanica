@@ -76,6 +76,7 @@ __all__ = [
     "RestoreRefused",
     "abandon_declared_restore",
     "checkpoint",
+    "complete_committed_replay",
     "completed_restores",
     "export_withdrawals",
     "initialise_restore_state",
@@ -1116,6 +1117,87 @@ def replay(
             "update restore_control set state='complete',updated_at=now() where restore_id=%s",
             (restore_id,),
         )
+    _write(
+        marker_path,
+        {**marker, "state": "complete", "completed": _completing(marker), "left_open": left_open},
+    )
+    verify_restore(database, marker_path)
+    return restore_id
+
+
+def complete_committed_replay(
+    database: Database, checkpoint_path: Path, marker_path: Path
+) -> uuid.UUID:
+    """Complete a pending marker whose attempt's replay already committed in ``database``, without
+    replaying again.
+
+    The replay commits its receipt and its complete ``restore_control`` row together, after every
+    check it makes, so a database holding both for this attempt and checkpoint holds that replay
+    whole. It may have served since (a marker put back from an older copy) or not (interrupted
+    before the marker write); either way a second replay would only run its purge jobs again,
+    mark every derived artifact stale and write each carried withdrawal again. ``left_open`` is
+    read from the database as it stands: each of the checkpoint's tombstones still open there,
+    with the targets a live record holds or, when anything else keeps it open, the targets not
+    yet done, which the ordinary purger owns as it owns any open tombstone.
+    """
+    record, digest, exported = _checkpoint(checkpoint_path)
+    marker = _marker(marker_path)
+    if (
+        marker.get("state") != "pending"
+        or marker.get("checkpoint_id") != record["checkpoint_id"]
+        or marker.get("checkpoint_sha256") != digest
+    ):
+        raise RestoreRefused("the marker is not pending for this checkpoint: nothing to complete")
+    if exported:
+        _redeclared(record, digest, marker)
+    elif "recovery" in marker:
+        raise RestoreRefused("a sealed checkpoint's marker records no declared recovery")
+    restore_id = uuid.UUID(marker["restore_id"])
+    left_open: dict[str, list[str]] = {}
+    with database.unscoped() as connection:
+        _admin(connection)
+        cursor = connection.cursor(row_factory=dict_row)
+        control = cursor.execute(
+            "select state, checkpoint_sha256, restore_id from restore_control"
+        ).fetchone()
+        receipt = cursor.execute(
+            "select checkpoint_id, checkpoint_sha256 from restore_replay_receipt "
+            "where restore_id=%s",
+            (restore_id,),
+        ).fetchone()
+        if (
+            control is None
+            or control["state"] != "complete"
+            or control["checkpoint_sha256"] != digest
+            or control["restore_id"] != restore_id
+            or receipt is None
+            or str(receipt["checkpoint_id"]) != record["checkpoint_id"]
+            or receipt["checkpoint_sha256"] != digest
+        ):
+            raise RestoreRefused(
+                "this database holds no replay of this attempt that committed: nothing to complete"
+            )
+        for item in record["tombstones"]:
+            original = item["tombstone"]
+            workspace_id = uuid.UUID(original["workspace_id"])
+            replay_id = uuid.uuid5(restore_id, original["tombstone_id"])
+            set_workspace(connection, workspace_id)
+            complete = cursor.execute(
+                "select tombstone_purge_is_complete(%s) as complete", (replay_id,)
+            ).fetchone()
+            if complete and complete["complete"]:
+                continue
+            held = _held_open(connection, workspace_id, replay_id)
+            if held is None:
+                held = [
+                    f"{row['target_kind']}:{row['target_ref']}"
+                    for row in cursor.execute(
+                        "select target_kind, target_ref from purge_job where tombstone_id=%s "
+                        "and state <> 'done' order by target_kind, target_ref",
+                        (replay_id,),
+                    ).fetchall()
+                ]
+            left_open[str(original["tombstone_id"])] = held
     _write(
         marker_path,
         {**marker, "state": "complete", "completed": _completing(marker), "left_open": left_open},

@@ -19,6 +19,7 @@ from exulanica.db.roles import provision_purge_role, provision_runtime_role
 from exulanica.deletion.restore import (
     RestoreRefused,
     checkpoint,
+    complete_committed_replay,
     prepare_restore,
     replay,
     verify_restore,
@@ -437,6 +438,68 @@ def test_a_completed_restore_is_remembered_after_a_later_one(purged, tmp_path):
     with pytest.raises(RestoreRefused, match="already complete"):
         prepare_restore(tmp_path / "first.json", marker)
     assert json.loads(marker.read_bytes()) == state
+
+
+def test_a_committed_replay_is_completed_without_replaying_again(purged, tmp_path):
+    """A pending marker whose attempt's replay committed (interrupted before the marker write, or
+    a marker put back from an older copy) is completed from the database: the purge jobs and the
+    control row are untouched, and the tombstones still open there are read back into the marker.
+    Anything short of this attempt's complete row and receipt is refused."""
+    capture = _capture(purged)
+    blob = bytes(purged.rows("select blob_sha256 from capture")[0]["blob_sha256"])
+    purged.repository.connection.execute(
+        "insert into capture (workspace_id,blob_sha256) values (%s,%s)", (uuid.uuid4(), blob)
+    )
+    purged.tombstone_the_capture(capture)
+    source, marker = tmp_path / "checkpoint.json", tmp_path / "restore.json"
+    checkpoint(purged.database(), source)
+    prepare_restore(source, marker)
+    with pytest.raises(RestoreRefused, match="no replay of this attempt that committed"):
+        complete_committed_replay(purged.database(), source, marker)
+    replay(
+        purged.database(), _purge_database(purged), purged.store, source, marker, writers=WRITERS
+    )
+    completed = json.loads(marker.read_bytes())
+    assert completed["left_open"]
+    pending = {**completed, "state": "pending", "completed": [], "left_open": {}}
+
+    def trace():
+        return purged.rows(
+            "select purge_id, state, attempts, completed_at from purge_job order by purge_id"
+        ), purged.rows("select restore_id, updated_at from restore_control")
+
+    def control(sql_text, *values):
+        with purged.database().unscoped() as connection:
+            connection.execute(f'set search_path to "{purged.scratch}", public')
+            connection.execute(sql_text, values)
+
+    restore_id = uuid.UUID(completed["restore_id"])
+    for broken, undo in (
+        (
+            ("update restore_control set restore_id=%s", uuid.uuid4()),
+            ("update restore_control set restore_id=%s", restore_id),
+        ),
+        (
+            ("update restore_control set state='replaying'",),
+            ("update restore_control set state='complete'",),
+        ),
+        (
+            ("update restore_replay_receipt set restore_id=%s", uuid.uuid4()),
+            ("update restore_replay_receipt set restore_id=%s", restore_id),
+        ),
+    ):
+        marker.write_text(json.dumps(pending))
+        control(*broken)
+        with pytest.raises(RestoreRefused, match="no replay of this attempt that committed"):
+            complete_committed_replay(purged.database(), source, marker)
+        control(*undo)
+    before = trace()
+    marker.write_text(json.dumps(pending))
+    assert complete_committed_replay(purged.database(), source, marker) == restore_id
+    assert trace() == before
+    again = json.loads(marker.read_bytes())
+    assert again["state"] == "complete" and again["left_open"] == completed["left_open"]
+    assert again["completed"] == completed["completed"]
 
 
 def test_only_a_skip_on_bytes_a_live_record_holds_leaves_a_tombstone_open(purged):

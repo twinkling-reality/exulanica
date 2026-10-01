@@ -32,6 +32,7 @@ from exulanica.orchestration.restore import WRITERS
 from exulanica.store.configured import local_content_stores
 from exulanica.store.local import LocalContentAddressedStore
 
+from test_local_database_postgres import _require_server_binaries
 from test_purge import _APP_PASSWORD, _APP_ROLE, _PURGE_PASSWORD, _PURGE_ROLE
 from test_purge import purged as purged
 from test_restore_replay import _capture
@@ -108,6 +109,7 @@ def _provision(scratch):
 
 
 def test_a_lost_source_is_recovered_into_an_isolated_server(purged, source, tmp_path):
+    _require_server_binaries()
     taken, backup_store = source
     objects = sorted(blob.hex for blob in purged.store.iter_blob_ids())
     deleted = purged.tombstone_the_capture(_capture(purged))
@@ -153,6 +155,7 @@ def test_a_lost_source_is_recovered_into_an_isolated_server(purged, source, tmp_
 
 
 def test_a_stale_authority_leaves_the_target_refusing(purged, source, tmp_path):
+    _require_server_binaries()
     taken, backup_store = source
     export, _ = _export(purged, tmp_path)
     late = dt.datetime.now(dt.UTC) + _LAG + dt.timedelta(minutes=1)
@@ -196,6 +199,7 @@ def _unseal(purged, sealed, tmp_path):
 
 
 def test_a_planned_restore_loses_nothing_and_the_source_can_serve_again(purged, source, tmp_path):
+    _require_server_binaries()
     from exulanica.orchestration.installation.recovery import restore_planned
 
     taken, backup_store = source
@@ -253,6 +257,7 @@ def _erase_from_backup(purged, backup_store, deleted):
 
 
 def test_a_recovery_accepts_backup_objects_a_purge_erased(purged, source, tmp_path):
+    _require_server_binaries()
     taken, backup_store = source
     deleted = purged.tombstone_the_capture(_capture(purged))
     purged.worker().drain()
@@ -278,6 +283,7 @@ def test_a_recovery_accepts_backup_objects_a_purge_erased(purged, source, tmp_pa
 
 
 def test_a_failed_planned_restore_refuses_its_partial_copy_then_resumes(purged, source, tmp_path):
+    _require_server_binaries()
     from exulanica.orchestration.installation.recovery import restore_planned
 
     taken, backup_store = source
@@ -314,6 +320,7 @@ def test_a_failed_planned_restore_refuses_its_partial_copy_then_resumes(purged, 
 
 
 def test_a_recovery_refuses_a_missing_object_no_purge_names(purged, source, tmp_path):
+    _require_server_binaries()
     from exulanica.orchestration.installation.backup_set import BackupSetRefused
 
     taken, backup_store = source
@@ -391,6 +398,7 @@ def test_a_recovered_installation_exports_and_backs_up_again_after_sign_outs(
     purged, source, tmp_path
 ):
     """Every sign-out writes a withdrawal of a row a backup set never carries."""
+    _require_server_binaries()
     from exulanica.deletion.restore import export_withdrawals
 
     taken, backup_store = source
@@ -427,6 +435,7 @@ def test_a_recovered_installation_exports_and_backs_up_again_after_sign_outs(
 
 
 def test_a_declared_recovery_resumes_after_a_failure(purged, source, tmp_path):
+    _require_server_binaries()
     taken, backup_store = source
     purged.tombstone_the_capture(_capture(purged))
     purged.worker().drain()
@@ -463,6 +472,7 @@ def test_a_declared_recovery_resumes_after_a_failure(purged, source, tmp_path):
 
 
 def test_nothing_is_sealed_or_written_when_the_target_holds_the_source(purged, source, tmp_path):
+    _require_server_binaries()
     from exulanica.orchestration.installation.recovery import restore_planned
 
     taken, backup_store = source
@@ -502,6 +512,7 @@ def test_nothing_is_sealed_or_written_when_the_target_holds_the_source(purged, s
 
 
 def test_a_declared_recovery_replays_only_the_newest_export(purged, source, tmp_path):
+    _require_server_binaries()
     import shutil
 
     taken, backup_store = source
@@ -555,6 +566,7 @@ def _source_on_the_target_server(purged, source, tmp_path, cluster, port):
 def test_a_set_aside_source_is_discarded_after_the_restore_and_never_resumed(
     purged, source, tmp_path
 ):
+    _require_server_binaries()
     from exulanica.orchestration.installation.recovery import (
         discard_set_aside,
         restore_planned,
@@ -648,6 +660,7 @@ def test_a_set_aside_source_is_discarded_after_the_restore_and_never_resumed(
 
 
 def test_an_unfinished_set_aside_restore_returns_to_its_source(purged, source, tmp_path):
+    _require_server_binaries()
     from exulanica.orchestration.installation.recovery import (
         discard_set_aside,
         restore_planned,
@@ -776,6 +789,7 @@ def test_a_damaged_key_list_or_another_database_name_refuses_before_anything(
 
 
 def test_a_planned_restore_interrupted_between_seal_and_marker_resumes(purged, source, tmp_path):
+    _require_server_binaries()
     from exulanica.deletion.restore import checkpoint
     from exulanica.orchestration.installation.recovery import restore_planned
 
@@ -807,6 +821,7 @@ def test_a_planned_restore_interrupted_between_seal_and_marker_resumes(purged, s
 
 
 def test_set_aside_refuses_a_database_that_is_not_the_source(purged, source, tmp_path):
+    _require_server_binaries()
     from exulanica.orchestration.installation.recovery import restore_planned
 
     taken, backup_store = source
@@ -839,6 +854,7 @@ def test_set_aside_refuses_a_database_that_is_not_the_source(purged, source, tmp
 
 
 def test_return_names_the_right_step_when_the_source_was_never_set_aside(purged, source, tmp_path):
+    _require_server_binaries()
     from exulanica.deletion.restore import checkpoint, prepare_restore
     from exulanica.orchestration.installation.recovery import return_to_source
 
@@ -879,6 +895,7 @@ def test_a_replaying_target_without_its_attempt_and_a_damaged_marker_refuse(tmp_
 def test_a_rerun_resumes_only_a_sealed_source(purged, source, tmp_path):
     """A source whose restore_control is not sealed for this checkpoint is not this restore's to
     resume, whatever the marker says: here it is mid-replay and no marker names it."""
+    _require_server_binaries()
     from exulanica.deletion.restore import checkpoint
     from exulanica.orchestration.installation.recovery import restore_planned
 
@@ -907,6 +924,7 @@ def test_a_rerun_resumes_only_a_sealed_source(purged, source, tmp_path):
 
 
 def test_a_pending_declared_recovery_is_abandoned_for_a_newer_export(purged, source, tmp_path):
+    _require_server_binaries()
     from exulanica.orchestration.installation.recovery import abandon_declared
 
     taken, backup_store = source
@@ -1003,6 +1021,7 @@ def test_the_refusals_never_tell_the_operator_to_drop_a_source():
 def test_a_declared_recovery_interrupted_mid_replay_resumes_the_replay_only(
     purged, source, tmp_path, monkeypatch
 ):
+    _require_server_binaries()
     from exulanica.deletion import restore
 
     taken, backup_store = source
@@ -1048,6 +1067,7 @@ def test_a_rerun_classifies_the_target_before_writing_a_marker(purged, source, t
     """Cross-server: the old source is still sealed for C and no marker names C, while the target
     serves a live database. The rerun refuses it as live, writing nothing, rather than marking a
     new attempt pending and calling the live database a partial copy."""
+    _require_server_binaries()
     from exulanica.deletion.restore import checkpoint
     from exulanica.orchestration.installation.recovery import _target_state, restore_planned
 
@@ -1091,6 +1111,7 @@ def test_a_partial_copy_whose_backup_carries_an_earlier_restore_is_not_called_li
     """Every set taken after a completed restore carries that restore's complete row. A failed
     load of such a set is this attempt's partial copy: the rerun says so and resumes after the
     drop, instead of calling it live and keeping the installation down."""
+    _require_server_binaries()
     from exulanica.orchestration.installation.recovery import restore_planned
 
     with purged.database().unscoped() as connection:
@@ -1148,6 +1169,7 @@ def test_a_partial_copy_whose_backup_carries_an_earlier_restore_is_not_called_li
 
 
 def test_a_return_whose_replay_began_resumes(purged, source, tmp_path, monkeypatch):
+    _require_server_binaries()
     from exulanica.deletion import restore
     from exulanica.orchestration.installation.recovery import restore_planned, return_to_source
 
@@ -1226,11 +1248,14 @@ def test_a_return_whose_replay_began_resumes(purged, source, tmp_path, monkeypat
             patched.setattr(restore, "_write", crash_before_completion)
             with pytest.raises(OSError, match="before the marker"):
                 return_to_source(set_aside=True, **arguments)
+        committed = _replay_trace(target.database_url)
         return_to_source(set_aside=True, **arguments)
+        assert _replay_trace(target.database_url) == committed  # completed, not replayed again
         verify_restore(Database(target.database_url), marker)
 
 
 def test_an_abandoned_recovery_is_never_replayed_and_keeps_its_record(purged, source, tmp_path):
+    _require_server_binaries()
     from exulanica.deletion.restore import replay
     from exulanica.orchestration.installation.recovery import abandon_declared
 
@@ -1292,6 +1317,7 @@ def test_an_abandoned_recovery_is_never_replayed_and_keeps_its_record(purged, so
 def test_a_replay_committed_before_its_marker_is_finished_by_the_rerun(
     purged, source, tmp_path, monkeypatch
 ):
+    _require_server_binaries()
     from exulanica.deletion import restore
 
     taken, backup_store = source
@@ -1323,7 +1349,10 @@ def test_a_replay_committed_before_its_marker_is_finished_by_the_rerun(
             with pytest.raises(OSError, match="before the marker"):
                 recover_declared(**arguments)
         assert json.loads(marker.read_bytes())["state"] == "pending"
+        committed = _replay_trace(arguments["target"].database_url)
         result = recover_declared(**arguments)
+        # Completed from the committed replay: nothing is replayed again.
+        assert _replay_trace(arguments["target"].database_url) == committed
     state = json.loads(marker.read_bytes())
     assert result["resumed"] is True and result["objects_copied"] == 0
     assert state["state"] == "complete"
@@ -1343,6 +1372,7 @@ def test_a_source_on_another_server_is_returned_without_the_target_server(
     """The restore into another server stopped mid-replay. --set-aside must not finish that copy
     as if it were the source; the source is returned without the flag, even with the target server
     down, and a source connection naming no database is refused by name."""
+    _require_server_binaries()
     from dataclasses import replace
 
     from exulanica.deletion import restore
@@ -1430,13 +1460,16 @@ def test_a_source_on_another_server_is_returned_without_the_target_server(
         patched.setattr(restore, "_write", crash_before_completion)
         with pytest.raises(OSError, match="before the marker"):
             return_to_source(target=back, set_aside=False, **arguments)
+    committed = _replay_trace(back.database_url)
     return_to_source(target=back, set_aside=False, **arguments)
+    assert _replay_trace(back.database_url) == committed  # completed, not replayed again
     verify_restore(purged.database(), marker)
 
 
 def test_abandon_after_the_replay_began_names_the_copy_to_drop(
     purged, source, tmp_path, monkeypatch
 ):
+    _require_server_binaries()
     from exulanica.deletion import restore
     from exulanica.orchestration.installation.recovery import abandon_declared
 
@@ -1487,6 +1520,7 @@ def test_a_return_token_tells_the_source_from_a_database_with_the_same_server_an
     """A database another server cloned from the same data directory created can share the
     source's server identifier and oid. The return writes a one-off token into the source before
     its replay; the recorded identity includes it, and a rename keeps it."""
+    _require_server_binaries()
     from exulanica.orchestration.installation.recovery import _database_identity, _mark_the_source
 
     with scratch_cluster(owner="exulanica") as (cluster, port):
@@ -1497,6 +1531,16 @@ def test_a_return_token_tells_the_source_from_a_database_with_the_same_server_an
         assert _database_identity(url) == recorded
         # A second return writes a fresh token: an older record no longer matches.
         assert _mark_the_source(url) != recorded
+
+
+def _replay_trace(url):
+    """What a replay rewrites: restore_control's last update and every purge job's run."""
+    with psycopg.connect(url) as c:
+        control = c.execute("select updated_at from restore_control").fetchone()
+        jobs = c.execute(
+            "select purge_id, state, attempts, completed_at from purge_job order by purge_id"
+        ).fetchall()
+    return control, jobs
 
 
 def _stale(marker):
@@ -1514,6 +1558,7 @@ def test_a_stale_pending_marker_never_has_a_served_planned_restore_dropped(
 ):
     """A set-aside restore completed and its copy served; the marker was then replaced by its
     pending copy. return-to-source --set-aside must not call the live copy one to drop."""
+    _require_server_binaries()
     from exulanica.orchestration.installation.recovery import restore_planned, return_to_source
 
     taken, backup_store = source
@@ -1547,13 +1592,16 @@ def test_a_stale_pending_marker_never_has_a_served_planned_restore_dropped(
             )
         assert "may have served since: do not drop it" in str(refused.value)
         assert "never served" not in str(refused.value)
-        # The rerun the refusal names completes the marker again.
+        # The rerun the refusal names completes the marker without replaying again.
+        served = _replay_trace(target.database_url)
         result = restore_planned(**arguments)
-        assert result["resumed"] is True
+        assert _replay_trace(target.database_url) == served
+        assert result["resumed"] is True and result["tombstones_left_open"] == {}
         assert json.loads(marker.read_bytes())["state"] == "complete"
 
 
 def test_a_stale_pending_marker_never_has_a_served_recovery_dropped(purged, source, tmp_path):
+    _require_server_binaries()
     from exulanica.orchestration.installation.recovery import abandon_declared
 
     taken, backup_store = source
@@ -1580,11 +1628,14 @@ def test_a_stale_pending_marker_never_has_a_served_recovery_dropped(purged, sour
             abandon_declared(target=target, export=export, marker=marker)
         assert "may have served since: do not drop it" in str(refused.value)
         assert "never served" not in str(refused.value)
+        served = _replay_trace(target.database_url)
         result = recover_declared(**arguments)
+        assert _replay_trace(target.database_url) == served
     assert result["resumed"] is True and json.loads(marker.read_bytes())["state"] == "complete"
 
 
 def test_a_return_refuses_by_name_when_its_connection_cannot_comment_on_the_source():
+    _require_server_binaries()
     from exulanica.orchestration.installation.recovery import _mark_the_source
 
     with scratch_cluster(owner="exulanica") as (cluster, port):
@@ -1644,6 +1695,7 @@ def _identical_probes(purged, tmp_path, photo_dir):
 def test_a_recovery_completes_when_a_live_capture_shares_a_withdrawn_ones_probe(
     purged, tmp_path, photo_dir
 ):
+    _require_server_binaries()
     taken, backup_store, (withdrawn, live), probe = _identical_probes(purged, tmp_path, photo_dir)
     tombstone = purged.tombstone_the_capture(withdrawn)
     purged.worker().drain()
@@ -1672,6 +1724,7 @@ def test_a_recovery_completes_when_a_live_capture_shares_a_withdrawn_ones_probe(
 def test_a_planned_restore_completes_when_a_live_capture_shares_a_withdrawn_ones_probe(
     purged, tmp_path, photo_dir
 ):
+    _require_server_binaries()
     from exulanica.orchestration.installation.recovery import restore_planned
 
     taken, backup_store, (withdrawn, _live), probe = _identical_probes(purged, tmp_path, photo_dir)

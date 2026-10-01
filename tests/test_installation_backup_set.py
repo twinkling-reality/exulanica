@@ -25,6 +25,7 @@ from exulanica.orchestration.installation.backup_set import (
 )
 from exulanica.store.local import LocalContentAddressedStore
 
+from test_local_database_postgres import _require_server_binaries
 from test_purge import purged as purged
 from test_restore_replay import _capture
 
@@ -57,6 +58,7 @@ def backup(purged, tmp_path):
 
 
 def test_a_set_holds_every_object_and_a_later_export_and_restores(purged, backup):
+    _require_server_binaries()
     take, target = backup
     purged.tombstone_the_capture(_capture(purged))
     taken = take()
@@ -148,6 +150,7 @@ def test_a_set_carries_no_sign_in_secrets(purged, backup):
 
 
 def test_an_object_erased_by_a_purge_is_accepted_and_no_other(purged, backup):
+    _require_server_binaries()
     take, target = backup
     taken = take()
     victim = next(iter(target.iter_blob_ids()))
@@ -218,6 +221,7 @@ def test_a_schema_that_records_its_migrations_verifies(purged, backup):
     The dump reads them through the connection's own schema and the restored copy is opened
     without it, so before the manifest named the schema a populated schema failed verification.
     """
+    _require_server_binaries()
     from exulanica.migrations import migrations
 
     take, target = backup

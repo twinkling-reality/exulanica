@@ -46,6 +46,7 @@ from exulanica.deletion.restore import (
     RestoreRefused,
     abandon_declared_restore,
     checkpoint,
+    complete_committed_replay,
     completed_restores,
     loss_window,
     mark_returning,
@@ -274,8 +275,9 @@ def _refuse_target(state: str, name: str, *, attempt_pending: bool) -> None:
     if state == "completed_here":
         raise RestoreRefused(
             f"{name} on the target server holds a restore this attempt completed, so it may have "
-            "served since: do not drop it; if the marker was restored from an older copy, put back "
-            "the marker this attempt completed, or rerun the restore, which completes it"
+            "served since: do not drop it; rerun the restore, which completes the marker from it "
+            "without replaying again (or, if the marker was restored from an older copy, put back "
+            "the marker this attempt completed)"
         )
     if state == "replaying" and attempt_pending:
         raise RestoreRefused(
@@ -432,17 +434,21 @@ def _report_unlisted(
 def _finish(
     target: Target, authority: Path, marker: Path, state: str, load: Callable[[], dict[str, Any]]
 ) -> dict[str, Any]:
-    """Load unless this attempt already loaded and began replaying, then replay and verify."""
+    """Load unless this attempt already loaded and began replaying, then replay and verify; a
+    replay this attempt already committed completes the marker without replaying again."""
     loaded = load() if state == "absent" else {"objects_copied": 0, "erased_objects": 0}
-    replay(
-        Database(target.database_url),
-        Database(target.purge_url),
-        None,
-        authority,
-        marker,
-        writers=WRITERS,
-        stores=target.stores,
-    )
+    if state == "completed_here":
+        complete_committed_replay(Database(target.database_url), authority, marker)
+    else:
+        replay(
+            Database(target.database_url),
+            Database(target.purge_url),
+            None,
+            authority,
+            marker,
+            writers=WRITERS,
+            stores=target.stores,
+        )
     verify_restore(Database(target.database_url), marker)
     # Tombstones left open on bytes a live record in the restored database still holds, with their
     # targets: queued for the ordinary purger, as they would be without a restore.
@@ -708,6 +714,7 @@ def return_to_source(
             )
         if held == "sealed_source":
             mark_returning(marker, digest, _mark_the_source(target.database_url))
+        committed = held == "completed_here"
     elif aside == "sealed_source":
         state = _target_state(target, name, digest, attempt)
         if state != "absent":
@@ -719,6 +726,7 @@ def return_to_source(
                     sql.Identifier(kept), sql.Identifier(name)
                 )
             )
+        committed = False
     else:
         # Renamed back by an earlier run of this return: resume its replay. Anything else under the
         # name is not a source set aside on this server.
@@ -742,10 +750,21 @@ def return_to_source(
                 "unrecorded; do not drop it. A source on another server is returned without "
                 "--set-aside"
             )
+        committed = state == "completed_here"
     source = Database(target.database_url)
-    replay(
-        source, source_purge, None, checkpoint_path, marker, writers=WRITERS, stores=target.stores
-    )
+    if committed:
+        # The return's replay committed before its marker write: complete the marker only.
+        complete_committed_replay(source, checkpoint_path, marker)
+    else:
+        replay(
+            source,
+            source_purge,
+            None,
+            checkpoint_path,
+            marker,
+            writers=WRITERS,
+            stores=target.stores,
+        )
     verify_restore(source, marker)
 
 

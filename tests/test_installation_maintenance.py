@@ -26,6 +26,7 @@ from exulanica.orchestration.installation.maintenance import Maintenance, Mainte
 from exulanica.store.configured import local_content_stores
 
 from test_installation_facts import PROFILES, _services
+from test_local_database_postgres import _require_server_binaries
 from test_purge import _PURGE_PASSWORD, _PURGE_ROLE
 from test_purge import purged as purged
 from test_restore_replay import _capture
@@ -71,6 +72,7 @@ def _maintenance(purged, tmp_path, **changes):
 
 
 def test_a_first_pass_exports_backs_up_verifies_and_reports(purged, tmp_path):
+    _require_server_binaries()
     maintenance = _maintenance(purged, tmp_path)
     status = maintenance.run_pass()
     assert status["failures"] == []
@@ -130,6 +132,7 @@ def test_a_purge_reaches_the_backup_copy(purged, tmp_path):
 
 
 def test_a_failed_step_is_a_code_and_the_rest_still_run(purged, tmp_path):
+    _require_server_binaries()
     maintenance = _maintenance(purged, tmp_path, purge_url=None)
     status = maintenance.run_pass()
     assert status["failures"] == ["purge_not_configured"]
@@ -186,6 +189,7 @@ def test_a_gap_in_the_backup_role_is_reported_every_pass(purged, tmp_path):
 
 
 def test_a_set_whose_erased_objects_left_the_backup_copy_still_verifies(purged, tmp_path):
+    _require_server_binaries()
     maintenance = _maintenance(purged, tmp_path)
     maintenance.run_pass()
     purged.tombstone_the_capture(_capture(purged))
@@ -200,6 +204,7 @@ def test_a_set_whose_erased_objects_left_the_backup_copy_still_verifies(purged, 
 def test_the_verify_command_accepts_the_gaps_maintenance_made(
     purged, tmp_path, monkeypatch, capsys
 ):
+    _require_server_binaries()
     from exulanica.orchestration.installation.cli import main
 
     maintenance = _maintenance(purged, tmp_path)

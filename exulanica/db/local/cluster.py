@@ -85,6 +85,10 @@ KNOWN_BINARY_DIRECTORIES: Final = (
     Path("/usr/lib/postgresql/18/bin"),
 )
 
+#: The programs ``run`` finds as ``client_program`` does: they talk to a running server and are
+#: installed without one, as on a machine whose database runs in a container.
+CLIENT_PROGRAMS: Final = frozenset({"pg_dump", "pg_restore", "psql"})
+
 #: Written into every cluster's ``postgresql.conf`` by ``initdb``: loopback TCP only, no socket.
 LISTEN_SETTINGS: Final = {"listen_addresses": "localhost", "unix_socket_directories": ""}
 
@@ -215,9 +219,14 @@ def bootstrap_user() -> str:
 
 
 def run(program: str, *arguments: str, refusal: Refusal) -> subprocess.CompletedProcess[str]:
-    """Run one PostgreSQL program to completion, or stop with ``refusal`` and its own words."""
+    """Run one PostgreSQL program to completion, or stop with ``refusal`` and its own words.
+
+    A client program is found as ``client_program`` finds it, so a dump or a restore into a
+    running server needs the client alone, not the server programs beside it.
+    """
+    located = client_program(program) if program in CLIENT_PROGRAMS else binaries().program(program)
     completed = subprocess.run(
-        [binaries().program(program), *arguments],
+        [located, *arguments],
         capture_output=True,
         text=True,
         check=False,

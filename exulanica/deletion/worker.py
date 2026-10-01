@@ -473,6 +473,10 @@ class PurgeWorker:
             outcome.completed_tombstones.append(target.tombstone_id)
 
 
+#: The error a job is skipped with while something live still holds its bytes: not terminal, it is
+#: tried again after ``queue.RETRY_AFTER`` and keeps its tombstone open (migration 0013).
+HELD_BY_A_LIVE_RECORD: Final = "something live still holds these bytes"
+
 #: The destroy question each tombstone scope asks, by the scope a claimed job carries.
 #:
 #: **Which question gets asked matters in the direction that leaves bytes on disk for ever.**
@@ -484,10 +488,6 @@ class PurgeWorker:
 #: artefact's own content hash, with its capture live, answers false, so a job enqueued without a
 #: question of its own skips, spends its eight attempts and is reported exhausted while the bytes
 #: are still there.
-#: The error a job is skipped with while something live still holds its bytes: not terminal, it is
-#: tried again after ``queue.RETRY_AFTER`` and keeps its tombstone open (migration 0013).
-HELD_BY_A_LIVE_RECORD: Final = "something live still holds these bytes"
-
 _ARTIFACT_QUESTION: Final = {
     "entity": "person_withdrawal_releases_artifact(%(tombstone)s,decode(%(ref)s,'hex'))",
     "scene_training": (
