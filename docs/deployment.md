@@ -1196,19 +1196,23 @@ restore is sealed or replaying. Two cases are kept apart
   checkpoint; anything else is refused and nothing is renamed. Without `--set-aside`, a target that
   already holds the source's name is refused before anything is sealed. Until the restore
   completes, `restore return-to-source --checkpoint FILE [--set-aside]` abandons it and lets the
-  source serve again; without `--set-aside` it replays only into a database sealed for this
-  checkpoint, so it refuses a partial copy that took the source's name after the source was set
-  aside. It replays with the installation's own purge connection and stores, so it returns a
+  source serve again. Without `--set-aside` it refuses while the source is still set aside, and
+  replays only into a database sealed for this checkpoint or one whose replay this attempt already
+  began, so it refuses a partial copy that took the source's name; with `--set-aside` it renames
+  back only a set-aside database sealed for this checkpoint. A return whose replay began and
+  stopped is resumed by running it again, with or without `--set-aside`. It replays with the installation's own purge connection and stores, so it returns a
   source on the installation's server; a source on another server fails closed (its re-queued
   purges cannot complete there) and is returned with that server's own settings. Once it completes, the set-aside source lacks every deletion made since and
   lies outside every deletion path, so it can never serve again:
-  `restore discard-set-aside --checkpoint FILE` drops it, and only a database that is that sealed
-  source, found through the marker's record of completed restores, so it stays discardable after a
-  later restore. The marker records every restore that completes and carries the record through
+  `restore discard-set-aside --checkpoint FILE` drops it: the database under the set-aside name
+  found through the marker's record of completed restores, and only while it is sealed for that
+  checkpoint (the drop checks the seal, not the identity), so it stays discardable after a later
+  restore. The marker records every restore that completes and carries the record through
   every later write, and while it is kept, preparing, resuming or replaying a recorded checkpoint
-  again is refused as already complete; a lost marker loses that record. A rerun classifies the
-  target before it writes the marker, and a database in which a restore completed is refused as
-  live, never offered as a partial copy.
+  again is refused; a lost marker loses that record. A rerun classifies the target before it writes
+  the marker. With no attempt pending, a database in which a restore completed is refused as live
+  ("do not drop it"); under a pending attempt a completed restore's row may be one the loaded
+  backup carried, so that database is refused as a possible partial copy of this attempt.
 - **Crash recovery**, with the source lost: `exulanica-installation restore declared --backup-set DIR
   --export FILE --declaration FILE` writes the marker first, loads the backup set into an empty
   target, copies its bytes back, migrates and reprovisions, and replays the export under the
@@ -1220,7 +1224,8 @@ restore is sealed or replaying. Two cases are kept apart
   refuses another release's, so a crash recovery runs on the release the export came from and
   upgrades afterwards. A pending declared recovery is abandoned, for example for a newer export, by
   `restore abandon --export FILE`, once the target holds no database of that name: the marker
-  becomes `abandoned`, which still refuses serving, as pending did, and accepts a new restore.
+  becomes `abandoned`, which still refuses serving, as pending did, is never replayed, and accepts
+  a new restore; it keeps the record of completed restores.
 
 Both restores check the set's key list, its dump's digest and the target database's name before
 anything else, then write the marker before loading anything, and keep the API refusing until

@@ -707,7 +707,10 @@ def completed_restores(marker: dict[str, Any]) -> list[dict[str, str]]:
 
 def _completing(marker: dict[str, Any]) -> list[dict[str, str]]:
     """The completed list once ``marker``'s own attempt completes."""
-    done = {"checkpoint_sha256": marker["checkpoint_sha256"], "restore_id": marker["restore_id"]}
+    digest, restore_id = marker.get("checkpoint_sha256"), marker.get("restore_id")
+    if not isinstance(digest, str) or not isinstance(restore_id, str):
+        raise RestoreRefused("the restore marker names no completed attempt it can record")
+    done = {"checkpoint_sha256": digest, "restore_id": restore_id}
     found = completed_restores(marker)
     return found if done in found else [*found, done]
 
@@ -860,6 +863,11 @@ def replay(
         or marker.get("checkpoint_sha256") != digest
     ):
         raise RestoreRefused("restore marker names a different authoritative checkpoint")
+    if marker.get("state") == "abandoned":
+        raise RestoreRefused(
+            "the restore this marker names was abandoned; prepare a new restore instead, which "
+            "takes the newest export in custody"
+        )
     if marker.get("state") == "complete":
         # Replaying again would make a database that has not served since (a set-aside source)
         # serve with every deletion made in the restored one undone.

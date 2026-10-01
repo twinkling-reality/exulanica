@@ -691,7 +691,7 @@ def test_an_unfinished_set_aside_restore_returns_to_its_source(purged, source, t
         with pytest.raises(RestoreRefused, match="has not completed"):
             discard_set_aside(target=target, name=database, checkpoint_path=sealed, marker=marker)
         # Without --set-aside it would replay into the partial copy that now holds the name.
-        with pytest.raises(RestoreRefused, match="not the source this restore sealed"):
+        with pytest.raises(RestoreRefused, match="the source was set aside as"):
             return_to_source(**{**arguments, "set_aside": False})
         with pytest.raises(RestoreRefused, match="partial copy"):
             return_to_source(**arguments)
@@ -943,7 +943,7 @@ def test_a_pending_declared_recovery_is_abandoned_for_a_newer_export(purged, sou
                 **common,
             )
         # Abandoned only once nothing the attempt loaded remains.
-        with pytest.raises(RestoreRefused, match="still holds"):
+        with pytest.raises(RestoreRefused, match="it is a partial copy"):
             abandon_declared(target=target, export=first, marker=marker)
         with psycopg.connect(cluster.url(port, owner, "postgres"), autocommit=True) as c:
             c.execute(f'drop database "{database}"')
@@ -1062,7 +1062,9 @@ def test_a_rerun_classifies_the_target_before_writing_a_marker(purged, source, t
             # The live database a restore completed in; the attempt that completed it is its own.
             assert _target_state(target, database, digest) == "live"
             assert _target_state(target, database, digest, completed) == "replaying"
-            with pytest.raises(RestoreRefused, match="live database"):
+            with pytest.raises(
+                RestoreRefused, match="is a live database, in which a restore completed"
+            ):
                 restore_planned(
                     source=purged.database(),
                     checkpoint_path=sealed,
@@ -1075,3 +1077,230 @@ def test_a_rerun_classifies_the_target_before_writing_a_marker(purged, source, t
             assert not marker.exists()
         finally:
             _unseal(purged, sealed, tmp_path)
+
+
+def test_a_partial_copy_whose_backup_carries_an_earlier_restore_is_not_called_live(
+    purged, tmp_path
+):
+    """Every set taken after a completed restore carries that restore's complete row. A failed
+    load of such a set is this attempt's partial copy: the rerun says so and resumes after the
+    drop, instead of calling it live and keeping the installation down."""
+    from exulanica.orchestration.installation.recovery import restore_planned
+
+    with purged.database().unscoped() as connection:
+        connection.execute(f'set search_path to "{purged.scratch}", public')
+        connection.execute(
+            "insert into restore_control (checkpoint_id,checkpoint_sha256,state,restore_id) "
+            "values (%s,%s,'complete',%s)",
+            (uuid.uuid4(), "e" * 64, uuid.uuid4()),
+        )
+        provision_backup_role(connection, role=_ROLE, password=_PASSWORD)
+    backup_store = LocalContentAddressedStore(tmp_path / "backup-store" / "blobs")
+    taken = take_backup_set(
+        backup_url=purged.database(role=_ROLE, password=_PASSWORD).url,
+        directory=tmp_path / "backup-sets",
+        namespaces=[Namespace("blobs", purged.store, backup_store)],
+        custody=tmp_path / "custody",
+        restore_state_path=None,
+        backup_domains=[purged.store.root, tmp_path / "backup-store"],
+        identity={"profile": "single-host"},
+        role=_ROLE,
+    )
+    sealed = tmp_path / "custody" / "checkpoint.json"
+    marker = tmp_path / "control" / "restore.json"
+    loaded = read_backup_set(taken.directory)
+    owner, database = loaded.database.owner_role, loaded.database.database
+
+    def failing(_database):
+        raise RuntimeError("the provisioning step fails this once")
+
+    try:
+        with scratch_cluster(owner=owner) as (cluster, port):
+            target = _target(cluster, port, owner, database, purged.scratch, tmp_path)
+            arguments = {
+                "source": purged.database(),
+                "checkpoint_path": sealed,
+                "backup_set": taken.directory,
+                "backup_stores": {"blobs": backup_store},
+                "marker": marker,
+                "target": target,
+            }
+            with pytest.raises(RuntimeError, match="fails this once"):
+                restore_planned(**arguments, provision=failing)
+            with psycopg.connect(target.database_url) as c:
+                assert c.execute("select state from restore_control").fetchone()[0] == "complete"
+            with pytest.raises(RestoreRefused) as refused:
+                restore_planned(**arguments, provision=_provision(purged.scratch))
+            assert "it is a partial copy" in str(refused.value)
+            assert "a live database, in which a restore completed" not in str(refused.value)
+            with psycopg.connect(cluster.url(port, owner, "postgres"), autocommit=True) as c:
+                c.execute(f'drop database "{database}"')
+            result = restore_planned(**arguments, provision=_provision(purged.scratch))
+            assert result["mode"] == "planned"
+    finally:
+        _unseal(purged, sealed, tmp_path)
+
+
+def test_a_return_whose_replay_began_resumes(purged, source, tmp_path, monkeypatch):
+    from exulanica.deletion import restore
+    from exulanica.orchestration.installation.recovery import restore_planned, return_to_source
+
+    taken, backup_store = source
+    loaded = read_backup_set(taken.directory)
+
+    class Interrupted(RuntimeError):
+        pass
+
+    class stopped:
+        def __init__(self, *args, **kwargs):
+            raise Interrupted("the return's purge never started")
+
+        @classmethod
+        def over(cls, *args, **kwargs):
+            raise Interrupted("the return's purge never started")
+
+    def failing(_database):
+        raise RuntimeError("the provisioning step fails this once")
+
+    with scratch_cluster(owner=loaded.database.owner_role) as (cluster, port):
+        target, owner, database = _source_on_the_target_server(
+            purged, source, tmp_path, cluster, port
+        )
+        sealed = tmp_path / "custody" / "planned.json"
+        marker = tmp_path / "control" / "planned.json"
+        with pytest.raises(RuntimeError, match="fails this once"):
+            restore_planned(
+                source=Database(target.database_url),
+                checkpoint_path=sealed,
+                backup_set=taken.directory,
+                backup_stores={"blobs": backup_store},
+                marker=marker,
+                target=target,
+                provision=failing,
+                set_aside=True,
+            )
+        with psycopg.connect(cluster.url(port, owner, "postgres"), autocommit=True) as c:
+            c.execute(f'drop database "{database}"')
+        arguments = {
+            "target": target,
+            "name": database,
+            "source_purge": Database(target.purge_url),
+            "checkpoint_path": sealed,
+            "marker": marker,
+        }
+        # Renamed back, then the replay stops: twice with --set-aside, which resumes it.
+        for _ in range(2):
+            with monkeypatch.context() as patched:
+                patched.setattr(restore, "PurgeWorker", stopped)
+                with pytest.raises(Interrupted):
+                    return_to_source(set_aside=True, **arguments)
+        # And without the flag, the same attempt's replay is resumed and completed.
+        return_to_source(set_aside=False, **arguments)
+        verify_restore(Database(target.database_url), marker)
+
+
+def test_an_abandoned_recovery_is_never_replayed_and_keeps_its_record(purged, source, tmp_path):
+    from exulanica.deletion.restore import replay
+    from exulanica.orchestration.installation.recovery import abandon_declared
+
+    from test_restore_replay import _purge_database
+
+    taken, backup_store = source
+    export, _ = _export(purged, tmp_path)
+    loaded = read_backup_set(taken.directory)
+    owner, database = loaded.database.owner_role, loaded.database.database
+    marker = tmp_path / "control" / "restore.json"
+    earlier = {"checkpoint_sha256": "f" * 64, "restore_id": str(uuid.uuid4())}
+    marker.parent.mkdir(parents=True, exist_ok=True)
+    marker.write_text(
+        json.dumps(
+            {
+                "profile": "exulanica.restore-state/v1",
+                "state": "complete",
+                "checkpoint_id": str(uuid.uuid4()),
+                **earlier,
+                "completed": [earlier],
+            }
+        )
+    )
+
+    def failing(_database):
+        raise RuntimeError("the provisioning step fails this once")
+
+    with scratch_cluster(owner=owner) as (cluster, port):
+        target = _target(cluster, port, owner, database, purged.scratch, tmp_path)
+        with pytest.raises(RuntimeError, match="fails this once"):
+            recover_declared(
+                backup_set=taken.directory,
+                backup_stores={"blobs": backup_store},
+                export=export,
+                custody=export.parent,
+                declaration=_declare(tmp_path, export, dt.datetime.now(dt.UTC)),
+                max_export_lag=_LAG,
+                marker=marker,
+                target=target,
+                provision=failing,
+            )
+        with psycopg.connect(cluster.url(port, owner, "postgres"), autocommit=True) as c:
+            c.execute(f'drop database "{database}"')
+        abandon_declared(target=target, export=export, marker=marker)
+    state = json.loads(marker.read_bytes())
+    assert state["state"] == "abandoned" and earlier in state["completed"]
+    with pytest.raises(RestoreRefused, match="abandoned"):
+        replay(
+            purged.database(),
+            _purge_database(purged),
+            purged.store,
+            export,
+            marker,
+            writers=WRITERS,
+        )
+    assert json.loads(marker.read_bytes()) == state
+
+
+def test_a_replay_committed_before_its_marker_is_finished_by_the_rerun(
+    purged, source, tmp_path, monkeypatch
+):
+    from exulanica.deletion import restore
+
+    taken, backup_store = source
+    export, _ = _export(purged, tmp_path)
+    loaded = read_backup_set(taken.directory)
+    owner, database = loaded.database.owner_role, loaded.database.database
+    marker = tmp_path / "control" / "restore.json"
+    written = restore._write
+
+    def crash_before_completion(path, value):
+        if value.get("state") == "complete":
+            raise OSError("the host stopped before the marker was written")
+        written(path, value)
+
+    with scratch_cluster(owner=owner) as (cluster, port):
+        arguments = {
+            "backup_set": taken.directory,
+            "backup_stores": {"blobs": backup_store},
+            "export": export,
+            "custody": export.parent,
+            "declaration": _declare(tmp_path, export, dt.datetime.now(dt.UTC)),
+            "max_export_lag": _LAG,
+            "marker": marker,
+            "target": _target(cluster, port, owner, database, purged.scratch, tmp_path),
+            "provision": _provision(purged.scratch),
+        }
+        with monkeypatch.context() as patched:
+            patched.setattr(restore, "_write", crash_before_completion)
+            with pytest.raises(OSError, match="before the marker"):
+                recover_declared(**arguments)
+        assert json.loads(marker.read_bytes())["state"] == "pending"
+        result = recover_declared(**arguments)
+    state = json.loads(marker.read_bytes())
+    assert result["resumed"] is True and result["objects_copied"] == 0
+    assert state["state"] == "complete"
+    assert state["checkpoint_sha256"] in [item["checkpoint_sha256"] for item in state["completed"]]
+
+
+def test_a_hand_edited_complete_marker_is_a_named_refusal():
+    from exulanica.deletion.restore import _completing
+
+    with pytest.raises(RestoreRefused, match="no completed attempt it can record"):
+        _completing({"profile": "exulanica.restore-state/v1", "state": "complete"})

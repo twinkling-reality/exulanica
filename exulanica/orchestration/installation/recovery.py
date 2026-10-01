@@ -186,8 +186,9 @@ def _target_state(
 def _state_at(url: str, authority_sha256: str, attempt: uuid.UUID | None = None) -> str:
     """What the database at ``url`` is to this restore, by its own restore_control: sealed_source
     (sealed for this authority), replaying (this authority's replay, loaded; or this attempt's
-    replay committed before its marker was), live (a restore completed in it), empty (no table)
-    or occupied (anything else)."""
+    replay committed before its marker was), live (a restore completed in it, and no attempt is
+    pending), empty (no table) or occupied (anything else, including a copy this attempt loaded
+    whose backup carried an earlier restore's complete row)."""
     with psycopg.connect(url, autocommit=True) as connection:
         tables = connection.execute(
             "select count(*) from pg_tables where schemaname not in ('pg_catalog', "
@@ -205,7 +206,12 @@ def _state_at(url: str, authority_sha256: str, attempt: uuid.UUID | None = None)
         return "occupied"
     state, digest, restore_id = control
     if state == "complete":
-        return "replaying" if attempt is not None and restore_id == attempt else "live"
+        if attempt is None:
+            return "live"
+        # Under a pending attempt, written only after the target held nothing of this name, a
+        # complete row is either this attempt's own committed replay or a row the loaded backup
+        # carried from an earlier restore: the copy this attempt loaded, never a live database.
+        return "replaying" if restore_id == attempt else "occupied"
     if digest == authority_sha256:
         if state == "sealed":
             return "sealed_source"
@@ -343,7 +349,7 @@ def _report_unlisted(
     backup_set: Path, target: Target, marker: Path, restore_id: uuid.UUID
 ) -> dict[str, Any]:
     """Count the objects the restored database does not reference and list their keys beside the
-    marker for the operator, who alone may remove them."""
+    marker. A listing, not a list of what may be removed: removal is open (deployment.md 9.4)."""
     try:
         found = unlisted_objects(backup_set, target)
     except Exception as failure:
@@ -577,40 +583,60 @@ def return_to_source(
     which finds every tombstone already present and writes only the receipt.
     """
     digest = _record_sha256(checkpoint_path)
-    if _pending(marker, digest) is None:
+    attempt = _pending(marker, digest)
+    if attempt is None:
         raise RestoreRefused(
             "the marker is not pending for this checkpoint: the restore completed and the "
             "restored database has served, so the source would bring back deletions made since; "
             "discard it instead"
         )
-    if not set_aside and _state_at(target.database_url, digest) != "sealed_source":
-        # Only the source this restore sealed is replayed into: a partial copy loaded under the
-        # source's name after it was set aside would otherwise be completed and served.
+    # Whether the source is still set aside decides what the source's name holds: while it is,
+    # the name holds the restore's own copy, which is never the source.
+    kept = _kept_name(name, attempt)
+    aside = _target_state(target, kept, digest, attempt)
+    if aside not in ("absent", "sealed_source"):
         raise RestoreRefused(
-            "the database the source connection names is not the source this restore sealed; if "
-            "the source was set aside, run return-to-source --set-aside"
+            f"{kept} on the target server is not the source this restore sealed; nothing is renamed"
         )
-    if set_aside:
-        state = _target_state(target, name, digest)
-        if state == "sealed_source":
+    if not set_aside:
+        if aside == "sealed_source":
             raise RestoreRefused(
-                f"{name} on the target server is still the sealed source: it was never set "
-                "aside; run return-to-source without --set-aside"
+                f"the source was set aside as {kept}: run return-to-source --set-aside"
             )
+        try:
+            held = _state_at(target.database_url, digest, attempt)
+        except psycopg.OperationalError as exc:
+            raise RestoreRefused(
+                "the source connection names no database that can be reached; if the source was "
+                "set aside, run return-to-source --set-aside"
+            ) from exc
+        # The seal, or this attempt's own replay of it, begun or committed by an earlier run.
+        if held not in ("sealed_source", "replaying"):
+            # A partial copy loaded under the source's name would otherwise be completed and served.
+            raise RestoreRefused(
+                "the database the source connection names is not the source this restore sealed; "
+                "if the source was set aside, run return-to-source --set-aside"
+            )
+    elif aside == "sealed_source":
+        state = _target_state(target, name, digest, attempt)
         if state != "absent":
             _refuse_target(state, name, attempt_pending=True)
-        kept = _kept_name(name, uuid.UUID(json.loads(marker.read_bytes())["restore_id"]))
-        if _target_state(target, kept, digest) != "sealed_source":
-            raise RestoreRefused(
-                f"{kept} on the target server is not the source this restore sealed; nothing is "
-                "renamed"
-            )
         with psycopg.connect(target.maintenance_url, autocommit=True) as connection:
             connection.execute(
                 sql.SQL("alter database {} rename to {}").format(
                     sql.Identifier(kept), sql.Identifier(name)
                 )
             )
+    else:
+        # Renamed back by an earlier run: resume its replay; or the source was never set aside.
+        state = _target_state(target, name, digest, attempt)
+        if state == "sealed_source":
+            raise RestoreRefused(
+                f"{name} on the target server is still the sealed source: it was never set aside; "
+                "run return-to-source without --set-aside"
+            )
+        if state != "replaying":
+            _refuse_target(state, name, attempt_pending=True)
     source = Database(target.database_url)
     replay(
         source, source_purge, None, checkpoint_path, marker, writers=WRITERS, stores=target.stores
@@ -623,17 +649,18 @@ def abandon_declared(*, target: Target, export: Path, marker: Path) -> dict[str,
 
     The source is lost, so nothing serves either way. Allowed only while the marker is pending for
     this export and the target holds no database of that name: whatever this attempt loaded is
-    dropped by the operator first. The marker returns to ``none`` and records what was abandoned.
+    dropped by the operator first. The marker becomes ``abandoned``, which still refuses serving and
+    accepts a new restore, and keeps its record of completed restores.
     """
     digest = _record_sha256(export)
-    if _pending(marker, digest) is None:
+    attempt = _pending(marker, digest)
+    if attempt is None:
         raise RestoreRefused("the marker is not pending for this export: nothing to abandon")
     name = str(conninfo_to_dict(target.database_url).get("dbname") or "")
-    if _target_state(target, name, digest) != "absent":
-        raise RestoreRefused(
-            f"the target server still holds {name}, loaded by this attempt from the backup: "
-            "drop it only if it is that copy, then abandon"
-        )
+    state = _target_state(target, name, digest, attempt)
+    if state != "absent":
+        # The same classification and words as the rerun: the copy this attempt loaded, or not.
+        _refuse_target(state, name, attempt_pending=True)
     return abandon_declared_restore(marker, digest)
 
 
