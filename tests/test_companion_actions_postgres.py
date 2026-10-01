@@ -607,15 +607,6 @@ def test_a_question_is_left_to_the_answer_path(actions):
     assert len(plan["execution"]["calls"]) == 1
 
 
-def test_a_simulation_request_names_the_direct_control(actions):
-    entry, version = actions.starter()
-    actions.script(kind("simulation"))
-    plan = actions.ask(entry, version, "pause everyone").json()
-    assert plan["outcome"] == "refused"
-    assert plan["refusal"]["code"] == "action_not_offered"
-    assert plan["refusal"]["operation"] == "PUT /world/versions/{version_id}/society/control"
-
-
 def test_what_can_be_asked_for_is_read_from_the_descriptors(actions):
     entry, version = actions.starter()
     actions.script(kind("capabilities"))
@@ -625,7 +616,10 @@ def test_what_can_be_asked_for_is_read_from_the_descriptors(actions):
     assert listed["place_object"]["state"] == "available"
     assert listed["place_object"]["permitted"] is True
     assert listed["place_arrangement"]["offered"] is True
-    assert listed["control_simulation"]["offered"] is False
+    # Simulated time and people: the playback controls and the creation of people, each with
+    # its own descriptor's state (tests/test_companion_simulation_actions_postgres.py).
+    assert {"control_simulation", "advance_time", "bring_people"} <= set(listed)
+    assert listed["bring_people"]["state"] == "available"
     # A starter holds no evidence: a design choice is the basis that is available.
     bases = listed["change_appearance"]["bases"]
     assert bases["evidence"] == {"state": "unavailable", "code": "no_evidence"}

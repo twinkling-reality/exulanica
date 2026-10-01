@@ -13,12 +13,14 @@ import json
 import uuid
 from collections.abc import Iterator
 from dataclasses import dataclass
+from decimal import Decimal
 
 import pytest
 from exulanica.api.app import create_app
 from exulanica.api.authorisation import load_token_directory
 from exulanica.api.services import Services
 from exulanica.models.client import ModelClient
+from exulanica.models.usage import usd_string
 from exulanica.orchestration.judge_seed import JUDGE_ROLE, mint_judge_token, provision_judge_role
 from exulanica.spending.ledger import DurableSpending
 from exulanica.store.local import LocalContentAddressedStore
@@ -27,7 +29,15 @@ from psycopg import sql
 
 from conftest import scratch_role_database
 from model_fakes import FakeTransport
-from spending_support import bench
+from spending_support import (
+    MESSAGES,
+    ROLE,
+    WorkspacePolicy,
+    bench,
+    no_usage_body,
+    one_reservation,
+    spending_client,
+)
 from tests_support_api import EVERY_PERMISSION
 
 __all__ = ["bench"]
@@ -149,3 +159,66 @@ def test_a_judge_deployment_reads_its_workspace_spending(bench, tmp_path):
         with bench.admin.unscoped() as connection:
             connection.execute(sql.SQL("drop owned by {}").format(sql.Identifier(role)))
             connection.execute(sql.SQL("drop role {}").format(sql.Identifier(role)))
+
+
+def test_no_answer_to_a_workspace_states_the_authority_figures(bench, tmp_path):
+    """An authority's ceiling and what it has committed are every workspace's spending together.
+    The process that admits receives them, for its witness; no HTTP answer states them: not a
+    refusal by the authority, not the workspace's status, not readiness."""
+    one = one_reservation()
+    ceiling = one * 2 + Decimal("0.00000011")
+    authority = bench.issue(ceiling=ceiling, calls=100)
+    mine, theirs = uuid.uuid4(), uuid.uuid4()
+    bench.grant(authority, mine, ceiling=one * 2 - Decimal("0.00000005"), calls=40)
+    bench.grant(authority, theirs, ceiling=ceiling, calls=40)
+    spent = FakeTransport()
+    spent.default = no_usage_body()
+    theirs_client = spending_client(bench.durable("theirs"), spent)
+    for _ in range(2):
+        theirs_client.with_policy(WorkspacePolicy(theirs)).chat(
+            ROLE, MESSAGES, prompt_version="authority-figures", use_cache=False
+        )
+    committed = bench.state(authority)["committed_usd"]
+    assert committed == one * 2
+    figures = {usd_string(ceiling), usd_string(committed)}
+
+    token = "spending-figures-owner-token-long-enough-to-be-accepted"
+    grants = {
+        token: {
+            "workspace_id": str(mine),
+            "actor": str(uuid.uuid4()),
+            "permissions": EVERY_PERMISSION,
+        }
+    }
+    transport = FakeTransport()
+    durable = bench.durable("api")
+    services = Services(
+        database=bench.runtime,
+        readonly_database=bench.runtime,
+        store=LocalContentAddressedStore(tmp_path / "figures-blobs"),
+        tokens=load_token_directory({"EXULANICA_API_TOKENS": json.dumps(grants)}),
+        executor_shares_the_write_role=True,
+        model_client=ModelClient(
+            api_key="test-key-not-real", transport=transport
+        ).with_spending_source(durable),
+        spending_mode="durable",
+        spending=durable,
+    )
+    with TestClient(create_app(services, verify=False), raise_server_exceptions=False) as http:
+        answers = [
+            http.post("/selection/plan", headers=_auth(token), json={"question": "where was I?"}),
+            http.get("/spending", headers=_auth(token)),
+            http.get("/readyz"),
+        ]
+    refused = answers[0]
+    assert refused.status_code == 429, refused.text
+    assert (refused.json()["spending"]["reason"], refused.json()["spending"]["scope"]) == (
+        "spending_limit_reached",
+        "authority",
+    )
+    assert transport.call_count == 0
+    assert answers[1].status_code == 200, answers[1].text
+    for answer in answers:
+        said = answer.text + json.dumps(dict(answer.headers))
+        for figure in figures:
+            assert figure not in said, (str(answer.request.url), figure)

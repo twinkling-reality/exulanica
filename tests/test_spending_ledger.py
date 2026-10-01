@@ -542,3 +542,28 @@ def test_status_is_the_workspace_own_and_names_what_is_unresolved(bench):
     assert entry["available_calls"] == 5
     none = workspace_status(bench.runtime, uuid.uuid4())["providers"][0]
     assert none["grant"] == {"state": "none"} and none["available_usd"] == "0.00000000"
+
+
+def test_an_admission_refused_before_the_authority_row_releases_nothing_until_expire(bench):
+    """Stated in the contract's section 12: an admission refused before it takes the authority's
+    row (here, no live grant) changes nothing, so its workspace's stale admissions stay held,
+    against every workspace's allowance, until an operator runs ``expire``."""
+    authority = bench.issue(dispatch_seconds=1)
+    workspace = uuid.uuid4()
+    grant = bench.grant(authority, workspace)
+    durable = bench.durable()
+    stale = durable.for_workspace(workspace).admit(_request())
+    bench.operator.revoke(
+        authority, workspace_id=workspace, grant_id=grant, operator="test-operator", reason="stop"
+    )
+    time.sleep(1.2)  # the dispatch window: the admission can no longer leave
+    with pytest.raises(SpendingRefused) as refused:
+        durable.for_workspace(workspace).admit(_request())
+    assert (refused.value.reason, refused.value.scope) == ("spending_revoked", "workspace")
+    rows = {row["reservation_id"]: row for row in bench.reservations(workspace)}
+    assert rows[stale.reservation_id]["state"] == "admitted"
+    assert bench.state(authority)["committed_calls"] == 1
+    assert bench.operator.expire(authority) == 1
+    rows = {row["reservation_id"]: row for row in bench.reservations(workspace)}
+    assert rows[stale.reservation_id]["state"] == "released"
+    assert bench.state(authority)["committed_calls"] == 0

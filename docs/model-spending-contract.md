@@ -40,7 +40,9 @@ admission:
 - **Workspace grant.** An operator grants one workspace an allowance under an authority
   (`spending_grant` with no parent). A workspace holds at most one live grant per provider.
 - **Bound.** A piece of work (a comparison, a run) opens a bound under the workspace's grant,
-  idempotently by its key, and may close it; it cannot open a grant.
+  idempotently by its key, and may close it; it cannot open a grant. No production path opens one
+  yet: a comparison holds its bound in its own process (`BoundedBudget`), and the durable bound is
+  the mechanism its planned use takes ([section 12](#12-what-this-does-not-provide)).
 
 Nothing is granted because a workspace exists: a workspace with no live grant refuses every attempt
 as `spending_not_granted`, and no import, seed or restore creates a grant (spending tables never
@@ -58,7 +60,8 @@ short transaction through a function migration 0124 grants the runtime:
 1. **Admit.** After the process fuse reserves the attempt and its credential is found, the attempt's
    worst case (the fuse's own estimate) is held against every level, or refused before anything is
    sent. Attempts the workspace admitted and never dispatched within the dispatch window can no
-   longer leave, and are released first, whatever this admission's own answer.
+   longer leave, and an admission that takes the authority's row releases them first, whatever
+   its own answer; one refused before that releases nothing ([section 12](#12-what-this-does-not-provide)).
 2. **Dispatch.** The durable record that the request may now leave, committed before the transport
    is given it, and on the ledger and the witness like every other step, so a restore cannot lose
    it unnoticed ([section 7](#7-restore-the-spending-witness)). An attempt past its window, under
@@ -71,7 +74,10 @@ short transaction through a function migration 0124 grants the runtime:
 
 Each admission is named by its own attempt: the process's label, its process id and a nonce, and a
 nonce for the attempt. Only that attempt dispatches, settles or releases its reservation; another
-call, of the same process or another, is refused at admission and cannot release it.
+call, of the same process or another, is refused at admission and cannot release it. The name
+separates attempts against accident, not sessions of the runtime role against each other: any of
+them may read a reservation's holder in its workspace. The runtime is trusted to settle what it
+sent; the authority bounds what it may spend.
 
 | State | Meaning | Liability held |
 | --- | --- | --- |
@@ -109,6 +115,15 @@ the request; each attempt inside is admitted as `<key>#<n>` in order, so the rep
 the same attempts. Outside one, every attempt has a fresh key and is accounted durably but is not
 deduplicated.
 
+No production caller makes its requests inside one yet. Every attempt of the API, the workers, the
+comparisons and the decision host is admitted under a fresh `auto:` key
+(`exulanica/models/chain.py`). So a request a caller replays after a crash, or a job its queue runs
+again, is admitted as new attempts: what each reserves is held and settled as
+[section 3](#3-an-attempt-from-admission-to-settlement) says, and the authority still bounds what is
+spent, but the same request can be sent, and billed, twice. The deduplication in the table holds
+for a caller that passes a key, which today is the tests
+([section 12](#12-what-this-does-not-provide)).
+
 | An attempt with the key is | Asking again |
 | --- | --- |
 | Admitted by another attempt, of this process or another, in its window | `duplicate_request_in_flight` |
@@ -118,8 +133,9 @@ deduplicated.
 
 `tests/test_spending_crash.py` stops a process with SIGKILL after its witness write and before its
 commit, after admission, after dispatch, after sending, after the reply and before settlement, and
-after settlement, then retries the same request from a new process: no request is sent twice where
-the first may have left, and the restarted process never finds the liability returned.
+after settlement, then retries the same request, under the same key, from a new process: no request
+is sent twice where the first may have left, and the restarted process never finds the liability
+returned.
 
 ## 5. Revocation and expiry
 
@@ -137,9 +153,10 @@ witness holds the authority's and every workspace grant's for a restore made wit
 Validity ends at the authority's current term, the grant's and the bound's own end.
 
 An attempt admitted and never dispatched in its window is released by the next admission of its
-workspace, whatever that admission's answer, and by `expire`, which releases every workspace's. An
-installation runs `expire` on a schedule: until then, a workspace that does not ask again holds its
-stale admissions against the authority, which fails closed.
+workspace that takes the authority's row, whatever that admission's answer, and by `expire`, which
+releases every workspace's. An installation runs `expire` on a schedule: until then, a workspace
+that does not ask again, or whose admissions are refused before the row (its grant revoked or
+expired), holds its stale admissions against the authority, which fails closed.
 
 ## 6. Concurrency and locks
 
@@ -177,7 +194,16 @@ where a restore does not reach, so a restore cannot hand the difference back.
 - **Where it lives.** `EXULANICA_SPENDING_WITNESS_DIR`, on storage outside the database's backup
   domain, shared by every spending process of the installation on one host (a local filesystem with
   POSIX advisory locks), and never restored together with the database. Copies kept in backup sets
-  or custody are evidence and are marked as copies when installed.
+  or custody are evidence and are marked as copies when installed. The envelope's state, never
+  anything a record holds, says whether a witness is live or a copy.
+- **Which directory.** The directory carries a marker naming it (`witness-directory.json`), written
+  by the operator commands and never by a spending process. Every witness a process reads names its
+  directory, and an authority records the directory its witness is kept in (migration 0133): at the
+  first operator step whose witness agrees with its ledger, and at every reauthorization and
+  reconciliation, which an operator makes from the directory the witness is kept in from then on. A
+  process whose directory has no marker, or another one, cannot prove it reads the authority's
+  witness: it is refused alone and suspends nobody. An authority with no recorded directory is not
+  checked.
 
 VERIFIED (`tests/test_spending_witness.py`). Each step compares the witness it read with the ledger
 under the authority's row:
@@ -187,6 +213,7 @@ under the authority's row:
 | Agrees, or is one unconfirmed step ahead of the ledger's head | Proceeds | |
 | Is ahead of the ledger (a database restored behind it) | Refused `spending_suspended`, `ledger_behind_witness` | `reconcile-restore` |
 | This process has none (`witness_not_configured`) | Refused in this process only | Configured |
+| Is in a directory that is not the authority's: no marker, or another (`witness_directory_mismatch`) | Refused in this process only | The process is given the installation's directory |
 | Is missing, unreadable, behind or diverged | The authority is suspended | `reauthorize` |
 | Is a copy installed from custody | The authority is suspended | `reconcile-restore` when the copy is ahead, then `reauthorize` |
 
@@ -205,7 +232,11 @@ frozen, since its later outcome is already in what the witness carries; every bo
 is closed, since bounds are not in the witness; the witness's terms and revocations are written
 again; the ledger continues from the witness's head. What was spent stays spent. After a copy the
 authority stays suspended (`witness_copy_only`) until reauthorized, since the copy may be older than
-the live witness it stands in for.
+the live witness it stands in for; the record a reconciliation from a copy writes stays a copy until
+its commit is confirmed, so one that never commits leaves a copy, and the reconciliation made again
+still holds the authority. A reconciliation writes revocation rows (the witness's, and every bound
+it closes), which a sealed restore checkpoint refuses as it refuses every withdrawal: it is made
+after the checkpoint is unsealed.
 
 `reauthorize` is an operator's explicit new epoch with stated terms; it clears a suspension and
 writes the witness whole from the ledger. A witness or copy that may hold spending the ledger lacks
@@ -234,25 +265,39 @@ read; reconciliation is an operator's act.
 - `process`: the process spends within its fuse alone, and `/readyz` says that a restart or another
   process starts it again at zero.
 - `EXULANICA_SPENDING_WITNESS_DIR` names the witness directory; a durable process without it refuses
-  to spend under a witnessed authority, and `/readyz` says so.
+  to spend under a witnessed authority, and `/readyz` says so. A directory with no marker is named
+  in `/readyz` too: the process refuses to spend under any authority whose directory is recorded.
 - Measurement scripts and the offline commands that build a `ModelClient` directly spend within
   their own fuses and are outside the authority unless given a source (`ModelClient(spending=...)`).
-- VERIFIED (`tests/test_spending_privileges.py`). The runtime and read-only roles read their own
-  workspace's grants, bounds and reservations, row-level security keeping every other workspace's
-  out, and change them only through the five runtime functions. Neither reads an authority's tables
-  or the ledger: an authority's committed total is every workspace's spending together, and the
-  ledger's sequence counts every workspace's steps. `spending_authority_facts` states an authority's
-  state and no amount. Migration 0124 takes back whatever writes or reads a provisioner's default
-  privileges gave on its tables, without waiting for the next provisioning.
+- VERIFIED (`tests/test_spending_privileges.py`, `tests/test_judge_seed.py`). The runtime, the
+  read-only and the judge roles read their own workspace's grants, bounds and reservations,
+  row-level security keeping every other workspace's out; the runtime changes them only through the
+  five runtime functions. None holds a privilege on an authority's tables or the ledger, and each
+  reads an authority's state, with no amount, through `spending_authority_facts`. Migrations 0124
+  and 0133 take back whatever a provisioner's default privileges gave on these tables (0133 with
+  CASCADE, and MAINTAIN too), without waiting for the next provisioning.
+- What the runtime process receives. The functions it executes return what its process writes to
+  the witness: after each step, the authority's committed USD and calls, its terms, and the
+  ledger's sequence and head (so two of its own steps show how many others happened between them),
+  with the committed amounts of the grants the step touched; and a refusal by the authority's
+  ceiling carries the authority's limit and committed amount. The read-only and judge roles receive
+  none of it. VERIFIED (`tests/test_spending_route.py`): no HTTP answer states any of them, not a
+  refusal by the authority, not `GET /spending`, not `/readyz`.
 
 ## 10. Operator commands
 
 `python -m exulanica.spending` with an administrative database URL (a role with SUPERUSER or
-BYPASSRLS) and the witness directory; each command prints one JSON document. `issue`, `adjust`,
+BYPASSRLS) and the witness directory; each command prints one JSON document, and writes the
+directory's marker first where it has none. `issue`, `adjust`,
 `grant`, `revoke`, `reconcile`, `reconcile-restore`, `reauthorize`, `expire` (release every
 workspace's attempts never dispatched in time; run it on a schedule), `verify` (the ledger's digest
 chain), `install-witness-copy` and `status`. `--operator` is a label for the record: lower case letters,
 digits and `:._-`, never a name, an address or a key. The runtime roles may not execute any of these.
+`issue` names its authority on standard error before issuing it, so an answer that never arrives is
+asked again with `--authority-id`, which never issues a second authority. A step that committed and
+whose witness record could not then be confirmed answers done, with `"witness_confirmed": false`:
+the record stays unconfirmed at the ledger's own sequence, which the next step reads as having
+taken effect, so asking again would repeat the step.
 
 ## 11. What a client sees
 
@@ -279,12 +324,25 @@ digits and `:._-`, never a name, an address or a key. The runtime roles may not 
 - OPEN. The witness is single-host. Processes on another host must run without spending, or refuse
   (`witness_not_configured`); a witness shared across hosts is later work.
 - OPEN. A restore to exactly the ledger's state before its last step, taken after that step committed
-  and before its witness was confirmed, cannot be told from a commit that failed; that step's
-  liability, at most one attempt's reservation, is not carried forward.
+  and before its witness was confirmed, cannot be told from a commit that failed; that one step's
+  effect is not carried forward: an admission's reservation, a settlement above its reservation, an
+  operator's reconciliation that raised a liability, a lowered ceiling, or a revocation.
 - OPEN. A witness restored together with its database agrees with it and protects nothing: the
   deployment keeps it outside the backup domain.
 - OPEN. Bounds are not in the witness. A restore's reconciliation closes every bound the restored
   database holds open; a bound opened after the backup is absent from it, and opening one again
-  under the same key starts it at zero, still inside its grant and authority, which are carried.
+  under the same key starts it at zero, still inside its grant and authority, which are carried. A
+  restore that lost no ledger step needs no reconciliation, so a bound closed after its backup is
+  open again unless a sealed restore checkpoint carried the closure; what it committed is accurate.
+- OPEN. Deduplicating a replayed request is a delivered mechanism with no production caller: no API,
+  worker or comparison path passes `spending_request_key`, so a request replayed after a crash is
+  admitted as new attempts, within the allowance, and may be sent and billed again (section 4). The
+  decision host, by its decision request, and derivative jobs, by job and stage, are its planned
+  first users. Durable bounds likewise have no production caller yet; comparisons are their
+  planned first user.
 - OPEN. An attempt admitted and never dispatched holds its reservation against the authority until
-  its workspace asks again or an operator runs `expire`; this fails closed, never open.
+  an admission of its workspace takes the authority's row or an operator runs `expire`. An admission
+  refused before the row (no live grant, an authority that changed or is suspended, a witness that
+  disagrees) releases nothing, so a workspace whose grant was revoked or expired keeps its stale
+  admissions against every workspace's allowance until `expire` (VERIFIED,
+  `tests/test_spending_ledger.py`). This fails closed, never open.

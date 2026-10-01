@@ -10,6 +10,7 @@ ledger holds the authority closed until an operator reauthorizes it explicitly.
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
 import json
 import time
 import uuid
@@ -17,9 +18,10 @@ from decimal import Decimal
 from typing import Any
 
 import pytest
+from exulanica.canonical import canonical_json
 from exulanica.models.spending import SpendingRefused, SpendingRequest, next_request_key
 from exulanica.spending import witness as witness_module
-from exulanica.spending.ledger import SettlementNotRecorded
+from exulanica.spending.ledger import DurableSpending, SettlementNotRecorded, holder_label
 from exulanica.spending.operator import SpendingOperationRefused
 from exulanica.spending.status import workspace_status
 from exulanica.spending.witness import FileSpendingWitness
@@ -578,3 +580,106 @@ def test_a_restore_counts_the_step_before_one_whose_commit_never_happened(bench,
     assert (term["ceiling_usd"], term["max_calls"], term["valid_until"]) == (one * 4, 40, until)
     assert term["basis"] == "restored"
     assert bench.state(authority)["committed_usd"] == one * 2
+
+
+def test_a_reconciliation_from_a_copy_that_never_committed_leaves_a_copy(
+    bench, tmp_path, monkeypatch
+):
+    """The record a reconciliation from a copy writes before its commit stays a copy, so a commit
+    that never happens leaves a copy, and the reconciliation made again still holds the authority
+    until an operator reauthorizes it."""
+    one = one_reservation()
+    authority = bench.issue(ceiling=one * 10)
+    workspace = uuid.uuid4()
+    bench.grant(authority, workspace, ceiling=one * 10)
+    client, _transport = _unknown_cost_client(bench)
+    _spend(client, workspace, 1)
+    backup = _snapshot(bench)
+    _spend(client, workspace, 2)
+    witness = FileSpendingWitness(bench.witness_dir)
+    custody = tmp_path / "custody.json"
+    custody.write_bytes(witness.path(authority).read_bytes())
+    witness.path(authority).unlink()
+    _restore(bench, backup)
+    bench.operator.install_witness_copy(authority, custody)
+
+    class Stopped(Exception):
+        """The operator's process stopped after writing the witness and before its commit."""
+
+    write = witness_module._FileHandle.write
+
+    def write_then_stop(self, record, *, confirmed, as_copy=False):
+        write(self, record, confirmed=confirmed, as_copy=as_copy)
+        if not confirmed:
+            raise Stopped
+
+    with monkeypatch.context() as patch:
+        patch.setattr(witness_module._FileHandle, "write", write_then_stop)
+        with pytest.raises(Stopped):
+            bench.operator.reconcile_restore(
+                authority, operator="test-operator", reason="restored from custody"
+            )
+    assert _witness_record(bench, authority)["state"] == "copy"
+    assert bench.state(authority)["suspended_reason"] is None
+    outcome = bench.operator.reconcile_restore(
+        authority, operator="test-operator", reason="restored from custody, again"
+    )
+    assert outcome["from_copy"] is True
+    assert bench.state(authority)["committed_usd"] == one * 3
+    refused = _refusal(client, workspace)
+    assert (refused.reason, refused.detail) == ("spending_suspended", "witness_copy_only")
+
+
+def test_a_copy_cannot_name_itself_live(bench, tmp_path):
+    """The envelope says what a witness is: a record holding its own ``status`` is still a copy."""
+    authority = bench.issue()
+    workspace = uuid.uuid4()
+    bench.grant(authority, workspace)
+    client, _transport = _unknown_cost_client(bench)
+    _spend(client, workspace, 1)
+    witness = FileSpendingWitness(bench.witness_dir)
+    envelope = json.loads(witness.path(authority).read_bytes())
+    record = {**envelope["record"], "status": "live"}
+    forged = {
+        **envelope,
+        "record": record,
+        "record_sha256": hashlib.sha256(canonical_json(record)).hexdigest(),
+    }
+    custody = tmp_path / "custody.json"
+    custody.write_bytes(canonical_json(forged))
+    witness.path(authority).unlink()
+    bench.operator.install_witness_copy(authority, custody)
+    refused = _refusal(client, workspace)
+    assert (refused.reason, refused.detail) == ("spending_suspended", "witness_copy_only")
+
+
+def test_a_process_reading_another_directory_is_refused_alone(bench, tmp_path):
+    """A process whose witness directory has no marker, or another directory's, cannot prove it
+    reads this authority's witness: it is refused, and suspends nobody."""
+    authority = bench.issue()
+    workspace = uuid.uuid4()
+    bench.grant(authority, workspace)
+    # The grant, the first operator step whose witness agreed with the ledger, recorded where.
+    assert bench.state(authority)["witness_directory_id"] == (
+        FileSpendingWitness(bench.witness_dir).directory_id()
+    )
+    right = spending_client(bench.durable("right"))
+    _spend(right, workspace, 1)
+    unmarked = tmp_path / "an-existing-directory"
+    unmarked.mkdir()
+    another = tmp_path / "another-installation"
+    FileSpendingWitness(another).ensure_directory_id()
+    for directory in (unmarked, another):
+        wrong = spending_client(
+            DurableSpending(
+                bench.runtime, FileSpendingWitness(directory), holder=holder_label("wrong")
+            )
+        )
+        refused = _refusal(wrong, workspace)
+        assert (refused.reason, refused.detail) == (
+            "spending_suspended",
+            "witness_directory_mismatch",
+        )
+        assert bench.state(authority)["suspended_reason"] is None
+        _spend(right, workspace, 1)
+    assert FileSpendingWitness(unmarked).directory_id() is None

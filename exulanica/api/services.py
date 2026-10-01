@@ -79,6 +79,7 @@ from exulanica.spending import (
     SPENDING_ENV,
     WITNESS_DIR_ENV,
     DurableSpending,
+    FileSpendingWitness,
     durable_spending_from_env,
     spending_mode,
 )
@@ -557,6 +558,17 @@ class Services:
             notes.append(
                 f"{WITNESS_DIR_ENV} is not set, so this process refuses to spend under any "
                 "witnessed spending authority. Work that asks no model is unaffected."
+            )
+        elif (
+            self.spending is not None
+            and isinstance(self.spending.witness, FileSpendingWitness)
+            and self.spending.witness.directory_id() is None
+        ):
+            notes.append(
+                f"{WITNESS_DIR_ENV} names a directory with no witness directory marker, so this "
+                "process refuses to spend under any authority whose witness directory is "
+                "recorded (witness_directory_mismatch). An operator command writes the marker in "
+                "the installation's witness directory. Work that asks no model is unaffected."
             )
         if not self.runs_derivative_worker:
             notes.append(

@@ -2,11 +2,12 @@
 
 Three routes, none of which changes the world. ``POST /selection/actions`` reads one utterance and
 answers with a plan whose steps are the exact requests a direct client sends to the routes that
-already change the world, each with that route's own preview
-(:mod:`exulanica.selection.action_plan`). ``POST /selection/actions/prepare`` does the same for
-typed actions with no model: a clarification answered, or the next step of a compound request
-against the state the previous step left. ``POST /selection/actions/outcome`` reads back what the
-authorities recorded for a plan's steps (:mod:`exulanica.selection.action_outcome`).
+already change the world, each with that route's own preview, or for simulated time, the clock
+read every base comes from (:mod:`exulanica.selection.action_plan`).
+``POST /selection/actions/prepare`` does the same for typed actions with no model: a
+clarification answered, or the next step of a compound request against the state the previous
+step left. ``POST /selection/actions/outcome`` reads back what the authorities recorded for a
+plan's steps (:mod:`exulanica.selection.action_outcome`).
 
 Confirmation is not here. The person confirms a step and the client sends its request to the route
 the step names, which applies the same permission, validation, transaction and refusal as it does
@@ -34,7 +35,7 @@ from typing import Annotated, Any, Literal
 import psycopg
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ConfigDict, Field, JsonValue
+from pydantic import BaseModel, ConfigDict, Field, JsonValue, field_validator, model_validator
 
 from exulanica.api.dependencies import (
     CurrentSession,
@@ -53,6 +54,9 @@ from exulanica.api.world_scope import WorldId
 from exulanica.selection.action_outcome import InvalidOutcomeStep, action_outcome
 from exulanica.selection.action_plan import (
     ACTION_PROMPT_VERSION,
+    MAX_MINUTES,
+    MAX_PLAN_STEPS,
+    ClockReader,
     Grant,
     Previewer,
     plan_action,
@@ -62,6 +66,8 @@ from exulanica.selection.validation import Session
 from exulanica.world.object_edit_preview import read_only_snapshot
 from exulanica.world.object_repository import WorldObjectRepository
 from exulanica.world.objects import OBJECT_ID_PATTERN
+from exulanica.world.society_controls import SPEEDS
+from exulanica.world.world_clock_repository import WorldClockRepository
 from exulanica.world.worlds import require_world
 
 router = APIRouter(prefix="/selection", tags=["selection"])
@@ -130,11 +136,42 @@ class TypedActionBody(BaseModel):
     arrangement_version: int | None = Field(default=None, ge=1)
 
 
+class TypedSimulationBody(BaseModel):
+    """One typed simulation request, as a plan's clarification states it, its slot filled."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    operation: Literal["play", "pause", "set_speed", "advance", "bring_people"]
+    #: A listed speed, as an integer or as the clarification candidate's value says it.
+    speed: Literal[SPEEDS] | None = None  # type: ignore[valid-type]
+    #: Simulated minutes to move forward: the server takes 1 to 10, and refuses any other count.
+    minutes: Annotated[int, Field(ge=1, le=MAX_MINUTES)] | None = None
+    region_id: str | None = Field(default=None, min_length=1, max_length=500)
+
+    @field_validator("speed", mode="before")
+    @classmethod
+    def _candidate_speed(cls, value: Any) -> Any:
+        """A ``speed_required`` candidate's value is the speed written as text, and a client
+        fills the open slot with it; it means the same listed speed."""
+        return int(value) if isinstance(value, str) and value in {str(v) for v in SPEEDS} else value
+
+
 class PrepareRequest(ActionBase):
-    actions: list[TypedActionBody] = Field(min_length=1, max_length=3)
+    actions: list[
+        Annotated[TypedActionBody | TypedSimulationBody, Field(discriminator="operation")]
+    ] = Field(min_length=1, max_length=3)
+
+    @model_validator(mode="after")
+    def _simulation_alone(self) -> PrepareRequest:
+        if len(self.actions) > 1 and any(
+            isinstance(action, TypedSimulationBody) for action in self.actions
+        ):
+            raise ValueError("a simulation request is prepared alone")
+        return self
 
 
-#: The route keys a plan's steps name: the matrix's edits and the style lifecycle's two requests.
+#: The route keys a plan's steps name: the matrix's edits, the style lifecycle's two requests,
+#: the playback controls and the creation of a version's people.
 OutcomeOperation = Literal[
     "POST /world/versions/{version_id}/compositions/apply",
     "POST /world/versions/{version_id}/objects/{object_id}/move",
@@ -143,6 +180,9 @@ OutcomeOperation = Literal[
     "POST /world/versions/{version_id}/arrangements/apply",
     "POST /world/styles/previews",
     "POST /world/styles/previews/{preview_id}/apply",
+    "PUT /world/versions/{version_id}/society/control",
+    "POST /world/versions/{version_id}/society/control/steps",
+    "POST /world/versions/{version_id}/society",
 ]
 
 
@@ -155,6 +195,11 @@ class OutcomePinsBody(BaseModel):
     edit_seq: int | None = Field(default=None, ge=0)
     base_style_version_id: uuid.UUID | None = None
     base_topology_digest: str | None = Field(default=None, max_length=256)
+    #: A simulation plan's first step: the clock read its bases came from.
+    clock_revision: int | None = Field(default=None, ge=0)
+    control_revision: int | None = Field(default=None, ge=0)
+    tick: int | None = Field(default=None, ge=0)
+    society_state_sha256: str | None = Field(default=None, pattern=_SHA256)
 
 
 class OutcomeStepBody(BaseModel):
@@ -179,7 +224,7 @@ class OutcomeRequest(BaseModel):
     #: Echoed back unverified: any client can name any digest.
     plan_sha256: str | None = Field(default=None, pattern=_SHA256)
     #: The plan's steps as it gave them. Used only to decide what to read.
-    steps: list[OutcomeStepBody] = Field(min_length=1, max_length=3)
+    steps: list[OutcomeStepBody] = Field(min_length=1, max_length=MAX_PLAN_STEPS)
 
 
 class ActionRefusalView(BaseModel):
@@ -236,12 +281,21 @@ class ActionStepView(BaseModel):
     bind_from: dict[str, dict[str, JsonValue]] | None = None
     query: dict[str, str]
     body: dict[str, JsonValue] | None
+    #: Body values taken from the response to an earlier step, by its index and a dotted field
+    #: path into that response, where the body states them null.
+    body_from: dict[str, dict[str, JsonValue]] | None = None
     requires: list[str]
     permitted: bool
+    #: Whether sending the step can lead to a hosted model call: its descriptor's own spending,
+    #: or a chosen model the time it moves on asks (a person's while the world plays, a light's
+    #: for each minute a coupled world with traffic seals).
+    spends: bool = False
     preview: dict[str, JsonValue] | None
     pins: dict[str, JsonValue] | None
     effects: list[dict[str, JsonValue]]
-    confirmation: Literal["required"]
+    #: ``chained``: the first step's confirmation covers this one; each is still its own commit,
+    #: and a refusal stops the chain where it is.
+    confirmation: Literal["required", "chained"]
     replay: str
     receipt: str
     compensation: dict[str, str] | None
@@ -261,12 +315,19 @@ class ActionPlanView(BaseModel):
     #: True only for one step the authority commits all at once (an arrangement).
     atomic: bool
     steps: list[ActionStepView]
+    #: Whether any step can lead to a hosted model call, said before the one confirmation, and
+    #: the decision roles whose chosen models the plan's steps can ask.
+    spends: bool = False
+    spends_by: list[str] = Field(default_factory=list)
     clarification: ActionClarificationView | None
     refusal: ActionRefusalView | None
     capabilities: list[dict[str, JsonValue]] | None
     #: The appearance drafter's own sentence about a proposal: model output about a change not
     #: made, never a statement that anything happened.
     proposal_speech: str | None
+    #: A simulation plan's clock read (``exulanica.world-clock/v1``), which every base it sends
+    #: came from; null for any other plan.
+    clock: dict[str, JsonValue] | None = None
     execution: ExecutionView
     names: dict[str, uuid.UUID] = Field(default_factory=dict)
 
@@ -296,6 +357,9 @@ class ActionOutcomeView(BaseModel):
     state: Literal["applied", "partial", "not_applied", "superseded", "pending"]
     current: dict[str, JsonValue]
     steps: list[ActionOutcomeStepView]
+    #: What the person could ask for next, by code: ``play`` when a chain that paused the world
+    #: stopped before playing it again. Nothing is resumed on its own.
+    alternatives: list[str] = Field(default_factory=list)
 
 
 def _declaration(operation: str) -> Requires | None:
@@ -374,6 +438,18 @@ def _capabilities(
         )
 
 
+def _clock_reader(
+    connection: psycopg.Connection, session: Session, world_id: str, version_id: uuid.UUID
+) -> ClockReader:
+    """The version's clock read, as ``GET .../clock`` answers it, taken on the read-only role
+    when a plan asks for it: the read takes no lock and writes nothing."""
+
+    def read() -> dict[str, Any]:
+        return WorldClockRepository(connection, session.workspace_id, world_id).read(version_id)
+
+    return read
+
+
 def _view(document: dict[str, Any], execution: ExecutionView, names: Any) -> ActionPlanView:
     return ActionPlanView.model_validate({**document, "execution": execution, "names": names})
 
@@ -404,6 +480,7 @@ def plan_actions(
         store=get_services(request).store,
         previewer=_previewer(request, session, held, world_id),
         grant=_grant(held),
+        clock=_clock_reader(connection, session, world_id, body.version_id),
     )
     return _view(
         planned.document,
@@ -435,6 +512,7 @@ def prepare_actions(
         capabilities=_capabilities(body.version_id, scoped, session, held, request, world_id),
         store=get_services(request).store,
         previewer=_previewer(request, session, held, world_id),
+        clock=_clock_reader(connection, session, world_id, body.version_id),
     )
     return _view(document, _execution((), (), prompt_version=ACTION_PROMPT_VERSION), {})
 
@@ -452,7 +530,13 @@ def action_outcomes(
 ) -> ActionOutcomeView | JSONResponse:
     require_world(connection, session.workspace_id, world_id)
     try:
-        read = action_outcome(connection, body.model_dump(mode="json"), session, world_id=world_id)
+        read = action_outcome(
+            connection,
+            body.model_dump(mode="json"),
+            session,
+            world_id=world_id,
+            clock=_clock_reader(connection, session, world_id, body.version_id),
+        )
     except InvalidOutcomeStep as exc:
         return JSONResponse(status_code=422, content={"code": exc.code, "detail": str(exc)})
     return ActionOutcomeView.model_validate(read)

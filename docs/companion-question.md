@@ -425,6 +425,14 @@ rests at a bench leads from the cited event to the bench and to the edit that pl
 (`tests/test_companion_actions_postgres.py`). The fields are ids only; no line text carries them,
 and none is sent to a model.
 
+An answer about a world's people cites only events up to the minute the page shows. A coupled
+world with roads runs its people ahead of what the page shows, by up to its clock's lead, so every
+event after the clock read's `presented_through_tick` (`exulanica.world-clock/v1`) is left out of
+each list that answer reads; a legacy world shows its people's head minute and leaves nothing out.
+A person's state line still describes the head minute, because only the society's current state is
+stored. A planned search's simulated evidence, a society in a confirmed place's events, is not
+bounded this way.
+
 It answers for the purposeful society and the living town profiles named by the words catalog,
 using the living resident's recorded home, work, activity and model decision events without
 exposing need levels or place identifiers. It refuses any other society by name
@@ -598,9 +606,9 @@ reviewed operation through the [appearance authority](world-version-authorities.
 [customization contract](atlas-world-customization-contract.md). Conflicts require review against
 the relevant version; natural language does not bypass the same validation as direct controls.
 
-Structural edits the Companion prepares are the [world actions](#world-actions); environment
-proposals follow their own registered capabilities and contracts. Neither establishes arbitrary
-creation, simulation control or a model's permission to act without review.
+Structural edits and simulation controls the Companion prepares are the
+[world actions](#world-actions); environment proposals follow their own registered capabilities and
+contracts. Neither establishes arbitrary creation or a model's permission to act without review.
 
 ## World actions
 
@@ -621,6 +629,9 @@ saved-entry lock and refusal as the same operation sent directly, because it is 
 | Take back the newest edit | `POST .../objects/undo/preview` | `POST .../objects/undo` |
 | Place a published arrangement | `POST .../arrangements/preview` | `POST .../arrangements/apply`, one transaction |
 | Change the look | the style preview is the reviewed record | `POST /world/styles/previews`, then `POST /world/styles/previews/{preview_id}/apply` |
+| Play, pause or change speed | none; the plan carries the clock read its bases came from | `PUT .../society/control` |
+| Move time on 1 to 10 simulated minutes | none, as above | `POST .../society/control/steps` once a minute, chained; a playing world is paused first and played again last |
+| Bring people into a world with none | none | `POST .../society` |
 
 A plan names each step's route key, path values, body, the permissions its route declares, the
 version pins (`base_state_sha256` and `edit_seq`), the authority's preview document and its digest,
@@ -641,14 +652,39 @@ approximated by an operation that is offered. A preview is computed by the funct
 route calls, on a connection opened only when the caller's grant satisfies that preview route's
 declaration, in a transaction that is read only before anything runs in it. A version the page no
 longer shows is refused `stale_version` before a model is asked, and a preview the authority blocks
-is refused `preview_blocked` with the authority's own reason on the step. Simulation requests are
-refused `action_not_offered` with the direct control's descriptor until the Companion prepares
-simulation controls against the world clock contract. `what can I do here` is answered from the
-descriptors, one entry per Companion action, with the appearance bases available on this world.
+is refused `preview_blocked` with the authority's own reason on the step. `what can I do here` is
+answered from the descriptors, one entry per Companion action, with the appearance bases available
+on this world.
 
-Only the first step of a compound request is prepared. Each later step is typed and prepared after
-the previous step's receipt, against the state it left, so every confirmed step was previewed
-against the state it meets; steps commit one at a time, and only a single arrangement is atomic.
+Simulated time moves only through the playback controls. Every base a simulation step sends comes
+from one read of the version's clock (`GET /world/versions/{version_id}/clock`), which the plan
+carries as `clock`: the control's revision, the society's minute and state, and the clock's own
+revision as `base_clock_revision`, so a plan made before the world's clock was coupled is refused
+`stale_clock_revision`. The model fills an action (`play`, `pause`, `set_speed`, `advance`,
+`bring_people` or `other`), a listed speed and a number of minutes, nothing else. Moving time on N
+minutes, 1 to 10 (the prepare body refuses any other count), is a chain of control steps under one
+confirmation: the first step says `confirmation` `required` and each later one `chained`, and each
+later step reads its bases from the response to the step before it, as `body_from` names them (a
+step index and a dotted field). A playing world is paused first and played again at its speed last.
+The first refusal stops the chain where it is, and nothing is retried inside a confirmation: a
+coupled world with roads lets its people run at most its lead ahead of sealed traffic, so a longer
+chain stops at `clock_lead_exhausted`. Asking for what the controls already hold is refused
+`no_change`; a missing speed, count or region is asked about (`speed_required`, `minutes_required`,
+`region_required`); a world with nobody in it refuses a control with its descriptor's code and
+offers `bring_people`; a society whose engine cannot play is refused with its descriptor's code
+(`legacy_society_not_playable`). Each step says whether sending it can lead to a hosted model call
+(`spends`), and the plan says so before the one confirmation (`spends`, and in `spends_by` the
+decision roles asked). Only the playback worker asks a person's chosen model, before each minute it
+plays, so a step that plays the world spends when the owner chose a model for a person; a control
+step asks no person's model. In a coupled world with traffic, sealing the minutes the people ran asks
+each light's chosen model, so a control step spends there too, and so does playing. A legacy world's
+lights run on the wall clock, whatever its people do.
+
+Only the first step of a compound world edit is prepared. Each later step is typed and prepared
+after the previous step's receipt, against the state it left, so every confirmed step was previewed
+against the state it meets; steps commit one at a time, and only a single arrangement is atomic. A
+simulation chain's later steps need no preparing: their requests are stated in full, with the bases
+`body_from` takes from the response before them.
 `POST /selection/actions/outcome` (`world.read`) reads what the authorities recorded for a plan's
 steps ([outcome read](../exulanica/selection/action_outcome.py)): `applied` with the receipt's ids
 and whether the record matches the preview, `not_applied` while the version still stands at the
@@ -666,9 +702,23 @@ the style lifecycle's durable proposal and preview record once confirmed and is 
 `DELETE /world/styles/previews/{preview_id}`. Each appearance plan carries a fresh proposal id, so
 confirming one plan twice is refused by the lifecycle and asking again makes a new proposal.
 
+A simulation plan is read as the chain it was sent as, from its first step's pins along the
+controls' own receipts: a configuration is the control event that moved the control revision one
+past its base to its mode and speed, and a control step is the `manual_step` event that ran the
+society on from the minute and state the step before it left, or, after a configuration, the first
+one recorded after it at its revision (a playing world moves on until its pause lands). A receipt is
+found by the bases the step was sent with, whoever sent them, as an edit step's is. Each receipt carries `operation`,
+`world_id`, `version_id`, `revision`, `tick` and `state_sha256` (both null for a configuration),
+the fields a project's context stores for it under the same names, and the event's own `event_seq`
+and `document_sha256`. A step pinned to a clock revision that moved reads `superseded`. A chain
+that paused a playing world and stopped before playing it again leaves it paused: the outcome's
+`current.society` says so and `alternatives` offers `play`, and nothing resumes it on its own.
+Bringing people in reads back the version's society in the region the step named.
+
 Behaviour changes, photo point maps, environment instances, model choices, comparisons, character
-looks, style rollback and interaction policy are not prepared by the Companion: a request for one is
-refused `action_not_offered` and names the direct operation. Conversation and remembered context
+looks, style rollback, interaction policy, sending people away or bringing them back, and a
+person's directed actions are not prepared by the Companion: the drafter's form has no slot for
+them, so a request for one is refused `action_not_offered`. Conversation and remembered context
 never make a step permitted, and the planner imports neither the interaction-policy plane nor stored
 conversation (`tests/test_companion_action_policy_boundary.py`). Scripted tests hold the mechanics;
 how well a live model reads requests into these plans is not measured.

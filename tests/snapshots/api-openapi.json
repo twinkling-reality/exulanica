@@ -16572,6 +16572,13 @@
       },
       "type": "array",
       "title": "Steps"
+     },
+     "alternatives": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Alternatives"
      }
     },
     "additionalProperties": false,
@@ -16641,6 +16648,18 @@
       "type": "array",
       "title": "Steps"
      },
+     "spends": {
+      "type": "boolean",
+      "title": "Spends",
+      "default": false
+     },
+     "spends_by": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Spends By"
+     },
      "clarification": {
       "anyOf": [
        {
@@ -16688,6 +16707,20 @@
        }
       ],
       "title": "Proposal Speech"
+     },
+     "clock": {
+      "anyOf": [
+       {
+        "additionalProperties": {
+         "$ref": "#/components/schemas/JsonValue"
+        },
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Clock"
      },
      "execution": {
       "$ref": "#/components/schemas/ExecutionView"
@@ -16942,6 +16975,23 @@
       ],
       "title": "Body"
      },
+     "body_from": {
+      "anyOf": [
+       {
+        "additionalProperties": {
+         "additionalProperties": {
+          "$ref": "#/components/schemas/JsonValue"
+         },
+         "type": "object"
+        },
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Body From"
+     },
      "requires": {
       "items": {
        "type": "string"
@@ -16952,6 +17002,11 @@
      "permitted": {
       "type": "boolean",
       "title": "Permitted"
+     },
+     "spends": {
+      "type": "boolean",
+      "title": "Spends",
+      "default": false
      },
      "preview": {
       "anyOf": [
@@ -16993,7 +17048,10 @@
      },
      "confirmation": {
       "type": "string",
-      "const": "required",
+      "enum": [
+       "required",
+       "chained"
+      ],
       "title": "Confirmation"
      },
      "replay": {
@@ -24753,6 +24811,54 @@
        }
       ],
       "title": "Base Topology Digest"
+     },
+     "clock_revision": {
+      "anyOf": [
+       {
+        "type": "integer",
+        "minimum": 0.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Clock Revision"
+     },
+     "control_revision": {
+      "anyOf": [
+       {
+        "type": "integer",
+        "minimum": 0.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Control Revision"
+     },
+     "tick": {
+      "anyOf": [
+       {
+        "type": "integer",
+        "minimum": 0.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Tick"
+     },
+     "society_state_sha256": {
+      "anyOf": [
+       {
+        "type": "string",
+        "pattern": "^[0-9a-f]{64}$"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Society State Sha256"
      }
     },
     "additionalProperties": false,
@@ -24784,7 +24890,7 @@
        "$ref": "#/components/schemas/OutcomeStepBody"
       },
       "type": "array",
-      "maxItems": 3,
+      "maxItems": 12,
       "minItems": 1,
       "title": "Steps"
      }
@@ -24819,7 +24925,10 @@
        "POST /world/versions/{version_id}/objects/undo",
        "POST /world/versions/{version_id}/arrangements/apply",
        "POST /world/styles/previews",
-       "POST /world/styles/previews/{preview_id}/apply"
+       "POST /world/styles/previews/{preview_id}/apply",
+       "PUT /world/versions/{version_id}/society/control",
+       "POST /world/versions/{version_id}/society/control/steps",
+       "POST /world/versions/{version_id}/society"
       ],
       "title": "Operation"
      },
@@ -26078,7 +26187,29 @@
      },
      "actions": {
       "items": {
-       "$ref": "#/components/schemas/TypedActionBody"
+       "oneOf": [
+        {
+         "$ref": "#/components/schemas/TypedActionBody"
+        },
+        {
+         "$ref": "#/components/schemas/TypedSimulationBody"
+        }
+       ],
+       "discriminator": {
+        "propertyName": "operation",
+        "mapping": {
+         "advance": "#/components/schemas/TypedSimulationBody",
+         "bring_people": "#/components/schemas/TypedSimulationBody",
+         "move_object": "#/components/schemas/TypedActionBody",
+         "pause": "#/components/schemas/TypedSimulationBody",
+         "place_arrangement": "#/components/schemas/TypedActionBody",
+         "place_object": "#/components/schemas/TypedActionBody",
+         "play": "#/components/schemas/TypedSimulationBody",
+         "remove_object": "#/components/schemas/TypedActionBody",
+         "set_speed": "#/components/schemas/TypedSimulationBody",
+         "undo_last_edit": "#/components/schemas/TypedActionBody"
+        }
+       }
       },
       "type": "array",
       "maxItems": 3,
@@ -33563,6 +33694,70 @@
     ],
     "title": "TypedActionBody",
     "description": "One typed change, as a plan's clarification or pending step states it."
+   },
+   "TypedSimulationBody": {
+    "properties": {
+     "operation": {
+      "type": "string",
+      "enum": [
+       "play",
+       "pause",
+       "set_speed",
+       "advance",
+       "bring_people"
+      ],
+      "title": "Operation"
+     },
+     "speed": {
+      "anyOf": [
+       {
+        "type": "integer",
+        "enum": [
+         1,
+         2,
+         4
+        ]
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Speed"
+     },
+     "minutes": {
+      "anyOf": [
+       {
+        "type": "integer",
+        "maximum": 10.0,
+        "minimum": 1.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Minutes"
+     },
+     "region_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 500,
+        "minLength": 1
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Region Id"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "operation"
+    ],
+    "title": "TypedSimulationBody",
+    "description": "One typed simulation request, as a plan's clarification states it, its slot filled."
    },
    "UnavailableRatio": {
     "properties": {

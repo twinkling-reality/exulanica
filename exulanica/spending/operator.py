@@ -27,6 +27,7 @@ What each is for:
 from __future__ import annotations
 
 import datetime as dt
+import logging
 import uuid
 from decimal import Decimal
 from typing import Any
@@ -36,9 +37,16 @@ from psycopg.types.json import Jsonb
 
 from exulanica.db.session import Database
 from exulanica.errors import ExulanicaError
-from exulanica.spending.witness import SpendingWitness, WitnessHandle, advance_record
+from exulanica.spending.witness import (
+    SpendingWitness,
+    WitnessHandle,
+    WitnessUnavailable,
+    advance_record,
+)
 
 __all__ = ["SpendingOperationRefused", "SpendingOperator"]
+
+_LOG = logging.getLogger(__name__)
 
 
 class SpendingOperationRefused(ExulanicaError):
@@ -51,6 +59,16 @@ class SpendingOperator:
     def __init__(self, database: Database, witness: SpendingWitness | None) -> None:
         self.database = database
         self.witness = witness
+        #: Whether the last step's witness record was confirmed after its commit: None where the
+        #: step wrote none. False is a step that committed and whose record stays unconfirmed at
+        #: the ledger's own sequence, which every later step reads as having taken effect.
+        self.last_witness_confirmed: bool | None = None
+
+    def _named_directory(self) -> None:
+        """Every witnessed step names the witness directory first, so the authority can record it
+        (migration 0133): its marker is written here, never by a spending process."""
+        if self.witness is not None:
+            self.witness.ensure_directory_id()
 
     def _step(
         self,
@@ -71,6 +89,7 @@ class SpendingOperator:
             return self._transaction(
                 statement, (*parameters, None) if pass_witness else parameters, None
             )
+        self._named_directory()
         with self.witness.hold(authority_id) as held:
             document = held.document
             return self._transaction(
@@ -85,6 +104,7 @@ class SpendingOperator:
         self, statement: str, parameters: tuple[Any, ...], held: WitnessHandle | None
     ) -> dict[str, Any]:
         pending: dict[str, Any] | None = None
+        self.last_witness_confirmed = None
         try:
             # An unscoped connection is one transaction, committed as the block closes: the
             # witness is written before that commit and confirmed after it.
@@ -102,7 +122,14 @@ class SpendingOperator:
             message = getattr(getattr(exc, "diag", None), "message_primary", None) or str(exc)
             raise SpendingOperationRefused(message) from exc
         if pending is not None and held is not None:
-            held.write(pending, confirmed=True)
+            try:
+                held.write(pending, confirmed=True)
+                self.last_witness_confirmed = True
+            except WitnessUnavailable as exc:
+                # The step committed. Its record stays unconfirmed at the ledger's own sequence,
+                # which the next step reads as having taken effect, as a spending process does.
+                _LOG.warning("the spending witness could not be confirmed: %s", exc)
+                self.last_witness_confirmed = False
         return document
 
     def _witnessed(self, authority_id: uuid.UUID) -> bool:
@@ -128,8 +155,19 @@ class SpendingOperator:
         reason: str,
         dispatch_seconds: int = 60,
         witnessed: bool = True,
+        authority_id: uuid.UUID | None = None,
     ) -> uuid.UUID:
-        authority_id = uuid.uuid4()
+        """Issue an authority, under ``authority_id`` where given, so that asking again after an
+        answer that never arrived finds the same authority rather than making a second."""
+        if authority_id is None:
+            authority_id = uuid.uuid4()
+        else:
+            with self.database.unscoped() as connection:
+                issued = connection.execute(
+                    "select 1 from spending_authority where authority_id = %s", (authority_id,)
+                ).fetchone()
+            if issued is not None:
+                raise SpendingOperationRefused(f"authority {authority_id} is already issued")
         self._step(
             authority_id,
             "select spending_issue(%s, %s, %s, %s, %s, %s, %s, %s, %s) as document",
@@ -246,6 +284,7 @@ class SpendingOperator:
         installed from custody (after which the authority stays suspended until reauthorized)."""
         if self.witness is None:
             raise SpendingOperationRefused("a restore is reconciled against the witness")
+        self._named_directory()
         with self.witness.hold(authority_id) as held:
             document = held.document
             if document is None or document.get("status") not in ("live", "copy"):
@@ -255,7 +294,7 @@ class SpendingOperator:
             return self._transaction(
                 "select spending_reconcile_restore(%s, %s, %s, %s) as document",
                 (authority_id, Jsonb(document), operator, reason),
-                held,
+                _StaysACopy(held) if document.get("status") == "copy" else held,
             )
 
     def reauthorize(
@@ -291,6 +330,7 @@ class SpendingOperator:
                 None,
             )
             return int(document["epoch"])
+        self._named_directory()
         with self.witness.hold(authority_id) as held:
             document_read = held.document
             document = self._transaction(
@@ -330,6 +370,7 @@ class SpendingOperator:
     def install_witness_copy(self, authority_id: uuid.UUID, source: Any) -> None:
         if self.witness is None or not hasattr(self.witness, "install_copy"):
             raise SpendingOperationRefused("no witness directory to install a copy into")
+        self._named_directory()
         self.witness.install_copy(authority_id, source)
 
 
@@ -348,5 +389,26 @@ class _Fresh:
     def record(self) -> dict[str, Any] | None:
         return None
 
-    def write(self, record: Any, *, confirmed: bool) -> None:
-        self._held.write(record, confirmed=confirmed)
+    def write(self, record: Any, *, confirmed: bool, as_copy: bool = False) -> None:
+        self._held.write(record, confirmed=confirmed, as_copy=as_copy)
+
+
+class _StaysACopy:
+    """A copy's handle while a restore is reconciled from it: the record the step writes stays a
+    copy until its commit is confirmed, so a commit that never happens leaves a copy, and the
+    reconciliation made again still holds the authority until an operator reauthorizes it."""
+
+    def __init__(self, held: WitnessHandle) -> None:
+        self._held = held
+
+    @property
+    def document(self) -> dict[str, Any] | None:
+        return self._held.document
+
+    @property
+    def record(self) -> dict[str, Any] | None:
+        # The copy itself, so the record written before the commit keeps it as its prior.
+        return getattr(self._held, "body", None)
+
+    def write(self, record: Any, *, confirmed: bool, as_copy: bool = False) -> None:
+        self._held.write(record, confirmed=confirmed, as_copy=as_copy or not confirmed)

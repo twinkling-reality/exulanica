@@ -142,3 +142,67 @@ def test_the_runtime_reads_its_own_spending_and_no_authority_total_or_ledger(ben
     assert (entry["grant"]["state"], entry["authority_state"]) == ("active", "active")
     (state,) = authority_states(bench.runtime)
     assert (state["authority_id"], state["state"]) == (str(authority), "active")
+
+
+MIGRATION_0133 = next(migration for migration in migrations() if migration.version == "0133")
+
+
+def test_the_later_strip_takes_back_what_was_passed_on_and_maintain(monkeypatch):
+    """Migration 0133 strips the spending tables again with CASCADE, so a write a grantee passed on
+    with its grant option goes with it rather than failing the migration, and with MAINTAIN, which
+    lets a holder lock the workspace tables."""
+    everything = list(migrations())
+    holder, passed, keeper = (
+        f"spending_{kind}_{uuid.uuid4().hex[:10]}" for kind in ("h", "p", "k")
+    )
+    with monkeypatch.context() as patch:
+        patch.setattr(
+            pg_harness, "migrations", lambda: iter(m for m in everything if m.version < "0133")
+        )
+        with pg_harness.migrated_schema() as (_psycopg, admin):
+            admin.row_factory = dict_row
+            scratch = admin.execute("select current_schema() as s").fetchone()["s"]
+            try:
+                for role in (holder, passed, keeper):
+                    admin.execute(sql.SQL("create role {}").format(sql.Identifier(role)))
+                    admin.execute(
+                        sql.SQL("grant usage on schema {} to {}").format(
+                            sql.Identifier(scratch), sql.Identifier(role)
+                        )
+                    )
+                admin.execute(
+                    sql.SQL("grant insert on spending_reservation to {} with grant option").format(
+                        sql.Identifier(holder)
+                    )
+                )
+                admin.execute(sql.SQL("set role {}").format(sql.Identifier(holder)))
+                admin.execute(
+                    sql.SQL("grant insert on spending_reservation to {}").format(
+                        sql.Identifier(passed)
+                    )
+                )
+                admin.execute("reset role")
+                admin.execute(
+                    sql.SQL("grant maintain on spending_reservation, spending_event to {}").format(
+                        sql.Identifier(keeper)
+                    )
+                )
+                admin.commit()
+                admin.execute(MIGRATION_0133.sql)
+                for role in (holder, passed, keeper):
+                    for privilege in ("INSERT", "MAINTAIN"):
+                        for table in ("spending_reservation", "spending_event"):
+                            held = admin.execute(
+                                "select has_table_privilege(%s, %s, %s) as held",
+                                (role, table, privilege),
+                            ).fetchone()["held"]
+                            assert held is False, (role, table, privilege)
+            finally:
+                admin.rollback()
+                for role in (passed, keeper, holder):
+                    if admin.execute(
+                        "select 1 from pg_roles where rolname = %s", (role,)
+                    ).fetchone():
+                        admin.execute(sql.SQL("drop owned by {}").format(sql.Identifier(role)))
+                        admin.execute(sql.SQL("drop role {}").format(sql.Identifier(role)))
+                admin.commit()

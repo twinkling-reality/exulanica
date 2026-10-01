@@ -28,6 +28,8 @@ PINNED = {
     "environment-proposal-1": "88314630219bea7f6571a54fff583920ac765581a25efa581e20f4b04e9e0a92",
     # The Companion's world actions: its five-way classifier and the world-edit drafter.
     "action-plan-1": "a9c3708ef441cbeeae00b2972628d89de75dc787aebf0a37f0cf658b8273da88",
+    # `action-plan-2` adds the simulation drafter's prompt; the other two texts are unchanged.
+    "action-plan-2": "f6d753b9d112b6b61f29c787fcea5beb65807248f19c66aee7d7a6eb63d4e6c9",
     # The appearance drafter for a design choice drawn from no evidence; its own family, so the
     # evidence drafter's texts and `proposal-4` are untouched.
     "proposal-authored-1": "7b840134c24bc8152ab423f0665362b1d37bdd3cfb9b96cf208cfc6a46308d9a",
@@ -62,6 +64,7 @@ def _texts() -> dict[str, tuple[str, dict[str, str]]]:
             {
                 "classifier_system": action_plan._CLASSIFIER_SYSTEM,
                 "world_edit_system": action_plan._WORLD_EDIT_SYSTEM,
+                "simulation_system": action_plan._SIMULATION_SYSTEM,
             },
         ),
         "proposal-authored": (

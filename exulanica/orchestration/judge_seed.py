@@ -57,7 +57,11 @@ from psycopg import sql
 from exulanica.canonical import canonical_json
 from exulanica.db.migrate import provision_workspace
 from exulanica.db.registries import REGISTRY_TABLES
-from exulanica.db.roles import SPENDING_READ_FUNCTIONS, grant_workspace_partition
+from exulanica.db.roles import (
+    SPENDING_ADMIN_TABLES,
+    SPENDING_READ_FUNCTIONS,
+    grant_workspace_partition,
+)
 from exulanica.errors import ExulanicaError
 from exulanica.evidence.blob import BlobId
 from exulanica.store.base import ContentAddressedStore
@@ -1517,12 +1521,13 @@ def provision_judge_role(
     """Create the role a judge deployment's API connects as, and grant it reading and a list of
     writes.
 
-    **SELECT on everything, INSERT and UPDATE on** :data:`JUDGE_WRITE_TABLES`**, INSERT on**
-    :data:`JUDGE_INSERT_ONLY_TABLES`**, EXECUTE on**
-    :data:`~exulanica.db.roles.SPENDING_READ_FUNCTIONS` **and nothing else.** Not "revoke the
-    dangerous ones": the grant is an allowlist, so a table a later migration adds arrives readable
-    and not writable without anybody remembering to come back here. That is the direction this has
-    to fail in.
+    **SELECT on everything but** :data:`~exulanica.db.roles.SPENDING_ADMIN_TABLES`**, INSERT and
+    UPDATE on** :data:`JUDGE_WRITE_TABLES`**, INSERT on** :data:`JUDGE_INSERT_ONLY_TABLES`**,
+    EXECUTE on** :data:`~exulanica.db.roles.SPENDING_READ_FUNCTIONS` **and nothing else.** Not
+    "revoke the dangerous ones": the grant is an allowlist, so a table a later migration adds
+    arrives readable and not writable without anybody remembering to come back here. That is the
+    direction this has to fail in. The spending authority's tables are the one exclusion from
+    reading, because they hold every workspace's spending together.
 
     **No DELETE anywhere, for the same reason** ``exulanica_app`` **has none.** Deletion in this
     system is a tombstone and a purge job, both of them writes to tables absent from the
@@ -1561,6 +1566,19 @@ def provision_judge_role(
         connection.execute(
             sql.SQL("grant select on all tables in schema {} to {}").format(schema, role_name)
         )
+        # Except migration 0124's authority tables and ledger: an authority's committed total is
+        # every workspace's spending together. The judge reads an authority's state, and no
+        # amount, through SPENDING_READ_FUNCTIONS, as the runtime roles do.
+        for table in SPENDING_ADMIN_TABLES:
+            found = connection.execute(
+                "select to_regclass(format('%%I.%%I', current_schema(), %s::text)) as relation",
+                (table,),
+            ).fetchone()
+            relation = found["relation"] if isinstance(found, dict) else (found or (None,))[0]
+            if relation is not None:
+                connection.execute(
+                    sql.SQL("revoke all on {} from {}").format(sql.Identifier(table), role_name)
+                )
         for table, privileges in (
             *((table, sql.SQL("insert, update")) for table in JUDGE_WRITE_TABLES),
             *((table, sql.SQL("insert")) for table in JUDGE_INSERT_ONLY_TABLES),

@@ -9,6 +9,11 @@ Run with an administrative database URL (``EXULANICA_DATABASE_URL``, a role with
 BYPASSRLS) and the installation's witness directory (``EXULANICA_SPENDING_WITNESS_DIR``). Every
 command prints one JSON document. ``--operator`` is a label for the record, never a name, an
 address or a key: lower case letters, digits and ``:._-``.
+
+``issue`` names the authority on standard error before it is issued, so an answer that never
+arrives is asked again with ``--authority-id``, which never issues a second authority. A step
+that committed and whose witness record could not then be confirmed answers as done, with
+``"witness_confirmed": false``: asking again would repeat it.
 """
 
 from __future__ import annotations
@@ -62,6 +67,11 @@ def _parser() -> argparse.ArgumentParser:
         "--unwitnessed",
         action="store_true",
         help="no restore protection: for development and tests only",
+    )
+    issue.add_argument(
+        "--authority-id",
+        type=uuid.UUID,
+        help="the authority's identifier; asking again with it never issues a second authority",
     )
     decided(issue)
 
@@ -144,9 +154,26 @@ def _run(arguments: argparse.Namespace, environ: Mapping[str, str]) -> dict[str,
     operator = SpendingOperator(
         database, FileSpendingWitness(Path(directory)) if directory else None
     )
+    document = _decided(operator, database, arguments)
+    if operator.last_witness_confirmed is False:
+        # The step committed; only its record's confirmation failed. Asking again would repeat it.
+        document = {**document, "witness_confirmed": False}
+    return document
+
+
+def _decided(
+    operator: SpendingOperator, database: Database, arguments: argparse.Namespace
+) -> dict[str, Any]:
     command = arguments.command
     if command == "issue":
+        # Named before the step, so an answer that never arrives can be asked again by this name.
+        authority_id = arguments.authority_id or uuid.uuid4()
+        print(
+            json.dumps({"issuing": str(authority_id), "ask_again_with": "--authority-id"}),
+            file=sys.stderr,
+        )
         authority = operator.issue(
+            authority_id=authority_id,
             provider=arguments.provider,
             ceiling_usd=arguments.ceiling_usd,
             max_calls=arguments.max_calls,

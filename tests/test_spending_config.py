@@ -19,6 +19,7 @@ from exulanica.models.client import ModelClient
 from exulanica.models.manifest import load_manifest
 from exulanica.spending import (
     DurableSpending,
+    FileSpendingWitness,
     SpendingConfigurationError,
     spending_mode,
 )
@@ -61,6 +62,8 @@ def test_a_process_holding_a_credential_must_say_how_it_spends(tmp_path):
 
 
 def test_durable_composes_even_an_injected_client_with_the_authority(tmp_path):
+    # The installation's witness directory, named by an operator command.
+    FileSpendingWitness(tmp_path / "witness").ensure_directory_id()
     services = build_services(
         _environ(
             tmp_path,
@@ -76,6 +79,20 @@ def test_durable_composes_even_an_injected_client_with_the_authority(tmp_path):
     assert services.model_client.spending_source is services.spending
     assert services.spending.holder.startswith("api:")
     assert not any("SPENDING" in note for note in services.warnings)
+
+
+def test_a_witness_directory_with_no_marker_is_named_in_readiness(tmp_path):
+    services = build_services(
+        _environ(
+            tmp_path,
+            EXULANICA_SPENDING="durable",
+            EXULANICA_SPENDING_WITNESS_DIR=str(tmp_path / "not-the-installation-s"),
+            **CREDENTIALS,
+        ),
+        model_client=_client(),
+    )
+    (note,) = [note for note in services.warnings if "SPENDING_WITNESS_DIR" in note]
+    assert "witness_directory_mismatch" in note
 
 
 def test_durable_without_a_witness_directory_is_named_in_readiness(tmp_path):

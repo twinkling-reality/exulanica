@@ -10,7 +10,9 @@ so neither a sentence nor a remembered preference can author what the system may
 from __future__ import annotations
 
 import ast
+from collections.abc import Iterator
 from pathlib import Path
+from typing import Any, get_args
 
 import pytest
 from exulanica.api.routes import selection_actions
@@ -56,15 +58,29 @@ def test_the_action_planner_imports_no_policy_type_and_no_stored_conversation(pa
     )
 
 
+def _models(annotation: Any) -> Iterator[type]:
+    """Every request model an annotation can carry, through lists, unions and ``Annotated``."""
+    if isinstance(annotation, type) and hasattr(annotation, "model_fields"):
+        yield annotation
+        return
+    for argument in get_args(annotation):
+        yield from _models(argument)
+
+
 def _fields(model: type) -> set[str]:
     names: set[str] = set()
     for name, field in model.model_fields.items():
         names.add(name)
-        annotation = field.annotation
-        for candidate in getattr(annotation, "__args__", (annotation,)):
-            if isinstance(candidate, type) and hasattr(candidate, "model_fields"):
-                names |= _fields(candidate)
+        for nested in _models(field.annotation):
+            names |= _fields(nested)
     return names
+
+
+def test_the_field_walk_reaches_every_typed_action_a_body_carries():
+    """Positive control for the check below: a walk that stopped at a union of typed actions would
+    pass it with nothing checked inside them."""
+    carried = _fields(selection_actions.PrepareRequest)
+    assert {"asset_key", "object_id", "speed", "minutes", "region_id"} <= carried
 
 
 @pytest.mark.parametrize(

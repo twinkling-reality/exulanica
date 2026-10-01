@@ -147,6 +147,19 @@ def _answer(*clauses: AnswerClause) -> HttpResponse:
     return _chat(Answer(clauses=list(clauses)).model_dump_json())
 
 
+#: A world-edit draft a fresh starter's form accepts at once: the form offers objects only once the
+#: version holds one, so a draft that needed its one repair would send the drafter twice a run.
+_BENCH_STEP = {"operation": "place_object", "kinds": ["cc0.bench"], "arrangements": []}
+#: Words that ask for time to move on: the action classifier is answered ``simulation`` for a
+#: request carrying them and ``world_edit`` for any other.
+_TIME_ASKED = "move time on"
+
+
+def _classified(payload: Mapping[str, Any]) -> HttpResponse:
+    asked = _TIME_ASKED in json.dumps(payload, ensure_ascii=False)
+    return _chat(json.dumps({"kind": "simulation" if asked else "world_edit"}))
+
+
 #: A composed answer the validator accepts: it claims nothing about the photographs.
 _ANSWERED = _answer(AnswerClause(text="I have no evidence for that.", type=ClauseType.META))
 #: One the validator refuses, a historical claim citing nothing, so the composer is asked again.
@@ -184,10 +197,15 @@ class Recorder(FakeTransport):
         if composer is None:
             self.by_model[manifest[Role.REASONING_CHEAP].primary.model_id] = _ANSWERED
         #: The extraction role's paths other than the planner, each answered in its own form.
-        self.by_path = {
+        self.by_path: dict[str, HttpResponse | Callable[[Mapping[str, Any]], HttpResponse]] = {
             "request classifier": _chat(json.dumps({"kind": "appearance"})),
             "appearance drafter": _chat(json.dumps(draft())),
             "environment drafter": _chat(json.dumps({"operation": "place_selected_feature"})),
+            "action classifier": _classified,
+            "world-edit drafter": _chat(json.dumps({"steps": [_BENCH_STEP]})),
+            "simulation drafter": _chat(
+                json.dumps({"action": "advance", "speed": None, "minutes": 1})
+            ),
         }
 
     def post_json(self, url, *, headers, payload, timeout):
@@ -197,7 +215,8 @@ class Recorder(FakeTransport):
             self.during(path)
         if path in self.by_path:
             self.requests.append({"url": url, "headers": dict(headers), "payload": dict(payload)})
-            return self.by_path[path]
+            reply = self.by_path[path]
+            return reply(payload) if callable(reply) else reply
         return super().post_json(url, headers=headers, payload=payload, timeout=timeout)
 
     def sent_by(self, path: str) -> list[str]:
@@ -871,11 +890,65 @@ def _draft_environment(instance: Instance, client: ModelClient, _http: TestClien
     assert decision.operation is EnvironmentOperation.PLACE_SELECTED_FEATURE, decision.refusal
 
 
+def _starter_version(http: TestClient) -> tuple[str, dict]:
+    """The workspace's starter world and its version, made the first time a run asks for one."""
+    entries = http.get("/world-entries", headers=AUTH)
+    assert entries.status_code == 200, entries.text
+    if entries.json():
+        entry = entries.json()[0]
+    else:
+        created = http.post("/world-entries/starter", headers=AUTH, json={"title": "My world"})
+        assert created.status_code == 200, created.text
+        entry = created.json()
+    version = http.get(
+        f"/world/versions/{entry['authored_version_id']}?world_id={entry['world_id']}",
+        headers=AUTH,
+    )
+    assert version.status_code == 200, version.text
+    return entry["world_id"], version.json()
+
+
+def _plan_an_action(_instance: Instance, _client: ModelClient, http: TestClient) -> None:
+    """``POST /selection/actions`` asking for a world edit near the place: classified, drafted."""
+    world_id, version = _starter_version(http)
+    response = http.post(
+        f"/selection/actions?world_id={world_id}",
+        headers=AUTH,
+        json={
+            "utterance": f"put a bench outside {PLACE}",
+            "version_id": version["version_id"],
+            "base_state_sha256": version["state_sha256"],
+        },
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["kind"] == "world_edit", response.text
+
+
+def _plan_time(_instance: Instance, _client: ModelClient, http: TestClient) -> None:
+    """``POST /selection/actions`` asking for time to move on near the place: classified as a
+    simulation request, then drafted, whatever the world then answers about its people."""
+    world_id, version = _starter_version(http)
+    response = http.post(
+        f"/selection/actions?world_id={world_id}",
+        headers=AUTH,
+        json={
+            "utterance": f"{_TIME_ASKED} by a minute outside {PLACE}",
+            "version_id": version["version_id"],
+            "base_state_sha256": version["state_sha256"],
+        },
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["kind"] == "simulation", response.text
+
+
 #: How to send a request down each request path the uses registry may name in ``honoured_by``, as
 #: the product builds that path, with a saved place in its text. A path the registry names and this
 #: does not fails below, so a use cannot be offered until a run shows its paths honouring it.
 HONOURING_RUNS: Mapping[str, Callable[[Instance, ModelClient, TestClient], None]] = {
     "exulanica.epistemics.caption_embeddings:embed_capture": _send_a_caption,
+    "exulanica.selection.action_plan:_draft_simulation": _plan_time,
+    "exulanica.selection.action_plan:_draft_world_edit": _plan_an_action,
+    "exulanica.selection.action_plan:classify_action": _plan_an_action,
     "exulanica.selection.embeddings:embed_query": _send_a_query,
     "exulanica.selection.environment_proposal:draft_environment_operation": _draft_environment,
     "exulanica.selection.proposal:classify_request": _classify,

@@ -44,6 +44,9 @@
         "exulanica/selection/society_question.py"
       ],
       "honoured_by": [
+        "exulanica.selection.action_plan:_draft_simulation",
+        "exulanica.selection.action_plan:_draft_world_edit",
+        "exulanica.selection.action_plan:classify_action",
         "exulanica.selection.environment_proposal:draft_environment_operation",
         "exulanica.selection.planner:propose_plan",
         "exulanica.selection.proposal:classify_request",

@@ -71,6 +71,8 @@ from exulanica.world.society_engines import INPUT_ENGINES, society_engine
 from exulanica.world.society_model_decisions import DECISION_EVENT_KIND
 from exulanica.world.society_person_label import person_label
 from exulanica.world.society_repository import SocietyRepository
+from exulanica.world.world_clock import ClockRefused
+from exulanica.world.world_clock_repository import WorldClockRepository
 
 __all__ = [
     "EVENT_LINES",
@@ -579,6 +581,10 @@ def read_scene(
     authorized is the named refusal :data:`SocietyRefusal.UNAVAILABLE`. The latest events and the
     events that explain people's states are read here, each input behind them authorized once,
     and an event recorded under an input a withdrawal no longer authorizes is left out alone.
+    Only events up to the version's presented minute are read (``exulanica.world-clock/v1``): a
+    coupled world with roads runs its people ahead of what the page shows, by up to the clock's
+    lead. A person's state line still describes the society's head minute: only the current
+    state is stored.
     """
     once = _AuthorizedOnce(authorize)
     repository = SocietyRepository(
@@ -590,6 +596,15 @@ def read_scene(
         raise UnknownSocietyContext() from None
     except (UnavailableSocietyInput, ValueError):
         return SocietyRefusal.UNAVAILABLE
+    # What the page shows: a coupled world with roads presents its people's minutes once traffic
+    # has sealed them, so its society runs ahead of the page and no event past the presented
+    # minute is cited. A legacy world presents its people's head (null here: nothing is left out).
+    try:
+        presented = WorldClockRepository(connection, workspace_id, world_id).read(
+            context.version_id
+        )["presented_through_tick"]
+    except ClockRefused:
+        raise UnknownSocietyContext() from None
     try:
         living = society_engine(snapshot["profile"]).state_family == "living"
         events = _authorized_events(
@@ -601,6 +616,7 @@ def read_scene(
             once,
             latest=EVENT_LINES,
             include_decisions=living,
+            through_tick=presented,
         )
         selected_events = (
             _authorized_events(
@@ -613,6 +629,7 @@ def read_scene(
                 latest=EVENT_LINES,
                 include_decisions=True,
                 subject_id=str(context.inhabitant_id),
+                through_tick=presented,
             )
             if living and context.inhabitant_id is not None
             else []
@@ -627,7 +644,14 @@ def read_scene(
             - shown
         )
         older = _authorized_events(
-            connection, workspace_id, world_id, snapshot, repository, once, event_ids=wanted
+            connection,
+            workspace_id,
+            world_id,
+            snapshot,
+            repository,
+            once,
+            event_ids=wanted,
+            through_tick=presented,
         )
         chosen_at = sorted(
             {
@@ -653,6 +677,7 @@ def read_scene(
                 repository,
                 once,
                 decisions_at=chosen_at,
+                through_tick=presented,
             )
         )
     except (UnavailableSocietyInput, ValueError):
@@ -728,6 +753,7 @@ def _authorized_events(
     decisions_at: Sequence[tuple[int, str]] = (),
     include_decisions: bool = False,
     subject_id: str | None = None,
+    through_tick: int | None = None,
 ) -> list[Mapping[str, Any]]:
     """This world's society's ``latest`` events, newest first, or the named ones however long ago,
     or the decision events recorded at ``decisions_at``'s minutes for its people, each only while
@@ -743,7 +769,8 @@ def _authorized_events(
     with the latest events or by id, so none takes a line: the words catalog has none for it, and
     the person's own events say what they did, a goal their model chose by the reason
     ``chosen_by_their_model``. ``decisions_at`` reads those events alone, for the model that line
-    names, under the same withdrawal rule.
+    names, under the same withdrawal rule. ``through_tick`` leaves out every event recorded after
+    that minute, whichever way they are asked for.
     """
     chosen: str
     values: tuple[Any, ...]
@@ -773,12 +800,19 @@ def _authorized_events(
         )
     else:
         return []
+    bounded = "" if through_tick is None else "and e.tick<=%s "
     rows = connection.execute(
         "select e.event_id,e.tick,e.event_kind,e.subject_id,e.document "
         "from world_society_event e join world_society s "
         "on s.workspace_id=e.workspace_id and s.society_id=e.society_id "
-        "where e.workspace_id=%s and s.world_id=%s and e.society_id=%s " + chosen,
-        (workspace_id, world_id, snapshot["society_id"], *values),
+        "where e.workspace_id=%s and s.world_id=%s and e.society_id=%s " + bounded + chosen,
+        (
+            workspace_id,
+            world_id,
+            snapshot["society_id"],
+            *(() if through_tick is None else (through_tick,)),
+            *values,
+        ),
     ).fetchall()
     if snapshot["profile"] not in INPUT_ENGINES:
         return [dict(row) for row in rows]

@@ -22,6 +22,14 @@ Per step:
 
 Content-addressed state can recur (an undo returns a version to an earlier digest), so a record
 made again from the same base after the first is reported in ``repeats``, never folded into it.
+
+A simulation plan's steps are a chain, read the way they were sent: from the first step's pins,
+each configuration is the control event that moved the control revision one past the step's base
+to the step's mode and speed, and each control step is the ``manual_step`` event that ran the
+society on from the minute and state the step before it left. The first step the records do not
+show stops the reading; every step after it is ``not_applied``. A chain that paused a playing
+world and stopped before playing it again leaves it paused: the answer says so, offers ``play``,
+and nothing resumes it.
 """
 
 from __future__ import annotations
@@ -35,15 +43,21 @@ import psycopg
 
 from exulanica.selection.action_plan import (
     ARRANGE,
+    BRING_PEOPLE,
+    CONTROL,
+    CONTROL_STEP,
     MOVE,
     PLACE,
     REMOVE,
     STYLE_APPLY,
     STYLE_PREVIEW,
     UNDO,
+    ClockReader,
+    SimulationAction,
     document_sha256,
 )
 from exulanica.selection.validation import Session
+from exulanica.world.object_edit_preview import read_only_snapshot
 from exulanica.world.object_repository import WorldObjectRepository
 
 __all__ = ["OUTCOME_PROFILE", "STEP_STATES", "InvalidOutcomeStep", "action_outcome"]
@@ -67,6 +81,8 @@ _EDIT_KINDS: Final[Mapping[str, str]] = {
     UNDO: "undo",
     ARRANGE: "add_object",
 }
+#: The playback controls a simulation plan's chain is sent to.
+_CONTROLS: Final = frozenset({CONTROL, CONTROL_STEP})
 
 
 def action_outcome(
@@ -75,29 +91,37 @@ def action_outcome(
     session: Session,
     *,
     world_id: str,
+    clock: ClockReader,
 ) -> dict[str, Any]:
     """The receipts the authorities recorded for ``request["steps"]``, and the plan's state.
 
     Raises ``UnknownWorldResource`` for a version this world does not hold, as every version read
-    does, so a foreign version is answered as a write answers it.
+    does, so a foreign version is answered as a write answers it. ``clock`` is read only for a
+    simulation plan, whose people's state now is the clock read's, as the plan's bases were.
     """
     version_id = uuid.UUID(str(request["version_id"]))
     repository = WorldObjectRepository(connection, session.workspace_id, world_id=world_id)
     row = repository.edit_base_row(version_id)
-    current = {"state_sha256": row["state_sha256"], "edit_seq": int(row["edit_seq"])}
+    current: dict[str, Any] = {
+        "state_sha256": row["state_sha256"],
+        "edit_seq": int(row["edit_seq"]),
+    }
+    steps = request["steps"]
     answered: list[dict[str, Any]] = []
-    for step in request["steps"]:
-        operation = str(step.get("operation"))
-        if step.get("state") == "pending" and operation not in (STYLE_APPLY,):
-            answered.append(_step(step, "pending"))
-        elif operation in _EDIT_KINDS:
-            answered.append(_edit_step(connection, session, world_id, version_id, step, current))
-        elif operation == STYLE_PREVIEW:
-            answered.append(_style_preview_step(connection, session, world_id, step))
-        elif operation == STYLE_APPLY:
-            answered.append(_style_apply_step(connection, session, world_id, request["steps"]))
-        else:
-            raise InvalidOutcomeStep(f"{operation!r} is not an operation a Companion plan names")
+    alternatives: list[str] = []
+    if any(step.get("operation") in _CONTROLS for step in steps):
+        # One snapshot: the people's state now and the receipts the chain is read from agree.
+        with read_only_snapshot(connection):
+            read = clock()
+            society = read.get("society")
+            answered = _control_chain(connection, session, world_id, steps, read)
+        current["society"] = society
+        alternatives = _after_chain(steps, answered, society)
+    else:
+        answered = [
+            _one_step(connection, session, world_id, version_id, step, steps, current)
+            for step in steps
+        ]
     return {
         "profile": OUTCOME_PROFILE,
         "world_id": world_id,
@@ -109,7 +133,32 @@ def action_outcome(
         "state": _plan_state(answered),
         "current": current,
         "steps": answered,
+        "alternatives": alternatives,
     }
+
+
+def _one_step(
+    connection: psycopg.Connection,
+    session: Session,
+    world_id: str,
+    version_id: uuid.UUID,
+    step: Mapping[str, Any],
+    steps: Sequence[Mapping[str, Any]],
+    current: Mapping[str, Any],
+) -> dict[str, Any]:
+    """One step of an edit, appearance or bring-people plan, read from its authority's records."""
+    operation = str(step.get("operation"))
+    if step.get("state") == "pending" and operation not in (STYLE_APPLY,):
+        return _step(step, "pending")
+    if operation in _EDIT_KINDS:
+        return _edit_step(connection, session, world_id, version_id, step, current)
+    if operation == STYLE_PREVIEW:
+        return _style_preview_step(connection, session, world_id, step)
+    if operation == STYLE_APPLY:
+        return _style_apply_step(connection, session, world_id, steps)
+    if operation == BRING_PEOPLE:
+        return _bring_people_step(connection, session, world_id, version_id, step)
+    raise InvalidOutcomeStep(f"{operation!r} is not an operation a Companion plan names")
 
 
 def _step(step: Mapping[str, Any], state: str, **found: Any) -> dict[str, Any]:
@@ -354,6 +403,219 @@ def _style_apply_step(
                 "style_version_id": str(row["version_id"]),
                 "revision": int(row["revision"]),
                 "proposal_id": str(proposal_id),
+            }
+        ],
+    )
+
+
+# -- simulation: the playback controls' receipts, followed as a chain -----------------------------
+
+
+def _control_chain(
+    connection: psycopg.Connection,
+    session: Session,
+    world_id: str,
+    steps: Sequence[Mapping[str, Any]],
+    clock: Mapping[str, Any],
+) -> list[dict[str, Any]]:
+    """A simulation plan's steps, read from the first step's pins along the receipts they left.
+
+    ``clock`` is the version's clock read now: a step pinned to a clock revision that moved is
+    refused as stale whatever the controls hold, so it is ``superseded``, never ``not_applied``.
+    A configuration leaves the society where it stood when the configuration landed, and a playing
+    world moves on until its pause does, so the control step after a configuration is the first
+    ``manual_step`` the controls recorded after it at its revision; a later one runs on from the
+    minute and state the step before it left. Each receipt comes after the one before it.
+    """
+    society = clock.get("society")
+    with _client_shape(steps[0]):
+        pins = steps[0].get("pins") or {}
+        clock_moved = int(clock["revision"]) != int(pins["clock_revision"])
+        revision = int(pins["control_revision"])
+        #: The minute and state the next control step runs on from, or None after a configuration.
+        base: tuple[int, str] | None = (int(pins["tick"]), str(pins["society_state_sha256"]))
+        wanted: list[tuple[Mapping[str, Any], tuple[str, int] | None]] = []
+        for step in steps:
+            operation = str(step["operation"])
+            if operation == CONTROL:
+                body = step.get("body") or {}
+                wanted.append((step, (str(body["mode"]), int(body["speed"]))))
+            elif operation == CONTROL_STEP:
+                wanted.append((step, None))
+            else:
+                raise ValueError("a simulation plan's steps are playback controls only")
+    if society is None:
+        return [_step(step, "not_applied") for step in steps]
+    society_id = uuid.UUID(str(society["society_id"]))
+    after = 0
+    answered: list[dict[str, Any]] = []
+    for step, configures in wanted:
+        if answered and answered[-1]["state"] != "applied":
+            # A chain stops at its first step the records do not show: nothing after it was sent.
+            answered.append(_step(step, "not_applied"))
+            continue
+        if configures is not None:
+            event = _control_event(
+                connection, session, society_id, "configured", after=after, revision=revision + 1
+            )
+            if event is not None and (event["mode"], event["speed"]) == configures:
+                revision, after, base = revision + 1, int(event["event_seq"]), None
+                answered.append(
+                    _step(step, "applied", receipts=[_control_reference(step, world_id, event)])
+                )
+                continue
+            stands = not clock_moved and int(society["control_revision"]) == revision
+        else:
+            event = (
+                _control_event(
+                    connection, session, society_id, "manual_step", after=after, revision=revision
+                )
+                if base is None
+                else _control_event(
+                    connection,
+                    session,
+                    society_id,
+                    "manual_step",
+                    after=after,
+                    tick_from=base[0],
+                    previous=base[1],
+                )
+            )
+            if event is not None:
+                revision, after = int(event["revision"]), int(event["event_seq"])
+                base = (int(event["tick_to"]), str(event["state_sha256"]))
+                answered.append(
+                    _step(step, "applied", receipts=[_control_reference(step, world_id, event)])
+                )
+                continue
+            # After a configuration only control steps move a paused society, and none ran at
+            # its revision, so the revision says whether the step's bases still stand.
+            stands = (
+                not clock_moved
+                and int(society["control_revision"]) == revision
+                and (base is None or (int(society["tick"]), str(society["state_sha256"])) == base)
+            )
+        # Not recorded: still sendable while the controls stand where the step's bases are,
+        # and refused as stale once anything moved them.
+        answered.append(_step(step, "not_applied" if stands else "superseded"))
+    return answered
+
+
+def _control_event(
+    connection: psycopg.Connection,
+    session: Session,
+    society_id: uuid.UUID,
+    kind: str,
+    *,
+    after: int,
+    revision: int | None = None,
+    tick_from: int | None = None,
+    previous: str | None = None,
+) -> dict[str, Any] | None:
+    """The control event of ``kind`` a step would have left, recorded after event ``after``.
+
+    A configuration is found by the revision it made, a control step by the minute and state it
+    ran on from, each one event at most, newest first; a control step after a configuration is the
+    first one recorded after it at its revision.
+    """
+    match = "document->>'kind'=%s and event_seq>%s"
+    values: list[Any] = [kind, after]
+    if revision is not None:
+        match += " and (document->>'revision')::bigint=%s"
+        values.append(revision)
+    if tick_from is not None:
+        match += (
+            " and (document->>'tick_from')::bigint=%s and document->>'previous_state_sha256'=%s"
+        )
+        values += [tick_from, previous]
+    first = kind == "manual_step" and tick_from is None
+    row = connection.execute(
+        "select event_seq,document,document_sha256 from world_society_control_event "
+        "where workspace_id=%s and society_id=%s and "
+        + match
+        + (" order by event_seq limit 1" if first else " order by event_seq desc limit 1"),
+        (session.workspace_id, society_id, *values),
+    ).fetchone()
+    if row is None:
+        return None
+    return {
+        **row["document"],
+        "event_seq": int(row["event_seq"]),
+        "document_sha256": row["document_sha256"],
+    }
+
+
+def _control_reference(
+    step: Mapping[str, Any], world_id: str, event: Mapping[str, Any]
+) -> dict[str, Any]:
+    """A playback control's receipt, carrying the fields a project's context stores for it under
+    the same names (a configuration's minute and state are null), and the event's own sequence
+    and digest."""
+    stepped = event["kind"] == "manual_step"
+    return {
+        "operation": step.get("operation"),
+        "world_id": world_id,
+        "version_id": str(event["branch_id"]),
+        "revision": int(event["revision"]),
+        "tick": int(event["tick_to"]) if stepped else None,
+        "state_sha256": str(event["state_sha256"]) if stepped else None,
+        "event_seq": int(event["event_seq"]),
+        "document_sha256": event["document_sha256"],
+    }
+
+
+def _after_chain(
+    steps: Sequence[Mapping[str, Any]],
+    answered: Sequence[Mapping[str, Any]],
+    society: Mapping[str, Any] | None,
+) -> list[str]:
+    """``play`` when the plan ends by playing the world again, that step did not run, and the
+    world stands paused: the chain stopped after its pause, and nothing resumes it on its own."""
+    if society is None or society.get("mode") != "paused":
+        return []
+    last = steps[-1]
+    resumes = last.get("operation") == CONTROL and (last.get("body") or {}).get("mode") == (
+        "playing"
+    )
+    if resumes and answered[-1]["state"] != "applied":
+        return [SimulationAction.PLAY.value]
+    return []
+
+
+def _bring_people_step(
+    connection: psycopg.Connection,
+    session: Session,
+    world_id: str,
+    version_id: uuid.UUID,
+    step: Mapping[str, Any],
+) -> dict[str, Any]:
+    """People brought in: the version's society, in the step's region and with its engine."""
+    with _client_shape(step):
+        body = step.get("body") or {}
+        region = str(body["region_id"])
+        engine = body.get("profile")
+    row = connection.execute(
+        "select society_id,region_id,engine_version from world_society "
+        "where workspace_id=%s and world_id=%s and version_id=%s",
+        (session.workspace_id, world_id, version_id),
+    ).fetchone()
+    if row is None:
+        return _step(step, "not_applied")
+    if row["region_id"] != region or engine not in (None, row["engine_version"]):
+        # A version holds one society, and this one was brought in first, into another region or
+        # with another engine: the step's own request is refused.
+        return _step(step, "superseded")
+    return _step(
+        step,
+        "applied",
+        receipts=[
+            {
+                "operation": BRING_PEOPLE,
+                "world_id": world_id,
+                "version_id": str(version_id),
+                "society_id": str(row["society_id"]),
+                "region_id": row["region_id"],
+                "engine": row["engine_version"],
             }
         ],
     )

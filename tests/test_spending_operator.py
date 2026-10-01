@@ -18,8 +18,10 @@ import pytest
 from exulanica.models.errors import TransportError
 from exulanica.models.spending import SpendingRefused, SpendingRequest, next_request_key
 from exulanica.models.usage import CallUsage, CostBasis
+from exulanica.spending import witness as witness_module
 from exulanica.spending.__main__ import main
 from exulanica.spending.operator import SpendingOperationRefused
+from exulanica.spending.witness import WitnessUnavailable
 
 from model_fakes import FakeTransport
 from spending_support import (
@@ -44,7 +46,8 @@ def _command(bench, capsys, *arguments: str) -> tuple[int, dict]:
     }
     code = main(list(arguments), environ=environ)
     captured = capsys.readouterr()
-    return code, json.loads(captured.out if code == 0 else captured.err)
+    # A refusal is the last line on standard error; ``issue`` names its authority there first.
+    return code, json.loads(captured.out if code == 0 else captured.err.strip().splitlines()[-1])
 
 
 def _request() -> SpendingRequest:
@@ -340,3 +343,52 @@ def test_every_authority_state_reads_without_a_workspace_or_a_writer(bench, caps
     }
     code, document = _command(bench, capsys, "status", "--authorities")
     assert code == 0 and len(document["authorities"]) == 2
+
+
+def test_an_operator_step_that_committed_answers_done_when_its_confirmation_fails(
+    bench, capsys, monkeypatch
+):
+    """The step committed and only its record's confirmation failed: the command answers done and
+    says so, and asking again by the authority's name never issues a second authority."""
+    until = (dt.datetime.now(dt.UTC) + dt.timedelta(days=7)).isoformat()
+    authority = str(uuid.uuid4())
+    issue = (
+        "issue",
+        "--authority-id",
+        authority,
+        "--provider",
+        PROVIDER,
+        "--ceiling-usd",
+        "0.5",
+        "--max-calls",
+        "100",
+        "--valid-until",
+        until,
+        "--operator",
+        "ops",
+        "--reason",
+        "the installation's allowance",
+    )
+    write = witness_module._FileHandle.write
+
+    def unconfirmed(self, record, *, confirmed, as_copy=False):
+        if confirmed:
+            raise WitnessUnavailable("the witness volume went away")
+        write(self, record, confirmed=confirmed, as_copy=as_copy)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(witness_module._FileHandle, "write", unconfirmed)
+        code, issued = _command(bench, capsys, *issue)
+    assert (code, issued) == (0, {"authority_id": authority, "witness_confirmed": False})
+    code, refused = _command(bench, capsys, *issue)
+    assert code == 1 and "already issued" in refused["refused"]
+    (row,) = bench.query("select count(*) as n from spending_authority")
+    assert row["n"] == 1
+    # The record left unconfirmed at the ledger's own sequence is read as having taken effect.
+    bench.grant(
+        uuid.UUID(authority),
+        uuid.uuid4(),
+        ceiling="0.1",
+        calls=10,
+        until=dt.datetime.now(dt.UTC) + dt.timedelta(days=6),
+    )

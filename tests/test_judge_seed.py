@@ -31,7 +31,14 @@ import psycopg
 import pytest
 from exulanica.api.authorisation import load_token_directory
 from exulanica.db.migrate import provision_workspace
-from exulanica.db.roles import INSERT_ONLY_TABLES, RUNTIME_ROLE, provision_runtime_role
+from exulanica.db.roles import (
+    INSERT_ONLY_TABLES,
+    RUNTIME_ROLE,
+    SPENDING_ADMIN_TABLES,
+    SPENDING_READ_FUNCTIONS,
+    SPENDING_TABLES,
+    provision_runtime_role,
+)
 from exulanica.orchestration.judge_seed import (
     GLOBAL_TABLES,
     INSTANCE_TABLES,
@@ -522,6 +529,23 @@ def test_a_table_added_later_arrives_readable_and_not_writable(judged):
     finally:
         judged.connection.execute("drop table if exists a_later_migration")
         judged.connection.commit()
+
+
+def test_the_judge_reads_no_spending_authority_table_and_reads_authority_facts(judged):
+    """An authority's tables and ledger hold every workspace's spending together. The judge reads
+    none of them, its own workspace's spending as the runtime does, and an authority's state, with
+    no amount, through the facts function. Read back from the live catalog."""
+    grants = judge_grants(judged.connection, role=_JUDGE_ROLE)
+    for table in SPENDING_ADMIN_TABLES:
+        assert not grants.get(table), f"{table}: {grants.get(table)}"
+    for table in SPENDING_TABLES:
+        assert grants.get(table) == {"SELECT"}, f"{table}: {grants.get(table)}"
+    for name, arguments in SPENDING_READ_FUNCTIONS:
+        row = judged.connection.execute(
+            "select has_function_privilege(%s, %s, 'EXECUTE') as granted",
+            (_JUDGE_ROLE, f"{name}({arguments})"),
+        ).fetchone()
+        assert row is not None and row["granted"] is True, name
 
 
 def test_provisioning_twice_does_not_widen_the_grants(judged):

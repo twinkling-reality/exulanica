@@ -88,11 +88,14 @@ SPENDING_REFUSALS: Final = frozenset(
 SPENDING_SCOPES: Final = frozenset({"authority", "workspace", "bound"})
 
 #: The detail a ``spending_suspended`` refusal names. ``witness_not_configured`` and
-#: ``ledger_behind_witness`` hold for as long as their cause does; every other suspends the
-#: authority until an operator reauthorizes it.
+#: ``witness_directory_mismatch`` refuse one process (it has no witness directory, or one that is
+#: not the authority's) and ``ledger_behind_witness`` refuses until a restore is reconciled, each
+#: for as long as its cause holds; every other suspends the authority until an operator
+#: reauthorizes it.
 SUSPENSION_DETAILS: Final = frozenset(
     {
         "witness_not_configured",
+        "witness_directory_mismatch",
         "ledger_behind_witness",
         "witness_missing",
         "witness_unreadable",

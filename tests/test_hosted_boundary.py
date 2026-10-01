@@ -133,6 +133,7 @@ HOSTED_CALL_PATHS: Mapping[str, tuple[str, str]] = {
     "role decision": ("exulanica.api.decision_host", "ask"),
     "action classifier": ("exulanica.selection.action_plan", "classify_action"),
     "world-edit drafter": ("exulanica.selection.action_plan", "_draft_world_edit"),
+    "simulation drafter": ("exulanica.selection.action_plan", "_draft_simulation"),
 }
 
 _PATH_AT = {site: path for path, site in HOSTED_CALL_PATHS.items()}
@@ -489,8 +490,9 @@ def _action_world() -> action_plan._World:
 
 
 def run_actions(world: World) -> Witness:
-    """The Companion's action planner: its classifier, then its world-edit drafter, each handed
-    the utterance as ``plan_action`` hands it, with every saved name replaced first."""
+    """The Companion's action planner: its classifier, then its world-edit and simulation
+    drafters, each handed the utterance as ``plan_action`` hands it, with every saved name
+    replaced first."""
     client, transport = world.hosted(
         [
             _json_reply({"kind": "world_edit"}, Role.STRUCTURED_EXTRACTION),
@@ -502,6 +504,9 @@ def run_actions(world: World) -> Witness:
                 },
                 Role.STRUCTURED_EXTRACTION,
             ),
+            _json_reply(
+                {"action": "advance", "speed": None, "minutes": 3}, Role.STRUCTURED_EXTRACTION
+            ),
         ]
     )
     names = RequestNames.read(world.connection, world.session.workspace_id)
@@ -511,6 +516,8 @@ def run_actions(world: World) -> Witness:
     action_plan._draft_world_edit(
         client, sent, _action_world(), log=log, placeholders=names.placeholders
     )
+    clock = {"revision": 0, "society": {"mode": "paused", "speed": 1}, "traffic": None}
+    action_plan._draft_simulation(client, sent, clock, log=log, placeholders=names.placeholders)
     return transport
 
 
@@ -686,6 +693,7 @@ SCENARIOS: Mapping[str, tuple[Callable[[World], Witness], str]] = {
     "role decision": (run_person, "wait here a minute"),
     "action classifier": (run_actions, "put a bench"),
     "world-edit drafter": (run_actions, "KINDS THAT CAN BE PLACED"),
+    "simulation drafter": (run_actions, "LISTED SPEEDS"),
 }
 
 #: The paths whose call site replaces saved names itself, and the modules it replaces them with.
@@ -698,6 +706,7 @@ CALL_SITE_REPLACES: Mapping[str, tuple[str, ...]] = {
     "specification drafter": ("exulanica.selection.world_drafting",),
     "action classifier": ("exulanica.selection.request_names",),
     "world-edit drafter": ("exulanica.selection.request_names",),
+    "simulation drafter": ("exulanica.selection.request_names",),
 }
 
 

@@ -21,6 +21,12 @@ reconciliation counts the prior of an unconfirmed record as well, since its step
 committed. A witness behind or beside the ledger, a missing or unreadable one, or a copy
 (``state: copy``) suspends the authority until an operator reauthorizes it.
 
+THE DIRECTORY. The directory carries a marker (``witness-directory.json``) holding its own
+identifier, written once by the operator commands, never by a spending process. Every witness a
+process reads names that identifier, and the database records, per authority, the directory its
+witness is kept in. A process whose directory has no marker, or another one, cannot prove it reads
+the authority's witness: it is refused alone (``witness_directory_mismatch``) and suspends nobody.
+
 What this does not cover, stated so no deployment infers it: the lock is a POSIX advisory lock, so
 every process that spends under an authority must share the directory on one host (a local
 filesystem, not NFS). A witness restored together with the database from the same backup agrees
@@ -62,6 +68,9 @@ __all__ = [
 #: The envelope every record sits in, as the restore checkpoint's does.
 ENVELOPE_PROFILE: Final = "exulanica.digest-bound-record/v1"
 RECORD_PROFILE: Final = "exulanica.spending-witness/v1"
+#: The marker naming a witness directory, and what it holds.
+DIRECTORY_MARKER: Final = "witness-directory.json"
+DIRECTORY_PROFILE: Final = "exulanica.spending-witness-directory/v1"
 _LIVE: Final = "live"
 _COPY: Final = "copy"
 
@@ -104,13 +113,20 @@ class WitnessHandle(Protocol):
         """The live record as read, or None."""
         ...
 
-    def write(self, record: Mapping[str, Any], *, confirmed: bool) -> None: ...
+    def write(
+        self, record: Mapping[str, Any], *, confirmed: bool, as_copy: bool = False
+    ) -> None: ...
 
 
 class SpendingWitness(Protocol):
     """Where every authority's witness is kept."""
 
     def hold(self, authority_id: uuid.UUID) -> contextlib.AbstractContextManager[WitnessHandle]: ...
+
+    def ensure_directory_id(self) -> uuid.UUID:
+        """The directory's identifier, written into its marker first where it has none. For the
+        operator commands only: a spending process never names a directory."""
+        ...
 
 
 @dataclass
@@ -119,27 +135,37 @@ class _FileHandle:
     authority_id: uuid.UUID
     status: str
     body: dict[str, Any] | None
+    #: The directory's identifier from its marker, or None where it has no readable one.
+    directory_id: uuid.UUID | None = None
 
     @property
     def document(self) -> dict[str, Any] | None:
+        # The envelope's state and the directory's marker are what they are, whatever a record
+        # holds under the same names.
+        named = {"directory_id": None if self.directory_id is None else str(self.directory_id)}
         if self.status in ("absent", "unreadable"):
-            return {"status": self.status}
+            return {"status": self.status, **named}
         assert self.body is not None
-        return {"status": self.status, **self.body}
+        return {**self.body, "status": self.status, **named}
 
     @property
     def record(self) -> dict[str, Any] | None:
         return self.body if self.status == _LIVE else None
 
-    def write(self, record: Mapping[str, Any], *, confirmed: bool) -> None:
+    def write(self, record: Mapping[str, Any], *, confirmed: bool, as_copy: bool = False) -> None:
+        """Write ``record`` as this authority's witness: live, or with ``as_copy`` still a copy,
+        which a step reconciling a restore from a copy writes until its commit is confirmed."""
         body = {**record, "confirmed": confirmed, "profile": RECORD_PROFILE}
+        body.pop("status", None)
+        body.pop("directory_id", None)
         if confirmed:
             # Committed: the step it was taken from no longer matters.
             body.pop("prior", None)
         if body.get("authority_id") != str(self.authority_id):
             raise ValueError("a witness record names the authority it is kept for")
-        self.witness._write(self.authority_id, body, state=_LIVE)
-        self.status = _LIVE
+        state = _COPY if as_copy else _LIVE
+        self.witness._write(self.authority_id, body, state=state)
+        self.status = state
         self.body = body
 
 
@@ -239,7 +265,7 @@ class FileSpendingWitness:
                         time.sleep(pause)
                         pause = min(pause * 2, _POLL_MOST_S)
                 status, body = self._read(authority_id)
-                yield _FileHandle(self, authority_id, status, body)
+                yield _FileHandle(self, authority_id, status, body, self.directory_id())
             finally:
                 os.close(descriptor)
         finally:
@@ -298,6 +324,63 @@ class FileSpendingWitness:
                 temporary.unlink(missing_ok=True)
         except OSError as exc:
             raise WitnessUnavailable(f"the witness cannot be written: {exc.strerror}") from exc
+
+    def _marker_path(self) -> Path:
+        return self.directory / DIRECTORY_MARKER
+
+    def directory_id(self) -> uuid.UUID | None:
+        """The identifier this directory's marker holds, or None where it has none or it cannot be
+        read: a directory that cannot name itself proves nothing."""
+        try:
+            marker = json.loads(self._marker_path().read_bytes())
+            if marker.get("profile") != DIRECTORY_PROFILE:
+                return None
+            return uuid.UUID(str(marker["directory_id"]))
+        except (OSError, ValueError, KeyError, TypeError, AttributeError):
+            return None
+
+    def ensure_directory_id(self) -> uuid.UUID:
+        """This directory's identifier, writing its marker first where it has none. Never
+        replaces a marker that is present: a directory keeps its name."""
+        present = self.directory_id()
+        if present is not None:
+            return present
+        if self._marker_path().exists():
+            raise WitnessUnavailable(
+                f"{DIRECTORY_MARKER} in the witness directory cannot be read; it is not replaced"
+            )
+        marker = {
+            "profile": DIRECTORY_PROFILE,
+            "directory_id": str(uuid.uuid4()),
+            "created_at": dt.datetime.now(dt.UTC).isoformat(),
+        }
+        try:
+            self.directory.mkdir(parents=True, exist_ok=True)
+            temporary = self.directory / f".{DIRECTORY_MARKER}.{uuid.uuid4().hex}.tmp"
+            with open(temporary, "xb") as stream:
+                stream.write(canonical_json(marker))
+                stream.flush()
+                os.fsync(stream.fileno())
+            try:
+                # A link either takes the name or finds it taken: two operators at once agree.
+                os.link(temporary, self._marker_path())
+            except FileExistsError:
+                pass
+            finally:
+                temporary.unlink(missing_ok=True)
+            directory = os.open(self.directory, os.O_RDONLY)
+            try:
+                os.fsync(directory)
+            finally:
+                os.close(directory)
+        except OSError as exc:
+            raise WitnessUnavailable(
+                f"the witness directory's marker cannot be written: {exc.strerror}"
+            ) from exc
+        written = self.directory_id()
+        if written is None:
+            raise WitnessUnavailable("the witness directory's marker cannot be read back")
+        return written
 
     def install_copy(self, authority_id: uuid.UUID, source: Path) -> None:
         """Install a retained copy of a witness as the authority's, marked a copy.
