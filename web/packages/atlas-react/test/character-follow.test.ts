@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import * as pc from 'playcanvas';
 import { inhabitantRenderable } from '../src/playcanvas/character/inhabitant.js';
 import type { InhabitantIdentity } from '../src/playcanvas/character/inhabitant.js';
+import { serveFixturePeople } from './served-people.js';
 
 let canvases = 0;
 
@@ -16,6 +17,7 @@ function world() {
   options.graphicsDevice = device;
   options.componentSystems = [pc.RenderComponentSystem];
   app.init(options);
+  serveFixturePeople(app);
   const parent = new pc.Entity('crowd', app);
   app.root.addChild(parent);
   return { app, device, parent };

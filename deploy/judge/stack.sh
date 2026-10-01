@@ -42,7 +42,9 @@ token_dir="$deploy_dir/judge-tokens"
 tokens_file="$deploy_dir/judge-tokens.json"
 backend_image="exulanica-judge-backend"
 web_image="exulanica-judge-web"
-# The long-running services. `migrate` and `seed` run once, on the first `up`.
+# The long-running services. `migrate` and `seed` run once, on the first `up`; the `catalogs` job
+# runs on every `up`, because publishing what the image carries is how a newer image serves its
+# catalog.
 serving="postgres api web edge"
 
 refuse() {
@@ -191,9 +193,13 @@ ENV
     case "$seeded" in
       "Exited (0)"*)
         # The seed completed on an earlier run. Starting it again would restore over the world a
-        # judge is using, and the restore refuses a database that already holds the seed.
+        # judge is using, and the restore refuses a database that already holds the seed. The
+        # character catalogs are published again in the same up, after the database is healthy and
+        # before the API starts, which waits for the job to complete: unchanged when the image
+        # carries the same ones, the newer revision when it carries a newer one. A failed
+        # publication fails the up and the API does not start.
         # shellcheck disable=SC2086
-        compose up -d --wait --no-build --pull missing --no-deps $serving
+        compose up -d --wait --no-build --pull missing --no-deps catalogs $serving
         ;;
       "")
         compose up -d --wait --no-build --pull missing

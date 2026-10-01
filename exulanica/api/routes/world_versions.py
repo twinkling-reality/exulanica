@@ -23,6 +23,7 @@ from exulanica.api.world_version_document import (
     AlternateVersionView,
     alternate_version_view,
     rendered_version,
+    workspace_asset_views,
 )
 from exulanica.world.bootstrap import bootstrap_world
 from exulanica.world.edit_kinds import EditSubject
@@ -93,7 +94,10 @@ class CreateVersionBody(BaseModel):
 def alternate_versions(repository: ReadObjects, request: Request) -> list[AlternateVersionView]:
     store = get_services(request).store
     assets = {asset.content_sha256: asset for asset in repository.reviewed_assets(store)}
-    return [alternate_version_view(version, assets) for version in repository.versions()]
+    return [
+        alternate_version_view(version, assets, workspace_asset_views(repository, version))
+        for version in repository.versions()
+    ]
 
 
 @router.post(

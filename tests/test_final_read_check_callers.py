@@ -1,12 +1,13 @@
 """The final read check, held at each entry point that decides whether something may leave.
 
-Seven entry points answer, at one instant, whether bytes or a name may be handed over:
+Eight entry points answer, at one instant, whether bytes or a name may be handed over:
 ``final_check`` in :mod:`exulanica.graph.asset_read_policy` for an asset delivery,
 ``require_model_right`` before a photograph reaches a model, ``require_scene_training`` before a
 trainer reads its photographs, ``require_artifact_training_right`` before a trained artefact is
 read, ``released_place_names`` before a place's name goes to a model,
-``MaterialRepository.read_bake`` before a material bake is served and ``BakedTileRepository.serve``
-before a tile is. Each takes the same steps on the caller's connection. This file holds each entry
+``MaterialRepository.read_bake`` before a material bake is served, ``BakedTileRepository.serve``
+before a tile is and ``WorkspacePreparationRepository.read_output`` before a workspace's prepared
+asset is. Each takes the same steps on the caller's connection. This file holds each entry
 point to them from outside and names no helper, so it holds whichever way a module reaches the
 steps:
 
@@ -25,12 +26,14 @@ steps:
   will not wait for it, is refused with ``LockNotAvailable``, and the read-only transaction is
   rolled back with nothing read.
 
-The material bake and the tile delivery read the evaluation instant and do not use it: the steps
+The material bake, the tile and the prepared asset deliveries read the evaluation instant and do
+not use it: the steps
 are one sequence for every caller, and an unused instant costs one statement.
 """
 
 from __future__ import annotations
 
+import json
 import re
 import threading
 import time
@@ -57,12 +60,15 @@ from exulanica.ingest.training_rights import (
     withdraw_training_right,
 )
 from exulanica.store.local import LocalContentAddressedStore
-from exulanica.store.namespaces import tile_store
+from exulanica.store.namespaces import LocalWorkspaceStores, tile_store
+from exulanica.world.asset_preparation import AssetPreparationWorker
 from exulanica.world.baked_tiles import BakedTileFaulted, BakedTileRepository
 from exulanica.world.material_recipes import MaterialWithdrawn
+from exulanica.world.workspace_assets import WorkspaceAssetRepository, WorkspaceAssetWithdrawn
 from psycopg.pq import TransactionStatus
 
 from conftest import photo_bytes
+from static_glb_builder import cube
 from test_corridor_tile_store import _record as record_tile
 from test_material_recipes import _small as small_recipe
 from test_material_recipes import materials as imported_materials  # noqa: F401
@@ -73,6 +79,8 @@ from test_place_name_rights import named as imported_named  # noqa: F401
 from test_purge import purged as imported_purged  # noqa: F401
 from test_scene_training_right import _grant as grant_training_right
 from test_scene_training_right import _publish, _queue, _scene_of
+from tests_support_api import scratch_database
+from workspace_asset_support import declaration as asset_declaration
 
 pytestmark = pytest.mark.postgres
 
@@ -350,6 +358,44 @@ def _baked_tile(request) -> Reader:
     )
 
 
+def _workspace_asset(request) -> Reader:
+    repository = request.getfixturevalue("repository")
+    _psycopg, scratch = request.getfixturevalue("spine_schema")
+    stores = LocalWorkspaceStores(request.getfixturevalue("tmp_path") / "workspace-assets")
+    payload = cube().build()
+
+    def assets(connection) -> WorkspaceAssetRepository:
+        return WorkspaceAssetRepository(connection, repository.workspace_id, ACCOUNT, stores=stores)
+
+    admitted = assets(repository.connection).admit(
+        json.dumps(asset_declaration(payload)).encode(), payload
+    )
+    outcome = AssetPreparationWorker(
+        scratch_database(scratch), stores, frozenset({repository.workspace_id})
+    ).drain()
+    assert (outcome.prepared, outcome.errors) == (1, []), outcome
+
+    def read(connection) -> str:
+        try:
+            assets(connection).read_prepared(admitted.asset.asset_id)
+        except WorkspaceAssetWithdrawn:
+            return "withdrawn"
+        return "permitted"
+
+    def withdraw(other: IngestRepository) -> None:
+        assets(other.connection).withdraw(admitted.asset.asset_id)
+
+    return Reader(
+        repository.connection,
+        read,
+        "tombstone_blocks_workspace_preparation(",
+        "a final preparation authorization needs an idle connection",
+        withdraw,
+        "permitted",
+        "withdrawn",
+    )
+
+
 READERS: dict[str, Callable[..., Reader]] = {
     "asset-delivery": _asset_delivery,
     "model-right": _model_right,
@@ -358,6 +404,7 @@ READERS: dict[str, Callable[..., Reader]] = {
     "place-name": _place_name,
     "material-bake": _material_bake,
     "baked-tile": _baked_tile,
+    "workspace-asset": _workspace_asset,
 }
 
 

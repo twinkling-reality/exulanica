@@ -22,6 +22,12 @@
 # The versioned catalogs the package reads, some of them when it is imported: the society's
 # routine, words and identities, and the detector's vocabulary. About 800 KiB.
 !assets/catalogs
+# The character catalogs the image publishes, with their containers and licences. About 22 MB.
+!assets/characters/catalog.json
+!assets/characters/looks.json
+!assets/characters/parametric-catalog.json
+!assets/characters/makehuman-people-v1
+!assets/characters/makehuman-parametric-v1
 # The gsplat trainer recipe under deploy/gsplat is its own build; it needs only its pinned
 # requirements from this directory.
 !deploy/gsplat/requirements.txt

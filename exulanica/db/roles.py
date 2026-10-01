@@ -138,6 +138,10 @@ READ_ONLY_TABLES: Final = (
     # them only through the functions in SPENDING_RUNTIME_FUNCTIONS. With INSERT or UPDATE it could
     # grant itself money, or put back an allowance it spent.
     *SPENDING_TABLES,
+    # Migration 0131: the host publishes and withdraws character catalogs with the owner
+    # connection; a request never does.
+    "character_catalog_publication",
+    "character_catalog_withdrawal",
 )
 
 #: What the runtime may call on migration 0124's durable spending: admit, dispatch and settle an
@@ -231,6 +235,13 @@ INSERT_ONLY_TABLES: Final = (
     "signal_comparison_run",
     "signal_comparison_decision",
     "signal_comparison_outcome",
+    # Migration 0126 appends a workspace's own admissions, their withdrawals, the preparation
+    # requests counted against its quota, and its namespace inventory, whose purge only the
+    # purger writes; each refuses every update the runtime could make.
+    "workspace_asset",
+    "workspace_asset_withdrawal",
+    "workspace_preparation_request",
+    "workspace_asset_blob",
 )
 
 #: The vocabulary is administered, not generated. Without revoking this the role could insert a
@@ -372,17 +383,20 @@ _PURGE_WRITES: Final = {
 #: workspace's own later withdrawal. Migration 0082's header carries the same paragraph.
 _PURGE_WORKSPACE_READS: Final = {
     "material_bake": ("workspace_id", "content_sha256", "purged_at"),
+    "workspace_asset_blob": ("workspace_id", "content_sha256", "purged_at"),
     "scene_training_artifact": ("workspace_id", "artifact_id", "right_id"),
     "scene_training_right": ("workspace_id", "right_id", "withdrawn_at"),
 }
 _PURGE_WORKSPACE_WRITES: Final = {
     "material_bake": ("purged_at",),
+    "workspace_asset_blob": ("purged_at",),
 }
 #: The destroy questions this role may ask, each revoked from PUBLIC by the migration that added
-#: it: a bake's in 0066, a withdrawn training right's in 0082.
+#: it: a bake's in 0066, a withdrawn training right's in 0082, a workspace asset object's in 0126.
 _PURGE_FUNCTIONS: Final = (
     ("material_bake_purge_is_authorized", "uuid,uuid,bytea"),
     ("scene_training_withdrawal_releases_artifact", "uuid,bytea"),
+    ("workspace_asset_purge_is_authorized", "uuid,uuid,text"),
 )
 
 #: What the purger may write on the queue and on the tombstone. Exactly the columns the worker

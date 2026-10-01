@@ -128,6 +128,35 @@ export const COMPOSITION_BLOCKED_WORDS: Readonly<Record<CompositionBlockedReason
       happened: 'Something in this world already has the name this addition was given.',
       next: 'Check again to give it a new one.',
     },
+    // Placeholder words: the page's own wording for these codes is not written yet.
+    unknown_workspace_asset: {
+      happened: 'That object is not one of this workspace\'s own added objects.',
+      next: 'Choose a different object.',
+    },
+    workspace_asset_withdrawn: {
+      happened: 'That object was withdrawn from this workspace.',
+      next: 'Choose a different object.',
+    },
+    workspace_asset_not_prepared: {
+      happened: 'That object is not ready to place yet.',
+      next: 'Try again once it has been prepared.',
+    },
+    workspace_asset_incompatible: {
+      happened: 'That object cannot be placed in this world.',
+      next: 'Choose a different object.',
+    },
+    workspace_asset_changed: {
+      happened: 'That object changed after it was checked.',
+      next: 'Check again to place it as it is now.',
+    },
+    workspace_asset_bytes_unavailable: {
+      happened: 'That object cannot be read right now.',
+      next: 'Try again, or ask whoever hosts this world to restore it.',
+    },
+    prepared_digest_required: {
+      happened: 'The request did not say which prepared copy of that object to place.',
+      next: 'Check again and place it from the new check.',
+    },
   });
 
 const UNRECOGNISED: Words = Object.freeze({

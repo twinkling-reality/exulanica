@@ -1,0 +1,7 @@
+{
+  "profile": "q10-scripted-model-plan/v1",
+  "bounds": {"ceiling_usd": "0.05", "max_calls": 1000},
+  "rules": [
+    {"match": {}, "content": "Scripted answer for Q10 spending acceptance mechanics."}
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "asset_key": "makehuman.parametric.default.v1",
+  "byte_size": 2502012,
+  "content_sha256": "8eb8c98fa5c516197f1a9a36d76e87145975c28a061d2a9c0762a94e10604051",
+  "licence_id": "CC0-1.0",
+  "licence_sha256": "f6089cba01cb570a24712b41ab8a586ccd3cc5ef53dc266ca50b95c288956d2c",
+  "producer": "makehuman-parametric-prepare/1",
+  "profile": "exulanica.reviewed-asset-import/v1",
+  "source_revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+  "source_url": "https://github.com/makehumancommunity/mpfb2",
+  "summary": "CC0 MakeHuman body fitted by MPFB 2 for the editable human's declared default controls, rigged and retargeted to Quaternius CC0 motion.",
+  "title": "Editable human, default body"
+}

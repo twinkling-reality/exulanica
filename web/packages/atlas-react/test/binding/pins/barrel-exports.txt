@@ -3,14 +3,13 @@ AUTHORED_GROUND_SCALE_SPACING_M
 AUTHORED_OBJECT_MEDIA_TYPE
 AnchorOverlay
 AtlasBinding
-CHARACTER_CATALOG
+CharacterCatalogs
 CharacterChoices
 CharacterCrowdEvaluation
 CharacterHost
 CharacterPreview
 DEFAULT_CONTROLS
 DEFAULT_PLACEMENT_DISTANCE_MM
-DESIGNED_LOOKS
 FirstPersonControls
 FirstPersonGesture
 INHABITANT_DRAW_DOMAIN
@@ -32,6 +31,7 @@ POINT_VERTEX_GLSL
 POINT_VERTEX_WGSL
 PROOF_LENS_SPLAT_MODIFIER
 PROVENANCE_SLOT
+PeopleCatalogNotServed
 PhysicalResidencyRuntime
 RepresentationRuntime
 SCALE_MILLI_UNIT
@@ -43,6 +43,7 @@ authoredGroundScaleCue
 authoredGroundSurface
 authoredPlacementTransform
 calibratedCameraFrustum
+canonicalJson
 createAnchorMotes
 createAuthoredPointMaps
 createComposedWorld
@@ -67,6 +68,7 @@ footprintLineGeometry
 footprintRadiusOf
 hostGeneratedSociety
 hostRegionSociety
+inhabitantCatalog
 inhabitantLook
 inhabitantRenderable
 isPresenceMarkerOnly
@@ -82,6 +84,7 @@ ownedDistrictCameraState
 ownedDistrictOverviewCameraState
 packSemantics
 packedVertexBytes
+parametricNativeDescriptor
 parseConfig
 placedCatalogObjectSubject
 placementLandingPose
@@ -93,6 +96,7 @@ probeAll
 probeGlobalSort
 probeSplatBudget
 probeWebGpu
+readServedCatalog
 regionPointFromAtlas
 runBakeoff
 safeObjectAssetPath
@@ -101,11 +105,16 @@ sceneInspectionViews
 scenePointMapFootprint
 scenePointMapForward
 scenePointMapViewpoint
+sha256Hex
 sourceMediaForIsland
 sourcePanelEnvelopeOf
 trainedSceneFootprint
+validateCharacterCatalog
+validateDesignedLooks
 validateGlbContainer
 validateLook
+validateParametricCatalog
+validateParametricValues
 validateRecoveredSceneCamera
 validateScenePointMapPlacement
 validateSogBundle

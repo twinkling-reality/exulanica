@@ -11,7 +11,6 @@ import {
   shapePoint,
   type CharacterDimensions,
 } from './character-shape.js';
-import { CHARACTER_CATALOG } from './character/catalog-data.js';
 import { CharacterChoices, type CharacterChoice } from './character/choices.js';
 import { CharacterHost, applicationOf } from './character/host.js';
 import { CHARACTER_RENDERABLE_TAG, LayeredCharacterRenderable } from './character/renderable.js';
@@ -183,8 +182,8 @@ export class PlayerAvatar {
     this.layered = null;
     const app = applicationOf(this.device);
     if (choice.kind === 'catalog' && app) {
-      const host = CharacterHost.forApp(app, CHARACTER_CATALOG);
-      this.layered = new LayeredCharacterRenderable(host, this.parent, this.representation.subject, choice.look, 'near');
+      const host = CharacterHost.forApp(app);
+      this.layered = new LayeredCharacterRenderable(host, this.parent, this.representation.subject, choice.look, 'near', choice.catalog);
       this.layered.setVisible(false);
       // The native runtime draws stylized examples over this root; a catalog person is not one.
       this.root.tags.add(CHARACTER_RENDERABLE_TAG);

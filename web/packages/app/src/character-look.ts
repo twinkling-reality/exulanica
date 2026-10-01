@@ -58,6 +58,51 @@ export function lookOverBase(catalog: CharacterCatalog, looks: DesignedLooks, lo
   return next;
 }
 
+/**
+ * The same person in another revision of their catalog: every choice it still offers is kept and
+ * the rest come from that body's designed default; a family or body it no longer offers gives the
+ * player's designed default. The studio edits recipes over the catalog served now, so a look saved
+ * over an earlier revision opens as this look, while the world keeps wearing the saved one.
+ */
+export function lookInCatalog(catalog: CharacterCatalog, looks: DesignedLooks, look: CharacterLook): CharacterLook {
+  const family = catalog.families.find((candidate) => candidate.familyId === look.familyId);
+  const base = family?.bases.find((candidate) => candidate.baseId === look.baseId);
+  const fallbackId = base === undefined ? undefined : looks.defaults.bases[base.baseId];
+  if (family === undefined || base === undefined || fallbackId === undefined) return designedLook(looks, looks.defaults.player);
+  const fallback = designedLook(looks, fallbackId);
+  const parts: Record<string, string | null> = {};
+  const materials: Record<string, string> = {};
+  const colours: Record<string, string> = {};
+  const parameters: Record<string, number> = {};
+  for (const slot of family.slots) {
+    if (slot.kind === 'part') {
+      const chosen = look.parts[slot.slot] ?? null;
+      const offered = chosen === null ? slot.optional : base.parts.some((part) => part.partId === chosen && part.slot === slot.slot);
+      parts[slot.slot] = offered ? chosen : fallback.parts[slot.slot] ?? null;
+    } else if (slot.kind === 'material') {
+      const chosen = look.materials[slot.slot];
+      materials[slot.slot] = chosen !== undefined && (base.materials[slot.slot] ?? []).includes(chosen) ? chosen : fallback.materials[slot.slot]!;
+    } else {
+      const chosen = look.colours[slot.slot];
+      colours[slot.slot] = chosen !== undefined && (family.colours[slot.slot] ?? []).some((colour) => colour.key === chosen)
+        ? chosen : fallback.colours[slot.slot]!;
+    }
+  }
+  for (const parameter of family.parameters) {
+    const bounds = parameter.unit === 'mm' ? base.heightMillimetres : parameter;
+    const value = look.parameters[parameter.key] ?? fallback.parameters[parameter.key]!;
+    parameters[parameter.key] = Math.max(bounds.min, Math.min(bounds.max, value));
+  }
+  const next: CharacterLook = { ...look, parts, materials, colours, parameters };
+  try {
+    validateLook(catalog, next);
+    return next;
+  } catch {
+    // A rule this projection does not know about: the body's designed default, never a guess.
+    return fallback;
+  }
+}
+
 /** A look is only ever handed on after the catalog has agreed to it. */
 export function checkedLook(catalog: CharacterCatalog, look: CharacterLook): CharacterLook {
   validateLook(catalog, look);

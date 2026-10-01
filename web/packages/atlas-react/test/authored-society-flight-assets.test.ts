@@ -21,6 +21,7 @@ vi.mock('../src/playcanvas/scene-objects.js', async (importOriginal) => {
 });
 
 import { AuthoredRegionSociety } from '../src/playcanvas/society/authored-society.js';
+import { serveFixturePeople } from './served-people.js';
 
 const LOOK = { key: 'small_bird', wingHingeMm: [30, 6, 66] as const, maxBankMrad: 785, flapCycleMs: 120 };
 
@@ -31,6 +32,7 @@ function setup() {
   const options = new pc.AppOptions();
   options.graphicsDevice = device;
   app.init(options);
+  serveFixturePeople(app);
   const root = new pc.Entity('region');
   app.root.addChild(root);
   return { app, device, root };

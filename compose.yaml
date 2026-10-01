@@ -43,6 +43,26 @@ services:
       postgres:
         condition: service_healthy
 
+  # Runs to completion after `migrate`, before the API: publishes the character catalogs the image
+  # carries (migration 0131), the people every world draws and the parametric family a person may
+  # wear. Publication is host administration, so this job and `migrate` are the two that hold the
+  # owner connection. It runs on every `up`: an identical catalog is answered `unchanged`, and a
+  # newer image serves its newer revision. Without it nobody is drawn and /readyz says so.
+  catalogs:
+    build: .
+    command: ["exulanica-character-catalog", "publish", "--apply"]
+    environment:
+      EXULANICA_DATABASE_URL: postgresql://${POSTGRES_USER:-exulanica}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-exulanica}
+      EXULANICA_DATA_DIR: /var/lib/exulanica
+    volumes:
+      - media:/var/lib/exulanica
+    depends_on:
+      # Its own wait for the database, so a start that names it with --no-deps cannot race it.
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
   api:
     build: .
     environment:
@@ -83,6 +103,8 @@ services:
       - "${EXULANICA_PORT:-8000}:8000"
     depends_on:
       migrate:
+        condition: service_completed_successfully
+      catalogs:
         condition: service_completed_successfully
 
   derivative-worker:

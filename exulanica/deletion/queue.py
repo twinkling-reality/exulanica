@@ -48,7 +48,12 @@ from typing import TYPE_CHECKING, Final
 import psycopg
 
 from exulanica.db.roles import PURGE_CROSS_WORKSPACE_TABLES
-from exulanica.store.namespaces import BLOB_NAMESPACE, MATERIAL_NAMESPACE, WORKSPACE_NAMESPACES
+from exulanica.store.namespaces import (
+    BLOB_NAMESPACE,
+    MATERIAL_NAMESPACE,
+    WORKSPACE_ASSET_NAMESPACE,
+    WORKSPACE_NAMESPACES,
+)
 
 if TYPE_CHECKING:
     from exulanica.store.base import ContentAddressedStore
@@ -100,15 +105,22 @@ MAX_ATTEMPTS: Final = 8
 #: hashes. Embedding targets name a database row that only the purge role may delete. Material bake
 #: targets name a container's hash in the workspace's own material namespace (migration 0066), and
 #: a worker given no material namespaces leaves them queued, so their tombstone stays incomplete
-#: and says so rather than completing over bytes nobody destroyed.
-DESTROYABLE_KINDS: Final = ("blob", "artifact", "embedding", "material_bake")
+#: and says so rather than completing over bytes nobody destroyed. Workspace asset targets name an
+#: admitted or prepared object's hash in the workspace's own asset namespace (migration 0126), on
+#: the same terms.
+DESTROYABLE_KINDS: Final = ("blob", "artifact", "embedding", "material_bake", "workspace_asset")
 
 #: The namespace each stored kind's bytes live in (:mod:`exulanica.store.namespaces`); in a
 #: per-workspace namespace, the target's own workspace. A kind is stored by adding it here with its
 #: namespace, and :data:`STORED_KINDS` follows. Whoever must find a target's bytes, in the live
 #: stores or in a backup's, asks :func:`stored_target_store`, which reads this one table.
 STORED_KIND_NAMESPACES: Final[Mapping[str, str]] = MappingProxyType(
-    {"blob": BLOB_NAMESPACE, "artifact": BLOB_NAMESPACE, "material_bake": MATERIAL_NAMESPACE}
+    {
+        "blob": BLOB_NAMESPACE,
+        "artifact": BLOB_NAMESPACE,
+        "material_bake": MATERIAL_NAMESPACE,
+        "workspace_asset": WORKSPACE_ASSET_NAMESPACE,
+    }
 )
 
 #: The destroyable kinds whose target names bytes in an object store, outside the database. A
@@ -244,7 +256,8 @@ def claim_purge(
     somebody to infer from the index definition that the predicate is covered.
 
     ``kinds`` narrows what may be claimed, and must be a subset of :data:`DESTROYABLE_KINDS`: a
-    worker that cannot reach the material namespaces does not claim a bake it could not destroy.
+    worker that cannot reach the material or asset namespaces does not claim a bake or an asset
+    object it could not destroy.
     """
     if not set(kinds) <= set(DESTROYABLE_KINDS):
         raise ValueError(f"cannot claim purge jobs of kinds {sorted(set(kinds))}")
@@ -258,6 +271,14 @@ def claim_purge(
         if "material_bake" in kinds
         else ""
     )
+    # The same for a workspace's own assets, whose function arrives in migration 0126.
+    assets = (
+        "     and (pj.target_kind <> 'workspace_asset' or "
+        "       workspace_asset_purge_is_authorized(pj.workspace_id, pj.tombstone_id, "
+        "                                           pj.target_ref)) "
+        if "workspace_asset" in kinds
+        else ""
+    )
     row = connection.execute(
         "update purge_job set state = 'running', attempts = attempts + 1, "
         "  attempted_at = now(), last_error = null "
@@ -269,6 +290,7 @@ def claim_purge(
         "       caption_vector_purge_is_authorized(pj.workspace_id, pj.tombstone_id, "
         "                                          pj.target_ref::uuid)) "
         + bakes
+        + assets
         + "     and pj.attempts < %s "
         "     and (pj.state = 'queued' "
         "          or (pj.state in ('skipped', 'failed', 'running') "
@@ -360,6 +382,13 @@ def mark_purged(connection: psycopg.Connection, target: PurgeTarget) -> None:
             "update material_bake set purged_at = now() "
             "where workspace_id = %s and content_sha256 = decode(%s, 'hex') "
             "  and purged_at is null",
+            (target.workspace_id, target.target_ref),
+        )
+        return
+    if target.target_kind == "workspace_asset":
+        connection.execute(
+            "update workspace_asset_blob set purged_at = now() "
+            "where workspace_id = %s and content_sha256 = %s and purged_at is null",
             (target.workspace_id, target.target_ref),
         )
         return

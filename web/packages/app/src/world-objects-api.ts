@@ -133,6 +133,35 @@ export interface AuthoredObject {
   readonly removed: boolean;
 }
 
+/** A placed object's own admitted asset, a person's upload, as the version read states it. */
+export interface WorkspaceAssetView {
+  readonly assetId: string;
+  readonly preparationId: string;
+  readonly title: string;
+  /** The prepared bytes' digest: `GET /workspace-assets/{assetId}/prepared/bytes` is checked against it. */
+  readonly contentSha256: string;
+  readonly byteSize: number;
+  readonly mediaType: string;
+  readonly licenceId: string | null;
+  readonly attribution: string | null;
+  /** `available`, `withdrawn` (not drawn; it stays until removed), `unavailable_bytes` or `unknown`. */
+  readonly availability: string;
+}
+
+/**
+ * An object placed from a person's own admitted asset. The version read gives it no reviewed
+ * `asset`. This client does not draw one, so a version lists these apart from `objects`, which every
+ * drawing path reads: a custom object is left undrawn rather than drawn as something else.
+ */
+export interface WorkspaceAssetObject {
+  readonly objectId: string;
+  readonly workspaceAsset: WorkspaceAssetView;
+  readonly regionId: string;
+  readonly transform: ObjectTransform;
+  readonly origin: { readonly kind: string; readonly role: ObjectRole };
+  readonly removed: boolean;
+}
+
 export interface ElementOverride {
   readonly elementId: string;
   readonly suppressed: boolean;
@@ -171,6 +200,8 @@ export interface AlternateVersion {
   readonly createdBy: string;
   readonly createdAt: string;
   readonly objects: readonly AuthoredObject[];
+  /** Objects placed from the workspace's own admitted assets, which this client does not draw. */
+  readonly workspaceObjects?: readonly WorkspaceAssetObject[];
   readonly elementOverrides: readonly ElementOverride[];
   readonly environmentInstances?: readonly EnvironmentInstance[];
   readonly pointMapInstances?: readonly PointMapInstance[];
@@ -913,6 +944,46 @@ export function parseObject(value: unknown): AuthoredObject {
   });
 }
 
+function parseWorkspaceAssetView(value: unknown): WorkspaceAssetView {
+  const row = record(value, 'workspace asset');
+  return Object.freeze({
+    assetId: text(row['asset_id'], 'workspace asset id'),
+    preparationId: text(row['preparation_id'], 'workspace asset preparation id'),
+    title: anyText(row['title'], 'workspace asset title'),
+    contentSha256: digest(row['content_sha256'], 'workspace asset content hash'),
+    byteSize: integer(row['byte_size'], 'workspace asset byte size'),
+    mediaType: text(row['media_type'], 'workspace asset media type'),
+    licenceId: optionalText(row['licence_id'], 'workspace asset licence id'),
+    attribution: optionalText(row['attribution'], 'workspace asset attribution'),
+    availability: text(row['availability'], 'workspace asset availability'),
+  });
+}
+
+/** A row that names its workspace asset, whose `asset` the read leaves null. */
+export function parseWorkspaceObject(value: unknown): WorkspaceAssetObject {
+  const row = record(value, 'authored object');
+  if (row['asset'] !== null) throw invalid('workspace asset object');
+  const origin = record(row['origin'], 'authored object origin');
+  const role = text(origin['role'], 'authored object role');
+  if (!isObjectRole(role)) throw invalid('authored object role');
+  return Object.freeze({
+    objectId: text(row['object_id'], 'authored object id'),
+    workspaceAsset: parseWorkspaceAssetView(row['workspace_asset']),
+    regionId: text(row['region_id'], 'authored object region'),
+    transform: parseTransform(row['transform']),
+    origin: Object.freeze({
+      kind: text(origin['kind'], 'authored object origin kind'),
+      role,
+    }),
+    removed: flag(row['removed'], 'authored object removal'),
+  });
+}
+
+function namesWorkspaceAsset(value: unknown): boolean {
+  const pinned = record(value, 'authored object')['workspace_asset'];
+  return pinned !== null && pinned !== undefined;
+}
+
 function parseOverride(value: unknown): ElementOverride {
   const row = record(value, 'element override');
   const transform = row['transform'];
@@ -986,8 +1057,11 @@ function parsePointMapInstance(value: unknown): PointMapInstance {
 
 export function parseVersion(value: unknown): AlternateVersion {
   const row = record(value, 'alternate world version');
-  const objects = array(row['objects'], 'authored object list').map(parseObject);
-  if (new Set(objects.map((object) => object.objectId)).size !== objects.length) {
+  const rows = array(row['objects'], 'authored object list');
+  const objects = rows.filter((item) => !namesWorkspaceAsset(item)).map(parseObject);
+  const workspaceObjects = rows.filter(namesWorkspaceAsset).map(parseWorkspaceObject);
+  const ids = [...objects, ...workspaceObjects].map((object) => object.objectId);
+  if (new Set(ids).size !== ids.length) {
     throw invalid('authored object list');
   }
   return Object.freeze({
@@ -1005,6 +1079,7 @@ export function parseVersion(value: unknown): AlternateVersion {
     createdBy: text(row['created_by'], 'version author'),
     createdAt: text(row['created_at'], 'version timestamp'),
     objects: Object.freeze(objects),
+    workspaceObjects: Object.freeze(workspaceObjects),
     elementOverrides: Object.freeze(
       array(row['element_overrides'], 'element override list').map(parseOverride),
     ),

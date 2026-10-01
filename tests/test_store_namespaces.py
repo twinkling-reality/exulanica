@@ -31,7 +31,12 @@ TESTS = Path(__file__).resolve().parent
 
 #: Names an object key, a data directory and a backup set already carry, with their kind. Never
 #: renamed and never moved between kinds; a new namespace is added beside them.
-STABLE = {"blobs": "shared", "tiles": "shared", "materials": "per-workspace"}
+STABLE = {
+    "blobs": "shared",
+    "tiles": "shared",
+    "materials": "per-workspace",
+    "workspace-assets": "per-workspace",
+}
 
 
 def test_the_registered_names_are_stable_single_segments():

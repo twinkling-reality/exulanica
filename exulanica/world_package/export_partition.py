@@ -26,6 +26,12 @@ that directory as well, so the directory is lineage-closed; those ancestors stay
 too. A kept version only a family that was not requested can hold is reported, and the projector
 refuses rather than write a directory that looks complete without it.
 
+**A workspace's own asset is carried by no format.** An object placed from an asset a workspace
+admitted and prepared names bytes only that workspace may deliver
+(:mod:`exulanica.world.workspace_assets`), so a version whose state holds one needs
+:data:`WORKSPACE_ASSETS`, which no family carries: it and every version branched from it are
+withheld under ``section_not_carried`` with that name, and the versions before it still export.
+
 **Where a withheld version is counted.** In the requested format of the family its own state and
 chain need or, when that family was not requested, in the nearest smaller family that was, so a
 receiver of an authored-world directory alone is told about every version it does not get. That is
@@ -38,6 +44,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
+from typing import Final
 
 from exulanica.world.authored_delta import DELTA_SECTIONS, DeltaSection
 from exulanica.world.edit_kinds import EDIT_KINDS, UNDO, EditKind, EditSubject
@@ -55,12 +62,18 @@ __all__ = [
     "REASON_KIND_NOT_ADMITTED",
     "REASON_SECTION_NOT_CARRIED",
     "REASON_SOURCE_INVALIDATED",
+    "WORKSPACE_ASSETS",
     "ExportPlan",
     "PlaneVersion",
     "WithheldVersion",
     "judging_formats",
     "plan_export",
 ]
+
+
+#: The name under which a version holding an object placed from a workspace's own asset is
+#: withheld: content its state holds that no extension format carries.
+WORKSPACE_ASSETS: Final = "workspace_assets"
 
 
 @dataclass(frozen=True, slots=True)
@@ -77,6 +90,9 @@ class PlaneVersion:
     chain_subjects: frozenset[EditSubject] = frozenset()
     #: The delta sections its current state holds anything in.
     state_sections: frozenset[str] = frozenset()
+    #: What its current state holds that no format carries, by name, such as
+    #: :data:`WORKSPACE_ASSETS`. Each name withholds it like a section its format does not carry.
+    uncarried: frozenset[str] = frozenset()
 
 
 @dataclass(frozen=True, slots=True)
@@ -163,7 +179,11 @@ def plan_export(
                     "it admits it"
                 )
             subjects.add(subject_of[kind])
-        return version.state_sections | {section_of[subject] for subject in subjects}
+        return (
+            version.state_sections
+            | version.uncarried
+            | {section_of[subject] for subject in subjects}
+        )
 
     def lineage(version: PlaneVersion) -> list[PlaneVersion]:
         found = [version]

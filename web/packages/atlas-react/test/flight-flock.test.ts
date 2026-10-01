@@ -4,6 +4,7 @@ import * as pc from 'playcanvas';
 import { FlightFlock } from '../src/playcanvas/flight/flock.js';
 import type { FlightKindLook, FlightSamples, FlightWindow } from '../src/playcanvas/flight/types.js';
 import { AuthoredRegionSociety } from '../src/playcanvas/society/authored-society.js';
+import { serveFixturePeople } from './served-people.js';
 
 const STATES = ['perching', 'taking_off', 'flying', 'landing'] as const;
 const PERCHING = 0;
@@ -18,6 +19,7 @@ function setup() {
   options.graphicsDevice = device;
   options.componentSystems = [pc.RenderComponentSystem];
   app.init(options);
+  serveFixturePeople(app);
   const root = new pc.Entity('region');
   app.root.addChild(root);
   return { app, device, root };

@@ -40,6 +40,8 @@ import hashlib
 import importlib.util
 import json
 import os
+import re
+import signal
 import subprocess
 import sys
 import time
@@ -48,6 +50,7 @@ import urllib.request
 import uuid
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
@@ -55,7 +58,7 @@ HERE = Path(__file__).resolve().parent
 REPOSITORY = HERE.parents[1]
 sys.path.insert(0, str(REPOSITORY / "clients" / "python"))
 
-from exulanica_client.client import Exchange, WorldClient  # noqa: E402
+from exulanica_client.client import ClientError, Exchange, WorldClient  # noqa: E402
 
 
 def _launcher() -> Any:
@@ -67,6 +70,9 @@ def _launcher() -> Any:
 
 
 LAUNCH = _launcher()
+#: This file's digest as the run began. Child processes re-read the file, so a run records whether
+#: it changed before the run ended, and a changed one is not evidence of the code it names.
+DRIVER_SHA256_AT_START = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
 
 #: The row states a result may take. There is no skipped state.
 STATES = ("passed", "failed", "blocked")
@@ -103,6 +109,24 @@ VERSION_CAPABILITIES_ROUTE = "/world/versions/{version_id}/capabilities"
 INPUT_PROVENANCE_ROUTE = "/world/versions/{version_id}/society/inputs/{input_seq}"
 OBJECT_ADD = "POST /world/versions/{version_id}/objects"
 MODEL_CHOICE = "POST /world/versions/{version_id}/models/{role_key}"
+#: W7's clock coupling write, and the client-example digest W7 delivered (delivery 1, A-19).
+CLOCK_ROUTE = "/world/versions/{version_id}/clock"
+W7_CLIENT_SHA256 = "f20e98b7bbcef3c14afcd54b84fbe46833da7bc4ae39370327c2ed16597ab9da"
+#: How long the driver waits for the host's traffic to follow the stepped people.
+FOLLOW_SECONDS = 120
+#: M7's project routes, the peer token the launcher writes, and the tests F3 and F4 re-run.
+PROJECTS_ROUTE = "/world/projects"
+PEER_TOKEN = "token-peer"
+M7_LANE_TESTS = (
+    "tests/test_developer_client_project_context.py",
+    "tests/test_project_context_api.py",
+    "tests/test_project_context_erasure.py",
+)
+F4_TESTS = (
+    "tests/test_companion_memory_policy_boundary.py",
+    "tests/test_project_context_policy_boundary.py",
+)
+F4_CONTRACT = "A world project's context cannot author policy, grant a permission or call a model"
 #: A region no world lists, for the unlisted-region refusal.
 UNLISTED_REGION = "region:q10-unlisted"
 #: The restrict key every evidence dump is made with, so two dumps of one database are equal.
@@ -237,13 +261,15 @@ class Stack:
     def token_file(self, name: str) -> Path:
         return self.run_dir / name
 
-    def restart_api(self, revoke: str | None = None) -> dict[str, Any]:
+    def restart_api(self, revoke: str | None = None, api: str = "primary") -> dict[str, Any]:
         command = [
             sys.executable,
             str(HERE / "launch.py"),
             "restart-api",
             "--worktree",
             str(self.worktree),
+            "--api",
+            api,
         ]
         if revoke is not None:
             command += ["--revoke", revoke]
@@ -1021,7 +1047,27 @@ def row_a4_discovery(
     return row.close()
 
 
-def row_a4_client(stack: Stack, w1: Client, out: Path) -> Row:
+def resume_points(c: Client, step: str) -> dict[str, dict[str, Any]]:
+    """Each saved world's availability and resume point, by entry id."""
+    _, entries = c.call(step, "GET", "/world-entries")
+    return {
+        e["entry_id"]: {
+            key: e.get(key)
+            for key in (
+                "availability",
+                "unavailable_reason",
+                "revision",
+                "authored_state_sha256",
+                "authored_edit_seq",
+            )
+        }
+        for e in entries
+    }
+
+
+def row_a4_client(
+    stack: Stack, client_of: Client, token_file: str, out: Path, own_worlds_only: bool
+) -> Row:
     """F1's independent client exercising every kind, in its own process. Run after every other
     row: its edits are not bound to the saved worlds, so each world it edits reads
     ``authored_version_changed`` afterwards and an entry-bound client is refused there until the
@@ -1031,11 +1077,22 @@ def row_a4_client(stack: Stack, w1: Client, out: Path) -> Row:
         "exulanica_client capabilities --exercise --origin-role fictional",
         "F1's independent client, in a process of its own with no site packages, discovers each "
         "saved world's capabilities, makes and rereads the edit each read calls available and is "
-        "refused by name against the replaced base; exit 0.",
+        "refused by name against the replaced base; exit 0."
+        + (
+            " Every saved world that existed before it ran keeps its availability and resume "
+            "point (root decision, amendment A-16)."
+            if own_worlds_only
+            else ""
+        ),
     )
-    if CAPABILITIES_ROUTE not in served_paths(w1):
+    if CAPABILITIES_ROUTE not in served_paths(client_of):
         row.blocked_by.append("F1 capability projection not in this candidate (routes not served)")
         return row.close()
+    _, assets = client_of.call("A4-client", "GET", "/world/assets")
+    if not [a for a in assets or [] if a.get("availability") == "available"]:
+        row.blocked_by.append("no reviewed asset is available on this server (amendment A-18)")
+        return row.close()
+    before = resume_points(client_of, "A4-client")
     completed = subprocess.run(
         [
             sys.executable,
@@ -1055,7 +1112,7 @@ def row_a4_client(stack: Stack, w1: Client, out: Path) -> Row:
         ],
         cwd=REPOSITORY / "clients" / "python",
         env={
-            "EXULANICA_TOKEN": stack.token_file("token").read_text(),
+            "EXULANICA_TOKEN": stack.token_file(token_file).read_text(),
             "PATH": os.environ.get("PATH", ""),
         },
         capture_output=True,
@@ -1066,9 +1123,19 @@ def row_a4_client(stack: Stack, w1: Client, out: Path) -> Row:
         completed.stdout + completed.stderr
     )
     row.expect(completed.returncode == 0, f"F1's independent client exited {completed.returncode}")
-    _, entries = w1.call("A4-client", "GET", "/world-entries")
+    after = resume_points(client_of, "A4-client")
+    transcript_path = out / "evidence" / "a4-capabilities-client.json"
+    transcript = json.loads(transcript_path.read_text()) if transcript_path.exists() else {}
+    moved = sorted(entry for entry, point in before.items() if after.get(entry) != point)
+    if own_worlds_only:
+        row.expect(moved == [], f"{len(moved)} pre-existing saved worlds changed: {moved}")
+    _, entries = client_of.call("A4-client", "GET", "/world-entries")
     row.observed = {
         "client_exit": completed.returncode,
+        "own_worlds_only_expected": own_worlds_only,
+        "pre_existing_worlds_changed": moved,
+        "workspace_token_file": token_file,
+        "made": (transcript.get("made") if isinstance(transcript, dict) else None),
         "saved_worlds_after": [
             {
                 "title": e.get("title"),
@@ -1078,6 +1145,370 @@ def row_a4_client(stack: Stack, w1: Client, out: Path) -> Row:
             for e in entries
         ],
     }
+    return row.close()
+
+
+def row_g1_g3_clock(
+    stack: Stack, w1: Client, towns: Sequence[Mapping[str, Any]], out: Path, client: Path | None
+) -> list[Row]:
+    """G1 and G3 by W7's procedure (amendment A-20): one coupling process, then two reading
+    processes at once after traffic has followed, judged by their printed lines."""
+    g1 = Row(
+        "G1",
+        "clock.pause_advance_reopen",
+        "A paused town is coupled and stepped four minutes by one client; once traffic has "
+        "followed, two clients started at once print the identical last sealed minute's frames "
+        "digest and the same frames on a second read; traffic always follows.",
+    )
+    g3 = Row(
+        "G3",
+        "clock.replay_zero_call",
+        "Every verify receipt reports model_client null and verified traffic and society replay, "
+        "and the scripted transport made no call while the two reading clients ran verify.",
+    )
+    rows = [g1, g3]
+    if CLOCK_ROUTE not in served_paths(w1):
+        for row in rows:
+            row.blocked_by.append("W7 clock routes not in this candidate")
+        return [row.close() for row in rows]
+    if client is None or not client.is_file():
+        for row in rows:
+            row.blocked_by.append("W7 client-example not supplied (--w7-client)")
+        return [row.close() for row in rows]
+    digest = hashlib.sha256(client.read_bytes()).hexdigest()
+    if digest != W7_CLIENT_SHA256:
+        for row in rows:
+            row.blocked_by.append(f"W7 client-example digest {digest} is not the delivered one")
+        return [row.close() for row in rows]
+    if not stack.state.get("society_playback") or not towns:
+        for row in rows:
+            row.blocked_by.append("the stack lists no society-control workspace or holds no town")
+        return [row.close() for row in rows]
+    town = read_entry(w1, "G1", towns[0]["entry_id"])
+    status, _ = w1.call(
+        "G1",
+        "POST",
+        version_path(town, "/society"),
+        query=world_query(town),
+        body={"region_id": "region:generated", "profile": "exulanica-society/v5"},
+    )
+    g1.expect(status == 200, f"the town's living society answered {status}")
+    scripted = stack.state.get("scripted_model")
+    log = Path(scripted["log"]) if isinstance(scripted, Mapping) else None
+
+    def calls() -> int | None:
+        return len(log.read_text().splitlines()) if log and log.exists() else (0 if log else None)
+
+    def command(minutes: int) -> list[str]:
+        return [
+            sys.executable,
+            str(client),
+            stack.base_url,
+            town["world_id"],
+            town["authored_version_id"],
+            str(minutes),
+        ]
+
+    # The token travels in the environment, never on a command line.
+    environment = {
+        "EXULANICA_TOKEN": stack.token_file("token").read_text(),
+        "PATH": os.environ.get("PATH", ""),
+    }
+
+    first = subprocess.run(command(4), env=environment, capture_output=True, text=True, check=False)
+    (out / "evidence" / "g1-client-a.txt").write_text(first.stdout + first.stderr)
+    g1.expect(first.returncode == 0, f"the coupling client exited {first.returncode}")
+    g1.expect("traffic has not followed" not in first.stdout, "traffic did not follow the steps")
+    deadline = time.monotonic() + FOLLOW_SECONDS
+    clock: dict[str, Any] = {}
+    while time.monotonic() < deadline:
+        _, clock = w1.call("G1", "GET", version_path(town, "/clock"), query=world_query(town))
+        if (clock.get("traffic") or {}).get("state") == "waiting_for_society":
+            break
+        time.sleep(1)
+    g1.expect(
+        (clock.get("traffic") or {}).get("state") == "waiting_for_society",
+        f"traffic did not reach waiting_for_society: {clock.get('traffic')}",
+    )
+    # Counted across the two readers alone: the coupling client's steps may legitimately ask a
+    # person's chosen model, while verify holds no model client (W7, A-20).
+    before_calls = calls()
+    readers = [
+        subprocess.Popen(
+            command(0), env=environment, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+        )
+        for _ in range(2)
+    ]
+    printed = [reader.communicate() for reader in readers]
+    after_calls = calls()
+    frames, verifies = [], []
+    for index, ((stdout, stderr), reader) in enumerate(zip(printed, readers, strict=True)):
+        (out / "evidence" / f"g1-client-{'bc'[index]}.txt").write_text(stdout + stderr)
+        g1.expect(reader.returncode == 0, f"reader {'BC'[index]} exited {reader.returncode}")
+        g1.expect(
+            "same frames on a second read: True" in stdout,
+            f"reader {'BC'[index]} saw different frames on a second read",
+        )
+        frame = re.findall(r"minute (\d+) frames (\w+)", stdout)
+        frames.append(frame[-1] if frame else None)
+        verifies += [line for line in stdout.splitlines() if line.startswith("verify:")]
+    verifies += [line for line in first.stdout.splitlines() if line.startswith("verify:")]
+    g1.expect(
+        frames[0] is not None and frames[0] == frames[1],
+        f"the two readers printed {frames}",
+    )
+    receipts = []
+    for line in verifies:
+        try:
+            receipts.append(json.loads(line.split(" ", 2)[2]))
+        except (IndexError, ValueError):
+            g3.failures.append(f"an unreadable verify line: {line[:120]}")
+    g3.expect(len(receipts) == 3, f"{len(receipts)} verify receipts printed, not 3")
+    for receipt in receipts:
+        g3.expect(
+            "model_client" in receipt and receipt["model_client"] is None,
+            "a verify receipt names a model client",
+        )
+        g3.expect(
+            (receipt.get("traffic") or {}).get("verified") is True,
+            "a verify receipt did not verify traffic",
+        )
+        g3.expect(
+            (receipt.get("society") or {}).get("replayed") is True,
+            "a verify receipt did not replay the society",
+        )
+    if before_calls is not None and after_calls is not None:
+        g3.expect(
+            after_calls == before_calls,
+            f"the scripted transport was called {after_calls - before_calls} times",
+        )
+    g1.observed = {
+        "town": town["world_id"],
+        "clock": clock,
+        "frames": frames,
+        "client_sha256": digest,
+    }
+    g3.observed = {
+        "receipts": receipts,
+        "scripted_calls": [before_calls, after_calls],
+        "model_client_on_stack": log is not None,
+    }
+    return [row.close() for row in rows]
+
+
+def row_f3_context(
+    stack: Stack,
+    w1: Client,
+    w2: Client,
+    peer_of: Callable[[], Client],
+    entry: Mapping[str, Any],
+    out: Path,
+) -> Row:
+    """F3 by M7's delivery (amendment A-10): two client processes either side of an API restart,
+    then what another actor, another workspace and a stale writer are told, and the raw tables."""
+    row = Row(
+        "F3",
+        "context.continuity",
+        "M7's client records a project on a saved world in one process and, after an API restart, "
+        "resumes it in another: the decision still names the same edit, the goal is corrected, the "
+        "question is deleted and absent from every read. Another actor in the workspace and "
+        "another workspace are answered as for an invented project; a stale writer is refused "
+        "409 stale_project_context; the deleted words are in no project table; a revoked token is "
+        "refused 401. M7's lane tests pass on the candidate.",
+    )
+    if PROJECTS_ROUTE not in served_paths(w1):
+        row.blocked_by.append("M7 project routes not in this candidate")
+        return row.close()
+    if "peer_token" not in stack.state:
+        row.blocked_by.append("the stack was started without --peer-token")
+        return row.close()
+    note = out / "evidence" / "f3-note.json"
+    question = f"Q10 continuity question {uuid.uuid4().hex}?"
+    environment = {
+        "EXULANICA_TOKEN": stack.token_file("token").read_text(),
+        "PATH": os.environ.get("PATH", ""),
+    }
+    base = [sys.executable, "-S", "-s", "-E", "-m", "exulanica_client.project_context"]
+    recorded = subprocess.run(
+        [
+            *base,
+            "record",
+            "--base-url",
+            stack.base_url,
+            "--note",
+            str(note),
+            "--entry-id",
+            entry["entry_id"],
+            "--question",
+            question,
+            "--transcript",
+            str(out / "evidence" / "f3-record.json"),
+        ],
+        cwd=REPOSITORY / "clients" / "python",
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    restart = stack.restart_api()
+    resumed = subprocess.run(
+        [
+            *base,
+            "resume",
+            "--base-url",
+            stack.base_url,
+            "--note",
+            str(note),
+            "--transcript",
+            str(out / "evidence" / "f3-resume.json"),
+        ],
+        cwd=REPOSITORY / "clients" / "python",
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    (out / "evidence" / "f3-clients.txt").write_text(
+        recorded.stdout + recorded.stderr + "\n----\n" + resumed.stdout + resumed.stderr
+    )
+    row.expect(recorded.returncode == 0, f"record exited {recorded.returncode}")
+    row.expect(resumed.returncode == 0, f"resume exited {resumed.returncode}")
+    kept = json.loads(note.read_text()) if note.exists() else {}
+    project, world = kept.get("project_id"), kept.get("world_id") or entry["world_id"]
+    query = {"world_id": world}
+    peer = peer_of()
+    invented = str(uuid.uuid4())
+    _, peer_list = peer.call("F3", "GET", PROJECTS_ROUTE, query=query)
+    peer_status, peer_body = peer.call("F3", "GET", f"{PROJECTS_ROUTE}/{project}", query=query)
+    made_status, made_body = peer.call("F3", "GET", f"{PROJECTS_ROUTE}/{invented}", query=query)
+    other_status, _ = w2.call("F3", "GET", f"{PROJECTS_ROUTE}/{project}", query=query)
+    row.expect(peer_list == [], f"another actor lists {peer_list}")
+    row.expect(
+        peer_status == made_status == 404
+        and json.dumps(peer_body).replace(str(project), "<id>")
+        == json.dumps(made_body).replace(invented, "<id>"),
+        f"another actor's read {peer_status}, an invented one {made_status}",
+    )
+    row.expect(other_status == 404, f"another workspace's read answered {other_status}")
+    _, current = w1.call("F3", "GET", f"{PROJECTS_ROUTE}/{project}", query=query)
+    stale_status, stale_body = w1.call(
+        "F3",
+        "PUT",
+        f"{PROJECTS_ROUTE}/{project}",
+        query=query,
+        body={
+            "base_revision": max(1, int(current.get("revision", 2)) - 1),
+            "title": current.get("title", "Q10"),
+            "version_id": (current.get("binding") or {}).get("version_id"),
+        },
+    )
+    row.expect(
+        stale_status == 409 and problem_code(stale_body) == "stale_project_context",
+        f"a stale write answered {stale_status} {problem_code(stale_body)}",
+    )
+    database = stack.state["database"]
+    tables = subprocess.run(
+        [
+            str(Path(database["postgres_bin"]) / "pg_dump"),
+            "--data-only",
+            "--no-owner",
+            f"--restrict-key={EVIDENCE_RESTRICT_KEY}",
+            "-t",
+            "world_project*",
+            database["owner_url_for_evidence_reads"],
+        ],
+        capture_output=True,
+        check=True,
+    ).stdout
+    row.expect(question.encode() not in tables, "the deleted question survives in a table")
+    revoked = stack.restart_api(revoke=PEER_TOKEN)
+    revoked_status, _ = peer_of().call("F3", "GET", PROJECTS_ROUTE, query=query)
+    restored = stack.restart_api()
+    row.expect(revoked_status == 401, f"the revoked token answered {revoked_status}")
+    lane = subprocess.run(
+        [
+            str(stack.worktree / ".venv" / "bin" / "python"),
+            "-m",
+            "pytest",
+            "-q",
+            "-p",
+            "no:cacheprovider",
+            *M7_LANE_TESTS,
+        ],
+        cwd=stack.worktree,
+        env={
+            **LAUNCH.clean_environment(),
+            "EXULANICA_TEST_POSTGRES": "private",
+            "EXULANICA_REQUIRE_POSTGRES": "1",
+        },
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    (out / "evidence" / "f3-lane-tests.txt").write_text(lane.stdout + lane.stderr)
+    row.expect(lane.returncode == 0, f"M7's lane tests exited {lane.returncode}")
+    row.observed = {
+        "project": project,
+        "record_exit": recorded.returncode,
+        "resume_exit": resumed.returncode,
+        "restart": restart,
+        "peer": {"list": peer_list, "read": peer_status, "invented": made_status},
+        "other_workspace": other_status,
+        "stale": [stale_status, problem_code(stale_body)],
+        "question_in_tables": question.encode() in tables,
+        "revoked": revoked_status,
+        "restarts": [revoked, restored],
+        "lane_tests_exit": lane.returncode,
+    }
+    return row.close()
+
+
+def row_f4_boundary(out: Path, worktree: Path) -> Row:
+    """F4: the two policy-boundary tests and the import contract over the context modules."""
+    row = Row(
+        "F4",
+        "context.policy_boundary",
+        "The unchanged Companion memory boundary test, M7's project-context boundary test and the "
+        "import contract that keeps project context from authoring policy pass on the candidate.",
+    )
+    tests = subprocess.run(
+        [
+            str(worktree / ".venv" / "bin" / "python"),
+            "-m",
+            "pytest",
+            "-q",
+            "-p",
+            "no:cacheprovider",
+            *F4_TESTS,
+        ],
+        cwd=worktree,
+        env={
+            **LAUNCH.clean_environment(),
+            "EXULANICA_TEST_POSTGRES": "private",
+            "EXULANICA_REQUIRE_POSTGRES": "1",
+        },
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    contracts = subprocess.run(
+        [str(worktree / ".venv" / "bin" / "lint-imports")],
+        cwd=worktree,
+        env=LAUNCH.clean_environment(),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    (out / "evidence" / "f4.txt").write_text(
+        tests.stdout + tests.stderr + "\n----\n" + contracts.stdout + contracts.stderr
+    )
+    # lint-imports wraps long contract names across lines; read it as one run of words.
+    flowing = " ".join(contracts.stdout.split())
+    kept = [f"{F4_CONTRACT} KEPT"] if f"{F4_CONTRACT} KEPT" in flowing else []
+    row.expect(tests.returncode == 0, f"the boundary tests exited {tests.returncode}")
+    row.expect(contracts.returncode == 0, f"lint-imports exited {contracts.returncode}")
+    row.expect(any("KEPT" in line for line in kept), f"the project-context contract reads {kept}")
+    row.observed = {"tests_exit": tests.returncode, "contract": kept}
     return row.close()
 
 
@@ -1693,25 +2124,14 @@ def journey(stack: Stack, w2: Client, entry_id: str, out: Path) -> list[Row]:
     }
     rows.append(reopen.close())
 
+    # N1.h and N1.i run on scripted stacks of their own: `foundation.py alternative` (A-28) and
+    # `foundation.py companion`.
     for identity, check, expected, blockers in (
-        (
-            "N1.h",
-            "journey.alternative",
-            "Compare the world without the bench from an exact starting state, original history "
-            "preserved.",
-            ["N-G5 (V7): no edit-alternative comparison on the saved-world engine"],
-        ),
-        (
-            "N1.i",
-            "journey.companion_edit",
-            "The same bench edit through the Companion with identical receipts.",
-            ["M6 not delivered"],
-        ),
         (
             "N1.j",
             "journey.browser",
             "The production browser performs preview, confirm, response and explanation.",
-            ["not part of BASELINE-0; browser rehearsal step not yet written"],
+            ["the production browser step is not yet written"],
         ),
     ):
         pending = Row(identity, check, expected)
@@ -2038,7 +2458,23 @@ def baseline(arguments: argparse.Namespace) -> int:
     rows.append(existing_tests(out, worktree))
     rows.append(row_c2_client(stack, read_entry(w1, "C2", w1_entry["entry_id"]), out, read_only()))
     rows.append(row_c3_revoke(stack, w1, read_only, read_entry(w1, "C3", w1_entry["entry_id"])))
-    rows.append(row_a4_client(stack, w1, out))
+    rows.append(
+        row_f3_context(
+            stack,
+            w1,
+            w2,
+            lambda: client(stack, transcripts, "peer", PEER_TOKEN),
+            read_entry(w1, "F3", w1_entry["entry_id"]),
+            out,
+        )
+    )
+    rows.append(row_f4_boundary(out, worktree))
+    rows += row_g1_g3_clock(
+        stack, w1, towns, out, Path(arguments.w7_client) if arguments.w7_client else None
+    )
+    # The journey workspace, last: it holds one saved world and room for a town, so F1's client
+    # can make a world of its own there, and A-16 compares the journey world before and after.
+    rows.append(row_a4_client(stack, w2, "token-2", out, arguments.exercise_own_worlds_only))
     results = {
         "profile": "q10-foundation-acceptance-results/v1",
         "candidate": stack.state["tree"],
@@ -2053,7 +2489,9 @@ def baseline(arguments: argparse.Namespace) -> int:
     public_state = {k: v for k, v in stack.state.items() if k not in ("database",)}
     manifest = {
         "driver": str(Path(__file__).resolve().relative_to(REPOSITORY)),
-        "driver_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+        "driver_sha256": DRIVER_SHA256_AT_START,
+        "driver_changed_during_run": hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
+        != DRIVER_SHA256_AT_START,
         "launcher_sha256": hashlib.sha256((HERE / "launch.py").read_bytes()).hexdigest(),
         "command": ["foundation.py", *sys.argv[1:]],
         "launcher_state": public_state,
@@ -2066,12 +2504,1163 @@ def baseline(arguments: argparse.Namespace) -> int:
     return 0 if results["counts"]["failed"] == 0 else 1
 
 
+# -- spending (B1 rows I1 to I5) ---------------------------------------------------------------------
+
+#: The spending tables in restore order, parents first (``tests/test_spending_witness.py``).
+SPENDING_TABLES = (
+    "spending_authority",
+    "spending_authority_term",
+    "spending_authority_state",
+    "spending_authority_revocation",
+    "spending_grant",
+    "spending_grant_state",
+    "spending_grant_revocation",
+    "spending_reservation",
+    "spending_event",
+)
+#: The authority's ceiling, above any one grant, and the grants: each racing workspace's small
+#: enough that its two processes reach it in seconds; the kill window's workspace its own.
+AUTHORITY_CEILING_USD = "0.020"
+GRANT_CEILING_USD = "0.006"
+KILL_GRANT_CEILING_USD = "0.004"
+SPENDING_MAX_CALLS = 1000
+#: How long each race client asks, and how long the kill window runs before the kill.
+RACE_SECONDS = 15
+KILL_AFTER_SECONDS = 3
+#: The question every spending client asks; it is admitted before anything is sent.
+SPENDING_QUESTION = {"question": "where was I?"}
+
+
+def spend_client(arguments: argparse.Namespace) -> int:
+    """One client asking for a plan until its time runs out, counting what each answer was."""
+    http = WorldClient(arguments.base_url, Path(arguments.token_file).read_text(), timeout=30)
+    started = time.time()
+    outcomes: dict[str, int] = {}
+    deadline = time.monotonic() + arguments.seconds
+    errors = 0
+    while time.monotonic() < deadline:
+        try:
+            status, body = http.request("POST", "/selection/plan", body=SPENDING_QUESTION)
+        except (ClientError, OSError):
+            # A killed server is an outcome of the run, counted, never a crash of the client.
+            errors += 1
+            time.sleep(0.2)
+            continue
+        reason = (body or {}).get("spending", {}).get("reason") if isinstance(body, dict) else None
+        key = f"{status}:{reason or problem_code(body) or ''}"
+        outcomes[key] = outcomes.get(key, 0) + 1
+    Path(arguments.out).write_text(
+        json.dumps(
+            {
+                "pid": os.getpid(),
+                "started_epoch": started,
+                "finished_epoch": time.time(),
+                "outcomes": outcomes,
+                "connection_errors": errors,
+            }
+        )
+    )
+    return 0
+
+
+def operator(stack: Stack, *command: str) -> tuple[int, dict[str, Any]]:
+    """``python -m exulanica.spending`` as the operator: owner database, the API's witness."""
+    environment = LAUNCH.clean_environment()
+    environment.update(
+        {
+            "EXULANICA_DATABASE_URL": stack.state["database"]["owner_url_for_evidence_reads"],
+            "EXULANICA_SPENDING_WITNESS_DIR": str(stack.run_dir / LAUNCH.SPENDING_WITNESS_NAME),
+        }
+    )
+    completed = subprocess.run(
+        [str(stack.worktree / ".venv" / "bin" / "python"), "-m", "exulanica.spending", *command],
+        cwd=stack.worktree,
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    text = completed.stdout.strip() or completed.stderr.strip()
+    try:
+        return completed.returncode, json.loads(text.splitlines()[-1]) if text else {}
+    except ValueError:
+        return completed.returncode, {"unparsed": text[-500:]}
+
+
+def scripted_calls(stack: Stack) -> int:
+    log = Path(stack.state["scripted_model"]["log"])
+    return len(log.read_text().splitlines()) if log.exists() else 0
+
+
+def spending_of(c: Client, step: str) -> dict[str, Any]:
+    status, body = c.call(step, "GET", "/spending")
+    if status != 200:
+        raise RuntimeError(f"GET /spending answered {status}: {body}")
+    return body["providers"][0]
+
+
+def ask(c: Client, step: str) -> tuple[int, str | None]:
+    status, body = c.call(step, "POST", "/selection/plan", body=SPENDING_QUESTION)
+    reason = (body or {}).get("spending", {}).get("reason") if isinstance(body, dict) else None
+    return status, reason
+
+
+def ledger_dump(stack: Stack, path: Path) -> None:
+    """An evidence copy of the spending tables, as a backup of them would hold them."""
+    database = stack.state["database"]
+    command = [
+        str(Path(database["postgres_bin"]) / "pg_dump"),
+        "--data-only",
+        "--disable-triggers",
+        "--no-owner",
+        "--no-privileges",
+        f"--restrict-key={EVIDENCE_RESTRICT_KEY}",
+    ]
+    for table in SPENDING_TABLES:
+        command += ["-t", table]
+    path.write_bytes(
+        subprocess.run(
+            [*command, database["owner_url_for_evidence_reads"]], capture_output=True, check=True
+        ).stdout
+    )
+
+
+def ledger_restore(stack: Stack, path: Path) -> None:
+    """Put the spending tables back as the dump holds them, as restoring a backup does."""
+    database = stack.state["database"]
+    script = path.with_suffix(".restore.sql")
+    script.write_text(f"truncate {', '.join(SPENDING_TABLES)};\n" + path.read_text())
+    subprocess.run(
+        [
+            str(Path(database["postgres_bin"]) / "psql"),
+            "--quiet",
+            "--set=ON_ERROR_STOP=1",
+            "--single-transaction",
+            "--file",
+            str(script),
+            database["owner_url_for_evidence_reads"],
+        ],
+        capture_output=True,
+        check=True,
+    )
+
+
+def kill_second_api(stack: Stack) -> dict[str, Any]:
+    """SIGKILL the second API this run started: only its recorded process, checked by its
+    marker and port, never anything else."""
+    pid = stack.state["pids"]["api_2"]
+    command = LAUNCH.command_of(pid)
+    port = str(stack.state["second_api"]["port"])
+    if LAUNCH.API_MARKER not in command or port not in command:
+        raise SystemExit(f"pid {pid} is not this run's second API: {command[:120]}")
+    os.killpg(pid, signal.SIGKILL)
+    return {"pid": pid, "signal": "SIGKILL"}
+
+
+def race(stack: Stack, out: Path, tokens: Sequence[str], seconds: int) -> list[dict[str, Any]]:
+    """Clients through both APIs at once, one process each, for ``seconds``."""
+    ports = (stack.state["ports"]["api"], stack.state["second_api"]["port"])
+    launched = []
+    for index, (token, port) in enumerate((token, port) for token in tokens for port in ports):
+        result = out / "evidence" / f"race-{index}.json"
+        launched.append(
+            (
+                result,
+                subprocess.Popen(
+                    [
+                        sys.executable,
+                        str(Path(__file__).resolve()),
+                        "spend-client",
+                        "--base-url",
+                        f"http://127.0.0.1:{port}",
+                        "--token-file",
+                        str(stack.token_file(token)),
+                        "--seconds",
+                        str(seconds),
+                        "--out",
+                        str(result),
+                    ]
+                ),
+            )
+        )
+    reports = []
+    for result, process in launched:
+        process.wait()
+        reports.append(json.loads(result.read_text()) if result.exists() else {})
+    return reports
+
+
+def spending(arguments: argparse.Namespace) -> int:
+    worktree = LAUNCH.checkout(arguments.worktree)
+    stack = Stack.read(worktree)
+    scripted = stack.state.get("scripted_model") or {}
+    if (
+        scripted.get("spending") != "durable"
+        or "second_api" not in stack.state
+        or len(stack.state.get("other_workspaces", [])) < 3
+    ):
+        raise SystemExit(
+            "spending needs a stack started with --scripted-model PLAN --spending durable "
+            "--second-api --workspaces 4"
+        )
+    out = Path(arguments.out).resolve()
+    (out / "evidence").mkdir(parents=True, exist_ok=True)
+    transcripts = Transcripts(out / "transcripts")
+    started = dt.datetime.now(dt.UTC).isoformat()
+    w1 = client(stack, transcripts, "w1", "token")
+    w2 = client(stack, transcripts, "w2", "token-2")
+    w3 = client(stack, transcripts, "w3", "token-3")
+    w4 = client(stack, transcripts, "w4", "token-4")
+    workspaces = {
+        "w1": stack.state["workspace_id"],
+        "w2": stack.state["other_workspaces"][0]["workspace_id"],
+        "w3": stack.state["other_workspaces"][1]["workspace_id"],
+        "w4": stack.state["other_workspaces"][2]["workspace_id"],
+    }
+    later = (dt.datetime.now(dt.UTC) + dt.timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    decided = ["--operator", "q10-acceptance", "--reason", "Q10 synthetic acceptance run"]
+    rows: list[Row] = []
+
+    def grant(label: str, ceiling: str, until: str = later) -> tuple[int, dict[str, Any]]:
+        return operator(
+            stack,
+            "grant",
+            "--authority",
+            authority,
+            "--workspace",
+            workspaces[label],
+            "--ceiling-usd",
+            ceiling,
+            "--max-calls",
+            str(SPENDING_MAX_CALLS),
+            "--valid-until",
+            until,
+            *decided,
+        )
+
+    before = spending_of(w1, "setup")
+    status_issue, issued = operator(
+        stack,
+        "issue",
+        "--provider",
+        before["provider"],
+        "--ceiling-usd",
+        AUTHORITY_CEILING_USD,
+        "--max-calls",
+        str(SPENDING_MAX_CALLS),
+        "--valid-until",
+        later,
+        *decided,
+    )
+    authority = issued.get("authority_id")
+    if status_issue != 0 or not authority:
+        raise SystemExit(f"issuing the authority failed: {issued}")
+
+    not_granted = Row(
+        "I1-not-granted",
+        "budget.not_granted",
+        "A workspace with no grant is refused 429 spending_not_granted and nothing reaches the "
+        "transport.",
+    )
+    calls_before = scripted_calls(stack)
+    status_w3, reason_w3 = ask(w3, "I1-not-granted")
+    not_granted.expect(
+        (status_w3, reason_w3) == (429, "spending_not_granted"),
+        f"an ungranted workspace answered {status_w3} {reason_w3}",
+    )
+    not_granted.expect(scripted_calls(stack) == calls_before, "the transport was called")
+    not_granted.observed = {"answer": [status_w3, reason_w3]}
+    rows.append(not_granted.close())
+
+    for label, ceiling in (
+        ("w1", GRANT_CEILING_USD),
+        ("w2", GRANT_CEILING_USD),
+        ("w3", KILL_GRANT_CEILING_USD),
+    ):
+        status_grant, granted = grant(label, ceiling)
+        if status_grant != 0:
+            raise SystemExit(f"granting {label} failed: {granted}")
+    snapshot = out / "evidence" / "ledger-after-grants.sql"
+    ledger_dump(stack, snapshot)
+
+    survive = Row(
+        "I2",
+        "budget.crash_retry",
+        "Killing the second API while a client asks through it, then restarting each API, never "
+        "lowers the committed allowance any read reports. Deduplication of real retries is not "
+        "delivered (amendment A-22): production calls carry no request key.",
+    )
+    loop = subprocess.Popen(
+        [
+            sys.executable,
+            str(Path(__file__).resolve()),
+            "spend-client",
+            "--base-url",
+            f"http://127.0.0.1:{stack.state['second_api']['port']}",
+            "--token-file",
+            str(stack.token_file("token-3")),
+            "--seconds",
+            str(KILL_AFTER_SECONDS + 3),
+            "--out",
+            str(out / "evidence" / "kill-client.json"),
+        ]
+    )
+    time.sleep(KILL_AFTER_SECONDS)
+    killed = kill_second_api(stack)
+    loop.wait()
+    after_kill = spending_of(w3, "I2")
+    stack.restart_api(api="second")
+    after_second = spending_of(w3, "I2")
+    stack.restart_api()
+    w1 = client(stack, transcripts, "w1", "token")
+    w2 = client(stack, transcripts, "w2", "token-2")
+    w3 = client(stack, transcripts, "w3", "token-3")
+    after_primary = spending_of(w3, "I2")
+    committed = [Decimal(p["committed_usd"]) for p in (after_kill, after_second, after_primary)]
+    kill_client = json.loads((out / "evidence" / "kill-client.json").read_text())
+    survive.expect(committed[0] > 0, "nothing was committed before the kill")
+    # Every transport call so far was workspace 3's (the ungranted ask sent nothing).
+    sent_by_w3 = scripted_calls(stack)
+    held = after_primary["committed_calls"] + after_primary["unresolved"]["count"] - sent_by_w3
+    survive.expect(held >= 0, f"{held} committed calls fewer than were sent")
+    survive.expect(committed == sorted(committed), f"committed fell across restarts: {committed}")
+    survive.observed = {
+        "sent_by_killed_workspace": sent_by_w3,
+        "held_not_sent": held,
+        "held_in_flight_usd": after_primary["in_flight_usd"],
+        "killed": killed,
+        "kill_client": kill_client,
+        "after_kill": after_kill,
+        "after_second_restart": after_second,
+        "after_primary_restart": after_primary,
+    }
+    survive.blocked_by.append(
+        "retry deduplication not delivered for production call sites (A-22); reported as a limit"
+    )
+    rows.append(survive.close())
+
+    racing = Row(
+        "I1",
+        "budget.race",
+        f"Workspaces 1 and 2 each race two client processes, one through each API, for "
+        f"{RACE_SECONDS} s against their own grants of {GRANT_CEILING_USD} USD under one "
+        f"authority of {AUTHORITY_CEILING_USD} USD. Requests are admitted during the race; each "
+        "workspace's committed liability stays within its grant and the authority's within its "
+        "ceiling; the limit is refused by name; scripted transport calls equal committed plus "
+        "unresolved calls across every workspace.",
+    )
+    calls_at_race = scripted_calls(stack)
+    reports = race(stack, out, ("token", "token-2"), RACE_SECONDS)
+    reads = {label: spending_of(c, "I1") for label, c in (("w1", w1), ("w2", w2), ("w3", w3))}
+    total_usd = sum(Decimal(r["committed_usd"]) for r in reads.values())
+    race_calls = sum(
+        reads[label]["committed_calls"] + reads[label]["unresolved"]["count"]
+        for label in ("w1", "w2")
+    )
+    admitted = sum(
+        count
+        for r in reports
+        for key, count in r.get("outcomes", {}).items()
+        if not key.startswith("429:")
+    )
+    refused = sum(
+        count
+        for r in reports
+        for key, count in r.get("outcomes", {}).items()
+        if key == "429:spending_limit_reached"
+    )
+    spans = [(r.get("started_epoch"), r.get("finished_epoch")) for r in reports]
+    overlap = min(end for _, end in spans) - max(start for start, _ in spans) if spans else None
+    for label in ("w1", "w2"):
+        racing.expect(
+            Decimal(reads[label]["committed_usd"]) <= Decimal(GRANT_CEILING_USD),
+            f"{label} committed {reads[label]['committed_usd']} beyond its grant",
+        )
+    racing.expect(
+        total_usd <= Decimal(AUTHORITY_CEILING_USD),
+        f"committed {total_usd} exceeds the authority ceiling",
+    )
+    racing.expect(admitted > 0, "no request was admitted during the race")
+    racing.expect(refused > 0, "no request was refused at the limit")
+    racing.expect(
+        scripted_calls(stack) - calls_at_race == race_calls,
+        f"{scripted_calls(stack) - calls_at_race} transport calls in the race, {race_calls} "
+        "committed or unresolved by the racing workspaces (amendment A-25)",
+    )
+    racing.expect(overlap is not None and overlap > 0, f"the clients did not overlap ({overlap})")
+    racing.observed = {
+        "reports": reports,
+        "reads": reads,
+        "committed_usd": str(total_usd),
+        "admitted_during_race": admitted,
+        "refused_at_limit": refused,
+        "transport_calls": [calls_at_race, scripted_calls(stack)],
+        "overlap_seconds": overlap,
+    }
+    rows.append(racing.close())
+
+    restore = Row(
+        "I3",
+        "budget.restore",
+        "With the spending tables restored to their state before any spending, admission is "
+        "refused spending_suspended (ledger behind its witness, retry after reauthorization) with "
+        "nothing sent; reconciling the restore carries forward exactly what was committed, and "
+        "after reauthorization each workspace's committed amount is unchanged and its availability "
+        "is at most its grant less that amount (amendment A-23, C-10).",
+    )
+    committed_before = {k: Decimal(v["committed_usd"]) for k, v in reads.items()}
+    ledger_restore(stack, snapshot)
+    calls_before = scripted_calls(stack)
+    status_r, body_r = w1.call("I3", "POST", "/selection/plan", body=SPENDING_QUESTION)
+    detail = (body_r or {}).get("spending", {}) if isinstance(body_r, dict) else {}
+    restore.expect(
+        status_r == 429
+        and detail.get("reason") == "spending_suspended"
+        and detail.get("retry") == "after_reauthorization",
+        f"after the restore admission answered {status_r} {detail}",
+    )
+    restore.expect(scripted_calls(stack) == calls_before, "the transport was called")
+    status_c, carried = operator(stack, "reconcile-restore", "--authority", authority, *decided)
+    status_a, reauthorized = operator(
+        stack,
+        "reauthorize",
+        "--authority",
+        authority,
+        "--ceiling-usd",
+        AUTHORITY_CEILING_USD,
+        "--max-calls",
+        str(SPENDING_MAX_CALLS),
+        "--valid-until",
+        later,
+        *decided,
+    )
+    restore.expect(status_c == 0, f"reconcile-restore exited {status_c}: {carried}")
+    restore.expect(status_a == 0, f"reauthorize exited {status_a}: {reauthorized}")
+    restore.expect(
+        Decimal(str(carried.get("carried_usd", "-1"))) == sum(committed_before.values()),
+        f"carried {carried.get('carried_usd')}, committed {sum(committed_before.values())}",
+    )
+    after = {label: spending_of(c, "I3") for label, c in (("w1", w1), ("w2", w2), ("w3", w3))}
+    for label, read in after.items():
+        restore.expect(
+            Decimal(read["committed_usd"]) == committed_before[label],
+            f"{label} committed {read['committed_usd']}, was {committed_before[label]}",
+        )
+        restore.expect(
+            Decimal(read["available_usd"])
+            <= Decimal(read["grant"]["ceiling_usd"]) - Decimal(read["committed_usd"]),
+            f"{label} may spend {read['available_usd']} after reauthorization",
+        )
+    restore.observed = {
+        "refusal": [status_r, detail],
+        "reconcile_restore": carried,
+        "reauthorize": reauthorized,
+        "committed_before": {k: str(v) for k, v in committed_before.items()},
+        "after": after,
+    }
+    rows.append(restore.close())
+
+    revoke = Row(
+        "I4",
+        "budget.revoke",
+        "After workspace 2's grant is revoked it is refused spending_revoked with nothing sent, "
+        "and its committed history stays readable.",
+    )
+    status_v, revoked = operator(
+        stack,
+        "revoke",
+        "--authority",
+        authority,
+        "--workspace",
+        workspaces["w2"],
+        "--grant",
+        spending_of(w2, "I4")["grant"]["grant_id"],
+        *decided,
+    )
+    calls_before = scripted_calls(stack)
+    status_w2, reason_w2 = ask(w2, "I4")
+    w2_read = spending_of(w2, "I4")
+    revoke.expect(status_v == 0, f"revoke exited {status_v}: {revoked}")
+    revoke.expect(
+        (status_w2, reason_w2) == (429, "spending_revoked"),
+        f"a revoked workspace answered {status_w2} {reason_w2}",
+    )
+    revoke.expect(scripted_calls(stack) == calls_before, "the transport was called")
+    revoke.expect(w2_read["grant"]["state"] == "revoked", f"grant state {w2_read['grant']}")
+    revoke.expect(Decimal(w2_read["committed_usd"]) > 0, "the committed history is gone")
+    revoke.observed = {"answer": [status_w2, reason_w2], "read": w2_read}
+    rows.append(revoke.close())
+
+    expiry = Row(
+        "I5",
+        "budget.expired",
+        "A workspace whose only grant's time has passed is refused spending_expired with "
+        "nothing sent (amendment A-24).",
+    )
+    soon = (dt.datetime.now(dt.UTC) + dt.timedelta(seconds=3)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    status_g, short = grant("w4", "0.001", soon)
+    time.sleep(5)
+    calls_before = scripted_calls(stack)
+    status_e, reason_e = ask(w4, "I5")
+    expiry.expect(status_g == 0, f"the short grant exited {status_g}")
+    expiry.expect(
+        (status_e, reason_e) == (429, "spending_expired"),
+        f"an expired grant answered {status_e} {reason_e}",
+    )
+    expiry.expect(scripted_calls(stack) == calls_before, "the transport was called")
+    expiry.observed = {"answer": [status_e, reason_e], "short_grant": short}
+    rows.append(expiry.close())
+
+    results = {
+        "profile": "q10-foundation-acceptance-results/v1",
+        "candidate": stack.state["tree"],
+        "launcher_run": stack.state["run_id"],
+        "started_at": started,
+        "finished_at": dt.datetime.now(dt.UTC).isoformat(),
+        "timing_claims": False,
+        "authority": authority,
+        "rows": [row.document() for row in rows],
+        "counts": {state: sum(r.status == state for r in rows) for state in STATES},
+    }
+    (out / "results.json").write_text(json.dumps(results, indent=2, sort_keys=True))
+    manifest = {
+        "driver_sha256": DRIVER_SHA256_AT_START,
+        "driver_changed_during_run": hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
+        != DRIVER_SHA256_AT_START,
+        "launcher_sha256": hashlib.sha256((HERE / "launch.py").read_bytes()).hexdigest(),
+        "command": ["foundation.py", *sys.argv[1:]],
+        "launcher_state": {k: v for k, v in stack.state.items() if k != "database"},
+    }
+    (out / "manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True))
+    for row in rows:
+        print(f"{row.row:16} {row.status:8} {'; '.join(row.failures or row.blocked_by)}")
+    print(json.dumps(results["counts"]))
+    return 0 if results["counts"]["failed"] == 0 else 1
+
+
+# -- the edit-alternative comparison (N1.h, V7 package d) -------------------------------------------
+
+COMPARISONS = "/society/comparisons"
+PERSON_ROLE = "society_decision"
+#: The model whose arm every comparison needs; the scripted plan answers its choices.
+COMPARED_MODEL = {
+    "provider": "nebius_token_factory",
+    "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+}
+COMPARISON_SECONDS = 600
+
+
+def finished(c: Client, step: str, entry: Mapping[str, Any], comparison: str) -> dict[str, Any]:
+    deadline = time.monotonic() + COMPARISON_SECONDS
+    read: dict[str, Any] = {}
+    while time.monotonic() < deadline:
+        _, read = c.call(
+            step,
+            "GET",
+            version_path(entry, f"{COMPARISONS}/{comparison}"),
+            query=world_query(entry),
+        )
+        if (read.get("start") or {}).get("state") in ("finished", "closed"):
+            return read
+        time.sleep(3)
+    return read
+
+
+def alternative(arguments: argparse.Namespace) -> int:
+    worktree = LAUNCH.checkout(arguments.worktree)
+    stack = Stack.read(worktree)
+    if "scripted_model" not in stack.state or not stack.state.get("society_playback"):
+        raise SystemExit(
+            "alternative needs a stack started with --scripted-model PLAN --society-playback"
+        )
+    out = Path(arguments.out).resolve()
+    (out / "evidence").mkdir(parents=True, exist_ok=True)
+    transcripts = Transcripts(out / "transcripts")
+    started = dt.datetime.now(dt.UTC).isoformat()
+    w1 = client(stack, transcripts, "w1", "token")
+    row = Row(
+        "N1.h",
+        "journey.alternative",
+        "On a saved starter world whose people were brought in before a bench was placed, two "
+        "comparisons with the same model, group and seed freeze the input before the bench and "
+        "the bench's input (V7 package d). Every run completes; the arms and seed agree; only the "
+        "run frozen at the bench's input offers the bench as a target and has a person heading "
+        "for it; the live society's state, tick and events and the version's edit history are "
+        "unchanged. Declared limit: each run starts from the society's genesis, not from the "
+        "live society at the edit's tick (docs/society-experiments.md, 'An earlier input.').",
+    )
+    status, entry = w1.call(
+        "N1.h", "POST", "/world-entries/starter", body={"title": "Q10 alternative"}
+    )
+    if status != 200:
+        raise SystemExit(f"starter answered {status}: {entry}")
+    apply(w1, "N1.h", entry, "cc0.market-stall", "stall", "stall")
+    entry = read_entry(w1, "N1.h", entry["entry_id"])
+    status, _ = w1.call(
+        "N1.h",
+        "POST",
+        version_path(entry, "/society"),
+        query=world_query(entry),
+        body={"region_id": STARTER_REGION, "profile": SAVED_WORLD_SOCIETY},
+    )
+    row.expect(status == 200, f"the society answered {status}")
+    entry = read_entry(w1, "N1.h", entry["entry_id"])
+    status_bench, _ = apply(w1, "N1.h", entry, "cc0.bench", "bench", "bench")
+    row.expect(status_bench in (200, 201), f"the bench answered {status_bench}")
+    entry = read_entry(w1, "N1.h", entry["entry_id"])
+    _, plan = w1.call(
+        "N1.h",
+        "GET",
+        version_path(entry, f"{COMPARISONS}/plan"),
+        query={
+            **world_query(entry),
+            "role": PERSON_ROLE,
+            "group": "everyone",
+            "model": f"{COMPARED_MODEL['provider']}/{COMPARED_MODEL['model_id']}",
+            "seeds": "1",
+        },
+    )
+    newest = (plan.get("plan") or {}).get("input_seq")
+    row.expect(newest is not None and newest >= 2, f"the plan freezes input {newest}")
+    _, society_before = society(w1, "N1.h", entry)
+    events_before, _ = events_history(w1, "N1.h", entry)
+    _, version_before = w1.call("N1.h", "GET", version_path(entry), query=world_query(entry))
+    bound = (plan.get("plan") or {}).get("suggested_usd") or "0.05"
+    reads: dict[str, dict[str, Any]] = {}
+    ids: dict[str, str] = {}
+    for label, frozen in (("without", 1), ("with", newest)):
+        comparison = str(uuid.uuid4())
+        status_start, start = w1.call(
+            "N1.h",
+            "POST",
+            version_path(entry, COMPARISONS),
+            query=world_query(entry),
+            body={
+                "comparison_id": comparison,
+                "role": PERSON_ROLE,
+                "group": {"kind": "everyone"},
+                "models": [COMPARED_MODEL],
+                "control": False,
+                "seeds": 1,
+                "bound_usd": str(bound),
+                "input_seq": frozen,
+            },
+        )
+        row.expect(
+            status_start in (200, 201),
+            f"the {label} comparison answered {status_start} {problem_code(start)}",
+        )
+        ids[label] = comparison
+        reads[label] = finished(w1, "N1.h", entry, comparison) if status_start in (200, 201) else {}
+    runs: dict[str, dict[str, Any]] = {}
+    for label, read in reads.items():
+        row.expect(
+            (read.get("start") or {}).get("state") == "finished",
+            f"the {label} comparison ended {(read.get('start') or {}).get('state')}",
+        )
+        seeds = read.get("seeds") or []
+        statuses = [r.get("status") for s in seeds for r in (s.get("runs") or {}).values()]
+        row.expect(
+            statuses and all(x == "completed" for x in statuses),
+            f"the {label} comparison's runs are {statuses}",
+        )
+        routine = ((seeds[0].get("runs") or {}).get("routine") or {}) if seeds else {}
+        if routine.get("run_id"):
+            _, runs[label] = w1.call(
+                "N1.h",
+                "GET",
+                version_path(entry, f"{COMPARISONS}/{ids[label]}/runs/{routine['run_id']}"),
+                query=world_query(entry),
+            )
+    bench_target = f"authored:{entry['authored_version_id']}:bench:rest"
+    offered = {
+        label: [t.get("target_id") for t in (run.get("place") or {}).get("targets", [])]
+        for label, run in runs.items()
+    }
+    heading = {
+        label: sum(
+            1
+            for minute in run.get("minutes", [])
+            for person in minute.get("people", [])
+            if (person.get("goal") or {}).get("target_id") == bench_target
+        )
+        for label, run in runs.items()
+    }
+    row.expect(set(runs) == {"without", "with"}, f"routine runs read: {sorted(runs)}")
+    row.expect(bench_target in offered.get("with", []), "the with-bench run offers no bench")
+    row.expect(bench_target not in offered.get("without", []), "the without-bench run offers it")
+    row.expect(heading.get("with", 0) > 0, "no person heads for the bench in the with-bench run")
+    row.expect(heading.get("without", 0) == 0, "a person heads for a bench that is not there")
+    if set(reads) == {"without", "with"}:
+        arms = {
+            label: sorted(a.get("key") for a in read.get("arms", []))
+            for label, read in reads.items()
+        }
+        digests = {
+            label: [s.get("seed_digest") for s in read.get("seeds", [])]
+            for label, read in reads.items()
+        }
+        frozen = {
+            label: (read.get("input") or {}).get("input_seq") for label, read in reads.items()
+        }
+        row.expect(arms["without"] == arms["with"], f"arms differ: {arms}")
+        row.expect(digests["without"] == digests["with"], "the seeds differ")
+        row.expect(frozen == {"without": 1, "with": newest}, f"frozen inputs {frozen}")
+    _, society_after = society(w1, "N1.h", entry)
+    events_after, _ = events_history(w1, "N1.h", entry)
+    _, version_after = w1.call("N1.h", "GET", version_path(entry), query=world_query(entry))
+    row.expect(
+        {k: society_after.get(k) for k in ("current_tick", "state_sha256", "input_seq")}
+        == {k: society_before.get(k) for k in ("current_tick", "state_sha256", "input_seq")},
+        "the live society moved",
+    )
+    row.expect(events_after == events_before, "the live society's events changed")
+    row.expect(
+        version_after.get("edits") == version_before.get("edits"), "the edit history changed"
+    )
+    row.observed = {
+        "frozen_inputs": {label: read.get("input") for label, read in reads.items()},
+        "states": {label: (read.get("start") or {}).get("state") for label, read in reads.items()},
+        "bench_target": bench_target,
+        "bench_offered": {label: bench_target in t for label, t in offered.items()},
+        "minutes_heading_for_bench": heading,
+        "live_society": {
+            k: society_after.get(k) for k in ("current_tick", "state_sha256", "input_seq")
+        },
+        "scripted_calls": scripted_calls(stack),
+    }
+    row.close()
+    results = {
+        "profile": "q10-foundation-acceptance-results/v1",
+        "candidate": stack.state["tree"],
+        "launcher_run": stack.state["run_id"],
+        "started_at": started,
+        "finished_at": dt.datetime.now(dt.UTC).isoformat(),
+        "timing_claims": False,
+        "rows": [row.document()],
+        "counts": {state: int(row.status == state) for state in STATES},
+    }
+    (out / "results.json").write_text(json.dumps(results, indent=2, sort_keys=True))
+    (out / "manifest.json").write_text(
+        json.dumps(
+            {
+                "driver_sha256": DRIVER_SHA256_AT_START,
+                "driver_changed_during_run": hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
+                != DRIVER_SHA256_AT_START,
+                "launcher_sha256": hashlib.sha256((HERE / "launch.py").read_bytes()).hexdigest(),
+                "command": ["foundation.py", *sys.argv[1:]],
+                "launcher_state": {k: v for k, v in stack.state.items() if k != "database"},
+            },
+            indent=2,
+            sort_keys=True,
+        )
+    )
+    print(f"{row.row:16} {row.status:8} {'; '.join(row.failures or row.blocked_by)}")
+    return 0 if row.status != "failed" else 1
+
+
+# -- Companion actions (M6 rows F1, F2 and N1.i) -----------------------------------------------------
+
+ACTIONS = "/selection/actions"
+COMPANION_PLAN = HERE / "plans" / "companion.json"
+COMPANION_TRANSFORM = {
+    "x_mm": -6000,
+    "y_mm": 0,
+    "z_mm": 4000,
+    "yaw_microradians": 0,
+    "scale_milli": 1000,
+}
+M6_LANE_TESTS = (
+    "tests/test_companion_actions_postgres.py",
+    "tests/test_companion_action_plan.py",
+    "tests/test_companion_action_policy_boundary.py",
+)
+
+
+def ask_companion(
+    c: Client,
+    step: str,
+    entry: Mapping[str, Any],
+    utterance: str,
+    base: str | None = None,
+    **extra: Any,
+) -> tuple[int, dict[str, Any]]:
+    body: dict[str, Any] = {
+        "version_id": entry["authored_version_id"],
+        "base_state_sha256": base or entry["authored_state_sha256"],
+        "utterance": utterance,
+        "origin_role": "fictional",
+        "context": {"placement": {"region_id": STARTER_REGION, "transform": COMPANION_TRANSFORM}},
+        "saved_entry": resume_point(entry),
+        **extra,
+    }
+    return c.call(step, "POST", ACTIONS, query=world_query(entry), body=body)
+
+
+def confirm(c: Client, step: str, entry: Mapping[str, Any], planned: Mapping[str, Any]):
+    """Send a prepared step's own request to the route it names, as a direct client would."""
+    method, template = planned["operation"].split(" ", 1)
+    path = template
+    for key, value in (planned.get("bind") or {}).items():
+        path = path.replace("{" + key + "}", str(value))
+    return c.call(
+        step, method, path, query=planned.get("query") or world_query(entry), body=planned["body"]
+    )
+
+
+def outcome(c: Client, step: str, entry: Mapping[str, Any], plan: Mapping[str, Any]):
+    return c.call(
+        step,
+        "POST",
+        f"{ACTIONS}/outcome",
+        query=world_query(entry),
+        body={
+            "version_id": entry["authored_version_id"],
+            "plan_sha256": plan.get("plan_sha256"),
+            "steps": plan.get("steps", []),
+        },
+    )
+
+
+def companion(arguments: argparse.Namespace) -> int:
+    worktree = LAUNCH.checkout(arguments.worktree)
+    stack = Stack.read(worktree)
+    if (
+        Path(stack.state.get("scripted_model", {}).get("plan", "")).name
+        != "scripted-model-plan.json"
+        or stack.state["scripted_model"]["plan_sha256"]
+        != hashlib.sha256(COMPANION_PLAN.read_bytes()).hexdigest()
+        or len(stack.state.get("other_workspaces", [])) < 3
+        or "read_only_token" not in stack.state
+    ):
+        raise SystemExit(
+            "companion needs a stack started with --scripted-model "
+            "scripts/acceptance/plans/companion.json --workspaces 4 --read-only-token"
+        )
+    utterances = json.loads(COMPANION_PLAN.read_text())["utterances"]
+    out = Path(arguments.out).resolve()
+    (out / "evidence").mkdir(parents=True, exist_ok=True)
+    transcripts = Transcripts(out / "transcripts")
+    started = dt.datetime.now(dt.UTC).isoformat()
+    w1, w2, w3, w4 = (
+        client(stack, transcripts, f"w{i}", LAUNCH.token_file_name(i)) for i in range(1, 5)
+    )
+    read_only = client(stack, transcripts, "read-only", "token-read")
+    rows: list[Row] = []
+
+    def starter(c: Client, title: str) -> dict[str, Any]:
+        status, made = c.call("setup", "POST", "/world-entries/starter", body={"title": title})
+        if status != 200:
+            raise SystemExit(f"starter answered {status}: {made}")
+        return made
+
+    # F1: the Companion's placement and the direct placement, compared.
+    parity = Row(
+        "F1",
+        "companion.parity",
+        "The Companion plans 'put a bench here' as one prepared composition-apply step whose "
+        "preview document equals the direct preview route's answer for the same body; nothing is "
+        "written before confirmation; confirming sends the step's own request and is answered by "
+        "the direct route, and the outcome read names that edit (same edit id, applied, matching "
+        "its preview); the direct placement of the same bench in another workspace yields an edit "
+        "and view of the same kind and shape; a repeated confirmation is refused and changes "
+        "nothing; a confirmation sent with a read-only grant is refused and the plan reads "
+        "not_applied.",
+    )
+    e1 = starter(w1, "Q10 companion parity")
+    calls = scripted_calls(stack)
+    control_equal, control = no_write_control(stack, w1, e1)
+    before = stack.evidence_digest()
+    status_plan, plan = ask_companion(w1, "F1", e1, utterances["bench"])
+    after = stack.evidence_digest()
+    planned = (plan.get("steps") or [{}])[0]
+    parity.expect(control_equal, "the evidence method saw a change across a plain read")
+    parity.expect(
+        status_plan == 200 and plan.get("outcome") == "plan",
+        f"the Companion answered {status_plan} {plan.get('outcome')} "
+        f"{(plan.get('refusal') or {}).get('code')}",
+    )
+    parity.expect(before == after, "planning wrote to the database or store")
+    parity.expect(scripted_calls(stack) - calls == 2, "planning did not ask exactly two calls")
+    parity.expect(planned.get("state") == "prepared", f"the step is {planned.get('state')}")
+    parity.expect(
+        planned.get("operation") == "POST /world/versions/{version_id}/compositions/apply",
+        f"the step names {planned.get('operation')}",
+    )
+    status_preview, direct_preview = w1.call(
+        "F1",
+        "POST",
+        version_path(e1, "/compositions/preview"),
+        query=world_query(e1),
+        body=(planned.get("preview") or {}).get("body"),
+    )
+    parity.expect(
+        status_preview == 200 and direct_preview == (planned.get("preview") or {}).get("document"),
+        "the plan's preview differs from the direct preview route's answer",
+    )
+    status_confirm, confirmed = confirm(w1, "F1", e1, planned)
+    status_outcome, read = outcome(w1, "F1", e1, plan)
+    receipt = ((read.get("steps") or [{}])[0].get("receipts") or [{}])[0]
+    parity.expect(status_confirm == 201, f"confirmation answered {status_confirm}")
+    parity.expect(status_outcome == 200, f"the outcome read answered {status_outcome}")
+    parity.expect(read.get("state") == "applied", f"the outcome reads {read.get('state')}")
+    parity.expect(
+        receipt.get("edit_id") == (confirmed.get("edits") or [{}])[-1].get("edit_id"),
+        "the outcome names another edit",
+    )
+    parity.expect(
+        (read.get("steps") or [{}])[0].get("matches_preview") is True,
+        "the applied edit does not match its preview",
+    )
+    e2 = starter(w2, "Q10 direct parity")
+    status_direct, direct = apply(w2, "F1", e2, "cc0.bench", "bench", "bench")
+    companion_edit = (confirmed.get("edits") or [{}])[-1]
+    direct_edit = (direct.get("edits") or [{}])[-1]
+    parity.expect(status_direct == 201, f"the direct placement answered {status_direct}")
+    parity.expect(
+        companion_edit.get("kind") == direct_edit.get("kind") == "add_object",
+        f"edit kinds {companion_edit.get('kind')} and {direct_edit.get('kind')}",
+    )
+    parity.expect(sorted(confirmed) == sorted(direct), "the two views differ in shape")
+    placed = {o["object_id"]: o for o in confirmed.get("objects", [])}
+    mine = placed.get(companion_edit.get("object_id"), {})
+    theirs = next((o for o in direct.get("objects", []) if o["object_id"] == "bench"), {})
+    same = {k: mine.get(k) == theirs.get(k) for k in ("asset", "region_id", "transform", "origin")}
+    parity.expect(all(same.values()), f"the placed objects differ: {same}")
+    status_again, again = confirm(w1, "F1", e1, planned)
+    parity.expect(
+        status_again == 409 and problem_code(again) == "stale_saved_world_entry",
+        f"a repeated confirmation answered {status_again} {problem_code(again)}",
+    )
+    e1 = read_entry(w1, "F1", e1["entry_id"])
+    # The world now holds an object, so the form offers an objects slot: the second ask is the one
+    # the scripted plan answers with that slot.
+    status_second, second = ask_companion(w1, "F1", e1, utterances["bench_by_stall"])
+    second_step = (second.get("steps") or [{}])[0]
+    parity.expect(
+        status_second == 200 and second.get("outcome") == "plan",
+        f"a second plan answered {status_second} {second.get('outcome')}",
+    )
+    status_ro, refused_ro = confirm(read_only, "F1", e1, second_step) if second_step else (None, {})
+    _, read_ro = outcome(w1, "F1", e1, second)
+    parity.expect(status_ro == 404, f"a read-only confirmation answered {status_ro}")
+    parity.expect(read_ro.get("state") == "not_applied", f"it reads {read_ro.get('state')}")
+    parity.observed = {
+        "plan": {k: plan.get(k) for k in ("outcome", "kind", "plan_sha256", "atomic")},
+        "step": {
+            k: planned.get(k)
+            for k in ("state", "operation", "receipt", "confirmation", "replay", "pins")
+        },
+        "receipt": receipt,
+        "companion_edit": companion_edit,
+        "direct_edit": direct_edit,
+        "same_object_fields": same,
+        "repeat": [status_again, problem_code(again)],
+        "read_only": [status_ro, problem_code(refused_ro), read_ro.get("state")],
+        "control": control,
+    }
+    rows.append(parity.close())
+
+    # N1.i: the journey's bench through the Companion, on a world whose people can use it.
+    journey_row = Row(
+        "N1.i",
+        "journey.companion_edit",
+        "On a saved starter with a stall and its people brought in, the Companion's bench, "
+        "confirmed as F1 confirms, is taken by the society in the next minute and offered as one "
+        "rest target, as the direct bench is in N1.c.",
+    )
+    e3 = starter(w3, "Q10 companion journey")
+    apply(w3, "N1.i", e3, "cc0.market-stall", "stall", "stall")
+    e3 = read_entry(w3, "N1.i", e3["entry_id"])
+    w3.call(
+        "N1.i",
+        "POST",
+        version_path(e3, "/society"),
+        query=world_query(e3),
+        body={"region_id": STARTER_REGION, "profile": SAVED_WORLD_SOCIETY},
+    )
+    e3 = read_entry(w3, "N1.i", e3["entry_id"])
+    _, held = society(w3, "N1.i", e3)
+    status_j, journey_plan = ask_companion(w3, "N1.i", e3, utterances["bench_by_stall"])
+    journey_step = (journey_plan.get("steps") or [{}])[0]
+    status_jc, _ = confirm(w3, "N1.i", e3, journey_step) if journey_step.get("body") else (None, {})
+    took = advance_once(journey_row, w3, "N1.i", e3)
+    subject = ((journey_step.get("body") or {}).get("placement") or {}).get("subject_id")
+    targets = [
+        t for t in (took.get("places") or {}).get("targets", []) if t.get("object_id") == subject
+    ]
+    journey_row.expect(
+        status_j == 200 and journey_plan.get("outcome") == "plan",
+        f"the Companion answered {status_j} {journey_plan.get('outcome')}",
+    )
+    journey_row.expect(status_jc == 201, f"confirmation answered {status_jc}")
+    journey_row.expect(
+        took.get("input_seq") == (held.get("input_seq") or 0) + 1,
+        "the next minute took no new input",
+    )
+    journey_row.expect(
+        [t.get("affordance") for t in targets] == ["rest"],
+        "the Companion's bench is not one rest target",
+    )
+    journey_row.observed = {
+        "subject": subject,
+        "targets": targets,
+        "input_seq": [held.get("input_seq"), took.get("input_seq")],
+    }
+    rows.append(journey_row.close())
+
+    # F2: what the Companion refuses, and that refusing writes nothing.
+    refusals = Row(
+        "F2",
+        "companion.refusals",
+        "With nothing written in any case: a stale base is refused stale_version with no model "
+        "call; an utterance naming a digest, a permission and a route, answered with an option "
+        "the form never offered, is refused not_drafted with none of the utterance's digest in "
+        "the plan; an ambiguous kind is asked about (asset_ambiguous) and the chosen answer is "
+        "prepared without a model; a change the form cannot express is refused "
+        "action_not_offered; M6's lane tests pass. A model timeout cannot be produced by the "
+        "scripted transport and stays unexercised here.",
+    )
+    e4 = starter(w4, "Q10 companion refusals")
+    observed: dict[str, Any] = {}
+    control_equal, _ = no_write_control(stack, w4, e4)
+    refusals.expect(control_equal, "the evidence method saw a change across a plain read")
+    before = stack.evidence_digest()
+    calls = scripted_calls(stack)
+    _, stale = ask_companion(w4, "F2", e4, utterances["bench"], base=STALE_SHA256)
+    refusals.expect(
+        (stale.get("refusal") or {}).get("code") == "stale_version",
+        f"a stale base is {stale.get('outcome')} {stale.get('refusal')}",
+    )
+    refusals.expect(scripted_calls(stack) == calls, "a stale request asked a model")
+    _, injected = ask_companion(w4, "F2", e4, utterances["inject"])
+    refusals.expect(
+        (injected.get("refusal") or {}).get("code") == "not_drafted",
+        f"the injection is {injected.get('outcome')} {injected.get('refusal')}",
+    )
+    refusals.expect("b41289ac" not in json.dumps(injected), "the plan carries the digest")
+    _, ambiguous = ask_companion(w4, "F2", e4, utterances["seat"])
+    clarification = ambiguous.get("clarification") or {}
+    refusals.expect(
+        clarification.get("code") == "asset_ambiguous",
+        f"an ambiguous kind is {ambiguous.get('outcome')} {clarification.get('code')}",
+    )
+    calls = scripted_calls(stack)
+    chosen = [dict((clarification.get("actions") or [{}])[0], asset_key="cc0.bench")]
+    status_prep, prepared = w4.call(
+        "F2",
+        "POST",
+        f"{ACTIONS}/prepare",
+        query=world_query(e4),
+        body={
+            "version_id": e4["authored_version_id"],
+            "base_state_sha256": e4["authored_state_sha256"],
+            "origin_role": "fictional",
+            "context": {
+                "placement": {"region_id": STARTER_REGION, "transform": COMPANION_TRANSFORM}
+            },
+            "actions": chosen,
+        },
+    )
+    refusals.expect(
+        status_prep == 200 and prepared.get("outcome") == "plan",
+        f"preparing the answer gave {status_prep} {prepared.get('outcome')}",
+    )
+    refusals.expect(scripted_calls(stack) == calls, "preparing asked a model")
+    _, other = ask_companion(w4, "F2", e4, utterances["other"])
+    refusals.expect(
+        (other.get("refusal") or {}).get("code") == "action_not_offered",
+        f"an inexpressible change is {other.get('outcome')} {other.get('refusal')}",
+    )
+    after = stack.evidence_digest()
+    refusals.expect(before == after, "a refused or unconfirmed request wrote something")
+    lane = subprocess.run(
+        [
+            str(stack.worktree / ".venv" / "bin" / "python"),
+            "-m",
+            "pytest",
+            "-q",
+            "-p",
+            "no:cacheprovider",
+            *M6_LANE_TESTS,
+        ],
+        cwd=stack.worktree,
+        env={
+            **LAUNCH.clean_environment(),
+            "EXULANICA_TEST_POSTGRES": "private",
+            "EXULANICA_REQUIRE_POSTGRES": "1",
+        },
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    (out / "evidence" / "f2-lane-tests.txt").write_text(lane.stdout + lane.stderr)
+    refusals.expect(lane.returncode == 0, f"M6's lane tests exited {lane.returncode}")
+    observed.update(
+        {
+            "stale": stale.get("refusal"),
+            "injection": injected.get("refusal"),
+            "injection_calls": [
+                c.get("outcome") for c in (injected.get("execution") or {}).get("calls", [])
+            ],
+            "ambiguous": {k: clarification.get(k) for k in ("code", "slot")},
+            "prepared": prepared.get("outcome"),
+            "other": other.get("refusal"),
+            "lane_tests_exit": lane.returncode,
+            "timeout": "not exercised (scripted transport)",
+        }
+    )
+    refusals.observed = observed
+    rows.append(refusals.close())
+
+    results = {
+        "profile": "q10-foundation-acceptance-results/v1",
+        "candidate": stack.state["tree"],
+        "launcher_run": stack.state["run_id"],
+        "started_at": started,
+        "finished_at": dt.datetime.now(dt.UTC).isoformat(),
+        "timing_claims": False,
+        "rows": [row.document() for row in rows],
+        "counts": {state: sum(r.status == state for r in rows) for state in STATES},
+    }
+    (out / "results.json").write_text(json.dumps(results, indent=2, sort_keys=True))
+    (out / "manifest.json").write_text(
+        json.dumps(
+            {
+                "driver_sha256": DRIVER_SHA256_AT_START,
+                "driver_changed_during_run": hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
+                != DRIVER_SHA256_AT_START,
+                "launcher_sha256": hashlib.sha256((HERE / "launch.py").read_bytes()).hexdigest(),
+                "plan_sha256": stack.state["scripted_model"]["plan_sha256"],
+                "command": ["foundation.py", *sys.argv[1:]],
+                "launcher_state": {k: v for k, v in stack.state.items() if k != "database"},
+            },
+            indent=2,
+            sort_keys=True,
+        )
+    )
+    for row in rows:
+        print(f"{row.row:16} {row.status:8} {'; '.join(row.failures or row.blocked_by)}")
+    print(json.dumps(results["counts"]))
+    return 0 if results["counts"]["failed"] == 0 else 1
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     commands = parser.add_subparsers(dest="command", required=True)
     run = commands.add_parser("baseline")
     run.add_argument("--worktree", required=True)
     run.add_argument("--out", required=True)
+    run.add_argument(
+        "--w7-client",
+        help="W7's delivered client-example.py, pinned by digest, for rows G1 and G3",
+    )
+    run.add_argument(
+        "--exercise-own-worlds-only",
+        action="store_true",
+        help="A4-client also requires F1's exercise client to leave every saved world that "
+        "existed before it untouched (amendment A-16; for candidates carrying F1's change)",
+    )
     probe = commands.add_parser("isolation-client")
     for name in ("--base-url", "--token-file", "--own", "--foreign", "--out"):
         probe.add_argument(name, required=True)
@@ -2079,6 +3668,19 @@ def build_parser() -> argparse.ArgumentParser:
     reopen = commands.add_parser("reopen-client")
     for name in ("--base-url", "--token-file", "--entry", "--out"):
         reopen.add_argument(name, required=True)
+    talk = commands.add_parser("companion")
+    talk.add_argument("--worktree", required=True)
+    talk.add_argument("--out", required=True)
+    other = commands.add_parser("alternative")
+    other.add_argument("--worktree", required=True)
+    other.add_argument("--out", required=True)
+    money = commands.add_parser("spending")
+    money.add_argument("--worktree", required=True)
+    money.add_argument("--out", required=True)
+    spender = commands.add_parser("spend-client")
+    for name in ("--base-url", "--token-file", "--out"):
+        spender.add_argument(name, required=True)
+    spender.add_argument("--seconds", type=float, required=True)
     return parser
 
 
@@ -2088,6 +3690,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         "baseline": baseline,
         "isolation-client": isolation_client,
         "reopen-client": reopen_client,
+        "spending": spending,
+        "alternative": alternative,
+        "companion": companion,
+        "spend-client": spend_client,
     }[arguments.command](arguments)
 
 

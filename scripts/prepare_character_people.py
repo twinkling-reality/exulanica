@@ -12,11 +12,12 @@ catalog and rewrites their TypeScript module. Verification needs only the reposi
 catalog entry's bytes, digests and import manifests are checked, no container in a catalog
 family's folder goes unreferenced, and both TypeScript modules are compared with their JSON.
 `--import --apply` publishes every container through the reviewed asset registry, which is how
-a deployment serves them at /world/assets/<asset key>/bytes.
+a deployment serves them at /world/assets/<asset key>/bytes, and then publishes the character
+catalogs themselves (migration 0131), which is how a deployment serves its families. It is
+`exulanica-character-catalog publish --apply` over this checkout's `assets/characters`.
 """
 
 import argparse
-import hashlib
 import json
 import sys
 import tempfile
@@ -115,31 +116,15 @@ def iter_assets(document):
 
 def catalog_imports(document=None):
     """Every catalog container with its reviewed import manifest and licence, each verified."""
-    from exulanica.world.asset_import import ReviewedAssetImport, validate_asset_import
+    from exulanica.world.character_catalog_publication import catalog_imports as imports_of
+    from exulanica.world.character_catalogs import layered_bundle
 
     document = document or json.loads(CATALOG.read_text())
-    characters = ROOT / "assets/characters"
-    imports = {}
-    for family in document["families"]:
-        licence_path = characters / family["licence"]["file"]
-        licence = licence_path.read_bytes()
-        if hashlib.sha256(licence).hexdigest() != family["licence"]["sha256"]:
-            raise ValueError(f"{family['familyId']} licence digest changed")
-        manifest_file = licence_path.parent / "imports.json"
-        for manifest in json.loads(manifest_file.read_text()):
-            imports[manifest["asset_key"]] = (ReviewedAssetImport.model_validate(manifest), licence)
-    verified = []
-    for asset in iter_assets(document):
-        payload = (characters / asset["file"]).read_bytes()
-        if (
-            len(payload) != asset["byteSize"]
-            or hashlib.sha256(payload).hexdigest() != asset["contentSha256"]
-        ):
-            raise ValueError(f"{asset['file']} does not match the catalog")
-        manifest, licence = imports[asset["assetKey"]]
-        validate_asset_import(manifest, payload, licence)
-        verified.append((manifest, payload, licence))
-    return verified
+    bundle = layered_bundle(document, json.loads(LOOKS.read_text()))
+    return [
+        (item.manifest, item.payload, item.licence)
+        for item in imports_of(bundle, ROOT / "assets/characters")
+    ]
 
 
 def import_catalog(connection, store, document=None):
@@ -157,6 +142,15 @@ def import_catalog(connection, store, document=None):
             connection, store, manifest, payload, licence, kind=AssetKind.COMPONENT
         )
     return len(imports)
+
+
+def publish_catalogs(connection, store):
+    """Import every container and publish every catalog in `assets/characters`, in one transaction."""
+    from exulanica.world.character_catalog_publication import catalog_documents
+    from exulanica.world.character_catalog_publication import publish_catalogs as publish
+
+    characters = ROOT / "assets/characters"
+    return publish(connection, store, catalog_documents(characters), characters)
 
 
 def verify(document=None):
@@ -219,8 +213,14 @@ def main():
         if not url:
             parser.error("EXULANICA_DATABASE_URL is required for publication")
         store = content_stores(data_dir=args.data_dir).blobs
-        with psycopg.connect(url) as connection, connection.transaction():
-            print(f"Published {import_catalog(connection, store)} character containers")
+        from psycopg.rows import dict_row
+
+        with psycopg.connect(url, row_factory=dict_row) as connection, connection.transaction():
+            for outcome in publish_catalogs(connection, store):
+                print(
+                    f"{outcome.state}: {outcome.catalog_id} revision {outcome.revision} "
+                    f"({outcome.kind}) {outcome.catalog_sha256}"
+                )
         return
     if args.verify_only:
         print(f"Verified {verify()} character assets")

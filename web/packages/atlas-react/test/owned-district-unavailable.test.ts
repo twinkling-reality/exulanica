@@ -10,6 +10,7 @@ import {
   ROLE_TINT,
   type OwnedAuthoredEnvironmentInstance,
 } from '../src/playcanvas/owned-district-runtime.js';
+import { serveFixturePeople } from './served-people.js';
 
 /*
  * What the owned district draws where no record says what is there.
@@ -65,6 +66,7 @@ function setup(interpretation?: DistrictInterpretation) {
   options.graphicsDevice = device;
   options.componentSystems = [pc.RenderComponentSystem];
   app.init(options);
+  serveFixturePeople(app);
   const runtime = new OwnedDistrictRuntime(device, app.root, district(), 100, interpretation);
   return { runtime, app };
 }

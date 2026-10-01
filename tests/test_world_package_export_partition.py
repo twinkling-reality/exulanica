@@ -18,13 +18,16 @@ from exulanica.world_package.export_partition import (
     REASON_KIND_NOT_ADMITTED,
     REASON_SECTION_NOT_CARRIED,
     REASON_SOURCE_INVALIDATED,
+    WORKSPACE_ASSETS,
     PlaneVersion,
     WithheldVersion,
     plan_export,
 )
 from exulanica.world_package.extension_formats import (
     AUTHORED_WORLD_1_0,
+    AUTHORED_WORLD_1_1,
     ENVIRONMENT_INSTANCES_1_0,
+    ENVIRONMENT_INSTANCES_1_1,
     ExtensionFormat,
 )
 from exulanica.world_package.package import PackageError
@@ -108,6 +111,40 @@ def test_a_section_no_format_carries_is_withheld_by_name_with_no_kind_behind_it(
     assert plan.withheld[AUTHORED] == (
         WithheldVersion("holding", REASON_SECTION_NOT_CARRIED, ("point_map_instances",)),
     )
+
+
+@pytest.mark.parametrize(
+    "formats",
+    [BOTH, [AUTHORED_WORLD_1_1, ENVIRONMENT_INSTANCES_1_1]],
+    ids=["1.0", "1.1"],
+)
+def test_a_workspace_asset_withholds_its_version_and_branches_but_not_its_parent(formats):
+    """No format carries a workspace's own asset; the version before it is placed still exports."""
+    lineage = (
+        _version("before", kinds={"add_object"}, sections={"objects"}),
+        dataclasses.replace(
+            _version("placed", "before", kinds={"add_object"}, sections={"objects"}),
+            uncarried=frozenset({WORKSPACE_ASSETS}),
+        ),
+        _version("branch", "placed", sections={"objects"}),
+    )
+    plan = plan_export(lineage, formats)
+    authored, environments = (format_.key for format_ in formats)
+    assert plan.exported[authored] == ("before",)
+    assert plan.exported[environments] == ()
+    assert plan.withheld[authored] == (
+        WithheldVersion("placed", REASON_SECTION_NOT_CARRIED, (WORKSPACE_ASSETS,)),
+        WithheldVersion("branch", REASON_SECTION_NOT_CARRIED, (WORKSPACE_ASSETS,)),
+    )
+    assert plan.withheld[environments] == ()
+    assert not plan.unrequested
+
+    # The control: the same lineage without the workspace asset exports whole.
+    control = plan_export(
+        tuple(dataclasses.replace(each, uncarried=frozenset()) for each in lineage), formats
+    )
+    assert control.exported[authored] == ("before", "placed", "branch")
+    assert control.withheld[authored] == ()
 
 
 def test_an_undo_counts_with_the_subject_it_reverses():

@@ -5,7 +5,7 @@
 import * as pc from 'playcanvas';
 import type { CharacterSubject } from '@exulanica/atlas-core';
 import type { CharacterHost } from './host.js';
-import { activityPosture, catalogFamily, type CatalogFamily } from './catalog.js';
+import { activityPosture, catalogFamily, type CatalogFamily, type CharacterCatalog } from './catalog.js';
 import { describeLook, type CharacterDetail, type CharacterLook, type CharacterRenderableDescription } from './look.js';
 import { CharacterPerson } from './person.js';
 import { FarPerson, farAppearance, type FarAppearance } from './far.js';
@@ -116,21 +116,26 @@ export class LayeredCharacterRenderable implements CharacterRenderable {
   private posture: string | null = null;
   readonly drawsSeats = true as const;
 
+  /**
+   * `catalog` is the published catalog the look is a recipe over: a saved look's own publication,
+   * or the current one for a default or an inhabitant. The host only supplies verified bytes.
+   */
   constructor(
     private readonly host: CharacterHost,
     parent: pc.Entity,
     readonly subject: CharacterSubject,
     readonly look: CharacterLook,
     detail: CharacterDetail,
+    readonly catalog: CharacterCatalog,
   ) {
-    this.nearDescription = describeLook(host.catalog, look, 'near');
-    this.farDescription = describeLook(host.catalog, look, 'far');
-    this.family = catalogFamily(host.catalog, look.familyId);
+    this.nearDescription = describeLook(catalog, look, 'near');
+    this.farDescription = describeLook(catalog, look, 'far');
+    this.family = catalogFamily(catalog, look.familyId);
     this.lookSha256 = this.nearDescription.lookSha256;
     this.root = new pc.Entity(rootName(subject), host.app);
     this.root.tags.add(CHARACTER_RENDERABLE_TAG);
     parent.addChild(this.root);
-    this.far = new FarPerson(host.app, farAppearance(host.catalog, look));
+    this.far = new FarPerson(host.app, farAppearance(catalog, look));
     this.root.addChild(this.far.root);
     this.wanted = detail;
     this.unsubscribe = host.onLoader(() => this.ensureNear());
@@ -185,7 +190,7 @@ export class LayeredCharacterRenderable implements CharacterRenderable {
     if (this.disposed || this.wanted !== 'near' || this.near || this.request || this.failure || !this.host.hasLoader) return;
     const request = new AbortController();
     this.request = request;
-    CharacterPerson.create(this.host, this.nearDescription, request.signal).then(
+    CharacterPerson.create(this.host, this.catalog, this.nearDescription, request.signal).then(
       (person) => {
         if (this.disposed || request.signal.aborted || this.wanted !== 'near') {
           person.destroy();

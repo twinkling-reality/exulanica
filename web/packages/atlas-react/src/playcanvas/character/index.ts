@@ -1,4 +1,12 @@
-export { inhabitantRenderable, inhabitantLook, inhabitantLookOf, INHABITANT_DRAW_DOMAIN, type InhabitantIdentity } from './inhabitant.js';
+export {
+  inhabitantCatalog,
+  inhabitantRenderable,
+  inhabitantLook,
+  inhabitantLookOf,
+  INHABITANT_DRAW_DOMAIN,
+  PeopleCatalogNotServed,
+  type InhabitantIdentity,
+} from './inhabitant.js';
 export type { CharacterRenderable, CharacterPose, CharacterRenderableStatus } from './renderable.js';
 export { LayeredCharacterRenderable, CHARACTER_RENDERABLE_TAG } from './renderable.js';
 export {
@@ -17,7 +25,6 @@ export {
   type CharacterRenderableDescription,
   type DesignedLooks,
 } from './look.js';
-export { DESIGNED_LOOKS } from './looks-data.js';
 export {
   catalogBase,
   catalogFamily,
@@ -31,10 +38,29 @@ export {
   type CatalogSlot,
   type CharacterCatalog,
 } from './catalog.js';
-export { CHARACTER_CATALOG } from './catalog-data.js';
 export { CharacterHost, type CharacterAssetLoader } from './host.js';
 export { canonicalJson, canonicalSha256, sha256Hex } from './digest.js';
 export { CharacterCrowdEvaluation, EVALUATION_SPEEDS, type CrowdEvaluationHost, type CrowdEvaluationOptions } from './evaluation.js';
 export { CharacterChoices, type CharacterChoice } from './choices.js';
 export { NEAR_CHARACTER_BUDGET, NEAR_INHABITANT_BUDGET, PLAYER_NEAR_PLACES } from './budget.js';
 export { farAppearance, type FarAppearance } from './far.js';
+export {
+  CharacterCatalogs,
+  LAYERED_PROFILE,
+  PARAMETRIC_PROFILE,
+  readServedCatalog,
+  type CatalogPublicationEntry,
+  type ServedCharacterCatalog,
+  type ServedLayeredCatalog,
+  type ServedParametricCatalog,
+} from './served.js';
+export {
+  PARAMETRIC_CATALOG_PROFILE,
+  parametricNativeDescriptor,
+  validateParametricCatalog,
+  validateParametricValues,
+  type ParametricCatalog,
+  type ParametricDescriptor,
+  type ParametricFamily,
+  type ParametricRepresentation,
+} from './parametric.js';

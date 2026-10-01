@@ -170,6 +170,16 @@
       "order": null
     },
     {
+      "kind": "workspace_asset",
+      "table": "workspace_asset_withdrawal",
+      "shape": "event",
+      "identity": ["workspace_id", "asset_id"],
+      "withdrawn": {"column": "withdrawn_at", "is": "not null"},
+      "workspace": "workspace_id",
+      "ends": {"table": "workspace_asset", "columns": ["workspace_id", "asset_id"]},
+      "order": null
+    },
+    {
       "kind": "retraction",
       "table": "retraction",
       "shape": "event",
@@ -205,6 +215,17 @@
       "workspace": "workspace_id",
       "ends": {"table": "spending_grant", "columns": ["workspace_id", "grant_id"]},
       "order": null
+    },
+    {
+      "kind": "character_catalog",
+      "table": "character_catalog_withdrawal",
+      "shape": "event",
+      "note": "The host withdrawing a published character catalog for good (migration 0131): no world draws from it again, a look saved over it reads as unavailable and its containers are no longer served under it. The row is the whole withdrawal. Publishing the same document again answers unchanged and leaves it withdrawn, so only a restore could serve it again.",
+      "identity": ["catalog_sha256"],
+      "withdrawn": {"column": "withdrawn_at", "is": "not null"},
+      "workspace": null,
+      "ends": {"table": "character_catalog_publication", "columns": ["catalog_sha256"]},
+      "order": null
     }
   ],
   "excluded": [
@@ -239,6 +260,10 @@
     {
       "table": "material_bake",
       "reason": "failure_class 'withdrawn' is written by the recipe withdrawal's own trigger, which replaying the withdrawal runs again."
+    },
+    {
+      "table": "workspace_preparation",
+      "reason": "failure_class 'withdrawn' is written by the asset withdrawal's own trigger, which replaying the withdrawal runs again."
     },
     {
       "table": "place_record_state_event",

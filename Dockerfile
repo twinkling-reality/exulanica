@@ -81,6 +81,14 @@ COPY assets/textures/blobs /app/assets/textures/blobs
 # is site-packages. Several are read when the package is imported, so an image without them
 # cannot start any process. `tests/test_image_ships_import_reads.py` holds both lines.
 COPY assets/catalogs /app/assets/catalogs
+# The character catalogs the image publishes (`exulanica-character-catalog publish --apply`, which
+# every serving database runs after `exulanica-db`, as deploy/judge's `catalogs` job does): the
+# people and the parametric family, with every container and licence they name. About 22 MB. The
+# development preview's stylized examples stay out. `tests/test_image_ships_character_catalogs.py`
+# holds these lines to what publishing reads.
+COPY assets/characters/catalog.json assets/characters/looks.json assets/characters/parametric-catalog.json /app/assets/characters/
+COPY assets/characters/makehuman-people-v1 /app/assets/characters/makehuman-people-v1
+COPY assets/characters/makehuman-parametric-v1 /app/assets/characters/makehuman-parametric-v1
 RUN ln -s /app/assets "$(/app/.venv/bin/python -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')/assets"
 
 ENV PATH=/app/.venv/bin:$PATH \

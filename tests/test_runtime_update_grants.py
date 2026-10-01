@@ -73,6 +73,11 @@ RUNTIME_UPDATES: dict[str, str] = {
         "migration 0132 refuses every other change"
     ),
     "stage_registry": "registering a stage moves its current version (stage_registry.py)",
+    "workspace_preparation": (
+        "the preparation worker claims, records and fails preparations and retakes an expired "
+        "lease; a request, a retry and a cancel move one under FOR NO KEY UPDATE; a withdrawal "
+        "or a tombstone cancels one"
+    ),
     "workspace_tile_quota": "tile use is counted against the quota (api/quotas.py)",
     "world_alternate_environment_instance": "an instance moves and is removed",
     "world_alternate_point_map_instance": (

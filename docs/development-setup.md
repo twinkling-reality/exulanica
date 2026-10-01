@@ -194,7 +194,9 @@ uv run python scripts/test_postgres.py stop
 bootstrap owner, confirms that `exulanica_app` is not an owner, a superuser or BYPASSRLS, and prints
 `EXULANICA_DATABASE_URL`, `EXULANICA_READONLY_DATABASE_URL` and `EXULANICA_PURGE_DATABASE_URL` for
 the runtime roles. The application never connects as the superuser; the owner URL it prints is for
-migrations and provisioning, and the API refuses to start on it.
+migrations and provisioning, and the API refuses to start on it. `serve` does not publish the
+character catalogs: run the publication below with that owner URL and the API's data directory, or
+no person is drawn.
 
 This is a test server, and every test server is disposable. It lives in the system temporary
 directory beside the per-worker servers, runs with `fsync` and `full_page_writes` off, and `serve`
@@ -217,7 +219,17 @@ pending migrations and provisions runtime roles; it is not a read-only check. Us
 for migrations and role provisioning. Configure `EXULANICA_APP_ROLE_PASSWORD`,
 `EXULANICA_EXECUTOR_ROLE_PASSWORD` and `EXULANICA_PURGE_ROLE_PASSWORD` when password authentication
 is used, then switch to the non-owner runtime URL below. See [deployment](deployment.md) for the
-full configuration. A database made by `exulanica-local-db` is upgraded only by its `upgrade`
+full configuration.
+
+Then publish the character catalogs, with the same owner connection and the data directory the API
+will serve its store from. People are drawn only from published catalogs; until this has run nobody
+is drawn and `/readyz` says `people_catalog_unpublished`. It is safe to run again: an identical
+catalog is answered `unchanged`.
+
+```bash
+EXULANICA_DATABASE_URL=<owner URL> EXULANICA_DATA_DIR=.exulanica/local \
+  uv run exulanica-character-catalog publish --apply
+``` A database made by `exulanica-local-db` is upgraded only by its `upgrade`
 command. Other existing databases, such as a retained reference copy, need a separately reviewed
 backup and activation path rather than an implicit startup upgrade; that procedure is not in this
 repository.

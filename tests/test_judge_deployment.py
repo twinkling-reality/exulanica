@@ -50,10 +50,12 @@ def test_the_api_connects_as_the_judge_role_and_never_as_the_runtime_role():
     """
     directives = _directives(JUDGE_COMPOSE)
     runtime_urls = [line for line in directives.splitlines() if "EXULANICA_DATABASE_URL:" in line]
-    assert len(runtime_urls) == 3, runtime_urls
-    owner, seeder, api = runtime_urls
+    assert len(runtime_urls) == 4, runtime_urls
+    owner, seeder, publisher, api = runtime_urls
     assert "postgresql://${POSTGRES_USER:-exulanica}:" in owner, owner
     assert "postgresql://${POSTGRES_USER:-exulanica}:" in seeder, seeder
+    # Catalog publication is host administration: the owner, never the runtime or judge role.
+    assert "postgresql://${POSTGRES_USER:-exulanica}:" in publisher, publisher
     assert "postgresql://exulanica_judge:" in api, api
     assert "postgresql://exulanica_app:" not in directives
 
@@ -91,8 +93,37 @@ def test_the_stack_refuses_to_start_without_its_secrets():
 def test_the_api_starts_only_after_the_seed_verified_what_it_loaded():
     """An API that is up is an API whose data was verified rather than merely written."""
     assert "exulanica-seed role && exulanica-seed restore --archive /seed" in JUDGE_COMPOSE
-    assert JUDGE_COMPOSE.count("condition: service_completed_successfully") == 2
+    # seed after migrate, catalogs after seed, and api after both.
+    assert JUDGE_COMPOSE.count("condition: service_completed_successfully") == 4
     assert 'exulanica-seed = "exulanica.orchestration.judge_seed_cli:main"' in PYPROJECT
+
+
+def test_the_api_starts_only_after_the_character_catalogs_are_published():
+    """A seed carries no catalog publication, since each deployment publishes its own, and a
+    database with none draws nobody. So the stack publishes after the seed, as the owner, into the
+    store the API serves, and publishes again on every later start."""
+    directives = _directives(JUDGE_COMPOSE)
+    catalogs = directives[directives.index("  catalogs:") : directives.index("  api:")]
+    assert 'command: ["exulanica-character-catalog", "publish", "--apply"]' in catalogs
+    assert "EXULANICA_DATABASE_URL: postgresql://${POSTGRES_USER:-exulanica}:" in catalogs
+    assert "EXULANICA_DATA_DIR: /var/lib/exulanica" in catalogs
+    assert "- media:/var/lib/exulanica" in catalogs
+    assert "seed:\n        condition: service_completed_successfully" in catalogs
+    # A later up names the job with --no-deps, which drops its dependency on `seed` and with it
+    # the chain that reached the database, so the job waits for the database itself.
+    assert "postgres:\n        condition: service_healthy" in catalogs
+    api = directives[directives.index("  api:") : directives.index("  web:")]
+    assert "catalogs:\n        condition: service_completed_successfully" in api
+    assert (
+        'exulanica-character-catalog = "exulanica.world.character_catalog_publication:main"'
+        in PYPROJECT
+    )
+    # Every later start publishes in the one up that starts the API, which never builds: a
+    # `compose run` would build the image where it is missing.
+    stack = _directives((ROOT / "deploy" / "judge" / "stack.sh").read_text(encoding="utf-8"))
+    later = [line for line in stack.splitlines() if "compose up" in line and "--no-deps" in line]
+    assert len(later) == 1 and later[0].rstrip().endswith("--no-deps catalogs $serving"), later
+    assert "--no-deps catalogs" not in stack.replace(later[0], "")
 
 
 def test_the_seed_archive_is_mounted_read_only():

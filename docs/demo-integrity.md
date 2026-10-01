@@ -222,7 +222,18 @@ isolation with two client processes at once, the edit lifecycle, and the observa
 connected journey in which a bench placed in a saved starter world becomes a place its people rest.
 Each row ends passed, failed or blocked with the missing prerequisite named; there is no skipped
 state. A claim that an operation writes nothing is checked by dumping the run's database and
-listing its store around it, after a plain read has shown the same check sees no change.
+listing its store around it, after a plain read has shown the same check sees no change. The
+baseline also covers project context, the policy boundary, capability discovery, the shared clock
+(given W7's client with `--w7-client`) and each run's driver digest, recorded when the run starts
+together with whether the file changed before it ended.
+
+Three further subcommands need their own stacks. `spending` races clients through two API processes
+(`--second-api`) against durable spending grants and checks restart, restore, revocation and expiry;
+`alternative` compares a saved world's people with and without a placed bench from frozen inputs;
+`companion` places that bench through the Companion and compares it with the direct edit, then checks
+what the Companion refuses. Each runs on a scripted model from `scripts/acceptance/plans/`, so its
+results are mechanics, never model quality. `--peer-token` adds a second actor in the first
+workspace, and `restart-api --api second` restarts the second API process.
 
 **Reading the result.** The run directory holds `result.json`, described by
 `scripts/rehearsal/result.schema.json`, a `summary.txt` table, a JPEG screenshot of every observed

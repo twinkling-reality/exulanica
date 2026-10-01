@@ -26,7 +26,11 @@ imports the code it starts.
 3.  Makes a fresh synthetic workspace: new workspace and actor ids and a new bearer token, granted
     the account owner's permissions, and provisions the workspace's embedding partition. With
     ``--tiles`` the token is also granted ``tiles.materialise`` and the workspace a tile quota of
-    ``TILES_LIMIT``, declared as the owner, so the development page can walk a baked tile.
+    ``TILES_LIMIT``, declared as the owner, so the development page can walk a baked tile. Then
+    publishes the character catalogs the checkout carries (``exulanica-character-catalog publish
+    --apply``) over the owner connection into the run's data directory, as every serving database
+    must be before anybody is drawn; its lines are kept in ``logs/character-catalogs.txt`` and the
+    run state.
 4.  Starts the API as the non-owner runtime role with the read-only and purge URLs, a
     content-addressed store in the run directory and no Google configuration. With ``--model``
     it also passes ``NEBIUS_API_KEY``, ``EXULANICA_EGRESS_ALLOWLIST``, ``EXULANICA_BUDGET_USD``,
@@ -64,6 +68,11 @@ starts exactly what it always did:
   ``--spending process|durable`` states the scripted API's ``EXULANICA_SPENDING`` explicitly.
 - ``--read-only-token`` adds one more token, ``token-read``, for the first workspace with
   ``world.read`` alone, so a client can be shown a refusal its grant earns.
+- ``--peer-token`` adds ``token-peer``: a second actor in the first workspace with the same
+  permissions, so a client can be shown what one actor's private work looks like to another.
+- ``--second-api`` starts a second API process on the slot's spare port with the same database,
+  store, spending witness and grants, so clients can race through two processes at once.
+  ``restart-api --api second`` restarts that one instead of the first.
 
 ``restart-api`` stops the recorded API and starts it again on the same port, database, store and
 grants, rebuilt from the run's token files and recorded state, so a client can reopen its work from a
@@ -115,6 +124,8 @@ PORT_MINIMUM = 1024
 PORT_MAXIMUM = 65535
 #: How many synthetic workspaces ``--workspaces`` may make.
 WORKSPACES_MAXIMUM = 8
+#: The token file ``--peer-token`` writes.
+PEER_TOKEN_NAME = "token-peer"
 #: The one permission ``--read-only-token`` grants.
 READ_ONLY_PERMISSIONS = ("world.read",)
 
@@ -211,6 +222,7 @@ REFUSALS = {
     "token-file-unknown": "--revoke names no token file this run wrote",
     "scripted-with-model": "--scripted-model and --model cannot both be given",
     "scripted-plan-missing": "--scripted-model names no readable plan file",
+    "no-second-api": "restart-api --api second names a run that started no second API",
 }
 
 
@@ -445,6 +457,28 @@ def api_environment(
         environment["EXULANICA_DERIVATIVE_WORKER"] = "off"
     environment.update(society_playback)
     return environment
+
+
+def publication_command(python: Path) -> list[str]:
+    """The host's character catalog publication, run by the checkout's own interpreter."""
+    return [
+        str(python),
+        "-m",
+        "exulanica.world.character_catalog_publication",
+        "publish",
+        "--apply",
+    ]
+
+
+def publication_environment(
+    owner_url: str, data_dir: Path, environ: Mapping[str, str] | None = None
+) -> dict[str, str]:
+    """A clean environment holding the owner connection and the run's data directory alone, so
+    the containers land in the store the run's API serves from and nowhere else."""
+    return clean_environment(environ) | {
+        "EXULANICA_DATABASE_URL": owner_url,
+        "EXULANICA_DATA_DIR": str(data_dir),
+    }
 
 
 def app_directory(worktree: Path) -> Path:
@@ -824,7 +858,7 @@ def up(arguments: argparse.Namespace) -> None:
         refuse("state-exists", str(state_file))
     chosen = ports(arguments.slot, arguments.port_base)
     count = workspace_count(arguments.workspaces)
-    for role in ("api", "vite", "browser"):
+    for role in ("api", "vite", "browser", *(("spare",) if arguments.second_api else ())):
         if listening(chosen[role]):
             refuse("port-in-use", f"port {chosen[role]} ({role})")
 
@@ -985,6 +1019,29 @@ def up(arguments: argparse.Namespace) -> None:
             "permissions": list(READ_ONLY_PERMISSIONS),
         }
         read_only_grant = {"token_file": str(read_only_file), **grant[read_only]}
+    peer_grant = None
+    if arguments.peer_token:
+        peer = secrets.token_urlsafe(48)
+        peer_file = run_dir / PEER_TOKEN_NAME
+        peer_file.write_text(peer)
+        peer_file.chmod(0o600)
+        grant[peer] = {
+            "workspace_id": workspace_id,
+            "actor": str(uuid.uuid4()),
+            "permissions": synthetic_permissions(arguments.tiles),
+        }
+        peer_grant = {"token_file": str(peer_file), **grant[peer]}
+
+    # People are drawn only from published catalogs (migration 0131), so a run publishes before
+    # its API starts, exactly as a deployment must.
+    published = run(
+        publication_command(python),
+        worktree,
+        publication_environment(exports["OWNER_URL"], data_dir),
+    )
+    (logs / "character-catalogs.txt").write_text(published)
+    state["character_catalogs"] = [line for line in published.splitlines() if line.strip()]
+    write_state(state_file, state)
 
     environment = api_environment(
         exports=exports,
@@ -1034,6 +1091,8 @@ def up(arguments: argparse.Namespace) -> None:
         state["other_workspaces"] = others
     if read_only_grant is not None:
         state["read_only_token"] = read_only_grant
+    if peer_grant is not None:
+        state["peer_token"] = peer_grant
     state["pids"]["api"] = api_pid
     write_state(state_file, state)
 
@@ -1070,6 +1129,22 @@ def up(arguments: argparse.Namespace) -> None:
     write_state(state_file, state)
     if probe_status != 200:
         refuse("token-refused", f"{probe_status} {probe_body[:REFUSAL_EXCERPT_CHARACTERS]!r}")
+    if arguments.second_api:
+        second_log = logs / "api-2.log"
+        state["pids"]["api_2"] = spawn(
+            api_command(python, worktree, chosen["spare"], plan), worktree, environment, second_log
+        )
+        state["second_api"] = {"port": chosen["spare"], "log": str(second_log)}
+        write_state(state_file, state)
+        second_status, _ = wait_http(
+            f"http://127.0.0.1:{chosen['spare']}/world-entries",
+            API_START_SECONDS,
+            {"Authorization": f"Bearer {token}"},
+        )
+        state["second_api"]["token_probe"] = second_status
+        write_state(state_file, state)
+        if second_status != 200:
+            refuse("token-refused", f"the second API answered {second_status}")
 
     if arguments.production:
         serve_production(worktree, run_dir, chosen, logs, state, state_file)
@@ -1077,7 +1152,11 @@ def up(arguments: argparse.Namespace) -> None:
         serve_development(worktree, chosen, token, logs, state, state_file)
     shown = ("worktree", "tree", "ports", "run_dir", "workspace_id", "api_imported_exulanica_from")
     extra = ("society_playback",) if arguments.society_playback else ()
-    extra += tuple(key for key in ("other_workspaces", "read_only_token") if key in state)
+    extra += tuple(
+        key
+        for key in ("other_workspaces", "read_only_token", "peer_token", "second_api")
+        if key in state
+    )
     print(json.dumps({key: state[key] for key in (*shown, "api_health", "app", *extra)}, indent=2))
     print(f"app: http://localhost:{chosen['vite']}/  token file: {token_file}")
 
@@ -1224,13 +1303,14 @@ def recorded_grants(state: Mapping[str, object], run_dir: Path) -> dict[str, dic
             "actor": other["actor"],
             "permissions": list(state["permissions"]),
         }
-    read_only = state.get("read_only_token")
-    if isinstance(read_only, Mapping):
-        grants[Path(read_only["token_file"]).name] = {
-            "workspace_id": read_only["workspace_id"],
-            "actor": read_only["actor"],
-            "permissions": list(read_only["permissions"]),
-        }
+    for key in ("read_only_token", "peer_token"):
+        recorded = state.get(key)
+        if isinstance(recorded, Mapping):
+            grants[Path(recorded["token_file"]).name] = {
+                "workspace_id": recorded["workspace_id"],
+                "actor": recorded["actor"],
+                "permissions": list(recorded["permissions"]),
+            }
     for name in grants:
         if not (run_dir / name).is_file():
             refuse("token-file-unknown", f"{name} is recorded but absent from {run_dir}")
@@ -1243,6 +1323,9 @@ def restart_api(arguments: argparse.Namespace) -> None:
     if not state_file.exists():
         refuse("no-state", str(state_file))
     state = json.loads(state_file.read_text())
+    second = arguments.api == "second"
+    if second and "api_2" not in state["pids"]:
+        refuse("no-second-api", REFUSALS["no-second-api"])
     run_dir = Path(state["run_dir"])
     logs = run_dir / "logs"
     grants = recorded_grants(state, run_dir)
@@ -1272,31 +1355,35 @@ def restart_api(arguments: argparse.Namespace) -> None:
         environment.update(
             scripted_environment(run_dir, logs, scripted.get("spending", SPENDING_MODES[0]))
         )
-    stop(state["pids"]["api"], API_MARKER, "api")
+    pid_key, port_role, log_name = (
+        ("api_2", "spare", "api-2.log") if second else ("api", "api", "api.log")
+    )
+    stop(state["pids"][pid_key], API_MARKER, pid_key)
     chosen = state["ports"]
-    if listening(chosen["api"]):
-        refuse("port-in-use", f"port {chosen['api']} (api) is still held after the stop")
+    if listening(chosen[port_role]):
+        refuse("port-in-use", f"port {chosen[port_role]} ({pid_key}) is still held after the stop")
     api_pid = spawn(
         api_command(
             worktree / ".venv" / "bin" / "python",
             worktree,
-            chosen["api"],
+            chosen[port_role],
             Path(scripted["plan"]) if isinstance(scripted, Mapping) else None,
         ),
         worktree,
         environment,
-        logs / "api.log",
+        logs / log_name,
     )
-    state["pids"]["api"] = api_pid
+    state["pids"][pid_key] = api_pid
     restart = {
         "at": dt.datetime.now(dt.UTC).isoformat(),
         "pid": api_pid,
+        "api": arguments.api,
         "revoked_token_file": revoked,
         "grants": sorted(grants),
     }
     state.setdefault("restarts", []).append(restart)
     write_state(state_file, state)
-    healthz, _ = wait_http(f"{api_url(chosen)}/healthz", API_START_SECONDS)
+    healthz, _ = wait_http(f"http://127.0.0.1:{chosen[port_role]}/healthz", API_START_SECONDS)
     restart["healthz"] = healthz
     write_state(state_file, state)
     print(json.dumps(restart, indent=2))
@@ -1319,6 +1406,8 @@ def down(arguments: argparse.Namespace) -> None:
         stop_tile_worker(state)
     if "vite" in state["pids"]:
         stop(state["pids"]["vite"], "vite", "app")
+    if "api_2" in state["pids"]:
+        stop(state["pids"]["api_2"], API_MARKER, "api_2")
     if "api" in state["pids"]:
         stop(state["pids"]["api"], API_MARKER, "api")
     if state["database"]["started_by_launcher"]:
@@ -1349,6 +1438,12 @@ def build_parser() -> argparse.ArgumentParser:
         command = commands.add_parser(name)
         command.add_argument("--worktree", required=True, help="the checkout to run")
         if name == "restart-api":
+            command.add_argument(
+                "--api",
+                choices=("primary", "second"),
+                default="primary",
+                help="which API process to restart (default: primary)",
+            )
             command.add_argument(
                 "--revoke",
                 metavar="TOKEN_FILE",
@@ -1411,6 +1506,18 @@ def build_parser() -> argparse.ArgumentParser:
                 help="with --scripted-model, the EXULANICA_SPENDING the API states: the plan's "
                 "process bounds, or the durable authority with its witness in the run directory "
                 "(default: process)",
+            )
+            command.add_argument(
+                "--peer-token",
+                action="store_true",
+                help="also write token-peer, a second actor in the first workspace with the same "
+                "permissions",
+            )
+            command.add_argument(
+                "--second-api",
+                action="store_true",
+                help="start a second API process on the slot's spare port with the same database, "
+                "store, spending witness and grants",
             )
             command.add_argument(
                 "--read-only-token",

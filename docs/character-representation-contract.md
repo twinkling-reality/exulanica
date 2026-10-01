@@ -1,14 +1,16 @@
 # Character representation and movement
 
-Status: **CATALOG PEOPLE FOR THE PLAYER AND INHABITANTS**. This contract defines the shared
+Status: **PUBLISHED CATALOG PEOPLE AND PARAMETRIC BODIES**. This contract defines the shared
 character foundation for the player and a world's synthetic inhabitants, how the app draws a
 society's people, and the representation boundary a scene's observed people would bind to, for
-which no adapter is built. A committed catalog of fitted, textured people supplies the player's
-default body, the look of every inhabitant of every world that holds a society, the character
-studio and saved looks, with near and distant detail levels, planted feet, a seated rest drawn for
-the activity a society states, on the ground or on the seat of the furniture a person uses, and a
-frame budget measured on a production build. It does not establish likeness reconstruction,
-automatic rigging of new source material, or crowd collision avoidance.
+which no adapter is built. Character catalogs are published by the host and served to the browser
+by digest; nothing about people is compiled into the app. A published catalog of fitted, textured
+people supplies the player's default body, the look of every inhabitant of every world that holds
+a society, the character studio and saved looks, with near and distant detail levels, planted
+feet, a seated rest drawn for the activity a society states, on the ground or on the seat of the
+furniture a person uses, and a frame budget measured on a production build. A second family kind,
+parametric bodies fitted per recipe, can be saved and worn by the player. It does not establish
+likeness reconstruction, automatic rigging of new source material, or crowd collision avoidance.
 
 <details>
 <summary>Sections</summary>
@@ -16,10 +18,11 @@ automatic rigging of new source material, or crowd collision avoidance.
 - [One foundation, distinct subjects](#one-foundation-distinct-subjects)
 - [Extensible asset and customization pipeline](#extensible-asset-and-customization-pipeline)
   - [Catalog people](#catalog-people)
+  - [Published catalogs](#published-catalogs)
   - [Inhabitant looks and the display function](#inhabitant-looks-and-the-display-function)
   - [Player, studio and saved looks](#player-studio-and-saved-looks)
   - [Authenticated appearance history](#authenticated-appearance-history)
-  - [Editable human builder](#editable-human-builder)
+  - [Parametric bodies](#parametric-bodies)
 - [Visual direction](#visual-direction)
 - [Representation boundary](#representation-boundary)
 - [Movement quality](#movement-quality)
@@ -120,6 +123,51 @@ show as swatches. `assets/characters/looks.json`
 holds designed looks, the player's default and one default per body, validated against the catalog in
 Python and TypeScript.
 
+### Published catalogs
+
+The repository's catalog files are what a host publishes, not what an app loads. Publication is
+host administration with the owner connection, never a request:
+`exulanica-character-catalog publish --directory assets/characters --apply` (which
+`scripts/prepare_character_people.py --import --apply` also runs) imports every container a catalog
+names as a reviewed asset, checks each one's bytes and licence in the store, and records the catalog
+as a publication (migration 0131): one canonical document named by the SHA-256 of its canonical
+JSON. Two document profiles exist, each read by a fixed adapter: `exulanica.character-catalog-bundle/v1`
+holds `catalog.json` with its designed looks (layered people), and
+`exulanica.parametric-character-catalog/v1` holds parametric families
+([below](#parametric-bodies)). A catalog's revisions only increase. The newest revision of each
+catalog is **current**, older ones stay **retained** until the host withdraws them
+(`exulanica-character-catalog withdraw`), and a withdrawal is final. Publishing the same document
+again leaves it withdrawn, and a restore from an older backup keeps it withdrawn: the restore
+withdrawal catalog (`exulanica/deletion/withdrawals.v2.json`, kind `character_catalog`) carries it.
+
+There is no fallback catalog. A serving database that was never given a publication draws nobody,
+and every saved look on it reads as unavailable. So every path that creates or upgrades one
+publishes right after `exulanica-db`, with the owner connection and the store the API serves:
+- the `catalogs` job in `compose.yaml` and in `deploy/judge/compose.yaml` (the judge stack runs it
+  again on every start);
+- the acceptance launcher, before its API starts;
+- the rehearsal's judge-seed restore, since a seed carries no publication: each deployment
+  publishes its own;
+- the documented development and personal-install steps;
+- the installation.
+
+The backend image carries the catalogs it publishes. `/readyz` reports `checks.character_catalogs`:
+`served` with the current publications, or the declared state `people_catalog_unpublished` with the
+command. It is a named state rather than a 503, because everything else the instance serves still
+works.
+
+`GET /world/character-catalogs` lists what the host serves (identity, profile, kind and state) and
+`GET /world/character-catalogs/{catalog_sha256}` answers the canonical document itself, cacheable
+forever because its address names its bytes; a withdrawn one answers 410 `withdrawn`. The browser
+believes a document only when its bytes hash to the digest it asked for and its kind's validators
+accept it (`atlas-react/src/playcanvas/character/served.ts`), and holds the served catalogs per
+application (`CharacterCatalogs`). The current people catalog that declares the street population is
+the one the player's default and every inhabitant are drawn from, so both always agree; a society
+snapshot that arrives before it waits and is drawn when it is served. The generated
+`catalog-data.ts` and `looks-data.ts` remain test fixtures and verification output only: a test fails
+if a production module imports them, and the production build test proves the catalog document is
+not in the bundle.
+
 ### Inhabitant looks and the display function
 
 An inhabitant's look is drawn from a population profile (`street-population/v1`) keyed only by the
@@ -155,14 +203,19 @@ rather than being lifted onto a seat.
 
 ### Player, studio and saved looks
 
-The player wears the designed default person until the person chooses otherwise. The abstract figure
-is a deliberate choice in the studio, and it also stands in whenever the chosen person cannot be
-loaded. The studio offers a figure choice, designed starting looks, the two bodies, and then every
+The player wears the served people catalog's designed default person until the person chooses
+otherwise. The abstract figure is a deliberate choice in the studio, and it also stands in whenever
+the chosen person cannot be loaded, whenever no people catalog is served, and whenever a saved look
+reads as unavailable, in which case the host's code says why; a designed default never takes the
+place of a saved person. The studio offers a figure choice, designed starting looks, the two bodies, and then every
 slot and parameter the family declares, on the step, in the order and with the words the catalog
 gives it (`ui/character-look-editor.ts`); adding a slot, a parameter or a choice to the catalog adds a
 control and no code, and a slot the body offers one choice for is not offered as a choice. Choosing
 the other body keeps every choice that body also offers and takes that body's designed default for
-the rest. Walking and running preview on a treadmill at the clip's own speed. A signed-in world opens
+the rest. A look saved over an earlier revision of the catalog stays worn as it was saved; the studio
+edits recipes over the catalog served now, so when that catalog cannot draw the saved look it opens
+on the nearest look it offers, by the same rule, and says so (code
+`saved_look_options_not_offered`) until the person chooses again. Walking and running preview on a treadmill at the clip's own speed. A signed-in world opens
 the same studio, loading people through the session's reviewed assets.
 
 Saved looks keep the server's revision rules: every save or reset appends a revision, a write names
@@ -195,27 +248,64 @@ authorized membership. Each world version has independent appearance history. Th
 account-global profile, cross-version identity inheritance, automatic generation or observed-person
 likeness fitting.
 
-`exulanica/api/services.py` registers one recipe family per catalog body, derived from the committed
-catalog and designed looks (`catalog_recipe_families`); a family is authorized while the instance
-serves it, and a catalog and designed looks that disagree stop startup. A family's revision is a digest
-of what a look over that body means: the slots, the part, material and colour ids each may name, the
-parameter bounds and the rig (`catalog_base_schema_sha256`). How an id is drawn is not part of it, so
-rebuilt containers, new clips, better materials, labels and colour values leave every saved look
-valid, as do population tuning and changes to the other body; removing a choice or narrowing a bound
-changes it. A saved catalog look reports `available` only when every container it composes is
-a reviewed asset whose bytes and licence are in the store. `scripts/prepare_character_people.py
+Families come from the publications the host serves: one recipe family per catalog body
+(`catalog_recipe_families`) and one per parametric family, each authorized exactly while a served
+publication derives it. A family's revision is a digest of what a look over that body means: the
+slots, the part, material and colour ids each may name, the parameter bounds and the rig
+(`catalog_base_schema_sha256`). How an id is drawn is not part of it, so rebuilt containers, new clips,
+better materials, labels and colour values leave every saved look valid, as do population tuning and
+changes to the other body; removing a choice or narrowing a bound changes it. The first publication of
+an unchanged catalog derives exactly the family digests looks were saved with before publications
+existed.
+
+A saved revision keeps the family document it names and, for revisions written since, the
+publication it was authored against (`publication` in the document). It is drawn from the newest
+served publication that derives exactly its family digest; every read says which (`render`: the
+publication, its kind, whether it is the `authored` one or a later `compatible` one, and the state of
+each container or prepared body it needs). When no served publication derives it, as after its only
+publication is withdrawn, the read reports `family_source_unavailable` with the recipe and history
+intact, and saving or resetting over that family answers 424 `appearance_unavailable`. Publishing a
+catalog that removes an option a look uses therefore leaves that look unchanged while its publication
+is retained, and explicitly unavailable after it is withdrawn; two worlds may hold looks over two
+revisions at once. A saved catalog look reports `available` only when every container it composes is
+a reviewed asset whose bytes and licence are in the store. `/families` names each family's kind and
+the publication that serves it. `scripts/prepare_character_people.py
 --import --apply` publishes all catalog containers through the reviewed asset registry; a signed-in
 world fetches them from `/world/assets/<asset key>/bytes`, and the host checks every byte against the
 catalog. The development preview reads the same committed containers through the development server
 only, and a production build test proves no container is bundled.
 
-### Editable human builder
+### Parametric bodies
 
-A MakeHuman/MPFB builder is also in the repository: a loopback-only preparation adapter
-(`scripts/parametric_character/preview_server.py`) fits a generated body for a full parameter recipe,
-and `scripts/prepare_parametric_character.py` prepares its committed default. The studio's catalog
-flow does not use it; generated bodies are development experiments, not saved looks, and they do not
-change traversal collision or camera authority.
+`makehuman-parametric/v1` is a family of declared body controls whose body is fitted per recipe
+by the pinned Blender 4.5.9 with MPFB 2 and the MakeHuman CC0 system assets
+(`makehuman-parametric-v1/source-lock.json`). Its published document is derived from the authored
+`family.json` (`exulanica/world/character_parametric.py`): whole centimetres for height and
+thousandths of the builder's own value for every fractional control, so the document is a canonical
+digest input. A recipe names exactly its controls and choices and, when it is drawn, the prepared
+body bound to exactly those values (`representation_id`); a body bound to other values is refused.
+The family's revision covers its controls, choices, bounds and rig only, so publishing more prepared
+bodies never changes what a saved recipe means. The committed default body is published as a
+reviewed asset (`makehuman.parametric.default.v1`) and listed in the document with the render
+descriptor measured from its own bytes.
+
+Every prepared body is checked by `exulanica/world/character_bodies.py` with the standard library
+before it is believed: one skin with exactly the family's joints, invertible bind matrices, at most
+four influences per vertex with weights summing to one, the declared clips with linear or step keys,
+skinned positions through idle, walk and run that stay finite, within reach of the hips and within
+declared height ratios, an idle pose standing on the ground, a measured gait, and the declared byte,
+triangle, vertex, joint and image budgets. On the committed default these measurements reproduce what
+the builder recorded. `exulanica/world/character_preparation.py` runs the build as a child process
+under a wall-clock and resident-memory watchdog, verifies the pinned inputs before and after it, and
+writes an integer receipt; a failure is reported with its class (`preparer_failed`, `timed_out`,
+`stale`, `rig_incompatible`, `deformation_invalid`, `over_budget`, `unverified_output`) and no body.
+One build of the reviewed default recipe (2026-09-30, one machine at load average 4) reproduced the
+committed body byte for byte in 4.8 s of wall time and 347 MiB of peak resident memory; a build may
+use at most 180 s and 1 GiB.
+A saved parametric look is worn by the player through the native character runtime with the measured
+descriptor. Parametric bodies are for the player only: they have no postures, no distant form and no
+population draw. The loopback development builder (`scripts/parametric_character/preview_server.py`)
+remains for the development preview; it does not save looks.
 
 ## Visual direction
 
@@ -498,6 +588,13 @@ build.
 
 Not built, and not claimed:
 
+- a per-world pin of the catalog inhabitants are drawn from: they follow the current people
+  publication, so publishing a new population changes how every world's inhabitants look (what they
+  do is unaffected);
+- parametric bodies for inhabitants, seated parametric bodies, or a distant form for them;
+- preparing a parametric body for a new recipe from a request: the preparer and its checks exist,
+  and joining them to the workspace preparation queue is the remaining step, so until then only a
+  published reviewed body can be saved and worn;
 - a frame measurement on a weaker machine, and saved looks for a session that names no account;
 - a scene-person adapter that represents a confirmed or unresolved observation from a photograph,
   starting from a source-linked abstract character, without requiring a photoreal likeness;

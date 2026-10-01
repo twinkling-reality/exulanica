@@ -35,6 +35,7 @@ from exulanica.api.dependencies import (
 from exulanica.api.services import Services
 from exulanica.api.world_scope import WorldId
 from exulanica.api.world_version_document import AlternateVersionView, rendered_version
+from exulanica.store.namespaces import WorkspaceStores
 from exulanica.world import (
     MAX_SCALE_MILLI,
     MAX_YAW_MICRORADIANS,
@@ -60,6 +61,7 @@ from exulanica.world import (
     WorldObjectRepository,
 )
 from exulanica.world.society import UnavailableSocietyInput
+from exulanica.world.workspace_assets import WorkspaceAssetWithdrawn
 from exulanica.world.worlds import require_world
 
 
@@ -153,7 +155,11 @@ def object_read_repository(
 ) -> WorldObjectRepository:
     require_world(connection, session.workspace_id, world_id)
     return WorldObjectRepository(
-        connection, session.workspace_id, world_id=world_id, store=services.store
+        connection,
+        session.workspace_id,
+        world_id=world_id,
+        store=services.store,
+        workspace_assets=_workspace_assets(services),
     )
 
 
@@ -171,12 +177,18 @@ def object_write_repository(
         session.workspace_id,
         world_id=world_id,
         store=services.store,
+        workspace_assets=_workspace_assets(services),
         on_edit=(
             None
             if observer is None
             else lambda version_id: observer(connection, session, version_id)
         ),
     )
+
+
+def _workspace_assets(services: Services) -> WorkspaceStores | None:
+    runtime = getattr(services, "workspace_assets", None)
+    return None if runtime is None else runtime.stores
 
 
 ReadObjects = Annotated[WorldObjectRepository, Depends(object_read_repository)]
@@ -203,6 +215,9 @@ OBJECT_PROBLEMS: Final[tuple[tuple[type[Exception], int, str], ...]] = (
     #: The society input hook refusing an accepted edit inside its transaction. The code and
     #: status are the ones the society routes answer for the same refusal.
     (UnavailableSocietyInput, 424, "unavailable_society_input"),
+    #: Moving an object whose workspace asset was withdrawn is placing it again, and refused as
+    #: an environment piece's is.
+    (WorkspaceAssetWithdrawn, 410, "withdrawn"),
 )
 
 

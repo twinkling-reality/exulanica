@@ -34,6 +34,7 @@ from exulanica.world.composition_preview import (
     PhotoPointMapSource,
     ReviewedAssetSource,
     SourceAttachmentSource,
+    WorkspaceAssetSource,
     apply_composition,
     preview_composition,
 )
@@ -268,6 +269,7 @@ __all__ = [
     "UnknownSociety",
     "UnknownWorldResource",
     "VersionEdit",
+    "WorkspaceAssetSource",
     "WorldInteractionPolicyRepository",
     "WorldNotConfigured",
     "WorldObjectRepository",

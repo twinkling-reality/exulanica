@@ -11,7 +11,7 @@ import json
 import math
 import re
 import uuid
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Annotated, Any, Final, Literal
 
@@ -188,8 +188,18 @@ def document_sha256(document: object) -> str:
 
 
 def validate_recipe(
-    recipe: CharacterRecipe, family: CharacterFamily, subject: CharacterSubject
+    recipe: CharacterRecipe,
+    family: CharacterFamily,
+    subject: CharacterSubject,
+    representations: Callable[[str], RepresentationBinding | None] | None = None,
 ) -> RepresentationBinding | None:
+    """Refuse a recipe that is not exactly over this family, and resolve the body it names.
+
+    A family may declare its prepared bodies itself (``representations``); a family whose bodies
+    are published or prepared elsewhere has them resolved by the host's ``representations``
+    callable. Either way the body must be bound to exactly this recipe's inputs and the
+    family's rig.
+    """
     if recipe.family_id != family.family_id or recipe.family_sha256 != family.sha256:
         raise ValueError("recipe must name the exact configured family revision")
     use = "authored-avatar" if subject.kind == "avatar" else "synthetic-inhabitant"
@@ -204,7 +214,15 @@ def validate_recipe(
     binding = next(
         (r for r in family.representations if r.binding_id == recipe.representation_id), None
     )
-    if binding is None or binding.recipe_input_sha256 != recipe.input_sha256:
+    if binding is None and representations is not None:
+        binding = representations(recipe.representation_id)
+    if (
+        binding is None
+        or binding.binding_id != recipe.representation_id
+        or binding.recipe_input_sha256 != recipe.input_sha256
+        or (binding.rig_id, binding.rig_revision, binding.rig_sha256)
+        != (family.rig_id, family.rig_revision, family.rig_sha256)
+    ):
         raise ValueError("representation is not prepared for these exact recipe inputs")
     return binding
 

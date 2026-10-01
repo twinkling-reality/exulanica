@@ -11,6 +11,11 @@ const VITE = join(APP, 'node_modules/vite/bin/vite.js');
 const CHARACTERS = resolve('../assets/characters');
 /** What only the development character source carries. */
 const MARKER = 'No committed character container has digest';
+/**
+ * A digest only the committed people catalog carries (its feminine body). The app is served its
+ * catalogs by the host, so no production bundle may hold the catalog document itself.
+ */
+const CATALOG_MARKER = '2a54b5b4eeb6cad184c593e401f35458bb358fe710f4cfeef214e7562b23e95d';
 /** The first bytes of a committed body container: its header and the start of its glTF JSON. */
 const BODY_PREFIX = readFileSync(join(CHARACTERS, 'makehuman-people-v1/bases/feminine.glb')).subarray(0, 96);
 const scratch: string[] = [];
@@ -52,12 +57,13 @@ describe('development character sources: who may ask', () => {
 });
 
 describe('character containers: never bundled into a production build', () => {
-  it('emits no container, no container bytes and no development source in production', () => {
+  it('emits no container, no container bytes, no catalog and no development source in production', () => {
     const production = buildApp('production');
     expect(production.names.some((name) => name.endsWith('index.html'))).toBe(true);
     expect(production.names.filter((name) => name.endsWith('.glb'))).toEqual([]);
     expect(production.holdsBodyBytes).toBe(false);
     expect(production.text.includes(MARKER)).toBe(false);
+    expect(production.text.includes(CATALOG_MARKER)).toBe(false);
   }, 180_000);
 
   it('would carry them if the development branch were reachable (the control)', () => {
@@ -65,5 +71,6 @@ describe('character containers: never bundled into a production build', () => {
     expect(development.names.filter((name) => name.endsWith('.glb')).length).toBeGreaterThan(90);
     expect(development.holdsBodyBytes).toBe(true);
     expect(development.text.includes(MARKER)).toBe(true);
+    expect(development.text.includes(CATALOG_MARKER)).toBe(true);
   }, 180_000);
 });

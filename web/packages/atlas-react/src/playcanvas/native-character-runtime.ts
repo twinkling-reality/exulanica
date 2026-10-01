@@ -5,7 +5,6 @@ import { NativeCharacterPool, type CharacterByteLoader } from './native-characte
 import type { NativeCharacterAppearance, NativeCharacterAuthority, NativeCharacterDescriptor, NativeCharacterMotion } from './native-character.js';
 import { CHARACTER_RENDERABLE_TAG } from './character/renderable.js';
 import { CharacterHost } from './character/host.js';
-import { CHARACTER_CATALOG } from './character/catalog-data.js';
 import { NEAR_CHARACTER_BUDGET } from './character/budget.js';
 
 export interface NativeCharacterFrame extends NativeCharacterMotion {
@@ -30,7 +29,7 @@ export class NativeCharacterRuntime {
     this.app=app;
     this.pool=new NativeCharacterPool(app,loadBytes);
     // Catalog people fetch through the same authority; renderables waiting for it upgrade now.
-    CharacterHost.forApp(app,CHARACTER_CATALOG).setLoader(loadBytes);
+    CharacterHost.forApp(app).setLoader(loadBytes);
   }
   /** Initial snapshot, then residency changes only. Pose/visibility updates do not notify. */
   subscribeResidents(listener:(subjects:readonly CharacterSubject[])=>void):()=>void{

@@ -1,5 +1,13 @@
 import type { BodyRecipe } from './ui/character-body.js';
-import type { NativeCharacterAppearance, NativeCharacterDescriptor, CharacterByteLoader, FirstPersonGestureDescriptor } from '@exulanica/atlas-react/playcanvas';
+import {
+  readServedCatalog,
+  type CatalogPublicationEntry,
+  type CharacterByteLoader,
+  type FirstPersonGestureDescriptor,
+  type NativeCharacterAppearance,
+  type NativeCharacterDescriptor,
+  type ServedCharacterCatalog,
+} from '@exulanica/atlas-react/playcanvas';
 import type { CharacterSubject } from '@exulanica/atlas-core';
 import { Transport, type TransportOptions } from '@exulanica/graph-client';
 
@@ -99,4 +107,38 @@ export function workspaceCharacterLoader(options: TransportOptions): CharacterBy
       .getBytes(`/world/assets/${encodeURIComponent(reference.assetKey)}/bytes`);
     return response.arrayBuffer();
   };
+}
+
+/** `GET /world/character-catalogs`, the host's list of the catalogs it serves. */
+interface CatalogList {
+  readonly profile: 'exulanica.character-catalog-list/v1';
+  readonly publications: readonly CatalogPublicationEntry[];
+}
+
+/** Published documents by digest. A digest names exact bytes, so a document is fetched once. */
+const SERVED = new Map<string, Promise<ServedCharacterCatalog>>();
+
+/** The catalogs the host serves, as it lists them: current and retained, each by its digest. */
+export async function characterCatalogList(options: TransportOptions): Promise<readonly CatalogPublicationEntry[]> {
+  const list = await new Transport(options).getJson<CatalogList>('/world/character-catalogs');
+  if (list.profile !== 'exulanica.character-catalog-list/v1' || !Array.isArray(list.publications)) {
+    throw new Error('The character catalog list could not be read.');
+  }
+  return list.publications;
+}
+
+/** One publication's document, fetched and checked once per page. */
+export function servedCharacterCatalog(
+  options: TransportOptions,
+  entry: CatalogPublicationEntry,
+): Promise<ServedCharacterCatalog> {
+  let held = SERVED.get(entry.catalog_sha256);
+  if (!held) {
+    held = new Transport(options)
+      .getBytes(`/world/character-catalogs/${encodeURIComponent(entry.catalog_sha256)}`)
+      .then(async (response) => readServedCatalog(entry, new Uint8Array(await response.arrayBuffer())));
+    held.catch(() => SERVED.delete(entry.catalog_sha256));
+    SERVED.set(entry.catalog_sha256, held);
+  }
+  return held;
 }

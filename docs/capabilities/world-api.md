@@ -43,6 +43,8 @@ and world generation are routes of their own contracts, listed with every other 
 | `POST /world/versions/{version_id}/arrangements/apply` | Add exactly the resolved objects as ordinary edits, or refuse with the reason |
 | `GET /world/arrangements` | The published arrangements, each with the key and version a preview or apply names it by |
 | `GET /world/assets` | The reviewed asset registry, with whether each asset's bytes are present |
+| `GET /workspace-assets` | The workspace's own admitted assets, what may be admitted, and the operations on each with their state ([workspace asset admission](../workspace-asset-admission.md)) |
+| `POST /workspace-assets` | Admit one static GLB the person declares the rights to; it is prepared before it may be placed |
 | `GET /world/assets/{asset_key}/bytes` | The reviewed GLB bytes |
 | `GET /world/behaviours` | The reviewed behaviours an object may be given, with each parameter's bounds |
 | `GET /world-entries` | The workspace's saved worlds, each naming the version and state it reopens at |
@@ -123,10 +125,13 @@ describes.
 
 ## Discovering what a world supports
 
-Two reads say what a caller can do, each from the checks the operations themselves make:
-`GET /worlds/capabilities` for making each kind of world, and
-`GET /world/versions/{version_id}/capabilities` for one version of one world. Neither writes or asks
-a model. Both describe each operation with the same descriptor:
+Three reads say what a caller can do, each from the checks the operations themselves make:
+`GET /worlds/capabilities` for making each kind of world,
+`GET /world/versions/{version_id}/capabilities` for one version of one world, and
+`GET /workspace-assets` for admitting a person's own asset and for each admitted asset's
+preparation, cancellation and withdrawal
+([workspace asset admission](../workspace-asset-admission.md#capabilities)). None writes or asks a
+model. All describe each operation with the same descriptor:
 
 | Field | Meaning |
 | --- | --- |
@@ -141,7 +146,7 @@ a model. Both describe each operation with the same descriptor:
 | `preview` | The operation that shows the effect without writing, and whether the write needs it |
 | `options` | The reads that list its choices, such as `GET /world/assets` or `GET /world/arrangements` |
 | `writes`, `spends` | Whether success records state, and whether it may call a model or commit the world to one |
-| `effects` | A later consequence this server may not produce: whether the world's people use what was placed (`society`), whether this host asks a chosen model (`decisions`), whether the world advances on its own once played (`playback`) |
+| `effects` | A later consequence this server may not produce: whether the world's people use what was placed (`society`), whether this host asks a chosen model (`decisions`), whether the world advances on its own once played (`playback`), whether an admitted asset is prepared on this installation (`preparation`) |
 
 Availability is not permission: an operation can be available and not permitted to this caller.
 Units are part of field names across the API (`_mm`, `_ms`, `_seconds`, `_usd`, `_microradians`,

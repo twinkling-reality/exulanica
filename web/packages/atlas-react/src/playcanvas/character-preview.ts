@@ -2,8 +2,8 @@ import * as pc from 'playcanvas';
 import { NativeCharacterActor } from './native-character-actor.js';
 import { NativeCharacterPool, type CharacterByteLoader } from './native-character-pool.js';
 import type { NativeCharacterAppearance, NativeCharacterDescriptor } from './native-character.js';
-import { CHARACTER_CATALOG } from './character/catalog-data.js';
 import { CharacterHost } from './character/host.js';
+import type { CharacterCatalog } from './character/catalog.js';
 import type { CharacterLook } from './character/look.js';
 import { LayeredCharacterRenderable } from './character/renderable.js';
 
@@ -52,7 +52,7 @@ export class CharacterPreview {
     load: CharacterByteLoader,
   ) {
     this.pool = new NativeCharacterPool(app, load);
-    CharacterHost.forApp(app, CHARACTER_CATALOG).setLoader(load);
+    CharacterHost.forApp(app).setLoader(load);
     this.stage = new pc.Entity('character-inspection-stage', app);
     app.root.addChild(this.stage);
     app.on('update', (dt: number) => this.walkStage(dt));
@@ -66,13 +66,13 @@ export class CharacterPreview {
    * at the clip's own speed so the gait is the one the world draws, and the stage slides back so
    * they stay framed.
    */
-  async showLook(look: CharacterLook): Promise<void> {
+  async showLook(look: CharacterLook, catalog: CharacterCatalog): Promise<void> {
     this.request?.abort();
     this.request = null;
     this.actor?.destroy();
     this.actor = null;
     this.person?.destroy();
-    const person = new LayeredCharacterRenderable(CharacterHost.forApp(this.app, CHARACTER_CATALOG), this.stage, INSPECTED, look, 'near');
+    const person = new LayeredCharacterRenderable(CharacterHost.forApp(this.app), this.stage, INSPECTED, look, 'near', catalog);
     this.person = person;
     person.setVisible(this.visible);
     this.restart = true;

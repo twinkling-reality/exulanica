@@ -104,6 +104,7 @@ CAPACITY_ROUTES: Final[Mapping[tuple[str, str], str]] = MappingProxyType(
         ("GET", "/readyz"): EXEMPT,
         ("GET", "/formation/{batch_id}"): STREAMS,
         ("POST", "/intake"): UPLOADS,
+        ("POST", "/workspace-assets"): UPLOADS,
     }
 )
 

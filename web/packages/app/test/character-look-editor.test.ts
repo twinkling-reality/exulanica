@@ -1,8 +1,10 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, vi } from 'vitest';
-import { CHARACTER_CATALOG, DESIGNED_LOOKS, designedLook, validateLook, type CharacterLook } from '@exulanica/atlas-react/playcanvas';
+import { designedLook, validateLook, type CharacterLook } from '@exulanica/atlas-react/playcanvas';
+import { CHARACTER_CATALOG, DESIGNED_LOOKS, SERVED_PEOPLE } from './served-people.js';
 import { buildLookEditor } from '../src/ui/character-look-editor.js';
-import { lookOverBase } from '../src/character-look.js';
+import { lookInCatalog, lookOverBase, sameLook } from '../src/character-look.js';
+import { editableChoice } from '../src/composition/character.js';
 
 function setup() {
   const onChange = vi.fn<(look: CharacterLook) => void>();
@@ -110,5 +112,41 @@ describe('catalog look editor', () => {
     shoes.click();
     expect((document.activeElement as HTMLElement).textContent).toBe(label);
     expect(document.activeElement?.closest('[data-control]')?.getAttribute('data-control')).toBe('shoes');
+  });
+});
+
+describe('a look saved over another revision of its catalog', () => {
+  // The next revision: one feminine hairstyle withdrawn and one hair colour added.
+  type Draft = { families: { bases: { baseId: string; parts: { partId: string }[] }[]; colours: Record<string, { key: string; label: string; rgb: string }[]> }[] };
+  const draft = structuredClone(CHARACTER_CATALOG) as unknown as Draft;
+  const feminineBase = draft.families[0]!.bases.find((base) => base.baseId === 'feminine')!;
+  feminineBase.parts = feminineBase.parts.filter((part) => part.partId !== 'feminine/hair/long01');
+  draft.families[0]!.colours['hairColour']!.push({ key: 'copper', label: 'Copper', rgb: '#9c5a2e' });
+  const catalog = draft as unknown as typeof CHARACTER_CATALOG;
+  const feminine = designedLook(DESIGNED_LOOKS, DESIGNED_LOOKS.defaults.bases['feminine']!);
+  const longHair: CharacterLook = { ...feminine, parts: { ...feminine.parts, hair: 'feminine/hair/long01' }, colours: { hairColour: 'auburn' } };
+
+  it('keeps every choice the revision still offers and takes the body default for the rest', () => {
+    const moved = lookInCatalog(catalog, DESIGNED_LOOKS, longHair);
+    expect(moved.parts['hair']).toBe(feminine.parts['hair']);
+    expect({ ...moved, parts: { ...moved.parts, hair: null } }).toEqual({ ...longHair, parts: { ...longHair.parts, hair: null } });
+    expect(() => validateLook(catalog, moved)).not.toThrow();
+    expect(() => validateLook(catalog, longHair)).toThrow(/long01/);
+  });
+
+  it('is the same look when the revision still offers all of it, and the player default for a family it lacks', () => {
+    const offered = { ...longHair, parts: { ...longHair.parts, hair: 'feminine/hair/braid01' }, colours: { hairColour: 'copper' } };
+    expect(lookInCatalog(catalog, DESIGNED_LOOKS, offered)).toEqual(offered);
+    expect(lookInCatalog(catalog, DESIGNED_LOOKS, { ...offered, familyId: 'another-people/v1' }))
+      .toEqual(designedLook(DESIGNED_LOOKS, DESIGNED_LOOKS.defaults.player));
+  });
+
+  it('opens in the studio as that look, and says when it is not the look the world wears', () => {
+    const served = { ...SERVED_PEOPLE, catalog };
+    const opened = editableChoice(served, { kind: 'catalog', look: longHair });
+    expect(opened.moved).toBe(true);
+    expect(opened.choice.kind === 'catalog' && sameLook(opened.choice.look, lookInCatalog(catalog, DESIGNED_LOOKS, longHair))).toBe(true);
+    expect(editableChoice(served, { kind: 'catalog', look: feminine })).toEqual({ choice: { kind: 'catalog', look: feminine }, moved: false });
+    expect(editableChoice(served, { kind: 'abstract' })).toEqual({ choice: { kind: 'abstract' }, moved: false });
   });
 });

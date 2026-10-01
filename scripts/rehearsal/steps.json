@@ -1457,7 +1457,7 @@
     {
       "id": "restore-judge-seed-into-a-fresh-stack",
       "session": "judge-seed",
-      "action": "Create a fresh database on the run's server and an empty data directory, migrate it (exulanica-db), provision the judge role and restore the seed into it (exulanica-seed role, restore), then read each town's tiles and the sealed signal choice back from them.",
+      "action": "Create a fresh database on the run's server and an empty data directory, migrate it (exulanica-db), provision the judge role and restore the seed into it (exulanica-seed role, restore), publish the character catalogs into it as the judge stack's catalogs job does (a seed carries none), then read each town's tiles and the sealed signal choice back from them.",
       "gates": ["delivery:Release rehearsal"],
       "gates_reason": "A judge's stack is brought up from the seed with no worker; the towns in it must draw from what the seed carried.",
       "requires": ["export-judge-seed"],
@@ -1472,7 +1472,7 @@
       "owner_area": "the judge seed: exulanica/orchestration/judge_seed.py and exulanica/orchestration/judge_seed_cli.py; deploy/judge/compose.yaml",
       "expect": {
         "api": [
-          {"id": "restored-and-verified", "says": "exulanica-db, exulanica-seed role and exulanica-seed restore each exit 0 on the fresh database, the restore having verified the rows and bytes that landed against the manifest."},
+          {"id": "restored-and-verified", "says": "exulanica-db, exulanica-seed role, exulanica-seed restore and the character catalog publication each exit 0 on the fresh database, the restore having verified the rows and bytes that landed against the manifest."},
           {"id": "towns-drawn-from-the-seed", "says": "Every tile of every generated world of the restored workspace reads baked, and its container is in the restored tile store and hashes to the digest its bake records."},
           {"id": "signal-choice-restored", "says": "The restored workspace holds the same activated model-controlled traffic-light choice and sealed segment, with accepted decision receipts and provider cost accounted as known cost or a conservative bound when a call's cost is unknown."}
         ]

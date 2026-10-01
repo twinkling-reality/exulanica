@@ -9,6 +9,7 @@ import { farAppearance, postureSeatMetres } from '../src/playcanvas/character/fa
 import { inhabitantLookOf } from '../src/playcanvas/character/inhabitant.js';
 import { SEAT_APPROACH_METRES, placeDrawing, type KindUse, type SeatingLayout } from '../src/playcanvas/society/seating.js';
 import type { CrowdPose, CrowdRenderableFactory, OwnedSocietyState } from '../src/playcanvas/society/types.js';
+import { serveFixturePeople } from './served-people.js';
 
 /*
  * People at the objects they use: seated on the seat their place has, at the seat's height and
@@ -83,6 +84,7 @@ function setup(drawsSeats: boolean, nearLimit?: number) {
   options.graphicsDevice = device;
   options.componentSystems = [pc.RenderComponentSystem];
   app.init(options);
+  serveFixturePeople(app);
   const root = new pc.Entity('society');
   app.root.addChild(root);
   const poses = new Map<string, CrowdPose[]>();
@@ -116,7 +118,7 @@ const last = (poses: Map<string, CrowdPose[]>, id: string) => poses.get(id)!.at(
 function benchSeat() {
   const found = placeDrawing(LAYOUT, 'target:0', STATE.inhabitants[0]!.position_mm);
   if (found.kind !== 'place' || found.drawing.seat === null) throw new Error('the bench place has no seat');
-  const appearance = farAppearance(CHARACTER_CATALOG, inhabitantLookOf('resting'));
+  const appearance = farAppearance(CHARACTER_CATALOG, inhabitantLookOf(CHARACTER_CATALOG, 'resting'));
   const lift = found.drawing.seat.position[1] - postureSeatMetres(appearance, 'perched');
   return { seat: found.drawing.seat, lift };
 }
@@ -325,6 +327,7 @@ describe('a person using an object', () => {
     options.graphicsDevice = device;
     options.componentSystems = [pc.RenderComponentSystem];
     app.init(options);
+  serveFixturePeople(app);
     const root = new pc.Entity('society');
     app.root.addChild(root);
     const crowd = new SocietyCrowd(device, root, { nearLimit: 0 });

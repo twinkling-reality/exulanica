@@ -10,6 +10,7 @@ import { lookSha256 } from '../src/playcanvas/character/look.js';
 import { CHARACTER_RENDERABLE_TAG, type LayeredCharacterRenderable } from '../src/playcanvas/character/renderable.js';
 import { SocietyCrowd } from '../src/playcanvas/society/crowd.js';
 import type { OwnedSocietyState } from '../src/playcanvas/society/types.js';
+import { serveFixturePeople } from './served-people.js';
 
 /*
  * The people a saved world draws are catalog people: the same person, near or far, as the look
@@ -23,7 +24,7 @@ async function savedWorld(): Promise<AtlasBinding> {
   const canvas = document.createElement('canvas');
   const overlay = document.createElement('div');
   document.body.append(canvas, overlay);
-  return AtlasBinding.create({
+  const atlas = await AtlasBinding.create({
     canvas,
     overlayParent: overlay,
     deviceTypes: ['null'],
@@ -36,6 +37,9 @@ async function savedWorld(): Promise<AtlasBinding> {
       spawn: { xMm: 0, yMm: 0, zMm: 4000, yawMicroradians: 0 },
     },
   } as never);
+  // The app serves its people catalog before a society arrives, as composition/character.ts does.
+  serveFixturePeople(atlas.app);
+  return atlas;
 }
 
 const society = (ids: readonly string[], at: (i: number) => readonly [number, number]): OwnedSocietyState => ({
@@ -59,7 +63,7 @@ describe('people in a saved world', () => {
       const root = region.findByName(`synthetic:${id}`) as pc.Entity;
       expect(root.tags.has(CHARACTER_RENDERABLE_TAG), id).toBe(true);
       // The drawn person is named by the digest of the look the inhabitant's id draws.
-      expect(crowd.inhabitantRepresentation(id)?.representationId).toBe(`look:${lookSha256(inhabitantLookOf(id))}`);
+      expect(crowd.inhabitantRepresentation(id)?.representationId).toBe(`look:${lookSha256(inhabitantLookOf(CHARACTER_CATALOG, id))}`);
       // With no byte loader registered yet, the person shows the far form of that same look.
       const far = root.findByName('character-far') as pc.Entity;
       expect(far.enabled).toBe(true);
@@ -77,6 +81,7 @@ describe('the far form of an inhabitant', () => {
     options.graphicsDevice = device;
     options.componentSystems = [pc.RenderComponentSystem];
     app.init(options);
+    serveFixturePeople(app);
     const root = new pc.Entity('society', app);
     app.root.addChild(root);
     const crowd = new SocietyCrowd(device, root, { nearLimit: 0 });
@@ -85,7 +90,7 @@ describe('the far form of an inhabitant', () => {
     const figures = root.findByName('society-far-figures')!;
     for (const id of ids) {
       const renderable = inhabitantRenderable(device, root, { societyId: 'society', branchId: 'branch', inhabitantId: id }, 'far') as LayeredCharacterRenderable;
-      const expected = farAppearance(CHARACTER_CATALOG, inhabitantLookOf(id));
+      const expected = farAppearance(CHARACTER_CATALOG, inhabitantLookOf(CHARACTER_CATALOG, id));
       expect(renderable.farAppearance, id).toEqual(expected);
       expect(crowd.farAppearance(id), id).toEqual(expected);
       const figure = figures.children[ids.indexOf(id)]!.findByName('character-far-body') as pc.Entity;

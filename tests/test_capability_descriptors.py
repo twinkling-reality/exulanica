@@ -20,7 +20,6 @@ from exulanica.api import capabilities
 from exulanica.api.permissions import ROUTE_RULES, Permission, Requires
 from exulanica.api.role_hosts import ROLE_HOSTS, choice_status
 from exulanica.api.routes import capabilities as reads
-from exulanica.api.routes import signal_comparisons as signal_reads
 from exulanica.api.routes.society_models import CHOICE_CONFLICTS
 from exulanica.api.routes.world_models import choose_world_model
 from exulanica.api.routes.world_objects import add_authored_object
@@ -123,8 +122,8 @@ def _no_roads(monkeypatch):
     def refused(*_args: Any) -> None:
         raise TrafficRefused("roads_not_stated", "no records in a test without a database")
 
-    monkeypatch.setattr(reads, "saved_world_roads", refused)
-    monkeypatch.setattr(signal_reads, "saved_world_roads", refused)
+    # Every adapter takes the roads from the one read each version's context makes.
+    monkeypatch.setattr(capabilities, "saved_world_roads", refused)
 
 
 def _operations(context: capabilities.VersionContext) -> list[capabilities.Operation]:

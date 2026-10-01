@@ -14,6 +14,7 @@ import type {
   CrowdRenderableFactory,
   OwnedSocietyState,
 } from '../src/playcanvas/society/types.js';
+import { serveFixturePeople } from './served-people.js';
 
 function setup(factory?: CrowdRenderableFactory, nearLimit?: number, poseInterval?: PoseInterval) {
   const canvas = document.createElement('canvas');
@@ -23,6 +24,7 @@ function setup(factory?: CrowdRenderableFactory, nearLimit?: number, poseInterva
   options.graphicsDevice = device;
   options.componentSystems = [pc.RenderComponentSystem];
   app.init(options);
+  serveFixturePeople(app);
   const root = new pc.Entity('society');
   app.root.addChild(root);
   const crowd = new SocietyCrowd(device, root, {
@@ -308,7 +310,7 @@ describe('society crowd', () => {
     }));
     // A 5x1 RGBA palette per distinct far colouring.
     const palettes = (ids: readonly string[]) => new Set(ids.map((id) => {
-      const palette = farAppearance(CHARACTER_CATALOG, inhabitantLookOf(id)).palette;
+      const palette = farAppearance(CHARACTER_CATALOG, inhabitantLookOf(CHARACTER_CATALOG, id)).palette;
       return FAR_REGIONS.map((region) => palette[region]).join('');
     })).size * FAR_REGIONS.length * 4;
     const shared = vi.spyOn(CharacterHost, 'residentFor');
@@ -358,7 +360,7 @@ describe('society crowd', () => {
     expect(figures).toHaveLength(64);
     for (const [i, figure] of figures.entries()) {
       const id = `synthetic-${i}`;
-      const expected = farAppearance(CHARACTER_CATALOG, inhabitantLookOf(id));
+      const expected = farAppearance(CHARACTER_CATALOG, inhabitantLookOf(CHARACTER_CATALOG, id));
       expect(crowd.farAppearance(id)).toEqual(expected);
       // Each figure is drawn by its own palette material and stands where the person stands.
       const body = figure.findByName('character-far-body') as pc.Entity;

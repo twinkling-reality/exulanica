@@ -180,6 +180,10 @@ INSTANCE_TABLES: Final[Mapping[str, str]] = {
     "spending_grant_revocation": "per-deployment spending grant revocation",
     "spending_reservation": "per-deployment spending reservation and settlement",
     "spending_event": "per-deployment spending ledger",
+    # The host publishes its character catalogs; a destination publishes its own, and a saved look
+    # it cannot resolve there reads as unavailable rather than borrowing the source's catalog.
+    "character_catalog_publication": "host-admin character catalog publication, per deployment",
+    "character_catalog_withdrawal": "host-admin character catalog withdrawal, per deployment",
 }
 
 #: Tables with no ``workspace_id`` that nevertheless hold this workspace's rows, with the exact
@@ -820,6 +824,33 @@ def _refuse_private_bakes(connection: psycopg.Connection, workspace_id: uuid.UUI
         )
 
 
+def _refuse_private_workspace_assets(
+    connection: psycopg.Connection, workspace_id: uuid.UUID
+) -> None:
+    """A workspace holding its own admitted assets cannot be seeded.
+
+    An admission is used in its own workspace's worlds and nowhere else (migration 0126), and its
+    bytes live in that workspace's own namespace, outside the content store a seed copies from.
+    Their rows alone would restore as assets whose bytes are missing, so the export refuses, as it
+    does for a private material bake.
+    """
+    present = connection.execute(
+        "select to_regclass('workspace_asset_blob') is not null as present"
+    )
+    if not present.fetchone()["present"]:
+        return
+    held = connection.execute(
+        "select count(*) as n from workspace_asset_blob "
+        "where workspace_id = %s and purged_at is null",
+        (workspace_id,),
+    ).fetchone()
+    if held["n"]:
+        raise SeedRefused(
+            f"workspace {workspace_id} holds {held['n']} workspace asset object(s), which are "
+            "used only in that workspace's worlds and never leave it; a seed cannot carry them"
+        )
+
+
 def export_seed(
     connection: psycopg.Connection,
     store: ContentAddressedStore,
@@ -853,6 +884,7 @@ def export_seed(
     if (destination / "manifest.json").exists():
         raise SeedRefused(f"{destination} already holds a seed archive; write to a new directory")
     _refuse_private_bakes(connection, workspace_id)
+    _refuse_private_workspace_assets(connection, workspace_id)
 
     buckets = classify_tables(connection)
     exported = list(buckets["workspace"]) + list(buckets["reached"])

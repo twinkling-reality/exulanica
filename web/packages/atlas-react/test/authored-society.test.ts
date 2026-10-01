@@ -5,6 +5,7 @@ import * as pc from 'playcanvas';
 import { islandId } from '@exulanica/atlas-core';
 import { AtlasBinding } from '../src/playcanvas/atlas-binding.js';
 import type { OwnedSocietyState } from '../src/playcanvas/society/types.js';
+import { serveFixturePeople } from './served-people.js';
 
 /*
  * A saved world's inhabitants are drawn by the same crowd the owned district draws, hung from the
@@ -18,7 +19,7 @@ async function binding(world: 'district' | 'saved'): Promise<AtlasBinding> {
   const canvas = document.createElement('canvas');
   const overlay = document.createElement('div');
   document.body.append(canvas, overlay);
-  return AtlasBinding.create({
+  const atlas = await AtlasBinding.create({
     canvas,
     overlayParent: overlay,
     deviceTypes: ['null'],
@@ -45,6 +46,9 @@ async function binding(world: 'district' | 'saved'): Promise<AtlasBinding> {
           },
         }),
   } as never);
+  // The app serves its people catalog before a society arrives (composition/character.ts).
+  serveFixturePeople(atlas.app);
+  return atlas;
 }
 
 /** Every native frame the binding sends, as the inhabitant identities in each call. */

@@ -26,6 +26,7 @@ export {
   stubTileMount,
   type WorldKind,
 } from './world-kinds.js';
+import { serveFixturePeople } from '../served-people.js';
 
 /**
  * The committed `.opm` pin, decoded. Read relative to web/, where the suite runs: under
@@ -62,6 +63,8 @@ export async function buildBinding(
     ...worldOptions(kind),
     ...extra,
   } as AtlasBindingOptions);
+  // The app serves the host's people catalog to every world it opens (composition/character.ts).
+  serveFixturePeople(binding.app);
   return { binding, canvas, overlay };
 }
 

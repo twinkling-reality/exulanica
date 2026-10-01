@@ -8,6 +8,7 @@ import { activityPosture, seatPosture } from '../src/playcanvas/character/catalo
 import { CharacterHost } from '../src/playcanvas/character/host.js';
 import { inhabitantRenderable } from '../src/playcanvas/character/inhabitant.js';
 import type { LayeredCharacterRenderable } from '../src/playcanvas/character/renderable.js';
+import { serveFixturePeople } from './served-people.js';
 
 /*
  * A person drawn at a seat takes the family's seat posture for the activity, and a full person's
@@ -25,6 +26,7 @@ function application() {
   options.componentSystems = [pc.RenderComponentSystem, pc.AnimComponentSystem];
   options.resourceHandlers = [pc.ContainerHandler, pc.AnimClipHandler, pc.AnimStateGraphHandler];
   app.init(options);
+  serveFixturePeople(app);
   const parent = new pc.Entity('people', app);
   app.root.addChild(parent);
   return { app, device, parent };
@@ -47,7 +49,7 @@ describe('a person at a seat', () => {
   it('sits a full person on the seat with the feet planted on the ground', async () => {
     vi.stubGlobal('createImageBitmap', async () => ({ width: 4, height: 4, close: () => undefined }));
     const { app, device, parent } = application();
-    CharacterHost.forApp(app, CHARACTER_CATALOG).setLoader(async (asset) => {
+    CharacterHost.forApp(app).setLoader(async (asset) => {
       const bytes = readFileSync(resolve('../assets/characters', asset.file));
       return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
     });
@@ -79,7 +81,7 @@ describe('a person at a seat', () => {
   it('snaps into the seat posture under reduced motion and plants the feet while rising', async () => {
     vi.stubGlobal('createImageBitmap', async () => ({ width: 4, height: 4, close: () => undefined }));
     const { app, device, parent } = application();
-    CharacterHost.forApp(app, CHARACTER_CATALOG).setLoader(async (asset) => {
+    CharacterHost.forApp(app).setLoader(async (asset) => {
       const bytes = readFileSync(resolve('../assets/characters', asset.file));
       return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
     });
@@ -107,7 +109,7 @@ describe('a person at a seat', () => {
   it('goes from sitting on the ground to sitting on a seat when a seat is found for them', async () => {
     vi.stubGlobal('createImageBitmap', async () => ({ width: 4, height: 4, close: () => undefined }));
     const { app, device, parent } = application();
-    CharacterHost.forApp(app, CHARACTER_CATALOG).setLoader(async (asset) => {
+    CharacterHost.forApp(app).setLoader(async (asset) => {
       const bytes = readFileSync(resolve('../assets/characters', asset.file));
       return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
     });
@@ -128,7 +130,7 @@ describe('a person at a seat', () => {
   it('asks for a missing container once, but asks again after a failure that may pass or a new loader', async () => {
     const { app } = application();
     let asked = 0;
-    const host = CharacterHost.forApp(app, CHARACTER_CATALOG);
+    const host = CharacterHost.forApp(app);
     const base = family.bases[0]!.asset;
     const acquire = () => host.acquire(base, new AbortController().signal, true);
     const failing = (status: number) => async () => {

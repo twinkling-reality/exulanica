@@ -445,7 +445,8 @@ _ADMISSION_READS: Final = _every(
     "GET /personal-admission",
 )
 
-#: Personal, reconstruction and environment source admission.
+#: Personal, reconstruction and environment source admission, and a workspace's own assets:
+#: admitting one, asking for or stopping its preparation, and withdrawing it.
 _ADMISSION_WRITES: Final = _every(
     _requires(_P.ADMISSION_WRITE),
     "POST /environment-resources/assets",
@@ -455,6 +456,10 @@ _ADMISSION_WRITES: Final = _every(
     "POST /operations/reconstruction-admission",
     "POST /personal-admission",
     "POST /personal-admission/model-rights/{right_id}/withdraw",
+    "POST /workspace-assets",
+    "POST /workspace-assets/{asset_id}/preparation",
+    "POST /workspace-assets/{asset_id}/preparation/cancel",
+    "POST /workspace-assets/{asset_id}/withdraw",
 )
 
 #: Derivative and reconstruction job status, and what the workspace may still spend on hosted
@@ -489,6 +494,9 @@ _WORLD_READS: Final = _every(
     "GET /materials/recipes/{recipe_id}/bake/bytes",
     "POST /selection/actions/outcome",
     "POST /selection/actions/prepare",
+    "GET /workspace-assets",
+    "GET /workspace-assets/{asset_id}",
+    "GET /workspace-assets/{asset_id}/prepared/bytes",
     "GET /world-entries",
     "GET /world-entries/candidates",
     "GET /world-entries/{entry_id}",
@@ -500,6 +508,8 @@ _WORLD_READS: Final = _every(
     "GET /world/assets/{asset_key}/bytes",
     "GET /world/assets/{asset_key}/licence",
     "GET /world/behaviours",
+    "GET /world/character-catalogs",
+    "GET /world/character-catalogs/{catalog_sha256}",
     "GET /world/interactions/catalog",
     "GET /world/interactions/current",
     "GET /world/interactions/proposals/{proposal_id}",

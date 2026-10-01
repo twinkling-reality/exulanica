@@ -68,6 +68,7 @@ from exulanica.api.routes.society import (
 )
 from exulanica.api.routes.society_actions import record_action
 from exulanica.api.routes.society_control import configure_control, manual_step, read_control
+from exulanica.api.routes.workspace_assets import list_workspace_assets
 from exulanica.api.routes.world_arrangements import (
     arrangement_apply_route,
     arrangement_catalog_route,
@@ -124,7 +125,6 @@ from exulanica.world.society_grounds import (
     society_ground_for_composer,
 )
 from exulanica.world.traffic_episodes import TrafficRefused
-from exulanica.world.traffic_host import saved_world_roads
 from exulanica.world.worlds import (
     AUTHORED_STARTER,
     GENERATED,
@@ -396,6 +396,9 @@ def _composition_operations(context: VersionContext) -> list[Operation]:
     state = unavailable(SOURCE_INVALIDATED) if context.source.invalidated else AVAILABLE
     base = _version_base()
     reach = _society_reach(context)
+    # The reviewed catalog and the workspace's own admitted assets are the sources an object
+    # composition names (source kinds reviewed_asset and workspace_asset).
+    sources = (reviewed_asset_catalog, list_workspace_assets)
     return [
         Operation(
             composition_preview_route,
@@ -403,7 +406,7 @@ def _composition_operations(context: VersionContext) -> list[Operation]:
             "version",
             context.bind,
             base=base,
-            options=(reviewed_asset_catalog,),
+            options=sources,
             writes=False,
         ),
         Operation(
@@ -413,7 +416,7 @@ def _composition_operations(context: VersionContext) -> list[Operation]:
             context.bind,
             base=base,
             preview=Preview(composition_preview_route, required=False),
-            options=(reviewed_asset_catalog,),
+            options=sources,
             effects=reach,
         ),
         Operation(
@@ -565,12 +568,7 @@ def _role_operations(context: VersionContext) -> list[Operation]:
 def _traffic_operations(context: VersionContext) -> list[Operation]:
     # The roads the traffic read reads, refused by the codes that read answers them with.
     try:
-        saved_world_roads(
-            context.connection,
-            context.session.workspace_id,
-            context.world_id,
-            context.source.snapshot_id,
-        )
+        context.roads()
         state = AVAILABLE
     except TrafficRefused as exc:
         state = unavailable(exc.code)

@@ -7,6 +7,10 @@ and include this router. Source authorization is host-owned and mandatory.
 Every operation names the world its version belongs to (``world_id``, required). A workspace
 holds several worlds, a saved starter world among them, and appearance history is kept per world
 version, so a caller that left the world out would read or write another world's history.
+
+The character catalogs the host publishes are read here too (``/world/character-catalogs``), with
+no world: every workspace is served the same publications, and a publication is addressed by the
+SHA-256 of its canonical document, so its bytes are the proof of what was read.
 """
 
 from __future__ import annotations
@@ -17,13 +21,19 @@ from dataclasses import dataclass
 from typing import Annotated, Any, Literal
 
 import psycopg
-from fastapi import APIRouter, Query, Request
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, Path, Query, Request
+from fastapi.responses import JSONResponse, Response
 from pydantic import Field, StrictInt
 
 from exulanica.api.capabilities import AVAILABLE, Base, Operation, VersionContext, unavailable
-from exulanica.api.dependencies import CurrentSession, ScopedConnection, get_services
+from exulanica.api.dependencies import (
+    CurrentSession,
+    ReadOnlyConnection,
+    ScopedConnection,
+    get_services,
+)
 from exulanica.api.world_scope import WorldId
+from exulanica.canonical import canonical_json
 from exulanica.selection.validation import Session
 from exulanica.store.base import ContentAddressedStore
 from exulanica.world.character_appearance import (
@@ -34,7 +44,11 @@ from exulanica.world.character_appearance import (
     Record,
     StaleAppearance,
 )
-from exulanica.world.character_appearance_repository import CharacterAppearanceRepository
+from exulanica.world.character_appearance_repository import (
+    CharacterAppearanceRepository,
+    CharacterPreparations,
+)
+from exulanica.world.character_catalogs import CatalogRegistry
 from exulanica.world.errors import UnknownWorldResource
 from exulanica.world.society import UnavailableSocietyInput
 
@@ -46,6 +60,11 @@ class CharacterAppearanceRuntime:
     store: ContentAddressedStore | None = None
     #: The character catalog that catalog-derived families compose their looks from.
     catalog: Mapping[str, Any] | None = None
+    #: The catalogs this host publishes (migration 0131). Families they derive are served while a
+    #: publication that derives them is not withdrawn.
+    catalogs: CatalogRegistry | None = None
+    #: The workspace's prepared bodies, read through the preparation queue.
+    preparations: Callable[[psycopg.Connection, Session], CharacterPreparations] | None = None
 
 
 class SaveBody(Record):
@@ -83,6 +102,10 @@ def _repo(
         store=runtime.store,
         catalog=runtime.catalog,
         world_id=world_id,
+        served=None if runtime.catalogs is None else runtime.catalogs.served(connection),
+        preparations=None
+        if runtime.preparations is None
+        else runtime.preparations(connection, session),
     )
 
 
@@ -254,12 +277,18 @@ def families(
 def capability_operations(context: VersionContext) -> list[Operation]:
     """Saving and resetting a character's appearance, as a world's capability read lists them.
 
-    Unavailable, as every appearance route answers, where this host configured no character
-    runtime (``appearance_unavailable``). A subject's own dependencies are decided when one is
-    named; the families read lists what a look may be made from.
+    Unavailable, as every appearance write answers (``appearance_unavailable``), where this host
+    configured no character runtime or serves no family a look may be made from: a family the
+    host registered itself, or one a served catalog publication derives. A subject's own
+    dependencies are decided when one is named; the families read lists what a look may be made
+    from, and the catalog reads what those families draw with.
     """
-    configured = getattr(context.services, "character_appearance", None) is not None
-    state = AVAILABLE if configured else unavailable("appearance_unavailable")
+    runtime = getattr(context.services, "character_appearance", None)
+    state = (
+        AVAILABLE
+        if runtime is not None and _serves_a_family(runtime, context.connection)
+        else unavailable("appearance_unavailable")
+    )
     base = (Base("base_revision", read, "revision"),)
     return [
         Operation(
@@ -268,7 +297,7 @@ def capability_operations(context: VersionContext) -> list[Operation]:
             subject="character",
             bind=context.bind,
             base=base,
-            options=(families,),
+            options=(families, character_catalogs),
         ),
         Operation(
             endpoint=reset,
@@ -279,3 +308,69 @@ def capability_operations(context: VersionContext) -> list[Operation]:
             options=(history,),
         ),
     ]
+
+
+def _serves_a_family(runtime: object, connection: psycopg.Connection) -> bool:
+    """Whether a look can be made here at all: a registered family or a served publication."""
+    if getattr(runtime, "families", ()):
+        return True
+    catalogs = getattr(runtime, "catalogs", None)
+    return catalogs is not None and bool(catalogs.served(connection).families)
+
+
+_CATALOG_HEADERS = {"Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff"}
+
+
+def _problem(status: int, code: str, detail: str) -> JSONResponse:
+    return JSONResponse(
+        status_code=status, content={"code": code, "detail": detail}, headers=_CATALOG_HEADERS
+    )
+
+
+@router.get(
+    "/character-catalogs",
+    summary="The character catalogs this host serves: each publication's identity and state.",
+)
+def character_catalogs(connection: ReadOnlyConnection, request: Request) -> Any:
+    from fastapi.encoders import jsonable_encoder
+
+    runtime = getattr(get_services(request), "character_appearance", None)
+    if runtime is None or runtime.catalogs is None:
+        return _problem(424, "appearance_unavailable", "no character catalogs are served here")
+    served = runtime.catalogs.served(connection)
+    return JSONResponse(
+        content=jsonable_encoder(
+            {"profile": "exulanica.character-catalog-list/v1", "publications": served.listing()}
+        ),
+        headers=_CATALOG_HEADERS,
+    )
+
+
+@router.get(
+    "/character-catalogs/{catalog_sha256}",
+    summary="One published character catalog, as the canonical document its digest names.",
+    responses={200: {"content": {"application/json": {}}}},
+)
+def character_catalog(
+    catalog_sha256: Annotated[str, Path(pattern=r"^[0-9a-f]{64}$")],
+    connection: ReadOnlyConnection,
+    request: Request,
+) -> Any:
+    runtime = getattr(get_services(request), "character_appearance", None)
+    if runtime is None or runtime.catalogs is None:
+        return _problem(424, "appearance_unavailable", "no character catalogs are served here")
+    publication, withdrawn = runtime.catalogs.document(connection, catalog_sha256)
+    if publication is None and not withdrawn:
+        return _problem(404, "unknown_reference", "no such character catalog")
+    if withdrawn:
+        return _problem(410, "withdrawn", "this character catalog was withdrawn")
+    # The digest names these exact bytes, so the address never names other ones: immutable.
+    return Response(
+        content=canonical_json(publication.document),
+        media_type="application/json",
+        headers={
+            "ETag": f'"{catalog_sha256}"',
+            "Cache-Control": "private, max-age=31536000, immutable",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )

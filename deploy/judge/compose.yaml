@@ -1,4 +1,4 @@
-# The judge deployment: five services, read-mostly, seeded from an archive.
+# The judge deployment: six services, read-mostly, seeded from an archive.
 #
 # Standalone rather than an override of the repository's `compose.yaml`, and the reason is not
 # style. That file's worker services declare `${EXULANICA_CODE_REVISION:?}` and
@@ -88,6 +88,29 @@ services:
       migrate:
         condition: service_completed_successfully
 
+  # Publishes the character catalogs the image carries: the people every world draws and the
+  # parametric family a person may wear (migration 0131). A seed carries no publication, because
+  # each deployment publishes its own, so this runs after `seed` and before `api`, and stack.sh runs
+  # it again on every later start: an identical catalog is answered `unchanged`, and a newer image
+  # serves its newer catalog without a reseed. Without it nobody is drawn and /readyz says so.
+  catalogs:
+    image: exulanica-judge-backend
+    build: *backend
+    command: ["exulanica-character-catalog", "publish", "--apply"]
+    environment:
+      # The owner: publication is host administration, and every runtime role may only read it.
+      EXULANICA_DATABASE_URL: postgresql://${POSTGRES_USER:-exulanica}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-exulanica}
+      EXULANICA_DATA_DIR: /var/lib/exulanica
+    volumes:
+      - media:/var/lib/exulanica
+    depends_on:
+      # Its own wait for the database, because a later start names it with --no-deps, which drops
+      # the dependency on `seed` and with it the chain that reached `postgres`.
+      postgres:
+        condition: service_healthy
+      seed:
+        condition: service_completed_successfully
+
   api:
     image: exulanica-judge-backend
     build: *backend
@@ -124,6 +147,8 @@ services:
       - "8000"
     depends_on:
       seed:
+        condition: service_completed_successfully
+      catalogs:
         condition: service_completed_successfully
 
   # The browser client, and the only port published. It serves the built bundle at the origin

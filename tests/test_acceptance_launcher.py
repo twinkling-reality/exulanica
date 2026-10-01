@@ -242,6 +242,52 @@ def test_restart_rebuilds_every_grant_the_run_started_with_by_token_file(tmp_pat
     assert grants["token-read"]["permissions"] == list(LAUNCH.READ_ONLY_PERMISSIONS)
 
 
+def test_the_peer_token_is_a_second_actor_in_the_first_workspace_and_survives_restart(tmp_path):
+    state = _recorded_run(tmp_path / "run")
+    (tmp_path / "run" / LAUNCH.PEER_TOKEN_NAME).write_text("peer-token")
+    state["peer_token"] = {
+        "token_file": str(tmp_path / "run" / LAUNCH.PEER_TOKEN_NAME),
+        "workspace_id": "w1",
+        "actor": "p1",
+        "permissions": list(LAUNCH.PERMISSIONS),
+    }
+
+    grants = LAUNCH.recorded_grants(state, tmp_path / "run")
+
+    assert grants[LAUNCH.PEER_TOKEN_NAME]["workspace_id"] == grants["token"]["workspace_id"]
+    assert grants[LAUNCH.PEER_TOKEN_NAME]["actor"] != grants["token"]["actor"]
+    assert grants[LAUNCH.PEER_TOKEN_NAME]["permissions"] == grants["token"]["permissions"]
+
+
+def test_the_peer_token_and_second_api_are_off_by_default_and_parse_when_asked():
+    parser = LAUNCH.build_parser()
+    plain = parser.parse_args(["up", "--worktree", "w"])
+    asked = parser.parse_args(["up", "--worktree", "w", "--peer-token", "--second-api"])
+
+    assert (plain.peer_token, plain.second_api) == (False, False)
+    assert (asked.peer_token, asked.second_api) == (True, True)
+    assert parser.parse_args(["restart-api", "--worktree", "w"]).api == "primary"
+    assert parser.parse_args(["restart-api", "--worktree", "w", "--api", "second"]).api == "second"
+    with pytest.raises(SystemExit), redirect_stderr(io.StringIO()):
+        parser.parse_args(["restart-api", "--worktree", "w", "--api", "third"])
+
+
+def test_restarting_a_second_api_the_run_never_started_is_refused(tmp_path, temporary):
+    worktree = _checkout(tmp_path / "checkout")
+    state_file = LAUNCH.state_dir(worktree) / "state.json"
+    state_file.parent.mkdir(parents=True)
+    run_dir = tmp_path / "run"
+    state = _recorded_run(run_dir)
+    run_dir.joinpath("logs").mkdir()
+    state.update({"run_dir": str(run_dir), "pids": {"api": 1}, "data_dir": str(run_dir)})
+    state_file.write_text(json.dumps(state))
+    arguments = LAUNCH.build_parser().parse_args(
+        ["restart-api", "--worktree", str(worktree), "--api", "second"]
+    )
+
+    assert _refusal(LAUNCH.restart_api, arguments) == "no-second-api"
+
+
 def test_a_plain_run_restarts_with_its_one_grant(tmp_path):
     grants = LAUNCH.recorded_grants(_recorded_run(tmp_path / "run"), tmp_path / "run")
     assert list(grants) == ["token"]
@@ -707,3 +753,30 @@ def test_the_launcher_states_nothing_that_belongs_to_one_machine():
         "RECORD_EXCERPT_CHARACTERS",
         "LOG_TAIL_CHARACTERS",
     }
+
+
+def test_a_run_publishes_the_character_catalogs_before_its_api_starts(tmp_path):
+    """People are drawn only from published catalogs, so a run publishes as a deployment must:
+    the owner connection, the run's own data directory, nothing inherited, before the API."""
+    import inspect
+
+    launch = _load()
+    assert launch.publication_command(Path("/w/.venv/bin/python")) == [
+        "/w/.venv/bin/python",
+        "-m",
+        "exulanica.world.character_catalog_publication",
+        "publish",
+        "--apply",
+    ]
+    owner = "postgresql://owner@127.0.0.1:1/exulanica"
+    environment = launch.publication_environment(
+        owner,
+        tmp_path / "data",
+        {"PATH": "/usr/bin", "EXULANICA_STORE_KIND": "object", "EXULANICA_DATABASE_URL": "x"},
+    )
+    assert environment["EXULANICA_DATABASE_URL"] == owner
+    assert environment["EXULANICA_DATA_DIR"] == str(tmp_path / "data")
+    assert "EXULANICA_STORE_KIND" not in environment
+    assert environment["PATH"] == "/usr/bin"
+    source = inspect.getsource(launch.up)
+    assert source.index("publication_command(") < source.index("api_command(")

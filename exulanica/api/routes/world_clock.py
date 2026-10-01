@@ -53,7 +53,7 @@ from exulanica.world.errors import InvalidStructuralData
 from exulanica.world.generated_worlds import unreadable_reason
 from exulanica.world.society_controls import utc
 from exulanica.world.society_repository import SocietyRepository
-from exulanica.world.traffic_episodes import TrafficRefused
+from exulanica.world.traffic_episodes import TrafficInput, TrafficRefused
 from exulanica.world.traffic_host import saved_world_roads
 from exulanica.world.traffic_signal_repository import SignalChoiceRefused
 from exulanica.world.world_clock import (
@@ -141,12 +141,23 @@ def _snapshot(clocks: WorldClockRepository, version_id: uuid.UUID) -> uuid.UUID:
 
 
 def _roads(
-    clocks: WorldClockRepository, request: Request, snapshot: uuid.UUID
+    clocks: WorldClockRepository,
+    request: Request,
+    snapshot: uuid.UUID,
+    *,
+    stated: Callable[[], TrafficInput] | None = None,
 ) -> RoadsFacts | None:
     """The version's roads as a transition binds them, compiled in the traffic worker, or None
-    when its records state no roads. Refused by the reader's or the compiler's own code."""
+    when its records state no roads. Refused by the reader's or the compiler's own code.
+    ``stated`` reads the roads where a caller already holds them: a capability read reads them
+    once for every adapter."""
     try:
-        value = saved_world_roads(clocks.connection, clocks.workspace_id, clocks.world_id, snapshot)
+        if stated is not None:
+            value = stated()
+        else:
+            value = saved_world_roads(
+                clocks.connection, clocks.workspace_id, clocks.world_id, snapshot
+            )
     except TrafficRefused as error:
         if error.code != "roads_not_stated":
             raise
@@ -357,7 +368,9 @@ def capability_operations(context: VersionContext) -> list[Operation]:
     try:
         refusal = clocks.transition_refusal(context.version_id, roads=None)
         if refusal is None:
-            roads = _roads(clocks, context.request, context.source.snapshot_id)
+            roads = _roads(
+                clocks, context.request, context.source.snapshot_id, stated=context.roads
+            )
             if roads is not None:
                 refusal = clocks.transition_refusal(context.version_id, roads=roads)
         code = None if refusal is None else refusal.code

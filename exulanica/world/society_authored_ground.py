@@ -51,12 +51,14 @@ from exulanica.world.society_composition import (
     clearance_test,
     composed_objects,
     footprint_ring,
+    object_affordance,
     object_dependency_refs,
     offers_activity,
     policy_dependency_refs,
     prune_navigation,
     turned_point,
     validate_reviewed_affordances,
+    validate_workspace_obstacles,
 )
 from exulanica.world.society_grounds import (
     SocietyGroundKind,
@@ -378,6 +380,7 @@ def build_authored_ground_society_input(
     unavailable_reason: str | None,
     reviewed_affordances: Mapping[str, dict[str, Any]],
     segment_blocked: SegmentBlocked,
+    workspace_obstacles: Mapping[str, dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Compose one saved world's accepted authored version over its society's walkable area.
 
@@ -390,6 +393,7 @@ def build_authored_ground_society_input(
     if version_delta_sha256(version) != version.state_sha256:
         raise ValueError("authored delta digest mismatch")
     validate_reviewed_affordances(reviewed_affordances)
+    validate_workspace_obstacles(workspace_obstacles)
     if availability not in ("available", "unavailable"):
         raise ValueError("invalid current availability")
     if (availability == "available") != (unavailable_reason is None):
@@ -416,7 +420,11 @@ def build_authored_ground_society_input(
             reviewed_affordances=reviewed_affordances,
         )
     )
-    refs.extend(object_dependency_refs(version, reviewed_affordances))
+    refs.extend(
+        object_dependency_refs(
+            version, reviewed_affordances, workspace_obstacles=workspace_obstacles
+        )
+    )
 
     objects: list[ComposedObject] = []
     obstacles: list[Obstacle] = []
@@ -431,6 +439,7 @@ def build_authored_ground_society_input(
             region_id=ground.region_id,
             translation_mm=(0, -ground.elevation_mm, 0),
             composition_profile=AUTHORED_GROUND_COMPOSITION,
+            workspace_obstacles=workspace_obstacles,
         )
     if reason is None:
         targets, unavailable_affordances, reason = affordance_targets(
@@ -579,6 +588,7 @@ def _objects_one_by_one(
     version: AlternateVersion,
     reviewed_affordances: Mapping[str, dict[str, Any]],
     ground: SocietyGround,
+    workspace_obstacles: Mapping[str, dict[str, Any]] | None = None,
 ) -> tuple[list[_UsableObject], list[Obstacle], list[dict[str, Any]], str | None]:
     """Every object's obstacle and activity, decided for that object alone.
 
@@ -590,7 +600,10 @@ def _objects_one_by_one(
     that blocks) or that the saved world does not validly hold (another region, an origin or a
     transform no writer produces) makes the whole input unavailable, and the reason names it. A
     kind nobody uses (its registry row offers no activity) is only what it blocks: it is an
-    obstacle wherever it stands, and it has no activity to offer or to record as refused.
+    obstacle wherever it stands, and it has no activity to offer or to record as refused. A
+    person's own admitted asset is such a kind: its preparation measured its footprint
+    (``workspace_obstacles``), so it blocks walking where it stands, withdrawn or not, until it is
+    removed.
     """
     usable: list[_UsableObject] = []
     obstacles: list[Obstacle] = []
@@ -598,7 +611,7 @@ def _objects_one_by_one(
     for obj in objects_in_region(version, ground):
         if obj.removed:
             continue
-        reviewed = reviewed_affordances.get(obj.asset_sha256)
+        reviewed = object_affordance(obj, reviewed_affordances, workspace_obstacles)
         transform = obj.transform
         if obj.region_id != ground.region_id:
             return [], [], [], f"unregistered_object_region:{obj.object_id}"
@@ -711,6 +724,7 @@ def standing_places(
     reviewed_affordances: Mapping[str, dict[str, Any]],
     ground: SocietyGround,
     standing: StandingPolicy,
+    workspace_obstacles: Mapping[str, dict[str, Any]] | None = None,
 ) -> dict[str, list[Point]]:
     """Where people would stand to use each object of a version, by object id.
 
@@ -719,7 +733,9 @@ def standing_places(
     (``destination_places``), before it keeps only those clear, spaced and reachable. A version
     the society cannot compose at all has nobody standing anywhere.
     """
-    usable, _, _, reason = _objects_one_by_one(version, reviewed_affordances, ground)
+    usable, _, _, reason = _objects_one_by_one(
+        version, reviewed_affordances, ground, workspace_obstacles
+    )
     if reason is not None:
         return {}
     return {item.obj.object_id: destination_places(item, standing, CLEARANCE_MM) for item in usable}
@@ -822,6 +838,7 @@ def build_authored_ground_society_input_v3(
     segment_blocked: SegmentBlocked,
     standing: StandingPolicy,
     routine: PurposefulRoutine | None = None,
+    workspace_obstacles: Mapping[str, dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Compose a saved world under ``exulanica.society-composition/authored-ground-v3``.
 
@@ -845,6 +862,7 @@ def build_authored_ground_society_input_v3(
         segment_blocked=segment_blocked,
         standing=standing,
         routine=routine,
+        workspace_obstacles=workspace_obstacles,
     )
 
 
@@ -861,6 +879,7 @@ def build_authored_ground_society_input_v4(
     segment_blocked: SegmentBlocked,
     standing: StandingPolicy,
     routine: PurposefulRoutine | None = None,
+    workspace_obstacles: Mapping[str, dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Compose a new made-world society at its pinned, region-local opening pose."""
     if (
@@ -885,6 +904,7 @@ def build_authored_ground_society_input_v4(
         standing=standing,
         routine=routine,
         arrival=arrival,
+        workspace_obstacles=workspace_obstacles,
     )
 
 
@@ -902,6 +922,7 @@ def _authored_ground_with_routine(
     standing: StandingPolicy,
     routine: PurposefulRoutine | None,
     arrival: ArrivalDescriptor | None = None,
+    workspace_obstacles: Mapping[str, dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     chosen = purposeful_routine() if routine is None else routine
     catalog = world_object_catalog()
@@ -924,6 +945,7 @@ def _authored_ground_with_routine(
         reviewed_affordances=reviewed_affordances,
         segment_blocked=segment_blocked,
         standing=standing,
+        workspace_obstacles=workspace_obstacles,
     )
     del document["document_sha256"]
     document["routine"] = chosen.binding()
@@ -945,6 +967,7 @@ def build_authored_ground_society_input_v2(
     reviewed_affordances: Mapping[str, dict[str, Any]],
     segment_blocked: SegmentBlocked,
     standing: StandingPolicy,
+    workspace_obstacles: Mapping[str, dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Compose a saved world under ``exulanica.society-composition/authored-ground-v2``.
 
@@ -967,6 +990,7 @@ def build_authored_ground_society_input_v2(
         reviewed_affordances=reviewed_affordances,
         segment_blocked=segment_blocked,
         standing=standing,
+        workspace_obstacles=workspace_obstacles,
     )
     validate_society_input(document)
     return document
@@ -985,11 +1009,13 @@ def _authored_ground_input(
     reviewed_affordances: Mapping[str, dict[str, Any]],
     segment_blocked: SegmentBlocked,
     standing: StandingPolicy,
+    workspace_obstacles: Mapping[str, dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """The projection the second and third compositions share, with its digest, unvalidated."""
     if version_delta_sha256(version) != version.state_sha256:
         raise ValueError("authored delta digest mismatch")
     validate_reviewed_affordances(reviewed_affordances)
+    validate_workspace_obstacles(workspace_obstacles)
     if availability not in ("available", "unavailable"):
         raise ValueError("invalid current availability")
     if (availability == "available") != (unavailable_reason is None):
@@ -1022,7 +1048,10 @@ def _authored_ground_input(
     )
     refs.extend(
         object_dependency_refs(
-            version, reviewed_affordances, objects=objects_in_region(version, ground)
+            version,
+            reviewed_affordances,
+            objects=objects_in_region(version, ground),
+            workspace_obstacles=workspace_obstacles,
         )
     )
 
@@ -1031,7 +1060,7 @@ def _authored_ground_input(
     unread: list[dict[str, Any]] = []
     if reason is None:
         usable, obstacles, records, reason = _objects_one_by_one(
-            version, reviewed_affordances, ground
+            version, reviewed_affordances, ground, workspace_obstacles
         )
     if reason is None:
         clear = clearance_test(

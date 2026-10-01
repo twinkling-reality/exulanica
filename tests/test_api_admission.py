@@ -27,6 +27,7 @@ from exulanica.api.admission import (
     CAPACITY_ROUTES,
     REQUESTS,
     STREAMS,
+    UPLOADS,
     Admission,
     AdmissionSettingRefused,
     AdmissionSettings,
@@ -139,6 +140,54 @@ def test_a_full_class_is_refused_before_its_body_is_read_or_a_connection_opened(
     assert refused._sent == 0
     assert observed["after"] == observed["before"]
     counts = app.state.admission.snapshot()["classes"][REQUESTS]
+    assert (counts["in_flight"], counts["refused"]) == (0, 1)
+
+
+def test_an_asset_upload_holds_the_upload_class_a_photograph_upload_waits_for(served):
+    # Both bodies are multipart and spooled before any route runs, so an asset admission takes an
+    # upload's slot and its 600 second body bound, never an ordinary request's.
+    app = served.app(requests=1, workspace_requests=1, uploads=1, workspace_uploads=1, threads=8)
+    holder = Exchange(
+        app,
+        "POST",
+        "/workspace-assets",
+        headers=[*auth(FIRST_TOKEN), (b"content-type", b"multipart/form-data; boundary=held")],
+        body=[b"--held\r\n"],
+        hold_body=True,
+    )
+    refused = Exchange(
+        app,
+        "POST",
+        "/intake",
+        headers=[*auth(SECOND_TOKEN), (b"content-length", b"2")],
+        body=[b"--"],
+    )
+    held: dict[str, int] = {}
+
+    async def main() -> None:
+        with anyio.fail_after(20):
+            async with anyio.create_task_group() as group:
+                group.start_soon(holder.run)
+                await _until(
+                    lambda: app.state.admission.snapshot()["classes"][UPLOADS]["in_flight"] == 1
+                )
+                held.update(
+                    {
+                        name: counts["in_flight"]
+                        for name, counts in app.state.admission.snapshot()["classes"].items()
+                    }
+                )
+                group.start_soon(refused.run)
+                await refused.done.wait()
+                holder.leave()
+
+    anyio.run(main)
+    assert held[REQUESTS] == 0
+    assert refused.status == 503
+    assert (refused.json()["code"], refused.json()["capacity"]) == ("capacity_exhausted", "uploads")
+    assert refused.response_headers["retry-after"] == "10"
+    assert refused._sent == 0
+    counts = app.state.admission.snapshot()["classes"][UPLOADS]
     assert (counts["in_flight"], counts["refused"]) == (0, 1)
 
 

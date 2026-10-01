@@ -51,6 +51,7 @@ from exulanica.world.society_composition import (
     object_dependency_refs,
     policy_dependency_refs,
     validate_reviewed_affordances,
+    validate_workspace_obstacles,
 )
 from exulanica.world.society_grounds import (
     SocietyGroundKind,
@@ -216,6 +217,7 @@ def build_walking_surfaces_input(
     standing: StandingPolicy,
     routine: PurposefulRoutine | None = None,
     living: RoutineModel | None = None,
+    workspace_obstacles: Mapping[str, dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Compose a generated world's input over the walking surfaces its records state, from the
     place :func:`walking_surfaces_place` made of them for ``ground``.
@@ -226,6 +228,7 @@ def build_walking_surfaces_input(
     if version_delta_sha256(version) != version.state_sha256:
         raise ValueError("authored delta digest mismatch")
     validate_reviewed_affordances(reviewed_affordances)
+    validate_workspace_obstacles(workspace_obstacles)
     if availability not in ("available", "unavailable"):
         raise ValueError("invalid current availability")
     if (availability == "available") != (unavailable_reason is None):
@@ -354,7 +357,14 @@ def build_walking_surfaces_input(
             reviewed_affordances=reviewed_affordances,
         )
     )
-    refs.extend(object_dependency_refs(version, reviewed_affordances, objects=in_region))
+    refs.extend(
+        object_dependency_refs(
+            version,
+            reviewed_affordances,
+            objects=in_region,
+            workspace_obstacles=workspace_obstacles,
+        )
+    )
     refs.append(
         {"kind": "city_place", "identity": ground.place_id, "sha256": place["document_sha256"]}
     )

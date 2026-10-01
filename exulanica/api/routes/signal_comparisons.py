@@ -97,7 +97,6 @@ from exulanica.world.society_comparison_start_repository import (
     start_document,
 )
 from exulanica.world.traffic_episodes import TrafficRefused, compute_signal_catalog, wire
-from exulanica.world.traffic_host import saved_world_roads
 from exulanica.world.worlds import require_world
 
 router = APIRouter(prefix="/world/versions/{version_id}/traffic/comparisons", tags=["world"])
@@ -706,12 +705,7 @@ def capability_operations(context: VersionContext) -> list[Operation]:
     """
     roads = None
     try:
-        saved_world_roads(
-            context.connection,
-            context.session.workspace_id,
-            context.world_id,
-            context.source.snapshot_id,
-        )
+        context.roads()
     except TrafficRefused as exc:
         roads = unavailable(exc.code)
     except InvalidStructuralData as exc:

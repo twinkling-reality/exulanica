@@ -1481,7 +1481,8 @@ def restore_judge_seed(
     run: Run, step: Mapping[str, Any], observe: Observe, evidence: dict[str, Any]
 ) -> None:
     """Restore the exported seed into a fresh database and an empty data directory, as the judge
-    deployment's jobs do (``exulanica-db``, then ``exulanica-seed role`` and ``restore``), and read
+    deployment's jobs do (``exulanica-db``, then ``exulanica-seed role`` and ``restore``, then the
+    character catalogs published as the ``catalogs`` job does, since a seed carries none), and read
     each generated world's tiles back from them (``seedcheck.py``). The fresh database is created
     on the run's own server and dropped afterwards."""
     assert run.state is not None
@@ -1524,6 +1525,13 @@ def restore_judge_seed(
             timeout,
             "judge-restore.txt",
         )
+        published = _seed_command(
+            run,
+            ["python", "-m", "exulanica.world.character_catalog_publication", "publish", "--apply"],
+            target,
+            timeout,
+            "judge-restore.txt",
+        )
         checked = subprocess.run(
             [python, str(HERE / "seedcheck.py"), run.state["workspace_id"]],
             cwd=run.worktree,
@@ -1560,12 +1568,15 @@ def restore_judge_seed(
         created == 0
         and migrated.returncode == 0
         and role.returncode == 0
-        and restored.returncode == 0,
+        and restored.returncode == 0
+        and published.returncode == 0,
         {
             "migrate_exit": migrated.returncode,
             "role_exit": role.returncode,
             "restore_exit": restored.returncode,
             "restore_output": scrub(restored.stdout[-800:] + restored.stderr[-800:]),
+            "publish_exit": published.returncode,
+            "publish_output": scrub(published.stdout[-800:] + published.stderr[-800:]),
         },
     )
     tiles = [tile for town in towns or [] for tile in town["tiles"]]

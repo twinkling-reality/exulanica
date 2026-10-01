@@ -8,6 +8,7 @@ import { activityPosture } from '../src/playcanvas/character/catalog.js';
 import { CharacterHost } from '../src/playcanvas/character/host.js';
 import { inhabitantRenderable } from '../src/playcanvas/character/inhabitant.js';
 import type { LayeredCharacterRenderable } from '../src/playcanvas/character/renderable.js';
+import { serveFixturePeople } from './served-people.js';
 
 /*
  * A person is drawn in the posture the catalog declares for the activity the simulation states,
@@ -24,6 +25,7 @@ function application() {
   options.componentSystems = [pc.RenderComponentSystem, pc.AnimComponentSystem];
   options.resourceHandlers = [pc.ContainerHandler, pc.AnimClipHandler, pc.AnimStateGraphHandler];
   app.init(options);
+  serveFixturePeople(app);
   const parent = new pc.Entity('people', app);
   app.root.addChild(parent);
   return { app, device, parent };
@@ -67,7 +69,7 @@ describe('postures', () => {
     // The null device uploads nothing, so an image only needs a size.
     vi.stubGlobal('createImageBitmap', async () => ({ width: 4, height: 4, close: () => undefined }));
     const { app, device, parent } = application();
-    CharacterHost.forApp(app, CHARACTER_CATALOG).setLoader(async (asset) => {
+    CharacterHost.forApp(app).setLoader(async (asset) => {
       // Tests run from web/; a happy-dom module URL is not a file path.
       const bytes = readFileSync(resolve('../assets/characters', asset.file));
       return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);

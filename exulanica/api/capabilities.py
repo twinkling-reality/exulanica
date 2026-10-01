@@ -37,9 +37,13 @@ from exulanica.api.permissions import Permission, Requires, rule_for
 from exulanica.api.routes import mounted_routes
 from exulanica.api.services import Services
 from exulanica.selection.validation import Session
+from exulanica.traffic.errors import UnsupportedNetworkError
+from exulanica.world.errors import InvalidStructuralData
 from exulanica.world.object_repository import SourceFacts
 from exulanica.world.society_engines import SocietyEngine
 from exulanica.world.society_grounds import SocietyGroundKind
+from exulanica.world.traffic_episodes import TrafficInput, TrafficRefused
+from exulanica.world.traffic_host import saved_world_roads
 from exulanica.world.worlds import WorldKind
 
 __all__ = [
@@ -64,8 +68,8 @@ __all__ = [
 State = Literal["available", "unavailable", "unsupported", "unknown"]
 #: What a later consequence of an operation is about, by the domain's word: whether the world's
 #: people use what was placed, whether a chosen model is asked here, whether the world advances
-#: on its own after play.
-EffectOn = Literal["society", "decisions", "playback"]
+#: on its own after play, whether an admitted asset is prepared on this installation.
+EffectOn = Literal["society", "decisions", "playback", "preparation"]
 #: A route's endpoint function, which is how an adapter names a route without spelling its path.
 Endpoint = Callable[..., Any]
 #: The methods a route never declares itself: Starlette adds HEAD to every GET, and OPTIONS is
@@ -195,10 +199,33 @@ class VersionContext:
     #: The engine the version's society runs, or else the one the engine table creates a new one
     #: with on this ground; None where no ground is stated.
     engine: SocietyEngine | None
+    #: What :meth:`roads` read, once it has: the roads, or the refusal reading them raised.
+    _roads: TrafficInput | Exception | None = field(
+        default=None, init=False, repr=False, compare=False
+    )
 
     @property
     def bind(self) -> dict[str, str]:
         return {"version_id": str(self.version_id)}
+
+    def roads(self) -> TrafficInput:
+        """The roads the version's snapshot states (:func:`saved_world_roads`), read once for
+        every adapter that asks; each adapter answers the one read's refusal by its own codes."""
+        outcome = self._roads
+        if outcome is None:
+            try:
+                outcome = saved_world_roads(
+                    self.connection,
+                    self.session.workspace_id,
+                    self.world_id,
+                    self.source.snapshot_id,
+                )
+            except (TrafficRefused, UnsupportedNetworkError, InvalidStructuralData) as refused:
+                outcome = refused
+            object.__setattr__(self, "_roads", outcome)
+        if isinstance(outcome, Exception):
+            raise outcome.with_traceback(None)
+        return outcome
 
 
 @dataclass(frozen=True, slots=True)

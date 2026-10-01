@@ -39,11 +39,13 @@ __all__ = [
     "MATERIAL_NAMESPACE",
     "SHARED_NAMESPACES",
     "TILE_NAMESPACE",
+    "WORKSPACE_ASSET_NAMESPACE",
     "WORKSPACE_NAMESPACES",
     "LocalWorkspaceStores",
     "WorkspaceStores",
     "material_stores",
     "tile_store",
+    "workspace_asset_lock_key",
 ]
 
 #: Where the shared, content-addressed evidence store lives under the data directory.
@@ -54,11 +56,15 @@ MATERIAL_NAMESPACE: Final = "materials"
 #: tile is a pure function of public inputs, so the same key names the same bytes for everyone
 #: (migration 0072).
 TILE_NAMESPACE: Final = "tiles"
+#: Where each workspace's own admitted assets and their prepared outputs live (migration 0126).
+#: One namespace per workspace, like the material bakes, so erasing a workspace's assets is a
+#: question about its own rows and never about anyone else's.
+WORKSPACE_ASSET_NAMESPACE: Final = "workspace-assets"
 
 #: The namespaces holding one store for every workspace, in the order they are listed.
 SHARED_NAMESPACES: Final[tuple[str, ...]] = (BLOB_NAMESPACE, TILE_NAMESPACE)
 #: The namespaces holding one store per workspace, each under ``<name>/<workspace hex>``.
-WORKSPACE_NAMESPACES: Final[tuple[str, ...]] = (MATERIAL_NAMESPACE,)
+WORKSPACE_NAMESPACES: Final[tuple[str, ...]] = (MATERIAL_NAMESPACE, WORKSPACE_ASSET_NAMESPACE)
 
 
 class WorkspaceStores(abc.ABC):
@@ -111,6 +117,16 @@ def material_stores(data_dir: str | os.PathLike[str]) -> LocalWorkspaceStores:
     if root.is_relative_to(blobs) or blobs.is_relative_to(root):
         raise ValueError(f"material namespaces at {root} would share the blob store at {blobs}")
     return LocalWorkspaceStores(root)
+
+
+def workspace_asset_lock_key(workspace_id: uuid.UUID, digest: str) -> str:
+    """The advisory lock key of one object in one workspace's asset namespace.
+
+    The workspace and the digest, never the digest alone: identical bytes admitted in two
+    workspaces are two objects, so a lock one workspace holds must neither delay nor be seen by
+    another. Admission, preparation, delivery and the purger all take this key.
+    """
+    return f"workspace-asset:{workspace_id}:{digest}"
 
 
 def tile_store(data_dir: str | os.PathLike[str]) -> LocalContentAddressedStore:

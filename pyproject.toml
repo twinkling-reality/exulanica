@@ -142,6 +142,11 @@ exulanica-identity = "exulanica.identity.cli:main"
 # `uv run exulanica-db`. Brings a database up to the schema and the roles this code expects, in the
 # one correct order. A deployment runs it before the API starts.
 exulanica-db = "exulanica.db.cli:main"
+# `uv run exulanica-character-catalog publish --apply`. Publishes the character catalogs this code
+# carries (migration 0131) over the owner connection, into the store the API serves from. Every
+# path that creates or upgrades a serving database runs it after `exulanica-db`; until it has, no
+# people are drawn and /readyz says so. Without --apply it checks every document and container.
+exulanica-character-catalog = "exulanica.world.character_catalog_publication:main"
 # `uv run exulanica-local-db init --directory <dir>`. A personal install's own PostgreSQL cluster:
 # durable, backed up on every stop, restored only into an empty directory, and upgraded only on
 # request, after a rehearsal on a scratch copy. Never in a temporary or test-server directory.
@@ -164,6 +169,10 @@ exulanica-scene-worker = "exulanica.ingest.scene_worker_command:main"
 # recipes in a Node process of its own, under a timeout and a memory ceiling, and records each
 # bake before its bytes are written. Needs Node and the web package installed; downloads nothing.
 exulanica-material-bake = "exulanica.world.material_bake_command:main"
+# `uv run exulanica-asset-preparation --workspace <uuid> --once`. Prepares the static assets people
+# admitted to their workspaces (migration 0126): validates, measures and normalizes each one, and
+# records each output before its bytes are written. Pure Python; downloads nothing.
+exulanica-asset-preparation = "exulanica.world.asset_preparation_command:main"
 # `uv run exulanica-generated-tile-worker --workspace <uuid> --once`. Bakes the tiles worlds
 # generated from a recipe are waiting for, off the request: claims each job as the runtime role and
 # publishes each bake through the owner connection migration 0072 requires. Needs Node and web/.

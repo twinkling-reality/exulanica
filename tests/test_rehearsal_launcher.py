@@ -243,3 +243,15 @@ def test_the_leak_check_reads_the_production_build_as_well_as_the_run_directory(
     (run.out / "summary.txt").write_text(f"token {run.token}")
 
     assert run.leak_check() == ["app-build/assets/main.js", "summary.txt"]
+
+
+def test_the_judge_seed_restore_publishes_the_character_catalogs_as_the_judge_stack_does():
+    """A seed carries no catalog publication (it is per deployment), so the restore step publishes
+    after the restore, as deploy/judge's catalogs job does, and holds its verdict to that exit."""
+    import inspect
+
+    source = inspect.getsource(_rehearse().restore_judge_seed)
+    restore = source.index('"exulanica-seed", "restore"')
+    publish = source.index("exulanica.world.character_catalog_publication")
+    assert restore < publish
+    assert "published.returncode == 0" in source

@@ -49,6 +49,7 @@ from psycopg.types.json import Jsonb
 from exulanica.db.read_check import lock_asset_reads_until_commit
 from exulanica.evidence.blob import BlobId
 from exulanica.store.base import ContentAddressedStore
+from exulanica.store.namespaces import WorkspaceStores
 from exulanica.world.authored_delta import DELTA_SECTIONS, AlternateVersion, delta_sha256
 from exulanica.world.edit_kinds import EditSubject, edit_kind
 from exulanica.world.environment_instances import (
@@ -103,6 +104,12 @@ from exulanica.world.point_map_source_authority import PointMapSourceAuthority
 from exulanica.world.reviewed_catalog import ReviewedAssetRow, ReviewedCatalog
 from exulanica.world.society import inputs_ahead
 from exulanica.world.society_engines import INPUT_ENGINES
+from exulanica.world.workspace_assets import (
+    ResolvedWorkspaceAsset,
+    WorkspaceAssetAuthority,
+    WorkspaceAssetError,
+    WorkspaceAssetWithdrawn,
+)
 from exulanica.world.workspace_lock import lock_workspace
 
 __all__ = [
@@ -139,7 +146,8 @@ class StayReason(StrEnum):
     (``exulanica.world.personal_composition``), and a test holds the two sets equal.
     """
 
-    #: An environment piece whose pinned source or render was withdrawn.
+    #: An environment piece whose pinned source or render was withdrawn, or an object whose
+    #: workspace asset was withdrawn.
     SOURCE_WITHDRAWN = "source_withdrawn"
     #: An environment piece whose source may no longer be composed into a world.
     COMPOSITION_DENIED = "composition_denied"
@@ -266,12 +274,16 @@ class WorldObjectRepository:
         world_id: str,
         store: ContentAddressedStore | None = None,
         on_edit: Callable[[uuid.UUID], None] | None = None,
+        workspace_assets: WorkspaceStores | None = None,
     ) -> None:
         self.connection = connection
         self.workspace_id = workspace_id
         self.world_id = world_id
         self.store = store
         self.on_edit = on_edit
+        #: Each workspace's own asset namespaces, where a pinned object's prepared bytes are. None
+        #: in a repository that was not given them, which then cannot place or draw one.
+        self.workspace_assets = workspace_assets
         #: Whether each reviewed digest's bytes were in the store when a run of additions began,
         #: which those additions take instead of looking again (:meth:`reviewed_bytes_read_first`).
         self._bytes_read_first: Mapping[str, bool] = MappingProxyType({})
@@ -561,7 +573,17 @@ class WorldObjectRepository:
         return self._written(version_id)
 
     def _object_carries(self, obj: AuthoredObject) -> tuple[CarryOutcome, StayReason | None]:
-        # A reviewed catalog asset, pinned by digest, is the only thing an object names.
+        # A reviewed catalog asset, pinned by digest, carries as it is. A workspace asset carries
+        # while its preparation may still be placed, and otherwise stays: a withdrawn source is
+        # removed data, never written back, as for an environment piece.
+        if obj.workspace_preparation_id is None:
+            return CarryOutcome.CARRIED, None
+        try:
+            self._workspace_asset_sources.require_current(
+                obj.workspace_preparation_id, obj.asset_sha256
+            )
+        except WorkspaceAssetError:
+            return CarryOutcome.STAYS, StayReason.SOURCE_WITHDRAWN
         return CarryOutcome.CARRIED, None
 
     def _override_carries(
@@ -999,7 +1021,8 @@ class WorldObjectRepository:
             row = self._begin_edit(version_id, base_state_sha256)
             checked = self._validated_object(row, obj)
             edit_id = uuid.uuid4()
-            self._insert_object(version_id, checked, (edit_id, edit_id))
+            with _binding_refusal():
+                self._insert_object(version_id, checked, (edit_id, edit_id))
             self._append_edit(
                 row,
                 edit_id=edit_id,
@@ -1009,6 +1032,10 @@ class WorldObjectRepository:
                 after=object_document(checked),
                 actor=actor,
             )
+            if checked.workspace_preparation_id is not None:
+                self._workspace_asset_sources.final_authorization(
+                    checked.workspace_preparation_id, checked.asset_sha256
+                )
         return self._written(version_id)
 
     def validate_object_placement(
@@ -1186,6 +1213,8 @@ class WorldObjectRepository:
             if current.removed:
                 raise InvalidObjectState(f"{object_id} is removed in this version")
             checked = validate_behaviour(behaviour, self.behaviour_registry())
+            if checked is not None and current.workspace_preparation_id is not None:
+                raise InvalidObjectData("a workspace asset takes no behaviour")
             before = object_document(current)
             if before["behaviour"] == (None if checked is None else checked.document()):
                 raise InvalidObjectState(
@@ -1396,6 +1425,8 @@ class WorldObjectRepository:
             )
 
     def _validated_object(self, row: Mapping[str, Any], obj: AuthoredObject) -> AuthoredObject:
+        if obj.workspace_preparation_id is not None:
+            return self._validated_workspace_object(row, obj)
         assets = {asset.content_sha256: asset for asset in self.reviewed_assets()}
         checked = validate_object(
             obj,
@@ -1410,6 +1441,54 @@ class WorldObjectRepository:
         if checked.object_id in {o.object_id for o in self._objects(row["version_id"])}:
             raise InvalidObjectState(f"{checked.object_id} already exists in this version")
         return checked
+
+    def _validated_workspace_object(
+        self, row: Mapping[str, Any], obj: AuthoredObject
+    ) -> AuthoredObject:
+        """The same checks as a reviewed object's, with the workspace asset's own authority
+        asked in place of the reviewed catalog: the pinned preparation is placeable now and its
+        prepared bytes are in the workspace's namespace."""
+        checked = validate_object(
+            obj,
+            region_ids=self._source_region_ids(row["source_snapshot_id"]),
+            asset_digests=frozenset(),
+            registry=self.behaviour_registry(),
+        )
+        assert checked.workspace_preparation_id is not None
+        sources = self._workspace_asset_sources
+        sources.require_current(checked.workspace_preparation_id, checked.asset_sha256)
+        sources.require_bytes(checked.asset_sha256)
+        if checked.object_id in {o.object_id for o in self._objects(row["version_id"])}:
+            raise InvalidObjectState(f"{checked.object_id} already exists in this version")
+        return checked
+
+    @property
+    def _workspace_asset_sources(self) -> WorkspaceAssetAuthority:
+        """The workspace asset authority, on this repository's connection and transaction."""
+        return WorkspaceAssetAuthority(self.connection, self.workspace_id, self.workspace_assets)
+
+    def resolve_workspace_asset(
+        self, asset_id: uuid.UUID, prepared_sha256: str | None
+    ) -> ResolvedWorkspaceAsset:
+        """The asset's placeable preparation, before a placement exists; read-only.
+
+        The workspace asset counterpart of ``validate_environment_source``: the same authority,
+        and the same order of refusals, that adding the object asks again under the lock.
+        """
+        return self._workspace_asset_sources.resolve(asset_id, prepared_sha256)
+
+    def pinned_workspace_asset(self, obj: AuthoredObject) -> ResolvedWorkspaceAsset:
+        """The preparation a pinned object draws, whatever has happened to its admission since."""
+        assert obj.workspace_preparation_id is not None
+        return self._workspace_asset_sources.pinned(obj.workspace_preparation_id, obj.asset_sha256)
+
+    def workspace_object_availability(self, obj: AuthoredObject) -> str | None:
+        """Whether a pinned object may be drawn now; None for a reviewed object."""
+        if obj.workspace_preparation_id is None:
+            return None
+        return self._workspace_asset_sources.availability(
+            obj.workspace_preparation_id, obj.asset_sha256
+        )
 
     @contextmanager
     def reviewed_bytes_read_first(self, digests: Iterable[str]) -> Iterator[None]:
@@ -1561,10 +1640,12 @@ class WorldObjectRepository:
             "insert into world_alternate_object (workspace_id,world_id,version_id,object_id,"
             "asset_sha256,region_id,x_mm,y_mm,z_mm,yaw_microradians,scale_milli,origin_kind,"
             "origin_role,behaviour_key,behaviour_version,behaviour_parameters,removed,"
-            "created_edit_id,last_edit_id,addition_undone) "
-            "values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,false) "
+            "created_edit_id,last_edit_id,addition_undone,workspace_preparation_id) "
+            "values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,false,%s) "
             "on conflict (workspace_id,world_id,version_id,object_id) do update set "
-            "asset_sha256=excluded.asset_sha256,region_id=excluded.region_id,x_mm=excluded.x_mm,"
+            "asset_sha256=excluded.asset_sha256,"
+            "workspace_preparation_id=excluded.workspace_preparation_id,"
+            "region_id=excluded.region_id,x_mm=excluded.x_mm,"
             "y_mm=excluded.y_mm,z_mm=excluded.z_mm,yaw_microradians=excluded.yaw_microradians,"
             "scale_milli=excluded.scale_milli,origin_kind=excluded.origin_kind,"
             "origin_role=excluded.origin_role,behaviour_key=excluded.behaviour_key,"
@@ -1593,6 +1674,7 @@ class WorldObjectRepository:
                 obj.removed,
                 created_edit_id,
                 last_edit_id,
+                obj.workspace_preparation_id,
             ),
         ).fetchone()
         if written is None:
@@ -1613,13 +1695,15 @@ class WorldObjectRepository:
             return
         behaviour = obj.behaviour
         self.connection.execute(
-            "update world_alternate_object set asset_sha256=%s,region_id=%s,x_mm=%s,y_mm=%s,"
+            "update world_alternate_object set asset_sha256=%s,workspace_preparation_id=%s,"
+            "region_id=%s,x_mm=%s,y_mm=%s,"
             "z_mm=%s,yaw_microradians=%s,scale_milli=%s,origin_role=%s,behaviour_key=%s,"
             "behaviour_version=%s,behaviour_parameters=%s,removed=%s,last_edit_id=%s,"
             "addition_undone=false "
             "where workspace_id=%s and world_id=%s and version_id=%s and object_id=%s",
             (
                 obj.asset_sha256,
+                obj.workspace_preparation_id,
                 obj.region_id,
                 obj.transform.x_mm,
                 obj.transform.y_mm,
@@ -2264,7 +2348,8 @@ class WorldObjectRepository:
     def _objects(self, version_id: uuid.UUID) -> tuple[AuthoredObject, ...]:
         rows = self.connection.execute(
             "select object_id,asset_sha256,region_id,x_mm,y_mm,z_mm,yaw_microradians,scale_milli,"
-            "origin_kind,origin_role,behaviour_key,behaviour_version,behaviour_parameters,removed "
+            "origin_kind,origin_role,behaviour_key,behaviour_version,behaviour_parameters,removed,"
+            "workspace_preparation_id "
             "from world_alternate_object where workspace_id=%s and world_id=%s and version_id=%s "
             "and not addition_undone "
             "order by object_id",
@@ -2291,6 +2376,7 @@ class WorldObjectRepository:
                     )
                 ),
                 removed=r["removed"],
+                workspace_preparation_id=r["workspace_preparation_id"],
             )
             for r in rows
         )
@@ -2440,6 +2526,11 @@ class WorldObjectRepository:
         current = self._require_object(version_id, object_id)
         if current.removed:
             raise InvalidObjectState(f"{object_id} is removed in this version")
+        if current.workspace_preparation_id is not None:
+            # Moving is placing again, as for an environment piece: a withdrawn source is not.
+            self._workspace_asset_sources.require_current(
+                current.workspace_preparation_id, current.asset_sha256
+            )
         return current, replace(current, transform=validate_transform(transform))
 
     def _checked_removal(
@@ -2669,6 +2760,24 @@ def _override_from_document(document: Mapping[str, Any]) -> ElementOverride:
     )
 
 
+#: The first words of the binding trigger's refusal (migration 0126), which a withdrawal that
+#: committed between the repository's own question and the row's insert makes it raise.
+_NOT_PLACEABLE: Final = "workspace asset preparation is not placeable"
+
+
+@contextmanager
+def _binding_refusal() -> Iterator[None]:
+    """The binding trigger's refusal as the class the repository's own check raises."""
+    try:
+        yield
+    except psycopg.errors.CheckViolation as error:
+        if (error.diag.message_primary or "").startswith(_NOT_PLACEABLE):
+            raise WorkspaceAssetWithdrawn(
+                "the workspace asset stopped being placeable before the object was written"
+            ) from error
+        raise
+
+
 def _object_from_document(document: Mapping[str, Any]) -> AuthoredObject:
     transform = document["transform"]
     behaviour = document["behaviour"]
@@ -2694,4 +2803,9 @@ def _object_from_document(document: Mapping[str, Any]) -> AuthoredObject:
             )
         ),
         removed=document["removed"],
+        workspace_preparation_id=(
+            uuid.UUID(document["workspace_preparation_id"])
+            if "workspace_preparation_id" in document
+            else None
+        ),
     )

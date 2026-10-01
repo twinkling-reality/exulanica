@@ -328,11 +328,14 @@ and whether one may be used with the other is decided by the plane-typed classif
 
 [composition_preview.py](../exulanica/world/composition_preview.py) is the one path by which a
 source is placed into a named authored alternate version; a further source kind extends its resolver,
-and has routes of its own only when it needs a permission the generic routes do not require. Three
+and has routes of its own only when it needs a permission the generic routes do not require. Four
 sources compose: a reviewed catalog asset, which becomes an authored object through
-`WorldObjectRepository.add_object`; an admitted environment selection, which becomes an environment
-instance through `WorldObjectRepository.add_environment`; and the depth estimate made from a
-reviewed photograph, which becomes a placed estimate through `WorldObjectRepository.add_point_map`.
+`WorldObjectRepository.add_object`; a person's own prepared asset
+([workspace asset admission](workspace-asset-admission.md)), which becomes an authored object
+pinned to its preparation through the same writer; an admitted environment selection, which
+becomes an environment instance through `WorldObjectRepository.add_environment`; and the depth
+estimate made from a reviewed photograph, which becomes a placed estimate through
+`WorldObjectRepository.add_point_map`.
 A saved-world source attachment resolves and is always refused: membership is a project reference,
 not composition.
 
@@ -341,7 +344,7 @@ parameter the other version routes take:
 
 | Routes | Source kinds | A caller must hold |
 | --- | --- | --- |
-| `POST /world/versions/{version_id}/compositions/preview` and `.../compositions/apply` | `reviewed_asset`, `environment_admission`, `source_attachment` | `world.write` |
+| `POST /world/versions/{version_id}/compositions/preview` and `.../compositions/apply` | `reviewed_asset`, `workspace_asset`, `environment_admission`, `source_attachment` | `world.write` |
 | `POST /world/versions/{version_id}/compositions/photo-point-maps/preview` and `.../photo-point-maps/apply` | `photo_point_map` | `world.write` and `admission.read` |
 
 Resolving a `photo_point_map` reads the photograph's admission state: the depth model right the
@@ -358,8 +361,8 @@ the photo point map routes by the permission floor, before anything is resolved,
 `unknown_reference` every route addressed by an id answers with.
 
 The request carries references and intent only: `base_state_sha256`,
-the source by identity (`asset_key`; or `admission_id`, `render_asset_id`, `publication_id` and
-selection; or `entry_id` and `attachment_id`), and a placement (subject id, region, transform, the
+the source by identity (`asset_key`; or `asset_id` and `prepared_sha256`; or `admission_id`,
+`render_asset_id`, `publication_id` and selection; or `entry_id` and `attachment_id`), and a placement (subject id, region, transform, the
 person's origin role, a behaviour for an object, a source anchor for an environment). Unknown fields
 answer 422, so no field can assert rights, bytes, classification or readiness. So do an `asset_key`
 the registry could never hold (its key rule is `^[a-z][a-z0-9.-]*$`) and a non-integer
@@ -373,11 +376,18 @@ answers `ready`, or `blocked` with the first failing check in this order:
 
 | Order | `blocked_reason` | What the server found |
 | --- | --- | --- |
+| 0 | `prepared_digest_required` | Apply only: a `workspace_asset` source names no `prepared_sha256`; over HTTP that body is refused 422 before this |
 | 1 | `source_invalidated` | A committed deletion invalidated the version's source snapshot |
 | 2 | `stale_base` | `base_state_sha256` is not the version's stored state |
 | 3 | `unknown_asset` | No reviewed asset has that `asset_key` |
 | 3 | `asset_not_placeable` | The reviewed asset's declared kind is not placeable: a component, such as a character's body, worn part or material pack |
 | 3 | `asset_bytes_unavailable` | The reviewed asset row exists and its bytes are not in the store |
+| 3 | `unknown_workspace_asset` | This workspace admitted no asset with that `asset_id` |
+| 3 | `workspace_asset_withdrawn` | The asset was withdrawn, or its workspace erased |
+| 3 | `workspace_asset_not_prepared` | The asset has no prepared output |
+| 3 | `workspace_asset_incompatible` | The prepared object is outside the placeable-object profile |
+| 3 | `workspace_asset_changed` | `prepared_sha256` names other bytes than the asset's prepared output |
+| 3 | `workspace_asset_bytes_unavailable` | The prepared output's bytes are not in the workspace's asset namespace |
 | 3 | `environment_binding_unknown` | The admission and render asset, the publication, or the feature and render batch do not resolve |
 | 3 | `environment_withdrawn` | The admission, render asset or feature index asset is withdrawn |
 | 3 | `compose_not_permitted` | Current rights do not allow compose on the exact binding, or index and compose for a feature |
@@ -393,12 +403,16 @@ answers `ready`, or `blocked` with the first failing check in this order:
 | 3 | `insufficient_depth` | Too little of the photograph could be placed to stand in front of |
 | 3 | `point_map_bytes_unavailable` | The estimate's stored bytes are absent, do not verify, or may not be read right now |
 | 4 | `placement_required` | Preview only: the source resolves and no placement was given |
-| 5 | `invalid_placement` | Subject id, region of the source snapshot, transform, origin role, behaviour or source anchor is not acceptable |
+| 5 | `invalid_placement` | Subject id, region of the source snapshot, transform, origin role, behaviour or source anchor is not acceptable, including any behaviour or source anchor for a workspace asset |
 | 5 | `subject_already_present` | The version already has an object, an environment instance, or a placed estimate, with that id |
 
 Step 3 is the durable resolver's own order for each source kind. Step 5 is the durable validators'
 order: an object is checked for data before its id is checked for duplicates, and an environment
 instance the other way round.
+
+A `workspace_asset` apply names the `prepared_sha256` its preview reported (step 0). The placed
+object's document carries `workspace_preparation_id` beside `asset_sha256`, and the write asks
+again, under `asset_read_lock()`, whether that preparation may still be placed.
 
 `photo_point_map` composes the depth estimate reached THROUGH a saved world's current membership of
 a photograph, which is why it takes the same `entry_id` and `attachment_id` a `source_attachment`
@@ -438,7 +452,10 @@ No preview digest is bound into apply. Everything a preview names is either comp
 `state_sha256` compare-and-swap, immutable for its identity (reviewed asset keys and environment
 admission, render and receipt rows), taken from the request itself, or mutable authority that apply
 re-checks and refuses on: rights (a grant withdrawn, an attachment's authorization or screening
-expired), publication currency, bytes and source invalidation.
+expired), publication currency, bytes and source invalidation. A workspace asset's
+`prepared_sha256` is not a preview token either: it pins the source's input, an asset's prepared
+digest never changes once published, and apply refuses any other digest as
+`workspace_asset_changed`.
 
 No style or structure classification gates reviewed-asset or environment composition. The durable
 writers compare the version's stored state and source snapshot, and an object or environment

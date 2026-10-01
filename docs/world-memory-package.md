@@ -251,6 +251,12 @@ beyond the reach of that withdrawal, so exporting one is a decision rather than 
 those versions, and every version branched from one, are withheld and counted. A withheld version
 is never named: its title, identifier and state stay out of the package.
 
+No version carries an object drawn from a workspace's own admitted asset either. Such an asset is
+used in its own workspace's worlds and nowhere else
+([workspace asset admission](workspace-asset-admission.md)), so a version holding one, and every
+version branched from it, is withheld under `section_not_carried` with the name
+`workspace_assets`, which no format carries. The versions before it still export.
+
 A version goes to the smallest extension family that carries every section its lineage needs:
 authored-world for objects and overrides alone, environment-instances when environment
 instances are involved. A family that was not requested is judged by its format of the version

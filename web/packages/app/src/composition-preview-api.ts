@@ -33,7 +33,8 @@ export type CompositionSourceKind =
   | 'reviewed_asset'
   | 'environment_admission'
   | 'source_attachment'
-  | 'photo_point_map';
+  | 'photo_point_map'
+  | 'workspace_asset';
 
 export type EnvironmentSelectionInput =
   | { readonly kind: 'whole_asset' }
@@ -185,11 +186,18 @@ export function compositionRequestBody(request: CompositionRequest): Record<stri
  * generic sentence rather than dropped or guessed at.
  */
 export const COMPOSITION_BLOCKED_REASONS = Object.freeze([
+  'prepared_digest_required',
   'source_invalidated',
   'stale_base',
   'unknown_asset',
   'asset_not_placeable',
   'asset_bytes_unavailable',
+  'unknown_workspace_asset',
+  'workspace_asset_withdrawn',
+  'workspace_asset_not_prepared',
+  'workspace_asset_incompatible',
+  'workspace_asset_changed',
+  'workspace_asset_bytes_unavailable',
   'environment_binding_unknown',
   'environment_withdrawn',
   'compose_not_permitted',
@@ -291,6 +299,7 @@ function oneOf<T extends string>(value: unknown, allowed: readonly T[], label: s
 
 const SOURCE_KINDS = [
   'reviewed_asset', 'environment_admission', 'source_attachment', 'photo_point_map',
+  'workspace_asset',
 ] as const satisfies readonly CompositionSourceKind[];
 const CHANGE_KINDS = [
   'add_object', 'add_environment', 'add_point_map', 'none',

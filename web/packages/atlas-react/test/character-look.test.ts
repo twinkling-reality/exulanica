@@ -72,8 +72,8 @@ describe('deterministic inhabitant looks', () => {
 
   it('ignores society, branch and every other field of the identity', () => {
     const id = inhabitant(7);
-    const look = inhabitantLook({ societyId: SOCIETY, branchId: 'main', inhabitantId: id });
-    expect(inhabitantLook({ societyId: 'another-society', branchId: 'counterfactual-3', inhabitantId: id })).toEqual(look);
+    const look = inhabitantLook(CHARACTER_CATALOG, { societyId: SOCIETY, branchId: 'main', inhabitantId: id });
+    expect(inhabitantLook(CHARACTER_CATALOG, { societyId: 'another-society', branchId: 'counterfactual-3', inhabitantId: id })).toEqual(look);
     expect(look).toEqual(draw(id));
   });
 

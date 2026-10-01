@@ -63,8 +63,10 @@ from exulanica.db.roles import provision_runtime_role
 from exulanica.store.local import LocalContentAddressedStore
 from exulanica.store.namespaces import LocalWorkspaceStores, tile_store
 from exulanica.world import TopologyContract, WorldStyleRepository
+from exulanica.world.character_catalogs import CatalogRegistry
 from exulanica.world.material_recipes import MaterialRuntime
 from exulanica.world.society import UnavailableSocietyInput
+from exulanica.world.workspace_assets import WorkspaceAssetRuntime
 from fastapi.responses import JSONResponse
 from fastapi.testclient import TestClient
 
@@ -284,7 +286,12 @@ def existence(tmp_path, photo_dir, repository, spine_schema):
             catalog=CATALOG, stores=LocalWorkspaceStores(tmp_path / "materials")
         ),
         character_appearance=CharacterAppearanceRuntime(
-            (family(),), lambda _connection, _session, _family: True
+            (family(),),
+            lambda _connection, _session, _family: True,
+            catalogs=CatalogRegistry(),
+        ),
+        workspace_assets=WorkspaceAssetRuntime(
+            stores=LocalWorkspaceStores(tmp_path / "workspace-assets")
         ),
     )
     app = create_app(services, verify=False)

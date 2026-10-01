@@ -2,6 +2,12 @@
 
 The world is always named by the caller: appearance history is kept per world version, and a
 workspace holds several worlds.
+
+Families come from two places. A host may register families itself (``families`` with
+``authorize_family``), and the character catalogs it publishes derive the rest (``served``, from
+:class:`~exulanica.world.character_catalogs.CatalogRegistry`). A saved look is drawn from the newest
+served publication that derives exactly the family revision it names; when none does, the look is
+unavailable by name and its history stays readable.
 """
 
 from __future__ import annotations
@@ -9,7 +15,7 @@ from __future__ import annotations
 import hashlib
 import uuid
 from collections.abc import Callable, Mapping
-from typing import Any
+from typing import Any, Protocol
 
 import psycopg
 from psycopg.types.json import Jsonb
@@ -32,10 +38,27 @@ from exulanica.world.character_appearance import (
     look_from_recipe,
     validate_recipe,
 )
+from exulanica.world.character_catalogs import CatalogPublication, ServedCatalogs
+from exulanica.world.character_parametric import (
+    PREPARATION_PREFIX,
+    declared_family,
+    is_parametric_family,
+    parametric_representation,
+)
 from exulanica.world.errors import UnknownWorldResource
 from exulanica.world.object_repository import WorldObjectRepository
 from exulanica.world.society import UnknownSociety
 from exulanica.world.society_repository import SocietyRepository
+
+
+class CharacterPreparations(Protocol):
+    """A workspace's prepared bodies, as the preparation queue records them."""
+
+    def binding(
+        self, family: CharacterFamily, representation_id: str
+    ) -> RepresentationBinding | None: ...
+
+    def render_status(self, binding: RepresentationBinding) -> str: ...
 
 
 class CharacterAppearanceRepository:
@@ -51,6 +74,8 @@ class CharacterAppearanceRepository:
         store: ContentAddressedStore | None = None,
         catalog: Mapping[str, Any] | None = None,
         world_id: str,
+        served: ServedCatalogs | None = None,
+        preparations: CharacterPreparations | None = None,
     ) -> None:
         self.connection, self.workspace_id, self.actor = connection, workspace_id, actor
         self.world_id, self.store, self.catalog = world_id, store, catalog
@@ -59,6 +84,7 @@ class CharacterAppearanceRepository:
             f.sha256: CharacterFamily.model_validate_json(f.model_dump_json()) for f in families
         }
         self.authorize_family = authorize_family
+        self.served, self.preparations = served, preparations
         self.societies = SocietyRepository(
             connection, workspace_id, world_id=world_id, input_authorizer=society_input_authorizer
         )
@@ -92,11 +118,50 @@ class CharacterAppearanceRepository:
 
     def _family(self, recipe: CharacterRecipe) -> CharacterFamily:
         family = self.families.get(recipe.family_sha256)
-        if family is None or family.family_id != recipe.family_id:
+        if family is not None:
+            if family.family_id != recipe.family_id:
+                raise AppearanceUnavailable("exact character family revision is not configured")
+            if self.authorize_family is None or self.authorize_family(family) is not True:
+                raise AppearanceUnavailable("character family sources are not currently authorized")
+            return family
+        # A published family is authorized exactly while a served publication derives it.
+        served = None if self.served is None else self.served.families.get(recipe.family_sha256)
+        if served is None or served.family_id != recipe.family_id:
             raise AppearanceUnavailable("exact character family revision is not configured")
-        if self.authorize_family is None or self.authorize_family(family) is not True:
-            raise AppearanceUnavailable("character family sources are not currently authorized")
-        return family
+        return served
+
+    def _publication(self, family: CharacterFamily) -> CatalogPublication | None:
+        return None if self.served is None else self.served.resolve(family.sha256)
+
+    def _representations(
+        self, family: CharacterFamily
+    ) -> Callable[[str], RepresentationBinding | None]:
+        """How a recipe over this family finds the prepared body it names, by kind of body."""
+
+        def resolve(representation_id: str) -> RepresentationBinding | None:
+            if representation_id.startswith(PREPARATION_PREFIX):
+                if self.preparations is None:
+                    return None
+                return self.preparations.binding(family, representation_id)
+            publication = self._publication(family)
+            if publication is None or not is_parametric_family(family):
+                return None
+            return parametric_representation(publication.document, family, representation_id)
+
+        return resolve
+
+    def _default_representation(
+        self, family: CharacterFamily, values: Mapping[str, Any]
+    ) -> str | None:
+        """The reviewed body a family publishes for exactly these values, if it publishes one."""
+        publication = self._publication(family)
+        if publication is None or not is_parametric_family(family):
+            return None
+        declared = declared_family(publication.document, family.family_id)
+        return next(
+            (r.representationId for r in declared.representations if r.values == dict(values)),
+            None,
+        )
 
     def _row(
         self, version_id: uuid.UUID, subject: CharacterSubject, revision: int | None = None
@@ -130,12 +195,27 @@ class CharacterAppearanceRepository:
             str(subject.society_id) if subject.society_id else None,
         ):
             raise ValueError("stored character appearance subject disagrees")
-        validate_recipe(recipe, family, subject)
+        # A body resolved at save time is stored with the revision; the stored recipe must still
+        # be bound to exactly it. Whether that body is available now is the read's question.
+        stored = document.get("representation")
+        binding = None if stored is None else RepresentationBinding.model_validate(stored)
+        validate_recipe(
+            recipe,
+            family,
+            subject,
+            lambda representation_id: (
+                binding if binding is not None and binding.binding_id == representation_id else None
+            ),
+        )
         return recipe, family
 
     def _render_status(self, binding: RepresentationBinding | None) -> str:
         if binding is None:
             return "no_prepared_representation"
+        if binding.binding_id.startswith(PREPARATION_PREFIX):
+            if self.preparations is None:
+                return "preparation_unavailable"
+            return self.preparations.render_status(binding)
         pin = binding.asset
         row = self.connection.execute(
             "select a.*,i.receipt_sha256 from world_reviewed_asset a "
@@ -180,20 +260,24 @@ class CharacterAppearanceRepository:
             return "asset_bytes_unavailable"
         return "available"
 
-    def _catalog_render_status(self, recipe: CharacterRecipe, family: CharacterFamily) -> str:
-        """Whether every container a catalog look composes is published and present.
+    def _catalog_render_status(
+        self, recipe: CharacterRecipe, family: CharacterFamily, catalog: Mapping[str, Any] | None
+    ) -> tuple[str, list[dict[str, Any]]]:
+        """Whether every container a catalog look composes is published and present, and each one.
 
         A catalog look has no single prepared body: the browser composes it from the body,
-        worn parts and material packs the catalog names, each fetched as a reviewed asset.
+        worn parts and material packs the catalog names, each fetched as a reviewed asset. The
+        overall status is the first of withdrawn, store unavailable and bytes missing that any
+        container reaches; each container also reports its own state.
         """
-        if self.catalog is None:
-            return "catalog_unavailable"
+        if catalog is None:
+            return "catalog_unavailable", []
         try:
-            catalog_family_base(self.catalog, family)
-            look = look_from_recipe(self.catalog, recipe, family)
-            containers = look_containers(self.catalog, look)
+            catalog_family_base(catalog, family)
+            look = look_from_recipe(catalog, recipe, family)
+            containers = look_containers(catalog, look)
         except ValueError:
-            return "catalog_unavailable"
+            return "catalog_unavailable", []
         rows = {
             row["asset_key"]: row
             for row in self.connection.execute(
@@ -204,35 +288,93 @@ class CharacterAppearanceRepository:
                 ([ref["assetKey"] for ref in containers],),
             ).fetchall()
         }
+        dependencies = []
         for ref in containers:
             row = rows.get(ref["assetKey"])
             if row is None or (row["content_sha256"], row["byte_size"]) != (
                 ref["contentSha256"],
                 ref["byteSize"],
             ):
-                return "asset_withdrawn_or_unreviewed"
-        if self.store is None:
-            return "asset_store_unavailable"
-        for ref in containers:
-            for digest in (ref["contentSha256"], rows[ref["assetKey"]]["licence_sha256"]):
-                if not self.store.exists(BlobId.from_hex(digest)):
-                    return "asset_bytes_unavailable"
-        return "available"
+                state = "withdrawn_or_unreviewed"
+            elif self.store is None:
+                state = "store_unavailable"
+            elif not all(
+                self.store.exists(BlobId.from_hex(digest))
+                for digest in (ref["contentSha256"], row["licence_sha256"])
+            ):
+                state = "bytes_unavailable"
+            else:
+                state = "available"
+            dependencies.append(
+                {
+                    "asset_key": ref["assetKey"],
+                    "content_sha256": ref["contentSha256"],
+                    "byte_size": ref["byteSize"],
+                    "state": state,
+                }
+            )
+        states = {d["state"] for d in dependencies}
+        for state, status in (
+            ("withdrawn_or_unreviewed", "asset_withdrawn_or_unreviewed"),
+            ("store_unavailable", "asset_store_unavailable"),
+            ("bytes_unavailable", "asset_bytes_unavailable"),
+        ):
+            if state in states:
+                return status, dependencies
+        return "available", dependencies
 
     def _view(self, row: dict) -> dict:
         recipe, _family = self._validated(row)
+        render: dict[str, Any] | None = None
         try:
             current = self._family(recipe)
         except AppearanceUnavailable:
             status = "family_source_unavailable"
         else:
             subject = CharacterSubject.model_validate(row["document"]["subject"])
-            binding = validate_recipe(recipe, current, subject)
-            status = (
-                self._catalog_render_status(recipe, current)
-                if is_catalog_family(current)
-                else self._render_status(binding)
-            )
+            publication = self._publication(current)
+            dependencies: list[dict[str, Any]] = []
+            if is_catalog_family(current):
+                catalog = self.catalog if publication is None else publication.document["catalog"]
+                status, dependencies = self._catalog_render_status(recipe, current, catalog)
+            else:
+                try:
+                    binding = validate_recipe(
+                        recipe, current, subject, self._representations(current)
+                    )
+                except ValueError:
+                    # The body the look was saved with is no longer listed or prepared here.
+                    named = recipe.representation_id or ""
+                    binding, status = (
+                        None,
+                        (
+                            "preparation_unavailable"
+                            if named.startswith(PREPARATION_PREFIX)
+                            else "asset_withdrawn_or_unreviewed"
+                        ),
+                    )
+                else:
+                    status = self._render_status(binding)
+                if binding is not None:
+                    dependencies = [
+                        {
+                            "asset_key": binding.asset.asset_key,
+                            "content_sha256": binding.asset.content_sha256,
+                            "byte_size": binding.asset.byte_size,
+                            "state": "available" if status == "available" else status,
+                        }
+                    ]
+            if publication is not None:
+                authored = (row["document"].get("publication") or {}).get("catalog_sha256")
+                render = {
+                    **publication.pin(),
+                    "kind": publication.kind,
+                    "resolution": None
+                    if authored is None
+                    else ("authored" if authored == publication.catalog_sha256 else "compatible"),
+                    "representation_id": recipe.representation_id,
+                    "dependencies": dependencies,
+                }
         return {
             "revision": row["revision"],
             "operation": row["operation"],
@@ -242,6 +384,7 @@ class CharacterAppearanceRepository:
             "created_by": row["created_by"],
             "created_at": row["created_at"],
             "render_status": status,
+            "render": render,
             "generation_status": "not_requested",
         }
 
@@ -301,13 +444,36 @@ class CharacterAppearanceRepository:
         with self.connection.transaction():
             self._authorize(version_id, subject)
             use = "authored-avatar" if subject.kind == "avatar" else "synthetic-inhabitant"
-            return [
-                {"family_sha256": family.sha256, "family": family.model_dump(mode="json")}
+            listed = [
+                {
+                    "family_sha256": family.sha256,
+                    "family": family.model_dump(mode="json"),
+                    "kind": _kind(family),
+                    "publication": None,
+                }
                 for family in self.families.values()
                 if use in family.permitted_uses
                 and self.authorize_family is not None
                 and self.authorize_family(family) is True
             ]
+            if self.served is not None:
+                for digest, family in self.served.families.items():
+                    if digest in self.families or use not in family.permitted_uses:
+                        continue
+                    publication = self.served.resolve(digest)
+                    assert publication is not None
+                    listed.append(
+                        {
+                            "family_sha256": digest,
+                            "family": family.model_dump(mode="json"),
+                            "kind": publication.kind,
+                            "publication": {
+                                **publication.pin(),
+                                "state": self.served.state(publication),
+                            },
+                        }
+                    )
+            return listed
 
     def read(self, version_id: uuid.UUID, subject: CharacterSubject) -> dict:
         with self.connection.transaction():
@@ -404,16 +570,19 @@ class CharacterAppearanceRepository:
                 recipe, _ = self._validated(target)
                 family = self._family(recipe)
                 if restore_revision is None:
+                    defaults = {p.key: p.default for p in family.parameters}
                     recipe = CharacterRecipe(
                         family_id=family.family_id,
                         family_sha256=family.sha256,
-                        parameters={p.key: p.default for p in family.parameters},
+                        parameters=defaults,
                         seed=family.default_seed,
+                        representation_id=self._default_representation(family, defaults),
                     )
             # Revalidate even models constructed by an internal caller, whose dicts can be mutable.
             recipe = CharacterRecipe.model_validate_json(recipe.model_dump_json())
             family = self._family(recipe)
-            binding = validate_recipe(recipe, family, subject)
+            binding = validate_recipe(recipe, family, subject, self._representations(family))
+            publication = self._publication(family)
             document = {
                 "profile": "exulanica.character-appearance-revision/v1",
                 "version_id": str(version_id),
@@ -425,6 +594,10 @@ class CharacterAppearanceRepository:
                 "plane": "fictional",
                 "producer": "exulanica.character-appearance/v1",
             }
+            if publication is not None:
+                # Which publication the look was authored against; a later compatible one may
+                # draw it, and a read says which.
+                document["publication"] = publication.pin()
             row = self.connection.execute(
                 "insert into world_character_appearance_revision(workspace_id,world_id,version_id,"
                 "subject_kind,subject_id,"
@@ -443,3 +616,12 @@ class CharacterAppearanceRepository:
                 ),
             ).fetchone()
             return {"revision": row["revision"], "current": self._view(row)}
+
+
+def _kind(family: CharacterFamily) -> str | None:
+    """The kind of a family a host registered itself, when it is one this module knows."""
+    if is_catalog_family(family):
+        return "layered-people"
+    if is_parametric_family(family):
+        return "parametric-body"
+    return None

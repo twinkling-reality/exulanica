@@ -126,6 +126,10 @@ class AuthoredObject:
     origin: ObjectOrigin
     behaviour: ObjectBehaviour | None = None
     removed: bool = False
+    #: The workspace asset preparation whose output this object draws, when it draws a person's
+    #: own admitted asset rather than a reviewed catalog asset (migration 0126). ``asset_sha256``
+    #: is then that output's digest.
+    workspace_preparation_id: uuid.UUID | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -165,7 +169,7 @@ def object_document(obj: AuthoredObject) -> dict[str, Any]:
     This is what an edit stores as its ``before`` and ``after``, so undo restores a document
     rather than replaying an intention.
     """
-    return {
+    document = {
         "asset_sha256": obj.asset_sha256,
         "behaviour": None if obj.behaviour is None else obj.behaviour.document(),
         "object_id": obj.object_id,
@@ -174,6 +178,11 @@ def object_document(obj: AuthoredObject) -> dict[str, Any]:
         "removed": obj.removed,
         "transform": obj.transform.document(),
     }
+    # Only when set, so every document written before a workspace asset could be placed keeps
+    # exactly its bytes, and so every state digest that covers one keeps its value.
+    if obj.workspace_preparation_id is not None:
+        document["workspace_preparation_id"] = str(obj.workspace_preparation_id)
+    return document
 
 
 def override_document(override: ElementOverride) -> dict[str, Any]:
@@ -309,7 +318,12 @@ def validate_object(
         # A removal is a stored edit against an object that exists, not a state to arrive in.
         # An object created already removed could never be moved, removed, or added again.
         raise InvalidObjectData("an object cannot be created already removed")
-    if obj.asset_sha256 not in asset_digests:
+    if obj.workspace_preparation_id is not None:
+        # A workspace asset is asked of its own authority by the repository that writes it, never
+        # of the reviewed catalog; a reviewed behaviour is not part of its first profile.
+        if obj.behaviour is not None:
+            raise InvalidObjectData("a workspace asset takes no behaviour")
+    elif obj.asset_sha256 not in asset_digests:
         raise InvalidObjectData(f"{obj.asset_sha256} is not a reviewed asset")
     if obj.region_id not in region_ids:
         raise InvalidObjectData(f"{obj.region_id} is not a region of the source snapshot")

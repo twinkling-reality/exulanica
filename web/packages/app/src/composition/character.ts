@@ -1,22 +1,35 @@
 import { createLatestCharacterPreview } from '../ui/latest-character-preview.js';
 import type { BodyFamily, BodyRecipe } from '../ui/character-body.js';
 import {
-  CHARACTER_CATALOG,
+  CharacterCatalogs,
   CharacterChoices,
   CharacterCrowdEvaluation,
   CharacterPreview,
-  DESIGNED_LOOKS,
   FirstPersonGesture,
   NEAR_CHARACTER_BUDGET,
   designedLook,
+  parametricNativeDescriptor,
   worldViews,
   type AtlasBinding,
+  type CatalogPublicationEntry,
   type CharacterByteLoader,
+  type CharacterCatalog,
   type CharacterLook as PersonLook,
   type NativeCharacterRuntime,
+  type ServedCharacterCatalog,
+  type ServedLayeredCatalog,
 } from '@exulanica/atlas-react/playcanvas';
 import { readBrowserAccount } from '../account-session.js';
-import { characterByteLoader, parseCharacterLooks, workspaceCharacterLoader, type CharacterLook, type CharacterSelection } from '../character-catalog.js';
+import {
+  characterByteLoader,
+  characterCatalogList,
+  parseCharacterLooks,
+  servedCharacterCatalog,
+  workspaceCharacterLoader,
+  type CharacterLook,
+  type CharacterSelection,
+} from '../character-catalog.js';
+import { lookInCatalog, sameLook } from '../character-look.js';
 import { PreviewLookStore, StaleLookError, WorkspaceLookStore, worldLookTarget, type LookStore, type SavedChoice, type SavedLooks } from '../character-looks-store.js';
 import { buildCharacterStudio, type PeopleChoice } from '../ui/character-studio.js';
 import { el } from '../ui/dom.js';
@@ -43,11 +56,36 @@ function previewSources(): Promise<typeof import('../dev/character-sources.js')>
     : Promise.reject(new Error('Character examples are available only on the development preview.'));
 }
 
-/** The default a reset returns to: the designed look for the body the person last wore. */
-export function defaultLookChoice(current: SavedChoice | null): SavedChoice {
+/**
+ * The default a reset returns to: the served people catalog's designed look for the body the person
+ * last wore, or its player default. With no people catalog served, the abstract figure, which is
+ * the contract's explicit stand-in, never a look the host did not serve.
+ */
+export function defaultLookChoice(people: ServedLayeredCatalog | null, current: SavedChoice | null): SavedChoice {
+  if (people === null) return { kind: 'abstract' };
+  const designed = people.looks;
   const base = current?.kind === 'catalog' ? current.look.baseId : null;
-  const lookId = (base !== null ? DESIGNED_LOOKS.defaults.bases[base] : undefined) ?? DESIGNED_LOOKS.defaults.player;
-  return { kind: 'catalog', look: designedLook(DESIGNED_LOOKS, lookId) };
+  const lookId = (base !== null ? designed.defaults.bases[base] : undefined) ?? designed.defaults.player;
+  return { kind: 'catalog', look: designedLook(designed, lookId), catalogSha256: people.catalogSha256 };
+}
+
+/** What the studio shows for a saved choice; a choice it has no control for shows the figure. */
+function studioChoice(choice: SavedChoice): PeopleChoice {
+  if (choice.kind === 'catalog') return { kind: 'catalog', look: choice.look };
+  if (choice.kind === 'stylized') return choice;
+  if (choice.kind === 'prepared') return { kind: 'stylized', selection: { lookId: choice.representationId, appearance: {} } };
+  return { kind: 'abstract' };
+}
+
+/**
+ * The studio edits recipes over the people catalog served now. A look saved over another revision
+ * opens as its nearest look there (`lookInCatalog`), and `moved` says the two differ, so the stage
+ * can show what Use in world would save instead of the look the world is still wearing.
+ */
+export function editableChoice(people: ServedLayeredCatalog, choice: PeopleChoice): { readonly choice: PeopleChoice; readonly moved: boolean } {
+  if (choice.kind !== 'catalog') return { choice, moved: false };
+  const look = lookInCatalog(people.catalog, people.looks, choice.look);
+  return { choice: { kind: 'catalog', look }, moved: !sameLook(look, choice.look) };
 }
 
 export function mountCharacter(deps: { env: AppEnvironment; state: SessionState; onClose(): void }) {
@@ -56,7 +94,46 @@ export function mountCharacter(deps: { env: AppEnvironment; state: SessionState;
   // Saved looks. The preview keeps them in this browser. A saved or starter world keeps them in the
   // authenticated history of its version when the session belongs to an account; anywhere else they
   // last for the visit, and the studio says which (see `followWorld`).
-  let lookStore: LookStore = env.preview ? new PreviewLookStore(defaultLookChoice) : new PreviewLookStore(defaultLookChoice, null);
+  // The people catalog the host served this page, and every served publication by digest.
+  let people: ServedLayeredCatalog | null = null;
+  const served = new Map<string, ServedCharacterCatalog>();
+  let listing: readonly CatalogPublicationEntry[] = [];
+  const defaultChoice = (current: SavedChoice | null): SavedChoice => defaultLookChoice(people, current);
+  const holding = new CharacterCatalogs();
+  /** Hold a served catalog here and in the open world, which draws its people from the same one. */
+  function adopt(catalog: ServedCharacterCatalog): void {
+    served.set(catalog.catalogSha256, catalog);
+    holding.add(catalog);
+    people = holding.people;
+    if (binding) CharacterCatalogs.forApp(binding.app).add(catalog);
+  }
+  /** The people catalog a saved catalog look is a recipe over: its own publication, else the current one. */
+  function catalogOf(choice: { readonly catalogSha256?: string }): CharacterCatalog | null {
+    const held = choice.catalogSha256 === undefined ? people : served.get(choice.catalogSha256);
+    return held?.kind === 'layered-people' ? held.catalog : null;
+  }
+  /** Every catalog the host serves now, fetched by digest once per page. */
+  async function ensureServed(): Promise<void> {
+    if (!state.credentials || people !== null) return;
+    listing = await characterCatalogList(state.credentials);
+    for (const entry of listing) {
+      if (entry.state === 'current') adopt(await servedCharacterCatalog(state.credentials, entry));
+    }
+  }
+  /** A served publication by digest, retained ones included, as a saved look names it. */
+  async function resolveCatalog(catalogSha256: string): Promise<ServedCharacterCatalog | null> {
+    const held = served.get(catalogSha256);
+    if (held) return held;
+    const entry = listing.find((candidate) => candidate.catalog_sha256 === catalogSha256);
+    if (!entry || !state.credentials) return null;
+    const fetched = await servedCharacterCatalog(state.credentials, entry);
+    adopt(fetched);
+    return fetched;
+  }
+  const peopleCatalog = (): CharacterCatalog | null => people?.catalog ?? null;
+  let lookStore: LookStore = env.preview
+    ? new PreviewLookStore(defaultChoice, undefined, peopleCatalog)
+    : new PreviewLookStore(defaultChoice, null, peopleCatalog);
   let lookStoreNote = env.preview ? 'Saved in this browser for this preview.' : 'Kept for this visit.';
   let saved: SavedLooks = { revision: 0, current: null };
   let disposed = false;
@@ -239,24 +316,23 @@ export function mountCharacter(deps: { env: AppEnvironment; state: SessionState;
       view.setFailure(error instanceof Error ? error.message : 'The character could not be loaded.');
     }
   }
-  function peopleChoice(): PeopleChoice {
-    const choice = saved.current?.choice ?? defaultLookChoice(null);
-    return choice;
-  }
   /** Committed catalog containers the stage and the world fetch in the preview. */
   async function ensurePreviewSources(): Promise<void> {
     const sources = await previewSources();
-    for (const [digest, file] of sources.catalogCharacterFiles()) previewFiles.set(digest, file);
+    if (people === null) adopt(await sources.developmentPeopleCatalog(lifetime.signal));
+    for (const [digest, file] of sources.catalogCharacterFiles(people!.catalog)) previewFiles.set(digest, file);
     previewLoader ??= sources.developmentCharacterLoader(previewFiles);
   }
-  async function showPerson(look: PersonLook): Promise<void> {
+  async function showPerson(look: PersonLook, catalog?: CharacterCatalog | null): Promise<void> {
     const revision = ++previewRevision;
     try {
       view.setPeopleStatus('Loading this person…', false);
       if (env.preview) await ensurePreviewSources();
       const renderer = await ensurePreview();
       if (revision !== previewRevision || disposed) return;
-      await renderer.showLook(look);
+      const drawn = catalog ?? peopleCatalog();
+      if (drawn === null) throw new Error('people_catalog_unavailable');
+      await renderer.showLook(look, drawn);
       if (revision !== previewRevision || disposed) return;
       previewLook = null;
       view.setPeopleStatus('Preview this person, then use them in the world.', true);
@@ -274,8 +350,54 @@ export function mountCharacter(deps: { env: AppEnvironment; state: SessionState;
       void prepareGesture(choice.selection);
       return;
     }
+    if (choice.kind === 'prepared') {
+      await wearPrepared(choice);
+      return;
+    }
     state.characterSelection = null;
-    if (binding) CharacterChoices.forApp(binding.app).set(PLAYER, choice.kind === 'catalog' ? { kind: 'catalog', look: choice.look } : { kind: 'abstract' });
+    if (!binding) return;
+    const choices = CharacterChoices.forApp(binding.app);
+    const catalogPerson = choice.kind === 'catalog' ? catalogOf(choice) : null;
+    if (choice.kind === 'catalog' && catalogPerson !== null) {
+      choices.set(PLAYER, { kind: 'catalog', look: choice.look, catalog: catalogPerson });
+      return;
+    }
+    // The abstract figure stands in, and the person is told why: never somebody else's look.
+    choices.set(PLAYER, { kind: 'abstract' });
+    if (choice.kind === 'unavailable') view.setPeopleStatus(choice.code, true);
+    else if (choice.kind === 'catalog') view.setPeopleStatus('catalog_unavailable', true);
+  }
+  /** A prepared body of a parametric family, drawn by the native runtime from its publication. */
+  async function wearPrepared(choice: Extract<SavedChoice, { kind: 'prepared' }>): Promise<void> {
+    const publication = served.get(choice.catalogSha256);
+    const family = publication?.kind === 'parametric-body'
+      ? publication.document.families.find((candidate) => candidate.familyId === choice.familyId)
+      : undefined;
+    const body = family?.representations.find((candidate) => candidate.representationId === choice.representationId);
+    if (!family || !body || !binding) {
+      if (binding) CharacterChoices.forApp(binding.app).set(PLAYER, { kind: 'abstract' });
+      view.setPeopleStatus('preparation_unavailable', true);
+      return;
+    }
+    const look: CharacterLook = {
+      lookId: body.representationId,
+      label: family.label,
+      file: `${body.asset.assetKey}.glb`,
+      creator: family.sources.map((source) => source.title).join(' · '),
+      license: 'CC0',
+      descriptor: parametricNativeDescriptor(family, body.descriptor, {
+        assetKey: body.asset.assetKey,
+        mediaType: body.asset.mediaType,
+        contentSha256: body.asset.contentSha256,
+        byteSize: body.asset.byteSize,
+      }),
+      defaultColors: family.colourSlots,
+      familyId: family.familyId,
+    };
+    catalog = [...catalog.filter((item) => item.lookId !== look.lookId), look];
+    const selection: CharacterSelection = { lookId: look.lookId, appearance: {} };
+    state.characterSelection = selection;
+    await install(selection);
   }
   async function reflectSaved(): Promise<void> {
     view.setHistory(await lookStore.history());
@@ -299,10 +421,10 @@ export function mountCharacter(deps: { env: AppEnvironment; state: SessionState;
     const entry = state.activeWorldEntry;
     const where = worldLookTarget(entry, entry ? await accountActor() : null);
     if (where.target) {
-      lookStore = new WorkspaceLookStore(state.credentials, where.target);
+      lookStore = new WorkspaceLookStore(state.credentials, where.target, resolveCatalog);
       lookStoreNote = 'Saved to this world.';
     } else {
-      lookStore = new PreviewLookStore(defaultLookChoice, null);
+      lookStore = new PreviewLookStore(defaultChoice, null, peopleCatalog);
       lookStoreNote = where.missing === 'account'
         ? 'Kept for this visit: saving looks to this world needs an account sign-in.'
         : 'Kept for this visit: this place has no saved version to keep looks with.';
@@ -313,10 +435,12 @@ export function mountCharacter(deps: { env: AppEnvironment; state: SessionState;
     if (applying || disposed) return;
     applying = true;
     view.setPeopleStatus('Applying your look…', false);
+    // A look made in the studio is a recipe over the people catalog the page was served.
+    const chosen: SavedChoice = choice.kind === 'catalog' && people !== null ? { ...choice, catalogSha256: people.catalogSha256 } : choice;
     try {
-      await wear(choice);
+      await wear(chosen);
       if (disposed) return;
-      if (lookStore.keeps(choice)) saved = await lookStore.save(choice, saved.revision);
+      if (lookStore.keeps(chosen)) saved = await lookStore.save(chosen, saved.revision);
       await reflectSaved();
       binding?.setCameraMode('third-person');
       binding?.setCameraFraming(2.4);
@@ -338,11 +462,7 @@ export function mountCharacter(deps: { env: AppEnvironment; state: SessionState;
       const choice = saved.current!.choice;
       await wear(choice);
       if (disposed) return;
-      view.setPeople(CHARACTER_CATALOG, DESIGNED_LOOKS, choice);
-      await reflectSaved();
-      if (choice.kind === 'catalog') await showPerson(choice.look);
-      else if (choice.kind === 'stylized') await showSelection(choice.selection);
-      else view.setPeopleStatus('You are wearing the abstract figure.', true);
+      await showStudioChoice(choice);
     } catch (error) {
       if (disposed) return;
       if (error instanceof StaleLookError) {
@@ -363,18 +483,42 @@ export function mountCharacter(deps: { env: AppEnvironment; state: SessionState;
         if (retained && !catalog.some(item => item.lookId === retained.lookId)) catalog = [...catalog.filter(item => !item.familyId), retained];
         view.setCatalog(catalog, selection);
       }
+      if (env.preview) await ensurePreviewSources();
+      else await ensureServed();
       saved = await lookStore.read();
       if (!opened || disposed) return;
-      const choice = peopleChoice();
-      view.setPeople(CHARACTER_CATALOG, DESIGNED_LOOKS, choice);
       view.setSaveNote(lookStoreNote);
-      await reflectSaved();
-      if (choice.kind === 'catalog') await showPerson(choice.look);
-      else if (choice.kind === 'stylized') await showSelection(choice.selection);
-      else view.setPeopleStatus('You are wearing the abstract figure.', true);
+      await showStudioChoice(saved.current?.choice ?? defaultChoice(null));
     } catch (error) {
       if (!disposed) view.setFailure(error instanceof Error ? error.message : 'Character looks are unavailable.');
     }
+  }
+  /**
+   * Put a saved choice in the studio. The editor works over the people catalog served now; a look
+   * that catalog cannot draw opens as its nearest look there and says so by code, and a saved look
+   * the host cannot resolve keeps the host's code beside the abstract figure that stands in.
+   */
+  async function showStudioChoice(current: SavedChoice): Promise<void> {
+    const shown = studioChoice(current);
+    const offered = people;
+    if (offered === null) {
+      // No people catalog is served, so there is nothing to edit; the studio says so by code.
+      await reflectSaved();
+      if (shown.kind === 'stylized') await showSelection(shown.selection);
+      if (!disposed) view.setPeopleStatus(current.kind === 'unavailable' ? current.code : 'people_catalog_unavailable', false);
+      return;
+    }
+    const editable = editableChoice(offered, shown);
+    view.setPeople(offered.catalog, offered.looks, editable.choice);
+    // After the people are set, so the history names designed looks by their labels.
+    await reflectSaved();
+    if (editable.choice.kind === 'catalog') {
+      await showPerson(editable.choice.look, editable.moved ? offered.catalog : current.kind === 'catalog' ? catalogOf(current) : null);
+      // Placeholder words for saved_look_options_not_offered: the page's own wording for this code
+      // is not written yet.
+      if (editable.moved && !disposed) view.setPeopleStatus('Your saved look uses options this studio no longer offers, so it opens on the nearest look it offers.', true);
+    } else if (editable.choice.kind === 'stylized') await showSelection(editable.choice.selection);
+    else view.setPeopleStatus(current.kind === 'unavailable' ? current.code : 'You are wearing the abstract figure.', true);
   }
   async function install(selection: CharacterSelection): Promise<void> {
     if (!binding || !native) throw new Error('The world is still loading. Try again in a moment.');
@@ -431,15 +575,20 @@ export function mountCharacter(deps: { env: AppEnvironment; state: SessionState;
       crowd = null;
       binding = atlas;
       view.setWorldView(worldViews(atlas.worldKind).thirdPerson);
+      // The open world draws its inhabitants and the player's default from the catalogs this page
+      // holds; a world opened after they arrived is given them at once.
+      for (const held of served.values()) CharacterCatalogs.forApp(atlas.app).add(held);
       if (!env.preview) {
-        // A signed-in world draws the same catalog people from its reviewed assets, and the player
-        // wears what this world keeps for them.
+        // A signed-in world draws the people its host serves from its reviewed assets, and the
+        // player wears what this world keeps for them, else the served designed default.
         if (state.credentials) native = atlas.enableNativeCharacters(workspaceCharacterLoader(state.credentials));
         try {
+          await ensureServed();
+          if (disposed || binding !== atlas) return;
           await followWorld();
           saved = await lookStore.read();
-          if (disposed || binding !== atlas || !saved.current) return;
-          await wear(saved.current.choice);
+          if (disposed || binding !== atlas) return;
+          await wear(saved.current?.choice ?? defaultChoice(null));
         } catch (error) {
           if (!disposed) view.setPeopleStatus(error instanceof Error ? error.message : 'Your saved look could not be read.', true);
         }
@@ -457,8 +606,8 @@ export function mountCharacter(deps: { env: AppEnvironment; state: SessionState;
         // wears the catalog's designed default until the person chooses otherwise.
         atlas.setCameraMode(atlas.cameraMode);
         saved = await lookStore.read();
-        if (disposed || !saved.current) return;
-        await wear(saved.current.choice);
+        if (disposed) return;
+        await wear(saved.current?.choice ?? defaultChoice(null));
       } catch (error) {
         if (!disposed) view.setFailure(error instanceof Error ? error.message : 'Character looks are unavailable.');
       }

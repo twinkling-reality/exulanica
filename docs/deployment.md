@@ -102,6 +102,7 @@ boundary ([security floor](security-floor.md)).
 | --- | --- | --- | --- |
 | API | `uvicorn --factory exulanica.api.app:create_app`, the image's `CMD` | Serves the HTTP API. When configured it also drains the derivative queue and plays societies in background threads | 5.1 |
 | Migrations and roles | `exulanica-db` | Applies migrations, then provisions the four application roles | 5.2.1 |
+| Character catalogs | `exulanica-character-catalog publish --apply` | Publishes the character catalogs the code carries, after `exulanica-db`, into the store the API serves | 5.2.1 |
 | Derivative worker | `exulanica-derivative-worker` | Drains the photograph derivative queue | 5.2.2 |
 | Scene worker | `exulanica-scene-worker` | Recovers camera poses and publishes scenes for queued scene jobs | 5.2.3 |
 | Purge worker | `exulanica-purge` | Destroys stored bytes that committed tombstones ask for | 5.2.4 |
@@ -167,6 +168,8 @@ With `EXULANICA_STORE_KIND` unset or `local`, the store is directories under `EX
 - `tiles/`: baked tiles, one store for everybody, because a tile is a pure function of public
   inputs.
 - `materials/<workspace>/`: each workspace's material bakes.
+- `workspace-assets/<workspace>/`: each workspace's own admitted 3D assets and their prepared
+  outputs (migration 0126); never shared between workspaces, and erased only with the workspace.
 
 `<workspace>` is the workspace id as 32 lower-case hex digits. These names are stable: each is a
 directory here, a segment of every object key in 4.2 and the name a backup set records, so renaming
@@ -448,6 +451,20 @@ the model settings in 5.1 apply; the decision contract's spend bounds are in
 | `EXULANICA_DATABASE_URL` | The bootstrap owner's connection. Migrations and role grants run in one command because there is one correct order |
 | `EXULANICA_APP_ROLE_PASSWORD`, `EXULANICA_EXECUTOR_ROLE_PASSWORD`, `EXULANICA_PURGE_ROLE_PASSWORD`, `EXULANICA_ACCOUNT_ROLE_PASSWORD` | Passwords for `exulanica_app`, `exulanica_ro`, `exulanica_purge` and `exulanica_accounts`. Each is optional and set only when supplied, because a role that authenticates by certificate or by peer has none |
 
+Every path that creates or upgrades a serving database then runs
+`exulanica-character-catalog publish --apply`. It uses the same owner connection and the data
+directory, or object-store settings, that the API serves its store from.
+
+- **Why it matters.** People are drawn only from catalogs the host published (migration 0131).
+  Until the command has run, no person is drawn and every saved look reads as unavailable.
+  `/readyz` states `people_catalog_unpublished` under `checks.character_catalogs`, with the
+  command.
+- **Which paths run it.** `compose.yaml` and `deploy/judge/compose.yaml` each run it as their
+  `catalogs` job, after `migrate` and before `api`.
+- **Running it again.** It is idempotent: an identical catalog is answered `unchanged`, and an
+  image carrying a newer catalog publishes the newer revision. Without `--apply` it checks every
+  document and container and writes nothing.
+
 #### 5.2.2 The derivative worker
 
 `exulanica-derivative-worker` drains the queue `POST /intake` fills. Its delivery contract,
@@ -638,7 +655,7 @@ opened:
 | --- | --- | --- | --- | --- |
 | exempt | `GET /healthz`, `GET /readyz` | none | none | none |
 | streams | `GET /formation/{batch_id}` | `EXULANICA_API_STREAMS` (128) | `EXULANICA_API_WORKSPACE_STREAMS` (8) | 5 s |
-| uploads | `POST /intake` | `EXULANICA_API_UPLOADS` (2) | `EXULANICA_API_WORKSPACE_UPLOADS` (1) | 10 s |
+| uploads | `POST /intake`, `POST /workspace-assets` | `EXULANICA_API_UPLOADS` (2) | `EXULANICA_API_WORKSPACE_UPLOADS` (1) | 10 s |
 | requests | every other route | `EXULANICA_API_REQUESTS` (24) | `EXULANICA_API_WORKSPACE_REQUESTS` (12) | 1 s |
 
 - A class at its limit answers **503 `capacity_exhausted`**, and a workspace at its share **429
@@ -654,6 +671,10 @@ opened:
   seconds between pieces, or 60 seconds in total for a request (600 for an upload, which is 512 MB
   at about 0.9 MB/s). A client can hold a slot for at most its class's total; a limit per address
   belongs to a reverse proxy (5.1.2).
+- `GET /workspace-assets/{asset_id}/prepared/bytes` is in the requests class and answers the whole
+  prepared output, up to 32 MiB, from memory, so at the defaults 24 such downloads can hold about
+  768 MiB that the decode-memory bound in 5.4.4 does not count; streaming it from the store is
+  later work.
 - A route missing from the application while `CAPACITY_ROUTES` still names it stops the build, so a
   renamed route cannot fall back to `requests` unnoticed.
 - `/readyz` reports each class's limit and share and the decode limit (6.2). The counts (in flight,

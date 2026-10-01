@@ -136,7 +136,8 @@ Branching from a version copies its delta, and the branch's rows are new placeme
 parent's rows is asked what carrying it onto a later snapshot asks (`carry_plan` in
 [`object_repository.py`](../exulanica/world/object_repository.py), the question the binding
 triggers ask as a row is written). An environment piece whose source was withdrawn, may no longer be
-composed or no longer resolves to its pinned binding, and a depth estimate whose right ended, whose
+composed or no longer resolves to its pinned binding, an object whose workspace asset may no longer
+be placed (withdrawn, or its workspace erased), and a depth estimate whose right ended, whose
 photograph was deleted or whose bytes may no longer be read, stays in the parent only. A piece
 whose source still stands and whose stored files are missing is copied, as a carry copies it, and
 the branch shows it as `unavailable_bytes`: the question reads rows, never stored bytes. The branch
@@ -194,6 +195,18 @@ is a property of the edit rather than of the object, and it lives on the edit ro
 
 The asset reference is a content digest, never a name and never a URL. `region_id` must be a region
 of the source snapshot's topology, and the transform is **region-local**.
+
+An object may instead draw a person's own prepared asset
+([workspace asset admission](workspace-asset-admission.md)). Its row then also names
+`workspace_preparation_id`, and `asset_sha256` is that preparation's output. The canonical object
+document carries `workspace_preparation_id` only for such an object, so the document of every
+reviewed object, and every state digest that covers one, keeps its bytes. The reviewed catalog's
+foreign key holds exactly the rows that name no preparation; a composite key to the preparation's
+`(workspace_id, preparation_id, output_sha256)` holds the rest. A binding trigger refuses writing a
+pin unless the preparation may be placed at that moment, on insertion and on the revival of an
+undone addition; every other update keeps the binding exactly as it was, so an object whose asset
+was withdrawn can still be removed and its edits undone. Moving it is placing it again, and is
+refused. Such an object takes no behaviour, which the table refuses as well.
 
 Reviewed GLBs that declare no materials receive a renderer-owned matte material derived from the
 world's appearance palette. Appearance preview, apply and discard update this fallback; declared
@@ -563,7 +576,8 @@ validators share their checks with the writers, including an undo's restore rule
 environment instance or point map whose binding moved, so for one stored state a ready preview's
 `after` is the document the write records and a blocked preview's reason is the problem code the
 write answers (`stale_object_base`, `invalidated_source_version`, `invalid_object_state`,
-`invalid_object_data`, `invalid_environment_state`). The base is checked before the object is
+`invalid_object_data`, `invalid_environment_state`, and `withdrawn` for a move of an object whose
+workspace asset was withdrawn). The base is checked before the object is
 looked up, as the write checks it, and an unknown or foreign version or object answers the write's
 `404 unknown_reference`. A preview does not compose the society input a purposeful society takes
 from every accepted edit, so a write whose preview was ready can still answer
@@ -577,7 +591,8 @@ The problem codes are distinct, because the recovery differs:
 
 | HTTP | Code | Recovery |
 | --- | --- | --- |
-| `422` | `invalid_object_data` | Correct the asset, region, transform, origin role, behaviour or parameter |
+| `422` | `invalid_object_data` | Correct the asset, region, transform, origin role, behaviour or parameter; an object drawn from a workspace asset takes no behaviour |
+| `410` | `withdrawn` | Moving an object whose workspace asset was withdrawn, or whose workspace was erased: it stays where it was placed until it is removed |
 | `409` | `stale_object_base` | Read the version again and re-issue the edit against the new `state_sha256`; for `POST /world/versions`, a source ended while the branch was written: branch again |
 | `409` | `busy` | `POST /world/versions` only: another write was in flight and nothing was written; branch again |
 | `409` | `invalid_object_state` | Do not move, remove or change the behaviour of an already-removed object, re-add an existing id, set the behaviour an object already has, or undo an empty history |
@@ -650,6 +665,15 @@ licence_id, licence_sha256, availability, placeable
 `content_sha256` is the object's actual reference. There is no separate `asset_sha256` on the wire
 object, because it would be that same value written twice.
 
+Every object also carries `workspace_asset`, null for a reviewed object. An object drawn from a
+workspace asset has a null `asset`, and its `workspace_asset` names `asset_id`, `preparation_id`,
+`title`, `content_sha256`, `byte_size`, `media_type`, `licence_id`, `attribution` and
+`availability`, resolved when the version is read and outside `state_sha256`: `available`,
+`withdrawn` (not drawn; the object stays), `unavailable_bytes`, or `unknown` on an instance with no
+workspace asset store. Its bytes are `GET /workspace-assets/{asset_id}/prepared/bytes`, checked
+against `content_sha256`. A version holding such an object reads with `schema_version` 4; every other
+version keeps the schema version it had.
+
 `objects[]` is sorted by `object_id` and `element_overrides[]` by `element_id`. Those two orders
 are load-bearing: `canonical_delta_document` sorts by the same keys, so the state digest is
 computed over exactly that sequence. `edits[]` is sorted by `edit_seq` ascending, which the digest
@@ -660,7 +684,10 @@ does not cover at all; it is ordered because a log read backwards is a log misre
 Package projection preserves `exulanica-wmp-1.0` byte compatibility and uses the opt-in
 `exulanica-wmp-ext-authored-world` 1.0 extension. It exports alternate versions, source snapshots,
 authored objects, element overrides, edit chains, reviewed asset descriptors and bounded behavior
-references. Asset bytes and runtime code remain excluded.
+references. Asset bytes and runtime code remain excluded. A version holding an object drawn from a
+workspace asset, and every version branched from it, is withheld and counted under
+`section_not_carried` with the name `workspace_assets`: no extension carries a workspace's own
+asset.
 
 The verifier re-derives every version state digest, closes edit and parent chains, validates source
 and region references, checks asset and behavior declarations, and withholds versions whose source

@@ -56,6 +56,7 @@ from exulanica.world.authored_delta import AlternateVersion
 from exulanica.world.errors import InvalidStructuralData, UnknownWorldResource
 from exulanica.world.generated_worlds import generation_receipt, town_records
 from exulanica.world.object_repository import WorldObjectRepository
+from exulanica.world.objects import AuthoredObject
 from exulanica.world.society import (
     SocietyBytesNotRead,
     UnavailableSocietyInput,
@@ -77,6 +78,7 @@ from exulanica.world.society_composition import (
     keep_registry,
     policy_dependency_refs,
     validate_recorded_registry,
+    workspace_obstacle,
 )
 from exulanica.world.society_engines import society_engine
 from exulanica.world.society_input_policy import (
@@ -632,6 +634,47 @@ class SocietyRuntime:
             (key,),
         ).fetchone()
 
+    def _workspace_obstacles(
+        self,
+        connection: psycopg.Connection,
+        workspace_id: uuid.UUID,
+        objects: Iterable[AuthoredObject],
+    ) -> dict[str, dict[str, Any]]:
+        """Each placed workspace asset's obstacle, from what its preparation measured.
+
+        Rows only, so it is asked under the asset read lock. The preparation stands for its object
+        whether or not its admission was withdrawn since: a withdrawn object stays where it was
+        placed, and blocks walking, until it is removed. A preparation that does not record the
+        object's exact output is a binding drift, and the input is unavailable by that name.
+        """
+        obstacles: dict[str, dict[str, Any]] = {}
+        for obj in objects:
+            if obj.removed or obj.workspace_preparation_id is None:
+                continue
+            row = connection.execute(
+                "select output_sha256, width_mm, depth_mm from workspace_preparation "
+                "where workspace_id = %s and preparation_id = %s",
+                (workspace_id, obj.workspace_preparation_id),
+            ).fetchone()
+            if row is None or row["output_sha256"] != obj.asset_sha256 or row["width_mm"] is None:
+                raise UnavailableSocietyInput("workspace asset preparation binding drift")
+            obstacles[str(obj.workspace_preparation_id)] = workspace_obstacle(
+                obj.workspace_preparation_id, row["width_mm"], row["depth_mm"]
+            )
+        return obstacles
+
+    def _workspace_ref(
+        self, connection: psycopg.Connection, session: Session, ref: Mapping[str, str]
+    ) -> None:
+        """A stored input's workspace asset ref still names its preparation's recorded output."""
+        row = connection.execute(
+            "select 1 from workspace_preparation where workspace_id = %s "
+            "and preparation_id = %s and output_sha256 = %s",
+            (session.workspace_id, uuid.UUID(ref["identity"]), ref["sha256"]),
+        ).fetchone()
+        if row is None:
+            raise UnavailableSocietyInput("workspace asset preparation binding drift")
+
     def _asset(
         self,
         connection: psycopg.Connection,
@@ -1067,8 +1110,9 @@ class SocietyRuntime:
         refs = self._refs(binding)
         try:
             interpreted, base_bytes, geometry = self._district(connection, session, binding, read)
+            workspace = self._workspace_obstacles(connection, session.workspace_id, version.objects)
             for obj in version.objects:
-                if obj.removed:
+                if obj.removed or obj.workspace_preparation_id is not None:
                     continue
                 assignment = registry.get(obj.asset_sha256)
                 if assignment is None:
@@ -1096,6 +1140,7 @@ class SocietyRuntime:
             supports=geometry.supports,
             segment_blocked=segment_blocked,
             composition_profile=self._composition_profile,
+            workspace_obstacles=workspace,
         )
 
     def initial_input(
@@ -1213,6 +1258,8 @@ class SocietyRuntime:
             for ref in document["dependency_refs"]:
                 if ref["kind"] == "reviewed_asset":
                     self._asset(connection, ref["identity"], ref["sha256"], registry, read)
+                elif ref["kind"] == "workspace_asset":
+                    self._workspace_ref(connection, session, ref)
 
     def authored_edit(
         self, connection: psycopg.Connection, session: Session, version_id: uuid.UUID
@@ -1374,10 +1421,15 @@ class SocietyRuntime:
         composition and names none."""
         registry = json.loads(self._registry_bytes)
         reason = None
+        workspace: dict[str, dict[str, Any]] = {}
         try:
-            # Only the objects this society reads: another region's are another place's.
+            # Only the objects this society reads: another region's are another place's. A
+            # person's own asset is no reviewed asset; its preparation states its obstacle.
+            workspace = self._workspace_obstacles(
+                connection, binding.workspace_id, objects_in_region(version, ground)
+            )
             for obj in objects_in_region(version, ground):
-                if obj.removed:
+                if obj.removed or obj.workspace_preparation_id is not None:
                     continue
                 assignment = registry.get(obj.asset_sha256)
                 if assignment is None:
@@ -1406,6 +1458,7 @@ class SocietyRuntime:
                     reviewed_affordances=registry,
                     segment_blocked=segment_blocked,
                     standing=self._standing,
+                    workspace_obstacles=workspace,
                 )
             return build_authored_ground_society_input_v3(
                 ground=ground,
@@ -1417,6 +1470,7 @@ class SocietyRuntime:
                 reviewed_affordances=registry,
                 segment_blocked=segment_blocked,
                 standing=self._standing,
+                workspace_obstacles=workspace,
             )
         if ground.navigation_form == "walking_surfaces":
             # The records and the place they make were generated before the asset read lock
@@ -1466,6 +1520,7 @@ class SocietyRuntime:
                 reviewed_affordances=registry,
                 standing=self._standing,
                 living=routine,
+                workspace_obstacles=workspace,
             )
         raise UnavailableSocietyInput(
             f"no society composition walks a {ground.navigation_form!r} ground"
@@ -1699,6 +1754,8 @@ class SocietyRuntime:
             for ref in document["dependency_refs"]:
                 if ref["kind"] == "reviewed_asset":
                     self._asset(connection, ref["identity"], ref["sha256"], registry, read)
+                elif ref["kind"] == "workspace_asset":
+                    self._workspace_ref(connection, session, ref)
 
     def _authored_world_edit(
         self, connection: psycopg.Connection, session: Session, version_id: uuid.UUID

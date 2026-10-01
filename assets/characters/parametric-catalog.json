@@ -1,0 +1,18 @@
+{
+  "catalogId": "exulanica-parametric-characters",
+  "families": [
+    {
+      "budget": {
+        "maxBytes": 8388608,
+        "maxImagePixels": 4194304,
+        "maxImages": 8,
+        "maxJoints": 64,
+        "maxTriangles": 80000,
+        "maxVertices": 60000
+      },
+      "folder": "makehuman-parametric-v1"
+    }
+  ],
+  "profile": "exulanica.parametric-character-catalog-source/v1",
+  "revision": 1
+}

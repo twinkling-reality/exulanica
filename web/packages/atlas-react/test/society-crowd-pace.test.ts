@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import * as pc from 'playcanvas';
 import { SocietyCrowd } from '../src/playcanvas/society/crowd.js';
 import type { CrowdRenderableFactory, OwnedSocietyState } from '../src/playcanvas/society/types.js';
+import { serveFixturePeople } from './served-people.js';
 
 /*
  * A v2 state records one travel budget for everybody, a bound. Here it is 6 m a tick, presented
@@ -21,6 +22,7 @@ function crowd() {
   options.graphicsDevice = device;
   options.componentSystems = [pc.RenderComponentSystem];
   app.init(options);
+  serveFixturePeople(app);
   const root = new pc.Entity('society');
   app.root.addChild(root);
   const factory: CrowdRenderableFactory = (_device, parent, identity) => {

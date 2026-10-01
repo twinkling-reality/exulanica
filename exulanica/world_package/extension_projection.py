@@ -44,7 +44,12 @@ from exulanica.world.edit_kinds import EditSubject
 from exulanica.world.object_repository import WorldObjectRepository
 from exulanica.world.objects import AuthoredObject
 from exulanica.world_package import authored, environments
-from exulanica.world_package.export_partition import ExportPlan, PlaneVersion, plan_export
+from exulanica.world_package.export_partition import (
+    WORKSPACE_ASSETS,
+    ExportPlan,
+    PlaneVersion,
+    plan_export,
+)
 from exulanica.world_package.extension_formats import FORMATS, ExtensionFormat, families
 from exulanica.world_package.package import PackageError
 from exulanica.world_package.pseudonyms import optional_urn, urn
@@ -165,6 +170,17 @@ def _plane_versions(
             (workspace_id, world_id),
         ).fetchall():
             sections.setdefault(row["version_id"], set()).add(section.key)
+    # An object placed from a workspace's own asset is in the objects section like any other;
+    # what no format carries is the asset it names.
+    holding_workspace_assets = {
+        row["version_id"]
+        for row in cursor.execute(
+            "select distinct version_id from world_alternate_object "
+            "where workspace_id=%s and world_id=%s and workspace_preparation_id is not null "
+            "and not addition_undone",
+            (workspace_id, world_id),
+        ).fetchall()
+    }
     return tuple(
         PlaneVersion(
             version_id=row["version_id"],
@@ -173,6 +189,11 @@ def _plane_versions(
             chain_kinds=frozenset(kinds.get(row["version_id"], ())),
             chain_subjects=frozenset(subjects.get(row["version_id"], ())),
             state_sections=frozenset(sections.get(row["version_id"], ())),
+            uncarried=(
+                frozenset({WORKSPACE_ASSETS})
+                if row["version_id"] in holding_workspace_assets
+                else frozenset()
+            ),
         )
         for row in cursor.execute(
             "select version_id,source_snapshot_id,parent_version_id from world_alternate_version "

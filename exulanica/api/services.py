@@ -98,6 +98,8 @@ from exulanica.world.society_controls import (
     validate_settings,
 )
 from exulanica.world.texture_assets import load_material_catalog
+from exulanica.world.workspace_assets import WorkspaceAssetRuntime
+from exulanica.world.workspace_preparations import RETAINED_BYTES_SETTING, retained_bytes_limit
 
 if TYPE_CHECKING:
     from exulanica.api.routes.character_appearance import CharacterAppearanceRuntime
@@ -216,6 +218,9 @@ class Services:
     #: The published material catalog and each workspace's bake namespace. None when this
     #: instance was started without ``assets/textures``, which ``warnings`` says.
     materials: MaterialRuntime | None = None
+    #: Each workspace's own admitted assets and prepared outputs (migration 0126). None in a
+    #: hand-built Services, which makes the workspace asset routes answer 503.
+    workspace_assets: WorkspaceAssetRuntime | None = None
     #: The one store baked tiles live in, shared by every workspace because a baked tile is a
     #: pure function of public inputs (migration 0072). None in a hand-built Services, which
     #: makes the tile routes answer 503 rather than reach a store nobody configured.
@@ -591,7 +596,7 @@ class Services:
             )
         if self.character_appearance is None:
             notes.append(
-                "the character catalog is not readable here, so saving a look answers 424 and a "
+                "no character runtime is configured here, so saving a look answers 424 and a "
                 "person's chosen look lasts only as long as their browser keeps it."
             )
         if self.society_runtime is None:
@@ -725,6 +730,9 @@ def build_services(
         accounts=accounts,
         environment_admission_root=data_dir / "environment-inbox",
         materials=_material_runtime(stores, environ),
+        workspace_assets=WorkspaceAssetRuntime(
+            stores=stores.workspace_assets, retained_bytes_limit=retained_bytes_limit(environ)
+        ),
         character_appearance=_character_appearance_runtime(store, environ),
         tiles=stores.tiles,
         society_runtime=_society_runtime(store, environ),
@@ -812,35 +820,25 @@ def _material_runtime(stores: ContentStores, environ: Mapping[str, str]) -> Mate
 def _character_appearance_runtime(
     store: ContentAddressedStore, environ: Mapping[str, str]
 ) -> CharacterAppearanceRuntime | None:
-    """Saved looks over the committed character catalog, when the catalog is here.
+    """Saved looks over the character catalogs this host publishes (migration 0131).
 
-    ``EXULANICA_CHARACTER_DIRECTORY`` names the catalog in an image; a checkout finds its own. Each
-    body's recipe family is derived from the catalog and its designed looks, and a family is
-    authorized exactly while this instance serves it. The containers a look composes are
-    reviewed assets, published by ``scripts/prepare_character_people.py --import --apply``. A
-    catalog and designed looks that disagree stop startup; only a missing catalog is an absence,
-    and ``warnings`` says so.
+    A family is served while a publication that derives it is not withdrawn, and a saved look is
+    drawn from the newest served publication deriving exactly its family. Publishing is host
+    administration, not startup: ``exulanica-character-catalog publish`` (or
+    ``scripts/prepare_character_people.py --import --apply``) imports the containers and records the
+    publication with the owner connection, so this instance reads the catalogs from the database
+    on every request and a publication or withdrawal takes effect without a restart. With nothing
+    published, the families read is empty and saving a look answers 424.
     """
     from exulanica.api.routes.character_appearance import CharacterAppearanceRuntime
-    from exulanica.world.character_appearance import (
-        catalog_recipe_families,
-        load_character_catalog,
-    )
+    from exulanica.world.character_catalogs import CatalogRegistry
 
-    directory = env_get("CHARACTER_DIRECTORY", environ)
-    try:
-        catalog, looks = (
-            load_character_catalog(Path(directory)) if directory else load_character_catalog()
-        )
-    except FileNotFoundError:
-        return None
-    families = catalog_recipe_families(catalog, looks)
-    served = frozenset(family.sha256 for family in families)
+    del environ
     return CharacterAppearanceRuntime(
-        families=families,
-        authorize_family=lambda _connection, _session, family: family.sha256 in served,
+        families=(),
+        authorize_family=lambda _connection, _session, _family: False,
         store=store,
-        catalog=catalog,
+        catalogs=CatalogRegistry(),
     )
 
 
@@ -943,6 +941,7 @@ def describe_configuration(environ: Mapping[str, str] | None = None) -> dict[str
         SOCIETY_TICK_INTERVAL_MS_ENV,
         API_TOKENS_ENV,
         *AdmissionSettings.variables(),
+        env_name(RETAINED_BYTES_SETTING),
         *sorted({provider.api_key_env for provider in load_manifest().providers.values()}),
         "EXULANICA_GOOGLE_CLIENT_ID",
         "EXULANICA_GOOGLE_CLIENT_SECRET",

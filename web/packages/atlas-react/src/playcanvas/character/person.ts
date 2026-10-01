@@ -8,7 +8,7 @@
  * the caller supplies resolved ground positions and facing.
  */
 import * as pc from 'playcanvas';
-import { catalogBase, catalogFamily, catalogMaterial, type CatalogBase } from './catalog.js';
+import { catalogBase, catalogFamily, catalogMaterial, type CatalogBase, type CharacterCatalog } from './catalog.js';
 import type { CharacterHost, ContainerLease, LoadedContainer } from './host.js';
 import type { CharacterRenderableDescription } from './look.js';
 import { FootLock } from './foot-lock.js';
@@ -105,11 +105,11 @@ export class CharacterPerson {
     this.root = new pc.Entity(`character:${description.lookSha256.slice(0, 12)}`, app);
   }
 
-  static async create(host: CharacterHost, description: CharacterRenderableDescription, signal: AbortSignal): Promise<CharacterPerson> {
+  static async create(host: CharacterHost, catalog: CharacterCatalog, description: CharacterRenderableDescription, signal: AbortSignal): Promise<CharacterPerson> {
     if (description.detail !== 'near' || !description.base) throw new TypeError('A rigged person needs a near description');
     const person = new CharacterPerson(description, host.app);
     try {
-      await person.assemble(host, signal);
+      await person.assemble(host, catalog, signal);
       return person;
     } catch (error) {
       person.destroy();
@@ -117,9 +117,9 @@ export class CharacterPerson {
     }
   }
 
-  private async assemble(host: CharacterHost, signal: AbortSignal): Promise<void> {
+  private async assemble(host: CharacterHost, catalog: CharacterCatalog, signal: AbortSignal): Promise<void> {
     const description = this.description;
-    const family = catalogFamily(host.catalog, description.familyId);
+    const family = catalogFamily(catalog, description.familyId);
     const base = catalogBase(family, description.baseId);
     const materialFor = (id: string, tint: string | null) => host.material(catalogMaterial(family, id), tint, signal);
     // Load everything in parallel; a failure anywhere releases what arrived.

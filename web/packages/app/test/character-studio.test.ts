@@ -141,7 +141,8 @@ it('keeps controls live during fitting, blocks stale application, and preserves 
 
 describe('people mode', () => {
   it('previews catalog choices, applies a person or the abstract figure, and restores saved looks', async () => {
-    const { CHARACTER_CATALOG, DESIGNED_LOOKS, designedLook } = await import('@exulanica/atlas-react/playcanvas');
+    const { designedLook } = await import('@exulanica/atlas-react/playcanvas');
+    const { CHARACTER_CATALOG, DESIGNED_LOOKS } = await import('./served-people.js');
     const handlers = {
       onClose: vi.fn(), onPreview: vi.fn(), onApply: vi.fn(), onRotate: vi.fn(), onZoom: vi.fn(), onMotion: vi.fn(),
       onGestures: vi.fn(), onRetry: vi.fn(), onPreviewLook: vi.fn(), onApplyChoice: vi.fn(), onResetLook: vi.fn(),

@@ -9,7 +9,9 @@ world version the way the society does and passes the module plain data:
   the ground's elevation to the flight module's declared ceiling;
 - **the solids**, every part of every placed object, from the world object catalog's recipe for
   the object's kind, turned, scaled and placed as the object stands; an object that moves along a
-  bounded path is solid everywhere its path takes it;
+  bounded path is solid everywhere its path takes it; a person's own admitted asset is one box,
+  the bounds its preparation measured, which stays solid while the object stays placed, withdrawn
+  or not;
 - **the perches** each placed kind declares, placed with it;
 - **the flyers** each placed kind hosts, each starting every episode on a perch of its host: an
   object's perches are one pool, which the widest kinds it hosts draw from first.
@@ -75,6 +77,7 @@ from exulanica.world.object_catalog import (
 )
 from exulanica.world.object_repository import WorldObjectRepository
 from exulanica.world.society_authored_ground import SocietyGround, read_authored_ground
+from exulanica.world.workspace_assets import WorkspaceAssetError
 
 __all__ = [
     "FLIGHT_NAMESPACE",
@@ -149,6 +152,17 @@ def _boxes(kind: WorldObjectKind) -> tuple[PartBox, ...]:
     return tuple(boxes)
 
 
+def _measured_box(width_mm: int, height_mm: int, depth_mm: int) -> PartBox:
+    """A workspace asset as the box its preparation measured, in the kind frame.
+
+    Prepared bytes stand on the bottom centre of their bounds (glTF ``+y`` up, ``+z`` front), so
+    the box is centred across and front to back, from the ground to the measured height, each half
+    rounded up so it is never narrower than the measure.
+    """
+    half_x, half_y = ceil_div(width_mm, 2), ceil_div(depth_mm, 2)
+    return PartBox(-half_x, half_x, -half_y, half_y, 0, height_mm)
+
+
 def _travel(parameters: Mapping[str, Any]) -> tuple[int, int, int]:
     """Where a bounded path's far end lies from where the object was placed, or a refusal."""
     travel = parameters.get("travel_mm")
@@ -174,11 +188,14 @@ def compose_flight_input(
     asset_keys: Mapping[str, str],
     objects: WorldObjectCatalog | None = None,
     flying: FlightKindCatalog | None = None,
+    workspace_bounds: Mapping[str, tuple[int, int, int]] | None = None,
 ) -> FlightInput:
     """The flight over one saved world version, or a refusal naming the object it could not read.
 
     ``asset_keys`` maps each reviewed asset's content digest to its registry key, as the reviewed
-    registry holds them.
+    registry holds them. ``workspace_bounds`` maps each placed workspace asset's preparation id to
+    the width, height and depth it measured, in millimetres; such an object is solid and hosts no
+    flyer and no perch.
     """
     if version.world_id != world_id or ground.world_id != world_id:
         raise FlightRefused("flight_unavailable", "the version or its ground is another world's")
@@ -200,9 +217,18 @@ def compose_flight_input(
             continue
         if obj.region_id != ground.region_id:
             raise _unavailable("unregistered_object_region", obj.object_id)
-        kind = kinds_by_asset.get(asset_keys.get(obj.asset_sha256, ""))
-        if kind is None:
-            raise _unavailable("unknown_object_geometry", obj.object_id)
+        kind: WorldObjectKind | None
+        if obj.workspace_preparation_id is not None:
+            # Read only through its preparation's measure, never through the reviewed registry.
+            measured = (workspace_bounds or {}).get(str(obj.workspace_preparation_id))
+            if measured is None:
+                raise _unavailable("unknown_object_geometry", obj.object_id)
+            kind, boxes = None, (_measured_box(*measured),)
+        else:
+            kind = kinds_by_asset.get(asset_keys.get(obj.asset_sha256, ""))
+            if kind is None:
+                raise _unavailable("unknown_object_geometry", obj.object_id)
+            boxes = _boxes(kind)
         transform = obj.transform
         numbers = (
             transform.x_mm,
@@ -226,8 +252,9 @@ def compose_flight_input(
                 travel = _travel(obj.behaviour.parameters)
             except ValueError:
                 raise _unavailable("unsupported_active_behaviour", obj.object_id) from None
-        solids.extend(Solid(obj.object_id, box, placement, travel) for box in _boxes(kind))
-        placed.append((obj.object_id, kind, placement, travel != (0, 0, 0)))
+        solids.extend(Solid(obj.object_id, box, placement, travel) for box in boxes)
+        if kind is not None:
+            placed.append((obj.object_id, kind, placement, travel != (0, 0, 0)))
         if len(solids) > _MAX_PARTS:
             raise FlightRefused(
                 "flight_world_too_large",
@@ -368,6 +395,9 @@ def saved_world_flight(
     object the flight cannot place, is a ``FlightRefused`` naming it.
     """
     version = repository.version(version_id, with_availability=False)
+    # Written once with each preparation's output, so the version's state digest, which names the
+    # preparation and its output, already decides them and the key needs nothing more.
+    bounds = _workspace_bounds(repository, version)
     key = (
         repository.workspace_id,
         repository.world_id,
@@ -394,10 +424,37 @@ def saved_world_flight(
         if ground is None:
             raise UnknownWorldResource("no such structural snapshot")
         return compose_flight_input(
-            world_id=repository.world_id, version=version, ground=ground, asset_keys=asset_keys
+            world_id=repository.world_id,
+            version=version,
+            ground=ground,
+            asset_keys=asset_keys,
+            workspace_bounds=bounds,
         )
 
     return SavedFlight(cached_input(key, compose), version.edit_seq)
+
+
+def _workspace_bounds(
+    repository: WorldObjectRepository, version: AlternateVersion
+) -> dict[str, tuple[int, int, int]]:
+    """What each placed workspace asset's preparation measured, whatever its admission's state.
+
+    A withdrawn object stays where it was placed until it is removed, so it stays solid.
+    """
+    bounds: dict[str, tuple[int, int, int]] = {}
+    for obj in version.objects:
+        if obj.removed or obj.workspace_preparation_id is None:
+            continue
+        try:
+            measured = repository.pinned_workspace_asset(obj).dimensions_mm
+        except WorkspaceAssetError as error:
+            raise _unavailable("unknown_object_geometry", obj.object_id) from error
+        bounds[str(obj.workspace_preparation_id)] = (
+            measured["width"],
+            measured["height"],
+            measured["depth"],
+        )
+    return bounds
 
 
 def _now_ms() -> int:

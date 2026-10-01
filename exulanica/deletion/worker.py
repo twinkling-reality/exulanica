@@ -26,7 +26,10 @@ those exact bytes, and the right thing is to ask again later.
 namespace of that workspace's own (``exulanica.store.namespaces``), so the question is not whether
 another workspace holds them but whether the tombstone reaches the bake, which
 ``material_bake_purge_is_authorized`` answers. A worker built without ``material_stores`` claims no
-bake job, and the tombstone it belongs to stays incomplete.
+bake job, and the tombstone it belongs to stays incomplete. **A workspace's own admitted assets
+and their prepared outputs** (migration 0126) go the same way from their own namespace, asked of
+``workspace_asset_purge_is_authorized``, and a worker built without ``workspace_asset_stores``
+claims none of them.
 
 **A withdrawn training right is destroyed here too, and it is the one erasure whose subject stays
 alive.** Migration 0082 writes a ``scene_training`` tombstone when an account holder withdraws the
@@ -77,7 +80,7 @@ from exulanica.db.session import Database
 from exulanica.deletion import queue
 from exulanica.evidence.blob import BlobId
 from exulanica.store.base import ContentAddressedStore, PurgeAuthorization, privileged_purger
-from exulanica.store.namespaces import WorkspaceStores
+from exulanica.store.namespaces import WorkspaceStores, workspace_asset_lock_key
 
 if TYPE_CHECKING:
     from exulanica.store.configured import ContentStores
@@ -131,14 +134,17 @@ class PurgeWorker:
         limit_per_pass: int = 500,
         require_cross_workspace_view: bool = True,
         material_stores: WorkspaceStores | None = None,
+        workspace_asset_stores: WorkspaceStores | None = None,
     ) -> None:
         self._database = database
         self._store = store
         self._material_stores = material_stores
+        self._workspace_asset_stores = workspace_asset_stores
         self._kinds = tuple(
             kind
             for kind in queue.DESTROYABLE_KINDS
-            if kind != "material_bake" or material_stores is not None
+            if (kind != "material_bake" or material_stores is not None)
+            and (kind != "workspace_asset" or workspace_asset_stores is not None)
         )
         self._workspaces = workspaces
         self._name = name
@@ -177,6 +183,7 @@ class PurgeWorker:
             limit_per_pass=limit_per_pass,
             require_cross_workspace_view=require_cross_workspace_view,
             material_stores=stores.materials,
+            workspace_asset_stores=stores.workspace_assets,
         )
 
     # -- driving it ---------------------------------------------------------------------
@@ -302,6 +309,9 @@ class PurgeWorker:
         if target.target_kind == "material_bake":
             self._destroy_bake(connection, target, outcome)
             return
+        if target.target_kind == "workspace_asset":
+            self._destroy_workspace_asset(connection, target, outcome)
+            return
         blob_id = BlobId.from_hex(target.target_ref)
         # The lock and the question share one transaction, so nothing can start holding these
         # bytes between the answer and the destruction. The lock is released at commit, which is
@@ -385,6 +395,53 @@ class PurgeWorker:
             if store.exists(blob_id):
                 raise RuntimeError(
                     f"the material namespace still holds {target.target_ref[:12]} after the purge"
+                )
+            if destroyed:
+                outcome.destroyed += 1
+            else:
+                outcome.already_absent += 1
+            queue.mark_purged(connection, target)
+            queue.finish_purge(
+                connection, target.workspace_id, purge_id=target.purge_id, state="done"
+            )
+
+    def _destroy_workspace_asset(
+        self, connection: psycopg.Connection, target: queue.PurgeTarget, outcome: PurgeOutcome
+    ) -> None:
+        """An admitted or prepared asset object, from its workspace's namespace, as a bake goes.
+
+        The lock is the one admission and the preparation worker hold from recording an object
+        until its bytes are written, so an object recorded just before its tombstone is destroyed
+        after it is written, never before.
+        """
+        stores = self._workspace_asset_stores
+        if stores is None:  # claim_purge was not given the kind; a job here is a programming error
+            raise RuntimeError("a workspace asset job reached a worker with no asset namespaces")
+        blob_id = BlobId.from_hex(target.target_ref)
+        store = stores.for_workspace(target.workspace_id)
+        with connection.transaction():
+            connection.execute(
+                "select purge_lock_object(%s)",
+                (workspace_asset_lock_key(target.workspace_id, target.target_ref),),
+            )
+            row = connection.execute(
+                "select workspace_asset_purge_is_authorized(%s, %s, %s) as allowed",
+                (target.workspace_id, target.tombstone_id, target.target_ref),
+            ).fetchone()
+            if row is None or not row["allowed"]:
+                raise ValueError("the tombstone does not authorize this workspace asset purge")
+            purger = privileged_purger(
+                store,
+                PurgeAuthorization(
+                    tombstone_id=str(target.tombstone_id),
+                    actor=str(target.requested_by),
+                    reason=target.reason or "a tombstone asked for these bytes to be destroyed",
+                ),
+            )
+            destroyed = purger.purge(blob_id)
+            if store.exists(blob_id):
+                raise RuntimeError(
+                    f"the asset namespace still holds {target.target_ref[:12]} after the purge"
                 )
             if destroyed:
                 outcome.destroyed += 1

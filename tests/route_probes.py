@@ -127,6 +127,7 @@ _PHOTO_POINT_MAP: Final = {
     "attachment_id": str(uuid.uuid4()),
 }
 _REVIEWED_ASSET: Final = {"kind": "reviewed_asset", "asset_key": "cc0.marker-cube"}
+_WORKSPACE_ASSET: Final = build.workspace_asset_request()
 
 #: A realistic request for each route whose default would stop at validation, sorted by path and
 #: then method. What a route does with a body it accepts belongs to that route's own tests; these
@@ -216,6 +217,9 @@ PROBE_OVERRIDES: Final[dict[str, dict[str, Any]]] = {
     "POST /selection/packet": {**_IN_WORLD, "json": {"intent": "captures"}},
     "POST /selection/plan": {"json": {"question": "where was I?"}},
     "GET /tiles": {"params": {"city_seed": _ZERO_DIGEST}},
+    # Multipart, as the route takes it: a declaration of exactly these bytes as the caller's own
+    # work. What admission does with a container is tests/test_workspace_assets_postgres.py.
+    "POST /workspace-assets": _WORKSPACE_ASSET,
     # Enough of a specification to reach the permission floor, which is all this sweep asks of it.
     # What the route does with a body it accepts is tests/test_world_generation_route.py.
     "PUT /world-entries/{entry_id}": {
@@ -770,6 +774,7 @@ EXISTENCE_BUILDERS: Final[Mapping[str, Owned | Shared]] = {
         "migration 0072 keeps baked tiles outside every workspace: an offline bake of a city seed "
         "is the same bytes for everyone, and what a workspace spends is its own delivery ledger",
     ),
+    "/workspace-assets/{asset_id}": Owned(build.workspace_asset),
     "/world-entries/{entry_id}": Owned(build.world_entry),
     "/world-entries/{entry_id}/arrival/scene-geometry/{artifact_id}": Owned(build.trained_scene),
     "/world-read/places/{place_id}": Owned(build.world_read_place),
@@ -779,6 +784,12 @@ EXISTENCE_BUILDERS: Final[Mapping[str, Owned | Shared]] = {
         build.reviewed_asset,
         "migration 0042 registers the reviewed assets once for every workspace, with no "
         "workspace column, and the application seeds their bytes at startup",
+    ),
+    "/world/character-catalogs/{catalog_sha256}": Shared(
+        build.character_catalog,
+        "migration 0131 keeps published character catalogs outside every workspace: the host "
+        "publishes one document for everyone, addressed by its own digest",
+        build.invented_digest,
     ),
     "/world/interactions/previews/{preview_id}": Owned(build.interaction_preview),
     "/world/interactions/proposals/{proposal_id}": Owned(build.interaction_proposal),

@@ -5,24 +5,38 @@
  * names the revision it was based on and is refused if another write came first, and a reset
  * either returns to the default or restores an earlier revision without rewriting history.
  *
- * The preview keeps its history in this browser. A signed-in world keeps catalog looks on the
- * server as recipes over one body's family, per world version (`/world/versions/{version}/characters
+ * The preview keeps its history in this browser. A signed-in world keeps looks on the server as
+ * recipes over one published family, per world version (`/world/versions/{version}/characters
  * /avatar/{actor}/appearance?world_id={world}`); the abstract figure and stylized examples are not
- * recipes, so they are worn without being saved there.
+ * recipes, so they are worn without being saved there. No catalog is compiled in: the people
+ * catalog comes from the host, and a saved look is read with the publication the host says it
+ * resolves to. A saved look the host reports unavailable stays in the history as unavailable, with
+ * the host's code, and is never replaced by somebody else.
  */
 import { ApiError, Transport, type TransportOptions } from '@exulanica/graph-client';
 import {
-  CHARACTER_CATALOG,
   validateLook,
   type CharacterCatalog,
   type CharacterLook,
+  type ServedCharacterCatalog,
 } from '@exulanica/atlas-react/playcanvas';
 import type { CharacterSelection } from './character-catalog.js';
 
 export type SavedChoice =
-  | { readonly kind: 'catalog'; readonly look: CharacterLook }
+  /** A catalog person. `catalogSha256` names the publication the look is a recipe over, when known. */
+  | { readonly kind: 'catalog'; readonly look: CharacterLook; readonly catalogSha256?: string }
   | { readonly kind: 'abstract' }
-  | { readonly kind: 'stylized'; readonly selection: CharacterSelection };
+  | { readonly kind: 'stylized'; readonly selection: CharacterSelection }
+  /** A prepared body of a parametric family: its exact values and the body bound to them. */
+  | {
+      readonly kind: 'prepared';
+      readonly familyId: string;
+      readonly values: Readonly<Record<string, number | string>>;
+      readonly representationId: string;
+      readonly catalogSha256: string;
+    }
+  /** A saved look this host cannot draw now; `code` is the host's `render_status`. */
+  | { readonly kind: 'unavailable'; readonly code: string; readonly familyId: string };
 
 export interface SavedRevision {
   readonly revision: number;
@@ -139,7 +153,8 @@ function parseChoice(value: unknown, catalog: CharacterCatalog): SavedChoice | n
 /**
  * The development preview's store: this browser's local storage, which the page may not have.
  * An unreadable or foreign entry is dropped rather than trusted; storage that refuses writes
- * keeps the history for this page only.
+ * keeps the history for this page only. Entries are checked against the people catalog the page
+ * was served; until it has one, the store reads as empty and leaves what is stored untouched.
  */
 export class PreviewLookStore implements LookStore {
   private memory: SavedRevision[] = [];
@@ -147,7 +162,7 @@ export class PreviewLookStore implements LookStore {
   constructor(
     private readonly defaultLook: (current: SavedChoice | null) => SavedChoice,
     private readonly storage: Pick<Storage, 'getItem' | 'setItem'> | null = PreviewLookStore.browserStorage(),
-    private readonly catalog: CharacterCatalog = CHARACTER_CATALOG,
+    private readonly catalog: () => CharacterCatalog | null = () => null,
     private readonly now: () => Date = () => new Date(),
   ) {
     this.memory = this.load();
@@ -162,6 +177,8 @@ export class PreviewLookStore implements LookStore {
   }
 
   private load(): SavedRevision[] {
+    const catalog = this.catalog();
+    if (catalog === null) return [];
     try {
       const raw = this.storage?.getItem(PREVIEW_KEY);
       if (!raw) return [];
@@ -169,7 +186,7 @@ export class PreviewLookStore implements LookStore {
       if (stored.profile !== 'exulanica.character-look-history/v1' || !Array.isArray(stored.revisions)) return [];
       const revisions: SavedRevision[] = [];
       for (const entry of stored.revisions) {
-        const choice = parseChoice(entry.choice, this.catalog);
+        const choice = parseChoice(entry.choice, catalog);
         if (!choice || !Number.isSafeInteger(entry.revision)) return [];
         revisions.push({ ...entry, choice });
       }
@@ -208,6 +225,7 @@ export class PreviewLookStore implements LookStore {
   }
 
   async read(): Promise<SavedLooks> {
+    if (this.memory.length === 0) this.memory = this.load();
     return this.view();
   }
 
@@ -227,18 +245,37 @@ export class PreviewLookStore implements LookStore {
   }
 }
 
+/** Where the host says a saved revision is drawn from (`render` on every appearance read). */
+interface WireRender {
+  readonly catalog_sha256: string;
+  readonly catalog_id: string;
+  readonly revision: number;
+  readonly kind: 'layered-people' | 'parametric-body';
+  readonly resolution: 'authored' | 'compatible' | null;
+  readonly representation_id: string | null;
+}
+
 interface WireRevision {
   readonly revision: number;
   readonly operation: 'save' | 'reset';
   readonly restored_from_revision: number | null;
-  readonly document: { readonly recipe: { readonly family_id: string; readonly parameters: Readonly<Record<string, unknown>> } };
+  readonly document: {
+    readonly recipe: {
+      readonly family_id: string;
+      readonly parameters: Readonly<Record<string, unknown>>;
+      readonly representation_id?: string | null;
+    };
+  };
   readonly created_at: string;
   readonly render_status: string;
+  readonly render?: WireRender | null;
 }
 
 interface WireFamily {
   readonly family_sha256: string;
   readonly family: { readonly family_id: string; readonly default_seed: number };
+  readonly kind?: string | null;
+  readonly publication?: { readonly catalog_sha256: string; readonly state: string } | null;
 }
 
 /** Where a signed-in person's saved looks live: one world version, as one actor. */
@@ -262,7 +299,10 @@ export function worldLookTarget(
   return { target: { worldId: entry.worldId, versionId: entry.authoredVersionId, actor } };
 }
 
-/** A signed-in person's catalog looks, saved through the authenticated appearance routes. */
+/** A served publication by its digest, or null when this page cannot be given it. */
+export type ServedCatalogResolver = (catalogSha256: string) => Promise<ServedCharacterCatalog | null>;
+
+/** A signed-in person's looks, saved through the authenticated appearance routes. */
 export class WorkspaceLookStore implements LookStore {
   private readonly transport: Transport;
   private readonly path: string;
@@ -272,7 +312,7 @@ export class WorkspaceLookStore implements LookStore {
   constructor(
     options: TransportOptions,
     target: WorkspaceLookTarget,
-    private readonly catalog: CharacterCatalog = CHARACTER_CATALOG,
+    private readonly catalogs: ServedCatalogResolver,
   ) {
     this.transport = new Transport(options);
     this.path = `/world/versions/${encodeURIComponent(target.versionId)}/characters/avatar/${encodeURIComponent(target.actor)}/appearance`;
@@ -284,34 +324,60 @@ export class WorkspaceLookStore implements LookStore {
     return `${this.path}${suffix}?${this.world}`;
   }
 
-  /** The server keeps recipes over catalog bodies; the abstract figure and examples are not recipes. */
+  /** The server keeps recipes over published families; the abstract figure and examples are not recipes. */
   keeps(choice: SavedChoice): boolean {
-    return choice.kind === 'catalog';
+    return choice.kind === 'catalog' || choice.kind === 'prepared';
   }
 
-  private revision(wire: WireRevision): SavedRevision | null {
-    const look = lookFromRecipe(this.catalog, wire.document.recipe.family_id, wire.document.recipe.parameters);
-    return look === null ? null : {
+  private async revision(wire: WireRevision): Promise<SavedRevision> {
+    const header = {
       revision: wire.revision,
       operation: wire.operation,
       restoredFromRevision: wire.restored_from_revision,
-      choice: { kind: 'catalog', look },
       savedAt: wire.created_at,
+    };
+    const recipe = wire.document.recipe;
+    const unavailable = (code: string): SavedRevision => ({ ...header, choice: { kind: 'unavailable', code, familyId: recipe.family_id } });
+    const render = wire.render ?? null;
+    if (wire.render_status !== 'available' || render === null) return unavailable(wire.render_status);
+    const served = await this.catalogs(render.catalog_sha256).catch(() => null);
+    if (served === null || served.kind !== render.kind) return unavailable('catalog_unavailable');
+    if (served.kind === 'layered-people') {
+      const look = lookFromRecipe(served.catalog, recipe.family_id, recipe.parameters);
+      return look === null
+        ? unavailable('catalog_unavailable')
+        : { ...header, choice: { kind: 'catalog', look, catalogSha256: served.catalogSha256 } };
+    }
+    const representationId = recipe.representation_id ?? null;
+    if (representationId === null) return unavailable('no_prepared_representation');
+    return {
+      ...header,
+      choice: {
+        kind: 'prepared',
+        familyId: recipe.family_id,
+        values: recipe.parameters as Readonly<Record<string, number | string>>,
+        representationId,
+        catalogSha256: served.catalogSha256,
+      },
     };
   }
 
-  private async family(look: CharacterLook): Promise<WireFamily> {
+  private async family(familyId: string, catalogSha256: string | undefined): Promise<WireFamily> {
     this.families ??= this.transport.getJson<readonly WireFamily[]>(this.at('/families')).catch((error: unknown) => {
       this.families = null;
       throw error;
     });
-    const family = (await this.families).find((entry) => entry.family.family_id === recipeFamilyId(look));
+    const offered = (await this.families).filter((entry) => entry.family.family_id === familyId);
+    // The family of the publication the look was made over; without one, the current family.
+    const family = offered.find((entry) => catalogSha256 !== undefined && entry.publication?.catalog_sha256 === catalogSha256)
+      ?? offered.find((entry) => entry.publication?.state === 'current')
+      ?? offered[0];
     if (!family) throw new Error('This body is not offered for saved looks here yet.');
     return family;
   }
 
-  private looks(response: { readonly revision: number; readonly current: WireRevision | null }): SavedLooks {
-    return { revision: response.revision, current: response.current === null ? null : this.revision(response.current) };
+  private async looks(response: { readonly revision: number; readonly current: WireRevision | null }): Promise<SavedLooks> {
+    return { revision: response.revision, current: response.current === null ? null : await this.revision(response.current) };
   }
 
   async read(): Promise<SavedLooks> {
@@ -320,38 +386,46 @@ export class WorkspaceLookStore implements LookStore {
 
   async history(): Promise<readonly SavedRevision[]> {
     const rows = await this.transport.getJson<readonly WireRevision[]>(this.at('/history'));
-    return rows.flatMap((row) => {
-      const revision = this.revision(row);
-      return revision === null ? [] : [revision];
-    });
+    return Promise.all(rows.map((row) => this.revision(row)));
   }
 
   async save(choice: SavedChoice, baseRevision: number): Promise<SavedLooks> {
-    if (choice.kind !== 'catalog') throw new Error('Only people from the catalog are saved to your world.');
-    const family = await this.family(choice.look);
+    let recipe: Record<string, unknown>;
+    if (choice.kind === 'catalog') {
+      const family = await this.family(recipeFamilyId(choice.look), choice.catalogSha256);
+      recipe = {
+        family_id: family.family.family_id,
+        family_sha256: family.family_sha256,
+        parameters: recipeParameters(choice.look),
+        seed: family.family.default_seed,
+      };
+    } else if (choice.kind === 'prepared') {
+      const family = await this.family(choice.familyId, choice.catalogSha256);
+      recipe = {
+        family_id: family.family.family_id,
+        family_sha256: family.family_sha256,
+        parameters: choice.values,
+        seed: family.family.default_seed,
+        representation_id: choice.representationId,
+      };
+    } else {
+      throw new Error('Only published looks are saved to your world.');
+    }
     try {
-      return this.looks(await this.transport.putJson(this.at(), {
-        base_revision: baseRevision,
-        recipe: {
-          family_id: family.family.family_id,
-          family_sha256: family.family_sha256,
-          parameters: recipeParameters(choice.look),
-          seed: family.family.default_seed,
-        },
-      }));
+      return await this.looks(await this.transport.putJson(this.at(), { base_revision: baseRevision, recipe }));
     } catch (error) {
-      throw error instanceof ApiError && error.status === 409 ? new StaleLookError() : error;
+      throw error instanceof ApiError && error.status === 409 && error.code === 'stale_appearance' ? new StaleLookError() : error;
     }
   }
 
   async reset(baseRevision: number, restoreRevision?: number): Promise<SavedLooks> {
     try {
-      return this.looks(await this.transport.postJson(this.at('/reset'), {
+      return await this.looks(await this.transport.postJson(this.at('/reset'), {
         base_revision: baseRevision,
         ...(restoreRevision === undefined ? {} : { restore_revision: restoreRevision }),
       }));
     } catch (error) {
-      throw error instanceof ApiError && error.status === 409 ? new StaleLookError() : error;
+      throw error instanceof ApiError && error.status === 409 && error.code === 'stale_appearance' ? new StaleLookError() : error;
     }
   }
 }

@@ -159,6 +159,64 @@ def reviewed_assignment(kind: WorldObjectKind, reach_mm: int) -> dict[str, Any]:
     return row
 
 
+#: The prefix a workspace obstacle row's ``asset_key`` carries: the preparation it stands for, never
+#: a reviewed asset key (those are dotted names with no colon).
+WORKSPACE_OBSTACLE_PREFIX: Final = "workspace-asset:"
+
+
+def workspace_obstacle(
+    preparation_id: uuid.UUID | str, width_mm: int, depth_mm: int
+) -> dict[str, Any]:
+    """The row a placed workspace asset stands for in a society: an obstacle, nothing more.
+
+    A person's own admitted asset (migration 0126) has no reviewed use, so it offers no activity.
+    Its preparation measured it, so the society can state its footprint: half the prepared width
+    and depth, rounded up so the obstacle is never smaller than the object, blocking walking. The
+    row has exactly the fields a reviewed obstacle row has, and turns and scales the same way.
+    """
+    return {
+        "asset_key": f"{WORKSPACE_OBSTACLE_PREFIX}{uuid.UUID(str(preparation_id))}",
+        "affordance": NO_ACTIVITY,
+        "footprint_half_extents_mm": [-(-width_mm // 2), -(-depth_mm // 2)],
+        "blocks_navigation": True,
+    }
+
+
+def validate_workspace_obstacles(mapping: Mapping[str, dict[str, Any]] | None) -> None:
+    """Refuse a workspace obstacle that is not exactly the row a preparation's measure makes.
+
+    Keyed by preparation id; every row is an obstacle row naming that preparation, with a whole,
+    non-negative footprint. Nothing here can make a workspace asset offer an activity.
+    """
+    for key, row in (mapping or {}).items():
+        if (
+            not isinstance(row, dict)
+            or set(row) != _OBSTACLE_FIELDS
+            or row.get("asset_key") != f"{WORKSPACE_OBSTACLE_PREFIX}{key}"
+            or row.get("affordance") != NO_ACTIVITY
+            or row.get("blocks_navigation") is not True
+            or not _footprint_is_valid(row.get("footprint_half_extents_mm"))
+        ):
+            raise ValueError("invalid workspace asset obstacle")
+        uuid.UUID(key)
+
+
+def object_affordance(
+    obj: AuthoredObject,
+    reviewed_affordances: Mapping[str, dict[str, Any]],
+    workspace_obstacles: Mapping[str, dict[str, Any]] | None = None,
+) -> dict[str, Any] | None:
+    """The row a society reads for one placed object, or None when it can state none.
+
+    A reviewed object's row is the reviewed registry's, by digest, as it always was. An object
+    pinned to a workspace asset preparation is read only through that preparation's obstacle row,
+    never through the reviewed registry, whatever its digest.
+    """
+    if obj.workspace_preparation_id is not None:
+        return (workspace_obstacles or {}).get(str(obj.workspace_preparation_id))
+    return reviewed_affordances.get(obj.asset_sha256)
+
+
 def offers_activity(row: Mapping[str, Any]) -> bool:
     """Whether a registry row's kind offers an activity, rather than only standing in the way."""
     return row["affordance"] != NO_ACTIVITY
@@ -262,6 +320,7 @@ def build_society_input(
     supports: Supports,
     segment_blocked: SegmentBlocked,
     composition_profile: str = COMPOSITION_PROFILE,
+    workspace_obstacles: Mapping[str, dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Compose a prevalidated A artifact and accepted authored version without mutating either.
 
@@ -288,6 +347,7 @@ def build_society_input(
     if version_delta_sha256(version) != version.state_sha256:
         raise ValueError("authored delta digest mismatch")
     validate_reviewed_affordances(reviewed_affordances)
+    validate_workspace_obstacles(workspace_obstacles)
     if availability not in ("available", "unavailable"):
         raise ValueError("invalid current availability")
     if (availability == "available") != (unavailable_reason is None):
@@ -311,7 +371,11 @@ def build_society_input(
             reviewed_affordances=reviewed_affordances,
         )
     )
-    refs.extend(object_dependency_refs(version, reviewed_affordances))
+    refs.extend(
+        object_dependency_refs(
+            version, reviewed_affordances, workspace_obstacles=workspace_obstacles
+        )
+    )
 
     objects: list[ComposedObject] = []
     obstacles: list[Obstacle] = []
@@ -325,6 +389,7 @@ def build_society_input(
             region_id=registration["region_id"],
             translation_mm=registration["translation_mm"],
             composition_profile=composition_profile,
+            workspace_obstacles=workspace_obstacles,
         )
     if reason is None:
         targets, unavailable_affordances, reason = affordance_targets(
@@ -424,6 +489,7 @@ def composed_objects(
     region_id: str,
     translation_mm: Sequence[int],
     composition_profile: str,
+    workspace_obstacles: Mapping[str, dict[str, Any]] | None = None,
 ) -> tuple[list[ComposedObject], list[Obstacle], str | None]:
     """Project accepted authored objects onto the composed ground plane, or say why not.
 
@@ -442,7 +508,7 @@ def composed_objects(
     for obj in sorted(version.objects, key=lambda value: value.object_id):
         if obj.removed:
             continue
-        reviewed = reviewed_affordances.get(obj.asset_sha256)
+        reviewed = object_affordance(obj, reviewed_affordances, workspace_obstacles)
         if obj.region_id != region_id:
             reason = f"unregistered_object_region:{obj.object_id}"
         elif reviewed is None:
@@ -657,6 +723,7 @@ def object_dependency_refs(
     reviewed_affordances: Mapping[str, dict[str, Any]],
     *,
     objects: Iterable[AuthoredObject] | None = None,
+    workspace_obstacles: Mapping[str, dict[str, Any]] | None = None,
 ) -> list[dict[str, str]]:
     """Bind every authored object in the version, and the reviewed asset each active one uses.
 
@@ -668,12 +735,19 @@ def object_dependency_refs(
     refs: list[dict[str, str]] = []
     chosen = version.objects if objects is None else objects
     for obj in sorted(chosen, key=lambda value: value.object_id):
-        reviewed = reviewed_affordances.get(obj.asset_sha256)
+        reviewed = object_affordance(obj, reviewed_affordances, workspace_obstacles)
         if not obj.removed and reviewed is not None:
             refs.append(
                 {
                     "kind": "reviewed_asset",
                     "identity": reviewed["asset_key"],
+                    "sha256": obj.asset_sha256,
+                }
+                if obj.workspace_preparation_id is None
+                else {
+                    # The preparation whose measured footprint the society stands this object on.
+                    "kind": "workspace_asset",
+                    "identity": str(obj.workspace_preparation_id),
                     "sha256": obj.asset_sha256,
                 }
             )

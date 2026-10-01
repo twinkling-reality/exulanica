@@ -48,6 +48,7 @@
         {"path": "saved-world-entry.md", "role": "contract", "owns": "World registry and count policy, starter and made-world creation, saved-world reopening and reference photographs"},
         {"path": "world-objects-contract.md", "role": "contract", "owns": "Authored versions, objects, arrangements, environment placements, edit log, undo and concurrency"},
         {"path": "world-composition-contract.md", "role": "contract", "owns": "Composition preview and apply, unified place retrieval, and composition of imports, personal and authored content"},
+        {"path": "workspace-asset-admission.md", "role": "contract", "owns": "A person's own uploaded 3D assets: profile, declaration and rights, preparation, delivery, withdrawal and erasure"},
         {"path": "world-version-authorities.md", "role": "contract", "owns": "Versioned structure, appearance and comfort-settings authorities"},
         {"path": "place-identity.md", "role": "contract", "owns": "Place identity, coordinate frames and cross-capture alignment"},
         {"path": "world-memory-package.md", "role": "contract", "owns": "Portable package profiles, integrity, projections and permissions"}

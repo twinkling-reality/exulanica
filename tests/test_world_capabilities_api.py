@@ -497,6 +497,54 @@ def test_the_people_role_names_why_its_read_is_unavailable(api, monkeypatch):
 # -- a society's input names the edit it followed ----------------------------------------------
 
 
+def test_a_version_the_caller_does_not_hold_is_unknown_to_both_reads(api, monkeypatch):
+    """A stranger asking for this workspace's town, and anyone asking for an invented version, get
+    404 unknown_reference from the capability and models reads, also where the version holds a
+    society whose snapshot the models read authorizes once and reads its decisions under."""
+    traffic._identity(monkeypatch, _signalled())
+    town = traffic._made(api, "A town with its people")
+    created = api.post(
+        _version_path(town, "/society"),
+        {"region_id": town["generated_ground"]["region_id"], "profile": "exulanica-society/v5"},
+    )
+    assert created.status_code == 200, created.text
+    invented = {**town, "authored_version_id": str(uuid.uuid4())}
+    for suffix in ("/capabilities", "/models"):
+        assert api.get(_version_path(town, suffix)).status_code == 200, suffix
+        for answer in (
+            api.get(_version_path(town, suffix), token=personal.STRANGER_TOKEN),
+            api.get(_version_path(invented, suffix)),
+        ):
+            assert answer.status_code == 404, (suffix, answer.text)
+            assert answer.json()["code"] == "unknown_reference", (suffix, answer.text)
+
+
+def test_the_models_read_authorizes_a_societys_inputs_as_reading_the_society_does(api, monkeypatch):
+    """The people's view reads the society's decisions under the one snapshot it read, so a models
+    read authorizes the society's inputs exactly as often as reading the society does."""
+    traffic._identity(monkeypatch, _signalled())
+    town = traffic._made(api, "A town with its people")
+    created = api.post(
+        _version_path(town, "/society"),
+        {"region_id": town["generated_ground"]["region_id"], "profile": "exulanica-society/v5"},
+    )
+    assert created.status_code == 200, created.text
+    calls: list[object] = []
+    authorize = api.client.app.state.society_input_authorizer
+
+    def counted(*args: Any, **kwargs: Any) -> Any:
+        calls.append(args)
+        return authorize(*args, **kwargs)
+
+    monkeypatch.setattr(api.client.app.state, "society_input_authorizer", counted)
+    assert api.get(_version_path(town, "/society")).status_code == 200
+    reading = len(calls)
+    calls.clear()
+    assert api.get(_version_path(town, "/models")).status_code == 200
+    assert reading > 0
+    assert len(calls) == reading
+
+
 def test_an_event_joins_to_the_authored_edit_its_input_followed(api):
     entry = _starter(api)
     placed = _place(api, entry, "region:starter")

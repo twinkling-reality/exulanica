@@ -776,3 +776,65 @@ describe('alternate version bootstrap transport', () => {
       body: { base_topology_digest: 'reviewed-topology' }, authorization: 'Bearer fixture' });
   });
 });
+
+describe('an object placed from a workspace asset', () => {
+  type Row = Record<string, unknown>;
+  const custom = (overrides: Row = {}): Row => {
+    const objects = (clone(FIXTURE) as { objects: Row[] }).objects;
+    return {
+      ...objects[0]!,
+      object_id: 'object:bench',
+      asset: null,
+      behaviour: null,
+      workspace_asset: {
+        asset_id: '01a0f502-4636-76a3-aee1-1244f67682a3',
+        preparation_id: '01a0f502-4637-7b2a-9c11-6b2f5a1d0e44',
+        title: 'Oak bench',
+        content_sha256: 'c7a1fb2fbaa2eece9395553d56959ac17cf6eb2ab7fe0076ad27f738e3b0de06',
+        byte_size: 1516,
+        media_type: 'model/gltf-binary',
+        licence_id: null,
+        attribution: null,
+        availability: 'withdrawn',
+      },
+      ...overrides,
+    };
+  };
+  const holding = (...rows: Row[]): Row => {
+    const value = clone(FIXTURE) as { objects: Row[]; schema_version: number };
+    value.schema_version = 4;
+    value.objects = [...value.objects, ...rows];
+    return value;
+  };
+
+  it('is read apart from the objects every drawing path reads, so it is left undrawn', () => {
+    const version = parseVersion(holding(custom()));
+    const reviewed = (FIXTURE as { objects: Row[] }).objects.map((row) => row['object_id']);
+    expect(version.objects.map((object) => object.objectId)).toEqual(reviewed);
+    expect(version.workspaceObjects!.map((object) => object.objectId)).toEqual(['object:bench']);
+    const [bench] = version.workspaceObjects!;
+    expect(bench!.workspaceAsset.availability).toBe('withdrawn');
+    expect(bench!.workspaceAsset.contentSha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(bench!.workspaceAsset.licenceId).toBeNull();
+  });
+
+  it('reads a version holding none as it always read it', () => {
+    expect(parseVersion(clone(FIXTURE)).workspaceObjects).toEqual([]);
+  });
+
+  it('refuses a row naming a workspace asset and a reviewed asset both', () => {
+    const both = custom({ asset: (FIXTURE as { objects: Row[] }).objects[0]!['asset'] });
+    expect(() => parseVersion(holding(both))).toThrow(/workspace asset object/);
+  });
+
+  it('refuses one object id in both lists', () => {
+    const reused = custom({ object_id: (FIXTURE as { objects: Row[] }).objects[0]!['object_id'] });
+    expect(() => parseVersion(holding(reused))).toThrow(/authored object list/);
+  });
+
+  it('refuses a workspace asset view missing a field', () => {
+    const row = custom();
+    delete (row['workspace_asset'] as Row)['availability'];
+    expect(() => parseVersion(holding(row))).toThrow(/workspace asset availability/);
+  });
+});

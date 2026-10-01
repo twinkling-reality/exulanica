@@ -88,6 +88,11 @@ _STAND_INS = (
     "create table world_identity (workspace_id uuid not null, world_id text not null, "
     "kind text not null, provenance jsonb not null, created_by uuid, "
     "created_at timestamptz not null default now(), primary key (workspace_id, world_id))",
+    # The workspace asset an object is pinned to, which migration 0126 adds and the current
+    # version read and object writes name. At 0089 no object was pinned to one, so the null
+    # column is a fact, not an interpretation. It is dropped with the others, and 0126, run
+    # below with every later migration, adds it again.
+    "alter table world_alternate_object add column workspace_preparation_id uuid",
 )
 
 
@@ -370,6 +375,7 @@ def test_0090_keeps_every_reference_a_populated_0089_database_held(
                 "alter table world_alternate_version_edit drop column point_map_instance_id"
             )
             admin.execute("drop table world_identity")
+            admin.execute("alter table world_alternate_object drop column workspace_preparation_id")
             admin.commit()
             _as_owner(admin, owned)
             admin.execute(by_version["0090"].sql)

@@ -3,7 +3,8 @@ import type { NativeCharacterFrame } from '../native-character-runtime.js';
 import { sampleMotionPath } from '../society-presentation.js';
 import { FarFigures } from './far-figures.js';
 import { NEAR_INHABITANT_BUDGET } from '../character/budget.js';
-import { CharacterHost } from '../character/host.js';
+import { CharacterHost, applicationOf } from '../character/host.js';
+import { CharacterCatalogs } from '../character/served.js';
 import { inhabitantRenderable } from '../character/inhabitant.js';
 import type { CharacterPose } from '../character/renderable.js';
 import { postureSeatMetres, type FarAppearance } from '../character/far.js';
@@ -298,6 +299,14 @@ export class SocietyCrowd {
   /** Nearness rank and unposed time of each full character. */
   private readonly slots = new Map<string, PoseSlot>();
   private frame = 0;
+  /** A snapshot held until the host serves a people catalog, with its unsubscription. */
+  private awaiting: {
+    readonly state: OwnedSocietyState;
+    readonly observer: readonly [number, number] | undefined;
+    readonly options: CrowdTiming;
+    readonly layout: SeatingLayout | null;
+  } | null = null;
+  private stopAwaiting: (() => void) | null = null;
 
   constructor(
     private readonly device: pc.GraphicsDevice,
@@ -319,6 +328,24 @@ export class SocietyCrowd {
     options: CrowdTiming = {},
     layout: SeatingLayout | null = null,
   ): CrowdCounts {
+    // Every person is drawn from the people catalog the host serves this application. Until one
+    // is served the snapshot waits and nobody is drawn, rather than anyone being drawn from a
+    // catalog the host did not serve; the latest snapshot is presented as soon as one arrives.
+    const app = applicationOf(this.device);
+    if (app && CharacterCatalogs.forApp(app).people === null) {
+      this.awaiting = { state, observer, options, layout };
+      this.stopAwaiting ??= CharacterCatalogs.forApp(app).onChange(() => {
+        const held = this.awaiting;
+        if (held === null || CharacterCatalogs.forApp(app).people === null) return;
+        this.awaiting = null;
+        this.stopAwaiting?.();
+        this.stopAwaiting = null;
+        // Presented now, not at the time the snapshot first arrived.
+        const { nowMs: _arrivedAt, ...timing } = held.options;
+        this.set(held.state, held.observer, timing, held.layout);
+      });
+      return { ...this.counts, population: state.inhabitants.filter((p) => p.synthetic === true).length };
+    }
     const scope = `${state.society_id ?? 'preview'}:${state.branch_id ?? ''}`;
     if (scope !== this.scope) this.releaseNear();
     const continuing = scope === this.scope && this.state !== null;
@@ -485,6 +512,9 @@ export class SocietyCrowd {
   }
 
   clear(): void {
+    this.awaiting = null;
+    this.stopAwaiting?.();
+    this.stopAwaiting = null;
     this.state = null;
     this.walkers.clear();
     this.releaseNear();

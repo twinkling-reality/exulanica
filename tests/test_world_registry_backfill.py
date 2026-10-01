@@ -95,6 +95,14 @@ def test_0099_registers_every_world_a_populated_schema_held(owner, spine_schema,
         with pg_harness.migrated_schema() as (_psycopg, admin):
             scratch = admin.execute("select current_schema()").fetchone()[0]
             database = _database(scratch)
+            # The workspace asset an object is pinned to, which migration 0126 adds and the
+            # current version read and object writes name. Before 0099 no object was pinned to
+            # one, so a null column stands in while the data is written, and it is dropped
+            # before 0099 runs, leaving every row in the shape those schemas held.
+            admin.execute(
+                "alter table world_alternate_object add column workspace_preparation_id uuid"
+            )
+            admin.commit()
 
             # A personal world: a composed topology, a structural snapshot and a version.
             with database.session(personal) as connection:
@@ -171,6 +179,7 @@ def test_0099_registers_every_world_a_populated_schema_held(owner, spine_schema,
                     WorldStyleRepository(connection, crowded, world_id=world).register_topology(
                         TopologyContract(f"{world}-topology", ("region-a",), world_id=world)
                     )
+            admin.execute("alter table world_alternate_object drop column workspace_preparation_id")
             admin.commit()
 
             before = _world_tables(admin, scratch)

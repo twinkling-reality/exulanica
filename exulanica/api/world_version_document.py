@@ -11,11 +11,13 @@ reviewed mesh it may draw from one whose bytes are gone.
 from __future__ import annotations
 
 import uuid
+from collections.abc import Mapping
 
 from pydantic import BaseModel, ConfigDict, Field, JsonValue
 
 from exulanica.store.base import ContentAddressedStore
 from exulanica.world import (
+    GLB_MEDIA_TYPE,
     AlternateVersion,
     ReviewedAssetRow,
     Transform,
@@ -154,11 +156,37 @@ class ObjectOriginView(BaseModel):
     role: str
 
 
+class WorkspaceAssetObjectView(BaseModel):
+    """What a placed object draws when it is a person's own admitted asset (migration 0126).
+
+    ``availability`` is resolved when the version is read and is not part of ``state_sha256``:
+    ``available``, ``withdrawn`` (the admission was withdrawn or its workspace erased; the object
+    stays in the version and is not drawn), ``unavailable_bytes``, or ``unknown`` when this
+    instance keeps no workspace asset store. The bytes are
+    ``GET /workspace-assets/{asset_id}/prepared/bytes``, checked against ``content_sha256``.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    asset_id: uuid.UUID
+    preparation_id: uuid.UUID
+    title: str
+    content_sha256: str
+    byte_size: int
+    media_type: str
+    licence_id: str | None
+    attribution: str | None
+    availability: str
+
+
 class AuthoredObjectView(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     object_id: str
-    asset: ReviewedAssetView
+    #: The reviewed asset the object draws, or null when it draws a workspace asset instead.
+    asset: ReviewedAssetView | None
+    #: The workspace asset the object draws, or null when it draws a reviewed asset.
+    workspace_asset: WorkspaceAssetObjectView | None = None
     region_id: str
     transform: TransformView
     origin: ObjectOriginView
@@ -293,13 +321,46 @@ def transform_view(transform: Transform) -> TransformView:
     return TransformView(**transform.document())
 
 
+def workspace_asset_views(
+    repository: WorldObjectRepository, version: AlternateVersion
+) -> dict[str, WorkspaceAssetObjectView]:
+    """Each pinned object's workspace asset, keyed by object id, with its availability now."""
+    views: dict[str, WorkspaceAssetObjectView] = {}
+    for obj in version.objects:
+        if obj.workspace_preparation_id is None:
+            continue
+        pinned = repository.pinned_workspace_asset(obj)
+        views[obj.object_id] = WorkspaceAssetObjectView(
+            asset_id=pinned.asset_id,
+            preparation_id=pinned.preparation_id,
+            title=pinned.title,
+            content_sha256=obj.asset_sha256,
+            byte_size=pinned.output_byte_size,
+            media_type=GLB_MEDIA_TYPE,
+            licence_id=pinned.licence_id,
+            attribution=pinned.attribution,
+            availability=repository.workspace_object_availability(obj) or "unknown",
+        )
+    return views
+
+
 def alternate_version_view(
-    version: AlternateVersion, assets: dict[str, ReviewedAssetRow]
+    version: AlternateVersion,
+    assets: dict[str, ReviewedAssetRow],
+    workspace_assets: Mapping[str, WorkspaceAssetObjectView] | None = None,
 ) -> AlternateVersionView:
-    """``assets`` is keyed by content digest, which is how an object names one."""
+    """``assets`` is keyed by content digest, which is how an object names one;
+    ``workspace_assets`` by object id, for the objects that pin a workspace asset."""
+    pinned = workspace_assets or {}
     return AlternateVersionView(
         schema_version=(
-            3 if version.point_map_instances else 2 if version.environment_instances else 1
+            4
+            if pinned
+            else 3
+            if version.point_map_instances
+            else 2
+            if version.environment_instances
+            else 1
         ),
         version_id=version.version_id,
         world_id=version.world_id,
@@ -316,7 +377,12 @@ def alternate_version_view(
         objects=[
             AuthoredObjectView(
                 object_id=obj.object_id,
-                asset=asset_view(assets[obj.asset_sha256]),
+                asset=(
+                    None
+                    if obj.workspace_preparation_id is not None
+                    else asset_view(assets[obj.asset_sha256])
+                ),
+                workspace_asset=pinned.get(obj.object_id),
                 region_id=obj.region_id,
                 transform=transform_view(obj.transform),
                 origin=ObjectOriginView(kind=obj.origin.kind, role=obj.origin.role),
@@ -405,4 +471,5 @@ def rendered_version(
     return alternate_version_view(
         repository.with_availability(version),
         {asset.content_sha256: asset for asset in repository.reviewed_assets(store)},
+        workspace_asset_views(repository, version),
     )

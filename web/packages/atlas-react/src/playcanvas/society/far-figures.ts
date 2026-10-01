@@ -1,9 +1,8 @@
 import * as pc from 'playcanvas';
-import { activityPosture, catalogBase, catalogFamily, seatPosture } from '../character/catalog.js';
-import { CHARACTER_CATALOG } from '../character/catalog-data.js';
+import { activityPosture, catalogBase, catalogFamily, seatPosture, type CharacterCatalog } from '../character/catalog.js';
 import { FAR_REGIONS, FarPerson, farAppearance, farTemplateBytes, type FarAppearance } from '../character/far.js';
 import { applicationOf } from '../character/host.js';
-import { inhabitantLookOf } from '../character/inhabitant.js';
+import { inhabitantCatalog, inhabitantLookOf } from '../character/inhabitant.js';
 
 /**
  * Inhabitants beyond the full-detail places, each drawn in the far form of their own look.
@@ -41,6 +40,8 @@ export class FarFigures {
   private readonly appearances = new Map<string, FarAppearance>();
   /** Each person's family, which says how an activity is drawn. */
   private readonly families = new Map<string, string>();
+  /** The served people catalog each person was drawn from, so near and far forms always agree. */
+  private readonly catalogs = new Map<string, CharacterCatalog>();
 
   constructor(private readonly device: pc.GraphicsDevice, parent: pc.Entity) {
     const app = applicationOf(device);
@@ -68,9 +69,12 @@ export class FarFigures {
   appearanceOf(id: string): FarAppearance {
     let held = this.appearances.get(id);
     if (!held) {
-      const look = inhabitantLookOf(id);
-      this.appearances.set(id, (held = farAppearance(CHARACTER_CATALOG, look)));
+      // The application's served people catalog; the crowd asks for nobody before one is served.
+      const catalog = inhabitantCatalog(this.app);
+      const look = inhabitantLookOf(catalog, id);
+      this.appearances.set(id, (held = farAppearance(catalog, look)));
       this.families.set(id, look.familyId);
+      this.catalogs.set(id, catalog);
     }
     return held;
   }
@@ -81,7 +85,7 @@ export class FarFigures {
    */
   postureOf(id: string, activity: string | null | undefined, seated = false): string | null {
     this.appearanceOf(id);
-    return activityPosture(catalogFamily(CHARACTER_CATALOG, this.families.get(id)!), activity, seated);
+    return activityPosture(catalogFamily(this.catalogs.get(id)!, this.families.get(id)!), activity, seated);
   }
 
   /**
@@ -90,14 +94,14 @@ export class FarFigures {
    */
   walkSpeedOf(id: string): number {
     const appearance = this.appearanceOf(id);
-    const base = catalogBase(catalogFamily(CHARACTER_CATALOG, this.families.get(id)!), appearance.baseId);
+    const base = catalogBase(catalogFamily(this.catalogs.get(id)!, this.families.get(id)!), appearance.baseId);
     return (base.clips.walk.speedMillimetresPerSecond / base.restHeightMillimetres) * appearance.heightMetres;
   }
 
   /** The posture a person is drawn in on a seat for an activity, or null where none is declared. */
   seatPostureOf(id: string, activity: string | null | undefined): string | null {
     this.appearanceOf(id);
-    return seatPosture(catalogFamily(CHARACTER_CATALOG, this.families.get(id)!), activity);
+    return seatPosture(catalogFamily(this.catalogs.get(id)!, this.families.get(id)!), activity);
   }
 
   /** Place exactly these figures this frame; everyone else in the crowd is drawn elsewhere or not at all. */

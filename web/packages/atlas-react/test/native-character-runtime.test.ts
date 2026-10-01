@@ -3,7 +3,6 @@ import type * as pc from 'playcanvas';
 import { NativeCharacterRuntime,type NativeCharacterFrame } from '../src/playcanvas/native-character-runtime.js';
 import type { NativeCharacterDescriptor } from '../src/playcanvas/native-character.js';
 import { CharacterHost } from '../src/playcanvas/character/host.js';
-import { CHARACTER_CATALOG } from '../src/playcanvas/character/catalog-data.js';
 import { NEAR_CHARACTER_BUDGET } from '../src/playcanvas/character/budget.js';
 const state=vi.hoisted(()=>({releases:0,destroys:0,appearances:[] as unknown[]}));
 vi.mock('../src/playcanvas/native-character-pool.js',()=>({NativeCharacterPool:class{async acquire(){return{release:()=>state.releases++};}destroy(){}}}));
@@ -136,9 +135,9 @@ describe('native resident subscriptions',()=>{
  });
  it('hands its byte authority to the catalog people of the same application',()=>{
   const application=app(),loader=vi.fn();
-  expect(CharacterHost.forApp(application,CHARACTER_CATALOG).hasLoader).toBe(false);
+  expect(CharacterHost.forApp(application).hasLoader).toBe(false);
   new NativeCharacterRuntime(application,loader);
-  expect(CharacterHost.forApp(application,CHARACTER_CATALOG).hasLoader).toBe(true);
-  expect(CharacterHost.forApp(app(),CHARACTER_CATALOG).hasLoader).toBe(false);
+  expect(CharacterHost.forApp(application).hasLoader).toBe(true);
+  expect(CharacterHost.forApp(app()).hasLoader).toBe(false);
  });
 });

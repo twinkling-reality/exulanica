@@ -4377,6 +4377,114 @@
     }
    }
   },
+  "/world/character-catalogs": {
+   "get": {
+    "tags": [
+     "character-appearance"
+    ],
+    "summary": "The character catalogs this host serves: each publication's identity and state.",
+    "operationId": "character_catalogs_world_character_catalogs_get",
+    "parameters": [
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Character Catalogs World Character Catalogs Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/world/character-catalogs/{catalog_sha256}": {
+   "get": {
+    "tags": [
+     "character-appearance"
+    ],
+    "summary": "One published character catalog, as the canonical document its digest names.",
+    "operationId": "character_catalog_world_character_catalogs__catalog_sha256__get",
+    "parameters": [
+     {
+      "name": "catalog_sha256",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "pattern": "^[0-9a-f]{64}$",
+       "title": "Catalog Sha256"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Character Catalog World Character Catalogs  Catalog Sha256  Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/materials/makers": {
    "get": {
     "tags": [
@@ -4841,6 +4949,394 @@
        "application/json": {
         "schema": {}
        }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/workspace-assets": {
+   "post": {
+    "tags": [
+     "workspace-assets"
+    ],
+    "summary": "Admit Workspace Asset",
+    "operationId": "admit_workspace_asset_workspace_assets_post",
+    "parameters": [
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "multipart/form-data": {
+       "schema": {
+        "$ref": "#/components/schemas/Body_admit_workspace_asset_workspace_assets_post"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "get": {
+    "tags": [
+     "workspace-assets"
+    ],
+    "summary": "List Workspace Assets",
+    "operationId": "list_workspace_assets_workspace_assets_get",
+    "parameters": [
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/workspace-assets/{asset_id}": {
+   "get": {
+    "tags": [
+     "workspace-assets"
+    ],
+    "summary": "Read Workspace Asset",
+    "operationId": "read_workspace_asset_workspace_assets__asset_id__get",
+    "parameters": [
+     {
+      "name": "asset_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Asset Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/workspace-assets/{asset_id}/preparation": {
+   "post": {
+    "tags": [
+     "workspace-assets"
+    ],
+    "summary": "Request Workspace Preparation",
+    "operationId": "request_workspace_preparation_workspace_assets__asset_id__preparation_post",
+    "parameters": [
+     {
+      "name": "asset_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Asset Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/workspace-assets/{asset_id}/preparation/cancel": {
+   "post": {
+    "tags": [
+     "workspace-assets"
+    ],
+    "summary": "Cancel Workspace Preparation",
+    "operationId": "cancel_workspace_preparation_workspace_assets__asset_id__preparation_cancel_post",
+    "parameters": [
+     {
+      "name": "asset_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Asset Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/workspace-assets/{asset_id}/withdraw": {
+   "post": {
+    "tags": [
+     "workspace-assets"
+    ],
+    "summary": "Withdraw Workspace Asset",
+    "operationId": "withdraw_workspace_asset_workspace_assets__asset_id__withdraw_post",
+    "parameters": [
+     {
+      "name": "asset_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Asset Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/workspace-assets/{asset_id}/prepared/bytes": {
+   "get": {
+    "tags": [
+     "workspace-assets"
+    ],
+    "summary": "Read Workspace Asset Prepared Bytes",
+    "operationId": "read_workspace_asset_prepared_bytes_workspace_assets__asset_id__prepared_bytes_get",
+    "parameters": [
+     {
+      "name": "asset_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Asset Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       },
+       "model/gltf-binary": {}
       }
      },
      "422": {
@@ -18568,7 +19064,24 @@
       "title": "Object Id"
      },
      "asset": {
-      "$ref": "#/components/schemas/ReviewedAssetView"
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/ReviewedAssetView"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "workspace_asset": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/WorkspaceAssetObjectView"
+       },
+       {
+        "type": "null"
+       }
+      ]
      },
      "region_id": {
       "type": "string",
@@ -19002,6 +19515,26 @@
     ],
     "title": "BindingBody",
     "description": "One enclosing scope's values, as a caller states them.\n\nDeliberately almost unvalidated here. ``level`` and every key of ``values`` are checked by\n:meth:`CascadeBinding.of` and the cascade, which refuse an unknown level, an unknown\nparameter, a level too fine for a parameter, a second binding at one level and a value outside\nits declared range, each naming the thing that was wrong. A pattern on this model would refuse\nfirst and name a field path instead, which is a worse answer to the same question."
+   },
+   "Body_admit_workspace_asset_workspace_assets_post": {
+    "properties": {
+     "declaration": {
+      "type": "string",
+      "maxLength": 65536,
+      "title": "Declaration"
+     },
+     "content": {
+      "type": "string",
+      "contentMediaType": "application/octet-stream",
+      "title": "Content"
+     }
+    },
+    "type": "object",
+    "required": [
+     "declaration",
+     "content"
+    ],
+    "title": "Body_admit_workspace_asset_workspace_assets_post"
    },
    "Body_intake_intake_post": {
     "properties": {
@@ -19997,6 +20530,9 @@
        },
        {
         "$ref": "#/components/schemas/PhotoPointMapSourceBody"
+       },
+       {
+        "$ref": "#/components/schemas/WorkspaceAssetSourceBody"
        }
       ],
       "title": "Source",
@@ -20006,7 +20542,8 @@
         "environment_admission": "#/components/schemas/EnvironmentAdmissionSourceBody",
         "photo_point_map": "#/components/schemas/PhotoPointMapSourceBody",
         "reviewed_asset": "#/components/schemas/ReviewedAssetSourceBody",
-        "source_attachment": "#/components/schemas/SourceAttachmentSourceBody"
+        "source_attachment": "#/components/schemas/SourceAttachmentSourceBody",
+        "workspace_asset": "#/components/schemas/WorkspaceAssetSourceBody"
        }
       }
      },
@@ -20109,6 +20646,9 @@
        },
        {
         "$ref": "#/components/schemas/PhotoPointMapSourceBody"
+       },
+       {
+        "$ref": "#/components/schemas/WorkspaceAssetSourceBody"
        }
       ],
       "title": "Source",
@@ -20118,7 +20658,8 @@
         "environment_admission": "#/components/schemas/EnvironmentAdmissionSourceBody",
         "photo_point_map": "#/components/schemas/PhotoPointMapSourceBody",
         "reviewed_asset": "#/components/schemas/ReviewedAssetSourceBody",
-        "source_attachment": "#/components/schemas/SourceAttachmentSourceBody"
+        "source_attachment": "#/components/schemas/SourceAttachmentSourceBody",
+        "workspace_asset": "#/components/schemas/WorkspaceAssetSourceBody"
        }
       }
      },
@@ -34278,6 +34819,111 @@
      "workspace_deleted"
     ],
     "title": "WithdrawalReason"
+   },
+   "WorkspaceAssetObjectView": {
+    "properties": {
+     "asset_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Asset Id"
+     },
+     "preparation_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Preparation Id"
+     },
+     "title": {
+      "type": "string",
+      "title": "Title"
+     },
+     "content_sha256": {
+      "type": "string",
+      "title": "Content Sha256"
+     },
+     "byte_size": {
+      "type": "integer",
+      "title": "Byte Size"
+     },
+     "media_type": {
+      "type": "string",
+      "title": "Media Type"
+     },
+     "licence_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Licence Id"
+     },
+     "attribution": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Attribution"
+     },
+     "availability": {
+      "type": "string",
+      "title": "Availability"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "asset_id",
+     "preparation_id",
+     "title",
+     "content_sha256",
+     "byte_size",
+     "media_type",
+     "licence_id",
+     "attribution",
+     "availability"
+    ],
+    "title": "WorkspaceAssetObjectView",
+    "description": "What a placed object draws when it is a person's own admitted asset (migration 0126).\n\n``availability`` is resolved when the version is read and is not part of ``state_sha256``:\n``available``, ``withdrawn`` (the admission was withdrawn or its workspace erased; the object\nstays in the version and is not drawn), ``unavailable_bytes``, or ``unknown`` when this\ninstance keeps no workspace asset store. The bytes are\n``GET /workspace-assets/{asset_id}/prepared/bytes``, checked against ``content_sha256``."
+   },
+   "WorkspaceAssetSourceBody": {
+    "properties": {
+     "kind": {
+      "type": "string",
+      "const": "workspace_asset",
+      "title": "Kind"
+     },
+     "asset_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Asset Id"
+     },
+     "prepared_sha256": {
+      "anyOf": [
+       {
+        "type": "string",
+        "pattern": "^[0-9a-f]{64}$"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Prepared Sha256"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "kind",
+     "asset_id"
+    ],
+    "title": "WorkspaceAssetSourceBody",
+    "description": "A person's own admitted asset, by the id ``POST /workspace-assets`` returned.\n\n``prepared_sha256`` pins the prepared bytes: optional in a preview, which reports the digest it\nresolved, and required in an apply, so a confirmed apply places exactly what was previewed."
    },
    "WorldCountPolicyView": {
     "properties": {

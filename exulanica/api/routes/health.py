@@ -150,6 +150,7 @@ async def readyz(request: Request, response: Response) -> dict[str, Any]:
     if not body["ready"]:
         response.status_code = 503
     admission = getattr(request.app.state, "admission", None)
+    workspace_assets = getattr(request.app.state.services, "workspace_assets", None)
     return {
         **body,
         "age_ms": int((time.monotonic() - cache.at) * 1000),
@@ -157,6 +158,15 @@ async def readyz(request: Request, response: Response) -> dict[str, Any]:
         "capacity": {
             **(admission.limits() if admission is not None else {}),
             "decodes": {"limit": decode_counts()["limit"]},
+            **(
+                {}
+                if workspace_assets is None
+                else {
+                    "workspace_assets": {
+                        "retained_bytes_per_workspace": workspace_assets.retained_bytes_limit
+                    }
+                }
+            ),
         },
     }
 
@@ -197,6 +207,7 @@ def _evaluate(request: Request) -> dict[str, Any]:
     checks["derivative_worker"] = _worker_check(request, services)
     checks["accounts"] = _account_check(services)
     checks["society_playback"] = _society_check(request, services)
+    checks["character_catalogs"] = _character_catalog_check(services)
 
     return {
         "ready": all(check["ok"] for check in checks.values()),
@@ -245,6 +256,59 @@ def _society_check(request: Request, services: Services) -> dict[str, Any]:
         "listed_workspaces": len(services.society_control_workspaces),
         "account_discovery": services.runs_society_control_worker,
         "proves": "worker liveness and last round status; no promised simulation delivery rate",
+    }
+
+
+#: What an operator runs when no people catalog is served: the host's own publication command,
+#: with the owner connection and the data directory this API serves its store from.
+PUBLISH_COMMAND: Final = "exulanica-character-catalog publish --apply"
+
+
+def _character_catalog_check(services: Services) -> dict[str, Any]:
+    """Which character catalogs this host serves, and a declared state when it serves no people.
+
+    People are drawn only from a catalog the host published (migration 0131). A database nobody
+    gave one, because ``exulanica-character-catalog publish --apply`` was not run after
+    ``exulanica-db``, draws no person anywhere and reads every saved look as unavailable. That is a
+    deployment step left undone, not a dependency that failed, so it is a named state and not a
+    503: every request this instance can serve is still served, and the entry names the cause and
+    the command. One query of a small global table; parsed documents are cached by digest.
+    """
+    runtime = services.character_appearance
+    if runtime is None or runtime.catalogs is None:
+        return {"ok": True, "configured": False, "state": "not_configured"}
+    try:
+        with services.database.unscoped() as connection:
+            served = runtime.catalogs.served(connection)
+    except Exception as exc:
+        return {"ok": False, "configured": True, "detail": f"{type(exc).__name__}: {exc}"}
+    current = [
+        {
+            "catalog_id": publication.catalog_id,
+            "revision": publication.revision,
+            "kind": publication.kind,
+            "catalog_sha256": publication.catalog_sha256,
+        }
+        for publication in served.current()
+    ]
+    if any(entry["kind"] == "layered-people" for entry in current):
+        return {
+            "ok": True,
+            "configured": True,
+            "state": "served",
+            "current": current,
+            "proves": "a people catalog is published and served; nothing about its containers",
+        }
+    return {
+        "ok": True,
+        "configured": True,
+        "state": "people_catalog_unpublished",
+        "current": current,
+        "detail": (
+            "no people catalog is published on this database, so no person is drawn and every "
+            f"saved look reads as unavailable. Run `{PUBLISH_COMMAND}` with the owner connection "
+            "and this API's data directory"
+        ),
     }
 
 

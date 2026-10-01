@@ -35,10 +35,7 @@ def _directives(text: str) -> str:
     explaining that a docker volume is not immutable, which is the sentence keeping the claim
     honest rather than making it.
     """
-    return "\n".join(
-        line for line in text.splitlines() if not line.lstrip().startswith("#")
-    )
-
+    return "\n".join(line for line in text.splitlines() if not line.lstrip().startswith("#"))
 
 
 def test_the_image_installs_the_package_it_claims_to_run():
@@ -104,8 +101,11 @@ def test_the_health_check_is_liveness_and_not_readiness():
     and is for a human or a load balancer to read, never for a supervisor to kill a process on.
     """
     directives = _directives(DOCKERFILE)
-    healthcheck = [line for line in directives.splitlines() if "HEALTHCHECK" in line or (
-        "healthz" in line and "CMD" in line)]
+    healthcheck = [
+        line
+        for line in directives.splitlines()
+        if "HEALTHCHECK" in line or ("healthz" in line and "CMD" in line)
+    ]
     assert healthcheck, "the image has no health check"
     assert "readyz" not in directives, "the health check probes readiness"
 
@@ -192,21 +192,39 @@ def test_the_composition_refuses_to_start_without_the_token_directory():
 
 
 def test_runtime_containers_use_the_rls_role_and_only_migrations_use_the_owner():
+    """Two one-shot jobs hold the owner: migrations, and catalog publication (host administration
+    a runtime role may only read). Every long-running process connects as the RLS role."""
     directives = _directives(COMPOSE)
-    runtime_urls = [
-        line for line in directives.splitlines() if "EXULANICA_DATABASE_URL:" in line
-    ]
-    assert len(runtime_urls) == 4, runtime_urls
-    assert "postgresql://${POSTGRES_USER:-exulanica}:" in runtime_urls[0], runtime_urls
-    assert all("postgresql://exulanica_app:" in line for line in runtime_urls[1:]), runtime_urls
+    runtime_urls = [line for line in directives.splitlines() if "EXULANICA_DATABASE_URL:" in line]
+    assert len(runtime_urls) == 5, runtime_urls
+    assert all("postgresql://${POSTGRES_USER:-exulanica}:" in url for url in runtime_urls[:2])
+    assert all("postgresql://exulanica_app:" in line for line in runtime_urls[2:]), runtime_urls
     assert "EXULANICA_APP_ROLE_PASSWORD:?" in COMPOSE
+
+
+def test_the_api_starts_only_after_the_character_catalogs_are_published():
+    """People are drawn only from published catalogs, so the composition publishes after the
+    migrations, as the owner, into the store the API serves, before the API starts."""
+    directives = _directives(COMPOSE)
+    catalogs = directives[directives.index("  catalogs:") : directives.index("  api:")]
+    assert 'command: ["exulanica-character-catalog", "publish", "--apply"]' in catalogs
+    assert "EXULANICA_DATA_DIR: /var/lib/exulanica" in catalogs
+    assert "- media:/var/lib/exulanica" in catalogs
+    assert "migrate:\n        condition: service_completed_successfully" in catalogs
+    assert "postgres:\n        condition: service_healthy" in catalogs
+    api = directives[directives.index("  api:") : directives.index("  derivative-worker:")]
+    assert "catalogs:\n        condition: service_completed_successfully" in api
+    assert (
+        'exulanica-character-catalog = "exulanica.world.character_catalog_publication:main"'
+        in PYPROJECT
+    )
 
 
 def test_the_derivative_worker_is_a_separate_restartable_command():
     assert "derivative-worker:" in COMPOSE
     assert "exulanica-derivative-worker" in COMPOSE
     assert "restart: unless-stopped" in COMPOSE
-    assert "EXULANICA_DERIVATIVE_WORKER: \"off\"" in COMPOSE
+    assert 'EXULANICA_DERIVATIVE_WORKER: "off"' in COMPOSE
     assert 'EXULANICA_SYNC_EXTRAS: "--extra reconstruction"' in COMPOSE
     assert "EXULANICA_DEPTH_MODEL: moge" in COMPOSE
     assert "HF_HOME: /var/lib/exulanica/model-cache" in COMPOSE
@@ -221,7 +239,7 @@ def test_the_pose_worker_is_separate_restartable_and_provenance_configured():
     assert "EXULANICA_POSE_RUNTIME_IMAGE: ${EXULANICA_POSE_RUNTIME_IMAGE:?" in COMPOSE
     assert "EXULANICA_CODE_REVISION=" in ENV_EXAMPLE
     assert "EXULANICA_POSE_RUNTIME_IMAGE=" in ENV_EXAMPLE
-    assert '--extra server --extra pose' in DOCKERFILE
+    assert "--extra server --extra pose" in DOCKERFILE
     assert 'exulanica-scene-worker = "exulanica.ingest.scene_worker_command:main"' in PYPROJECT
     assert 'exulanica-scene-worker = "exulanica.ingest.scene_worker_command:main"' in PYPROJECT
 

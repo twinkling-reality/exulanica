@@ -34,6 +34,14 @@ from exulanica.ingest.repository import IngestRepository
 from exulanica.ingest.training_rights import grant_training_right, withdraw_training_right
 from exulanica.models.manifest import Role
 from exulanica.orchestration.restore import main as restore_command
+from exulanica.store.local import LocalContentAddressedStore
+from exulanica.world.character_catalog_publication import (
+    catalog_documents,
+    catalog_imports,
+    publish_catalogs,
+    withdraw_catalog,
+)
+from exulanica.world.character_catalogs import CatalogRegistry, read_publication_document
 from exulanica.world.companion_memory import AnswerCitation, CompanionMemoryRepository
 from exulanica.world_package.training_store import record_training_decision
 
@@ -302,6 +310,43 @@ def test_a_recipe_withdrawn_after_the_backup_stays_withdrawn(materials, commands
         withdraw=lambda: materials.repository().withdraw_recipe(record.recipe_id),
         current=current,
     )
+
+
+def test_a_character_catalog_withdrawn_after_the_backup_stays_withdrawn(purged, commands, tmp_path):
+    """The host's withdrawal is final (migration 0131), so a restore may not serve it again."""
+    connection = purged.repository.connection
+    layered = catalog_documents()[0]
+    digest = read_publication_document(layered).catalog_sha256
+    keys = sorted({item.manifest.asset_key for item in catalog_imports(layered)})
+    held = {
+        row["asset_key"]
+        for row in purged.rows(
+            "select asset_key from world_reviewed_asset where asset_key = any(%s)", keys
+        )
+    }
+    registry = CatalogRegistry()
+    with connection.transaction():
+        publish_catalogs(connection, LocalContentAddressedStore(tmp_path / "people"), [layered])
+    connection.commit()
+
+    def withdraw() -> None:
+        with connection.transaction():
+            assert withdraw_catalog(connection, digest, "licence_withdrawn") == "withdrawn"
+        connection.commit()
+
+    def current() -> bool:
+        return digest in {p.catalog_sha256 for p in registry.served(connection).publications}
+
+    try:
+        assert not _through_a_restore(purged, tmp_path, withdraw=withdraw, current=current)
+    finally:
+        # world_reviewed_asset is kept between tests; the keys this test added leave with it.
+        with connection.transaction():
+            connection.execute(
+                "delete from world_reviewed_asset where asset_key = any(%s)",
+                (sorted(set(keys) - held),),
+            )
+        connection.commit()
 
 
 def _signed_in(purged) -> tuple[str, uuid.UUID]:

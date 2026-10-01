@@ -78,6 +78,10 @@ REFERENCE_AND_INTENT = {
     "placement",
     "kind",
     "asset_key",
+    # A workspace asset by id, and the prepared digest that pins its input: a reference to bytes
+    # the server resolves and compares, never a claim that they are ready.
+    "asset_id",
+    "prepared_sha256",
     "admission_id",
     "render_asset_id",
     "publication_id",

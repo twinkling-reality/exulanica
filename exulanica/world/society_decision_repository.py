@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Callable, Iterable, Mapping, Sequence
-from typing import Final
+from typing import Any, Final
 
 from psycopg.types.json import Jsonb
 
@@ -134,7 +134,12 @@ class SocietyDecisionRepository:
             self.society._authorize(document)
 
     def role_decisions(
-        self, role: DecisionRole, version_id: uuid.UUID, *, latest: int | None = None
+        self,
+        role: DecisionRole,
+        version_id: uuid.UUID,
+        *,
+        latest: int | None = None,
+        authorized: Mapping[str, Any] | None = None,
     ) -> list[dict]:
         """``role``'s decisions this society recorded, in order, with what their minutes did.
 
@@ -144,9 +149,18 @@ class SocietyDecisionRepository:
         the ``decision_applied`` event it recorded, or ``None`` while none has. The read a
         comparison of models is made from. ``latest`` keeps only that many of the most recent,
         for a reader that must not grow with the world's age.
+
+        Reading the society's snapshot authorizes its inputs. ``authorized`` is the snapshot the
+        caller read through this same society in this transaction; when it is this society's,
+        for this version, that read is the authorization and the snapshot is not read again.
         """
         row = self._row(version_id)
-        self.society.snapshot(version_id)
+        if (
+            authorized is None
+            or authorized.get("society_id") != row["society_id"]
+            or authorized.get("version_id") != version_id
+        ):
+            self.society.snapshot(version_id)
         rows = self.connection.execute(
             "select d.decision_seq,d.document,r.document as request,d.recorded_at,"
             "t.disposition,t.tick,(select e.document->>'reason' from world_society_event e "

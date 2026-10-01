@@ -93,6 +93,14 @@ from exulanica.world.style_structure import (
     CompatibilityIntent,
     SourceAttachmentRef,
 )
+from exulanica.world.workspace_assets import (
+    UnknownWorkspaceAsset,
+    WorkspaceAssetBytesUnavailable,
+    WorkspaceAssetChanged,
+    WorkspaceAssetIncompatible,
+    WorkspaceAssetNotPrepared,
+    WorkspaceAssetWithdrawn,
+)
 
 __all__ = [
     "BLOCKED_REASONS",
@@ -105,6 +113,7 @@ __all__ = [
     "PhotoPointMapSource",
     "ReviewedAssetSource",
     "SourceAttachmentSource",
+    "WorkspaceAssetSource",
     "apply_composition",
     "preview_composition",
 ]
@@ -141,6 +150,16 @@ BLOCKED_REASONS: frozenset[str] = frozenset(
         "placement_required",
         "invalid_placement",
         "subject_already_present",
+        # A person's own admitted asset, in the order its authority refuses: never admitted here,
+        # withdrawn, not prepared, prepared but not a placeable object, prepared as other bytes
+        # than the request names, bytes missing, and an apply that named no prepared digest.
+        "unknown_workspace_asset",
+        "workspace_asset_withdrawn",
+        "workspace_asset_not_prepared",
+        "workspace_asset_incompatible",
+        "workspace_asset_changed",
+        "workspace_asset_bytes_unavailable",
+        "prepared_digest_required",
     }
 )
 
@@ -168,6 +187,19 @@ class EnvironmentAdmissionSource:
 
 
 @dataclass(frozen=True, slots=True)
+class WorkspaceAssetSource:
+    """A person's own admitted asset, by id, and the prepared digest the request expects.
+
+    ``prepared_sha256`` is the input pin that keeps a preview and its confirmed apply on the same
+    bytes: once an asset's preparation publishes, its digest never changes (migration 0126), and a
+    request naming another digest is refused ``workspace_asset_changed``. Apply requires it.
+    """
+
+    asset_id: uuid.UUID
+    prepared_sha256: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class SourceAttachmentSource:
     entry_id: uuid.UUID
     attachment_id: uuid.UUID
@@ -187,7 +219,11 @@ class PhotoPointMapSource:
 
 
 CompositionSource = (
-    ReviewedAssetSource | EnvironmentAdmissionSource | SourceAttachmentSource | PhotoPointMapSource
+    ReviewedAssetSource
+    | EnvironmentAdmissionSource
+    | SourceAttachmentSource
+    | PhotoPointMapSource
+    | WorkspaceAssetSource
 )
 
 
@@ -285,6 +321,10 @@ def apply_composition(
     report for the same state. Anything else it raises is not a composition verdict and propagates
     unchanged.
     """
+    if isinstance(request.source, WorkspaceAssetSource) and request.source.prepared_sha256 is None:
+        raise CompositionBlocked(
+            "prepared_digest_required", "an apply names the prepared digest it expects"
+        )
     resolved = _resolve(repository, version_id, request)
     preview = resolved.preview
     if preview.blocked_reason is not None:
@@ -315,7 +355,9 @@ def apply_composition(
         )
     except Exception as exc:
         refusals = (
-            _OBJECT_WRITE_REFUSALS
+            _WORKSPACE_OBJECT_WRITE_REFUSALS
+            if isinstance(subject, AuthoredObject) and subject.workspace_preparation_id is not None
+            else _OBJECT_WRITE_REFUSALS
             if isinstance(subject, AuthoredObject)
             else _POINT_MAP_WRITE_REFUSALS
             if isinstance(subject, PointMapInstance)
@@ -422,6 +464,24 @@ _ENVIRONMENT_WRITE_REFUSALS = tuple(
 _POINT_MAP_WRITE_REFUSALS = tuple(
     pair for pair in _POINT_MAP_PLACEMENT_REFUSALS if pair[0] is not InvalidObjectState
 )
+#: The workspace asset source's refusals, in its authority's own order.
+_WORKSPACE_SOURCE_REFUSALS: tuple[tuple[type[Exception], str], ...] = (
+    (UnknownWorkspaceAsset, "unknown_workspace_asset"),
+    (WorkspaceAssetWithdrawn, "workspace_asset_withdrawn"),
+    (WorkspaceAssetNotPrepared, "workspace_asset_not_prepared"),
+    (WorkspaceAssetIncompatible, "workspace_asset_incompatible"),
+    (WorkspaceAssetChanged, "workspace_asset_changed"),
+    (WorkspaceAssetBytesUnavailable, "workspace_asset_bytes_unavailable"),
+)
+_WORKSPACE_OBJECT_PLACEMENT_REFUSALS: tuple[tuple[type[Exception], str], ...] = (
+    *_BASE_REFUSALS,
+    *_WORKSPACE_SOURCE_REFUSALS,
+    (InvalidObjectData, "invalid_placement"),
+    (InvalidObjectState, "subject_already_present"),
+)
+_WORKSPACE_OBJECT_WRITE_REFUSALS = tuple(
+    pair for pair in _WORKSPACE_OBJECT_PLACEMENT_REFUSALS if pair[0] is not InvalidObjectState
+)
 
 
 def _reason(exc: Exception, table: tuple[tuple[type[Exception], str], ...]) -> str | None:
@@ -481,7 +541,7 @@ def _resolve(
         },
         kind=(
             "add_object"
-            if isinstance(source, ReviewedAssetSource)
+            if isinstance(source, ReviewedAssetSource | WorkspaceAssetSource)
             else "add_environment"
             if isinstance(source, EnvironmentAdmissionSource)
             else "add_point_map"
@@ -503,6 +563,8 @@ def _resolve(
         return _resolve_photo_point_map(repository, version_id, request, source, frame)
     if isinstance(source, ReviewedAssetSource):
         return _resolve_reviewed_asset(repository, version_id, request, source, frame)
+    if isinstance(source, WorkspaceAssetSource):
+        return _resolve_workspace_asset(repository, version_id, request, source, frame)
     return _resolve_environment(repository, version_id, request, source, frame)
 
 
@@ -559,6 +621,56 @@ def _resolve_reviewed_asset(
         )
     except Exception as exc:
         reason = _reason(exc, _OBJECT_PLACEMENT_REFUSALS)
+        if reason is None:
+            raise
+        return frame.blocked(reason, str(exc), view)
+    return frame.ready(view, object_document(checked), checked)
+
+
+def _resolve_workspace_asset(
+    repository: WorldObjectRepository,
+    version_id: uuid.UUID,
+    request: CompositionRequest,
+    source: WorkspaceAssetSource,
+    frame: _Frame,
+) -> _Resolution:
+    """Resolve the admission's placeable preparation, then the placement, in the writer's order."""
+    unresolved = _unresolved_source_view(source)
+    try:
+        resolved = repository.resolve_workspace_asset(source.asset_id, source.prepared_sha256)
+    except Exception as exc:
+        reason = _reason(exc, _WORKSPACE_SOURCE_REFUSALS)
+        if reason is None:
+            raise
+        return frame.blocked(reason, str(exc), unresolved)
+    view = {
+        **resolved.source_view(),
+        "title": resolved.title,
+        "dimensions_mm": dict(resolved.dimensions_mm),
+        "licence_id": resolved.licence_id,
+        "attribution": resolved.attribution,
+    }
+    placement = request.placement
+    if placement is None:
+        return frame.blocked("placement_required", "the source resolves; name a placement", view)
+    if placement.source_anchor is not None:
+        return frame.blocked("invalid_placement", "a workspace asset takes no source anchor", view)
+    if placement.behaviour is not None:
+        return frame.blocked("invalid_placement", "a workspace asset takes no behaviour", view)
+    obj = AuthoredObject(
+        object_id=placement.subject_id,
+        asset_sha256=resolved.output_sha256,
+        region_id=placement.region_id,
+        transform=placement.transform,
+        origin=ObjectOrigin("authored", placement.origin_role),
+        workspace_preparation_id=resolved.preparation_id,
+    )
+    try:
+        checked = repository.validate_object_placement(
+            version_id, obj, base_state_sha256=request.base_state_sha256
+        )
+    except Exception as exc:
+        reason = _reason(exc, _WORKSPACE_OBJECT_PLACEMENT_REFUSALS)
         if reason is None:
             raise
         return frame.blocked(reason, str(exc), view)
@@ -724,6 +836,14 @@ def _unresolved_source_view(source: CompositionSource) -> dict[str, Any]:
             "render_asset_id": str(source.render_asset_id),
             "publication_id": None if source.publication_id is None else str(source.publication_id),
             "selection": source.selection.document(),
+            "content_sha256": None,
+            "bytes": None,
+        }
+    if isinstance(source, WorkspaceAssetSource):
+        return {
+            "kind": "workspace_asset",
+            "asset_id": str(source.asset_id),
+            "preparation_id": None,
             "content_sha256": None,
             "bytes": None,
         }

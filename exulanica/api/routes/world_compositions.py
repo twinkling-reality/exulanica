@@ -40,6 +40,7 @@ from exulanica.world import (
     PhotoPointMapSource,
     ReviewedAssetSource,
     SourceAttachmentSource,
+    WorkspaceAssetSource,
     WorldObjectRepository,
     apply_composition,
     preview_composition,
@@ -83,6 +84,23 @@ class EnvironmentAdmissionSourceBody(BaseModel):
         )
 
 
+class WorkspaceAssetSourceBody(BaseModel):
+    """A person's own admitted asset, by the id ``POST /workspace-assets`` returned.
+
+    ``prepared_sha256`` pins the prepared bytes: optional in a preview, which reports the digest it
+    resolved, and required in an apply, so a confirmed apply places exactly what was previewed.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal["workspace_asset"]
+    asset_id: uuid.UUID
+    prepared_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+
+    def domain(self) -> WorkspaceAssetSource:
+        return WorkspaceAssetSource(self.asset_id, self.prepared_sha256)
+
+
 class SourceAttachmentSourceBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -116,7 +134,8 @@ CompositionSourceBody = Annotated[
     ReviewedAssetSourceBody
     | EnvironmentAdmissionSourceBody
     | SourceAttachmentSourceBody
-    | PhotoPointMapSourceBody,
+    | PhotoPointMapSourceBody
+    | WorkspaceAssetSourceBody,
     Field(discriminator="kind"),
 ]
 
@@ -175,6 +194,14 @@ class CompositionPreviewBody(BaseModel):
 class CompositionApplyBody(CompositionPreviewBody):
     placement: CompositionPlacementBody
     saved_entry: SavedEntryAdvanceBody | None = None
+
+    @model_validator(mode="after")
+    def workspace_asset_names_its_bytes(self) -> CompositionApplyBody:
+        """An apply of a workspace asset names the prepared digest it expects to place."""
+        source = self.source
+        if isinstance(source, WorkspaceAssetSourceBody) and source.prepared_sha256 is None:
+            raise ValueError("a workspace asset apply names the prepared_sha256 it previewed")
+        return self
 
 
 class PhotoPointMapPreviewBody(CompositionPreviewBody):

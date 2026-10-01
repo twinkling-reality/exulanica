@@ -242,7 +242,9 @@ def society_models_view(
         connection, session.workspace_id, world_id=world_id
     ).current(version_id, role)
     decisions = (
-        SocietyDecisionRepository(society).role_decisions(role, version_id, latest=DECISIONS_READ)
+        SocietyDecisionRepository(society).role_decisions(
+            role, version_id, latest=DECISIONS_READ, authorized=snapshot
+        )
         if engine.owner_model_choice
         else []
     )

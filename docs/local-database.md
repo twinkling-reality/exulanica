@@ -136,5 +136,9 @@ URLs, needs the printed URLs afterwards.
 
 A database this command made is upgraded only by its `upgrade` command, never by an implicit
 startup migration. Point the API at the runtime URL `init` or `restore` printed; the owner URL is for
-migrations and provisioning, and the API refuses to start on it. [Development setup](development-setup.md#running-the-api)
+migrations and provisioning, and the API refuses to start on it. After `init`, and after every
+`upgrade`, publish the character catalogs with that owner URL and the data directory the API will
+use (`EXULANICA_DATABASE_URL=<owner URL> EXULANICA_DATA_DIR=<data directory> uv run
+exulanica-character-catalog publish --apply`); until then no person is drawn and `/readyz` says so.
+[Development setup](development-setup.md#running-the-api)
 lists the API's other settings, and [deployment](deployment.md) owns the full configuration.

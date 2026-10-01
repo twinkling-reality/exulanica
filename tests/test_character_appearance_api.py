@@ -119,60 +119,98 @@ def test_client_cannot_supply_actor_scope_unregistered_family_or_output(appearan
     assert api.get(path).status_code == 424
 
 
-def test_the_host_serves_saved_looks_over_the_committed_character_catalog(appearance_api):
+def test_the_host_serves_saved_looks_over_its_published_character_catalog(
+    appearance_api, repository
+):
     from exulanica.api.services import _character_appearance_runtime
     from exulanica.world.character_appearance import (
         designed_looks,
         load_character_catalog,
         recipe_from_look,
     )
+    from exulanica.world.character_catalog_publication import (
+        catalog_documents,
+        catalog_imports,
+        publish_catalogs,
+    )
+    from exulanica.world.character_catalogs import read_publication_document
 
     api, at = appearance_api
     services = api.client.app.state.services
     runtime = _character_appearance_runtime(services.store, {})
-    assert runtime is not None
+    assert runtime is not None and runtime.catalogs is not None
     api.client.app.state.services = replace(services, character_appearance=runtime)
-    served = api.get(at("/families")).json()
-    assert [entry["family"]["family_id"] for entry in served] == [
-        "makehuman-people/v1/feminine",
-        "makehuman-people/v1/masculine",
-    ]
-    catalog, looks = load_character_catalog()
-    feminine = next(f for f in runtime.families if f.family_id.endswith("/feminine"))
-    look = designed_looks(catalog, looks)["tailored-feminine"]["look"]
-    body = {"base_revision": 0, "recipe": recipe_from_look(look, feminine).model_dump(mode="json")}
-    saved = api.client.put(at(), json=body, headers=api.headers)
-    assert saved.status_code == 200, saved.text
-    # Nothing is published in this test's registry, and the status says so.
-    assert saved.json()["current"]["render_status"] == "asset_withdrawn_or_unreviewed"
-    recipe = body["recipe"]
-    crossed = {
-        "base_revision": 1,
-        "recipe": {
-            **recipe,
-            "parameters": {**recipe["parameters"], "outfit": "masculine/outfit/male_worksuit01"},
-        },
-    }
-    assert api.client.put(at(), json=crossed, headers=api.headers).status_code == 422
-    reset = api.post(at("/reset"), {"base_revision": 1})
-    assert reset.status_code == 200, reset.text
-    default = designed_looks(catalog, looks)[looks["defaults"]["bases"]["feminine"]]["look"]
-    assert reset.json()["current"]["document"]["recipe"] == recipe_from_look(
-        default, feminine
-    ).model_dump(mode="json")
+    # Nothing is published yet, so nothing is offered and nothing can be saved.
+    assert api.get(at("/families")).json() == []
+
+    layered, _parametric = catalog_documents()
+    keys = sorted(item.manifest.asset_key for item in catalog_imports(layered))
+    try:
+        with repository.connection.transaction():
+            publish_catalogs(repository.connection, services.store, [layered])
+        repository.connection.commit()
+        served = api.get(at("/families")).json()
+        assert [entry["family"]["family_id"] for entry in served] == [
+            "makehuman-people/v1/feminine",
+            "makehuman-people/v1/masculine",
+        ]
+        catalog, looks = load_character_catalog()
+        feminine = next(
+            f
+            for f in read_publication_document(layered).families
+            if f.family_id.endswith("/feminine")
+        )
+        look = designed_looks(catalog, looks)["tailored-feminine"]["look"]
+        body = {
+            "base_revision": 0,
+            "recipe": recipe_from_look(look, feminine).model_dump(mode="json"),
+        }
+        saved = api.client.put(at(), json=body, headers=api.headers)
+        assert saved.status_code == 200, saved.text
+        # Publishing imported every container the catalog names, so the look can be drawn.
+        assert saved.json()["current"]["render_status"] == "available"
+        recipe = body["recipe"]
+        crossed = {
+            "base_revision": 1,
+            "recipe": {
+                **recipe,
+                "parameters": {
+                    **recipe["parameters"],
+                    "outfit": "masculine/outfit/male_worksuit01",
+                },
+            },
+        }
+        assert api.client.put(at(), json=crossed, headers=api.headers).status_code == 422
+        reset = api.post(at("/reset"), {"base_revision": 1})
+        assert reset.status_code == 200, reset.text
+        default = designed_looks(catalog, looks)[looks["defaults"]["bases"]["feminine"]]["look"]
+        assert reset.json()["current"]["document"]["recipe"] == recipe_from_look(
+            default, feminine
+        ).model_dump(mode="json")
+    finally:
+        with repository.connection.transaction():
+            repository.connection.execute(
+                "delete from world_reviewed_asset where asset_key = any(%s)", (keys,)
+            )
+        repository.connection.commit()
 
 
-def test_a_missing_character_catalog_is_an_absence_and_a_disagreeing_one_stops_startup(tmp_path):
+def test_the_runtime_serves_what_is_published_and_a_disagreeing_catalog_never_is(tmp_path):
     import json
     from pathlib import Path
 
     from exulanica.api.authorisation import TokenDirectory
     from exulanica.api.services import Services, _character_appearance_runtime
     from exulanica.store.local import LocalContentAddressedStore
+    from exulanica.world.character_catalog_publication import catalog_documents
+    from exulanica.world.character_catalogs import PublicationRefused
 
     store = LocalContentAddressedStore(tmp_path / "blobs")
-    missing = {"EXULANICA_CHARACTER_DIRECTORY": str(tmp_path / "nothing-here")}
-    assert _character_appearance_runtime(store, missing) is None
+    # The API no longer loads a directory at startup; a host publishes into the database.
+    runtime = _character_appearance_runtime(
+        store, {"EXULANICA_CHARACTER_DIRECTORY": str(tmp_path / "nothing-here")}
+    )
+    assert runtime is not None and runtime.catalogs is not None and runtime.families == ()
     services = Services(
         database=None,
         readonly_database=None,
@@ -181,7 +219,7 @@ def test_a_missing_character_catalog_is_an_absence_and_a_disagreeing_one_stops_s
         executor_shares_the_write_role=False,
         model_client=None,
     )
-    assert any("character catalog" in note for note in services.warnings)
+    assert any("no character runtime" in note for note in services.warnings)
 
     committed = Path(__file__).parents[1] / "assets/characters"
     directory = tmp_path / "characters"
@@ -190,6 +228,5 @@ def test_a_missing_character_catalog_is_an_absence_and_a_disagreeing_one_stops_s
     looks = json.loads((committed / "looks.json").read_text())
     looks["defaults"]["player"] = "nobody"
     (directory / "looks.json").write_text(json.dumps(looks))
-    disagreeing = {"EXULANICA_CHARACTER_DIRECTORY": str(directory)}
-    with pytest.raises(ValueError, match="unknown looks"):
-        _character_appearance_runtime(store, disagreeing)
+    with pytest.raises(PublicationRefused, match="unknown looks"):
+        catalog_documents(directory)

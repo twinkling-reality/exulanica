@@ -7,6 +7,7 @@ import {
 } from '../src/playcanvas/owned-district-runtime.js';
 import { NEAR_INHABITANT_BUDGET } from '../src/playcanvas/character/budget.js';
 import type { OwnedDistrict } from '@exulanica/atlas-core';
+import { serveFixturePeople } from './served-people.js';
 
 function setup() {
   const canvas = document.createElement('canvas');
@@ -16,6 +17,7 @@ function setup() {
   options.graphicsDevice = device;
   options.componentSystems = [pc.RenderComponentSystem];
   app.init(options);
+  serveFixturePeople(app);
   const district: OwnedDistrict = {
     profile: 'exulanica.owned-district/v1',
     district_id: 'test',

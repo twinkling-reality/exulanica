@@ -40,6 +40,7 @@ from exulanica.world.errors import (
 )
 from exulanica.world.object_repository import WorldObjectRepository
 from exulanica.world.objects import Transform, object_document
+from exulanica.world.workspace_assets import WorkspaceAssetWithdrawn
 
 __all__ = [
     "OBJECT_EDIT_BLOCKED_REASONS",
@@ -61,6 +62,8 @@ _REFUSALS: Final[tuple[tuple[type[Exception], str], ...]] = (
     (InvalidObjectData, "invalid_object_data"),
     #: An undo whose environment instance left the binding the reversed edit stored.
     (InvalidEnvironmentState, "invalid_environment_state"),
+    #: A move of an object whose workspace asset was withdrawn, or whose workspace was erased.
+    (WorkspaceAssetWithdrawn, "withdrawn"),
 )
 
 #: Every code ``blocked_reason`` can carry. Stable: codes are added, never renamed.

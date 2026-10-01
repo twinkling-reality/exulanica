@@ -9,8 +9,8 @@
  */
 import * as pc from 'playcanvas';
 import { createObjectContainerAsset, validateGlbContainer } from '../scene-objects.js';
-import type { CatalogAssetRef, CatalogMaterial, CharacterCatalog } from './catalog.js';
-import { hex, sha256Hex } from './digest.js';
+import type { CatalogAssetRef, CatalogMaterial } from './catalog.js';
+import { canonicalJson, hex, sha256Hex } from './digest.js';
 
 export type CharacterAssetLoader = (asset: CatalogAssetRef, signal: AbortSignal) => Promise<ArrayBuffer>;
 
@@ -250,12 +250,17 @@ export class CharacterHost {
   private loader: CharacterAssetLoader | null = null;
   private destroyed = false;
 
-  private constructor(readonly app: pc.AppBase, readonly catalog: CharacterCatalog) {}
+  private constructor(readonly app: pc.AppBase) {}
 
-  static forApp(app: pc.AppBase, catalog: CharacterCatalog): CharacterHost {
+  /**
+   * The application's one host. It holds no catalog: containers and material packs are addressed
+   * by content digest and checked against the reference each look's own catalog gives, so people
+   * drawn from two published catalogs share whatever bytes the two have in common.
+   */
+  static forApp(app: pc.AppBase): CharacterHost {
     let host = HOSTS.get(app);
     if (!host || host.destroyed) {
-      host = new CharacterHost(app, catalog);
+      host = new CharacterHost(app);
       HOSTS.set(app, host);
       app.once('destroy', () => host!.destroy());
     }
@@ -263,10 +268,10 @@ export class CharacterHost {
   }
 
   /** The host of the application that owns `device`, found by its canvas identity. */
-  static forDevice(device: pc.GraphicsDevice, catalog: CharacterCatalog): CharacterHost {
+  static forDevice(device: pc.GraphicsDevice): CharacterHost {
     const app = applicationOf(device);
     if (!app) throw new Error('Characters need an application whose canvas has a unique id');
-    return CharacterHost.forApp(app, catalog);
+    return CharacterHost.forApp(app);
   }
 
   /**
@@ -419,7 +424,8 @@ export class CharacterHost {
   /** A shared material built from a reviewed pack, optionally tinted. */
   async material(material: CatalogMaterial, tint: string | null, signal: AbortSignal): Promise<{ material: pc.StandardMaterial; release(): void }> {
     if (this.destroyed) throw cancelled();
-    const key = `${material.asset.contentSha256}:${tint ?? ''}`;
+    // The whole declaration, not only the pack: two catalogs may light the same pack differently.
+    const key = `${canonicalJson(material)}:${tint ?? ''}`;
     const { value, release } = await this.materials.lease(key, async (own) => {
       const pack = await this.acquirePack(material, own);
       try {

@@ -9,7 +9,16 @@
  * world fetches the same bytes as reviewed assets from `/world/assets/<asset key>/bytes`.
  */
 
-import { CHARACTER_CATALOG, type CharacterByteLoader } from '@exulanica/atlas-react/playcanvas';
+import {
+  canonicalJson,
+  readServedCatalog,
+  sha256Hex,
+  type CharacterByteLoader,
+  type CharacterCatalog,
+  type ServedLayeredCatalog,
+} from '@exulanica/atlas-react/playcanvas';
+import catalogUrl from '../../../../../assets/characters/catalog.json?url';
+import looksUrl from '../../../../../assets/characters/looks.json?url';
 import stylizedLooksUrl from '../../../../../assets/characters/stylized-looks.json?url';
 import editableHumanUrl from '../../../../../assets/characters/makehuman-parametric-v1/default.look.json?url';
 
@@ -40,10 +49,39 @@ export function developmentCharacterLoader(files: ReadonlyMap<string, string>): 
   };
 }
 
+/**
+ * The committed people catalog as the host would publish it: the same bundle document, read through
+ * the same reader, with the digest the host's canonical JSON gives it. The preview route has no API
+ * to serve it, so the repository's own files stand in for the publication.
+ */
+export async function developmentPeopleCatalog(signal: AbortSignal): Promise<ServedLayeredCatalog> {
+  const read = async (url: string, what: string): Promise<unknown> => {
+    const response = await fetch(url, { signal, credentials: 'same-origin' });
+    if (!response.ok) throw new Error(`${what} unavailable: HTTP ${response.status}`);
+    return response.json() as Promise<unknown>;
+  };
+  const [catalog, looks] = await Promise.all([read(catalogUrl, 'The character catalog'), read(looksUrl, 'Designed looks')]);
+  const bytes = new TextEncoder().encode(canonicalJson({ profile: 'exulanica.character-catalog-bundle/v1', catalog, looks }));
+  const document = catalog as { readonly catalogId: string; readonly revision: number };
+  const served = readServedCatalog(
+    {
+      catalog_sha256: sha256Hex(bytes),
+      catalog_id: document.catalogId,
+      revision: document.revision,
+      profile: 'exulanica.character-catalog-bundle/v1',
+      kind: 'layered-people',
+      state: 'current',
+    },
+    bytes,
+  );
+  if (served.kind !== 'layered-people') throw new Error('The committed people catalog is not a layered catalog.');
+  return served;
+}
+
 /** Every catalog container's repository file, by content digest. */
-export function catalogCharacterFiles(): Map<string, string> {
+export function catalogCharacterFiles(catalog: CharacterCatalog): Map<string, string> {
   const files = new Map<string, string>();
-  for (const family of CHARACTER_CATALOG.families) {
+  for (const family of catalog.families) {
     for (const base of family.bases) {
       files.set(base.asset.contentSha256, base.asset.file);
       for (const part of base.parts) if (part.asset) files.set(part.asset.contentSha256, part.asset.file);

@@ -9,6 +9,7 @@ echoed identifier but nothing else. Running it against a stack is the acceptance
 from __future__ import annotations
 
 import ast
+import hashlib
 import importlib.util
 import subprocess
 import sys
@@ -119,3 +120,12 @@ def test_an_echoed_identifier_is_no_difference_but_anything_else_is():
     assert DRIVE.without_identities(
         {"code": "unknown_reference", "detail": "entry e-1 is withdrawn"}, foreign
     ) != DRIVE.without_identities({"code": "unknown_reference", "detail": "no entry e-2"}, invented)
+
+
+def test_the_driver_names_the_code_it_started_with_and_says_when_that_changed():
+    source = DRIVER.read_text(encoding="utf-8")
+
+    assert hashlib.sha256(DRIVER.read_bytes()).hexdigest() == DRIVE.DRIVER_SHA256_AT_START
+    assert source.count('"driver_sha256": DRIVER_SHA256_AT_START') == source.count(
+        '"driver_changed_during_run":'
+    )

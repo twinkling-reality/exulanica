@@ -60,7 +60,9 @@ from retired_society_support import plant_retired_decision, plant_retired_societ
 from social_society_fixtures import social_input
 from society_fixtures import SEED, society_input
 from society_living_fixtures import grid_input
+from static_glb_builder import cube
 from test_material_recipes import _small
+from workspace_asset_support import declaration as workspace_asset_declaration
 from world_support import FIXTURE_WORLD_ID, registered_world
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -786,6 +788,22 @@ def material_recipe(owner) -> str:
     return made["recipe_id"]
 
 
+def workspace_asset_request() -> dict[str, Any]:
+    """The multipart request that admits a one-metre cube as the caller's own work."""
+    payload = cube().build()
+    return {
+        "data": {"declaration": json.dumps(workspace_asset_declaration(payload))},
+        "files": {"content": ("object.glb", payload, "model/gltf-binary")},
+    }
+
+
+def workspace_asset(owner) -> str:
+    """A person's own admitted asset, not yet prepared (API)."""
+    return _ok(owner.request("POST", "/workspace-assets", **workspace_asset_request()), 201)[
+        "asset_id"
+    ]
+
+
 def world_entry(owner) -> str:
     """The workspace's starter world (API)."""
     return _ok(owner.request("POST", "/world-entries/starter", json={"title": "My world"}), 200)[
@@ -945,6 +963,44 @@ def baked_tile(owner) -> str:
 def reviewed_asset(owner) -> str:
     """The reviewed cube, which migration 0042 registers for every workspace."""
     return CUBE.asset_key
+
+
+def character_catalog(owner) -> str:
+    """A character catalog the host published (domain: host administration, owner connection).
+
+    Written as the publication row alone: the read serves the document, and the containers a
+    catalog names are the reviewed registry's concern, which this sweep leaves alone.
+    """
+    from exulanica.world.character_catalogs import layered_bundle, read_publication_document
+    from psycopg.types.json import Jsonb
+
+    characters = ROOT / "assets/characters"
+    publication = read_publication_document(
+        layered_bundle(
+            json.loads((characters / "catalog.json").read_text()),
+            json.loads((characters / "looks.json").read_text()),
+        )
+    )
+    connection = owner.repository.connection
+    connection.execute(
+        "insert into character_catalog_publication"
+        "(catalog_sha256,catalog_id,profile,kind,revision,document,producer) "
+        "values(%s,%s,%s,%s,%s,%s,'existence sweep')",
+        (
+            publication.catalog_sha256,
+            publication.catalog_id,
+            publication.profile,
+            publication.kind,
+            publication.revision,
+            Jsonb(publication.document),
+        ),
+    )
+    connection.commit()
+    return publication.catalog_sha256
+
+
+def invented_digest() -> str:
+    return uuid.uuid4().hex * 2
 
 
 def district_version(owner) -> uuid.UUID:
