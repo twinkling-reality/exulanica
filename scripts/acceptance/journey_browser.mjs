@@ -23,7 +23,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 
 import { open as openBrowser } from '../rehearsal/cdp.mjs';
 import {
-  BUTTON, OBJECT_PANEL, OPEN_CONFIRM, confirm, confirmation, liveObjects, open, openObjects, savedWorld,
+  ACTION, OBJECT_PANEL, OPEN_CONFIRM, confirm, confirmation, liveObjects, open, openObjects, savedWorld,
 } from '../rehearsal/app.mjs';
 import {
   INSPECT, INSPECTOR, PEOPLE, ROW, inspectorSeen, openPeopleNearby, societyPath, waitForEdit,
@@ -177,18 +177,18 @@ const STEP_HANDLERS = {
       await ctx.page.key(MOVE_KEY, MOVE_KEY);
       await sleep(150);
     }
-    await ctx.page.click(BUTTON('Save this position', OBJECT_PANEL), 'Save this position');
+    await ctx.page.click(ACTION('objects.save-move', OBJECT_PANEL), 'Save position');
     await confirmation(ctx.page, 'the move');
     await confirm(ctx.page, 'the move');
     const after = await waitForEdit(ctx, before.version.edit_seq, 'the move to be saved');
     ctx.observe('stall-moved-aside', after.version.edits.at(-1)?.kind === 'move_object',
       { newest_edit: after.version.edits.at(-1) });
-    await ctx.page.click(BUTTON('Close', OBJECT_PANEL), 'Close the objects panel').catch(() => null);
+    await ctx.page.click(ACTION('panel.close', OBJECT_PANEL), 'Close the objects panel').catch(() => null);
   },
   async 'journey-people'(ctx) {
     await openPeopleNearby(ctx.page);
     await ctx.page.waitFor(`['absent', 'present'].includes(${PEOPLE}?.dataset.state)`, SETTLE_MS, 'People nearby to read the society');
-    await ctx.page.click(BUTTON('Bring in inhabitants', PEOPLE), 'Bring in inhabitants');
+    await ctx.page.click(ACTION('people.bring-in', PEOPLE), 'Bring people in');
     await ctx.page.waitFor(`${PEOPLE}?.dataset.state === 'present'`, SETTLE_MS, 'the inhabitants to be present');
     const { entry } = await savedWorld(ctx);
     const society = (await ctx.api('GET', societyPath(entry))).body;
@@ -196,13 +196,13 @@ const STEP_HANDLERS = {
     ctx.observe('people-brought-in', (society?.state?.inhabitants ?? []).length > 0
       && created.some((r) => r.status === 200),
     { population: society?.population_size ?? null, requests: created.map((r) => [r.path, r.status]) });
-    await ctx.screenshot('people', 'People nearby after Bring in inhabitants');
+    await ctx.screenshot('people', 'People here after Bring people in');
   },
   async 'journey-bench'(ctx) {
     const { placed, edit } = await place(ctx, 'cc0.bench');
     Object.assign(ctx.facts, { bench_object_id: placed?.object_id ?? null, bench_edit_id: edit?.edit_id ?? null,
       bench_edit_seq: edit?.edit_seq ?? null });
-    await ctx.page.click(BUTTON('Close', OBJECT_PANEL), 'Close the objects panel').catch(() => null);
+    await ctx.page.click(ACTION('panel.close', OBJECT_PANEL), 'Close the objects panel').catch(() => null);
   },
   async 'journey-response'(ctx) {
     await openPeopleNearby(ctx.page);
@@ -210,9 +210,9 @@ const STEP_HANDLERS = {
     let rest = null;
     let minutes = 0;
     while (rest === null && minutes < MINUTES_MOST) {
-      await ctx.page.waitFor(`(() => { const b = ${BUTTON('Advance one minute', PEOPLE)}; return !!b && !b.disabled; })()`,
-        SETTLE_MS, 'Advance one minute to be offered');
-      await ctx.page.click(BUTTON('Advance one minute', PEOPLE), 'Advance one minute');
+      await ctx.page.waitFor(`(() => { const b = ${ACTION('clock.advance', PEOPLE)}; return !!b && !b.disabled; })()`,
+        SETTLE_MS, 'Next minute to be offered');
+      await ctx.page.click(ACTION('clock.advance', PEOPLE), 'Next minute');
       minutes += 1;
       await sleep(PAGE_SETTLE_MS);
       const events = (await ctx.api('GET', societyPath(entry, '/events', '&limit=256'))).body?.events ?? [];

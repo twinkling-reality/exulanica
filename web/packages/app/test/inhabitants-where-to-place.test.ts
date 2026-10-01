@@ -49,9 +49,8 @@ describe('where inhabitants need somewhere, the panel says where to place it', (
 });
 
 describe('the pointer names the controls a person sees', () => {
-  it('names the Create tab and the control that opens the objects', () => {
-    expect(POINTER).toContain(say('worldControls.create'));
-    expect(POINTER).toContain(say('worldControls.addAndArrange'));
+  it('names the control that opens the objects, as the top bar shows it', () => {
+    expect(POINTER).toContain(say('worldControls.addObject'));
   });
 
   it('the Create tab reads its key', () => {

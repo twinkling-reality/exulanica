@@ -397,7 +397,7 @@ async function place(
     toggle.checked = true;
     toggle.dispatchEvent(new Event('change'));
   }
-  button(h.mounted.panel.root, 'Place before me').click();
+  button(h.mounted.panel.root, 'Place here').click();
 }
 
 beforeEach(() => { document.body.replaceChildren(); });
@@ -484,7 +484,7 @@ describe('nothing reaches the authority without a confirmation', () => {
 
     await place(h);
     expect(h.mounted.confirm.root.hidden).toBe(false);
-    expect(h.mounted.confirm.root.textContent).toContain('Before anything is written');
+    expect(h.mounted.confirm.root.textContent).toContain('Check this change');
     expect(h.mounted.confirm.root.textContent).toContain('Marker pillar');
     expect(writes(h.authority.calls)).toEqual([]);
   });
@@ -586,8 +586,7 @@ describe('nothing reaches the authority without a confirmation', () => {
     button(h.mounted.panel.root, 'Remove').click();
     // The contract keeps the row with removed = true so undo restores the same identity. Saying
     // "this cannot be undone" here would be the false reversibility claim confirm.ts warns about.
-    expect(h.mounted.confirm.root.textContent).toContain('reversible event');
-    expect(h.mounted.confirm.root.textContent).toContain('Use “Take back the last change”');
+    expect(h.mounted.confirm.root.textContent).toContain('You can take this back afterwards with Take back.');
     expect(h.mounted.confirm.root.textContent).not.toContain('This cannot be undone');
     expect(writes(h.authority.calls)).toEqual([]);
     button(h.mounted.confirm.root, 'Confirm').click();
@@ -639,7 +638,7 @@ describe('nothing reaches the authority without a confirmation', () => {
     // Listed, named, and unselectable: a storage failure must not become a shorter menu.
     expect(h.mounted.panel.root.textContent).toContain('Marker pillar');
     expect(h.mounted.panel.root.textContent).toContain('unavailable_asset');
-    expect(button(h.mounted.panel.root, 'Place before me').disabled).toBe(true);
+    expect(button(h.mounted.panel.root, 'Place here').disabled).toBe(true);
   });
 
   it('says under the chosen kind what inhabitants do there, from the served row alone', async () => {
@@ -816,7 +815,7 @@ describe('adding goes through the server’s preview, then the same request is a
     expect(h.objects.clear.mock.calls.length).toBe(drawsBefore);
     expect(h.objects.objectIds).toEqual([]);
     expect(writes(h.authority.calls)).toEqual(['apply']);
-    expect(button(h.mounted.panel.root, 'Take back the last change').disabled).toBe(true);
+    expect(button(h.mounted.panel.root, 'Take back').disabled).toBe(true);
   });
 
   it('offers a stale apply back as a fresh check against the world read again', async () => {
@@ -854,7 +853,7 @@ describe('adding goes through the server’s preview, then the same request is a
     await vi.waitFor(() => expect(h.mounted.confirm.root.hidden).toBe(true));
     expect(h.mounted.panel.root.textContent).toContain('Added.');
 
-    const undo = button(h.mounted.panel.root, 'Take back the last change');
+    const undo = button(h.mounted.panel.root, 'Take back');
     expect(undo.disabled).toBe(false);
     undo.click();
     expect(h.mounted.confirm.root.textContent).toContain('an object you added');
@@ -870,7 +869,7 @@ describe('adding goes through the server’s preview, then the same request is a
     await vi.waitFor(() => expect(writes(h.authority.calls)).toEqual(['apply', 'undo']));
     expect(h.authority.calls.find((call) => call.name === 'undo')!.args[0]).toBe(added);
     await vi.waitFor(() => expect(h.objects.objectIds).toEqual([]));
-    expect(button(h.mounted.panel.root, 'Take back the last change').disabled).toBe(true);
+    expect(button(h.mounted.panel.root, 'Take back').disabled).toBe(true);
   });
 
   it('says it is not known whether an apply was recorded when its answer is lost', async () => {
@@ -1227,7 +1226,7 @@ describe('a nudge is shown at once and written once', () => {
     expect(writes(h.authority.calls)).toEqual([]);
     expect(h.mounted.panel.root.textContent).toContain('Not saved yet');
 
-    button(h.mounted.panel.root, 'Save this position').click();
+    button(h.mounted.panel.root, 'Save position').click();
     expect(writes(h.authority.calls)).toEqual([]);
     button(h.mounted.confirm.root, 'Confirm').click();
     await vi.waitFor(() => expect(writes(h.authority.calls)).toEqual(['move']));
@@ -1318,7 +1317,7 @@ describe('undo is the authority’s, not this surface’s memory of one', () => 
     const h = harness();
     await h.mounted.begin();
     h.mounted.panel.setVisible(true);
-    expect(button(h.mounted.panel.root, 'Take back the last change').disabled).toBe(true);
+    expect(button(h.mounted.panel.root, 'Take back').disabled).toBe(true);
   });
 
   it('offers the newest edit no undo already names, and sends undo once confirmed', async () => {
@@ -1335,7 +1334,7 @@ describe('undo is the authority’s, not this surface’s memory of one', () => 
     });
     await h.mounted.begin();
     h.mounted.panel.setVisible(true);
-    const undo = button(h.mounted.panel.root, 'Take back the last change');
+    const undo = button(h.mounted.panel.root, 'Take back');
     expect(undo.disabled).toBe(false);
     undo.click();
     // Edit 2 is already named by the undo at 3, and 3 is itself an undo, so 1 is next.
@@ -1353,7 +1352,7 @@ describe('undo is the authority’s, not this surface’s memory of one', () => 
     });
     await h.mounted.begin();
     h.mounted.panel.setVisible(true);
-    expect(button(h.mounted.panel.root, 'Take back the last change').disabled).toBe(true);
+    expect(button(h.mounted.panel.root, 'Take back').disabled).toBe(true);
   });
 });
 
@@ -1464,7 +1463,7 @@ describe('a motion given, changed or taken away later is its own confirmed edit'
     choose(open, 'object-motion-easing', 'linear');
     choose(open, 'object-motion-travel', '2000');
     choose(open, 'object-motion-period', '6000');
-    button(open, 'Save this motion').click();
+    button(open, 'Save motion').click();
 
     expect(h.mounted.confirm.root.hidden).toBe(false);
     expect(h.mounted.confirm.root.textContent).toContain(
@@ -1503,12 +1502,12 @@ describe('a motion given, changed or taken away later is its own confirmed edit'
     expect([travel.value, travel.step]).toEqual(['655', '1']);
     expect(open.querySelector<HTMLInputElement>('#object-motion-period')!.step).toBe('100');
 
-    button(open, 'Save this motion').click();
+    button(open, 'Save motion').click();
     expect(h.mounted.confirm.root.hidden).toBe(true);
     expect(h.mounted.panel.root.textContent).toContain('That is the motion it already has');
 
     choose(open, 'object-motion-axis', 'x');
-    button(open, 'Save this motion').click();
+    button(open, 'Save motion').click();
     expect(h.mounted.confirm.root.textContent).toContain('Change the motion of “Marker pillar”');
     confirmButton(h).click();
     await vi.waitFor(() => expect(writes(h.authority.calls)).toEqual(['behaviour']));
@@ -1535,10 +1534,10 @@ describe('a motion given, changed or taken away later is its own confirmed edit'
     choose(editor(h.mounted.panel.root)!, 'object-motion-travel', '2000');
     const reason = 'behaviour parameter travel_mm must be between 100 and 10000';
     h.authority.answerWith(new ApiError(422, 'invalid_object_data', reason));
-    button(editor(h.mounted.panel.root)!, 'Save this motion').click();
+    button(editor(h.mounted.panel.root)!, 'Save motion').click();
     confirmButton(h).click();
 
-    const said = `The authority refused this edit: ${reason}`;
+    const said = `This world did not accept that change: ${reason}`;
     await vi.waitFor(() => expect(h.mounted.confirm.root.textContent).toContain(said));
     const status = h.mounted.panel.root.querySelector<HTMLElement>('.object-placement-status')!;
     expect([status.textContent, status.dataset['kind']]).toEqual([said, 'failure']);
@@ -1561,7 +1560,7 @@ describe('a motion given, changed or taken away later is its own confirmed edit'
     });
     await h.mounted.begin();
     h.mounted.panel.setVisible(true);
-    button(h.mounted.panel.root, 'Take back the last change').click();
+    button(h.mounted.panel.root, 'Take back').click();
     expect(h.mounted.confirm.root.textContent).toContain('a change to an object’s motion');
     confirmButton(h).click();
     await vi.waitFor(() => expect(writes(h.authority.calls)).toEqual(['undo']));
@@ -1769,7 +1768,7 @@ describe('object and data-view selection share one supported identity', () => {
     h.mounted.panel.setVisible(true);
     button(h.mounted.panel.root, 'Marker pillar').click();
     arrow('ArrowLeft');
-    button(h.mounted.panel.root, 'Save this position').click();
+    button(h.mounted.panel.root, 'Save position').click();
     button(h.mounted.confirm.root, 'Confirm').click();
 
     await vi.waitFor(() => expect(writes(h.authority.calls)).toEqual(['move']));
@@ -1791,7 +1790,7 @@ describe('object and data-view selection share one supported identity', () => {
     h.mounted.panel.setVisible(true);
     button(h.mounted.panel.root, 'Marker pillar').click();
     arrow('ArrowLeft');
-    button(h.mounted.panel.root, 'Save this position').click();
+    button(h.mounted.panel.root, 'Save position').click();
     button(h.mounted.confirm.root, 'Confirm').click();
     await vi.waitFor(() => expect(loadCount).toBe(2));
 
@@ -1865,7 +1864,7 @@ describe('opening the first alternate through confirmation', () => {
     const h = emptyWorld();
     h.fetcher.mockResolvedValueOnce(response({ current_topology_digest: STATE }));
     await h.mounted.begin();
-    expect(h.mounted.panel.root.textContent).toContain('open an alternate version first');
+    expect(h.mounted.panel.root.textContent).toContain('opens an editable copy of this world');
     await place(h);
     await vi.waitFor(() => expect(h.mounted.confirm.root.hidden).toBe(false));
     expect(h.mounted.confirm.root.textContent).toContain('Open an alternate version');
@@ -1902,7 +1901,7 @@ describe('opening the first alternate through confirmation', () => {
     expect(new Headers(request?.headers).get('content-type')).toBe('application/json');
     expect(h.fetcher).toHaveBeenCalledTimes(2);
     expect(h.placeObject).not.toHaveBeenCalled();
-    await vi.waitFor(() => expect(h.mounted.panel.root.textContent).toContain('Alternate version opened'));
+    await vi.waitFor(() => expect(h.mounted.panel.root.textContent).toContain('This world can be changed now'));
     expect(h.mounted.confirm.root.hidden).toBe(true);
     h.mounted.dispose();
   });
@@ -1920,7 +1919,7 @@ describe('opening the first alternate through confirmation', () => {
     await vi.waitFor(() => expect(h.mounted.confirm.root.hidden).toBe(false));
     button(h.mounted.confirm.root, 'Confirm').click();
     await vi.waitFor(() => expect(h.mounted.confirm.root.textContent).toContain('Nothing was written'));
-    expect(h.mounted.confirm.root.textContent).toContain('Choose “Place before me” again');
+    expect(h.mounted.confirm.root.textContent).toContain('Choose “Place here” again');
     expect(h.connect).toHaveBeenCalledTimes(1);
     expect(h.fetcher).toHaveBeenCalledTimes(2);
     button(h.mounted.confirm.root, 'Close').click();

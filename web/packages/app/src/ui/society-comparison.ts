@@ -58,8 +58,7 @@ export const FAILURE_WORDS: Readonly<Record<string, string>> = {
   anchor_failed: 'a run of the routine or of waiting on this seed did not complete, so this run could never be scored and asked nothing',
   comparison_bound_before_seed: 'what was left of the bound you set would not let this seed finish, so the comparison stopped before it and kept the seeds it had played',
   comparison_bound_spent: 'the bound you set for this comparison had too little left for its next ask, so it stopped there',
-  // Placeholder words: the page's own wording for this code is not written yet.
-  comparison_cancelled: 'the comparison was cancelled before this run finished',
+  comparison_cancelled: 'the comparison was stopped before this run finished',
   comparison_stopped: 'the server stopped running the comparison before this run was played',
   input_unavailable: 'this world\'s places were no longer available to run it on',
   interrupted: 'the process that ran it stopped part way, so its hour was not finished; a new comparison runs it again',
@@ -72,14 +71,13 @@ export const FAILURE_WORDS: Readonly<Record<string, string>> = {
   provider_not_admitted: 'the server that ran it may not reach the model\'s service',
   question_changed_by_rules: 'this world\'s rules would change the question each person is asked',
   request_refused: 'this world\'s rules would not let the question be sent',
-  // Placeholder words: the page's own wording for these codes is not written yet.
-  spending_not_granted: 'no spending grant covers this workspace and the model\'s service',
-  spending_revoked: 'the spending it ran under was revoked',
-  spending_expired: 'the spending it ran under had expired',
-  spending_limit_reached: 'a spending limit would have been crossed',
-  spending_suspended: 'spending is held closed until an operator acts',
-  spending_unavailable: 'the spending record did not answer, so nothing was sent',
-  spending_scope_missing: 'the request named no workspace to spend for',
+  spending_not_granted: 'this workspace has no allowance to spend on that model\'s service',
+  spending_revoked: 'the allowance it spent from was withdrawn',
+  spending_expired: 'the allowance it spent from had run out of time',
+  spending_limit_reached: 'the allowance would have gone over its limit',
+  spending_suspended: 'spending on models is paused until the person who runs this installation resumes it',
+  spending_unavailable: 'the allowance could not be checked, so nothing was sent',
+  spending_scope_missing: 'the request did not say which workspace to spend for',
 };
 
 /**
@@ -129,7 +127,7 @@ export function reasonWords(reliability: Reliability | null): string {
     .sort(([one, first], [two, second]) => second - first || one.localeCompare(two));
   if (reasons.length === 0) return '';
   return `Why the routine decided instead: ${reasons.map(([code, times]) =>
-    `${DECISION_WORDS[code] ?? `a reason this page has no words for (${code})`} (${times})`).join('; ')}.`;
+    `${DECISION_WORDS[code] ?? 'a reason this page cannot name yet'} (${times})`).join('; ')}.`;
 }
 
 /**

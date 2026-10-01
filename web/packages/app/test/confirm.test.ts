@@ -65,7 +65,7 @@ describe('proposal confirmation copy', () => {
     );
     expect(panel.root.textContent).toContain('2 evidence points across 2 memory regions');
     expect(panel.root.textContent).toContain(
-      'The object panel does not expose the undo control.',
+      'This change is recorded so it can be undone, though not from here.',
     );
     expect(panel.root.textContent).not.toContain('[object Object]');
     expect(onVisibilityChange).toHaveBeenLastCalledWith(true);
@@ -92,15 +92,15 @@ describe('proposal confirmation copy', () => {
     const panel = buildConfirm({ onConfirm: vi.fn(), onCancel: vi.fn() });
     const proposed = summary(pendingRow('row.note', { text: 'Move the cube' }));
     panel.show('move', proposed, 'Move the cube', { undoControlAvailable: true });
-    expect(panel.root.textContent).toContain('Use “Take back the last change” in the object panel');
-    expect(panel.root.textContent).not.toContain('does not expose the undo control');
+    expect(panel.root.textContent).toContain('You can take this back afterwards with Take back.');
+    expect(panel.root.textContent).not.toContain('though not from here');
     panel.show('bootstrap', { ...proposed, reversible: false }, 'Open a version', {
       undoControlAvailable: true,
     });
     expect(panel.root.textContent).toContain('This cannot be undone.');
-    expect(panel.root.textContent).not.toContain('Take back the last change');
+    expect(panel.root.textContent).not.toContain('Take back');
     panel.show('other-caller', proposed, 'Another proposal');
-    expect(panel.root.textContent).toContain('does not expose the undo control');
+    expect(panel.root.textContent).toContain('though not from here');
   });
 });
 

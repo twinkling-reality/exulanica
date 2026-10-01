@@ -245,7 +245,7 @@ describe('the Compare view\'s reads', () => {
     await vi.waitFor(() => expect(mounted.root.querySelector('.comparison-start')?.hasAttribute('hidden'))
       .toBe(false));
     expect(mounted.root.querySelector('.comparison-list')?.textContent)
-      .toContain('unknown_reference: no such world resource');
+      .toContain('That is no longer here, or it is not in this workspace.');
     mounted.dispose();
   });
 
@@ -310,5 +310,19 @@ describe('the Compare view\'s reads', () => {
     expect(mounted.root.querySelector<HTMLSelectElement>('.comparison-seed-select')!.value)
       .toBe(read.seeds[1]!.seedDigest);
     mounted.dispose();
+  });
+});
+
+describe('a plan whose start the spending allowance would refuse', () => {
+  it('says why in words, by the authority’s finer reason first, never with the code', async () => {
+    const { planRefusalWords } = await import('../src/ui/society-comparison-start.js');
+    const bound = planRefusalWords({ code: 'budget_exceeded', detail: 'spending_limit_reached (workspace): bound_exceeds_grant',
+      spending: { reason: 'spending_limit_reached', detail: 'bound_exceeds_grant' } });
+    expect(bound).toBe('The bound you set is more than this workspace\'s allowance grants. Set a lower bound to start.');
+    expect(planRefusalWords({ code: 'budget_exceeded', detail: 'x', spending: { reason: 'spending_revoked', detail: null } }))
+      .toContain('withdrawn');
+    const bare = planRefusalWords({ code: 'budget_exceeded', detail: 'spent' });
+    expect(bare).toMatch(/more than this workspace's model allowance permits/);
+    expect(bare).not.toContain('budget_exceeded');
   });
 });

@@ -4,6 +4,7 @@ import {
   type IslandId,
 } from '@exulanica/atlas-core';
 import { ApiError } from '@exulanica/graph-client';
+import { problemSentence, type ProblemWords } from '../ui/words/problems.js';
 import {
   hostGeneratedSociety,
   hostRegionSociety,
@@ -208,6 +209,40 @@ export interface PeopleControls {
   advance(): Promise<void>;
 }
 
+/** The People and clock refusals this surface meets, in words (codes stay in the technical record). */
+const PEOPLE_PROBLEMS: Readonly<Record<string, ProblemWords>> = {
+  // Thrown by this module when the place a saved world opens at cannot be drawn.
+  arrival_source_unavailable: {
+    happened: 'The place this world opens at is not available here, so its people cannot be shown.',
+    next: 'Reload the page; if it stays, open the world again from the list.',
+  },
+  society_unavailable: { happened: 'Nobody lives in this world yet.', next: 'Bring people in first.' },
+  invalid_society_control: {
+    happened: 'The world’s clock did not change.',
+    next: 'Look at what the world is doing now, then try again.',
+  },
+  unavailable_society_input: {
+    happened: 'The people of this world cannot be read right now.',
+    next: 'Its source photos were withdrawn, so there is nowhere for them to start.',
+  },
+};
+const CLOCK_UNREAD: ProblemWords = {
+  happened: 'The world’s clock could not be read.',
+  next: 'Try again in a moment.',
+};
+const CLOCK_UNCHANGED: ProblemWords = {
+  happened: 'The world’s clock did not change.',
+  next: 'Try again in a moment.',
+};
+const MINUTE_NOT_ADVANCED: ProblemWords = {
+  happened: 'The world did not move on a minute.',
+  next: 'Try again in a moment.',
+};
+const PEOPLE_UNREAD: ProblemWords = {
+  happened: 'The people of this world could not be read.',
+  next: 'Reload the page to try again.',
+};
+
 const instanceId = (feature: NYCLocalFeature): string =>
   `nyc-open-data:${feature.providerFeatureId.replace(':', '-')}`;
 
@@ -307,7 +342,7 @@ export function mountEnvironmentSelection(
   for (const speed of [1, 2, 4] as const) {
     playbackSpeed.append(el('option', { value: String(speed), text: `${speed}× speed` }));
   }
-  const advanceSociety = el('button', { type: 'button', text: 'Advance one minute', disabled: true });
+  const advanceSociety = el('button', { type: 'button', text: 'Next minute', 'data-action': 'clock.advance', disabled: true });
   const refreshSociety = el('button', { type: 'button', text: 'Refresh persisted society', disabled: true });
   playbackMode.addEventListener('click', () => void configurePlayback(
     societyControl?.mode === 'playing' ? 'paused' : 'playing',
@@ -1019,7 +1054,7 @@ export function mountEnvironmentSelection(
     } catch (error) {
       if ((phase as string) === 'disposed') return;
       recordingPlay.disabled = true; recordingNext.disabled = true; recordingRestart.disabled = true;
-      recordingStatus.textContent = `Living society unavailable: ${error instanceof Error ? error.message : String(error)}`;
+      recordingStatus.textContent = `The recorded people could not be shown. ${problemSentence(error, PEOPLE_PROBLEMS)}`;
     }
   }
 
@@ -1448,7 +1483,7 @@ export function mountEnvironmentSelection(
     } catch (error) {
       if ((phase as string) === 'disposed' || epoch !== controlEpoch) return;
       societyControl = null;
-      playbackStatus.textContent = `Playback controls unavailable. ${error instanceof Error ? error.message : 'The request failed.'}`;
+      playbackStatus.textContent = problemSentence(error, PEOPLE_PROBLEMS, CLOCK_UNREAD);
     } finally {
       if ((phase as string) !== 'disposed' && epoch === controlEpoch) { reflectPlayback(); scheduleControlPoll(); }
     }
@@ -1463,7 +1498,7 @@ export function mountEnvironmentSelection(
       societyControl = await controlClient.read(current.versionId);
     } catch (error) {
       societyControl = null;
-      playbackStatus.textContent = `Playback controls unavailable. ${error instanceof Error ? error.message : 'The request failed.'}`;
+      playbackStatus.textContent = problemSentence(error, PEOPLE_PROBLEMS, CLOCK_UNREAD);
     } finally {
       controlBusy = false; reflectPlayback(); scheduleControlPoll();
     }
@@ -1482,7 +1517,7 @@ export function mountEnvironmentSelection(
       );
       if (mode === 'paused') await liveSociety?.refresh();
     } catch (error) {
-      playbackStatus.textContent = `Playback change was not saved. ${error instanceof Error ? error.message : 'The request failed.'}`;
+      playbackStatus.textContent = problemSentence(error, PEOPLE_PROBLEMS, CLOCK_UNCHANGED);
       try { societyControl = current ? await controlClient.read(current.versionId) : null; } catch { societyControl = null; }
     } finally {
       controlBusy = false; reflectPlayback(); scheduleControlPoll();
@@ -1504,7 +1539,7 @@ export function mountEnvironmentSelection(
       societyControl = result.control;
       await liveSociety?.refresh();
     } catch (error) {
-      playbackStatus.textContent = `The society did not advance. ${error instanceof Error ? error.message : 'The request failed.'}`;
+      playbackStatus.textContent = problemSentence(error, PEOPLE_PROBLEMS, MINUTE_NOT_ADVANCED);
       try { societyControl = current ? await controlClient.read(current.versionId) : null; } catch { societyControl = null; }
     } finally {
       controlBusy = false; reflectPlayback(); scheduleControlPoll();
@@ -1933,7 +1968,7 @@ export function mountEnvironmentSelection(
         phase = 'idle';
         // Said where the person looks for people, whether or not the panel was offered yet.
         offerInhabitantsPanel();
-        inhabitantsPanel.unavailable(`Inhabitants are unavailable. ${error instanceof Error ? error.message : String(error)}`);
+        inhabitantsPanel.unavailable(problemSentence(error, PEOPLE_PROBLEMS, PEOPLE_UNREAD));
       }
       return;
     }

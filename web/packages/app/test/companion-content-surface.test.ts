@@ -237,3 +237,26 @@ describe('CONTENT row parsing', () => {
     });
   });
 });
+
+describe('an answer keeps what it says in view', () => {
+  it('shows every clause, the abstention and who answered outside any closed disclosure', () => {
+    const panel = opened();
+    const { content: _placeContent, ...plain } = answer({
+      question: 'Where did I see the harbour?',
+      clauses: [
+        { text: 'No photograph shows the harbour.', type: 'meta', citations: [] },
+        { text: 'Nothing has changed yet.', type: 'meta', citations: [] },
+      ],
+      abstained: 'UNANSWERABLE_NOT_CAPTURED',
+    });
+    panel.showAnswer(plain);
+    const speech = panel.root.querySelector('.companion-speech')!;
+    const outside = (selector: string) => [...speech.querySelectorAll(selector)]
+      .filter((node) => node.closest('details') === null);
+    expect(outside('p.companion-utterance').map((p) => p.textContent))
+      .toEqual(['No photograph shows the harbour.', 'Nothing has changed yet.']);
+    expect(outside('p.companion-abstention').map((p) => p.textContent)).toEqual([say('abstention.UNANSWERABLE_NOT_CAPTURED')]);
+    expect(outside('p.companion-provenance')).toHaveLength(1);
+    expect(speech.querySelector('details')).toBeNull();
+  });
+});

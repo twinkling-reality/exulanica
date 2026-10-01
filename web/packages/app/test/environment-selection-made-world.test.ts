@@ -143,7 +143,7 @@ describe('a world made from photographs holds inhabitants in one of its places',
     const { mounted, crowd, societyClient, modelsClient, panel } = mount({ stored: null, livesIn: 'region-b' });
     await mounted.begin();
     expect(panel().dataset['state']).toBe('absent');
-    [...panel().querySelectorAll('button')].find((b) => b.textContent === 'Bring in inhabitants')!.click();
+    [...panel().querySelectorAll('button')].find((b) => b.textContent === 'Bring people in')!.click();
     for (let i = 0; i < 6; i += 1) await settle();
     expect(societyClient.create).toHaveBeenCalledWith('version', null, 'region-b', engineCreatedOver('saved_world'));
     expect(crowd.setSociety).toHaveBeenCalled();
@@ -185,7 +185,8 @@ describe('a world made from photographs holds inhabitants in one of its places',
     for (let i = 0; i < 4; i += 1) await settle();
     expect(societyClient.create).not.toHaveBeenCalled();
     expect(panel().isConnected).toBe(true);
-    expect(panel().textContent).toContain('Inhabitants are unavailable.');
+    expect(panel().textContent).toContain('The people of this world could not be read.');
+    expect(panel().textContent).not.toContain('internal_error');
     mounted.dispose();
   });
 

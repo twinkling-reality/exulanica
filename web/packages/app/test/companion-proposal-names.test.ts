@@ -118,7 +118,7 @@ function drawn(outcome: CompanionProposal, snapshot: GraphSnapshot | null) {
     worldStyleProposalOutcomes.report({
       originReference: proposal.originReference ?? '',
       kind: 'previewed',
-      detail: 'Waiting to be confirmed in Customize.',
+      detail: 'Waiting to be confirmed in Design.',
     });
   }));
   const stageParent = document.createElement('div');

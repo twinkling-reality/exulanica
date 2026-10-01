@@ -290,7 +290,7 @@ function chooseRole(h: ReturnType<typeof harness>, role: string): void {
   select.dispatchEvent(new Event('change'));
 }
 
-const SQUARE_CONTROL = 'Place a small square before me';
+const SQUARE_CONTROL = 'Place a small square';
 
 describe('the Create panel offers the catalog’s kinds and a small square', () => {
   it('lists each kind by its title and says what the chosen one is', async () => {

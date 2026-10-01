@@ -55,8 +55,8 @@ describe('World menu', () => {
       onCommand: vi.fn(),
     });
     const make = menu.root.querySelector<HTMLButtonElement>('[data-command=make]')!;
-    expect(make.querySelector('.world-menu-entry-label')?.textContent).toBe('Create');
-    expect(make.querySelector('.world-menu-entry-detail')?.textContent).toBe('Make a world');
+    expect(make.querySelector('.world-menu-entry-label')?.textContent).toBe('Make a world');
+    expect(make.querySelector('.world-menu-entry-detail')?.textContent).toBe('Start a new town');
     expect(make.getAttribute('aria-label')).toBe('Make a world');
     make.click();
     expect(onMakeWorld).toHaveBeenCalledOnce();
@@ -70,7 +70,7 @@ describe('World menu', () => {
     const labels = [...menu.root.querySelectorAll('.world-menu-entry-label')]
       .map((node) => node.textContent);
     expect(labels).toEqual([
-      'World', 'Character', 'Library', 'Map', 'Compare', 'Companion', 'Create',
+      'World', 'Character', 'Library', 'Map', 'Compare', 'Companion', 'Make a world',
       'Design', 'Settings',
     ]);
     expect(menu.root.querySelector('[data-command=experiment]')).toBeNull();

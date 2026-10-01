@@ -54,7 +54,9 @@ export function buildWorldWorkspace(parts: {
     if (focus) panel.querySelector<HTMLElement>('button')?.focus();
   };
   const addPanel = (name: string, label: string, children: Node[]) => {
-    const back = el('button', { type: 'button', class: 'world-panel-close', text: 'Close', 'aria-label': `Close ${label.toLowerCase()}` });
+    const back = el('button', {
+      type: 'button', class: 'world-panel-close', text: 'Close', 'aria-label': `Close ${label.toLowerCase()}`, 'data-action': 'panel.close',
+    });
     back.addEventListener('click', () => close());
     const panel = el('section', { class: 'world-panel', id: `world-panel-${name}`, hidden: true, 'aria-label': label }, [
       el('header', { class: 'world-panel-heading' }, [el('h2', { text: label }), back]), ...children,
@@ -62,7 +64,7 @@ export function buildWorldWorkspace(parts: {
     panels.set(name, panel);
     return panel;
   };
-  const nearby = addPanel('nearby', 'People nearby', [
+  const nearby = addPanel('nearby', 'People here', [
     parts.inhabitants, nearbyState,
     el('p', { class: 'world-help', text: 'Aim at a person or object and press E to inspect it.' }),
   ]);
@@ -90,10 +92,14 @@ export function buildWorldWorkspace(parts: {
   const authoring = addPanel('authoring', say('worldControls.create'), [
     el('p', { text: 'Select a source building with E, then preview an edit before applying it.' }), parts.authoring,
   ]);
-  const inspection = addPanel('inspection', 'Selected in the world', [parts.selected, parts.inspector]);
+  const inspection = addPanel('inspection', 'Selected', [parts.selected, parts.inspector]);
   const nav = el('nav', { class: 'world-local-nav', 'aria-label': 'Explore this place' });
-  for (const [name, label] of [['nearby', 'Nearby'], ['authoring', say('worldControls.create')], ['details', 'About']] as const) {
-    const button = el('button', { type: 'button', text: label, 'aria-expanded': 'false', 'aria-controls': `world-panel-${name}` });
+  for (const [name, label, action] of [
+    ['nearby', 'People', 'panel.people'], ['authoring', say('worldControls.create'), 'panel.build'], ['details', 'About', 'panel.about'],
+  ] as const) {
+    const button = el('button', {
+      type: 'button', text: label, 'aria-expanded': 'false', 'aria-controls': `world-panel-${name}`, 'data-action': action,
+    });
     button.addEventListener('click', () => active === name ? close() : open(name));
     buttons.set(name, button);
     nav.append(button);

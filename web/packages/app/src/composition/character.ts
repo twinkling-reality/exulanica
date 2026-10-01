@@ -35,6 +35,7 @@ import { lookInCatalog, sameLook } from '../character-look.js';
 import { PreviewLookStore, StaleLookError, WorkspaceLookStore, worldLookTarget, type LookStore, type SavedChoice, type SavedLooks } from '../character-looks-store.js';
 import { buildCharacterStudio, type PeopleChoice } from '../ui/character-studio.js';
 import { el } from '../ui/dom.js';
+import { characterStatusWords } from '../ui/words/character.js';
 import type { AppEnvironment, SessionState } from './session-state.js';
 
 const PLAYER = { kind: 'player', playerId: 'local-viewer' } as const;
@@ -340,7 +341,9 @@ export function mountCharacter(deps: { env: AppEnvironment; state: SessionState;
       view.setPeopleStatus('Preview this person, then use them in the world.', true);
     } catch (error) {
       if (revision !== previewRevision || disposed) return;
-      view.setPeopleStatus(error instanceof Error ? error.message : 'This person could not be loaded. Choose another look or try again.', false);
+      view.setPeopleStatus(error instanceof Error && error.message === 'people_catalog_unavailable'
+        ? characterStatusWords('people_catalog_unavailable')
+        : 'This person could not be loaded. Choose another look or try again.', false);
     }
   }
   /** Put a saved choice on the player in the world. */
@@ -366,8 +369,8 @@ export function mountCharacter(deps: { env: AppEnvironment; state: SessionState;
     }
     // The abstract figure stands in, and the person is told why: never somebody else's look.
     choices.set(PLAYER, { kind: 'abstract' });
-    if (choice.kind === 'unavailable') view.setPeopleStatus(choice.code, true);
-    else if (choice.kind === 'catalog') view.setPeopleStatus('catalog_unavailable', true);
+    if (choice.kind === 'unavailable') view.setPeopleStatus(characterStatusWords(choice.code), true);
+    else if (choice.kind === 'catalog') view.setPeopleStatus(characterStatusWords('catalog_unavailable'), true);
   }
   /** Where a body prepared for this workspace is delivered, while the world keeps its looks. */
   function preparedBytes(preparationId: string): string | null {
@@ -407,7 +410,7 @@ export function mountCharacter(deps: { env: AppEnvironment; state: SessionState;
     const body = family ? await preparedBody(choice) : null;
     if (!family || !body || !binding) {
       if (binding) CharacterChoices.forApp(binding.app).set(PLAYER, { kind: 'abstract' });
-      view.setPeopleStatus('preparation_unavailable', true);
+      view.setPeopleStatus(characterStatusWords('preparation_unavailable'), true);
       return;
     }
     const look: CharacterLook = {
@@ -536,7 +539,7 @@ export function mountCharacter(deps: { env: AppEnvironment; state: SessionState;
       // No people catalog is served, so there is nothing to edit; the studio says so by code.
       await reflectSaved();
       if (shown.kind === 'stylized') await showSelection(shown.selection);
-      if (!disposed) view.setPeopleStatus(current.kind === 'unavailable' ? current.code : 'people_catalog_unavailable', false);
+      if (!disposed) view.setPeopleStatus(characterStatusWords(current.kind === 'unavailable' ? current.code : 'people_catalog_unavailable'), false);
       return;
     }
     const editable = editableChoice(offered, shown);
@@ -545,11 +548,9 @@ export function mountCharacter(deps: { env: AppEnvironment; state: SessionState;
     await reflectSaved();
     if (editable.choice.kind === 'catalog') {
       await showPerson(editable.choice.look, editable.moved ? offered.catalog : current.kind === 'catalog' ? catalogOf(current) : null);
-      // Placeholder words for saved_look_options_not_offered: the page's own wording for this code
-      // is not written yet.
-      if (editable.moved && !disposed) view.setPeopleStatus('Your saved look uses options this studio no longer offers, so it opens on the nearest look it offers.', true);
+      if (editable.moved && !disposed) view.setPeopleStatus(characterStatusWords('saved_look_options_not_offered'), true);
     } else if (editable.choice.kind === 'stylized') await showSelection(editable.choice.selection);
-    else view.setPeopleStatus(current.kind === 'unavailable' ? current.code : 'You are wearing the abstract figure.', true);
+    else view.setPeopleStatus(current.kind === 'unavailable' ? characterStatusWords(current.code) : 'You are wearing the abstract figure.', true);
   }
   async function install(selection: CharacterSelection): Promise<void> {
     if (!binding || !native) throw new Error('The world is still loading. Try again in a moment.');

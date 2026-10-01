@@ -1,4 +1,5 @@
 import { ApiError } from '@exulanica/graph-client';
+import { problemSentence } from './words/problems.js';
 import type { BrowserAccountState } from '../account-session.js';
 import { el } from './dom.js';
 
@@ -73,10 +74,11 @@ export function buildCredentialGate(deps: {
       failure.hidden = false;
       failure.textContent =
         error instanceof ApiError && error.isUnauthenticated
-          ? 'That token is not configured on this instance.'
-          : error instanceof Error
-            ? error.message
-            : 'the request failed';
+          ? 'That token is not accepted here. Check it, or ask the person who runs this installation for one.'
+          : problemSentence(error, {}, {
+            happened: 'Exulanica could not be opened with that token.',
+            next: 'Try again in a moment.',
+          });
     });
   });
   return form;

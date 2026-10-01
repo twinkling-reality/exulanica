@@ -771,7 +771,8 @@ function liveMount(preview = false, living = false, interpretation: unknown = un
     scene:{islands:[{islandId:'region'}]} as unknown as AtlasScene,credentials:{baseUrl:'https://api.test',token:'test'},showStatus:vi.fn(),admissionId:'admission',
     environmentClient:environment as never,worldClient:worldClient as never,societyClient:client as never,societyControlClient:societyControlClient as never,societyDistrictClient:districtClient as never,onDistrictPlacementChange,
     societyModelsClient:modelsClient as never,createOverlay:()=>({pick:()=>null,destroy:vi.fn()})});
-  const button = (label:string)=>[...mount.root.querySelectorAll('button')].find(b=>b.textContent===label)!;
+  // The district's own controls; the People panel names its Next minute the same way.
+  const button = (label:string)=>[...mount.root.querySelectorAll('button')].find(b=>b.textContent===label&&b.closest('.world-inhabitants')===null)!;
   return {mount,client,societyControlClient,district,canvas,controls,button,environment,districtClient,districtResult,worldClient,binding,onDistrictPlacementChange,modelsClient};
 }
 
@@ -810,13 +811,13 @@ describe('persisted living world controls',()=>{
     const {mount,client,district,button,canvas}=liveMount();await mount.begin();
     expect(client.advance).not.toHaveBeenCalled();expect(district.setSociety).toHaveBeenCalledTimes(1);
     expect(district.setSociety).toHaveBeenCalledWith(liveSnapshot().state,[0,0]);
-    expect(button('Advance one minute').disabled).toBe(false);button('Advance one minute').click();
+    expect(button('Next minute').disabled).toBe(false);button('Next minute').click();
     await vi.waitFor(()=>expect(canvas.dataset.societyTick).toBe('1'));
     expect(client.advance).toHaveBeenCalledTimes(1);expect(district.setSociety).toHaveBeenCalledTimes(2);
     mount.dispose();
   });
   it('inspects actual persisted event documents and discloses missing references',async()=>{
-    const {mount,button,controls}=liveMount();await mount.begin();button('Advance one minute').click();
+    const {mount,button,controls}=liveMount();await mount.begin();button('Next minute').click();
     await vi.waitFor(()=>expect(mount.root.textContent).toContain('Persisted tick 1'));
     controls.onInteract?.();
     expect(mount.root.textContent).toContain('Recorded target removal.');
@@ -857,13 +858,13 @@ describe('persisted living world controls',()=>{
     const {mount,client,button,district,controls,canvas}=liveMount();await mount.begin();controls.onInteract?.();
     client.read.mockRejectedValueOnce(new ApiError(424,'unavailable_society_input','withdrawn'));
     button('Refresh persisted society').click();await vi.waitFor(()=>expect(canvas.dataset.societyTick).toBeUndefined());
-    expect(district.clearSociety).toHaveBeenCalled();expect(button('Advance one minute').disabled).toBe(true);
+    expect(district.clearSociety).toHaveBeenCalled();expect(button('Next minute').disabled).toBe(true);
     expect(mount.root.querySelector<HTMLElement>('.living-world-inspector')!.hidden).toBe(true);
     mount.dispose();
   });
   it('keeps preview isolated even if an authored version happens to be available',async()=>{
-    const {mount,client,button}=liveMount(true);await mount.begin();
-    expect(client.connect).not.toHaveBeenCalled();expect(button('Advance one minute').closest('details')?.hidden).toBe(true);
+    const {mount,client}=liveMount(true);await mount.begin();
+    expect(client.connect).not.toHaveBeenCalled();expect(mount.root.querySelector('button[data-action="clock.advance"]')?.closest('details')?.hidden).toBe(true);
     await mount.afterAuthoredEdit('version');expect(client.read).not.toHaveBeenCalled();mount.dispose();
   });
   it('never installs residents from a response received after mount disposal',async()=>{
@@ -922,9 +923,9 @@ describe('authorized district placement lifecycle',()=>{
   it('revalidates before advancing and refuses edits/progression with unavailable frame dependencies',async()=>{
     const {mount,districtClient,binding,button,client,canvas}=liveMount();await mount.begin();
     districtClient.read.mockRejectedValueOnce(new ApiError(424,'unavailable_society_input','withdrawn'));
-    button('Advance one minute').click();await vi.waitFor(()=>expect(mount.districtPlacement()).toBeNull());
+    button('Next minute').click();await vi.waitFor(()=>expect(mount.districtPlacement()).toBeNull());
     expect(client.advance).not.toHaveBeenCalled();expect(binding.setDistrictObjectFrame).toHaveBeenLastCalledWith(null);
-    expect(canvas.dataset.societyTick).toBeUndefined();expect(button('Advance one minute').disabled).toBe(true);
+    expect(canvas.dataset.societyTick).toBeUndefined();expect(button('Next minute').disabled).toBe(true);
     mount.dispose();
   });
   it('clears the frame and authored controls when the branch already drifted',async()=>{
@@ -933,7 +934,7 @@ describe('authorized district placement lifecycle',()=>{
       'saved_entry_reconciliation_required',
       'This saved world changed elsewhere. Reload to compare the latest changes before opening it.',
     ));
-    button('Advance one minute').click();
+    button('Next minute').click();
     await vi.waitFor(()=>expect(mount.districtPlacement()).toBeNull());
     expect(binding.setDistrictObjectFrame).toHaveBeenLastCalledWith(null);
     expect(onDistrictPlacementChange).toHaveBeenCalledTimes(2);
@@ -946,7 +947,7 @@ describe('authorized district placement lifecycle',()=>{
     const {mount,districtClient,districtResult,worldClient,binding,button,client}=liveMount();await mount.begin();
     const held=deferred<typeof districtResult>();
     districtClient.read.mockReturnValueOnce(held.promise);
-    button('Advance one minute').click();
+    button('Next minute').click();
     await vi.waitFor(()=>expect(districtClient.read).toHaveBeenCalledTimes(2));
     worldClient.connect.mockRejectedValueOnce(new WorldObjectsContractError(
       'saved_entry_reconciliation_required',
@@ -1005,7 +1006,7 @@ describe('authorized district placement lifecycle',()=>{
         'This saved world changed elsewhere or its source became unavailable. Reload to compare the latest changes.',
       ));
 
-    button('Advance one minute').click();
+    button('Next minute').click();
     await vi.waitFor(()=>expect(mount.districtPlacement()).toBeNull());
 
     expect(binding.setDistrictObjectFrame).toHaveBeenLastCalledWith(null);
@@ -1050,7 +1051,7 @@ describe('authorized district placement lifecycle',()=>{
   it('can reauthorize frame and state after a prior society authorization failure',async()=>{
     const {mount,client,button}=liveMount();await mount.begin();client.read.mockRejectedValueOnce(new ApiError(424,'unavailable_society_input','withdrawn'));
     button('Refresh persisted society').click();await vi.waitFor(()=>expect(mount.districtPlacement()).toBeNull());
-    button('Refresh persisted society').click();await vi.waitFor(()=>expect(button('Advance one minute').disabled).toBe(false));
+    button('Refresh persisted society').click();await vi.waitFor(()=>expect(button('Next minute').disabled).toBe(false));
     expect(mount.districtPlacement()?.regionId).toBe('registered-region');mount.dispose();
   });
   it('ignores a district binding response after disposal',async()=>{

@@ -29,7 +29,7 @@ describe('Atlas command strip', () => {
     expect(view.root.querySelectorAll('.atlas-command-label')).toHaveLength(6);
     expect(view.root.querySelector('[data-command=character]')?.getAttribute('aria-label')).toBe('Character (K)');
     expect(view.root.querySelector('[data-command=companion]')?.getAttribute('aria-label')).toBe('Companion (X)');
-    expect(view.root.textContent).toContain('Customize');
+    expect(view.root.textContent).toContain('Design');
     expect(view.root.textContent).toContain('Settings');
   });
 });

@@ -15,7 +15,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import { addUsd, increaseUsd } from './usd.mjs';
 import { hostProgresses } from './continuation.mjs';
 import {
-  BUTTON, OBJECT_PANEL, OPEN_CONFIRM, PLACEHOLDER, SAVED_WORLD_LIST, TITLE_FIELD, WORLD_MENU_BUTTON, WORLD_READY,
+  ACTION, BUTTON, OBJECT_PANEL, OPEN_CONFIRM, PLACEHOLDER, SAVED_WORLD_LIST, TITLE_FIELD, WORLD_MENU_BUTTON, WORLD_READY,
   chooseMenu, confirm, confirmation, enter, focusCanvas, liveObjects, objectRows, objectStatus, open,
   openEntryId, openObjects, reload, savedWorld, waitForWorld,
 } from './app.mjs';
@@ -185,7 +185,7 @@ async function readAboutThisPlace(ctx) {
   const missing = ctx.parameters.offers.filter((name) => !offered.includes(name));
   ctx.observe('starter-offers-no-district-views', districtViews.length === 0 && missing.length === 0,
     { offered, district_views_offered: districtViews, every_world_sections_missing: missing });
-  await page.click(BUTTON('Close', `document.getElementById('world-panel-details')`), 'Close About this place').catch(() => null);
+  await page.click(ACTION('panel.close', `document.getElementById('world-panel-details')`), 'Close About this place').catch(() => null);
 }
 
 async function nameWorld(ctx) {
@@ -232,7 +232,7 @@ async function exploreWalk(ctx) {
 // -- creation ------------------------------------------------------------------------------------
 
 export const ROW = `document.querySelector('aside.object-placement li.object-placement-item')`;
-const rowButton = (text) => `[...(${ROW})?.querySelectorAll('button') ?? []].find(b => b.textContent.trim() === ${JSON.stringify(text)})`;
+const rowButton = (action) => `(${ROW})?.querySelector('button[data-action=${JSON.stringify(action)}]')`;
 const motionWord = (page) => page.evaluate(`(${ROW})?.querySelector('.object-placement-motion')?.textContent.trim() ?? null`);
 
 export async function waitForEdit(ctx, beyondSeq, what) {
@@ -294,7 +294,7 @@ async function moveObject(ctx) {
     await page.key(ctx.parameters.key, ctx.parameters.key);
     await sleep(150);
   }
-  await page.click(BUTTON('Save this position', OBJECT_PANEL), 'Save this position');
+  await page.click(ACTION('objects.save-move', OBJECT_PANEL), 'Save position');
   const said = await confirmation(page, 'the move');
   await confirm(page, 'the move');
   const after = await waitForEdit(ctx, before.version.edit_seq, 'the move to be saved');
@@ -311,7 +311,7 @@ async function moveObject(ctx) {
 async function inspectObject(ctx) {
   const { page } = ctx;
   if (await page.evaluate(`${OBJECT_PANEL}?.checkVisibility() ?? false`)) {
-    await page.click(BUTTON('Close', OBJECT_PANEL), 'Close the objects panel');
+    await page.click(ACTION('panel.close', OBJECT_PANEL), 'Close the objects panel');
   }
   await chooseMenu(page, 'world');
   await page.waitFor(`document.getElementById('world-panel-details')?.checkVisibility() ?? false`, 10_000, 'About this place');
@@ -366,16 +366,16 @@ async function inspectObject(ctx) {
   await ctx.screenshot('inspector', 'World to data in About this place, with the placed object selected and visible');
   await page.evaluate(`(${inspector})?.querySelector('ul.representation-availability > li:last-child')?.scrollIntoView({block: 'center'})`);
   await ctx.screenshot('provenance', 'World to data with the selected object and its availability lines');
-  await page.click(BUTTON('Close', `document.getElementById('world-panel-details')`), 'Close About this place').catch(() => null);
+  await page.click(ACTION('panel.close', `document.getElementById('world-panel-details')`), 'Close About this place').catch(() => null);
 }
 
 async function giveBoundedMotion(ctx) {
   const { page } = ctx;
   await openObjects(page);
   const before = await savedWorld(ctx);
-  await page.click(rowButton('Give it motion'), 'Give it motion');
+  await page.click(rowButton('object.motion'), 'Give it motion');
   await page.waitFor(`document.querySelector('div.object-placement-motion-editor')?.checkVisibility() ?? false`, 10_000, 'the motion editor');
-  await page.click(BUTTON('Save this motion', OBJECT_PANEL), 'Save this motion');
+  await page.click(ACTION('object.save-motion', OBJECT_PANEL), 'Save motion');
   const said = await confirmation(page, 'the motion');
   await confirm(page, 'the motion');
   const after = await waitForEdit(ctx, before.version.edit_seq, 'the motion to be saved');
@@ -398,7 +398,7 @@ async function triggerStopReset(ctx) {
   await openObjects(page);
   const before = (await savedWorld(ctx)).version;
   const press = async (label, word) => {
-    await page.click(rowButton(label), label);
+    await page.click(rowButton(`object.${label.toLowerCase()}`), label);
     return page.waitFor(`(${ROW})?.querySelector('.object-placement-motion')?.textContent.trim() === ${JSON.stringify(word)}`,
       10_000, `the object to read "${word}"`).then(() => word).catch(async () => motionWord(page));
   };
@@ -464,7 +464,7 @@ async function undoLastChange(ctx) {
   await openObjects(page);
   const before = await savedWorld(ctx);
   const newestBefore = before.version.edits.at(-1);
-  await page.click(BUTTON('Take back the last change', OBJECT_PANEL), 'Take back the last change');
+  await page.click(ACTION('objects.undo', OBJECT_PANEL), 'Take back');
   const said = await confirmation(page, 'taking back the last change');
   await confirm(page, 'taking back the last change');
   const after = await waitForEdit(ctx, before.version.edit_seq, 'the undo to be saved');
@@ -700,7 +700,7 @@ async function startWithSmallSquare(ctx) {
   const undone = [];
   for (let index = 0; index < applied.added.length; index += 1) {
     const was = await savedWorld(ctx);
-    await page.click(BUTTON('Take back the last change', OBJECT_PANEL), 'Take back the last change');
+    await page.click(ACTION('objects.undo', OBJECT_PANEL), 'Take back');
     await confirmation(page, 'taking back the last change');
     await confirm(page, 'taking back the last change');
     const now = await waitForEdit(ctx, was.version.edit_seq, 'the take-back to be saved');
@@ -721,7 +721,7 @@ async function startWithSmallSquare(ctx) {
   ctx.observe('taken-back-one-at-a-time', counts.every((n, i) => n === applied.added.length - i) && !card.includes(offer)
     && !card.includes('Meet your Companion'), { listed_after_each: counts, card_after: card });
   await ctx.screenshot('taken-back', 'the objects panel after the square was taken back');
-  await page.click(BUTTON('Close', OBJECT_PANEL), 'Close the objects panel').catch(() => null);
+  await page.click(ACTION('panel.close', OBJECT_PANEL), 'Close the objects panel').catch(() => null);
 }
 
 /** The Create panel's own square, in the world the step names (the starter, or the made world). */
@@ -764,7 +764,7 @@ async function furnishSmallSquare(ctx) {
   ctx.observe('square-drawn', kinds.length > 0 && fetched.every((r) => r.statuses.includes(200)), fetched);
   ctx.facts[ctx.parameters.facts_key] = { object_ids: applied.added,
     titles: Object.fromEntries(wouldAdd.map((o) => [o.object_id, o.title])) };
-  await page.click(BUTTON('Close', OBJECT_PANEL), 'Close the objects panel').catch(() => null);
+  await page.click(ACTION('panel.close', OBJECT_PANEL), 'Close the objects panel').catch(() => null);
   await sleep(SQUARE_DRAWN_MS);
   await ctx.screenshot('furnished', `${ctx.parameters.world_words} furnished with the small square`);
 }
@@ -772,7 +772,9 @@ async function furnishSmallSquare(ctx) {
 // People nearby: the inhabitants' panel, reached from the World menu's local navigation.
 export const NEARBY = `document.getElementById('world-panel-nearby')`;
 export const PEOPLE = `document.querySelector('section.world-inhabitants')`;
-const PLAYBACK = `${PEOPLE}?.querySelector('button[data-action]')`;
+// People's Play or Pause control, by the action it names (the panel's other controls carry names too).
+const PLAYBACK_CONTROL = `button[data-action="play"], button[data-action="pause"]`;
+const PLAYBACK = `${PEOPLE}?.querySelector('${PLAYBACK_CONTROL}')`;
 export const INSPECT = `document.querySelector('select[aria-label="Inspect nearby inhabitant"]')`;
 export const INSPECTOR = `document.querySelector('.living-world-inspector')`;
 // After the square is confirmed, time for the page to draw its objects before the screenshot.
@@ -783,7 +785,7 @@ export async function openPeopleNearby(page) {
   if (!await page.evaluate(`[...document.querySelectorAll('nav.world-local-nav button')].some(b => b.checkVisibility())`)) {
     await chooseMenu(page, 'world');
   }
-  await page.click(BUTTON('Nearby', `document.querySelector('nav.world-local-nav')`), 'Nearby');
+  await page.click(ACTION('panel.people', `document.querySelector('nav.world-local-nav')`), 'Nearby');
   await page.waitFor(`${NEARBY}?.checkVisibility() ?? false`, 10_000, 'People nearby');
 }
 
@@ -795,7 +797,7 @@ const peopleSeen = (page) => page.evaluate(`(() => { const p = ${PEOPLE}; if (!p
   return { state: p.dataset.state ?? null, summary, minute: minute ? Number(minute[1]) : null,
     playback: shown(p.querySelector('.world-inhabitants-playback')),
     help: [...p.querySelectorAll('p.world-help')].map(shown).filter(Boolean),
-    control: (() => { const b = p.querySelector('button[data-action]'); return b && !b.hidden ? { action: b.dataset.action, text: b.textContent.trim(), disabled: b.disabled } : null; })() }; })()`);
+    control: (() => { const b = p.querySelector('${PLAYBACK_CONTROL}'); return b && !b.hidden ? { action: b.dataset.action, text: b.textContent.trim(), disabled: b.disabled } : null; })() }; })()`);
 
 /** A society route of the starter's saved version. */
 export const societyPath = (entry, suffix = '', query = '') =>
@@ -805,7 +807,7 @@ async function bringInInhabitants(ctx) {
   const { page } = ctx;
   await openPeopleNearby(page);
   await page.waitFor(`['absent', 'present'].includes(${PEOPLE}?.dataset.state)`, SETTLE_MS, 'People nearby to read the society');
-  await page.click(BUTTON('Bring in inhabitants', PEOPLE), 'Bring in inhabitants');
+  await page.click(ACTION('people.bring-in', PEOPLE), 'Bring people in');
   await page.waitFor(`${PEOPLE}?.dataset.state === 'present'`, SETTLE_MS, 'the inhabitants to be present');
   await sleep(PAGE_SETTLE_MS);
   const seen = await peopleSeen(page);
@@ -825,7 +827,7 @@ async function bringInInhabitants(ctx) {
   const unreachable = (society?.places?.unreachable ?? []).filter((t) => square.includes(t.object_id));
   ctx.observe('square-is-somewhere-to-go', targets.some((t) => t.enabled) && unreachable.every((t) => Boolean(t.reason)),
     { targets, unreachable, places_available: society?.places?.available ?? null });
-  await ctx.screenshot('people', 'People nearby after Bring in inhabitants');
+  await ctx.screenshot('people', 'People here after Bring people in');
 }
 // After a panel changes, time for the page to draw what it read before it is read back.
 const PAGE_SETTLE_MS = 1_500;
@@ -966,7 +968,7 @@ async function pausePlayback(ctx) {
   const paused = { seen: await peopleSeen(page), control: pick(await read(), ['mode', 'current_tick', 'host_playback']) };
   await sleep(ctx.parameters.hold_intervals * interval);
   const held = { seen: await peopleSeen(page), control: pick(await read(), ['mode', 'current_tick', 'host_playback']) };
-  const advance = await page.evaluate(`(() => { const b = ${BUTTON('Advance one minute', PEOPLE)}; return b ? !b.disabled : null; })()`);
+  const advance = await page.evaluate(`(() => { const b = ${ACTION('clock.advance', PEOPLE)}; return b ? !b.disabled : null; })()`);
   ctx.observe('paused-in-words', paused.seen?.control?.action === 'play' && held.seen?.control?.action === 'play'
     && paused.seen?.minute !== null && held.seen?.minute === paused.seen?.minute && advance === true,
   { paused: paused.seen, held: held.seen, advance_offered: advance });
@@ -2254,7 +2256,7 @@ const speechSeen = (page) => page.evaluate(`(() => { const s = ${SPEECH};
     text: s?.innerText.trim() ?? '' }; })()`);
 
 // The words of the one control the Companion's accepted proposal names, and never offers on a refusal.
-const CUSTOMIZE_WORDS = /Open Customize/;
+const CUSTOMIZE_WORDS = /Open Design/;
 
 async function companionRefusesUnsupportedChange(ctx) {
   const { page } = ctx;
@@ -2318,7 +2320,7 @@ async function madeWorldHostsPeople(ctx) {
   await openPeopleNearby(page);
   const { entry } = await savedWorld(ctx);
   await page.waitFor(`['absent', 'present'].includes(${PEOPLE}?.dataset.state)`, SETTLE_MS, 'People nearby to read the society');
-  await page.click(BUTTON('Bring in inhabitants', PEOPLE), 'Bring in inhabitants');
+  await page.click(ACTION('people.bring-in', PEOPLE), 'Bring people in');
   await page.waitFor(`${PEOPLE}?.dataset.state === 'present'`, SETTLE_MS, 'the inhabitants to be present');
   await sleep(PAGE_SETTLE_MS);
   await ctx.screenshot('arrival-people', 'the made world on the first resident frame at its pinned arrival');
@@ -2412,7 +2414,7 @@ async function returningUserReopens(ctx) {
   { listed: rows, saved: saved.map((o) => pick(o, ['object_id', 'behaviour'])), client_object: ctx.facts.client_object_id ?? null,
     asset_reads: bytes.map((r) => pick(r, ['path', 'status'])) });
   await ctx.screenshot('objects', 'the saved world reopened, with its objects listed');
-  await page.click(BUTTON('Close', OBJECT_PANEL), 'Close the objects panel');
+  await page.click(ACTION('panel.close', OBJECT_PANEL), 'Close the objects panel');
   await openCustomize(page);
   const shown = await page.evaluate(`document.querySelector('section.options-view p.world-style-version')?.textContent.trim() ?? null`);
   const current = await currentStyle(ctx);
@@ -2603,7 +2605,7 @@ async function madeWorldTakesNewPhotograph(ctx) {
   ctx.observe('reopened-with-edits', title === ctx.facts.made_title && rows.length === after.live_objects.length
     && Array.isArray(notices) && !notices.some((n) => n.includes(REGION_NOT_DRAWN)),
   { title_field: title, listed: rows, live_objects: after.live_objects, notices_seen: notices });
-  await page.click(BUTTON('Close', OBJECT_PANEL), 'Close the objects panel').catch(() => null);
+  await page.click(ACTION('panel.close', OBJECT_PANEL), 'Close the objects panel').catch(() => null);
   await ctx.screenshot('reopened', 'the made world reopened with the new photograph added');
 
   await openDrawer(page);
@@ -2743,7 +2745,7 @@ async function peopleCrossTileSeams(ctx) {
   await openPeopleNearby(page);
   await page.waitFor(`['absent', 'present'].includes(${PEOPLE}?.dataset.state)`, SETTLE_MS, 'People nearby to read the town\'s society');
   if (await page.evaluate(`${PEOPLE}?.dataset.state`) === 'absent') {
-    await page.click(BUTTON('Bring in inhabitants', PEOPLE), 'Bring in inhabitants');
+    await page.click(ACTION('people.bring-in', PEOPLE), 'Bring people in');
     await page.waitFor(`${PEOPLE}?.dataset.state === 'present'`, SETTLE_MS, 'the town\'s people to be present');
   }
   const firstSociety = (await ctx.api('GET', societyPath(entry))).body;

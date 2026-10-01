@@ -185,7 +185,7 @@ describe('watching a saved world live', () => {
     await mounted.begin();
     const play = [...panel().querySelectorAll('button')].find((button) => !button.hidden && button.textContent === 'Pause')!;
     expect(play).toBeDefined();
-    expect([...panel().querySelectorAll('button')].find((button) => button.textContent === 'Advance one minute')!.hidden).toBe(true);
+    expect([...panel().querySelectorAll('button')].find((button) => button.textContent === 'Next minute')!.hidden).toBe(true);
     const about = [...mounted.root.querySelectorAll('details')].find((node) => node.querySelector('summary')?.textContent === 'Living world simulation')!;
     expect(about.textContent).toContain('Play, pause and pace are in People nearby');
     expect([...about.querySelectorAll('button')].map((button) => button.textContent)).toEqual(['Refresh persisted society']);
@@ -222,7 +222,7 @@ describe('watching a saved world live', () => {
     const reads = controlClient.read.mock.calls.length;
     await vi.advanceTimersByTimeAsync(10_000);
     expect(controlClient.read.mock.calls.length).toBe(reads);
-    expect(panel().textContent).toContain(`${reason} Advance one minute at a time instead.`);
+    expect(panel().textContent).toContain(`${reason} Use Next minute to move on one minute at a time instead.`);
     mounted.dispose();
   });
 

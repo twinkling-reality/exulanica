@@ -161,7 +161,7 @@ describe('a saved world holds inhabitants only when the person asks', () => {
     const nearbyLine = mounted.root.querySelector<HTMLElement>('#world-panel-nearby p.world-help[role="status"]')!;
     expect(nearbyLine.hidden).toBe(true);
 
-    [...panel().querySelectorAll('button')].find((b) => b.textContent === 'Bring in inhabitants')!.click();
+    [...panel().querySelectorAll('button')].find((b) => b.textContent === 'Bring people in')!.click();
     for (let i = 0; i < 6; i += 1) await settle();
     expect(societyClient.create).toHaveBeenCalledWith('version', null, 'region:starter', 'exulanica-society/v2');
     expect(crowd.setSociety).toHaveBeenCalledTimes(1);
@@ -200,7 +200,7 @@ describe('a saved world holds inhabitants only when the person asks', () => {
   it('a chosen inhabitant can be asked to rest at a place, and a minute can be advanced', async () => {
     const { mounted, crowd, controls, societyClient, controlClient, panel } = mount();
     await mounted.begin();
-    [...panel().querySelectorAll('button')].find((b) => b.textContent === 'Bring in inhabitants')!.click();
+    [...panel().querySelectorAll('button')].find((b) => b.textContent === 'Bring people in')!.click();
     for (let i = 0; i < 6; i += 1) await settle();
 
     // Aiming at a person and pressing E selects them over whatever the world would do.
@@ -216,12 +216,12 @@ describe('a saved world holds inhabitants only when the person asks', () => {
     );
     expect(rest.parentElement!.textContent).toMatch(/Asked to rest at Marker plate 1\. They set off at the next simulated minute\./);
 
-    const advance = [...panel().querySelectorAll('button')].find((b) => b.textContent === 'Advance one minute')!;
+    const advance = [...panel().querySelectorAll('button')].find((b) => b.textContent === 'Next minute')!;
     expect(advance.disabled).toBe(false);
     advance.click();
     for (let i = 0; i < 6; i += 1) await settle();
     expect(controlClient.step).toHaveBeenCalledTimes(1);
-    expect(panel().querySelector('.world-inhabitants-summary')?.textContent).toMatch(/Simulated minute 1\./);
+    expect(panel().querySelector('.world-inhabitants-summary')?.textContent).toMatch(/Minute 1;/);
     // The top says who, what now and why in words, naming the place by the object's title.
     const inspector = mounted.root.querySelector<HTMLElement>('.living-world-inspector')!;
     expect(inspector.querySelector('h3')?.textContent).toBe('Person 0');
@@ -251,7 +251,7 @@ describe('a saved world holds inhabitants only when the person asks', () => {
     const section = mounted.root.querySelector<HTMLElement>('section.society-models')!;
     expect(section.hidden).toBe(true);
     expect(modelsClient.read).not.toHaveBeenCalled();
-    [...panel().querySelectorAll('button')].find((b) => b.textContent === 'Bring in inhabitants')!.click();
+    [...panel().querySelectorAll('button')].find((b) => b.textContent === 'Bring people in')!.click();
     for (let i = 0; i < 6; i += 1) await settle();
     expect(modelsClient.read).toHaveBeenCalledWith('version');
     expect(section.hidden).toBe(false);
@@ -282,10 +282,10 @@ describe('a saved world holds inhabitants only when the person asks', () => {
     expect(details).toContainEqual(['Latest decision', 'At simulated minute 1, Nemotron 3 Nano 30B chose “rest, 4 m away”, and they did it.']);
     // A minute advanced is read once more, and the same minute drawn again is not.
     const reads = modelsClient.read.mock.calls.length;
-    const advance = () => [...panel().querySelectorAll('button')].find((b) => b.textContent === 'Advance one minute')!;
+    const advance = () => [...panel().querySelectorAll('button')].find((b) => b.textContent === 'Next minute')!;
     advance().click();
     for (let i = 0; i < 6; i += 1) await settle();
-    expect(panel().querySelector('.world-inhabitants-summary')?.textContent).toMatch(/Simulated minute 1\./);
+    expect(panel().querySelector('.world-inhabitants-summary')?.textContent).toMatch(/Minute 1;/);
     expect(modelsClient.read).toHaveBeenCalledTimes(reads + 1);
     advance().click();
     for (let i = 0; i < 6; i += 1) await settle();

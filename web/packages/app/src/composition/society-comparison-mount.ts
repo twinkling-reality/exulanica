@@ -11,6 +11,7 @@
  * was made is dropped, so the view never shows two choices mixed. Nothing here asks a model.
  */
 
+import { problemSentence } from '../ui/words/problems.js';
 import { ApiError, type TransportOptions } from '@exulanica/graph-client';
 import {
   SocietyComparisonClient,
@@ -61,8 +62,10 @@ export interface MountedSocietyComparison {
   dispose(): void;
 }
 
-const failure = (error: unknown): string =>
-  error instanceof Error && error.message.length > 0 ? error.message : 'The server did not answer.';
+const failure = (error: unknown): string => problemSentence(error, {}, {
+  happened: 'The server did not answer.',
+  next: 'Try again in a moment.',
+});
 /** The society route uses the same response when a society is absent or inaccessible. */
 const societyUnavailable = (error: unknown): boolean =>
   error instanceof ApiError && error.status === 404 && error.code === 'unknown_reference'

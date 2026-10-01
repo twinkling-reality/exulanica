@@ -329,8 +329,10 @@ export function buildCompanionSpeech(options: CompanionSpeechOptions): Companion
       el('p', { class: 'companion-question-echo', text: answer.question }),
     ];
 
-    const supporting: Node[] = [];
-    for (const [index, clause] of answer.clauses.entries()) {
+    // Everything the answer says is in view: every clause, the kind of silence an abstention is,
+    // and which model answered or that none was asked. Only the rows a place-content answer lists
+    // sit behind a disclosure, because they are supporting records rather than the answer.
+    for (const clause of answer.clauses) {
       const paragraph = el(
         'p',
         { class: 'companion-utterance' },
@@ -341,34 +343,34 @@ export function buildCompanionSpeech(options: CompanionSpeechOptions): Companion
         )),
       );
       paragraph.dataset['clause'] = clause.type;
-      if (index === 0) content.push(paragraph);
-      else supporting.push(paragraph);
+      content.push(paragraph);
     }
     if (answer.clauses.length === 0) {
       content.push(el('p', { class: 'companion-utterance', text: say('ask.emptyAnswer') }));
     }
 
-    supporting.push(...renderContentSurface(answer));
-
     // A place with nothing linked to it is not a photograph search that found nothing, so the
     // photograph abstention sentence would be wrong there. The server's clause and the empty
     // place-content line already say what happened.
     if (answer.abstained !== null && answer.content?.placeConfirmed !== true) {
-      supporting.push(el('p', {
+      content.push(el('p', {
         class: 'companion-abstention',
         text: say(`abstention.${answer.abstained}`),
       }));
     }
 
-    supporting.push(el('p', {
+    content.push(el('p', {
       class: 'companion-provenance',
       text: provenanceParagraph(answer),
     }));
 
-    content.push(el('details', { class: 'companion-answer-details' }, [
-      el('summary', { text: 'Answer details and sources' }),
-      el('div', { class: 'companion-answer-detail-body' }, supporting),
-    ]));
+    const records = renderContentSurface(answer);
+    if (records.length > 0) {
+      content.push(el('details', { class: 'companion-answer-details' }, [
+        el('summary', { text: 'Where this comes from' }),
+        el('div', { class: 'companion-answer-detail-body' }, records),
+      ]));
+    }
 
     root.dataset['mode'] = 'answer';
     root.toggleAttribute('data-abstained', answer.abstained !== null);

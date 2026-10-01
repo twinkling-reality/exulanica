@@ -32,10 +32,11 @@ describe('what somebody sees before their world is on the screen', () => {
     expect(signedOut.querySelector('button')?.textContent).toBe('Sign in');
   });
 
-  it('keeps an unrecognised failure\'s own message, which the statement cannot carry', () => {
+  it('keeps an unrecognised failure\'s own message in its technical details, not in the statement', () => {
     const view = buildStartupState(new Error('Invalid world topology'));
     expect(view.querySelector('h1')?.textContent).toBe('Your world could not be loaded.');
-    expect(view.querySelector('.gate-note')?.textContent).toBe('Invalid world topology');
+    expect(view.querySelector('.gate-note')?.textContent).toBe('Reload the page to try again.');
+    expect(view.querySelector('details.x-technical')?.textContent).toContain('Invalid world topology');
     expect(view.querySelector('button')?.textContent).toBe('Try again');
     // A thrown value with nothing to say adds no empty line.
     expect(buildStartupState('a thrown string').querySelector('.gate-note')).toBeNull();

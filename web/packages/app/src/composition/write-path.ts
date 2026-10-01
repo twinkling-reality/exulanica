@@ -16,7 +16,7 @@
  * interface would be confidently wrong. Re-reading costs one request and cannot drift.
  */
 
-import { ApiError, type OccurrenceRecord } from '@exulanica/graph-client';
+import type { OccurrenceRecord } from '@exulanica/graph-client';
 import type { GraphSnapshot } from '@exulanica/graph-client';
 import { confirmationFor, draftEdit } from '@exulanica/world-index';
 
@@ -24,6 +24,8 @@ import { toUpdateProposal } from '../proposal.js';
 import type { Session } from '../session.js';
 import type { CompanionStage } from '../ui/companion-stage.js';
 import { buildConfirm, type ConfirmPanel } from '../ui/confirm.js';
+import { technicalRecord } from '../ui/system/components.js';
+import { problemRecord, problemWords } from '../ui/words/problems.js';
 import type { AppEnvironment, SessionState } from './session-state.js';
 
 export interface WritePathDependencies {
@@ -121,15 +123,20 @@ export function mountWritePath(deps: WritePathDependencies): MountedWritePath {
   return { confirm, propose, commit, dispose: () => undefined };
 }
 
+/** A refused write in words; the code and the server's detail only in the technical record. */
 function panelFailure(confirm: ConfirmPanel, error: unknown): void {
-  confirm.reportFailure(
-    error instanceof ApiError
-      ? `${error.code}: ${error.message}`
-      : error instanceof Error
-        ? error.message
-        : 'the write was refused',
-  );
+  const words = problemWords(error, IDENTITY_WRITE_WORDS);
+  confirm.reportFailure(words.happened, { next: words.next, details: technicalRecord(problemRecord(error)) });
 }
+
+/** What the identity write's own refusals mean to the person who made it. */
+const IDENTITY_WRITE_WORDS = {
+  // The identity routes answer a conflicting change with a bare 409, which arrives as http_409.
+  http_409: {
+    happened: 'This changed while you were deciding, so nothing was written.',
+    next: 'Look at it again, then make the change once more.',
+  },
+} as const;
 
 /**
  * The entity a bare occurrence would become.

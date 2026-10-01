@@ -166,7 +166,7 @@ export function createLiveSociety(options: LiveSocietyOptions): LiveSociety {
   const changePresence = (wanted: 'away' | 'here', message: string) => run(async () => {
     const snapshot = view.snapshot;
     if (client.changePresence === undefined) throw new Error('This society client cannot change who is here.');
-    if (!snapshot) throw new Error('Connect to this world\'s inhabitants first.');
+    if (!snapshot) throw new Error('Connect to this world\'s people first.');
     publish({ refusal: null });
     try {
       await client.changePresence(snapshot, wanted);
@@ -200,7 +200,7 @@ export function createLiveSociety(options: LiveSocietyOptions): LiveSociety {
         return;
       }
       // Read back rather than trusting the write's body, so places come with it.
-      await read('Inhabitants live in this world now. Each advance is one simulated minute.');
+      await read('People live in this world now. Each Next minute moves it on one minute.');
     }),
     refresh,
     sendAway: () => changePresence('away', 'Everyone has left. What they did here is still in this world\'s history.'),

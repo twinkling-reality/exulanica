@@ -90,7 +90,7 @@ const REFUSAL_WORDS: Readonly<Record<string, string>> = {
 export function flightRefusalWords(error: unknown): string {
   if (error instanceof FlightContractError) return 'Flight stopped: this page cannot read the flight the server sent.';
   const code = error instanceof ApiError ? error.code : '';
-  const words = REFUSAL_WORDS[code] ?? `the server refused it${code ? ` (${code})` : ''}`;
+  const words = REFUSAL_WORDS[code] ?? 'the server refused it';
   return `Flight stopped: ${words}.`;
 }
 
@@ -129,7 +129,7 @@ export function flightUnplacedWords(
     .map(({ kind, reason, count, objects }) => {
       const title = titles.get(kind) ?? kind;
       const why = UNPLACED_WORDS[reason];
-      if (why === undefined) return `${title}: ${count} cannot live here (${reason}).`;
+      if (why === undefined) return `${title}: ${count} cannot live here.`;
       const one = objects.size === 1;
       const hosts = one ? 'the object meant to host' : `the ${objects.size} objects meant to host`;
       return `${title}: ${count} cannot live here; ${hosts} ${count === 1 ? 'it' : 'them'} ${one ? 'has' : 'have'} ${why}.`;

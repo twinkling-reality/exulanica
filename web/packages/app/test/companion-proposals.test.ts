@@ -1820,7 +1820,7 @@ describe('the words a refusal is said in', () => {
 
   it('says that nothing has changed yet, because that is the fact a person cannot see', () => {
     expect(say('proposal.staged')).toContain('Nothing has changed yet');
-    expect(say('proposal.staged')).toContain('Customize');
+    expect(say('proposal.staged')).toContain('Design');
   });
 
   it('never says a refused value was moved to the nearest one it could have been', () => {

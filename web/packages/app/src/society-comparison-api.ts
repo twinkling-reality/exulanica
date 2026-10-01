@@ -773,6 +773,11 @@ export interface PlanFigures {
 export interface Refusal {
   readonly code: string;
   readonly detail: string;
+  /**
+   * The durable spending authority's statement, on a plan whose start it would refuse
+   * (`budget_exceeded`): its reason code and, where it gives one, its finer reason.
+   */
+  readonly spending?: { readonly reason: string; readonly detail: string | null };
 }
 
 /** What this server offers a comparison of a version's society, and a selection's plan. */
@@ -815,6 +820,14 @@ export interface StartRequest extends ComparisonSelection {
 
 const refusal = (value: unknown): Refusal => {
   const held = object(value);
+  const spending = held['spending'];
+  if (spending !== null && typeof spending === 'object' && typeof (spending as Record<string, unknown>)['reason'] === 'string') {
+    const member = spending as Record<string, unknown>;
+    return {
+      code: text(held['code']), detail: words(held['detail']),
+      spending: { reason: member['reason'] as string, detail: typeof member['detail'] === 'string' ? member['detail'] : null },
+    };
+  }
   return { code: text(held['code']), detail: words(held['detail']) };
 };
 

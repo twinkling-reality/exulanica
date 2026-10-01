@@ -75,6 +75,7 @@
       "purpose": "Follow user controls, the browser world runtime, the Companion and appearance changes.",
       "documents": [
         {"path": "interaction-model.md", "role": "contract", "owns": "The Atlas browser runtime's interaction, navigation, Companion encounter and proposal confirmation"},
+        {"path": "interface-system.md", "role": "contract", "owns": "The browser interface system: design tokens, components, icons, layout regions, the action registry and its availability, and the voice and words"},
         {"path": "companion-question.md", "role": "contract", "owns": "Grounded question, conversation and appearance-proposal path"},
         {"path": "project-context.md", "role": "contract", "owns": "World projects: identity and binding, kept items and their bases, named records, sharing, bounded context assembly, deletion and audit residue"},
         {"path": "atlas-world-customization-contract.md", "role": "contract", "owns": "Browser appearance customization, protected values and review lifecycle"},

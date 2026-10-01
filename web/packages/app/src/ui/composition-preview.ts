@@ -118,7 +118,7 @@ export const COMPOSITION_BLOCKED_WORDS: Readonly<Record<CompositionBlockedReason
     },
     placement_required: {
       happened: 'No spot was chosen for this addition.',
-      next: 'Stand where you want it and choose Place before me.',
+      next: 'Stand where you want it and choose Place here.',
     },
     invalid_placement: {
       happened: 'That spot or setting is not one this world accepts.',
@@ -128,9 +128,8 @@ export const COMPOSITION_BLOCKED_WORDS: Readonly<Record<CompositionBlockedReason
       happened: 'Something in this world already has the name this addition was given.',
       next: 'Check again to give it a new one.',
     },
-    // Placeholder words: the page's own wording for these codes is not written yet.
     unknown_workspace_asset: {
-      happened: 'That object is not one of this workspace\'s own added objects.',
+      happened: 'That object is not one of the objects added to this workspace.',
       next: 'Choose a different object.',
     },
     workspace_asset_withdrawn: {

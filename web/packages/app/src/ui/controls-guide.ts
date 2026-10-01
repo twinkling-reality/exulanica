@@ -49,7 +49,7 @@ const controlRows: readonly (readonly [string, string])[] = [
   ['H', 'Open the World hub'],
   ['I', 'Open Index'],
   ['M', 'Tap for the Map, hold to look and drop back'],
-  ['O', 'Open Customize'],
+  ['O', 'Open Design'],
   ['?', 'Open Settings'],
   ['Escape', 'Release the mouse, dismiss, or step back'],
 ];
@@ -84,12 +84,12 @@ export function buildControlsGuide(options: ControlsGuideOptions): ControlsGuide
 
   const close = el('button', {
     type: 'button', class: 'overlay-close command-action', 'aria-label': 'Return to your world',
-  }, commandAction('?', 'Dismiss'));
+  }, commandAction('?', 'Close'));
   close.addEventListener('click', options.onClose);
   const customize = el(
     'button',
-    { type: 'button', class: 'text-action command-action', 'aria-label': 'Open Customize' },
-    commandAction('O', 'Customize'),
+    { type: 'button', class: 'text-action command-action', 'aria-label': 'Open Design' },
+    commandAction('O', 'Design'),
   );
   customize.addEventListener('click', options.onShowCustomize);
 

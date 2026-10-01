@@ -271,7 +271,7 @@ describe('createSavedWorldFlight', () => {
     [409, 'home_perch_unusable', "Flight stopped: a flyer's home in this world is not a perch it can use."],
     [422, 'flight_step_out_of_range',
       'Flight stopped: this page asked for flight too far from the present moment; open the world again.'],
-    [409, 'a_code_this_page_does_not_know', 'Flight stopped: the server refused it (a_code_this_page_does_not_know).'],
+    [409, 'a_code_this_page_does_not_know', 'Flight stopped: the server refused it.'],
   ])('stops at a %i %s and says why in words', async (status, code, words) => {
     const { flight, log, advance } = harness(() => { throw new ApiError(status, code, 'refused'); });
     await flight.start();
@@ -388,7 +388,7 @@ describe('flightUnplacedWords', () => {
     expect(flightUnplacedWords([row('tree-1', 3)], titles)).not.toMatch(/tree/iu);
   });
 
-  it('says each kind in the order of its key, and shows a key or a code it has no words for', () => {
+  it('says each kind in the order of its key, and shows a key it has no words for, never a code', () => {
     expect(flightUnplacedWords([
       row('tree-1', 3),
       row('tree-1', 1, 'owl'),
@@ -396,7 +396,7 @@ describe('flightUnplacedWords', () => {
       row('tree-3', 4, 'small_bird', 'a_reason_this_page_does_not_know'),
     ], titles)).toBe([
       'Tawny owl: 1 cannot live here; the object meant to host it has too few usable perches.',
-      'Small bird: 4 cannot live here (a_reason_this_page_does_not_know).',
+      'Small bird: 4 cannot live here.',
       'Small bird: 3 cannot live here; the object meant to host them has too few usable perches.',
       'swift: 2 cannot live here; the object meant to host them has too few usable perches.',
     ].join(' '));

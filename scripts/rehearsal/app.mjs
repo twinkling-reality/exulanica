@@ -18,6 +18,12 @@ export const BUTTON = (text, scope = 'document') =>
 /** A visible button whose text starts with `text`, for labels that carry a count or a key. */
 export const BUTTON_STARTING = (text, scope = 'document') =>
   `[...${scope}.querySelectorAll('button')].find(b => b.textContent.trim().startsWith(${JSON.stringify(text)}) && b.checkVisibility())`;
+/**
+ * A visible control by the interface's stable action name (its data-action), inside `scope`. The
+ * interface keeps these names when its words change, so a driver never matches on words.
+ */
+export const ACTION = (id, scope = 'document') =>
+  `[...${scope}.querySelectorAll('[data-action=${JSON.stringify(id)}]')].find(b => b.checkVisibility())`;
 export const TITLE_FIELD = `document.querySelector('input[aria-label="World title"]')`;
 export const OBJECT_PANEL = `document.querySelector('aside.object-placement')`;
 export const OPEN_CONFIRM = `document.querySelector('aside.confirm:not([hidden])')`;

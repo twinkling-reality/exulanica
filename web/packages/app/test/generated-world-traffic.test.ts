@@ -64,7 +64,8 @@ describe('a saved generated world\'s traffic', () => {
       expect(trafficRefusalWords(code)).toMatch(/could not be read/);
     }
     const other = trafficRefusalWords('a_refusal_nobody_named');
-    expect(other).toContain('a_refusal_nobody_named');
+    expect(other).not.toContain('a_refusal_nobody_named');
+    expect(other).toMatch(/^No cars drive this world/);
     expect(other.startsWith('No cars drive this world')).toBe(true);
   });
 

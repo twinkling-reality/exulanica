@@ -8,6 +8,7 @@
 
 import { objectActivity } from '../society-activity-words.js';
 import { ApiError } from '@exulanica/graph-client';
+import { problemSentence } from './words/problems.js';
 import {
   type SocietyActionAffordance,
   type SocietyActionRecord,
@@ -90,19 +91,23 @@ export function describeSocietyActionFailure(error: unknown): string {
       ? error.message.slice(prefix.length)
       : error.message;
     if (error.status === 401 || error.status === 403) {
-      return 'Directed action refused: sign in again to write this world.';
+      return 'Nothing was asked: this session may not change this world. Sign in again.';
     }
     if (error.status === 424 || error.code === 'unavailable_society_input') {
-      return `Directed action unavailable: ${detail}`;
+      return 'Nothing was asked: the people of this world cannot be read right now. Try again in a moment.';
     }
     if (error.status === 409 || error.code === 'invalid_society_action' || error.code === 'stale_society_state') {
-      return `Directed action refused: ${REFUSAL_WORDS[detail] ?? detail}`;
+      // The refusal's own name is in the detail; a name with no words gets the general sentence.
+      return REFUSAL_WORDS[detail] ?? 'Nothing was asked: the world changed. Look again, then ask again.';
     }
-    return `Directed action unavailable (${error.code}): ${detail}`;
+    if (error.code === 'engine_takes_no_directed_actions') {
+      return 'People in this kind of world choose for themselves; they cannot be asked to go somewhere.';
+    }
   }
-  return error instanceof Error
-    ? `Directed action unavailable. ${error.message}`
-    : 'Directed action unavailable. The request failed.';
+  return problemSentence(error, {}, {
+    happened: 'Nothing was asked.',
+    next: 'Try again in a moment.',
+  });
 }
 
 export interface SocietyDirectedActionControl {

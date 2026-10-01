@@ -1101,7 +1101,6 @@ async function mount(): Promise<void> {
     worldMenu.root,
     ...(societyExperiment === null ? [] : [societyExperiment.root]),
     ...(societyComparison === null ? [] : [societyComparison.root]),
-    mapCaption,
     minimap.root,
     appearance.options.root,
     appearance.settings.root,
@@ -1127,6 +1126,7 @@ async function mount(): Promise<void> {
   layout.place('dock', companion.panel.root);
   layout.place('toast', travelStatus);
   layout.place('hud', formation.root);
+  layout.place('hud', mapCaption);
   if (segments !== null) layout.place('hud', segments.root);
   layout.adopt('.world-traffic-note, .reconstruction-loading', 'hud');
 

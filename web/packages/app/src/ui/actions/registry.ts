@@ -16,6 +16,7 @@
 import type { CapabilityDescriptor, WorldCapabilities } from '../../capabilities-api.js';
 import type { InterfaceState } from '../system/components.js';
 import type { IconName } from '../system/icon.js';
+import { REQUEST_REFUSALS } from '../words/problems.js';
 
 export type ActionGroup = 'build' | 'people' | 'ask' | 'explore' | 'system';
 export type ActionPlacement = 'rail' | 'top-bar' | 'palette' | 'panel:people' | 'panel:objects';
@@ -182,25 +183,7 @@ export function actionSpec(id: string): ActionSpec {
  * Refusals any operation may answer at request time (interface packet 5a): the same words for
  * every action, under the action's own.
  */
-export const COMMON_REFUSALS: Readonly<Record<string, RefusalWords>> = {
-  busy: { happened: 'The world was busy for a moment, so nothing was changed.', next: 'Try again.' },
-  capacity_exhausted: {
-    happened: 'This installation is at its limit right now, so nothing was changed.',
-    next: 'Try again in a minute.',
-  },
-  workspace_capacity_exhausted: {
-    happened: 'Your workspace is doing as much as it may at once, so nothing was changed.',
-    next: 'Try again when something you started has finished.',
-  },
-  budget_exceeded: {
-    happened: 'The spending allowance for models refused this, so nothing was spent.',
-    next: 'Ask the owner of this workspace about its allowance.',
-  },
-  provider_credential_absent: {
-    happened: 'No model can be asked on this installation.',
-    next: 'Ask the person who runs it to add one.',
-  },
-};
+export const COMMON_REFUSALS: Readonly<Record<string, RefusalWords>> = REQUEST_REFUSALS;
 
 /** The generic words for a refusal the action has no words for; its code goes to the record. */
 export const UNRECOGNISED_REFUSAL: RefusalWords = {

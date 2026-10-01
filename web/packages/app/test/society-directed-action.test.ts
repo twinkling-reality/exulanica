@@ -198,17 +198,17 @@ describe('society directed-action control', () => {
     });
     await control.issue();
     expect(control.status.textContent).toBe(
-      'Directed action refused: unknown canonical target',
+      'Nothing was asked: the world changed. Look again, then ask again.',
     );
     expect(describeSocietyActionFailure(
       new ApiError(424, 'unavailable_society_input', 'current society input authorization is not configured'),
-    )).toMatch(/^Directed action unavailable:/);
+    )).toMatch(/^Nothing was asked: the people of this world cannot be read/);
   });
 
   it('says in words that somebody is already where they were asked to go', () => {
     expect(describeSocietyActionFailure(
       new ApiError(409, 'invalid_society_action', 'inhabitant_already_there'),
-    )).toBe('Directed action refused: They are already there, using it now.');
+    )).toBe('They are already there, using it now.');
   });
 });
 

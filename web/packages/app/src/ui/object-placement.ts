@@ -228,6 +228,8 @@ const PERIOD_STEP_MILLISECONDS = 100;
  * the panel stops being busy, only the controls without such a reason come back.
  */
 const UNAVAILABLE = 'unavailable';
+/** The stable action names of a row's motion controls, which drivers select by. */
+const ROW_CONTROL_ACTION = { trigger: 'object.start', stop: 'object.stop', reset: 'object.reset' } as const;
 /** The server refused this control's write; the reason is the control's title. */
 const REFUSED = 'refused';
 
@@ -246,12 +248,12 @@ export function buildObjectPlacement(
   const motionToggle = el('input', { type: 'checkbox', id: 'object-placement-motion' });
   const placementMotion = buildMotionControls('object-placement', bounds, null);
   const placeButton = el('button', {
-    type: 'button', class: 'primary object-placement-place', text: 'Place before me',
+    type: 'button', class: 'primary object-placement-place', text: 'Place here', 'data-action': 'objects.place',
   });
   const assetSummary = el('p', { class: 'object-placement-summary' });
   const assetUse = el('p', { class: 'object-placement-use' });
   const arrangeButton = el('button', {
-    type: 'button', class: 'object-placement-arrange', text: 'Place a small square before me',
+    type: 'button', class: 'object-placement-arrange', text: 'Place a small square', 'data-action': 'objects.arrange',
   });
   /** Each offered asset's summary, by key, for the line under the choice. */
   let summaries = new Map<string, string>();
@@ -259,13 +261,13 @@ export function buildObjectPlacement(
   let uses = new Map<string, string | null>();
   const objectList = el('ul', { class: 'object-placement-list' });
   const status = el('p', { class: 'object-placement-status', role: 'status', 'aria-live': 'polite' });
-  const undoButton = el('button', { type: 'button', class: 'ghost', text: 'Take back the last change' });
-  const close = el('button', { type: 'button', class: 'ghost', text: 'Close' });
+  const undoButton = el('button', { type: 'button', class: 'ghost', text: 'Take back', 'data-action': 'objects.undo' });
+  const close = el('button', { type: 'button', class: 'ghost', text: 'Close', 'data-action': 'panel.close' });
   undoButton.addEventListener('click', () => handlers.onUndo());
 
   const pendingText = el('span', { class: 'object-placement-pending-text' });
-  const saveMove = el('button', { type: 'button', class: 'primary', text: 'Save this position' });
-  const discardMove = el('button', { type: 'button', class: 'ghost', text: 'Put it back' });
+  const saveMove = el('button', { type: 'button', class: 'primary', text: 'Save position', 'data-action': 'objects.save-move' });
+  const discardMove = el('button', { type: 'button', class: 'ghost', text: 'Put it back', 'data-action': 'objects.discard-move' });
   saveMove.addEventListener('click', () => handlers.onSaveMove());
   discardMove.addEventListener('click', () => handlers.onDiscardMove());
   const pending = el('div', { class: 'object-placement-pending' }, [
@@ -310,7 +312,7 @@ export function buildObjectPlacement(
   arrangeButton.addEventListener('click', () => handlers.onArrange(roleSelect.value));
 
   replace(root, [
-    el('h2', { id: 'object-placement-title', text: 'Objects you have added' }),
+    el('h2', { id: 'object-placement-title', text: 'Objects' }),
     el('p', { class: 'object-placement-note' }, [
       'Anything you add here is something you made. It is not part of what the photographs '
         + 'recorded, and adding it changes nothing about what this place was.',
@@ -330,7 +332,7 @@ export function buildObjectPlacement(
     el('div', { class: 'object-placement-arrangement' }, [
       el('p', { class: 'object-placement-hint' }, [
         'Or place a small square: several objects together in front of you, facing you, each its '
-          + 'own change, so “Take back the last change” removes them one at a time. It brings '
+          + 'own change, so “Take back” removes them one at a time. It brings '
           + 'nobody in.',
       ]),
       arrangeButton,
@@ -366,16 +368,16 @@ export function buildObjectPlacement(
       if (editing?.objectId === row.objectId) editing.values = draft;
     });
     controls.root.classList.add('object-placement-motion-fields');
-    const save = el('button', { type: 'button', class: 'primary', text: 'Save this motion' });
+    const save = el('button', { type: 'button', class: 'primary', text: 'Save motion', 'data-action': 'object.save-motion' });
     save.addEventListener('click', () => handlers.onSetMotion(row.objectId, controls.read()));
-    const keep = el('button', { type: 'button', class: 'ghost', text: 'Keep it as it is' });
+    const keep = el('button', { type: 'button', class: 'ghost', text: 'Keep it as it is', 'data-action': 'object.keep-motion' });
     keep.addEventListener('click', () => {
       editing = null;
       showObjects(rendered.rows, rendered.selectedId);
     });
     const buttons: HTMLElement[] = [save];
     if (row.motion !== 'none') {
-      const takeAway = el('button', { type: 'button', class: 'ghost', text: 'Take its motion away' });
+      const takeAway = el('button', { type: 'button', class: 'ghost', text: 'Take its motion away', 'data-action': 'object.clear-motion' });
       takeAway.addEventListener('click', () => handlers.onClearMotion(row.objectId));
       buttons.push(takeAway);
     }
@@ -419,7 +421,7 @@ export function buildObjectPlacement(
       for (const [action, label] of [
         ['trigger', 'Start'], ['stop', 'Stop'], ['reset', 'Reset'],
       ] as const) {
-        const button = el('button', { type: 'button', class: 'ghost', text: label });
+        const button = el('button', { type: 'button', class: 'ghost', text: label, 'data-action': ROW_CONTROL_ACTION[action] });
         if (!runnable) button.dataset[UNAVAILABLE] = 'yes';
         button.disabled = busy || !runnable;
         button.addEventListener('click', () => handlers.onControl(row.objectId, action));
@@ -431,6 +433,7 @@ export function buildObjectPlacement(
         class: 'ghost object-placement-motion-edit',
         'aria-expanded': open ? 'true' : 'false',
         text: row.motion === 'none' ? 'Give it motion' : 'Change its motion',
+        'data-action': 'object.motion',
       });
       motion.disabled = busy;
       motion.addEventListener('click', () => {
@@ -440,7 +443,7 @@ export function buildObjectPlacement(
         showObjects(rendered.rows, rendered.selectedId);
       });
       controls.append(motion);
-      const remove = el('button', { type: 'button', class: 'ghost object-placement-remove', text: 'Remove' });
+      const remove = el('button', { type: 'button', class: 'ghost object-placement-remove', text: 'Remove', 'data-action': 'object.remove' });
       remove.disabled = busy;
       remove.addEventListener('click', () => handlers.onRemove(row.objectId));
       controls.append(remove);

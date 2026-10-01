@@ -34,7 +34,7 @@ export const FORBIDDEN_WORDS: readonly string[] = Object.freeze([
   'compliant',
 ]);
 
-const COPY: Readonly<Record<string, string>> = Object.freeze({
+export const COPY: Readonly<Record<string, string>> = Object.freeze({
   // Provenance rows. Band 1 renders the user's verbatim words when it has them; these are the
   // labels for a row that has none.
   'row.name': 'Name',
@@ -179,13 +179,13 @@ const COPY: Readonly<Record<string, string>> = Object.freeze({
   // from the sentence alone: nothing has happened yet, and where to go to make it happen or make
   // it stop.
   'proposal.staged':
-    'Nothing has changed yet. Open Customize to look at it, then Apply it or throw it away.',
+    'Nothing has changed yet. Open Design to look at it, then Apply it or throw it away.',
   'proposal.unavailable':
     'That change could not be put in front of you, so nothing was proposed and nothing changed.',
   // The authority did not say in time whether it can show the change. It may still arrive, so
   // the sentence describing it stays above this one.
   'proposal.unconfirmed':
-    'Customize has not confirmed that it can show this change. It may still appear there, and '
+    'Design has not confirmed that it can show this change. It may still appear there, and '
     + 'nothing changes unless you apply it.',
 
   // A request to change how the world looks that produced no proposal. Seven different facts,
@@ -222,7 +222,7 @@ const COPY: Readonly<Record<string, string>> = Object.freeze({
   'proposal.outcome.accepted': 'The change was applied to your world.',
   'proposal.outcome.discarded': 'The change was thrown away and your world is as it was.',
   'proposal.outcome.refused': 'The change was refused and your world is as it was.',
-  'proposal.outcome.previewed': 'The change is waiting to be confirmed in Customize.',
+  'proposal.outcome.previewed': 'The change is waiting to be confirmed in Design.',
   'proposal.outcome.still_open': 'The change is still waiting, and nothing has changed yet.',
   // What an outcome is kept under when the proposal was made before this page opened.
   'proposal.earlier': 'A change the Companion proposed earlier',
@@ -347,10 +347,10 @@ const COPY: Readonly<Record<string, string>> = Object.freeze({
   'worldControls.world': 'World',
   'worldControls.openWorld': 'Open World menu',
   'worldControls.addObject': 'Add object',
-  'worldControls.create': 'Create',
-  'worldControls.addAndArrange': 'Add and arrange objects',
+  'worldControls.create': 'Build',
+  'worldControls.addAndArrange': 'Add objects',
   // Where a person places something inhabitants can rest on or visit, named by the controls above.
-  'inhabitants.whereToPlace': 'You place objects from Create, with “Add and arrange objects”.',
+  'inhabitants.whereToPlace': 'Add them with Add object in the top bar.',
   'worldControls.addPhotos': 'Add photos',
   'photosDrawer.kicker': 'World sources',
   'photosDrawer.title': 'Add photos',
@@ -407,7 +407,7 @@ const COPY: Readonly<Record<string, string>> = Object.freeze({
     + 'generated, not recorded from a real place.',
   // Making a world from a recipe: the World menu's offer, and the panel that lists the recipes.
   'worldMenu.make': 'Make a world',
-  'worldMenu.make.detail': 'Make a world',
+  'worldMenu.make.detail': 'Start a new town',
   'worldRecipes.heading': 'Make a world',
   'worldRecipes.introduction':
     'Choose a town recipe, adjust its values, and save it as your world.',
@@ -427,7 +427,7 @@ const COPY: Readonly<Record<string, string>> = Object.freeze({
     'No cars drive this town: it has more parking places than the traffic drives.',
   'world.traffic.unreadable': 'No cars drive this world: its streets could not be read.',
   'world.traffic.traffic_not_loaded': 'No cars are shown: this page could not load its traffic. Reload to try again.',
-  'world.traffic.other': 'No cars drive this world ({reason}).',
+  'world.traffic.other': 'No cars drive this world: its roads could not be read for traffic.',
   // A saved world generated from a recipe, before and while its tiles are baked.
   'world.entry.generated': 'Generated world · {recipe} · saved changes and appearance',
   'world.entry.generated-unreadable':
@@ -489,14 +489,14 @@ const COPY: Readonly<Record<string, string>> = Object.freeze({
     'One sample town of these values: {tiles} tiles, {people} people, {buildings} buildings '
     + 'and {vehicles}.',
   'worldDescription.sample.vehicles': '{count} vehicles',
-  'worldDescription.sample.noVehicles': 'no vehicles, because its roads give none ({code})',
+  'worldDescription.sample.noVehicles': 'no vehicles, because its roads give none',
   'worldDescription.sample.streets': 'Streets: {list}',
   'worldDescription.sample.premises': 'Premises: {list}',
   'worldDescription.sample.counted': '{label} {count}',
   'worldDescription.sample.differs':
     'A town made from these values draws its own streets, so its numbers will differ.',
   'worldDescription.sample.refused':
-    'A town of these values could not be generated ({code}). Change a value, or describe it again.',
+    'A town of these values could not be generated. Change a value, or describe it again.',
   'worldDescription.sample.overran':
     'The sample town took too long to make, so there are no numbers to show. The values are valid.',
   'worldDescription.sample.busy':

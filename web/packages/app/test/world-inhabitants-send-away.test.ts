@@ -120,7 +120,7 @@ describe('the panel says who is here in plain words', () => {
 
     panel.render({ society: view(away(4)), objects: [], walked: 0, advanceBlocked: null });
     expect(panel.root.querySelector('.world-inhabitants-summary')?.textContent)
-      .toBe('Nobody lives here now: you sent everyone away at simulated minute 4.');
+      .toBe('Nobody lives here now: you sent everyone away at minute 4.');
     expect(panel.sendAway.hidden).toBe(true);
     expect(panel.advance.hidden).toBe(true);
     expect(panel.bringBack.hidden).toBe(false);

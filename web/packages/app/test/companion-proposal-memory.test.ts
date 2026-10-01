@@ -170,7 +170,7 @@ async function answerAs(authority: Authority, proposal: unknown): Promise<void> 
   }
   if (typeof authority === 'object') await authority.previewsWhen;
   worldStyleProposalOutcomes.report({
-    originReference, kind: 'previewed', detail: 'Waiting to be confirmed in Customize.',
+    originReference, kind: 'previewed', detail: 'Waiting to be confirmed in Design.',
   });
 }
 
@@ -402,7 +402,7 @@ describe('a sentence that turns out to be a request to change the world', () => 
       worldStyleProposalOutcomes.report({
         originReference: (received[0] as { readonly originReference: string }).originReference,
         kind: 'previewed',
-        detail: 'Waiting to be confirmed in Customize.',
+        detail: 'Waiting to be confirmed in Design.',
       });
     }
     await settle();

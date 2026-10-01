@@ -10,6 +10,7 @@
  * server and then read back, so the section only ever says what the server holds.
  */
 
+import { problemSentence, problemWords } from '../ui/words/problems.js';
 import { ApiError } from '@exulanica/graph-client';
 import type { Credentials } from '../config.js';
 import { SocietyModelsClient, type ModelRef, type SocietyModels } from '../society-models-api.js';
@@ -95,7 +96,7 @@ export function mountSocietyModels(options: {
       failure = '';
     } catch (error) {
       if (disposed) return;
-      failure = `Who decides for them could not be read. ${error instanceof Error ? error.message : ''}`.trim();
+      failure = `Who decides for them could not be read. ${problemSentence(error)}`;
     } finally {
       ended = Math.max(ended, number);
     }
@@ -140,7 +141,7 @@ export function mountSocietyModels(options: {
     } catch (error) {
       message = error instanceof ApiError
         ? choiceRefusalWords(error.code, error.message)
-        : `The choice was not recorded. ${error instanceof Error ? error.message : ''}`.trim();
+        : `The choice was not recorded. ${problemWords(error).next}`;
     } finally {
       busy = false;
     }
@@ -165,7 +166,7 @@ export function mountSocietyModels(options: {
     } catch (error) {
       signalMessage = error instanceof ApiError
         ? choiceRefusalWords(error.code, error.message)
-        : `The choice was not recorded. ${error instanceof Error ? error.message : ''}`.trim();
+        : `The choice was not recorded. ${problemWords(error).next}`;
     } finally {
       busy = false;
       render();

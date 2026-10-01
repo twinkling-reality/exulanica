@@ -14,6 +14,7 @@
  * there, and `world-description.test.ts` holds them to the server's own lists.
  */
 
+import { problemSentence } from './words/problems.js';
 import type {
   DraftRefusalCode,
   SampleStatus,
@@ -227,7 +228,7 @@ export function buildWorldDescription(options: {
       show(draft);
     }).catch((error: unknown) => {
       status.textContent = fill('worldDescription.failed', {
-        reason: error instanceof Error ? error.message : String(error),
+        reason: problemSentence(error),
       });
     }).finally(() => {
       ask.disabled = false;

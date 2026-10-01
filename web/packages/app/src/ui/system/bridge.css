@@ -23,7 +23,7 @@
 #shell .x-region[data-region] > :is(
   .world-identity, .object-placement, .world-panel, .world-local-nav, .reconstruction-inspector,
   .confirm, .companion-encounter, .travel-status, .forming, .world-traffic-note,
-  .reconstruction-loading, .scene-segments
+  .reconstruction-loading, .scene-segments, .map-caption
 ) {
   position: relative;
   inset: auto;
@@ -268,7 +268,7 @@
 }
 
 /* -- The heads-up stack ---------------------------------------------------------------------------------- */
-#shell .x-region[data-region='hud'] > :is(.forming, .world-traffic-note, .reconstruction-loading) {
+#shell .x-region[data-region='hud'] > :is(.forming, .world-traffic-note, .reconstruction-loading, .map-caption) {
   left: auto;
   right: auto;
   bottom: auto;

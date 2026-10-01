@@ -96,15 +96,15 @@ export function buildConfirm(handlers: ConfirmHandlers): GatedConfirmPanel {
   return {
     root,
     show(proposalId, summary, utterance, options) {
-      const confirm = el('button', { type: 'button', class: 'primary', text: 'Confirm' });
+      const confirm = el('button', { type: 'button', class: 'primary', text: 'Confirm', 'data-action': 'confirm.accept' });
       confirmButton = confirm;
       confirm.disabled = options?.confirmable === false;
-      const cancel = el('button', { type: 'button', class: 'ghost', text: 'Cancel' });
+      const cancel = el('button', { type: 'button', class: 'ghost', text: 'Cancel', 'data-action': 'confirm.cancel' });
       confirm.addEventListener('click', () => handlers.onConfirm(proposalId));
       cancel.addEventListener('click', () => handlers.onCancel(proposalId));
 
       const children: (HTMLElement | string)[] = [
-        el('h2', { id: 'confirm-title', text: 'Before anything is written' }),
+        el('h2', { id: 'confirm-title', text: 'Check this change' }),
       ];
       // A free reply is verbatim. A selected answer is the exact reviewed option phrasing.
       if (utterance.trim().length > 0) {
@@ -115,8 +115,8 @@ export function buildConfirm(handlers: ConfirmHandlers): GatedConfirmPanel {
         el('p', { class: 'confirm-reversible' }, [
           summary.reversible
             ? options?.undoControlAvailable === true
-              ? 'This writes a reversible event. Use “Take back the last change” in the object panel to undo it.'
-              : 'This writes a reversible event. The object panel does not expose the undo control.'
+              ? 'You can take this back afterwards with Take back.'
+              : 'This change is recorded so it can be undone, though not from here.'
             : 'This cannot be undone.',
         ]),
       );
@@ -152,7 +152,7 @@ export function buildConfirm(handlers: ConfirmHandlers): GatedConfirmPanel {
     },
     reportFailure(reason, options) {
       confirmButton = null;
-      const close = el('button', { type: 'button', class: 'ghost', text: 'Close' });
+      const close = el('button', { type: 'button', class: 'ghost', text: 'Close', 'data-action': 'confirm.close' });
       close.addEventListener('click', conceal);
       const actions: HTMLElement[] = [];
       if (options?.retry !== undefined) {

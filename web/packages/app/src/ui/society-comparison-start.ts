@@ -19,6 +19,7 @@ import type {
   PlanModel,
   PlanRole,
   StartRequest,
+  Refusal,
   StartState,
 } from '../society-comparison-api.js';
 import { el, replace } from './dom.js';
@@ -51,10 +52,8 @@ export const START_REFUSAL_WORDS: Readonly<Record<string, string>> = {
   bound_out_of_range: 'State a bound above $0 and at most the most the comparison can cost.',
   bound_over_budget: 'This server\'s model budget has too little left for that bound.',
   calls_over_budget: 'This server\'s model budget allows fewer calls than this comparison can make. Choose fewer people, models or seeds.',
-  // Placeholder words: the page's own wording for this code is not written yet.
-  input_not_in_society: 'This world\'s people hold no input with that number.',
-  // Placeholder words: the page's own wording for this code is not written yet.
-  bound_exceeds_grant: 'The bound you set is more than this workspace\'s spending grant has left. Set a smaller bound.',
+  input_not_in_society: 'This world\'s people have no starting point with that number. Choose another.',
+  bound_exceeds_grant: 'This workspace\'s spending grant has less left than the bound you set. Set a smaller bound.',
 };
 
 /**
@@ -65,8 +64,7 @@ export const CLOSED_WORDS: Readonly<Record<string, string>> = {
   claims_spent: 'the server stopped while running it three times in a row, so it was closed',
   comparison_bound_before_seed: 'what was left of the bound you set would not let the next seed finish, so it stopped between seeds and kept those it had played',
   comparison_bound_spent: 'the bound you set was spent',
-  // Placeholder words: the page's own wording for this code is not written yet.
-  comparison_cancelled: 'it was cancelled',
+  comparison_cancelled: 'it was stopped before every run was played',
   process_budget_spent: 'this server\'s model budget had too little left for it',
 };
 
@@ -90,9 +88,34 @@ export function dollars(value: string): string {
   return `$${whole}.${kept}`;
 }
 
-/** Why a start was refused, in words, by the server's code. */
+/** Why a start was refused, in words, by the server's code; a code with no words is never shown. */
 export function refusalWords(code: string, detail = ''): string {
-  return START_REFUSAL_WORDS[code] ?? `The server refused it (${code}${detail === '' ? '' : `: ${detail}`}).`;
+  return START_REFUSAL_WORDS[code]
+    ?? (detail === '' ? 'The server refused it.' : 'The server refused it. Change a choice, or try again later.');
+}
+
+/**
+ * Why the plan says a start would be refused for spending (`budget_exceeded`, with the durable
+ * authority's reason): the plan line a person reads before pressing Start.
+ */
+export const PLAN_SPENDING_WORDS: Readonly<Record<string, string>> = {
+  bound_exceeds_grant: 'The bound you set is more than this workspace\'s allowance grants. Set a lower bound to start.',
+  spending_not_granted: 'This workspace has no allowance to spend on these models\' service, so it cannot start.',
+  spending_revoked: 'This workspace\'s model allowance was withdrawn, so it cannot start.',
+  spending_expired: 'This workspace\'s model allowance has run out of time, so it cannot start.',
+  spending_limit_reached: 'This comparison would go over this workspace\'s model allowance, so it cannot start.',
+  spending_suspended: 'Spending on models is paused for this workspace, so it cannot start.',
+  spending_unavailable: 'The model allowance could not be checked, so it cannot start now. Try again later.',
+  spending_scope_missing: 'The request did not say which workspace to spend for, so it cannot start.',
+};
+const PLAN_OVER_BUDGET = 'This comparison would spend more than this workspace\'s model allowance permits, so it cannot start.';
+
+export function planRefusalWords(refusal: Refusal): string {
+  if (refusal.code !== 'budget_exceeded') return refusalWords(refusal.code, refusal.detail);
+  const spending = refusal.spending;
+  if (spending === undefined) return PLAN_OVER_BUDGET;
+  return (spending.detail === null ? undefined : PLAN_SPENDING_WORDS[spending.detail])
+    ?? PLAN_SPENDING_WORDS[spending.reason] ?? PLAN_OVER_BUDGET;
 }
 
 /**
@@ -343,7 +366,7 @@ export function buildComparisonStartForm(handlers: {
       latest = answer;
       const figures = answer.plan;
       planLine.textContent = answer.planRefusal !== null
-        ? refusalWords(answer.planRefusal.code, answer.planRefusal.detail)
+        ? planRefusalWords(answer.planRefusal)
         : figures === null
           ? 'Choose what to compare.'
           : `${figures.runs} runs of one simulated hour. It could cost at most ${dollars(figures.mostUsd)}, if every person were asked every minute and every answer were as long as allowed. `

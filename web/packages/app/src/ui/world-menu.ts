@@ -127,7 +127,7 @@ export function buildWorldMenu(options: {
     ]),
     entry('companion', 'Companion', 'Ask and act', 'X', 'world-menu-companion'),
     ...(options.onMakeWorld === undefined ? [] : [
-      entry('make', 'Create', say('worldMenu.make.detail'), '', 'world-menu-make', say('worldMenu.make')),
+      entry('make', say('worldMenu.make'), say('worldMenu.make.detail'), '', 'world-menu-make', say('worldMenu.make')),
     ]),
     entry('options', 'Design', 'Light and material', 'O', 'world-menu-customize', 'Customize world'),
     entry('controls', 'Settings', 'Display and controls', '?', 'world-menu-settings'),

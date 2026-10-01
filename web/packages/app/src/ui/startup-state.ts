@@ -1,4 +1,6 @@
 import { ApiError } from '@exulanica/graph-client';
+import { problemRecord } from './words/problems.js';
+import { technicalRecord } from './system/components.js';
 import { say } from './copy.js';
 import { el } from './dom.js';
 import { buildThinkingStatus } from './thinking-status.js';
@@ -40,7 +42,7 @@ export function buildStartupState(error?: unknown): HTMLElement {
   action.addEventListener('click', () => window.location.reload());
   // Only what the statement does not already carry: the message behind an unrecognised failure.
   const detail = !signedOut && !unreachable && error instanceof Error && error.message !== ''
-    ? [el('p', { class: 'gate-note', text: error.message })]
+    ? [el('p', { class: 'gate-note', text: 'Reload the page to try again.' }), technicalRecord(problemRecord(error))]
     : [];
   const panel = el('section', { class: 'gate', role: 'alert' }, [
     el('h1', { text: statement }),

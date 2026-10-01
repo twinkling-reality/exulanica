@@ -615,7 +615,7 @@ describe('the client reads both routes and writes through one queue', () => {
       parameters: { axis: 'x', easing: 'linear', travel_mm: 20000, period_milliseconds: 4000 },
     }).catch((error: unknown) => error);
     expect(refused).toBeInstanceOf(ApiError);
-    expect(objectWriteFailure(refused)).toBe(`The authority refused this edit: ${reason}`);
+    expect(objectWriteFailure(refused)).toBe(`This world did not accept that change: ${reason}`);
   });
 
   it('turns a stale base into a re-read rather than into a thrown failure', async () => {
@@ -743,10 +743,12 @@ describe('a refusal reaches the surface in words', () => {
   });
 
   it('passes an unrecognised code through with its own words', () => {
+    // An unknown code gets the shared words; the code itself never becomes the sentence.
     expect(objectWriteFailure(new ApiError(500, 'internal', 'something broke')))
-      .toBe('internal: something broke');
+      .toBe('That could not be done just now, so nothing was changed. Try again, or look at the technical details.');
     expect(objectWriteFailure(new Error('offline'))).toBe('offline');
-    expect(objectWriteFailure('nothing')).toBe('the write was refused');
+    expect(objectWriteFailure('nothing'))
+      .toBe('That could not be done just now, so nothing was changed. Try again, or look at the technical details.');
   });
 
   it('names an invalid response as this client’s own contract failure', () => {

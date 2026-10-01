@@ -39,7 +39,7 @@ export function buildAtlasCommands(onCommand: (command: AtlasCommand) => void): 
     ['index', 'Library', 'I'],
     ['companion', 'Companion', 'X'],
     ['map', 'Map', 'M'],
-    ['options', 'Customize', 'O'],
+    ['options', 'Design', 'O'],
     ['controls', 'Settings', '?'],
   ];
   const buttons = new Map<AtlasCommand, HTMLButtonElement>();

@@ -37,6 +37,7 @@
 
 import { ApiError, Transport, type TransportOptions } from '@exulanica/graph-client';
 import { KIND_SIDES, type KindPlace, type KindSide, type KindUse } from '@exulanica/atlas-react/playcanvas';
+import { problemSentence } from './ui/words/problems.js';
 import { worldPath } from './world-scope.js';
 
 // -- the read model ------------------------------------------------------------------------------
@@ -1098,11 +1099,10 @@ export function parseVersion(value: unknown): AlternateVersion {
 /** What a refusal from this authority means, in the words a surface can show. */
 export function objectWriteFailure(error: unknown): string {
   if (error instanceof WorldObjectsContractError) return error.message;
-  if (!(error instanceof ApiError)) {
-    return error instanceof Error ? error.message : 'the write was refused';
-  }
-  if (error.isUnauthenticated) return 'This session is not authorized to change this world.';
+  // This client's own failures are already sentences for a person; anything else gets shared words.
+  if (!(error instanceof ApiError)) return error instanceof Error ? error.message : problemSentence(error);
   const detail = error.message.replace(`${error.code}: `, '');
+  if (error.isUnauthenticated) return 'This session is not authorized to change this world.';
   // A body-shape refusal comes from Pydantic rather than from the domain, so it carries
   // `{detail: [...]}` with no `code` at all. `toApiError` deliberately does not trust a failed
   // response to be JSON and degrades to `http_422` plus the status text, which reaches a person
@@ -1117,19 +1117,20 @@ export function objectWriteFailure(error: unknown): string {
     case 'unknown_reference':
       return 'That version, object or asset is not in this workspace.';
     case 'protected_topology_conflict':
-      return 'This world changed. Choose “Place before me” again to review its current version.';
+      return 'This world changed. Choose “Place here” again to see it as it is now.';
     case 'stale_object_base':
       return 'This world changed while you were deciding, so nothing was written.';
     case 'invalid_object_state':
-      return `That edit does not apply to this world as it stands: ${detail}`;
+      return `That change does not fit this world as it stands: ${detail}`;
     case 'invalid_object_data':
-      return `The authority refused this edit: ${detail}`;
+      return `This world did not accept that change: ${detail}`;
     case 'invalidated_source_version':
       return 'The place this version was built on was deleted, so it can no longer be changed. '
         + 'What you already made is kept.';
     case 'unavailable_asset':
       return 'The reviewed bytes for that asset are not in storage, so it cannot be drawn.';
     default:
-      return `${error.code}: ${detail}`;
+      // A code this table has no words for: the shared words, never the code (kept for the record).
+      return problemSentence(error);
   }
 }

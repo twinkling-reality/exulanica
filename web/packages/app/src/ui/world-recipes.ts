@@ -15,6 +15,7 @@
  * a person's edit is checked, so the controls never hold a value the page has not checked.
  */
 
+import { problemSentence } from './words/problems.js';
 import type { SavedWorldEntry } from '../world-entry-api.js';
 import {
   effectiveRange,
@@ -192,7 +193,7 @@ export function buildWorldRecipes(options: {
       making = false;
       for (const button of list.querySelectorAll('button')) (button as HTMLButtonElement).disabled = false;
       status.textContent = fill('worldRecipes.failed', {
-        reason: error instanceof Error ? error.message : String(error),
+        reason: problemSentence(error),
       });
       make.disabled = refusal !== null;
     });
@@ -211,7 +212,7 @@ export function buildWorldRecipes(options: {
     }
   }).catch((error: unknown) => {
     status.textContent = fill('worldRecipes.failed', {
-      reason: error instanceof Error ? error.message : String(error),
+      reason: problemSentence(error),
     });
   });
 

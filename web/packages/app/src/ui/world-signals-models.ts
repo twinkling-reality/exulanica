@@ -22,7 +22,7 @@ const refusalWords: Readonly<Record<string, string>> = {
   provider_changed: 'the model service has changed',
   provider_not_admitted: 'this server cannot reach that model service',
 };
-const why = (code: string): string => refusalWords[code] ?? `the model is unavailable (${code})`;
+const why = (code: string): string => refusalWords[code] ?? 'the model is unavailable';
 
 export function signalChoiceWords(choice: SignalChoice | undefined, refusal: string | null): string {
   if (choice === undefined) return 'Fixed timing decides this light.';

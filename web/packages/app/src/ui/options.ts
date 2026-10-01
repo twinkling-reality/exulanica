@@ -558,7 +558,7 @@ export function buildOptions(callbacks: OptionsCallbacks): OptionsView {
     el('header', { class: 'overlay-head' }, [
       el('div', {}, [
         el('p', { class: 'overlay-kicker', text: 'System' }),
-        el('h1', { id: 'options-title', text: 'Customize' }),
+        el('h1', { id: 'options-title', text: 'Design' }),
       ]),
       close,
     ]),

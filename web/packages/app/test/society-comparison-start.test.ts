@@ -105,7 +105,7 @@ describe('the words a start is told in', () => {
     );
     expect(refusalWords('comparisons_not_set_up')).toContain('not set up on this computer');
     expect(refusalWords('comparisons_not_played')).toContain('Nothing on this computer runs comparisons');
-    expect(refusalWords('something_new', 'why')).toBe('The server refused it (something_new: why).');
+    expect(refusalWords('something_new', 'why')).toBe('The server refused it. Change a choice, or try again later.');
   });
 
   it('takes a bound only above zero and at most the most the comparison can cost', () => {

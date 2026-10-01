@@ -13,6 +13,7 @@
  * renderer is rebuilt on every mount and a held binding would be a disposed one.
  */
 
+import { problemSentence } from '../ui/words/problems.js';
 import { readInteractionCatalog } from '../interaction-policy.js';
 import { REGISTRY as INTERACTION_REGISTRY } from '../interaction-settings.js';
 import { ApiError } from '@exulanica/graph-client';
@@ -1100,7 +1101,7 @@ export function describeWorldStyleFailure(error: unknown): string {
       // entry, or a question reading the world. Nothing was written, whichever it was.
       return 'Your world was busy with something else a moment ago, so nothing was saved. Try again.';
     }
-    return `${error.code}: ${error.message.replace(`${error.code}: `, '')}`;
+    return problemSentence(error);
   }
   return error instanceof Error ? error.message : 'The world style request failed.';
 }

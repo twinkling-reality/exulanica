@@ -136,11 +136,11 @@ export const PRESENCE_WORDS: Readonly<Record<string, string>> = {
   nobody_to_send_away: 'Nobody is here to send away.',
   already_here: 'They are already here.',
   a_request_is_waiting: 'Someone was just asked to go somewhere, or a model\'s decision for someone waits for '
-    + 'the next simulated minute. Advance one minute first, then ask again.',
+    + 'the next simulated minute. Use Next minute first, then ask again.',
   nowhere_to_arrive: 'They cannot come back yet: there is nowhere in this world they could reach. Put something '
     + `they can rest on or visit near where you arrive, then ask again. ${say('inhabitants.whereToPlace')}`,
   stale_society_state: 'This world changed while you were deciding. Look again, then ask again.',
-  engine_keeps_its_people: 'The inhabitants of this world cannot be sent away.',
+  engine_keeps_its_people: 'The people of this world cannot be sent away.',
 };
 
 /** A refusal of the person's request, in words. The code stays in the detail line. */
@@ -154,7 +154,7 @@ export function refusalWords(refusal: NonNullable<InhabitantsView['refusal']>): 
   if (refusal.code === 'engine_not_for_this_ground') {
     // The page asked for inhabitants of another kind than this world's ground takes, as a page
     // older than the server's engine table would.
-    return 'Nobody came in: this page asked for another kind of inhabitants than this world takes. '
+    return 'Nobody came in: this page asked for another kind of people than this world takes. '
       + 'Reload the page, then bring them in again.';
   }
   if (refusal.status === 424) return `Inhabitants cannot come in right now. ${refusal.detail}`;
@@ -199,14 +199,14 @@ export function playbackWords(control: SocietyPlaybackControl | null): {
   if (host === null) {
     return {
       offerPlay: false, offerPause: playing, status: '',
-      why: 'This server does not say whether it plays worlds on its own, so Play is not offered. Advance one minute at a time instead.',
+      why: 'This server does not say whether it plays worlds on its own, so Play is not offered. Use Next minute to move on one minute at a time instead.',
     };
   }
   if (!host.running) {
     return {
       offerPlay: false, offerPause: playing,
       status: playing ? 'Saved as playing, but nothing moves until this host plays it.' : '',
-      why: `${host.reason} Advance one minute at a time instead.`,
+      why: `${host.reason} Use Next minute to move on one minute at a time instead.`,
     };
   }
   if (!control.playEligible && !playing) {
@@ -347,12 +347,12 @@ export function buildWorldInhabitants(handlers: {
   readonly onPause?: () => void;
   readonly onPace?: (speed: SocietyPlaybackSpeed) => void;
 }): WorldInhabitantsPanel {
-  const heading = el('h3', { text: 'Inhabitants' });
+  const heading = el('h3', { text: 'People' });
   const summary = el('p', { class: 'world-inhabitants-summary', role: 'status', 'aria-live': 'polite' });
   const about = el('p', {
     class: 'world-help',
-    text: 'Inhabitants are simulated people. They are invented, not anyone you know, and what '
-      + 'they do is simulation, never a memory.',
+    text: 'These are simulated people: invented for this world, not anyone you know. What they do '
+      + 'is simulation, never a memory.',
   });
   const need = el('p', {
     class: 'world-help',
@@ -361,11 +361,11 @@ export function buildWorldInhabitants(handlers: {
   });
   const refusal = el('p', { class: 'world-inhabitants-refusal', role: 'alert', hidden: true });
   const refusalCode = el('code');
-  const refusalDetails = el('details', { hidden: true }, [el('summary', { text: 'Details' }), refusalCode]);
-  const bringIn = el('button', { type: 'button', text: 'Bring in inhabitants' }) as HTMLButtonElement;
-  const advance = el('button', { type: 'button', text: 'Advance one minute' }) as HTMLButtonElement;
-  const sendAway = el('button', { type: 'button', text: 'Send everyone away' }) as HTMLButtonElement;
-  const bringBack = el('button', { type: 'button', text: 'Bring them back' }) as HTMLButtonElement;
+  const refusalDetails = el('details', { hidden: true }, [el('summary', { text: 'Technical details' }), refusalCode]);
+  const bringIn = el('button', { type: 'button', text: 'Bring people in', 'data-action': 'people.bring-in' }) as HTMLButtonElement;
+  const advance = el('button', { type: 'button', text: 'Next minute', 'data-action': 'clock.advance' }) as HTMLButtonElement;
+  const sendAway = el('button', { type: 'button', text: 'Send everyone away', 'data-action': 'people.send-away' }) as HTMLButtonElement;
+  const bringBack = el('button', { type: 'button', text: 'Bring them back', 'data-action': 'people.bring-back' }) as HTMLButtonElement;
   const play = el('button', { type: 'button', text: 'Play', hidden: true }) as HTMLButtonElement;
   const pace = el('select', { 'aria-label': 'Pace' }) as HTMLSelectElement;
   for (const speed of PLAYBACK_SPEEDS) pace.append(el('option', { value: String(speed), text: `${speed}×` }));
@@ -393,7 +393,7 @@ export function buildWorldInhabitants(handlers: {
   bringBack.addEventListener('click', () => handlers.onBringBack());
   play.addEventListener('click', () => (play.dataset['action'] === 'pause' ? handlers.onPause?.() : handlers.onPlay?.()));
   pace.addEventListener('change', () => handlers.onPace?.(Number(pace.value) as SocietyPlaybackSpeed));
-  const root = el('section', { class: 'world-inhabitants', 'aria-label': 'Inhabitants' }, [
+  const root = el('section', { class: 'world-inhabitants', 'aria-label': 'People' }, [
     heading, summary, about, need, refusal, refusalDetails, bringIn, bringBack, play, paceLabel,
     playbackStatus, playbackWhy, advance, advanceWhy, movedLine, noticeLine, flightLine, unplacedLine,
     sendAway, presenceHelp, area, placesHeading, placesList, select,
@@ -456,7 +456,7 @@ export function buildWorldInhabitants(handlers: {
     need.hidden = present;
     bringIn.hidden = present;
     bringIn.disabled = society.busy || society.status === 'unauthorized';
-    bringIn.textContent = society.busy && !present ? 'Bringing them in…' : 'Bring in inhabitants';
+    bringIn.textContent = society.busy && !present ? 'Bringing people in…' : 'Bring people in';
     // While the world plays on its own, advancing by hand is not offered at all.
     const playing = renderPlayback(here, playback);
     advance.hidden = !here || playing;
@@ -499,9 +499,9 @@ export function buildWorldInhabitants(handlers: {
     }
     const people = snapshot.populationSize;
     summary.textContent = away
-      ? `Nobody lives here now: you sent everyone away at simulated minute ${snapshot.presence.sinceTick}.`
-      : `${people} inhabitants live here. ${walked} walked in the last minute. `
-        + `Simulated minute ${snapshot.currentTick}.`;
+      ? `Nobody lives here now: you sent everyone away at minute ${snapshot.presence.sinceTick}.`
+      : `${people === 1 ? 'One person lives' : `${people} people live`} here. Minute ${snapshot.currentTick}; `
+        + `${walked === 0 ? 'nobody' : walked} walked in the last minute.`;
     const places = snapshot.places;
     const words = places === null ? null : areaWords(places);
     area.hidden = words === null;

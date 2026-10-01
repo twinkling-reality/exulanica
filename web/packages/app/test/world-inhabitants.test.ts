@@ -143,7 +143,7 @@ describe('the inhabitants panel', () => {
     panel.render({ society: view({ status: 'ready', snapshot, eventsAvailable: true }), objects, walked: 3, advanceBlocked: null });
     expect(panel.root.dataset['state']).toBe('present');
     expect(panel.root.querySelector('.world-inhabitants-summary')?.textContent)
-      .toBe('100 inhabitants live here. 3 walked in the last minute. Simulated minute 7.');
+      .toBe('100 people live here. Minute 7; 3 walked in the last minute.');
     expect(panel.bringIn.hidden).toBe(true);
     const items = [...panel.root.querySelectorAll('.world-inhabitants-places li')] as HTMLElement[];
     expect(items.map((item) => [item.dataset['objectId'], item.dataset['status']])).toEqual([
@@ -164,7 +164,7 @@ describe('a society the server will not start on this ground', () => {
       status: 409, code: 'engine_not_for_this_ground',
       detail: "this engine does not stand on this world's ground",
     });
-    expect(words).toMatch(/^Nobody came in: this page asked for another kind of inhabitants/);
+    expect(words).toMatch(/^Nobody came in: this page asked for another kind of people/);
     expect(words).toContain('Reload the page');
   });
 });

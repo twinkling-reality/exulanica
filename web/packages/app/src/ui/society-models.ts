@@ -57,12 +57,12 @@ export const CHOICE_REFUSAL_WORDS: Readonly<Record<string, string>> = {
 };
 
 const decisionWords = (code: string): string =>
-  DECISION_WORDS[code] ?? `of a reason this page has no words for (${code})`;
+  DECISION_WORDS[code] ?? 'of a reason this page cannot name yet';
 const sentence = (words: string): string => words.charAt(0).toUpperCase() + words.slice(1);
 
 /** Why this host asks nobody's model here, or null when it asks them. */
 function hostReason(refusal: string | null): string | null {
-  return refusal === null ? null : HOST_REFUSAL_WORDS[refusal] ?? `this server does not ask models here (${refusal})`;
+  return refusal === null ? null : HOST_REFUSAL_WORDS[refusal] ?? 'this server does not ask models here';
 }
 
 /** What the section says of this host: that it asks the models chosen, or why it asks none. */
@@ -279,5 +279,7 @@ export function buildSocietyModels(handlers: {
 
 /** Why a choice was refused, in words; the code stays available to the caller. */
 export function choiceRefusalWords(code: string, detail: string): string {
-  return CHOICE_REFUSAL_WORDS[code] ?? `The choice was not recorded. ${detail}`;
+  return CHOICE_REFUSAL_WORDS[code] ?? (detail.length > 0
+    ? 'The choice was not recorded. Try again, or choose another model.'
+    : 'The choice was not recorded.');
 }

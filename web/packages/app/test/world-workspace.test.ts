@@ -29,7 +29,7 @@ describe('world workspace interaction ownership', () => {
   it('focuses inspection and releases its listener on disposal', () => {
     const { root, view } = mount();
     view.inspect();
-    expect(document.activeElement?.getAttribute('aria-label')).toBe('Close selected in the world');
+    expect(document.activeElement?.getAttribute('aria-label')).toBe('Close selected');
     view.close();
     expect(document.activeElement?.getAttribute('aria-controls')).toBe('world-panel-nearby');
     view.inspect(); view.dispose();

@@ -387,7 +387,7 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
       if (disposed || generation !== drawGeneration) return;
       if (version === null) {
         panel.report(
-          'Choose an object and select “Place before me” to open an alternate version first.',
+          'Choose an object and select “Place here”. The first change opens an editable copy of this world.',
         );
         return;
       }
@@ -778,7 +778,7 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
             panel.report('The alternate version opened, but could not be read. Reload to try again.', 'failure');
             return;
           }
-          panel.report('Alternate version opened. Choose “Place before me” again to place your object.', 'settled');
+          panel.report('This world can be changed now. Choose “Place here” again to place your object.', 'settled');
         },
       });
     } catch (error) {
@@ -1002,7 +1002,7 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
     plan: PlacementPlan,
   ): Promise<void | 'reported'> {
     if (result.kind === 'recorded') {
-      await settle(result, 'Added. “Take back the last change” removes it again.');
+      await settle(result, 'Added. “Take back” removes it again.');
       return;
     }
     if (disposed) return 'reported';
@@ -1154,7 +1154,7 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
     verdict.ready(
       `${preview.arrangement.title}: ${preview.arrangement.summary} It adds `
       + `${objectCount(preview.wouldAdd.length)} in front of you, facing you, each its own change, so `
-      + '“Take back the last change” removes them one at a time, newest first. Confirm to place '
+      + '“Take back” removes them one at a time, newest first. Confirm to place '
       + 'it, or Cancel to leave the world as it is.',
     );
     confirm.setConfirmable(true);
@@ -1170,7 +1170,7 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
       await settle(
         { kind: 'recorded', version: result.version },
         `Placed “${arrangement.title}”: ${objectCount(addedObjectIds.length)}, each its own change. `
-          + '“Take back the last change” removes them one at a time, newest first.',
+          + '“Take back” removes them one at a time, newest first.',
       );
       return;
     }
@@ -1277,7 +1277,7 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
           return;
         }
         const result = await client.setBehaviour(version, objectId, behaviour);
-        await settle(result, 'Motion saved. Start runs it, and “Take back the last change” removes it.');
+        await settle(result, 'Motion saved. Start runs it, and “Take back” removes it.');
         if (result.kind === 'recorded') panel.closeMotionEditor();
       },
     });

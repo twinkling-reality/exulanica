@@ -102,7 +102,7 @@ describe('Play, Pause and pace beside the people', () => {
     built.render({ society: view(), objects, walked: 0, advanceBlocked: null, playback: { control: control('paused', notHere), busy: false } });
     expect(shown(built.play)).toBe(false);
     expect(shown(built.advance)).toBe(true);
-    expect(built.root.textContent).toContain('This host does not play this workspace. Advance one minute at a time instead.');
+    expect(built.root.textContent).toContain('This host does not play this workspace. Use Next minute to move on one minute at a time instead.');
     // Saved as playing on such a host: Pause stays, so it can be stepped by hand again.
     built.render({ society: view(), objects, walked: 0, advanceBlocked: null, playback: { control: control('playing', notHere), busy: false } });
     expect(built.play.textContent).toBe('Pause');
