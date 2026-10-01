@@ -821,9 +821,37 @@ another host or about more than one process.
   lease, and the API killed mid-stream each gave every slot back. Every watched upload reached one
   outcome, no subscription received an event twice, and where a live stream was compared with a
   full replay (the worker killed, the worker paused) it had missed none.
+- **Past the limits:** the same eight workspaces each offering 150 small reads a second (the client
+  sent about 730 a second in all), holding 16 progress streams (twice the workspace share) and
+  uploading three 12-megapixel photographs every five seconds, for two minutes. Of 87,857 small
+  reads, 41,804 were answered (137 ms p95) and 46,053 were refused with 503 `capacity_exhausted` in
+  46 ms p95, with no other answer. 2,415 attempts to open a stream past a workspace's share were
+  refused with 429, and every watched upload reached its outcome with no event twice and none of
+  another workspace's. `/healthz` answered every probe at 27 ms p95. The process peaked at about 1.4
+  cores and 760 MiB, the database at 26 client backends and the derivative queue at 20 jobs. Of 176
+  uploads, 63 were accepted, 86 answered 409 `busy` (5.4.6) and the server refused 27 for the
+  uploads class.
+- **A refused upload can arrive as a reset connection.** An upload is refused before its body is
+  read and its connection is then closed, so a client still sending a large body can see the close
+  before the 503: in the run above, 23 of the 27 refused uploads reached the client that way. A
+  client treats a reset during an upload as "send it again later". A proxy in front that reads the
+  whole body before passing it on hands the client the 503 instead; that is not measured here.
+- **Inhabited worlds beside the supported load:** eight towns whose societies the API process plays
+  at four times speed, each town's traffic read every five seconds, beside the supported load for
+  three minutes. The towns advanced 72 to 73 percent of the ticks their speed sets (85 to 87 of
+  about 119), and traffic reads took 1.8 s p50, 3.4 s p95 and at most 11 s. Small reads rose to 250
+  ms p95, and 57 of 4,327 were refused when the requests class reached its 24. Progress arrived at
+  3.4 s p95, every watched upload reached its outcome with no event twice and none of another
+  workspace's, and `/healthz` answered every probe at 48 ms p95. The process peaked at 51 threads
+  and 529 MiB, the database at 19 client backends. 8 of 24 uploads answered 409 `busy` and 26 of the
+  48 photographs in accepted uploads were refused `busy`: playing towns and traffic reads both take
+  migration 0041's global asset read lock (`exulanica/api/society_runtime.py`,
+  `exulanica/world/traffic_host.py`), and a guarded intake write that meets it is refused (5.4.6),
+  which the supported load without towns did for no upload and no photograph. The supported figures
+  above therefore hold for an API process that plays no towns.
 
-Not measured: load past the limits held for minutes, inhabited worlds played by the host beside
-that load, more than one API process, and any other host.
+Not measured: load past the limits for longer than two minutes, more towns or more traffic than
+above or both together with the overload, more than one API process, and any other host.
 
 ## 6. Health check
 
