@@ -240,6 +240,15 @@ rehearsal's browser session machinery) and records functional observations, not 
 `--peer-token` adds a second actor in the first workspace, and `restart-api --api second` restarts
 the second API process.
 
+Two further drivers sit beside it. `scripts/acceptance/installation.py run` composes the complete
+installation of section 9 of [deployment](deployment.md) as a Compose project of the checkout's
+own, from images built out of `git archive HEAD`, and checks a clean install, a planned restore and
+a declared crash recovery through `exulanica-installation`, taking the project down with its
+volumes afterwards; `--distinct-probes` gives each test photograph its own size.
+`scripts/acceptance/chaos.py run` checks the formation stream and the derivative queue under faults
+on a running stack: resumes, a held table lock, a client that leaves, a cancelled upload and a
+worker killed mid-job by stopping the API it runs in. Neither makes a timing claim.
+
 **Reading the result.** The run directory holds `result.json`, described by
 `scripts/rehearsal/result.schema.json`, a `summary.txt` table, a JPEG screenshot of every observed
 moment and at least one of every browser step, and each browser session's log. A step's evidence
