@@ -15,6 +15,14 @@ describe('the Atlas shell', () => {
     expect(updateWorldShell(menu, { type: 'toggle-menu' })).toEqual(initialWorldShell());
   });
 
+  it('makes a world in a surface the shell owns, so another surface replaces it and Escape takes it back', () => {
+    const menu = updateWorldShell(initialWorldShell(), { type: 'toggle-menu' });
+    const make = updateWorldShell(updateWorldShell(menu, { type: 'toggle-menu' }), { type: 'toggle-make' });
+    expect(make).toMatchObject({ primary: 'make', camera: 'ground' });
+    expect(updateWorldShell(make, { type: 'step-back' })).toEqual(initialWorldShell());
+    expect(updateWorldShell(make, { type: 'toggle-photos' }).primary).toBe('photos');
+  });
+
   it('lets Customize close directly to the world even when opened from the World menu', () => {
     const menu = updateWorldShell(initialWorldShell(), { type: 'toggle-menu' });
     const options = updateWorldShell(menu, { type: 'toggle-options' });

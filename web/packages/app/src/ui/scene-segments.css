@@ -29,7 +29,7 @@
   font: 400 0.8rem/1.5 var(--ui-font-body);
   text-shadow: none;
   pointer-events: auto;
-  z-index: 55;
+  z-index: var(--z-hud);
 }
 
 .scene-segments h2 {

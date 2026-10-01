@@ -16,7 +16,7 @@
   --comparison-differs: #c2423a;
   position: fixed;
   inset: 1rem;
-  z-index: 60;
+  z-index: var(--z-overlay);
   display: grid;
   grid-template-rows: auto 1fr;
   max-width: 84rem;

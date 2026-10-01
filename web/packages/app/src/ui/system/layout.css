@@ -1,0 +1,188 @@
+/*
+ * The layout regions. Each region is a fixed box computed from the size tokens, with its layer
+ * from the one z table, so a surface placed in a region cannot land on another region's pixels.
+ * ui/system/layout.ts creates the regions and is the only code that puts surfaces into them.
+ *
+ * The world area is what is left between the rail and the inspector; the dock, the toast stack
+ * and the heads-up stack centre themselves in it, so they move aside when the inspector opens.
+ */
+#shell {
+  --layout-top: calc(var(--region-gap) + var(--topbar-height) + var(--region-gap));
+  --layout-left: calc(var(--region-gap) + var(--rail-width) + var(--region-gap));
+  --layout-right: var(--region-gap);
+  --layout-bottom: var(--region-gap);
+}
+#shell[data-inspector-open] {
+  --layout-right: calc(var(--region-gap) + var(--inspector-width) + var(--region-gap));
+}
+
+.x-region {
+  position: fixed;
+  box-sizing: border-box;
+  pointer-events: none;
+}
+.x-region > * { pointer-events: auto; }
+.x-region:empty { display: none; }
+
+.x-region[data-region='top-bar'] {
+  z-index: var(--z-chrome);
+  top: var(--region-gap);
+  left: var(--region-gap);
+  right: var(--region-gap);
+  height: var(--topbar-height);
+  display: flex;
+}
+.x-region[data-region='tool-rail'] {
+  z-index: var(--z-chrome);
+  top: var(--layout-top);
+  left: var(--region-gap);
+  width: var(--rail-width);
+  max-height: calc(100dvh - var(--layout-top) - var(--region-gap));
+  display: flex;
+}
+.x-region[data-region='inspector'],
+.x-region[data-region='sheet'] {
+  top: var(--layout-top);
+  right: var(--region-gap);
+  bottom: var(--region-gap);
+  width: var(--inspector-width);
+  display: flex;
+  flex-direction: column;
+}
+.x-region[data-region='inspector'] { z-index: var(--z-panel); }
+.x-region[data-region='sheet'] { z-index: var(--z-sheet); }
+/* While a sheet is open it dims the panel under it and takes the pointer from it. */
+.x-region[data-region='sheet']:has(> :not([hidden])) {
+  border-radius: var(--radius-lg);
+  background: var(--color-scrim);
+  pointer-events: auto;
+}
+/* One surface at a time; the layout manager closes the one before. */
+.x-region[data-region='inspector'] > *,
+.x-region[data-region='sheet'] > * {
+  position: relative;
+  inset: auto;
+  translate: none;
+  width: auto;
+  max-width: none;
+  max-height: 100%;
+  margin: 0;
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+.x-region[data-region='dock'] {
+  z-index: var(--z-dock);
+  left: var(--layout-left);
+  right: var(--layout-right);
+  bottom: var(--layout-bottom);
+  display: flex;
+  justify-content: center;
+}
+.x-region[data-region='dock'] > * { width: min(var(--dock-width), 100%); }
+.x-region[data-region='toast'] {
+  z-index: var(--z-toast);
+  top: calc(var(--layout-top) + var(--space-2));
+  left: var(--layout-left);
+  right: var(--layout-right);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+}
+.x-region[data-region='hud'] {
+  z-index: var(--z-hud);
+  top: var(--layout-top);
+  left: var(--layout-left);
+  max-width: min(420px, calc(100vw - var(--layout-left) - var(--layout-right)));
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+.x-region[data-region='hud'] > * {
+  position: relative;
+  inset: auto;
+  translate: none;
+  margin: 0;
+  width: auto;
+}
+.x-region[data-region='overlay'] {
+  z-index: var(--z-overlay);
+  inset: 0;
+}
+
+/* -- Top bar and tool rail -------------------------------------------------------------------- */
+.x-topbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: 0 var(--space-2) 0 var(--space-3);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--elevation-1);
+}
+.x-topbar-title { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
+.x-topbar-spacer { flex: 1; }
+.x-rail {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-1);
+  width: 100%;
+  padding: var(--space-2) var(--space-1);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--elevation-1);
+  overflow-y: auto;
+}
+.x-rail-item {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  min-height: 56px;
+  padding: var(--space-2) var(--space-1);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: none;
+  color: var(--color-text-muted);
+  font: var(--weight-medium) 11px / 13px var(--font-ui);
+  text-align: center;
+  cursor: pointer;
+}
+.x-rail-item:hover:not(:disabled) { background: var(--color-surface-hover); color: var(--color-text); }
+.x-rail-item[aria-pressed='true'], .x-rail-item[aria-expanded='true'] {
+  background: var(--color-surface-selected);
+  color: var(--color-accent-text);
+}
+.x-rail-item:disabled { color: var(--color-text-disabled); cursor: not-allowed; }
+.x-rail-item:focus-visible { outline: var(--focus-ring-width) solid var(--focus-ring-color); outline-offset: 0; }
+.x-rail-group-label { margin: var(--space-2) 0 0; color: var(--color-text-faint); font: var(--weight-bold) 10px / 12px var(--font-ui); text-align: center; letter-spacing: 0.04em; text-transform: uppercase; }
+
+/* -- Narrow screens: rail to bottom bar, inspector to bottom sheet ---------------------------- */
+@media (max-width: 60rem) {
+  #shell {
+    --layout-top: calc(var(--region-gap) + var(--topbar-height) + var(--region-gap));
+    --layout-left: var(--region-gap);
+    --layout-bottom: calc(var(--bottombar-height) + 2 * var(--region-gap));
+  }
+  #shell[data-inspector-open] { --layout-right: var(--region-gap); }
+  .x-region[data-region='tool-rail'] {
+    top: auto;
+    bottom: var(--region-gap);
+    right: var(--region-gap);
+    width: auto;
+    height: var(--bottombar-height);
+  }
+  .x-rail { flex-direction: row; justify-content: space-around; padding: var(--space-1); overflow-x: auto; overflow-y: hidden; }
+  .x-rail-item { min-width: 56px; min-height: 0; }
+  .x-rail-group-label, .x-rail .x-toolbar-separator { display: none; }
+  .x-region[data-region='inspector'],
+  .x-region[data-region='sheet'] {
+    top: auto;
+    left: var(--region-gap);
+    width: auto;
+    bottom: calc(var(--bottombar-height) + 2 * var(--region-gap));
+    max-height: 70dvh;
+  }
+  #shell[data-inspector-open] .x-region[data-region='dock'] { display: none; }
+}

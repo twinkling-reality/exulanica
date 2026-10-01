@@ -1,0 +1,274 @@
+/*
+ * The interface's design tokens: the one place a colour, space, type size, radius, shadow,
+ * duration or stacking layer is chosen. Components and layout read these roles and never write a
+ * literal of their own (test/ui-system-tokens.test.ts holds that).
+ *
+ * To retune the look, change a value here. The accent is one hue; status colours are kept for
+ * status. Light values come first and are the default, matching the light world the page draws;
+ * data-ui-scheme="dark" on the root element chooses the dark scheme, and "system" follows the
+ * operating system.
+ *
+ * World profiles keep their own roles (--ui-companion-*, --ui-spectrum-*) in
+ * @exulanica/presentation/tokens.css; this file does not replace them.
+ */
+:root {
+  /* Surfaces */
+  --color-surface: rgb(251 251 248 / 0.94);
+  --color-surface-solid: #fbfbf8;
+  --color-surface-raised: #ffffff;
+  --color-surface-sunken: #eef1ef;
+  --color-surface-hover: #1c23260d;
+  --color-surface-pressed: #1c23261a;
+  --color-surface-selected: var(--color-accent-soft);
+  --color-scrim: rgb(17 24 28 / 0.32);
+  --surface-blur: 16px;
+
+  /* Text */
+  --color-text: #1c2326;
+  --color-text-muted: #4a565b;
+  --color-text-faint: #5f6b72;
+  --color-text-disabled: #8a959a;
+  --color-text-on-accent: #ffffff;
+  --color-text-on-status: #ffffff;
+
+  /* Lines */
+  --color-border: #1c232624;
+  --color-border-strong: #1c232647;
+
+  /* The one accent */
+  --color-accent: #0b6b67;
+  --color-accent-hover: #095a57;
+  --color-accent-pressed: #074845;
+  --color-accent-disabled: #9fb9b7;
+  --color-accent-soft: #0b6b6717;
+  --color-accent-text: #0a5f5b;
+
+  /* Status */
+  --color-positive: #2f7a3d;
+  --color-positive-hover: #276633;
+  --color-positive-pressed: #1f5229;
+  --color-positive-disabled: #a9c4ad;
+  --color-positive-soft: #2f7a3d17;
+  --color-positive-text: #276633;
+  --color-caution: #9a5b00;
+  --color-caution-hover: #824d00;
+  --color-caution-pressed: #6b3f00;
+  --color-caution-disabled: #d3bb93;
+  --color-caution-soft: #c97a0a1f;
+  --color-caution-text: #7d4a00;
+  --color-danger: #b3261e;
+  --color-danger-hover: #981f19;
+  --color-danger-pressed: #7e1914;
+  --color-danger-disabled: #dba8a5;
+  --color-danger-soft: #b3261e14;
+  --color-danger-text: #9a201a;
+  --color-info: #2457a6;
+  --color-info-hover: #1e498b;
+  --color-info-pressed: #183b71;
+  --color-info-disabled: #a6b9d8;
+  --color-info-soft: #2457a614;
+  --color-info-text: #1f4d93;
+
+  /* Focus */
+  --focus-ring-color: var(--color-accent);
+  --focus-ring-width: 3px;
+  --focus-ring-offset: 2px;
+
+  /* Space */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* Type */
+  --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+  --font-display: "Avenir Next", "Segoe UI Variable Display", var(--font-ui);
+  --font-mono: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  --text-xs: 12px;
+  --text-xs-line: 16px;
+  --text-sm: 13px;
+  --text-sm-line: 18px;
+  --text-md: 14px;
+  --text-md-line: 20px;
+  --text-lg: 16px;
+  --text-lg-line: 22px;
+  --text-xl: 20px;
+  --text-xl-line: 26px;
+  --text-2xl: 26px;
+  --text-2xl-line: 32px;
+  --weight-regular: 400;
+  --weight-medium: 550;
+  --weight-bold: 650;
+  --weight-display: 300;
+
+  /* Shape */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-full: 999px;
+
+  /* Elevation */
+  --elevation-1: 0 1px 2px #11181c14, 0 1px 1px #11181c0d;
+  --elevation-2: 0 4px 16px #11181c1a, 0 1px 3px #11181c12;
+  --elevation-3: 0 10px 32px #11181c24, 0 2px 6px #11181c14;
+  --elevation-4: 0 18px 56px #11181c33, 0 4px 12px #11181c1a;
+
+  /* Motion: every duration becomes 0ms under reduced motion (below). */
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+  --duration-slow: 320ms;
+  --ease-standard: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+
+  /* Sizes */
+  --control-sm: 28px;
+  --control-md: 36px;
+  --control-lg: 44px;
+  --icon-sm: 16px;
+  --icon-md: 20px;
+  --icon-lg: 24px;
+  --icon-stroke: 1.75;
+  --topbar-height: 56px;
+  --rail-width: 76px;
+  --inspector-width: 384px;
+  --dock-width: 720px;
+  --region-gap: 12px;
+  --bottombar-height: 64px;
+
+  /* Retuning switches for the earlier look (0deg and none keep panels flat and plain). */
+  --panel-tilt: 0deg;
+  --panel-header-fill: none;
+
+  /* The one stacking table. No other z-index value appears in app CSS. */
+  --z-world: 0;
+  --z-shell: 1;
+  --z-vignette: 5;
+  --z-hud: 10;
+  --z-chrome: 20;
+  --z-panel: 30;
+  --z-dock: 40;
+  --z-overlay: 60;
+  --z-sheet: 70;
+  --z-toast: 80;
+  --z-boundary: 95;
+  --z-boot: 100;
+  /* Layers inside one component's own stacking context (a sticky header over its list). */
+  --z-local-0: 0;
+  --z-local-1: 1;
+  --z-local-2: 2;
+  --z-local-3: 3;
+  --z-local-4: 4;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-ui-scheme='system'] {
+    --color-surface: rgb(24 30 33 / 0.92);
+    --color-surface-solid: #181e21;
+    --color-surface-raised: #20282c;
+    --color-surface-sunken: #12171a;
+    --color-surface-hover: #ffffff12;
+    --color-surface-pressed: #ffffff1f;
+    --color-scrim: rgb(0 0 0 / 0.5);
+    --color-text: #eef2f1;
+    --color-text-muted: #b9c4c2;
+    --color-text-faint: #98a5a3;
+    --color-text-disabled: #6e7a79;
+    --color-text-on-accent: #0b1f1e;
+    --color-text-on-status: #0b1214;
+    --color-border: #ffffff24;
+    --color-border-strong: #ffffff42;
+    --color-accent: #5fc6bd;
+    --color-accent-hover: #7ad3cb;
+    --color-accent-pressed: #96ddd6;
+    --color-accent-disabled: #335f5b;
+    --color-accent-soft: #5fc6bd24;
+    --color-accent-text: #7ad3cb;
+    --color-positive: #6fc47d;
+    --color-positive-soft: #6fc47d24;
+    --color-positive-text: #8fd39a;
+    --color-caution: #e6a64a;
+    --color-caution-soft: #e6a64a24;
+    --color-caution-text: #f0bd72;
+    --color-danger: #f08a82;
+    --color-danger-soft: #f08a8224;
+    --color-danger-text: #f5a59f;
+    --color-info: #8fb4ec;
+    --color-info-soft: #8fb4ec24;
+    --color-info-text: #a8c5f1;
+    --elevation-1: 0 1px 2px #00000047;
+    --elevation-2: 0 4px 16px #00000059;
+    --elevation-3: 0 10px 32px #00000066;
+    --elevation-4: 0 18px 56px #00000080;
+  }
+}
+
+:root[data-ui-scheme='dark'] {
+  --color-surface: rgb(24 30 33 / 0.92);
+  --color-surface-solid: #181e21;
+  --color-surface-raised: #20282c;
+  --color-surface-sunken: #12171a;
+  --color-surface-hover: #ffffff12;
+  --color-surface-pressed: #ffffff1f;
+  --color-scrim: rgb(0 0 0 / 0.5);
+  --color-text: #eef2f1;
+  --color-text-muted: #b9c4c2;
+  --color-text-faint: #98a5a3;
+  --color-text-disabled: #6e7a79;
+  --color-text-on-accent: #0b1f1e;
+  --color-text-on-status: #0b1214;
+  --color-border: #ffffff24;
+  --color-border-strong: #ffffff42;
+  --color-accent: #5fc6bd;
+  --color-accent-hover: #7ad3cb;
+  --color-accent-pressed: #96ddd6;
+  --color-accent-disabled: #335f5b;
+  --color-accent-soft: #5fc6bd24;
+  --color-accent-text: #7ad3cb;
+  --color-positive: #6fc47d;
+  --color-positive-soft: #6fc47d24;
+  --color-positive-text: #8fd39a;
+  --color-caution: #e6a64a;
+  --color-caution-soft: #e6a64a24;
+  --color-caution-text: #f0bd72;
+  --color-danger: #f08a82;
+  --color-danger-soft: #f08a8224;
+  --color-danger-text: #f5a59f;
+  --color-info: #8fb4ec;
+  --color-info-soft: #8fb4ec24;
+  --color-info-text: #a8c5f1;
+  --elevation-1: 0 1px 2px #00000047;
+  --elevation-2: 0 4px 16px #00000059;
+  --elevation-3: 0 10px 32px #00000066;
+  --elevation-4: 0 18px 56px #00000080;
+}
+
+/* Reduced transparency and high contrast make surfaces opaque and remove the blur. */
+:root[data-transparency='reduced'],
+:root[data-contrast='high'] {
+  --color-surface: var(--color-surface-solid);
+  --surface-blur: 0px;
+}
+:root[data-contrast='high'] {
+  --color-border: var(--color-text-faint);
+  --color-border-strong: var(--color-text);
+  --color-text-muted: var(--color-text);
+  --color-text-faint: var(--color-text-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-fast: 0ms;
+    --duration-base: 0ms;
+    --duration-slow: 0ms;
+  }
+}
+:root[data-motion='reduced'] {
+  --duration-fast: 0ms;
+  --duration-base: 0ms;
+  --duration-slow: 0ms;
+}

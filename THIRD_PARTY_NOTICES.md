@@ -267,6 +267,7 @@ Read on **2026-08-28** from `web/package.json`, the `web/packages/*/package.json
 | Package | Version | License | Required attribution | Where |
 | --- | --- | --- | --- | --- |
 | `playcanvas` | 2.21.4 | MIT | Copyright (c) 2011-2026 PlayCanvas Ltd. | `@exulanica/atlas-react`, the selected renderer per [docs/adr/0003-renderer-selection.md](docs/adr/0003-renderer-selection.md) |
+| `lucide` | 1.49.0 | ISC; the icons its licence file lists as derived from Feather are MIT | Copyright (c) 2026 Lucide Icons and Contributors. Feather-derived icons: Copyright (c) 2013-present Cole Bemis | `@exulanica/app`, the interface icons, imported only by `web/packages/app/src/ui/system/icon.ts`. **VERIFIED** 2026-10-01 from the package's own `LICENSE` |
 
 **three.js and Spark are gone.** The three.js plus Spark binding (`@exulanica/atlas-three`) and the
 ADR-0003 harness (`@exulanica/bakeoff`) were deleted on 2026-09-16. They were the only packages that

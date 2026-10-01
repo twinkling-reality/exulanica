@@ -40,7 +40,7 @@ body {
   display: block;
   width: 100%;
   height: 100%;
-  z-index: 0;
+  z-index: var(--z-world);
 }
 
 #atlas[hidden] {
@@ -57,7 +57,7 @@ body {
 
 #shell[data-booting] > .startup-thinking {
   display: flex !important;
-  z-index: 100;
+  z-index: var(--z-boot);
   pointer-events: auto;
 }
 
@@ -77,7 +77,7 @@ body {
 #shell {
   position: fixed;
   inset: 0;
-  z-index: 1;
+  z-index: var(--z-shell);
   /* A lid over the canvas would swallow the mousedown that takes pointer lock, and that gesture
    * is the only way into the world: the browser grants the lock from a real user gesture and
    * from nothing else. Chrome opts back in below. */
@@ -88,7 +88,7 @@ body {
 #shell::before {
   content: '';
   position: fixed;
-  z-index: 0;
+  z-index: var(--z-world);
   pointer-events: none;
 }
 
@@ -97,7 +97,7 @@ body {
   content: '';
   position: fixed;
   inset: 0;
-  z-index: 8;
+  z-index: var(--z-vignette);
   pointer-events: none;
   opacity: 0;
   background: radial-gradient(
@@ -1261,7 +1261,7 @@ button.ghost {
   position: fixed;
   left: 50%;
   bottom: 5.25rem;
-  z-index: 12;
+  z-index: var(--z-toast);
   max-width: min(36rem, calc(100vw - 2 * var(--gap)));
   margin: 0;
   padding: 0.42rem 0.7rem;
@@ -1309,7 +1309,7 @@ button.ghost {
   top: clamp(8.5rem, 25vh, 13rem);
   width: min(25rem, calc(100vw - 2 * var(--gap)));
   max-height: calc(100vh - 10rem);
-  z-index: 8;
+  z-index: var(--z-sheet);
   display: flex;
   flex-direction: column;
   gap: 0.7rem;
@@ -1416,7 +1416,7 @@ button.ghost {
   font: 400 0.9rem/1.5 var(--ui-font-body);
   text-shadow: none;
   pointer-events: auto;
-  z-index: 60;
+  z-index: var(--z-hud);
 }
 .reconstruction-availability h2 {
   margin: 0;
@@ -1443,7 +1443,7 @@ button.ghost {
   padding: 0.7rem 1rem;
   background: var(--raised);
   color: var(--ink);
-  z-index: 80;
+  z-index: var(--z-hud);
 }
 
 .reconstruction-inspector {
@@ -1457,7 +1457,7 @@ button.ghost {
   background: var(--raised);
   color: var(--ink);
   border: 1px solid var(--ink-faint);
-  z-index: 70;
+  z-index: var(--z-panel);
   font-size: 0.85rem;
   line-height: 1.5;
   pointer-events: auto;
@@ -1491,7 +1491,7 @@ button.ghost {
   font: 400 0.8rem/1.5 var(--ui-font-body);
   text-shadow: none;
   pointer-events: auto;
-  z-index: 55;
+  z-index: var(--z-hud);
 }
 .proof-lens h2 {
   margin: 0;
@@ -1550,7 +1550,7 @@ button.ghost {
   position: fixed;
   right: var(--gap);
   top: var(--gap);
-  z-index: 10;
+  z-index: var(--z-chrome);
   display: flex;
   gap: 0.5rem;
   padding: 0;
@@ -1629,7 +1629,7 @@ button.ghost {
   position: fixed;
   left: var(--gap);
   top: var(--gap);
-  z-index: 10;
+  z-index: var(--z-hud);
   margin: 0;
   width: min(46rem, calc(100vw - 22rem));
   min-height: 2.85rem;
@@ -1665,7 +1665,7 @@ button.ghost {
 .map-regions {
   position: absolute;
   inset: 0;
-  z-index: 9;
+  z-index: var(--z-hud);
   pointer-events: none;
 }
 
@@ -1712,7 +1712,7 @@ button.ghost {
   position: fixed;
   left: 50%;
   top: 50%;
-  z-index: 20;
+  z-index: var(--z-overlay);
   width: min(42rem, calc(100vw - 2 * var(--gap)));
   max-height: min(46rem, calc(100vh - 2 * var(--gap)));
   overflow-y: auto;
@@ -1896,7 +1896,7 @@ kbd {
   .viewport-boundary {
     position: fixed;
     inset: 0;
-    z-index: 50;
+    z-index: var(--z-boundary);
     display: grid;
     align-content: center;
     justify-items: center;
@@ -1948,7 +1948,7 @@ kbd {
   left: var(--gap);
   bottom: 2.6rem;
   width: min(20rem, calc(100vw - 2 * var(--gap)));
-  z-index: 3;
+  z-index: var(--z-hud);
   padding: 0;
   background: none;
   border: none;
@@ -2469,7 +2469,7 @@ kbd {
   .index-results-head {
     position: sticky;
     top: 0;
-    z-index: 2;
+    z-index: var(--z-local-2);
     display: flex;
     align-items: end;
     justify-content: space-between;
@@ -2551,7 +2551,7 @@ kbd {
     top: calc(var(--gap) + 4.8rem);
     right: var(--gap);
     bottom: var(--gap);
-    z-index: 4;
+    z-index: var(--z-overlay);
     width: min(32vw, 31rem);
     max-height: none;
     padding: 1rem 1.15rem 2rem;
@@ -2566,7 +2566,7 @@ kbd {
   #shell[data-primary='index'] > .detail .detail-close {
     position: sticky;
     top: -1rem;
-    z-index: 2;
+    z-index: var(--z-local-2);
     width: 100%;
     padding: 0.75rem 0;
     background: var(--material-archive);
@@ -2760,7 +2760,7 @@ button.command-action:focus-visible {
   position: fixed;
   right: var(--gap);
   bottom: var(--gap);
-  z-index: 4;
+  z-index: var(--z-hud);
   display: grid;
   gap: 0.4rem;
   width: clamp(7rem, 9.5vw, 9rem);
@@ -2810,7 +2810,7 @@ button.command-action:focus-visible {
 
 /* Nothing pulses or grows while you walk. The wedge moving is the only change worth noticing. */
 
-.reconstruction-inspector-header { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 12px; background: var(--raised); padding-bottom: 10px; }
+.reconstruction-inspector-header { position: sticky; top: 0; z-index: var(--z-local-1); display: flex; align-items: center; justify-content: space-between; gap: 12px; background: var(--raised); padding-bottom: 10px; }
 .reconstruction-inspector-header h2 { margin: 0; }
 
 /* The person review, under the evidence panel in the reconstruction inspector.

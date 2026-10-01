@@ -126,7 +126,7 @@
 .map-caption {
   left: clamp(1rem, 2vw, 1.55rem);
   top: clamp(1rem, 2vw, 1.55rem);
-  z-index: 70;
+  z-index: var(--z-hud);
   width: min(42rem, calc(100vw - 44rem));
   min-height: 2.7rem;
   padding: 0.4rem 0.75rem;
@@ -205,7 +205,7 @@
     inset: auto;
     top: 50%;
     left: 50%;
-    z-index: 30;
+    z-index: var(--z-overlay);
     width: var(--plate-w);
     height: var(--plate-h);
     overflow: hidden;
@@ -318,7 +318,7 @@
   .atlas-instrument.options-view.system-overlay {
     --plate-w: min(52rem, 56vw);
     --plate-h: min(36rem, 74vh);
-    z-index: 40;
+    z-index: var(--z-overlay);
     display: flex;
     flex-direction: column;
     gap: 0;
@@ -328,7 +328,7 @@
   .options-view > .overlay-head {
     position: sticky;
     top: 0;
-    z-index: 2;
+    z-index: var(--z-local-2);
     flex: 0 0 auto;
     padding: 0.7rem 1.15rem 0.6rem;
     background: var(--atlas-plane);
@@ -347,7 +347,7 @@
   .options-view > .overlay-actions {
     position: sticky;
     bottom: 0;
-    z-index: 2;
+    z-index: var(--z-local-2);
     flex: 0 0 auto;
     margin-top: auto;
     padding: 0.6rem 1.15rem;
@@ -366,7 +366,7 @@
   .settings-view.system-overlay {
     --plate-w: min(56rem, 58vw);
     --plate-h: min(36rem, 72vh);
-    z-index: 40;
+    z-index: var(--z-overlay);
     display: grid;
     grid-template-columns: clamp(12rem, 20vw, 16rem) minmax(22rem, 1fr);
     grid-template-rows: 4.2rem minmax(0, 1fr) 3.8rem;

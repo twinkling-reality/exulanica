@@ -11,6 +11,7 @@
     "@exulanica/graph-client": "workspace:*",
     "@exulanica/presentation": "workspace:*",
     "@exulanica/world-index": "workspace:*",
+    "lucide": "1.49.0",
     "thinking-orbs": "0.3.1"
   },
   "devDependencies": {

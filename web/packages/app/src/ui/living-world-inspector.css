@@ -10,13 +10,13 @@
   border-left-color: #417786;
   box-sizing: border-box;
 }
-.environment-selection [hidden] { display: none !important; }
-.environment-selection h2 { font-family: var(--companion-utility-font); font-size: 1rem; }
-.environment-selection p { line-height: 1.5; }
+:is(.environment-selection, .world-panel) [hidden] { display: none !important; }
+:is(.environment-selection, .world-panel) h2 { font-family: var(--companion-utility-font); font-size: 1rem; }
+:is(.environment-selection, .world-panel) p { line-height: 1.5; }
 .environment-selection-source, .environment-selection-reason { color: var(--inspector-muted); }
-.environment-selection details { border-top: 1px solid #c3d1d7; padding-top: .6rem; margin-top: .6rem; }
-.environment-selection summary { cursor: pointer; font-size: .8rem; font-weight: 600; }
-.environment-selection button:focus-visible, .environment-selection summary:focus-visible {
+:is(.environment-selection, .world-panel) details { border-top: 1px solid #c3d1d7; padding-top: .6rem; margin-top: .6rem; }
+:is(.environment-selection, .world-panel) summary { cursor: pointer; font-size: .8rem; font-weight: 600; }
+:is(.environment-selection, .world-panel) button:focus-visible, :is(.environment-selection, .world-panel) summary:focus-visible {
   outline: 2px solid #417786; outline-offset: 3px;
 }
 .environment-selection-city-controls { display: flex; flex-wrap: wrap; gap: .35rem; margin-block: .6rem; }
@@ -26,8 +26,8 @@
 .living-world-inspector dd { margin: 0; overflow-wrap: anywhere; }
 .living-world-inspector .living-world-activity { font-size: .84rem; }
 .living-world-fixture { display: block; font: 600 .7rem/1.5 var(--companion-utility-font); color: #705322; }
-.environment-selection select[aria-label='Inspect nearby inhabitant'] {
+:is(.environment-selection, .world-panel) select[aria-label='Inspect nearby inhabitant'] {
   width: 100%; font-size: .78rem; padding: .45rem; border: 1px solid #c3d1d7;
   background: #f6fafb; color: #213c48; border-radius: .3rem;
 }
-.environment-selection details > button { margin: .3rem .3rem 0 0; }
+:is(.environment-selection, .world-panel) details > button { margin: .3rem .3rem 0 0; }

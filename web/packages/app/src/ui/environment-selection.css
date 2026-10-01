@@ -1,6 +1,6 @@
 .environment-selection {
   position: fixed;
-  z-index: 2;
+  z-index: var(--z-panel);
   left: var(--gap);
   bottom: 2.6rem;
   width: min(24rem, calc(100vw - 2 * var(--gap)));
@@ -13,12 +13,12 @@
   backdrop-filter: blur(var(--blur-system));
 }
 
-.environment-selection h2,
-.environment-selection p {
+:is(.environment-selection, .world-panel) h2,
+:is(.environment-selection, .world-panel) p {
   margin: 0 0 0.45rem;
 }
 
-.environment-selection h2 {
+:is(.environment-selection, .world-panel) h2 {
   font: 600 0.9rem/1.3 var(--companion-utility-font);
 }
 

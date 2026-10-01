@@ -31,7 +31,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-
 
 const STYLE = `
 .society-experiment-result {
-  position: fixed; inset: 1rem; z-index: 60; display: grid; grid-template-rows: auto 1fr;
+  position: fixed; inset: 1rem; z-index: var(--z-overlay); display: grid; grid-template-rows: auto 1fr;
   max-width: 76rem; margin: auto; color: var(--ink, #202a2f);
   background: var(--atlas-plane, #f5f8f7f2); border: 1px solid var(--edge, #c5cfd2);
   box-shadow: var(--app-shadow, 0 8px 32px #24203324); overflow: hidden;

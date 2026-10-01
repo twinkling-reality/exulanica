@@ -95,7 +95,7 @@
 /* Conversation is a caption over the world. Only its controls receive pointer events. */
 #shell .companion-encounter[data-state='open'] {
   position: fixed;
-  z-index: 35;
+  z-index: var(--z-dock);
   right: auto;
   bottom: max(16px, env(safe-area-inset-bottom));
   left: 50%;
@@ -137,7 +137,7 @@
 
 #shell .companion-encounter[data-state='open'] .companion-toolbar {
   position: absolute;
-  z-index: 2;
+  z-index: var(--z-local-2);
   right: 0;
   bottom: 0;
   left: 0;

@@ -48,12 +48,12 @@
 #shell .world-heading h2 { margin: 0; max-width: 18ch; font: 300 21px/1.12 var(--ui-font-display); letter-spacing: -.035em; }
 .world-source-label, #shell .world-heading .living-world-fixture { width: max-content; margin: 0; padding: 2px 6px; border: 1px solid var(--edge); border-radius: 999px; color: var(--ink-soft); background: color-mix(in srgb, var(--surface) 72%, transparent); font: 600 9px/1.35 var(--ui-font-body); letter-spacing: .03em; }
 .world-local-nav { display: none; gap: 4px; width: max-content; padding: 4px; border: 1px solid color-mix(in srgb, var(--edge) 76%, transparent); border-radius: 8px; background: color-mix(in srgb, var(--atlas-plane) 91%, transparent); box-shadow: var(--app-shadow); backdrop-filter: blur(16px); }
-.world-workspace[data-panel] .world-local-nav { position: fixed; display: flex; top: 5vh; right: var(--ui-plane-right); z-index: 14; transform: var(--ui-plane-transform); transform-origin: right center; }
+.world-workspace[data-panel] .world-local-nav { position: fixed; display: flex; top: 5vh; right: var(--ui-plane-right); z-index: var(--z-panel); transform: var(--ui-plane-transform); transform-origin: right center; }
 #shell .world-workspace button { min-height: 34px; padding: 7px 11px; color: var(--ink); background: transparent; border: 1px solid transparent; border-radius: 5px; font-size: 12px; font-weight: 550; }
 #shell .world-workspace button:hover { background: var(--surface); border-color: var(--accent); }
 #shell .world-workspace button[aria-expanded='true'] { color: var(--ink); background: color-mix(in srgb, var(--raised) 72%, transparent); border-color: var(--accent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--raised) 78%, transparent); }
 #shell .world-workspace button:disabled { color: var(--ink-faint); background: var(--surface); opacity: .75; }
-.world-panel { position: fixed; right: var(--ui-plane-right); top: 12vh; z-index: 12; width: min(440px, 42vw); max-height: calc(100dvh - 20vh); overflow-y: auto; overscroll-behavior: contain; box-sizing: border-box; padding: 22px; color: var(--ink); background: var(--atlas-plane); border: 1px solid var(--edge); border-radius: var(--radius-chromatic); box-shadow: var(--app-shadow); transform: var(--ui-plane-transform); transform-origin: right center; --inspector-ink: var(--ink); --inspector-muted: var(--ink-soft); }
+.world-panel { position: fixed; right: var(--ui-plane-right); top: 12vh; z-index: var(--z-panel); width: min(440px, 42vw); max-height: calc(100dvh - 20vh); overflow-y: auto; overscroll-behavior: contain; box-sizing: border-box; padding: 22px; color: var(--ink); background: var(--atlas-plane); border: 1px solid var(--edge); border-radius: var(--radius-chromatic); box-shadow: var(--app-shadow); transform: var(--ui-plane-transform); transform-origin: right center; --inspector-ink: var(--ink); --inspector-muted: var(--ink-soft); }
 #shell .world-panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 22px; }
 #shell .world-panel-heading h2 { margin: 0; color: var(--ink); font: 450 21px/1.2 var(--ui-font-display); letter-spacing: -.025em; }
 #shell .world-panel-close { font-size: 12px; min-height: 34px; padding: 7px 10px; }
@@ -85,7 +85,7 @@
 #shell .index-workspace .index-search-wrap { display: block; width: min(440px, 65%); }
 #shell .index-workspace .rail-search { display: block; height: 42px; border: 1px solid var(--edge); border-radius: 4px; background: var(--raised); padding: 0 14px; font-size: 14px; }
 #shell .index-workspace .index-filters { display: block; position: relative; }
-#shell .index-filter-body { position: absolute; z-index: 20; top: 44px; right: 0; min-width: 270px; max-height: 45vh; overflow: auto; padding: 16px; background: var(--raised); border: 1px solid var(--edge); border-radius: 4px; box-shadow: var(--app-shadow); }
+#shell .index-filter-body { position: absolute; z-index: var(--z-local-4); top: 44px; right: 0; min-width: 270px; max-height: 45vh; overflow: auto; padding: 16px; background: var(--raised); border: 1px solid var(--edge); border-radius: 4px; box-shadow: var(--app-shadow); }
 #shell .index-workspace .index-results { grid-row: 3; padding-inline: 28px; }
 #shell .index-workspace .index-plan { grid-row: 3; }
 #shell .rail-list .index-row { min-height: 62px; border-radius: 4px; }
@@ -173,13 +173,13 @@
   position: fixed; inset: 100px 28px auto auto; width: min(440px, calc(100vw - 56px));
   max-height: calc(100dvh - 180px); overflow-y: auto; box-sizing: border-box;
   padding: 24px; color: var(--ink); background: var(--atlas-plane); border: 1px solid var(--edge);
-  border-radius: 4px; box-shadow: var(--app-shadow); transform: none; z-index: 40;
+  border-radius: 4px; box-shadow: var(--app-shadow); transform: none; z-index: var(--z-panel);
 }
 #shell :is(.reconstruction-inspector, .object-placement, .detail) :is(button, select) { color: var(--ink); background: var(--raised); border: 1px solid var(--edge); border-radius: 4px; min-height: 38px; padding: 9px 12px; font-size: 13px; }
 #shell :is(.reconstruction-inspector, .object-placement, .detail) :is(h1, h2) { font-family: var(--ui-font-display); font-size: 24px; font-weight: 300; letter-spacing: -.03em; }
 #shell :is(.reconstruction-inspector, .object-placement, .detail) p { font-size: 13px; line-height: 1.6; }
 #shell .object-placement-form { gap: 16px; padding-block: 18px; }
-#shell .confirm { position: fixed; inset: 100px 28px auto auto; width: min(480px, calc(100vw - 56px)); max-height: calc(100dvh - 180px); overflow-y: auto; box-sizing: border-box; transform: none; translate: none; padding: 26px; z-index: 90; border: 1px solid var(--edge); border-radius: 4px; background: var(--atlas-plane); color: var(--ink); box-shadow: var(--app-shadow); }
+#shell .confirm { position: fixed; inset: 100px 28px auto auto; width: min(480px, calc(100vw - 56px)); max-height: calc(100dvh - 180px); overflow-y: auto; box-sizing: border-box; transform: none; translate: none; padding: 26px; z-index: var(--z-sheet); border: 1px solid var(--edge); border-radius: 4px; background: var(--atlas-plane); color: var(--ink); box-shadow: var(--app-shadow); }
 #shell .confirm h2 { font: 300 26px/1.2 var(--ui-font-display); }
 #shell .confirm p { font-size: 14px; line-height: 1.6; }
 #shell .confirm button { padding: 11px 18px; min-height: 42px; border-radius: 4px; }
@@ -192,7 +192,7 @@
   position: fixed;
   top: 6vh;
   left: 5vw;
-  z-index: 6;
+  z-index: var(--z-hud);
   width: min(620px, 68vw);
   color: white;
   pointer-events: none;
@@ -235,7 +235,7 @@
   position: fixed;
   top: 24px;
   left: 28px;
-  z-index: 34;
+  z-index: var(--z-chrome);
   display: flex;
   align-items: center;
   gap: 10px;
@@ -266,7 +266,7 @@
   border-bottom-color: white;
   outline: 0;
 }
-#shell .world-identity :is(.world-title-save, .world-open-menu, .world-add-object, .world-add-photos) {
+#shell .world-identity :is(.world-title-save, .world-open-menu, .world-add-object, .world-add-photos):not(.x-btn) {
   flex: none;
   min-height: 28px;
   padding: 4px 8px;
@@ -277,7 +277,7 @@
   font-size: 11px;
   white-space: nowrap;
 }
-#shell .world-identity :is(.world-title-save, .world-open-menu, .world-add-object, .world-add-photos):hover {
+#shell .world-identity :is(.world-title-save, .world-open-menu, .world-add-object, .world-add-photos):not(.x-btn):hover {
   background: #ffffff12;
   border-color: #ffffff70;
 }
@@ -291,7 +291,7 @@
 #shell .photos-drawer {
   position: fixed;
   inset: 24px 28px 24px auto;
-  z-index: 85;
+  z-index: var(--z-overlay);
   display: flex;
   flex-direction: column;
   width: min(560px, calc(100vw - 56px));
@@ -531,7 +531,7 @@
 #shell .options-view > .overlay-head {
   position: sticky;
   top: 0;
-  z-index: 3;
+  z-index: var(--z-local-3);
   align-items: center;
   margin: 0;
   padding: 22px 28px;
@@ -690,7 +690,7 @@
 #shell .world-menu {
   position: fixed;
   inset: 0;
-  z-index: 40;
+  z-index: var(--z-overlay);
   display: grid;
   align-content: center;
   justify-items: end;
@@ -756,9 +756,9 @@
   inset: 0;
   border-radius: inherit;
   pointer-events: none;
-  z-index: 0;
+  z-index: var(--z-local-0);
 }
-#shell .world-menu-entry > * { position: relative; z-index: 1; }
+#shell .world-menu-entry > * { position: relative; z-index: var(--z-local-1); }
 /* Fine grain sits over each color field without a repeated directional pattern. */
 #shell .world-menu-entry::before {
   opacity: clamp(0, calc(var(--grain-opacity) * 1.15), .14);
@@ -830,7 +830,7 @@
   position: fixed;
   top: 50%;
   left: 50%;
-  z-index: 41;
+  z-index: var(--z-overlay);
   display: grid;
   gap: 12px;
   width: min(560px, calc(100vw - 48px));
@@ -973,7 +973,7 @@
   position: fixed;
   left: var(--gap);
   bottom: 1rem;
-  z-index: 30;
+  z-index: var(--z-hud);
   max-width: min(420px, 80vw);
   margin: 0;
   padding: 8px 12px;

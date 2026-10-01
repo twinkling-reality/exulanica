@@ -1,0 +1,283 @@
+/*
+ * The bridge: existing surfaces, seated in the layout regions and dressed in the system's tokens,
+ * while their own modules move onto the components one by one. It loads last.
+ *
+ * Three jobs, each by selector only (no module behaviour changes here):
+ * 1. A surface placed in a region gives up its own fixed position, offsets, transform and layer;
+ *    the region owns those.
+ * 2. Inside a region, the older colour variables (--ink, --edge, --accent ...) are pointed at the
+ *    tokens, so every rule written against them takes the system's colours.
+ * 3. Older button classes map onto the button roles: .primary to primary, .ghost and unclassed
+ *    buttons to secondary.
+ *
+ * When a module is migrated onto components.ts its rules here are deleted. This file only shrinks.
+ */
+
+/* -- 1. Regions own position ------------------------------------------------------------------- */
+#shell .x-region[data-region] > :is(
+  .world-identity, .object-placement, .world-panel, .world-local-nav, .reconstruction-inspector,
+  .confirm, .companion-encounter, .travel-status, .forming, .world-traffic-note,
+  .reconstruction-loading, .scene-segments
+) {
+  position: relative;
+  inset: auto;
+  transform: perspective(1400px) rotateY(var(--panel-tilt));
+  translate: none;
+  z-index: auto;
+  margin: 0;
+  max-width: 100%;
+}
+/* The Companion's own staged-choice placement yields to the sheet region. */
+#shell:has(.companion-encounter[data-confirming]) .x-region[data-region='sheet'] > .confirm:not([hidden]) {
+  position: relative;
+  inset: auto;
+  transform: none;
+  width: auto;
+  max-height: 100%;
+}
+/* Hidden is hidden inside a region, whatever display a class sets (it was scoped to one panel). */
+#shell .x-region [hidden] { display: none !important; }
+
+/* -- 2. Older variables take the tokens inside regions ------------------------------------------ */
+#shell .x-region:not([data-region='dock']) {
+  --ink: var(--color-text);
+  --ink-soft: var(--color-text-muted);
+  --ink-faint: var(--color-text-faint);
+  --edge: var(--color-border);
+  --accent: var(--color-accent);
+  --focus: var(--focus-ring-color);
+  --raised: var(--color-surface-raised);
+  --surface: var(--color-surface-sunken);
+  --atlas-plane: var(--color-surface-solid);
+  --inspector-ink: var(--color-text);
+  --inspector-muted: var(--color-text-muted);
+  --app-shadow: var(--elevation-2);
+  --ui-font-body: var(--font-ui);
+  --ui-font-display: var(--font-ui);
+  --companion-utility-font: var(--font-ui);
+  font-family: var(--font-ui);
+}
+
+/* Panels and sheets: the surface. */
+#shell .x-region[data-region='inspector'] > :is(.object-placement, .world-panel, .reconstruction-inspector),
+#shell .x-region[data-region='sheet'] > .confirm {
+  box-sizing: border-box;
+  width: auto;
+  max-height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--space-5);
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--elevation-2);
+  backdrop-filter: blur(var(--surface-blur)) saturate(1.1);
+  font: var(--weight-regular) var(--text-md) / var(--text-md-line) var(--font-ui);
+}
+#shell .x-region[data-region='sheet'] > .confirm { box-shadow: var(--elevation-4); }
+#shell .x-region[data-region='inspector'] > .world-local-nav {
+  display: none;
+  flex: none;
+  align-self: flex-start;
+  gap: var(--space-1);
+  margin-bottom: var(--space-2);
+  padding: var(--space-1);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--elevation-1);
+  backdrop-filter: blur(var(--surface-blur));
+}
+#shell:has(.world-workspace[data-panel]) .x-region[data-region='inspector'] > .world-local-nav { display: flex; }
+#shell .x-region .world-local-nav button {
+  min-height: var(--control-sm);
+  padding: 0 var(--space-3);
+  color: var(--color-text-muted);
+  background: none;
+  border: 0;
+  border-radius: var(--radius-sm);
+  font: var(--weight-medium) var(--text-sm) / 1 var(--font-ui);
+}
+#shell .x-region .world-local-nav button[aria-expanded='true'] {
+  color: var(--color-accent-text);
+  background: var(--color-surface-selected);
+}
+
+/* Headings inside panels: one size and weight. */
+#shell .x-region :is(.object-placement, .world-panel, .reconstruction-inspector) > :is(h1, h2, header h2),
+#shell .x-region .world-panel-heading h2,
+#shell .x-region .confirm h2 {
+  margin: 0 0 var(--space-3);
+  color: var(--color-text);
+  font: var(--weight-bold) var(--text-xl) / var(--text-xl-line) var(--font-ui);
+  letter-spacing: 0;
+}
+#shell .x-region .world-panel-heading {
+  margin: calc(-1 * var(--space-5)) calc(-1 * var(--space-5)) var(--space-4);
+  padding: var(--space-3) var(--space-3) var(--space-3) var(--space-5);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--panel-header-fill);
+}
+#shell .x-region .world-panel-heading h2 { margin: 0; font-size: var(--text-lg); line-height: var(--text-lg-line); }
+#shell .x-region :is(.object-placement, .world-panel, .reconstruction-inspector, .confirm) :is(p, li) {
+  font-size: var(--text-md);
+  line-height: var(--text-md-line);
+}
+#shell .x-region :is(.object-placement, .world-panel, .reconstruction-inspector) h3 {
+  margin: var(--space-4) 0 var(--space-2);
+  color: var(--color-text-muted);
+  font: var(--weight-bold) var(--text-xs) / var(--text-xs-line) var(--font-ui);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+#shell .x-region :is(.object-placement, .world-panel, .reconstruction-inspector, .confirm) :is(label, legend) {
+  color: var(--color-text);
+  font-size: var(--text-sm);
+}
+#shell .x-region :is(.object-placement, .world-panel, .reconstruction-inspector, .confirm) :is(select, input[type='text'], input[type='search'], input[type='number'], textarea) {
+  box-sizing: border-box;
+  min-height: var(--control-md);
+  padding: 0 var(--space-3);
+  color: var(--color-text);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  font: var(--weight-regular) var(--text-md) / var(--text-md-line) var(--font-ui);
+}
+#shell .x-region :is(input[type='checkbox'], input[type='radio'], input[type='range']) { accent-color: var(--color-accent); }
+#shell .x-region details > summary { color: var(--color-text); font: var(--weight-medium) var(--text-sm) / var(--text-sm-line) var(--font-ui); }
+
+/* -- 3. Older button classes take the button roles ---------------------------------------------- */
+#shell .x-region:not([data-region='dock']) button:not(.x-btn, .x-rail-item, .x-tab, .object-placement-choose, .scene-segment-select) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  box-sizing: border-box;
+  min-height: var(--control-md);
+  padding: 0 var(--space-4);
+  color: var(--color-text);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  box-shadow: none;
+  font: var(--weight-medium) var(--text-md) / var(--text-md-line) var(--font-ui);
+  letter-spacing: 0;
+  text-transform: none;
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-standard);
+}
+#shell .x-region:not([data-region='dock']) button:not(.x-btn, .x-rail-item, .x-tab, .object-placement-choose, .scene-segment-select):hover:not(:disabled) {
+  background: var(--color-surface-sunken);
+}
+#shell .x-region:not([data-region='dock']) button:not(.x-btn, .x-rail-item, .x-tab, .object-placement-choose, .scene-segment-select):disabled {
+  color: var(--color-text-disabled);
+  background: var(--color-surface-sunken);
+  border-color: var(--color-border);
+  cursor: not-allowed;
+  opacity: 1;
+}
+#shell .x-region:not([data-region='dock']) button.primary:not(.x-btn) {
+  color: var(--color-text-on-accent);
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+}
+#shell .x-region:not([data-region='dock']) button.primary:not(.x-btn):hover:not(:disabled) { background: var(--color-accent-hover); }
+#shell .x-region:not([data-region='dock']) button.primary:not(.x-btn):active:not(:disabled) { background: var(--color-accent-pressed); }
+#shell .x-region:not([data-region='dock']) button.primary:not(.x-btn):disabled {
+  color: var(--color-text-on-accent);
+  background: var(--color-accent-disabled);
+  border-color: var(--color-accent-disabled);
+}
+#shell .x-region:not([data-region='dock']) button:is(.object-placement-remove):not(:disabled) { color: var(--color-danger-text); }
+#shell .x-region:not([data-region='dock']) button:is([aria-pressed='true'], [aria-expanded='true']):not(.x-btn, .x-rail-item, .x-tab, .object-placement-choose, .scene-segment-select) {
+  color: var(--color-accent-text);
+  background: var(--color-surface-selected);
+  border-color: var(--color-accent);
+}
+#shell .x-region:not([data-region='dock']) button:focus-visible,
+#shell .x-region :is(select, input, textarea, summary):focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+/* A panel's own close control reads as a quiet action in its header. */
+#shell .x-region .world-panel-close:not(.x-btn) {
+  min-height: var(--control-sm);
+  padding: 0 var(--space-3);
+  color: var(--color-accent-text);
+  background: none;
+  border-color: transparent;
+}
+
+/* -- The top bar ----------------------------------------------------------------------------------- */
+#shell .x-region[data-region='top-bar'] > .world-identity {
+  flex: 1;
+  height: 100%;
+  max-width: none;
+  gap: var(--space-2);
+  padding: 0 var(--space-2) 0 var(--space-3);
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--elevation-1);
+  backdrop-filter: blur(var(--surface-blur)) saturate(1.1);
+}
+#shell .x-region[data-region='top-bar'] .world-title-form input {
+  width: clamp(140px, 24vw, 320px);
+  color: var(--color-text);
+  font: var(--weight-bold) var(--text-lg) / var(--text-lg-line) var(--font-ui);
+}
+#shell .x-region[data-region='top-bar'] .world-title-form input:hover { border-bottom-color: var(--color-border-strong); }
+#shell .x-region[data-region='top-bar'] .world-title-form input:focus-visible { border-bottom-color: var(--color-accent); }
+#shell .x-region[data-region='top-bar'] .world-title-status { color: var(--color-text-muted); font-size: var(--text-xs); }
+#shell .x-region[data-region='top-bar'] .world-identity :is(.world-title-save, .world-open-menu, .world-add-object, .world-add-photos):not(.x-btn) {
+  min-height: var(--control-md);
+  padding: 0 var(--space-3);
+  color: var(--color-text);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  font: var(--weight-medium) var(--text-md) / 1 var(--font-ui);
+}
+
+/* -- Toasts ------------------------------------------------------------------------------------------ */
+#shell .x-region[data-region='toast'] > .travel-status {
+  left: auto;
+  bottom: auto;
+  max-width: min(480px, 100%);
+  padding: var(--space-3) var(--space-4);
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--elevation-3);
+  backdrop-filter: blur(var(--surface-blur));
+  font: var(--weight-medium) var(--text-md) / var(--text-md-line) var(--font-ui);
+}
+#shell .x-region[data-region='toast'] > .travel-status[data-kind='failure'] {
+  border-color: var(--color-danger);
+  box-shadow: inset 4px 0 0 var(--color-danger), var(--elevation-3);
+}
+
+/* -- The heads-up stack ---------------------------------------------------------------------------------- */
+#shell .x-region[data-region='hud'] > :is(.forming, .world-traffic-note, .reconstruction-loading) {
+  left: auto;
+  right: auto;
+  bottom: auto;
+  width: auto;
+  padding: var(--space-2) var(--space-3);
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--elevation-1);
+  backdrop-filter: blur(var(--surface-blur));
+  font: var(--weight-regular) var(--text-sm) / var(--text-sm-line) var(--font-ui);
+}
+#shell .x-region[data-region='hud'] > .scene-segments {
+  left: auto;
+  bottom: auto;
+  width: min(22rem, 100%);
+}

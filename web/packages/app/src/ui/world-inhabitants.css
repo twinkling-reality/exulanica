@@ -2,7 +2,7 @@
  * The inhabitants of a saved world. The workspace draws its own buttons as text; the requests
  * this section makes are drawn as buttons, as the object panel draws its own.
  */
-#shell .world-workspace :is(.world-inhabitants, .world-inhabitants-action) button {
+#shell :is(.world-workspace, .world-panel) :is(.world-inhabitants, .world-inhabitants-action) button {
   color: var(--ink);
   background: var(--raised);
   border: 1px solid var(--edge);
@@ -12,10 +12,10 @@
   font-size: 13px;
   font-weight: 550;
 }
-#shell .world-workspace :is(.world-inhabitants, .world-inhabitants-action) button:hover:not(:disabled) {
+#shell :is(.world-workspace, .world-panel) :is(.world-inhabitants, .world-inhabitants-action) button:hover:not(:disabled) {
   border-color: var(--accent);
 }
-#shell .world-workspace :is(.world-inhabitants, .world-inhabitants-action) button:disabled {
+#shell :is(.world-workspace, .world-panel) :is(.world-inhabitants, .world-inhabitants-action) button:disabled {
   color: var(--ink-faint);
   background: var(--surface);
   opacity: .75;

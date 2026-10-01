@@ -1,6 +1,7 @@
 import type { SavedWorldEntry } from '../world-entry-api.js';
 import { say } from './copy.js';
 import { el } from './dom.js';
+import { button } from './system/components.js';
 
 export interface WorldIdentity {
   readonly root: HTMLElement;
@@ -29,21 +30,23 @@ export function buildWorldIdentity(deps: {
     class: 'world-title-status', role: 'status', 'aria-live': 'polite',
   });
   const form = el('form', { class: 'world-title-form' }, [title, save, status]);
-  const photos = el('button', {
-    type: 'button', class: 'world-add-photos', text: say('worldControls.addPhotos'),
+  const photos = button({
+    label: say('worldControls.addPhotos'), icon: 'photos', variant: 'quiet', className: 'world-add-photos',
   });
-  const addObject = el('button', {
-    type: 'button', class: 'world-add-object', text: say('worldControls.addObject'),
+  const addObject = button({
+    label: say('worldControls.addObject'), icon: 'object', variant: 'quiet', className: 'world-add-object',
   });
-  const world = el('button', {
-    type: 'button', class: 'world-open-menu', text: say('worldControls.world'),
-    'aria-label': say('worldControls.openWorld'),
+  const world = button({
+    label: say('worldControls.world'), icon: 'menu', variant: 'quiet', shortcut: 'H',
+    className: 'world-open-menu',
   });
+  world.setAttribute('aria-label', say('worldControls.openWorld'));
   const root = el('aside', { class: 'world-identity', 'aria-label': say('worldControls.label') }, [
     form,
-    world,
+    el('span', { class: 'x-topbar-spacer' }),
     addObject,
     photos,
+    world,
   ]);
 
   const close = el('button', {

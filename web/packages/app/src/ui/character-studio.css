@@ -1,6 +1,6 @@
 /* The character editor uses the shared reading plane, with room around the live model. */
 #shell .character-studio {
-  position: fixed; inset: 6vh var(--ui-plane-right) 7vh auto; width: min(1120px, 90vw); z-index: 35; pointer-events: auto;
+  position: fixed; inset: 6vh var(--ui-plane-right) 7vh auto; width: min(1120px, 90vw); z-index: var(--z-overlay); pointer-events: auto;
   color: var(--ink); background: var(--atlas-plane); overflow: hidden;
   border: 1px solid var(--edge); border-radius: var(--radius-chromatic); box-shadow: var(--app-shadow);
   transform: var(--ui-plane-transform); transform-origin: right center;
@@ -13,7 +13,7 @@
 #shell .character-stage:active { cursor: grabbing; }
 #shell .character-studio[data-fitting='true'] .character-stage { opacity: .72; filter: saturate(.65); transition: opacity 180ms ease, filter 180ms ease; }
 #shell .character-fitting {
-  position: absolute; z-index: 2; left: 50%; bottom: 96px; transform: translateX(-50%);
+  position: absolute; z-index: var(--z-local-2); left: 50%; bottom: 96px; transform: translateX(-50%);
   width: min(320px, 34vw); box-sizing: border-box; display: grid; grid-template-columns: 28px 1fr;
   gap: 3px 12px; padding: 13px 16px 15px; overflow: hidden; pointer-events: none;
   color: #26343a; background: #f4f7f5d9; border: 1px solid #bdc9cc;
@@ -35,14 +35,14 @@
 #shell .character-fitting-copy small { color: #5a696f; font-size: 11px; line-height: 1.4; }
 @keyframes character-fitting-line { 0% { left: -35%; } 65%, 100% { left: 100%; } }
 @keyframes character-fitting-pulse { 0%, 100% { opacity: .55; transform: scale(.88); } 50% { opacity: 1; transform: scale(1); } }
-#shell .character-header { position: absolute; top: 0; left: 0; right: 0; z-index: 2; min-height: 104px; box-sizing: border-box; padding: 20px 3%; display: flex; justify-content: space-between; align-items: center; pointer-events: none; }
+#shell .character-header { position: absolute; top: 0; left: 0; right: 0; z-index: var(--z-local-2); min-height: 104px; box-sizing: border-box; padding: 20px 3%; display: flex; justify-content: space-between; align-items: center; pointer-events: none; }
 #shell .character-header > * { pointer-events: auto; }
 #shell .character-eyebrow { margin: 0 0 8px; color: #56666c; font-size: 11px; font-weight: 500; letter-spacing: .08em; text-transform: uppercase; }
 #shell .character-header h1 { margin: 0; font: var(--ui-plane-title); letter-spacing: var(--ui-plane-title-tracking); }
 #shell .character-studio button { min-height: 40px; padding: 10px 14px; border: 1px solid transparent; background: transparent; color: inherit; font: 500 14px/1.3 var(--ui-font-body); border-radius: 3px; }
 #shell .character-studio button:hover { background: #ffffff66; border-color: #aebdc1; }
 #shell .character-studio button:disabled { opacity: .5; }
-#shell .character-sidebar { position: absolute; top: 125px; bottom: 82px; left: 3%; z-index: 1; width: min(300px, 28%); display: flex; flex-direction: column; gap: 22px; }
+#shell .character-sidebar { position: absolute; top: 125px; bottom: 82px; left: 3%; z-index: var(--z-local-1); width: min(300px, 28%); display: flex; flex-direction: column; gap: 22px; }
 #shell .character-tabs { display: flex; gap: 8px; border-bottom: 1px solid #b9c4c7; }
 #shell .character-tabs button { padding: 8px 6px 14px; border: 0; border-radius: 0; font-size: 13px; }
 #shell .character-tabs button[aria-pressed='true'] { box-shadow: 0 2px 0 #40545d; color: #263940; }
@@ -51,7 +51,7 @@
 #shell .character-look-list button { text-align: left; font: 400 26px/1.2 var(--ui-font-display); letter-spacing: -.03em; padding: 16px 10px; border-radius: 0; }
 #shell .character-look-list button[aria-pressed='true'] { background: #ffffff70; color: #263940; box-shadow: inset 0 0 0 1px #9faeb3; }
 /* Bounded above the preview controls like the sidebar; a long saved-looks list scrolls. */
-#shell .character-description { position: absolute; top: 145px; right: 3%; bottom: 82px; z-index: 1; width: min(250px, 23%); overflow-y: auto; }
+#shell .character-description { position: absolute; top: 145px; right: 3%; bottom: 82px; z-index: var(--z-local-1); width: min(250px, 23%); overflow-y: auto; }
 #shell .character-description h2 { margin: 0 0 12px; font: 400 32px/1.2 var(--ui-font-display); letter-spacing: -.03em; }
 #shell .character-description > p { line-height: 1.6; }
 #shell .character-description .character-status { min-height: 42px; margin-block: 28px 20px; padding-top: 20px; border-top: 1px solid #b9c4c7; font-size: 13px; }
@@ -61,10 +61,10 @@
 #shell .character-source { font-size: 11px; color: #56666c; }
 #shell .character-gesture-setting { display: flex; align-items: center; gap: 9px; margin-top: 20px; font-size: 13px; }
 #shell .character-gesture-setting input { accent-color: #40545d; }
-#shell .first-person-gesture { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 9; }
+#shell .first-person-gesture { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: var(--z-hud); }
 #shell .first-person-gesture[hidden] { display: none; }
 :root[data-transparency='reduced'] #shell .first-person-gesture { background: transparent; }
-#shell .character-preview-controls { position: absolute; bottom: 16px; left: 50%; z-index: 1; transform: translateX(-50%); width: min(360px, 34%); display: grid; grid-template-columns: 1fr 1fr; gap: 8px 20px; }
+#shell .character-preview-controls { position: absolute; bottom: 16px; left: 50%; z-index: var(--z-local-1); transform: translateX(-50%); width: min(360px, 34%); display: grid; grid-template-columns: 1fr 1fr; gap: 8px 20px; }
 #shell .character-preview-controls label { display: flex; align-items: center; gap: 10px; font-size: 12px; }
 #shell .character-preview-controls input { min-width: 0; width: 100%; accent-color: #40545d; }
 #shell .character-preview-controls > span { grid-column: 1 / -1; text-align: center; color: #56666c; font-size: 11px; }

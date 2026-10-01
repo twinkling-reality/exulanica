@@ -71,6 +71,7 @@ import {
   worldOpeningReason,
 } from './ui/startup-state.js';
 import { el, replace } from './ui/dom.js';
+import { createLayout, type Layout } from './ui/system/layout.js';
 import { createFirstUseGuidance, type FirstUseMode } from './ui/first-use-guidance.js';
 import { buildWorldIndex } from './ui/world-index.js';
 import { MapPeek } from './ui/map-peek.js';
@@ -316,10 +317,10 @@ shell.addEventListener(GENERATED_WORLD_READY_EVENT, (event) => {
  * from one is opened the way a chosen saved world is: its entry becomes the active one and the
  * world is mounted afresh.
  */
-function showWorldRecipes(): void {
+function showWorldRecipes(onClose: () => void): HTMLElement | null {
   const client = state.worldEntries;
   const credentials = state.credentials;
-  if (client === null || credentials === null) return;
+  if (client === null || credentials === null) return null;
   shell.querySelector('.world-recipes')?.remove();
   const specification = new WorldSpecificationClient(credentials);
   const panel = buildWorldRecipes({
@@ -333,10 +334,16 @@ function showWorldRecipes(): void {
       shell.removeAttribute('data-world-state');
       await mount();
     },
-    onClose: () => panel.root.remove(),
+    onClose,
   });
+  // A dialog over the world, opened and closed through the shell state like the other major
+  // surfaces, so it cannot stay open under the next one and Escape takes it back.
+  panel.root.setAttribute('aria-modal', 'true');
   shell.append(panel.root);
   attachWorldDescription(panel, { credentials, specification: () => specification.specification() });
+  window.setTimeout(() => panel.root.querySelector<HTMLElement>('button, select, input, textarea')
+    ?.focus({ preventScroll: true }));
+  return panel.root;
 }
 
 /** Show the list. Only `mountNoWorld` calls this, and only when there is a choice to make. */
@@ -390,6 +397,9 @@ function activeEntryWriteBinding(): SavedEntryWriteBinding {
  * `mount` sets this; between mounts there is nothing drawn to redraw.
  */
 let afterEntryAdvanced = (): void => undefined;
+
+/** The layout of the mounted world; replaced on every mount, with the surfaces it places. */
+let layout: Layout | null = null;
 
 async function recordAuthoredEntryAdvance(
   version: AlternateVersion,
@@ -550,6 +560,7 @@ async function mount(): Promise<void> {
   const stage = el('div', { class: 'stage' });
 
   let shellState = initialWorldShell();
+  let makeWorld: HTMLElement | null = null;
   const returnFocus: Array<HTMLElement | null> = [];
   let reflectShell = (): void => undefined;
   const dispatchShell = (event: WorldShellEvent): void => {
@@ -674,7 +685,7 @@ async function mount(): Promise<void> {
       shellState.primary === 'menu' || shellState.primary === 'options' ||
       shellState.primary === 'controls' || shellState.primary === 'character' ||
       shellState.primary === 'experiment' || shellState.primary === 'compare' ||
-      shellState.primary === 'photos',
+      shellState.primary === 'photos' || shellState.primary === 'make',
     onFirstUseAction: (action) => {
       const { activate } = action;
       if (activate === 'summon-companion') runFirstUseAction();
@@ -987,7 +998,7 @@ async function mount(): Promise<void> {
     ...(state.worldEntries === null ? {} : {
       onMakeWorld: () => {
         dispatchShell({ type: 'toggle-menu' });
-        showWorldRecipes();
+        dispatchShell({ type: 'toggle-make' });
       },
     }),
     onCommand: handleAtlasCommand,
@@ -1075,33 +1086,48 @@ async function mount(): Promise<void> {
     showWorld: () => dispatchShell({ type: 'show-world' }),
     showTravelStatus,
   });
+  // Surfaces that live in a region are placed by the layout below; the rest keep their own place
+  // until they move onto the system (ui/system/layout.ts).
+  layout?.dispose();
+  layout = createLayout(shell);
   replace(shell, [
     stage,
     chrome.reticle,
-    ...(worldIdentity === null ? [] : [worldIdentity.root, worldIdentity.photosDrawer]),
+    ...(worldIdentity === null ? [] : [worldIdentity.photosDrawer]),
     worldIndex.root,
     detail.root,
-    formation.root,
-    companion.panel.root,
-    writePath.confirm.root,
-    objects.panel.root,
-    objects.confirm.root,
     environmentSelection.root,
     worldMenu.root,
     ...(societyExperiment === null ? [] : [societyExperiment.root]),
     ...(societyComparison === null ? [] : [societyComparison.root]),
     mapCaption,
-    travelStatus,
     minimap.root,
     appearance.options.root,
     appearance.settings.root,
     character.root,
     character.gestureRoot,
     viewportBoundary,
-    status.inspectorRoot,
-    ...(segments === null ? [] : [segments.root]),
+    ...Object.values(layout.regions),
     retainedLoading,
   ]);
+  if (worldIdentity !== null) layout.place('top-bar', worldIdentity.root);
+  const closeWorldPanels = (): void => environmentSelection.closePanels();
+  const worldNav = environmentSelection.root.querySelector<HTMLElement>(':scope > .world-local-nav');
+  if (worldNav !== null) layout.place('inspector', worldNav, { attachment: true });
+  for (const worldPanel of environmentSelection.root.querySelectorAll<HTMLElement>(':scope > .world-panel')) {
+    layout.place('inspector', worldPanel, { close: closeWorldPanels });
+  }
+  layout.place('inspector', objects.panel.root, { close: () => objects.close() });
+  layout.place('inspector', status.inspectorRoot, {
+    close: () => { state.atlas?.binding.endSceneInspection(); status.hideInspector(); },
+  });
+  layout.place('sheet', writePath.confirm.root, { close: () => writePath.confirm.hide() });
+  layout.place('sheet', objects.confirm.root, { close: () => objects.confirm.hide() });
+  layout.place('dock', companion.panel.root);
+  layout.place('toast', travelStatus);
+  layout.place('hud', formation.root);
+  if (segments !== null) layout.place('hud', segments.root);
+  layout.adopt('.world-traffic-note, .reconstruction-loading', 'hud');
   void intake.begin();
 
   reflectShell = (): void => {
@@ -1122,10 +1148,18 @@ async function mount(): Promise<void> {
     societyExperiment?.setVisible(shellState.primary === 'experiment');
     societyComparison?.setVisible(shellState.primary === 'compare');
     worldIdentity?.setPhotosVisible(shellState.primary === 'photos');
+    if (shellState.primary === 'make') {
+      if (makeWorld === null || !makeWorld.isConnected) {
+        makeWorld = showWorldRecipes(() => dispatchShell({ type: 'step-back' }));
+      }
+    } else if (makeWorld !== null) {
+      makeWorld.remove();
+      makeWorld = null;
+    }
     const systemSurfaceOpen = shellState.primary === 'menu' || shellState.primary === 'options' ||
       shellState.primary === 'controls' || shellState.primary === 'character' ||
       shellState.primary === 'experiment' || shellState.primary === 'compare' ||
-      shellState.primary === 'photos';
+      shellState.primary === 'photos' || shellState.primary === 'make';
     const modalBackground = [
       stage,
       worldIndex.root,

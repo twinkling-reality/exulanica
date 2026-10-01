@@ -9,7 +9,7 @@
 
 export type PrimarySurface =
   | 'world' | 'menu' | 'index' | 'options' | 'controls' | 'character' | 'experiment' | 'compare'
-  | 'photos';
+  | 'photos' | 'make';
 export type CameraPresentation = 'ground' | 'map';
 
 export interface WorldSurfaceContext {
@@ -34,6 +34,7 @@ export type WorldShellEvent =
   | { readonly type: 'toggle-experiment' }
   | { readonly type: 'toggle-compare' }
   | { readonly type: 'toggle-photos' }
+  | { readonly type: 'toggle-make' }
   | { readonly type: 'show-index' }
   | { readonly type: 'show-world' }
   | { readonly type: 'show-detail'; readonly id: string }
@@ -107,6 +108,10 @@ export function updateWorldShell(
       return state.primary === 'photos'
         ? restoreSurface(state)
         : openTemporarySurface(state, { primary: 'photos', camera: 'ground', detailId: null });
+    case 'toggle-make':
+      return state.primary === 'make'
+        ? restoreSurface(state)
+        : openTemporarySurface(state, { primary: 'make', camera: 'ground', detailId: null });
     case 'show-world':
       return initialWorldShell();
     case 'show-index':

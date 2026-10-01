@@ -2,7 +2,7 @@
  * Who decides for the people of a saved world, beside the inhabitants panel: its buttons and
  * headings as that panel draws its own, and the choice laid out.
  */
-#shell .world-workspace .society-models button {
+#shell :is(.world-workspace, .world-panel) .society-models button {
   color: var(--ink);
   background: var(--raised);
   border: 1px solid var(--edge);
@@ -13,8 +13,8 @@
   font-size: 13px;
   font-weight: 550;
 }
-#shell .world-workspace .society-models button:hover:not(:disabled) { border-color: var(--accent); }
-#shell .world-workspace .society-models button:disabled {
+#shell :is(.world-workspace, .world-panel) .society-models button:hover:not(:disabled) { border-color: var(--accent); }
+#shell :is(.world-workspace, .world-panel) .society-models button:disabled {
   color: var(--ink-faint);
   background: var(--surface);
   opacity: .75;

@@ -14,6 +14,7 @@
  */
 
 import '@exulanica/presentation/tokens.css';
+import './ui/system/tokens.css';
 import './style.css';
 import './appearance.css';
 import './unified-interface.css';
@@ -23,6 +24,9 @@ import './ui/scene-segments.css';
 import './ui/redesign.css';
 import './ui/character-studio.css';
 import './ui/companion-layout.css';
+import './ui/system/components.css';
+import './ui/system/layout.css';
+import './ui/system/bridge.css';
 
 window.addEventListener('beforeunload', () => {
   document.documentElement.setAttribute('data-reloading', '');
