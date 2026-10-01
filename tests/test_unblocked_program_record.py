@@ -13,6 +13,18 @@ from exulanica.ingest.stages import STAGES
 ROOT = Path(__file__).resolve().parents[1]
 PROGRAM = ROOT / "docs/evaluation/2026-09-05-unblocked-backend-program.json"
 
+#: Tests a recorded decision names that a later change retired with the behaviour they pinned, each
+#: with the test that pins the behaviour that replaced it and the document that states the change.
+#: The retained records keep their words; this table is where the program says which no longer hold.
+SUPERSEDED = {
+    "tests/test_restore_replay.py::"
+    "test_shared_live_bytes_leave_restore_refusing_and_foreign_capture_intact": (
+        "tests/test_restore_replay.py::"
+        "test_shared_live_bytes_leave_the_tombstone_open_and_foreign_capture_intact",
+        "docs/adr/0019-offline-restore-tombstone-replay.md",
+    ),
+}
+
 
 def _read(path):
     envelope = json.loads(path.read_bytes())
@@ -44,7 +56,7 @@ def test_program_goals_are_complete_bound_records_with_checkable_decisions():
                 "deletion_paths", "browser_consumers",
             }
             for test in decision["tests"]:
-                path, _, node = test.partition("::")
+                path, _, node = SUPERSEDED.get(test, (test,))[0].partition("::")
                 assert (ROOT / path).is_file()
                 if node:
                     assert node.split("[", 1)[0] in (ROOT / path).read_text()
@@ -53,6 +65,23 @@ def test_program_goals_are_complete_bound_records_with_checkable_decisions():
         assert hashlib.sha256((ROOT / path).read_bytes()).hexdigest() == expected
     assert len(program["frozen_migrations"]) == 35
     assert {item["id"] for item in program["still_open"]} >= {"P-1", "A-8", "OGC-1"}
+
+
+def test_a_superseded_test_is_one_the_records_name_and_is_gone_from_its_file():
+    """The table cannot hide a test that still exists or excuse one no record names: each retired
+    test is named by a goal record and absent from its file, and its successor and the document
+    stating the change exist."""
+    named = set()
+    for goal in _read(PROGRAM)["record"]["goal_records"]:
+        for decision in _read(ROOT / goal["path"])["record"]["decisions"]:
+            named.update(decision["tests"])
+    for retired, (successor, stated) in SUPERSEDED.items():
+        assert retired in named, retired
+        path, _, node = retired.partition("::")
+        assert node not in (ROOT / path).read_text(), retired
+        path, _, node = successor.partition("::")
+        assert f"def {node}(" in (ROOT / path).read_text(), successor
+        assert (ROOT / stated).is_file(), stated
 
 
 def test_program_measurements_do_not_outgrow_their_observed_scope():

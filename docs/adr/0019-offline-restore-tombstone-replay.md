@@ -37,9 +37,14 @@ a fresh complete checkpoint before a later restore. This mechanism cannot recove
 lost before any current independent checkpoint was retained.
 
 Physical deletion may be correctly deferred when a live capture in this or another workspace
-holds the same content. This version **refuses restore completion** in that case. It never widens
-the purger's authority to make a restore pass. Supporting completion with verified shared-content
-holdbacks is deferred; the refusal and the preserved foreign bytes are tested.
+holds the same content. A replay then completes with that tombstone left open and its jobs queued
+for the ordinary purger, exactly as in normal operation, keeps those bytes, and names the tombstone
+and its held targets in the restore's result (deployment.md 9.4). It never widens the purger's
+authority to make a restore pass: a target counts as held only when its job was skipped for that
+reason and the purge question still answers that a live record holds it, and a failed, blocked or
+exhausted purge still refuses. Refusing completion in that case, this protocol's first behaviour,
+is rejected: a live sharer is an ordinary state, so the refusal blocked every recovery that met
+one. The kept bytes and the intact foreign capture are tested.
 
 The existing interval-withdrawal limits remain: replay reproduces its tombstone and serving
 refusals, and does not invent video repair or broader erasure semantics. Source and evidence stub

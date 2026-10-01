@@ -1297,7 +1297,10 @@ checkpoint or export it replays names it as a purge target, and refuses any othe
 verification, restore and the backup-copy purge take every namespace from the store registry, so a
 namespace registered later needs no change here; the live purge reaches the namespaces the purge
 worker is built over (`PurgeWorker.over`), and a stored kind it cannot reach leaves its tombstone
-incomplete, which the replay refuses. The restore marker is always the one the API reads:
+incomplete, which the replay refuses. A tombstone left incomplete only because a record live in the restored
+database still holds the same bytes is the exception: the replay completes, leaves that tombstone
+open with its jobs queued for the ordinary purger, as normal operation does, keeps the bytes, and
+the command's result lists it with those targets under `tombstones_left_open`. The restore marker is always the one the API reads:
 `exulanica-installation restore` refuses to run unless the profile (or `EXULANICA_RESTORE_STATE_PATH`)
 declares it, a different `--marker` is refused, and `init` writes it only on a first install.
 
