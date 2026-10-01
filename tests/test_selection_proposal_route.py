@@ -403,10 +403,10 @@ def _narrowed_registry(registry):
     return bound()
 
 
-def _forced(original, narrowed, draft, current, catalogue, *, registry=None):
-    """Ignore the registry the caller passed and use the narrowed one."""
+def _forced(original, narrowed, draft, current, catalogue, *, registry=None, **passed):
+    """Ignore the registry the caller passed and use the narrowed one; pass the rest on."""
     del registry
-    return original(draft, current, catalogue, registry=narrowed)
+    return original(draft, current, catalogue, registry=narrowed, **passed)
 
 
 def test_an_unregistered_control_is_refused_rather_than_dropped_from_the_proposal(proposal_api):

@@ -1,0 +1,106 @@
+{
+  "profile": "exulanica.runtime-capacity-workload/v1",
+  "ports": {
+    "api": 19410,
+    "proxy": 19411,
+    "database": 19412
+  },
+  "workspaces": 8,
+  "settings": {
+    "EXULANICA_API_THREADS": "40",
+    "EXULANICA_API_REQUESTS": "24",
+    "EXULANICA_API_UPLOADS": "2",
+    "EXULANICA_API_STREAMS": "128",
+    "EXULANICA_API_WORKSPACE_REQUESTS": "12",
+    "EXULANICA_API_WORKSPACE_UPLOADS": "1",
+    "EXULANICA_API_WORKSPACE_STREAMS": "8",
+    "EXULANICA_API_DECODES": "2",
+    "EXULANICA_INTAKE_QUEUED_JOBS": "4"
+  },
+  "uvicorn_arguments": [
+    "--timeout-graceful-shutdown",
+    "10"
+  ],
+  "derivative_worker": {
+    "vision_seconds": 1.0,
+    "poll_seconds": 1.0
+  },
+  "phases": {
+    "knee": {
+      "kind": "closed_reads",
+      "concurrency": [
+        1,
+        2,
+        4,
+        8,
+        16,
+        24,
+        32,
+        48
+      ],
+      "seconds": 12
+    },
+    "supported": {
+      "kind": "mixed",
+      "seconds": 180,
+      "drain_seconds": 120,
+      "photo": {
+        "width": 2000,
+        "height": 1500
+      },
+      "per_workspace": {
+        "held_streams": 6,
+        "reads_per_second": 3,
+        "uploads_every_seconds": 60,
+        "photos_per_upload": 3
+      }
+    },
+    "overload": {
+      "kind": "mixed",
+      "saturation": true,
+      "seconds": 120,
+      "drain_seconds": 180,
+      "photo": {
+        "width": 4000,
+        "height": 3000
+      },
+      "per_workspace": {
+        "held_streams": 16,
+        "reads_per_second": 150,
+        "uploads_every_seconds": 5,
+        "photos_per_upload": 3
+      }
+    },
+    "sharing": {
+      "kind": "sharing",
+      "seconds": 180,
+      "drain_seconds": 120,
+      "warmup_seconds": 20,
+      "towns": 8,
+      "recipe": "small_town",
+      "profile": "exulanica-society/v5",
+      "speed": 4,
+      "base_tick_interval_ms": 8000,
+      "traffic_every_seconds": 5,
+      "photo": {
+        "width": 2000,
+        "height": 1500
+      },
+      "per_workspace": {
+        "held_streams": 6,
+        "reads_per_second": 3,
+        "uploads_every_seconds": 60,
+        "photos_per_upload": 3
+      }
+    }
+  },
+  "chaos": {
+    "killed_client_streams": 20,
+    "lock_seconds": 20,
+    "interrupted_batch_photos": 6,
+    "photo": {
+      "width": 2000,
+      "height": 1500
+    }
+  }
+}

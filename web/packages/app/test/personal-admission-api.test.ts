@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { PersonalAdmissionApi, sha256, HUMAN_ATTESTATION, type PersonalAdmission } from '../src/personal-admission-api.js';
+import { PersonalAdmissionApi, sha256, type PersonalAdmission } from '../src/personal-admission-api.js';
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
 const source = { capture_id: '11111111-1111-4111-8111-111111111111', sha256: 'a'.repeat(64), bytes: 42 };
 const body: PersonalAdmission = {
@@ -70,12 +70,14 @@ describe('original byte intake and dated admission', () => {
     expect(requests[1]).toEqual(requests[0]);
     expect(requests[0]).not.toHaveProperty('attestation');
   });
-  it('requires human choices and the exact attestation before review', async () => {
+  it('requires human choices and an attestation before review; the server checks its words', async () => {
     const fetch = vi.fn();
     const api = new PersonalAdmissionApi({ baseUrl: 'https://fixture.test', token: 't', fetch });
     await expect(api.admit({ ...body, operation: 'review' })).rejects.toThrow('named human review');
     await expect(api.admit({ ...body, operation: 'review', reviewed_by_name: 'Fixture reviewer',
-      attestation: HUMAN_ATTESTATION })).rejects.toThrow('named human review');
+      attestation: 'Fixture attestation' })).rejects.toThrow('named human review');
+    await expect(api.admit({ ...body, operation: 'review', reviewed_by_name: 'Fixture reviewer',
+      members: [{ ...source, review: 'no-person' }] })).rejects.toThrow('named human review');
     expect(fetch).not.toHaveBeenCalled();
   });
 });

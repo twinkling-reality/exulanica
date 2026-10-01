@@ -1513,7 +1513,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     from exulanica.env import resolve_data_dir
     from exulanica.ingest.repository import IngestRepository
     from exulanica.ingest.stages import STAGES
-    from exulanica.store.local import LocalContentAddressedStore
+    from exulanica.store.configured import content_stores
 
     parser = argparse.ArgumentParser(description=__doc__.split("\n", 1)[0])
     parser.add_argument("--workspace", type=uuid.UUID, required=True)
@@ -1531,7 +1531,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="the delivery artifact digest the PLY was decoded from; required with --gaussian-ply",
     )
     args = parser.parse_args(argv)
-    store = LocalContentAddressedStore(resolve_data_dir(explicit=args.data_dir).resolve() / "blobs")
+    store = content_stores(data_dir=resolve_data_dir(explicit=args.data_dir).resolve()).blobs
     gaussian_ply = None if args.gaussian_ply is None else args.gaussian_ply.read_bytes()
     gaussian_source = None
     if gaussian_ply is not None:

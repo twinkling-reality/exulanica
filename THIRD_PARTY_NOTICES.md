@@ -56,6 +56,11 @@ derivation can be checked. Those files are third party data copied into this rep
 listed in [Shipped third party data](#shipped-third-party-data-2026-09-17) with its attribution,
 dataset, terms and the modifications made.
 
+**Exception: published test vectors.** The Signature Version 4 cases the object store's request
+signer is tested against are copied unchanged into `tests/vectors/`, with their licence and notice,
+and listed in [Copied test vectors](#copied-test-vectors-2026-09-30). They are test data: no image,
+package or browser bundle contains them.
+
 ---
 
 ## 2. Exulanica's own license
@@ -528,3 +533,27 @@ is NOT a product dependency: it lives in `tools/lettering` with its own `pyproje
 `uv.lock`, it never enters the root `uv.lock`, and `tests/test_lettering_boundary.py` plus the
 import contract `The product never imports the lettering tool` in `pyproject.toml` hold both halves
 of that. The product reads the catalogs and parses no font.
+
+## Copied test vectors (2026-09-30)
+
+The request signer of the S3-compatible content store (`exulanica/store/sigv4.py`) is checked
+against the cases of the AWS Signature Version 4 Test Suite that apply to S3. They are retained
+under `tests/vectors/aws-sigv4-test-suite/` byte for byte as published in the `boto/botocore`
+repository under `tests/unit/auth/aws4_testsuite/`, read from its `develop` branch on 2026-09-30,
+where that directory was last changed by commit `32302bc372dde1b6173b60f8b85d671e24a0d414`. The
+suite's own `LICENSE` and `NOTICE` are retained beside the cases.
+
+**Licence: Apache License, Version 2.0**, the `LICENSE` file beside the cases. The required notice,
+verbatim from the suite's `NOTICE`:
+
+- AWS Signature Version 4 Test Suite
+- Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+
+**Modifications:** none to any retained file. 21 of the suite's 26 case groups are retained, and of
+each only the request, canonical request, string to sign and Authorization files;
+`tests/test_store_sigv4.py` names the groups left out and why, and fails if the retained files
+differ from the manifest below.
+
+| Retained files | Count and bytes | Digest |
+| --- | --- | --- |
+| `tests/vectors/aws-sigv4-test-suite/` | 86 files, 24,272 bytes | manifest SHA-256 `c9f6907461bed6cea5f24d12d841265a113b37ecd1b7a583ccec8257dfb1c37c`: the SHA-256 of one line per file in path order, `<file SHA-256>  <path within the directory>`, each line ending in a newline |

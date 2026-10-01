@@ -103,6 +103,23 @@ describe('outcome labels state what is usable', () => {
     expect(l.detail).toContain('Nothing was deleted. The originals are retained.');
   });
 
+  it('does not offer photographs a cancelled batch no longer has', () => {
+    let s = initialFormationState(CAPTURE);
+    s = reduceFormation(s, { eventId: 'a', captureId: CAPTURE, phase: 'received', stageIndex: 0, at: 0, photographs: 4 });
+    s = reduceFormation(s, {
+      eventId: 'b',
+      captureId: CAPTURE,
+      phase: 'failed',
+      stageIndex: 6,
+      at: 1,
+      outcome: { rung: 4, openQuestions: 0, photographsAvailable: 0, reason: 'cancelled' },
+    });
+    const l = formationLabel(s);
+    expect(l.headline).toContain('The job was stopped.');
+    expect(l.headline).not.toContain('The photographs are available.');
+    expect(l.detail).toContain('0 photographs are available to open now.');
+  });
+
   it('states open questions without treating zero as a finish line', () => {
     let s = initialFormationState(CAPTURE);
     s = reduceFormation(s, { eventId: 'a', captureId: CAPTURE, phase: 'ready', stageIndex: 6, at: 1, outcome: { rung: 1, openQuestions: 0, photographsAvailable: 3 } });

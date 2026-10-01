@@ -15,7 +15,7 @@ from exulanica.ingest.personal_admission import execute, load_manifest, read_sou
 from exulanica.ingest.pipeline import PhotoIngestPipeline
 from exulanica.ingest.repository import IngestRepository
 from exulanica.migrations import migrations, verify_applied
-from exulanica.store.local import LocalContentAddressedStore
+from exulanica.store.configured import content_stores
 
 DATABASE_URL = "postgresql://localhost:5433/exulanica_spine_test"
 
@@ -67,7 +67,7 @@ def main(argv: list[str] | None = None) -> int:
             provision_workspace(connection, workspace)
             pipeline = PhotoIngestPipeline(
                 IngestRepository(connection, workspace),
-                LocalContentAddressedStore(args.data_dir / "blobs"),
+                content_stores(data_dir=args.data_dir).blobs,
             )
             result = execute(manifest, data, pipeline)
         print(json.dumps({"ok": True, "result": result}, sort_keys=True))

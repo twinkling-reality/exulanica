@@ -23,9 +23,8 @@ from typing import Any, Final
 
 from exulanica.db.session import Database
 from exulanica.deletion.worker import PurgeWorker
-from exulanica.env import env_get, env_name, resolve_data_dir
-from exulanica.store.local import LocalContentAddressedStore
-from exulanica.store.namespaces import BLOB_NAMESPACE, material_stores
+from exulanica.env import env_get, env_name
+from exulanica.store.configured import purging_content_stores
 
 __all__ = ["PURGE_DATABASE_URL_ENV", "main"]
 
@@ -75,13 +74,15 @@ def main(argv: list[str] | None = None, stream: Any = None) -> int:
         return 2
 
     workspaces = frozenset(uuid.UUID(value) for value in args.workspace)
-    data_dir = resolve_data_dir(explicit=args.data_dir)
+    # The purge identity's stores: on an object store, built from its own credentials, which no
+    # runtime process holds.
+    stores = purging_content_stores(data_dir=args.data_dir)
     worker = PurgeWorker(
         Database(url=url),
-        LocalContentAddressedStore(data_dir / BLOB_NAMESPACE),
+        stores.blobs,
         workspaces,
         limit_per_pass=args.limit,
-        material_stores=material_stores(data_dir),
+        material_stores=stores.materials,
     )
     outcome = worker.drain()
 

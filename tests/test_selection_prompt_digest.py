@@ -14,7 +14,7 @@ import hashlib
 
 import pytest
 from exulanica.canonical import canonical_json
-from exulanica.selection import environment_proposal, prompts, proposal
+from exulanica.selection import action_plan, environment_proposal, prompts, proposal
 
 #: version -> SHA-256 of the canonical JSON of that family's prompt texts, as ``_texts`` reads them.
 PINNED = {
@@ -26,6 +26,11 @@ PINNED = {
     "proposal-3": "7c6b2cb2633943e0858cd7064e97bda1dcfa42cd9c520ed6c9f901f9b0d61665",
     "proposal-4": "c5d95ac33e52e9a22fe41d4056788b18a05588260506499ac91a2792b4e005ae",
     "environment-proposal-1": "88314630219bea7f6571a54fff583920ac765581a25efa581e20f4b04e9e0a92",
+    # The Companion's world actions: its five-way classifier and the world-edit drafter.
+    "action-plan-1": "a9c3708ef441cbeeae00b2972628d89de75dc787aebf0a37f0cf658b8273da88",
+    # The appearance drafter for a design choice drawn from no evidence; its own family, so the
+    # evidence drafter's texts and `proposal-4` are untouched.
+    "proposal-authored-1": "7b840134c24bc8152ab423f0665362b1d37bdd3cfb9b96cf208cfc6a46308d9a",
 }
 
 
@@ -51,6 +56,17 @@ def _texts() -> dict[str, tuple[str, dict[str, str]]]:
         "environment-proposal": (
             environment_proposal.ENVIRONMENT_PROMPT_VERSION,
             {"system": environment_proposal._SYSTEM},
+        ),
+        "action-plan": (
+            action_plan.ACTION_PROMPT_VERSION,
+            {
+                "classifier_system": action_plan._CLASSIFIER_SYSTEM,
+                "world_edit_system": action_plan._WORLD_EDIT_SYSTEM,
+            },
+        ),
+        "proposal-authored": (
+            proposal.AUTHORED_PROMPT_VERSION,
+            {"drafter_system": proposal._AUTHORED_DRAFTER_SYSTEM},
         ),
     }
 

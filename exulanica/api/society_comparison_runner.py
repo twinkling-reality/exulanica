@@ -102,6 +102,7 @@ from exulanica.world.society_repository import SocietyRepository
 __all__ = [
     "BOUND_BEFORE_SEED",
     "BOUND_SPENT",
+    "CANCELLED",
     "PEOPLE",
     "RUN_FAILURE_CODES",
     "ClaimLost",
@@ -120,8 +121,9 @@ _LOG = logging.getLogger(__name__)
 #: recorded, rules that would change the question itself, or a request the rules refused; a run the
 #: process stopped part way, found with receipts and no outcome; a run a host could not play because
 #: the society's inputs are no longer available to it; one the comparison's claims closed before it
-#: was played, after hosts that claimed it kept stopping; or a model run whose seed's anchors did
-#: not complete, closed before it asks. A receipt whose reason is one of them stops its run there;
+#: was played, after hosts that claimed it kept stopping; one closed because the comparison was
+#: cancelled, before its next dispatch; or a model run whose seed's anchors did not complete, closed
+#: before it asks. A receipt whose reason is one of them stops its run there;
 #: every other reason a turn was not the model's is the model's own, and is reported beside the
 #: score. The page has words for each.
 RUN_FAILURE_CODES: Final = frozenset(
@@ -129,6 +131,7 @@ RUN_FAILURE_CODES: Final = frozenset(
         "anchor_failed",
         "comparison_bound_before_seed",
         "comparison_bound_spent",
+        "comparison_cancelled",
         "comparison_stopped",
         "input_unavailable",
         "interrupted",
@@ -159,6 +162,9 @@ ANCHOR_FAILED: Final = "anchor_failed"
 BOUND_SPENT: Final = "comparison_bound_spent"
 #: Why a run a host could not play was closed: the society's inputs are no longer available to it.
 INPUT_UNAVAILABLE: Final = "input_unavailable"
+#: Why a run was closed: its comparison was cancelled. A run that was asking stops before its next
+#: dispatch and keeps every receipt it recorded; one not yet played asks nothing.
+CANCELLED: Final = "comparison_cancelled"
 #: The word the subjects of a comparison's groups are known by: a society's people. The role a
 #: comparison defines by, unless it names another, is the one registered role deciding for them.
 PEOPLE: Final = "person"
@@ -223,6 +229,13 @@ class RunHost:
     #: anchors have played. A seed not admitted closes it and every later seed's model runs as
     #: :data:`BOUND_BEFORE_SEED`, asking nothing. Left out, every seed is admitted.
     admit: Callable[[Sequence[uuid.UUID]], bool] = field(default=lambda _runs: True)
+    #: Whether the comparison was cancelled: asked before a run starts and before each minute's
+    #: asks are sent, so a cancelled comparison sends nothing more (:data:`CANCELLED`). Left out,
+    #: nobody cancels.
+    cancelled: Callable[[], bool] = field(default=lambda: False)
+    #: Called with a run's id as the host starts playing it, so readers tell a run being played
+    #: from one waiting for its turn (:mod:`exulanica.world.comparison_facts`).
+    started: Callable[[uuid.UUID], None] = field(default=lambda _run: None)
 
 
 def call_facts(receipts: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
@@ -271,6 +284,7 @@ class _Asking:
         bound: BoundedBudget | None = None,
         run_bound: BoundedBudget | None = None,
         keeps_share: bool = False,
+        cancelled: Callable[[], bool] = lambda: False,
     ) -> None:
         self.client = client
         self.manifest = manifest
@@ -289,10 +303,15 @@ class _Asking:
         #: The part of the process's budget and calls the asks leave for its other work: the
         #: contract's share where the process does other work, nothing for the local command.
         self.keep = share_kept(client.budget, contract) if keeps_share else (Decimal(0), 0)
+        #: Whether the comparison was cancelled, asked before every minute's asks are sent.
+        self.cancelled = cancelled
 
     def offerable(
         self, tick: int, due: Mapping[str, Sequence[RoleOption]]
     ) -> dict[str, frozenset[str]]:
+        # The last point before this minute's asks are sent: a cancelled comparison sends none.
+        if self.cancelled():
+            raise _RunStopped(CANCELLED)
         asked = sorted({self.model_of(subject) for subject in due})
         for model_id in asked:
             refused = self.client.refusals.get(self.models[model_id][0].provider)
@@ -729,6 +748,21 @@ class SocietyComparisonRunner:
             done = repository.outcome(run_id)
             if done is not None:
                 return done
+            if host is not None and host.cancelled():
+                # Cancelled before this run's turn, or while it was stopped part way: it asks
+                # nothing more, and any receipts it holds stay recorded.
+                reserved = repository._run(run_id)
+                definition = repository._definition(comparison_id)["document"]  # type: ignore[index]
+                return recorded(
+                    connection,
+                    repository.finish(
+                        comparison_id,
+                        run_id,
+                        self._failed(
+                            definition, reserved["arm"], reserved["seed_digest"], CANCELLED
+                        ),
+                    ),
+                )
             if repository.stored(run_id):
                 reserved = repository._run(run_id)
                 definition = repository._definition(comparison_id)["document"]  # type: ignore[index]
@@ -807,8 +841,14 @@ class SocietyComparisonRunner:
                         raise _RunStopped(INTERRUPTED)
                     raise HostStopping
 
+        if host is not None:
+            host.started(run_id)
         try:
-            asking = self._asking(plan, _recorded_answering(definition, arm))
+            asking = self._asking(
+                plan,
+                _recorded_answering(definition, arm),
+                cancelled=host.cancelled if host is not None else None,
+            )
             played = play(plan, asking, on_minute=store)
         except _RunStopped as stop:
             outcome = self._failed(definition, arm, digest, stop.code)
@@ -894,13 +934,24 @@ class SocietyComparisonRunner:
             self._repository(connection).store_drawing(comparison_id, run_id, drawing, encoded)
         return True
 
-    def fail_open(self, comparison_id: uuid.UUID, codes: Mapping[uuid.UUID, str]) -> None:
+    def fail_open(
+        self,
+        comparison_id: uuid.UUID,
+        codes: Mapping[uuid.UUID, str],
+        *,
+        connection: Any = None,
+    ) -> None:
         """Record each run of ``codes`` that has no outcome yet as failed by its code, asking
-        nothing: what a host closing a comparison does with the runs it will never play."""
+        nothing: what a host closing a comparison does with the runs it will never play, and what
+        a cancellation does, inside the caller's transaction on ``connection``."""
         for code in codes.values():
             if code not in RUN_FAILURE_CODES:
                 raise ValueError(f"a run fails only by a stated code, not {code!r}")
-        with self.database.session(self.workspace_id) as connection, connection.transaction():
+        if connection is None:
+            with self.database.session(self.workspace_id) as held, held.transaction():
+                self.fail_open(comparison_id, codes, connection=held)
+            return
+        with connection.transaction():
             repository = self._repository(connection)
             definition = repository._definition(comparison_id)["document"]  # type: ignore[index]
             for run_id, code in codes.items():
@@ -932,7 +983,11 @@ class SocietyComparisonRunner:
         return tuple(statuses)
 
     def _asking(
-        self, plan: RunPlan, recorded: Mapping[str, Mapping[str, Any] | None]
+        self,
+        plan: RunPlan,
+        recorded: Mapping[str, Mapping[str, Any] | None],
+        *,
+        cancelled: Callable[[], bool] | None = None,
     ) -> _Asking | _Anchor:
         """What a run asks: nobody where no model decides for anybody in it, else every model
         that does, each checked against the manifest as the definition recorded it, its answering
@@ -991,6 +1046,7 @@ class SocietyComparisonRunner:
             bound=self.bound,
             run_bound=run_bound,
             keeps_share=self.keeps_share,
+            cancelled=cancelled if cancelled is not None else (lambda: False),
         )
 
     @staticmethod

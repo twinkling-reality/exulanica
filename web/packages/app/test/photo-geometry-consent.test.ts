@@ -10,10 +10,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { adaptSnapshot } from '@exulanica/graph-client';
 import { mountPersonalIntake, createPersonalIntakeSession } from '../src/composition/personal-intake.js';
-import { HUMAN_ATTESTATION, sha256, type ModelRightOffer } from '../src/personal-admission-api.js';
+import { sha256, type ModelRightOffer } from '../src/personal-admission-api.js';
 import type { SavedWorldEntry, SavedWorldSourceAttachment } from '../src/world-entry-api.js';
 
 const mocks = vi.hoisted(() => ({ media: new Map<string, unknown>() }));
+/** The attestation as a server serves it. The browser holds no copy, so any words do here. */
+const ATTESTATION = 'Fixture attestation: I inspected every exact photograph and its people.';
 vi.mock('../src/formation.js', () => ({ listBatches: async () => [], watchBatch: () => () => undefined }));
 vi.mock('../src/source-media-api.js', () => ({ SourceMediaClient: class {
   async load() { return { catalog: mocks.media, issues: [], dispose: () => undefined }; }
@@ -99,6 +101,7 @@ function fixture(rights: 'none' | 'current' | 'ended' = 'none', placed = false) 
         }],
         requests: saved,
         model_right_offers: [DEPTH_OFFER],
+        attestation: ATTESTATION,
       });
     }
     if (init.method === 'POST') {
@@ -221,7 +224,7 @@ async function readyToReview(root: HTMLElement, file: File): Promise<void> {
   const choice = field(root, 'Human review of this photograph');
   choice.value = 'no-person';
   choice.dispatchEvent(new Event('change'));
-  field(root, HUMAN_ATTESTATION).checked = true;
+  field(root, ATTESTATION).checked = true;
 }
 
 describe('permission for a 3D estimate from a personal photograph', () => {
@@ -274,7 +277,7 @@ describe('permission for a 3D estimate from a personal photograph', () => {
     choice.value = 'confirmed-regions';
     choice.dispatchEvent(new Event('change'));
     await settle(mounted.root);
-    expect(field(mounted.root, HUMAN_ATTESTATION).checked).toBe(false);
+    expect(field(mounted.root, ATTESTATION).checked).toBe(false);
     expect(tick.checked).toBe(false);
     mounted.dispose();
   });

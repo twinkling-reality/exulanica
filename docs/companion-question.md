@@ -14,6 +14,7 @@ comfort-settings policy.
 - [Execution provenance](#execution-provenance)
 - [Conversation memory](#conversation-memory)
 - [Appearance proposals](#appearance-proposals)
+- [World actions](#world-actions)
 - [Evidence and limits](#evidence-and-limits)
 
 ## Request path
@@ -52,8 +53,11 @@ worlds that stand over one place, through these routes, and no answer, evidence 
 page names the other world.
 
 A question that cannot be understood, one with no supporting evidence, unavailable models and a
-failed network request remain distinguishable. None authorizes an invented factual answer. The
-exact response shapes and refusal codes live in the route models and API schema snapshots.
+failed network request remain distinguishable. None authorizes an invented factual answer. A route
+that needs a model answers an instance with no model credential `503 provider_credential_absent`,
+the code a capability read gives the same condition, with a detail sentence clients already
+recognise. The exact response shapes and refusal codes live in the route models and API schema
+snapshots.
 
 ## Answer and source boundaries
 
@@ -412,6 +416,15 @@ about the world's people is the inspector's words, a recorded line's own words, 
 nothing the simulation did not record, what anybody said above all, can reach an answer, whichever
 lines the composer chooses. The notes an answer leads with are the code's and cost it no clause.
 
+Each simulation citation also says what the event followed. `input_seq` is the society input the
+event's minute consumed. For an event whose target is a placed authored object, `object_id` names
+it, and `edit_seq` and `edit_id` name the version edit that last set that object at or before the
+authored state the input followed, as `GET /world/versions/{version_id}` lists it in `edits`. A
+state line and an event with no placed target leave them null. So an answer about why a person
+rests at a bench leads from the cited event to the bench and to the edit that placed it
+(`tests/test_companion_actions_postgres.py`). The fields are ids only; no line text carries them,
+and none is sent to a model.
+
 It answers for the purposeful society and the living town profiles named by the words catalog,
 using the living resident's recorded home, work, activity and model decision events without
 exposing need levels or place identifiers. It refuses any other society by name
@@ -528,13 +541,24 @@ record. The [proposal implementation](../exulanica/selection/proposal.py) classi
 drafts from the reviewed style registry and validates the result. A question about evidence and a
 request to change appearance have distinct inputs and responsibilities.
 
-A proposal cites the evidence of the world it is asked in: the slots that world's current topology
-binds, then the reviewed photographs attached to its saved entry that are available when it is
-read, each named to the drafter by its attachment id alone. A world with neither, such as a starter
-with no attached photograph, is refused as `no_evidence`, in words saying that attaching a
-reviewed photograph makes a proposal possible. A draft that names none of the evidence the world holds, or names
-evidence outside it, is refused as `unsupported_reference`, and the page says each of the two in
-its own words (`proposal.refused.*` in `web/packages/app/src/ui/copy.ts`).
+A proposal states what it is drawn from, and the caller chooses; it is never inferred. The request's
+`appearance_basis` is `evidence` unless it says otherwise. An evidence proposal cites the evidence
+of the world it is asked in: the slots that world's current topology binds, then the reviewed
+photographs attached to its saved entry that are available when it is read, each named to the
+drafter by its attachment id alone. A world with neither, such as a starter with no attached
+photograph, is refused as `no_evidence`, in words saying that attaching a reviewed photograph makes a
+proposal possible. A draft that names none of the evidence the world holds, or names evidence outside
+it, is refused as `unsupported_reference`, and the page says each of the two in its own words
+(`proposal.refused.*` in `web/packages/app/src/ui/copy.ts`).
+
+An `authored_design` proposal is a design choice drawn from no evidence. Its drafter reads no
+evidence and its form has no field for a reference, under its own prompt version
+(`proposal-authored-1`, so the evidence drafter's measured wording and `proposal-4` are unchanged).
+The proposal and the version applied from it record the basis (`appearance_basis`). The world style
+authority refuses a Companion proposal drawn from evidence without a reference and a design choice
+with any (`_validate_proposal_provenance` in `exulanica/world/repository.py`), and migration 0128's
+check holds the same rule in the database, so choosing a basis in a request cannot bypass either
+rule. Other origins state no basis.
 
 The drafter's schema derives from the registry's profiles, controls, ranges and choices. It states
 each range control as the values on its grid rather than as a number between two bounds: as a
@@ -557,9 +581,80 @@ reviewed operation through the [appearance authority](world-version-authorities.
 [customization contract](atlas-world-customization-contract.md). Conflicts require review against
 the relevant version; natural language does not bypass the same validation as direct controls.
 
-Broader structural edits and environment proposals follow their own registered capabilities and
-contracts. This route's existence does not establish arbitrary creation, simulation control or a
-model's permission to act without review.
+Structural edits the Companion prepares are the [world actions](#world-actions); environment
+proposals follow their own registered capabilities and contracts. Neither establishes arbitrary
+creation, simulation control or a model's permission to act without review.
+
+## World actions
+
+The Companion prepares world work as a plan of the exact requests a direct client sends, and never
+sends them itself. `POST /selection/actions` (`world.read` and `model.invoke`) reads one utterance
+in the world it is asked in, against the version the page shows, and answers
+`exulanica.companion-action-plan/v1` ([action routes](../exulanica/api/routes/selection_actions.py),
+[planner](../exulanica/selection/action_plan.py)). The person confirms a step; the client sends that
+step's request to the route it names; the receipt is that route's own answer and record. An
+operation reached through the Companion therefore has the same permission, validation, transaction,
+saved-entry lock and refusal as the same operation sent directly, because it is the same request.
+
+| Companion action | Preview (writes nothing) | Request a confirmed step sends |
+| --- | --- | --- |
+| Place one reviewed object | `POST .../compositions/preview` | `POST .../compositions/apply` |
+| Move an object to where the person points | `POST .../objects/{object_id}/move/preview` | `POST .../objects/{object_id}/move` |
+| Remove an object | `POST .../objects/{object_id}/remove/preview` | `POST .../objects/{object_id}/remove` |
+| Take back the newest edit | `POST .../objects/undo/preview` | `POST .../objects/undo` |
+| Place a published arrangement | `POST .../arrangements/preview` | `POST .../arrangements/apply`, one transaction |
+| Change the look | the style preview is the reviewed record | `POST /world/styles/previews`, then `POST /world/styles/previews/{preview_id}/apply` |
+
+A plan names each step's route key, path values, body, the permissions its route declares, the
+version pins (`base_state_sha256` and `edit_seq`), the authority's preview document and its digest,
+what replaying the request does and which route compensates it. The model fills enums only: an
+operation from the fixed vocabulary above or `other`, and options from the reads a direct client
+makes, the reviewed kinds a person may place, the version's objects offered by opaque label so a
+client-chosen id never reaches a hosted request, and the published arrangements. Positions come
+from the page's placement or viewer context, and the origin role of anything added is the person's
+stated choice. What is missing is asked about before anything is prepared (`asset_ambiguous`,
+`object_ambiguous`, `object_required`, `arrangement_ambiguous`, `origin_role_required`,
+`placement_required`, `viewer_required`); the answer goes to `POST /selection/actions/prepare`
+(`world.read`, no model), which validates typed actions as any direct body is validated.
+
+Availability and permission are the version capability read's (`GET /world/versions/{version_id}/capabilities`,
+read in process). An operation it calls unsupported, unavailable or not permitted is refused with
+its own descriptor (`action_unsupported`, `action_unavailable`, `action_not_permitted`), never
+approximated by an operation that is offered. A preview is computed by the function its preview
+route calls, on a connection opened only when the caller's grant satisfies that preview route's
+declaration, in a transaction that is read only before anything runs in it. A version the page no
+longer shows is refused `stale_version` before a model is asked, and a preview the authority blocks
+is refused `preview_blocked` with the authority's own reason on the step. Simulation requests are
+refused `action_not_offered` with the direct control's descriptor until the Companion prepares
+simulation controls against the world clock contract. `what can I do here` is answered from the
+descriptors, one entry per Companion action, with the appearance bases available on this world.
+
+Only the first step of a compound request is prepared. Each later step is typed and prepared after
+the previous step's receipt, against the state it left, so every confirmed step was previewed
+against the state it meets; steps commit one at a time, and only a single arrangement is atomic.
+`POST /selection/actions/outcome` (`world.read`) reads what the authorities recorded for a plan's
+steps ([outcome read](../exulanica/selection/action_outcome.py)): `applied` with the receipt's ids
+and whether the record matches the preview, `not_applied` while the version still stands at the
+pin, `superseded` when another change came first, `pending` for a step not yet prepared, and
+`partial` for a plan with some steps applied. A style proposal the lifecycle refused reads as
+refused, never as applied: `superseded` with `code` `stale`, or `not_applied` with `code`
+`rejected`. A step that does not have the shape a plan gives it is refused
+`422 invalid_outcome_step`. The read trusts the plan it is sent only to decide what to look up:
+`plan_sha256` is echoed unverified and `matches_preview` compares the records with the preview the
+client sent back, so an outcome is that client's answer and no proof of a plan this server made. Sending a confirmed step again is refused by the
+authority as stale; a version whose content returns to the pinned state (after an undo) takes the
+same request again as a new edit, which the read lists under `repeats`. A plan is never a
+reservation: discarding one changes nothing, except an appearance plan's first step, which creates
+the style lifecycle's durable proposal and preview record once confirmed and is discarded through
+`DELETE /world/styles/previews/{preview_id}`. Each appearance plan carries a fresh proposal id, so
+confirming one plan twice is refused by the lifecycle and asking again makes a new proposal.
+
+Behaviour changes, photo point maps, environment instances, model choices, comparisons, character
+looks, style rollback and interaction policy are not prepared by the Companion: a request for one is
+refused `action_not_offered` and names the direct operation. Conversation and remembered context
+never make a step permitted, and the planner imports neither the interaction-policy plane nor stored
+conversation (`tests/test_companion_action_policy_boundary.py`). Scripted tests hold the mechanics;
+how well a live model reads requests into these plans is not measured.
 
 ## Evidence and limits
 

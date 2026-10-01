@@ -104,10 +104,17 @@ def start_state(row: Mapping[str, Any] | None, now: dt.datetime) -> str | None:
     return "waiting"
 
 
-def start_document(row: Mapping[str, Any], spent_usd: Decimal, now: dt.datetime) -> dict[str, Any]:
+def start_document(
+    row: Mapping[str, Any],
+    spent_usd: Decimal,
+    now: dt.datetime,
+    cancellation: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
     """A start as the reads serve it: the bound its owner stated, what its asks spent by their
     receipts and what hosts that stopped were presumed to have spent unrecorded, where it stands,
-    why a host closed it, and when it was started."""
+    why a host closed it, when it was started, and when it was cancelled, if it was
+    (:mod:`exulanica.world.comparison_facts`). A start whose cancellation a host has not yet acted
+    on still reads running; it closes with the reason ``comparison_cancelled``."""
     return {
         "bound_usd": format(row["bound_usd"], "f"),
         "spent_usd": format(spent_usd.quantize(USD_QUANTUM), "f"),
@@ -117,6 +124,9 @@ def start_document(row: Mapping[str, Any], spent_usd: Decimal, now: dt.datetime)
         "runs_planned": row["runs_planned"],
         "started_at": row["created_at"].isoformat(),
         "finished_at": None if row["finished_at"] is None else row["finished_at"].isoformat(),
+        "cancel": None
+        if cancellation is None
+        else {"requested_at": cancellation["requested_at"].isoformat()},
     }
 
 
@@ -190,6 +200,33 @@ class SocietyComparisonStarts:
             (self.workspace_id, world_id, list(comparison_ids)),
         ).fetchall()
         return {row["comparison_id"]: row for row in rows}
+
+    def lock(self, world_id: str, comparison_id: uuid.UUID) -> dict[str, Any] | None:
+        """The comparison's start, locked for the caller's open transaction so no host claims it
+        meanwhile (a claim skips a locked start), or None for a comparison nobody started from
+        the application."""
+        return self.connection.execute(
+            "select * from society_comparison_start where workspace_id=%s and world_id=%s "
+            "and comparison_id=%s for update",
+            (self.workspace_id, world_id, comparison_id),
+        ).fetchone()
+
+    def close_unclaimed(
+        self, world_id: str, comparison_id: uuid.UUID, *, closed_reason: str, presumed_usd: Decimal
+    ) -> bool:
+        """Finish a start no host holds a live lease on, closed by ``closed_reason``, keeping
+        ``presumed_usd`` more as spent and unrecorded: what a host whose lease ran out may have
+        been asking. Say whether it was still unfinished. Asked by a cancellation, in the
+        transaction that locked the start (:meth:`lock`)."""
+        changed = self.connection.execute(
+            "update society_comparison_start set presumed_usd=presumed_usd+%s,"
+            "lease_token=null,claimed_at=null,lease_expires_at=null,"
+            "finished_at=clock_timestamp(),closed_reason=%s "
+            "where workspace_id=%s and world_id=%s and comparison_id=%s and finished_at is null "
+            "and (lease_token is null or lease_expires_at<=clock_timestamp())",
+            (presumed_usd, closed_reason, self.workspace_id, world_id, comparison_id),
+        ).rowcount
+        return changed == 1
 
     def unfinished(self, world_id: str) -> dict[str, Any] | None:
         """The world's start that has not finished, or None."""

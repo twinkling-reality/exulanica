@@ -30,7 +30,7 @@ from typing import Any, Final
 
 from exulanica.canonical import canonical_json
 from exulanica.db.session import Database
-from exulanica.env import env_get, env_name, resolve_data_dir
+from exulanica.env import env_get, env_name
 from exulanica.orchestration.judge_seed import (
     JUDGE_ROLE,
     JUDGE_WRITE_TABLES,
@@ -44,8 +44,8 @@ from exulanica.orchestration.judge_seed import (
     restore_seed,
     verify_seed,
 )
-from exulanica.store.local import LocalContentAddressedStore
-from exulanica.store.namespaces import tile_store
+from exulanica.store.base import ContentAddressedStore
+from exulanica.store.configured import content_stores
 
 __all__ = ["JUDGE_ROLE_PASSWORD_ENV", "main"]
 
@@ -56,13 +56,13 @@ JUDGE_ROLE_PASSWORD_ENV: Final = env_name("JUDGE_ROLE_PASSWORD")
 _TOKEN_BYTES: Final = 36
 
 
-def _store(explicit: str | None) -> LocalContentAddressedStore:
-    return LocalContentAddressedStore(resolve_data_dir(explicit=explicit) / "blobs")
+def _store(explicit: str | None) -> ContentAddressedStore:
+    return content_stores(data_dir=explicit).blobs
 
 
-def _tiles(explicit: str | None) -> LocalContentAddressedStore:
-    """The tile store under the same data directory the blob store is resolved from."""
-    return tile_store(resolve_data_dir(explicit=explicit))
+def _tiles(explicit: str | None) -> ContentAddressedStore:
+    """The tile store of the same installation the blob store is resolved from."""
+    return content_stores(data_dir=explicit).tiles
 
 
 def _report(stream: Any, manifest: Any, archive: Path) -> None:

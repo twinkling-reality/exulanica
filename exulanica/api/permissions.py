@@ -381,6 +381,7 @@ _LIBRARY_READS_WITH_A_MODEL: Final = _every(
 #: World reads that may call a model.
 _WORLD_READS_WITH_A_MODEL: Final = _every(
     _requires(_P.WORLD_READ, _P.MODEL_INVOKE),
+    "POST /selection/actions",
     "POST /selection/appearance",
     "POST /selection/environment",
     "POST /worlds/specification/drafts",
@@ -388,11 +389,13 @@ _WORLD_READS_WITH_A_MODEL: Final = _every(
 
 #: World writes that commit the world to a model: a choice of the model that runs a world's
 #: people commits the world's host to asking it, and a comparison started from the application
-#: commits it to asking the models compared, within the bound its owner stated.
+#: commits it to asking the models compared, within the bound its owner stated. Cancelling a
+#: comparison takes the same grants as starting one, so nobody else ends an owner's paid run.
 _WORLD_WRITES_WITH_A_MODEL: Final = _every(
     _requires(_P.WORLD_WRITE, _P.MODEL_INVOKE),
     "POST /world/versions/{version_id}/models/{role_key}",
     "POST /world/versions/{version_id}/society/comparisons",
+    "POST /world/versions/{version_id}/society/comparisons/{comparison_id}/cancel",
     "POST /world/versions/{version_id}/society/models",
 )
 
@@ -452,7 +455,9 @@ _ADMISSION_WRITES: Final = _every(
 #: Derivative and reconstruction job status.
 _OPERATIONS_READS: Final = _every(
     _requires(_P.OPERATIONS_READ),
+    "GET /operations/capacity",
     "GET /operations/derivative-jobs",
+    "GET /operations/derivative-jobs/{job_id}",
     "GET /operations/derivative-jobs/{job_id}/events",
     "GET /operations/reconstruction-scenes",
     "GET /operations/reconstruction-scenes/{job_id}",
@@ -475,6 +480,8 @@ _WORLD_READS: Final = _every(
     "GET /materials/recipes/{recipe_id}",
     "GET /materials/recipes/{recipe_id}/bake",
     "GET /materials/recipes/{recipe_id}/bake/bytes",
+    "POST /selection/actions/outcome",
+    "POST /selection/actions/prepare",
     "GET /world-entries",
     "GET /world-entries/candidates",
     "GET /world-entries/{entry_id}",
@@ -577,9 +584,12 @@ _WORLD_WRITES: Final = _every(
     "POST /world/versions/{version_id}/environment-instances/{instance_id}/remove",
     "POST /world/versions/{version_id}/objects",
     "POST /world/versions/{version_id}/objects/undo",
+    "POST /world/versions/{version_id}/objects/undo/preview",
     "POST /world/versions/{version_id}/objects/{object_id}/behaviour",
     "POST /world/versions/{version_id}/objects/{object_id}/move",
+    "POST /world/versions/{version_id}/objects/{object_id}/move/preview",
     "POST /world/versions/{version_id}/objects/{object_id}/remove",
+    "POST /world/versions/{version_id}/objects/{object_id}/remove/preview",
     "POST /world/versions/{version_id}/society",
     "POST /world/versions/{version_id}/society/actions",
     "PUT /world/versions/{version_id}/society/control",

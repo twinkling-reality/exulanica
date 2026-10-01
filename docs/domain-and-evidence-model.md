@@ -97,9 +97,11 @@ that "Write-once-read-many (WORM) retention policies are not supported", and it 
 and no Legal Hold. Source: <https://docs.nebius.com/object-storage/interfaces/s3-api-compatibility>
 (VERIFIED 2026-08-27). Product copy says **"append-only by policy"**, enforced by bucket versioning
 enabled at bucket creation plus a bucket policy denying `DeleteObject` and `DeleteObjectVersion` to the
-runtime service account. Never "immutable", "WORM", or "tamper-proof". The implemented store is the
-local content-addressed store (`exulanica/store/local.py`), whose key layout an S3-compatible
-backend can serve unchanged; the bucket policy is the requirement that backend must meet.
+runtime service account. Never "immutable", "WORM", or "tamper-proof". Two stores implement the
+interface with the same keys: local directories (`exulanica/store/local.py`) and an S3-compatible
+bucket (`exulanica/store/object.py`), whose purge deletes every version and delete marker of a key
+and refuses a bucket that reports object lock or replication. The bucket policy is the requirement an
+installation's bucket must meet ([deployment](deployment.md#4-the-content-store)).
 
 ### 1.3 Why frame indices and byte offsets are unusable
 

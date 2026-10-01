@@ -736,14 +736,16 @@ def test_operational_api_reports_measured_queue_metrics_and_complete_delivery_re
         "an unknown job must not disclose any operational row"
     )
     unknown_scene_job = uuid.uuid4()
-    assert upload.get(f"/operations/reconstruction-scenes/{unknown_scene_job}").status_code == 404
-    assert (
-        upload.client.post(
-            f"/operations/reconstruction-scenes/{unknown_scene_job}/retry",
-            headers={"Authorization": f"Bearer {_TOKEN}"},
-        ).status_code
-        == 404
+    # The problem shape with the code clients key on; another workspace's build is answered the
+    # same (tests/test_existence_oracle.py compares the two whole bodies).
+    not_found = {"code": "unknown_reference", "detail": "reconstruction build not found"}
+    read = upload.get(f"/operations/reconstruction-scenes/{unknown_scene_job}")
+    assert (read.status_code, read.json()) == (404, not_found)
+    retried = upload.client.post(
+        f"/operations/reconstruction-scenes/{unknown_scene_job}/retry",
+        headers={"Authorization": f"Bearer {_TOKEN}"},
     )
+    assert (retried.status_code, retried.json()) == (404, not_found)
 
 
 def test_no_run_is_left_saying_it_is_still_running(upload):

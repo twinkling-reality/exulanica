@@ -395,6 +395,27 @@ finished no run, the next closes the start (`claims_spent`): runs with receipts 
 and the rest `comparison_stopped`. A claim whose bound is spent, or which this process's model
 budget cannot hold, closes the start with every run left failed by that name, asking nothing.
 
+**Cancelling one.** `POST /world/versions/{version_id}/society/comparisons/{comparison_id}/cancel`
+requires `world.write` and `model.invoke`, the grants a start takes, and never asks a model. It
+cancels a comparison started from the application once: the cancellation is appended and never
+changed (migration 0130), so a repeated cancel finds the first and changes nothing, and a start
+that already finished keeps its own closing. A start no host holds is closed by the cancellation
+itself: every run left open fails as `comparison_cancelled`, asking nothing, and where the lease
+of a host that was playing it ran out, what that host may have spent unrecorded is presumed as a
+claim that takes a start over presumes it. A start a host is playing is closed by that host. It
+reads the cancellation before each minute's asks are sent and sends nothing more; the answers of
+a minute already sent are recorded and counted like any other; its run and every run it has not
+played fail as `comparison_cancelled`, keeping every receipt; and the start finishes closed by
+that same code. No claim plays a finished start again. A comparison the local command defined
+has no start and is not cancelled here (`comparison_not_started`). A cancellation that arrives
+between a host's check and its sending lets that one minute's asks go out: they are paid,
+recorded and counted.
+
+**Progress.** The reads serve a cancelled start's cancellation (`cancel`, when it was requested)
+and, for each run with no outcome yet, where it stands (`progress`): `running` while a host plays
+it under the start's live lease, since a host records each run it starts (migration 0130), and
+`queued` otherwise.
+
 **From the local command.** The command defines and runs one in its own process:
 
 ```

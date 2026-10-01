@@ -18,6 +18,7 @@ from __future__ import annotations
 import abc
 import os
 import uuid
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Final
 
@@ -51,6 +52,11 @@ class WorkspaceStores(abc.ABC):
     def for_workspace(self, workspace_id: uuid.UUID) -> ContentAddressedStore:
         """The store holding this workspace's bytes, and nobody else's."""
 
+    @abc.abstractmethod
+    def iter_workspace_ids(self) -> Iterator[uuid.UUID]:
+        """The workspaces that have a namespace here. For backup, verification and restore, which
+        must copy every namespace; never for deciding which workspaces exist."""
+
 
 class LocalWorkspaceStores(WorkspaceStores):
     """Workspace namespaces as directories under one root on the local filesystem."""
@@ -68,6 +74,17 @@ class LocalWorkspaceStores(WorkspaceStores):
                 f"a workspace namespace is named by a uuid, not {type(workspace_id).__name__}"
             )
         return LocalContentAddressedStore(self._root / workspace_id.hex)
+
+    def iter_workspace_ids(self) -> Iterator[uuid.UUID]:
+        if not self._root.is_dir():
+            return
+        for path in sorted(self._root.iterdir()):
+            try:
+                workspace_id = uuid.UUID(hex=path.name)
+            except ValueError:
+                continue
+            if path.is_dir() and workspace_id.hex == path.name:
+                yield workspace_id
 
 
 def material_stores(data_dir: str | os.PathLike[str]) -> LocalWorkspaceStores:

@@ -2,7 +2,7 @@
 import { formationLabel, formationLabelLine } from '@exulanica/formation';
 import { ApiError, type GraphSnapshot, type TransportOptions } from '@exulanica/graph-client';
 import type { SourceMediaCatalog } from '@exulanica/atlas-react/playcanvas';
-import { PersonalAdmissionApi, DEPTH_ROLE, HUMAN_ATTESTATION,
+import { PersonalAdmissionApi, DEPTH_ROLE,
   sha256, type PersonalSource, type PersonalAdmission,
   type AdmissionResult, type ModelRightOffer, type ModelRightState, type ServedStanding } from '../personal-admission-api.js';
 import { readOffers, standingControls, standingOf, standingText } from '../ui/model-right-controls.js';
@@ -149,6 +149,8 @@ export function mountPersonalIntake(deps: {
    * Empty until the first read and after a read that states none, so nothing can be ticked then.
    */
   let offers: readonly ModelRightOffer[] = [];
+  /** The words a human review sends back, as the server last served them. */
+  let attestationWords = '';
   /**
    * Placed estimates in the open world, by the photograph they were made from.
    *
@@ -681,6 +683,12 @@ export function mountPersonalIntake(deps: {
       ui.processingRights.show(offers.filter((offer) => offer.offered_with === 'detect'));
       ui.reviewRights.show(offers.filter((offer) => offer.offered_with === 'review'));
     }
+    // So are the attestation's words: changed words take the tick back.
+    if ((recovered.attestation ?? '') !== attestationWords) {
+      attestationWords = recovered.attestation ?? '';
+      ui.showAttestation(attestationWords);
+      ui.attestation.checked = false;
+    }
     await readPlacedEstimates();
     const available = new Set(journal.sources.map(s => s.capture_id));
     journal.memberIds = journal.memberIds.filter(id => available.has(id));
@@ -785,7 +793,7 @@ export function mountPersonalIntake(deps: {
     const until = new Date(ui.validUntil.value);
     if (!Number.isFinite(until.getTime()) || until.getTime() <= Date.now()) throw new Error('Enter a future authority expiry.');
     if (!ui.purpose.value.trim() || !ui.authority.value.trim()) throw new Error('Choose sources and state your purpose and account authority.');
-    if (operation === 'review' && (!ui.attestation.checked || !ui.reviewer.value.trim()
+    if (operation === 'review' && (!attestationWords || !ui.attestation.checked || !ui.reviewer.value.trim()
       || members.some(s => !inspected.has(s.capture_id) || !choices.has(s.capture_id)))) {
       throw new Error('Inspect every exact original, choose its actual review, and complete the named attestation.');
     }
@@ -795,7 +803,7 @@ export function mountPersonalIntake(deps: {
       purpose: ui.purpose.value.trim(),
       authority: { account_authority_basis: ui.authority.value.trim(), authorized_at: now, valid_until: until.toISOString() },
       recorded_at: now, operation,
-      ...(operation === 'review' ? { reviewed_by_name: ui.reviewer.value.trim(), attestation: HUMAN_ATTESTATION } : {}),
+      ...(operation === 'review' ? { reviewed_by_name: ui.reviewer.value.trim(), attestation: attestationWords } : {}),
       // Sent only for the boxes ticked in this admission's own step, with the authority the rights
       // are granted under. Each notice is the server's text displayed beside its box; the server
       // compares it with its own and refuses anything else, so a client that showed nothing, or

@@ -51,6 +51,7 @@ from PIL import Image
 
 from exulanica.canonical import sha256_digest
 from exulanica.consent.regions import PersonDetector, Silhouette
+from exulanica.corpus.decode import DecodeBusy
 from exulanica.epistemics.source_images import normalized_image
 from exulanica.errors import BlobNotFoundError, TombstonedError
 from exulanica.evidence import EvidenceAddress
@@ -719,12 +720,14 @@ def _retryable(exc: Exception) -> bool:
 
     Retry only failures whose types carry that meaning. Configuration, missing input, budget
     refusal, integrity failure and programmer errors are terminal; treating every exception as
-    transient is an automated spend loop disguised as resilience.
+    transient is an automated spend loop disguised as resilience. A decode refused because the
+    process was decoding its limit (:class:`DecodeBusy`) decoded nothing and spent nothing.
     """
     if isinstance(exc, TransportError):
         return exc.retryable
     return isinstance(
-        exc, (StructuredOutputError, TruncatedResponseError, *TRANSIENT_DATABASE_REFUSALS)
+        exc,
+        (StructuredOutputError, TruncatedResponseError, DecodeBusy, *TRANSIENT_DATABASE_REFUSALS),
     )
 
 

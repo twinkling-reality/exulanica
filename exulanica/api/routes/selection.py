@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Callable
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Final, Literal
 
 from fastapi import APIRouter, HTTPException, Request, status
 from pydantic import BaseModel, ConfigDict, Field
@@ -66,7 +66,6 @@ from exulanica.selection import (
 )
 from exulanica.selection.calls import AttemptOutcome, CallCost, noted_calls
 from exulanica.selection.packet import build_content_packet
-from exulanica.selection.proposal import PROMPT_VERSION as PROPOSAL_PROMPT_VERSION
 from exulanica.selection.proposal import propose_appearance
 from exulanica.selection.question import (
     PROMPT_VERSION,
@@ -327,6 +326,14 @@ class SimulationCitationView(BaseModel):
     line: str
     #: Always false: a simulation is not a memory, and never evidence of a personal visit.
     personal_visit_evidence: Literal[False]
+    #: For an event: the society input its minute consumed. Null for the state. Additive.
+    input_seq: int | None = None
+    #: For an event whose target is a placed authored object: that object's id. Additive.
+    object_id: str | None = None
+    #: The version edit that last set that object at or before the authored state the input
+    #: followed, as ``GET /world/versions/{version_id}`` lists it in ``edits``. Additive.
+    edit_seq: int | None = None
+    edit_id: uuid.UUID | None = None
 
 
 class InhabitantReferenceView(BaseModel):
@@ -612,6 +619,10 @@ def _simulation_views(packet: SocietyEvidencePacket | None) -> dict[str, Any]:
                 tick=item.tick,
                 line=item.line,
                 personal_visit_evidence=False,
+                input_seq=item.input_seq,
+                object_id=item.object_id,
+                edit_seq=item.edit_seq,
+                edit_id=item.edit_id,
             )
             for item in packet.items
         },
@@ -797,6 +808,22 @@ def society_answer_model(
     )
 
 
+class ModelNotConfigured(Exception):
+    """This instance holds no model credential, so a route that needs a model answers without one.
+
+    Answered ``503`` with :attr:`code`, the code a capability read gives a model-calling operation
+    on such an instance, and the detail sentence below, which clients already recognise.
+    """
+
+    code: Final = "provider_credential_absent"
+
+    def __init__(self) -> None:
+        super().__init__(
+            "no model credential is configured on this instance. Every other endpoint "
+            "works; this one needs a model and will not guess without one."
+        )
+
+
 def _require_model(
     request: Request, connection: ReadOnlyConnection, session: CurrentSession
 ) -> ModelClient:
@@ -807,13 +834,7 @@ def _require_model(
     """
     client = get_services(request).hosted_model(connection, session.workspace_id)
     if client is None:
-        raise HTTPException(
-            status_code=503,
-            detail=(
-                "no model credential is configured on this instance. Every other endpoint "
-                "works; this one needs a model and will not guess without one."
-            ),
-        )
+        raise ModelNotConfigured()
     return client
 
 
@@ -907,6 +928,10 @@ class AppearanceRequest(BaseModel):
 
     #: The same bound the question route uses, because it is the same text box.
     utterance: Annotated[str, Field(min_length=1, max_length=1000)]
+    #: What a proposal may be drawn from, chosen by the caller and never inferred: the world's
+    #: evidence (the default, and today's path exactly) or an authored design choice that cites
+    #: none. A world with nothing to cite refuses the first with ``no_evidence``.
+    appearance_basis: Literal["evidence", "authored_design"] = "evidence"
 
 
 class AppearanceProfileView(BaseModel):
@@ -956,6 +981,8 @@ class AppearanceProposalView(BaseModel):
     #: change drawn before another writer's is still refused by the world authority.
     base_style_version_id: uuid.UUID
     base_topology_digest: str
+    #: ``evidence`` or ``authored_design``, as the request chose; the preview carries it back.
+    appearance_basis: Literal["evidence", "authored_design"] = "evidence"
 
 
 class AppearanceRefusalView(BaseModel):
@@ -1029,6 +1056,7 @@ def appearance(
         current=current,
         world_id=world_id,
         store=get_services(request).store,
+        basis=body.appearance_basis,
     )
     # A proposal exists only when a current style was read: without one the request is refused.
     assert outcome.proposal is None or drawn_on is not None
@@ -1049,10 +1077,13 @@ def appearance(
                 # Never null on this branch: a proposal exists only because a draft call
                 # returned, and a returned call carries the identifier that served it.
                 model_id=outcome.model_id or "",
-                prompt_version=PROPOSAL_PROMPT_VERSION,
+                # The drafter's own version: evidence and design choices are drawn under
+                # different prompts, and a style proposal records the one that drew it.
+                prompt_version=outcome.prompt_version,
                 spoken=outcome.proposal.spoken,
                 base_style_version_id=drawn_on.version_id,
                 base_topology_digest=drawn_on.topology_digest,
+                appearance_basis=body.appearance_basis,
             )
         ),
         refusal=(
@@ -1062,6 +1093,6 @@ def appearance(
                 code=outcome.refusal.code.value, detail=outcome.refusal.detail
             )
         ),
-        execution=_execution(outcome.calls, (), prompt_version=PROPOSAL_PROMPT_VERSION),
+        execution=_execution(outcome.calls, (), prompt_version=outcome.prompt_version),
         names=dict(outcome.names),
     )

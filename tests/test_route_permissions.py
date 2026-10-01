@@ -30,6 +30,7 @@ from types import MappingProxyType, SimpleNamespace
 import psycopg
 import pytest
 from exulanica.api import permissions
+from exulanica.api.admission import AdmissionSettings
 from exulanica.api.app import create_app
 from exulanica.api.authorisation import TokenDirectory, TokenNotAccepted, load_token_directory
 from exulanica.api.authorisation import TokenNotAccepted as _NotAccepted
@@ -70,9 +71,11 @@ APP_ROLE = f"{RUNTIME_ROLE}_secfloor"
 
 
 def _unbuilt_services() -> object:
-    """Enough for ``create_app`` to build a router: it reads these two at construction and
+    """Enough for ``create_app`` to build a router: it reads these three at construction and
     nothing else until a request arrives, so the sweep needs no database."""
-    return SimpleNamespace(society_base_tick_interval_ms=1000, society_runtime=None)
+    return SimpleNamespace(
+        society_base_tick_interval_ms=1000, society_runtime=None, admission=AdmissionSettings()
+    )
 
 
 def _application():
@@ -229,9 +232,22 @@ def test_the_consequential_surfaces_are_each_isolated():
     }
 
 
+#: POSTs that only read: each takes a body a GET could not carry and writes nothing. The two
+#: Companion action routes compute a plan from typed actions and read back what the authorities
+#: recorded; their tests hold every world, style and society table unchanged across them.
+READ_SHAPED_POSTS = frozenset(
+    {
+        ("POST", "/selection"),
+        ("POST", "/selection/packet"),
+        ("POST", "/selection/actions/outcome"),
+        ("POST", "/selection/actions/prepare"),
+    }
+)
+
+
 def test_no_route_that_changes_state_is_satisfied_by_a_read_alone():
-    """A POST or DELETE needing only reads is a hole, except the two named read-shaped POSTs."""
-    read_shaped = {("POST", "/selection"), ("POST", "/selection/packet")}
+    """A POST or DELETE needing only reads is a hole, except the named read-shaped POSTs."""
+    read_shaped = READ_SHAPED_POSTS
     for (method, path), rule in ROUTE_RULES.items():
         if method == "GET" or isinstance(rule, Public | Authentication):
             continue
@@ -275,6 +291,7 @@ def test_every_route_that_can_reach_a_model_requires_model_invoke():
     """
     found = _model_routes()
     assert sorted(found) == [
+        ("POST", "/selection/actions"),
         ("POST", "/selection/appearance"),
         ("POST", "/selection/ask"),
         ("POST", "/selection/environment"),
@@ -584,7 +601,7 @@ def test_every_route_refuses_a_grant_that_does_not_cover_it(floor):
         refused.add((method, path))
         expected = (404, "unknown_reference") if "{" in path else (403, "not_authorised")
         assert (response.status_code, response.json()["code"]) == expected, (method, path)
-    assert len(refused) == len(AUTHENTICATED) - 4
+    assert len(refused) == len(AUTHENTICATED) - 6
 
     rows = _refusal_rows(floor, floor.workspace_a, "operator")
     assert set(rows) == refused
@@ -819,11 +836,7 @@ def test_a_token_missing_a_routes_permission_is_refused_on_the_wire(floor, who):
         assert _refused_by_the_floor(response), (method, path, response.status_code, response.text)
         refused.append((method, path))
     # Every state-changing route is among the refused, for a token that holds only reads.
-    writes = {
-        key
-        for key in AUTHENTICATED
-        if key[0] != "GET" and key not in {("POST", "/selection"), ("POST", "/selection/packet")}
-    }
+    writes = {key for key in AUTHENTICATED if key[0] != "GET" and key not in READ_SHAPED_POSTS}
     assert writes <= set(refused), sorted(writes - set(refused))
 
 

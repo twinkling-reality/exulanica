@@ -11,13 +11,16 @@ from __future__ import annotations
 
 from PIL import Image
 
-from exulanica.corpus.decode import MAX_PIXELS, UNREADABLE, open_sensor, probe
+from exulanica.corpus.decode import MAX_PIXELS, UNREADABLE, decoding, open_sensor, probe
 from exulanica.ingest.exif import ExifFacts, extract_exif_facts
 
 __all__ = ["MAX_PIXELS", "UNREADABLE", "open_upright", "probe"]
 
 
 def open_upright(data: bytes) -> tuple[Image.Image, ExifFacts]:
-    """Return bounded upright pixels and the facts recorded by their original photograph."""
-    with open_sensor(data) as opened:
+    """Return bounded upright pixels and the facts recorded by their original photograph.
+
+    One decode turn covers the load and the orientation copy, the two buffers of the peak.
+    """
+    with decoding(), open_sensor(data) as opened:
         return extract_exif_facts(opened)

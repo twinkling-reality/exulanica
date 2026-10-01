@@ -26,24 +26,49 @@ rather than as a comment:
 Neither endpoint is authorised, and that is the one deliberate exception to "every endpoint is
 authorised". A liveness probe that needed a credential would be a liveness probe that goes red
 when the credential rotates. Neither returns anything about the contents of any workspace.
+
+**Neither competes with the work it reports on.** Both are exempt from admission
+(:mod:`exulanica.api.admission`), so a full instance still answers them. Liveness is asynchronous
+and uses no worker thread, so it answers while every request thread is busy. Readiness runs its
+checks in one thread of its own, one evaluation at a time: a probe that arrives while one runs is
+answered from the last evaluation when that is at most :data:`READINESS_TTL_SECONDS` old, and
+otherwise waits for the running one for at most :data:`READINESS_WAIT_SECONDS`. So a flood of
+probes holds one thread and the connections of one evaluation, never a request thread, and a probe
+with nobody else asking always gets a fresh evaluation. The body says when its checks ran.
 """
 
 from __future__ import annotations
 
-from typing import Any
+import datetime as dt
+import time
+from dataclasses import dataclass
+from typing import Any, Final
 
-from fastapi import APIRouter, Request, Response
+import anyio
+import anyio.to_thread
+from anyio.lowlevel import RunVar
+from fastapi import APIRouter, FastAPI, Request, Response
 
 from exulanica.api.services import Services, describe_configuration
+from exulanica.corpus.decode import decode_counts
 from exulanica.db.migrate import applied_migrations
 from exulanica.migrations import migrations
 from exulanica.models.manifest import Role, load_manifest
 
 router = APIRouter(tags=["health"])
 
+#: How old an evaluation may be to answer a probe that arrives while another evaluation runs.
+READINESS_TTL_SECONDS: Final = 2.0
+
+#: The longest a probe waits for a running evaluation when no recent one can answer it.
+READINESS_WAIT_SECONDS: Final = 5.0
+
+#: Readiness's own worker thread, one per event loop, as anyio keeps its default limiter.
+_READINESS_THREAD: RunVar[anyio.CapacityLimiter] = RunVar("exulanica_readiness_thread")
+
 
 @router.get("/healthz", summary="Liveness. Touches no dependency.")
-def healthz() -> dict[str, str]:
+async def healthz() -> dict[str, str]:
     return {"status": "alive"}
 
 
@@ -93,13 +118,75 @@ def _worker_check(request: Request, services: Services) -> dict[str, Any]:
 
 
 @router.get("/readyz", summary="Readiness. One query, one object-store call, no model call.")
-def readyz(request: Request, response: Response) -> dict[str, Any]:
+async def readyz(request: Request, response: Response) -> dict[str, Any]:
     """Report each check separately, and return 503 when any of them fails.
 
     Separately, because a single boolean tells an operator at 3am that something is wrong and
     nothing about which thing. The checks are the ones section 6.2 lists, and each one's entry says
-    what it proves rather than only whether it passed.
+    what it proves rather than only whether it passed. ``checked_at`` and ``age_ms`` say when the
+    checks ran; ``capacity`` gives the declared limits, and ``GET /operations/capacity`` the counts.
     """
+    cache = _readiness_cache(request.app)
+    if cache.pending is None:
+        cache.pending = anyio.Event()
+        try:
+            cache.body = await anyio.to_thread.run_sync(
+                _evaluate, request, limiter=_readiness_thread()
+            )
+            cache.at = time.monotonic()
+        finally:
+            pending, cache.pending = cache.pending, None
+            pending.set()
+    elif cache.body is None or time.monotonic() - cache.at > READINESS_TTL_SECONDS:
+        with anyio.move_on_after(READINESS_WAIT_SECONDS):
+            await cache.pending.wait()
+    body = cache.body
+    if body is None:
+        response.status_code = 503
+        return {
+            "ready": False,
+            "detail": "the first readiness evaluation has not finished; ask again",
+        }
+    if not body["ready"]:
+        response.status_code = 503
+    admission = getattr(request.app.state, "admission", None)
+    return {
+        **body,
+        "age_ms": int((time.monotonic() - cache.at) * 1000),
+        # Limits only: what is in use is other workspaces' activity, and this is unauthenticated.
+        "capacity": {
+            **(admission.limits() if admission is not None else {}),
+            "decodes": {"limit": decode_counts()["limit"]},
+        },
+    }
+
+
+@dataclass
+class _ReadinessCache:
+    body: dict[str, Any] | None = None
+    at: float = 0.0
+    pending: anyio.Event | None = None
+
+
+def _readiness_cache(app: FastAPI) -> _ReadinessCache:
+    cache = getattr(app.state, "readiness_cache", None)
+    if cache is None:
+        cache = _ReadinessCache()
+        app.state.readiness_cache = cache
+    return cache
+
+
+def _readiness_thread() -> anyio.CapacityLimiter:
+    try:
+        return _READINESS_THREAD.get()
+    except LookupError:
+        limiter = anyio.CapacityLimiter(1)
+        _READINESS_THREAD.set(limiter)
+        return limiter
+
+
+def _evaluate(request: Request) -> dict[str, Any]:
+    """The checks themselves, in readiness's own thread."""
     services: Services = request.app.state.services
     checks: dict[str, Any] = {}
 
@@ -111,14 +198,12 @@ def readyz(request: Request, response: Response) -> dict[str, Any]:
     checks["accounts"] = _account_check(services)
     checks["society_playback"] = _society_check(request, services)
 
-    ready = all(check["ok"] for check in checks.values())
-    if not ready:
-        response.status_code = 503
     return {
-        "ready": ready,
+        "ready": all(check["ok"] for check in checks.values()),
         "checks": checks,
         "warnings": list(services.warnings),
         "configuration": describe_configuration(),
+        "checked_at": dt.datetime.now(dt.UTC).isoformat(timespec="milliseconds"),
     }
 
 

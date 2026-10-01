@@ -902,6 +902,11 @@ class DerivativeWorker:
             return "failed"
         if outcome.unavailable:
             return "partial"
+        # Every photograph was withdrawn before its derivatives ran: the batch was cancelled by
+        # the person who uploaded it, which is neither a success nor a failure. A mix of
+        # withdrawn and finished photographs closes by the finished ones, as below.
+        if outcome.cancelled and not outcome.succeeded:
+            return "cancelled"
         return IntakeBatch.outcome_for(succeeded=outcome.succeeded, failed=outcome.failed)
 
     @staticmethod
@@ -932,7 +937,9 @@ class DerivativeWorker:
         was withdrawn. Counting it as a failure would put a red state in front of somebody who
         had just pressed delete and got exactly what they asked for, and the terminal event
         already tells the truth about what is left: ``photographsAvailable`` counts live
-        captures, so a batch whose every photograph was deleted ends as ready with none.
+        captures. A batch whose every photograph was withdrawn closes ``cancelled``, which its
+        terminal event carries as ``reason: cancelled``; one with some photographs finished
+        closes by those.
 
         ``IntakeBatch.close`` refuses a batch that is not ``running``, so this is safe to call
         for a batch some other worker has already closed. It is the second guard rather than the

@@ -255,6 +255,11 @@ else:
 
 - `exulanica/environment/nyc_open_data.py`, `exulanica/environment/owned_district.py` and
   `exulanica/evaluation/benchmark.py` open URLs with `urllib` and do not pass through it.
+- `exulanica/store/object.py`, the S3-compatible content store, reaches the one endpoint its
+  settings name ([deployment](deployment.md#4-the-content-store)) with a client of its own. It
+  follows no redirect and reads no proxy setting, and it refuses plain `http` except to a loopback
+  host or an acknowledged private network; it is not held to this allowlist, which lives in the
+  model client that the store's layer may not import.
 - The test that keeps this list true matches `urlopen`, `httpx` and `httpx2` clients,
   `OAuth2Client`, `requests`, `aiohttp`, `urllib3` and `socket.create_connection`. A client library
   outside that pattern would be missed.
@@ -345,3 +350,5 @@ when it does not, naming the role.
 
 - OPEN. A process-level sandbox exists only for the gsplat container. Nothing here adds one.
 - OPEN. An egress control at the network, and a request rate limit, are a deployment's to add.
+  Admission ([deployment](deployment.md#541-admission)) bounds how much work one API process holds
+  at once, per class and per workspace; it counts work in progress, not requests per unit of time.

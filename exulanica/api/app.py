@@ -31,6 +31,14 @@ through ``/readyz`` rather than looking identical to one whose worker is wedged.
 route sees it, which is the only place it can be refused before a multipart parser has already
 written it to disk.
 
+**Admission.** :mod:`exulanica.api.admission` sits just inside the body limit and decides, before
+routing, a body, a thread or a connection, whether this process accepts a request now: 503
+``capacity_exhausted`` for the process at a declared limit, 429 ``workspace_capacity_exhausted``
+for a workspace at its share, both with ``Retry-After``, and 408 ``body_timeout`` for a body that
+stopped arriving. The lifespan applies the thread limit those declarations are checked against, and
+the photograph decode bound (:func:`exulanica.corpus.decode.configure_decode_concurrency`) is set
+here, answering 503 ``capacity_exhausted`` for ``decodes`` when a decode waited out its turn.
+
 **The permission floor.** :func:`exulanica.api.dependencies.authorise_route` is installed as an
 application-level dependency, so it runs for every route before the route's own dependencies and
 before any validation, and no route can leave it out. :func:`create_app` refuses to build an
@@ -55,11 +63,21 @@ from collections.abc import AsyncIterator, Mapping
 from contextlib import asynccontextmanager
 from typing import Final
 
+import anyio.to_thread
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
-from psycopg.errors import InsufficientPrivilege
+from psycopg.errors import DeadlockDetected, InsufficientPrivilege, SerializationFailure
 
 from exulanica.api.account_repository import AccountUnavailable
+from exulanica.api.admission import (
+    DECODES,
+    Admission,
+    AdmissionMiddleware,
+    BodyTimeout,
+    CapacityRefused,
+    DerivativeQueueFull,
+    require_capacity_declaration,
+)
 from exulanica.api.authorisation import TokenNotAccepted
 from exulanica.api.body_limit import BodyLimit, BodyTooLarge
 from exulanica.api.dependencies import authorise_route
@@ -88,6 +106,7 @@ from exulanica.api.routes import (
     reconstruction_admission,
     scene_segments,
     selection,
+    selection_actions,
     selection_environment,
     society,
     society_actions,
@@ -115,9 +134,10 @@ from exulanica.api.routes import (
     world_write,
     worlds,
 )
-from exulanica.api.routes.selection import failure_extensions
+from exulanica.api.routes.selection import ModelNotConfigured, failure_extensions
 from exulanica.api.services import Services, build_services
 from exulanica.api.traffic_signal_controller import TrafficSignalController
+from exulanica.corpus.decode import DecodeBusy, configure_decode_concurrency
 from exulanica.db.migrate import verify_schema
 from exulanica.db.roles import assert_runtime_role
 from exulanica.deletion.restore import verify_restore
@@ -125,6 +145,8 @@ from exulanica.errors import (
     BlobNotFoundError,
     EpistemicViolation,
     IntegrityError,
+    ObjectStoreError,
+    ObjectStoreUnavailable,
     TombstonedError,
 )
 from exulanica.grammar.errors import (
@@ -239,6 +261,9 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     lifespan: the seeding a deployment depends on is the seeding the tests exercise.
     """
     services: Services = app.state.services
+    # Every synchronous route and dependency runs on this limiter, and admission's limits are
+    # checked against its size, so it is set before the first request rather than left to anyio.
+    anyio.to_thread.current_default_thread_limiter().total_tokens = services.admission.threads
     if app.state.verify_schema_at_boot:
         verify_schema(services.database)
         with services.database.unscoped() as connection:
@@ -347,6 +372,12 @@ def create_app(services: Services | None = None, *, verify: bool = True) -> Fast
         app.state.society_input_authorizer = runtime.authorize
         app.state.society_authored_edit = runtime.authored_edit
     app.state.verify_schema_at_boot = verify
+    app.state.admission = Admission(app.state.services.admission)
+    configure_decode_concurrency(app.state.services.admission.decodes)
+    # Pure ASGI and just inside the body limit, so a refusal comes before routing, before any body
+    # is read and before a thread or a connection is taken. Added first, because the middleware
+    # added last is the outermost.
+    app.add_middleware(AdmissionMiddleware, admission=app.state.admission)
     # Pure ASGI and outermost, so it runs before routing and before any body is read.
     app.add_middleware(BodyLimit)
 
@@ -357,6 +388,7 @@ def create_app(services: Services | None = None, *, verify: bool = True) -> Fast
     app.include_router(geometry.scene_router)
     app.include_router(scene_segments.router)
     app.include_router(selection.router)
+    app.include_router(selection_actions.router)
     app.include_router(selection_environment.router)
     app.include_router(society.router)
     app.include_router(society_actions.router)
@@ -406,12 +438,35 @@ def create_app(services: Services | None = None, *, verify: bool = True) -> Fast
     # After the last router and before the application is handed to anybody: a route nobody
     # declared, or a declaration for a route that is gone, is a build failure with its name in it.
     require_complete_declaration(app)
+    require_capacity_declaration(app)
 
     @app.exception_handler(BodyTooLarge)
     async def _too_large(_request: Request, exc: BodyTooLarge) -> JSONResponse:
         # Raised out of the wrapped `receive` while the body was still arriving, which is the
         # only place a request that declared no length can be stopped before it is all on disk.
         return _problem(413, "body_too_large", exc.detail)
+
+    @app.exception_handler(BodyTimeout)
+    async def _body_timeout(_request: Request, exc: BodyTimeout) -> JSONResponse:
+        # Raised out of admission's wrapped `receive`; the connection ends with the answer, as it
+        # does for a body that is too large, because the rest of the body is never read.
+        response = _problem(408, "body_timeout", exc.detail)
+        response.headers["Connection"] = "close"
+        return response
+
+    @app.exception_handler(CapacityRefused)
+    async def _capacity(_request: Request, exc: CapacityRefused) -> JSONResponse:
+        # A workspace at its share, found when the caller was resolved and before the route ran.
+        return exc.response()
+
+    @app.exception_handler(DecodeBusy)
+    async def _decode_busy(_request: Request, _exc: DecodeBusy) -> JSONResponse:
+        # A decode waited out its turn: nothing was decoded, so the request can be sent again.
+        return CapacityRefused(DECODES, workspace=False).response()
+
+    @app.exception_handler(DerivativeQueueFull)
+    async def _queue_full(_request: Request, exc: DerivativeQueueFull) -> JSONResponse:
+        return exc.response()
 
     @app.exception_handler(TokenNotAccepted)
     async def _unauthenticated(_request: Request, exc: TokenNotAccepted) -> JSONResponse:
@@ -450,6 +505,32 @@ def create_app(services: Services | None = None, *, verify: bool = True) -> Fast
             403,
             "database_privilege_refused",
             "this instance's database role may not do what this request asked",
+        )
+
+    @app.exception_handler(SerializationFailure)
+    @app.exception_handler(DeadlockDetected)
+    async def _transient_conflict(request: Request, exc: Exception) -> JSONResponse:
+        # SQLSTATE 40001 or 40P01: the database refused this request's statement for a moment,
+        # for a conflict with another transaction (migration 0041's asset read barrier is one).
+        # Transient by definition, so the same request can be sent again; "busy", as the routes
+        # that meet a held lock say it. A route that knows more answers first with its own code.
+        _LOG.warning(
+            "A transient database conflict ended %s %s: SQLSTATE %s",
+            request.method,
+            getattr(request.scope.get("route"), "path", request.url.path),
+            getattr(exc, "sqlstate", None),
+        )
+        return JSONResponse(
+            status_code=409,
+            content={
+                "code": "busy",
+                "detail": (
+                    "the database refused this request for a moment, for a conflict with another "
+                    "transaction; the same request can be sent again after 1 second"
+                ),
+                "retry_after_seconds": 1,
+            },
+            headers={"Retry-After": "1"},
         )
 
     @app.exception_handler(TileQuotaExceeded)
@@ -516,6 +597,18 @@ def create_app(services: Services | None = None, *, verify: bool = True) -> Fast
         # all here would hide it.
         return _problem(500, "integrity_failure", str(exc))
 
+    @app.exception_handler(ObjectStoreError)
+    async def _store_unavailable(_request: Request, exc: ObjectStoreError) -> JSONResponse:
+        # The content store is an upstream this instance depends on: an endpoint that cannot be
+        # reached, or a bucket the store refuses to trust. 503 with the store's stable reason as
+        # the detail, rather than an unhandled 500, which this API keeps for `integrity_failure`.
+        # The reason and not the message: the message names object keys. Retry-After only when
+        # waiting can help; a refused bucket waits for its operator.
+        response = _problem(503, "store_unavailable", exc.code)
+        if isinstance(exc, ObjectStoreUnavailable):
+            response.headers["Retry-After"] = "30"
+        return response
+
     @app.exception_handler(ModelError)
     async def _model(_request: Request, exc: ModelError) -> JSONResponse:
         # **A question that could not be planned or answered is refused, not crashed.**
@@ -548,6 +641,13 @@ def create_app(services: Services | None = None, *, verify: bool = True) -> Fast
         if isinstance(exc, TruncatedResponseError):
             return _problem(500, "model_output_truncated", str(exc), extensions)
         return _problem(502, "model_refused", _model_failure_detail(exc), extensions)
+
+    @app.exception_handler(ModelNotConfigured)
+    async def _no_model(_request: Request, exc: ModelNotConfigured) -> JSONResponse:
+        # A route that needs a model, on an instance with no credential. 503 as it always was,
+        # now with the code a capability read gives the same condition; the detail is unchanged
+        # because clients recognise the sentence.
+        return _problem(503, exc.code, str(exc))
 
     @app.exception_handler(HostedRequestRefused)
     async def _hosted_refused(_request: Request, exc: HostedRequestRefused) -> JSONResponse:

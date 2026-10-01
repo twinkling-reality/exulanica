@@ -11,6 +11,7 @@ from exulanica.ingest.derivative_queue import DERIVATIVES
 from exulanica.ingest.spine.reconstruction_jobs import MAX_SCENE_CLAIMS
 
 __all__ = [
+    "derivative_job",
     "derivative_job_events",
     "derivative_job_metrics",
     "reconstruction_scene_job",
@@ -84,6 +85,37 @@ def derivative_job_metrics(
             "usd_estimate": str(row["usd_estimate"]),
         },
         "failure_classes": failures,
+    }
+
+
+def derivative_job(
+    connection: psycopg.Connection,
+    workspace_id: uuid.UUID,
+    job_id: uuid.UUID,
+) -> dict[str, Any] | None:
+    """One derivative job's state and progress, or None for foreign and unknown ids alike.
+
+    ``state`` is the job's own: ``queued`` and ``running`` are live, ``done``, ``failed``,
+    ``cancelled``, ``missing`` and ``unavailable`` are the terminal outcomes the queue records.
+    """
+    row = connection.execute(
+        "select job_id, batch_id, state, attempts, progress_completed, progress_total, "
+        "created_at, completed_at, duration_ms, failure_class from job "
+        "where workspace_id = %s and kind = %s and job_id = %s",
+        (workspace_id, DERIVATIVES, job_id),
+    ).fetchone()
+    if row is None:
+        return None
+    return {
+        "job_id": str(row["job_id"]),
+        "batch_id": None if row["batch_id"] is None else str(row["batch_id"]),
+        "state": row["state"],
+        "attempts": int(row["attempts"]),
+        "progress": {"completed": int(row["progress_completed"]), "total": row["progress_total"]},
+        "created_at": row["created_at"].isoformat(),
+        "completed_at": None if row["completed_at"] is None else row["completed_at"].isoformat(),
+        "duration_ms": row["duration_ms"],
+        "failure_class": row["failure_class"],
     }
 
 

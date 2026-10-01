@@ -421,6 +421,10 @@ PROBE_OVERRIDES: Final[dict[str, dict[str, Any]]] = {
         **_IN_WORLD,
         "json": {"base_state_sha256": _ZERO_DIGEST},
     },
+    "POST /world/versions/{version_id}/objects/undo/preview": {
+        **_IN_WORLD,
+        "json": {"base_state_sha256": _ZERO_DIGEST},
+    },
     "POST /world/versions/{version_id}/objects/{object_id}/behaviour": {
         **_IN_WORLD,
         "json": {
@@ -441,7 +445,15 @@ PROBE_OVERRIDES: Final[dict[str, dict[str, Any]]] = {
         **_IN_WORLD,
         "json": {"base_state_sha256": _ZERO_DIGEST, "transform": _TRANSFORM},
     },
+    "POST /world/versions/{version_id}/objects/{object_id}/move/preview": {
+        **_IN_WORLD,
+        "json": {"base_state_sha256": _ZERO_DIGEST, "transform": _TRANSFORM},
+    },
     "POST /world/versions/{version_id}/objects/{object_id}/remove": {
+        **_IN_WORLD,
+        "json": {"base_state_sha256": _ZERO_DIGEST},
+    },
+    "POST /world/versions/{version_id}/objects/{object_id}/remove/preview": {
         **_IN_WORLD,
         "json": {"base_state_sha256": _ZERO_DIGEST},
     },

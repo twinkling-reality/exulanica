@@ -424,6 +424,10 @@ def _terminal(
             "stage_missing": "missing",
         }.get(stopped["type"], "stage_error")
         outcome["reason"] = "cancelled" if status == "cancelled" else reason
+    elif status == "cancelled":
+        # Withdrawn photographs record no failed stage, so nothing above names a reason; the
+        # batch's own status is the reason, and it is not a failure of the pipeline.
+        outcome["reason"] = "cancelled"
 
     return FormationEvent(
         event_id=f"batch:{batch['batch_id']}:{status}",

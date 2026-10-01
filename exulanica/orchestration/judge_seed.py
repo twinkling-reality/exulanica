@@ -595,9 +595,8 @@ def _blob_id(key: str) -> BlobId:
 def _read_key(store: ContentAddressedStore, key: str) -> bytes:
     """Read one object through the store's interface rather than through a path.
 
-    ``LocalContentAddressedStore`` is the only backend today and it writes its files 0444, so
-    reaching around it to a path would work, and would also be the line that has to change on the
-    day a second backend exists.
+    A path reaches the local backend and nothing else: the S3-compatible backend has no path, so
+    reading through the interface is what lets a seed move between the two.
     """
     try:
         return store.get(_blob_id(key))

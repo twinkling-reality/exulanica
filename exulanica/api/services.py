@@ -34,7 +34,7 @@ import os
 import uuid
 from collections.abc import Callable, Mapping
 from contextlib import AbstractContextManager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal
 from pathlib import Path
 from typing import TYPE_CHECKING, Final
@@ -42,6 +42,7 @@ from typing import TYPE_CHECKING, Final
 import psycopg
 
 from exulanica.api.account_runtime import AccountRuntime, load_account_runtime
+from exulanica.api.admission import AdmissionSettings
 from exulanica.api.authorisation import API_TOKENS_ENV, TokenDirectory, load_token_directory
 from exulanica.api.composer_rights import photograph_text_right
 from exulanica.api.decision_host import (
@@ -72,8 +73,7 @@ from exulanica.models.client import PROVIDER_CREDENTIAL_ABSENT, ModelClient
 from exulanica.models.egress import EGRESS_ALLOWLIST_ENV
 from exulanica.models.manifest import MANIFEST_PATH, Role, load_manifest
 from exulanica.store.base import ContentAddressedStore
-from exulanica.store.local import LocalContentAddressedStore
-from exulanica.store.namespaces import BLOB_NAMESPACE, material_stores, tile_store
+from exulanica.store.configured import ContentStores, content_stores
 from exulanica.world.decision_roles import DecisionRole, decision_roles
 from exulanica.world.material_recipes import MaterialRuntime
 from exulanica.world.society import world_society_seed
@@ -236,6 +236,10 @@ class Services:
     #: the default of a hand-built instance, so an instance nobody wired to the right sends no
     #: place's name.
     released_place_names: ReleasedPlaces = no_place_released
+    #: How much work this process accepts at once (:mod:`exulanica.api.admission`). The declared
+    #: defaults for a hand-built instance; ``build_services`` reads ``EXULANICA_API_*`` and
+    #: ``EXULANICA_INTAKE_QUEUED_JOBS``.
+    admission: AdmissionSettings = field(default_factory=AdmissionSettings)
 
     @property
     def society_control_enabled(self) -> bool:
@@ -623,7 +627,8 @@ def build_services(
     client = model_client
     if client is None and _role_credentials_set(environ):
         client = ModelClient()
-    store = LocalContentAddressedStore(data_dir / BLOB_NAMESPACE)
+    stores = content_stores(environ, data_dir=data_dir)
+    store = stores.blobs
     comparison_player = _comparison_player(env_get("COMPARISON_WORKER", environ))
 
     return Services(
@@ -635,9 +640,9 @@ def build_services(
         model_client=client,
         accounts=accounts,
         environment_admission_root=data_dir / "environment-inbox",
-        materials=_material_runtime(data_dir, environ),
+        materials=_material_runtime(stores, environ),
         character_appearance=_character_appearance_runtime(store, environ),
-        tiles=tile_store(data_dir),
+        tiles=stores.tiles,
         society_runtime=_society_runtime(store, environ),
         runs_derivative_worker=_enabled(env_get("DERIVATIVE_WORKER", environ)),
         runs_society_control_worker=_explicitly_enabled(env_get("SOCIETY_CONTROL_WORKER", environ)),
@@ -654,6 +659,7 @@ def build_services(
             Path(value) if (value := env_get("RESTORE_STATE_PATH", environ)) else None
         ),
         released_place_names=released_place_names,
+        admission=AdmissionSettings.from_env(environ),
     )
 
 
@@ -701,7 +707,7 @@ def _society_runtime(store: ContentAddressedStore, environ: Mapping[str, str]) -
     )
 
 
-def _material_runtime(data_dir: Path, environ: Mapping[str, str]) -> MaterialRuntime | None:
+def _material_runtime(stores: ContentStores, environ: Mapping[str, str]) -> MaterialRuntime | None:
     """The published makers and each workspace's bake namespace, when the catalog is here.
 
     ``EXULANICA_TEXTURE_DIRECTORY`` names the catalog in an image; a checkout finds its own. The
@@ -714,7 +720,7 @@ def _material_runtime(data_dir: Path, environ: Mapping[str, str]) -> MaterialRun
         catalog = load_material_catalog(Path(directory)) if directory else load_material_catalog()
     except FileNotFoundError:
         return None
-    return MaterialRuntime(catalog=catalog, stores=material_stores(data_dir))
+    return MaterialRuntime(catalog=catalog, stores=stores.materials)
 
 
 def _character_appearance_runtime(
@@ -850,6 +856,7 @@ def describe_configuration(environ: Mapping[str, str] | None = None) -> dict[str
         SOCIETY_CONTROL_WORKSPACES_ENV,
         SOCIETY_TICK_INTERVAL_MS_ENV,
         API_TOKENS_ENV,
+        *AdmissionSettings.variables(),
         *sorted({provider.api_key_env for provider in load_manifest().providers.values()}),
         "EXULANICA_GOOGLE_CLIENT_ID",
         "EXULANICA_GOOGLE_CLIENT_SECRET",

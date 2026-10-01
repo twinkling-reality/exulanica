@@ -72,6 +72,10 @@ class StyleProposal:
     model_id: str | None = None
     prompt_version: str | None = None
     refines_proposal_id: uuid.UUID | None = None
+    #: What a Companion proposal is drawn from: ``evidence`` (it cites the world's evidence by
+    #: reference id) or ``authored_design`` (a design choice citing none). Null for every other
+    #: origin, and read as ``evidence`` on a Companion proposal written before the column.
+    appearance_basis: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -104,6 +108,9 @@ class StyleVersion:
     model_id: str | None = None
     prompt_version: str | None = None
     refines_proposal_id: uuid.UUID | None = None
+    #: The applied proposal's ``appearance_basis``: null for every version not from a Companion
+    #: proposal and for a Companion one applied before the column.
+    appearance_basis: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

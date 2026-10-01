@@ -18,13 +18,19 @@
  * which is the behaviour interaction-model.md 8.4 asks for and which falls out of there being no
  * timer anywhere in this module.
  *
+ * **Only a terminal event finishes a stream.** The server also ends a stream cleanly at its time
+ * cap and after polls it could not make, and a stream that ended without a terminal event is
+ * reconnected from the last token, exactly as a drop is. A refusal that sending again cannot
+ * change (a 4xx other than 408, 409 and 429) stops the subscription rather than retrying it
+ * forever, and a `Retry-After` on a 409, 429 or 503 is waited out before the next attempt.
+ *
  * **Nothing here parses a phase or invents a number.** A frame is JSON, it is handed to the
  * reducer, and a frame that is not usable is dropped with the stream marked lost rather than
  * repaired. `assertUsableEvent` throws on a negative count or a non-finite timestamp precisely so
  * that a pipeline bug surfaces instead of being rendered as a plausible display.
  */
 
-import { assertUsableEvent, type StageEvent } from './events.js';
+import { assertUsableEvent, FORMATION_STAGES, type StageEvent } from './events.js';
 import type { FormationEventSource } from './source.js';
 import type { StreamState } from './state.js';
 
@@ -44,6 +50,8 @@ export interface StreamResponse {
   readonly ok: boolean;
   readonly status: number;
   readonly body: { getReader(): StreamReader } | null;
+  /** Read for `Retry-After` only. Absent in a test double that sends none. */
+  readonly headers?: { get(name: string): string | null };
 }
 
 export type StreamFetch = (
@@ -69,6 +77,21 @@ export interface HttpFormationOptions {
 
 const DEFAULT_RETRY_MS = 1000;
 const DEFAULT_MAX_RETRY_MS = 15000;
+
+/** The id the server gives a batch's terminal event: `batch:<batch id>:<status>`. */
+const TERMINAL_TOKEN = /^batch:[^:]+:[a-z]+$/;
+
+/**
+ * Statuses a later attempt can get past; every other 4xx is final for this subscription. The only
+ * 409 this route gives is the server's `busy`, a momentary database conflict on any route.
+ */
+const RETRIABLE_REFUSALS = new Set([408, 409, 429]);
+
+function retryAfterMs(response: StreamResponse): number {
+  const value = response.headers?.get('retry-after');
+  const seconds = value === null || value === undefined ? Number.NaN : Number(value);
+  return Number.isFinite(seconds) && seconds > 0 ? seconds * 1000 : 0;
+}
 
 function defaultSchedule(run: () => void, ms: number): () => void {
   const handle = setTimeout(run, ms);
@@ -100,6 +123,8 @@ export class HttpFormationEventSource implements FormationEventSource {
     let cancelRetry: (() => void) | null = null;
     let token = fromEventId;
     let waitMs = options.retryMs ?? DEFAULT_RETRY_MS;
+    // A subscription resumed from a terminal id already has its outcome: nothing will follow it.
+    let finished = token !== null && TERMINAL_TOKEN.test(token);
 
     const connect = async (): Promise<void> => {
       if (cancelled) return;
@@ -117,10 +142,17 @@ export class HttpFormationEventSource implements FormationEventSource {
       } catch {
         return retry();
       }
+      const final = response.status >= 400 && response.status < 500;
+      if (final && !RETRIABLE_REFUSALS.has(response.status)) {
+        // Unknown batch, a token the server did not issue, a credential it will not accept:
+        // sending the same request again gets the same answer, so the subscription stops here.
+        onStreamState('lost');
+        return;
+      }
       if (!response.ok || response.body === null) {
         // A refusal is not a lost connection, but the client can do nothing about either and the
         // honest display is the same: we do not know what the pipeline is doing.
-        return retry();
+        return retry(retryAfterMs(response));
       }
 
       reader = response.body.getReader();
@@ -144,6 +176,7 @@ export class HttpFormationEventSource implements FormationEventSource {
             const event = parseFrame(frame);
             if (event !== null) {
               token = event.eventId;
+              finished ||= event.stageIndex >= FORMATION_STAGES.length;
               onEvent(event);
             }
             split = buffer.indexOf('\n\n');
@@ -153,17 +186,22 @@ export class HttpFormationEventSource implements FormationEventSource {
         return retry();
       }
       if (cancelled) return;
+      if (!finished) {
+        // Ended without an outcome: the server's time cap, or polls it could not make. The
+        // pipeline may still be running, so this is resumed like a drop.
+        return retry();
+      }
       // The server closes the stream after a terminal event, which is the normal end. Reporting
       // it as lost would put a reconnecting spinner over a finished region.
       onStreamState('live');
     };
 
-    const retry = (): void => {
-      if (cancelled) return;
+    const retry = (atLeastMs = 0): void => {
+      if (cancelled || finished) return;
       onStreamState('lost');
       cancelRetry = schedule(() => {
         void connect();
-      }, waitMs);
+      }, Math.max(waitMs, atLeastMs));
       waitMs = Math.min(waitMs * 2, options.maxRetryMs ?? DEFAULT_MAX_RETRY_MS);
     };
 

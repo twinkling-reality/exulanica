@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ApiError, adaptSnapshot } from '@exulanica/graph-client';
 import { initialFormationState } from '@exulanica/formation';
 import { mountPersonalIntake, createPersonalIntakeSession } from '../src/composition/personal-intake.js';
-import { sha256, HUMAN_ATTESTATION } from '../src/personal-admission-api.js';
+import { sha256 } from '../src/personal-admission-api.js';
 import type {
   SavedWorldEntry,
   SavedWorldPreviousSourceAttachment,
@@ -23,10 +23,13 @@ vi.mock('../src/source-media-api.js', () => ({ SourceMediaClient: class {
 const ids = ['11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222222'];
 const key = 'a'.repeat(64), subject = '33333333-3333-4333-8333-333333333333';
 const json = (body: unknown) => new Response(JSON.stringify(body));
+/** The attestation as a server serves it. The browser holds no copy, so any words do here. */
+const ATTESTATION = 'Fixture attestation: I inspected every exact photograph and its people.';
 function fixture(count = 2) {
   let uploaded = false, linked = false, interrupted = false;
   let viewerAvailable = false;
   let regions = true;
+  let attestation = ATTESTATION;
   const posts: { path: string; body: any }[] = [];
   const savedRequests: any[] = [];
   const captureIds = Array.from({ length: count }, (_, i) => ids[i] ?? `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`);
@@ -48,6 +51,7 @@ function fixture(count = 2) {
     if (path === '/personal-admission' && init.method === 'GET') return json({
       sources: uploaded ? await Promise.all(files.map(async (f, i) => ({ capture_id: captureIds[i], sha256: await sha256(await f.arrayBuffer()), bytes: f.size, media_type: 'image/jpeg', authority: null }))) : [],
       requests: savedRequests,
+      attestation,
     });
     if (path === '/intake') {
       uploaded = true;
@@ -83,6 +87,7 @@ function fixture(count = 2) {
   return {
     files, posts, make, captureIds, savedRequests,
     setUploaded: () => { uploaded = true; },
+    setAttestation: (words: string) => { attestation = words; },
     seedReviewed: (ineligible: readonly string[] = []) => {
       uploaded = true;
       viewerAvailable = true;
@@ -705,10 +710,10 @@ describe('mounted personal intake with scripted transport (not real-photo accept
       photo.dispatchEvent(new Event('load'));
       const choice = input(mounted.root, 'Human review of this photograph'); choice.value = 'confirmed-regions'; choice.dispatchEvent(new Event('change'));
     }
-    const attest = input(mounted.root, HUMAN_ATTESTATION); expect(attest.checked).toBe(false); attest.checked = true;
+    const attest = input(mounted.root, ATTESTATION); expect(attest.checked).toBe(false); attest.checked = true;
     button(mounted.root, 'Record human review').click(); await settle(mounted.root);
     const review = f.posts.at(-1)!.body;
-    expect(review.operation).toBe('review'); expect(review.attestation).toBe(HUMAN_ATTESTATION);
+    expect(review.operation).toBe('review'); expect(review.attestation).toBe(ATTESTATION);
     expect(review.members.every((m: any) => m.review === 'confirmed-regions')).toBe(true);
     expect(mounted.root.textContent).toContain('Photograph 1: reviewed and ready to keep with a world.');
     mounted.dispose();
@@ -719,10 +724,25 @@ describe('mounted personal intake with scripted transport (not real-photo accept
     expect(mounted.root.textContent).toContain(subject);
     expect(mounted.root.textContent).toContain(await sha256(await f.files[0]!.arrayBuffer()));
     expect(mounted.root.textContent).toContain('Photograph 1: reviewed and ready to keep with a world.');
-    expect(input(mounted.root, HUMAN_ATTESTATION).checked).toBe(false);
+    expect(input(mounted.root, ATTESTATION).checked).toBe(false);
     expect(input(mounted.root, 'Human review of this photograph').value).toBe('');
     expect(mounted.root.textContent).toContain('0 of 2 saved photographs selected');
     expect(f.posts).toHaveLength(writes);
+    mounted.dispose();
+  });
+  it('shows the attestation the server serves and takes the tick back when its words change', async () => {
+    const f = fixture(); f.setUploaded();
+    const mounted = f.make(); document.body.append(mounted.root); await mounted.begin();
+    const attest = input(mounted.root, ATTESTATION);
+    expect(attest.closest('label')!.textContent).toBe(ATTESTATION);
+    attest.checked = true;
+    f.setAttestation('Fixture attestation, reworded by the server.');
+    button(mounted.root, 'Reload sources and proposals').click(); await settle(mounted.root);
+    expect(input(mounted.root, ATTESTATION)).toBeNull();
+    const reworded = input(mounted.root, 'Fixture attestation, reworded by the server.');
+    expect(reworded).toBe(attest);
+    expect(reworded.checked).toBe(false);
+    expect(reworded.closest('label')!.textContent).toBe('Fixture attestation, reworded by the server.');
     mounted.dispose();
   });
   it('keeps unavailable detection and zero regions separate from a no-person attestation', async () => {
@@ -730,7 +750,7 @@ describe('mounted personal intake with scripted transport (not real-photo accept
     const mounted = f.make(); document.body.append(mounted.root); await mounted.begin();
     expect(mounted.root.textContent).toContain('does not establish a human no-person attestation');
     expect(input(mounted.root, 'Human review of this photograph').value).toBe('');
-    expect(input(mounted.root, HUMAN_ATTESTATION).checked).toBe(false);
+    expect(input(mounted.root, ATTESTATION).checked).toBe(false);
     expect(f.posts).toEqual([]);
     Object.defineProperty(input(mounted.root, 'Reselect exact originals for local review'), 'files', {
       value: [new File(['different bytes'], 'a.heic')],
@@ -749,7 +769,7 @@ describe('mounted personal intake with scripted transport (not real-photo accept
     Object.defineProperty(input(mounted.root, 'Original HEIC or JPEG photographs'), 'files', { value: f.files });
     button(mounted.root, 'Upload originals').click(); await settle(mounted.root);
     expect(mounted.root.textContent).toContain('Person detector unavailable: no provider configured.');
-    expect(input(mounted.root, HUMAN_ATTESTATION).checked).toBe(false);
+    expect(input(mounted.root, ATTESTATION).checked).toBe(false);
     mounted.dispose();
   });
   it('selects a small exact admission from 201 saved photographs and recovers selection, retry and prior receipts', async () => {

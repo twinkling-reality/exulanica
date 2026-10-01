@@ -553,14 +553,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     from exulanica.ingest.repository import IngestRepository
     from exulanica.ingest.stages import STAGES, stage
     from exulanica.reconstruction.standpoint import StandpointPolicy
-    from exulanica.store.local import LocalContentAddressedStore
+    from exulanica.store.configured import content_stores
 
     parser = argparse.ArgumentParser(description=__doc__.split("\n", 1)[0])
     parser.add_argument("--workspace", type=uuid.UUID, required=True)
     parser.add_argument("--scene", type=uuid.UUID, default=None)
     parser.add_argument("--data-dir", type=Path, default=None)
     args = parser.parse_args(argv)
-    store = LocalContentAddressedStore(resolve_data_dir(explicit=args.data_dir).resolve() / "blobs")
+    store = content_stores(data_dir=resolve_data_dir(explicit=args.data_dir).resolve()).blobs
     extractor = _extractor(StandpointPolicy.from_params(stage(STANDPOINT_STAGE).params))
     results = []
     with Database.from_env().session(args.workspace) as connection:

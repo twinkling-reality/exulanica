@@ -1050,8 +1050,11 @@ optimistically, and the label says contact was lost.
 `exulanica/ingest/formation.py` folds the `pipeline_event` rows each stage writes into per-stage
 counters, so a resumed stream reports the same numbers as an uninterrupted one, and a stage nothing
 produces is absent from the stream rather than reported as done. `GET /formation/{batch_id}`
-(`exulanica/api/routes/formation.py`) streams them as server-sent events, polling one indexed query
-every two seconds, ending when the batch ends and sending a comment heartbeat.
+(`exulanica/api/routes/formation.py`) streams them as server-sent events, reading the ledger every
+two seconds on a connection opened for that read, ending when the batch ends and sending a comment
+heartbeat. A stream resumed from the batch's terminal event sends nothing more. A stream that ends
+without a terminal event, at its time cap or when the ledger cannot be read, is resumed from the
+last event id, as a dropped one is ([deployment](deployment.md#545-a-formation-stream-holds-a-place-not-a-thread)).
 
 ---
 

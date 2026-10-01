@@ -48,6 +48,37 @@ class PurgeNotAuthorisedError(ExulanicaError):
     """A purge was attempted without a well formed authorisation."""
 
 
+class ObjectStoreError(ExulanicaError):
+    """An S3-compatible content store refused a request or could not be reached.
+
+    ``code`` is a stable reason a caller or a readiness report can act on, for example
+    ``object_store_unreachable`` or ``object_store_object_lock_enabled``. The message names the
+    operation, the HTTP status, the store's own error code and the object key, and never a
+    credential, a signature or a request header.
+    """
+
+    def __init__(self, code: str, message: str) -> None:
+        super().__init__(message)
+        self.code = code
+
+
+class ObjectStoreUnavailable(ObjectStoreError, ConnectionError):
+    """The endpoint could not be reached, or kept failing, within the retry bound.
+
+    A ``ConnectionError``, so a caller that already treats a local ``OSError`` as a failed read
+    or write treats this one the same way.
+    """
+
+
+class ObjectStoreRefused(ObjectStoreError):
+    """The endpoint or the bucket refused, and retrying the same request will not change that."""
+
+
+class ObjectStoreConfigurationError(ObjectStoreError, ValueError):
+    """A store setting is missing or malformed. Raised at construction, so a process stops at
+    startup with the setting's name rather than failing at its first read."""
+
+
 class EpistemicViolation(ExulanicaError):
     """A write would file a claim under a provenance class its predicate does not allow.
 

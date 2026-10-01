@@ -37,7 +37,7 @@
      "health"
     ],
     "summary": "Readiness. One query, one object-store call, no model call.",
-    "description": "Report each check separately, and return 503 when any of them fails.\n\nSeparately, because a single boolean tells an operator at 3am that something is wrong and\nnothing about which thing. The checks are the ones section 6.2 lists, and each one's entry says\nwhat it proves rather than only whether it passed.",
+    "description": "Report each check separately, and return 503 when any of them fails.\n\nSeparately, because a single boolean tells an operator at 3am that something is wrong and\nnothing about which thing. The checks are the ones section 6.2 lists, and each one's entry says\nwhat it proves rather than only whether it passed. ``checked_at`` and ``age_ms`` say when the\nchecks ran; ``capacity`` gives the declared limits, and ``GET /operations/capacity`` the counts.",
     "operationId": "readyz_readyz_get",
     "responses": {
      "200": {
@@ -1048,6 +1048,216 @@
        "application/json": {
         "schema": {
          "$ref": "#/components/schemas/AppearanceView"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/selection/actions": {
+   "post": {
+    "tags": [
+     "selection"
+    ],
+    "summary": "Read one utterance as a plan of exact world requests, or decline to. Changes nothing.",
+    "operationId": "plan_actions_selection_actions_post",
+    "parameters": [
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ActionRequest"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ActionPlanView"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/selection/actions/prepare": {
+   "post": {
+    "tags": [
+     "selection"
+    ],
+    "summary": "Prepare typed actions as a plan, with no model. Changes nothing.",
+    "operationId": "prepare_actions_selection_actions_prepare_post",
+    "parameters": [
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/PrepareRequest"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ActionPlanView"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/selection/actions/outcome": {
+   "post": {
+    "tags": [
+     "selection"
+    ],
+    "summary": "What the authorities recorded for a plan's steps, read back. Changes nothing.",
+    "operationId": "action_outcomes_selection_actions_outcome_post",
+    "parameters": [
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/OutcomeRequest"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ActionOutcomeView"
         }
        }
       }
@@ -2897,6 +3107,87 @@
        "application/json": {
         "schema": {
          "title": "Response Society Comparison Run World Versions  Version Id  Society Comparisons  Comparison Id  Runs  Run Id  Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/world/versions/{version_id}/society/comparisons/{comparison_id}/cancel": {
+   "post": {
+    "tags": [
+     "society"
+    ],
+    "summary": "Cancel Society Comparison",
+    "description": "Cancel a comparison started from the application, once. A start no host holds closes now:\nevery run left open fails as ``comparison_cancelled``, asking nothing, and what a host whose\nlease ran out may have spent is presumed as a takeover presumes it. A start a host is playing\nis closed by that host before its next dispatch. A repeated cancel changes nothing, and a\nfinished start keeps its own closing. Answers the comparison as the listing states it.",
+    "operationId": "cancel_society_comparison_world_versions__version_id__society_comparisons__comparison_id__cancel_post",
+    "parameters": [
+     {
+      "name": "version_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Version Id"
+      }
+     },
+     {
+      "name": "comparison_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Comparison Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Cancel Society Comparison World Versions  Version Id  Society Comparisons  Comparison Id  Cancel Post"
         }
        }
       }
@@ -6740,6 +7031,58 @@
     }
    }
   },
+  "/operations/capacity": {
+   "get": {
+    "tags": [
+     "operations"
+    ],
+    "summary": "How much of each capacity class this API process holds now.",
+    "description": "This process's admission limits and counts, and the decode bound's.\n\nCounts for the whole process, never another workspace's id; ``workspace_in_flight`` is the\ncaller's own. This read is itself a request, so the requests class's ``in_flight`` includes it.\nAnother API process keeps counts of its own (``docs/deployment.md`` section 5.4).",
+    "operationId": "capacity_operations_capacity_get",
+    "parameters": [
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Capacity Operations Capacity Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/operations/derivative-jobs": {
    "get": {
     "tags": [
@@ -6774,6 +7117,68 @@
          "type": "object",
          "additionalProperties": true,
          "title": "Response Jobs Operations Derivative Jobs Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/operations/derivative-jobs/{job_id}": {
+   "get": {
+    "tags": [
+     "operations"
+    ],
+    "summary": "One derivative job's state and progress.",
+    "description": "Whether the job is queued, running or finished, and how far it got.\n\n404 ``unknown_reference`` for a job this workspace cannot see, identically to one that never\nexisted. The events route beside this one answers an empty replay for both; this is the read\nthat tells an unknown job from one that has not reported yet.",
+    "operationId": "job_operations_derivative_jobs__job_id__get",
+    "parameters": [
+     {
+      "name": "job_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Job Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Job Operations Derivative Jobs  Job Id  Get"
         }
        }
       }
@@ -10003,6 +10408,272 @@
        "application/json": {
         "schema": {
          "$ref": "#/components/schemas/AlternateVersionView"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/world/versions/{version_id}/objects/{object_id}/move/preview": {
+   "post": {
+    "tags": [
+     "world"
+    ],
+    "summary": "What moving one authored object would record. Writes nothing.",
+    "operationId": "move_authored_object_preview_world_versions__version_id__objects__object_id__move_preview_post",
+    "parameters": [
+     {
+      "name": "version_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Version Id"
+      }
+     },
+     {
+      "name": "object_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "maxLength": 200,
+       "title": "Object Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/MovePreviewBody"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Move Authored Object Preview World Versions  Version Id  Objects  Object Id  Move Preview Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/world/versions/{version_id}/objects/{object_id}/remove/preview": {
+   "post": {
+    "tags": [
+     "world"
+    ],
+    "summary": "What removing one authored object would record. Writes nothing.",
+    "operationId": "remove_authored_object_preview_world_versions__version_id__objects__object_id__remove_preview_post",
+    "parameters": [
+     {
+      "name": "version_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Version Id"
+      }
+     },
+     {
+      "name": "object_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "maxLength": 200,
+       "title": "Object Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/EditPreviewBody"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Remove Authored Object Preview World Versions  Version Id  Objects  Object Id  Remove Preview Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/world/versions/{version_id}/objects/undo/preview": {
+   "post": {
+    "tags": [
+     "world"
+    ],
+    "summary": "Which edit an undo would reverse, and what it would restore. Writes nothing.",
+    "operationId": "undo_authored_edit_preview_world_versions__version_id__objects_undo_preview_post",
+    "parameters": [
+     {
+      "name": "version_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Version Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/EditPreviewBody"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Undo Authored Edit Preview World Versions  Version Id  Objects Undo Preview Post"
         }
        }
       }
@@ -13382,6 +14053,709 @@
     "title": "AcceptedPart",
     "description": "One photograph that is in the library now, with the rest of its stages queued."
    },
+   "ActionClarificationView": {
+    "properties": {
+     "code": {
+      "type": "string",
+      "title": "Code"
+     },
+     "step": {
+      "type": "integer",
+      "title": "Step"
+     },
+     "slot": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Slot"
+     },
+     "candidates": {
+      "items": {
+       "$ref": "#/components/schemas/ClarificationCandidateView"
+      },
+      "type": "array",
+      "title": "Candidates"
+     },
+     "actions": {
+      "items": {
+       "additionalProperties": {
+        "$ref": "#/components/schemas/JsonValue"
+       },
+       "type": "object"
+      },
+      "type": "array",
+      "title": "Actions"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "code",
+     "step",
+     "slot",
+     "candidates",
+     "actions"
+    ],
+    "title": "ActionClarificationView"
+   },
+   "ActionContextBody": {
+    "properties": {
+     "placement": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/PlacementContextBody"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "viewer": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/ViewerBody"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "selected_object_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 200,
+        "pattern": "^[a-z0-9]([a-z0-9:._-]{0,198}[a-z0-9])?$"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Selected Object Id"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "title": "ActionContextBody",
+    "description": "What the page shows the person, carried into the steps' bodies exactly as supplied."
+   },
+   "ActionOutcomeStepView": {
+    "properties": {
+     "index": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Index"
+     },
+     "operation": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Operation"
+     },
+     "state": {
+      "type": "string",
+      "enum": [
+       "applied",
+       "not_applied",
+       "superseded",
+       "pending"
+      ],
+      "title": "State"
+     },
+     "code": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Code"
+     },
+     "receipts": {
+      "items": {
+       "additionalProperties": {
+        "$ref": "#/components/schemas/JsonValue"
+       },
+       "type": "object"
+      },
+      "type": "array",
+      "title": "Receipts"
+     },
+     "repeats": {
+      "items": {
+       "additionalProperties": {
+        "$ref": "#/components/schemas/JsonValue"
+       },
+       "type": "object"
+      },
+      "type": "array",
+      "title": "Repeats"
+     },
+     "matches_preview": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Matches Preview"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "index",
+     "operation",
+     "state",
+     "code",
+     "receipts",
+     "repeats",
+     "matches_preview"
+    ],
+    "title": "ActionOutcomeStepView"
+   },
+   "ActionOutcomeView": {
+    "properties": {
+     "profile": {
+      "type": "string",
+      "const": "exulanica.companion-action-outcome/v1",
+      "title": "Profile"
+     },
+     "world_id": {
+      "type": "string",
+      "title": "World Id"
+     },
+     "version_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Version Id"
+     },
+     "plan_sha256": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Plan Sha256"
+     },
+     "state": {
+      "type": "string",
+      "enum": [
+       "applied",
+       "partial",
+       "not_applied",
+       "superseded",
+       "pending"
+      ],
+      "title": "State"
+     },
+     "current": {
+      "additionalProperties": {
+       "$ref": "#/components/schemas/JsonValue"
+      },
+      "type": "object",
+      "title": "Current"
+     },
+     "steps": {
+      "items": {
+       "$ref": "#/components/schemas/ActionOutcomeStepView"
+      },
+      "type": "array",
+      "title": "Steps"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "profile",
+     "world_id",
+     "version_id",
+     "plan_sha256",
+     "state",
+     "current",
+     "steps"
+    ],
+    "title": "ActionOutcomeView",
+    "description": "``exulanica.companion-action-outcome/v1``: what the authorities recorded, read back."
+   },
+   "ActionPlanView": {
+    "properties": {
+     "profile": {
+      "type": "string",
+      "const": "exulanica.companion-action-plan/v1",
+      "title": "Profile"
+     },
+     "outcome": {
+      "type": "string",
+      "enum": [
+       "plan",
+       "clarify",
+       "refused",
+       "capabilities",
+       "question"
+      ],
+      "title": "Outcome"
+     },
+     "kind": {
+      "type": "string",
+      "enum": [
+       "question",
+       "appearance",
+       "world_edit",
+       "simulation",
+       "capabilities"
+      ],
+      "title": "Kind"
+     },
+     "world_id": {
+      "type": "string",
+      "title": "World Id"
+     },
+     "version_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Version Id"
+     },
+     "plan_sha256": {
+      "type": "string",
+      "title": "Plan Sha256"
+     },
+     "atomic": {
+      "type": "boolean",
+      "title": "Atomic"
+     },
+     "steps": {
+      "items": {
+       "$ref": "#/components/schemas/ActionStepView"
+      },
+      "type": "array",
+      "title": "Steps"
+     },
+     "clarification": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/ActionClarificationView"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "refusal": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/ActionRefusalView"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "capabilities": {
+      "anyOf": [
+       {
+        "items": {
+         "additionalProperties": {
+          "$ref": "#/components/schemas/JsonValue"
+         },
+         "type": "object"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Capabilities"
+     },
+     "proposal_speech": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Proposal Speech"
+     },
+     "execution": {
+      "$ref": "#/components/schemas/ExecutionView"
+     },
+     "names": {
+      "additionalProperties": {
+       "type": "string",
+       "format": "uuid"
+      },
+      "type": "object",
+      "title": "Names"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "profile",
+     "outcome",
+     "kind",
+     "world_id",
+     "version_id",
+     "plan_sha256",
+     "atomic",
+     "steps",
+     "clarification",
+     "refusal",
+     "capabilities",
+     "proposal_speech",
+     "execution"
+    ],
+    "title": "ActionPlanView",
+    "description": "``exulanica.companion-action-plan/v1``: what one request asks for, as the routes take it."
+   },
+   "ActionRefusalView": {
+    "properties": {
+     "code": {
+      "type": "string",
+      "title": "Code"
+     },
+     "detail": {
+      "type": "string",
+      "title": "Detail"
+     },
+     "step": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Step"
+     },
+     "operation": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Operation"
+     },
+     "capability": {
+      "anyOf": [
+       {
+        "additionalProperties": {
+         "$ref": "#/components/schemas/JsonValue"
+        },
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Capability"
+     },
+     "alternatives": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Alternatives"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "code",
+     "detail",
+     "step",
+     "operation",
+     "capability",
+     "alternatives"
+    ],
+    "title": "ActionRefusalView"
+   },
+   "ActionRequest": {
+    "properties": {
+     "version_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Version Id"
+     },
+     "base_state_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Base State Sha256"
+     },
+     "origin_role": {
+      "anyOf": [
+       {
+        "type": "string",
+        "enum": [
+         "fictional",
+         "personal"
+        ]
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Origin Role"
+     },
+     "context": {
+      "$ref": "#/components/schemas/ActionContextBody"
+     },
+     "saved_entry": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/CompanionSavedEntryBody"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "utterance": {
+      "type": "string",
+      "maxLength": 1000,
+      "minLength": 1,
+      "title": "Utterance"
+     },
+     "appearance_basis": {
+      "type": "string",
+      "enum": [
+       "evidence",
+       "authored_design"
+      ],
+      "title": "Appearance Basis",
+      "default": "evidence"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "version_id",
+     "base_state_sha256",
+     "utterance"
+    ],
+    "title": "ActionRequest"
+   },
+   "ActionStepView": {
+    "properties": {
+     "index": {
+      "type": "integer",
+      "title": "Index"
+     },
+     "action": {
+      "additionalProperties": {
+       "$ref": "#/components/schemas/JsonValue"
+      },
+      "type": "object",
+      "title": "Action"
+     },
+     "state": {
+      "type": "string",
+      "enum": [
+       "prepared",
+       "pending",
+       "blocked",
+       "not_permitted"
+      ],
+      "title": "State"
+     },
+     "code": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Code"
+     },
+     "operation": {
+      "type": "string",
+      "title": "Operation"
+     },
+     "bind": {
+      "additionalProperties": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "type": "object",
+      "title": "Bind"
+     },
+     "bind_from": {
+      "anyOf": [
+       {
+        "additionalProperties": {
+         "additionalProperties": {
+          "$ref": "#/components/schemas/JsonValue"
+         },
+         "type": "object"
+        },
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Bind From"
+     },
+     "query": {
+      "additionalProperties": {
+       "type": "string"
+      },
+      "type": "object",
+      "title": "Query"
+     },
+     "body": {
+      "anyOf": [
+       {
+        "additionalProperties": {
+         "$ref": "#/components/schemas/JsonValue"
+        },
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Body"
+     },
+     "requires": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Requires"
+     },
+     "permitted": {
+      "type": "boolean",
+      "title": "Permitted"
+     },
+     "preview": {
+      "anyOf": [
+       {
+        "additionalProperties": {
+         "$ref": "#/components/schemas/JsonValue"
+        },
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Preview"
+     },
+     "pins": {
+      "anyOf": [
+       {
+        "additionalProperties": {
+         "$ref": "#/components/schemas/JsonValue"
+        },
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Pins"
+     },
+     "effects": {
+      "items": {
+       "additionalProperties": {
+        "$ref": "#/components/schemas/JsonValue"
+       },
+       "type": "object"
+      },
+      "type": "array",
+      "title": "Effects"
+     },
+     "confirmation": {
+      "type": "string",
+      "const": "required",
+      "title": "Confirmation"
+     },
+     "replay": {
+      "type": "string",
+      "title": "Replay"
+     },
+     "receipt": {
+      "type": "string",
+      "title": "Receipt"
+     },
+     "compensation": {
+      "anyOf": [
+       {
+        "additionalProperties": {
+         "type": "string"
+        },
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Compensation"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "index",
+     "action",
+     "state",
+     "code",
+     "operation",
+     "bind",
+     "query",
+     "body",
+     "requires",
+     "permitted",
+     "preview",
+     "pins",
+     "effects",
+     "confirmation",
+     "replay",
+     "receipt",
+     "compensation"
+    ],
+    "title": "ActionStepView",
+    "description": "One step: the exact request, what it requires, its pins and the authority's preview."
+   },
    "AddEnvironmentBody": {
     "properties": {
      "base_state_sha256": {
@@ -13978,6 +15352,15 @@
      "base_topology_digest": {
       "type": "string",
       "title": "Base Topology Digest"
+     },
+     "appearance_basis": {
+      "type": "string",
+      "enum": [
+       "evidence",
+       "authored_design"
+      ],
+      "title": "Appearance Basis",
+      "default": "evidence"
      }
     },
     "additionalProperties": false,
@@ -14021,6 +15404,15 @@
       "maxLength": 1000,
       "minLength": 1,
       "title": "Utterance"
+     },
+     "appearance_basis": {
+      "type": "string",
+      "enum": [
+       "evidence",
+       "authored_design"
+      ],
+      "title": "Appearance Basis",
+      "default": "evidence"
      }
     },
     "additionalProperties": false,
@@ -15852,6 +17244,30 @@
     "title": "CityContextRequest",
     "description": "A reticle selection from the independently admitted semantic city layer."
    },
+   "ClarificationCandidateView": {
+    "properties": {
+     "value": {
+      "type": "string",
+      "title": "Value"
+     },
+     "title": {
+      "type": "string",
+      "title": "Title"
+     },
+     "selected": {
+      "type": "boolean",
+      "title": "Selected"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "value",
+     "title",
+     "selected"
+    ],
+    "title": "ClarificationCandidateView"
+   },
    "ClauseType": {
     "type": "string",
     "enum": [
@@ -15948,6 +17364,52 @@
      "document_sha256"
     ],
     "title": "CompactResult"
+   },
+   "CompanionSavedEntryBody": {
+    "properties": {
+     "entry_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Entry Id"
+     },
+     "base_revision": {
+      "type": "integer",
+      "minimum": 1.0,
+      "title": "Base Revision"
+     },
+     "authored_state_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Authored State Sha256"
+     },
+     "authored_edit_seq": {
+      "type": "integer",
+      "minimum": 0.0,
+      "title": "Authored Edit Seq"
+     },
+     "style_version_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Style Version Id"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "entry_id",
+     "base_revision",
+     "authored_state_sha256",
+     "authored_edit_seq"
+    ],
+    "title": "CompanionSavedEntryBody",
+    "description": "The saved world the page edits. ``style_version_id`` is needed only by an appearance\nplan's apply step, whose saved-entry body names the style it advances from."
    },
    "Comparison": {
     "properties": {
@@ -17407,6 +18869,22 @@
      "silhouette"
     ],
     "title": "Edit"
+   },
+   "EditPreviewBody": {
+    "properties": {
+     "base_state_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Base State Sha256"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "base_state_sha256"
+    ],
+    "title": "EditPreviewBody",
+    "description": "The base a preview is read against. No saved entry: a preview advances nothing."
    },
    "EditSubject": {
     "type": "string",
@@ -20439,6 +21917,25 @@
     ],
     "title": "MoveObjectBody"
    },
+   "MovePreviewBody": {
+    "properties": {
+     "base_state_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Base State Sha256"
+     },
+     "transform": {
+      "$ref": "#/components/schemas/TransformBody"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "base_state_sha256",
+     "transform"
+    ],
+    "title": "MovePreviewBody"
+   },
    "NameRequest": {
     "properties": {
      "occurrence_id": {
@@ -20812,6 +22309,196 @@
      "model_processing"
     ],
     "title": "OperationRights"
+   },
+   "OutcomePinsBody": {
+    "properties": {
+     "base_state_sha256": {
+      "anyOf": [
+       {
+        "type": "string",
+        "pattern": "^[0-9a-f]{64}$"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Base State Sha256"
+     },
+     "edit_seq": {
+      "anyOf": [
+       {
+        "type": "integer",
+        "minimum": 0.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Edit Seq"
+     },
+     "base_style_version_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Base Style Version Id"
+     },
+     "base_topology_digest": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 256
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Base Topology Digest"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "title": "OutcomePinsBody",
+    "description": "A step's pins as the plan stated them."
+   },
+   "OutcomeRequest": {
+    "properties": {
+     "version_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Version Id"
+     },
+     "plan_sha256": {
+      "anyOf": [
+       {
+        "type": "string",
+        "pattern": "^[0-9a-f]{64}$"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Plan Sha256"
+     },
+     "steps": {
+      "items": {
+       "$ref": "#/components/schemas/OutcomeStepBody"
+      },
+      "type": "array",
+      "maxItems": 3,
+      "minItems": 1,
+      "title": "Steps"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "version_id",
+     "steps"
+    ],
+    "title": "OutcomeRequest"
+   },
+   "OutcomeStepBody": {
+    "properties": {
+     "index": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Index"
+     },
+     "operation": {
+      "type": "string",
+      "enum": [
+       "POST /world/versions/{version_id}/compositions/apply",
+       "POST /world/versions/{version_id}/objects/{object_id}/move",
+       "POST /world/versions/{version_id}/objects/{object_id}/remove",
+       "POST /world/versions/{version_id}/objects/undo",
+       "POST /world/versions/{version_id}/arrangements/apply",
+       "POST /world/styles/previews",
+       "POST /world/styles/previews/{preview_id}/apply"
+      ],
+      "title": "Operation"
+     },
+     "state": {
+      "type": "string",
+      "enum": [
+       "prepared",
+       "pending",
+       "blocked",
+       "not_permitted"
+      ],
+      "title": "State",
+      "default": "prepared"
+     },
+     "bind": {
+      "additionalProperties": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ]
+      },
+      "type": "object",
+      "title": "Bind"
+     },
+     "pins": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/OutcomePinsBody"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "body": {
+      "anyOf": [
+       {
+        "additionalProperties": {
+         "$ref": "#/components/schemas/JsonValue"
+        },
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Body"
+     },
+     "preview": {
+      "anyOf": [
+       {
+        "additionalProperties": {
+         "$ref": "#/components/schemas/JsonValue"
+        },
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Preview"
+     }
+    },
+    "type": "object",
+    "required": [
+     "operation"
+    ],
+    "title": "OutcomeStepBody",
+    "description": "One step as a plan gives it. The fields the read does not use are accepted and ignored,\nso a client can send the plan's steps back as they came."
    },
    "Outline": {
     "properties": {
@@ -21803,6 +23490,27 @@
     "title": "PlaceableAssetView",
     "description": "A reviewed asset as the registry reads serve it, with what inhabitants do with it."
    },
+   "PlacementContextBody": {
+    "properties": {
+     "region_id": {
+      "type": "string",
+      "maxLength": 500,
+      "minLength": 1,
+      "title": "Region Id"
+     },
+     "transform": {
+      "$ref": "#/components/schemas/TransformBody"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "region_id",
+     "transform"
+    ],
+    "title": "PlacementContextBody",
+    "description": "Where the person is pointing: the region and the region-local transform, as supplied."
+   },
    "PointMapArrivalPin": {
     "properties": {
      "profile": {
@@ -21934,6 +23642,65 @@
     ],
     "title": "PrepareExperimentBody"
    },
+   "PrepareRequest": {
+    "properties": {
+     "version_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Version Id"
+     },
+     "base_state_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Base State Sha256"
+     },
+     "origin_role": {
+      "anyOf": [
+       {
+        "type": "string",
+        "enum": [
+         "fictional",
+         "personal"
+        ]
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Origin Role"
+     },
+     "context": {
+      "$ref": "#/components/schemas/ActionContextBody"
+     },
+     "saved_entry": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/CompanionSavedEntryBody"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "actions": {
+      "items": {
+       "$ref": "#/components/schemas/TypedActionBody"
+      },
+      "type": "array",
+      "maxItems": 3,
+      "minItems": 1,
+      "title": "Actions"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "version_id",
+     "base_state_sha256",
+     "actions"
+    ],
+    "title": "PrepareRequest"
+   },
    "PresenceBody": {
     "properties": {
      "base_tick": {
@@ -22058,6 +23825,21 @@
        }
       ],
       "title": "Refines Proposal Id"
+     },
+     "appearance_basis": {
+      "anyOf": [
+       {
+        "type": "string",
+        "enum": [
+         "evidence",
+         "authored_design"
+        ]
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Appearance Basis"
      }
     },
     "additionalProperties": false,
@@ -25855,6 +27637,51 @@
       "type": "boolean",
       "const": false,
       "title": "Personal Visit Evidence"
+     },
+     "input_seq": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Input Seq"
+     },
+     "object_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Object Id"
+     },
+     "edit_seq": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Edit Seq"
+     },
+     "edit_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Edit Id"
      }
     },
     "additionalProperties": false,
@@ -26680,6 +28507,17 @@
       ],
       "title": "Refines Proposal Id"
      },
+     "appearance_basis": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Appearance Basis"
+     },
      "recipe_binding": {
       "additionalProperties": {
        "$ref": "#/components/schemas/JsonValue"
@@ -27019,6 +28857,17 @@
        }
       ],
       "title": "Refines Proposal Id"
+     },
+     "appearance_basis": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Appearance Basis"
      }
     },
     "additionalProperties": false,
@@ -27213,6 +29062,79 @@
      "scale_milli"
     ],
     "title": "TransformView"
+   },
+   "TypedActionBody": {
+    "properties": {
+     "operation": {
+      "type": "string",
+      "enum": [
+       "place_object",
+       "move_object",
+       "remove_object",
+       "undo_last_edit",
+       "place_arrangement"
+      ],
+      "title": "Operation"
+     },
+     "asset_key": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 200,
+        "pattern": "^[a-z][a-z0-9.-]*$"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Asset Key"
+     },
+     "object_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 200,
+        "pattern": "^[a-z0-9]([a-z0-9:._-]{0,198}[a-z0-9])?$"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Object Id"
+     },
+     "arrangement_key": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 200,
+        "pattern": "^[a-z][a-z0-9_]*$"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Arrangement Key"
+     },
+     "arrangement_version": {
+      "anyOf": [
+       {
+        "type": "integer",
+        "minimum": 1.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Arrangement Version"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "operation"
+    ],
+    "title": "TypedActionBody",
+    "description": "One typed change, as a plan's clarification or pending step states it."
    },
    "UnavailableRatio": {
     "properties": {

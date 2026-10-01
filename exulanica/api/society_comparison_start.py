@@ -52,6 +52,7 @@ from exulanica.world.society_comparison_repository import seed_digest
 from exulanica.world.society_comparison_result import (
     GROUP_SOURCES,
     MINUTES_PER_HOUR,
+    definition_role,
     protocol_value,
 )
 
@@ -77,6 +78,7 @@ __all__ = [
     "development_seeds",
     "development_seeds_in",
     "figures_for",
+    "stopped_host_usd",
     "typical_figures",
     "typical_latency_ms",
     "typical_per_person_hour",
@@ -630,3 +632,36 @@ def comparison_cost(
         typical_matches=matches,
         typical_record=TYPICAL_RECORD if figures is None else figures.record,
     )
+
+
+#: What prices asks where the caller has no budget of its own: estimating reads the manifest's
+#: prices, never a ceiling.
+_PRICES: Final = BudgetGuard(ceiling_usd=Decimal(0), max_calls=0)
+
+
+def stopped_host_usd(
+    definition: Mapping[str, Any],
+    catalogs: ComparisonCatalogs,
+    budget: BudgetGuard | None,
+    manifest: Manifest,
+    open_runs: Sequence[Mapping[str, Any]],
+) -> Decimal:
+    """The most a host whose lease ran out may have spent and never recorded: one minute of each
+    open run it may have been playing, the protocol's ``runs_at_once`` at a time, at the most a
+    minute of any of them can cost. What a claim that takes the start over presumes, and what a
+    cancellation of such a start presumes."""
+    if not open_runs:
+        return Decimal(0)
+    at_once = protocol_value(catalogs, "runs_at_once")
+    cost = comparison_cost(
+        definition,
+        int(definition["population"]),
+        definition_role(definition),
+        budget if budget is not None else _PRICES,
+        manifest,
+        at_once=at_once,
+        navigation_profile=None,
+        runs_left=[(run["arm"], run["seed_digest"]) for run in open_runs],
+    )
+    in_flight = min(at_once, len(open_runs))
+    return (in_flight * cost.minute_usd).quantize(USD_QUANTUM, rounding=ROUND_CEILING)

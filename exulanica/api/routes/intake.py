@@ -46,20 +46,28 @@ and a request that declares no length at all is a reverse proxy's to bound.
 
 from __future__ import annotations
 
+import time
 import uuid
 from pathlib import PurePosixPath
 from typing import Annotated, Final, Literal
 
 from fastapi import APIRouter, Depends, File, UploadFile
+from fastapi.responses import JSONResponse
 from PIL import Image, UnidentifiedImageError
 from pydantic import BaseModel, ConfigDict
 
+from exulanica.api.admission import DerivativeQueueFull
 from exulanica.api.dependencies import CurrentSession, ScopedConnection, get_services
 from exulanica.api.services import Services
+from exulanica.corpus.decode import DecodeBusy, decoding
 from exulanica.ingest import derivative_queue
 from exulanica.ingest.batch import IntakeBatch
 from exulanica.ingest.decode import probe
-from exulanica.ingest.pipeline import SUPPORTED_SUFFIXES, PhotoIngestPipeline
+from exulanica.ingest.pipeline import (
+    SUPPORTED_SUFFIXES,
+    TRANSIENT_DATABASE_REFUSALS,
+    PhotoIngestPipeline,
+)
 from exulanica.ingest.report import IngestOutcome
 from exulanica.ingest.repository import IngestRepository
 
@@ -74,6 +82,12 @@ MAX_PARTS: Final = 200
 #: 16-bit TIFF of the same frame.
 MAX_PART_BYTES: Final = 64 * 1024 * 1024
 
+#: How many times the pipeline's stage registration is tried before the upload is answered
+#: ``busy``. The registration is an idempotent write to two tables migration 0041 guards, refused
+#: with 40001 for the instant a final read check holds the asset read lock; the check holds it for
+#: milliseconds, so a short wait almost always clears it.
+_REGISTRATION_ATTEMPTS: Final = 3
+
 #: The refusal codes, and what each one means. A client can act on the code; the detail beside
 #: it says which instance of it this was. Collapsing these into one "bad file" would be the
 #: failure this project has a rule about: a zero must say which zero it is.
@@ -85,6 +99,10 @@ REFUSALS: Final[dict[str, str]] = {
     "not_an_image": "the bytes are not an image of a format this pipeline identifies",
     "too_many_pixels": "the frame is larger than this pipeline will decode",
     "tombstoned": "the user has deleted these bytes and they may not be re-admitted",
+    "busy": (
+        "this part met a moment the server could not take it (its decode bound, or a guarded "
+        "write held by a read check); nothing of it was written; send this one again"
+    ),
     "failed": "the intake stage did not complete, and the reason is beside this",
 }
 
@@ -133,6 +151,7 @@ class IntakeAccepted(BaseModel):
 @router.post(
     "",
     status_code=202,
+    response_model=IntakeAccepted,
     summary="Upload photographs. Intake runs now; the model stages are queued.",
 )
 def intake(
@@ -140,7 +159,7 @@ def intake(
     session: CurrentSession,
     services: Annotated[Services, Depends(get_services)],
     files: Annotated[list[UploadFile], File(description="The photographs to ingest.")],
-) -> IntakeAccepted:
+) -> IntakeAccepted | JSONResponse:
     """Admit what can be admitted, refuse the rest by name, and queue what remains.
 
     The batch is opened before anything is read so a client that subscribes immediately finds
@@ -153,10 +172,29 @@ def intake(
     come after all of the work. A request that closed the batch it opened would emit "finished"
     before the vision stage had started.
     """
+    # Before a batch is opened, so a refusal writes nothing: an upload whose workspace already has
+    # this many uploads still being processed waits for them rather than lengthening the queue.
+    bound = services.admission.intake_queued_jobs
+    if derivative_queue.outstanding(connection, session.workspace_id) >= bound:
+        raise DerivativeQueueFull(bound)
     repository = IngestRepository(connection, session.workspace_id)
     # No vision model and no depth model. Structural, not configuration: this pipeline cannot
     # make a model call, so no amount of later editing puts one in a request thread.
-    pipeline = PhotoIngestPipeline(repository, services.store)
+    pipeline = _pipeline(repository, services)
+    if pipeline is None:
+        # Still before the batch: the upload is answered as busy and nothing was written.
+        return JSONResponse(
+            status_code=409,
+            content={
+                "code": "busy",
+                "detail": (
+                    "a read check held the asset lock each time this upload tried to begin; "
+                    "nothing was written, so the upload can be sent again after 1 second"
+                ),
+                "retry_after_seconds": 1,
+            },
+            headers={"Retry-After": "1"},
+        )
     batch = IntakeBatch.open(repository, label="upload")
 
     accepted: list[AcceptedPart] = []
@@ -173,7 +211,17 @@ def intake(
             if isinstance(checked, RefusedPart):
                 refused.append(checked)
                 continue
-            outcome = pipeline.ingest_intake(checked, filename=name, batch_id=batch.batch_id)
+            try:
+                # One decode turn for the whole part, taken before the pipeline opens a run, so
+                # the decoded frame and its upright copy are inside the process's decode bound
+                # for as long as this part holds them, and a part refused for it left nothing.
+                with decoding():
+                    outcome = pipeline.ingest_intake(
+                        checked, filename=name, batch_id=batch.batch_id
+                    )
+            except DecodeBusy as exc:
+                refused.append(_refusal(name, "busy", str(exc)))
+                continue
             _record(outcome, name, accepted, refused, capture_ids)
         except Exception as exc:
             # **One part may never abandon the others.** By the time a later part raises, the
@@ -268,7 +316,10 @@ def _record(
         refused.append(_refusal(name, "tombstoned", outcome.error or "tombstoned"))
         return
     if outcome.error is not None or outcome.capture_id is None or outcome.blob_id is None:
-        refused.append(_refusal(name, "failed", outcome.error or "the intake stage wrote nothing"))
+        # A transient refusal (a guarded write met a read check) rolled the part back: busy, and
+        # sent again it is admitted. Anything else did not complete and says why.
+        reason = "busy" if outcome.retryable else "failed"
+        refused.append(_refusal(name, reason, outcome.error or "the intake stage wrote nothing"))
         return
     accepted.append(
         AcceptedPart(
@@ -284,6 +335,17 @@ def _record(
     # work queued twice and the model calls behind it are what a duplicate costs.
     if outcome.capture_id not in capture_ids:
         capture_ids.append(outcome.capture_id)
+
+
+def _pipeline(repository: IngestRepository, services: Services) -> PhotoIngestPipeline | None:
+    """The intake pipeline, or None when its stage registration kept meeting a read check."""
+    for attempt in range(1, _REGISTRATION_ATTEMPTS + 1):
+        try:
+            return PhotoIngestPipeline(repository, services.store)
+        except TRANSIENT_DATABASE_REFUSALS:
+            if attempt < _REGISTRATION_ATTEMPTS:
+                time.sleep(0.05 * attempt)
+    return None
 
 
 def _refusal(name: str, reason: str, detail: str) -> RefusedPart:

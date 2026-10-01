@@ -156,17 +156,22 @@ class AccountApi:
         return self.client.get("/auth/session").json()
 
 
-@pytest.fixture
-def account_api(repository, spine_schema, account_role, tmp_path):
-    _, scratch = spine_schema
-    database = scratch_database(scratch)
-    config = GoogleAccountConfig(
+def google_config() -> GoogleAccountConfig:
+    """The test Google client every account test signs in through, declared in one place."""
+    return GoogleAccountConfig(
         client_id="test-google-client",
         client_secret="test-only-client-secret",
         callback_uri="https://app.test/auth/google/callback",
         return_uris=("https://app.test/world",),
         browser_origins=("https://app.test",),
     )
+
+
+@pytest.fixture
+def account_api(repository, spine_schema, account_role, tmp_path):
+    _, scratch = spine_schema
+    database = scratch_database(scratch)
+    config = google_config()
     fake = FakeGoogle()
     # Every provider request passes the same allowlist a deployment declares, in front of the fake.
     runtime = AccountRuntime(

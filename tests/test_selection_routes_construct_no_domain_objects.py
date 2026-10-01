@@ -98,8 +98,12 @@ def _namespace(path: Path) -> dict[str, Any]:
     return namespace
 
 
-def test_the_rule_reads_both_selection_route_modules():
-    assert [path.name for path in ROUTES] == ["selection.py", "selection_environment.py"]
+def test_the_rule_reads_every_selection_route_module():
+    assert [path.name for path in ROUTES] == [
+        "selection.py",
+        "selection_actions.py",
+        "selection_environment.py",
+    ]
 
 
 @pytest.mark.parametrize("path", ROUTES, ids=lambda path: path.name)

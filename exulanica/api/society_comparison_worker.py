@@ -50,9 +50,9 @@ import dataclasses
 import logging
 import threading
 import uuid
-from collections.abc import Callable, Iterable, Sequence
-from decimal import ROUND_CEILING, Decimal
-from typing import Final
+from collections.abc import Callable, Iterable, Mapping, Sequence
+from decimal import Decimal
+from typing import Any, Final
 
 import psycopg
 
@@ -60,17 +60,18 @@ from exulanica.api.decision_host import share_kept
 from exulanica.api.society_comparison_runner import (
     BOUND_BEFORE_SEED,
     BOUND_SPENT,
+    CANCELLED,
     ClaimLost,
     HostStopping,
     RunHost,
     SocietyComparisonRunner,
 )
-from exulanica.api.society_comparison_start import comparison_cost
+from exulanica.api.society_comparison_start import comparison_cost, stopped_host_usd
 from exulanica.db.session import Database
 from exulanica.models.budget import BoundedBudget, BudgetGuard
 from exulanica.models.client import ModelClient
 from exulanica.models.manifest import Manifest
-from exulanica.models.usage import USD_QUANTUM
+from exulanica.world.comparison_facts import ComparisonFacts
 from exulanica.world.society_comparison_result import definition_role
 from exulanica.world.society_comparison_start_repository import (
     ComparisonClaim,
@@ -78,7 +79,7 @@ from exulanica.world.society_comparison_start_repository import (
 )
 from exulanica.world.society_comparison_verdict import protocol_value
 
-__all__ = ["CLOSED_REASONS", "SocietyComparisonWorker"]
+__all__ = ["CANCELLED_REASON", "CLOSED_REASONS", "SocietyComparisonWorker"]
 
 _LOG = logging.getLogger(__name__)
 #: Why a host closed a start before every run was played, by name: hosts that claimed it kept
@@ -89,8 +90,12 @@ CLOSED_REASONS: Final = (
     "claims_spent",
     "comparison_bound_before_seed",
     "comparison_bound_spent",
+    "comparison_cancelled",
     "process_budget_spent",
 )
+#: Why a start was closed when whoever may start one cancelled it, the code its open runs fail by
+#: too, whether or not they asked.
+CANCELLED_REASON: Final = CANCELLED
 #: How a run a closed start left open fails: one that asked something was stopped part way;
 #: one that asked nothing was never played.
 _STOPPED_PART_WAY = "interrupted"
@@ -173,7 +178,8 @@ class SocietyComparisonWorker:
             definition = repository._definition(claim.comparison_id)["document"]  # type: ignore[index]
             open_runs = repository.open_runs(claim.comparison_id)
             spent = repository.spending([claim.comparison_id]).get(claim.comparison_id, Decimal(0))
-        if SocietyComparisonStarts.attempts_spent(claim):
+        cancelled = self._cancelled(claim)
+        if not cancelled and SocietyComparisonStarts.attempts_spent(claim):
             self._close(runner, claim, open_runs, "claims_spent", change)
             return
         role = definition_role(definition)
@@ -192,12 +198,16 @@ class SocietyComparisonWorker:
         if claim.took_over and open_runs:
             # The host whose lease ran out may have been asking a minute of each run it played,
             # the protocol's number at a time, and may never record them.
-            in_flight = min(protocol_value(runner.catalogs, "runs_at_once"), len(open_runs))
-            more = (in_flight * cost.minute_usd).quantize(USD_QUANTUM, rounding=ROUND_CEILING)
+            more = stopped_host_usd(definition, runner.catalogs, budget, self.manifest, open_runs)
             if more > 0:
                 if not change("presume", usd=more):
                     return
                 presumed += more
+        if cancelled:
+            # Cancelled while no host played it, or by a host that stopped before closing it:
+            # what that host may have spent is presumed above, and nothing is asked.
+            self._close(runner, claim, open_runs, CANCELLED_REASON, change)
+            return
         ceiling = claim.bound_usd - spent - presumed
         if ceiling <= 0:
             self._close(runner, claim, open_runs, BOUND_SPENT, change)
@@ -268,7 +278,14 @@ class SocietyComparisonWorker:
             )
             return money and calls
 
-        host = RunHost(minute=minute, stopping=stop.is_set, recorded=recorded, admit=admit)
+        host = RunHost(
+            minute=minute,
+            stopping=stop.is_set,
+            recorded=recorded,
+            admit=admit,
+            cancelled=lambda: self._cancelled(claim),
+            started=lambda run_id: self._started(claim, run_id),
+        )
         order = [run["run_id"] for run in open_runs]
         try:
             played.run_all(claim.comparison_id, order, host=host)
@@ -276,6 +293,12 @@ class SocietyComparisonWorker:
             change("release")
             return
         except ClaimLost:
+            return
+        if self._cancelled(claim):
+            # Cancelled while this host played it: what it did not play closes asking nothing.
+            with self.database.session(claim.workspace_id) as connection:
+                left = runner._repository(connection).open_runs(claim.comparison_id)
+            self._close(runner, claim, left, CANCELLED_REASON, change)
             return
         with self.database.session(claim.workspace_id) as connection:
             repository = runner._repository(connection)
@@ -291,23 +314,38 @@ class SocietyComparisonWorker:
             # is drawn for its reads, whichever claim played it (the runner's ``draw_all``).
             runner.draw_all(claim.comparison_id, stopping=stop.is_set)
 
+    def _cancelled(self, claim: ComparisonClaim) -> bool:
+        """Whether the claimed comparison was cancelled, read in a short session of its own."""
+        with self.database.session(claim.workspace_id) as connection:
+            facts = ComparisonFacts(connection, claim.workspace_id, claim.world_id, "society")
+            return facts.cancellation(claim.comparison_id) is not None
+
+    def _started(self, claim: ComparisonClaim, run_id: uuid.UUID) -> None:
+        """Record that this host starts playing a run under its claim's lease."""
+        with self.database.session(claim.workspace_id) as connection, connection.transaction():
+            ComparisonFacts(connection, claim.workspace_id, claim.world_id, "society").run_started(
+                claim.comparison_id, run_id, claim.token
+            )
+
     def _close(
         self,
         runner: SocietyComparisonRunner,
         claim: ComparisonClaim,
-        open_runs: list[dict],
+        open_runs: Sequence[Mapping[str, Any]],
         reason: str,
         change: Callable[..., bool],
     ) -> None:
         """Close the start by ``reason``: every run left open fails, one that asked something as
         ``interrupted`` and any other by ``reason``, or ``comparison_stopped`` where hosts kept
-        stopping; then the start is finished."""
-        never_played = _NEVER_PLAYED if reason == "claims_spent" else reason
-        runner.fail_open(
-            claim.comparison_id,
-            {
+        stopping; a cancelled start's runs all fail as ``comparison_cancelled``, their receipts
+        kept. Then the start is finished."""
+        if reason == CANCELLED_REASON:
+            codes = {run["run_id"]: CANCELLED for run in open_runs}
+        else:
+            never_played = _NEVER_PLAYED if reason == "claims_spent" else reason
+            codes = {
                 run["run_id"]: _STOPPED_PART_WAY if run["asked"] else never_played
                 for run in open_runs
-            },
-        )
+            }
+        runner.fail_open(claim.comparison_id, codes)
         change("finish", closed_reason=reason)

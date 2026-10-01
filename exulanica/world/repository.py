@@ -65,7 +65,18 @@ from exulanica.world.style_structure import (
 )
 from exulanica.world.worlds import world_kind
 
-__all__ = ["WorldStyleRepository"]
+__all__ = [
+    "APPEARANCE_BASES",
+    "AUTHORED_DESIGN_BASIS",
+    "EVIDENCE_BASIS",
+    "WorldStyleRepository",
+]
+
+#: What a Companion appearance proposal is drawn from. ``evidence``: the world's own evidence,
+#: named by reference id. ``authored_design``: a design choice, naming none.
+EVIDENCE_BASIS: Final = "evidence"
+AUTHORED_DESIGN_BASIS: Final = "authored_design"
+APPEARANCE_BASES: Final = frozenset({EVIDENCE_BASIS, AUTHORED_DESIGN_BASIS})
 
 _SLOT_KEY: Final = re.compile(r"^[a-z][a-z0-9.-]*$")
 
@@ -351,6 +362,7 @@ class WorldStyleRepository:
             model_id=row["model_id"],
             prompt_version=row["prompt_version"],
             refines_proposal_id=row["refines_proposal_id"],
+            appearance_basis=row.get("appearance_basis"),
         )
         return StyleProposalRecord(
             proposal=proposal,
@@ -597,15 +609,18 @@ class WorldStyleRepository:
                     )
                 current = self._version_by_id(state["current_style_version_id"])
                 version_id = uuid.uuid4()
+                basis = preview.get("appearance_basis")
                 row = self.connection.execute(
                     "insert into world_style_version "
                     "(version_id,workspace_id,world_id,revision,parent_version_id,topology_digest,"
                     "global_profile_id,global_profile_version,global_parameters,"
                     "applied_from_proposal_id,origin,actor,origin_reference,"
                     "provenance_schema_version,reference_ids,model_id,prompt_version,"
-                    "refines_proposal_id,recipe_binding,capability_mapping) "
-                    "values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,1,%s,%s,%s,%s,%s,%s) "
-                    "returning *",
+                    "refines_proposal_id,recipe_binding,capability_mapping"
+                    + ("" if basis is None else ",appearance_basis")
+                    + ") values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,1,%s,%s,%s,%s,%s,%s"
+                    + ("" if basis is None else ",%s")
+                    + ") returning *",
                     (
                         version_id,
                         self.workspace_id,
@@ -626,6 +641,7 @@ class WorldStyleRepository:
                         preview["refines_proposal_id"],
                         Jsonb(preview["recipe_binding"]),
                         Jsonb(preview["capability_mapping"]),
+                        *(() if basis is None else (basis,)),
                     ),
                 ).fetchone()
                 assert row is not None
@@ -951,6 +967,9 @@ class WorldStyleRepository:
             model_id=row["model_id"],
             prompt_version=row["prompt_version"],
             refines_proposal_id=row["refines_proposal_id"],
+            # Absent from a history read that names its columns: such a row predates no rule,
+            # it simply did not ask, and a version it builds is not a Companion one.
+            appearance_basis=row.get("appearance_basis"),
         )
 
     def _preview_row(self, preview_id: uuid.UUID, *, for_update: bool) -> Mapping[str, Any]:
@@ -1000,6 +1019,7 @@ class WorldStyleRepository:
             model_id=proposal.model_id,
             prompt_version=proposal.prompt_version,
             refines_proposal_id=proposal.refines_proposal_id,
+            appearance_basis=proposal.appearance_basis,
         )
 
     def _candidate_from_document(self, value: Mapping[str, Any]) -> StyleVersion:
@@ -1039,12 +1059,16 @@ class WorldStyleRepository:
                 if value["refines_proposal_id"] is None
                 else uuid.UUID(value["refines_proposal_id"])
             ),
+            appearance_basis=value.get("appearance_basis"),
         )
 
     def _insert_proposal(
         self, proposal: StyleProposal, status: str, error: Exception | None
     ) -> None:
         binding, capability_mapping = self._proposal_binding(proposal.profile)
+        # The basis column is written only by a proposal that states one (0128), so every other
+        # proposal is written exactly as it was before the column existed.
+        basis = proposal.appearance_basis
         try:
             self.connection.execute(
                 "insert into world_style_proposal "
@@ -1052,8 +1076,11 @@ class WorldStyleRepository:
                 "scope_region_id,base_style_version_id,base_topology_digest,profile_id,"
                 "profile_version,parameters,status,validation_issues,provenance_schema_version,"
                 "reference_ids,model_id,prompt_version,refines_proposal_id,recipe_binding,"
-                "capability_mapping) "
-                "values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,1,%s,%s,%s,%s,%s,%s)",
+                "capability_mapping"
+                + ("" if basis is None else ",appearance_basis")
+                + ") values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,1,%s,%s,%s,%s,%s,%s"
+                + ("" if basis is None else ",%s")
+                + ")",
                 (
                     proposal.proposal_id,
                     self.workspace_id,
@@ -1076,6 +1103,7 @@ class WorldStyleRepository:
                     proposal.refines_proposal_id,
                     Jsonb(binding),
                     Jsonb(capability_mapping),
+                    *(() if basis is None else (basis,)),
                 ),
             )
         except psycopg.errors.UniqueViolation as exc:
@@ -1496,18 +1524,31 @@ class WorldStyleRepository:
         ):
             raise InvalidStyleData("style proposal reference ids must be unique and non-empty")
         if proposal.provenance.origin is ProposalOrigin.COMPANION:
+            # Two bases, each with its own rule about evidence, and neither may borrow the
+            # other's: a proposal drawn from evidence names it, and a design choice names none,
+            # so it never presents a reference nothing was drawn from. Migration 0128's check
+            # holds the same rule in the database.
+            basis = proposal.appearance_basis or EVIDENCE_BASIS
+            if basis not in APPEARANCE_BASES:
+                raise InvalidStyleData(f"unknown appearance basis {basis!r}")
             if (
                 not (proposal.model_id or "").strip()
                 or not (proposal.prompt_version or "").strip()
-                or not proposal.reference_ids
+                or (basis == EVIDENCE_BASIS and not proposal.reference_ids)
             ):
                 raise InvalidStyleData(
                     "Companion style proposals require model, prompt version, and reference ids"
+                )
+            if basis == AUTHORED_DESIGN_BASIS and proposal.reference_ids:
+                raise InvalidStyleData(
+                    "an authored-design proposal is drawn from no evidence and names none"
                 )
         elif proposal.model_id is not None or proposal.prompt_version is not None:
             raise InvalidStyleData(
                 "only Companion style proposals may carry model and prompt provenance"
             )
+        elif proposal.appearance_basis is not None:
+            raise InvalidStyleData("only Companion style proposals state an appearance basis")
         if len(proposal.model_id or "") > 300 or len(proposal.prompt_version or "") > 300:
             raise InvalidStyleData("style proposal model or prompt version is too long")
 
@@ -1813,6 +1854,7 @@ def _version_document(value: StyleVersion) -> dict[str, Any]:
         "refines_proposal_id": (
             None if value.refines_proposal_id is None else str(value.refines_proposal_id)
         ),
+        "appearance_basis": value.appearance_basis,
         "created_at": value.created_at.isoformat(),
     }
 

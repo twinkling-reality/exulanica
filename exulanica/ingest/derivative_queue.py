@@ -66,6 +66,7 @@ __all__ = [
     "enqueue",
     "finish",
     "heartbeat",
+    "outstanding",
     "record_capture",
     "record_lease_lost",
     "record_worker_event",
@@ -154,6 +155,22 @@ def enqueue(
     ).fetchone()
     assert row is not None
     return row["job_id"]
+
+
+def outstanding(connection: psycopg.Connection, workspace_id: uuid.UUID) -> int:
+    """How many derivative jobs this workspace has queued or running.
+
+    Each state is read through its own partial index, both leading on workspace and kind
+    (``job_queue_idx`` for queued, ``job_reclaim_idx`` for running), so the count costs index reads
+    in proportion to its answer rather than to the queue's history.
+    """
+    row = connection.execute(
+        "select count(*) as n from job "
+        "where workspace_id = %s and kind = %s and state in ('queued', 'running')",
+        (workspace_id, DERIVATIVES),
+    ).fetchone()
+    assert row is not None
+    return int(row["n"])
 
 
 def claim(

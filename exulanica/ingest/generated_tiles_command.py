@@ -30,9 +30,9 @@ from psycopg.rows import dict_row
 from exulanica.db.migrate import verify_schema
 from exulanica.db.roles import assert_runtime_role
 from exulanica.db.session import Database
-from exulanica.env import env_get, env_name, resolve_data_dir
+from exulanica.env import env_get, env_name
 from exulanica.ingest.generated_tiles import GeneratedTileBaker
-from exulanica.store.namespaces import tile_store
+from exulanica.store.configured import content_stores
 
 __all__ = ["PUBLISHER_ENV", "main"]
 
@@ -95,7 +95,7 @@ def main(
         baker = GeneratedTileBaker(
             session=database.session,
             publisher=publisher,
-            store=tile_store(resolve_data_dir(environment)),
+            store=content_stores(environment).tiles,
             web_directory=Path(web) if web else _CHECKOUT_WEB,
             worker=f"{platform.node() or 'unknown'}:{os.getpid()}:{uuid.uuid4().hex[:8]}",
         )
@@ -120,3 +120,7 @@ def main(
         if args.once:
             return 1 if failed else 0
         time.sleep(args.poll_seconds)
+
+
+if __name__ == "__main__":  # pragma: no cover
+    raise SystemExit(main())

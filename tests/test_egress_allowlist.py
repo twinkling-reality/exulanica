@@ -417,6 +417,7 @@ UNCOVERED_NETWORK_MODULES = {
     "exulanica/environment/nyc_open_data.py",
     "exulanica/environment/owned_district.py",
     "exulanica/evaluation/benchmark.py",
+    "exulanica/store/object.py",
 }
 
 #: ``httpx2`` is named as well as ``httpx``: the sign-in path uses it, and a pattern that knew

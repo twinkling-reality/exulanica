@@ -22,22 +22,34 @@ the declaration. A route cannot forget, because a route never registers it.
 itself when that dependency has not already run, so a route mounted on an application somebody
 built without ``create_app`` is not left open by that omission.
 
-Two things happen in the application-level dependency and nowhere else, because each must happen
-exactly once per request. A refusal is counted in ``route_permission_refusal`` before it is
-raised, and a route whose declaration requires ``tiles.materialise`` is charged one tile against
-the workspace quota before it runs, unless it is declared in
-:data:`~exulanica.api.permissions.SELF_CHARGING_TILE_ROUTES`, which names the routes that charge
-the quota themselves, once per tile delivered rather than once per request, and why each does.
+Three things happen in the application-level dependency and nowhere else, because each must
+happen exactly once per request. A refusal is counted in ``route_permission_refusal`` before it is
+raised; an admitted request is counted against its workspace's share of its capacity class
+(:mod:`exulanica.api.admission`), at the first moment the workspace is known; and a route whose
+declaration requires ``tiles.materialise`` is charged one tile against the workspace quota before
+it runs, unless it is declared in :data:`~exulanica.api.permissions.SELF_CHARGING_TILE_ROUTES`,
+which names the routes that charge the quota themselves, once per tile delivered rather than once
+per request, and why each does. The share is claimed after the permission check and before the
+charge, so a request that is not permitted is refused exactly as it would be on an idle server,
+and a request refused for capacity is never charged.
+
+**The dependency is asynchronous and never touches a database on the event loop.** Public and
+sign-in routes return without leaving the loop, so liveness needs no worker thread. Everything that
+can reach a database, the credential lookup, the refusal record, the share and the charge, runs in
+the threadpool, in that order.
 """
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
+from contextlib import AbstractContextManager
 from typing import Annotated
 
 import psycopg
 from fastapi import Depends, Header, Request
+from starlette.concurrency import run_in_threadpool
 
+from exulanica.api.admission import claim_workspace
 from exulanica.api.authorisation import TokenNotAccepted
 from exulanica.api.permissions import (
     ACCOUNT_OWNER_PERMISSIONS,
@@ -61,6 +73,7 @@ __all__ = [
     "CurrentSession",
     "HeldPermissions",
     "ReadOnlyConnection",
+    "ReadOnlySessions",
     "ScopedConnection",
     "WorkspaceIdentity",
     "authorise_route",
@@ -123,19 +136,24 @@ def _grant(request: Request, authorization: str | None) -> tuple[Session, frozen
     return services.tokens.grant_for(presented.strip())
 
 
-def authorise_route(request: Request) -> None:
+async def authorise_route(request: Request) -> None:
     """The route permission floor. Installed on the application, so it runs for every route.
 
     Public routes and the sign-in surface return at once and never look at a credential, so a
-    liveness probe cannot go red because a token rotated and a sign-in cannot require the session
-    it creates. Every other route resolves the caller, then its declaration, in that order, so an
-    anonymous caller learns nothing about what a route requires. The header is read from the
-    request rather than declared as a parameter, because a declared parameter here would advertise
-    an Authorization header on the public routes too.
+    liveness probe cannot go red because a token rotated, a sign-in cannot require the session it
+    creates, and neither needs a worker thread. Every other route resolves the caller, then its
+    declaration, in that order, so an anonymous caller learns nothing about what a route requires.
+    The header is read from the request rather than declared as a parameter, because a declared
+    parameter here would advertise an Authorization header on the public routes too.
     """
     path = _matched_path(request)
     if _needs_no_credential(request, path):
         return
+    await run_in_threadpool(_authorise, request, path)
+
+
+def _authorise(request: Request, path: str | None) -> None:
+    """The half of :func:`authorise_route` that may reach a database, run in a worker thread."""
     session, held = _grant(request, request.headers.get("authorization"))
     services = get_services(request)
     try:
@@ -149,6 +167,7 @@ def authorise_route(request: Request) -> None:
                 refused=refused,
             )
         raise
+    claim_workspace(request.scope, session.workspace_id)
     charges_here = (request.method.upper(), path) not in SELF_CHARGING_TILE_ROUTES
     if (
         charges_here
@@ -215,8 +234,25 @@ def readonly_connection(request: Request, session: CurrentSession) -> Iterator[p
         yield connection
 
 
+async def readonly_sessions(
+    request: Request, session: CurrentSession
+) -> Callable[[], AbstractContextManager[psycopg.Connection]]:
+    """Short read-only connections bound to the caller's workspace, opened when the route asks.
+
+    For a route that must not hold one connection for its whole response, which a streamed
+    response otherwise does: a request-scoped connection is closed only after the response ends.
+    The workspace is bound here, so the route still never names one.
+    """
+    database = get_services(request).readonly_database
+    workspace_id = session.workspace_id
+    return lambda: database.session(workspace_id)
+
+
 ScopedConnection = Annotated[psycopg.Connection, Depends(scoped_connection)]
 ReadOnlyConnection = Annotated[psycopg.Connection, Depends(readonly_connection)]
+ReadOnlySessions = Annotated[
+    Callable[[], AbstractContextManager[psycopg.Connection]], Depends(readonly_sessions)
+]
 
 
 class WorkspaceIdentity:

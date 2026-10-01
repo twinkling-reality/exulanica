@@ -764,6 +764,8 @@ layers = [
 name = "The Companion's proposal features do not import its answer path"
 type = "forbidden"
 source_modules = [
+  "exulanica.selection.action_outcome",
+  "exulanica.selection.action_plan",
   "exulanica.selection.environment_proposal",
   "exulanica.selection.proposal",
 ]

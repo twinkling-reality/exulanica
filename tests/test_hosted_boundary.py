@@ -64,6 +64,7 @@ from exulanica.models.manifest import (
 )
 from exulanica.models.policy import HostedRequestRefused, request_parts
 from exulanica.models.transport import HttpResponse
+from exulanica.selection import action_plan
 from exulanica.selection.answer import Answer, AnswerClause, ClauseType
 from exulanica.selection.calls import CallLog
 from exulanica.selection.environment_proposal import (
@@ -79,6 +80,7 @@ from exulanica.selection.plan import (
 )
 from exulanica.selection.proposal import propose_appearance
 from exulanica.selection.question import answer_question
+from exulanica.selection.request_names import RequestNames
 from exulanica.selection.society_question import answer_about_society, build_scene
 from exulanica.selection.world_drafting import propose_world_specification, specification_view
 from exulanica.world.society_decision_contract import decision_contract, person_role
@@ -129,6 +131,8 @@ HOSTED_CALL_PATHS: Mapping[str, tuple[str, str]] = {
     "caption embedding": ("exulanica.epistemics.caption_embeddings", "embed_capture"),
     "vision": ("exulanica.ingest.vision", "NebiusVisionModel.observe"),
     "role decision": ("exulanica.api.decision_host", "ask"),
+    "action classifier": ("exulanica.selection.action_plan", "classify_action"),
+    "world-edit drafter": ("exulanica.selection.action_plan", "_draft_world_edit"),
 }
 
 _PATH_AT = {site: path for path, site in HOSTED_CALL_PATHS.items()}
@@ -466,6 +470,50 @@ def run_environment(world: World) -> Witness:
     return transport
 
 
+def _action_world() -> action_plan._World:
+    """What the action planner reads from a version, as the drafter is shown it."""
+    return action_plan._World(
+        world_id=WORLD,
+        version_id=uuid.UUID(int=1),
+        state_sha256="0" * 64,
+        edit_seq=0,
+        assets=(action_plan._Choice("cc0.bench", "cc0.bench", "Bench", "A wooden bench."),),
+        objects=(),
+        arrangements=(
+            action_plan._Choice("small_square", "small_square", "Small square", "Seats."),
+        ),
+        arrangement_versions={"small_square": 1},
+        descriptors={},
+        object_ids=frozenset(),
+    )
+
+
+def run_actions(world: World) -> Witness:
+    """The Companion's action planner: its classifier, then its world-edit drafter, each handed
+    the utterance as ``plan_action`` hands it, with every saved name replaced first."""
+    client, transport = world.hosted(
+        [
+            _json_reply({"kind": "world_edit"}, Role.STRUCTURED_EXTRACTION),
+            _json_reply(
+                {
+                    "steps": [
+                        {"operation": "place_object", "kinds": ["cc0.bench"], "arrangements": []}
+                    ]
+                },
+                Role.STRUCTURED_EXTRACTION,
+            ),
+        ]
+    )
+    names = RequestNames.read(world.connection, world.session.workspace_id)
+    sent = names.sendable(f"put a bench where {PERSON} waits outside {PLACE}")
+    log = CallLog()
+    action_plan.classify_action(client, sent, log=log, placeholders=names.placeholders)
+    action_plan._draft_world_edit(
+        client, sent, _action_world(), log=log, placeholders=names.placeholders
+    )
+    return transport
+
+
 def run_specification(world: World) -> Witness:
     """The specification drafter, handed a description as its route hands it."""
     form = {
@@ -636,6 +684,8 @@ SCENARIOS: Mapping[str, tuple[Callable[[World], Witness], str]] = {
     "caption embedding": (run_caption, "RUNNING CLUB"),
     "vision": (run_vision, "Describe this photograph"),
     "role decision": (run_person, "wait here a minute"),
+    "action classifier": (run_actions, "put a bench"),
+    "world-edit drafter": (run_actions, "KINDS THAT CAN BE PLACED"),
 }
 
 #: The paths whose call site replaces saved names itself, and the modules it replaces them with.
@@ -646,6 +696,8 @@ CALL_SITE_REPLACES: Mapping[str, tuple[str, ...]] = {
     "appearance drafter": ("exulanica.selection.request_names",),
     "environment drafter": ("exulanica.selection.request_names",),
     "specification drafter": ("exulanica.selection.world_drafting",),
+    "action classifier": ("exulanica.selection.request_names",),
+    "world-edit drafter": ("exulanica.selection.request_names",),
 }
 
 

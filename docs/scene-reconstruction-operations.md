@@ -437,7 +437,8 @@ published scenes and superseded builds. `GET /operations/reconstruction-scenes/{
 job's exact inputs, member outcomes, outputs, failure and current-build state. A retryable failure
 can be made immediately eligible with `POST /operations/reconstruction-scenes/{job_id}/retry`;
 succeeded, cancelled and exhausted jobs are immutable and return a conflict instead of being
-rewritten.
+rewritten. Both routes answer 404 `unknown_reference` for a job the workspace cannot see, the same
+for one that never existed as for another workspace's.
 
 ## 8. The graph projection
 

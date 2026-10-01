@@ -212,13 +212,13 @@ def main():
             return
         import psycopg
 
-        from exulanica.env import env_get, resolve_data_dir
-        from exulanica.store.local import LocalContentAddressedStore
+        from exulanica.env import env_get
+        from exulanica.store.configured import content_stores
 
         url = env_get("DATABASE_URL")
         if not url:
             parser.error("EXULANICA_DATABASE_URL is required for publication")
-        store = LocalContentAddressedStore(resolve_data_dir(explicit=args.data_dir) / "blobs")
+        store = content_stores(data_dir=args.data_dir).blobs
         with psycopg.connect(url) as connection, connection.transaction():
             print(f"Published {import_catalog(connection, store)} character containers")
         return

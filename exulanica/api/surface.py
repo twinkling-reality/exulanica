@@ -18,7 +18,8 @@ router through :func:`exulanica.api.routes.mounted_routes`, the walk ``routable_
 **The database role** is the role of the connection a route is given by dependency injection:
 ``runtime`` for :data:`~exulanica.api.dependencies.ScopedConnection` (the non-owner runtime role
 behind ``Services.database``), ``read-only`` for
-:data:`~exulanica.api.dependencies.ReadOnlyConnection` (``Services.readonly_database``), and
+:data:`~exulanica.api.dependencies.ReadOnlyConnection` and
+:data:`~exulanica.api.dependencies.ReadOnlySessions` (``Services.readonly_database``), and
 ``not injected`` for a route given neither. The last does not mean a route touches no database:
 ``/readyz`` and the sign-in routes open their own connections through their services, and the row
 says only that no connection reaches them by dependency.
@@ -36,7 +37,8 @@ from typing import Any, Final
 from fastapi import FastAPI
 from fastapi.routing import APIRoute
 
-from exulanica.api.dependencies import readonly_connection, scoped_connection
+from exulanica.api.admission import AdmissionSettings
+from exulanica.api.dependencies import readonly_connection, readonly_sessions, scoped_connection
 from exulanica.api.permissions import Authentication, Public, Requires, rule_for
 from exulanica.api.routes import mounted_routes
 from exulanica.world.society_controls import DEFAULT_BASE_TICK_INTERVAL_MS
@@ -53,6 +55,7 @@ __all__ = [
 DATABASE_ROLES: Final[dict[Callable[..., Any], str]] = {
     scoped_connection: "runtime",
     readonly_connection: "read-only",
+    readonly_sessions: "read-only",
 }
 _NOT_INJECTED: Final = "not injected"
 #: The methods ``routable_paths`` leaves out, for the reason it gives: Starlette adds HEAD to every
@@ -63,16 +66,17 @@ _IMPLICIT_METHODS: Final = frozenset({"HEAD", "OPTIONS"})
 def routing_only_application() -> FastAPI:
     """The real application, built without services, for reading its routes and schema.
 
-    :func:`exulanica.api.app.create_app` reads two attributes of its services while it builds
+    :func:`exulanica.api.app.create_app` reads three attributes of its services while it builds
     the router and nothing else until a request arrives, so this application can be walked and
     can produce its OpenAPI document with no database, store or credential configured. It cannot
-    serve a request. A third attribute read at build time fails here loudly, by name.
+    serve a request. A fourth attribute read at build time fails here loudly, by name.
     """
     from exulanica.api.app import create_app
 
     services = SimpleNamespace(
         society_base_tick_interval_ms=DEFAULT_BASE_TICK_INTERVAL_MS,
         society_runtime=None,
+        admission=AdmissionSettings(),
     )
     return create_app(services, verify=False)  # type: ignore[arg-type]
 

@@ -114,6 +114,7 @@ __all__ = [
     "ReviewedAssetRow",
     "SourceFacts",
     "StayReason",
+    "UndoCandidate",
     "WorldObjectRepository",
 ]
 
@@ -211,6 +212,22 @@ class SourceFacts:
     region_ids: frozenset[str]
     #: A committed deletion invalidated the source, so every edit of the version is refused first.
     invalidated: bool
+
+
+@dataclass(frozen=True, slots=True)
+class UndoCandidate:
+    """The edit an undo of one version would reverse, read without making the undo."""
+
+    edit_id: uuid.UUID
+    edit_seq: int
+    kind: str
+    subject: EditSubject
+    subject_id: str
+    #: The subject's document as the log last recorded it: the ``before`` the undo would record.
+    current: Mapping[str, Any] | None
+    #: The reversed edit's stored ``before_document``: what the undo restores. Null when the
+    #: reversed edit added the subject, so the undo takes the addition back.
+    restores: Mapping[str, Any] | None
 
 
 class WorldObjectRepository:
@@ -1011,6 +1028,68 @@ class WorldObjectRepository:
         self._require_edit_base(row, base_state_sha256)
         return self._validated_object(row, obj)
 
+    def validate_object_move(
+        self,
+        version_id: uuid.UUID,
+        object_id: str,
+        transform: Transform,
+        *,
+        base_state_sha256: str,
+    ) -> tuple[AuthoredObject, AuthoredObject]:
+        """Validate exactly what ``move_object`` would, without a lock or a write.
+
+        The same base check, then the same object and transform checks through
+        :meth:`_checked_move`, in the writer's order. Answers the object as it stands and as the
+        move would leave it.
+        """
+        row = self._version_row(version_id)
+        self._require_edit_base(row, base_state_sha256)
+        return self._checked_move(version_id, object_id, transform)
+
+    def validate_object_removal(
+        self, version_id: uuid.UUID, object_id: str, *, base_state_sha256: str
+    ) -> tuple[AuthoredObject, AuthoredObject]:
+        """Validate exactly what ``remove_object`` would, without a lock or a write."""
+        row = self._version_row(version_id)
+        self._require_edit_base(row, base_state_sha256)
+        return self._checked_removal(version_id, object_id)
+
+    def validate_undo(self, version_id: uuid.UUID, *, base_state_sha256: str) -> UndoCandidate:
+        """The edit ``undo`` would reverse and what it would restore, without a lock or a write.
+
+        The candidate is the one :meth:`undo` takes (:meth:`_undo_candidate_row`). ``current`` is
+        the subject's document as the log last recorded it, which is what the undo edit records
+        as its ``before``; ``restores`` is the reversed edit's stored ``before_document``, null
+        when the reversed edit added the subject.
+        """
+        row = self._version_row(version_id)
+        self._require_edit_base(row, base_state_sha256)
+        newest = self._undo_candidate_row(version_id)
+        subject = edit_kind(newest["kind"]).subject
+        subject_id = str(newest[subject.column])
+        restores = newest["before_document"]
+        # The checks the writer's restore rule makes before it writes: a placed environment
+        # instance or point map whose binding moved since the reversed edit is refused.
+        if restores is not None and subject is EditSubject.ENVIRONMENT_INSTANCE:
+            self._check_environment_restore(version_id, restores)
+        if restores is not None and subject is EditSubject.POINT_MAP_INSTANCE:
+            self._check_point_map_restore(version_id, restores)
+        current = self.connection.execute(
+            "select after_document from world_alternate_version_edit "
+            f"where workspace_id=%s and world_id=%s and version_id=%s and {subject.column}=%s "
+            "order by edit_seq desc limit 1",
+            (self.workspace_id, self.world_id, version_id, subject_id),
+        ).fetchone()
+        return UndoCandidate(
+            edit_id=newest["edit_id"],
+            edit_seq=int(newest["edit_seq"]),
+            kind=str(newest["kind"]),
+            subject=subject,
+            subject_id=subject_id,
+            current=None if current is None else current["after_document"],
+            restores=restores,
+        )
+
     def move_object(
         self,
         version_id: uuid.UUID,
@@ -1022,10 +1101,8 @@ class WorldObjectRepository:
     ) -> AlternateVersion:
         with self.connection.transaction():
             row = self._begin_edit(version_id, base_state_sha256)
-            current = self._require_object(version_id, object_id)
-            if current.removed:
-                raise InvalidObjectState(f"{object_id} is removed in this version")
-            checked = validate_transform(transform)
+            current, moved = self._checked_move(version_id, object_id, transform)
+            checked = moved.transform
             edit_id = uuid.uuid4()
             self.connection.execute(
                 "update world_alternate_object set x_mm=%s,y_mm=%s,z_mm=%s,"
@@ -1065,9 +1142,7 @@ class WorldObjectRepository:
     ) -> AlternateVersion:
         with self.connection.transaction():
             row = self._begin_edit(version_id, base_state_sha256)
-            current = self._require_object(version_id, object_id)
-            if current.removed:
-                raise InvalidObjectState(f"{object_id} is already removed in this version")
+            current, _removed = self._checked_removal(version_id, object_id)
             edit_id = uuid.uuid4()
             self.connection.execute(
                 "update world_alternate_object set removed=true,last_edit_id=%s "
@@ -1173,19 +1248,7 @@ class WorldObjectRepository:
         """
         with self.connection.transaction():
             row = self._begin_edit(version_id, base_state_sha256)
-            newest = self.connection.execute(
-                f"select edit_id,kind,{_SUBJECT_COLUMNS},before_document "
-                "from world_alternate_version_edit e "
-                "where e.workspace_id=%s and e.world_id=%s and e.version_id=%s "
-                "and e.kind <> 'undo' "
-                "and not exists (select 1 from world_alternate_version_edit u "
-                " where u.workspace_id=e.workspace_id and u.world_id=e.world_id "
-                " and u.version_id=e.version_id and u.undone_edit_id=e.edit_id) "
-                "order by e.edit_seq desc limit 1",
-                (self.workspace_id, self.world_id, version_id),
-            ).fetchone()
-            if newest is None:
-                raise InvalidObjectState("this version has no edit left to undo")
+            newest = self._undo_candidate_row(version_id)
             subject_kind = edit_kind(newest["kind"]).subject
             restore = getattr(self, self._UNDO_RULES[subject_kind])
             edit_id = uuid.uuid4()
@@ -1661,9 +1724,11 @@ class WorldObjectRepository:
         if written is None:
             raise InvalidEnvironmentState(f"{instance.instance_id} already exists in this version")
 
-    def _restore_environment(
-        self, version_id: uuid.UUID, document: Mapping[str, Any], edit_id: uuid.UUID
+    def _check_environment_restore(
+        self, version_id: uuid.UUID, document: Mapping[str, Any]
     ) -> None:
+        """Refuse restoring a stored environment document whose binding the instance left: the
+        writer's check and the undo preview's one rule."""
         current = self._require_environment(version_id, document["instance_id"])
         current_document = environment_instance_document(current)
         if (
@@ -1671,6 +1736,11 @@ class WorldObjectRepository:
             or current_document["origin"] != document["origin"]
         ):
             raise InvalidEnvironmentState("stored undo source binding disagrees with current state")
+
+    def _restore_environment(
+        self, version_id: uuid.UUID, document: Mapping[str, Any], edit_id: uuid.UUID
+    ) -> None:
+        self._check_environment_restore(version_id, document)
         transform = document["transform"]
         self.connection.execute(
             "update world_alternate_environment_instance "
@@ -2140,9 +2210,9 @@ class WorldObjectRepository:
             self._require_point_map(version_id, instance_id)
         )
 
-    def _restore_point_map(
-        self, version_id: uuid.UUID, document: Mapping[str, Any], edit_id: uuid.UUID
-    ) -> None:
+    def _check_point_map_restore(self, version_id: uuid.UUID, document: Mapping[str, Any]) -> None:
+        """Refuse restoring a stored point map document whose binding the instance left: the
+        writer's check and the undo preview's one rule."""
         current = self._require_point_map(version_id, document["instance_id"])
         current_document = point_map_instance_document(current)
         if (
@@ -2150,6 +2220,11 @@ class WorldObjectRepository:
             or current_document["origin"] != document["origin"]
         ):
             raise InvalidObjectState("stored undo source binding disagrees with current state")
+
+    def _restore_point_map(
+        self, version_id: uuid.UUID, document: Mapping[str, Any], edit_id: uuid.UUID
+    ) -> None:
+        self._check_point_map_restore(version_id, document)
         transform = document["transform"]
         self.connection.execute(
             "update world_alternate_point_map_instance set region_id=%s,x_mm=%s,y_mm=%s,z_mm=%s,"
@@ -2356,6 +2431,42 @@ class WorldObjectRepository:
             if obj.object_id == object_id:
                 return obj
         raise UnknownWorldResource("no such authored object")
+
+    def _checked_move(
+        self, version_id: uuid.UUID, object_id: str, transform: Transform
+    ) -> tuple[AuthoredObject, AuthoredObject]:
+        """The object a move names and the object it would leave: the writer's and the preview's
+        one set of checks, after the base check and in the writer's order."""
+        current = self._require_object(version_id, object_id)
+        if current.removed:
+            raise InvalidObjectState(f"{object_id} is removed in this version")
+        return current, replace(current, transform=validate_transform(transform))
+
+    def _checked_removal(
+        self, version_id: uuid.UUID, object_id: str
+    ) -> tuple[AuthoredObject, AuthoredObject]:
+        """The object a removal names and the object it would leave, as :meth:`_checked_move`."""
+        current = self._require_object(version_id, object_id)
+        if current.removed:
+            raise InvalidObjectState(f"{object_id} is already removed in this version")
+        return current, replace(current, removed=True)
+
+    def _undo_candidate_row(self, version_id: uuid.UUID) -> Mapping[str, Any]:
+        """The newest edit no undo names: what :meth:`undo` reverses and its preview names."""
+        newest = self.connection.execute(
+            f"select edit_id,edit_seq,kind,{_SUBJECT_COLUMNS},before_document "
+            "from world_alternate_version_edit e "
+            "where e.workspace_id=%s and e.world_id=%s and e.version_id=%s "
+            "and e.kind <> 'undo' "
+            "and not exists (select 1 from world_alternate_version_edit u "
+            " where u.workspace_id=e.workspace_id and u.world_id=e.world_id "
+            " and u.version_id=e.version_id and u.undone_edit_id=e.edit_id) "
+            "order by e.edit_seq desc limit 1",
+            (self.workspace_id, self.world_id, version_id),
+        ).fetchone()
+        if newest is None:
+            raise InvalidObjectState("this version has no edit left to undo")
+        return newest
 
     def _require_environment(self, version_id: uuid.UUID, instance_id: str) -> EnvironmentInstance:
         # Read by writers only, from rows: a writer may hold the asset read lock.

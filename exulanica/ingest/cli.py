@@ -31,7 +31,7 @@ from exulanica.ingest.report import IngestReport
 from exulanica.ingest.repository import IngestRepository
 from exulanica.ingest.stages import stage
 from exulanica.ingest.vision import NebiusVisionModel, VisionModel
-from exulanica.store.local import LocalContentAddressedStore
+from exulanica.store.configured import content_stores
 
 __all__ = ["main"]
 
@@ -189,8 +189,7 @@ def _print_report(report: IngestReport, stream: Any) -> None:
 
 
 def _cmd_ingest(args: argparse.Namespace, stream: Any) -> int:
-    data_dir = _data_dir(args)
-    store = LocalContentAddressedStore(data_dir / "blobs")
+    store = content_stores(data_dir=_data_dir(args)).blobs
     vision = _build_vision(args, stream)
     depth = _build_depth(args, stream)
     with _repository(args, stream) as repository:

@@ -64,22 +64,22 @@ frame is 64.1 MB as `L`, 256.3 MB as `RGB` and 256.2 MB as `RGBA`, so `RGB` pays
 does not have. A larger frame, a stitched panorama or a medium-format original, is refused with
 its own pixel count in the message, and the number here is one line to raise deliberately.
 
-**What is NOT bounded, said plainly, and what not to reach for.** This bounds one decode. A
-synchronous route runs in the ASGI server's threadpool, so the aggregate is that bound times the
-number of threads, and nothing here limits how many decode at once. Measured against uvicorn
-rather than read from anyio: 120 concurrent requests to a synchronous handler ran 40 at a time
-across 40 distinct worker threads, which is anyio's hard-coded default and nothing in this
-deployment chose it. The production composition disables the in-process derivative worker, so
-the API-process worst case is 40 x 512 MB, about 20 GiB. Its dedicated derivative worker is a
-separate process with one delivery thread and roughly one more 512 MB decode peak.
-``docs/deployment.md`` section 5.4.4 carries that arithmetic and the sizing it implies.
+**How many decode at once is bounded too, per process.** The pixel budget bounds one decode; a
+synchronous route runs in the ASGI server's threadpool, so without a second bound the aggregate
+would be that budget times the number of threads (40 x 512 MB, about 20 GiB, at anyio's default).
+:func:`decoding` is that second bound: a process-wide count of decodes in progress, taken before
+the pixels are loaded and held through the orientation copy, so a process holds at most
+``limit`` decode peaks at a time. The API sets the limit at startup from ``EXULANICA_API_DECODES``;
+every other process keeps :data:`DEFAULT_DECODES`. It is reentrant within a thread, so a caller
+already holding it (``open_upright`` calling :func:`open_sensor`) cannot wait on itself.
 
-**A semaphore around the decode is the wrong repair and was rejected on measurement.** Acquiring
-one inside a synchronous handler blocks a thread that is *already* holding one of anyio's 40
-tokens, so the requests over the bound do not fail fast: they occupy threads while waiting, and
-``/healthz`` is synchronous on the same limiter, so the instance's own liveness probe starves at
-exactly the load the semaphore was added to survive. The bound that works is on how many threads
-exist, not on what they are allowed to do once they have one.
+**It waits, boundedly, and then refuses.** A decode over the limit waits at most
+:data:`DECODE_WAIT_SECONDS` for a turn, then raises :class:`DecodeBusy`, which is not in
+:data:`UNREADABLE`, so nothing reads it as a bad photograph. Waiting holds the waiting thread, and
+that is acceptable only because both conditions that made it unacceptable are gone: liveness does
+not use the request threadpool, and the threads that can wait here are requests the API admitted,
+already bounded below the thread limit (``exulanica.api.admission``). ``docs/deployment.md``
+section 5.4.4 carries the arithmetic and the sizing it implies.
 
 **And it does not bound the number of bytes.** A file can be small and decode enormous, which is
 what a decompression bomb is, and it can be enormous and decode to nothing. The byte bound
@@ -91,15 +91,30 @@ from __future__ import annotations
 
 import io
 import re
+import threading
+import time
 import warnings
-from typing import Final
+from collections.abc import Iterator
+from contextlib import contextmanager
+from typing import Any, Final
 
 from pi_heif import __version__ as heif_version
 from pi_heif import libheif_info, register_heif_opener
 from PIL import Image, UnidentifiedImageError
 from PIL import __version__ as pillow_version
 
-__all__ = ["MAX_PIXELS", "UNREADABLE", "open_sensor", "probe"]
+__all__ = [
+    "DECODE_WAIT_SECONDS",
+    "DEFAULT_DECODES",
+    "MAX_PIXELS",
+    "UNREADABLE",
+    "DecodeBusy",
+    "configure_decode_concurrency",
+    "decode_counts",
+    "decoding",
+    "open_sensor",
+    "probe",
+]
 
 #: The largest frame this pipeline will decode, in pixels. 64 megapixels: past every phone and
 #: every consumer camera, below Pillow's own 89478485 default so that assigning it below tightens
@@ -137,6 +152,107 @@ UNREADABLE: Final = (
     ValueError,
 )
 
+#: Decodes one process holds at once when nothing configures it: every process but the API, which
+#: sets its own from ``EXULANICA_API_DECODES``. Two decode peaks at the pixel budget are about 1 GB.
+DEFAULT_DECODES: Final = 2
+
+#: The longest a decode waits for a turn before :class:`DecodeBusy`.
+DECODE_WAIT_SECONDS: Final = 20.0
+
+
+class DecodeBusy(Exception):
+    """This process was already decoding as many photographs as it allows, for longer than a
+    decode waits. Nothing was decoded, so the same work can be asked for again.
+
+    A plain ``Exception``: this module imports nothing from the package, ``exulanica.errors``
+    included, and it must not be an ``OSError`` or ``ValueError``, which :data:`UNREADABLE` reads
+    as a photograph this pipeline cannot open.
+    """
+
+
+class _DecodeBound:
+    """A process-wide count of decodes in progress, reentrant within one thread."""
+
+    def __init__(self, limit: int, wait_seconds: float) -> None:
+        self._condition = threading.Condition()
+        self._limit = limit
+        self._wait_seconds = wait_seconds
+        self._in_use = 0
+        self._peak = 0
+        self._waited = 0
+        self._refused = 0
+        self._depth = threading.local()
+
+    def configure(self, limit: int) -> None:
+        if type(limit) is not int or limit < 1:
+            raise ValueError("the decode limit must be a whole number of at least 1")
+        with self._condition:
+            self._limit = limit
+            self._condition.notify_all()
+
+    @contextmanager
+    def hold(self) -> Iterator[None]:
+        depth = getattr(self._depth, "value", 0)
+        if depth:
+            self._depth.value = depth + 1
+            try:
+                yield
+            finally:
+                self._depth.value = depth
+            return
+        deadline = time.monotonic() + self._wait_seconds
+        with self._condition:
+            waited = False
+            while self._in_use >= self._limit:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    self._refused += 1
+                    raise DecodeBusy(
+                        f"this process was already decoding as many photographs as it allows "
+                        f"({self._limit}) for {self._wait_seconds:g} seconds; nothing was decoded"
+                    )
+                waited = True
+                self._condition.wait(remaining)
+            self._in_use += 1
+            self._peak = max(self._peak, self._in_use)
+            self._waited += waited
+        self._depth.value = 1
+        try:
+            yield
+        finally:
+            self._depth.value = 0
+            with self._condition:
+                self._in_use -= 1
+                self._condition.notify()
+
+    def counts(self) -> dict[str, Any]:
+        with self._condition:
+            return {
+                "limit": self._limit,
+                "in_use": self._in_use,
+                "peak": self._peak,
+                "waited": self._waited,
+                "refused": self._refused,
+            }
+
+
+_BOUND: Final = _DecodeBound(DEFAULT_DECODES, DECODE_WAIT_SECONDS)
+
+
+def decoding() -> Any:
+    """Hold one of this process's decode turns for the ``with`` block. See the module docstring."""
+    return _BOUND.hold()
+
+
+def configure_decode_concurrency(limit: int) -> None:
+    """Set how many photographs this process decodes at once."""
+    _BOUND.configure(limit)
+
+
+def decode_counts() -> dict[str, Any]:
+    """The limit, the decodes in progress, the most at once, and how many waited or were refused."""
+    return _BOUND.counts()
+
 
 def probe(data: bytes) -> tuple[int, int]:
     """The frame's dimensions from its header alone, or a refusal. No decode.
@@ -161,13 +277,16 @@ def open_sensor(data: bytes) -> Image.Image:
     The caller owns the image and should close it (or use it as a context manager). Ingest's
     compatibility facade applies its existing explicit orientation transform after this call.
 
-    Header dimensions and frame count are checked before loading. On failure, the opened image
-    is closed; successful returns keep any in-memory metadata stream needed by Pillow plugins.
+    Header dimensions and frame count are checked before loading, and the load takes one of the
+    process's decode turns (:func:`decoding`), so it may wait and may raise :class:`DecodeBusy`.
+    On failure, the opened image is closed; successful returns keep any in-memory metadata stream
+    needed by Pillow plugins.
     """
     opened = Image.open(io.BytesIO(data))
     try:
         _within_budget(opened)
-        opened.load()
+        with decoding():
+            opened.load()
         _within_budget(opened)
     except BaseException:
         opened.close()

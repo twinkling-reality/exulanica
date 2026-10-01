@@ -89,9 +89,12 @@ from exulanica.api.routes.world_environments import (
 from exulanica.api.routes.world_objects import (
     add_authored_object,
     move_authored_object,
+    move_authored_object_preview,
     remove_authored_object,
+    remove_authored_object_preview,
     set_authored_object_behaviour,
     undo_authored_edit,
+    undo_authored_edit_preview,
 )
 from exulanica.api.routes.world_traffic import world_traffic
 from exulanica.api.routes.world_versions import alternate_version
@@ -320,8 +323,24 @@ def _object_operations(context: VersionContext) -> list[Operation]:
             options=(reviewed_asset_catalog, reviewed_behaviours),
             effects=_society_reach(context),
         ),
-        Operation(move_authored_object, state, "object", context.bind, objects, base=base),
-        Operation(remove_authored_object, state, "object", context.bind, objects, base=base),
+        Operation(
+            move_authored_object,
+            state,
+            "object",
+            context.bind,
+            objects,
+            base=base,
+            preview=Preview(move_authored_object_preview, required=False),
+        ),
+        Operation(
+            remove_authored_object,
+            state,
+            "object",
+            context.bind,
+            objects,
+            base=base,
+            preview=Preview(remove_authored_object_preview, required=False),
+        ),
         Operation(
             set_authored_object_behaviour,
             state,
@@ -331,7 +350,14 @@ def _object_operations(context: VersionContext) -> list[Operation]:
             base=base,
             options=(reviewed_behaviours,),
         ),
-        Operation(undo_authored_edit, state, "version", context.bind, base=base),
+        Operation(
+            undo_authored_edit,
+            state,
+            "version",
+            context.bind,
+            base=base,
+            preview=Preview(undo_authored_edit_preview, required=False),
+        ),
     ]
 
 

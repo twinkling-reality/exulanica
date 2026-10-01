@@ -164,7 +164,11 @@ function outcomeHeadline(state: FormationState): string {
           : o?.reason === 'cancelled'
             ? ' The job was stopped.'
             : '';
-      return `${where}.${why} The photographs are available.`;
+      // A batch whose every photograph was withdrawn ends here with none to open, so the
+      // sentence is said only for a known positive count.
+      const available = o?.photographsAvailable ?? state.photographs;
+      const kept = available !== null && available > 0 ? ' The photographs are available.' : '';
+      return `${where}.${why}${kept}`;
     }
 
     default:

@@ -162,7 +162,9 @@ serving boundary. Source withdrawal affects dependent reads and artifacts under 
 
 ## 4. Object storage reality
 
-Shared object storage and production streaming require explicit implementation and acceptance.
+Content is stored in local directories or in an S3-compatible bucket that separate hosts share, with
+the same keys and a separately privileged purge ([deployment](deployment.md#4-the-content-store)).
+Acceptance on a production provider, and production streaming, require their own evidence.
 Personal world assets require authorized delivery; public showcase artifacts require a separate
 publication decision. Content addressing is an integrity mechanism, not a claim of immutable
 storage, permanent access or end-to-end encryption. [Privacy and deletion](privacy-consent-threat-model.md)

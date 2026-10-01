@@ -59,6 +59,7 @@
         "seeds": 1,
         "start": {
           "bound_usd": "0.10000000",
+          "cancel": null,
           "closed_reason": null,
           "finished_at": "2026-09-30T02:21:29.693061+00:00",
           "presumed_usd": "0.00000000",
@@ -403,6 +404,7 @@
               "need_relief": "1.0000",
               "variety": "0.8710"
             },
+            "progress": null,
             "reliability": {
               "answered": 62,
               "left_to_routine": 27,
@@ -481,6 +483,7 @@
               "need_relief": "1.0000",
               "variety": "1.0000"
             },
+            "progress": null,
             "reliability": {
               "answered": 0,
               "left_to_routine": 0,
@@ -542,6 +545,7 @@
               "need_relief": "0.0000",
               "variety": "0.0000"
             },
+            "progress": null,
             "reliability": {
               "answered": 0,
               "left_to_routine": 0,
@@ -596,6 +600,7 @@
     ],
     "start": {
       "bound_usd": "0.10000000",
+      "cancel": null,
       "closed_reason": null,
       "finished_at": "2026-09-30T02:21:29.693061+00:00",
       "presumed_usd": "0.00000000",
@@ -806,6 +811,7 @@
         "seeds": 1,
         "start": {
           "bound_usd": "0.10000000",
+          "cancel": null,
           "closed_reason": null,
           "finished_at": null,
           "presumed_usd": "0.00000000",

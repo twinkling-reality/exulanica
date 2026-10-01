@@ -25,13 +25,13 @@ from exulanica.db.account_workspaces import (
 from exulanica.db.migrate import verify_schema
 from exulanica.db.roles import assert_runtime_role
 from exulanica.db.session import Database
-from exulanica.env import env_get, env_name, resolve_data_dir
+from exulanica.env import env_get, env_name
 from exulanica.epistemics.caption_embeddings import CaptionEmbeddingPass
 from exulanica.ingest.vision import NebiusVisionModel
 from exulanica.ingest.worker import DerivativeWorker, lease_seconds_for
 from exulanica.models.client import ModelClient
 from exulanica.models.manifest import Role, load_manifest
-from exulanica.store.local import LocalContentAddressedStore
+from exulanica.store.configured import content_stores
 
 __all__ = [
     "ACCOUNT_DATABASE_URL_ENV",
@@ -121,10 +121,9 @@ def _build_worker(args: argparse.Namespace, environ: Mapping[str, str]) -> Deriv
         if client is not None
         else None
     )
-    data_dir = resolve_data_dir(environ)
     worker = DerivativeWorker(
         database,
-        LocalContentAddressedStore(data_dir / "blobs"),
+        content_stores(environ).blobs,
         parse_workspaces(args.workspace, environ, allow_empty=workspace_source is not None),
         workspace_source=workspace_source,
         vision=vision,

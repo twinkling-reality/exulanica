@@ -30,8 +30,8 @@ from exulanica.db.account_workspaces import ACCOUNT_DATABASE_URL_ENV, AccountWor
 from exulanica.db.migrate import verify_schema
 from exulanica.db.roles import assert_runtime_role
 from exulanica.db.session import Database
-from exulanica.env import env_get, env_name, resolve_data_dir
-from exulanica.store.namespaces import material_stores
+from exulanica.env import env_get, env_name
+from exulanica.store.configured import content_stores
 from exulanica.world.material_bakes import BakeLimits, BakeRuntime, MaterialBakeWorker
 from exulanica.world.texture_assets import TEXTURE_DIRECTORY, load_material_catalog
 
@@ -84,7 +84,7 @@ def _build(args: argparse.Namespace, environ: Mapping[str, str]) -> MaterialBake
     )
     return MaterialBakeWorker(
         database,
-        material_stores(resolve_data_dir(environ)),
+        content_stores(environ).materials,
         workspaces,
         runtime=runtime,
         catalog=load_material_catalog(Path(textures) if textures else TEXTURE_DIRECTORY),
@@ -162,3 +162,7 @@ def main(
     worker.stop(timeout=args.grace_seconds)
     _emit(output, "stopped", last_error=worker.last_error)
     return 0
+
+
+if __name__ == "__main__":  # pragma: no cover
+    raise SystemExit(main())

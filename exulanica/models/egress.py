@@ -35,7 +35,7 @@ because a bearer credential over plain HTTP is readable at every hop.
 **What it is not.** It is a development and deployment safety rail, described as one, and it is
 not a substitute for the network's own limit. It governs the one HTTP seam the model client uses
 and nothing else in the process: a module that opens its own socket, calls ``urllib`` or builds
-its own ``httpx.Client`` is not covered, and three of those exist outside the model path today.
+its own ``httpx.Client`` is not covered, and ``docs/security-floor.md`` names each one.
 It checks the name, not the address the name resolves to, so a listed host whose DNS answer
 changes reaches wherever the answer points. It does not stop a compromised process, which can
 simply not call it. Environment proxy settings are ignored by the client it builds, because a

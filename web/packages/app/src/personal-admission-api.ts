@@ -17,8 +17,6 @@ export interface PersonalAuthority {
   readonly authorized_at: string;
   readonly valid_until: string;
 }
-export const HUMAN_ATTESTATION = 'I personally inspected every exact photograph in this inventory and reviewed all people '
-  + 'and sensitive person regions, including any missed by the detector.';
 /**
  * The role whose estimates can be placed in a world. The placed-estimate inspector stops this role
  * for its photo; every word it is shown with still comes from the server's offer for it.
@@ -134,7 +132,7 @@ export class PersonalAdmissionApi {
       throw new Error('Exact sources, purpose and account authority are required.');
     }
     if (body.operation === 'review' && (!body.reviewed_by_name?.trim()
-      || body.attestation !== HUMAN_ATTESTATION || body.members.some(m => m.review === 'not-reviewed'))) {
+      || !body.attestation || body.members.some(m => m.review === 'not-reviewed'))) {
       throw new Error('Complete the named human review and exact-photo attestation.');
     }
     return this.requests.post<AdmissionResult>('/personal-admission', { ...body });
@@ -174,6 +172,8 @@ export interface PersonalStatus {
   readonly requests: readonly (Partial<AdmissionResult> & { readonly request_id: string; readonly operation: string })[];
   /** Every right a person may give, depth first. Absent from a server that offers none. */
   readonly model_right_offers?: unknown;
+  /** The exact words a human review sends back; the server refuses any other text. */
+  readonly attestation?: string;
 }
 interface PendingRequest { path: string; body: Record<string, unknown>; request_id: string }
 /** One recoverable browser write at a time, backed by the server's atomic receipt boundary. */

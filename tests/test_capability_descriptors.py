@@ -41,7 +41,13 @@ _VERSION_PREFIX = "/world/versions/{version_id}/"
 #: The operations whose route holds model.invoke only to decide who may act and that call no
 #: model, so they are described as spending nothing. Each is a reviewed exception, added here
 #: together with a test that it calls no model.
-NARROWED_SPENDS: frozenset[str] = frozenset()
+NARROWED_SPENDS: frozenset[str] = frozenset(
+    {
+        # tests/test_comparison_cancel_postgres.py: a cancel closes a waiting start with no
+        # request sent, and a host it stops sends nothing after its minute in flight.
+        "POST /world/versions/{version_id}/society/comparisons/{comparison_id}/cancel",
+    }
+)
 
 
 class _NoRows:

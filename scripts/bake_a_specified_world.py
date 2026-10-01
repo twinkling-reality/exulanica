@@ -61,7 +61,7 @@ from exulanica.grammar.grammars.city.tile import tile_inputs_digest
 from exulanica.grammar.parameters import CascadeBinding
 from exulanica.grammar.records import record_payload
 from exulanica.ingest.stages import STAGES, baked_tile_id
-from exulanica.store.namespaces import tile_store
+from exulanica.store.configured import content_stores
 from exulanica.world.baked_tiles import BakedTileRepository
 from psycopg.rows import dict_row
 
@@ -213,7 +213,9 @@ def main() -> int:
         tempfile.TemporaryDirectory() as work,
         psycopg.connect(url, autocommit=True, row_factory=dict_row) as connection,
     ):
-        repository = BakedTileRepository(connection=connection, store=tile_store(Path(data_dir)))
+        repository = BakedTileRepository(
+            connection=connection, store=content_stores(data_dir=data_dir).tiles
+        )
         outcomes: list[tuple[str, str]] = []
         for pass_name in ("first", "second"):
             for document in [d for d in documents if (d.tile.tile_x, d.tile.tile_y) in chosen]:

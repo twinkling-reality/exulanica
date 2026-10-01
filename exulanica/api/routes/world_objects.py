@@ -3,6 +3,11 @@
 An object names a reviewed asset by content digest, a region-local transform, the origin role the
 person chose and optionally one reviewed behaviour with bounded parameters. Every edit names the
 version state it was made against and runs in :func:`exulanica.api.world_edit.commit_edit`.
+
+Move, remove and undo each have a preview beside them that writes nothing
+(:mod:`exulanica.world.object_edit_preview`): the verdict the write would reach on the stored state,
+and the document it would record. A preview takes the write's base and fields and no saved entry,
+because it advances nothing; it answers an unknown version or object exactly as the write does.
 """
 
 from __future__ import annotations
@@ -11,7 +16,7 @@ import uuid
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Path, Request, Response
-from pydantic import Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from exulanica.api.dependencies import CurrentSession
 from exulanica.api.world_edit import (
@@ -25,6 +30,11 @@ from exulanica.api.world_edit import (
 )
 from exulanica.api.world_version_document import AlternateVersionView
 from exulanica.world import AuthoredObject, ObjectOrigin
+from exulanica.world.object_edit_preview import (
+    preview_object_move,
+    preview_object_removal,
+    preview_undo,
+)
 
 router = APIRouter(prefix="/world", tags=["world"])
 
@@ -46,6 +56,18 @@ class SetObjectBehaviourBody(EntryBoundEditBody):
     #: Required, and null means "take the behaviour away". A body that simply omitted it would
     #: otherwise be read as a clear the caller never asked for.
     behaviour: BehaviourBody | None
+
+
+class EditPreviewBody(BaseModel):
+    """The base a preview is read against. No saved entry: a preview advances nothing."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    base_state_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
+class MovePreviewBody(EditPreviewBody):
+    transform: TransformBody
 
 
 @router.post(
@@ -181,3 +203,54 @@ def undo_authored_edit(
             version_id, base_state_sha256=body.base_state_sha256, actor=session.actor
         ),
     )
+
+
+@router.post(
+    "/versions/{version_id}/objects/{object_id}/move/preview",
+    response_model=dict[str, object],
+    summary="What moving one authored object would record. Writes nothing.",
+)
+def move_authored_object_preview(
+    version_id: Annotated[uuid.UUID, Path()],
+    object_id: Annotated[str, Path(max_length=200)],
+    body: MovePreviewBody,
+    repository: WriteObjects,
+) -> dict[str, object]:
+    # The write-scoped connection, read only, as the composition preview uses it: the write
+    # resolves on this same connection role, so the two cannot see different rows.
+    return preview_object_move(
+        repository,
+        version_id,
+        object_id,
+        body.transform.domain(),
+        base_state_sha256=body.base_state_sha256,
+    ).document()
+
+
+@router.post(
+    "/versions/{version_id}/objects/{object_id}/remove/preview",
+    response_model=dict[str, object],
+    summary="What removing one authored object would record. Writes nothing.",
+)
+def remove_authored_object_preview(
+    version_id: Annotated[uuid.UUID, Path()],
+    object_id: Annotated[str, Path(max_length=200)],
+    body: EditPreviewBody,
+    repository: WriteObjects,
+) -> dict[str, object]:
+    return preview_object_removal(
+        repository, version_id, object_id, base_state_sha256=body.base_state_sha256
+    ).document()
+
+
+@router.post(
+    "/versions/{version_id}/objects/undo/preview",
+    response_model=dict[str, object],
+    summary="Which edit an undo would reverse, and what it would restore. Writes nothing.",
+)
+def undo_authored_edit_preview(
+    version_id: Annotated[uuid.UUID, Path()],
+    body: EditPreviewBody,
+    repository: WriteObjects,
+) -> dict[str, object]:
+    return preview_undo(repository, version_id, base_state_sha256=body.base_state_sha256).document()

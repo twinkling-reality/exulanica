@@ -533,6 +533,9 @@ client recipe; this surface has no such prior client, so it does not invent a se
 | `POST` | `/world/versions/{version_id}/objects/{object_id}/remove` | Store a removal |
 | `POST` | `/world/versions/{version_id}/objects/{object_id}/behaviour` | Give one object a reviewed behaviour, replace it, or take it away with `null` |
 | `POST` | `/world/versions/{version_id}/objects/undo` | Reverse the newest edit not already reversed |
+| `POST` | `/world/versions/{version_id}/objects/{object_id}/move/preview` | What the move would record, or its refusal; writes nothing |
+| `POST` | `/world/versions/{version_id}/objects/{object_id}/remove/preview` | What the removal would record, or its refusal; writes nothing |
+| `POST` | `/world/versions/{version_id}/objects/undo/preview` | Which edit an undo would reverse and what it would restore; writes nothing |
 | `POST` | `/world/versions/{version_id}/arrangements/preview` | Where an arrangement's objects would stand, or its refusal; writes nothing |
 | `POST` | `/world/versions/{version_id}/arrangements/apply` | Add an arrangement's objects as ordinary edits |
 | `GET` | `/world/assets` | The reviewed assets a person may place, with availability, each kind's use and what inhabitants do there |
@@ -551,6 +554,20 @@ Cacheable, and not `immutable`. The bytes are immutable under content addressing
 not, because they are keyed by `asset_key`, and a later migration could point that key at a
 different digest. `immutable` tells the browser never to revalidate, which would leave the ETag
 unable to correct it. A reviewed asset is never a citation target and never evidence.
+
+A move, remove or undo preview (`exulanica/world/object_edit_preview.py`) takes the write's body
+without its saved entry and answers the composition preview's frame: `availability`,
+`blocked_reason`, `blocked_detail`, the `version` it read, and `would_change` with the subject's
+document before and after and, for an undo, the edit it would reverse. The repository's read-only
+validators share their checks with the writers, including an undo's restore rules for a placed
+environment instance or point map whose binding moved, so for one stored state a ready preview's
+`after` is the document the write records and a blocked preview's reason is the problem code the
+write answers (`stale_object_base`, `invalidated_source_version`, `invalid_object_state`,
+`invalid_object_data`, `invalid_environment_state`). The base is checked before the object is
+looked up, as the write checks it, and an unknown or foreign version or object answers the write's
+`404 unknown_reference`. A preview does not compose the society input a purposeful society takes
+from every accepted edit, so a write whose preview was ready can still answer
+`424 unavailable_society_input`, as a composition's can.
 
 Remove and undo are POST rather than DELETE because both carry a base token in the body and both
 append history rather than destroying a row. A DELETE that stores a row and requires a request body

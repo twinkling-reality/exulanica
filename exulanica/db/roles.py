@@ -154,6 +154,10 @@ INSERT_ONLY_TABLES: Final = (
     "world_traffic_signal_decision_request",
     "world_traffic_signal_decision",
     "world_traffic_signal_segment",
+    # Migration 0130 appends a started comparison's one cancellation and each start of its runs,
+    # and refuses every update and delete of either.
+    "comparison_cancellation",
+    "comparison_run_start",
 )
 
 #: The vocabulary is administered, not generated. Without revoking this the role could insert a

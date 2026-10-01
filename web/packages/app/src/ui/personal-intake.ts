@@ -1,5 +1,4 @@
 import { el } from './dom.js';
-import { HUMAN_ATTESTATION } from '../personal-admission-api.js';
 import { buildModelRightGrants } from './model-right-controls.js';
 
 /** Sequential reading groups; callbacks and server receipts still own progress. */
@@ -150,7 +149,12 @@ export function buildPersonalIntake() {
   const reviewer = field('Reviewer’s actual name');
   group.append(el('p', { text: 'The inventory in this attestation is the selected admission photographs. '
     + 'Inspect and review every selected original before checking it.' }));
-  const attestation = field(HUMAN_ATTESTATION, 'checkbox');
+  // Its words are the server's (`attestation` in GET /personal-admission), set by showAttestation.
+  const attestation = field('', 'checkbox');
+  function showAttestation(words: string): void {
+    attestation.setAttribute('aria-label', words);
+    attestation.parentElement!.replaceChildren(words, attestation);
+  }
   // A second, separate decision. Unticked, and never implied by the review above: a person who
   // said "I looked at this photograph and these are the people in it" has said nothing about
   // whether a model may read the same pixels.
@@ -161,7 +165,7 @@ export function buildPersonalIntake() {
   root.append(collection, status, workflow);
   return { root, controls, status, files, upload, inventory, members, purpose, authority, validUntil, detect,
     retry, retryReview, receipts, progress, reload, source, review, linkedSubject, selection, link,
-    reviewChoice, reviewer, attestation, processingRights, reviewRights, complete, attachedReferences, referenceCount,
+    reviewChoice, reviewer, attestation, showAttestation, processingRights, reviewRights, complete, attachedReferences, referenceCount,
     attachmentStatus, worldAction, retryAttachment, originals, workflow, referenceNotice,
     ready, readyReferences, previous, previousReferences, retryMembership };
 }

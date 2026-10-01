@@ -30,6 +30,15 @@ records the start with the bound its owner stated, at most the most it can cost.
 comparison worker plays it off the request path (:mod:`exulanica.api.society_comparison_worker`).
 The comparison's id is the caller's, keyed within its workspace: the same start sent again is
 answered with the start it made, and every refusal is named (``START_REFUSALS``).
+
+``POST .../comparisons/{comparison_id}/cancel`` cancels a comparison started from the application,
+once (:mod:`exulanica.world.comparison_facts`): a start no host holds is closed by the cancellation
+itself, every run left open failed as ``comparison_cancelled`` asking nothing, with what a host
+whose lease ran out may have spent presumed as a takeover presumes it; a start a host is playing
+is closed by that host before its next dispatch. A repeated cancel changes nothing, and a start
+that already finished keeps its own closing. The reads serve the cancellation on the start, and
+each unfinished run's progress: running while a host plays it under the start's live lease, else
+queued.
 """
 
 from __future__ import annotations
@@ -49,13 +58,18 @@ from exulanica.api.capabilities import (
     AVAILABLE,
     Operation,
     Preview,
+    Subjects,
     VersionContext,
     unavailable,
     unsupported,
 )
 from exulanica.api.dependencies import CurrentSession, ScopedConnection, get_services
 from exulanica.api.services import Services
-from exulanica.api.society_comparison_runner import ComparisonArm, SocietyComparisonRunner
+from exulanica.api.society_comparison_runner import (
+    CANCELLED,
+    ComparisonArm,
+    SocietyComparisonRunner,
+)
 from exulanica.api.society_comparison_start import (
     MODELS_MOST,
     START_REFUSALS,
@@ -67,11 +81,14 @@ from exulanica.api.society_comparison_start import (
     answers_per_minute,
     comparison_cost,
     definition_body,
+    stopped_host_usd,
     typical_per_person_hour,
 )
+from exulanica.api.society_comparison_worker import CANCELLED_REASON
 from exulanica.api.world_scope import WorldId
 from exulanica.models.budget import BudgetGuard
 from exulanica.models.manifest import load_manifest
+from exulanica.world.comparison_facts import ComparisonFacts, run_progress
 from exulanica.world.decision_roles import DecisionRole, RoleRefused, decision_roles
 from exulanica.world.society import UnavailableSocietyInput, UnknownSociety
 from exulanica.world.society_catalogs import load_comparison_catalogs
@@ -154,17 +171,48 @@ def _starts(
     comparison_ids: Sequence[uuid.UUID],
     comparisons: SocietyComparisonRepository,
 ) -> dict[uuid.UUID, dict[str, Any]]:
-    """The start of each comparison started from the application, as the reads serve it."""
+    """The start of each comparison started from the application, as the reads serve it, with
+    its cancellation where it was cancelled."""
     starts = SocietyComparisonStarts(connection, session.workspace_id)
     rows = starts.read(world_id, comparison_ids)
     if not rows:
         return {}
     spent = comparisons.spending(list(rows))
+    cancelled = ComparisonFacts(
+        connection, session.workspace_id, world_id, "society"
+    ).cancellations(list(rows))
     now = starts.now()
     return {
-        comparison_id: start_document(row, spent.get(comparison_id, Decimal(0)), now)
+        comparison_id: start_document(
+            row, spent.get(comparison_id, Decimal(0)), now, cancelled.get(comparison_id)
+        )
         for comparison_id, row in rows.items()
     }
+
+
+def _with_progress(
+    document: dict[str, Any],
+    connection: ScopedConnection,
+    session: CurrentSession,
+    world_id: str,
+    comparison_id: uuid.UUID,
+) -> dict[str, Any]:
+    """``document``'s runs, each unfinished one with where it stands: running while a host plays
+    it under the start's live lease, else queued; a finished run states none, and so does a run
+    not yet reserved, which has no id."""
+    starts = SocietyComparisonStarts(connection, session.workspace_id)
+    start = starts.read(world_id, [comparison_id]).get(comparison_id)
+    facts = ComparisonFacts(connection, session.workspace_id, world_id, "society")
+    begun = facts.run_starts(comparison_id)
+    now = starts.now()
+    for seed in document.get("seeds", ()):
+        for run in seed["runs"].values():
+            run["progress"] = (
+                None
+                if run["status"] in ("completed", "failed") or run["run_id"] is None
+                else run_progress(start, begun.get(uuid.UUID(run["run_id"]), []), now)
+            )
+    return document
 
 
 def _unreadable(exc: ComparisonRefused | ScoreRefused) -> JSONResponse:
@@ -337,7 +385,7 @@ def society_comparison(
     row = comparisons.definition(version_id, comparison_id)
     start = _starts(connection, session, world_id, [comparison_id], comparisons).get(comparison_id)
     try:
-        return comparison_result(
+        document = comparison_result(
             row,
             comparisons.runs(comparison_id),
             model_name=load_manifest().model_name,
@@ -345,6 +393,7 @@ def society_comparison(
         )
     except (ComparisonRefused, ScoreRefused) as exc:
         return _unreadable(exc)
+    return _with_progress(document, connection, session, world_id, comparison_id)
 
 
 @router.get("/{comparison_id}/runs/{run_id}")
@@ -760,25 +809,97 @@ def start_society_comparison(
     )
 
 
+@router.post("/{comparison_id}/cancel")
+def cancel_society_comparison(
+    version_id: uuid.UUID,
+    comparison_id: uuid.UUID,
+    connection: ScopedConnection,
+    session: CurrentSession,
+    request: Request,
+    world_id: WorldId,
+) -> Any:
+    """Cancel a comparison started from the application, once. A start no host holds closes now:
+    every run left open fails as ``comparison_cancelled``, asking nothing, and what a host whose
+    lease ran out may have spent is presumed as a takeover presumes it. A start a host is playing
+    is closed by that host before its next dispatch. A repeated cancel changes nothing, and a
+    finished start keeps its own closing. Answers the comparison as the listing states it."""
+    comparisons = _comparisons(connection, session, request, world_id)
+    row = comparisons.definition(version_id, comparison_id)
+    services = get_services(request)
+    starts = SocietyComparisonStarts(connection, session.workspace_id)
+    with connection.transaction():
+        start = starts.lock(world_id, comparison_id)
+        if start is None:
+            return JSONResponse(
+                status_code=409,
+                content={
+                    "code": "comparison_not_started",
+                    "detail": "only a comparison started from the application is cancelled",
+                },
+            )
+        if start["finished_at"] is None:
+            ComparisonFacts(connection, session.workspace_id, world_id, "society").cancel(
+                comparison_id, session.actor
+            )
+        held = start["lease_token"] is not None and start["lease_expires_at"] > starts.now()
+        if start["finished_at"] is None and not held:
+            definition = row["document"]
+            open_runs = comparisons.open_runs(comparison_id)
+            presumed = Decimal(0)
+            if start["lease_token"] is not None:
+                client = services.model_client
+                presumed = stopped_host_usd(
+                    definition,
+                    services.comparison_catalogs or load_comparison_catalogs(),
+                    None if client is None else client.budget,
+                    load_manifest(),
+                    open_runs,
+                )
+            for run in open_runs:
+                comparisons.finish(
+                    comparison_id,
+                    run["run_id"],
+                    SocietyComparisonRunner._failed(
+                        definition, run["arm"], run["seed_digest"], CANCELLED
+                    ),
+                )
+            starts.close_unclaimed(
+                world_id, comparison_id, closed_reason=CANCELLED_REASON, presumed_usd=presumed
+            )
+    ids = [comparison_id]
+    return listing_document(
+        [comparisons.definition(version_id, comparison_id)],
+        comparisons.run_counts(ids),
+        model_name=load_manifest().model_name,
+        starts=_starts(connection, session, world_id, ids, comparisons),
+    )
+
+
 # -- a world's capability read --------------------------------------------------------------------
 
 
 def capability_operations(context: VersionContext) -> list[Operation]:
-    """Starting a comparison of the version's society, as a world's capability read lists it.
+    """Starting a comparison of the version's society, and cancelling one started from the
+    application, as a world's capability read lists them.
 
-    Refused in the order a start refuses before it reads its body: a version with no society, a
-    comparison of the world that has not finished, this server's own refusal
+    A start is refused in the order a start refuses before it reads its body: a version with no
+    society, a comparison of the world that has not finished, this server's own refusal
     (``Services.comparison_refusal``), and an engine that takes no comparison. The plan read is its
-    preview and lists what a start may name.
+    preview and lists what a start may name. A cancel acts on a comparison the listing names and is
+    available while a start of the world has not finished, else ``comparison_not_started``. It holds
+    ``model.invoke`` only so that whoever may start a paid comparison may stop it, and calls no
+    model, so it is described as spending nothing.
     """
-    if context.society is None:
-        state = unavailable("society_unavailable")
-    elif (
-        SocietyComparisonStarts(context.connection, context.session.workspace_id).unfinished(
+    running = (
+        None
+        if context.society is None
+        else SocietyComparisonStarts(context.connection, context.session.workspace_id).unfinished(
             context.world_id
         )
-        is not None
-    ):
+    )
+    if context.society is None:
+        state = unavailable("society_unavailable")
+    elif running is not None:
         state = unavailable("comparison_running")
     elif (refusal := context.services.comparison_refusal(context.session.workspace_id)) is not None:
         state = unavailable(refusal)
@@ -795,5 +916,15 @@ def capability_operations(context: VersionContext) -> list[Operation]:
             idempotency="comparison_id",
             preview=Preview(plan_society_comparison, required=False),
             options=(plan_society_comparison,),
-        )
+        ),
+        Operation(
+            endpoint=cancel_society_comparison,
+            availability=AVAILABLE
+            if running is not None
+            else unavailable("comparison_not_started"),
+            subject="comparison",
+            bind=context.bind,
+            subjects=Subjects(society_comparisons, "comparisons"),
+            spends=False,
+        ),
     ]

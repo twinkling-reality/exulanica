@@ -61,6 +61,8 @@ export const CLOSED_WORDS: Readonly<Record<string, string>> = {
   claims_spent: 'the server stopped while running it three times in a row, so it was closed',
   comparison_bound_before_seed: 'what was left of the bound you set would not let the next seed finish, so it stopped between seeds and kept those it had played',
   comparison_bound_spent: 'the bound you set was spent',
+  // Placeholder words: the page's own wording for this code is not written yet.
+  comparison_cancelled: 'it was cancelled',
   process_budget_spent: 'this server\'s model budget had too little left for it',
 };
 

@@ -259,9 +259,9 @@ def _cmd_run(args: argparse.Namespace, stream: Any) -> int:
     workspace = uuid.UUID(args.workspace)
     database = Database.from_env()
 
-    from exulanica.store.local import LocalContentAddressedStore
+    from exulanica.store.configured import content_stores
 
-    store = LocalContentAddressedStore(resolve_data_dir(explicit=args.data_dir) / "blobs")
+    store = content_stores(data_dir=args.data_dir).blobs
 
     def read_blob(digest: bytes) -> bytes | None:
         from exulanica.evidence.blob import BlobId

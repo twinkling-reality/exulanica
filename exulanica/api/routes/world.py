@@ -164,6 +164,12 @@ class PreviewBody(BaseModel):
         uuid.UUID | None,
         Field(validation_alias=AliasChoices("refines_proposal_id", "refinesProposalId")),
     ] = None
+    #: What a Companion proposal is drawn from: its evidence (absent means this) or an authored
+    #: design choice, which names no reference id. Every other origin states none.
+    appearance_basis: Annotated[
+        Literal["evidence", "authored_design"] | None,
+        Field(validation_alias=AliasChoices("appearance_basis", "appearanceBasis")),
+    ] = None
 
 
 class SavedEntryStyleAdvanceBody(SavedEntryAdvanceBody):
@@ -248,6 +254,8 @@ class StyleVersionView(BaseModel):
     model_name: str | None
     prompt_version: str | None
     refines_proposal_id: uuid.UUID | None
+    #: The applied Companion proposal's basis, ``evidence`` or ``authored_design``; null otherwise.
+    appearance_basis: str | None = None
 
 
 class StyleStateView(BaseModel):
@@ -304,6 +312,8 @@ class StyleProposalView(BaseModel):
     model_name: str | None
     prompt_version: str | None
     refines_proposal_id: uuid.UUID | None
+    #: A Companion proposal's basis, ``evidence`` or ``authored_design``; null for other origins.
+    appearance_basis: str | None = None
     recipe_binding: dict[str, JsonValue]
     capability_mapping: dict[str, str]
     status: str
@@ -414,6 +424,7 @@ def preview(body: PreviewBody, repository: WriteWorld, session: CurrentSession) 
         model_id=body.model_id,
         prompt_version=body.prompt_version,
         refines_proposal_id=body.refines_proposal_id,
+        appearance_basis=body.appearance_basis,
     )
     created = repository.preview(proposal)
     return PreviewView(
@@ -699,6 +710,7 @@ def _version_view(version: StyleVersion) -> StyleVersionView:
         model_name=_model_name(version.model_id),
         prompt_version=version.prompt_version,
         refines_proposal_id=version.refines_proposal_id,
+        appearance_basis=version.appearance_basis,
     )
 
 
@@ -724,6 +736,7 @@ def _proposal_view(record: StyleProposalRecord) -> StyleProposalView:
         model_name=_model_name(proposal.model_id),
         prompt_version=proposal.prompt_version,
         refines_proposal_id=proposal.refines_proposal_id,
+        appearance_basis=proposal.appearance_basis,
         recipe_binding=dict(record.recipe_binding),
         capability_mapping=dict(record.capability_mapping),
         status=record.status,

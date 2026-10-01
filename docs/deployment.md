@@ -38,11 +38,14 @@ worker. The repository holds the recipes; no cloud account, host or domain is pr
     - [5.2.11 The browser client](#5211-the-browser-client)
     - [5.2.12 Other commands and settings](#5212-other-commands-and-settings)
   - [5.3 Rules](#53-rules)
-  - [5.4 What one instance runs out of](#54-what-one-instance-runs-out-of)
-    - [5.4.1 The request threadpool](#541-the-request-threadpool)
-    - [5.4.2 A formation stream holds a thread for its whole life](#542-a-formation-stream-holds-a-thread-for-its-whole-life)
+  - [5.4 What one instance runs out of, and where each is bounded](#54-what-one-instance-runs-out-of-and-where-each-is-bounded)
+    - [5.4.1 Admission](#541-admission)
+    - [5.4.2 The request threadpool](#542-the-request-threadpool)
     - [5.4.3 Connection slots](#543-connection-slots)
     - [5.4.4 Decode memory: the term that sizes the box](#544-decode-memory-the-term-that-sizes-the-box)
+    - [5.4.5 A formation stream holds a place, not a thread](#545-a-formation-stream-holds-a-place-not-a-thread)
+    - [5.4.6 The derivative queue](#546-the-derivative-queue)
+    - [5.4.7 The measured envelope](#547-the-measured-envelope)
 - [6. Health check](#6-health-check)
   - [6.1 Three signals, not one](#61-three-signals-not-one)
   - [6.2 What readiness reports](#62-what-readiness-reports)
@@ -59,10 +62,8 @@ worker. The repository holds the recipes; no cloud account, host or domain is pr
 - [11. Open items](#11-open-items)
 - [12. Changes declined](#12-changes-declined)
   - [12.1 No connection pool](#121-no-connection-pool)
-  - [12.2 No subscriber bound on the formation stream](#122-no-subscriber-bound-on-the-formation-stream)
-  - [12.3 No reference counting on `blob`](#123-no-reference-counting-on-blob)
-  - [12.4 No semaphore around the decode](#124-no-semaphore-around-the-decode)
-  - [12.5 Poll intervals, and the shape of the queue index](#125-poll-intervals-and-the-shape-of-the-queue-index)
+  - [12.2 No reference counting on `blob`](#122-no-reference-counting-on-blob)
+  - [12.3 Poll intervals, and the shape of the queue index](#123-poll-intervals-and-the-shape-of-the-queue-index)
 
 </details>
 
@@ -140,20 +141,144 @@ belongs on one.
 
 ## 4. The content store
 
-Original photographs and every derived file are kept in the local content-addressed store
-(`exulanica/store/local.py`) under `EXULANICA_DATA_DIR`, keyed by SHA-256. The default is
-`.exulanica/local`; the image sets `/var/lib/exulanica`, and `compose.yaml` mounts the `media`
-volume there for the API and both workers. Every process that reads or writes bytes must name the
-same directory, or a citation resolves against a store the bytes are not in.
+Original photographs and every derived file are kept in a content-addressed store keyed by SHA-256,
+behind the interface in `exulanica/store/base.py`. `EXULANICA_STORE_KIND` chooses the backend, and
+every process builds its stores in one place, `exulanica/store/configured.py`: the API, the
+derivative, scene, material and tile workers, `exulanica-purge`, restore replay, and the commands
+that publish content (`exulanica-seed`, `exulanica-ingest`, `exulanica-eval`, the character and
+reviewed-asset imports, the tile bakes). Every process of one installation must name the same store,
+or a citation resolves against a store the bytes are not in.
 
 No runtime role deletes stored bytes. `exulanica-purge` destroys the bytes that committed
 tombstones ask for, as the separate `exulanica_purge` role (5.2.4). The store is therefore
 **append-only by policy**, which is exactly as strong as that separation. It is not immutable, not
-write-once and not tamper-proof: a Docker volume supports none of those, and
-`tests/test_deployment.py` refuses those words in the deployment recipes.
+write-once and not tamper-proof: neither a Docker volume nor a bucket without object lock supports
+those, and `tests/test_deployment.py` refuses those words in the deployment recipes. Nothing issues a
+URL to a stored object: bytes leave through the API's own reads, after its permission and withdrawal
+checks, because holding a digest is not permission to read.
 
-No shared object store is built. A hosted deployment needs an object-store implementation behind
-`exulanica/store/base.py`; the researched design is part of section 10.
+### 4.1 Local directories, the default
+
+With `EXULANICA_STORE_KIND` unset or `local`, the store is directories under `EXULANICA_DATA_DIR`
+(`exulanica/store/local.py`): `blobs/`, shared by every workspace; `materials/<workspace>/`, one
+namespace per workspace for its bakes; and `tiles/`. The default is `.exulanica/local`; the image
+sets `/var/lib/exulanica`, and `compose.yaml` mounts the `media` volume there for the API and both
+workers. Processes on separate hosts cannot share it.
+
+### 4.2 An S3-compatible bucket for several hosts
+
+With `EXULANICA_STORE_KIND=object`, the same three namespaces are key prefixes in one bucket
+(`exulanica/store/object.py`), so processes on separate hosts share them. An object's key is the
+optional prefix followed by the path the local store would use,
+`<prefix>/blobs/sha-256/<aa>/<bb>/<hex>`. Rows record the key without the prefix and namespace,
+which is the same on both backends, so moving a store from one backend to the other is a key-for-key
+copy and no migration. Wherever section 5 calls `EXULANICA_DATA_DIR` the content store, this backend
+replaces it with the bucket, and the directory keeps only host-local files: reconstruction scratch,
+caches, and the spool a stream is written to while it is hashed.
+
+| Variable | Purpose | Default, and what refuses |
+| --- | --- | --- |
+| `EXULANICA_STORE_KIND` | `local` or `object` | `local`. Any other value stops startup |
+| `EXULANICA_OBJECT_STORE_ENDPOINT` | The endpoint's origin, `https://host[:port]` | No default with `object`. A path, query or userinfo stops startup. Plain `http` only to a loopback host, or with `EXULANICA_OBJECT_STORE_PLAINTEXT=private-network` on an isolated container network: request signing authenticates a request but does not hide the photographs it carries |
+| `EXULANICA_OBJECT_STORE_BUCKET`, `EXULANICA_OBJECT_STORE_REGION` | The bucket and the region requests are signed for | No default with `object` |
+| `EXULANICA_OBJECT_STORE_PREFIX` | A key prefix: lower-case segments separated by `/` | None |
+| `EXULANICA_OBJECT_STORE_ADDRESSING` | `path`, or `virtual` for the bucket in the host name | `path` |
+| `EXULANICA_OBJECT_STORE_CA_FILE` | A CA bundle for an endpoint with a private certificate | The certifi bundle httpx ships with; `SSL_CERT_FILE` and `SSL_CERT_DIR` are ignored |
+| `EXULANICA_OBJECT_STORE_ACCESS_KEY_ID`, `EXULANICA_OBJECT_STORE_SECRET_ACCESS_KEY` | The runtime identity: read, write and list | No default with `object` |
+| `EXULANICA_OBJECT_STORE_PURGE_ACCESS_KEY_ID`, `EXULANICA_OBJECT_STORE_PURGE_SECRET_ACCESS_KEY` | The purge identity, for `exulanica-purge`, restore replay and maintenance only | Every other process refuses to start when either is set |
+
+Each credential may instead come from a file named by the same variable with `_FILE` appended;
+setting both forms stops startup. An error names the variable and never its value, and no credential
+appears in a log, an error or readiness. No `AWS_*` variable, `~/.aws` file or proxy setting is read.
+
+**Identities.** An installation creates two identities and a bucket policy. The runtime identity
+holds GetObject, PutObject, ListBucket, ListBucketMultipartUploads, AbortMultipartUpload and the
+four bucket configuration reads (GetBucketVersioning, GetBucketObjectLockConfiguration,
+GetReplicationConfiguration, GetLifecycleConfiguration); the bucket policy denies it DeleteObject
+and DeleteObjectVersion. The purge identity holds the same reads plus ListBucketVersions,
+DeleteObject and DeleteObjectVersion. The store's code gives the runtime identity no request that
+deletes an object, so the code and the policy each hold the line; on an endpoint whose policies
+cannot express the denial, only the code does. How a policy names an identity is the provider's own
+format, so the verification command below applies the policy file the installation itself uses and
+fails unless the endpoint refuses the runtime identity's delete. On SeaweedFS, the shared-store
+profile's endpoint, a Deny takes effect only when the principal is written
+`arn:aws:iam::000000000000:user/<identity name>`; a policy naming the identity any other way is
+accepted and ignored. For a bucket `exulanica` and an identity named `runtime`:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "RuntimeNeverDeletes",
+      "Effect": "Deny",
+      "Principal": {"AWS": ["arn:aws:iam::000000000000:user/runtime"]},
+      "Action": ["s3:DeleteObject", "s3:DeleteObjectVersion"],
+      "Resource": ["arn:aws:s3:::exulanica/*"]
+    }
+  ]
+}
+```
+
+**The bucket check.** A process's first request, every request five minutes after the last check,
+and every purge first read the bucket's configuration. Each finding has a stable code, which
+`ObjectStoreRefused.code` carries and `ContentStores.describe()` reports for installation facts:
+
+| Code | Found because | A purge still runs |
+| --- | --- | --- |
+| `object_store_object_lock_enabled` | The bucket reports object lock enabled; a locked version cannot be erased | No |
+| `object_store_replication_configured` | A replica is a copy no purge reaches | No |
+| `object_store_bucket_unverified` | The identity may not read the versioning, replication or lifecycle configuration | Only when replication was readable |
+| `object_store_lifecycle_moves_content` | An enabled lifecycle rule expires or transitions current objects under the prefix | Yes |
+| `object_store_publicly_listable` | Anyone can list the bucket, so the digests that citations and ETags carry would open its bytes | Yes |
+| `object_store_publicly_readable` | Anyone can read a stored object without credentials | Yes |
+
+Any finding refuses every read and write. A purge refuses only where erasure itself would be
+incomplete: deleting from a bucket that is wrongly public, or that a lifecycle rule expires, still
+removes the bytes. The anonymous read is tried on one stored object, so an empty bucket records it
+as `unchecked` until it holds one. Versioning is allowed. A configuration read the endpoint does not
+implement is recorded as `not_exposed` rather than refused. An object lock configuration the
+identity may not read, which some endpoints reserve for an administrator, is recorded as
+`unverified` rather than refused: a lock shows up as a purge that fails because a version remains,
+never as a purge reported complete. A copy made by means no S3 request shows, such as a provider's
+own tiering, is outside what the check can see.
+
+**Versioning and overwrite.** The runtime identity holds PutObject, so it can replace a stored
+object's bytes. Reads and writes detect that by the hash, and nothing silently serves the result.
+An installation that states its originals are append-only by policy creates the bucket with
+versioning enabled (the decision in [the domain model](domain-and-evidence-model.md)), so the
+original survives such an overwrite as an earlier version; without versioning it survives only in a
+backup. `ContentStores.describe()` reports which.
+
+**Erasure.** A purge deletes every version and delete marker of the key and then lists the key again.
+A version still present fails the purge job, so a tombstone is never completed over bytes that can
+be retrieved, whether or not the bucket keeps versions and whenever versioning was switched on. A
+purge reaches this bucket only: backups are section 9's, and the remaining limits are the
+[threat model's](privacy-consent-threat-model.md#55-the-honest-limits).
+
+**Integrity.** Every object and part body carries a signed SHA-256 and a Content-MD5; an endpoint
+checks at least one of them against the bytes it keeps, and the verification command records which.
+Above 64 MiB an object goes up in parts of 16 MiB or more, and the whole object's SHA-256 must equal
+its key before the upload is completed. A write to an existing key reads it back and refuses
+different content; a read re-hashes what it returns; a read that loses its connection resumes where
+it stopped, pinned to the object's ETag.
+
+**Failures.** A request is tried at most four times, with backoff, after a connection error or a
+transient status. An unreachable store raises `ObjectStoreUnavailable`, is remembered for five
+seconds so requests do not queue behind one another's retries, and `/readyz` reports it through its
+store check. A writer abandons its own failed multipart upload. An upload left by a killed process,
+and a stale spool or temporary file, holds photograph bytes no key names, and
+`sweep_incomplete_writes(stores, older_than=...)` abandons it; the installation's maintenance runs
+it on a schedule with an age longer than its longest write. A bucket lifecycle rule
+`AbortIncompleteMultipartUpload` bounds abandoned uploads on the endpoint's side as well, and the
+bucket check allows it.
+
+**Compatibility.** The store speaks the S3 REST subset above over `httpx`, signing with
+`exulanica/store/sigv4.py`, which is tested against the applicable cases of AWS's Signature Version 4
+test suite. `scripts/verify_object_store.py` runs the store's contract against a real endpoint with
+three identities (runtime, purge and an administrator that creates its buckets) and the
+installation's bucket policy, and records each check as passed, failed or not supported; a provider
+it has not been run against, Nebius Object Storage among them, is unverified.
 
 ## 5. Environment configuration
 
@@ -181,6 +306,7 @@ Where a table says "no default", the process refuses to start without the settin
 | `EXULANICA_RESTORE_STATE_PATH` | The restore marker the API checks at startup | Optional. With it, a sealed or replaying database refuses to serve ([ADR-0019](adr/0019-offline-restore-tombstone-replay.md)) |
 | `EXULANICA_GOOGLE_CLIENT_ID`, `EXULANICA_GOOGLE_CLIENT_SECRET`, `EXULANICA_GOOGLE_CALLBACK_URI`, `EXULANICA_GOOGLE_RETURN_URIS`, `EXULANICA_ACCOUNT_BROWSER_ORIGINS`, `EXULANICA_ACCOUNT_DATABASE_URL` | Google sign-in and browser accounts (5.1.4) | Optional, all six or none: a partial set stops startup |
 | `EXULANICA_SOCIETY_CONTROL_WORKSPACES`, `EXULANICA_SOCIETY_TICK_INTERVAL_MS`, `EXULANICA_SOCIETY_CONTROL_WORKER` | Society playback (5.1.5) | Playback is off by default |
+| `EXULANICA_API_THREADS`, `EXULANICA_API_REQUESTS`, `EXULANICA_API_UPLOADS`, `EXULANICA_API_STREAMS`, `EXULANICA_API_WORKSPACE_REQUESTS`, `EXULANICA_API_WORKSPACE_UPLOADS`, `EXULANICA_API_WORKSPACE_STREAMS`, `EXULANICA_API_DECODES`, `EXULANICA_INTAKE_QUEUED_JOBS` | How much work this process accepts at once (5.4) | 40, 24, 2, 128, 12, 1, 8, 2 and 4. A value that is not a whole number, is outside its bounds, gives a workspace more than its class, or leaves fewer than four threads beside the admitted requests stops startup with the setting named |
 
 #### 5.1.1 The database roles
 
@@ -478,39 +604,81 @@ its own role. The [local database](local-database.md) guide owns its steps.
   the provider and the model, so a cached answer is never served for another model.
 - **Secrets are not committed and are not baked into images.** They are injected at run time.
 
-### 5.4 What one instance runs out of
+### 5.4 What one instance runs out of, and where each is bounded
 
-These are properties of the composition that a deployment inherits; none is an environment variable.
-The order below is the order in which one API process runs out.
+One API process runs out of request threads, database connections, decode memory and open streams,
+and each is taken by work the process has already accepted. `exulanica/api/admission.py` therefore
+decides, before any of it is taken, whether the process accepts a request now. **Every number in
+this section bounds one API process.** Several API processes behind one database hold several
+times each limit, and a workspace can hold its share in each of them; the database's
+`max_connections` must cover the sum (5.4.3).
 
-#### 5.4.1 The request threadpool
+#### 5.4.1 Admission
 
-None of the route handlers under `exulanica/api/routes/` is `async def`, so every request occupies a
-worker thread of the ASGI threadpool for as long as it runs. The threadpool is anyio's default
-limiter of 40 tokens. Nothing in the application sets it, and uvicorn has no flag for it: the only
-place to change it is `anyio.to_thread.current_default_thread_limiter().total_tokens` inside the
-application's own lifespan.
+Pure ASGI middleware, just inside the body limit (5.1.2), sorts each request by its route into a
+class before routing, before the body is read, before a thread is taken and before a connection is
+opened:
 
-#### 5.4.2 A formation stream holds a thread for its whole life
+| Class | Routes | Limit | One workspace's share | `Retry-After` |
+| --- | --- | --- | --- | --- |
+| exempt | `GET /healthz`, `GET /readyz` | none | none | none |
+| streams | `GET /formation/{batch_id}` | `EXULANICA_API_STREAMS` (128) | `EXULANICA_API_WORKSPACE_STREAMS` (8) | 5 s |
+| uploads | `POST /intake` | `EXULANICA_API_UPLOADS` (2) | `EXULANICA_API_WORKSPACE_UPLOADS` (1) | 10 s |
+| requests | every other route | `EXULANICA_API_REQUESTS` (24) | `EXULANICA_API_WORKSPACE_REQUESTS` (12) | 1 s |
 
-`GET /formation/{batch_id}` (`exulanica/api/routes/formation.py`) streams one intake batch's
-progress. It polls every `_POLL_SECONDS` (2 seconds) and sends a heartbeat every
-`_HEARTBEAT_EVERY` (7) polls, holding its thread and its connection throughout. Once every thread is held, every other request waits for one, `/healthz`
-included, because it is a synchronous handler on the same limiter. The container's health check
-allows two seconds (`urlopen(..., timeout=2)` in the `Dockerfile`), so a saturated instance fails it
-and Docker restarts it; that consequence is deduced, not observed (open item D-15). A browser that
-disappears keeps its slot until the stream next tries to send. Section 12.2 says why there is no
-subscriber bound.
+- A class at its limit answers **503 `capacity_exhausted`**, and a workspace at its share **429
+  `workspace_capacity_exhausted`**. Both carry `capacity` (the class), `retry_after_seconds` and a
+  `Retry-After` header. Nothing of the route ran before either answer, so the same request can
+  always be sent again after that wait. A refusal names no other workspace.
+- There is no queue in front of the classes: a request over a limit is answered at once.
+- The share is claimed in the permission floor (`authorise_route`) as soon as the caller is known,
+  after the permission check and before the tile charge, so a request that is not permitted is
+  refused as it would be on an idle server and a refused request is never charged.
+- A slot is released where it was taken, around the whole response, a streamed one included.
+- A body that stops arriving is answered **408 `body_timeout`** and the connection closed: 15
+  seconds between pieces, or 60 seconds in total for a request (600 for an upload, which is 512 MB
+  at about 0.9 MB/s). A client can hold a slot for at most its class's total; a limit per address
+  belongs to a reverse proxy (5.1.2).
+- A route missing from the application while `CAPACITY_ROUTES` still names it stops the build, so a
+  renamed route cannot fall back to `requests` unnoticed.
+- `/readyz` reports each class's limit and share and the decode limit (6.2). The counts (in flight,
+  peak, admitted, refused, body timeouts, failed stream polls, and the decode bound's) are an
+  operator's read, `GET /operations/capacity` with `operations.read`, because what is in use is other
+  workspaces' activity; it names no workspace and adds the caller's own holdings.
+- Every request takes its class's slot before it is authenticated, so a flood of unauthenticated or
+  refused requests uses the same slots as real work. A public deployment needs a rate limit per
+  address at its edge (section 11, D-13); admission bounds the damage, it does not attribute it.
+
+A request that is not permitted, is malformed or names an unknown id is answered as before; a
+capacity refusal never replaces one of those answers for a request the process accepted. A
+transient database conflict, SQLSTATE 40001 or 40P01 (migration 0041's asset read barrier refuses
+a guarded write for the instant a final read check holds it), is answered 409 `busy` with
+`Retry-After` on every route, never a bare 500; a route that knows more answers with its own code.
+
+#### 5.4.2 The request threadpool
+
+Synchronous routes and dependencies run on anyio's default thread limiter, which the lifespan sets
+to `EXULANICA_API_THREADS` (40). Startup refuses fewer than `EXULANICA_API_REQUESTS +
+EXULANICA_API_UPLOADS + 4` threads, so an admitted request never waits for a thread while it holds a
+connection; the four are for multipart spooling and for streams resolving their caller. Streams do
+not use this limiter between polls (5.4.5), liveness does not use it at all, and readiness runs in
+one thread of its own, one evaluation at a time (6.1).
 
 #### 5.4.3 Connection slots
 
 A request opens one database connection through `scoped_connection` or `readonly_connection` in
-`exulanica/api/dependencies.py` and holds it for the request's whole duration. There is no pool
-(section 12.1). The threadpool does not cap connections: a request waiting for a thread already
-holds its connection, so one API process can demand as many backends as it has requests in flight.
-A PostgreSQL server at its default `max_connections` of 100 with 3 superuser slots leaves 97 for the
-runtime roles, shared by every API process and worker on that server. `uvicorn --limit-concurrency`
-is the only lever that counts requests where they are held, and nothing sets it (open item D-14).
+`exulanica/api/dependencies.py` and holds it for its whole duration, and a browser-session request
+opens one more, briefly, to the account store. There is no pool (section 12.1). Admission bounds how
+many requests hold connections, so one API process opens at most:
+
+    connections = 2 x (requests + uploads) + 4 stream pollers + 2 for readiness
+                  + background: 2 in-process derivative worker, 1 playback, 2 comparisons,
+                    2 traffic controller, when each runs in the process
+
+With the defaults and nothing running in the background that is 58, and 5.4.7 gives the peak
+measured under load. A PostgreSQL server at its default `max_connections` of 100 keeps 3 slots for
+superusers and leaves 97 for every API process and worker on that server, so a second API process at
+the defaults needs a larger setting or smaller limits. Section 3 has one server for every process.
 
 #### 5.4.4 Decode memory: the term that sizes the box
 
@@ -518,15 +686,89 @@ One photograph at `MAX_PIXELS` (64 megapixels) costs about 512 MB at peak: Pillo
 four bytes per pixel, and `ImageOps.exif_transpose` allocates a second buffer of the same size.
 `exulanica/corpus/decode.py` holds the measurement and its environment.
 
-    API worst-case bytes = baseline + T x 67 MB + D x 512 MB
+The same module bounds how many decodes run at once in a process: `EXULANICA_API_DECODES` (2) in the
+API, 2 in every other process. A decode takes a turn before its pixels are loaded and keeps it
+through the orientation copy, and `POST /intake` keeps one for the whole part it ingests. A decode
+that waits 20 seconds for a turn gives up with nothing decoded: a read answers 503
+`capacity_exhausted` for `decodes`, an upload refuses that part as `busy` (nothing of it written),
+and the derivative worker retries the capture later.
 
-`T` is the threadpool (40) and `D` the number of request decodes running at once. The 67 MB per
-thread is the encoded part the intake route reads into memory before it probes anything
-(`MAX_PART_BYTES` plus one byte). Nothing bounds `D`, so `D` is `T`: about 20 GiB of decode buffers
-plus about 2.7 GB of encoded parts. The composition turns the in-process derivative worker off; the
-dedicated worker is a separate process with one delivery thread, so budget about another 512 MB for
-each worker process. The levers that reduce the product are the threadpool size, `MAX_PART_BYTES`
-and `MAX_PIXELS`, in that order. Section 12.4 says why there is no decode semaphore.
+    API decode bytes <= D x 512 MB + U x 67 MB
+
+`D` is the decode limit and `U` the uploads limit; the 67 MB per upload is the encoded part the
+intake route reads into memory before it probes anything (`MAX_PART_BYTES` plus one byte). At the
+defaults that is about 1.2 GB. The dedicated derivative worker is a separate process with one
+delivery thread, so budget about another 512 MB for each worker process. The levers are the decode
+limit, the uploads limit, `MAX_PART_BYTES` and `MAX_PIXELS`.
+
+#### 5.4.5 A formation stream holds a place, not a thread
+
+`GET /formation/{batch_id}` (`exulanica/api/routes/formation.py`) polls the ledger every 2 seconds.
+Each poll opens a read-only connection bound to the caller's workspace, reads, and closes it, in one
+of four threads the process's streams share; between polls a stream holds only its place in the
+streams class. So open streams cost at most four connections and no request thread, and a client
+that leaves gives its place back within one poll. A poll has a 5 second statement timeout; a poll
+that fails sends nothing and the next one tries again, and three failed polls in a row end the
+stream. A stream also ends at 30 minutes. Either end comes without a terminal event, after
+`retry: 5000` (the delay a browser `EventSource` reconnects after), and means "reconnect with the last
+event id". A heartbeat comment every 7 polls keeps a proxy from closing a quiet stream.
+
+A stream resumes from `Last-Event-ID` (which wins) or `since`. Resuming from the batch's terminal id
+answers 200 with no events, so a client that already has the outcome is not sent it twice, and a
+token the stream did not issue answers 422 `invalid_resume_token` before a stream opens. Event ids
+are uuidv7 values PostgreSQL assigns at insert, and a resume reads events after the token. One batch
+has one writer at a time except while a derivative job's lease is reclaimed from a claimant that was
+silent but alive: events that claimant commits after its lease was taken, at most one capture's, can
+be missed by a live stream. Counters and the outcome stay correct, because each is folded from the
+whole ledger.
+
+#### 5.4.6 The derivative queue
+
+`POST /intake` refuses an upload with 429 `derivative_queue_full` (and `Retry-After` 30) when its
+workspace already has `EXULANICA_INTAKE_QUEUED_JOBS` (4) derivative jobs queued or running, checked
+before a batch is opened, so nothing is written. The job is queued at the end of the upload, so
+uploads admitted at the same moment each pass the check before either queues: with the default
+share of one upload per workspace in one process the bound is exact, and with several API processes
+a workspace can pass it by at most the number of processes times the uploads share, minus one. A
+batch whose every photograph was withdrawn before its derivatives ran closes `cancelled`, and its
+terminal event says `reason: cancelled`; one with some photographs finished closes by those.
+`GET /operations/derivative-jobs/{job_id}` reads one job's state and progress, and answers 404
+`unknown_reference` for a job the workspace cannot see.
+
+An upload writes the stage registry before it opens a batch, and that write is guarded by migration
+0041's barrier, so it can meet a final read check (one runs before every vision call). The route
+tries it three times over about 150 milliseconds and then answers 409 `busy` with `Retry-After` 1,
+with nothing written. A part whose own intake write meets one is rolled back and refused as `busy`,
+not `failed`, and is admitted when it is sent again.
+
+#### 5.4.7 The measured envelope
+
+Measured with `scripts/measure_runtime_capacity.py` and `scripts/runtime_capacity_workload.json` on
+one host: an 18-core Apple M5 Max with 64 GiB, PostgreSQL 18 on the same host (`fsync` on,
+`max_connections` 100), one API process with the default limits, and the dedicated derivative
+worker with a vision model that answers after one second. A local record, not a statement about
+another host or about more than one process.
+
+- **Supported load:** eight workspaces, each holding six progress streams and watching each of its
+  uploads to its outcome, reading three times a second and uploading three photographs a minute,
+  for three minutes. Small reads answered at 10.4 ms p95 (21 ms p99), every upload was accepted
+  (62 ms p95), every watched upload reached its outcome, no subscription received an event twice
+  or an event of another workspace's batch, and progress arrived within the two-second poll (1.9 s
+  p95). The process peaked at 41 threads, 243 MiB resident and a quarter of one core, the database
+  at three client backends, the derivative queue at one job, and `/healthz` answered at 2.1 ms p95.
+- **The first constraint is one process's CPU:** cheap reads stop rising at about 760 a second
+  between 8 and 16 concurrent requests (p95 15 to 28 ms), and at the requests limit of 24 the p95 is
+  about 66 ms while the excess is refused in a few milliseconds. The limit sits above that knee
+  because many requests wait on a model, a traffic worker or a lock rather than on the core. More
+  API processes behind one database is the boundary that expands it (5.4.3).
+- **Faults:** a client killed while holding streams, a request cancelled mid-body, stalled upload
+  bodies, a table lock held for twenty seconds, the derivative worker killed or paused past its
+  lease, and the API killed mid-stream each gave every slot back. Every watched upload reached one
+  outcome, no subscription received an event twice, and where a live stream was compared with a
+  full replay (the worker killed, the worker paused) it had missed none.
+
+Not measured: load past the limits held for minutes, inhabited worlds played by the host beside
+that load, more than one API process, and any other host.
 
 ## 6. Health check
 
@@ -537,8 +779,8 @@ returns anything about a workspace's contents.
 
 | Signal | Path | Cost | Checks |
 | --- | --- | --- | --- |
-| Liveness | `GET /healthz` | Nothing beyond the process | The process is running and can serve a request. No dependency is touched |
-| Readiness | `GET /readyz` | A few cheap queries and one store probe, no model call | The dependencies a request needs are reachable (6.2) |
+| Liveness | `GET /healthz` | Nothing beyond the process, and no worker thread | The process is running and can serve a request. No dependency is touched |
+| Readiness | `GET /readyz` | A few cheap queries and one store probe, no model call, in a thread of its own | The dependencies a request needs are reachable (6.2) |
 | Catalog integrity | Not an endpoint: a scheduled `exulanica-preflight` | One public catalog fetch per provider, no credential, no model call | Every model identifier the application can reach still exists and declares the use cases its role needs (section 7) |
 
 ### 6.2 What readiness reports
@@ -556,8 +798,16 @@ returns anything about a workspace's contents.
 | `society_playback` | The playback worker's thread is alive and its last round did not fail, when playback is configured | Any simulation delivery rate |
 
 It also returns `warnings`, what this instance is running without (for example no read-only
-executor role, no model credential, no material or character catalog, or a spent model budget), and
-`configuration`, which names each setting as set or missing and never shows a value.
+executor role, no model credential, no material or character catalog, or a spent model budget),
+`configuration`, which names each setting as set or missing and never shows a value, and `capacity`,
+the declared limit and share of each admission class and the decode limit (5.4.1). What is in use is
+not in it: that is other workspaces' activity, read with `operations.read` at
+`GET /operations/capacity`. A full instance is serving, so saturation leaves `ready` as it is.
+
+Both endpoints are exempt from admission. Readiness evaluates its checks one at a time: a probe that
+arrives while an evaluation runs is answered from the last one when it is at most 2 seconds old, and
+otherwise waits for the running one for at most 5 seconds. `checked_at` and `age_ms` say when the
+checks ran. A flood of probes therefore holds one thread and one evaluation's connections.
 
 ### 6.3 What the health check must not do
 
@@ -786,8 +1036,6 @@ stopped virtual machine's compute is not charged.
 | D-7 | The fallback rule has never run against the live platform | Forcing a primary to fail |
 | D-9 | No cloud account, project, region, domain or host is provisioned. Section 8.1 is the recipe for one Nebius AI Cloud virtual machine serving the reviewer stack | Provisioning it and running the smoke check against the public address |
 | D-13 | `compose.yaml` has no reverse proxy and no static client host. The reviewer stack has both: the web image serves the client and proxies `/api`, and `edge.yaml` terminates TLS in front of it (section 8.1) | Choosing a host for the general composition (D-9) |
-| D-14 | Nothing limits in-flight requests, so one process can demand more backends than the server has slots | Setting `uvicorn --limit-concurrency` |
-| D-15 | The container restart under thread saturation (5.4.2) is deduced from the health check's timeout, not observed | Running the image, saturating it and watching whether Docker restarts it |
 
 ## 12. Changes declined
 
@@ -803,17 +1051,11 @@ under the autocommit `Database.session` chooses, a returned connection is always
 borrower that declared no workspace would read the previous one's rows. `exulanica/db/session.py`
 records the probe. A pool would need `reset all` on return, the time zone set in the startup packet
 (because `reset all` undoes the UTC `Database.session` sets), and `Database.unscoped` never drawing
-from it. Opening a connection per request is small beside the model calls most requests make; a
-request rate or workspace count an order of magnitude higher is what would change the answer.
+from it. Opening a connection per request is small beside the model calls most requests make, and
+admission bounds how many a process opens (5.4.3); a request rate or workspace count an order of
+magnitude higher is what would change the answer.
 
-### 12.2 No subscriber bound on the formation stream
-
-A counter incremented in `stream()` before its `StreamingResponse` is built would leak a slot for
-every response that is built and never iterated, because `_events` is a generator whose `finally`
-runs only once iteration starts. The bound that counts requests where they are held is
-`uvicorn --limit-concurrency` (open item D-14).
-
-### 12.3 No reference counting on `blob`
+### 12.2 No reference counting on `blob`
 
 `blob` is not workspace-scoped, and the purge path answers "does anything still hold these bytes"
 with the purge role's cross-workspace read of the holder tables (5.1.1). `purge_releases_bytes`
@@ -825,13 +1067,7 @@ if a workspace stops being one user (assumption A-30 in the
 [domain and evidence model](domain-and-evidence-model.md)), if the cross-workspace read itself
 becomes unacceptable, or if bytes are ever found shared between workspaces.
 
-### 12.4 No semaphore around the decode
-
-A semaphore acquired inside a synchronous route handler blocks a thread that already holds one of
-the threadpool's tokens, so uploads over the bound wait on threads instead of failing fast, and
-`/healthz` starves with them (5.4.2). The aggregate in 5.4.4 is a sizing input instead.
-
-### 12.5 Poll intervals, and the shape of the queue index
+### 12.3 Poll intervals, and the shape of the queue index
 
 The derivative worker polls every 2 seconds (`--poll-seconds`) and `exulanica-purge` makes one pass
 per run; neither cadence is worth changing at one workspace per person. The derivative queue's claim filters on workspace,

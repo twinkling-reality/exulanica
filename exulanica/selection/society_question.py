@@ -334,6 +334,16 @@ class SocietyEvidenceItem:
     #: model a person's owner chose when the line says that model picked their goal
     #: (``Manifest.model_name``: a manifest description, never anything a person wrote).
     line: str
+    #: For an event: the society input its minute consumed, as the event's document records it.
+    #: Null for a state line. Never sent to a model: the lines are.
+    input_seq: int | None = None
+    #: For an event whose target is a placed authored object: that object's id. Null otherwise.
+    object_id: str | None = None
+    #: The version edit that last set that object at or before the authored state the input
+    #: followed (the input's ``authored_state.edit_seq``), by sequence and id. Null when the
+    #: event names no placed object, the input records no authored state, or no edit is found.
+    edit_seq: int | None = None
+    edit_id: uuid.UUID | None = None
 
     @property
     def truth_class(self) -> str:
@@ -466,6 +476,62 @@ class SocietyScene:
     #: The name of the model a person's owner chose, by the minute and the person whose goal it
     #: picked, for each such goal whose model one decision event of that minute names.
     deciding_models: Mapping[tuple[int, str], str] = field(default_factory=dict)
+    #: For each placed object an event targets and the authored ``edit_seq`` its input followed,
+    #: the version edit that last set that object at or before it, as ``(edit_seq, edit_id)``.
+    object_edits: Mapping[tuple[str, int], tuple[int, uuid.UUID]] = field(default_factory=dict)
+
+
+#: The key an event read here carries its input's authored ``edit_seq`` under, or None: read from
+#: the input the event's authorization already loads, and never served.
+_AUTHORED_EDIT_SEQ: Final = "input_authored_edit_seq"
+
+
+def event_object_id(event: Mapping[str, Any]) -> str | None:
+    """The placed authored object an event's target names, or None.
+
+    A saved world's planner records the target a person heads for (``society_planner``); only an
+    ``authored`` target names an object of the version.
+    """
+    target = (event.get("document") or {}).get("target")
+    if not isinstance(target, Mapping) or target.get("origin") != "authored":
+        return None
+    object_id = target.get("object_id")
+    return object_id if isinstance(object_id, str) and object_id else None
+
+
+def _object_edits(
+    connection: psycopg.Connection,
+    workspace_id: uuid.UUID,
+    world_id: str,
+    version_id: uuid.UUID,
+    events: Iterable[Mapping[str, Any]],
+) -> dict[tuple[str, int], tuple[int, uuid.UUID]]:
+    """The edit that last set each targeted object at or before its event's authored state.
+
+    One read of the version's edit log for every object the events target. An undo that restored
+    an object sets it as much as the edit it reversed did, so every kind counts.
+    """
+    wanted = {
+        (object_id, int(seq))
+        for event in events
+        if (object_id := event_object_id(event)) is not None
+        and isinstance(seq := event.get(_AUTHORED_EDIT_SEQ), int)
+    }
+    if not wanted:
+        return {}
+    rows = connection.execute(
+        "select edit_id,edit_seq,object_id from world_alternate_version_edit "
+        "where workspace_id=%s and world_id=%s and version_id=%s and object_id=any(%s) "
+        "order by edit_seq",
+        (workspace_id, world_id, version_id, sorted({object_id for object_id, _ in wanted})),
+    ).fetchall()
+    found: dict[tuple[str, int], tuple[int, uuid.UUID]] = {}
+    for object_id, seq in wanted:
+        setting = [row for row in rows if row["object_id"] == object_id and row["edit_seq"] <= seq]
+        if setting:
+            last = setting[-1]
+            found[(object_id, seq)] = (int(last["edit_seq"]), last["edit_id"])
+    return found
 
 
 class _AuthorizedOnce:
@@ -612,6 +678,13 @@ def read_scene(
     )
     if decisions:
         scene.deciding_models = _deciding_models(decisions, load_manifest())
+    scene.object_edits = _object_edits(
+        connection,
+        workspace_id,
+        world_id,
+        scene.version_id,
+        [*events, *older, *selected_events],
+    )
     return scene
 
 
@@ -720,7 +793,20 @@ def _authorized_events(
         except UnavailableSocietyInput:
             continue
         authorized.add(sequence)
-    return [dict(row) for row in rows if row["document"]["input_seq"] in authorized]
+    return [
+        {**row, _AUTHORED_EDIT_SEQ: _authored_edit_seq(documents[row["document"]["input_seq"]])}
+        for row in rows
+        if row["document"]["input_seq"] in authorized
+    ]
+
+
+def _authored_edit_seq(document: Mapping[str, Any]) -> int | None:
+    """The version ``edit_seq`` an input records it followed, or None for one that records none."""
+    authored = document.get("authored_state")
+    if not isinstance(authored, Mapping):
+        return None
+    seq = authored.get("edit_seq")
+    return seq if isinstance(seq, int) and not isinstance(seq, bool) else None
 
 
 def build_scene(
@@ -964,6 +1050,7 @@ class _Builder:
                 event_id=uuid.UUID(str(event["event_id"])),
                 tick=tick,
                 line=line,
+                **self.provenance(event),
             )
             self.items.append(item)
             return item
@@ -1010,9 +1097,28 @@ class _Builder:
             event_id=uuid.UUID(str(event["event_id"])),
             tick=tick,
             line=line,
+            **self.provenance(event),
         )
         self.items.append(item)
         return item
+
+    def provenance(self, event: Mapping[str, Any]) -> dict[str, Any]:
+        """What an event's citation says it followed: its input, the placed object it targets and
+        the edit that last set that object at or before the input's authored state."""
+        seq = event["document"].get("input_seq")
+        object_id = event_object_id(event)
+        authored = event.get(_AUTHORED_EDIT_SEQ)
+        edit = (
+            self.scene.object_edits.get((object_id, authored))
+            if object_id is not None and isinstance(authored, int)
+            else None
+        )
+        return {
+            "input_seq": seq if isinstance(seq, int) and not isinstance(seq, bool) else None,
+            "object_id": object_id,
+            "edit_seq": None if edit is None else edit[0],
+            "edit_id": None if edit is None else edit[1],
+        }
 
     def minute(self, tick: int) -> ValueReference:
         key = f"minute_{tick}"

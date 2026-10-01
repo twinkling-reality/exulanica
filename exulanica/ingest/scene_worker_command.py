@@ -21,7 +21,7 @@ from exulanica.db.session import Database
 from exulanica.env import env_get, env_name, resolve_data_dir
 from exulanica.ingest.scene_worker import SceneReconstructionWorker
 from exulanica.ingest.worker_command import parse_workspaces
-from exulanica.store.local import LocalContentAddressedStore
+from exulanica.store.configured import content_stores
 
 __all__ = ["COMPRESSOR_GPU_ENV", "JOB_IDS_ENV", "main", "parse_compressor_gpu", "parse_job_ids"]
 
@@ -161,7 +161,7 @@ def _build(args: argparse.Namespace, environment: Mapping[str, str]) -> SceneRec
     data_directory = _worker_data_directory(environment)
     return SceneReconstructionWorker(
         database,
-        LocalContentAddressedStore(data_directory / "blobs"),
+        content_stores(environment, data_dir=data_directory).blobs,
         data_directory / "reconstruction-scratch",
         parse_workspaces(args.workspace, environment),
         name=_worker_name(args.name),
