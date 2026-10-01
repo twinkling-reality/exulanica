@@ -1,0 +1,131 @@
+{
+  "billed": 28,
+  "mode": "paid",
+  "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+  "process_ceiling_usd": "0.04",
+  "process_max_calls": 56,
+  "signal_ask_invocations": 28,
+  "source_commit": "a775a02f68c3e26c9c6266bd99869200b1b93a45",
+  "spent_usd": "0.00276234",
+  "towns": [
+    {
+      "choice_points": 23,
+      "composer": {
+        "key": "city-grammar-town",
+        "version": 2
+      },
+      "departure_steps": 600,
+      "episode": 0,
+      "fixed": {
+        "entries_at_signalled": 46,
+        "late_home": 0,
+        "mean_delay_ms_at_signalled": 11194,
+        "mean_door_to_door_s": 145,
+        "trips": {
+          "arrived": 18,
+          "blocked": {},
+          "requested": 18,
+          "unfinished": 0
+        }
+      },
+      "grammar": {
+        "descriptor_sha256": "2d998b59e93cfd256e42b89d7be519693c67ae1c344ace3cfa7e75ba357a0922",
+        "grammar_id": "city",
+        "grammar_version": 5
+      },
+      "hosted_asks": 14,
+      "model": {
+        "entries_at_signalled": 46,
+        "late_home": 0,
+        "mean_delay_ms_at_signalled": 11999,
+        "mean_door_to_door_s": 147,
+        "trips": {
+          "arrived": 18,
+          "blocked": {},
+          "requested": 18,
+          "unfinished": 0
+        }
+      },
+      "preset": "small_town",
+      "receipt_reasons": {
+        "process_share_spent": 9,
+        "validated_choice": 14
+      },
+      "receipt_sha256": "d5ba4e0eb2a85f4dd15407b013a4bf613ac2d883d787d035cce4b60c976f392b",
+      "receipt_statuses": {
+        "accepted": 14,
+        "unavailable": 9
+      },
+      "recipe_catalog_version": 4,
+      "roads_sha256": "f52bd6eff65da54ece0c2b4e074768fd105fda1a8932c621549a51239509f961",
+      "selected_signal_id": "5f7f7cac-5918-5c28-8c09-f4876d0c051a",
+      "signal_ids": [
+        "5f7f7cac-5918-5c28-8c09-f4876d0c051a",
+        "66ab794a-3431-53f9-b433-938a425196b5"
+      ],
+      "specification": "world-specification.v2",
+      "world_id": "world:generated:departures-0",
+      "world_index": 0
+    },
+    {
+      "choice_points": 30,
+      "composer": {
+        "key": "city-grammar-town",
+        "version": 2
+      },
+      "departure_steps": 600,
+      "episode": 0,
+      "fixed": {
+        "entries_at_signalled": 74,
+        "late_home": 0,
+        "mean_delay_ms_at_signalled": 16357,
+        "mean_door_to_door_s": 131,
+        "trips": {
+          "arrived": 44,
+          "blocked": {},
+          "requested": 44,
+          "unfinished": 0
+        }
+      },
+      "grammar": {
+        "descriptor_sha256": "2d998b59e93cfd256e42b89d7be519693c67ae1c344ace3cfa7e75ba357a0922",
+        "grammar_id": "city",
+        "grammar_version": 5
+      },
+      "hosted_asks": 14,
+      "model": {
+        "entries_at_signalled": 74,
+        "late_home": 0,
+        "mean_delay_ms_at_signalled": 19467,
+        "mean_door_to_door_s": 138,
+        "trips": {
+          "arrived": 44,
+          "blocked": {},
+          "requested": 44,
+          "unfinished": 0
+        }
+      },
+      "preset": "market_town",
+      "receipt_reasons": {
+        "model_timed_out": 2,
+        "process_share_spent": 16,
+        "validated_choice": 12
+      },
+      "receipt_sha256": "64583bca536e82a0401380e864767da045310ea0854117b4ee9bf2bb8b2c2826",
+      "receipt_statuses": {
+        "accepted": 12,
+        "unavailable": 18
+      },
+      "recipe_catalog_version": 4,
+      "roads_sha256": "c5effda50dd8b74d16d335c70455d7cd81fab50a21c31f7c7a047f949debbc2e",
+      "selected_signal_id": "53d62433-a06a-5dbd-9677-c0afa0ea8fd1",
+      "signal_ids": [
+        "53d62433-a06a-5dbd-9677-c0afa0ea8fd1",
+        "8d5f6046-32fb-5ded-af86-3f398ccf32f3"
+      ],
+      "specification": "world-specification.v2",
+      "world_id": "world:generated:departures-0",
+      "world_index": 0
+    }
+  ]
+}

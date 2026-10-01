@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "catalog_id": "society-comparison-reading",
+  "catalog_version": 1,
+  "source_build": "Derived from the immutable evaluation record each entry names, by the reader exulanica.world.society_comparison_reading states for its extraction. A state family no entry names reads the comparison protocol's own line.",
+  "entries": [
+    {
+      "key": "living",
+      "state_family": "living",
+      "source": "docs/evaluation/2026-10-01-living-comparison-replay.json",
+      "source_sha256": "63652a3e902642b962045a5925288d584948d4ff477681737a5c6e2c1431ab03",
+      "extraction": "replay_line",
+      "replay_fixed_ms": 25,
+      "replay_per_person_us": 10134,
+      "replay_per_decided_person_us": 1250,
+      "replay_per_decided_pair_us": 108,
+      "reason": "Derived: the least-margin line on or above every 95th percentile read the record states, measured on the living town's own replay (generated towns at their median and largest populations and a stress town at the society ground's bound), read by the extraction this entry names; the pair budget stays the protocol's."
+    }
+  ]
+}

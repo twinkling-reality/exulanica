@@ -1,0 +1,32 @@
+{
+  "source_commit": "a775a02f68c3e26c9c6266bd99869200b1b93a45",
+  "known_cost_usd": "0.00175374",
+  "accounted_including_unknown_reservations_usd": "0.00276234",
+  "point_counts": {
+    "small_town": {
+      "validated_choice": 14,
+      "process_share_spent": 9
+    },
+    "market_town": {
+      "validated_choice": 12,
+      "model_timed_out": 2,
+      "process_share_spent": 16
+    }
+  },
+  "pairs": [
+    {
+      "town": "small_town",
+      "fixed_delay_ms": 11194,
+      "model_delay_ms": 11999,
+      "fixed_arrived": 18,
+      "model_arrived": 18
+    },
+    {
+      "town": "market_town",
+      "fixed_delay_ms": 16357,
+      "model_delay_ms": 19467,
+      "fixed_arrived": 44,
+      "model_arrived": 44
+    }
+  ]
+}

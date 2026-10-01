@@ -115,8 +115,9 @@ def test_the_discovery_finds_every_family_and_no_unknown_shape():
     # version (the grounds' navigation forms and population rules), the world recipes in four
     # versions and the two versions of the specification schema their presets are points in,
     # plus the signal role registry and its policy, observation and response catalogs, the world
-    # clock's two profiles, and the protocol and seeds a comparison of signal models reads.
-    assert len(found[ENTRY_SHAPE]) == 73
+    # clock's two profiles, the protocol and seeds a comparison of signal models reads, and the
+    # replay line a comparison of a living town's people is read by.
+    assert len(found[ENTRY_SHAPE]) == 74
     # The traffic catalogs: vehicle classes, right-of-way policies, signal plans, the two access
     # mappings, the road derivation and the signal placement.
     assert len(found[CITED_SHAPE]) == 7

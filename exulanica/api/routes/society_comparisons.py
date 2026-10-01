@@ -310,6 +310,8 @@ def plan_society_comparison(
     running = SocietyComparisonStarts(connection, session.workspace_id).unfinished(world_id)
     catalogs = services.comparison_catalogs or load_comparison_catalogs()
     population = int(society["population_size"])
+    # A run is read by the line measured on its engine's state family.
+    family = society_engine(engine).state_family
     document: dict[str, Any] = {
         "profile": PLAN_PROFILE,
         "refusal": refused,
@@ -321,8 +323,8 @@ def plan_society_comparison(
         "models_most": MODELS_MOST,
         "window_ticks": protocol_value(catalogs, "window_ticks"),
         "population": population,
-        "population_most": population_maximum(catalogs),
-        "decided_most": decided_maximum(catalogs, population),
+        "population_most": population_maximum(catalogs, family),
+        "decided_most": decided_maximum(catalogs, population, family),
         # Everybody a named group may be chosen from, by id and name, as the society's state
         # names them: a group of more people than one owner's choice holds is chosen from these.
         "people": sorted(
@@ -612,7 +614,8 @@ def _prepare(
     if not role.hosted_by(engine):
         raise StartRefused("role_not_hosted", f"{engine} hosts no {role.key} decisions")
     population = int(society["population_size"])
-    refused = reading_refusal(runner.catalogs, population)
+    family = society_engine(engine).state_family
+    refused = reading_refusal(runner.catalogs, population, family=family)
     if refused is not None:
         raise StartRefused(*refused)
     arms = [ComparisonArm(model.provider, model.model_id) for model in models]
@@ -666,7 +669,7 @@ def _prepare(
         if exc.code in START_REFUSALS:
             raise StartRefused(exc.code, str(exc)) from exc
         raise
-    refused = reading_refusal(runner.catalogs, population, body)
+    refused = reading_refusal(runner.catalogs, population, body, family=family)
     if refused is not None:
         raise StartRefused(*refused)
     client = services.model_client

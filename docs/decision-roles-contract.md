@@ -211,7 +211,8 @@ Signal models are compared over a saved town's own episodes, each model beside t
 timing on the same seeds, with every choice point's request and receipt, the junction delay
 measure, trips, unanswered points and spend kept per run
 ([signal comparisons](traffic-contract.md#signal-comparisons)). No benefit of a model over fixed
-timing has been measured, and none is claimed.
+timing has been measured, and none is claimed: in the one paid trial the model arm's mean delay was
+above fixed timing's in both towns ([signal model trial](evaluation/2026-09-30-signal-model-trial.json)).
 
 ## The person's contract
 

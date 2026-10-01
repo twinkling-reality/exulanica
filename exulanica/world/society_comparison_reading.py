@@ -14,6 +14,17 @@ building a decided person's options reads everybody else. A run's read is estima
 per_person x population + per_decided x decided + per_pair x population x decided``, and every run
 of a comparison is held to the pair's budget over :data:`PAIR_RUNS`.
 
+**A line per engine.** The protocol's line was measured on the purposeful engine, whose people
+build their options every minute. A living town's people are asked only at the engine's own
+choice points, and its replay costs several times less for the same people, so a line measured on
+that engine reads its runs. The catalog :data:`READING_CATALOG` states the line of each state
+family measured apart from the protocol's, bound to the measurement record it was read from by
+path and digest; a family it does not name reads the protocol's own line. Which family a
+comparison's runs are is the family whose score its catalogs hold
+(:data:`~exulanica.world.society_catalogs.COMPARISON_SCORE_BY_FAMILY`), the table a definition
+is held to when it is recorded, or the family its caller names. The pair's budget is the
+protocol's for every family.
+
 So the most people a comparison runs, and the most of them a model may decide for in any one of
 its runs, are derived, never stated (:class:`ReadingBound`). A comparison whose dearest run would
 read for longer is refused by name (:func:`reading_refusal`): ``population_over_comparison_bound``
@@ -21,25 +32,36 @@ when the society is too many for a run in which a model decides for even one of 
 ``decided_over_comparison_bound`` when the people a model decides for are. The first two protocol
 versions state ``population_maximum`` and bound nothing else.
 
-Nothing here reads a world, a model or a database: a protocol, a population and a definition's
-body in, a bound or a refusal out.
+Nothing here reads a world, a model or a database: a protocol, a family's measured line, a
+population and a definition's body in, a bound or a refusal out.
 """
 
 from __future__ import annotations
 
+import json
 from collections.abc import Mapping
 from dataclasses import dataclass
+from functools import cache
+from pathlib import Path
 from typing import Any, Final
 
-from exulanica.world.society_catalogs import ComparisonCatalogs
-from exulanica.world.society_comparison_verdict import ComparisonRefused, protocol_values
+from exulanica.world.society_catalogs import COMPARISON_SCORE_BY_FAMILY, ComparisonCatalogs
+from exulanica.world.society_comparison_verdict import (
+    ComparisonRefused,
+    protocol_values,
+    score_version,
+)
 
 __all__ = [
+    "LINE_KEYS",
     "PAIR_RUNS",
+    "READING_CATALOG",
     "READING_REFUSALS",
     "ReadingBound",
     "decided_maximum",
     "decided_people",
+    "family_of",
+    "measured_line",
     "population_maximum",
     "reading_bound",
     "reading_refusal",
@@ -53,6 +75,26 @@ PAIR_RUNS: Final = 2
 _US_PER_MS: Final = 1000
 #: Why a comparison's reading does not fit, by the code it is refused with.
 READING_REFUSALS: Final = ("population_over_comparison_bound", "decided_over_comparison_bound")
+#: The four figures a reading line states, by the names the protocol states its own under.
+LINE_KEYS: Final = (
+    "replay_fixed_ms",
+    "replay_per_person_us",
+    "replay_per_decided_person_us",
+    "replay_per_decided_pair_us",
+)
+#: The lines measured apart from the protocol's, by state family: a derived catalog, each entry
+#: naming the measurement record it was read from, its digest and how it was read.
+READING_CATALOG: Final = (
+    Path(__file__).resolve().parents[2]
+    / "assets"
+    / "catalogs"
+    / "society-comparison-cost"
+    / "society-comparison-reading.v1.json"
+)
+_CATALOG_ID: Final = "society-comparison-reading"
+_CATALOG_VERSION: Final = 1
+#: How an entry's line is read from its record: the record's fitted ``line``.
+_EXTRACTION: Final = "replay_line"
 
 
 @dataclass(frozen=True, slots=True)
@@ -91,38 +133,95 @@ class ReadingBound:
         )
 
 
-def reading_bound(catalogs: ComparisonCatalogs) -> ReadingBound | None:
-    """The protocol's bound on reading one run, or None for a protocol that states no replay line,
-    an earlier one stating its population maximum instead."""
+def family_of(catalogs: ComparisonCatalogs) -> str | None:
+    """The state family whose score ``catalogs`` hold, as the definition table states each
+    family's score, or None for a score no family is defined under now (an earlier comparison's)."""
+    held = score_version(catalogs)
+    return next(
+        (family for family, score in COMPARISON_SCORE_BY_FAMILY.items() if score == held), None
+    )
+
+
+@cache
+def _catalog_lines(path: Path) -> dict[str, dict[str, Any]]:
+    """Each family's measured line the catalog at ``path`` states, with where it was read from;
+    refused by name where the catalog is not one this code reads."""
+    document = json.loads(path.read_text(encoding="utf-8"))
+    if document.get("catalog_id") != _CATALOG_ID or document.get("catalog_version") != (
+        _CATALOG_VERSION
+    ):
+        raise ComparisonRefused("reading_catalog", "not a comparison reading catalog this reads")
+    lines: dict[str, dict[str, Any]] = {}
+    for entry in document["entries"]:
+        family = entry.get("state_family")
+        values = {key: entry.get(key) for key in LINE_KEYS}
+        if (
+            entry.get("key") != family
+            or family not in COMPARISON_SCORE_BY_FAMILY
+            or family in lines
+            or entry.get("extraction") != _EXTRACTION
+            or not isinstance(entry.get("source"), str)
+            or not isinstance(entry.get("source_sha256"), str)
+            or any(type(value) is not int or value < 0 for value in values.values())
+            or values["replay_per_person_us"] < 1
+            or values["replay_per_decided_person_us"] < 1
+        ):
+            raise ComparisonRefused("reading_catalog", f"entry {entry.get('key')!r} is malformed")
+        lines[family] = {
+            **values,
+            "source": entry["source"],
+            "source_sha256": entry["source_sha256"],
+        }
+    return lines
+
+
+def measured_line(family: str | None) -> dict[str, Any] | None:
+    """The line measured for ``family`` apart from the protocol's, with the record it was read
+    from, or None where the reading catalog names none for it (it then reads the protocol's own).
+    The catalog ships with the code: one that is missing is an error, never a quiet fallback."""
+    if family is None:
+        return None
+    return _catalog_lines(READING_CATALOG).get(family)
+
+
+def reading_bound(catalogs: ComparisonCatalogs, family: str | None = None) -> ReadingBound | None:
+    """The protocol's bound on reading one run of a comparison of ``family`` (left out, the family
+    whose score ``catalogs`` hold), or None for a protocol that states no replay line, an earlier
+    one stating its population maximum instead. The pair's budget is always the protocol's; the
+    line is the family's measured one where the reading catalog states it, else the protocol's."""
     values = protocol_values(catalogs)
     if "pair_replay_budget_ms" not in values:
         return None
-    if values["replay_per_person_us"] < 1 or values["replay_per_decided_person_us"] < 1:
+    measured = measured_line(family_of(catalogs) if family is None else family)
+    line = values if measured is None else measured
+    if line["replay_per_person_us"] < 1 or line["replay_per_decided_person_us"] < 1:
         raise ComparisonRefused(
             "protocol_keys", "the protocol's replay line states no cost for a person"
         )
     return ReadingBound(
         run_us=values["pair_replay_budget_ms"] * _US_PER_MS // PAIR_RUNS,
-        fixed_us=values["replay_fixed_ms"] * _US_PER_MS,
-        per_person_us=values["replay_per_person_us"],
-        per_decided_us=values["replay_per_decided_person_us"],
-        per_pair_us=values["replay_per_decided_pair_us"],
+        fixed_us=line["replay_fixed_ms"] * _US_PER_MS,
+        per_person_us=line["replay_per_person_us"],
+        per_decided_us=line["replay_per_decided_person_us"],
+        per_pair_us=line["replay_per_decided_pair_us"],
     )
 
 
-def population_maximum(catalogs: ComparisonCatalogs) -> int:
-    """The most people a comparison under ``catalogs`` runs: derived from the protocol's replay
+def population_maximum(catalogs: ComparisonCatalogs, family: str | None = None) -> int:
+    """The most people a comparison of ``family`` under ``catalogs`` runs: derived from its read
     line (:meth:`ReadingBound.population_most`), or the figure an earlier protocol states."""
-    bound = reading_bound(catalogs)
+    bound = reading_bound(catalogs, family)
     if bound is None:
         return protocol_values(catalogs)["population_maximum"]
     return bound.population_most()
 
 
-def decided_maximum(catalogs: ComparisonCatalogs, population: int) -> int:
+def decided_maximum(
+    catalogs: ComparisonCatalogs, population: int, family: str | None = None
+) -> int:
     """The most of a society of ``population`` people a model may decide for in one run of a
-    comparison under ``catalogs``; an earlier protocol bounds only the population."""
-    bound = reading_bound(catalogs)
+    comparison of ``family`` under ``catalogs``; an earlier protocol bounds only the population."""
+    bound = reading_bound(catalogs, family)
     return population if bound is None else bound.decided_most(population)
 
 
@@ -140,12 +239,16 @@ def decided_people(body: Mapping[str, Any], population: int) -> dict[str, int]:
 
 
 def reading_refusal(
-    catalogs: ComparisonCatalogs, population: int, body: Mapping[str, Any] | None = None
+    catalogs: ComparisonCatalogs,
+    population: int,
+    body: Mapping[str, Any] | None = None,
+    family: str | None = None,
 ) -> tuple[str, str] | None:
     """Why a comparison of ``population`` people defined by ``body`` cannot be read within the
     protocol's bound, as a code of :data:`READING_REFUSALS` and a sentence, or None. Without a
-    body, only the population is held."""
-    most = population_maximum(catalogs)
+    body, only the population is held. ``family`` is the state family of the society's engine;
+    left out, the family whose score ``catalogs`` hold."""
+    most = population_maximum(catalogs, family)
     if population > most:
         return (
             "population_over_comparison_bound",
@@ -154,7 +257,7 @@ def reading_refusal(
     if body is None:
         return None
     decided = max(decided_people(body, population).values(), default=0)
-    allowed = decided_maximum(catalogs, population)
+    allowed = decided_maximum(catalogs, population, family)
     if decided > allowed:
         return (
             "decided_over_comparison_bound",

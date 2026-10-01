@@ -1,0 +1,216 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "artifacts": [
+      {
+        "bytes": 15277,
+        "path": "docs/evaluation/artifacts/2026-09-30-signal-model-trial/record_signal_model_trial.py.txt",
+        "sha256": "d9605260b3ef6e6570297f09c6d2b308a018369ba686b73e000f82ed1f14c19b"
+      },
+      {
+        "bytes": 724,
+        "path": "docs/evaluation/artifacts/2026-09-30-signal-model-trial/root-validation.json",
+        "sha256": "3df29c5d48ac1c2e50f3a6c0fd7d6ddbdd4016c68c2de6b0318121b83cd6d4e4"
+      },
+      {
+        "bytes": 175860,
+        "path": "docs/evaluation/artifacts/2026-09-30-signal-model-trial/trial-receipts.jsonl",
+        "sha256": "da6113d313b0e5f312d78d089b7723081c15ad5911b2570e26d6e97effd2d164"
+      },
+      {
+        "bytes": 3792,
+        "path": "docs/evaluation/artifacts/2026-09-30-signal-model-trial/trial-summary.json",
+        "sha256": "ce49b6af1d5702c7389ed6a2dbf4d52e6df1d62cdb6aaff74a1978b77f15a2cf"
+      }
+    ],
+    "checks": {
+      "receipts_bound_to_their_requests": 53,
+      "requests_and_receipts_sealed": 106,
+      "towns_held_to_root_validation": 2
+    },
+    "finding": {
+      "model_delay_above_fixed_in": [
+        "small_town",
+        "market_town"
+      ],
+      "statement": "In 2 of 2 towns the model arm's mean delay at the signalled junctions was above fixed timing's (small_town: 11999 ms against 11194 ms; market_town: 19467 ms against 16357 ms). No benefit and no ranking of models is claimed.",
+      "towns": 2
+    },
+    "kind": "exulanica.signal-model-trial/v1",
+    "limitations": [
+      "One paid pair: episode 0 of one generated town of each of two presets, one signal of each town decided by the model and every other signal on fixed timing.",
+      "The model was asked at 28 of 53 choice points: 25 were not asked because the process's share for the role was spent, and 2 asked were not answered in time; fixed timing decided each of those.",
+      "The measure is the trial driver's mean delay per entry at the signalled junctions in whole milliseconds, read from its summary; the driver is not retained, and the episodes are not replayed here.",
+      "Not pre-registered and not held out; one model, one episode per town."
+    ],
+    "name": "2026-09-30-signal-model-trial",
+    "question": "What did one paid pair of episodes show of a model deciding one signal of a generated town, beside the signal plan's fixed timing?",
+    "retained_as": "2026-09-30-root11-verify/t3-w5-a775",
+    "source": {
+      "commit": "a775a02f68c3e26c9c6266bd99869200b1b93a45",
+      "driver_retained": false,
+      "files": [
+        {
+          "bytes": 4437,
+          "name": "w5-pair-a775-paid.json",
+          "sha256": "9adb33867a610430f01796fddbc8e4c507ac396c0faac97c8889e2a8dc68d09e"
+        },
+        {
+          "bytes": 175860,
+          "name": "w5-pair-a775-paid.receipts.jsonl",
+          "sha256": "da6113d313b0e5f312d78d089b7723081c15ad5911b2570e26d6e97effd2d164"
+        },
+        {
+          "bytes": 724,
+          "name": "root-validation.json",
+          "sha256": "3df29c5d48ac1c2e50f3a6c0fd7d6ddbdd4016c68c2de6b0318121b83cd6d4e4"
+        }
+      ],
+      "mode": "paid",
+      "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "process_ceiling_usd": "0.04",
+      "process_max_calls": 56
+    },
+    "spend": {
+      "accounted_usd": "0.00276234",
+      "asks": 28,
+      "asks_of_unknown_cost": 2,
+      "known_cost_usd": "0.00175374"
+    },
+    "towns": [
+      {
+        "answers_by_kind": {
+          "keep": 9,
+          "switch": 5
+        },
+        "asked": 14,
+        "asks_of_unknown_cost": 0,
+        "choice_points": 23,
+        "decided_by_the_model": "5f7f7cac-5918-5c28-8c09-f4876d0c051a",
+        "departure_steps": 600,
+        "episode": 0,
+        "fixed": {
+          "entries_at_signalled": 46,
+          "mean_delay_ms_at_signalled": 11194,
+          "mean_door_to_door_s": 145,
+          "trips": {
+            "arrived": 18,
+            "blocked": {},
+            "requested": 18,
+            "unfinished": 0
+          }
+        },
+        "generation_receipt_sha256": "d5ba4e0eb2a85f4dd15407b013a4bf613ac2d883d787d035cce4b60c976f392b",
+        "known_cost_usd": "0.00104574",
+        "latencies_ms": [
+          4766,
+          2789,
+          2091,
+          2185,
+          4138,
+          2448,
+          3297,
+          2214,
+          2211,
+          2019,
+          3282,
+          2344,
+          1517,
+          2912
+        ],
+        "model": {
+          "entries_at_signalled": 46,
+          "mean_delay_ms_at_signalled": 11999,
+          "mean_door_to_door_s": 147,
+          "trips": {
+            "arrived": 18,
+            "blocked": {},
+            "requested": 18,
+            "unfinished": 0
+          }
+        },
+        "model_less_fixed_delay_ms": 805,
+        "preset": "small_town",
+        "receipts_by_reason": {
+          "process_share_spent": 9,
+          "validated_choice": 14
+        },
+        "receipts_by_status": {
+          "accepted": 14,
+          "unavailable": 9
+        },
+        "roads_sha256": "f52bd6eff65da54ece0c2b4e074768fd105fda1a8932c621549a51239509f961",
+        "signals": 2,
+        "world_id": "world:generated:departures-0",
+        "world_index": 0
+      },
+      {
+        "answers_by_kind": {
+          "keep": 12
+        },
+        "asked": 14,
+        "asks_of_unknown_cost": 2,
+        "choice_points": 30,
+        "decided_by_the_model": "53d62433-a06a-5dbd-9677-c0afa0ea8fd1",
+        "departure_steps": 600,
+        "episode": 0,
+        "fixed": {
+          "entries_at_signalled": 74,
+          "mean_delay_ms_at_signalled": 16357,
+          "mean_door_to_door_s": 131,
+          "trips": {
+            "arrived": 44,
+            "blocked": {},
+            "requested": 44,
+            "unfinished": 0
+          }
+        },
+        "generation_receipt_sha256": "64583bca536e82a0401380e864767da045310ea0854117b4ee9bf2bb8b2c2826",
+        "known_cost_usd": "0.00070800",
+        "latencies_ms": [
+          1570,
+          1581,
+          1919,
+          3138,
+          2409,
+          3518,
+          2468,
+          1372,
+          2483,
+          2547,
+          5003,
+          2269,
+          1899,
+          5003
+        ],
+        "model": {
+          "entries_at_signalled": 74,
+          "mean_delay_ms_at_signalled": 19467,
+          "mean_door_to_door_s": 138,
+          "trips": {
+            "arrived": 44,
+            "blocked": {},
+            "requested": 44,
+            "unfinished": 0
+          }
+        },
+        "model_less_fixed_delay_ms": 3110,
+        "preset": "market_town",
+        "receipts_by_reason": {
+          "model_timed_out": 2,
+          "process_share_spent": 16,
+          "validated_choice": 12
+        },
+        "receipts_by_status": {
+          "accepted": 12,
+          "unavailable": 18
+        },
+        "roads_sha256": "c5effda50dd8b74d16d335c70455d7cd81fab50a21c31f7c7a047f949debbc2e",
+        "signals": 2,
+        "world_id": "world:generated:departures-0",
+        "world_index": 0
+      }
+    ]
+  },
+  "record_sha256": "840f1b35e10d85c303cdc802ff01fad42a1a1e21ddce5b52617b565e561c36dd"
+}

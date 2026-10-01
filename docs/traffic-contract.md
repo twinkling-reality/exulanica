@@ -585,7 +585,11 @@ choices or its sealed minutes.
   first model less the second where there are two) is paired over the seeds every arm measured and
   read by the person comparison's claim module (percentile bootstrap, Holm), never judged here: a
   comparison on development seeds is `not_judged` with `development_seeds`. No benefit of a model
-  over fixed timing has been measured, and none is claimed.
+  over fixed timing has been measured, and none is claimed. The one paid pair of episodes, one
+  signal of a generated small town and one of a market town decided by a model, had the model arm's
+  mean delay at the signalled junctions above fixed timing's in both, with the model asked at 28 of
+  53 choice points; it was not pre-registered or held out
+  ([signal model trial](evaluation/2026-09-30-signal-model-trial.json)).
 - **Replay.** A completed run plays again from its stored requests and receipts with no model
   client, held to the stored bytes, the episode's end and its measure; a difference is
   `run_replay_mismatch`. It plays the whole episode in the request, so its cost grows with the

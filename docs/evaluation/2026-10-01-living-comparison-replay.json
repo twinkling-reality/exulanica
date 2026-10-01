@@ -1,0 +1,3087 @@
+{
+ "profile": "exulanica.digest-bound-record/v1",
+ "record": {
+  "derived": {
+   "decided_most": [
+    {
+     "decided_most": 38,
+     "estimate_everybody_us": 613544,
+     "population": 38
+    },
+    {
+     "decided_most": 52,
+     "estimate_everybody_us": 909000,
+     "population": 52
+    },
+    {
+     "decided_most": 74,
+     "estimate_everybody_us": 1458824,
+     "population": 74
+    },
+    {
+     "decided_most": 88,
+     "estimate_everybody_us": 1863144,
+     "population": 88
+    },
+    {
+     "decided_most": 128,
+     "estimate_everybody_us": 3251624,
+     "population": 128
+    }
+   ],
+   "pair_replay_budget_ms": 10000,
+   "population_most": 485,
+   "run_budget_us": 5000000
+  },
+  "discard": false,
+  "engine": "exulanica-society/v5",
+  "gate": {
+   "idle_percent_after": "77.47",
+   "idle_percent_before": "81.34",
+   "idle_percent_before_least": "70.0",
+   "idle_percent_mean_least": "50.0",
+   "load_after": "16:45  up 10 days,  7:33, 2 users, load averages: 6.62 6.75 7.51",
+   "load_before": "16:41  up 10 days,  7:29, 2 users, load averages: 6.45 7.19 7.90",
+   "load_most_before_each_point": "8.0"
+  },
+  "graphs": [
+   {
+    "index": 6,
+    "nodes": 612,
+    "outside_specification": false,
+    "population": 38,
+    "preset": "small_town",
+    "world_id": "world:generated:living-replay-measured-small_town-6"
+   },
+   {
+    "index": 7,
+    "nodes": 658,
+    "outside_specification": false,
+    "population": 52,
+    "preset": "small_town",
+    "world_id": "world:generated:living-replay-measured-small_town-7"
+   },
+   {
+    "index": 6,
+    "nodes": 914,
+    "outside_specification": false,
+    "population": 74,
+    "preset": "market_town",
+    "world_id": "world:generated:living-replay-measured-market_town-6"
+   },
+   {
+    "index": 1,
+    "nodes": 990,
+    "outside_specification": false,
+    "population": 88,
+    "preset": "market_town",
+    "world_id": "world:generated:living-replay-measured-market_town-1"
+   },
+   {
+    "index": 0,
+    "nodes": 1210,
+    "outside_specification": true,
+    "population": 128,
+    "preset": "market_town",
+    "world_id": "world:generated:living-replay-measured-stress-0"
+   }
+  ],
+  "kind": "exulanica.living-comparison-replay-measurement/v1",
+  "limits": [
+   "Scripted answers the engine applies: the most receipts a run can hold, not any model's behaviour.",
+   "One simulated hour per run; a full day is not measured.",
+   "The stress town is outside the admitted specification and is never offered as a world."
+  ],
+  "line": {
+   "margins": [
+    {
+     "decided": 0,
+     "graph": "world:generated:living-replay-measured-small_town-6",
+     "margin_us": 40883,
+     "p95_us": 65189,
+     "population": 8
+    },
+    {
+     "decided": 8,
+     "graph": "world:generated:living-replay-measured-small_town-6",
+     "margin_us": 36442,
+     "p95_us": 86542,
+     "population": 8
+    },
+    {
+     "decided": 0,
+     "graph": "world:generated:living-replay-measured-small_town-6",
+     "margin_us": 83159,
+     "p95_us": 103985,
+     "population": 16
+    },
+    {
+     "decided": 16,
+     "graph": "world:generated:living-replay-measured-small_town-6",
+     "margin_us": 50817,
+     "p95_us": 183975,
+     "population": 16
+    },
+    {
+     "decided": 0,
+     "graph": "world:generated:living-replay-measured-small_town-6",
+     "margin_us": 155211,
+     "p95_us": 194077,
+     "population": 32
+    },
+    {
+     "decided": 32,
+     "graph": "world:generated:living-replay-measured-small_town-6",
+     "margin_us": 113802,
+     "p95_us": 386078,
+     "population": 32
+    },
+    {
+     "decided": 0,
+     "graph": "world:generated:living-replay-measured-small_town-6",
+     "margin_us": 190669,
+     "p95_us": 219423,
+     "population": 38
+    },
+    {
+     "decided": 38,
+     "graph": "world:generated:living-replay-measured-small_town-6",
+     "margin_us": 148524,
+     "p95_us": 465020,
+     "population": 38
+    },
+    {
+     "decided": 4,
+     "graph": "world:generated:living-replay-measured-small_town-6",
+     "margin_us": 177874,
+     "p95_us": 253634,
+     "population": 38
+    },
+    {
+     "decided": 8,
+     "graph": "world:generated:living-replay-measured-small_town-6",
+     "margin_us": 73179,
+     "p95_us": 379745,
+     "population": 38
+    },
+    {
+     "decided": 16,
+     "graph": "world:generated:living-replay-measured-small_town-6",
+     "margin_us": 72685,
+     "p95_us": 423071,
+     "population": 38
+    },
+    {
+     "decided": 0,
+     "graph": "world:generated:living-replay-measured-small_town-7",
+     "margin_us": 39435,
+     "p95_us": 66637,
+     "population": 8
+    },
+    {
+     "decided": 8,
+     "graph": "world:generated:living-replay-measured-small_town-7",
+     "margin_us": 35232,
+     "p95_us": 87752,
+     "population": 8
+    },
+    {
+     "decided": 0,
+     "graph": "world:generated:living-replay-measured-small_town-7",
+     "margin_us": 74389,
+     "p95_us": 112755,
+     "population": 16
+    },
+    {
+     "decided": 16,
+     "graph": "world:generated:living-replay-measured-small_town-7",
+     "margin_us": 47952,
+     "p95_us": 186840,
+     "population": 16
+    },
+    {
+     "decided": 0,
+     "graph": "world:generated:living-replay-measured-small_town-7",
+     "margin_us": 160358,
+     "p95_us": 188930,
+     "population": 32
+    },
+    {
+     "decided": 32,
+     "graph": "world:generated:living-replay-measured-small_town-7",
+     "margin_us": 142556,
+     "p95_us": 357324,
+     "population": 32
+    },
+    {
+     "decided": 0,
+     "graph": "world:generated:living-replay-measured-small_town-7",
+     "margin_us": 230435,
+     "p95_us": 321533,
+     "population": 52
+    },
+    {
+     "decided": 52,
+     "graph": "world:generated:living-replay-measured-small_town-7",
+     "margin_us": 169095,
+     "p95_us": 739905,
+     "population": 52
+    },
+    {
+     "decided": 4,
+     "graph": "world:generated:living-replay-measured-small_town-7",
+     "margin_us": 201050,
+     "p95_us": 378382,
+     "population": 52
+    },
+    {
+     "decided": 8,
+     "graph": "world:generated:living-replay-measured-small_town-7",
+     "margin_us": 177938,
+     "p95_us": 428958,
+     "population": 52
+    },
+    {
+     "decided": 16,
+     "graph": "world:generated:living-replay-measured-small_town-7",
+     "margin_us": 74491,
+     "p95_us": 587333,
+     "population": 52
+    },
+    {
+     "decided": 0,
+     "graph": "world:generated:living-replay-measured-market_town-6",
+     "margin_us": 35806,
+     "p95_us": 70266,
+     "population": 8
+    },
+    {
+     "decided": 8,
+     "graph": "world:generated:living-replay-measured-market_town-6",
+     "margin_us": 18174,
+     "p95_us": 104810,
+     "population": 8
+    },
+    {
+     "decided": 0,
+     "graph": "world:generated:living-replay-measured-market_town-6",
+     "margin_us": 65815,
+     "p95_us": 121329,
+     "population": 16
+    },
+    {
+     "decided": 16,
+     "graph": "world:generated:living-replay-measured-market_town-6",
+     "margin_us": 913,
+     "p95_us": 233879,
+     "population": 16
+    },
+    {
+     "decided": 0,
+     "graph": "world:generated:living-replay-measured-market_town-6",
+     "margin_us": 120556,
+     "p95_us": 228732,
+     "population": 32
+    },
+    {
+     "decided": 32,
+     "graph": "world:generated:living-replay-measured-market_town-6",
+     "margin_us": 54595,
+     "p95_us": 445285,
+     "population": 32
+    },
+    {
+     "decided": 0,
+     "graph": "world:generated:living-replay-measured-market_town-6",
+     "margin_us": 213610,
+     "p95_us": 459966,
+     "population": 64
+    },
+    {
+     "decided": 64,
+     "graph": "world:generated:living-replay-measured-market_town-6",
+     "margin_us": 134021,
+     "p95_us": 1061923,
+     "population": 64
+    },
+    {
+     "decided": 0,
+     "graph": "world:generated:living-replay-measured-market_town-6",
+     "margin_us": 221103,
+     "p95_us": 553813,
+     "population": 74
+    },
+    {
+     "decided": 74,
+     "graph": "world:generated:living-replay-measured-market_town-6",
+     "margin_us": 89302,
+     "p95_us": 1369522,
+     "population": 74
+    },
+    {
+     "decided": 4,
+     "graph": "world:generated:living-replay-measured-market_town-6",
+     "margin_us": 183459,
+     "p95_us": 628425,
+     "population": 74
+    },
+    {
+     "decided": 8,
+     "graph": "world:generated:living-replay-measured-market_town-6",
+     "margin_us": 109167,
+     "p95_us": 739685,
+     "population": 74
+    },
+    {
+     "decided": 16,
+     "graph": "world:generated:living-replay-measured-market_town-6",
+     "margin_us": 64937,
+     "p95_us": 857851,
+     "population": 74
+    },
+    {
+     "decided": 0,
+     "graph": "world:generated:living-replay-measured-market_town-1",
+     "margin_us": 58821,
+     "p95_us": 47251,
+     "population": 8
+    },
+    {
+     "decided": 8,
+     "graph": "world:generated:living-replay-measured-market_town-1",
+     "margin_us": 888,
+     "p95_us": 122096,
+     "population": 8
+    },
+    {
+     "decided": 0,
+     "graph": "world:generated:living-replay-measured-market_town-1",
+     "margin_us": 60774,
+     "p95_us": 126370,
+     "population": 16
+    },
+    {
+     "decided": 16,
+     "graph": "world:generated:living-replay-measured-market_town-1",
+     "margin_us": 43244,
+     "p95_us": 191548,
+     "population": 16
+    },
+    {
+     "decided": 0,
+     "graph": "world:generated:living-replay-measured-market_town-1",
+     "margin_us": 129181,
+     "p95_us": 220107,
+     "population": 32
+    },
+    {
+     "decided": 32,
+     "graph": "world:generated:living-replay-measured-market_town-1",
+     "margin_us": 1527,
+     "p95_us": 498353,
+     "population": 32
+    },
+    {
+     "decided": 0,
+     "graph": "world:generated:living-replay-measured-market_town-1",
+     "margin_us": 224714,
+     "p95_us": 448862,
+     "population": 64
+    },
+    {
+     "decided": 64,
+     "graph": "world:generated:living-replay-measured-market_town-1",
+     "margin_us": 176295,
+     "p95_us": 1019649,
+     "population": 64
+    },
+    {
+     "decided": 0,
+     "graph": "world:generated:living-replay-measured-market_town-1",
+     "margin_us": 333916,
+     "p95_us": 582876,
+     "population": 88
+    },
+    {
+     "decided": 88,
+     "graph": "world:generated:living-replay-measured-market_town-1",
+     "margin_us": 301663,
+     "p95_us": 1561481,
+     "population": 88
+    },
+    {
+     "decided": 4,
+     "graph": "world:generated:living-replay-measured-market_town-1",
+     "margin_us": 272848,
+     "p95_us": 686960,
+     "population": 88
+    },
+    {
+     "decided": 8,
+     "graph": "world:generated:living-replay-measured-market_town-1",
+     "margin_us": 247492,
+     "p95_us": 755332,
+     "population": 88
+    },
+    {
+     "decided": 16,
+     "graph": "world:generated:living-replay-measured-market_town-1",
+     "margin_us": 289858,
+     "p95_us": 798998,
+     "population": 88
+    },
+    {
+     "decided": 0,
+     "graph": "world:generated:living-replay-measured-stress-0",
+     "margin_us": 26963,
+     "p95_us": 79109,
+     "population": 8
+    },
+    {
+     "decided": 8,
+     "graph": "world:generated:living-replay-measured-stress-0",
+     "margin_us": 1561,
+     "p95_us": 121423,
+     "population": 8
+    },
+    {
+     "decided": 0,
+     "graph": "world:generated:living-replay-measured-stress-0",
+     "margin_us": 53767,
+     "p95_us": 133377,
+     "population": 16
+    },
+    {
+     "decided": 16,
+     "graph": "world:generated:living-replay-measured-stress-0",
+     "margin_us": 20064,
+     "p95_us": 214728,
+     "population": 16
+    },
+    {
+     "decided": 0,
+     "graph": "world:generated:living-replay-measured-stress-0",
+     "margin_us": 112497,
+     "p95_us": 236791,
+     "population": 32
+    },
+    {
+     "decided": 32,
+     "graph": "world:generated:living-replay-measured-stress-0",
+     "margin_us": 8192,
+     "p95_us": 491688,
+     "population": 32
+    },
+    {
+     "decided": 0,
+     "graph": "world:generated:living-replay-measured-stress-0",
+     "margin_us": 212339,
+     "p95_us": 461237,
+     "population": 64
+    },
+    {
+     "decided": 64,
+     "graph": "world:generated:living-replay-measured-stress-0",
+     "margin_us": 1240,
+     "p95_us": 1194704,
+     "population": 64
+    },
+    {
+     "decided": 0,
+     "graph": "world:generated:living-replay-measured-stress-0",
+     "margin_us": 383045,
+     "p95_us": 939107,
+     "population": 128
+    },
+    {
+     "decided": 128,
+     "graph": "world:generated:living-replay-measured-stress-0",
+     "margin_us": 544062,
+     "p95_us": 2707562,
+     "population": 128
+    },
+    {
+     "decided": 4,
+     "graph": "world:generated:living-replay-measured-stress-0",
+     "margin_us": 362012,
+     "p95_us": 1020436,
+     "population": 128
+    },
+    {
+     "decided": 8,
+     "graph": "world:generated:living-replay-measured-stress-0",
+     "margin_us": 108495,
+     "p95_us": 1334249,
+     "population": 128
+    },
+    {
+     "decided": 16,
+     "graph": "world:generated:living-replay-measured-stress-0",
+     "margin_us": 1106,
+     "p95_us": 1562230,
+     "population": 128
+    }
+   ],
+   "replay_fixed_ms": 25,
+   "replay_per_decided_pair_us": 108,
+   "replay_per_decided_person_us": 1250,
+   "replay_per_person_us": 10134
+  },
+  "line_without_pairs": {
+   "margins": [
+    {
+     "decided": 0,
+     "graph": "world:generated:living-replay-measured-small_town-6",
+     "margin_us": 22227,
+     "p95_us": 65189,
+     "population": 8
+    },
+    {
+     "decided": 8,
+     "graph": "world:generated:living-replay-measured-small_town-6",
+     "margin_us": 82690,
+     "p95_us": 86542,
+     "population": 8
+    },
+    {
+     "decided": 0,
+     "graph": "world:generated:living-replay-measured-small_town-6",
+     "margin_us": 70847,
+     "p95_us": 103985,
+     "population": 16
+    },
+    {
+     "decided": 16,
+     "graph": "world:generated:living-replay-measured-small_town-6",
+     "margin_us": 154489,
+     "p95_us": 183975,
+     "population": 16
+    },
+    {
+     "decided": 0,
+     "graph": "world:generated:living-replay-measured-small_town-6",
+     "margin_us": 155587,
+     "p95_us": 194077,
+     "population": 32
+    },
+    {
+     "decided": 32,
+     "graph": "world:generated:living-replay-measured-small_town-6",
+     "margin_us": 290850,
+     "p95_us": 386078,
+     "population": 32
+    },
+    {
+     "decided": 0,
+     "graph": "world:generated:living-replay-measured-small_town-6",
+     "margin_us": 195803,
+     "p95_us": 219423,
+     "population": 38
+    },
+    {
+     "decided": 38,
+     "graph": "world:generated:living-replay-measured-small_town-6",
+     "margin_us": 338832,
+     "p95_us": 465020,
+     "population": 38
+    },
+    {
+     "decided": 4,
+     "graph": "world:generated:living-replay-measured-small_town-6",
+     "margin_us": 202500,
+     "p95_us": 253634,
+     "population": 38
+    },
+    {
+     "decided": 8,
+     "graph": "world:generated:living-replay-measured-small_town-6",
+     "margin_us": 117297,
+     "p95_us": 379745,
+     "population": 38
+    },
+    {
+     "decided": 16,
+     "graph": "world:generated:living-replay-measured-small_town-6",
+     "margin_us": 155787,
+     "p95_us": 423071,
+     "population": 38
+    },
+    {
+     "decided": 0,
+     "graph": "world:generated:living-replay-measured-small_town-7",
+     "margin_us": 20779,
+     "p95_us": 66637,
+     "population": 8
+    },
+    {
+     "decided": 8,
+     "graph": "world:generated:living-replay-measured-small_town-7",
+     "margin_us": 81480,
+     "p95_us": 87752,
+     "population": 8
+    },
+    {
+     "decided": 0,
+     "graph": "world:generated:living-replay-measured-small_town-7",
+     "margin_us": 62077,
+     "p95_us": 112755,
+     "population": 16
+    },
+    {
+     "decided": 16,
+     "graph": "world:generated:living-replay-measured-small_town-7",
+     "margin_us": 151624,
+     "p95_us": 186840,
+     "population": 16
+    },
+    {
+     "decided": 0,
+     "graph": "world:generated:living-replay-measured-small_town-7",
+     "margin_us": 160734,
+     "p95_us": 188930,
+     "population": 32
+    },
+    {
+     "decided": 32,
+     "graph": "world:generated:living-replay-measured-small_town-7",
+     "margin_us": 319604,
+     "p95_us": 357324,
+     "population": 32
+    },
+    {
+     "decided": 0,
+     "graph": "world:generated:living-replay-measured-small_town-7",
+     "margin_us": 246671,
+     "p95_us": 321533,
+     "population": 52
+    },
+    {
+     "decided": 52,
+     "graph": "world:generated:living-replay-measured-small_town-7",
+     "margin_us": 360103,
+     "p95_us": 739905,
+     "population": 52
+    },
+    {
+     "decided": 4,
+     "graph": "world:generated:living-replay-measured-small_town-7",
+     "margin_us": 230730,
+     "p95_us": 378382,
+     "population": 52
+    },
+    {
+     "decided": 8,
+     "graph": "world:generated:living-replay-measured-small_town-7",
+     "margin_us": 221062,
+     "p95_us": 428958,
+     "population": 52
+    },
+    {
+     "decided": 16,
+     "graph": "world:generated:living-replay-measured-small_town-7",
+     "margin_us": 144503,
+     "p95_us": 587333,
+     "population": 52
+    },
+    {
+     "decided": 0,
+     "graph": "world:generated:living-replay-measured-market_town-6",
+     "margin_us": 17150,
+     "p95_us": 70266,
+     "population": 8
+    },
+    {
+     "decided": 8,
+     "graph": "world:generated:living-replay-measured-market_town-6",
+     "margin_us": 64422,
+     "p95_us": 104810,
+     "population": 8
+    },
+    {
+     "decided": 0,
+     "graph": "world:generated:living-replay-measured-market_town-6",
+     "margin_us": 53503,
+     "p95_us": 121329,
+     "population": 16
+    },
+    {
+     "decided": 16,
+     "graph": "world:generated:living-replay-measured-market_town-6",
+     "margin_us": 104585,
+     "p95_us": 233879,
+     "population": 16
+    },
+    {
+     "decided": 0,
+     "graph": "world:generated:living-replay-measured-market_town-6",
+     "margin_us": 120932,
+     "p95_us": 228732,
+     "population": 32
+    },
+    {
+     "decided": 32,
+     "graph": "world:generated:living-replay-measured-market_town-6",
+     "margin_us": 231643,
+     "p95_us": 445285,
+     "population": 32
+    },
+    {
+     "decided": 0,
+     "graph": "world:generated:living-replay-measured-market_town-6",
+     "margin_us": 239362,
+     "p95_us": 459966,
+     "population": 64
+    },
+    {
+     "decided": 64,
+     "graph": "world:generated:living-replay-measured-market_town-6",
+     "margin_us": 291933,
+     "p95_us": 1061923,
+     "population": 64
+    },
+    {
+     "decided": 0,
+     "graph": "world:generated:living-replay-measured-market_town-6",
+     "margin_us": 254785,
+     "p95_us": 553813,
+     "population": 74
+    },
+    {
+     "decided": 74,
+     "graph": "world:generated:living-replay-measured-market_town-6",
+     "margin_us": 195874,
+     "p95_us": 1369522,
+     "population": 74
+    },
+    {
+     "decided": 4,
+     "graph": "world:generated:living-replay-measured-market_town-6",
+     "margin_us": 221081,
+     "p95_us": 628425,
+     "population": 74
+    },
+    {
+     "decided": 8,
+     "graph": "world:generated:living-replay-measured-market_town-6",
+     "margin_us": 150729,
+     "p95_us": 739685,
+     "population": 74
+    },
+    {
+     "decided": 16,
+     "graph": "world:generated:living-replay-measured-market_town-6",
+     "margin_us": 114379,
+     "p95_us": 857851,
+     "population": 74
+    },
+    {
+     "decided": 0,
+     "graph": "world:generated:living-replay-measured-market_town-1",
+     "margin_us": 40165,
+     "p95_us": 47251,
+     "population": 8
+    },
+    {
+     "decided": 8,
+     "graph": "world:generated:living-replay-measured-market_town-1",
+     "margin_us": 47136,
+     "p95_us": 122096,
+     "population": 8
+    },
+    {
+     "decided": 0,
+     "graph": "world:generated:living-replay-measured-market_town-1",
+     "margin_us": 48462,
+     "p95_us": 126370,
+     "population": 16
+    },
+    {
+     "decided": 16,
+     "graph": "world:generated:living-replay-measured-market_town-1",
+     "margin_us": 146916,
+     "p95_us": 191548,
+     "population": 16
+    },
+    {
+     "decided": 0,
+     "graph": "world:generated:living-replay-measured-market_town-1",
+     "margin_us": 129557,
+     "p95_us": 220107,
+     "population": 32
+    },
+    {
+     "decided": 32,
+     "graph": "world:generated:living-replay-measured-market_town-1",
+     "margin_us": 178575,
+     "p95_us": 498353,
+     "population": 32
+    },
+    {
+     "decided": 0,
+     "graph": "world:generated:living-replay-measured-market_town-1",
+     "margin_us": 250466,
+     "p95_us": 448862,
+     "population": 64
+    },
+    {
+     "decided": 64,
+     "graph": "world:generated:living-replay-measured-market_town-1",
+     "margin_us": 334207,
+     "p95_us": 1019649,
+     "population": 64
+    },
+    {
+     "decided": 0,
+     "graph": "world:generated:living-replay-measured-market_town-1",
+     "margin_us": 378700,
+     "p95_us": 582876,
+     "population": 88
+    },
+    {
+     "decided": 88,
+     "graph": "world:generated:living-replay-measured-market_town-1",
+     "margin_us": 300071,
+     "p95_us": 1561481,
+     "population": 88
+    },
+    {
+     "decided": 4,
+     "graph": "world:generated:living-replay-measured-market_town-1",
+     "margin_us": 315524,
+     "p95_us": 686960,
+     "population": 88
+    },
+    {
+     "decided": 8,
+     "graph": "world:generated:living-replay-measured-market_town-1",
+     "margin_us": 288060,
+     "p95_us": 755332,
+     "population": 88
+    },
+    {
+     "decided": 16,
+     "graph": "world:generated:living-replay-measured-market_town-1",
+     "margin_us": 326210,
+     "p95_us": 798998,
+     "population": 88
+    },
+    {
+     "decided": 0,
+     "graph": "world:generated:living-replay-measured-stress-0",
+     "margin_us": 8307,
+     "p95_us": 79109,
+     "population": 8
+    },
+    {
+     "decided": 8,
+     "graph": "world:generated:living-replay-measured-stress-0",
+     "margin_us": 47809,
+     "p95_us": 121423,
+     "population": 8
+    },
+    {
+     "decided": 0,
+     "graph": "world:generated:living-replay-measured-stress-0",
+     "margin_us": 41455,
+     "p95_us": 133377,
+     "population": 16
+    },
+    {
+     "decided": 16,
+     "graph": "world:generated:living-replay-measured-stress-0",
+     "margin_us": 123736,
+     "p95_us": 214728,
+     "population": 16
+    },
+    {
+     "decided": 0,
+     "graph": "world:generated:living-replay-measured-stress-0",
+     "margin_us": 112873,
+     "p95_us": 236791,
+     "population": 32
+    },
+    {
+     "decided": 32,
+     "graph": "world:generated:living-replay-measured-stress-0",
+     "margin_us": 185240,
+     "p95_us": 491688,
+     "population": 32
+    },
+    {
+     "decided": 0,
+     "graph": "world:generated:living-replay-measured-stress-0",
+     "margin_us": 238091,
+     "p95_us": 461237,
+     "population": 64
+    },
+    {
+     "decided": 64,
+     "graph": "world:generated:living-replay-measured-stress-0",
+     "margin_us": 159152,
+     "p95_us": 1194704,
+     "population": 64
+    },
+    {
+     "decided": 0,
+     "graph": "world:generated:living-replay-measured-stress-0",
+     "margin_us": 459549,
+     "p95_us": 939107,
+     "population": 128
+    },
+    {
+     "decided": 128,
+     "graph": "world:generated:living-replay-measured-stress-0",
+     "margin_us": 150,
+     "p95_us": 2707562,
+     "population": 128
+    },
+    {
+     "decided": 4,
+     "graph": "world:generated:living-replay-measured-stress-0",
+     "margin_us": 419128,
+     "p95_us": 1020436,
+     "population": 128
+    },
+    {
+     "decided": 8,
+     "graph": "world:generated:living-replay-measured-stress-0",
+     "margin_us": 146223,
+     "p95_us": 1334249,
+     "population": 128
+    },
+    {
+     "decided": 16,
+     "graph": "world:generated:living-replay-measured-stress-0",
+     "margin_us": 58,
+     "p95_us": 1562230,
+     "population": 128
+    }
+   ],
+   "replay_fixed_ms": 0,
+   "replay_per_decided_person_us": 10227,
+   "replay_per_person_us": 10927
+  },
+  "machine": {
+   "cpus": 18,
+   "python": "3.11.6",
+   "system": "macOS-26.7-arm64-arm-64bit"
+  },
+  "points": [
+   {
+    "body_bytes": 240684,
+    "decided": 0,
+    "drawing_bytes": 240684,
+    "drawing_gzip_bytes": 23918,
+    "graph": "world:generated:living-replay-measured-small_town-6",
+    "load_1m": {
+     "after": "5.52",
+     "before": "5.52"
+    },
+    "play_cpu_us": 41054,
+    "play_wall_us": 41092,
+    "population": 8,
+    "read_cpu_us": {
+     "max": 65103,
+     "median": 42637,
+     "min": 42330,
+     "p95": 65103
+    },
+    "read_wall_us": {
+     "max": 65189,
+     "median": 42691,
+     "min": 42352,
+     "p95": 65189
+    },
+    "receipts": 0,
+    "stored_read_wall_us": {
+     "max": 11365,
+     "median": 11158,
+     "min": 10954,
+     "p95": 11365
+    },
+    "stored_request_receipt_bytes": 0
+   },
+   {
+    "body_bytes": 245306,
+    "decided": 8,
+    "drawing_bytes": 245170,
+    "drawing_gzip_bytes": 23936,
+    "graph": "world:generated:living-replay-measured-small_town-6",
+    "load_1m": {
+     "after": "5.52",
+     "before": "5.52"
+    },
+    "play_cpu_us": 46621,
+    "play_wall_us": 46677,
+    "population": 8,
+    "read_cpu_us": {
+     "max": 86458,
+     "median": 67274,
+     "min": 67110,
+     "p95": 86458
+    },
+    "read_wall_us": {
+     "max": 86542,
+     "median": 67323,
+     "min": 67271,
+     "p95": 86542
+    },
+    "receipts": 17,
+    "stored_read_wall_us": {
+     "max": 31267,
+     "median": 11237,
+     "min": 10966,
+     "p95": 31267
+    },
+    "stored_request_receipt_bytes": 52475
+   },
+   {
+    "body_bytes": 418879,
+    "decided": 0,
+    "drawing_bytes": 418879,
+    "drawing_gzip_bytes": 35910,
+    "graph": "world:generated:living-replay-measured-small_town-6",
+    "load_1m": {
+     "after": "5.52",
+     "before": "5.52"
+    },
+    "play_cpu_us": 46117,
+    "play_wall_us": 46174,
+    "population": 16,
+    "read_cpu_us": {
+     "max": 103891,
+     "median": 81774,
+     "min": 81442,
+     "p95": 103891
+    },
+    "read_wall_us": {
+     "max": 103985,
+     "median": 81833,
+     "min": 81510,
+     "p95": 103985
+    },
+    "receipts": 0,
+    "stored_read_wall_us": {
+     "max": 38579,
+     "median": 20063,
+     "min": 19648,
+     "p95": 38579
+    },
+    "stored_request_receipt_bytes": 0
+   },
+   {
+    "body_bytes": 435304,
+    "decided": 16,
+    "drawing_bytes": 435032,
+    "drawing_gzip_bytes": 36576,
+    "graph": "world:generated:living-replay-measured-small_town-6",
+    "load_1m": {
+     "after": "5.52",
+     "before": "5.52"
+    },
+    "play_cpu_us": 120099,
+    "play_wall_us": 120238,
+    "population": 16,
+    "read_cpu_us": {
+     "max": 183755,
+     "median": 160970,
+     "min": 159913,
+     "p95": 183755
+    },
+    "read_wall_us": {
+     "max": 183975,
+     "median": 161257,
+     "min": 160082,
+     "p95": 183975
+    },
+    "receipts": 43,
+    "stored_read_wall_us": {
+     "max": 20434,
+     "median": 20391,
+     "min": 19979,
+     "p95": 20434
+    },
+    "stored_request_receipt_bytes": 134592
+   },
+   {
+    "body_bytes": 787444,
+    "decided": 0,
+    "drawing_bytes": 787444,
+    "drawing_gzip_bytes": 63294,
+    "graph": "world:generated:living-replay-measured-small_town-6",
+    "load_1m": {
+     "after": "5.8",
+     "before": "5.52"
+    },
+    "play_cpu_us": 116698,
+    "play_wall_us": 116980,
+    "population": 32,
+    "read_cpu_us": {
+     "max": 193804,
+     "median": 191127,
+     "min": 167264,
+     "p95": 193804
+    },
+    "read_wall_us": {
+     "max": 194077,
+     "median": 191423,
+     "min": 167441,
+     "p95": 194077
+    },
+    "receipts": 0,
+    "stored_read_wall_us": {
+     "max": 59688,
+     "median": 38719,
+     "min": 38326,
+     "p95": 59688
+    },
+    "stored_request_receipt_bytes": 0
+   },
+   {
+    "body_bytes": 801520,
+    "decided": 32,
+    "drawing_bytes": 800976,
+    "drawing_gzip_bytes": 62174,
+    "graph": "world:generated:living-replay-measured-small_town-6",
+    "load_1m": {
+     "after": "5.8",
+     "before": "5.8"
+    },
+    "play_cpu_us": 302253,
+    "play_wall_us": 302604,
+    "population": 32,
+    "read_cpu_us": {
+     "max": 385498,
+     "median": 380838,
+     "min": 356865,
+     "p95": 385498
+    },
+    "read_wall_us": {
+     "max": 386078,
+     "median": 381351,
+     "min": 357380,
+     "p95": 386078
+    },
+    "receipts": 80,
+    "stored_read_wall_us": {
+     "max": 66503,
+     "median": 40007,
+     "min": 37998,
+     "p95": 66503
+    },
+    "stored_request_receipt_bytes": 252665
+   },
+   {
+    "body_bytes": 912444,
+    "decided": 0,
+    "drawing_bytes": 912444,
+    "drawing_gzip_bytes": 71219,
+    "graph": "world:generated:living-replay-measured-small_town-6",
+    "load_1m": {
+     "after": "5.8",
+     "before": "5.8"
+    },
+    "play_cpu_us": 103819,
+    "play_wall_us": 103955,
+    "population": 38,
+    "read_cpu_us": {
+     "max": 219076,
+     "median": 217339,
+     "min": 192939,
+     "p95": 219076
+    },
+    "read_wall_us": {
+     "max": 219423,
+     "median": 217618,
+     "min": 193150,
+     "p95": 219423
+    },
+    "receipts": 0,
+    "stored_read_wall_us": {
+     "max": 68758,
+     "median": 45273,
+     "min": 43978,
+     "p95": 68758
+    },
+    "stored_request_receipt_bytes": 0
+   },
+   {
+    "body_bytes": 922335,
+    "decided": 38,
+    "drawing_bytes": 921689,
+    "drawing_gzip_bytes": 69495,
+    "graph": "world:generated:living-replay-measured-small_town-6",
+    "load_1m": {
+     "after": "5.81",
+     "before": "5.8"
+    },
+    "play_cpu_us": 323832,
+    "play_wall_us": 324193,
+    "population": 38,
+    "read_cpu_us": {
+     "max": 461661,
+     "median": 440241,
+     "min": 430587,
+     "p95": 461661
+    },
+    "read_wall_us": {
+     "max": 465020,
+     "median": 440729,
+     "min": 431363,
+     "p95": 465020
+    },
+    "receipts": 85,
+    "stored_read_wall_us": {
+     "max": 66124,
+     "median": 45397,
+     "min": 44296,
+     "p95": 66124
+    },
+    "stored_request_receipt_bytes": 268206
+   },
+   {
+    "body_bytes": 918408,
+    "decided": 4,
+    "drawing_bytes": 918340,
+    "drawing_gzip_bytes": 72822,
+    "graph": "world:generated:living-replay-measured-small_town-6",
+    "load_1m": {
+     "after": "5.81",
+     "before": "5.81"
+    },
+    "play_cpu_us": 129540,
+    "play_wall_us": 129749,
+    "population": 38,
+    "read_cpu_us": {
+     "max": 253247,
+     "median": 248617,
+     "min": 224610,
+     "p95": 253247
+    },
+    "read_wall_us": {
+     "max": 253634,
+     "median": 249039,
+     "min": 224876,
+     "p95": 253634
+    },
+    "receipts": 6,
+    "stored_read_wall_us": {
+     "max": 64710,
+     "median": 45131,
+     "min": 44859,
+     "p95": 64710
+    },
+    "stored_request_receipt_bytes": 19419
+   },
+   {
+    "body_bytes": 942537,
+    "decided": 8,
+    "drawing_bytes": 942401,
+    "drawing_gzip_bytes": 74412,
+    "graph": "world:generated:living-replay-measured-small_town-6",
+    "load_1m": {
+     "after": "5.51",
+     "before": "5.81"
+    },
+    "play_cpu_us": 242149,
+    "play_wall_us": 242506,
+    "population": 38,
+    "read_cpu_us": {
+     "max": 379284,
+     "median": 353396,
+     "min": 333791,
+     "p95": 379284
+    },
+    "read_wall_us": {
+     "max": 379745,
+     "median": 353681,
+     "min": 334204,
+     "p95": 379745
+    },
+    "receipts": 30,
+    "stored_read_wall_us": {
+     "max": 70869,
+     "median": 46237,
+     "min": 45763,
+     "p95": 70869
+    },
+    "stored_request_receipt_bytes": 93442
+   },
+   {
+    "body_bytes": 942490,
+    "decided": 16,
+    "drawing_bytes": 942218,
+    "drawing_gzip_bytes": 74053,
+    "graph": "world:generated:living-replay-measured-small_town-6",
+    "load_1m": {
+     "after": "5.51",
+     "before": "5.51"
+    },
+    "play_cpu_us": 315113,
+    "play_wall_us": 315506,
+    "population": 38,
+    "read_cpu_us": {
+     "max": 421809,
+     "median": 415239,
+     "min": 389212,
+     "p95": 421809
+    },
+    "read_wall_us": {
+     "max": 423071,
+     "median": 415784,
+     "min": 389647,
+     "p95": 423071
+    },
+    "receipts": 56,
+    "stored_read_wall_us": {
+     "max": 69885,
+     "median": 45583,
+     "min": 45142,
+     "p95": 69885
+    },
+    "stored_request_receipt_bytes": 177930
+   },
+   {
+    "body_bytes": 249838,
+    "decided": 0,
+    "drawing_bytes": 249838,
+    "drawing_gzip_bytes": 27500,
+    "graph": "world:generated:living-replay-measured-small_town-7",
+    "load_1m": {
+     "after": "5.51",
+     "before": "5.51"
+    },
+    "play_cpu_us": 43249,
+    "play_wall_us": 43304,
+    "population": 8,
+    "read_cpu_us": {
+     "max": 66537,
+     "median": 44267,
+     "min": 44168,
+     "p95": 66537
+    },
+    "read_wall_us": {
+     "max": 66637,
+     "median": 44326,
+     "min": 44235,
+     "p95": 66637
+    },
+    "receipts": 0,
+    "stored_read_wall_us": {
+     "max": 36590,
+     "median": 12361,
+     "min": 12186,
+     "p95": 36590
+    },
+    "stored_request_receipt_bytes": 0
+   },
+   {
+    "body_bytes": 251134,
+    "decided": 8,
+    "drawing_bytes": 250998,
+    "drawing_gzip_bytes": 27014,
+    "graph": "world:generated:living-replay-measured-small_town-7",
+    "load_1m": {
+     "after": "5.51",
+     "before": "5.51"
+    },
+    "play_cpu_us": 48072,
+    "play_wall_us": 48339,
+    "population": 8,
+    "read_cpu_us": {
+     "max": 87616,
+     "median": 68547,
+     "min": 67776,
+     "p95": 87616
+    },
+    "read_wall_us": {
+     "max": 87752,
+     "median": 68658,
+     "min": 67842,
+     "p95": 87752
+    },
+    "receipts": 18,
+    "stored_read_wall_us": {
+     "max": 11762,
+     "median": 11512,
+     "min": 11309,
+     "p95": 11762
+    },
+    "stored_request_receipt_bytes": 55059
+   },
+   {
+    "body_bytes": 424353,
+    "decided": 0,
+    "drawing_bytes": 424353,
+    "drawing_gzip_bytes": 38569,
+    "graph": "world:generated:living-replay-measured-small_town-7",
+    "load_1m": {
+     "after": "5.79",
+     "before": "5.51"
+    },
+    "play_cpu_us": 47111,
+    "play_wall_us": 47175,
+    "population": 16,
+    "read_cpu_us": {
+     "max": 112360,
+     "median": 88138,
+     "min": 85375,
+     "p95": 112360
+    },
+    "read_wall_us": {
+     "max": 112755,
+     "median": 88808,
+     "min": 85531,
+     "p95": 112755
+    },
+    "receipts": 0,
+    "stored_read_wall_us": {
+     "max": 22730,
+     "median": 20440,
+     "min": 20258,
+     "p95": 22730
+    },
+    "stored_request_receipt_bytes": 0
+   },
+   {
+    "body_bytes": 440314,
+    "decided": 16,
+    "drawing_bytes": 440042,
+    "drawing_gzip_bytes": 39472,
+    "graph": "world:generated:living-replay-measured-small_town-7",
+    "load_1m": {
+     "after": "5.79",
+     "before": "5.79"
+    },
+    "play_cpu_us": 143722,
+    "play_wall_us": 143966,
+    "population": 16,
+    "read_cpu_us": {
+     "max": 186447,
+     "median": 159612,
+     "min": 159125,
+     "p95": 186447
+    },
+    "read_wall_us": {
+     "max": 186840,
+     "median": 159859,
+     "min": 159309,
+     "p95": 186840
+    },
+    "receipts": 40,
+    "stored_read_wall_us": {
+     "max": 20711,
+     "median": 20537,
+     "min": 20259,
+     "p95": 20711
+    },
+    "stored_request_receipt_bytes": 123765
+   },
+   {
+    "body_bytes": 778691,
+    "decided": 0,
+    "drawing_bytes": 778691,
+    "drawing_gzip_bytes": 64188,
+    "graph": "world:generated:living-replay-measured-small_town-7",
+    "load_1m": {
+     "after": "5.79",
+     "before": "5.79"
+    },
+    "play_cpu_us": 114845,
+    "play_wall_us": 114957,
+    "population": 32,
+    "read_cpu_us": {
+     "max": 188622,
+     "median": 183340,
+     "min": 160482,
+     "p95": 188622
+    },
+    "read_wall_us": {
+     "max": 188930,
+     "median": 183564,
+     "min": 160606,
+     "p95": 188930
+    },
+    "receipts": 0,
+    "stored_read_wall_us": {
+     "max": 60378,
+     "median": 37755,
+     "min": 37395,
+     "p95": 60378
+    },
+    "stored_request_receipt_bytes": 0
+   },
+   {
+    "body_bytes": 796177,
+    "decided": 32,
+    "drawing_bytes": 795633,
+    "drawing_gzip_bytes": 63876,
+    "graph": "world:generated:living-replay-measured-small_town-7",
+    "load_1m": {
+     "after": "5.56",
+     "before": "5.79"
+    },
+    "play_cpu_us": 275633,
+    "play_wall_us": 275910,
+    "population": 32,
+    "read_cpu_us": {
+     "max": 356877,
+     "median": 352337,
+     "min": 331380,
+     "p95": 356877
+    },
+    "read_wall_us": {
+     "max": 357324,
+     "median": 352751,
+     "min": 331777,
+     "p95": 357324
+    },
+    "receipts": 68,
+    "stored_read_wall_us": {
+     "max": 60542,
+     "median": 37783,
+     "min": 37565,
+     "p95": 60542
+    },
+    "stored_request_receipt_bytes": 214398
+   },
+   {
+    "body_bytes": 1244496,
+    "decided": 0,
+    "drawing_bytes": 1244496,
+    "drawing_gzip_bytes": 99756,
+    "graph": "world:generated:living-replay-measured-small_town-7",
+    "load_1m": {
+     "after": "5.56",
+     "before": "5.56"
+    },
+    "play_cpu_us": 174778,
+    "play_wall_us": 174937,
+    "population": 52,
+    "read_cpu_us": {
+     "max": 321122,
+     "median": 304797,
+     "min": 302633,
+     "p95": 321122
+    },
+    "read_wall_us": {
+     "max": 321533,
+     "median": 305170,
+     "min": 303107,
+     "p95": 321533
+    },
+    "receipts": 0,
+    "stored_read_wall_us": {
+     "max": 82986,
+     "median": 61653,
+     "min": 60486,
+     "p95": 82986
+    },
+    "stored_request_receipt_bytes": 0
+   },
+   {
+    "body_bytes": 1275490,
+    "decided": 52,
+    "drawing_bytes": 1274606,
+    "drawing_gzip_bytes": 99018,
+    "graph": "world:generated:living-replay-measured-small_town-7",
+    "load_1m": {
+     "after": "5.44",
+     "before": "5.56"
+    },
+    "play_cpu_us": 572968,
+    "play_wall_us": 574235,
+    "population": 52,
+    "read_cpu_us": {
+     "max": 739052,
+     "median": 726242,
+     "min": 714357,
+     "p95": 739052
+    },
+    "read_wall_us": {
+     "max": 739905,
+     "median": 727350,
+     "min": 715254,
+     "p95": 739905
+    },
+    "receipts": 134,
+    "stored_read_wall_us": {
+     "max": 86951,
+     "median": 64555,
+     "min": 60612,
+     "p95": 86951
+    },
+    "stored_request_receipt_bytes": 423294
+   },
+   {
+    "body_bytes": 1243905,
+    "decided": 4,
+    "drawing_bytes": 1243837,
+    "drawing_gzip_bytes": 99687,
+    "graph": "world:generated:living-replay-measured-small_town-7",
+    "load_1m": {
+     "after": "5.44",
+     "before": "5.44"
+    },
+    "play_cpu_us": 228524,
+    "play_wall_us": 229346,
+    "population": 52,
+    "read_cpu_us": {
+     "max": 377872,
+     "median": 359022,
+     "min": 323359,
+     "p95": 377872
+    },
+    "read_wall_us": {
+     "max": 378382,
+     "median": 359438,
+     "min": 323759,
+     "p95": 378382
+    },
+    "receipts": 9,
+    "stored_read_wall_us": {
+     "max": 86162,
+     "median": 61125,
+     "min": 60779,
+     "p95": 86162
+    },
+    "stored_request_receipt_bytes": 28469
+   },
+   {
+    "body_bytes": 1239705,
+    "decided": 8,
+    "drawing_bytes": 1239569,
+    "drawing_gzip_bytes": 98486,
+    "graph": "world:generated:living-replay-measured-small_town-7",
+    "load_1m": {
+     "after": "5.4",
+     "before": "5.44"
+    },
+    "play_cpu_us": 245998,
+    "play_wall_us": 246264,
+    "population": 52,
+    "read_cpu_us": {
+     "max": 428309,
+     "median": 402593,
+     "min": 371328,
+     "p95": 428309
+    },
+    "read_wall_us": {
+     "max": 428958,
+     "median": 403045,
+     "min": 371773,
+     "p95": 428958
+    },
+    "receipts": 24,
+    "stored_read_wall_us": {
+     "max": 84362,
+     "median": 60600,
+     "min": 60077,
+     "p95": 84362
+    },
+    "stored_request_receipt_bytes": 71082
+   },
+   {
+    "body_bytes": 1249020,
+    "decided": 16,
+    "drawing_bytes": 1248748,
+    "drawing_gzip_bytes": 98119,
+    "graph": "world:generated:living-replay-measured-small_town-7",
+    "load_1m": {
+     "after": "5.69",
+     "before": "5.4"
+    },
+    "play_cpu_us": 408097,
+    "play_wall_us": 409406,
+    "population": 52,
+    "read_cpu_us": {
+     "max": 586519,
+     "median": 567455,
+     "min": 551494,
+     "p95": 586519
+    },
+    "read_wall_us": {
+     "max": 587333,
+     "median": 568316,
+     "min": 552253,
+     "p95": 587333
+    },
+    "receipts": 63,
+    "stored_read_wall_us": {
+     "max": 84296,
+     "median": 60987,
+     "min": 60626,
+     "p95": 84296
+    },
+    "stored_request_receipt_bytes": 194980
+   },
+   {
+    "body_bytes": 287130,
+    "decided": 0,
+    "drawing_bytes": 287130,
+    "drawing_gzip_bytes": 32802,
+    "graph": "world:generated:living-replay-measured-market_town-6",
+    "load_1m": {
+     "after": "5.69",
+     "before": "5.69"
+    },
+    "play_cpu_us": 56458,
+    "play_wall_us": 56547,
+    "population": 8,
+    "read_cpu_us": {
+     "max": 70184,
+     "median": 48155,
+     "min": 47741,
+     "p95": 70184
+    },
+    "read_wall_us": {
+     "max": 70266,
+     "median": 48243,
+     "min": 47779,
+     "p95": 70266
+    },
+    "receipts": 0,
+    "stored_read_wall_us": {
+     "max": 13273,
+     "median": 12929,
+     "min": 12741,
+     "p95": 13273
+    },
+    "stored_request_receipt_bytes": 0
+   },
+   {
+    "body_bytes": 294744,
+    "decided": 8,
+    "drawing_bytes": 294608,
+    "drawing_gzip_bytes": 33286,
+    "graph": "world:generated:living-replay-measured-market_town-6",
+    "load_1m": {
+     "after": "5.69",
+     "before": "5.69"
+    },
+    "play_cpu_us": 58229,
+    "play_wall_us": 58279,
+    "population": 8,
+    "read_cpu_us": {
+     "max": 104701,
+     "median": 82010,
+     "min": 81443,
+     "p95": 104701
+    },
+    "read_wall_us": {
+     "max": 104810,
+     "median": 82219,
+     "min": 81530,
+     "p95": 104810
+    },
+    "receipts": 19,
+    "stored_read_wall_us": {
+     "max": 34086,
+     "median": 13407,
+     "min": 13116,
+     "p95": 34086
+    },
+    "stored_request_receipt_bytes": 63866
+   },
+   {
+    "body_bytes": 482975,
+    "decided": 0,
+    "drawing_bytes": 482975,
+    "drawing_gzip_bytes": 47420,
+    "graph": "world:generated:living-replay-measured-market_town-6",
+    "load_1m": {
+     "after": "5.69",
+     "before": "5.69"
+    },
+    "play_cpu_us": 64977,
+    "play_wall_us": 65052,
+    "population": 16,
+    "read_cpu_us": {
+     "max": 121135,
+     "median": 99250,
+     "min": 97976,
+     "p95": 121135
+    },
+    "read_wall_us": {
+     "max": 121329,
+     "median": 99361,
+     "min": 98068,
+     "p95": 121329
+    },
+    "receipts": 0,
+    "stored_read_wall_us": {
+     "max": 44533,
+     "median": 22593,
+     "min": 22485,
+     "p95": 44533
+    },
+    "stored_request_receipt_bytes": 0
+   },
+   {
+    "body_bytes": 508496,
+    "decided": 16,
+    "drawing_bytes": 508224,
+    "drawing_gzip_bytes": 48898,
+    "graph": "world:generated:living-replay-measured-market_town-6",
+    "load_1m": {
+     "after": "5.69",
+     "before": "5.69"
+    },
+    "play_cpu_us": 168186,
+    "play_wall_us": 168428,
+    "population": 16,
+    "read_cpu_us": {
+     "max": 233589,
+     "median": 230954,
+     "min": 207136,
+     "p95": 233589
+    },
+    "read_wall_us": {
+     "max": 233879,
+     "median": 231183,
+     "min": 207341,
+     "p95": 233879
+    },
+    "receipts": 45,
+    "stored_read_wall_us": {
+     "max": 45665,
+     "median": 23981,
+     "min": 23617,
+     "p95": 45665
+    },
+    "stored_request_receipt_bytes": 147453
+   },
+   {
+    "body_bytes": 866714,
+    "decided": 0,
+    "drawing_bytes": 866714,
+    "drawing_gzip_bytes": 77052,
+    "graph": "world:generated:living-replay-measured-market_town-6",
+    "load_1m": {
+     "after": "5.71",
+     "before": "5.69"
+    },
+    "play_cpu_us": 126224,
+    "play_wall_us": 126358,
+    "population": 32,
+    "read_cpu_us": {
+     "max": 227910,
+     "median": 218392,
+     "min": 193634,
+     "p95": 227910
+    },
+    "read_wall_us": {
+     "max": 228732,
+     "median": 218701,
+     "min": 193877,
+     "p95": 228732
+    },
+    "receipts": 0,
+    "stored_read_wall_us": {
+     "max": 65989,
+     "median": 42546,
+     "min": 41825,
+     "p95": 65989
+    },
+    "stored_request_receipt_bytes": 0
+   },
+   {
+    "body_bytes": 857079,
+    "decided": 32,
+    "drawing_bytes": 856535,
+    "drawing_gzip_bytes": 71931,
+    "graph": "world:generated:living-replay-measured-market_town-6",
+    "load_1m": {
+     "after": "5.71",
+     "before": "5.71"
+    },
+    "play_cpu_us": 326595,
+    "play_wall_us": 326965,
+    "population": 32,
+    "read_cpu_us": {
+     "max": 444000,
+     "median": 430397,
+     "min": 427414,
+     "p95": 444000
+    },
+    "read_wall_us": {
+     "max": 445285,
+     "median": 430908,
+     "min": 427920,
+     "p95": 445285
+    },
+    "receipts": 86,
+    "stored_read_wall_us": {
+     "max": 61393,
+     "median": 41143,
+     "min": 40128,
+     "p95": 61393
+    },
+    "stored_request_receipt_bytes": 276561
+   },
+   {
+    "body_bytes": 1629651,
+    "decided": 0,
+    "drawing_bytes": 1629651,
+    "drawing_gzip_bytes": 134843,
+    "graph": "world:generated:living-replay-measured-market_town-6",
+    "load_1m": {
+     "after": "5.5",
+     "before": "5.71"
+    },
+    "play_cpu_us": 272945,
+    "play_wall_us": 273222,
+    "population": 64,
+    "read_cpu_us": {
+     "max": 459348,
+     "median": 422178,
+     "min": 413024,
+     "p95": 459348
+    },
+    "read_wall_us": {
+     "max": 459966,
+     "median": 423357,
+     "min": 413561,
+     "p95": 459966
+    },
+    "receipts": 0,
+    "stored_read_wall_us": {
+     "max": 111102,
+     "median": 105297,
+     "min": 79731,
+     "p95": 111102
+    },
+    "stored_request_receipt_bytes": 0
+   },
+   {
+    "body_bytes": 1646135,
+    "decided": 64,
+    "drawing_bytes": 1645047,
+    "drawing_gzip_bytes": 130656,
+    "graph": "world:generated:living-replay-measured-market_town-6",
+    "load_1m": {
+     "after": "5.62",
+     "before": "5.5"
+    },
+    "play_cpu_us": 850359,
+    "play_wall_us": 851424,
+    "population": 64,
+    "read_cpu_us": {
+     "max": 1059826,
+     "median": 1036769,
+     "min": 1013608,
+     "p95": 1059826
+    },
+    "read_wall_us": {
+     "max": 1061923,
+     "median": 1038433,
+     "min": 1015202,
+     "p95": 1061923
+    },
+    "receipts": 175,
+    "stored_read_wall_us": {
+     "max": 106931,
+     "median": 80407,
+     "min": 78254,
+     "p95": 106931
+    },
+    "stored_request_receipt_bytes": 559381
+   },
+   {
+    "body_bytes": 1879692,
+    "decided": 0,
+    "drawing_bytes": 1879692,
+    "drawing_gzip_bytes": 155376,
+    "graph": "world:generated:living-replay-measured-market_town-6",
+    "load_1m": {
+     "after": "5.97",
+     "before": "5.62"
+    },
+    "play_cpu_us": 327290,
+    "play_wall_us": 327770,
+    "population": 74,
+    "read_cpu_us": {
+     "max": 551820,
+     "median": 518219,
+     "min": 492905,
+     "p95": 551820
+    },
+    "read_wall_us": {
+     "max": 553813,
+     "median": 520136,
+     "min": 493724,
+     "p95": 553813
+    },
+    "receipts": 0,
+    "stored_read_wall_us": {
+     "max": 123247,
+     "median": 118201,
+     "min": 93261,
+     "p95": 123247
+    },
+    "stored_request_receipt_bytes": 0
+   },
+   {
+    "body_bytes": 1881634,
+    "decided": 74,
+    "drawing_bytes": 1880376,
+    "drawing_gzip_bytes": 146003,
+    "graph": "world:generated:living-replay-measured-market_town-6",
+    "load_1m": {
+     "after": "5.95",
+     "before": "5.97"
+    },
+    "play_cpu_us": 1084781,
+    "play_wall_us": 1086019,
+    "population": 74,
+    "read_cpu_us": {
+     "max": 1364800,
+     "median": 1355966,
+     "min": 1293789,
+     "p95": 1364800
+    },
+    "read_wall_us": {
+     "max": 1369522,
+     "median": 1358642,
+     "min": 1295807,
+     "p95": 1369522
+    },
+    "receipts": 233,
+    "stored_read_wall_us": {
+     "max": 126415,
+     "median": 114337,
+     "min": 90496,
+     "p95": 126415
+    },
+    "stored_request_receipt_bytes": 742074
+   },
+   {
+    "body_bytes": 1876518,
+    "decided": 4,
+    "drawing_bytes": 1876450,
+    "drawing_gzip_bytes": 154644,
+    "graph": "world:generated:living-replay-measured-market_town-6",
+    "load_1m": {
+     "after": "5.95",
+     "before": "5.95"
+    },
+    "play_cpu_us": 402950,
+    "play_wall_us": 403493,
+    "population": 74,
+    "read_cpu_us": {
+     "max": 626640,
+     "median": 617850,
+     "min": 565631,
+     "p95": 626640
+    },
+    "read_wall_us": {
+     "max": 628425,
+     "median": 619418,
+     "min": 568942,
+     "p95": 628425
+    },
+    "receipts": 10,
+    "stored_read_wall_us": {
+     "max": 126784,
+     "median": 120365,
+     "min": 93387,
+     "p95": 126784
+    },
+    "stored_request_receipt_bytes": 32569
+   },
+   {
+    "body_bytes": 1855100,
+    "decided": 8,
+    "drawing_bytes": 1854964,
+    "drawing_gzip_bytes": 152617,
+    "graph": "world:generated:living-replay-measured-market_town-6",
+    "load_1m": {
+     "after": "5.72",
+     "before": "5.95"
+    },
+    "play_cpu_us": 518135,
+    "play_wall_us": 519014,
+    "population": 74,
+    "read_cpu_us": {
+     "max": 736403,
+     "median": 705345,
+     "min": 696211,
+     "p95": 736403
+    },
+    "read_wall_us": {
+     "max": 739685,
+     "median": 706355,
+     "min": 697103,
+     "p95": 739685
+    },
+    "receipts": 24,
+    "stored_read_wall_us": {
+     "max": 119677,
+     "median": 117304,
+     "min": 91799,
+     "p95": 119677
+    },
+    "stored_request_receipt_bytes": 78761
+   },
+   {
+    "body_bytes": 1865040,
+    "decided": 16,
+    "drawing_bytes": 1864768,
+    "drawing_gzip_bytes": 150290,
+    "graph": "world:generated:living-replay-measured-market_town-6",
+    "load_1m": {
+     "after": "6.61",
+     "before": "5.72"
+    },
+    "play_cpu_us": 617782,
+    "play_wall_us": 618560,
+    "population": 74,
+    "read_cpu_us": {
+     "max": 854738,
+     "median": 844606,
+     "min": 837454,
+     "p95": 854738
+    },
+    "read_wall_us": {
+     "max": 857851,
+     "median": 845762,
+     "min": 838714,
+     "p95": 857851
+    },
+    "receipts": 57,
+    "stored_read_wall_us": {
+     "max": 133729,
+     "median": 126105,
+     "min": 93693,
+     "p95": 133729
+    },
+    "stored_request_receipt_bytes": 182877
+   },
+   {
+    "body_bytes": 293558,
+    "decided": 0,
+    "drawing_bytes": 293558,
+    "drawing_gzip_bytes": 35546,
+    "graph": "world:generated:living-replay-measured-market_town-1",
+    "load_1m": {
+     "after": "6.61",
+     "before": "6.61"
+    },
+    "play_cpu_us": 59926,
+    "play_wall_us": 60101,
+    "population": 8,
+    "read_cpu_us": {
+     "max": 47182,
+     "median": 46818,
+     "min": 46540,
+     "p95": 47182
+    },
+    "read_wall_us": {
+     "max": 47251,
+     "median": 46861,
+     "min": 46566,
+     "p95": 47251
+    },
+    "receipts": 0,
+    "stored_read_wall_us": {
+     "max": 37187,
+     "median": 13485,
+     "min": 13221,
+     "p95": 37187
+    },
+    "stored_request_receipt_bytes": 0
+   },
+   {
+    "body_bytes": 309219,
+    "decided": 8,
+    "drawing_bytes": 309083,
+    "drawing_gzip_bytes": 37293,
+    "graph": "world:generated:living-replay-measured-market_town-1",
+    "load_1m": {
+     "after": "6.61",
+     "before": "6.61"
+    },
+    "play_cpu_us": 71432,
+    "play_wall_us": 71505,
+    "population": 8,
+    "read_cpu_us": {
+     "max": 121478,
+     "median": 93855,
+     "min": 92626,
+     "p95": 121478
+    },
+    "read_wall_us": {
+     "max": 122096,
+     "median": 93994,
+     "min": 92790,
+     "p95": 122096
+    },
+    "receipts": 23,
+    "stored_read_wall_us": {
+     "max": 37352,
+     "median": 14148,
+     "min": 13733,
+     "p95": 37352
+    },
+    "stored_request_receipt_bytes": 72968
+   },
+   {
+    "body_bytes": 483404,
+    "decided": 0,
+    "drawing_bytes": 483404,
+    "drawing_gzip_bytes": 49242,
+    "graph": "world:generated:living-replay-measured-market_town-1",
+    "load_1m": {
+     "after": "6.61",
+     "before": "6.61"
+    },
+    "play_cpu_us": 63118,
+    "play_wall_us": 63174,
+    "population": 16,
+    "read_cpu_us": {
+     "max": 126097,
+     "median": 96698,
+     "min": 94823,
+     "p95": 126097
+    },
+    "read_wall_us": {
+     "max": 126370,
+     "median": 96943,
+     "min": 94938,
+     "p95": 126370
+    },
+    "receipts": 0,
+    "stored_read_wall_us": {
+     "max": 23233,
+     "median": 23160,
+     "min": 23059,
+     "p95": 23233
+    },
+    "stored_request_receipt_bytes": 0
+   },
+   {
+    "body_bytes": 481465,
+    "decided": 16,
+    "drawing_bytes": 481193,
+    "drawing_gzip_bytes": 47699,
+    "graph": "world:generated:living-replay-measured-market_town-1",
+    "load_1m": {
+     "after": "6.61",
+     "before": "6.61"
+    },
+    "play_cpu_us": 114568,
+    "play_wall_us": 114769,
+    "population": 16,
+    "read_cpu_us": {
+     "max": 190514,
+     "median": 171298,
+     "min": 156632,
+     "p95": 190514
+    },
+    "read_wall_us": {
+     "max": 191548,
+     "median": 172808,
+     "min": 156974,
+     "p95": 191548
+    },
+    "receipts": 31,
+    "stored_read_wall_us": {
+     "max": 49797,
+     "median": 23376,
+     "min": 23069,
+     "p95": 49797
+    },
+    "stored_request_receipt_bytes": 100508
+   },
+   {
+    "body_bytes": 862391,
+    "decided": 0,
+    "drawing_bytes": 862391,
+    "drawing_gzip_bytes": 78751,
+    "graph": "world:generated:living-replay-measured-market_town-1",
+    "load_1m": {
+     "after": "6.61",
+     "before": "6.61"
+    },
+    "play_cpu_us": 132513,
+    "play_wall_us": 132716,
+    "population": 32,
+    "read_cpu_us": {
+     "max": 219894,
+     "median": 215687,
+     "min": 190275,
+     "p95": 219894
+    },
+    "read_wall_us": {
+     "max": 220107,
+     "median": 216145,
+     "min": 190571,
+     "p95": 220107
+    },
+    "receipts": 0,
+    "stored_read_wall_us": {
+     "max": 69170,
+     "median": 42694,
+     "min": 42185,
+     "p95": 69170
+    },
+    "stored_request_receipt_bytes": 0
+   },
+   {
+    "body_bytes": 891323,
+    "decided": 32,
+    "drawing_bytes": 890779,
+    "drawing_gzip_bytes": 79060,
+    "graph": "world:generated:living-replay-measured-market_town-1",
+    "load_1m": {
+     "after": "6.32",
+     "before": "6.61"
+    },
+    "play_cpu_us": 377299,
+    "play_wall_us": 377824,
+    "population": 32,
+    "read_cpu_us": {
+     "max": 497375,
+     "median": 493180,
+     "min": 479593,
+     "p95": 497375
+    },
+    "read_wall_us": {
+     "max": 498353,
+     "median": 494092,
+     "min": 480120,
+     "p95": 498353
+    },
+    "receipts": 99,
+    "stored_read_wall_us": {
+     "max": 65355,
+     "median": 42810,
+     "min": 42346,
+     "p95": 65355
+    },
+    "stored_request_receipt_bytes": 311996
+   },
+   {
+    "body_bytes": 1586279,
+    "decided": 0,
+    "drawing_bytes": 1586279,
+    "drawing_gzip_bytes": 131342,
+    "graph": "world:generated:living-replay-measured-market_town-1",
+    "load_1m": {
+     "after": "6.86",
+     "before": "6.32"
+    },
+    "play_cpu_us": 260691,
+    "play_wall_us": 260981,
+    "population": 64,
+    "read_cpu_us": {
+     "max": 447379,
+     "median": 396482,
+     "min": 382466,
+     "p95": 447379
+    },
+    "read_wall_us": {
+     "max": 448862,
+     "median": 396983,
+     "min": 382914,
+     "p95": 448862
+    },
+    "receipts": 0,
+    "stored_read_wall_us": {
+     "max": 104837,
+     "median": 78174,
+     "min": 77430,
+     "p95": 104837
+    },
+    "stored_request_receipt_bytes": 0
+   },
+   {
+    "body_bytes": 1612881,
+    "decided": 64,
+    "drawing_bytes": 1611793,
+    "drawing_gzip_bytes": 128558,
+    "graph": "world:generated:living-replay-measured-market_town-1",
+    "load_1m": {
+     "after": "6.79",
+     "before": "6.86"
+    },
+    "play_cpu_us": 811711,
+    "play_wall_us": 812810,
+    "population": 64,
+    "read_cpu_us": {
+     "max": 1017693,
+     "median": 1008533,
+     "min": 976129,
+     "p95": 1017693
+    },
+    "read_wall_us": {
+     "max": 1019649,
+     "median": 1009988,
+     "min": 977389,
+     "p95": 1019649
+    },
+    "receipts": 167,
+    "stored_read_wall_us": {
+     "max": 104138,
+     "median": 77714,
+     "min": 76512,
+     "p95": 104138
+    },
+    "stored_request_receipt_bytes": 536326
+   },
+   {
+    "body_bytes": 2154294,
+    "decided": 0,
+    "drawing_bytes": 2154294,
+    "drawing_gzip_bytes": 268326,
+    "graph": "world:generated:living-replay-measured-market_town-1",
+    "load_1m": {
+     "after": "6.73",
+     "before": "6.79"
+    },
+    "play_cpu_us": 383347,
+    "play_wall_us": 383808,
+    "population": 88,
+    "read_cpu_us": {
+     "max": 582098,
+     "median": 573149,
+     "min": 545595,
+     "p95": 582098
+    },
+    "read_wall_us": {
+     "max": 582876,
+     "median": 573952,
+     "min": 546350,
+     "p95": 582876
+    },
+    "receipts": 0,
+    "stored_read_wall_us": {
+     "max": 140391,
+     "median": 136206,
+     "min": 107854,
+     "p95": 140391
+    },
+    "stored_request_receipt_bytes": 0
+   },
+   {
+    "body_bytes": 2186353,
+    "decided": 88,
+    "drawing_bytes": 2184857,
+    "drawing_gzip_bytes": 237109,
+    "graph": "world:generated:living-replay-measured-market_town-1",
+    "load_1m": {
+     "after": "7.06",
+     "before": "6.73"
+    },
+    "play_cpu_us": 1244051,
+    "play_wall_us": 1245648,
+    "population": 88,
+    "read_cpu_us": {
+     "max": 1559188,
+     "median": 1499939,
+     "min": 1474800,
+     "p95": 1559188
+    },
+    "read_wall_us": {
+     "max": 1561481,
+     "median": 1502413,
+     "min": 1476637,
+     "p95": 1561481
+    },
+    "receipts": 236,
+    "stored_read_wall_us": {
+     "max": 145022,
+     "median": 136462,
+     "min": 107217,
+     "p95": 145022
+    },
+    "stored_request_receipt_bytes": 751507
+   },
+   {
+    "body_bytes": 2151592,
+    "decided": 4,
+    "drawing_bytes": 2151524,
+    "drawing_gzip_bytes": 272518,
+    "graph": "world:generated:living-replay-measured-market_town-1",
+    "load_1m": {
+     "after": "6.74",
+     "before": "7.06"
+    },
+    "play_cpu_us": 417905,
+    "play_wall_us": 418495,
+    "population": 88,
+    "read_cpu_us": {
+     "max": 685754,
+     "median": 669725,
+     "min": 648504,
+     "p95": 685754
+    },
+    "read_wall_us": {
+     "max": 686960,
+     "median": 670565,
+     "min": 649466,
+     "p95": 686960
+    },
+    "receipts": 10,
+    "stored_read_wall_us": {
+     "max": 138940,
+     "median": 136878,
+     "min": 106669,
+     "p95": 138940
+    },
+    "stored_request_receipt_bytes": 30848
+   },
+   {
+    "body_bytes": 2155926,
+    "decided": 8,
+    "drawing_bytes": 2155790,
+    "drawing_gzip_bytes": 280193,
+    "graph": "world:generated:living-replay-measured-market_town-1",
+    "load_1m": {
+     "after": "6.76",
+     "before": "6.74"
+    },
+    "play_cpu_us": 503806,
+    "play_wall_us": 504443,
+    "population": 88,
+    "read_cpu_us": {
+     "max": 753905,
+     "median": 731299,
+     "min": 694299,
+     "p95": 753905
+    },
+    "read_wall_us": {
+     "max": 755332,
+     "median": 732324,
+     "min": 695159,
+     "p95": 755332
+    },
+    "receipts": 16,
+    "stored_read_wall_us": {
+     "max": 138572,
+     "median": 136868,
+     "min": 107871,
+     "p95": 138572
+    },
+    "stored_request_receipt_bytes": 49340
+   },
+   {
+    "body_bytes": 2159367,
+    "decided": 16,
+    "drawing_bytes": 2159095,
+    "drawing_gzip_bytes": 267925,
+    "graph": "world:generated:living-replay-measured-market_town-1",
+    "load_1m": {
+     "after": "6.62",
+     "before": "6.76"
+    },
+    "play_cpu_us": 519894,
+    "play_wall_us": 520568,
+    "population": 88,
+    "read_cpu_us": {
+     "max": 797900,
+     "median": 791581,
+     "min": 784051,
+     "p95": 797900
+    },
+    "read_wall_us": {
+     "max": 798998,
+     "median": 792796,
+     "min": 785455,
+     "p95": 798998
+    },
+    "receipts": 28,
+    "stored_read_wall_us": {
+     "max": 141649,
+     "median": 136583,
+     "min": 107655,
+     "p95": 141649
+    },
+    "stored_request_receipt_bytes": 86419
+   },
+   {
+    "body_bytes": 334276,
+    "decided": 0,
+    "drawing_bytes": 334276,
+    "drawing_gzip_bytes": 44144,
+    "graph": "world:generated:living-replay-measured-stress-0",
+    "load_1m": {
+     "after": "6.62",
+     "before": "6.62"
+    },
+    "play_cpu_us": 71930,
+    "play_wall_us": 72037,
+    "population": 8,
+    "read_cpu_us": {
+     "max": 79035,
+     "median": 52996,
+     "min": 52973,
+     "p95": 79035
+    },
+    "read_wall_us": {
+     "max": 79109,
+     "median": 53049,
+     "min": 53023,
+     "p95": 79109
+    },
+    "receipts": 0,
+    "stored_read_wall_us": {
+     "max": 40560,
+     "median": 15222,
+     "min": 14723,
+     "p95": 40560
+    },
+    "stored_request_receipt_bytes": 0
+   },
+   {
+    "body_bytes": 341480,
+    "decided": 8,
+    "drawing_bytes": 341344,
+    "drawing_gzip_bytes": 45000,
+    "graph": "world:generated:living-replay-measured-stress-0",
+    "load_1m": {
+     "after": "6.62",
+     "before": "6.62"
+    },
+    "play_cpu_us": 65132,
+    "play_wall_us": 65255,
+    "population": 8,
+    "read_cpu_us": {
+     "max": 121172,
+     "median": 90782,
+     "min": 87915,
+     "p95": 121172
+    },
+    "read_wall_us": {
+     "max": 121423,
+     "median": 90961,
+     "min": 88022,
+     "p95": 121423
+    },
+    "receipts": 17,
+    "stored_read_wall_us": {
+     "max": 15847,
+     "median": 15387,
+     "min": 15240,
+     "p95": 15847
+    },
+    "stored_request_receipt_bytes": 55135
+   },
+   {
+    "body_bytes": 525401,
+    "decided": 0,
+    "drawing_bytes": 525401,
+    "drawing_gzip_bytes": 58281,
+    "graph": "world:generated:living-replay-measured-stress-0",
+    "load_1m": {
+     "after": "6.62",
+     "before": "6.62"
+    },
+    "play_cpu_us": 98473,
+    "play_wall_us": 98598,
+    "population": 16,
+    "read_cpu_us": {
+     "max": 133246,
+     "median": 103855,
+     "min": 103415,
+     "p95": 133246
+    },
+    "read_wall_us": {
+     "max": 133377,
+     "median": 103965,
+     "min": 103512,
+     "p95": 133377
+    },
+    "receipts": 0,
+    "stored_read_wall_us": {
+     "max": 25406,
+     "median": 24875,
+     "min": 24726,
+     "p95": 25406
+    },
+    "stored_request_receipt_bytes": 0
+   },
+   {
+    "body_bytes": 528670,
+    "decided": 16,
+    "drawing_bytes": 528398,
+    "drawing_gzip_bytes": 56967,
+    "graph": "world:generated:living-replay-measured-stress-0",
+    "load_1m": {
+     "after": "6.62",
+     "before": "6.62"
+    },
+    "play_cpu_us": 170722,
+    "play_wall_us": 170962,
+    "population": 16,
+    "read_cpu_us": {
+     "max": 214474,
+     "median": 188079,
+     "min": 187625,
+     "p95": 214474
+    },
+    "read_wall_us": {
+     "max": 214728,
+     "median": 188353,
+     "min": 187800,
+     "p95": 214728
+    },
+    "receipts": 40,
+    "stored_read_wall_us": {
+     "max": 48942,
+     "median": 24519,
+     "min": 24128,
+     "p95": 48942
+    },
+    "stored_request_receipt_bytes": 125381
+   },
+   {
+    "body_bytes": 901216,
+    "decided": 0,
+    "drawing_bytes": 901216,
+    "drawing_gzip_bytes": 87127,
+    "graph": "world:generated:living-replay-measured-stress-0",
+    "load_1m": {
+     "after": "6.65",
+     "before": "6.62"
+    },
+    "play_cpu_us": 174107,
+    "play_wall_us": 174326,
+    "population": 32,
+    "read_cpu_us": {
+     "max": 236373,
+     "median": 227321,
+     "min": 200713,
+     "p95": 236373
+    },
+    "read_wall_us": {
+     "max": 236791,
+     "median": 227560,
+     "min": 200957,
+     "p95": 236791
+    },
+    "receipts": 0,
+    "stored_read_wall_us": {
+     "max": 71026,
+     "median": 43803,
+     "min": 43355,
+     "p95": 71026
+    },
+    "stored_request_receipt_bytes": 0
+   },
+   {
+    "body_bytes": 911033,
+    "decided": 32,
+    "drawing_bytes": 910489,
+    "drawing_gzip_bytes": 85094,
+    "graph": "world:generated:living-replay-measured-stress-0",
+    "load_1m": {
+     "after": "6.65",
+     "before": "6.65"
+    },
+    "play_cpu_us": 377123,
+    "play_wall_us": 377593,
+    "population": 32,
+    "read_cpu_us": {
+     "max": 488363,
+     "median": 462998,
+     "min": 434546,
+     "p95": 488363
+    },
+    "read_wall_us": {
+     "max": 491688,
+     "median": 463906,
+     "min": 435167,
+     "p95": 491688
+    },
+    "receipts": 85,
+    "stored_read_wall_us": {
+     "max": 94270,
+     "median": 46905,
+     "min": 43473,
+     "p95": 94270
+    },
+    "stored_request_receipt_bytes": 270832
+   },
+   {
+    "body_bytes": 1648141,
+    "decided": 0,
+    "drawing_bytes": 1648141,
+    "drawing_gzip_bytes": 144834,
+    "graph": "world:generated:living-replay-measured-stress-0",
+    "load_1m": {
+     "after": "6.59",
+     "before": "6.65"
+    },
+    "play_cpu_us": 357154,
+    "play_wall_us": 362449,
+    "population": 64,
+    "read_cpu_us": {
+     "max": 460570,
+     "median": 430248,
+     "min": 422685,
+     "p95": 460570
+    },
+    "read_wall_us": {
+     "max": 461237,
+     "median": 431230,
+     "min": 423169,
+     "p95": 461237
+    },
+    "receipts": 0,
+    "stored_read_wall_us": {
+     "max": 127067,
+     "median": 108710,
+     "min": 82121,
+     "p95": 127067
+    },
+    "stored_request_receipt_bytes": 0
+   },
+   {
+    "body_bytes": 1691517,
+    "decided": 64,
+    "drawing_bytes": 1690429,
+    "drawing_gzip_bytes": 142432,
+    "graph": "world:generated:living-replay-measured-stress-0",
+    "load_1m": {
+     "after": "6.63",
+     "before": "6.59"
+    },
+    "play_cpu_us": 985486,
+    "play_wall_us": 986624,
+    "population": 64,
+    "read_cpu_us": {
+     "max": 1193097,
+     "median": 1173189,
+     "min": 1146449,
+     "p95": 1193097
+    },
+    "read_wall_us": {
+     "max": 1194704,
+     "median": 1174472,
+     "min": 1148148,
+     "p95": 1194704
+    },
+    "receipts": 198,
+    "stored_read_wall_us": {
+     "max": 112466,
+     "median": 84345,
+     "min": 81830,
+     "p95": 112466
+    },
+    "stored_request_receipt_bytes": 624075
+   },
+   {
+    "body_bytes": 3165286,
+    "decided": 0,
+    "drawing_bytes": 3165286,
+    "drawing_gzip_bytes": 607892,
+    "graph": "world:generated:living-replay-measured-stress-0",
+    "load_1m": {
+     "after": "6.37",
+     "before": "6.63"
+    },
+    "play_cpu_us": 652979,
+    "play_wall_us": 653665,
+    "population": 128,
+    "read_cpu_us": {
+     "max": 937216,
+     "median": 906601,
+     "min": 872971,
+     "p95": 937216
+    },
+    "read_wall_us": {
+     "max": 939107,
+     "median": 908181,
+     "min": 874173,
+     "p95": 939107
+    },
+    "receipts": 0,
+    "stored_read_wall_us": {
+     "max": 201958,
+     "median": 196642,
+     "min": 196220,
+     "p95": 201958
+    },
+    "stored_request_receipt_bytes": 0
+   },
+   {
+    "body_bytes": 3208656,
+    "decided": 128,
+    "drawing_bytes": 3206480,
+    "drawing_gzip_bytes": 593239,
+    "graph": "world:generated:living-replay-measured-stress-0",
+    "load_1m": {
+     "after": "6.66",
+     "before": "6.37"
+    },
+    "play_cpu_us": 2325805,
+    "play_wall_us": 2329170,
+    "population": 128,
+    "read_cpu_us": {
+     "max": 2703659,
+     "median": 2670078,
+     "min": 2643917,
+     "p95": 2703659
+    },
+    "read_wall_us": {
+     "max": 2707562,
+     "median": 2674657,
+     "min": 2647387,
+     "p95": 2707562
+    },
+    "receipts": 350,
+    "stored_read_wall_us": {
+     "max": 232423,
+     "median": 195985,
+     "min": 156905,
+     "p95": 232423
+    },
+    "stored_request_receipt_bytes": 1114647
+   },
+   {
+    "body_bytes": 3160181,
+    "decided": 4,
+    "drawing_bytes": 3160113,
+    "drawing_gzip_bytes": 607828,
+    "graph": "world:generated:living-replay-measured-stress-0",
+    "load_1m": {
+     "after": "6.42",
+     "before": "6.66"
+    },
+    "play_cpu_us": 613488,
+    "play_wall_us": 614204,
+    "population": 128,
+    "read_cpu_us": {
+     "max": 1019259,
+     "median": 985015,
+     "min": 973840,
+     "p95": 1019259
+    },
+    "read_wall_us": {
+     "max": 1020436,
+     "median": 986338,
+     "min": 975232,
+     "p95": 1020436
+    },
+    "receipts": 6,
+    "stored_read_wall_us": {
+     "max": 225962,
+     "median": 197335,
+     "min": 159361,
+     "p95": 225962
+    },
+    "stored_request_receipt_bytes": 19235
+   },
+   {
+    "body_bytes": 3164769,
+    "decided": 8,
+    "drawing_bytes": 3164633,
+    "drawing_gzip_bytes": 605706,
+    "graph": "world:generated:living-replay-measured-stress-0",
+    "load_1m": {
+     "after": "6.54",
+     "before": "6.42"
+    },
+    "play_cpu_us": 956971,
+    "play_wall_us": 957841,
+    "population": 128,
+    "read_cpu_us": {
+     "max": 1332496,
+     "median": 1327868,
+     "min": 1274162,
+     "p95": 1332496
+    },
+    "read_wall_us": {
+     "max": 1334249,
+     "median": 1329248,
+     "min": 1275393,
+     "p95": 1334249
+    },
+    "receipts": 32,
+    "stored_read_wall_us": {
+     "max": 201265,
+     "median": 197726,
+     "min": 195410,
+     "p95": 201265
+    },
+    "stored_request_receipt_bytes": 104449
+   },
+   {
+    "body_bytes": 3161722,
+    "decided": 16,
+    "drawing_bytes": 3161450,
+    "drawing_gzip_bytes": 605291,
+    "graph": "world:generated:living-replay-measured-stress-0",
+    "load_1m": {
+     "after": "6.56",
+     "before": "6.54"
+    },
+    "play_cpu_us": 1087955,
+    "play_wall_us": 1089061,
+    "population": 128,
+    "read_cpu_us": {
+     "max": 1558275,
+     "median": 1470330,
+     "min": 1462024,
+     "p95": 1558275
+    },
+    "read_wall_us": {
+     "max": 1562230,
+     "median": 1472255,
+     "min": 1463515,
+     "p95": 1562230
+    },
+    "receipts": 43,
+    "stored_read_wall_us": {
+     "max": 202647,
+     "median": 198572,
+     "min": 194251,
+     "p95": 202647
+    },
+    "stored_request_receipt_bytes": 140056
+   }
+  ],
+  "repeats": 5,
+  "script": "scripts/measure_living_comparison_replay.py",
+  "source": {
+   "changed_paths": [
+    "assets/catalogs/society-comparison-cost/society-comparison-reading.v1.json",
+    "exulanica/api/routes/society_comparisons.py",
+    "exulanica/world/society_comparison_reading.py",
+    "scripts/measure_living_comparison_replay.py",
+    "tests/test_catalog_provenance.py",
+    "tests/test_comparison_reading_family.py",
+    "tests/test_living_town_comparison_capacity_postgres.py",
+    "tests/test_measure_living_comparison_replay.py"
+   ],
+   "drawing_code_sha256": "5f2da2dbbb1bb15a2da26b8fbd1616d112f643966d1fd80c67eb1d3bffb11094",
+   "head": "652dc1bc134aca13b32d0f1f90e8f21124dd2499"
+  },
+  "stress_measured": true,
+  "surveyed_populations": {
+   "market_town": [
+    56,
+    64,
+    66,
+    72,
+    74,
+    82,
+    82,
+    88
+   ],
+   "small_town": [
+    30,
+    32,
+    36,
+    38,
+    38,
+    46,
+    48,
+    52
+   ]
+  },
+  "window_ticks": 60
+ },
+ "record_sha256": "209e0dc0605ca0605b137faadfbf9069f85ba60935ff1079ef11959cc1d1e6ef"
+}
