@@ -1017,6 +1017,78 @@ def district_version(owner) -> uuid.UUID:
     return version_id
 
 
+# -- world projects -------------------------------------------------------------------------------
+
+
+def _world_project(owner) -> dict[str, Any]:
+    """A project in the owner's world with one goal, the goal shared (API)."""
+    if "world_project" not in owner.memo:
+        version_id = _plain_version(owner)
+        project = _ok(
+            in_world(
+                owner,
+                "POST",
+                "/world/projects",
+                json={"title": "existence", "version_id": str(version_id)},
+            ),
+            201,
+        )
+        route = f"/world/projects/{project['project_id']}"
+        item = _ok(
+            in_world(
+                owner,
+                "POST",
+                f"{route}/items",
+                json={
+                    "base_revision": project["revision"],
+                    "kind": "goal",
+                    "basis": "user_statement",
+                    "text": "a quiet square",
+                },
+            ),
+            201,
+        )
+        shared = _ok(
+            in_world(
+                owner,
+                "POST",
+                f"{route}/shares",
+                json={"base_revision": item["project_revision"], "item_ids": [item["item_id"]]},
+            ),
+            200,
+        )
+        owner.memo["world_project"] = {
+            "/world/projects/{project_id}": project["project_id"],
+            "/world/projects/{project_id}/items/{item_id}": item["item_id"],
+            "/world/projects/{project_id}/shares/{share_id}": shared["shares"][0]["share_id"],
+        }
+    return owner.memo["world_project"]
+
+
+def world_project(owner) -> str:
+    return _world_project(owner)["/world/projects/{project_id}"]
+
+
+def world_project_item(owner) -> dict[str, Any]:
+    made = _world_project(owner)
+    return {
+        "/world/projects/{project_id}": made["/world/projects/{project_id}"],
+        "/world/projects/{project_id}/items/{item_id}": made[
+            "/world/projects/{project_id}/items/{item_id}"
+        ],
+    }
+
+
+def world_project_share(owner) -> dict[str, Any]:
+    made = _world_project(owner)
+    return {
+        "/world/projects/{project_id}": made["/world/projects/{project_id}"],
+        "/world/projects/{project_id}/shares/{share_id}": made[
+            "/world/projects/{project_id}/shares/{share_id}"
+        ],
+    }
+
+
 # -- requests made from the owner's own objects ----------------------------------------------------
 
 

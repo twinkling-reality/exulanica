@@ -46,6 +46,15 @@ So this module creates the role and grants it exactly what it needs:
     and detach rows, with the owner's rights, so every change has an event that records it. With
     INSERT or UPDATE the runtime could empty a world's references with no detach, or point one
     back at an old attachment and revive receipts a person withdrew by removing it.
+*   **SELECT only on its own workspace's durable spending, nothing on an authority or the
+    ledger, and EXECUTE on five functions.** Migration 0124 keeps the allowance of money every
+    process shares. The runtime admits, dispatches and settles attempts and opens and closes
+    bounds through owner-rights functions that act for its session's workspace
+    (:data:`SPENDING_RUNTIME_FUNCTIONS`); with INSERT or UPDATE on a table it could grant itself
+    money or put back an allowance it spent. An authority's committed total is every workspace's
+    spending together and the ledger's sequence counts every workspace's steps, so neither role
+    reads :data:`SPENDING_ADMIN_TABLES`; both learn an authority's state, and no amount, from
+    :data:`SPENDING_READ_FUNCTIONS`.
 *   **No ownership and no BYPASSRLS**, which is the whole point.
 
 Every statement here is built with :mod:`psycopg.sql` rather than an f-string. Role names,
@@ -72,6 +81,10 @@ __all__ = [
     "PURGE_ROLE",
     "READ_ONLY_TABLES",
     "RUNTIME_ROLE",
+    "SPENDING_ADMIN_TABLES",
+    "SPENDING_READ_FUNCTIONS",
+    "SPENDING_RUNTIME_FUNCTIONS",
+    "SPENDING_TABLES",
     "RuntimeRoleUnsafe",
     "assert_runtime_role",
     "grant_workspace_partition",
@@ -92,6 +105,26 @@ EXECUTOR_ROLE: Final = "exulanica_ro"
 #: have, and the privilege is a READ: see :func:`provision_purge_role`.
 PURGE_ROLE: Final = "exulanica_purge"
 
+#: Migration 0124's durable spending a workspace's runtime reads, row-level security keeping it to
+#: its own rows: its grants and bounds, what each committed, their revocations, its reservations.
+SPENDING_TABLES: Final = (
+    "spending_grant",
+    "spending_grant_state",
+    "spending_grant_revocation",
+    "spending_reservation",
+)
+
+#: Migration 0124's authority tables and ledger, which no runtime or read-only role reads: an
+#: authority's terms, state and revocation hold every workspace's spending together, and the
+#: ledger's sequence counts every workspace's steps.
+SPENDING_ADMIN_TABLES: Final = (
+    "spending_authority",
+    "spending_authority_term",
+    "spending_authority_state",
+    "spending_authority_revocation",
+    "spending_event",
+)
+
 #: Tables the runtime may read and may not write. See the module docstring for why each. Every
 #: registry table in :data:`exulanica.db.registries.REGISTRY_TABLES` is one; the rest are these.
 READ_ONLY_TABLES: Final = (
@@ -101,7 +134,26 @@ READ_ONLY_TABLES: Final = (
     "schema_migrations",
     "baked_tile",
     "saved_world_source_current_membership",
+    # Migration 0124's durable spending: the runtime reads its own workspace's rows and changes
+    # them only through the functions in SPENDING_RUNTIME_FUNCTIONS. With INSERT or UPDATE it could
+    # grant itself money, or put back an allowance it spent.
+    *SPENDING_TABLES,
 )
+
+#: What the runtime may call on migration 0124's durable spending: admit, dispatch and settle an
+#: attempt, and open and close a bound, each with its owner's rights and each acting for the
+#: session's workspace only. Issuing, granting, revoking, reconciling and reauthorizing are an
+#: operator's, and no runtime role may execute them.
+SPENDING_RUNTIME_FUNCTIONS: Final = (
+    ("spending_admit", "uuid,uuid,text,uuid,text,text,text,numeric,text,jsonb"),
+    ("spending_dispatch", "uuid,uuid,text,jsonb"),
+    ("spending_settle", "uuid,uuid,text,text,numeric,integer,integer,jsonb"),
+    ("spending_open_bound", "uuid,text,text,numeric,integer,timestamptz,text,text"),
+    ("spending_close_bound", "uuid,uuid,text,text"),
+)
+
+#: What the runtime and the read-only role may read of an authority: its state, and no amount.
+SPENDING_READ_FUNCTIONS: Final = (("spending_authority_facts", ""),)
 
 #: Tables the runtime may read and append to and may not update. See the module docstring.
 INSERT_ONLY_TABLES: Final = (
@@ -154,6 +206,16 @@ INSERT_ONLY_TABLES: Final = (
     "world_traffic_signal_decision_request",
     "world_traffic_signal_decision",
     "world_traffic_signal_segment",
+    # Migration 0127 appends a project's bindings and what each item was drawn from, and refuses
+    # every update and delete of either. An item's revisions are appended by the runtime and
+    # erased only by the owner-rights trigger that deletes the item, never updated by the runtime.
+    "world_project_binding",
+    "world_project_item_revision",
+    "world_project_item_source",
+    # Migration 0127 keeps what a remembered answer about a world's people cited, and whom its
+    # labels stood for, and refuses every update and delete of either.
+    "companion_answer_simulation_citation",
+    "companion_answer_simulation_label",
     # Migration 0130 appends a started comparison's one cancellation and each start of its runs,
     # and refuses every update and delete of either.
     "comparison_cancellation",
@@ -417,7 +479,13 @@ def provision_runtime_role(
         )
         revoke_account_access(connection, role=role)
         _grant_caption_purge_checks(connection, schema, role_name)
+        for table in sorted(_present_tables(connection, SPENDING_ADMIN_TABLES)):
+            connection.execute(
+                sql.SQL("revoke all on {} from {}").format(sql.Identifier(table), role_name)
+            )
+        _grant_functions(connection, schema, role_name, SPENDING_READ_FUNCTIONS)
         if not read_only:
+            _grant_functions(connection, schema, role_name, SPENDING_RUNTIME_FUNCTIONS)
             connection.execute(
                 sql.SQL("grant usage, select on all sequences in schema {} to {}").format(
                     schema, role_name

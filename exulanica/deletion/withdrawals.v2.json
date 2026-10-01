@@ -1,6 +1,6 @@
 {
   "profile": "exulanica.restore-withdrawal-catalog/v2",
-  "note": "Every withdrawal a person can make that lives outside the tombstone table, which a restore from an older backup would otherwise undo. A restore checkpoint of profile exulanica.restore-tombstone-checkpoint/v2 carries each row this names, and replay writes each one again into the restored database, before any tombstone, by the same statement the product writes: a column kind sets the columns a withdrawal sets on a row whose withdrawal is still open, and an event kind appends the withdrawal's own row. `withdrawn` is the condition a withdrawn row meets; `carried_when` narrows it; `workspace` names the column that says which workspace a row belongs to, or null for a row no workspace owns. A condition with `of` tests a column of the row the carried row names in another table, joined on the `on` columns. An event kind's `ends` names the rows the withdrawal ends, and `order` the column that orders a chain of decisions. `writer` names the product's own writer that writes the carried row, where a row alone is not the whole withdrawal; `continues` names the writer that continues a chain whose restored last decision the carried row cannot follow, because a decision was made after the backup. Both are names of the writers the restore command gives replay (WRITERS in exulanica/orchestration/restore.py); replay refuses, when it starts and before it writes anything, writers other than exactly the names this catalog uses (require_writers in exulanica/deletion/withdrawals.py). `excluded` names every other withdrawal-shaped table or column in the schema and why it is not carried; tests/test_restore_replay_withdrawal_catalog.py fails on any the catalog neither carries nor excludes.",
+  "note": "Every withdrawal a person can make that lives outside the tombstone table, which a restore from an older backup would otherwise undo. A restore checkpoint of profile exulanica.restore-tombstone-checkpoint/v2 carries each row this names, and replay writes each one again into the restored database, before any tombstone, by the same statement the product writes: a column kind sets the columns a withdrawal sets on a row whose withdrawal is still open, and an event kind appends the withdrawal's own row. `withdrawn` is the condition a withdrawn row meets; `carried_when` narrows it; `workspace` names the column that says which workspace a row belongs to, or null for a row no workspace owns. A condition with `of` tests a column of the row the carried row names in another table, joined on the `on` columns. An event kind's `ends` names the rows the withdrawal ends, and `order` the column that orders a chain of decisions; a column kind's `order` is the column its rows are replayed by, earliest first, so a later withdrawal's cascade finds what an earlier one already ended. `writer` names the product's own writer that writes the carried row, where a row alone is not the whole withdrawal; `continues` names the writer that continues a chain whose restored last decision the carried row cannot follow, because a decision was made after the backup. Both are names of the writers the restore command gives replay (WRITERS in exulanica/orchestration/restore.py); replay refuses, when it starts and before it writes anything, writers other than exactly the names this catalog uses (require_writers in exulanica/deletion/withdrawals.py). `excluded` names every other withdrawal-shaped table or column in the schema and why it is not carried; tests/test_restore_replay_withdrawal_catalog.py fails on any the catalog neither carries nor excludes.",
   "kinds": [
     {
       "kind": "model_right",
@@ -19,6 +19,41 @@
       "columns": ["withdrawn_at", "withdrawn_by"],
       "withdrawn": {"column": "withdrawn_at", "is": "not null"},
       "workspace": "workspace_id"
+    },
+    {
+      "kind": "project_context_share",
+      "table": "world_project_share",
+      "shape": "column",
+      "note": "A person stopping a share of a project or an item (migration 0127), and the shares a deletion closes, whatever closed them. A share is never reopened, so a restore cannot show another person what its owner stopped sharing. First of the project kinds, earliest first, so a later deletion's cascade finds the shares an earlier stop or deletion closed already closed.",
+      "identity": ["workspace_id", "share_id"],
+      "columns": ["withdrawn_at"],
+      "withdrawn": {"column": "withdrawn_at", "is": "not null"},
+      "workspace": "workspace_id",
+      "order": "withdrawn_at"
+    },
+    {
+      "kind": "project_context_item",
+      "table": "world_project_item",
+      "shape": "column",
+      "note": "A person deleting a project item, rejecting a suggestion, or deleting the project, Companion answer or item it was drawn from (migration 0127). The update erases every revision's words and references and withdraws the items copied from it with the same instant. Earliest first and ahead of projects and Companion memory, so a later deletion's cascade finds what an earlier one ended already ended. One reached through a tombstone names it and is re-derived by it.",
+      "identity": ["workspace_id", "item_id"],
+      "columns": ["status", "withdrawn_at", "withdrawn_reason"],
+      "withdrawn": {"column": "status", "in": ["withdrawn"]},
+      "carried_when": [{"column": "withdrawn_by", "is": "null"}],
+      "workspace": "workspace_id",
+      "order": "withdrawn_at"
+    },
+    {
+      "kind": "project_context_project",
+      "table": "world_project",
+      "shape": "column",
+      "note": "A person deleting a world project (migration 0127). The update erases the project's title and request digest and, by owner-rights triggers, withdraws every item still open and closes every share at the same instant. Earliest first. A workspace tombstone's deletion names its tombstone and is re-derived by it.",
+      "identity": ["workspace_id", "project_id"],
+      "columns": ["withdrawn_at"],
+      "withdrawn": {"column": "withdrawn_at", "is": "not null"},
+      "carried_when": [{"column": "withdrawn_by", "is": "null"}],
+      "workspace": "workspace_id",
+      "order": "withdrawn_at"
     },
     {
       "kind": "companion_memory",
@@ -148,6 +183,28 @@
       "ends": {"table": "assertion", "columns": ["workspace_id", "assertion_id"]},
       "order": null,
       "writer": "retract"
+    },
+    {
+      "kind": "spending_authority",
+      "table": "spending_authority_revocation",
+      "shape": "event",
+      "note": "An operator revoking a spending authority (migration 0124): nothing more is admitted under it, and the row is the whole revocation. The spending witness holds it as well, for a restore made without a checkpoint.",
+      "identity": ["authority_id"],
+      "withdrawn": {"column": "revoked_at", "is": "not null"},
+      "workspace": null,
+      "ends": {"table": "spending_authority", "columns": ["authority_id"]},
+      "order": null
+    },
+    {
+      "kind": "spending_grant",
+      "table": "spending_grant_revocation",
+      "shape": "event",
+      "note": "An operator revoking a workspace's spending grant, or a bound closed under one (migration 0124): nothing more is admitted under it, and the row is the whole revocation.",
+      "identity": ["workspace_id", "grant_id"],
+      "withdrawn": {"column": "revoked_at", "is": "not null"},
+      "workspace": "workspace_id",
+      "ends": {"table": "spending_grant", "columns": ["workspace_id", "grant_id"]},
+      "order": null
     }
   ],
   "excluded": [
@@ -198,6 +255,10 @@
     {
       "table": "saved_world_source_detach_operation",
       "reason": "The operation record of saved_world_source_detach."
+    },
+    {
+      "table": "spending_event",
+      "reason": "The durable spending ledger's chain (migration 0124). Its revocation events record revocations whose own rows are carried (spending_authority, spending_grant); a restored ledger is carried forward from the spending witness, never replayed from a checkpoint."
     }
   ]
 }

@@ -428,9 +428,10 @@ and none is sent to a model.
 It answers for the purposeful society and the living town profiles named by the words catalog,
 using the living resident's recorded home, work, activity and model decision events without
 exposing need levels or place identifiers. It refuses any other society by name
-(`society_profile_has_no_words`). An answer about the world's people is not kept in the Companion's memory,
-which holds photograph citations and saved names only. A remembered answer that cites nothing is
-drawn as a statement about the search, never as the person's past.
+(`society_profile_has_no_words`). The browser does not keep an answer about the world's people in
+the Companion's memory; the memory routes accept one with its simulation citations
+([conversation memory](#conversation-memory)). A remembered answer that cites nothing is drawn as a
+statement about the search, never as the person's past.
 
 ## Execution provenance
 
@@ -494,6 +495,19 @@ without granting a capability. The policy plane refuses its declared conversatio
 that key check does not detect arbitrary text hidden under an unrelated key. Source rights and
 hosted-request policy still govern model use.
 
+An answer about a world's simulated people is kept with what it cited instead
+([migration 0127](../exulanica/migrations/0127_a_world_project_keeps_what_its_person_chose.sql)):
+`POST /companion/memory/answers` takes the world asked about, the answer's `simulation` citations in
+reading order (result kind, version, inhabitant, event, tick, and the society input, placed object
+and version edit that explain an event where the answer named them) and its `inhabitants` and
+`spots` labels, all as ids; no event line is stored, because it is read again under the society's
+current authorization when the answer is drawn. An answer cites photographs or a simulation, never
+both; it names its world exactly when it cites a simulated record, and keeps labels only with one.
+A citation of a version whose source a deletion invalidated is refused
+`424 unavailable_society_input`, and a version or event this world does not hold is an unknown
+reference. A correction keeps them as it keeps photograph citations. `AnswerView` returns the same
+fields, each citation with `truth_class` `simulation`.
+
 Stored citation bindings preserve the dependency through which source withdrawal reaches an
 answer. An answer with unresolved cited sources is not stored by dropping the unavailable citations.
 Deleting an answer withdraws its correction lineage as well, so a correction cannot keep the
@@ -523,7 +537,10 @@ and the no-penalty Later choice do not become permanent suppression after reload
 write is a durability failure, distinct from displaying a correctly supported answer.
 
 These mechanisms establish bounded conversation persistence. They do not by themselves establish
-autonomous activity, complete lifelong shared context or model training.
+autonomous activity, complete lifelong shared context or model training. What a person chooses to
+keep about their work in a world, beyond what was asked, is their
+[world project context](project-context.md); deleting a remembered answer deletes every project item
+drawn from it.
 
 ## Appearance proposals
 

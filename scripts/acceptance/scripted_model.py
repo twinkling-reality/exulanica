@@ -48,6 +48,7 @@ PROVIDER_PREFIXES = ("NEBIUS_", "OPENAI_", "ANTHROPIC_")
 EGRESS_VARIABLE = "EXULANICA_EGRESS_ALLOWLIST"
 LOG_VARIABLE = "EXULANICA_SCRIPTED_MODEL_LOG"
 DURABLE_SPENDING = ("EXULANICA_SPENDING", "durable")
+WITNESS_VARIABLE = "EXULANICA_SPENDING_WITNESS_DIR"
 #: What a request no rule matches is answered with.
 UNMATCHED_STATUS = 500
 #: The only address the scripted API listens on.
@@ -236,6 +237,8 @@ def build(plan_path: Path, environ: Mapping[str, str] | None = None) -> Any:
     log = Path(environ[LOG_VARIABLE]) if environ.get(LOG_VARIABLE) else None
     transport = ScriptedTransport(plan, log, HttpResponse)
     durable = environ.get(DURABLE_SPENDING[0]) == DURABLE_SPENDING[1]
+    if durable and not environ.get(WITNESS_VARIABLE):
+        raise Refused(f"durable spending needs {WITNESS_VARIABLE}")
     budget = (
         None
         if durable

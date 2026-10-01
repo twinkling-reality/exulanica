@@ -7435,6 +7435,57 @@
     }
    }
   },
+  "/spending": {
+   "get": {
+    "tags": [
+     "spending"
+    ],
+    "summary": "What this workspace may still spend on hosted models, by provider.",
+    "operationId": "spending_spending_get",
+    "parameters": [
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Spending Spending Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/person-regions/{capture_id}": {
    "get": {
     "tags": [
@@ -12913,6 +12964,1293 @@
     }
    }
   },
+  "/world/projects": {
+   "get": {
+    "tags": [
+     "world"
+    ],
+    "summary": "This world's projects the caller owns or that are shared with them.",
+    "operationId": "list_projects_world_projects_get",
+    "parameters": [
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 100,
+       "minimum": 1,
+       "default": 50,
+       "title": "Limit"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "$ref": "#/components/schemas/ProjectView"
+         },
+         "title": "Response List Projects World Projects Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "world"
+    ],
+    "summary": "Start a project bound to a version of this world. An exact retry of a key is 200.",
+    "operationId": "create_project_world_projects_post",
+    "parameters": [
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ProjectBody"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ProjectView"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/world/projects/{project_id}": {
+   "get": {
+    "tags": [
+     "world"
+    ],
+    "summary": "One project: its binding as the version reads now, and what the caller may see.",
+    "operationId": "read_project_world_projects__project_id__get",
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ProjectView"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "put": {
+    "tags": [
+     "world"
+    ],
+    "summary": "Rename the project, or bind it to another version of this world.",
+    "operationId": "update_project_world_projects__project_id__put",
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ProjectUpdateBody"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ProjectView"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "delete": {
+    "tags": [
+     "world"
+    ],
+    "summary": "Delete the project, every item's words and every share, for good.",
+    "operationId": "delete_project_world_projects__project_id__delete",
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/world/projects/{project_id}/audit": {
+   "get": {
+    "tags": [
+     "world"
+    ],
+    "summary": "The owner's non-content record of a project, kept after its words are deleted.",
+    "operationId": "project_audit_world_projects__project_id__audit_get",
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ProjectAuditView"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/world/projects/{project_id}/items": {
+   "get": {
+    "tags": [
+     "world"
+    ],
+    "summary": "The items the caller may see, with what each names as its authority reads now.",
+    "operationId": "list_items_world_projects__project_id__items_get",
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     },
+     {
+      "name": "status",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "array",
+         "items": {
+          "enum": [
+           "proposed",
+           "active",
+           "resolved"
+          ],
+          "type": "string"
+         }
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Status"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "$ref": "#/components/schemas/ProjectItemView"
+         },
+         "title": "Response List Items World Projects  Project Id  Items Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "world"
+    ],
+    "summary": "Keep an item, or copy one of the caller's own. An exact retry of a key is 200.",
+    "operationId": "add_item_world_projects__project_id__items_post",
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ProjectItemBody"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ProjectItemView"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/world/projects/{project_id}/items/{item_id}/history": {
+   "get": {
+    "tags": [
+     "world"
+    ],
+    "summary": "Every revision of one of the owner's items, with its words: its correction history.",
+    "operationId": "item_history_world_projects__project_id__items__item_id__history_get",
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     },
+     {
+      "name": "item_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Item Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "$ref": "#/components/schemas/ProjectItemRevisionView"
+         },
+         "title": "Response Item History World Projects  Project Id  Items  Item Id  History Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/world/projects/{project_id}/items/{item_id}/corrections": {
+   "post": {
+    "tags": [
+     "world"
+    ],
+    "summary": "Correct an item. The earlier words stay in its history until it is deleted.",
+    "operationId": "correct_item_world_projects__project_id__items__item_id__corrections_post",
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     },
+     {
+      "name": "item_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Item Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ProjectItemCorrectionBody"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ProjectItemView"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/world/projects/{project_id}/items/{item_id}/review": {
+   "post": {
+    "tags": [
+     "world"
+    ],
+    "summary": "Accept a suggestion into the context, or reject it and erase its words.",
+    "operationId": "review_item_world_projects__project_id__items__item_id__review_post",
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     },
+     {
+      "name": "item_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Item Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ProjectItemReviewBody"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ProjectItemReviewView"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/world/projects/{project_id}/items/{item_id}/resolve": {
+   "post": {
+    "tags": [
+     "world"
+    ],
+    "summary": "Close a goal, question or task that is done. It leaves the context.",
+    "operationId": "resolve_item_world_projects__project_id__items__item_id__resolve_post",
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     },
+     {
+      "name": "item_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Item Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ProjectItemResolveBody"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ProjectItemView"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/world/projects/{project_id}/items/{item_id}": {
+   "delete": {
+    "tags": [
+     "world"
+    ],
+    "summary": "Delete one item and every copy of it, erasing their words.",
+    "operationId": "delete_item_world_projects__project_id__items__item_id__delete",
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     },
+     {
+      "name": "item_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Item Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ProjectRevisionView"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/world/projects/{project_id}/shares": {
+   "post": {
+    "tags": [
+     "world"
+    ],
+    "summary": "Share the project, or listed items of it, with the other people of this workspace.",
+    "operationId": "share_world_projects__project_id__shares_post",
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ProjectShareBody"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ProjectSharesView"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/world/projects/{project_id}/shares/{share_id}": {
+   "delete": {
+    "tags": [
+     "world"
+    ],
+    "summary": "Stop one share. The next read by anyone else no longer shows what it opened.",
+    "operationId": "stop_share_world_projects__project_id__shares__share_id__delete",
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     },
+     {
+      "name": "share_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Share Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ProjectRevisionView"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/world/projects/{project_id}/context": {
+   "get": {
+    "tags": [
+     "world"
+    ],
+    "summary": "The bounded context the caller may hand onward, assembled now; nothing is stored.",
+    "operationId": "project_context_world_projects__project_id__context_get",
+    "parameters": [
+     {
+      "name": "project_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Project Id"
+      }
+     },
+     {
+      "name": "max_entries",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 64,
+       "minimum": 1,
+       "default": 24,
+       "title": "Max Entries"
+      }
+     },
+     {
+      "name": "max_bytes",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 32768,
+       "minimum": 1024,
+       "default": 8192,
+       "title": "Max Bytes"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ProjectContextView"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/world-read/scenes/{scene_id}": {
    "get": {
     "tags": [
@@ -15197,6 +16535,53 @@
       "type": "object",
       "maxProperties": 64,
       "title": "Names"
+     },
+     "world_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 200,
+        "minLength": 1
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "World Id"
+     },
+     "simulation_citations": {
+      "items": {
+       "$ref": "#/components/schemas/RememberedSimulationCitationBody"
+      },
+      "type": "array",
+      "maxItems": 64,
+      "title": "Simulation Citations"
+     },
+     "inhabitants": {
+      "additionalProperties": {
+       "$ref": "#/components/schemas/RememberedInhabitantBody"
+      },
+      "propertyNames": {
+       "maxLength": 64,
+       "minLength": 1
+      },
+      "type": "object",
+      "maxProperties": 64,
+      "title": "Inhabitants"
+     },
+     "spots": {
+      "additionalProperties": {
+       "type": "string",
+       "maxLength": 500,
+       "minLength": 1
+      },
+      "propertyNames": {
+       "maxLength": 64,
+       "minLength": 1
+      },
+      "type": "object",
+      "maxProperties": 64,
+      "title": "Spots"
      }
     },
     "additionalProperties": false,
@@ -21427,6 +22812,46 @@
     ],
     "title": "InvalidPair"
    },
+   "ItemBasis": {
+    "type": "string",
+    "enum": [
+     "user_statement",
+     "inferred_suggestion",
+     "recorded_outcome",
+     "simulated_event"
+    ],
+    "title": "ItemBasis"
+   },
+   "ItemKind": {
+    "type": "string",
+    "enum": [
+     "goal",
+     "preference",
+     "question",
+     "task",
+     "decision",
+     "event"
+    ],
+    "title": "ItemKind"
+   },
+   "ItemOrigin": {
+    "type": "string",
+    "enum": [
+     "person",
+     "companion"
+    ],
+    "title": "ItemOrigin"
+   },
+   "ItemStatus": {
+    "type": "string",
+    "enum": [
+     "proposed",
+     "active",
+     "resolved",
+     "withdrawn"
+    ],
+    "title": "ItemStatus"
+   },
    "JsonValue": {},
    "LastBatchExecution": {
     "properties": {
@@ -23894,6 +25319,1655 @@
     "title": "ProcessingState",
     "description": "How far a capture got, so a user can ask for what is actually explorable."
    },
+   "ProjectAuditBindingView": {
+    "properties": {
+     "binding_seq": {
+      "type": "integer",
+      "title": "Binding Seq"
+     },
+     "version_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Version Id"
+     },
+     "bound_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Bound At"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "binding_seq",
+     "version_id",
+     "bound_at"
+    ],
+    "title": "ProjectAuditBindingView"
+   },
+   "ProjectAuditItemView": {
+    "properties": {
+     "item_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Item Id"
+     },
+     "kind": {
+      "$ref": "#/components/schemas/ItemKind"
+     },
+     "status": {
+      "$ref": "#/components/schemas/ItemStatus"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Created At"
+     },
+     "reviewed_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reviewed At"
+     },
+     "resolved_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Resolved At"
+     },
+     "withdrawn_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Withdrawn At"
+     },
+     "withdrawn_reason": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/WithdrawalReason"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "revisions": {
+      "items": {
+       "$ref": "#/components/schemas/ProjectAuditRevisionView"
+      },
+      "type": "array",
+      "title": "Revisions"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "item_id",
+     "kind",
+     "status",
+     "created_at",
+     "reviewed_at",
+     "resolved_at",
+     "withdrawn_at",
+     "withdrawn_reason",
+     "revisions"
+    ],
+    "title": "ProjectAuditItemView"
+   },
+   "ProjectAuditRevisionView": {
+    "properties": {
+     "basis": {
+      "$ref": "#/components/schemas/ItemBasis"
+     },
+     "origin": {
+      "$ref": "#/components/schemas/ItemOrigin"
+     },
+     "recorded_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Recorded At"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "basis",
+     "origin",
+     "recorded_at"
+    ],
+    "title": "ProjectAuditRevisionView"
+   },
+   "ProjectAuditShareView": {
+    "properties": {
+     "share_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Share Id"
+     },
+     "item_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Item Id"
+     },
+     "shared_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Shared At"
+     },
+     "withdrawn_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Withdrawn At"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "share_id",
+     "item_id",
+     "shared_at",
+     "withdrawn_at"
+    ],
+    "title": "ProjectAuditShareView"
+   },
+   "ProjectAuditView": {
+    "properties": {
+     "project_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Project Id"
+     },
+     "world_id": {
+      "type": "string",
+      "title": "World Id"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Created At"
+     },
+     "withdrawn_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Withdrawn At"
+     },
+     "withdrawn_by_tombstone": {
+      "type": "boolean",
+      "title": "Withdrawn By Tombstone"
+     },
+     "revision": {
+      "type": "integer",
+      "title": "Revision"
+     },
+     "bindings": {
+      "items": {
+       "$ref": "#/components/schemas/ProjectAuditBindingView"
+      },
+      "type": "array",
+      "title": "Bindings"
+     },
+     "items": {
+      "items": {
+       "$ref": "#/components/schemas/ProjectAuditItemView"
+      },
+      "type": "array",
+      "title": "Items"
+     },
+     "shares": {
+      "items": {
+       "$ref": "#/components/schemas/ProjectAuditShareView"
+      },
+      "type": "array",
+      "title": "Shares"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "project_id",
+     "world_id",
+     "created_at",
+     "withdrawn_at",
+     "withdrawn_by_tombstone",
+     "revision",
+     "bindings",
+     "items",
+     "shares"
+    ],
+    "title": "ProjectAuditView",
+    "description": "What remains when the words are gone: ids, kinds, instants and reasons, never content."
+   },
+   "ProjectBindingView": {
+    "properties": {
+     "version_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Version Id"
+     },
+     "state": {
+      "type": "string",
+      "enum": [
+       "available",
+       "unavailable"
+      ],
+      "title": "State"
+     },
+     "code": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Code"
+     },
+     "state_sha256": {
+      "type": "string",
+      "title": "State Sha256"
+     },
+     "edit_seq": {
+      "type": "integer",
+      "title": "Edit Seq"
+     },
+     "bound_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Bound At"
+     },
+     "bound_state_sha256": {
+      "type": "string",
+      "title": "Bound State Sha256"
+     },
+     "bound_edit_seq": {
+      "type": "integer",
+      "title": "Bound Edit Seq"
+     },
+     "entry_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Entry Id"
+     },
+     "entry_version_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Entry Version Id"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "version_id",
+     "state",
+     "code",
+     "state_sha256",
+     "edit_seq",
+     "bound_at",
+     "bound_state_sha256",
+     "bound_edit_seq",
+     "entry_id",
+     "entry_version_id"
+    ],
+    "title": "ProjectBindingView"
+   },
+   "ProjectBody": {
+    "properties": {
+     "title": {
+      "type": "string",
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Title"
+     },
+     "version_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Version Id"
+     },
+     "idempotency_key": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Idempotency Key"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "title",
+     "version_id"
+    ],
+    "title": "ProjectBody"
+   },
+   "ProjectCompanionAnswerReference": {
+    "properties": {
+     "kind": {
+      "type": "string",
+      "const": "companion_answer",
+      "title": "Kind"
+     },
+     "answer_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Answer Id"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "kind",
+     "answer_id"
+    ],
+    "title": "ProjectCompanionAnswerReference",
+    "description": "One of the caller's own remembered Companion answers. An item naming one is deleted with\nit."
+   },
+   "ProjectContextBudgetView": {
+    "properties": {
+     "max_entries": {
+      "type": "integer",
+      "title": "Max Entries"
+     },
+     "max_bytes": {
+      "type": "integer",
+      "title": "Max Bytes"
+     },
+     "used_entries": {
+      "type": "integer",
+      "title": "Used Entries"
+     },
+     "used_bytes": {
+      "type": "integer",
+      "title": "Used Bytes"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "max_entries",
+     "max_bytes",
+     "used_entries",
+     "used_bytes"
+    ],
+    "title": "ProjectContextBudgetView"
+   },
+   "ProjectContextEntryView": {
+    "properties": {
+     "item_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Item Id"
+     },
+     "revision": {
+      "type": "integer",
+      "title": "Revision"
+     },
+     "kind": {
+      "$ref": "#/components/schemas/ItemKind"
+     },
+     "basis": {
+      "$ref": "#/components/schemas/ItemBasis"
+     },
+     "origin": {
+      "$ref": "#/components/schemas/ItemOrigin"
+     },
+     "written_by_reader": {
+      "type": "boolean",
+      "title": "Written By Reader"
+     },
+     "recorded_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Recorded At"
+     },
+     "text": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Text"
+     },
+     "note": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Note"
+     },
+     "references": {
+      "items": {
+       "$ref": "#/components/schemas/ProjectReferenceStateView"
+      },
+      "type": "array",
+      "title": "References"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "item_id",
+     "revision",
+     "kind",
+     "basis",
+     "origin",
+     "written_by_reader",
+     "recorded_at",
+     "text",
+     "note",
+     "references"
+    ],
+    "title": "ProjectContextEntryView"
+   },
+   "ProjectContextView": {
+    "properties": {
+     "profile": {
+      "type": "string",
+      "title": "Profile"
+     },
+     "project": {
+      "$ref": "#/components/schemas/ProjectView"
+     },
+     "budget": {
+      "$ref": "#/components/schemas/ProjectContextBudgetView"
+     },
+     "entries": {
+      "items": {
+       "$ref": "#/components/schemas/ProjectContextEntryView"
+      },
+      "type": "array",
+      "title": "Entries"
+     },
+     "omitted": {
+      "additionalProperties": {
+       "type": "integer"
+      },
+      "type": "object",
+      "title": "Omitted"
+     },
+     "assembly_sha256": {
+      "type": "string",
+      "title": "Assembly Sha256"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "profile",
+     "project",
+     "budget",
+     "entries",
+     "omitted",
+     "assembly_sha256"
+    ],
+    "title": "ProjectContextView",
+    "description": "The bounded context this reader may hand onward, assembled from current rows."
+   },
+   "ProjectItemBody": {
+    "properties": {
+     "base_revision": {
+      "type": "integer",
+      "minimum": 1.0,
+      "title": "Base Revision"
+     },
+     "kind": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/ItemKind"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "basis": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/ItemBasis"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "text": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 2000,
+        "minLength": 1
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Text"
+     },
+     "note": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 2000,
+        "minLength": 1
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Note"
+     },
+     "references": {
+      "items": {
+       "oneOf": [
+        {
+         "$ref": "#/components/schemas/ProjectWorldEditReference"
+        },
+        {
+         "$ref": "#/components/schemas/ProjectStyleVersionReference"
+        },
+        {
+         "$ref": "#/components/schemas/ProjectSocietyControlReference"
+        },
+        {
+         "$ref": "#/components/schemas/ProjectSocietyEventReference"
+        },
+        {
+         "$ref": "#/components/schemas/ProjectStylePreviewReference"
+        },
+        {
+         "$ref": "#/components/schemas/ProjectCompanionAnswerReference"
+        }
+       ],
+       "discriminator": {
+        "propertyName": "kind",
+        "mapping": {
+         "companion_answer": "#/components/schemas/ProjectCompanionAnswerReference",
+         "society_control": "#/components/schemas/ProjectSocietyControlReference",
+         "society_event": "#/components/schemas/ProjectSocietyEventReference",
+         "style_preview": "#/components/schemas/ProjectStylePreviewReference",
+         "style_version": "#/components/schemas/ProjectStyleVersionReference",
+         "world_edit": "#/components/schemas/ProjectWorldEditReference"
+        }
+       }
+      },
+      "type": "array",
+      "maxItems": 8,
+      "title": "References"
+     },
+     "reuse": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/ProjectReuseBody"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "idempotency_key": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Idempotency Key"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "base_revision"
+    ],
+    "title": "ProjectItemBody",
+    "description": "One item in the caller's words, a suggestion to review, or a copy of their own item.\n\n``basis`` says where the words come from: the caller's own statement, a suggestion the\nCompanion drew (which must name the Companion answers it was drawn from and waits for review),\na recorded outcome (a decision naming accepted records) or a simulated event. A copy names\nonly ``reuse`` and takes everything else from the item it copies."
+   },
+   "ProjectItemCorrectionBody": {
+    "properties": {
+     "base_revision": {
+      "type": "integer",
+      "minimum": 1.0,
+      "title": "Base Revision"
+     },
+     "text": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 2000,
+        "minLength": 1
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Text"
+     },
+     "note": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 2000,
+        "minLength": 1
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Note"
+     },
+     "references": {
+      "anyOf": [
+       {
+        "items": {
+         "oneOf": [
+          {
+           "$ref": "#/components/schemas/ProjectWorldEditReference"
+          },
+          {
+           "$ref": "#/components/schemas/ProjectStyleVersionReference"
+          },
+          {
+           "$ref": "#/components/schemas/ProjectSocietyControlReference"
+          },
+          {
+           "$ref": "#/components/schemas/ProjectSocietyEventReference"
+          },
+          {
+           "$ref": "#/components/schemas/ProjectStylePreviewReference"
+          },
+          {
+           "$ref": "#/components/schemas/ProjectCompanionAnswerReference"
+          }
+         ],
+         "discriminator": {
+          "propertyName": "kind",
+          "mapping": {
+           "companion_answer": "#/components/schemas/ProjectCompanionAnswerReference",
+           "society_control": "#/components/schemas/ProjectSocietyControlReference",
+           "society_event": "#/components/schemas/ProjectSocietyEventReference",
+           "style_preview": "#/components/schemas/ProjectStylePreviewReference",
+           "style_version": "#/components/schemas/ProjectStyleVersionReference",
+           "world_edit": "#/components/schemas/ProjectWorldEditReference"
+          }
+         }
+        },
+        "type": "array",
+        "maxItems": 8
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "References"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "base_revision"
+    ],
+    "title": "ProjectItemCorrectionBody",
+    "description": "The item as it should read. ``note`` says why; ``references`` replaces what it names."
+   },
+   "ProjectItemResolveBody": {
+    "properties": {
+     "base_revision": {
+      "type": "integer",
+      "minimum": 1.0,
+      "title": "Base Revision"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "base_revision"
+    ],
+    "title": "ProjectItemResolveBody"
+   },
+   "ProjectItemReviewBody": {
+    "properties": {
+     "base_revision": {
+      "type": "integer",
+      "minimum": 1.0,
+      "title": "Base Revision"
+     },
+     "decision": {
+      "type": "string",
+      "enum": [
+       "accept",
+       "reject"
+      ],
+      "title": "Decision"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "base_revision",
+     "decision"
+    ],
+    "title": "ProjectItemReviewBody"
+   },
+   "ProjectItemReviewView": {
+    "properties": {
+     "project_revision": {
+      "type": "integer",
+      "title": "Project Revision"
+     },
+     "item": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/ProjectItemView"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "project_revision",
+     "item"
+    ],
+    "title": "ProjectItemReviewView",
+    "description": "The project's revision after a decision, and the accepted item; null for a rejection,\nwhose words are erased."
+   },
+   "ProjectItemRevisionView": {
+    "properties": {
+     "revision": {
+      "type": "integer",
+      "title": "Revision"
+     },
+     "basis": {
+      "$ref": "#/components/schemas/ItemBasis"
+     },
+     "origin": {
+      "$ref": "#/components/schemas/ItemOrigin"
+     },
+     "text": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Text"
+     },
+     "note": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Note"
+     },
+     "references": {
+      "items": {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      "type": "array",
+      "title": "References"
+     },
+     "recorded_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Recorded At"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "revision",
+     "basis",
+     "origin",
+     "text",
+     "note",
+     "references",
+     "recorded_at"
+    ],
+    "title": "ProjectItemRevisionView"
+   },
+   "ProjectItemView": {
+    "properties": {
+     "item_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Item Id"
+     },
+     "project_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Project Id"
+     },
+     "project_revision": {
+      "type": "integer",
+      "title": "Project Revision"
+     },
+     "kind": {
+      "$ref": "#/components/schemas/ItemKind"
+     },
+     "basis": {
+      "$ref": "#/components/schemas/ItemBasis"
+     },
+     "origin": {
+      "$ref": "#/components/schemas/ItemOrigin"
+     },
+     "status": {
+      "$ref": "#/components/schemas/ItemStatus"
+     },
+     "revision": {
+      "type": "integer",
+      "title": "Revision"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Created At"
+     },
+     "changed_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Changed At"
+     },
+     "recorded_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Recorded At"
+     },
+     "reviewed_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reviewed At"
+     },
+     "resolved_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Resolved At"
+     },
+     "text": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Text"
+     },
+     "note": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Note"
+     },
+     "references": {
+      "items": {
+       "$ref": "#/components/schemas/ProjectReferenceStateView"
+      },
+      "type": "array",
+      "title": "References"
+     },
+     "hidden_references": {
+      "type": "integer",
+      "title": "Hidden References"
+     },
+     "share_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Share Id"
+     },
+     "owner_is_reader": {
+      "type": "boolean",
+      "title": "Owner Is Reader"
+     },
+     "source_answer_ids": {
+      "items": {
+       "type": "string",
+       "format": "uuid"
+      },
+      "type": "array",
+      "title": "Source Answer Ids"
+     },
+     "reused_from": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/ProjectReuseView"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "item_id",
+     "project_id",
+     "project_revision",
+     "kind",
+     "basis",
+     "origin",
+     "status",
+     "revision",
+     "created_at",
+     "changed_at",
+     "recorded_at",
+     "reviewed_at",
+     "resolved_at",
+     "text",
+     "note",
+     "references",
+     "hidden_references",
+     "share_id",
+     "owner_is_reader",
+     "source_answer_ids",
+     "reused_from"
+    ],
+    "title": "ProjectItemView"
+   },
+   "ProjectReferenceStateView": {
+    "properties": {
+     "reference": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Reference"
+     },
+     "state": {
+      "type": "string",
+      "title": "State"
+     },
+     "code": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Code"
+     },
+     "detail": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Detail"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "reference",
+     "state",
+     "code",
+     "detail"
+    ],
+    "title": "ProjectReferenceStateView"
+   },
+   "ProjectReuseBody": {
+    "properties": {
+     "world_id": {
+      "type": "string",
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "World Id"
+     },
+     "project_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Project Id"
+     },
+     "item_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Item Id"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "world_id",
+     "project_id",
+     "item_id"
+    ],
+    "title": "ProjectReuseBody"
+   },
+   "ProjectReuseView": {
+    "properties": {
+     "world_id": {
+      "type": "string",
+      "title": "World Id"
+     },
+     "project_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Project Id"
+     },
+     "item_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Item Id"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "world_id",
+     "project_id",
+     "item_id"
+    ],
+    "title": "ProjectReuseView"
+   },
+   "ProjectRevisionView": {
+    "properties": {
+     "project_revision": {
+      "type": "integer",
+      "title": "Project Revision"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "project_revision"
+    ],
+    "title": "ProjectRevisionView"
+   },
+   "ProjectShareBody": {
+    "properties": {
+     "base_revision": {
+      "type": "integer",
+      "minimum": 1.0,
+      "title": "Base Revision"
+     },
+     "project": {
+      "type": "boolean",
+      "title": "Project",
+      "default": false
+     },
+     "item_ids": {
+      "items": {
+       "type": "string",
+       "format": "uuid"
+      },
+      "type": "array",
+      "maxItems": 500,
+      "title": "Item Ids"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "base_revision"
+    ],
+    "title": "ProjectShareBody"
+   },
+   "ProjectShareView": {
+    "properties": {
+     "share_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Share Id"
+     },
+     "item_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Item Id"
+     },
+     "shared_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Shared At"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "share_id",
+     "item_id",
+     "shared_at"
+    ],
+    "title": "ProjectShareView"
+   },
+   "ProjectSharesView": {
+    "properties": {
+     "project_revision": {
+      "type": "integer",
+      "title": "Project Revision"
+     },
+     "shares": {
+      "items": {
+       "$ref": "#/components/schemas/ProjectShareView"
+      },
+      "type": "array",
+      "title": "Shares"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "project_revision",
+     "shares"
+    ],
+    "title": "ProjectSharesView"
+   },
+   "ProjectSocietyControlReference": {
+    "properties": {
+     "kind": {
+      "type": "string",
+      "const": "society_control",
+      "title": "Kind"
+     },
+     "operation": {
+      "type": "string",
+      "title": "Operation"
+     },
+     "world_id": {
+      "type": "string",
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "World Id"
+     },
+     "version_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Version Id"
+     },
+     "revision": {
+      "type": "integer",
+      "minimum": 1.0,
+      "title": "Revision"
+     },
+     "tick": {
+      "anyOf": [
+       {
+        "type": "integer",
+        "minimum": 0.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Tick"
+     },
+     "state_sha256": {
+      "anyOf": [
+       {
+        "type": "string",
+        "pattern": "^[0-9a-f]{64}$"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "State Sha256"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "kind",
+     "operation",
+     "world_id",
+     "version_id",
+     "revision",
+     "tick",
+     "state_sha256"
+    ],
+    "title": "ProjectSocietyControlReference",
+    "description": "A control receipt: a configuration by its revision, a manual step by its tick and state."
+   },
+   "ProjectSocietyEventReference": {
+    "properties": {
+     "kind": {
+      "type": "string",
+      "const": "society_event",
+      "title": "Kind"
+     },
+     "world_id": {
+      "type": "string",
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "World Id"
+     },
+     "version_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Version Id"
+     },
+     "event_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Event Id"
+     },
+     "tick": {
+      "type": "integer",
+      "minimum": 1.0,
+      "title": "Tick"
+     },
+     "input_seq": {
+      "anyOf": [
+       {
+        "type": "integer",
+        "minimum": 1.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Input Seq"
+     },
+     "object_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 200,
+        "minLength": 1
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Object Id"
+     },
+     "edit_seq": {
+      "anyOf": [
+       {
+        "type": "integer",
+        "minimum": 1.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Edit Seq"
+     },
+     "edit_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Edit Id"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "kind",
+     "world_id",
+     "version_id",
+     "event_id",
+     "tick",
+     "input_seq",
+     "object_id",
+     "edit_seq",
+     "edit_id"
+    ],
+    "title": "ProjectSocietyEventReference",
+    "description": "A simulated event, and the input, object and edit that explain it where the answer named\nthem."
+   },
+   "ProjectStylePreviewReference": {
+    "properties": {
+     "kind": {
+      "type": "string",
+      "const": "style_preview",
+      "title": "Kind"
+     },
+     "world_id": {
+      "type": "string",
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "World Id"
+     },
+     "preview_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Preview Id"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "kind",
+     "world_id",
+     "preview_id"
+    ],
+    "title": "ProjectStylePreviewReference",
+    "description": "An appearance preview: unfinished work while it is open."
+   },
+   "ProjectStyleVersionReference": {
+    "properties": {
+     "kind": {
+      "type": "string",
+      "const": "style_version",
+      "title": "Kind"
+     },
+     "operation": {
+      "type": "string",
+      "title": "Operation"
+     },
+     "world_id": {
+      "type": "string",
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "World Id"
+     },
+     "style_version_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Style Version Id"
+     },
+     "preview_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Preview Id"
+     },
+     "proposal_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Proposal Id"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "kind",
+     "operation",
+     "world_id",
+     "style_version_id",
+     "preview_id",
+     "proposal_id"
+    ],
+    "title": "ProjectStyleVersionReference",
+    "description": "An applied appearance: a style version, and the preview and proposal it came from."
+   },
+   "ProjectUpdateBody": {
+    "properties": {
+     "base_revision": {
+      "type": "integer",
+      "minimum": 1.0,
+      "title": "Base Revision"
+     },
+     "title": {
+      "type": "string",
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Title"
+     },
+     "version_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Version Id"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "base_revision",
+     "title",
+     "version_id"
+    ],
+    "title": "ProjectUpdateBody",
+    "description": "The project's name and version as they should be; either may be what they already are."
+   },
+   "ProjectView": {
+    "properties": {
+     "project_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Project Id"
+     },
+     "world_id": {
+      "type": "string",
+      "title": "World Id"
+     },
+     "title": {
+      "type": "string",
+      "title": "Title"
+     },
+     "revision": {
+      "type": "integer",
+      "title": "Revision"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Created At"
+     },
+     "changed_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Changed At"
+     },
+     "owner_is_reader": {
+      "type": "boolean",
+      "title": "Owner Is Reader"
+     },
+     "share_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Share Id"
+     },
+     "binding": {
+      "$ref": "#/components/schemas/ProjectBindingView"
+     },
+     "counts": {
+      "additionalProperties": {
+       "type": "integer"
+      },
+      "type": "object",
+      "title": "Counts"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "project_id",
+     "world_id",
+     "title",
+     "revision",
+     "created_at",
+     "changed_at",
+     "owner_is_reader",
+     "share_id",
+     "binding",
+     "counts"
+    ],
+    "title": "ProjectView"
+   },
+   "ProjectWorldEditReference": {
+    "properties": {
+     "kind": {
+      "type": "string",
+      "const": "world_edit",
+      "title": "Kind"
+     },
+     "operation": {
+      "type": "string",
+      "title": "Operation"
+     },
+     "world_id": {
+      "type": "string",
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "World Id"
+     },
+     "version_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Version Id"
+     },
+     "edit_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Edit Id"
+     },
+     "edit_seq": {
+      "type": "integer",
+      "minimum": 1.0,
+      "title": "Edit Seq"
+     },
+     "result_state_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Result State Sha256"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "kind",
+     "operation",
+     "world_id",
+     "version_id",
+     "edit_id",
+     "edit_seq",
+     "result_state_sha256"
+    ],
+    "title": "ProjectWorldEditReference",
+    "description": "An accepted edit, as the route that made it reported it."
+   },
    "ProposalOrigin": {
     "type": "string",
     "enum": [
@@ -24746,6 +27820,262 @@
      "region_id"
     ],
     "title": "RegionStyleView"
+   },
+   "RememberedInhabitantBody": {
+    "properties": {
+     "version_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Version Id"
+     },
+     "inhabitant_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Inhabitant Id"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "version_id",
+     "inhabitant_id"
+    ],
+    "title": "RememberedInhabitantBody"
+   },
+   "RememberedInhabitantView": {
+    "properties": {
+     "version_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Version Id"
+     },
+     "inhabitant_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Inhabitant Id"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "version_id",
+     "inhabitant_id"
+    ],
+    "title": "RememberedInhabitantView"
+   },
+   "RememberedSimulationCitationBody": {
+    "properties": {
+     "ordinal": {
+      "type": "integer",
+      "maximum": 4096.0,
+      "minimum": 0.0,
+      "title": "Ordinal"
+     },
+     "result_kind": {
+      "type": "string",
+      "enum": [
+       "synthetic_inhabitant",
+       "simulation_event"
+      ],
+      "title": "Result Kind"
+     },
+     "version_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Version Id"
+     },
+     "inhabitant_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Inhabitant Id"
+     },
+     "event_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Event Id"
+     },
+     "tick": {
+      "type": "integer",
+      "minimum": 0.0,
+      "title": "Tick"
+     },
+     "input_seq": {
+      "anyOf": [
+       {
+        "type": "integer",
+        "minimum": 1.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Input Seq"
+     },
+     "object_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 200,
+        "minLength": 1
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Object Id"
+     },
+     "edit_seq": {
+      "anyOf": [
+       {
+        "type": "integer",
+        "minimum": 1.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Edit Seq"
+     },
+     "edit_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Edit Id"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "ordinal",
+     "result_kind",
+     "version_id",
+     "inhabitant_id",
+     "tick"
+    ],
+    "title": "RememberedSimulationCitationBody",
+    "description": "One simulated record an answer about a world's people cited, as the answer route served it\n(``simulation`` in ``POST /selection/ask``), with its reading position. Ids only."
+   },
+   "RememberedSimulationCitationView": {
+    "properties": {
+     "ordinal": {
+      "type": "integer",
+      "title": "Ordinal"
+     },
+     "truth_class": {
+      "type": "string",
+      "const": "simulation",
+      "title": "Truth Class"
+     },
+     "result_kind": {
+      "type": "string",
+      "title": "Result Kind"
+     },
+     "world_id": {
+      "type": "string",
+      "title": "World Id"
+     },
+     "version_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Version Id"
+     },
+     "inhabitant_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Inhabitant Id"
+     },
+     "event_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Event Id"
+     },
+     "tick": {
+      "type": "integer",
+      "title": "Tick"
+     },
+     "input_seq": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Input Seq"
+     },
+     "object_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Object Id"
+     },
+     "edit_seq": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Edit Seq"
+     },
+     "edit_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Edit Id"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "ordinal",
+     "truth_class",
+     "result_kind",
+     "world_id",
+     "version_id",
+     "inhabitant_id",
+     "event_id",
+     "tick",
+     "input_seq",
+     "object_id",
+     "edit_seq",
+     "edit_id"
+    ],
+    "title": "RememberedSimulationCitationView"
    },
    "RemoveEnvironmentProposalView": {
     "properties": {
@@ -29645,6 +32975,17 @@
     "title": "ViewerBody",
     "description": "Where the person stands in the world's authored region, and the yaw of their facing."
    },
+   "WithdrawalReason": {
+    "type": "string",
+    "enum": [
+     "deleted",
+     "rejected",
+     "project_deleted",
+     "source_withdrawn",
+     "workspace_deleted"
+    ],
+    "title": "WithdrawalReason"
+   },
    "WorldCountPolicyView": {
     "properties": {
      "policy_id": {
@@ -30021,6 +33362,38 @@
      "unanswered_cost_unknown": {
       "type": "boolean",
       "title": "Unanswered Cost Unknown"
+     },
+     "world_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "World Id"
+     },
+     "simulation_citations": {
+      "items": {
+       "$ref": "#/components/schemas/RememberedSimulationCitationView"
+      },
+      "type": "array",
+      "title": "Simulation Citations"
+     },
+     "inhabitants": {
+      "additionalProperties": {
+       "$ref": "#/components/schemas/RememberedInhabitantView"
+      },
+      "type": "object",
+      "title": "Inhabitants"
+     },
+     "spots": {
+      "additionalProperties": {
+       "type": "string"
+      },
+      "type": "object",
+      "title": "Spots"
      }
     },
     "additionalProperties": false,

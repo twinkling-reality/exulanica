@@ -395,6 +395,11 @@ layers = [
   # directions: deletion knows nothing about how a claim is written, and a claim writer that
   # reached for the purger would break the build rather than a review.
   "deletion",
+  # The durable spending authority: the allowance of money every process shares, kept in the
+  # database and admitted through the model client's injected spending protocol. It sits directly
+  # above the database and the model client it joins, so the model client never learns where
+  # spending is kept, and below every workflow that composes a client for a workspace.
+  "spending",
   "db | models | store",
   # Traffic simulation reads generated road records and its own catalogs and nothing else. It
   # sits below the database, the store and the model client so the layers refuse those, and the
@@ -770,6 +775,28 @@ source_modules = [
   "exulanica.selection.proposal",
 ]
 forbidden_modules = ["exulanica.selection.question"]
+
+[[tool.importlinter.contracts]]
+# What a person keeps about a world project may inform a proposal and may never author one. The
+# project-context modules cannot import the interaction-policy plane, the model client, the
+# Companion's asking path or the API, so no refactor inside them can turn a kept preference into a
+# capability decision, a permission or a model call, and no reviewer has to notice. Indirect
+# imports count. `tests/test_project_context_policy_boundary.py` holds the plane from the database
+# side.
+name = "A world project's context cannot author policy, grant a permission or call a model"
+type = "forbidden"
+source_modules = [
+  "exulanica.world.project_context",
+  "exulanica.world.project_context_assembly",
+  "exulanica.world.project_context_references",
+]
+forbidden_modules = [
+  "exulanica.api",
+  "exulanica.models.client",
+  "exulanica.selection",
+  "exulanica.world.interaction",
+  "exulanica.world.interaction_repository",
+]
 
 [[tool.importlinter.contracts]]
 # A person's score is read from what the engine recorded, never from what a model said of itself.

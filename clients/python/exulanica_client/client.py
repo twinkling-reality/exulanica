@@ -22,7 +22,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
-__all__ = ["ApiRefusal", "ClientError", "Exchange", "WorldClient"]
+__all__ = ["ApiRefusal", "ClientError", "Exchange", "WorldClient", "resume_point"]
 
 #: Hosts a plain-http address may name: the credential never leaves the machine.
 _LOOPBACK_NAMES = frozenset({"localhost"})
@@ -222,7 +222,7 @@ class WorldClient:
             "origin_role": origin_role,
         }
         if saved_entry is not None:
-            body["saved_entry"] = _resume_point(saved_entry)
+            body["saved_entry"] = resume_point(saved_entry)
         return self.post(
             f"/world/versions/{_segment(version['version_id'])}/objects",
             body,
@@ -243,7 +243,7 @@ class WorldClient:
             "behaviour": None if behaviour is None else dict(behaviour),
         }
         if saved_entry is not None:
-            body["saved_entry"] = _resume_point(saved_entry)
+            body["saved_entry"] = resume_point(saved_entry)
         return self.post(
             f"/world/versions/{_segment(version['version_id'])}/objects/"
             f"{_segment(object_id)}/behaviour",
@@ -252,7 +252,7 @@ class WorldClient:
         )
 
 
-def _resume_point(entry: Mapping[str, Any]) -> dict[str, Any]:
+def resume_point(entry: Mapping[str, Any]) -> dict[str, Any]:
     """The saved world's resume point, so the edit and the saved world advance together or not."""
     return {
         "entry_id": entry["entry_id"],

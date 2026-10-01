@@ -26,7 +26,7 @@ __all__ = ["main"]
 
 def main(argv: Sequence[str] | None = None) -> int:
     del argv
-    services = build_services()
+    services = build_services(spending_label="comparison-worker")
     worker = services.build_comparison_worker(keeps_share=False)
     if worker is None:
         raise SystemExit(

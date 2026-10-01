@@ -294,6 +294,30 @@ PROBE_OVERRIDES: Final[dict[str, dict[str, Any]]] = {
             "base_topology_sha256": None,
         },
     },
+    "PUT /world/projects/{project_id}": {
+        **_IN_WORLD,
+        "json": {"base_revision": 1, "title": "probe", "version_id": str(uuid.uuid4())},
+    },
+    "POST /world/projects/{project_id}/items": {
+        **_IN_WORLD,
+        "json": {"base_revision": 1, "kind": "goal", "basis": "user_statement", "text": "probe"},
+    },
+    "POST /world/projects/{project_id}/items/{item_id}/corrections": {
+        **_IN_WORLD,
+        "json": {"base_revision": 1, "text": "probe"},
+    },
+    "POST /world/projects/{project_id}/items/{item_id}/resolve": {
+        **_IN_WORLD,
+        "json": {"base_revision": 1},
+    },
+    "POST /world/projects/{project_id}/items/{item_id}/review": {
+        **_IN_WORLD,
+        "json": {"base_revision": 1, "decision": "accept"},
+    },
+    "POST /world/projects/{project_id}/shares": {
+        **_IN_WORLD,
+        "json": {"base_revision": 1, "project": True},
+    },
     "POST /world/styles/previews": {
         **_IN_WORLD,
         "json": {
@@ -738,6 +762,9 @@ EXISTENCE_BUILDERS: Final[Mapping[str, Owned | Shared]] = {
     ),
     "/world/interactions/previews/{preview_id}": Owned(build.interaction_preview),
     "/world/interactions/proposals/{proposal_id}": Owned(build.interaction_proposal),
+    "/world/projects/{project_id}": Owned(build.world_project),
+    "/world/projects/{project_id}/items/{item_id}": Owned(build.world_project_item),
+    "/world/projects/{project_id}/shares/{share_id}": Owned(build.world_project_share),
     "/world/source-media/{source_id}": Owned(build.source_media),
     "/world/styles/previews/{preview_id}": Owned(build.style_preview),
     "/world/styles/proposals/{proposal_id}": Owned(build.style_proposal),

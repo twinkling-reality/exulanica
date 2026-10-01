@@ -72,6 +72,14 @@ export const FAILURE_WORDS: Readonly<Record<string, string>> = {
   provider_not_admitted: 'the server that ran it may not reach the model\'s service',
   question_changed_by_rules: 'this world\'s rules would change the question each person is asked',
   request_refused: 'this world\'s rules would not let the question be sent',
+  // Placeholder words: the page's own wording for these codes is not written yet.
+  spending_not_granted: 'no spending grant covers this workspace and the model\'s service',
+  spending_revoked: 'the spending it ran under was revoked',
+  spending_expired: 'the spending it ran under had expired',
+  spending_limit_reached: 'a spending limit would have been crossed',
+  spending_suspended: 'spending is held closed until an operator acts',
+  spending_unavailable: 'the spending record did not answer, so nothing was sent',
+  spending_scope_missing: 'the request named no workspace to spend for',
 };
 
 /**

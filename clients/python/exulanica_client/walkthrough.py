@@ -34,7 +34,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from .capabilities import descriptor_checks, exercise, print_capabilities, read_capabilities
+from .capabilities import descriptor_checks, exercise_run, print_capabilities, read_capabilities
 from .client import ApiRefusal, ClientError, Exchange, WorldClient
 from .comparisons import ComparisonStop, read_comparison
 from .discovery import (
@@ -539,13 +539,20 @@ def _arguments(argv: Sequence[str] | None) -> argparse.Namespace:
         "--comparison",
         help="the comparison to read; the newest started from the application otherwise",
     )
-    parser.add_argument("--world", help="with --version, the world whose comparisons to read")
+    parser.add_argument(
+        "--world",
+        help="with --version, the world whose comparisons to read; with capabilities --exercise, "
+        "an existing world to edit instead of one the run makes (its saved entry then needs its "
+        "new version adopted)",
+    )
     parser.add_argument("--version", help="with --world, the version whose comparisons to read")
     parser.add_argument(
         "--exercise",
         action="store_true",
-        help="with capabilities: make one available edit in each saved world, have it refused "
-        "against the base it replaced, and read the base again",
+        help="with capabilities: make a world of the run's own (a starter in a workspace that "
+        "holds no saved world, otherwise a generated town), make one available edit in it, have it "
+        "refused against the base it replaced, and read the base again; no other saved world is "
+        "touched",
     )
     parser.add_argument("--transcript", type=Path, help="write the transcript as JSON here")
     args = parser.parse_args(argv)
@@ -555,6 +562,8 @@ def _arguments(argv: Sequence[str] | None) -> argparse.Namespace:
         parser.error("walkthrough needs --place and --origin-role")
     if args.exercise and (args.command != "capabilities" or args.origin_role is None):
         parser.error("--exercise goes with capabilities and needs --origin-role")
+    if args.command == "capabilities" and args.world and not args.exercise:
+        parser.error("with capabilities, --world names the world --exercise edits")
     return args
 
 
@@ -580,18 +589,19 @@ def main(argv: Sequence[str] | None = None) -> int:
             checks = descriptor_checks(client.openapi(), read)
             record["capabilities"] = read
             if args.exercise:
-                entries = {entry["entry_id"]: entry for entry in client.saved_worlds()}
-                record["exercised"] = [
-                    exercise(
-                        client,
-                        world,
-                        entries[world["entry_id"]],
-                        origin_role=args.origin_role,
-                        step=lambda name: setattr(transcript, "step", name),
-                    )
-                    for world in read["worlds"]
-                ]
-                checks += [check for done in record["exercised"] for check in done["checks"]]
+                done = exercise_run(
+                    client,
+                    read,
+                    origin_role=args.origin_role,
+                    world_id=args.world,
+                    step=lambda name: setattr(transcript, "step", name),
+                )
+                record["made"] = done["made"]
+                record["exercised"] = done["exercised"]
+                if done["warning"]:
+                    record["warning"] = done["warning"]
+                    print(f"  warning: {done['warning']}")
+                checks += done["checks"]
             record["checks"] = checks
             failed = [check["check"] for check in checks if not check["holds"]]
             record["result"] = "confirmed" if not failed else "not confirmed"

@@ -29,10 +29,10 @@ imports the code it starts.
     ``TILES_LIMIT``, declared as the owner, so the development page can walk a baked tile.
 4.  Starts the API as the non-owner runtime role with the read-only and purge URLs, a
     content-addressed store in the run directory and no Google configuration. With ``--model``
-    it also passes ``NEBIUS_API_KEY``, ``EXULANICA_EGRESS_ALLOWLIST``, ``EXULANICA_BUDGET_USD``
-    and ``EXULANICA_BUDGET_MAX_CALLS``
+    it also passes ``NEBIUS_API_KEY``, ``EXULANICA_EGRESS_ALLOWLIST``, ``EXULANICA_BUDGET_USD``,
+    ``EXULANICA_BUDGET_MAX_CALLS`` and ``EXULANICA_SPENDING``
     from this process's environment, and refuses without any of them: a run with a model always
-    states the bound the API enforces. Nothing writes the key anywhere. With
+    states the bound the API enforces and how it spends. Nothing writes the key anywhere. With
     ``--society-playback`` the API also plays the synthetic workspace's societies on their own
     (``EXULANICA_SOCIETY_CONTROL_WORKSPACES`` names that workspace alone), at the host's declared
     base wait or at ``--society-tick-interval-ms``, which the API validates. Without it the API
@@ -61,6 +61,7 @@ starts exactly what it always did:
 - ``--scripted-model PLAN`` serves the API through ``scripted_model.py``, whose model transport
   answers from the plan and which refuses to start if a provider could be reached. The plan is
   copied into the run directory and its digest recorded; every model request is logged beside it.
+  ``--spending process|durable`` states the scripted API's ``EXULANICA_SPENDING`` explicitly.
 - ``--read-only-token`` adds one more token, ``token-read``, for the first workspace with
   ``world.read`` alone, so a client can be shown a refusal its grant earns.
 
@@ -151,6 +152,7 @@ MODEL_VARIABLES = {
     "EXULANICA_EGRESS_ALLOWLIST": "model-allowlist-missing",
     "EXULANICA_BUDGET_USD": "budget-missing",
     "EXULANICA_BUDGET_MAX_CALLS": "call-ceiling-missing",
+    "EXULANICA_SPENDING": "spending-mode-missing",
 }
 
 #: Environment prefixes dropped from every process this starts, so nothing in the caller's shell
@@ -192,6 +194,7 @@ REFUSALS = {
     "model-allowlist-missing": "--model needs EXULANICA_EGRESS_ALLOWLIST in this environment",
     "budget-missing": "--model needs EXULANICA_BUDGET_USD, the bound the API enforces",
     "call-ceiling-missing": "--model needs EXULANICA_BUDGET_MAX_CALLS, the call bound the API enforces",
+    "spending-mode-missing": "--model needs EXULANICA_SPENDING, durable or process, how the API spends",
     "api-origin": "the API did not confirm it imported exulanica from the checkout",
     "token-refused": "the API did not accept the synthetic token",
     "no-answer": "a service did not answer in time",
@@ -261,6 +264,22 @@ runpy.run_path(str(script), run_name="__main__")
 #: Where a scripted run keeps its plan and its log of every model request, in the run directory.
 SCRIPTED_PLAN_NAME = "scripted-model-plan.json"
 SCRIPTED_LOG_NAME = "scripted-model-calls.jsonl"
+#: The spending authorities a scripted run may state (``EXULANICA_SPENDING``): the process's own
+#: bounds from the plan, or the durable authority with its witness in the run directory.
+SPENDING_MODES = ("process", "durable")
+SPENDING_WITNESS_NAME = "spending-witness"
+
+
+def scripted_environment(run_dir: Path, logs: Path, spending: str) -> dict[str, str]:
+    """What a scripted API is given beyond the plain one's environment: its request log and the
+    spending authority it states, never left to a default."""
+    environment = {
+        "EXULANICA_SCRIPTED_MODEL_LOG": str(logs / SCRIPTED_LOG_NAME),
+        "EXULANICA_SPENDING": spending,
+    }
+    if spending == "durable":
+        environment["EXULANICA_SPENDING_WITNESS_DIR"] = str(run_dir / SPENDING_WITNESS_NAME)
+    return environment
 
 
 def api_command(python: Path, worktree: Path, port: int, plan: Path | None) -> list[str]:
@@ -982,11 +1001,12 @@ def up(arguments: argparse.Namespace) -> None:
     if arguments.scripted_model is not None:
         plan = run_dir / SCRIPTED_PLAN_NAME
         plan.write_bytes(Path(arguments.scripted_model).read_bytes())
-        environment["EXULANICA_SCRIPTED_MODEL_LOG"] = str(logs / SCRIPTED_LOG_NAME)
+        environment.update(scripted_environment(run_dir, logs, arguments.spending))
         state["scripted_model"] = {
             "plan": str(plan),
             "plan_sha256": hashlib.sha256(plan.read_bytes()).hexdigest(),
             "log": str(logs / SCRIPTED_LOG_NAME),
+            "spending": arguments.spending,
         }
     api_log = logs / "api.log"
     api_pid = spawn(
@@ -1249,7 +1269,9 @@ def restart_api(arguments: argparse.Namespace) -> None:
     )
     scripted = state.get("scripted_model")
     if isinstance(scripted, Mapping):
-        environment["EXULANICA_SCRIPTED_MODEL_LOG"] = scripted["log"]
+        environment.update(
+            scripted_environment(run_dir, logs, scripted.get("spending", SPENDING_MODES[0]))
+        )
     stop(state["pids"]["api"], API_MARKER, "api")
     chosen = state["ports"]
     if listening(chosen["api"]):
@@ -1381,6 +1403,14 @@ def build_parser() -> argparse.ArgumentParser:
                 metavar="PLAN",
                 help="serve the API with scripts/acceptance/scripted_model.py answering model "
                 "requests from PLAN; refused with --model (default: no model)",
+            )
+            command.add_argument(
+                "--spending",
+                choices=SPENDING_MODES,
+                default=SPENDING_MODES[0],
+                help="with --scripted-model, the EXULANICA_SPENDING the API states: the plan's "
+                "process bounds, or the durable authority with its witness in the run directory "
+                "(default: process)",
             )
             command.add_argument(
                 "--read-only-token",

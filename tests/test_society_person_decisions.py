@@ -700,6 +700,25 @@ def test_a_refusal_is_decided_on_money_spent_never_on_calls_under_way():
     assert host_refusal(person_role(), client, manifest, contract) == "process_budget_spent"
 
 
+def test_a_durable_refusal_is_recorded_by_the_authority_s_own_reason():
+    from exulanica.api.decision_host import _failure_reason
+    from exulanica.models.errors import BudgetExceededError
+    from exulanica.models.spending import SPENDING_REFUSALS, SpendingRefused
+
+    asked = {reason for reason in SPENDING_REFUSALS if not reason.startswith("duplicate_")}
+    assert {reason: _failure_reason(SpendingRefused(reason)) for reason in asked} == {
+        reason: reason for reason in asked
+    }
+    assert asked <= DECISION_REASONS
+    # The host asks under no request key; were an idempotency refusal to reach it, it is still
+    # named as the authority not answering, never as a reason it is not.
+    for reason in SPENDING_REFUSALS - asked:
+        assert _failure_reason(SpendingRefused(reason)) == "spending_unavailable"
+    # The process's own fuse keeps its own name.
+    fuse = BudgetExceededError("x", spent_usd=0, ceiling_usd=0)
+    assert _failure_reason(fuse) == "process_budget_spent"
+
+
 def test_every_reason_a_person_decision_records_is_in_the_stated_set():
     from exulanica.api.decision_host import _failure_reason
     from exulanica.models.client import PROVIDER_CREDENTIAL_ABSENT, PROVIDER_NOT_ADMITTED

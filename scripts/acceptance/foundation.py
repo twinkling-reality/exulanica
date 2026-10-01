@@ -97,6 +97,14 @@ SOURCE_FIXTURE = {
 STAND_IN_REVIEWER = "Q10 acceptance stand-in reviewer (synthetic fixture)"
 #: How long the derivative worker may take to group the fixture's scenes.
 GROUPING_SECONDS = 300
+#: F1's reads (interface packet v1.2), by the path the server's OpenAPI document serves them under.
+CAPABILITIES_ROUTE = "/worlds/capabilities"
+VERSION_CAPABILITIES_ROUTE = "/world/versions/{version_id}/capabilities"
+INPUT_PROVENANCE_ROUTE = "/world/versions/{version_id}/society/inputs/{input_seq}"
+OBJECT_ADD = "POST /world/versions/{version_id}/objects"
+MODEL_CHOICE = "POST /world/versions/{version_id}/models/{role_key}"
+#: A region no world lists, for the unlisted-region refusal.
+UNLISTED_REGION = "region:q10-unlisted"
 #: The restrict key every evidence dump is made with, so two dumps of one database are equal.
 EVIDENCE_RESTRICT_KEY = "q10evidence"
 #: A digest no state has, for stale-base refusals.
@@ -371,6 +379,40 @@ def advance(c: Client, step: str, entry: Mapping[str, Any], snapshot: Mapping[st
         query=world_query(entry),
         body={"base_tick": snapshot["current_tick"], "base_state_sha256": snapshot["state_sha256"]},
     )
+
+
+def served_paths(c: Client) -> set[str]:
+    """The paths the server's own OpenAPI document serves: whether a candidate carries a read is
+    decided from the server, never assumed from a lane's plan."""
+    status, document = c.call("openapi", "GET", "/openapi.json")
+    return set(document.get("paths", {})) if status == 200 and isinstance(document, dict) else set()
+
+
+def descriptor(read: Mapping[str, Any], operation: str) -> dict[str, Any] | None:
+    return next((d for d in read.get("operations", []) if d.get("operation") == operation), None)
+
+
+def events_history(c: Client, step: str, entry: Mapping[str, Any]) -> tuple[list[dict], bool]:
+    """Every event, newest first, through the ``before`` cursor when the server serves one; the
+    flag says whether it did (without it only the newest page exists)."""
+    query = {**world_query(entry), "limit": str(EVENTS_LIMIT)}
+    status, body = c.call(step, "GET", version_path(entry, "/society/events"), query=query)
+    if status != 200:
+        raise RuntimeError(f"events read answered {status}: {body}")
+    if "next" not in body:
+        return body["events"], False
+    everything = list(body["events"])
+    while body.get("next"):
+        status, body = c.call(
+            step,
+            "GET",
+            version_path(entry, "/society/events"),
+            query={**query, "before": body["next"]},
+        )
+        if status != 200:
+            raise RuntimeError(f"events page answered {status}: {body}")
+        everything += body["events"]
+    return everything, True
 
 
 def events(c: Client, step: str, entry: Mapping[str, Any]) -> list[dict[str, Any]]:
@@ -700,6 +742,17 @@ def row_a3_source(stack: Stack, w1: Client, w2: Client, out: Path) -> Row:
         sorted(a["blob_sha256"] for a in accepted) == sorted(SOURCE_FIXTURE.values()),
         "intake did not accept exactly the fixture's bytes",
     )
+    _, admission = w1.call("A3", "GET", "/personal-admission")
+    served = admission.get("attestation") if isinstance(admission, dict) else None
+    if served:
+        attestation, row.observed["attestation_source"] = served, "GET /personal-admission"
+    else:
+        row.expect(
+            CAPABILITIES_ROUTE not in served_paths(w1),
+            "a candidate carrying F1's reads serves no attestation (packet 3.7)",
+        )
+        attestation = human_attestation(stack)
+        row.observed["attestation_source"] = "candidate source (no route served it)"
     now = dt.datetime.now(dt.UTC)
     review = {
         "members": [
@@ -724,7 +777,7 @@ def row_a3_source(stack: Stack, w1: Client, w2: Client, out: Path) -> Row:
         "recorded_at": (now - dt.timedelta(seconds=1)).isoformat(),
         "operation": "review",
         "reviewed_by_name": STAND_IN_REVIEWER,
-        "attestation": human_attestation(stack),
+        "attestation": attestation,
     }
     status_review, reviewed = w1.call("A3", "POST", "/personal-admission", body=review)
     row.expect(status_review == 202, f"review answered {status_review}")
@@ -809,25 +862,232 @@ def row_a3_source(stack: Stack, w1: Client, w2: Client, out: Path) -> Row:
     return row.close()
 
 
-def row_a4_discovery(w1: Client, starter: Mapping[str, Any]) -> Row:
+def row_a4_discovery(
+    stack: Stack,
+    w1: Client,
+    w2: Client,
+    read: Client,
+    worlds: Mapping[str, Mapping[str, Any]],
+    out: Path,
+) -> Row:
     row = Row(
         "A4",
         "discover.per_kind",
-        "Per-kind capability discovery (F1): GET /worlds/capabilities and GET "
-        "/world/versions/{v}/capabilities.",
+        "GET /worlds/capabilities states each world kind with the workspace's held count, the "
+        "policy limit and the creation state the creation route would give; each saved world's "
+        "version capabilities list its regions, every listed region is accepted by object add and "
+        "an unlisted one refused 422 invalid_object_data; the society effect of object add is "
+        "authored_affordance_unreachable on a generated town and not on the starter; another "
+        "workspace's version answers as an invented one does; a read-only grant is not permitted "
+        "to write. F1's independent client runs as row A4-client, last, because its edits are not "
+        "bound to the saved worlds.",
     )
-    status_kinds, _ = w1.call("A4", "GET", "/worlds/capabilities")
-    status_version, _ = w1.call(
+    paths = served_paths(w1)
+    if CAPABILITIES_ROUTE not in paths or VERSION_CAPABILITIES_ROUTE not in paths:
+        row.blocked_by.append("F1 capability projection not in this candidate (routes not served)")
+        return row.close()
+    status, kinds = w1.call("A4", "GET", CAPABILITIES_ROUTE)
+    row.expect(status == 200, f"{CAPABILITIES_ROUTE} answered {status}")
+    by_kind = {k["kind"]: k for k in kinds.get("kinds", [])}
+    row.expect(
+        set(by_kind) == {"personal-source", "authored-starter", "generated"},
+        f"kinds listed are {list(by_kind)}",
+    )
+    held = {
+        "authored-starter": 1,
+        "generated": len(worlds.get("towns", [])),
+        "personal-source": 1 if worlds.get("source") else 0,
+    }
+    for kind, count in held.items():
+        row.expect(
+            by_kind.get(kind, {}).get("held") == count,
+            f"{kind} held {by_kind.get(kind, {}).get('held')}, not {count}",
+        )
+    starter_create = (by_kind.get("authored-starter") or {}).get("create") or {}
+    row.expect(
+        (starter_create.get("state"), starter_create.get("code"))
+        == ("unavailable", "saved_world_conflict"),
+        f"starter creation is {starter_create.get('state')} {starter_create.get('code')}",
+    )
+    if held["generated"] >= GENERATED_WORLDS_ALLOWED:
+        town_create = (by_kind.get("generated") or {}).get("create") or {}
+        row.expect(
+            (town_create.get("state"), town_create.get("code"))
+            == ("unavailable", "world_limit_reached"),
+            f"town creation is {town_create.get('state')} {town_create.get('code')}",
+        )
+    _, assets = w1.call("A4", "GET", "/world/assets")
+    cube = next(a for a in assets if a["asset_key"] == "cc0.marker-cube")
+    reads: dict[str, Any] = {}
+    candidates = [("starter", worlds["starter"])]
+    candidates += [("town", worlds["towns"][0])] if worlds.get("towns") else []
+    candidates += [("source", worlds["source"])] if worlds.get("source") else []
+    for label, entry in candidates:
+        entry = read_entry(w1, "A4", entry["entry_id"])
+        path = version_path(entry, "/capabilities")
+        status, caps = w1.call("A4", "GET", path, query=world_query(entry))
+        row.expect(status == 200, f"{label} capabilities answered {status}")
+        regions = caps.get("regions") or {}
+        listed = regions.get("region_ids") or []
+        row.expect(regions.get("state") == "listed" and listed, f"{label} lists no region")
+        add = descriptor(caps, OBJECT_ADD) or {}
+        society_effect = next((e for e in add.get("effects", []) if e.get("on") == "society"), {})
+        unreachable = society_effect.get("code") == "authored_affordance_unreachable"
+        row.expect(
+            unreachable == (label == "town"),
+            f"{label} object add society effect is {society_effect}",
+        )
+        placed = {}
+        for region in [*listed[:1], UNLISTED_REGION]:
+            # Bound to the saved world, as a person's edit is, so the world's resume point
+            # advances with it and later rows edit from where it now stands.
+            current = read_entry(w1, "A4", entry["entry_id"])
+            status_add, added = w1.call(
+                "A4",
+                "POST",
+                version_path(entry, "/objects"),
+                query=world_query(entry),
+                body={
+                    "base_state_sha256": current["authored_state_sha256"],
+                    "saved_entry": resume_point(current),
+                    "object_id": f"a4-{label}-{len(placed)}",
+                    "asset_sha256": cube["content_sha256"],
+                    "region_id": region,
+                    "transform": {
+                        "x_mm": 0,
+                        "y_mm": 0,
+                        "z_mm": 0,
+                        "yaw_microradians": 0,
+                        "scale_milli": 1000,
+                    },
+                    "origin_role": "fictional",
+                },
+            )
+            placed[region] = [status_add, problem_code(added)]
+        row.expect(
+            placed[listed[0]][0] in (200, 201) if listed else False,
+            f"{label} refused its listed region: {placed}",
+        )
+        row.expect(
+            placed[UNLISTED_REGION] == [422, "invalid_object_data"],
+            f"{label} answered an unlisted region {placed[UNLISTED_REGION]}",
+        )
+        reads[label] = {
+            "kind": caps.get("kind"),
+            "regions": regions,
+            "operations": len(caps.get("operations", [])),
+            "society_effect": society_effect,
+            "placements": placed,
+        }
+    starter = read_entry(w1, "A4", worlds["starter"]["entry_id"])
+    invented = {"authored_version_id": str(uuid.uuid4()), "world_id": starter["world_id"]}
+    foreign_status, foreign = w2.call(
         "A4", "GET", version_path(starter, "/capabilities"), query=world_query(starter)
     )
-    row.observed = {"worlds_capabilities": status_kinds, "version_capabilities": status_version}
-    if status_kinds == 404 and status_version == 404:
-        row.blocked_by.append("F1 capability projection not in this candidate (both routes 404)")
+    made_status, made = w2.call(
+        "A4", "GET", version_path(invented, "/capabilities"), query=world_query(invented)
+    )
+    row.expect(
+        foreign_status == made_status == 404
+        and without_identities(foreign, {"entry_id": "-", **starter})
+        == without_identities(made, {"entry_id": "-", **invented}),
+        f"another workspace's version answered {foreign_status}, an invented one {made_status}",
+    )
+    status_read, read_caps = read.call(
+        "A4", "GET", version_path(starter, "/capabilities"), query=world_query(starter)
+    )
+    read_add = descriptor(read_caps, OBJECT_ADD) or {}
+    row.expect(
+        status_read == 200 and read_add.get("permitted") is False,
+        "a read-only grant is shown object add as permitted",
+    )
+    row.observed = {
+        "kind_order": [k["kind"] for k in kinds.get("kinds", [])],
+        "kinds": {
+            k: {
+                "held": v.get("held"),
+                "limit": v.get("limit"),
+                "create": {
+                    "state": (v.get("create") or {}).get("state"),
+                    "code": (v.get("create") or {}).get("code"),
+                },
+            }
+            for k, v in by_kind.items()
+        },
+        "versions": reads,
+        "foreign_vs_invented": [foreign_status, made_status],
+        "read_only_object_add_permitted": read_add.get("permitted"),
+    }
+    return row.close()
+
+
+def row_a4_client(stack: Stack, w1: Client, out: Path) -> Row:
+    """F1's independent client exercising every kind, in its own process. Run after every other
+    row: its edits are not bound to the saved worlds, so each world it edits reads
+    ``authored_version_changed`` afterwards and an entry-bound client is refused there until the
+    person adopts the version (``docs/saved-world-entry.md``). That consequence is recorded."""
+    row = Row(
+        "A4-client",
+        "exulanica_client capabilities --exercise --origin-role fictional",
+        "F1's independent client, in a process of its own with no site packages, discovers each "
+        "saved world's capabilities, makes and rereads the edit each read calls available and is "
+        "refused by name against the replaced base; exit 0.",
+    )
+    if CAPABILITIES_ROUTE not in served_paths(w1):
+        row.blocked_by.append("F1 capability projection not in this candidate (routes not served)")
+        return row.close()
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-S",
+            "-s",
+            "-E",
+            "-m",
+            "exulanica_client",
+            "capabilities",
+            "--base-url",
+            stack.base_url,
+            "--exercise",
+            "--origin-role",
+            "fictional",
+            "--transcript",
+            str(out / "evidence" / "a4-capabilities-client.json"),
+        ],
+        cwd=REPOSITORY / "clients" / "python",
+        env={
+            "EXULANICA_TOKEN": stack.token_file("token").read_text(),
+            "PATH": os.environ.get("PATH", ""),
+        },
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    (out / "evidence" / "a4-capabilities-client.txt").write_text(
+        completed.stdout + completed.stderr
+    )
+    row.expect(completed.returncode == 0, f"F1's independent client exited {completed.returncode}")
+    _, entries = w1.call("A4-client", "GET", "/world-entries")
+    row.observed = {
+        "client_exit": completed.returncode,
+        "saved_worlds_after": [
+            {
+                "title": e.get("title"),
+                "availability": e.get("availability"),
+                "unavailable_reason": e.get("unavailable_reason"),
+            }
+            for e in entries
+        ],
+    }
     return row.close()
 
 
 def row_b1_no_model(
-    stack: Stack, w1: Client, starter: Mapping[str, Any], town: Mapping[str, Any] | None
+    stack: Stack,
+    w1: Client,
+    starter: Mapping[str, Any],
+    town: Mapping[str, Any] | None,
+    w2: Client,
+    peopled: Mapping[str, Any],
 ) -> Row:
     row = Row(
         "B1",
@@ -851,6 +1111,28 @@ def row_b1_no_model(
             "models_not_run_here" in text or "provider_credential_absent" in text,
             f"{label} models states no unavailable reason",
         )
+    decisions: dict[str, Any] = {"served": VERSION_CAPABILITIES_ROUTE in served_paths(w1)}
+    if decisions["served"]:
+        # The decisions effect concerns people, so it is read on the world that holds a society.
+        _, caps = w2.call(
+            "B1", "GET", version_path(peopled, "/capabilities"), query=world_query(peopled)
+        )
+        choice = next(
+            (
+                d
+                for d in caps.get("operations", [])
+                if d.get("operation") == MODEL_CHOICE and d.get("subject") == "person"
+            ),
+            {},
+        )
+        effect = next((e for e in choice.get("effects", []) if e.get("on") == "decisions"), {})
+        row.expect(choice.get("state") == "available", "the person model choice is not available")
+        row.expect(
+            effect.get("state") == "unavailable"
+            and effect.get("code") in ("models_not_run_here", "provider_credential_absent"),
+            f"the decisions effect is {effect}",
+        )
+        decisions |= {"choice_state": choice.get("state"), "decisions_effect": effect}
     status_ask, asked = w1.call(
         "B1",
         "POST",
@@ -865,6 +1147,7 @@ def row_b1_no_model(
         "models": models,
         "ask": {"status": status_ask, "body": asked, "has_code": problem_code(asked) is not None},
         "launcher_model_flag": stack.state.get("model"),
+        "decisions": decisions,
     }
     return row.close()
 
@@ -1250,6 +1533,23 @@ def journey(stack: Stack, w2: Client, entry_id: str, out: Path) -> list[Row]:
         response.expect(found["input_seq"] >= bench_input, "the rest predates the bench's input")
         response.expect(found["action"] == "rest", f"the completed action is {found['action']}")
     response.observed = found or {"minutes_advanced": minutes}
+    history, cursor = events_history(w2, "N1.d", entry)
+    response.observed["history_cursor"] = cursor
+    if cursor:
+        ids = {e["event_id"] for e in history}
+        response.expect(set(seen) <= ids, "the paged history omits events read minute by minute")
+        response.expect(len(ids) == len(history), "the paged history repeats an event")
+        status_bad, bad = w2.call(
+            "N1.d",
+            "GET",
+            version_path(entry, "/society/events"),
+            query={**world_query(entry), "before": "q10-no-such-event"},
+        )
+        response.expect(
+            status_bad == 422 and problem_code(bad) == "invalid_event_cursor",
+            f"a cursor naming no event answered {status_bad} {problem_code(bad)}",
+        )
+        response.observed["history_events"] = len(history)
     rows.append(response.close())
     decoys = [
         e["event_id"]
@@ -1282,7 +1582,7 @@ def journey(stack: Stack, w2: Client, entry_id: str, out: Path) -> list[Row]:
     )
     explain.observed = {"status": status_ask, "body": asked}
     explain.blocked_by += [
-        "scripted-model mode (B2) not yet built; no-model answers 503",
+        "no-model answers 503; a scripted plan answering each request kind of the question path is not yet written",
         "N-G3 (M6/M7): citations lack object_id, input_seq and edit reference",
     ]
     rows.append(explain.close())
@@ -1300,14 +1600,44 @@ def journey(stack: Stack, w2: Client, entry_id: str, out: Path) -> list[Row]:
     ]
     cause.expect(len(added) >= 1, "no edit in the version history names the bench")
     cause.observed = {
-        "join": "event.document.target.object_id -> version.edits[].object_id",
         "edits_naming_bench": [
             {"edit_id": e["edit_id"], "edit_seq": e["edit_seq"], "kind": e["kind"]} for e in added
         ],
     }
-    cause.blocked_by.append(
-        "N-G4 (F1): no read links an event's input_seq to the authored edit; joined by object_id"
-    )
+    if INPUT_PROVENANCE_ROUTE not in served_paths(w2):
+        cause.observed["join"] = "event.document.target.object_id -> version.edits[].object_id"
+        cause.blocked_by.append(
+            "N-G4 (F1): the candidate serves no input provenance read; joined by object_id only"
+        )
+    elif not found:
+        cause.failures.append("no rest at the bench was observed to trace to its edit")
+    else:
+        path = version_path(entry, f"/society/inputs/{found['input_seq']}")
+        status, provenance = w2.call("N1.f", "GET", path, query=world_query(entry))
+        authored = (provenance or {}).get("authored_state") or {}
+        matched = [e for e in version.get("edits", []) if e["edit_seq"] == authored.get("edit_seq")]
+        status_none, none = w2.call(
+            "N1.f", "GET", version_path(entry, "/society/inputs/999999"), query=world_query(entry)
+        )
+        cause.expect(status == 200, f"the input provenance read answered {status}")
+        cause.expect("document" not in (provenance or {}), "the read served the input document")
+        cause.expect(len(matched) == 1, "no single edit has the input's edit_seq")
+        if len(matched) == 1:
+            cause.expect(matched[0]["object_id"] == "bench", "the input's edit is not the bench's")
+            cause.expect(
+                matched[0]["result_state_sha256"] == authored.get("delta_sha256"),
+                "the edit's result digest differs from the input's delta digest",
+            )
+        cause.expect(
+            status_none == 404 and problem_code(none) == "unknown_reference",
+            f"an unknown input answered {status_none} {problem_code(none)}",
+        )
+        cause.observed |= {
+            "join": "event.input_seq -> inputs/{seq}.authored_state.edit_seq -> version.edits[]",
+            "event": found.get("completed_event"),
+            "provenance": provenance,
+            "edit": matched[0] if len(matched) == 1 else None,
+        }
     rows.append(cause.close())
 
     reopen = Row(
@@ -1375,7 +1705,7 @@ def journey(stack: Stack, w2: Client, entry_id: str, out: Path) -> list[Row]:
             "N1.i",
             "journey.companion_edit",
             "The same bench edit through the Companion with identical receipts.",
-            ["M6 not delivered", "scripted-model mode (B2) not yet built"],
+            ["M6 not delivered"],
         ),
         (
             "N1.j",
@@ -1672,10 +2002,26 @@ def baseline(arguments: argparse.Namespace) -> int:
     a2, towns = row_a2_generated(stack, w1)
     rows.append(a2)
     rows.append(row_a3_source(stack, w1, w2, out))
-    rows.append(row_a4_discovery(w1, read_entry(w1, "A4", w1_entry["entry_id"])))
+    held_entries = w1.call("A4", "GET", "/world-entries")[1]
+    source = next((e for e in held_entries if e.get("source_kind") == "personal"), None)
+    rows.append(
+        row_a4_discovery(
+            stack,
+            w1,
+            w2,
+            read_only(),
+            {"starter": w1_entry, "towns": towns, "source": source},
+            out,
+        )
+    )
     rows.append(
         row_b1_no_model(
-            stack, w1, read_entry(w1, "B1", w1_entry["entry_id"]), towns[0] if towns else None
+            stack,
+            w1,
+            read_entry(w1, "B1", w1_entry["entry_id"]),
+            towns[0] if towns else None,
+            w2,
+            read_entry(w2, "B1", w2_entry["entry_id"]),
         )
     )
     own = {
@@ -1692,6 +2038,7 @@ def baseline(arguments: argparse.Namespace) -> int:
     rows.append(existing_tests(out, worktree))
     rows.append(row_c2_client(stack, read_entry(w1, "C2", w1_entry["entry_id"]), out, read_only()))
     rows.append(row_c3_revoke(stack, w1, read_only, read_entry(w1, "C3", w1_entry["entry_id"])))
+    rows.append(row_a4_client(stack, w1, out))
     results = {
         "profile": "q10-foundation-acceptance-results/v1",
         "candidate": stack.state["tree"],

@@ -31,6 +31,7 @@ from exulanica.ingest.vision import NebiusVisionModel
 from exulanica.ingest.worker import DerivativeWorker, lease_seconds_for
 from exulanica.models.client import ModelClient
 from exulanica.models.manifest import Role, load_manifest
+from exulanica.spending import DURABLE, durable_spending_from_env, spending_mode
 from exulanica.store.configured import content_stores
 
 __all__ = [
@@ -43,6 +44,7 @@ __all__ = [
     "WORKSPACES_ENV",
     "main",
     "parse_workspaces",
+    "worker_model_client",
 ]
 
 WORKSPACES_ENV: Final = env_name("WORKSPACE_IDS")
@@ -99,6 +101,29 @@ def _emit(stream: Any, event: str, **fields: Any) -> None:
     )
 
 
+def worker_model_client(
+    environ: Mapping[str, str], database: Database, *, model_client: ModelClient | None = None
+) -> ModelClient | None:
+    """The client the worker asks for a photograph's observation and caption vectors, or None
+    without every credential those roles need.
+
+    How it spends is stated, as the API's is (:func:`exulanica.spending.spending_mode`): a worker
+    holding a credential refuses to start without ``EXULANICA_SPENDING``, and under ``durable``
+    its client, an injected one included, is composed with the durable spending authority, so each
+    call is admitted for the workspace whose rules it carries.
+    """
+    credentials = all(environ.get(name) for name in MODEL_KEY_ENVS)
+    mode = spending_mode(environ, credentials_configured=credentials)
+    client = model_client
+    if client is None and credentials:
+        client = ModelClient(max_attempts=1)
+    if client is not None and mode == DURABLE and client.spending_source is None:
+        client = client.with_spending_source(
+            durable_spending_from_env(environ, database, label="worker")
+        )
+    return client
+
+
 def _build_worker(args: argparse.Namespace, environ: Mapping[str, str]) -> DerivativeWorker:
     database = Database.from_env(environ)
     verify_schema(database)
@@ -109,9 +134,7 @@ def _build_worker(args: argparse.Namespace, environ: Mapping[str, str]) -> Deriv
         AccountWorkspaceSource(account_url, database.url).verify() if account_url else None
     )
 
-    client = (
-        ModelClient(max_attempts=1) if all(environ.get(name) for name in MODEL_KEY_ENVS) else None
-    )
+    client = worker_model_client(environ, database)
     vision = NebiusVisionModel(client) if client is not None else None
     depth = _build_depth(environ)
     detector = _build_detector(environ)

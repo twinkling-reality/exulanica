@@ -86,6 +86,16 @@ def test_a_comparison_asks_on_the_whole_budget_where_the_host_keeps_part_back():
     assert stopped.value.code == "process_budget_spent"
 
 
+def test_a_run_the_spending_authority_refuses_stops_by_the_authority_s_reason():
+    """A receipt's reason stops its run only when it is a run failure code: whatever the decision
+    host records for a durable refusal must be one, or a run the authority refuses asks on."""
+    from exulanica.api.decision_host import _failure_reason
+    from exulanica.models.spending import SPENDING_REFUSALS, SpendingRefused
+
+    recorded = {_failure_reason(SpendingRefused(reason)) for reason in SPENDING_REFUSALS}
+    assert recorded <= RUN_FAILURE_CODES, recorded - RUN_FAILURE_CODES
+
+
 def test_a_run_fails_only_by_a_stated_code():
     assert "process_budget_spent" in RUN_FAILURE_CODES
     with pytest.raises(ValueError, match="stated code"):

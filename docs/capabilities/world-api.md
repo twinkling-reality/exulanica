@@ -97,6 +97,17 @@ proposals are retired. The full contract, including every refusal, is the
 [society contract](../synthetic-society-contract.md); paired experiments with an intervention are
 [society experiments](../society-experiments.md).
 
+### Projects
+
+The `/world/projects` routes keep what a person chose to keep about their work in a world: a project
+bound to one of the world's versions, its goals, preferences, open questions, tasks, decisions naming
+accepted edits and simulated events, their corrections, what the owner shares, and a bounded context
+assembled from them. They take `world_id`, read with `world.read`, write with `world.write` and
+delete with `deletion.write`; every write names the project revision it read. The contract, with
+every route and refusal, is [world project context](../project-context.md), and
+`python -m exulanica_client.project_context` is a two-process example of keeping a project and
+resuming it from another client.
+
 ### The pinned surface
 
 The whole surface, every route with its permission rule and every schema, is pinned in

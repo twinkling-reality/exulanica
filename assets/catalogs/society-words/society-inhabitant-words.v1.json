@@ -960,6 +960,55 @@
       "reason": "Authored: why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py), in the words the People panel uses."
     },
     {
+      "key": "decision_reason.spending_not_granted",
+      "kind": "decision_reason",
+      "code": "spending_not_granted",
+      "words": "no spending grant covers this workspace and the model's service",
+      "reason": "Placeholder words: the page's own wording for this code is not written yet. Why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py)."
+    },
+    {
+      "key": "decision_reason.spending_revoked",
+      "kind": "decision_reason",
+      "code": "spending_revoked",
+      "words": "the spending it ran under was revoked",
+      "reason": "Placeholder words: the page's own wording for this code is not written yet. Why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py)."
+    },
+    {
+      "key": "decision_reason.spending_expired",
+      "kind": "decision_reason",
+      "code": "spending_expired",
+      "words": "the spending it ran under had expired",
+      "reason": "Placeholder words: the page's own wording for this code is not written yet. Why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py)."
+    },
+    {
+      "key": "decision_reason.spending_limit_reached",
+      "kind": "decision_reason",
+      "code": "spending_limit_reached",
+      "words": "a spending limit would have been crossed",
+      "reason": "Placeholder words: the page's own wording for this code is not written yet. Why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py)."
+    },
+    {
+      "key": "decision_reason.spending_suspended",
+      "kind": "decision_reason",
+      "code": "spending_suspended",
+      "words": "spending is held closed until an operator acts",
+      "reason": "Placeholder words: the page's own wording for this code is not written yet. Why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py)."
+    },
+    {
+      "key": "decision_reason.spending_unavailable",
+      "kind": "decision_reason",
+      "code": "spending_unavailable",
+      "words": "the spending record did not answer, so nothing was sent",
+      "reason": "Placeholder words: the page's own wording for this code is not written yet. Why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py)."
+    },
+    {
+      "key": "decision_reason.spending_scope_missing",
+      "kind": "decision_reason",
+      "code": "spending_scope_missing",
+      "words": "the request named no workspace to spend for",
+      "reason": "Placeholder words: the page's own wording for this code is not written yet. Why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py)."
+    },
+    {
       "key": "doing.living_idle",
       "kind": "doing",
       "code": "living_idle",

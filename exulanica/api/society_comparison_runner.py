@@ -122,8 +122,9 @@ _LOG = logging.getLogger(__name__)
 #: process stopped part way, found with receipts and no outcome; a run a host could not play because
 #: the society's inputs are no longer available to it; one the comparison's claims closed before it
 #: was played, after hosts that claimed it kept stopping; one closed because the comparison was
-#: cancelled, before its next dispatch; or a model run whose seed's anchors did not complete, closed
-#: before it asks. A receipt whose reason is one of them stops its run there;
+#: cancelled, before its next dispatch; a model run whose seed's anchors did not complete, closed
+#: before it asks; or the durable spending authority refused the ask, by its own reason, before
+#: anything was sent. A receipt whose reason is one of them stops its run there;
 #: every other reason a turn was not the model's is the model's own, and is reported beside the
 #: score. The page has words for each.
 RUN_FAILURE_CODES: Final = frozenset(
@@ -144,6 +145,13 @@ RUN_FAILURE_CODES: Final = frozenset(
         "provider_not_admitted",
         "question_changed_by_rules",
         "request_refused",
+        "spending_expired",
+        "spending_limit_reached",
+        "spending_not_granted",
+        "spending_revoked",
+        "spending_scope_missing",
+        "spending_suspended",
+        "spending_unavailable",
     }
 )
 #: Why a run with receipts and no outcome is closed: the process that played it stopped part way,

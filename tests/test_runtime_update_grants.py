@@ -83,6 +83,15 @@ RUNTIME_UPDATES: dict[str, str] = {
     "world_interaction_policy_preview": "a preview is applied, discarded or made stale",
     "world_interaction_policy_proposal": "a proposal is applied, discarded or made stale",
     "world_interaction_policy_state": "the current policy version moves, under a lock",
+    "world_project": (
+        "a write moves its revision under FOR UPDATE; a deletion sets withdrawn_at "
+        "(world/project_context.py)"
+    ),
+    "world_project_item": (
+        "items are accepted, resolved, corrected and deleted, under FOR UPDATE or FOR SHARE "
+        "(world/project_context.py)"
+    ),
+    "world_project_share": "stopping a share sets withdrawn_at (world/project_context.py)",
     "world_society": "a society advances its tick and state; request triggers lock it",
     "world_society_control": "playback leases, pauses and schedules; event triggers lock it",
     "world_structure_preview": "a preview is applied, discarded or made stale, under a lock",

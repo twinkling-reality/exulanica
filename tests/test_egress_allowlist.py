@@ -485,7 +485,9 @@ def test_readiness_reports_whether_the_allowlist_is_set_and_never_its_value():
 def test_a_deployment_with_a_model_key_and_no_allowlist_does_not_start(tmp_path, sockets):
     from exulanica.api.services import build_services
 
-    environ = _deployment_environ(tmp_path, NEBIUS_API_KEY="test-key-not-real")
+    environ = _deployment_environ(
+        tmp_path, **{"NEBIUS_API_KEY": "test-key-not-real", "EXULANICA_SPENDING": "process"}
+    )
     with pytest.MonkeyPatch.context() as patch:
         for name, value in environ.items():
             patch.setenv(name, value)

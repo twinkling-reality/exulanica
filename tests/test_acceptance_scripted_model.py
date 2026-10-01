@@ -74,6 +74,11 @@ def test_build_refuses_a_reachable_provider_before_it_reads_the_plan(tmp_path):
         SCRIPTED.build(tmp_path / "absent.json", {"NEBIUS_API_KEY": "key"})
 
 
+def test_durable_spending_without_its_witness_is_refused(tmp_path):
+    with pytest.raises(SystemExit, match="EXULANICA_SPENDING_WITNESS_DIR"):
+        SCRIPTED.build(_plan(tmp_path), {"EXULANICA_SPENDING": "durable"})
+
+
 @pytest.mark.parametrize(
     ("overrides", "reason"),
     [

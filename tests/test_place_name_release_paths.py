@@ -314,6 +314,8 @@ class Instance:
         environ = {
             worker_command.DATA_DIR_ENV: str(self.tmp_path / "worker"),
             **dict.fromkeys(worker_command.MODEL_KEY_ENVS, "test-key-not-real"),
+            # A worker holding a provider credential states how it spends.
+            "EXULANICA_SPENDING": "process",
         }
         return worker_command._build_worker(args, environ)
 

@@ -24,6 +24,7 @@ capability is a rule. The first may inform the next question and may never autho
 from __future__ import annotations
 
 import datetime as dt
+import re
 import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
@@ -37,7 +38,10 @@ from exulanica.epistemics.saved_names import PLACEHOLDER
 from exulanica.errors import ExulanicaError, TombstonedError
 
 __all__ = [
+    "NO_INHABITANTS",
     "NO_NAMES",
+    "NO_SPOTS",
+    "SIMULATED_LABEL",
     "AnswerCitation",
     "AnswerComposed",
     "AnswerOrigin",
@@ -51,6 +55,9 @@ __all__ = [
     "MemoryStatus",
     "RecordedAnswer",
     "RecordedEscape",
+    "SimulatedInhabitant",
+    "SimulationCitation",
+    "UnavailableSimulationSource",
     "UnknownCompanionMemory",
 ]
 
@@ -75,6 +82,23 @@ ABSTENTIONS: Final = frozenset(
 #: An answer that names nothing. Shared and read-only, so no answer can grow another's map.
 NO_NAMES: Final[Mapping[str, uuid.UUID]] = MappingProxyType({})
 
+#: An ``[inhabitant X]`` or ``[spot X]`` label, as an answer about a world's simulated people writes
+#: one. ``exulanica.selection.society_question.SIMULATED_PLACEHOLDER`` writes them and this plane
+#: may not import it; ``tests/test_companion_memory_simulation.py`` holds the two equal.
+SIMULATED_LABEL: Final = re.compile(r"\[(?:inhabitant|spot) [A-Z]+\]")
+_INHABITANT_LABEL: Final = re.compile(r"\[inhabitant [A-Z]+\]")
+_SPOT_LABEL: Final = re.compile(r"\[spot [A-Z]+\]")
+
+#: The most simulation citations and labels one remembered answer keeps: the rail's bound, as for
+#: photograph citations.
+MAX_SIMULATION_CITATIONS: Final = 64
+MAX_SIMULATED_LABELS: Final = 64
+
+#: How many times a deletion is tried when the database ended it to break a lock cycle. Items of
+#: world projects drawn from an answer are withdrawn with it (0127), and a deletion reaching copies
+#: of them can meet another deletion coming the other way.
+_DEADLOCK_ATTEMPTS: Final = 3
+
 
 class CompanionMemoryError(ExulanicaError):
     """Base class for failures owned by durable Companion memory."""
@@ -86,6 +110,15 @@ class UnknownCompanionMemory(CompanionMemoryError):
 
 class InvalidCompanionMemory(CompanionMemoryError):
     """A recorded answer, citation, or escape is not in the shape this plane accepts."""
+
+
+class UnavailableSimulationSource(CompanionMemoryError):
+    """An answer cites a simulated event on a version whose source a deletion invalidated.
+
+    The forward half of the rule 0043 applies to photographs: a citation of evidence already
+    withdrawn is refused rather than kept. The society's own read answers the same fact with
+    ``unavailable_society_input``.
+    """
 
 
 class MemoryStatus(StrEnum):
@@ -156,6 +189,43 @@ class AnswerCitation:
 
 
 @dataclass(frozen=True, slots=True)
+class SimulationCitation:
+    """One simulated record an answer about a world's people quoted, in reading order.
+
+    Ids only, as the answer route served them (``SimulationCitationView``): the line is read
+    again, under the society's current authorization, when the answer is drawn. A simulation is
+    never a memory, so nothing here is evidence of anybody's visit anywhere.
+    """
+
+    ordinal: int
+    #: ``synthetic_inhabitant`` for a person's state, ``simulation_event`` for an event.
+    result_kind: str
+    version_id: uuid.UUID
+    inhabitant_id: uuid.UUID
+    event_id: uuid.UUID | None
+    tick: int
+    #: The society input the event's minute consumed, the placed object its target names and the
+    #: version edit that last set that object: what explains an event by the edit behind it.
+    input_seq: int | None = None
+    object_id: str | None = None
+    edit_seq: int | None = None
+    edit_id: uuid.UUID | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class SimulatedInhabitant:
+    """Whom an ``[inhabitant X]`` label stood for: an id in one version's society, never a name."""
+
+    version_id: uuid.UUID
+    inhabitant_id: uuid.UUID
+
+
+#: An answer that labels no simulated person or place.
+NO_INHABITANTS: Final[Mapping[str, SimulatedInhabitant]] = MappingProxyType({})
+NO_SPOTS: Final[Mapping[str, str]] = MappingProxyType({})
+
+
+@dataclass(frozen=True, slots=True)
 class CompanionAnswer:
     answer_id: uuid.UUID
     asked_at: dt.datetime
@@ -185,6 +255,12 @@ class CompanionAnswer:
     #: unknown: the attempts line drawn under the answer.
     unanswered_attempts: int
     unanswered_cost_unknown: bool
+    #: For an answer about a world's simulated people: the world, what it cited and whom and
+    #: where its labels stood for. Empty for an answer about photographs.
+    world_id: str | None = None
+    simulation_citations: tuple[SimulationCitation, ...] = ()
+    inhabitants: Mapping[str, SimulatedInhabitant] = field(default_factory=lambda: NO_INHABITANTS)
+    spots: Mapping[str, str] = field(default_factory=lambda: NO_SPOTS)
 
 
 @dataclass(frozen=True, slots=True)
@@ -219,6 +295,13 @@ class RecordedAnswer:
     unanswered_cost_unknown: bool
     #: The answer's own ``names``, as the answer route served it: placeholder to entity id.
     names: Mapping[str, uuid.UUID] = field(default_factory=lambda: NO_NAMES)
+    #: For an answer about a world's simulated people, as the answer route served it: the world
+    #: asked about, the ``simulation`` citations in reading order, and ``inhabitants`` and
+    #: ``spots``. An answer carries photograph citations or simulation citations, never both.
+    world_id: str | None = None
+    simulation_citations: tuple[SimulationCitation, ...] = ()
+    inhabitants: Mapping[str, SimulatedInhabitant] = field(default_factory=lambda: NO_INHABITANTS)
+    spots: Mapping[str, str] = field(default_factory=lambda: NO_SPOTS)
 
 
 @dataclass(frozen=True, slots=True)
@@ -284,9 +367,13 @@ class CompanionMemoryRepository:
         ids = tuple(row["answer_id"] for row in rows)
         citations = self._citations_for(ids)
         names = self._names_for(ids)
+        simulated = self._simulation_for(ids)
         answers = tuple(
             _row_to_answer(
-                row, citations.get(row["answer_id"], ()), names.get(row["answer_id"], NO_NAMES)
+                row,
+                citations.get(row["answer_id"], ()),
+                names.get(row["answer_id"], NO_NAMES),
+                simulated.get(row["answer_id"]),
             )
             for row in rows
         )
@@ -318,7 +405,13 @@ class CompanionMemoryRepository:
             raise UnknownCompanionMemory(f"no companion memory {answer_id}")
         citations = self._citations_for((answer_id,))
         names = self._names_for((answer_id,))
-        return _row_to_answer(row, citations.get(answer_id, ()), names.get(answer_id, NO_NAMES))
+        simulated = self._simulation_for((answer_id,))
+        return _row_to_answer(
+            row,
+            citations.get(answer_id, ()),
+            names.get(answer_id, NO_NAMES),
+            simulated.get(answer_id),
+        )
 
     def _citations_for(
         self, answer_ids: Sequence[uuid.UUID]
@@ -358,6 +451,48 @@ class CompanionMemoryRepository:
             grouped.setdefault(row["answer_id"], {})[row["label"]] = row["entity_id"]
         return {answer_id: MappingProxyType(items) for answer_id, items in grouped.items()}
 
+    def _simulation_for(self, answer_ids: Sequence[uuid.UUID]) -> dict[uuid.UUID, _Simulated]:
+        """Every simulation citation and label for a set of answers, in two queries."""
+        if not answer_ids:
+            return {}
+        grouped: dict[uuid.UUID, _Simulated] = {}
+        for row in self.connection.execute(
+            "select answer_id, ordinal, result_kind, world_id, version_id, inhabitant_id, "
+            "event_id, tick, input_seq, object_id, edit_seq, edit_id "
+            "from companion_answer_simulation_citation "
+            "where workspace_id=%s and answer_id = any(%s) order by answer_id, ordinal",
+            (self.workspace_id, list(answer_ids)),
+        ).fetchall():
+            simulated = grouped.setdefault(row["answer_id"], _Simulated(row["world_id"]))
+            simulated.citations.append(
+                SimulationCitation(
+                    ordinal=row["ordinal"],
+                    result_kind=row["result_kind"],
+                    version_id=row["version_id"],
+                    inhabitant_id=row["inhabitant_id"],
+                    event_id=row["event_id"],
+                    tick=row["tick"],
+                    input_seq=row["input_seq"],
+                    object_id=row["object_id"],
+                    edit_seq=row["edit_seq"],
+                    edit_id=row["edit_id"],
+                )
+            )
+        for row in self.connection.execute(
+            "select answer_id, label, version_id, inhabitant_id, spot_target "
+            "from companion_answer_simulation_label "
+            "where workspace_id=%s and answer_id = any(%s) order by answer_id, label",
+            (self.workspace_id, list(answer_ids)),
+        ).fetchall():
+            simulated = grouped.setdefault(row["answer_id"], _Simulated(None))
+            if row["spot_target"] is None:
+                simulated.inhabitants[row["label"]] = SimulatedInhabitant(
+                    row["version_id"], row["inhabitant_id"]
+                )
+            else:
+                simulated.spots[row["label"]] = row["spot_target"]
+        return grouped
+
     # -- writes ---------------------------------------------------------------------------
 
     def record_answer(self, recorded: RecordedAnswer) -> CompanionAnswer:
@@ -382,6 +517,7 @@ class CompanionMemoryRepository:
             row,
             tuple(sorted(recorded.citations, key=_by_ordinal)),
             MappingProxyType(dict(recorded.names)),
+            _Simulated.of(recorded),
         )
 
     def _insert_answer(self, recorded: RecordedAnswer) -> Mapping[str, Any]:
@@ -413,6 +549,7 @@ class CompanionMemoryRepository:
             assert row is not None
             self._insert_citations(row["answer_id"], recorded.citations)
             self._insert_names(row["answer_id"], recorded.names)
+            self._insert_simulation(row["answer_id"], recorded)
         return row
 
     def record_escape(self, recorded: RecordedEscape) -> CompanionEscape:
@@ -528,6 +665,23 @@ class CompanionMemoryRepository:
                 "where workspace_id=%s and answer_id=%s",
                 (self.workspace_id, row["answer_id"], self.workspace_id, answer_id),
             )
+            # The simulated records it quoted and whom its labels stood for, verbatim, for the
+            # reason the citations above are copied: the same question about the same world.
+            self.connection.execute(
+                "insert into companion_answer_simulation_citation (workspace_id,answer_id,"
+                "ordinal,result_kind,world_id,version_id,inhabitant_id,event_id,tick,input_seq,"
+                "object_id,edit_seq,edit_id) select %s,%s,ordinal,result_kind,world_id,version_id,"
+                "inhabitant_id,event_id,tick,input_seq,object_id,edit_seq,edit_id "
+                "from companion_answer_simulation_citation where workspace_id=%s and answer_id=%s",
+                (self.workspace_id, row["answer_id"], self.workspace_id, answer_id),
+            )
+            self.connection.execute(
+                "insert into companion_answer_simulation_label (workspace_id,answer_id,label,"
+                "version_id,inhabitant_id,spot_target) select %s,%s,label,version_id,"
+                "inhabitant_id,spot_target from companion_answer_simulation_label "
+                "where workspace_id=%s and answer_id=%s",
+                (self.workspace_id, row["answer_id"], self.workspace_id, answer_id),
+            )
             self.connection.execute(
                 "update companion_answer set status='superseded', superseded_at=now() "
                 "where workspace_id=%s and answer_id=%s",
@@ -535,8 +689,12 @@ class CompanionMemoryRepository:
             )
         citations = self._citations_for((row["answer_id"],))
         names = self._names_for((row["answer_id"],))
+        simulated = self._simulation_for((row["answer_id"],))
         return _row_to_answer(
-            row, citations.get(row["answer_id"], ()), names.get(row["answer_id"], NO_NAMES)
+            row,
+            citations.get(row["answer_id"], ()),
+            names.get(row["answer_id"], NO_NAMES),
+            simulated.get(row["answer_id"]),
         )
 
     def withdraw(self, answer_id: uuid.UUID) -> None:
@@ -552,6 +710,28 @@ class CompanionMemoryRepository:
         conversation rather than a tombstone reaching it. Migration 0043 keeps the two
         distinguishable on purpose.
         """
+        for attempt in range(1, _DEADLOCK_ATTEMPTS + 1):
+            try:
+                self._withdraw(answer_id)
+                return
+            except psycopg.errors.DeadlockDetected:
+                if attempt == _DEADLOCK_ATTEMPTS:
+                    raise
+
+    def _withdraw(self, answer_id: uuid.UUID) -> None:
+        lineage = (
+            "with recursive lineage(answer_id) as ("
+            "  select answer_id from companion_answer"
+            "   where workspace_id=%(ws)s and actor_id=%(actor)s and answer_id=%(seed)s"
+            "  union"
+            "  select a.answer_id from companion_answer a join lineage l"
+            "    on a.workspace_id=%(ws)s"
+            "   and (a.supersedes = l.answer_id or a.answer_id = ("
+            "         select s.supersedes from companion_answer s"
+            "          where s.workspace_id=%(ws)s and s.answer_id = l.answer_id))"
+            ") "
+        )
+        names = {"ws": self.workspace_id, "actor": self.actor_id, "seed": answer_id}
         with self.connection.transaction():
             found = self.connection.execute(
                 "select 1 from companion_answer "
@@ -560,22 +740,22 @@ class CompanionMemoryRepository:
             ).fetchone()
             if found is None:
                 raise UnknownCompanionMemory(f"no companion memory {answer_id}")
+            # Locked in id order first, the order a project item drawn from these answers holds
+            # them in; an update visits its rows in no order at all (0127's lock order).
+            self.connection.execute(
+                lineage + "select a.answer_id from companion_answer a "
+                "where a.workspace_id=%(ws)s and a.actor_id=%(actor)s "
+                "and a.answer_id in (select answer_id from lineage) and a.status<>'withdrawn' "
+                "order by a.answer_id for update of a",
+                names,
+            )
             # A recursive walk rather than a loop in Python, so the whole lineage is withdrawn in
             # one statement and a chain cannot be half-deleted by a failure partway along it.
             self.connection.execute(
-                "with recursive lineage(answer_id) as ("
-                "  select answer_id from companion_answer"
-                "   where workspace_id=%(ws)s and actor_id=%(actor)s and answer_id=%(seed)s"
-                "  union"
-                "  select a.answer_id from companion_answer a join lineage l"
-                "    on a.workspace_id=%(ws)s"
-                "   and (a.supersedes = l.answer_id or a.answer_id = ("
-                "         select s.supersedes from companion_answer s"
-                "          where s.workspace_id=%(ws)s and s.answer_id = l.answer_id))"
-                ") update companion_answer set status='withdrawn', withdrawn_at=now() "
+                lineage + "update companion_answer set status='withdrawn', withdrawn_at=now() "
                 "where workspace_id=%(ws)s and actor_id=%(actor)s "
                 "and answer_id in (select answer_id from lineage) and status<>'withdrawn'",
-                {"ws": self.workspace_id, "actor": self.actor_id, "seed": answer_id},
+                names,
             )
 
     # -- internal validation and rows -----------------------------------------------------
@@ -600,6 +780,92 @@ class CompanionMemoryRepository:
                 "insert into companion_answer_name (workspace_id,answer_id,label,entity_id) "
                 "values (%s,%s,%s,%s)",
                 (self.workspace_id, answer_id, label, entity_id),
+            )
+
+    def _insert_simulation(self, answer_id: uuid.UUID, recorded: RecordedAnswer) -> None:
+        """Keep what an answer about a world's people cited, refusing a record that is not there.
+
+        Each version must be the world's own, and each event the version's society's own at the
+        tick cited, or the answer is an unknown reference; a version whose source a deletion
+        invalidated is refused, as a withdrawn photograph's citation is (0043's forward half).
+        """
+        if not recorded.simulation_citations and not recorded.inhabitants and not recorded.spots:
+            return
+        versions = sorted(
+            {c.version_id for c in recorded.simulation_citations}
+            | {i.version_id for i in recorded.inhabitants.values()}
+        )
+        found = {
+            row["version_id"]: row["invalidated"]
+            for row in self.connection.execute(
+                "select v.version_id, exists (select 1 from world_structure_invalidation i "
+                "where i.workspace_id=v.workspace_id and i.world_id=v.world_id "
+                "and i.snapshot_id=v.source_snapshot_id) as invalidated "
+                "from world_alternate_version v where v.workspace_id=%s and v.world_id=%s "
+                "and v.version_id = any(%s)",
+                (self.workspace_id, recorded.world_id, versions),
+            ).fetchall()
+        }
+        if set(found) != set(versions):
+            raise UnknownCompanionMemory("this answer cites a version that is not in this world")
+        if any(found.values()):
+            raise UnavailableSimulationSource(
+                "this answer cites a simulation whose source has been deleted, so it was not kept"
+            )
+        events = [c for c in recorded.simulation_citations if c.event_id is not None]
+        if events:
+            held = {
+                (row["event_id"], row["version_id"], row["tick"])
+                for row in self.connection.execute(
+                    "select e.event_id, s.version_id, e.tick from world_society_event e "
+                    "join world_society s on s.workspace_id=e.workspace_id "
+                    "and s.society_id=e.society_id where e.workspace_id=%s and s.world_id=%s "
+                    "and e.event_id = any(%s)",
+                    (self.workspace_id, recorded.world_id, [c.event_id for c in events]),
+                ).fetchall()
+            }
+            if any((c.event_id, c.version_id, c.tick) not in held for c in events):
+                raise UnknownCompanionMemory(
+                    "this answer cites a simulated event that is not in this world"
+                )
+        for citation in sorted(recorded.simulation_citations, key=_by_ordinal):
+            self.connection.execute(
+                "insert into companion_answer_simulation_citation (workspace_id,answer_id,"
+                "ordinal,result_kind,world_id,version_id,inhabitant_id,event_id,tick,input_seq,"
+                "object_id,edit_seq,edit_id) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+                (
+                    self.workspace_id,
+                    answer_id,
+                    citation.ordinal,
+                    citation.result_kind,
+                    recorded.world_id,
+                    citation.version_id,
+                    citation.inhabitant_id,
+                    citation.event_id,
+                    citation.tick,
+                    citation.input_seq,
+                    citation.object_id,
+                    citation.edit_seq,
+                    citation.edit_id,
+                ),
+            )
+        for label, inhabitant in sorted(recorded.inhabitants.items()):
+            self.connection.execute(
+                "insert into companion_answer_simulation_label (workspace_id,answer_id,label,"
+                "version_id,inhabitant_id) values (%s,%s,%s,%s,%s)",
+                (
+                    self.workspace_id,
+                    answer_id,
+                    label,
+                    inhabitant.version_id,
+                    inhabitant.inhabitant_id,
+                ),
+            )
+        for label, target in sorted(recorded.spots.items()):
+            self.connection.execute(
+                "insert into companion_answer_simulation_label (workspace_id,answer_id,label,"
+                "spot_target) values (%s,%s,%s,%s)",
+                (self.workspace_id, answer_id, label, target),
             )
 
     @staticmethod
@@ -634,9 +900,10 @@ class CompanionMemoryRepository:
             raise InvalidCompanionMemory(
                 "an answer's names map placeholders, and only placeholders"
             )
+        _validate_simulation(recorded)
 
 
-def _by_ordinal(citation: AnswerCitation) -> int:
+def _by_ordinal(citation: AnswerCitation | SimulationCitation) -> int:
     return citation.ordinal
 
 
@@ -672,11 +939,83 @@ def _refusal(exc: psycopg.Error) -> Exception:
     return InvalidCompanionMemory(message)
 
 
+@dataclass(slots=True)
+class _Simulated:
+    """What one answer about a world's people kept, gathered from its rows or its request."""
+
+    world_id: str | None
+    citations: list[SimulationCitation] = field(default_factory=list)
+    inhabitants: dict[str, SimulatedInhabitant] = field(default_factory=dict)
+    spots: dict[str, str] = field(default_factory=dict)
+
+    @classmethod
+    def of(cls, recorded: RecordedAnswer) -> _Simulated:
+        return cls(
+            recorded.world_id,
+            sorted(recorded.simulation_citations, key=_by_ordinal),
+            dict(recorded.inhabitants),
+            dict(recorded.spots),
+        )
+
+
+def _validate_simulation(recorded: RecordedAnswer) -> None:
+    """An answer about a world's people, held to the shape the answer route serves.
+
+    Photograph citations and simulation citations are never both on one answer: a simulated event
+    is not evidence about a photograph, and the two may not borrow each other's truth status.
+    """
+    simulated = bool(recorded.simulation_citations)
+    if recorded.world_id is not None and (
+        not recorded.world_id.strip() or len(recorded.world_id) > 200
+    ):
+        raise InvalidCompanionMemory("a world id is 1 to 200 characters")
+    if simulated != (recorded.world_id is not None):
+        raise InvalidCompanionMemory(
+            "an answer names its world exactly when it cites the world's simulated people"
+        )
+    # A label stands for someone or somewhere a simulated record cited; with none, nothing ties
+    # it to the world it was drawn from.
+    if (recorded.inhabitants or recorded.spots) and not simulated:
+        raise InvalidCompanionMemory("an answer's labels stand for what its simulation cites")
+    if simulated and (recorded.citations or recorded.names):
+        raise InvalidCompanionMemory("an answer cites photographs or a simulation, never both")
+    if len(recorded.simulation_citations) > MAX_SIMULATION_CITATIONS:
+        raise InvalidCompanionMemory(
+            f"an answer keeps at most {MAX_SIMULATION_CITATIONS} simulation citations"
+        )
+    if len(recorded.inhabitants) + len(recorded.spots) > MAX_SIMULATED_LABELS:
+        raise InvalidCompanionMemory(f"an answer keeps at most {MAX_SIMULATED_LABELS} labels")
+    ordinals = [c.ordinal for c in recorded.simulation_citations]
+    if len(set(ordinals)) != len(ordinals) or any(o < 0 or o > 4096 for o in ordinals):
+        raise InvalidCompanionMemory("each simulation citation has its own reading position")
+    for citation in recorded.simulation_citations:
+        if citation.result_kind not in ("synthetic_inhabitant", "simulation_event"):
+            raise InvalidCompanionMemory("a simulation citation is a person's state or an event")
+        if (citation.result_kind == "simulation_event") != (citation.event_id is not None):
+            raise InvalidCompanionMemory("an event citation names its event, and only it does")
+        if citation.tick < 0 or (citation.input_seq is not None and citation.input_seq < 1):
+            raise InvalidCompanionMemory("a tick is not negative and an input is counted from 1")
+        if (citation.edit_seq is None) != (citation.edit_id is None) or (
+            citation.edit_seq is not None and citation.edit_seq < 1
+        ):
+            raise InvalidCompanionMemory("an edit is named by its sequence and its id together")
+        if citation.object_id is not None and not 1 <= len(citation.object_id) <= 200:
+            raise InvalidCompanionMemory("an object id is 1 to 200 characters")
+    if any(_INHABITANT_LABEL.fullmatch(label) is None for label in recorded.inhabitants):
+        raise InvalidCompanionMemory("an answer's inhabitants map [inhabitant X] labels only")
+    if any(_SPOT_LABEL.fullmatch(label) is None for label in recorded.spots):
+        raise InvalidCompanionMemory("an answer's spots map [spot X] labels only")
+    if any(not 1 <= len(target) <= 500 for target in recorded.spots.values()):
+        raise InvalidCompanionMemory("a spot names its target in 1 to 500 characters")
+
+
 def _row_to_answer(
     row: Mapping[str, Any],
     citations: tuple[AnswerCitation, ...],
     names: Mapping[str, uuid.UUID],
+    simulated: _Simulated | None = None,
 ) -> CompanionAnswer:
+    simulated = simulated or _Simulated(None)
     return CompanionAnswer(
         row["answer_id"],
         row["asked_at"],
@@ -699,6 +1038,10 @@ def _row_to_answer(
         row["used_fallback"],
         row["unanswered_attempts"],
         row["unanswered_cost_unknown"],
+        simulated.world_id,
+        tuple(simulated.citations),
+        MappingProxyType(dict(simulated.inhabitants)),
+        MappingProxyType(dict(simulated.spots)),
     )
 
 

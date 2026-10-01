@@ -1,7 +1,8 @@
 """What a server says a caller can do with its worlds, read from the server and checked against it.
 
     EXULANICA_TOKEN=<token> python -m exulanica_client capabilities \\
-        --base-url http://127.0.0.1:8000 [--exercise] --transcript capabilities.json
+        --base-url http://127.0.0.1:8000 [--exercise --origin-role fictional [--world WORLD_ID]] \\
+        --transcript capabilities.json
 
 Two reads answer it, each the server's own statement: ``GET /worlds/capabilities`` for making each
 kind of world, and ``GET /world/versions/{version_id}/capabilities`` for the version each saved
@@ -12,11 +13,16 @@ module reads both for every saved world of the token's workspace and checks ever
 against the OpenAPI document the same server serves, so a descriptor naming something the server
 does not document is reported rather than trusted.
 
-With ``--exercise`` it also makes one edit in each saved world, chosen from what the reads call
-available rather than from a list in this client: an arrangement, previewed and then applied, where
-one is available, otherwise one reviewed object placed in a region the read lists. It then sends
-the same request again against the base it has just replaced, which the server must refuse by name,
-and reads the base again from the read the descriptor names. Nothing here knows a world's kind.
+With ``--exercise`` it also makes a world of the run's own, of the first kind the creation read
+calls available to this token: a starter in a workspace that holds no saved world, otherwise a
+generated town. It makes one edit there, chosen from what the version read calls available rather
+than from a list in this client: an arrangement, previewed and then applied, where one is available,
+otherwise one reviewed object placed in a region the read lists. The edit is bound to the new
+world's saved entry, so that world opens where the edit left it. It then sends the same request
+again, unbound, against the base it has just replaced, which the server must refuse by name; reads
+the base again from the read the descriptor names; and checks that every saved world that was there
+before the run is as it was. With ``--world`` it edits that existing world instead, unbound, and
+says so: that saved world opens again only once its new version is adopted.
 """
 
 from __future__ import annotations
@@ -25,13 +31,16 @@ import urllib.parse
 from collections.abc import Callable, Iterator, Mapping
 from typing import Any
 
-from .client import WorldClient
+from .client import WorldClient, resume_point
 
 __all__ = [
     "CREATION",
+    "EXERCISE_TITLE",
     "descriptor_checks",
     "documented_routes",
     "exercise",
+    "exercise_run",
+    "make_world",
     "print_capabilities",
     "read_capabilities",
 ]
@@ -43,27 +52,33 @@ _PREVIEW_ARRANGEMENT = "POST /world/versions/{version_id}/arrangements/preview"
 _APPLY_ARRANGEMENT = "POST /world/versions/{version_id}/arrangements/apply"
 #: A placed object faces its region's own axes at its reviewed size.
 _UPRIGHT = {"yaw_microradians": 0, "scale_milli": 1000}
+#: The creation routes an exercise makes its own world with, in the order it tries them, and the
+#: body each takes. A world from photographs needs photographs this client does not have.
+_MAKERS = ("POST /world-entries/starter", "POST /worlds/generated")
+#: The title of the world an exercise makes.
+EXERCISE_TITLE = "Developer client exercise"
 
 
 def read_capabilities(client: WorldClient) -> dict[str, Any]:
     """Both reads: making worlds, and each saved world's version."""
-    worlds = []
-    for entry in client.saved_worlds():
-        worlds.append(
-            {
-                "entry_id": entry["entry_id"],
-                "title": entry["title"],
-                "world_id": entry["world_id"],
-                "source_kind": entry["source_kind"],
-                "capabilities": client.get(
-                    "/world/versions/"
-                    + urllib.parse.quote(entry["authored_version_id"], safe="")
-                    + "/capabilities",
-                    query={"world_id": entry["world_id"]},
-                ),
-            }
-        )
+    worlds = [_world(client, entry) for entry in client.saved_worlds()]
     return {"creation": client.get(CREATION), "worlds": worlds}
+
+
+def _world(client: WorldClient, entry: Mapping[str, Any]) -> dict[str, Any]:
+    """One saved world as the reads describe it: its entry and its version's capabilities."""
+    return {
+        "entry_id": entry["entry_id"],
+        "title": entry["title"],
+        "world_id": entry["world_id"],
+        "source_kind": entry["source_kind"],
+        "capabilities": client.get(
+            "/world/versions/"
+            + urllib.parse.quote(entry["authored_version_id"], safe="")
+            + "/capabilities",
+            query={"world_id": entry["world_id"]},
+        ),
+    }
 
 
 def documented_routes(openapi: Mapping[str, Any]) -> set[str]:
@@ -216,10 +231,15 @@ def _arrangement(
 
 def _placement(
     client: WorldClient, world: Mapping[str, Any], placing: Mapping[str, Any], origin_role: str
-) -> dict[str, Any]:
-    """One reviewed object, whose bytes this server holds, in the first region the read lists."""
+) -> dict[str, Any] | str:
+    """One reviewed object, whose bytes this server holds, in the first region the read lists; or
+    why no object can be placed."""
+    if not world["capabilities"]["regions"]["region_ids"]:
+        return "the read lists no region to place into"
     assets = client.get(_path(placing["options"][0], {})[1])
-    asset = next(asset for asset in assets if asset["availability"] == "available")
+    asset = next((asset for asset in assets if asset["availability"] == "available"), None)
+    if asset is None:
+        return "the assets read lists no asset whose bytes this server holds"
     return {
         "object_id": "developer-client:capabilities",
         "asset_sha256": asset["content_sha256"],
@@ -236,11 +256,14 @@ def exercise(
     entry: Mapping[str, Any],
     *,
     origin_role: str,
+    bind: bool,
     step: Callable[[str], None] = lambda _name: None,
 ) -> dict[str, Any]:
     """One available edit in ``world``: an arrangement previewed first where one is available and
     shows ready, else one reviewed object placed; applied; sent again against the base it replaced
-    to be refused; and its base read again. Returns what happened."""
+    to be refused; and its base read again. With ``bind`` the edit is bound to the saved world's
+    entry, as the walkthrough's edits are, and the saved world is read again: it must still open
+    where the edit left it. Returns what happened."""
     capabilities = world["capabilities"]
     world_id = world["world_id"]
     applying = _find(capabilities, _APPLY_ARRANGEMENT)
@@ -254,16 +277,31 @@ def exercise(
         descriptor = applying if body is not None else None
         record["preview"] = "ready" if body is not None else "not ready where the person stands"
     if body is None and _usable(placing) and placing is not None:
-        body, descriptor = _placement(client, world, placing, origin_role), placing
+        placed = _placement(client, world, placing, origin_role)
+        if isinstance(placed, str):
+            record["result"] = f"no object can be placed: {placed}"
+            record["checks"] = [
+                {
+                    "check": f"{world['title']!r}: an edit the read calls available can be made",
+                    "holds": False,
+                }
+            ]
+            return record
+        body, descriptor = placed, placing
     if body is None or descriptor is None:
         record["result"] = "no edit is available to this token in this world"
         record["checks"] = []
         return record
+    # Bound, the saved world advances with the edit, or neither does; unbound, the saved world
+    # opens again only once its new version is adopted. A preview writes nothing and takes none.
+    bound = {**body, "saved_entry": resume_point(entry)} if bind else body
     step("apply")
     method, path = _path(descriptor["operation"], descriptor["bind"])
-    applied = client.post(path, body, query={"world_id": world_id})
+    applied = client.post(path, bound, query={"world_id": world_id})
     record["applied"] = descriptor["operation"]
     step("stale")
+    # Sent again unbound, so the version's own base token, the one the descriptor names, is what
+    # refuses it; a bound copy is refused first by the saved world's resume point.
     status, refused = client.request(method, path, query={"world_id": world_id}, body=body)
     problem = refused if isinstance(refused, dict) else {}
     record["stale"] = {
@@ -286,4 +324,93 @@ def exercise(
             "holds": reread.get("base_state_sha256") == answered.get("state_sha256"),
         },
     ]
+    if bind:
+        resumed = client.saved_world(entry["entry_id"])
+        record["checks"].append(
+            {
+                "check": f"{world['title']!r}: the saved world still opens where the edit left it",
+                "holds": resumed.get("availability") == "available",
+            }
+        )
     return record
+
+
+def make_world(
+    client: WorldClient, creation: Mapping[str, Any], *, title: str = EXERCISE_TITLE
+) -> tuple[dict[str, Any] | None, list[str]]:
+    """A world of this run's own, made by the first route in ``_MAKERS`` the creation read calls
+    available to this token. Returns its saved entry as the entries read serves it, or None, and
+    why each route it passed over was not used."""
+    creates = {
+        row["create"]["operation"]: row["create"]
+        for row in creation["kinds"]
+        if row["create"] is not None
+    }
+    passed: list[str] = []
+    for route in _MAKERS:
+        create = creates.get(route)
+        if not _usable(create) or create is None:
+            passed.append(f"{route}: {_said(create) if create else 'not offered'}")
+            continue
+        body: dict[str, Any] = {"title": title}
+        if route == "POST /worlds/generated":
+            # The first recipe the read the descriptor names lists.
+            body["recipe"] = client.get(_path(create["options"][0], {})[1])[0]["key"]
+        made = client.post(_path(route, create["bind"])[1], body)
+        return client.saved_world(made["entry_id"]), passed
+    return None, passed
+
+
+def exercise_run(
+    client: WorldClient,
+    read: Mapping[str, Any],
+    *,
+    origin_role: str,
+    world_id: str | None = None,
+    step: Callable[[str], None] = lambda _name: None,
+) -> dict[str, Any]:
+    """The exercise: in a world this run makes, touching no other saved world; or, when
+    ``world_id`` names one, in that existing world, unbound, with a warning that says so."""
+    entries = {entry["entry_id"]: entry for entry in client.saved_worlds()}
+    if world_id is not None:
+        world = next((w for w in read["worlds"] if w["world_id"] == world_id), None)
+        if world is None:
+            named = {"check": f"{world_id!r} is a saved world of this workspace", "holds": False}
+            return {"made": None, "warning": None, "exercised": [], "checks": [named]}
+        done = exercise(
+            client,
+            world,
+            entries[world["entry_id"]],
+            origin_role=origin_role,
+            bind=False,
+            step=step,
+        )
+        warning = (
+            f"{world['title']!r} was edited outside its saved entry; it opens again only once its "
+            "new version is adopted"
+        )
+        return {"made": None, "warning": warning, "exercised": [done], "checks": done["checks"]}
+    step("make")
+    made, passed = make_world(client, read["creation"])
+    if made is None:
+        none = {"check": "a world of this run's own was made: " + "; ".join(passed), "holds": False}
+        return {"made": None, "warning": None, "exercised": [], "checks": [none]}
+    done = exercise(
+        client, _world(client, made), made, origin_role=origin_role, bind=True, step=step
+    )
+    after = {entry["entry_id"]: entry for entry in client.saved_worlds()}
+    untouched = all(
+        after.get(entry_id, {}).get("revision") == entry["revision"]
+        and after.get(entry_id, {}).get("availability") == entry["availability"]
+        for entry_id, entry in entries.items()
+    )
+    kept = {
+        "check": f"each of the {len(entries)} saved worlds there before the run is as it was",
+        "holds": untouched,
+    }
+    return {
+        "made": {key: made[key] for key in ("entry_id", "world_id", "title", "source_kind")},
+        "warning": None,
+        "exercised": [done],
+        "checks": [*done["checks"], kept],
+    }

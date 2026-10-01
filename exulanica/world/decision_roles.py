@@ -134,6 +134,18 @@ GENERIC_REASONS: Final = frozenset(
         "world_hour_spend_spent",
         "process_budget_spent",
         "process_share_spent",
+        # The durable spending authority refused the ask before anything was sent, by its own
+        # reason (exulanica.models.spending.SPENDING_REFUSALS): the workspace holds no live
+        # allowance, it was revoked or has expired, a ceiling would be crossed, the authority is
+        # held closed until an operator acts, it could not be asked, or the host's client was
+        # composed without the workspace's spending.
+        "spending_not_granted",
+        "spending_revoked",
+        "spending_expired",
+        "spending_limit_reached",
+        "spending_suspended",
+        "spending_unavailable",
+        "spending_scope_missing",
         # The minute left no time to ask before the playback lease ran out.
         "no_time_to_ask",
         # A host that stopped between reserving a request and recording its answer: the next

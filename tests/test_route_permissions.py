@@ -605,7 +605,8 @@ def test_every_route_refuses_a_grant_that_does_not_cover_it(floor):
         refused.add((method, path))
         expected = (404, "unknown_reference") if "{" in path else (403, "not_authorised")
         assert (response.status_code, response.json()["code"]) == expected, (method, path)
-    assert len(refused) == len(AUTHENTICATED) - 6
+    # Six operations reads and GET /spending.
+    assert len(refused) == len(AUTHENTICATED) - 7
 
     rows = _refusal_rows(floor, floor.workspace_a, "operator")
     assert set(rows) == refused

@@ -209,7 +209,8 @@ serves the API through `scripts/acceptance/scripted_model.py`, whose model trans
 the plan while the model client, hosted-request policy, budget and receipts run as they do with a
 provider; it refuses to start when any provider credential, provider variable or egress allowlist
 is set, labels itself in `/readyz` with the plan's digest, and establishes mechanics only, never
-model quality. The wheel and every image leave `scripts/` out, which
+model quality. `--spending process|durable` states its `EXULANICA_SPENDING` explicitly: the plan's
+own bounds, or the durable spending authority with its witness directory in the run directory. The wheel and every image leave `scripts/` out, which
 `tests/test_acceptance_scripted_model.py` checks. `restart-api` stops the recorded API and starts
 it again on the same port, database, store and grants, and with `--revoke <token file>` leaves that
 grant out, so a client can reopen its work from a fresh process or be shown a withdrawn credential

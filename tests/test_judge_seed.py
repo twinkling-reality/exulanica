@@ -31,10 +31,11 @@ import psycopg
 import pytest
 from exulanica.api.authorisation import load_token_directory
 from exulanica.db.migrate import provision_workspace
-from exulanica.db.roles import RUNTIME_ROLE, provision_runtime_role
+from exulanica.db.roles import INSERT_ONLY_TABLES, RUNTIME_ROLE, provision_runtime_role
 from exulanica.orchestration.judge_seed import (
     GLOBAL_TABLES,
     INSTANCE_TABLES,
+    JUDGE_INSERT_ONLY_TABLES,
     JUDGE_PERMISSIONS,
     JUDGE_ROLE,
     JUDGE_WRITE_TABLES,
@@ -462,7 +463,16 @@ def test_the_judge_role_may_write_exactly_the_allowlist(judged):
     """Read back from ``pg_class.relacl``, not compared against the constant that produced it."""
     grants = judge_grants(judged.connection, role=_JUDGE_ROLE)
     writable = {name for name, values in grants.items() if values & {"INSERT", "UPDATE"}}
-    assert writable == set(JUDGE_WRITE_TABLES)
+    assert writable == set(JUDGE_WRITE_TABLES) | set(JUDGE_INSERT_ONLY_TABLES)
+
+
+def test_the_judge_only_appends_where_the_runtime_only_appends(judged):
+    """A table the runtime may only insert into is insert-only for the judge as well."""
+    assert set(JUDGE_INSERT_ONLY_TABLES) <= set(INSERT_ONLY_TABLES)
+    assert not set(JUDGE_INSERT_ONLY_TABLES) & set(JUDGE_WRITE_TABLES)
+    grants = judge_grants(judged.connection, role=_JUDGE_ROLE)
+    for table in JUDGE_INSERT_ONLY_TABLES:
+        assert grants.get(table) == {"SELECT", "INSERT"}, f"{table}: {grants.get(table)}"
 
 
 def test_the_judge_role_may_delete_nothing_at_all(judged):

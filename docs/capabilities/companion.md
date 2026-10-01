@@ -16,6 +16,7 @@ Companion does from the experience it is meant to become.
 | Appearance proposals | A reviewed change to the world's appearance, shown as a preview in Customize for the person to apply or discard. The Companion speaks about a proposal only once that preview has been shown or refused. A proposal is drawn from the world's evidence, or, when the caller asks for it, is a design choice that cites none. |
 | World actions | A plan of the exact requests that place, move or remove an object, take back an edit or set out an arrangement, each with the authority's own preview. The person confirms each step and the client sends it to the same route a direct control uses; the Companion reports the receipts the authorities recorded, never an effect no record shows. |
 | Conversation memory | What was asked, what was answered and what the person corrected, kept across reloads. The person can read it back, correct it and delete it. |
+| Project context | What a person keeps about their work in a world: goals, preferences, open questions, tasks, decisions naming accepted edits and simulated events they want to return to. Any client can read, correct, share and delete it without a model, and the Companion can be given a bounded context assembled from it. A suggestion the Companion draws is kept only once the person accepts it. |
 
 The rules for each are in [Companion questions, memory and proposals](../companion-question.md),
 and the appearance authority a proposal is applied through is in

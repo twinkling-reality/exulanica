@@ -57,7 +57,7 @@ from psycopg import sql
 from exulanica.canonical import canonical_json
 from exulanica.db.migrate import provision_workspace
 from exulanica.db.registries import REGISTRY_TABLES
-from exulanica.db.roles import grant_workspace_partition
+from exulanica.db.roles import SPENDING_READ_FUNCTIONS, grant_workspace_partition
 from exulanica.errors import ExulanicaError
 from exulanica.evidence.blob import BlobId
 from exulanica.store.base import ContentAddressedStore
@@ -65,6 +65,7 @@ from exulanica.store.base import ContentAddressedStore
 __all__ = [
     "GLOBAL_TABLES",
     "INSTANCE_TABLES",
+    "JUDGE_INSERT_ONLY_TABLES",
     "JUDGE_PERMISSIONS",
     "JUDGE_ROLE",
     "JUDGE_WRITE_TABLES",
@@ -163,6 +164,18 @@ INSTANCE_TABLES: Final[Mapping[str, str]] = {
     "restore_replay_receipt": "per-deployment deletion checkpoint state, not workspace content",
     "schema_migrations": "the destination records what it applied, not what the source did",
     "world_reviewed_asset_import": "host-admin reviewed import provenance, not workspace content",
+    # Money is the deployment's own decision. A seed that carried a grant would grant money on
+    # import, and one that carried a ledger would hand the destination another installation's
+    # spending, so no spending row travels in a seed, even one that names the workspace.
+    "spending_authority": "per-deployment spending authority an operator issued",
+    "spending_authority_term": "per-deployment spending authority terms",
+    "spending_authority_state": "per-deployment spending ledger state",
+    "spending_authority_revocation": "per-deployment spending authority revocation",
+    "spending_grant": "per-deployment spending grant, never granted by an import",
+    "spending_grant_state": "per-deployment spending committed by a grant",
+    "spending_grant_revocation": "per-deployment spending grant revocation",
+    "spending_reservation": "per-deployment spending reservation and settlement",
+    "spending_event": "per-deployment spending ledger",
 }
 
 #: Tables with no ``workspace_id`` that nevertheless hold this workspace's rows, with the exact
@@ -266,11 +279,27 @@ JUDGE_WRITE_TABLES: Final[tuple[str, ...]] = (
     "companion_answer",
     "companion_answer_citation",
     "companion_escape",
+    # A judge's world projects: what it keeps about its work in a world, shares and deletes.
+    "world_project",
+    "world_project_item",
+    "world_project_share",
     # A judge can choose a model for a world's signals and keep its immutable traffic decisions.
     "world_traffic_signal_choice",
     "world_traffic_signal_decision_request",
     "world_traffic_signal_decision",
     "world_traffic_signal_segment",
+)
+
+#: Tables the judge role may append to and never update, because the runtime may only insert into
+#: them (``exulanica.db.roles.INSERT_ONLY_TABLES``): what a judge's remembered answers about a
+#: world's people cite, and the bindings, revisions and sources of its world projects. Erasing a
+#: deleted item's revisions is an owner-rights trigger's update, not the judge's.
+JUDGE_INSERT_ONLY_TABLES: Final[tuple[str, ...]] = (
+    "companion_answer_simulation_citation",
+    "companion_answer_simulation_label",
+    "world_project_binding",
+    "world_project_item_revision",
+    "world_project_item_source",
 )
 
 #: What the judge's bearer token may do, named from ``exulanica.api.permissions.Permission``.
@@ -1485,12 +1514,15 @@ def provision_judge_role(
     role: str = JUDGE_ROLE,
     password: str | None = None,
 ) -> None:
-    """Create the role a judge deployment's API connects as, and grant it exactly two things.
+    """Create the role a judge deployment's API connects as, and grant it reading and a list of
+    writes.
 
-    **SELECT on everything, INSERT and UPDATE on** :data:`JUDGE_WRITE_TABLES` **and nothing
-    else.** Not "revoke the dangerous ones": the grant is an allowlist, so a table a later
-    migration adds arrives readable and not writable without anybody remembering to come back
-    here. That is the direction this has to fail in.
+    **SELECT on everything, INSERT and UPDATE on** :data:`JUDGE_WRITE_TABLES`**, INSERT on**
+    :data:`JUDGE_INSERT_ONLY_TABLES`**, EXECUTE on**
+    :data:`~exulanica.db.roles.SPENDING_READ_FUNCTIONS` **and nothing else.** Not "revoke the
+    dangerous ones": the grant is an allowlist, so a table a later migration adds arrives readable
+    and not writable without anybody remembering to come back here. That is the direction this has
+    to fail in.
 
     **No DELETE anywhere, for the same reason** ``exulanica_app`` **has none.** Deletion in this
     system is a tombstone and a purge job, both of them writes to tables absent from the
@@ -1529,7 +1561,10 @@ def provision_judge_role(
         connection.execute(
             sql.SQL("grant select on all tables in schema {} to {}").format(schema, role_name)
         )
-        for table in JUDGE_WRITE_TABLES:
+        for table, privileges in (
+            *((table, sql.SQL("insert, update")) for table in JUDGE_WRITE_TABLES),
+            *((table, sql.SQL("insert")) for table in JUDGE_INSERT_ONLY_TABLES),
+        ):
             present = connection.execute(
                 "select 1 from pg_class c join pg_namespace n on n.oid = c.relnamespace"
                 " where n.nspname = current_schema() and c.relname = %s"
@@ -1541,13 +1576,29 @@ def provision_judge_role(
                     f"the judge write allowlist names {table}, which is not in this schema"
                 )
             connection.execute(
-                sql.SQL("grant insert, update on {} to {}").format(sql.Identifier(table), role_name)
+                sql.SQL("grant {} on {} to {}").format(privileges, sql.Identifier(table), role_name)
             )
         connection.execute(
             sql.SQL("grant usage, select on all sequences in schema {} to {}").format(
                 schema, role_name
             )
         )
+        # GET /spending reads an authority's state through migration 0124's owner-rights
+        # functions, which state no amount; the judge reads them as the runtime roles do.
+        for name, arguments in SPENDING_READ_FUNCTIONS:
+            found = connection.execute(
+                "select to_regprocedure(format('%%I.%%I(%%s)', current_schema(), %s::text, "
+                "%s::text)) as function_ref",
+                (name, arguments),
+            ).fetchone()
+            if found is not None and (
+                found["function_ref"] if isinstance(found, dict) else found[0]
+            ):
+                connection.execute(
+                    sql.SQL("grant execute on function {}.{}({}) to {}").format(
+                        schema, sql.Identifier(name), sql.SQL(arguments), role_name
+                    )
+                )
         # Partitions created later by provision_workspace, and any table a later migration adds,
         # arrive readable. Writability is never a default.
         connection.execute(

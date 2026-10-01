@@ -240,12 +240,18 @@ its `permissions` from the closed vocabulary in [security-floor.md](security-flo
 grant that lists none stops startup. Add `intake.write` to upload, `model.invoke` to ask a
 question or choose a model for a world's people, and so on.
 
-With `NEBIUS_API_KEY` set, the model client also needs the origins it may reach, and startup
-stops without them:
+With `NEBIUS_API_KEY` set, the model client also needs the origins it may reach, and how the
+process spends, and startup stops without either:
 
 ```bash
 export EXULANICA_EGRESS_ALLOWLIST='["https://api.tokenfactory.nebius.com"]'
+export EXULANICA_SPENDING=process
 ```
+
+`process` spends within `EXULANICA_BUDGET_USD` alone, which a restart starts again. `durable` admits
+every call by the spending authority every process shares, which an operator issues and grants with
+`python -m exulanica.spending` ([model spending](model-spending-contract.md)); a workspace with no
+grant then spends nothing.
 
 Three more are optional and all three are reported by `/readyz`, because a defence that is off and
 silent is worse than one that is absent:

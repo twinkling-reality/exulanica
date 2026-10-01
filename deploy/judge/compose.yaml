@@ -115,6 +115,9 @@ services:
       # starts a fresh one, so the provider balance is what bounds spend across restarts.
       EXULANICA_BUDGET_USD: ${EXULANICA_BUDGET_USD:?set EXULANICA_BUDGET_USD; this stack states its model spend ceiling}
       EXULANICA_BUDGET_MAX_CALLS: ${EXULANICA_BUDGET_MAX_CALLS:?set EXULANICA_BUDGET_MAX_CALLS; this stack states its model call ceiling}
+      # A process holding NEBIUS_API_KEY states how it spends. This stack runs one API process and
+      # bounds it by the ceilings above alone, as it always has (docs/model-spending-contract.md).
+      EXULANICA_SPENDING: process
     volumes:
       - media:/var/lib/exulanica
     expose:

@@ -50,10 +50,12 @@ from exulanica.models.errors import (
 )
 from exulanica.models.manifest import AnsweringMechanism, Manifest, ModelSpec
 from exulanica.models.policy import HostedRequestPolicy, NoHostedRequestPolicy
+from exulanica.models.spending import SpendingRefused
 from exulanica.models.usage import CallUsage, usd_string
 from exulanica.selection.calls import CallLog
 from exulanica.selection.validation import Session
 from exulanica.world.decision_roles import (
+    GENERIC_REASONS,
     DecisionContract,
     DecisionRole,
     RoleOption,
@@ -121,6 +123,10 @@ def _failure_reason(exc: BaseException) -> str:
     """How a failure that ended a subject's call is recorded, by the error that ended it."""
     if isinstance(exc, ProviderRefused):
         return exc.reason
+    if isinstance(exc, SpendingRefused):
+        # The durable authority's own reason. The host asks under no request key, so an
+        # idempotency refusal cannot reach here; it would still be named for what it is not.
+        return exc.reason if exc.reason in GENERIC_REASONS else "spending_unavailable"
     if isinstance(exc, BudgetShareExceeded):
         return "process_share_spent"
     if isinstance(exc, BudgetExceededError):

@@ -9,8 +9,8 @@ with it for a checkpoint of profile ``exulanica.restore-tombstone-checkpoint/v2`
 
 * :func:`read_withdrawals` reads every withdrawn row the catalog names, across workspaces, as the
   checkpoint's record of them. A column kind is carried as its identity and the columns a
-  withdrawal sets and nothing else; an event kind as its whole row, because the row is the
-  withdrawal.
+  withdrawal sets and nothing else, in the order of its ``order`` column where it names one; an
+  event kind as its whole row, because the row is the withdrawal.
 * :func:`reapply` writes one carried withdrawal into a restored database with the statement the
   product writes: a column kind sets its columns on a row whose withdrawal is still open, so every
   trigger that update fires runs (migration 0104's search-entry erasure among them); an event kind
@@ -266,6 +266,10 @@ def read_withdrawals(connection: psycopg.Connection[Any]) -> list[Carried]:
         order = kind.identity
         if kind.chained and kind.ends is not None and kind.order is not None:
             order = (*kind.ends.columns, kind.order, *kind.identity)
+        elif kind.shape == "column" and kind.order is not None:
+            # Earliest first: a replayed withdrawal whose cascade reaches rows must find the rows
+            # an earlier withdrawal ended already ended, with that withdrawal's own values.
+            order = (kind.order, *kind.identity)
         rows = connection.execute(
             sql.SQL("select {} as row from {} t where {} order by {}").format(
                 _projection(kind, "t"),

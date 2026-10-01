@@ -1,7 +1,8 @@
 # Security floor
 
 This contract owns the controls the code enforces: route permissions, per-workspace tile quotas,
-the egress allowlist, model spend budgets and the database roles. Status labels follow the
+the egress allowlist, each process's model spend fuse and the database roles. The durable spending
+authority every process shares is owned by [model spending](model-spending-contract.md). Status labels follow the
 [documentation standard](documentation-standard.md#evidence-labels) and apply per claim.
 [Privacy and consent](privacy-consent-threat-model.md) names the boundaries these controls serve,
 including what a hosted request may carry (its section 4.4), and
@@ -295,6 +296,13 @@ routine decides ([model selection](model-and-service-selection.md#what-a-persons
   constructs. `/readyz` warns when a playback host's budget no longer fits a person's ask.
 - Enforced by `tests/test_model_budget_holds.py`.
 
+**The durable authority beside it.** A process started with `EXULANICA_SPENDING=durable` admits every
+attempt through the durable spending authority as well: an operator-issued allowance for each
+provider and workspace grants under it, kept in the database with a witness outside its backup
+domain, which neither a restart nor a restore replenishes
+([model spending](model-spending-contract.md)). This guard stays each process's fuse against a
+runaway loop; it is not the allowance.
+
 **The per-lens guard.** `LensBudgetGuard` in `exulanica/models/lens_budget.py` has the shape of
 `BudgetGuard` and plugs into `ModelClient(budget=...)`. It holds one lens to four ceilings,
 `max_tokens`, `max_calls`, `max_wall_clock_ms` and `max_cost_usd`, stated in the `LensBudget` it is
@@ -311,7 +319,9 @@ transport is shown not to have been called. No command constructs this guard.
 **What it does not cover.** OPEN.
 
 - Both guards are in memory and per process. A restart starts from a full ceiling, and two
-  processes each have their own.
+  processes each have their own. The shared, durable limit is the spending authority
+  ([model spending](model-spending-contract.md)); a process started with `EXULANICA_SPENDING=process`
+  has this fuse alone.
 - The wall clock bounds how long a started call runs only through a transport that enforces a
   deadline. `HttpxTransport` does: it abandons a request at its timeout however the response stalls
   ([transport](../exulanica/models/transport.py)). A transport supplied in its place is bounded only
@@ -331,7 +341,7 @@ BYPASSRLS role or the owner of a row-level-security table
 
 | Role | Holds | Why it is separate |
 | --- | --- | --- |
-| `exulanica_app` | Select, insert and update; no delete anywhere. Select only on the registries and control tables in `READ_ONLY_TABLES`; select and insert, never update, on `tombstone` and the append-only tables in `INSERT_ONLY_TABLES` (`exulanica/db/roles.py`) | Row-level security is inert for an owner. A runtime that could update the vocabulary could disarm the rule that stops a model writing a person's name, one that could update a tombstone could postpone or rewrite a deletion, and one that could update a bake request could move it out of the day its quota counts. `tests/test_runtime_update_grants.py` names every table it may update and why |
+| `exulanica_app` | Select, insert and update; no delete anywhere. Select only on the registries and control tables in `READ_ONLY_TABLES`, the spending tables among them, with execute on the five runtime spending functions in `SPENDING_RUNTIME_FUNCTIONS`; select and insert, never update, on `tombstone` and the append-only tables in `INSERT_ONLY_TABLES` (`exulanica/db/roles.py`) | Row-level security is inert for an owner. A runtime that could update the vocabulary could disarm the rule that stops a model writing a person's name, one that could update a tombstone could postpone or rewrite a deletion, one that could update a bake request could move it out of the day its quota counts, and one that could write a spending table could grant itself money or put back an allowance it spent. `tests/test_runtime_update_grants.py` names every table it may update and why |
 | `exulanica_ro` | Select and nothing else | The Selection executor runs a plan derived from model output. It must not be able to write whatever happened upstream of it |
 | `exulanica_purge` | A cross-workspace read of the holder columns of the tables in `PURGE_CROSS_WORKSPACE_TABLES` (`capture`, `artifact`, `reconstruction_scene_member` and `person_derivative_dependency`); column-level updates of purge markers; delete on `embedding` only | Stored bytes may be shared across workspaces, so the destroy decision needs every holder. A person vector has no harmless stub, so the purger removes that row while every other table stays outside its delete authority |
 | `exulanica_accounts` | The account tables and nothing in any workspace | Sign-in state lives outside workspace scope, and the application roles cannot read it ([deployment](deployment.md#514-browser-accounts)) |

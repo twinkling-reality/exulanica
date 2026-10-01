@@ -342,7 +342,10 @@ The [project foundation requirements](product-direction.md#worlds-as-project-fou
 same world authorities for interactive applications, controlled comparisons and task-specific data.
 A project identifies the world versions, subjects, input and rule bindings, permitted operations
 and outputs needed for its task. This is an architectural requirement, not a separate universal
-project store or an assertion that every projection has an implemented endpoint.
+project store or an assertion that every projection has an implemented endpoint. The
+[world project context](project-context.md) a person keeps binds a project to one version and holds
+what they chose to keep with the ids of the records the world's authorities own; it copies none of
+those records and is the authority for none of them.
 
 External consumers receive a bounded projection whose contract declares preserved identities,
 coordinate and time semantics, source lineage, capabilities and losses. A geometry consumer need

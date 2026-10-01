@@ -325,7 +325,12 @@ process that every model call it makes shares, the Companion, photograph ingesti
 caption search among them. People's decisions may use all of it but the contract's
 `process_reserve_percent`, which they leave for that other work, so a world played for hours never
 leaves the Companion or ingestion refused. The budget holds each admitted call's reservation until
-its usage is recorded, so calls admitted at once never cross the ceiling together.
+its usage is recorded, so calls admitted at once never cross the ceiling together. A process that
+spends durably also admits every ask through the workspace's grant under the installation's spending
+authority, which a restart does not refill ([model spending](model-spending-contract.md)); a
+refusal there is recorded on the receipt by its own reason (`spending_not_granted`,
+`spending_revoked`, `spending_expired`, `spending_limit_reached`, `spending_suspended`,
+`spending_unavailable` or `spending_scope_missing`), and ends a comparison run by that reason.
 
 The host decides on what the process has spent, whoever spent it, never on what calls under way
 hold. Once what is left, beside the part kept for other work, fits no ask, it asks nobody, and the

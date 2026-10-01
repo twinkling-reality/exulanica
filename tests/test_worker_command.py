@@ -360,6 +360,8 @@ def test_both_worker_constructors_share_the_client_and_cover_each_model_gap(
     environ = {worker_command.DATA_DIR_ENV: str(tmp_path)}
     if enabled:
         environ.update(dict.fromkeys(worker_command.MODEL_KEY_ENVS, "scripted-key"))
+        # A worker holding a credential states how it spends; this one within its own fuse.
+        environ["EXULANICA_SPENDING"] = "process"
     worker_command._build_worker(args, environ)
     assert clients_built == ([{"max_attempts": 1}] if enabled else [])
     assert (built["depth"], built["detector"], built["segmenter"]) == (depth, detector, segmenter)

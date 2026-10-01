@@ -115,6 +115,7 @@ from exulanica.api.routes import (
     society_district,
     society_experiments,
     society_models,
+    spending,
     tiles,
     world,
     world_arrangements,
@@ -128,6 +129,7 @@ from exulanica.api.routes import (
     world_generation,
     world_models,
     world_objects,
+    world_projects,
     world_read,
     world_traffic,
     world_versions,
@@ -173,6 +175,7 @@ from exulanica.models.errors import (
     TruncatedResponseError,
 )
 from exulanica.models.policy import HostedRequestRefused, NoHostedRequestPolicy
+from exulanica.models.spending import SpendingRefused
 from exulanica.selection.validation import RejectionCode, SelectionRejected
 from exulanica.world import (
     ExpiredPreview,
@@ -407,6 +410,7 @@ def create_app(services: Services | None = None, *, verify: bool = True) -> Fast
     app.include_router(formation.router)
     app.include_router(intake.router)
     app.include_router(operations.router)
+    app.include_router(spending.router)
     app.include_router(person_consent.router)
     app.include_router(personal_admission.router)
     app.include_router(place_name_rights.router)
@@ -428,6 +432,7 @@ def create_app(services: Services | None = None, *, verify: bool = True) -> Fast
     app.include_router(world_models.router)
     app.include_router(capabilities.router)
     app.include_router(interaction.router)
+    app.include_router(world_projects.router)
     app.include_router(world_read.router)
     app.include_router(world_write.router)
     app.include_router(world_generation.router)
@@ -635,6 +640,10 @@ def create_app(services: Services | None = None, *, verify: bool = True) -> Fast
         # execution block a completed request returns, as a member of the problem.
         extensions = failure_extensions(exc)
         if isinstance(exc, BudgetExceededError):
+            # The durable authority's refusal says which allowance refused and whether asking
+            # again can succeed; the process's own fuse carries no such member.
+            if isinstance(exc, SpendingRefused):
+                extensions = {**extensions, "spending": exc.problem_member()}
             return _problem(429, "budget_exceeded", str(exc), extensions)
         if isinstance(exc, EgressRefused):
             return _problem(502, "egress_refused", str(exc), extensions)

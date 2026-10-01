@@ -29,6 +29,12 @@ this walks it. Three policies live here and nowhere else, each because of someth
     provider's own credential, both the manifest's. A model a world chose is walked alone, with
     no fallback and the timeout its caller's contract gives: a choice names one model, and a
     withdrawn one is reported as withdrawn, never answered by another.
+*   **Every attempt is admitted by the durable spending authority as well, where the client has
+    one** (:mod:`exulanica.models.spending`): after the process's guard reserves it and its
+    credential is found, before it is sent, and dispatched (the durable record that it may now
+    leave) before the request is handed to the transport. What came back settles it; a failure
+    proven never to have left releases it; any other failure after dispatch leaves its whole
+    reservation held, because the provider may bill what nobody received.
 
 Split out of the client because these are decisions about the network, and the client's own job
 is what a request means and whether a reply may be believed. A change to the retry policy should
@@ -38,6 +44,7 @@ not be a change to the module that decides whether a model's answer enters canon
 from __future__ import annotations
 
 import copy
+import logging
 import random
 import time
 from collections.abc import Callable, Mapping
@@ -46,6 +53,7 @@ from decimal import Decimal
 from typing import Any, Final
 
 from exulanica.models.budget import BudgetGuard
+from exulanica.models.egress import EgressRefused
 from exulanica.models.errors import (
     ModelUnavailableError,
     NoFallbackError,
@@ -53,10 +61,19 @@ from exulanica.models.errors import (
     TransportError,
 )
 from exulanica.models.manifest import Manifest, ModelSpec, Role
+from exulanica.models.spending import (
+    SpendingGate,
+    SpendingRefused,
+    SpendingRequest,
+    SpendingTicket,
+    next_request_key,
+)
 from exulanica.models.transport import HttpResponse, Transport
-from exulanica.models.usage import CallUsage, usd_string
+from exulanica.models.usage import CallUsage, CostBasis, usd_string
 
 __all__ = ["ChainResponse", "ModelChain"]
+
+_LOG = logging.getLogger(__name__)
 
 #: Statuses worth issuing the identical request again for. Everything else the endpoint
 #: understood and refused, and it will refuse it identically forever. 404 is absent on purpose:
@@ -110,6 +127,7 @@ class ModelChain:
         max_attempts: int,
         sleep: Callable[[float], None] = time.sleep,
         clock: Callable[[], float] = time.monotonic,
+        spending_required: bool = False,
     ) -> None:
         if max_attempts < 1:
             raise ValueError("max_attempts must be at least 1")
@@ -126,6 +144,10 @@ class ModelChain:
         self._sleep = sleep
         #: What every latency and every caller's deadline is read from; a test gives its own.
         self._clock = clock
+        #: The workspace's durable spending, once one is attached (``with_spending``).
+        self._spending: SpendingGate | None = None
+        #: Whether an attempt with no durable spending attached is refused rather than sent.
+        self._spending_required = spending_required
 
     def __repr__(self) -> str:
         # No credential, not even a prefix of one. A truncated key in a traceback is still a leak.
@@ -136,6 +158,26 @@ class ModelChain:
         bound = copy.copy(self)
         bound._budget = budget
         return bound
+
+    def with_spending(self, gate: SpendingGate) -> ModelChain:
+        """This chain, admitting every attempt by ``gate`` as well as by its budget guard."""
+        bound = copy.copy(self)
+        bound._spending = gate
+        return bound
+
+    def requiring_spending(self) -> ModelChain:
+        """This chain, refusing every attempt no durable spending is attached to."""
+        bound = copy.copy(self)
+        bound._spending_required = True
+        return bound
+
+    @property
+    def spending(self) -> SpendingGate | None:
+        return self._spending
+
+    @property
+    def spending_required(self) -> bool:
+        return self._spending_required
 
     def _headers(self, spec: ModelSpec) -> dict[str, str]:
         key = self._api_keys.get(spec.provider)
@@ -187,11 +229,20 @@ class ModelChain:
         return self._clock() + deadline_s
 
     def _post(
-        self, path: str, payload: Mapping[str, Any], spec: ModelSpec, *, timeout: float
+        self,
+        path: str,
+        payload: Mapping[str, Any],
+        spec: ModelSpec,
+        *,
+        timeout: float,
+        headers: Mapping[str, str] | None = None,
     ) -> dict[str, Any]:
         url = f"{self._manifest.provider(spec.provider).base_url}{path}"
         response = self._transport.post_json(
-            url, headers=self._headers(spec), payload=payload, timeout=timeout
+            url,
+            headers=dict(headers) if headers is not None else self._headers(spec),
+            payload=payload,
+            timeout=timeout,
         )
         if self._is_model_missing(response):
             raise ModelUnavailableError(
@@ -317,6 +368,16 @@ class ModelChain:
                     )
                 cut = left < timeout
                 wait = min(timeout, left)
+            if self._spending is None and self._spending_required:
+                raise SpendingRefused(
+                    "spending_scope_missing",
+                    message=(
+                        f"this client spends through a durable authority and no workspace's "
+                        f"spending is attached to this {role} request, so nothing was sent. "
+                        "Attach the workspace's policy, or with_spending, where the workspace "
+                        "is known."
+                    ),
+                )
             reserved = self._budget.reserve(
                 spec,
                 role=role,
@@ -329,13 +390,30 @@ class ModelChain:
                     else {}
                 ),
             )
+            ticket: SpendingTicket | None = None
+            try:
+                headers = self._headers(spec)
+                if self._spending is not None:
+                    ticket = self._admitted(
+                        spec,
+                        role,
+                        prompt_chars=prompt_chars,
+                        max_tokens=max_tokens,
+                        extra_prompt_tokens=extra_prompt_tokens,
+                    )
+            except BaseException:
+                # Refused before it left (a credential, the durable authority): nothing to
+                # record, and the reservation it held is given back.
+                self._budget.release(reserved)
+                raise
             started = self._clock()
             try:
-                return self._post(path, payload, spec, timeout=wait), attempt, reserved
+                body = self._post(path, payload, spec, timeout=wait, headers=headers)
             except ModelUnavailableError as exc:
-                self._record_failure(
+                usage = self._record_failure(
                     role, spec, exc, reserved, started, used_fallback, reached_provider=True
                 )
+                self._settle(ticket, usage)
                 raise
             except TransportError as exc:
                 if cut and exc.timed_out:
@@ -350,15 +428,110 @@ class ModelChain:
                 usage = self._record_failure(
                     role, spec, exc, reserved, started, used_fallback, exc.reached_provider
                 )
+                self._settle(ticket, usage)
                 if not exc.retryable or attempt == self._max_attempts:
                     raise _with_cost(exc, usage, attempt) from exc
                 self._backoff(attempt)
+            except EgressRefused:
+                # Refused by the allowlist before it left: nothing to record, and both
+                # reservations it held are given back.
+                self._budget.release(reserved)
+                self._release(ticket)
+                raise
             except BaseException:
-                # Refused before it left (a credential, an allowlist): nothing to record, and
-                # the reservation it held is given back.
+                # Stopped while it may have been under way. The process's guard gives its
+                # reservation back, as it always has; the durable one stays held, since the
+                # request may have reached the provider and nobody saw what it cost.
                 self._budget.release(reserved)
                 raise
+            else:
+                if ticket is not None:
+                    reported = body.get("usage")
+                    self._settle(
+                        ticket,
+                        CallUsage.from_response(
+                            role=role,
+                            spec=spec,
+                            usage=reported if isinstance(reported, Mapping) else None,
+                            used_fallback=used_fallback,
+                            usd_bound=ticket.usd,
+                        ),
+                    )
+                return body, attempt, reserved
         raise AssertionError("unreachable: the last attempt either returns or raises")
+
+    def _admitted(
+        self,
+        spec: ModelSpec,
+        role: Role | str,
+        *,
+        prompt_chars: int,
+        max_tokens: int,
+        extra_prompt_tokens: int,
+    ) -> SpendingTicket:
+        """This attempt admitted and dispatched by the durable authority, or its refusal raised.
+
+        Reserved at the same worst case the process's guard holds for it. An attempt admitted and
+        then refused its dispatch is released, and never sent.
+        """
+        gate = self._spending
+        assert gate is not None
+        ticket = gate.admit(
+            SpendingRequest(
+                provider=spec.provider,
+                model_id=spec.model_id,
+                role=str(role),
+                usd=self._budget.estimate_usd(
+                    spec,
+                    prompt_chars=prompt_chars,
+                    max_tokens=max_tokens,
+                    extra_prompt_tokens=extra_prompt_tokens,
+                ),
+                key=next_request_key(),
+            )
+        )
+        try:
+            gate.dispatch(ticket)
+        except BaseException:
+            self._release(ticket)
+            raise
+        return ticket
+
+    def _settle(self, ticket: SpendingTicket | None, usage: CallUsage) -> None:
+        """Settle an admitted attempt by what the ledger recorded of it, or release it when it
+        never left. A settlement the authority could not take leaves the reservation held, which
+        is the conservative side, and never costs the caller an answer it already paid for."""
+        if ticket is None:
+            return
+        if usage.cost_basis is CostBasis.NOT_SENT:
+            self._release(ticket)
+            return
+        gate = self._spending
+        assert gate is not None
+        try:
+            gate.settle(ticket, usage)
+        except Exception as exc:
+            _LOG.warning(
+                "the durable settlement of reservation %s failed with %s; its whole reservation "
+                "stays held until it is reconciled",
+                ticket.reservation_id,
+                type(exc).__name__,
+            )
+
+    def _release(self, ticket: SpendingTicket | None) -> None:
+        if ticket is None:
+            return
+        gate = self._spending
+        assert gate is not None
+        try:
+            gate.release(ticket)
+        except Exception as exc:
+            _LOG.warning(
+                "the durable release of reservation %s failed with %s; it is released when its "
+                "dispatch window passes, or stays held if it was dispatched",
+                ticket.reservation_id,
+                type(exc).__name__,
+            )
 
     def _record_failure(
         self,

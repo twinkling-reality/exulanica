@@ -305,6 +305,20 @@ def test_a_scripted_run_is_refused_with_a_model_or_without_its_plan(tmp_path, te
     assert not LAUNCH.state_dir(worktree).exists()
 
 
+def test_a_scripted_run_always_states_its_spending_authority(tmp_path):
+    process = LAUNCH.scripted_environment(tmp_path, tmp_path / "logs", "process")
+    durable = LAUNCH.scripted_environment(tmp_path, tmp_path / "logs", "durable")
+    parser = LAUNCH.build_parser()
+
+    assert process["EXULANICA_SPENDING"] == "process"
+    assert "EXULANICA_SPENDING_WITNESS_DIR" not in process
+    assert durable["EXULANICA_SPENDING"] == "durable"
+    assert durable["EXULANICA_SPENDING_WITNESS_DIR"] == str(tmp_path / "spending-witness")
+    assert parser.parse_args(["up", "--worktree", "w"]).spending == "process"
+    with pytest.raises(SystemExit), redirect_stderr(io.StringIO()):
+        parser.parse_args(["up", "--worktree", "w", "--spending", "free"])
+
+
 # -- refusals before anything starts ---------------------------------------------------------------
 
 
@@ -337,6 +351,15 @@ def test_a_model_run_is_refused_until_it_has_a_key_an_allowlist_and_a_bound():
             },
             "call-ceiling-missing",
         ),
+        (
+            {
+                "NEBIUS_API_KEY": key,
+                "EXULANICA_EGRESS_ALLOWLIST": '["https://model.example"]',
+                "EXULANICA_BUDGET_USD": "1.00",
+                "EXULANICA_BUDGET_MAX_CALLS": "7000",
+            },
+            "spending-mode-missing",
+        ),
     ]
     for environ, expected in steps:
         with pytest.raises(LAUNCH.Refused) as refused:
@@ -349,6 +372,7 @@ def test_a_model_run_is_refused_until_it_has_a_key_an_allowlist_and_a_bound():
         "EXULANICA_EGRESS_ALLOWLIST": '["https://model.example"]',
         "EXULANICA_BUDGET_USD": "1.00",
         "EXULANICA_BUDGET_MAX_CALLS": "7000",
+        "EXULANICA_SPENDING": "process",
         "EXULANICA_DATA_DIR": "/elsewhere",
     }
     assert LAUNCH.model_environment(complete) == {
@@ -516,6 +540,7 @@ def test_the_api_gets_the_model_and_its_bound_only_with_model():
         "EXULANICA_EGRESS_ALLOWLIST": '["https://model.example"]',
         "EXULANICA_BUDGET_USD": "1.00",
         "EXULANICA_BUDGET_MAX_CALLS": "7000",
+        "EXULANICA_SPENDING": "process",
         "EXULANICA_DATA_DIR": "/somebody/else",
     }
 

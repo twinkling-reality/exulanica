@@ -44,6 +44,7 @@ from exulanica_client import (  # noqa: E402
     reviewed_behaviours,
     version_edits,
 )
+from exulanica_client.capabilities import exercise  # noqa: E402
 from exulanica_client.walkthrough import PLACE_OBJECT, SET_BEHAVIOUR  # noqa: E402
 
 # -- what the client is made of --------------------------------------------------------------------
@@ -115,6 +116,51 @@ def test_a_behaviour_is_checked_in_the_registrys_own_terms():
 
 
 # -- the credential stays with the server it was given ---------------------------------------------
+
+
+class _AssetsWithoutBytes:
+    """Answers the one read an object placement makes, listing no asset whose bytes are held."""
+
+    def get(self, path: str, query: object = None) -> list[dict[str, str]]:
+        assert path == "/world/assets", path
+        return [{"content_sha256": "a" * 64, "availability": "unavailable"}]
+
+    def post(self, *_args: object, **_kwargs: object) -> None:
+        raise AssertionError("nothing is sent when no object can be placed")
+
+
+@pytest.mark.parametrize(
+    ("regions", "reason"),
+    [
+        (["region:generated"], "the assets read lists no asset whose bytes this server holds"),
+        ([], "the read lists no region to place into"),
+    ],
+)
+def test_an_exercise_that_can_place_nothing_fails_by_name(regions, reason):
+    """No asset's bytes on the server, or no region listed: a named failing check, not a crash."""
+    placing = {
+        "operation": "POST /world/versions/{version_id}/objects",
+        "bind": {"version_id": "00000000-0000-4000-8000-000000000000"},
+        "state": "available",
+        "code": None,
+        "permitted": True,
+        "options": ["GET /world/assets"],
+    }
+    world = {
+        "world_id": "world:generated:fixture",
+        "title": "Town",
+        "capabilities": {
+            "kind": "generated",
+            "regions": {"state": "listed", "code": None, "region_ids": regions},
+            "operations": [placing],
+        },
+    }
+    client = _AssetsWithoutBytes()
+    done = exercise(client, world, {}, origin_role="fictional", bind=True)  # type: ignore[arg-type]
+    assert done["result"] == f"no object can be placed: {reason}"
+    assert done["checks"] == [
+        {"check": "'Town': an edit the read calls available can be made", "holds": False}
+    ]
 
 
 def test_plain_http_is_accepted_only_for_a_loopback_address():

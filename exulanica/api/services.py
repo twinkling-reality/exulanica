@@ -72,6 +72,15 @@ from exulanica.ingest.worker import DerivativeWorker, lease_seconds_for
 from exulanica.models.client import PROVIDER_CREDENTIAL_ABSENT, ModelClient
 from exulanica.models.egress import EGRESS_ALLOWLIST_ENV
 from exulanica.models.manifest import MANIFEST_PATH, Role, load_manifest
+from exulanica.spending import (
+    DURABLE,
+    PROCESS,
+    SPENDING_ENV,
+    WITNESS_DIR_ENV,
+    DurableSpending,
+    durable_spending_from_env,
+    spending_mode,
+)
 from exulanica.store.base import ContentAddressedStore
 from exulanica.store.configured import ContentStores, content_stores
 from exulanica.world.decision_roles import DecisionRole, decision_roles
@@ -240,6 +249,12 @@ class Services:
     #: defaults for a hand-built instance; ``build_services`` reads ``EXULANICA_API_*`` and
     #: ``EXULANICA_INTAKE_QUEUED_JOBS``.
     admission: AdmissionSettings = field(default_factory=AdmissionSettings)
+    #: How this instance spends on hosted models: ``durable``, admitted by the spending authority
+    #: every process shares (``spending``), or ``process``, within its own budget fuse alone; None
+    #: where it holds no provider credential. ``build_services`` reads ``EXULANICA_SPENDING``.
+    spending_mode: str | None = None
+    #: The durable spending authority the model client is composed with, when durable.
+    spending: DurableSpending | None = None
 
     @property
     def society_control_enabled(self) -> bool:
@@ -502,6 +517,18 @@ class Services:
                     f"provider {provider} is refused by this process ({reason}), so no model it "
                     "serves is asked here, and a person run by one is decided by their routine."
                 )
+        if self.model_client is not None and self.spending_mode == PROCESS:
+            notes.append(
+                f"{SPENDING_ENV} is {PROCESS}: this process spends within its own budget "
+                "(EXULANICA_BUDGET_USD and EXULANICA_BUDGET_MAX_CALLS) alone, which a restart or "
+                "another process starts again at zero. No durable spending authority admits its "
+                "hosted calls."
+            )
+        if self.spending is not None and self.spending.witness is None:
+            notes.append(
+                f"{WITNESS_DIR_ENV} is not set, so this process refuses to spend under any "
+                "witnessed spending authority. Work that asks no model is unaffected."
+            )
         if not self.runs_derivative_worker:
             notes.append(
                 f"{DERIVATIVE_WORKER_ENV} is off, so this process serves POST /intake and does "
@@ -603,7 +630,10 @@ class Services:
 
 
 def build_services(
-    environ: Mapping[str, str] | None = None, *, model_client: ModelClient | None = None
+    environ: Mapping[str, str] | None = None,
+    *,
+    model_client: ModelClient | None = None,
+    spending_label: str = "api",
 ) -> Services:
     """Resolve configuration into services, or fail at startup with the reason.
 
@@ -612,6 +642,11 @@ def build_services(
     code gets to make, except the place-name right's resolver: every instance reads the right,
     because what leaves with a place's name is the account holder's decision rather than a
     deployment's. Routes, the society runtime and the derivative worker all ask this one.
+
+    How the instance spends is stated, never defaulted: a process holding a provider credential
+    refuses to start without ``EXULANICA_SPENDING`` (:func:`exulanica.spending.spending_mode`).
+    Under ``durable`` the model client, an injected one included, is composed with the durable
+    spending authority, named on what it reserves by ``spending_label``.
     """
     environ = os.environ if environ is None else environ
     database = Database.from_env(environ)
@@ -624,9 +659,17 @@ def build_services(
         else load_token_directory(environ)
     )
 
+    mode = spending_mode(environ, credentials_configured=_role_credentials_set(environ))
+    spending = (
+        durable_spending_from_env(environ, database, label=spending_label)
+        if mode == DURABLE
+        else None
+    )
     client = model_client
     if client is None and _role_credentials_set(environ):
         client = ModelClient()
+    if client is not None and spending is not None and client.spending_source is None:
+        client = client.with_spending_source(spending)
     stores = content_stores(environ, data_dir=data_dir)
     store = stores.blobs
     comparison_player = _comparison_player(env_get("COMPARISON_WORKER", environ))
@@ -660,6 +703,8 @@ def build_services(
         ),
         released_place_names=released_place_names,
         admission=AdmissionSettings.from_env(environ),
+        spending_mode=mode,
+        spending=spending,
     )
 
 

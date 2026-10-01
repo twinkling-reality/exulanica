@@ -116,8 +116,11 @@ def test_a_model_run_asks_for_a_production_build_and_hands_over_the_step_lists_b
     assert [name for name in environment if name.startswith("EXULANICA_")] == [
         "EXULANICA_BUDGET_USD",
         "EXULANICA_BUDGET_MAX_CALLS",
+        "EXULANICA_SPENDING",
     ]
     assert environment["EXULANICA_BUDGET_MAX_CALLS"] == "7000"
+    # The run's bound is each process's own fuse: the API states it, never a default.
+    assert environment["EXULANICA_SPENDING"] == "process"
     assert command[-1] == "--model"
     assert "--production" in command
     assert "--society-playback" in command

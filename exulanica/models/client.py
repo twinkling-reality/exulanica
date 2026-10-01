@@ -52,6 +52,16 @@ Everything here exists because of something that was measured, not assumed:
     by the code that knows whose data the request carries; policies only accumulate. See
     :mod:`exulanica.models.policy`.
 
+*   **A client given a durable spending source spends nothing outside a workspace's scope.**
+    ``ModelClient(spending=...)`` makes every attempt wait for the workspace's durable admission
+    as well as the process's budget guard, and refuses one that reaches it with no workspace
+    (``spending_scope_missing``). The workspace is the one the attached workspace policy names,
+    resolved when :meth:`ModelClient.with_policy` attaches it, or the gate
+    :meth:`ModelClient.with_spending` attaches; never one a request carries. See
+    :mod:`exulanica.models.spending`. A client built without a source spends as it always has,
+    within its process's guard only: scripts that build one directly are outside the durable
+    authority.
+
 *   **Each role's request is bounded by the role's own timeout**, which the manifest derives
     from the longest latency measured for the role's primary. ``timeout`` overrides it for every
     role, for a caller that reserves wall clock by a timeout of its own; the default is the
@@ -114,6 +124,7 @@ from exulanica.models.results import ChatResult, ChoiceResult, EmbeddingResult, 
 from exulanica.models.schema import (
     response_format_for,
 )
+from exulanica.models.spending import SpendingGate, SpendingSource
 from exulanica.models.transport import HttpxTransport, Transport
 from exulanica.models.usage import CallUsage, CostLedger
 
@@ -182,10 +193,17 @@ class ModelClient:
         sleep: Callable[[float], None] = time.sleep,
         policy: HostedRequestPolicy | None = None,
         clock: Callable[[], float] = time.monotonic,
+        spending: SpendingSource | None = None,
     ) -> None:
         # No policy means nothing is sent: every sending method refuses by name until one is
         # attached, here or with `with_policy` where the workspace is known.
         self._policies: tuple[HostedRequestPolicy, ...] = () if policy is None else (policy,)
+        if spending is not None and not callable(getattr(spending, "for_workspace", None)):
+            raise TypeError("a spending source has a for_workspace method")
+        #: Every workspace's durable spending, when this client is composed with it; and the
+        #: workspace this copy spends for, once a policy or a gate named it.
+        self._spending_source: SpendingSource | None = spending
+        self._spending_workspace: uuid.UUID | None = None
         self._manifest = manifest or load_manifest()
         self._cache: ResponseCache = cache if cache is not None else NullResponseCache()
         self._budget = budget if budget is not None else BudgetGuard()
@@ -245,6 +263,7 @@ class ModelClient:
             max_attempts=max_attempts,
             sleep=sleep,
             clock=clock,
+            spending_required=spending is not None,
         )
 
     # -- introspection ---------------------------------------------------------------------
@@ -265,6 +284,16 @@ class ModelClient:
     def refusals(self) -> Mapping[str, str]:
         """Each provider this client refuses, by key, and why, by name."""
         return MappingProxyType(dict(self._refusals))
+
+    @property
+    def spending_source(self) -> SpendingSource | None:
+        """Every workspace's durable spending this client was composed with, or None."""
+        return self._spending_source
+
+    @property
+    def spending(self) -> SpendingGate | None:
+        """The durable spending every attempt of this copy is admitted by, or None."""
+        return self._chain.spending
 
     def __repr__(self) -> str:
         # No credential, not even a prefix of one. A truncated key in a traceback is still a leak.
@@ -287,7 +316,56 @@ class ModelClient:
             raise TypeError("a hosted-request policy has an admit method")
         bound = copy.copy(self)
         bound._policies = (*self._policies, policy)
+        # The workspace a policy is attached for is the one the copy spends for, when this client
+        # spends durably. It is the composition's own statement of the workspace, never a value
+        # a request carries; a policy for no workspace names none.
+        workspace = getattr(policy, "workspace_id", None)
+        if self._spending_source is not None and isinstance(workspace, uuid.UUID):
+            bound._spend_for(workspace)
         return bound
+
+    def with_spending(self, gate: SpendingGate) -> ModelClient:
+        """This client, admitting every attempt by ``gate``: a workspace's durable spending, or a
+        bound under it, attached where the workspace is known. The copy shares the manifest, the
+        cache, the policies and the budget guard. A gate for another workspace than the one this
+        copy already spends for is refused."""
+        for method in ("admit", "dispatch", "settle", "release"):
+            if not callable(getattr(gate, method, None)):
+                raise TypeError(f"a spending gate has a {method} method")
+        workspace = getattr(gate, "workspace_id", None)
+        if (
+            self._spending_workspace is not None
+            and isinstance(workspace, uuid.UUID)
+            and workspace != self._spending_workspace
+        ):
+            raise ValueError("one client copy spends for one workspace")
+        bound = copy.copy(self)
+        if isinstance(workspace, uuid.UUID):
+            bound._spending_workspace = workspace
+        bound._chain = self._chain.with_spending(gate)
+        return bound
+
+    def with_spending_source(self, source: SpendingSource) -> ModelClient:
+        """This client, composed with ``source``: from now on it sends nothing outside a
+        workspace's durable spending. For a composition handed a client built elsewhere."""
+        if not callable(getattr(source, "for_workspace", None)):
+            raise TypeError("a spending source has a for_workspace method")
+        if self._policies:
+            raise ValueError("a spending source is attached before any policy")
+        bound = copy.copy(self)
+        bound._spending_source = source
+        bound._chain = self._chain.requiring_spending()
+        return bound
+
+    def _spend_for(self, workspace: uuid.UUID) -> None:
+        """Attach the workspace's durable spending to this copy, which is a fresh copy."""
+        assert self._spending_source is not None
+        if self._spending_workspace is not None:
+            if self._spending_workspace != workspace:
+                raise ValueError("one client copy spends for one workspace")
+            return
+        self._spending_workspace = workspace
+        self._chain = self._chain.with_spending(self._spending_source.for_workspace(workspace))
 
     def with_attempts(self, observe: Callable[[CallUsage], object]) -> ModelClient:
         """This client, handing ``observe`` every attempt it makes as its budget guard records it.

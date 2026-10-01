@@ -71,8 +71,14 @@ services:
       # is configured: an unset or malformed allowlist, or one that omits the model endpoint or
       # the three Google sign-in origins, stops startup. See docs/security-floor.md.
       EXULANICA_EGRESS_ALLOWLIST: ${EXULANICA_EGRESS_ALLOWLIST:-}
+      # How the process spends on hosted models, durable or process: required whenever
+      # NEBIUS_API_KEY is set, with no default (docs/model-spending-contract.md). Every spending
+      # process shares the witness volume, which is never restored with the database.
+      EXULANICA_SPENDING: ${EXULANICA_SPENDING:-}
+      EXULANICA_SPENDING_WITNESS_DIR: /var/lib/exulanica-spending-witness
     volumes:
       - media:/var/lib/exulanica
+      - spending-witness:/var/lib/exulanica-spending-witness
     ports:
       - "${EXULANICA_PORT:-8000}:8000"
     depends_on:
@@ -107,8 +113,12 @@ services:
       # then an unset or malformed allowlist, or one that omits the model endpoint, stops startup.
       # See docs/security-floor.md.
       EXULANICA_EGRESS_ALLOWLIST: ${EXULANICA_EGRESS_ALLOWLIST:-}
+      # As the API: required with NEBIUS_API_KEY, and the same witness volume.
+      EXULANICA_SPENDING: ${EXULANICA_SPENDING:-}
+      EXULANICA_SPENDING_WITNESS_DIR: /var/lib/exulanica-spending-witness
     volumes:
       - media:/var/lib/exulanica
+      - spending-witness:/var/lib/exulanica-spending-witness
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -138,6 +148,9 @@ services:
 
 volumes:
   pgdata:
+  # The spending witness: what every authority's ledger has committed, kept apart from pgdata so a
+  # database restore cannot hand spent allowance back. Never back it up as restorable data.
+  spending-witness:
   # The content-addressed store. Append-only by policy: nothing in the runtime deletes from it,
   # and erasure runs through a separately authorised purger. Not immutable, not WORM, not
   # tamper-proof: a docker volume supports none of those and claiming them would be an overclaim.

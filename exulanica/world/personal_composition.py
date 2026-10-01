@@ -152,6 +152,9 @@ VERSION_TABLES: Final[Mapping[str, str]] = {
     "world_traffic_signal_choice": "stays with the previous version's traffic history",
     "world_traffic_signal_decision_request": "stays with the previous version's traffic history",
     "world_traffic_signal_segment": "stays with the previous version's traffic history",
+    "world_project": "stays bound to the previous version until its owner binds it to another",
+    "world_project_binding": "stays: each binding records the version as it was bound",
+    "companion_answer_simulation_citation": "stays: an answer cites the version it read",
 }
 
 

@@ -78,7 +78,7 @@ the society's state, and answer with something else, so they are not counted
 
 ```bash
 EXULANICA_TOKEN=<token> python3 -m exulanica_client capabilities --base-url https://<api> \
-  [--exercise --origin-role fictional] --transcript capabilities.json
+  [--exercise --origin-role fictional [--world <world_id>]] --transcript capabilities.json
 ```
 
 It reads `GET /worlds/capabilities` and, for each saved world of the token's workspace, the
@@ -88,14 +88,21 @@ each operation's state with the code of any refusal and whether this token may u
 route a descriptor names against the server's own `/openapi.json`, so a descriptor naming a route the
 server does not document fails a check rather than being trusted.
 
-With `--exercise` it makes one edit in each saved world, chosen from what the read calls available
-rather than from anything written into the client: an arrangement, previewed and then applied, where
-one is available and the preview shows it ready where the person arrives; otherwise one reviewed object
-placed in a region the read lists. It then sends the same request again against the base it replaced,
-which the server must refuse by name, and reads the base again from the read the descriptor names. It
-needs only `world.read` and `world.write`; operations that need another permission are listed as not
-permitted, and whether a world can be made from photographs is `unknown` to it, because that needs
-`admission.read`. The exit code is 0 when every check holds.
+With `--exercise` it makes a world of its own, of the first kind the creation read calls available
+to the token: a starter in a workspace that holds no saved world, otherwise a generated town. It edits
+that world alone, so a person's saved worlds open afterwards exactly as before. The edit is chosen
+from what the read calls available rather than from anything written into the client: an
+arrangement, previewed and then applied, where one is available and the preview shows it ready where
+the person arrives; otherwise one reviewed object placed in a region the read lists. The edit is bound
+to the new world's saved entry, so that world opens where the edit left it. The client then sends the
+same request again against the base it replaced, which the server must refuse by name, reads the base
+again from the read the descriptor names, and checks that every saved world that was there before the
+run is unchanged. `--world` names an existing world to edit instead. That edit is not bound to the
+world's saved entry, and the client prints a warning: the saved world opens again only once its new
+version is adopted ([Saved world entries](../saved-world-entry.md)). It needs only `world.read` and
+`world.write`; operations that need another permission are listed as not permitted, and whether a
+world can be made from photographs is `unknown` to it, because that needs `admission.read`. The exit
+code is 0 when every check holds.
 
 The walkthrough takes its region from the same read when `--region` is not given, so it places into
 a generated town, whose saved world names no authored region, as it does into a starter world.
@@ -182,8 +189,11 @@ acceptance runtime with a synthetic workspace, and binds the transcript and the 
 of the saved world afterwards, with the object drawn where the client placed it.
 [`tests/test_developer_client_capabilities.py`](../../tests/test_developer_client_capabilities.py)
 runs `capabilities --exercise` as a separate process against the application as a deployment runs
-it, with a runtime role and row-level security, over a starter world, a generated town and a world
-from two photographs, and holds the edits it made to the repository.
+it, with a runtime role and row-level security, in a workspace holding a starter world, a generated
+town and a world from two photographs. The run makes a town of its own and edits only that world, and
+the three saved worlds still open as before. A second run names the starter with `--world`: an
+arrangement is previewed and applied there, and the starter then needs its new version adopted, as
+the run warned. Each result is held to the repository and the entries read.
 [`tests/test_developer_client_comparisons.py`](../../tests/test_developer_client_comparisons.py)
 runs the comparison reading with a token granted `world.read` alone, over a comparison started
 through the start route and played by the host's worker, and holds the asks it counted to the

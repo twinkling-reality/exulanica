@@ -190,9 +190,11 @@ database refuses as it is written, because its right passed its end after that q
 addition the same way. In each case nothing is written. A society and its history stay in the
 previous version, and the preview says where its inhabitants are only when its engine keeps that;
 inhabitants who are here refuse the addition as `personal_world_edit_cannot_carry` until the person
-sends them away. A saved world changed elsewhere is refused as `personal_world_changed_elsewhere`,
-and a world one of whose photographs was deleted as `personal_world_source_deleted`: rebuilding a
-world from the photographs that remain is not something the app does.
+sends them away. A world project stays bound to the version it named, and a remembered answer keeps
+citing the version it read ([world project context](project-context.md)). A saved world changed
+elsewhere is refused as `personal_world_changed_elsewhere`, and a world one of whose photographs
+was deleted as `personal_world_source_deleted`: rebuilding a world from the photographs that
+remain is not something the app does.
 
 A world draws a personal photograph only while its personal authorization and human review are
 current, the rule saved-world references follow. `GET /world/source-media` reads the same rule

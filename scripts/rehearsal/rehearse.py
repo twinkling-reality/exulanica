@@ -380,6 +380,8 @@ class Run:
         if self.model_configured:  # the API itself then refuses a model call past the run's bound
             environment["EXULANICA_BUDGET_USD"] = str(self.bound)
             environment["EXULANICA_BUDGET_MAX_CALLS"] = str(self.steps["spend"]["max_calls"])
+            # The run's bound is each process's own fuse, as it always was.
+            environment["EXULANICA_SPENDING"] = "process"
         completed = subprocess.run(command, capture_output=True, text=True, env=environment)
         (self.out / "launcher-up.txt").write_text(
             scrub(f"exit {completed.returncode}\n{completed.stdout}\n{completed.stderr}")
@@ -439,6 +441,7 @@ class Run:
         if with_key:
             environment["EXULANICA_BUDGET_USD"] = str(self.worker_bound)
             environment["EXULANICA_BUDGET_MAX_CALLS"] = str(self.steps["spend"]["max_calls"])
+            environment["EXULANICA_SPENDING"] = "process"
             command = [*self.key_handoff(), *command]
         log_name = f"{key.replace('_', '-')}.log"
         log_file = self.out / log_name

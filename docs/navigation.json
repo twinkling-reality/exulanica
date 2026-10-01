@@ -74,6 +74,7 @@
       "documents": [
         {"path": "interaction-model.md", "role": "contract", "owns": "The Atlas browser runtime's interaction, navigation, Companion encounter and proposal confirmation"},
         {"path": "companion-question.md", "role": "contract", "owns": "Grounded question, conversation and appearance-proposal path"},
+        {"path": "project-context.md", "role": "contract", "owns": "World projects: identity and binding, kept items and their bases, named records, sharing, bounded context assembly, deletion and audit residue"},
         {"path": "atlas-world-customization-contract.md", "role": "contract", "owns": "Browser appearance customization, protected values and review lifecycle"},
         {"path": "atlas-reconstruction-inspection.md", "role": "contract", "owns": "Reconstructed geometry delivery, display frame and inspection"},
         {"path": "atlas-spatial-architecture.md", "role": "contract", "owns": "Atlas region layout, navigation, grounds and residency"}
@@ -103,7 +104,8 @@
         {"path": "deployment.md", "role": "guide", "owns": "Processes, per-process settings, health, catalog preflight, reviewer stack, backups and recovery"},
         {"path": "local-database.md", "role": "guide", "owns": "A personal install's durable PostgreSQL database: create, back up, verify, restore, upgrade, adopt, require passwords"},
         {"path": "derivative-worker-operations.md", "role": "guide", "owns": "Running the photograph derivative worker: delivery, stages, progress, shutdown and recovery"},
-        {"path": "security-floor.md", "role": "contract", "owns": "Route permissions, tile quotas, egress, model spend budgets and database roles"},
+        {"path": "security-floor.md", "role": "contract", "owns": "Route permissions, tile quotas, egress, each process's model spend fuse and database roles"},
+        {"path": "model-spending-contract.md", "role": "contract", "owns": "The durable spending authority: authorities, workspace grants and bounds, admission and settlement, idempotency, revocation, restore protection and reconciliation"},
         {"path": "privacy-consent-threat-model.md", "role": "contract", "owns": "Processing, consent and rights records, the hosted-request boundary, deletion and restore, disclosure, injection and misuse"},
         {"path": "model-and-service-selection.md", "role": "reference", "owns": "Model roles, models offered for decisions, selection evidence, judged comparisons and candidates"},
         {"path": "license-matrix.md", "role": "reference", "owns": "Model, dependency and asset license decisions"}

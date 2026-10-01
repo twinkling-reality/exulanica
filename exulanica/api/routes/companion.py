@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import datetime as dt
 import uuid
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Path, Query, Response
 from fastapi.responses import JSONResponse
@@ -36,6 +36,8 @@ from exulanica.models.manifest import load_manifest
 from exulanica.world.companion_memory import (
     DEFAULT_RECENT_LIMIT,
     MAX_RECENT_LIMIT,
+    MAX_SIMULATED_LABELS,
+    MAX_SIMULATION_CITATIONS,
     AnswerCitation,
     AnswerComposed,
     AnswerOrigin,
@@ -46,6 +48,9 @@ from exulanica.world.companion_memory import (
     InvalidCompanionMemory,
     RecordedAnswer,
     RecordedEscape,
+    SimulatedInhabitant,
+    SimulationCitation,
+    UnavailableSimulationSource,
     UnknownCompanionMemory,
 )
 
@@ -83,6 +88,31 @@ class CitationBody(BaseModel):
     span_id: uuid.UUID
     capture_id: uuid.UUID
     ordinal: Annotated[int, Field(ge=0, le=4096)]
+
+
+class RememberedSimulationCitationBody(BaseModel):
+    """One simulated record an answer about a world's people cited, as the answer route served it
+    (``simulation`` in ``POST /selection/ask``), with its reading position. Ids only."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    ordinal: Annotated[int, Field(ge=0, le=4096)]
+    result_kind: Literal["synthetic_inhabitant", "simulation_event"]
+    version_id: uuid.UUID
+    inhabitant_id: uuid.UUID
+    event_id: uuid.UUID | None = None
+    tick: Annotated[int, Field(ge=0)]
+    input_seq: Annotated[int, Field(ge=1)] | None = None
+    object_id: Annotated[str, Field(min_length=1, max_length=200)] | None = None
+    edit_seq: Annotated[int, Field(ge=1)] | None = None
+    edit_id: uuid.UUID | None = None
+
+
+class RememberedInhabitantBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    version_id: uuid.UUID
+    inhabitant_id: uuid.UUID
 
 
 class AnswerBody(BaseModel):
@@ -131,6 +161,24 @@ class AnswerBody(BaseModel):
         dict[Annotated[str, Field(min_length=1, max_length=_MAX_LABEL)], uuid.UUID],
         Field(max_length=_MAX_NAMES),
     ] = Field(default_factory=dict)
+    #: For an answer about a world's simulated people: the world asked about, what the answer
+    #: cited, and whom each ``[inhabitant X]`` and ``[spot X]`` label stood for, as the answer route
+    #: served them. Never with photograph citations or ``names``.
+    world_id: Annotated[str, Field(min_length=1, max_length=200)] | None = None
+    simulation_citations: Annotated[
+        list[RememberedSimulationCitationBody], Field(max_length=MAX_SIMULATION_CITATIONS)
+    ] = Field(default_factory=list)
+    inhabitants: Annotated[
+        dict[Annotated[str, Field(min_length=1, max_length=_MAX_LABEL)], RememberedInhabitantBody],
+        Field(max_length=MAX_SIMULATED_LABELS),
+    ] = Field(default_factory=dict)
+    spots: Annotated[
+        dict[
+            Annotated[str, Field(min_length=1, max_length=_MAX_LABEL)],
+            Annotated[str, Field(min_length=1, max_length=500)],
+        ],
+        Field(max_length=MAX_SIMULATED_LABELS),
+    ] = Field(default_factory=dict)
 
 
 class EscapeBody(BaseModel):
@@ -166,6 +214,31 @@ class CitationView(BaseModel):
     ordinal: int
 
 
+class RememberedSimulationCitationView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    ordinal: int
+    #: Always ``simulation``: a remembered answer about simulated people is never a memory.
+    truth_class: Literal["simulation"]
+    result_kind: str
+    world_id: str
+    version_id: uuid.UUID
+    inhabitant_id: uuid.UUID
+    event_id: uuid.UUID | None
+    tick: int
+    input_seq: int | None
+    object_id: str | None
+    edit_seq: int | None
+    edit_id: uuid.UUID | None
+
+
+class RememberedInhabitantView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    version_id: uuid.UUID
+    inhabitant_id: uuid.UUID
+
+
 class AnswerView(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -198,6 +271,11 @@ class AnswerView(BaseModel):
     used_fallback: bool
     unanswered_attempts: int
     unanswered_cost_unknown: bool
+    #: For an answer about a world's simulated people; null and empty otherwise.
+    world_id: str | None = None
+    simulation_citations: list[RememberedSimulationCitationView] = Field(default_factory=list)
+    inhabitants: dict[str, RememberedInhabitantView] = Field(default_factory=dict)
+    spots: dict[str, str] = Field(default_factory=dict)
 
 
 class EscapeView(BaseModel):
@@ -284,6 +362,27 @@ def record_answer(body: AnswerBody, repository: WriteMemory) -> AnswerView | JSO
                     for citation in body.citations
                 ),
                 names=dict(body.names),
+                world_id=body.world_id,
+                simulation_citations=tuple(
+                    SimulationCitation(
+                        ordinal=citation.ordinal,
+                        result_kind=citation.result_kind,
+                        version_id=citation.version_id,
+                        inhabitant_id=citation.inhabitant_id,
+                        event_id=citation.event_id,
+                        tick=citation.tick,
+                        input_seq=citation.input_seq,
+                        object_id=citation.object_id,
+                        edit_seq=citation.edit_seq,
+                        edit_id=citation.edit_id,
+                    )
+                    for citation in body.simulation_citations
+                ),
+                inhabitants={
+                    label: SimulatedInhabitant(value.version_id, value.inhabitant_id)
+                    for label, value in body.inhabitants.items()
+                },
+                spots=dict(body.spots),
             )
         )
     except InvalidCompanionMemory as exc:
@@ -292,6 +391,9 @@ def record_answer(body: AnswerBody, repository: WriteMemory) -> AnswerView | JSO
         # An entity or a photograph another workspace holds is one this library does not, and
         # the answer is the one an absent id gets, so the route is not an existence oracle.
         return _problem(404, "unknown_reference", str(exc))
+    except UnavailableSimulationSource as exc:
+        # The society's own read answers a deleted source so; a citation of it is not kept.
+        return _problem(424, "unavailable_society_input", str(exc))
     return _answer_view(answer)
 
 
@@ -394,6 +496,31 @@ def _answer_view(answer: CompanionAnswer) -> AnswerView:
         used_fallback=answer.used_fallback,
         unanswered_attempts=answer.unanswered_attempts,
         unanswered_cost_unknown=answer.unanswered_cost_unknown,
+        world_id=answer.world_id,
+        simulation_citations=[
+            RememberedSimulationCitationView(
+                ordinal=citation.ordinal,
+                truth_class="simulation",
+                result_kind=citation.result_kind,
+                world_id=answer.world_id or "",
+                version_id=citation.version_id,
+                inhabitant_id=citation.inhabitant_id,
+                event_id=citation.event_id,
+                tick=citation.tick,
+                input_seq=citation.input_seq,
+                object_id=citation.object_id,
+                edit_seq=citation.edit_seq,
+                edit_id=citation.edit_id,
+            )
+            for citation in answer.simulation_citations
+        ],
+        inhabitants={
+            label: RememberedInhabitantView(
+                version_id=value.version_id, inhabitant_id=value.inhabitant_id
+            )
+            for label, value in answer.inhabitants.items()
+        },
+        spots=dict(answer.spots),
     )
 
 

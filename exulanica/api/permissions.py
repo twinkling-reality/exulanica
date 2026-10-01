@@ -411,6 +411,8 @@ _DELETIONS: Final = _every(
     "DELETE /companion/memory/answers/{answer_id}",
     "POST /identity/revoke",
     "POST /selection/place-bridges/{decision_id}/revoke",
+    "DELETE /world/projects/{project_id}",
+    "DELETE /world/projects/{project_id}/items/{item_id}",
 )
 
 #: Reading proposed person regions, and where a place's name may go.
@@ -452,7 +454,8 @@ _ADMISSION_WRITES: Final = _every(
     "POST /personal-admission/model-rights/{right_id}/withdraw",
 )
 
-#: Derivative and reconstruction job status.
+#: Derivative and reconstruction job status, and what the workspace may still spend on hosted
+#: models: a monitoring token sees spending without being able to spend.
 _OPERATIONS_READS: Final = _every(
     _requires(_P.OPERATIONS_READ),
     "GET /operations/capacity",
@@ -461,6 +464,7 @@ _OPERATIONS_READS: Final = _every(
     "GET /operations/derivative-jobs/{job_id}/events",
     "GET /operations/reconstruction-scenes",
     "GET /operations/reconstruction-scenes/{job_id}",
+    "GET /spending",
 )
 
 #: Retrying a reconstruction job.
@@ -498,6 +502,12 @@ _WORLD_READS: Final = _every(
     "GET /world/interactions/proposals/{proposal_id}",
     "GET /world/interactions/recommendations",
     "GET /world/interactions/versions",
+    "GET /world/projects",
+    "GET /world/projects/{project_id}",
+    "GET /world/projects/{project_id}/audit",
+    "GET /world/projects/{project_id}/context",
+    "GET /world/projects/{project_id}/items",
+    "GET /world/projects/{project_id}/items/{item_id}/history",
     "GET /world/source-media",
     "GET /world/source-media/{source_id}",
     "GET /world/styles/catalog",
@@ -566,6 +576,14 @@ _WORLD_WRITES: Final = _every(
     "DELETE /world/interactions/previews/{preview_id}",
     "POST /world/interactions/previews/{preview_id}/apply",
     "POST /world/interactions/rollback",
+    "POST /world/projects",
+    "PUT /world/projects/{project_id}",
+    "POST /world/projects/{project_id}/items",
+    "POST /world/projects/{project_id}/items/{item_id}/corrections",
+    "POST /world/projects/{project_id}/items/{item_id}/resolve",
+    "POST /world/projects/{project_id}/items/{item_id}/review",
+    "POST /world/projects/{project_id}/shares",
+    "DELETE /world/projects/{project_id}/shares/{share_id}",
     "POST /world/styles/previews",
     "DELETE /world/styles/previews/{preview_id}",
     "POST /world/styles/previews/{preview_id}/apply",
