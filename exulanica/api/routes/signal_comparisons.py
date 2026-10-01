@@ -27,7 +27,10 @@ meet. It plays no episode. ``POST .../comparisons`` starts one
 the version's roads as they are, reserves every run and records the start with the bound its owner
 stated, at most the most it can cost. A host's comparison worker plays it off the request path, as
 it plays a comparison of people. The comparison's id is the caller's, keyed within its workspace:
-the same start sent again is answered with the start it made.
+the same start sent again is answered with the start it made. Where a durable spending authority
+admits this host's calls, a new start an arm of which names a provider whose allowance is spent is
+refused as admission would refuse that arm's first ask, 429 ``budget_exceeded`` with its
+``spending`` member, before anything is defined (``Services.require_allowance``).
 
 ``POST .../comparisons/{comparison_id}/cancel`` cancels a started comparison once, as a comparison
 of people is cancelled (:mod:`exulanica.world.comparison_facts`): a start no host holds closes now,
@@ -60,6 +63,7 @@ from exulanica.api.capabilities import (
     VersionContext,
     unavailable,
 )
+from exulanica.api.decision_host import offered_providers
 from exulanica.api.dependencies import CurrentSession, ScopedConnection, get_services
 from exulanica.api.services import Services
 from exulanica.api.signal_comparison_runner import SignalComparisonRunner
@@ -77,9 +81,10 @@ from exulanica.api.traffic_answer import refusal_status
 from exulanica.api.world_scope import WorldId
 from exulanica.models.budget import BudgetGuard
 from exulanica.models.manifest import load_manifest
+from exulanica.models.spending import SpendingRefused
 from exulanica.traffic.errors import UnsupportedNetworkError
 from exulanica.world.comparison_facts import ComparisonFacts, run_progress
-from exulanica.world.decision_roles import DecisionRole
+from exulanica.world.decision_roles import DecisionRole, decision_roles
 from exulanica.world.errors import InvalidStructuralData
 from exulanica.world.generated_worlds import unreadable_reason
 from exulanica.world.role_decisions import ReplayMismatch
@@ -459,6 +464,12 @@ def start_signal_comparison(
                 f"this server's model budget has {calls} calls left for comparisons, and this "
                 f"one can make {prepared.cost.calls}",
             )
+        if existing is None:
+            # Every arm asks its own model's provider alone: refused here as admission would
+            # refuse its first ask, before anything is defined.
+            services.require_allowance(
+                connection, session.workspace_id, [model.provider for model in body.models]
+            )
         with connection.transaction():
             prepared.runner.define(
                 version_id,
@@ -690,6 +701,17 @@ def cancel_signal_comparison(
 # -- a world's capability read --------------------------------------------------------------------
 
 
+def _spent(context: VersionContext) -> SpendingRefused | None:
+    """The durable authority's refusal of every start: the allowance of every provider the signal
+    role can ask is spent. None while one has allowance left, or in a process no durable authority
+    admits."""
+    spending = context.spending()
+    if spending is None:
+        return None
+    role = decision_roles().deciding_for("signal")
+    return spending.every(offered_providers(role, load_manifest(), role.contract()))
+
+
 def capability_operations(context: VersionContext) -> list[Operation]:
     """Starting a comparison of the models that decide the town's signals, and cancelling one, as a
     world's capability read lists them.
@@ -698,10 +720,13 @@ def capability_operations(context: VersionContext) -> list[Operation]:
     of the world that has not finished, roads the version does not state or traffic cannot read
     (by the codes the traffic read answers them with; a network the compiler refuses is found by
     the start itself, which this read does not compile), and this server's own refusal
-    (``Services.signal_comparison_refusal``). The plan read is its preview and lists what a start
-    may name. A cancel acts on a comparison the listing names and is available while a start of
-    the world has not finished, else ``comparison_not_started``; it holds ``model.invoke`` only so
-    that whoever may start a paid comparison may stop it, and calls no model.
+    (``Services.signal_comparison_refusal``). Where a durable spending authority admits this
+    server's calls, it is also unavailable by the authority's reason once the allowance of every
+    provider the signal role can ask is spent: every start would then be refused
+    (``Services.require_allowance``). The plan read is its preview and lists what a start may name.
+    A cancel acts on a comparison the listing names and is available while a start of the world has
+    not finished, else ``comparison_not_started``; it holds ``model.invoke`` only so that whoever
+    may start a paid comparison may stop it, and calls no model, so no allowance is read for it.
     """
     roads = None
     try:
@@ -724,6 +749,8 @@ def capability_operations(context: VersionContext) -> list[Operation]:
         state = roads
     elif refusal := context.services.signal_comparison_refusal(context.session.workspace_id):
         state = unavailable(refusal)
+    elif (spent := _spent(context)) is not None:
+        state = unavailable(spent.reason)
     else:
         state = AVAILABLE
     return [

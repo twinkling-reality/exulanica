@@ -189,6 +189,16 @@ choice is recorded even when this host asks no model; the choice's `decisions` e
 registered role whose subject this server has no host for is listed as `unsupported` with
 `role_subject_unsupported`, and a choice of it is refused by that code.
 
+Where a durable spending authority admits this server's calls, the reads also state the workspace's
+allowance, as admission would answer its next attempt. An ask reaches its chosen model's provider
+alone, so a role is refused once the allowance of every provider its models are served by is spent.
+A model choice's `decisions` effect is then `unavailable` by the authority's reason
+(`spending_not_granted`, `spending_revoked`, `spending_expired`, `spending_suspended` or
+`spending_limit_reached`), after this process's own refusal, which a call meets first. A comparison's
+start is `unavailable` by the same reason, and a start that would ask a spent provider is refused 429
+`budget_exceeded` with the authority's `spending` member
+([model spending](../model-spending-contract.md#11-what-a-client-sees)). A cancel reads no allowance.
+
 A society's events name the input they were played under (`document.input_seq`). The input's
 provenance read gives the authored `edit_seq` it followed and the version's state digest after that
 edit (`delta_sha256`), which is the `result_state_sha256` of that edit in the version's history, so

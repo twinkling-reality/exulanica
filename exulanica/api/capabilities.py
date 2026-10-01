@@ -37,6 +37,7 @@ from exulanica.api.permissions import Permission, Requires, rule_for
 from exulanica.api.routes import mounted_routes
 from exulanica.api.services import Services
 from exulanica.selection.validation import Session
+from exulanica.spending.status import SpendingRefusals
 from exulanica.traffic.errors import UnsupportedNetworkError
 from exulanica.world.errors import InvalidStructuralData
 from exulanica.world.object_repository import SourceFacts
@@ -203,6 +204,10 @@ class VersionContext:
     _roads: TrafficInput | Exception | None = field(
         default=None, init=False, repr=False, compare=False
     )
+    #: What :meth:`spending` read, once it has, as a one-item tuple: None is a read's answer too.
+    _spending: tuple[SpendingRefusals | None] | None = field(
+        default=None, init=False, repr=False, compare=False
+    )
 
     @property
     def bind(self) -> dict[str, str]:
@@ -226,6 +231,16 @@ class VersionContext:
         if isinstance(outcome, Exception):
             raise outcome.with_traceback(None)
         return outcome
+
+    def spending(self) -> SpendingRefusals | None:
+        """What admission would answer this workspace's next attempt, by provider
+        (:meth:`Services.spending_refusals`), read once for every adapter that asks; None in a
+        process no durable authority admits."""
+        outcome = self._spending
+        if outcome is None:
+            outcome = (self.services.spending_refusals(self.connection, self.session.workspace_id),)
+            object.__setattr__(self, "_spending", outcome)
+        return outcome[0]
 
 
 @dataclass(frozen=True, slots=True)

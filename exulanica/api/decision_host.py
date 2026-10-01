@@ -78,6 +78,7 @@ __all__ = [
     "host_refusal",
     "hour_refusal",
     "model_refusal",
+    "offered_providers",
     "question_refusal",
     "sendable_labels",
     "share_kept",
@@ -200,6 +201,21 @@ def smallest_ask_usd(
         if contract.mechanism_for(spec) is not None
     ]
     return min(bounds) if bounds else None
+
+
+def offered_providers(
+    role: DecisionRole, manifest: Manifest, contract: DecisionContract
+) -> tuple[str, ...]:
+    """The providers an ask for ``role`` can reach: those serving the models the manifest offers
+    it and its contract can ask, each once, in the order the manifest offers them. An ask reaches
+    its chosen model's provider alone."""
+    return tuple(
+        dict.fromkeys(
+            spec.provider
+            for spec in manifest.offered_models(role.chosen)
+            if contract.mechanism_for(spec) is not None
+        )
+    )
 
 
 def _budget_refusal(budget: BudgetGuard, contract: DecisionContract, need: Decimal) -> str | None:

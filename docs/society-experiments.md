@@ -281,6 +281,11 @@ this world does not hold; more seeds than the server holds; and a bound above th
 comparison can cost (`bound_out_of_range`) or above what this server's model budget has left beside
 the part its decision contract keeps for other work (`bound_over_budget`), or a comparison that can
 make more calls than this server's model budget has left beside that part (`calls_over_budget`).
+Where a durable spending authority admits this server's calls, a new start that would ask a model
+whose provider's allowance is spent, for the group or for somebody outside it whose owner chose it,
+is refused before anything is defined, as admission would refuse that model's first ask: 429
+`budget_exceeded` with the authority's `spending` member
+([model spending](model-spending-contract.md#11-what-a-client-sees)).
 
 **What it can cost.** The most is derived: a run asks each subject a model decides for at most once
 a minute, so its asks are at most the protocol's window times those subjects (the arm's group under

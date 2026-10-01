@@ -561,7 +561,8 @@ def _role_operations(context: VersionContext) -> list[Operation]:
             context.world_id,
             context.version_id,
             context.source.snapshot_id,
-        )
+        ),
+        spending=context.spending(),
     )
 
 

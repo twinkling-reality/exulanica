@@ -618,7 +618,10 @@ seed. `POST .../comparisons` (`comparison_id`, `models`, `control`, `seeds`, `si
 `world.write` and `model.invoke`, and the cancel asks no model. A start is refused by name
 (`START_REFUSALS` in `exulanica/api/signal_comparison_start.py`); an id the workspace does not hold,
 or a credential that may not use the route, is answered 404 `unknown_reference`; roads are refused
-as the saved world's traffic read refuses them.
+as the saved world's traffic read refuses them. Where a durable spending authority admits this
+server's calls, a new start naming a model whose provider's allowance is spent is refused before
+anything is defined, as admission would refuse that model's first ask: 429 `budget_exceeded` with
+the authority's `spending` member ([model spending](model-spending-contract.md#11-what-a-client-sees)).
 
 ## The layer
 

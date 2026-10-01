@@ -17,14 +17,19 @@ from typing import Any
 
 import pytest
 from exulanica.api import capabilities
+from exulanica.api.decision_host import offered_providers
 from exulanica.api.permissions import ROUTE_RULES, Permission, Requires
-from exulanica.api.role_hosts import ROLE_HOSTS, choice_status
+from exulanica.api.role_hosts import ROLE_HOSTS, RoleContext, choice_status
 from exulanica.api.routes import capabilities as reads
+from exulanica.api.routes import world_models
 from exulanica.api.routes.society_models import CHOICE_CONFLICTS
 from exulanica.api.routes.world_models import choose_world_model
 from exulanica.api.routes.world_objects import add_authored_object
 from exulanica.api.surface import routing_only_application
+from exulanica.models.manifest import load_manifest
+from exulanica.models.spending import SpendingRefused
 from exulanica.selection.validation import Session
+from exulanica.spending.status import SpendingRefusals
 from exulanica.world.decision_roles import decision_roles
 from exulanica.world.object_repository import SourceFacts
 from exulanica.world.society_engines import society_engine
@@ -71,6 +76,8 @@ def _services(**changes: Any) -> SimpleNamespace:
         "character_appearance": object(),
         "model_host_refusal": lambda _workspace, _role: "models_not_run_here",
         "comparison_refusal": lambda _workspace: "comparisons_not_set_up",
+        # A process no durable spending authority admits.
+        "spending_refusals": lambda _connection, _workspace: None,
     }
     return SimpleNamespace(**(values | changes))
 
@@ -320,6 +327,50 @@ def test_every_registered_role_has_a_host_and_a_choice_descriptor():
     for described in roles.values():
         assert described["spends"] and described["idempotency"] == "idempotency_key"
         assert described["options"] == ["GET /world/versions/{version_id}/models"]
+
+
+@pytest.mark.parametrize(
+    ("host_refusal", "spent", "decisions"),
+    [
+        (None, None, ("available", None)),
+        (None, "spending_revoked", ("unavailable", "spending_revoked")),
+        ("process_budget_spent", "spending_revoked", ("unavailable", "process_budget_spent")),
+    ],
+    ids=["allowance left", "allowance spent", "the process's fuse first"],
+)
+def test_a_choice_says_the_fuse_then_the_allowance_on_its_decisions(host_refusal, spent, decisions):
+    # A call meets this process's fuse before the durable authority admits it.
+    providers = load_manifest().providers
+    spending = SpendingRefusals(
+        {} if spent is None else {provider: SpendingRefused(spent) for provider in providers}
+    )
+    context = RoleContext(
+        None,  # type: ignore[arg-type]
+        Session(uuid.uuid4(), uuid.uuid4()),
+        None,  # type: ignore[arg-type]
+        "world:test:choice",
+        uuid.uuid4(),
+        uuid.uuid4(),
+    )
+    for role in decision_roles():
+        operation = world_models._operation(
+            context,
+            role,
+            capabilities.AVAILABLE,
+            host_refusal,
+            world_models._spent(role, spending),
+        )
+        effects = capabilities.describe(operation, ROUTES, EVERYTHING)["effects"]
+        assert [(e["on"], e["state"], e["code"]) for e in effects] == [("decisions", *decisions)]
+
+
+def test_each_decision_role_asks_one_provider():
+    """A role is refused once every provider it can ask is spent, which is the allowance of the
+    model chosen only while each role asks one: offering a role a second provider needs a refusal
+    per model on the models read first."""
+    manifest = load_manifest()
+    for role in decision_roles():
+        assert len(offered_providers(role, manifest, role.contract())) == 1, role.key
 
 
 def test_a_choice_is_refused_with_the_status_its_code_has_on_every_route():

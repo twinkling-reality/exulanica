@@ -315,6 +315,26 @@ taken effect, so asking again would repeat the step.
   (`spending_not_granted`, `spending_revoked`, `spending_expired`, `spending_limit_reached`,
   `spending_suspended`, `spending_unavailable` or `spending_scope_missing`), and a comparison run
   that refusal ends fails by that reason.
+- Before any attempt, the workspace's own spending is projected onto the refusal admission would
+  give its next attempt of each provider (`exulanica.spending.status.admission_refusal`): with no
+  live grant, the latest grant's state, its authority first; with one, the authority suspended, a
+  witnessed authority asked by a process with no witness directory, the authority expired or
+  exhausted, then the grant's calls and money. The reason, scope, detail and retry are admission's,
+  with the grant's figures; it states no requested amount, since no attempt is made, and for an
+  exhausted authority neither unit. VERIFIED against a real admission in each state
+  (`tests/test_spending_admission_projection.py`).
+- An ask reaches its chosen model's provider alone (`ModelClient.choose` walks one model, and a
+  chain falls back only on a model that is no longer served), so a refusal never falls through to
+  another provider. A comparison's start, of a world's people or a town's signals, that would ask a
+  model whose provider's allowance is spent is refused with that projection before anything is
+  defined: the same `429 budget_exceeded` with its `spending` member. The capability reads state it
+  too ([world API](capabilities/world-api.md)): the start is `unavailable` by its reason, as is a
+  model choice's `decisions` effect, once every provider the role can ask is spent. VERIFIED
+  (`tests/test_comparison_start_allowance_postgres.py`).
+- The projection cannot foresee three refusals, which admission still gives when the attempt is
+  made: a remainder above zero that one attempt's reservation does not fit, an authority whose own
+  remainder (every workspace's spending together, which no workspace reads) does not fit it, and a
+  witness directory that is not the authority's.
 
 ## 12. What this does not provide
 

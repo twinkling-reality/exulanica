@@ -32,7 +32,7 @@ import hashlib
 import json
 import os
 import uuid
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from contextlib import AbstractContextManager
 from dataclasses import dataclass, field
 from decimal import Decimal
@@ -83,6 +83,7 @@ from exulanica.spending import (
     durable_spending_from_env,
     spending_mode,
 )
+from exulanica.spending.status import SpendingRefusals, read_spending_refusals
 from exulanica.store.base import ContentAddressedStore
 from exulanica.store.configured import ContentStores, content_stores
 from exulanica.store.namespaces import WorkspaceStores
@@ -452,6 +453,35 @@ class Services:
         if self.model_client is None:
             return PROVIDER_CREDENTIAL_ABSENT
         return self.model_client.refusals.get(provider)
+
+    def spending_refusals(
+        self, connection: psycopg.Connection, workspace_id: uuid.UUID
+    ) -> SpendingRefusals | None:
+        """What the durable spending authority would answer a workspace's next attempt, by
+        provider, from one read of the workspace's own spending on ``connection``
+        (:func:`~exulanica.spending.status.admission_refusal`); None in a process no durable
+        authority admits, which spends within its fuse alone (:meth:`model_host_refusal`).
+
+        A provider's refusal is every ask's of a model it serves: an ask goes to its chosen
+        model's provider alone (``ModelClient.choose`` walks one model with no fallback), and
+        ``ModelChain.walk`` falls back only on ``ModelUnavailableError``, never on a refusal.
+        """
+        if self.spending is None:
+            return None
+        return read_spending_refusals(
+            connection, workspace_id, witness_configured=self.spending.witness is not None
+        )
+
+    def require_allowance(
+        self, connection: psycopg.Connection, workspace_id: uuid.UUID, providers: Iterable[str]
+    ) -> None:
+        """Raise the refusal admission would give the first ask of the first of ``providers``
+        whose allowance is spent (:meth:`spending_refusals`), before anything is written; return
+        while each has allowance left, or in a process no durable authority admits."""
+        refusals = self.spending_refusals(connection, workspace_id)
+        refused = None if refusals is None else refusals.first(providers)
+        if refused is not None:
+            raise refused
 
     def choice_refusal(
         self,

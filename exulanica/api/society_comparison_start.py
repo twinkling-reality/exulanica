@@ -72,6 +72,7 @@ __all__ = [
     "StartRefused",
     "TypicalFigures",
     "answers_per_minute",
+    "asked_providers",
     "comparison_body",
     "comparison_cost",
     "definition_body",
@@ -524,6 +525,20 @@ class ComparisonCost:
             "suggested_usd": None if suggested is None else format(suggested, "f"),
             "typical_matches": self.typical_matches,
         }
+
+
+def asked_providers(body: Mapping[str, Any]) -> tuple[str, ...]:
+    """Every provider a comparison ``body`` asks, each once and sorted: each model arm's, and in
+    every arm the provider of the model an owner chose for somebody outside the group."""
+    return tuple(
+        sorted(
+            {
+                str(held["provider_config"]["provider"])
+                for held in [*body["arms"].values(), *body["others"]]
+                if held.get("provider_config") is not None
+            }
+        )
+    )
 
 
 def comparison_cost(

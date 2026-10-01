@@ -30,7 +30,11 @@ newest input or at an earlier stored one the caller names (``input_seq``), reser
 records the start with the bound its owner stated, at most the most it can cost. A host's
 comparison worker plays it off the request path (:mod:`exulanica.api.society_comparison_worker`).
 The comparison's id is the caller's, keyed within its workspace: the same start sent again is
-answered with the start it made, and every refusal is named (``START_REFUSALS``).
+answered with the start it made, and every refusal is named (``START_REFUSALS``). Where a durable
+spending authority admits this host's calls, a new start that would ask a provider whose allowance
+is spent, an arm's model or the model an owner chose for somebody outside the group, is refused as
+admission would refuse that first ask, 429 ``budget_exceeded`` with its ``spending`` member, before
+anything is defined (``Services.require_allowance``).
 
 ``POST .../comparisons/{comparison_id}/cancel`` cancels a comparison started from the application,
 once (:mod:`exulanica.world.comparison_facts`): a start no host holds is closed by the cancellation
@@ -64,6 +68,7 @@ from exulanica.api.capabilities import (
     unavailable,
     unsupported,
 )
+from exulanica.api.decision_host import offered_providers
 from exulanica.api.dependencies import CurrentSession, ScopedConnection, get_services
 from exulanica.api.services import Services
 from exulanica.api.society_comparison_runner import (
@@ -80,6 +85,7 @@ from exulanica.api.society_comparison_start import (
     ComparisonSelection,
     StartRefused,
     answers_per_minute,
+    asked_providers,
     comparison_cost,
     definition_body,
     stopped_host_usd,
@@ -89,6 +95,7 @@ from exulanica.api.society_comparison_worker import CANCELLED_REASON
 from exulanica.api.world_scope import WorldId
 from exulanica.models.budget import BudgetGuard
 from exulanica.models.manifest import load_manifest
+from exulanica.models.spending import SpendingRefused
 from exulanica.world.comparison_facts import ComparisonFacts, run_progress
 from exulanica.world.decision_roles import DecisionRole, RoleRefused, decision_roles
 from exulanica.world.society import UnavailableSocietyInput, UnknownSociety
@@ -783,6 +790,13 @@ def start_society_comparison(
                 f"this server's model budget has {calls} calls left for comparisons, and this "
                 f"one can make {prepared.cost.calls}",
             )
+        if existing is None:
+            # Each model the definition asks, an arm's or an outside person's owner's choice,
+            # asks its own provider alone: refused here as admission would refuse that first ask,
+            # before anything is defined.
+            services.require_allowance(
+                connection, session.workspace_id, asked_providers(prepared.body)
+            )
         with connection.transaction():
             prepared.runner.define(
                 version_id,
@@ -897,17 +911,35 @@ def cancel_society_comparison(
 # -- a world's capability read --------------------------------------------------------------------
 
 
+def _spent(context: VersionContext, engine: str) -> SpendingRefused | None:
+    """The durable authority's refusal of every start of a society on ``engine``: the allowance
+    of every provider the roles it hosts can ask is spent. None while one has allowance left, or
+    in a process no durable authority admits."""
+    spending = context.spending()
+    if spending is None:
+        return None
+    manifest = load_manifest()
+    return spending.every(
+        provider
+        for role in decision_roles().hosted_by(engine)
+        for provider in offered_providers(role, manifest, role.contract())
+    )
+
+
 def capability_operations(context: VersionContext) -> list[Operation]:
     """Starting a comparison of the version's society, and cancelling one started from the
     application, as a world's capability read lists them.
 
     A start is refused in the order a start refuses before it reads its body: a version with no
     society, a comparison of the world that has not finished, this server's own refusal
-    (``Services.comparison_refusal``), and an engine that takes no comparison. The plan read is its
-    preview and lists what a start may name. A cancel acts on a comparison the listing names and is
-    available while a start of the world has not finished, else ``comparison_not_started``. It holds
-    ``model.invoke`` only so that whoever may start a paid comparison may stop it, and calls no
-    model, so it is described as spending nothing.
+    (``Services.comparison_refusal``), and an engine that takes no comparison. Where a durable
+    spending authority admits this server's calls, it is also unavailable by the authority's
+    reason once the allowance of every provider the engine's roles can ask is spent: every start
+    would then be refused (``Services.require_allowance``). The plan read is its preview and lists
+    what a start may name. A cancel acts on a comparison the listing names and is available while a
+    start of the world has not finished, else ``comparison_not_started``. It holds ``model.invoke``
+    only so that whoever may start a paid comparison may stop it, and calls no model, so it is
+    described as spending nothing, and no allowance is read for it.
     """
     running = (
         None
@@ -924,6 +956,8 @@ def capability_operations(context: VersionContext) -> list[Operation]:
         state = unavailable(refusal)
     elif not society_engine(str(context.society["engine_version"])).comparisons:
         state = unsupported("engine_takes_no_comparison")
+    elif (spent := _spent(context, str(context.society["engine_version"]))) is not None:
+        state = unavailable(spent.reason)
     else:
         state = AVAILABLE
     return [

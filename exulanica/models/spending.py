@@ -201,7 +201,9 @@ def _sentence(
     figures = ""
     unit = "calls" if detail == "calls" else "USD"
     if limit is not None and scope != "authority":
-        figures = f": {committed or '0'} {unit} committed of {limit}, this needs {requested}"
+        # A refusal before any attempt (a comparison's start) has no amount it needs.
+        needs = "" if requested is None else f", this needs {requested}"
+        figures = f": {committed or '0'} {unit} committed of {limit}{needs}"
     elif requested is not None:
         figures = f": this needs {requested} {unit}"
     why = f" [{detail}]" if detail and detail not in ("usd", "calls") else ""

@@ -12,6 +12,11 @@ role), why this host asks no chosen model (``host_refusal``), how many of its su
 run at once (``model_subjects_maximum``) and the contract a new choice records (``contract``). Each
 role's host is named in code (:mod:`exulanica.api.role_hosts`); a registered role no host serves is
 listed as unsupported, and a choice of any role is refused with the status its code has everywhere.
+
+``host_refusal`` is this process's own refusal, by ``HOST_REFUSALS``. Where a durable spending
+authority admits this process's calls, the descriptor's ``decisions`` effect also names the
+authority's refusal once the allowance of every provider the role's models are served by is spent
+(``Services.spending_refusals``): every ask would then be refused before anything is sent.
 """
 
 from __future__ import annotations
@@ -33,6 +38,7 @@ from exulanica.api.capabilities import (
     unavailable,
     unsupported,
 )
+from exulanica.api.decision_host import offered_providers
 from exulanica.api.dependencies import (
     CurrentSession,
     HeldPermissions,
@@ -47,6 +53,9 @@ from exulanica.api.role_hosts import (
     choice_status,
 )
 from exulanica.api.world_scope import WorldId
+from exulanica.models.manifest import load_manifest
+from exulanica.models.spending import SpendingRefused
+from exulanica.spending.status import SpendingRefusals
 from exulanica.world.decision_roles import DecisionRole, RoleRefused, decision_roles
 from exulanica.world.traffic_host import traffic_clock
 from exulanica.world.worlds import require_world
@@ -80,11 +89,32 @@ def _version(
     ).fetchone()
 
 
+def _spent(role: DecisionRole, spending: SpendingRefusals | None) -> SpendingRefused | None:
+    """The durable authority's refusal of every ask for ``role``, once the allowance of every
+    provider its models are served by is spent; None while one has allowance left, or in a
+    process no durable authority admits."""
+    if spending is None:
+        return None
+    return spending.every(offered_providers(role, load_manifest(), role.contract()))
+
+
 def _operation(
-    context: RoleContext, role: DecisionRole, state: Availability, host_refusal: str | None
+    context: RoleContext,
+    role: DecisionRole,
+    state: Availability,
+    host_refusal: str | None,
+    spent: SpendingRefused | None,
 ) -> Operation:
     """The choice of ``role``'s model as a capability read names it: this route's ``POST``."""
     host = ROLE_HOSTS.get(role.subject)
+    # A choice is recorded whether or not this host asks the model; which it does is said here:
+    # this process's own refusal first, as a call meets its fuse before the durable authority.
+    if host_refusal is not None:
+        decisions = unavailable(host_refusal)
+    elif spent is not None:
+        decisions = unavailable(spent.reason)
+    else:
+        decisions = AVAILABLE
     return Operation(
         endpoint=choose_world_model,
         availability=state,
@@ -93,17 +123,16 @@ def _operation(
         subjects=None if host is None else host.subjects(role, world_models),
         idempotency="idempotency_key",
         options=(world_models,),
-        # A choice is recorded whether or not this host asks the model; which it does is said here.
-        effects=()
-        if state.state != "available"
-        else (
-            Effect("decisions", AVAILABLE if host_refusal is None else unavailable(host_refusal)),
-        ),
+        effects=() if state.state != "available" else (Effect("decisions", decisions),),
     )
 
 
-def role_operations(context: RoleContext) -> list[Operation]:
-    """Each registered role's model choice, as a world's capability read lists it."""
+def role_operations(
+    context: RoleContext, *, spending: SpendingRefusals | None = None
+) -> list[Operation]:
+    """Each registered role's model choice, as a world's capability read lists it; ``spending``
+    is what the read found of the workspace's durable allowance
+    (``Services.spending_refusals``)."""
     services = get_services(context.request)
     found = []
     for role in decision_roles():
@@ -119,6 +148,7 @@ def role_operations(context: RoleContext) -> list[Operation]:
                 role,
                 state,
                 services.model_host_refusal(context.session.workspace_id, role),
+                _spent(role, spending),
             )
         )
     return found
@@ -144,6 +174,7 @@ def world_models(
     )
     services = get_services(request)
     routes = surface(request.app)
+    spending = services.spending_refusals(connection, session.workspace_id)
     roles = []
     for role in decision_roles():
         host = ROLE_HOSTS.get(role.subject)
@@ -163,7 +194,9 @@ def world_models(
                 "model_subjects_maximum": role.contract().value(role.subjects_bound),
                 "contract": role.contract().binding(),
                 "capability": describe(
-                    _operation(context, role, state, host_refusal), routes, held
+                    _operation(context, role, state, host_refusal, _spent(role, spending)),
+                    routes,
+                    held,
                 ),
             }
         )
