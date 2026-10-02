@@ -40,6 +40,8 @@ services:
     environment: *runtime-identity
   preparation:
     environment: *runtime-identity
+  playback-worker:
+    environment: *runtime-identity
   maintenance:
     environment: *purge-identity
   restore:

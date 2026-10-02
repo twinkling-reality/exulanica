@@ -470,6 +470,14 @@ no lock; a process whose loop hangs still holds it and reads as running. Readine
 reports `played_by` and `process_alive`. Claims and leases decide which host advances a society, so
 several playback processes, or one beside an API that also plays, never advance one twice.
 
+In `compose.yaml` the API and the `playback-worker` service take the three playback settings from
+one block (`x-society-playback`), so their configuration digests agree. The API plays in threads
+(`EXULANICA_PLAYBACK_WORKER`, default `on`). To play in a process of its own, set
+`EXULANICA_PLAYBACK_WORKER=process` and start `docker compose --profile playback up`. The worker
+starts only with that profile, because it refuses an environment that names no society to play,
+and the default composition names none. Its stop grace is 40 seconds, longer than a playback
+round's 30 second lease, so a stop lets a running round finish or roll back.
+
 A playing world whose people are run by models asks those models through this process's client, so
 the model settings in 5.1 apply; the decision contract's spend bounds are in
 [model selection](model-and-service-selection.md#what-a-persons-decisions-may-spend).
@@ -1224,6 +1232,11 @@ runs every registered preparer its host can. The facts report each declared prep
 capability whose effect names a preparer takes that preparer's state, and maintenance observes the
 preparation queue per preparer, so a request for a preparer the installation does not run waits
 without making the component `degraded`.
+
+The three installation profiles declare `simulation` installed. An API that plays societies itself
+reports it `ready`; one that leaves playback to the `playback-worker` service (5.1.5) reports the
+profile's declaration, `configured`, and each world's `host_playback` says whether that process
+is running.
 
 Every profile names its restore marker
 (`recovery.restore_state_path`), which every process of the installation reads, and

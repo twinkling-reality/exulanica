@@ -231,6 +231,47 @@ def test_every_profile_that_installs_preparation_is_composed_with_a_preparation_
     assert reviewer["components"]["preparation"] == {"installed": False}
 
 
+def test_the_playback_worker_plays_by_exactly_the_apis_playback_settings():
+    """The API reads the playback process's liveness by the digest of the playback settings, so
+    the two take them from one place; the worker starts only on request, because a composition
+    that names no society to play would have it refuse and restart for ever; and it stops after a
+    round's lease, not in the middle of a round."""
+    import tomllib
+
+    import yaml
+    from exulanica.world.society_controls import LEASE_SECONDS
+
+    document = yaml.safe_load((ROOT / "compose.yaml").read_text(encoding="utf-8"))
+    shared = document["x-society-playback"]
+    api = document["services"]["api"]["environment"]
+    worker_service = document["services"]["playback-worker"]
+    worker = worker_service["environment"]
+    for setting, value in shared.items():
+        assert api[setting] == worker[setting] == value, setting
+    assert set(shared) == {
+        "EXULANICA_SOCIETY_CONTROL_WORKSPACES",
+        "EXULANICA_SOCIETY_CONTROL_WORKER",
+        "EXULANICA_SOCIETY_TICK_INTERVAL_MS",
+    }
+    assert api["EXULANICA_PLAYBACK_WORKER"] == "${EXULANICA_PLAYBACK_WORKER:-on}"
+    assert worker["EXULANICA_PLAYBACK_WORKER"] == "process"
+    assert worker_service["profiles"] == ["playback"]
+    assert worker_service["command"] == ["exulanica-playback-worker"]
+    assert int(worker_service["stop_grace_period"].removesuffix("s")) > LEASE_SECONDS
+    assert worker["EXULANICA_INSTALLATION_PROFILE"] == api["EXULANICA_INSTALLATION_PROFILE"]
+    assert "restore-control:/var/lib/exulanica-restore:ro" in worker_service["volumes"]
+    for credential in ("BACKUP", "PURGE", "RESTORE", "TILE_PUBLISHER"):
+        assert not any(credential in key for key in worker), credential
+    scripts = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"][
+        "scripts"
+    ]
+    assert scripts["exulanica-playback-worker"] == "exulanica.orchestration.playback_worker:main"
+    # A process that plays societies elsewhere leaves simulation to the profile's declaration.
+    for name in ("single-host", "single-host-server-only", "shared-store"):
+        profile = json.loads((ROOT / "deploy" / "profiles" / f"{name}.json").read_text())
+        assert profile["components"]["simulation"] == {"installed": True}, name
+
+
 def test_the_shared_store_override_gives_the_purge_identity_to_maintenance_and_restore_alone():
     import yaml
 
@@ -263,7 +304,11 @@ def test_the_shared_store_override_gives_the_purge_identity_to_maintenance_and_r
     }
     assert purge == {"maintenance", "restore"}
     publishes = {"catalogs"} if _publishes_character_catalogs() else set()
-    assert runtime == {"api", "derivative-worker", "scene-worker", "preparation"} | publishes
+    assert (
+        runtime
+        == {"api", "derivative-worker", "scene-worker", "preparation", "playback-worker"}
+        | publishes
+    )
 
 
 def _publishes_character_catalogs() -> bool:

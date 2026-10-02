@@ -16,6 +16,15 @@ x-backend-build: &backend-build
   args:
     EXULANICA_SYNC_EXTRAS: ${EXULANICA_BACKEND_EXTRAS:---extra server}
 
+# Society playback (docs/deployment.md 5.1.5): which workspaces' societies play, account-wide
+# discovery and the base wait. The API and the playback worker take them from here alike, because
+# the API reads the worker's liveness by the digest of exactly these settings.
+x-society-playback: &society-playback
+  EXULANICA_SOCIETY_CONTROL_WORKSPACES: ${EXULANICA_SOCIETY_CONTROL_WORKSPACES:-}
+  # Account-wide playback is a separate opt-in from configuring browser accounts.
+  EXULANICA_SOCIETY_CONTROL_WORKER: ${EXULANICA_SOCIETY_CONTROL_WORKER:-off}
+  EXULANICA_SOCIETY_TICK_INTERVAL_MS: ${EXULANICA_SOCIETY_TICK_INTERVAL_MS:-}
+
 services:
   postgres:
     # Restarted when its process exits. Docker does not restart a container whose health check
@@ -104,8 +113,10 @@ services:
       EXULANICA_GOOGLE_RETURN_URIS: ${EXULANICA_GOOGLE_RETURN_URIS:-}
       EXULANICA_ACCOUNT_BROWSER_ORIGINS: ${EXULANICA_ACCOUNT_BROWSER_ORIGINS:-}
       EXULANICA_ACCOUNT_DATABASE_URL: ${EXULANICA_ACCOUNT_DATABASE_URL:-}
-      # Account-wide playback is a separate opt-in from configuring browser accounts.
-      EXULANICA_SOCIETY_CONTROL_WORKER: ${EXULANICA_SOCIETY_CONTROL_WORKER:-off}
+      <<: *society-playback
+      # Who plays: "on" (the default), this process in threads; "process", the playback-worker
+      # service below, started with `--profile playback`, and this process plays nothing.
+      EXULANICA_PLAYBACK_WORKER: ${EXULANICA_PLAYBACK_WORKER:-on}
       EXULANICA_DATA_DIR: /var/lib/exulanica
       # Production delivery belongs to the separate worker service below. The in-process worker
       # remains available for a one-process development run, but this composition does not use it.
@@ -239,6 +250,50 @@ services:
       - media:/var/lib/exulanica
     depends_on:
       migrate:
+        condition: service_completed_successfully
+
+  # Society playback in a process of its own (docs/deployment.md 5.1.5), beside an API started with
+  # EXULANICA_PLAYBACK_WORKER=process. Started only with `--profile playback`: it refuses to start
+  # when the playback settings name no society to play, and a default composition names none. A
+  # round it is running finishes or rolls back on SIGTERM, inside its 30 second lease, so the stop
+  # grace outlasts the lease.
+  playback-worker:
+    profiles: ["playback"]
+    build: *backend-build
+    command: ["exulanica-playback-worker"]
+    restart: unless-stopped
+    stop_grace_period: 40s
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os; os.kill(1, 0)"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+    environment:
+      EXULANICA_DATABASE_URL: postgresql://exulanica_app:${EXULANICA_APP_ROLE_PASSWORD}@postgres:5432/${POSTGRES_DB:-exulanica}
+      EXULANICA_READONLY_DATABASE_URL: postgresql://exulanica_ro:${EXULANICA_EXECUTOR_ROLE_PASSWORD}@postgres:5432/${POSTGRES_DB:-exulanica}
+      # The same tokens and account source the API reads; it serves nothing over HTTP.
+      EXULANICA_API_TOKENS: ${EXULANICA_API_TOKENS:?set EXULANICA_API_TOKENS; there is no default}
+      EXULANICA_ACCOUNT_DATABASE_URL: ${EXULANICA_ACCOUNT_DATABASE_URL:-}
+      <<: *society-playback
+      EXULANICA_PLAYBACK_WORKER: process
+      EXULANICA_DATA_DIR: /var/lib/exulanica
+      # A minute of a society may ask the models its owner chose, under the API's spending rules.
+      NEBIUS_API_KEY: ${NEBIUS_API_KEY:-}
+      EXULANICA_EGRESS_ALLOWLIST: ${EXULANICA_EGRESS_ALLOWLIST:-}
+      EXULANICA_SPENDING: ${EXULANICA_SPENDING:-}
+      EXULANICA_SPENDING_WITNESS_DIR: /var/lib/exulanica-spending-witness
+      EXULANICA_INSTALLATION_PROFILE: /app/deploy/profiles/${EXULANICA_PROFILE:-single-host-server-only}.json
+    volumes:
+      - media:/var/lib/exulanica
+      - spending-witness:/var/lib/exulanica-spending-witness
+      # It refuses to play a restored database whose withdrawals are not replayed, as the API does.
+      - restore-control:/var/lib/exulanica-restore:ro
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      catalogs:
+        condition: service_completed_successfully
+      restore-marker:
         condition: service_completed_successfully
 
   # Unattended maintenance: withdrawal exports on change, purges, backup sets, their purge and
