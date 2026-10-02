@@ -134,10 +134,12 @@ def test_a_full_class_is_refused_before_its_body_is_read_or_a_connection_opened(
         "retry_after_seconds": 1,
     }
     assert refused.response_headers["retry-after"] == "1"
-    # The refused request declared a body, so the connection ends with the answer.
+    # The refused request declared a body, so the connection ends with the answer, after the body
+    # was read and thrown away so that the client meets the answer rather than a reset.
     assert refused.response_headers["connection"] == "close"
-    # Its body was never asked for, and it opened no connection.
-    assert refused._sent == 0
+    assert refused._sent == 1
+    assert app.state.admission.snapshot()["refusal_drains"]["drained"] == 1
+    # It opened no connection.
     assert observed["after"] == observed["before"]
     counts = app.state.admission.snapshot()["classes"][REQUESTS]
     assert (counts["in_flight"], counts["refused"]) == (0, 1)
@@ -186,7 +188,8 @@ def test_an_asset_upload_holds_the_upload_class_a_photograph_upload_waits_for(se
     assert refused.status == 503
     assert (refused.json()["code"], refused.json()["capacity"]) == ("capacity_exhausted", "uploads")
     assert refused.response_headers["retry-after"] == "10"
-    assert refused._sent == 0
+    # Its body was read only to be thrown away (tests/test_admission_refusal_drain.py).
+    assert refused._sent == 1
     counts = app.state.admission.snapshot()["classes"][UPLOADS]
     assert (counts["in_flight"], counts["refused"]) == (0, 1)
 

@@ -665,8 +665,8 @@ times each limit, and a workspace can hold its share in each of them; the databa
 #### 5.4.1 Admission
 
 Pure ASGI middleware, just inside the body limit (5.1.2), sorts each request by its route into a
-class before routing, before the body is read, before a thread is taken and before a connection is
-opened:
+class before routing, before the body is parsed, before a thread is taken and before a connection
+is opened:
 
 | Class | Routes | Limit | One workspace's share | `Retry-After` |
 | --- | --- | --- | --- | --- |
@@ -680,6 +680,17 @@ opened:
   `Retry-After` header. Nothing of the route ran before either answer, so the same request can
   always be sent again after that wait. A refusal names no other workspace.
 - There is no queue in front of the classes: a request over a limit is answered at once.
+- A refused request that declares a body is answered at once, and its connection is closed only
+  after its body has been read and discarded, so a client that sends its whole body before it
+  reads meets the answer rather than a reset (a socket closed with bytes unread is reset). Each
+  drain is bounded by the body limit (512 MiB, 5.1.2) and 10 seconds, and at most 16 refusals
+  drain at once in one process. A drain holds no slot, no thread and no connection. A refusal
+  whose client waits for `100 Continue` has sent no body and is closed at once; so is one past
+  those bounds (a client that cannot finish its body within 10 seconds, a body without a declared
+  length that passes the limit, a seventeenth at once), and a client still sending then reads a
+  reset. `GET /operations/capacity` counts how each refusal with a body ended under
+  `refusal_drains`: `drained` (read to its end), `left` (the client went first), `cut` (a bound
+  reached first) and `closed` (not drained).
 - The share is claimed in the permission floor (`authorise_route`) as soon as the caller is known,
   after the permission check and before the tile charge, so a request that is not permitted is
   refused as it would be on an idle server and a refused request is never charged.
@@ -831,10 +842,12 @@ another host or about more than one process.
   cores and 760 MiB, the database at 26 client backends and the derivative queue at 20 jobs. Of 176
   uploads, 63 were accepted, 86 answered 409 `busy` (5.4.6) and the server refused 27 for the
   uploads class.
-- **A refused upload can arrive as a reset connection.** An upload is refused before its body is
-  read and its connection is then closed, so a client still sending a large body can see the close
-  before the 503: in the run above, 23 of the 27 refused uploads reached the client that way. A
-  client treats a reset during an upload as "send it again later". Behind the installation's own
+- **Before refusals drained their bodies, a refused upload could arrive as a reset connection.**
+  An upload was refused before its body was read and its connection then closed, so a client still
+  sending a large body could see the close before the 503: in the run above, 23 of the 27 refused
+  uploads reached the client that way. Refusals now drain their bodies (5.4.1), and this load has
+  not been measured since. A client treats a reset during an upload as "send it again later",
+  which a refusal closed at once still produces. Behind the installation's own
   client proxy (`deploy/installation/client-nginx.conf`), which reads a request's body before
   passing it on, an acceptance run on the same host sent 40 uploads of about 3.35 MB from four
   workspaces at once through a running installation, and none met a reset: the proxy's per-address

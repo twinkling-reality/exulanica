@@ -7,10 +7,19 @@ accepted, and this module is that place: pure ASGI middleware, like
 :mod:`exulanica.api.body_limit`, that sorts each request into a class by its route and admits it
 or refuses it at once.
 
-**Refused before anything is spent.** The middleware runs before routing, before the body is read,
-before a threadpool token and before a database connection. A refused request is answered 503
-``capacity_exhausted`` with ``Retry-After``, and nothing of the route ran, so sending the same
+**Refused before anything is spent.** The middleware runs before routing, before the body is
+parsed, before a threadpool token and before a database connection. A refused request is answered
+503 ``capacity_exhausted`` with ``Retry-After``, and nothing of the route ran, so sending the same
 request again after that wait is always safe.
+
+**A refusal reaches a client that is still sending.** A connection closed with body bytes unread
+is reset by the operating system, and a client still writing its upload reads that reset instead
+of the answer. So a refused request that declares a body is answered at once and its body is then
+read and discarded, up to :data:`DRAIN_BYTES` and :data:`DRAIN_SECONDS`, before the connection
+closes, with at most :data:`DRAIN_SLOTS` of them at a time in one process. A drain holds no slot,
+thread or database connection; its cost is a socket and what the server buffers for it, which
+pauses reading at 64 KiB. A body declared over the byte bound, a client waiting for ``100
+Continue`` (which has sent no body) and a refusal past the drain slots are closed at once.
 
 **There is no queue here.** Admission is a try-acquire under a lock. A request over the limit is
 refused rather than parked, because a parked request is a held socket and an unanswered person, and
@@ -59,6 +68,7 @@ from starlette.exceptions import HTTPException
 from starlette.routing import compile_path
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
+from exulanica.api.body_limit import MAX_BODY_BYTES
 from exulanica.api.routes import routable_paths
 from exulanica.env import env_get, env_name
 from exulanica.errors import ExulanicaError
@@ -122,6 +132,20 @@ BODY_IDLE_SECONDS: Final = 15.0
 BODY_SECONDS: Final[Mapping[str, float]] = MappingProxyType(
     {REQUESTS: 60.0, UPLOADS: 600.0, STREAMS: 60.0}
 )
+
+#: The most of a refused request's body read and discarded so that the refusal, not a reset,
+#: reaches its client: the body limit itself, so every body the application would accept is
+#: drained whole. Reading costs the event loop a copy of each piece and holds nothing.
+DRAIN_BYTES: Final = MAX_BODY_BYTES
+
+#: The longest one refusal's drain may take, the uploads class's ``Retry-After``: a client that
+#: needs longer to send its body (a whole 512 MiB body at under about 54 MB/s) is closed on, as
+#: before.
+DRAIN_SECONDS: Final = 10.0
+
+#: How many refusals one process drains at once. At about 320 KiB buffered each (uvicorn pauses
+#: reading at 64 KiB, plus one 256 KiB socket read) the set holds about 5 MiB.
+DRAIN_SLOTS: Final = 16
 
 #: Threads kept free of admitted requests for the short work around them: multipart spooling and a
 #: stream resolving its caller before it starts.
@@ -365,6 +389,11 @@ class _Class:
     body_timeouts: int = 0
 
 
+#: How a refused request with a body ended: its body read to the end (``drained``), the client
+#: gone first (``left``), a bound reached first (``cut``), or no drain at all (``closed``).
+DRAIN_OUTCOMES: Final = ("drained", "left", "cut", "closed")
+
+
 class Ticket:
     """One admitted request's hold on its class, and on its workspace's share once claimed."""
 
@@ -390,6 +419,9 @@ class Admission:
         }
         self._workspaces: dict[tuple[str, uuid.UUID], int] = {}
         self._poll_failures = 0
+        self._drains_in_flight = 0
+        self._drains_peak = 0
+        self._drain_outcomes = dict.fromkeys(DRAIN_OUTCOMES, 0)
 
     def try_acquire(self, capacity: str) -> Ticket | None:
         """A ticket for one request of ``capacity``, or None when the class is full."""
@@ -437,6 +469,27 @@ class Admission:
         with self._lock:
             self._classes[capacity].body_timeouts += 1
 
+    def try_drain(self) -> bool:
+        """A place to drain one refused body, or False (counted ``closed``) when all are taken."""
+        with self._lock:
+            if self._drains_in_flight >= DRAIN_SLOTS:
+                self._drain_outcomes["closed"] += 1
+                return False
+            self._drains_in_flight += 1
+            self._drains_peak = max(self._drains_peak, self._drains_in_flight)
+            return True
+
+    def end_drain(self, outcome: str) -> None:
+        """Give back a place :meth:`try_drain` gave, and count how its drain ended."""
+        with self._lock:
+            self._drains_in_flight -= 1
+            self._drain_outcomes[outcome] += 1
+
+    def note_closed(self) -> None:
+        """A refused body that was not drained: declared over the bound, or awaiting 100."""
+        with self._lock:
+            self._drain_outcomes["closed"] += 1
+
     def note_poll_failure(self) -> None:
         with self._lock:
             self._poll_failures += 1
@@ -474,6 +527,14 @@ class Admission:
                     for name, held in self._classes.items()
                 },
                 "stream_poll_failures": self._poll_failures,
+                "refusal_drains": {
+                    "limit_bytes": DRAIN_BYTES,
+                    "limit_seconds": DRAIN_SECONDS,
+                    "slots": DRAIN_SLOTS,
+                    "in_flight": self._drains_in_flight,
+                    "peak": self._drains_peak,
+                    **self._drain_outcomes,
+                },
             }
             if workspace_id is not None:
                 document["workspace_in_flight"] = {
@@ -531,13 +592,55 @@ class AdmissionMiddleware:
             return
         ticket = self._admission.try_acquire(capacity)
         if ticket is None:
-            await _refuse(send, CapacityRefused(capacity, workspace=False), _has_body(scope))
+            await self._refuse(scope, receive, send, CapacityRefused(capacity, workspace=False))
             return
         scope[TICKET_SCOPE_KEY] = ticket
         try:
             await self._app(scope, self._deadlined(receive, capacity), send)
         finally:
             self._admission.release(ticket)
+
+    async def _refuse(
+        self, scope: Scope, receive: Receive, send: Send, refused: CapacityRefused
+    ) -> None:
+        """The refusal, sent from here because nothing of the application runs for it.
+
+        A request with a body ends its connection with the answer, as the body limit's does: an
+        unread body must never be read as the next request on the connection. Its answer is sent
+        first, so a client that reads before it has finished sending has it at once, and its body
+        is then drained within the bounds, so a client that reads only after sending meets the
+        answer rather than a reset.
+        """
+        payload = json.dumps(refused.body()).encode("utf-8")
+        has_body = _has_body(scope)
+        headers = [
+            (b"content-type", b"application/json"),
+            (b"content-length", str(len(payload)).encode("ascii")),
+            *(
+                (key.lower().encode("ascii"), value.encode("ascii"))
+                for key, value in refused.headers().items()
+            ),
+        ]
+        if has_body:
+            headers.append((b"connection", b"close"))
+        await send({"type": "http.response.start", "status": refused.status, "headers": headers})
+        if not has_body:
+            await send({"type": "http.response.body", "body": payload})
+            return
+        if not _drainable(scope):
+            self._admission.note_closed()
+            await send({"type": "http.response.body", "body": payload})
+            return
+        if not self._admission.try_drain():
+            await send({"type": "http.response.body", "body": payload})
+            return
+        outcome = "cut"
+        try:
+            await send({"type": "http.response.body", "body": payload, "more_body": True})
+            outcome = await _drain(receive)
+        finally:
+            self._admission.end_drain(outcome)
+        await send({"type": "http.response.body", "body": b""})
 
     def _deadlined(self, receive: Receive, capacity: str) -> Receive:
         """``receive``, bounded while the body is incomplete and passed through after it.
@@ -595,22 +698,38 @@ def _has_body(scope: Scope) -> bool:
     return False
 
 
-async def _refuse(send: Send, refused: CapacityRefused, close: bool) -> None:
-    """The refusal, sent from here because nothing of the application runs for it.
+def _drainable(scope: Scope) -> bool:
+    """Whether a refused body is worth reading: not declared over :data:`DRAIN_BYTES`, and not
+    held back by a client that waits for ``100 Continue``, which the answer already replaces."""
+    for name, value in scope.get("headers", ()):
+        if name == b"expect" and value.strip().lower() == b"100-continue":
+            return False
+        if name == b"content-length":
+            text = value.strip()
+            if text.isdigit() and int(text) > DRAIN_BYTES:
+                return False
+    return True
 
-    With ``close`` the connection ends with the answer, as the body limit's does: an unread body
-    must never be read as the next request on the connection.
+
+async def _drain(receive: Receive) -> str:
+    """Read and discard a refused body, within :data:`DRAIN_BYTES` and :data:`DRAIN_SECONDS`.
+
+    Returns the outcome :data:`DRAIN_OUTCOMES` names. Every piece is dropped as it arrives, so the
+    drain holds no more of the body than the server buffers for any connection.
     """
-    payload = json.dumps(refused.body()).encode("utf-8")
-    headers = [
-        (b"content-type", b"application/json"),
-        (b"content-length", str(len(payload)).encode("ascii")),
-        *(
-            (key.lower().encode("ascii"), value.encode("ascii"))
-            for key, value in refused.headers().items()
-        ),
-    ]
-    if close:
-        headers.append((b"connection", b"close"))
-    await send({"type": "http.response.start", "status": refused.status, "headers": headers})
-    await send({"type": "http.response.body", "body": payload})
+    read = 0
+    with anyio.move_on_after(DRAIN_SECONDS):
+        while True:
+            try:
+                message = await receive()
+            except HTTPException:
+                # The body limit outside this middleware cut a body without a declared length.
+                return "cut"
+            if message["type"] != "http.request":
+                return "left"
+            read += len(message.get("body", b""))
+            if not message.get("more_body", False):
+                return "drained"
+            if read > DRAIN_BYTES:
+                return "cut"
+    return "cut"
