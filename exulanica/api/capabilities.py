@@ -65,6 +65,7 @@ __all__ = [
     "Subjects",
     "Surface",
     "VersionContext",
+    "component_refusal",
     "describe",
     "installation_facts_of",
     "surface",
@@ -363,6 +364,18 @@ def installation_facts_of(services: Services) -> Mapping[str, Any] | None:
     if services.installation is None:
         return None
     return installation_facts(services)
+
+
+def component_refusal(facts: Mapping[str, Any] | None, component: str) -> str | None:
+    """The code a route refuses by when the installation's facts say ``component`` cannot run here:
+    not installed, unavailable or refused, by a profile that declares it. None where the component
+    runs, or where no profile lets this process see it, as the projection decides an operation."""
+    if facts is None:
+        return None
+    entry = next((one for one in facts["components"] if one["component"] == component), None)
+    if entry is None or entry["state"] not in _PREVENTING or entry.get("reason") == _UNDECLARED:
+        return None
+    return _component_refusal(component, entry)
 
 
 def _component_refusal(component: str, entry: Mapping[str, Any]) -> str:

@@ -289,3 +289,47 @@ def test_a_read_only_deployment_answers_writes_with_a_named_403(materials):
                 403,
                 "materials_read_only",
             ), path
+
+
+def test_a_bake_is_not_requested_where_the_installation_runs_no_bake_worker(api, materials):
+    """A request no worker will ever take would wait for ever and hold a place in the quota, so an
+    installation whose profile does not install materials refuses it by name and writes nothing.
+    The control is the same request on a process with no profile, which is queued (202)."""
+    import dataclasses
+    from pathlib import Path
+
+    from exulanica.api.installation import Installation, load_profile
+
+    library = api.call("owner", "GET", "/materials/library").json()["sets"]
+    recipe = next(entry for entry in library if entry["set_id"] == BRICK)["recipe"]
+    recipe["resolution"] = {"width": 16, "height": 16}
+    created = api.call(
+        "owner",
+        "POST",
+        "/materials/recipes",
+        json={"recipe": recipe, "based_on": {"set_id": BRICK, "version": 1}, "label": "Plain"},
+    )
+    assert created.status_code == 201, created.text
+    recipe_id = created.json()["recipe_id"]
+
+    app = api.client.app
+    undeclared = app.state.services
+    app.state.services = dataclasses.replace(
+        undeclared,
+        installation=Installation(
+            profile=load_profile(
+                Path(__file__).resolve().parents[1] / "deploy" / "profiles" / "single-host.json"
+            ),
+            code_revision=None,
+            images={},
+            maintenance_status_path=None,
+        ),
+    )
+    refused = api.call("owner", "POST", f"/materials/recipes/{recipe_id}/bake")
+    assert refused.status_code == 409, refused.text
+    assert refused.json()["code"] == "materials_not_installed"
+    assert api.call("owner", "GET", f"/materials/recipes/{recipe_id}/bake").status_code == 404
+
+    app.state.services = undeclared
+    queued = api.call("owner", "POST", f"/materials/recipes/{recipe_id}/bake")
+    assert queued.status_code == 202, queued.text

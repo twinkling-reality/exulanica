@@ -40,6 +40,7 @@ from exulanica.world.source_membership_events import (
     MembershipEventRefused,
 )
 from exulanica.world.starter import AuthoredStarterScene
+from exulanica.world.worlds import WorldsReadOnly, require_world_registration
 
 router = APIRouter(prefix="/world-entries", tags=["world-entries"])
 #: What a creation this workspace cannot make is answered with, whatever its reason.
@@ -392,6 +393,10 @@ def create_starter_entry(
     session: CurrentSession,
     services: Annotated[Services, Depends(get_services)],
 ) -> SavedWorldEntryView | JSONResponse:
+    try:
+        require_world_registration(connection)
+    except WorldsReadOnly as exc:
+        return JSONResponse(status_code=403, content={"code": exc.code, "detail": str(exc)})
     try:
         created = SavedWorldEntryRepository(
             connection, session.workspace_id, services.store

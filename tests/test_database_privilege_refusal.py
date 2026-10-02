@@ -91,11 +91,17 @@ def judge_api(tmp_path, monkeypatch) -> Iterator[JudgeApi]:
             yield JudgeApi(client)
 
 
-def test_the_judge_asking_for_a_starter_world_is_refused_by_name(judge_api, caplog):
+def test_the_judge_asking_for_a_starter_world_is_refused_by_name(judge_api, caplog, monkeypatch):
     # The precondition that makes this a grant gap rather than a permitted write: the table the
     # starter writes first is off the judge's allowlist. Should the allowlist grow to take it,
     # this test needs another route the judge's token permits and its role may not write.
     assert "world_identity" not in JUDGE_WRITE_TABLES
+    # The creation routes now refuse such a role before any work (worlds_read_only,
+    # tests/test_world_creation_guard.py). That probe reads one grant; a role holding it and
+    # lacking a later table still reaches the database's refusal, which is what this holds.
+    from exulanica.api.routes import world_entries
+
+    monkeypatch.setattr(world_entries, "require_world_registration", lambda connection: None)
 
     with caplog.at_level(logging.ERROR, logger="exulanica.api.app"):
         response = judge_api.post("/world-entries/starter", {"title": "My world"})

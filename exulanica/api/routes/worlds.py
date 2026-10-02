@@ -42,6 +42,7 @@ from exulanica.world.personal_composition import (
 from exulanica.world.workspace_lock import lock_workspace
 from exulanica.world.worlds import (
     WorldLimitReached,
+    WorldsReadOnly,
     current_world_count_policy,
     workspace_worlds,
 )
@@ -298,6 +299,8 @@ def compose_personal_source_world(
         return JSONResponse(status_code=409, content={"code": exc.code, "detail": exc.detail})
     except WorldLimitReached as exc:
         return JSONResponse(status_code=409, content={"code": exc.code, "detail": str(exc)})
+    except WorldsReadOnly as exc:
+        return JSONResponse(status_code=403, content={"code": exc.code, "detail": str(exc)})
     assert plan.action is not None
     return ComposedPersonalWorldView(
         action=plan.action,

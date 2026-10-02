@@ -133,9 +133,12 @@ from exulanica.world.worlds import (
     WORLD_KINDS,
     WorldKind,
     WorldLimitReached,
+    WorldsReadOnly,
     current_world_count_policy,
+    may_register_worlds,
     refuse_past_limit,
     require_world,
+    require_world_registration,
     workspace_worlds,
     world_kind,
 )
@@ -190,11 +193,11 @@ def _starter(
 ) -> Operation:
     # The early answer of the starter's own rule: a workspace holding any saved entry is refused.
     holds = SavedWorldEntryRepository(connection, session.workspace_id).holds_entry()
-    return Operation(
-        endpoint=create_starter_entry,
-        availability=unavailable(SAVED_WORLD_CONFLICT) if holds else AVAILABLE,
-        subject="workspace",
-    )
+    if not may_register_worlds(connection):
+        state = unavailable(WorldsReadOnly.code)
+    else:
+        state = unavailable(SAVED_WORLD_CONFLICT) if holds else AVAILABLE
+    return Operation(endpoint=create_starter_entry, availability=state, subject="workspace")
 
 
 def _generated(
@@ -205,16 +208,21 @@ def _generated(
     held: frozenset[Permission],
 ) -> Operation:
     try:
-        # The creation route's own early check, which may be stale and is never a permission.
+        # The creation route's own early checks, which may be stale and are never a permission:
+        # a role that cannot register a world, then the count policy.
+        require_world_registration(connection)
         refuse_past_limit(connection, session.workspace_id, GENERATED)
         state = AVAILABLE
-    except WorldLimitReached as exc:
+    except (WorldsReadOnly, WorldLimitReached) as exc:
         state = unavailable(exc.code)
     return Operation(
         endpoint=create_generated_world,
         availability=state,
         subject="workspace",
         options=(recipes, specification),
+        # A generated world is drawn only from tiles a bake worker makes: where the installation
+        # does not run one, a town made here would never be drawn.
+        needs=("generated_tiles",),
     )
 
 
@@ -234,7 +242,12 @@ def _personal_source(
             connection, session.workspace_id, reviewed_for=session.actor, store=services.store
         )
         plan = personal_world_plan(connection, session.workspace_id, sources, store=services.store)
-        state = AVAILABLE if plan.refusal is None else unavailable(plan.refusal.code)
+        if plan.refusal is not None:
+            state = unavailable(plan.refusal.code)
+        elif plan.action == "create_world" and not may_register_worlds(connection):
+            state = unavailable(WorldsReadOnly.code)
+        else:
+            state = AVAILABLE
     return Operation(
         endpoint=compose_personal_source_world,
         availability=state,

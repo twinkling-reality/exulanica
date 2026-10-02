@@ -32,6 +32,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, ConfigDict, Field, StrictInt
 
+from exulanica.api.capabilities import component_refusal, installation_facts_of
 from exulanica.api.dependencies import CurrentSession, ScopedConnection, get_services
 from exulanica.materials import thaw
 from exulanica.selection.validation import Session
@@ -295,8 +296,22 @@ def request_bake(
     recipe_id: uuid.UUID, request: Request, connection: ScopedConnection, session: CurrentSession
 ) -> JSONResponse:
     try:
-        bake = _repository(request, connection, session).request_bake(recipe_id)
-    except (MaterialError, _Unavailable) as error:
+        repository = _repository(request, connection, session)
+    except _Unavailable as error:
+        return _refused(error)
+    # A request where the installation runs no bake worker would wait for ever and hold a place
+    # in the workspace's quota, so it is refused by the installation's own reason instead.
+    refusal = component_refusal(installation_facts_of(get_services(request)), "materials")
+    if refusal is not None:
+        return _problem(
+            409,
+            refusal,
+            "this installation runs no material bake worker, so the bake would never be made; "
+            "nothing was requested",
+        )
+    try:
+        bake = repository.request_bake(recipe_id)
+    except MaterialError as error:
         return _refused(error)
     return _json(_bake_view(bake), status=200 if bake.state == "baked" else 202)
 

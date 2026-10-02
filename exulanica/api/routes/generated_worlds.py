@@ -55,7 +55,12 @@ from exulanica.world.world_recipes import (
     specification_document,
     world_recipes,
 )
-from exulanica.world.worlds import WorldLimitReached, require_world
+from exulanica.world.worlds import (
+    WorldLimitReached,
+    WorldsReadOnly,
+    require_world,
+    require_world_registration,
+)
 
 __all__ = ["router", "tiles_router"]
 
@@ -128,8 +133,13 @@ def create_generated_world(
     range), a title that is empty once trimmed (422), a preset its composer does not generate, a
     specification that generates no world from any of its seed candidates, and a workspace that
     already holds as many generated worlds as the count policy allows are each refused by name, and
-    nothing is written.
+    nothing is written. A deployment whose database role cannot register a world is refused 403
+    `worlds_read_only` before anything is generated.
     """
+    try:
+        require_world_registration(connection)
+    except WorldsReadOnly as exc:
+        return _problem(403, exc.code, str(exc))
     try:
         created = SavedWorldEntryRepository(
             connection, session.workspace_id, services.store

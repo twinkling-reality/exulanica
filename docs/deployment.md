@@ -1170,8 +1170,11 @@ complete installation: it runs the database, schema, API, client, ingestion and 
 derivatives, pose and scene reconstruction (`pose_scene`), workspace asset preparation
 (`preparation`), simulation and comparison. No shipped profile installs material bakes (`materials`)
 or generated tiles (`generated_tiles`): each reports not installed, and `compose.yaml` runs no worker
-for them, so a material bake requested on an installation waits, and a town created on one stays
-"being built" and is not drawn (its tiles are never baked). `single-host-server-only` is
+for them. So on an installation the creation read (`GET /worlds/capabilities`) lists a generated
+town unavailable (`generated_tiles_not_installed`), because nothing would bake its tiles and it
+would never be drawn, and a material bake request is refused 409 `materials_not_installed` rather
+than queued for a worker that does not run. A town created by calling the route directly still
+stays "being built". `single-host-server-only` is
 the same built without the reconstruction and pose extras, whose workers then report unavailable,
 and is what `compose.yaml` and `.env.example` select by default (`EXULANICA_PROFILE`);
 `shared-store` keeps its bytes in an S3-compatible bucket, composed by adding

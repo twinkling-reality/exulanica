@@ -195,8 +195,13 @@ What differs by kind, as the reads state it:
 
 Making worlds: a starter is refused `saved_world_conflict` once the workspace holds any saved world,
 although the count policy sets no starter limit, and the read says so. A generated world is refused
-`world_limit_reached` at the policy's limit. A world from photographs takes the state and code of the
-`GET /worlds/personal-source` plan, which needs `admission.read`; without it the state is `unknown`.
+`world_limit_reached` at the policy's limit, and needs the installation's `generated_tiles`
+component: where a profile does not install it, nothing would bake the town's tiles, and making
+one is unavailable `generated_tiles_not_installed`. A world from photographs takes the state and
+code of the `GET /worlds/personal-source` plan, which needs `admission.read`; without it the state
+is `unknown`. Every kind is unavailable `worlds_read_only` where this deployment's database role
+cannot register a world, and each creation route then answers 403 `worlds_read_only` before any of
+its work.
 
 Choosing a model for a role (`POST /world/versions/{version_id}/models/{role_key}`) answers a refused
 choice with the status the person's own route gives the same code: 409 for `choice_key_reused`,

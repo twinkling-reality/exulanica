@@ -89,6 +89,7 @@ from exulanica.world.workspace_lock import lock_workspace
 from exulanica.world.worlds import (
     PERSONAL_SOURCE,
     ensure_personal_source_world,
+    require_world_registration,
     workspace_worlds,
 )
 
@@ -1035,6 +1036,9 @@ def compose_personal_world(
         # The refusal first: it says what is true now, which a digest mismatch alone would not.
         if plan.refusal is not None:
             raise plan.refusal
+        if plan.action == "create_world":
+            # Before anything is composed: a role that cannot register the world refuses here.
+            require_world_registration(connection)
         if (plan.action == "add_photographs") != (expected_preview_sha256 is not None):
             raise _preview_changed()
         if plan.action == "add_photographs":

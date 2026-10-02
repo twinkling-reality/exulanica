@@ -175,3 +175,47 @@ def test_a_start_of_signals_needs_the_comparison_component(town):
     ]
     own = app.state.services.signal_comparison_refusal(town["repository"].workspace_id)
     assert (start["state"], start["code"]) == ("unavailable", own or "comparison_not_installed")
+
+
+@pytest.mark.postgres
+@pytest.mark.parametrize("saved_world", [2], indirect=True)
+def test_a_town_is_not_offered_where_nothing_bakes_its_tiles(started):
+    """A generated world is drawn only from tiles a bake worker makes, so an installation that
+    runs none lists its creation unavailable, by the component; an undeclared process decides
+    nothing, and the starter, which bakes nothing, is untouched."""
+    app = started["client"].app
+    # A store to serve tiles from, so the component's state is the profile's declaration; a
+    # process with no tile store reports it unavailable (tile_store_absent), which refuses too.
+    tiles = app.state.services.store
+
+    def creation():
+        read = started["client"].get("/worlds/capabilities", headers=people.OWNER)
+        assert read.status_code == 200, read.text
+        return {row["kind"]: row["create"] for row in read.json()["kinds"]}
+
+    _installed(app, None, tiles=tiles)
+    undeclared = creation()["generated"]
+    assert undeclared["code"] != "generated_tiles_not_installed"
+    assert undeclared["dependencies"] == [
+        {
+            "component": "generated_tiles",
+            "state": "not_installed",
+            "code": "undeclared_installation",
+        }
+    ]
+    for profile in ("single-host", "reviewer"):
+        _installed(app, profile, tiles=tiles)
+        kinds = creation()
+        generated = kinds["generated"]
+        if generated["code"] != "world_limit_reached":
+            assert (generated["state"], generated["code"]) == (
+                "unavailable",
+                "generated_tiles_not_installed",
+            ), profile
+        assert generated["dependencies"] == [
+            {"component": "generated_tiles", "state": "not_installed", "code": None}
+        ]
+        assert (
+            "dependencies" not in kinds["authored-starter"]
+            or not kinds["authored-starter"]["dependencies"]
+        )

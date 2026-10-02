@@ -64,13 +64,16 @@ __all__ = [
     "WorldKind",
     "WorldKindConflict",
     "WorldLimitReached",
+    "WorldsReadOnly",
     "current_world_count_policy",
     "ensure_personal_source_world",
     "load_world_count_policy",
+    "may_register_worlds",
     "new_world_id",
     "refuse_past_limit",
     "register_world",
     "require_world",
+    "require_world_registration",
     "resolve_personal_source_world",
     "workspace_world",
     "workspace_worlds",
@@ -160,6 +163,35 @@ class WorldLimitReached(Exception):
             f"world{'' if limit == 1 else 's'}, the most {policy.policy_id} version "
             f"{policy.version} allows"
         )
+
+
+class WorldsReadOnly(Exception):
+    """A deployment whose database role may read worlds and not register one (the judge stack)."""
+
+    code: Final = "worlds_read_only"
+
+    def __init__(self) -> None:
+        super().__init__(
+            "this deployment's database role cannot register a world, so no world is made here; "
+            "nothing was generated or written"
+        )
+
+
+def may_register_worlds(connection: psycopg.Connection) -> bool:
+    """Whether this connection's role may insert ``world_identity``, the first write every world
+    creation makes. A probe of one grant: a role holding it may still lack a later table."""
+    row = (
+        connection.cursor(row_factory=dict_row)
+        .execute("select has_table_privilege('world_identity', 'INSERT') as allowed")
+        .fetchone()
+    )
+    return row is not None and bool(row["allowed"])
+
+
+def require_world_registration(connection: psycopg.Connection) -> None:
+    """Refuse a world creation before any of its work, where the role cannot register a world."""
+    if not may_register_worlds(connection):
+        raise WorldsReadOnly()
 
 
 class WorldKindConflict(Exception):
