@@ -54,6 +54,7 @@ export const START_REFUSAL_WORDS: Readonly<Record<string, string>> = {
   calls_over_budget: 'This server\'s model budget allows fewer calls than this comparison can make. Choose fewer people, models or seeds.',
   input_not_in_society: 'This world\'s people have no starting point with that number. Choose another.',
   bound_exceeds_grant: 'This workspace\'s spending grant has less left than the bound you set. Set a smaller bound.',
+  window_not_offered: 'This world cannot be compared over a whole day here. Compare one hour instead.',
 };
 
 /**
