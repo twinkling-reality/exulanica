@@ -1252,7 +1252,7 @@
         "model": {"provider": "nebius_token_factory", "model_id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"},
         "model_reason": "One of the pair a comparison of a town's group measured (docs/evaluation/2026-09-29-town-comparison-cost.json), so the plan for this group's comparison states what one like it typically costs and the bound it suggests.",
         "group_size": 4,
-        "group_size_reason": "A group a comparison of a market town can hold whatever its population (a model decides for at most 11 of 86 people, exulanica/world/society_comparison_reading.py), and the same size as the starter's group.",
+        "group_size_reason": "The same size as the starter's group, and a group a comparison of a market town can hold whatever its population: a generated town's society is read by the living town's line, which lets a model decide for everybody in each town measured (exulanica/world/society_comparison_reading.py, docs/evaluation/2026-10-01-living-comparison-replay.json).",
         "fact": "town_model_group",
         "fact_reason": "The name the compare step reads the choice by, beside the starter's model_group."
       },
