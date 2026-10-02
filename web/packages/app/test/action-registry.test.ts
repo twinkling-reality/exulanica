@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
-import { parseWorldCapabilities, type WorldCapabilities } from '../src/capabilities-api.js';
+import { parseWorkspaceCreation, parseWorldCapabilities, type WorldCapabilities } from '../src/capabilities-api.js';
 import {
   ACTIONS,
   availability,
@@ -111,5 +111,57 @@ describe('availability comes from the descriptors', () => {
     expect(refusalWords(spec('objects.undo'), 'stale_object_base').happened).toContain('changed while you were deciding');
     expect(refusalWords(spec('objects.undo'), 'busy')).toBe(COMMON_REFUSALS['busy']);
     expect(refusalWords(spec('objects.undo'), 'something_new')).toBe(UNRECOGNISED_REFUSAL);
+  });
+});
+
+/** `GET /worlds/capabilities` as `exulanica/api/routes/capabilities.py` answers it. */
+function workspace(generated: Record<string, unknown> | null) {
+  const create = (operation: string) => ({
+    operation, bind: {}, permitted: true, state: 'available', code: null, subject: 'workspace', spends: false,
+    writes: true, effects: [], dependencies: [], preview: null,
+  });
+  return parseWorkspaceCreation({
+    profile: 'exulanica.world-creation/v1',
+    policy: { policy_id: 'p', version: 1, sha256: 'x' },
+    kinds: [
+      { kind: 'authored-starter', held: 1, limit: 1, kind_facts: {}, create: create('POST /worlds/starter') },
+      { kind: 'generated', held: 2, limit: 3, kind_facts: { draws_generated_tiles: true },
+        create: generated === null ? null : { ...create('POST /worlds/generated'), ...generated } },
+      { kind: 'personal-source', held: 0, limit: 1, kind_facts: {}, create: null },
+    ],
+  });
+}
+
+describe('making a world reads the workspace’s creation descriptors', () => {
+  const make = spec('world.make');
+
+  it('reads every kind’s create and keeps the counts', () => {
+    const read = workspace({});
+    expect(read.kinds.map((kind) => [kind.kind, kind.held, kind.limit])).toEqual([
+      ['authored-starter', 1, 1], ['generated', 2, 3], ['personal-source', 0, 1],
+    ]);
+    expect(read.operations.map((descriptor) => descriptor.operation)).toEqual(['POST /worlds/starter', 'POST /worlds/generated']);
+    expect(() => parseWorkspaceCreation({ profile: 'something-else', kinds: [] })).toThrow();
+  });
+
+  it('is available only when the create says so, and unknown before any read or with a version read alone', () => {
+    expect(availability(make, workspace({})).state).toBe('available');
+    expect(availability(make, null).state).toBe('unknown');
+    expect(availability(make, world([])).state).toBe('unknown');
+    expect(availability(make, workspace(null)).state).toBe('unknown');
+  });
+
+  it('says why in its own words for each code the create can give', () => {
+    for (const [code, happened] of [
+      ['world_limit_reached', 'This workspace already holds as many towns as it may.'],
+      ['generated_tiles_not_installed', 'This server cannot build new towns.'],
+      ['worlds_read_only', 'This server does not make new worlds.'],
+    ] as const) {
+      const found = availability(make, workspace({ state: 'unavailable', code }));
+      expect(found.state, code).toBe('unavailable');
+      expect(found.code, code).toBe(code);
+      expect(found.words?.happened, code).toBe(happened);
+    }
+    expect(availability(make, workspace({ permitted: false })).state).toBe('not-permitted');
   });
 });

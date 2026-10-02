@@ -8,12 +8,13 @@
  * A new backend operation becomes one entry here plus its run binding in the composition root.
  *
  * Availability is the server's. An action with an operation takes its state from that operation's
- * capability descriptor (`GET /world/versions/{v}/capabilities`); an action with none (opening a
+ * capability descriptor (`GET /world/versions/{v}/capabilities`, or `GET /worlds/capabilities` for
+ * making a world); an action with none (opening a
  * panel, the map) is local and available whenever its binding exists. The interface never guesses
  * that a write is possible; the operation still decides when it runs.
  */
 
-import type { CapabilityDescriptor, WorldCapabilities } from '../../capabilities-api.js';
+import type { CapabilityDescriptor, OperationDescriptors } from '../../capabilities-api.js';
 import type { InterfaceState } from '../system/components.js';
 import type { IconName } from '../system/icon.js';
 import { REQUEST_REFUSALS } from '../words/problems.js';
@@ -56,6 +57,8 @@ const SOCIETY = 'POST /world/versions/{version_id}/society';
 const CONTROL = 'PUT /world/versions/{version_id}/society/control';
 const CONTROL_STEP = 'POST /world/versions/{version_id}/society/control/steps';
 const OBJECT_UNDO = 'POST /world/versions/{version_id}/objects/undo';
+/** Making a town, read from the workspace's creation descriptors (`GET /worlds/capabilities`). */
+const MAKE_GENERATED = 'POST /worlds/generated';
 
 const NOBODY_HERE: RefusalWords = {
   happened: 'Nobody lives in this world yet.',
@@ -155,7 +158,21 @@ export const ACTIONS: readonly ActionSpec[] = Object.freeze([
   },
   {
     id: 'world.make', label: 'Make a world', hint: 'Start a new town from a recipe',
-    icon: 'world', group: 'system', placement: ['palette'],
+    icon: 'world', group: 'system', placement: ['palette'], operation: MAKE_GENERATED,
+    refusals: {
+      world_limit_reached: {
+        happened: 'This workspace already holds as many towns as it may.',
+        next: 'Open one of the towns you already have instead.',
+      },
+      generated_tiles_not_installed: {
+        happened: 'This server cannot build new towns.',
+        next: 'Open a town that is already here.',
+      },
+      worlds_read_only: {
+        happened: 'This server does not make new worlds.',
+        next: 'You can open and explore the worlds already here.',
+      },
+    },
   },
   {
     id: 'design.open', label: 'Design', hint: 'Light, colour and material of this world',
@@ -208,7 +225,7 @@ export interface ActionAvailability {
   readonly descriptor: CapabilityDescriptor | null;
 }
 
-export function descriptorFor(spec: ActionSpec, capabilities: WorldCapabilities | null): CapabilityDescriptor | null {
+export function descriptorFor(spec: ActionSpec, capabilities: OperationDescriptors | null): CapabilityDescriptor | null {
   if (spec.operation === undefined || capabilities === null) return null;
   return capabilities.operations.find((descriptor) => descriptor.operation === spec.operation
     && Object.entries(spec.bind ?? {}).every(([key, value]) => descriptor.bind[key] === value)) ?? null;
@@ -219,7 +236,7 @@ export function descriptorFor(spec: ActionSpec, capabilities: WorldCapabilities 
  * descriptor's state (unsupported first, then permission, then the state). Without a capability
  * read yet, an operation's state is unknown, never assumed available.
  */
-export function availability(spec: ActionSpec, capabilities: WorldCapabilities | null): ActionAvailability {
+export function availability(spec: ActionSpec, capabilities: OperationDescriptors | null): ActionAvailability {
   if (spec.operation === undefined) {
     return { state: 'available', code: null, words: null, spends: false, descriptor: null };
   }
@@ -242,7 +259,7 @@ export function availability(spec: ActionSpec, capabilities: WorldCapabilities |
  * registry entry (a row's Remove): the same reading as `availability`, with the shared words.
  */
 export function operationAvailability(
-  operation: string, capabilities: WorldCapabilities | null, bind: Readonly<Record<string, string>> = {},
+  operation: string, capabilities: OperationDescriptors | null, bind: Readonly<Record<string, string>> = {},
 ): ActionAvailability {
   return availability({
     id: `operation:${operation}`, label: operation, hint: operation, icon: 'info', group: 'build',

@@ -10,7 +10,7 @@
  */
 
 import { ApiError } from '@exulanica/graph-client';
-import type { WorldCapabilities } from '../../capabilities-api.js';
+import type { OperationDescriptors } from '../../capabilities-api.js';
 import { el } from '../dom.js';
 import {
   button,
@@ -46,7 +46,8 @@ export interface ActionBinding {
 
 export interface ActionHost {
   binding(id: string): ActionBinding | undefined;
-  capabilities(): WorldCapabilities | null;
+  /** The descriptors read so far: the open version's and the workspace's creation ones. */
+  capabilities(): OperationDescriptors | null;
   /** Called when the capabilities or the state an action reads changed; returns the unsubscribe. */
   onChange(listener: () => void): () => void;
   readonly toasts: ToastStack;

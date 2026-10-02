@@ -73,7 +73,8 @@ import {
 import { el, replace } from './ui/dom.js';
 import { createLayout, MODAL_BACKGROUND_REGIONS, type Layout } from './ui/system/layout.js';
 import { mountActions, type MountedActions } from './composition/actions.js';
-import { perform } from './ui/actions/surfaces.js';
+import { actionState, perform } from './ui/actions/surfaces.js';
+import { actionSpec } from './ui/actions/registry.js';
 import { createFirstUseGuidance, type FirstUseMode } from './ui/first-use-guidance.js';
 import { buildWorldIndex } from './ui/world-index.js';
 import { MapPeek } from './ui/map-peek.js';
@@ -996,9 +997,13 @@ async function mount(): Promise<void> {
       onCompare: () => dispatchShell({ type: 'toggle-compare' }),
     }),
     ...(state.worldEntries === null ? {} : {
+      // Through the registry, so a create the workspace refuses is said and never opened.
       onMakeWorld: () => {
-        dispatchShell({ type: 'toggle-menu' });
-        dispatchShell({ type: 'toggle-make' });
+        if (actions === null) return;
+        if (actionState(actions.host, actionSpec('world.make')).state === 'available') {
+          dispatchShell({ type: 'toggle-menu' });
+        }
+        void perform(actions.host, 'world.make');
       },
     }),
     onCommand: handleAtlasCommand,
@@ -1237,6 +1242,11 @@ async function mount(): Promise<void> {
   };
   actions.host.onChange(gateObjects);
   gateObjects();
+  const reflectMake = (): void => {
+    if (actions !== null) worldMenu.setMake(actionState(actions.host, actionSpec('world.make')));
+  };
+  actions.host.onChange(reflectMake);
+  reflectMake();
   void intake.begin();
 
   let reflectedPrimary = shellState.primary;

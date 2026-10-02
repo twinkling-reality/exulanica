@@ -2,7 +2,7 @@
 import { ApiError } from '@exulanica/graph-client';
 import { describe, expect, it, vi } from 'vitest';
 
-import { parseWorldCapabilities, type WorldCapabilities } from '../src/capabilities-api.js';
+import { parseWorkspaceCreation, parseWorldCapabilities, type OperationDescriptors, type WorldCapabilities } from '../src/capabilities-api.js';
 import { ACTIONS, actionSpec } from '../src/ui/actions/registry.js';
 import { buildPalette, buildRail, perform, type ActionBinding, type ActionHost } from '../src/ui/actions/surfaces.js';
 import { toastStack } from '../src/ui/system/components.js';
@@ -21,7 +21,7 @@ function capabilities(states: Readonly<Record<string, [string, string | null, bo
   });
 }
 
-function host(bindings: Record<string, ActionBinding>, read: WorldCapabilities | null): ActionHost & { emit(): void } {
+function host(bindings: Record<string, ActionBinding>, read: OperationDescriptors | null): ActionHost & { emit(): void } {
   const listeners = new Set<() => void>();
   return {
     binding: (id) => bindings[id],
@@ -31,6 +31,27 @@ function host(bindings: Record<string, ActionBinding>, read: WorldCapabilities |
     emit: () => { for (const listener of listeners) listener(); },
   };
 }
+
+describe('making a world', () => {
+  const creation = (state: string, code: string | null) => parseWorkspaceCreation({
+    profile: 'exulanica.world-creation/v1',
+    kinds: [{ kind: 'generated', held: 0, limit: 3, create: {
+      operation: 'POST /worlds/generated', bind: {}, permitted: true, state, code, spends: false, writes: true,
+      effects: [], dependencies: [], preview: null,
+    } }],
+  });
+
+  it('never opens where the workspace refuses it, and says why in its words', async () => {
+    const run = vi.fn();
+    const refused = host({ 'world.make': { run } }, creation('unavailable', 'worlds_read_only'));
+    await perform(refused, 'world.make');
+    expect(run).not.toHaveBeenCalled();
+    expect(refused.toasts.root.textContent).toContain('This server does not make new worlds.');
+    const open = host({ 'world.make': { run } }, creation('available', null));
+    await perform(open, 'world.make');
+    expect(run).toHaveBeenCalledOnce();
+  });
+});
 
 describe('the tool rail', () => {
   it('draws the registry’s rail entries that have a binding, grouped, and marks the open one', () => {

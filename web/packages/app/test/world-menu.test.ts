@@ -163,4 +163,22 @@ describe('World menu', () => {
       vi.useRealTimers();
     }
   });
+
+  it('says in place why a world cannot be made, and keeps the entry reachable', () => {
+    const menu = buildWorldMenu({
+      preview: false, onResume: vi.fn(), onWorld: vi.fn(), onCommand: vi.fn(), onMakeWorld: vi.fn(),
+    });
+    const make = menu.root.querySelector<HTMLButtonElement>('[data-command=make]')!;
+    const detail = () => make.querySelector('.world-menu-entry-detail')?.textContent;
+    expect(detail()).toBe('Start a new town');
+    menu.setMake({ state: 'unavailable', words: { happened: 'This server cannot build new towns.' } });
+    expect(make.getAttribute('aria-disabled')).toBe('true');
+    expect(make.disabled).toBe(false);
+    expect(detail()).toBe('This server cannot build new towns.');
+    menu.setMake({ state: 'unknown', words: null });
+    expect(make.hasAttribute('aria-disabled')).toBe(false);
+    expect(detail()).toBe('Start a new town');
+    menu.setMake({ state: 'available', words: null });
+    expect(make.dataset['state']).toBe('available');
+  });
 });

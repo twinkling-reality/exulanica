@@ -6,6 +6,12 @@ import { createModalFocus } from './modal-focus.js';
 export interface WorldMenu {
   readonly root: HTMLElement;
   setVisible(visible: boolean): void;
+  /**
+   * Whether making a world is available, as the registry reads it from the workspace's creation
+   * descriptors. Unavailable, the entry says why in place of its detail and stays focusable, so
+   * the reason can be read; choosing it shows the action's two sentences and makes nothing.
+   */
+  setMake(state: { readonly state: string; readonly words: { readonly happened: string } | null }): void;
 }
 
 type MenuArrow = 'ArrowLeft' | 'ArrowRight' | 'ArrowUp' | 'ArrowDown';
@@ -117,6 +123,8 @@ export function buildWorldMenu(options: {
   ]);
   resume.addEventListener('click', () => activate(options.onResume));
 
+  const makeEntry = options.onMakeWorld === undefined ? null
+    : entry('make', say('worldMenu.make'), say('worldMenu.make.detail'), '', 'world-menu-make', say('worldMenu.make'));
   const grid = el('div', { class: 'world-menu-grid' }, [
     entry('world', 'World', 'Explore and build', '', 'world-menu-world'),
     entry('character', 'Character', 'Appearance and identity', 'K', 'world-menu-character'),
@@ -126,9 +134,7 @@ export function buildWorldMenu(options: {
       entry('compare', 'Compare', 'See what each model chose', '', 'world-menu-compare', 'Compare models'),
     ]),
     entry('companion', 'Companion', 'Ask and act', 'X', 'world-menu-companion'),
-    ...(options.onMakeWorld === undefined ? [] : [
-      entry('make', say('worldMenu.make'), say('worldMenu.make.detail'), '', 'world-menu-make', say('worldMenu.make')),
-    ]),
+    ...(makeEntry === null ? [] : [makeEntry]),
     entry('options', 'Design', 'Light and material', 'O', 'world-menu-customize', 'Customize world'),
     entry('controls', 'Settings', 'Display and controls', '?', 'world-menu-settings'),
   ]);
@@ -199,6 +205,17 @@ export function buildWorldMenu(options: {
   };
   return {
     root,
+    setMake(state) {
+      if (makeEntry === null) return;
+      const refused = state.state !== 'available' && state.state !== 'unknown';
+      makeEntry.dataset['state'] = state.state;
+      if (refused) makeEntry.setAttribute('aria-disabled', 'true');
+      else makeEntry.removeAttribute('aria-disabled');
+      const detail = makeEntry.querySelector('.world-menu-entry-detail');
+      if (detail !== null) {
+        detail.textContent = refused && state.words !== null ? state.words.happened : say('worldMenu.make.detail');
+      }
+    },
     setVisible(visible) {
       if (visible) {
         leaving = false;

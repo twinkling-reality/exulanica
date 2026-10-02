@@ -7,11 +7,17 @@
  * shell's surfaces), so a click in the rail and a click in a panel are one action with one
  * receipt. Capabilities are read when the world mounts, after each saved change and when the
  * people of the world arrive or leave; until the first read, an action with an operation is
- * `unknown`, never assumed available.
+ * `unknown`, never assumed available. Making a world reads the workspace's creation descriptors
+ * (`GET /worlds/capabilities`) the same way, once on mount and again with every refresh.
  */
 
 import type { TransportOptions } from '@exulanica/graph-client';
-import { CapabilitiesClient, type WorldCapabilities } from '../capabilities-api.js';
+import {
+  CapabilitiesClient,
+  type OperationDescriptors,
+  type WorldCapabilities,
+  type WorkspaceCreation,
+} from '../capabilities-api.js';
 import {
   buildClock,
   buildPalette,
@@ -83,6 +89,15 @@ const CAPABILITY_RETRY_MS = 15_000;
 export function mountActions(deps: MountActionsDeps): MountedActions {
   const client = deps.worldId === null ? null : new CapabilitiesClient({ ...deps.credentials, worldId: deps.worldId });
   let capabilities: WorldCapabilities | null = null;
+  const creationClient = new CapabilitiesClient({ ...deps.credentials, worldId: null });
+  let creation: WorkspaceCreation | null = null;
+  let creationRetry: number | null = null;
+  /** The version's descriptors and the workspace's creation ones, as one list an action reads. */
+  let descriptors: OperationDescriptors | null = null;
+  const merge = (): void => {
+    descriptors = capabilities === null && creation === null ? null
+      : { operations: [...(capabilities?.operations ?? []), ...(creation?.operations ?? [])] };
+  };
   let disposed = false;
   let reading = 0;
   let retry: number | null = null;
@@ -104,6 +119,25 @@ export function mountActions(deps: MountActionsDeps): MountedActions {
       capabilities = null;
       retry = window.setTimeout(() => void read(), CAPABILITY_RETRY_MS);
     }
+    merge();
+    changed();
+  };
+
+  let creating = 0;
+  const readCreation = async (): Promise<void> => {
+    if (disposed) return;
+    const ticket = ++creating;
+    if (creationRetry !== null) { window.clearTimeout(creationRetry); creationRetry = null; }
+    try {
+      const next = await creationClient.creation();
+      if (disposed || ticket !== creating) return;
+      creation = next;
+    } catch {
+      if (disposed || ticket !== creating) return;
+      creation = null;
+      creationRetry = window.setTimeout(() => void readCreation(), CAPABILITY_RETRY_MS);
+    }
+    merge();
     changed();
   };
 
@@ -117,7 +151,7 @@ export function mountActions(deps: MountActionsDeps): MountedActions {
   const toasts = toastStack();
   const host: ActionHost = {
     binding: (id) => deps.bindings[id],
-    capabilities: () => capabilities,
+    capabilities: () => descriptors,
     onChange: (listener) => { listeners.add(listener); return () => listeners.delete(listener); },
     toasts,
   };
@@ -168,16 +202,18 @@ export function mountActions(deps: MountActionsDeps): MountedActions {
   window.addEventListener('keydown', onKey);
 
   void read();
+  void readCreation();
   return {
     host,
     objectGate: (operation) => refusedWords(OBJECT_OPERATIONS[operation]),
     peopleGate: (operation) => refusedWords(PEOPLE_OPERATIONS[operation]),
     palette,
-    refresh: () => void read(),
+    refresh: () => { void read(); void readCreation(); },
     changed,
     dispose() {
       disposed = true;
       if (retry !== null) window.clearTimeout(retry);
+      if (creationRetry !== null) window.clearTimeout(creationRetry);
       window.removeEventListener('keydown', onKey);
       releasePeople();
       releaseLayout();

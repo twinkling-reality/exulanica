@@ -113,7 +113,11 @@ row, a panel button and the Companion's starter offer are one action with one re
 
 Availability is the server's. An action with an operation takes its descriptor's state from
 `GET /world/versions/{version_id}/capabilities`, read in the order unsupported, not permitted,
-unavailable, unknown, available. Before the first read it is unknown, never assumed available. An
+unavailable, unknown, available. Make a world needs no open world: it reads the generated town's
+create from `GET /worlds/capabilities` (`exulanica.world-creation/v1`), read when a world mounts and
+again with every refresh. Where the workspace refuses it (the world limit, a server that builds no
+towns, a role that registers no worlds) the World menu entry says why in place of its detail and
+stays reachable, choosing it shows the two sentences, and the Make a world surface never opens. Before the first read it is unknown, never assumed available. An
 action with no operation (opening a panel, the map) is local and available. A world that never
 supports an action leaves it out of the rail and lists it in the palette with why.
 

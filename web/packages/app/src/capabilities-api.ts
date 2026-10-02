@@ -2,7 +2,8 @@
  * What a world says it can do: the capability descriptors the server projects for one version.
  *
  * Speaks `GET /world/versions/{version_id}/capabilities?world_id=` (profile
- * `exulanica.world-capabilities/v1`, `exulanica/api/routes/capabilities.py`). Each descriptor names
+ * `exulanica.world-capabilities/v1`, `exulanica/api/routes/capabilities.py`), and for making a
+ * world, which needs no open world, `GET /worlds/capabilities` (`exulanica.world-creation/v1`). Each descriptor names
  * an operation by its route key ("METHOD /path/template"), whether the caller's grant permits it,
  * its state (`available`, `unavailable`, `unsupported`, `unknown`) with a code for any state but
  * available, whether it spends, its preview and its effects. The interface reads availability from
@@ -38,13 +39,12 @@ export interface CapabilityDescriptor {
   readonly dependencies: readonly CapabilityEffect[];
 }
 
-export interface WorldCapabilities {
+export interface WorldCapabilities extends OperationDescriptors {
   readonly worldId: string;
   readonly versionId: string;
   readonly kind: string;
   readonly societyHeld: boolean;
   readonly societyEngine: string | null;
-  readonly operations: readonly CapabilityDescriptor[];
 }
 
 const STATES: readonly DescriptorState[] = ['available', 'unavailable', 'unsupported', 'unknown'];
@@ -114,6 +114,49 @@ export function parseWorldCapabilities(value: unknown): WorldCapabilities {
   });
 }
 
+/** Descriptors an action reads its availability from: one version's, a workspace's, or both. */
+export interface OperationDescriptors {
+  readonly operations: readonly CapabilityDescriptor[];
+}
+
+/** How one kind of world is made in this workspace now (`GET /worlds/capabilities`). */
+export interface WorldKindCreation {
+  readonly kind: string;
+  readonly held: number;
+  readonly limit: number | null;
+  /** The create's descriptor; null for a kind no client makes. */
+  readonly create: CapabilityDescriptor | null;
+}
+
+/**
+ * Whether each kind of world can be made now (profile `exulanica.world-creation/v1`). The create
+ * descriptors are the same shape as a version's, so an action reads them the same way.
+ */
+export interface WorkspaceCreation extends OperationDescriptors {
+  readonly kinds: readonly WorldKindCreation[];
+}
+
+export function parseWorkspaceCreation(value: unknown): WorkspaceCreation {
+  const row = record(value, 'body');
+  if (row['profile'] !== 'exulanica.world-creation/v1') {
+    throw new TypeError('Invalid creation read: profile');
+  }
+  if (!Array.isArray(row['kinds'])) throw new TypeError('Invalid creation read: kinds');
+  const kinds = row['kinds'].map((entry): WorldKindCreation => {
+    const kind = record(entry, 'kind');
+    return Object.freeze({
+      kind: text(kind['kind'], 'kind name'),
+      held: typeof kind['held'] === 'number' ? kind['held'] : 0,
+      limit: typeof kind['limit'] === 'number' ? kind['limit'] : null,
+      create: kind['create'] === null || kind['create'] === undefined ? null : parseDescriptor(kind['create']),
+    });
+  });
+  return Object.freeze({
+    kinds: Object.freeze(kinds),
+    operations: Object.freeze(kinds.flatMap((kind) => (kind.create === null ? [] : [kind.create]))),
+  });
+}
+
 export interface CapabilitiesClientOptions extends TransportOptions {
   readonly worldId: string | null;
 }
@@ -125,6 +168,11 @@ export class CapabilitiesClient {
   constructor(options: CapabilitiesClientOptions) {
     this.#transport = new Transport(options);
     this.#worldId = options.worldId;
+  }
+
+  /** Whether each kind of world can be made in this workspace now. Needs no open world. */
+  async creation(): Promise<WorkspaceCreation> {
+    return parseWorkspaceCreation(await this.#transport.getJson<unknown>('/worlds/capabilities'));
   }
 
   async version(versionId: string): Promise<WorldCapabilities> {
