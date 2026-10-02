@@ -3,12 +3,14 @@ limit and a queue, kept by what it is made from, and counted from the town's own
 
 from __future__ import annotations
 
+import contextlib
 import functools
 import multiprocessing
 import os
 import subprocess
 import threading
 import time
+from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
@@ -24,16 +26,42 @@ from exulanica.world.specification_samples import (
 SHA = "0" * 64
 
 
-@pytest.fixture(autouse=True)
-def _no_sample_process_outlives_its_test():
-    """A sample process a test leaves running would hold the whole run open at exit (a pool's
-    processes are joined then), so one is stopped here and the test fails by name instead."""
+@contextlib.contextmanager
+def _sample_processes_end_with_the_test(seconds: float = 10.0) -> Iterator[None]:
+    """Fail by name a test that leaves running a sample process it started, and stop the process.
+
+    Only the spawned processes started inside are judged. One already running belongs to whatever
+    started it, such as a worker a server keeps for its whole life: a test that reads windows from
+    the server's flight worker leaves its process running for the tests after it in that test
+    process. Judged here, it would fail a test that started nothing, and stopping it would refuse
+    the next read from that worker.
+
+    The processes started inside get ``seconds`` to end: one stopped by SIGTERM, as a test here
+    stops its own, is reaped well within 10 s on a loaded machine, and the wait is spent in full
+    only when a process is left running, which fails the test anyway.
+    """
+    before = set(multiprocessing.active_children())
     yield
-    left = [p for p in multiprocessing.active_children() if p.name.startswith("SpawnProcess")]
-    if not _until(lambda: not any(p.is_alive() for p in left), 10.0):
+    started = [
+        process
+        for process in multiprocessing.active_children()
+        if process.name.startswith("SpawnProcess") and process not in before
+    ]
+    _until(lambda: not any(process.is_alive() for process in started), seconds)
+    left = [process for process in started if process.is_alive()]
+    if left:
         for process in left:
             process.terminate()
-        pytest.fail(f"{len(left)} sample process(es) outlived the test")
+        names = ", ".join(process.name for process in left)
+        pytest.fail(f"{len(left)} sample process(es) outlived the test: {names}")
+
+
+@pytest.fixture(autouse=True)
+def _no_sample_process_outlives_its_test() -> Iterator[None]:
+    """A sample process a test leaves running would hold the whole run open at exit (a pool's
+    processes are joined then), so one is stopped here and the test fails by name instead."""
+    with _sample_processes_end_with_the_test():
+        yield
 
 
 def _counted_job(calls: list[tuple[str, dict[str, int], str]]):
@@ -224,3 +252,42 @@ def test_after_a_process_dies_the_next_sample_starts_another(tmp_path) -> None:
         assert worker.sample("small_town", {"n": 2}, SHA).status == "sampled"
     finally:
         worker.close()
+
+
+# -- the guard every test here runs under --------------------------------------------------------
+
+
+def test_a_sample_process_a_test_leaves_running_fails_that_test_and_is_stopped(tmp_path) -> None:
+    """The guard's positive control: a stuck sample left running fails the test it was started
+    in, in the guard's words, and its process is stopped."""
+    pidfile = tmp_path / "pids"
+    pidfile.write_text("")
+    worker = SampleWorker(
+        sample_process_pool, job=functools.partial(_stuck, str(pidfile)), seconds=0.2, waiting=0
+    )
+    try:
+        with (
+            pytest.raises(
+                pytest.fail.Exception, match=r"^1 sample process\(es\) outlived the test"
+            ),
+            _sample_processes_end_with_the_test(seconds=0.5),
+        ):
+            assert worker.sample("small_town", {"n": 1}, SHA).status == "overran"
+            assert _until(lambda: pidfile.read_text().strip() != "")
+        stuck = int(pidfile.read_text().split()[0])
+        assert _until(lambda: _gone(stuck)), "the guard did not stop the process it blamed"
+    finally:
+        worker.close()
+
+
+def test_a_process_running_before_a_test_is_neither_blamed_on_it_nor_stopped() -> None:
+    """A spawned worker left running by an earlier test, as the server's flight worker is by a
+    test that reads windows from it, fails no later test that starts no process, and runs on."""
+    earlier = sample_process_pool()
+    try:
+        pid = earlier.submit(os.getpid).result(timeout=60)
+        with _sample_processes_end_with_the_test(seconds=0.5):
+            pass
+        assert not _gone(pid), "the guard stopped a process the test did not start"
+    finally:
+        earlier.shutdown(wait=True, cancel_futures=True)
