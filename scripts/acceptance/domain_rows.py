@@ -4,6 +4,7 @@
     .venv/bin/python scripts/acceptance/domain_rows.py comparisons --worktree PATH --out DIR
     .venv/bin/python scripts/acceptance/domain_rows.py assets      --worktree PATH --out DIR
     .venv/bin/python scripts/acceptance/domain_rows.py characters  --worktree PATH --out DIR
+    .venv/bin/python scripts/acceptance/domain_rows.py catalog     --worktree PATH --out DIR
 
 Each subcommand checks rows against the stack ``launch.py up`` started for ``--worktree``,
 restarts that stack's API with ``launch.py restart-api`` where a row needs a fresh process, and
@@ -21,6 +22,9 @@ leaves the stack running:
   scripted model; the driver runs the installation's asset preparation process itself.
 - ``characters``: E1 (two character families of different kinds) and E2 (a catalog's next
   revision, then its withdrawal). Any stack whose launcher published the character catalogs.
+- ``catalog``: E4 (an option the host publishes appears in the production page's look editor
+  without a rebuild), through ``catalog_browser.mjs`` under gpu-slot then quiet-slot, on a
+  ``--production`` stack.
 
 Every row ends ``passed``, ``failed`` or ``blocked``, by the rules of ``foundation.py``, whose
 records, clients and stack this file uses. Like it, this is an independent client: it imports
@@ -3113,6 +3117,182 @@ def reviews(arguments: argparse.Namespace) -> int:
     return 0 if all(row.status != "failed" for row in rows) else 1
 
 
+# -- E4: a newly published option in the production page, from outside -----------------------------
+
+CATALOG_RUNNER = HERE / "catalog_browser.mjs"
+#: The option E4 publishes: one more hair colour in the people catalog's first family, data only.
+NEW_COLOUR = {"key": "q10-copper", "label": "Copper", "rgb": "#b0643a"}
+NEW_COLOUR_SLOT = "hairColour"
+CATALOG_BUDGET_SECONDS = 600
+HANDSHAKE_SECONDS = 300
+
+
+def build_digest(stack: Stack) -> str:
+    """An evidence read: the digest of every file of the stack's production build."""
+    root = Path(stack.state["run_dir"]) / "app-build"
+    digest = hashlib.sha256()
+    for path in sorted(p for p in root.rglob("*") if p.is_file()):
+        digest.update(str(path.relative_to(root)).encode() + b"\0" + path.read_bytes() + b"\0")
+    return digest.hexdigest()
+
+
+def catalog_c(stack: Stack, revision: int) -> Path:
+    """The repository's layered catalog at ``revision`` with one more hair colour in its first
+    family, beside links to the unchanged family folders."""
+    source = stack.worktree / CHARACTER_SOURCE
+    target = stack.run_dir / f"catalog-e4-{revision}"
+    target.mkdir(exist_ok=True)
+    catalog = json.loads((source / "catalog.json").read_text())
+    catalog["revision"] = revision
+    catalog["families"][0]["colours"][NEW_COLOUR_SLOT].append(dict(NEW_COLOUR))
+    (target / "catalog.json").write_text(json.dumps(catalog, indent=2))
+    (target / "looks.json").write_bytes((source / "looks.json").read_bytes())
+    for folder in source.iterdir():
+        if folder.is_dir() and not (target / folder.name).exists():
+            (target / folder.name).symlink_to(folder)
+    return target
+
+
+def row_e4(stack: Stack, transcripts: Any, out: Path) -> Row:
+    row = Row(
+        "E4",
+        "browser.catalog_injection",
+        "In the production build served by the stack, the character studio's people controls, "
+        "reached through the page's own tool rail, do not offer a hair colour the repository's "
+        "catalog lacks; the host publishes the layered catalog's next revision with that one "
+        "colour added to the first family; after the page reloads, the same control offers it "
+        "beside every colour it offered before, the page having read the new revision by its "
+        "digest, and no file of the production build changed (A-42). A newly published family "
+        "is a stated limit and is not checked. Functional only; how it looks stays with the "
+        "experience owner.",
+    )
+    c = F.client(stack, transcripts, "w1", "token")
+    _, listing = c.call("E4", "GET", CATALOGS)
+    revisions = [
+        int(p.get("revision") or 0)
+        for p in (listing or {}).get("publications", [])
+        if p.get("catalog_id") == LAYERED_CATALOG_ID
+    ]
+    revision = max(revisions or [REPOSITORY_LAYERED_REVISION]) + 1
+    directory = catalog_c(stack, revision)
+    build_before = build_digest(stack)
+    rehearse = F._rehearsal()
+    session_dir = out / "session"
+    session_dir.mkdir(parents=True, exist_ok=True)
+    ready, published = session_dir / "ready", session_dir / "published.json"
+    ports = stack.state["ports"]
+    plan = {
+        "session": {"id": "e4", "budget_seconds": CATALOG_BUDGET_SECONDS},
+        "out": str(session_dir),
+        "label": NEW_COLOUR["label"],
+        "slot": NEW_COLOUR_SLOT,
+        "handshake": {
+            "ready": str(ready),
+            "published": str(published),
+            "wait_seconds": HANDSHAKE_SECONDS,
+        },
+        "runtime": {
+            "app_url": f"http://localhost:{ports['vite']}/",
+            "api_base": f"http://127.0.0.1:{ports['api']}",
+            "token_file": str(stack.token_file("token")),
+            "browser_port": ports["browser"],
+            "chrome_flags": list(rehearse.CHROME_GPU_FLAGS),
+        },
+    }
+    plan_file = session_dir / "plan.json"
+    plan_file.write_text(json.dumps(plan, indent=2))
+    checkout = rehearse.main_checkout(stack.worktree)
+    gpu, quiet = checkout / ".exulanica/bin/gpu-slot", checkout / ".exulanica/bin/quiet-slot"
+    command = rehearse.browser_slot_command(
+        gpu if gpu.exists() else None,
+        quiet if quiet.exists() else None,
+        ["node", str(CATALOG_RUNNER), str(plan_file)],
+    )
+    runner_log = (out / "runner.txt").open("w")
+    runner = subprocess.Popen(
+        command,
+        cwd=stack.worktree,
+        env=LAUNCH.clean_environment(),
+        stdout=runner_log,
+        stderr=subprocess.STDOUT,
+    )
+    deadline = time.monotonic() + CATALOG_BUDGET_SECONDS + rehearse.GPU_SLOT_WAIT_SECONDS
+    while not ready.exists() and runner.poll() is None and time.monotonic() < deadline:
+        time.sleep(1)
+    publication: dict[str, Any] = {}
+    if ready.exists():
+        publication = catalog_tool(
+            stack, out, "publish-e4", "publish", "--directory", str(directory), "--apply"
+        )
+        _, after = c.call("E4", "GET", CATALOGS)
+        current = next(
+            (
+                p
+                for p in (after or {}).get("publications", [])
+                if p.get("catalog_id") == LAYERED_CATALOG_ID and p.get("revision") == revision
+            ),
+            {},
+        )
+        publication["catalog_sha256"] = current.get("catalog_sha256")
+        publication["state"] = current.get("state")
+        published.write_text(json.dumps({"catalog_sha256": current.get("catalog_sha256")}))
+    try:
+        runner.wait(timeout=max(1.0, deadline - time.monotonic()))
+    except subprocess.TimeoutExpired:
+        runner.terminate()
+        runner.wait(timeout=30)
+    runner_log.close()
+    build_after = build_digest(stack)
+    session = (
+        json.loads((session_dir / "session.json").read_text())
+        if (session_dir / "session.json").exists()
+        else {}
+    )
+    outcomes = session.get("outcomes") or {}
+    row.expect(
+        publication.get("exit") == 0, f"publishing the revision exited {publication.get('exit')}"
+    )
+    row.expect(
+        publication.get("state") == "current", f"the new revision reads {publication.get('state')}"
+    )
+    for step in ("catalog-before", "catalog-after"):
+        outcome = outcomes.get(step) or {}
+        row.expect(
+            outcome.get("status") == "passed",
+            f"{step}: {outcome.get('status') or 'not reached'} {outcome.get('reason') or ''}".strip(),
+        )
+    row.expect(build_before == build_after, "a file of the production build changed")
+    row.observed = {
+        "runner_exit": runner.returncode,
+        "revision": revision,
+        "option": NEW_COLOUR,
+        "publication": publication,
+        "steps": {step: (outcomes.get(step) or {}).get("status") for step in outcomes},
+        "observations": {step: (outcomes.get(step) or {}).get("observations") for step in outcomes},
+        "facts": session.get("facts"),
+        "unreached": session.get("unreached"),
+        "build_sha256": {"before": build_before, "after": build_after},
+        "index_html_sha256": ((stack.state.get("app") or {}).get("build") or {}).get(
+            "index_html_sha256"
+        ),
+    }
+    return row.close()
+
+
+def catalog(arguments: argparse.Namespace) -> int:
+    worktree = LAUNCH.checkout(arguments.worktree)
+    stack = Stack.read(worktree)
+    if (stack.state.get("app") or {}).get("mode") != "production":
+        raise SystemExit("catalog needs a stack started with --production")
+    out = Path(arguments.out).resolve()
+    (out / "evidence").mkdir(parents=True, exist_ok=True)
+    transcripts = Transcripts(out / "transcripts")
+    started = dt.datetime.now(dt.UTC).isoformat()
+    rows = [row_e4(stack, transcripts, out)]
+    write_results(out, stack, rows, started, sys.argv[1:])
+    return 0 if all(row.status != "failed" for row in rows) else 1
+
+
 def comparisons(arguments: argparse.Namespace) -> int:
     worktree = LAUNCH.checkout(arguments.worktree)
     stack = Stack.read(worktree)
@@ -3144,6 +3324,9 @@ def build_parser() -> argparse.ArgumentParser:
     people = commands.add_parser("characters")
     people.add_argument("--worktree", required=True)
     people.add_argument("--out", required=True)
+    page = commands.add_parser("catalog")
+    page.add_argument("--worktree", required=True)
+    page.add_argument("--out", required=True)
     mapped = commands.add_parser("reviews")
     mapped.add_argument("--worktree", required=True)
     mapped.add_argument("--out", required=True)
@@ -3169,6 +3352,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "withdrawal": withdrawal,
         "roles": roles,
         "reviews": reviews,
+        "catalog": catalog,
     }
     return commands[arguments.command](arguments)
 

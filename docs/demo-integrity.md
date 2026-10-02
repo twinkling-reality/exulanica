@@ -261,7 +261,10 @@ bound to the measurement record that states it and serves what the record derive
 prepares, places and withdraws a workspace asset, running the installation's preparation process
 itself, and checks each refused admission against the run's database and store. `characters` saves
 looks in two character families, then publishes and withdraws a catalog revision as the host
-administrator. Each re-runs its owners' lane tests on the checkout, and none makes a timing claim.
+administrator. `catalog` publishes one more option in the people catalog's first family while a
+production page is served and checks, through the page's own controls
+(`scripts/acceptance/catalog_browser.mjs`), that the page offers it after a reload with no file of
+the build changed. Each re-runs its owners' lane tests on the checkout, and none makes a timing claim.
 
 **Reading the result.** The run directory holds `result.json`, described by
 `scripts/rehearsal/result.schema.json`, a `summary.txt` table, a JPEG screenshot of every observed

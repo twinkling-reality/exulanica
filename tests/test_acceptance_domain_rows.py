@@ -128,3 +128,25 @@ def test_the_comparisons_plan_answers_both_roles_of_both_models():
     for model in (DRIVE.GOING_MODEL, DRIVE.WAITING_MODEL):
         assert (model["model_id"], None) in answered
         assert (model["model_id"], "Green elapsed:") in answered
+
+
+def test_the_e4_revision_is_one_the_product_publishes_with_its_new_colour_served(tmp_path):
+    from exulanica.world.character_catalog_publication import catalog_documents
+    from exulanica.world.character_catalogs import publication_families, read_publication_document
+
+    class Stack:
+        worktree = ROOT
+        run_dir = tmp_path
+
+    directory = DRIVE.catalog_c(Stack(), 9)
+    (layered,) = catalog_documents(directory)
+    publication = read_publication_document(layered)
+    first = layered["catalog"]["families"][0]
+
+    assert publication.revision == 9
+    assert DRIVE.NEW_COLOUR in first["colours"][DRIVE.NEW_COLOUR_SLOT]
+    keys = [colour["key"] for colour in first["colours"][DRIVE.NEW_COLOUR_SLOT]]
+    assert len(keys) == len(set(keys))
+    assert publication_families(layered)
+    repository = json.loads((ROOT / "assets" / "characters" / "catalog.json").read_text())
+    assert DRIVE.NEW_COLOUR not in repository["families"][0]["colours"][DRIVE.NEW_COLOUR_SLOT]
