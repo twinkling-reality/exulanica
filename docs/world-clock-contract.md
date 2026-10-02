@@ -180,6 +180,8 @@ minute `j` binds the digest of feeds 1 to `j + 1`, the ones it consumed.
 ## Coupled traffic
 
 The traffic signal controller ([`traffic_signal_controller.py`](../exulanica/api/traffic_signal_controller.py))
+runs where playback runs: in the API process, or in `exulanica-playback-worker`'s when the API
+leaves playback to it ([deployment](deployment.md#515-society-playback)). It
 rotates the coupled worlds with roads beside the legacy worlds with a signal choice, at most the
 timing catalog's pending bound a turn, and seals at most two minutes of each a turn. For a minute
 it reads the occupancy, projects the feed, runs the minute in its pure worker process from the

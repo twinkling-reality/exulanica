@@ -491,6 +491,7 @@ def _playback_effect(context: VersionContext) -> tuple[Effect, ...]:
         getattr(context.request.app.state, "society_control_worker", None),
         getattr(context.request.app.state, "society_control_thread", None),
         context.session.workspace_id,
+        getattr(context.request.app.state, "playback_process", None),
     )
     return (Effect("playback", AVAILABLE if refusal is None else unavailable(refusal)),)
 

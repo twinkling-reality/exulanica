@@ -287,7 +287,12 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
         services.person_decision_policy,
     )
     app.state.traffic_signal_controller = traffic_signals
-    society_worker = services.build_society_control_worker()
+    # Played here, in a process of its own (EXULANICA_PLAYBACK_WORKER=process: that process also
+    # seals coupled traffic, so this one keeps its controller for reads only), or by nobody.
+    society_worker = (
+        services.build_society_control_worker() if services.playback_player == "here" else None
+    )
+    app.state.playback_process = services.playback_process()
     society_stop = threading.Event()
     society_thread = (
         threading.Thread(
@@ -322,7 +327,8 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
             society_thread.start()
         if comparison_thread is not None:
             comparison_thread.start()
-        traffic_signals.start()
+        if services.playback_player != "process":
+            traffic_signals.start()
         # What startup made lives as long as the server. A full garbage collection walks every
         # tracked object and holds the interpreter's lock while it does, so no request the server is
         # answering moves: over about 172,000 objects once the application is imported, 33 to 36 ms

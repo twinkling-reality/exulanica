@@ -753,8 +753,10 @@ def _components(
         entries.append(declared("generated_tiles"))
     if services.society_runtime is None:
         entries.append(_component("simulation", "unavailable", "society_runtime_absent"))
-    elif services.society_control_enabled:
+    elif services.society_control_enabled and services.playback_player == "here":
         entries.append(_component("simulation", "ready"))
+    elif services.society_control_enabled and services.playback_player == "process":
+        entries.append(declared("simulation"))
     else:
         entries.append(_component("simulation", "configured", "advanced_on_request"))
     if no_model:

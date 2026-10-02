@@ -185,6 +185,9 @@ exulanica-installation = "exulanica.orchestration.installation.cli:main"
 # workspaces EXULANICA_SOCIETY_CONTROL_WORKSPACES lists, when the API runs with
 # EXULANICA_COMPARISON_WORKER=process.
 exulanica-comparison-worker = "exulanica.orchestration.comparison_worker:main"
+# `uv run exulanica-playback-worker`. Plays the societies this host plays and seals their coupled
+# traffic in a process of its own, when the API runs with EXULANICA_PLAYBACK_WORKER=process.
+exulanica-playback-worker = "exulanica.orchestration.playback_worker:main"
 # `uv run exulanica-wmp project ...` creates a signed, independently verifiable World Memory
 # Package; verify, inspect, and diff never open PostgreSQL.
 exulanica-wmp = "exulanica.world_package.cli:main"

@@ -37,7 +37,7 @@ from contextlib import AbstractContextManager
 from dataclasses import dataclass, field
 from decimal import Decimal
 from pathlib import Path
-from typing import TYPE_CHECKING, Final
+from typing import TYPE_CHECKING, Final, Literal
 
 import psycopg
 
@@ -64,7 +64,11 @@ from exulanica.api.signal_comparison_runner import SignalComparisonRunner
 from exulanica.api.society_comparison_runner import SocietyComparisonRunner
 from exulanica.api.society_comparison_start import development_seeds
 from exulanica.api.society_comparison_worker import SocietyComparisonWorker
-from exulanica.api.society_control_worker import SocietyControlWorker
+from exulanica.api.society_control_worker import (
+    PlaybackProcess,
+    SocietyControlWorker,
+    playback_configuration_sha256,
+)
 from exulanica.api.society_runtime import AuthoredWorldSocietyBinding, SocietyRuntime
 from exulanica.consent.place_name_rights import released_place_names
 from exulanica.db.session import DATABASE_URL_ENV, Database
@@ -118,6 +122,7 @@ if TYPE_CHECKING:
 __all__ = [
     "DATA_DIR_ENV",
     "DERIVATIVE_WORKER_ENV",
+    "PLAYBACK_WORKER_ENV",
     "READONLY_DATABASE_URL_ENV",
     "SOCIETY_AUTHORED_WORLDS_ENV",
     "SOCIETY_CONTROL_WORKER_ENV",
@@ -148,6 +153,13 @@ SOCIETY_CONTROL_WORKER_ENV: Final = env_name("SOCIETY_CONTROL_WORKER")
 #: accounts. Absent or ``[]`` plays none. Independent of the account-wide switch above.
 SOCIETY_CONTROL_WORKSPACES_ENV: Final = env_name("SOCIETY_CONTROL_WORKSPACES")
 
+#: Who plays the societies this host plays (the listed and discovered workspaces above) and seals
+#: their coupled traffic. Absent (or an explicit on), this process, in threads. ``process``, a
+#: process of its own (``exulanica-playback-worker``), and this one serves the playback controls
+#: without playing; ``0``, ``false``, ``off`` or ``no``, nobody, and a society advances only a
+#: minute at a time when somebody advances it.
+PLAYBACK_WORKER_ENV: Final = env_name("PLAYBACK_WORKER")
+
 #: Who plays the comparisons started from the application, for the workspaces this host asks models
 #: for. Absent (or an explicit on), this process, in a thread. ``process``, a process of its own
 #: (``python -m exulanica.orchestration.comparison_worker``), and this one only serves starts.
@@ -175,6 +187,7 @@ SOCIETY_SETTING_REFUSALS: Final = {
     "society_control_workspaces_duplicate": "names a workspace more than once",
     "society_tick_interval_not_integer": "must be a whole number of milliseconds",
     "comparison_worker_not_recognised": "must be absent, on, process or off",
+    "playback_worker_not_recognised": "must be absent, on, process or off",
     "society_tick_interval_out_of_bounds": (
         f"must be {BASE_TICK_INTERVAL_MIN_MS} to {BASE_TICK_INTERVAL_MAX_MS} milliseconds and "
         f"divisible by {BASE_TICK_INTERVAL_DIVISOR}, so every speed divides it exactly"
@@ -258,6 +271,10 @@ class Services:
     runs_society_control_worker: bool = False
     #: ``build_services`` reads it from ``EXULANICA_SOCIETY_TICK_INTERVAL_MS``.
     society_base_tick_interval_ms: int = DEFAULT_BASE_TICK_INTERVAL_MS
+    #: Who plays the societies this host plays (:data:`PLAYBACK_WORKER_ENV`): ``here``, this
+    #: process; ``process``, the playback worker's process; ``none``, nobody. ``here`` for a
+    #: hand-built Services, as before the setting existed; ``build_services`` reads the setting.
+    playback_player: Literal["here", "process", "none"] = "here"
     #: The development seeds comparisons started from the application run on, in the seed
     #: catalog's order; ``build_services`` takes them from the seed catalog a new comparison is
     #: defined under, which commits their text.
@@ -608,6 +625,33 @@ class Services:
             before_minute=(None if (host := self.decision_host()) is None else host.before_minute),
         )
 
+    def playback_configuration_sha256(self) -> str:
+        """The digest of what this host's playback plays, which the playback process holds its
+        lock under and an API that leaves playback to it reads that lock by."""
+        return playback_configuration_sha256(
+            self.society_control_workspaces,
+            account_discovery=self.runs_society_control_worker,
+            base_tick_interval_ms=self.society_base_tick_interval_ms,
+        )
+
+    def playback_process(self) -> PlaybackProcess | None:
+        """What this process says of the process that plays its societies, where one does
+        (``process`` in :data:`PLAYBACK_WORKER_ENV`); None where this process plays them, where
+        nothing plays them, or where playback is not configured."""
+        if self.playback_player != "process" or not self.society_control_enabled:
+            return None
+        return PlaybackProcess(
+            self.database,
+            workspaces=self.society_control_workspaces,
+            account_discovery=self.runs_society_control_worker,
+            workspace_source=(
+                self.accounts.active_owned_workspaces
+                if self.runs_society_control_worker and self.accounts is not None
+                else None
+            ),
+            base_tick_interval_ms=self.society_base_tick_interval_ms,
+        )
+
     @property
     def warnings(self) -> tuple[str, ...]:
         """What this instance is running without. Surfaced by ``/readyz``, never swallowed."""
@@ -724,6 +768,18 @@ class Services:
                 "no workspace, so a society advances only when somebody advances it, one "
                 "simulated minute at a time."
             )
+        elif self.playback_player == "process":
+            notes.append(
+                f"{PLAYBACK_WORKER_ENV} is process: this process plays no society and seals no "
+                "traffic. exulanica-playback-worker does, and while no such process runs with "
+                "this configuration a world's playback control says playback has stopped."
+            )
+        elif self.playback_player == "none":
+            notes.append(
+                f"{PLAYBACK_WORKER_ENV} is off: nothing plays the societies of the workspaces "
+                "this host lists, so each advances only when somebody advances it, one simulated "
+                "minute at a time."
+            )
         if self.runs_derivative_worker:
             notes.append(
                 "the derivative worker runs no depth model, so an uploaded photograph is a rung "
@@ -831,6 +887,7 @@ def build_services(
     stores = content_stores(environ, data_dir=data_dir)
     store = stores.blobs
     comparison_player = _comparison_player(env_get("COMPARISON_WORKER", environ))
+    playback_player = _playback_player(env_get("PLAYBACK_WORKER", environ))
 
     return Services(
         database=database,
@@ -857,6 +914,7 @@ def build_services(
         society_base_tick_interval_ms=_society_tick_interval_ms(
             env_get("SOCIETY_TICK_INTERVAL_MS", environ)
         ),
+        playback_player=playback_player,
         comparison_seeds=development_seeds(load_comparison_catalogs()),
         runs_comparison_worker=comparison_player == "here",
         comparisons_played_elsewhere=comparison_player == "process",
@@ -973,6 +1031,19 @@ def _character_appearance_runtime(
         if workspace_stores is None
         else CharacterBodyPreparer(hosts=lambda family_id: environment_host(family_id, environ)),
     )
+
+
+def _playback_player(value: str | None) -> Literal["here", "process", "none"]:
+    """Who plays this host's societies (``EXULANICA_PLAYBACK_WORKER``): ``here``, ``process`` or
+    ``none``, or a named refusal of anything else."""
+    normalized = (value or "").strip().lower()
+    if normalized in ("", "1", "true", "on", "yes"):
+        return "here"
+    if normalized == "process":
+        return "process"
+    if normalized in ("0", "false", "off", "no"):
+        return "none"
+    raise SocietySettingRefused("playback_worker_not_recognised", PLAYBACK_WORKER_ENV)
 
 
 def _comparison_player(value: str | None) -> str:

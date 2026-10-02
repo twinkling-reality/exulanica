@@ -248,6 +248,30 @@ def _society_check(request: Request, services: Services) -> dict[str, Any]:
     """
     if not services.society_control_enabled:
         return {"ok": True, "configured": False, "running": False}
+    if services.playback_player != "here":
+        # Played by a process of its own, or by nobody: this process is ready either way, as one
+        # that leaves the derivative queue to another is. Whether that process is alive is said.
+        process = (
+            getattr(request.app.state, "playback_process", None)
+            if services.playback_player == "process"
+            else None
+        )
+        return {
+            "ok": True,
+            "configured": True,
+            "running": False,
+            "played_by": services.playback_player,
+            **({"process_alive": process.alive} if process is not None else {}),
+            "base_tick_interval_ms": services.society_base_tick_interval_ms,
+            "listed_workspaces": len(services.society_control_workspaces),
+            "account_discovery": services.runs_society_control_worker,
+            "proves": (
+                "whether a playback process holds the lock its configuration names; not whether "
+                "its rounds succeed, and a hung one still holds it"
+                if process is not None
+                else "nothing plays these societies here; they advance a minute at a time"
+            ),
+        }
     thread = getattr(request.app.state, "society_control_thread", None)
     worker = getattr(request.app.state, "society_control_worker", None)
     running = thread is not None and thread.is_alive()

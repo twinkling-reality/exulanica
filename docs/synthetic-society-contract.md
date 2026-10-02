@@ -1039,7 +1039,8 @@ module, creating a society or configuring play never starts a worker. The API st
 environment lists workspaces (`EXULANICA_SOCIETY_CONTROL_WORKSPACES`, a JSON array of workspace
 ids) or opts into fresh discovery of active account-owned workspaces through the isolated account
 role (`EXULANICA_SOCIETY_CONTROL_WORKER`); `docs/deployment.md` lists the settings and their
-refusals. Account-wide discovery is off by default and refuses startup without configured
+refusals. With `EXULANICA_PLAYBACK_WORKER=process` the API starts none, and
+`exulanica-playback-worker` plays those workspaces in a process of its own. Account-wide discovery is off by default and refuses startup without configured
 accounts and the reviewed current-input runtime. The worker asks a model only in the decision
 phase before a minute of a purposeful society whose owner chose one for someone, and only for a
 workspace its environment lists
@@ -1059,9 +1060,12 @@ The authenticated base route is `/world/versions/{version_id}/society/control`:
   current source authority is checked when configuring play and executing a batch.
   `host_playback` is `{running, interval_ms, reason}`: `running` is true when this instance's
   worker thread is alive and its last workspace snapshot names this workspace, whatever the saved
-  mode, so a paused world reads true when Play would advance it; `interval_ms` is the saved base
-  divided by the speed while playing and the host's current base divided by the speed while
-  paused, which is what Play adopts; `reason` is null while running and otherwise one of the
+  mode, so a paused world reads true when Play would advance it. Where this instance leaves
+  playback to a process of its own (`EXULANICA_PLAYBACK_WORKER=process`), `running` is true when a
+  process holds the lock its playback configuration names and that configuration plays the
+  workspace; a process whose loop hangs still holds it, so it reads true. `interval_ms` is the
+  saved base divided by the speed while playing and the host's current base divided by the speed
+  while paused, which is what Play adopts; `reason` is null while running and otherwise one of the
   sentences in `HOST_PLAYBACK_REFUSALS` (`exulanica/api/society_control_worker.py`). The `PUT`
   answer and the `control` inside a step answer carry it too.
 - `PUT` accepts only `{base_revision, mode: "playing" | "paused", speed: 1 | 2 | 4}`. Successful

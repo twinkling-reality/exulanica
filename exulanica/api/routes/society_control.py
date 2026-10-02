@@ -105,11 +105,13 @@ def host_base_tick_interval_ms(request: Request) -> int:
 
 
 def with_host_playback(control: dict, request: Request, workspace: uuid.UUID) -> dict:
-    """The control read with whether this host plays it, from the process's own worker."""
+    """The control read with whether this host plays it: from the process's own worker, or from
+    the playback process this one leaves playback to."""
     refusal = host_playback_refusal(
         getattr(request.app.state, "society_control_worker", None),
         getattr(request.app.state, "society_control_thread", None),
         workspace,
+        getattr(request.app.state, "playback_process", None),
     )
     base = (
         control["base_tick_interval_ms"]

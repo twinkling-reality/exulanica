@@ -109,6 +109,7 @@ boundary ([security floor](security-floor.md)).
 | Migrations and roles | `exulanica-db` | Applies migrations, then provisions the four application roles | 5.2.1 |
 | Character catalogs | `exulanica-character-catalog publish --apply` | Publishes the character catalogs the code carries, after `exulanica-db`, into the store the API serves | 5.2.1 |
 | Derivative worker | `exulanica-derivative-worker` | Drains the photograph derivative queue | 5.2.2 |
+| Playback worker | `exulanica-playback-worker` | Plays the societies the API leaves to it and seals their coupled traffic | 5.1.5, 5.2.12 |
 | Scene worker | `exulanica-scene-worker` | Recovers camera poses and publishes scenes for queued scene jobs | 5.2.3 |
 | Purge worker | `exulanica-purge` | Destroys stored bytes that committed tombstones ask for | 5.2.4 |
 | Material bake worker | `exulanica-material-bake` | Bakes requested material recipes in a Node process | 5.2.5 |
@@ -446,6 +447,7 @@ stops startup on a malformed value, with a named code from `SOCIETY_SETTING_REFU
 | `EXULANICA_SOCIETY_CONTROL_WORKSPACES` | A JSON array of workspace ids whose playing societies this instance advances, with no accounts needed. Absent or `[]` plays none; a malformed or repeated id is refused |
 | `EXULANICA_SOCIETY_TICK_INTERVAL_MS` | The base wait between simulated minutes, in whole milliseconds: 1,000 to 60,000 and divisible by 4, so every speed divides it exactly. Absent means the declared default, 8,000 |
 | `EXULANICA_SOCIETY_CONTROL_WORKER` | Account-wide discovery. Absent or `off` disables it; `true`, `yes`, `on` or `1` also plays every current account-owned workspace, and needs accounts configured |
+| `EXULANICA_PLAYBACK_WORKER` | Who plays the listed and discovered workspaces' societies and seals their coupled traffic. Absent or `on`, this process, in threads; `process`, a process of its own (`exulanica-playback-worker`, 5.2.12), and this one serves the playback controls without playing or sealing; `off`, nothing, and a society advances only a minute at a time when somebody advances it. Any other value stops startup (`playback_worker_not_recognised`) |
 | `EXULANICA_COMPARISON_WORKER` | Who plays the comparisons started from the application for the listed workspaces. Absent, this process, in a thread; `process`, a process of its own (5.2.12), and this one only serves starts, refusing them as `comparisons_not_played` where the installation's profile declares the `comparison` component not installed or unavailable (9.1); `off`, nothing, and every start is refused as `comparisons_not_played`. Any other value stops startup (`comparison_worker_not_recognised`) |
 
 Listed and discovered workspaces are played together. A person's saved world needs no host
@@ -457,6 +459,16 @@ finish or roll back. Readiness reports its thread, its latest round, the base wa
 workspaces are listed (never which) and whether account discovery is on; it promises no delivery
 rate. Playback controls, speeds, the `host_playback` field and recovery are the
 [society contract](synthetic-society-contract.md#persisted-playback-controls-and-bounded-host-progression)'s.
+
+With `EXULANICA_PLAYBACK_WORKER=process` the API plays no society and seals no traffic, so no round
+and no traffic minute runs on its interpreter; `exulanica-playback-worker`, started with the same
+settings, does both. While it runs that process holds a shared session advisory lock keyed by the
+digest of its playback configuration (the listed workspaces, account discovery and the base wait),
+and the API reads `pg_locks` for its own configuration's key, at most every 5 seconds, to answer a
+world's `host_playback`: no such lock reads as `playback_worker_stopped`. A process that died holds
+no lock; a process whose loop hangs still holds it and reads as running. Readiness stays ready and
+reports `played_by` and `process_alive`. Claims and leases decide which host advances a society, so
+several playback processes, or one beside an API that also plays, never advance one twice.
 
 A playing world whose people are run by models asks those models through this process's client, so
 the model settings in 5.1 apply; the decision contract's spend bounds are in
@@ -637,6 +649,13 @@ its own role. The [local database](local-database.md) guide owns its steps.
   application for the workspaces `EXULANICA_SOCIETY_CONTROL_WORKSPACES` lists, from the settings in
   5.1, when the API runs with `EXULANICA_COMPARISON_WORKER=process`; each plays within the bound its
   owner stated ([running a comparison](society-experiments.md#running-a-comparison)).
+- `exulanica-playback-worker` plays the societies of the workspaces 5.1.5's settings name and seals
+  their coupled traffic, from the settings in 5.1, when the API runs with
+  `EXULANICA_PLAYBACK_WORKER=process` (5.1.5). It checks the schema, the runtime role and the
+  restore state as the API does, asks people's chosen models through its own client and budget,
+  writes one line of JSON per event on standard output, and on `SIGTERM` or `SIGINT` lets a round
+  in progress finish or roll back before it exits. It opens the connections the API's playback and
+  traffic controller would (5.4.3) and one more, idle, that holds its lock.
 - `exulanica-wmp` is owned by the [world memory package](world-memory-package.md), and
   `exulanica-gsplat-scene-v1` by [scene training](gsplat-scene-jobs.md).
 - `TAVILY_API_KEY` is read only by `scripts/verify_web_lookup.py`, a one-off credential check. No

@@ -3,19 +3,33 @@
 Before a claimed minute, a host that asks models (``before_minute``) asks the model each chosen
 person's world owner picked, with no connection held; a world that runs people by models then
 advances one minute per claim, so no person's choice point is passed without being asked.
+
+**Where it runs.** In the API process, in a thread, or in a process of its own
+(``exulanica-playback-worker``, :mod:`exulanica.orchestration.playback_worker`) beside an API set
+to leave playback to it (``EXULANICA_PLAYBACK_WORKER=process``). Claims and leases decide which
+host advances a society, so a host in either place, or several, never advances one twice. A process
+of its own says it is alive the one way an API process can see without a table of its own: while it
+runs it holds a shared session advisory lock keyed by its playback configuration
+(:class:`PlaybackHostLock`), and the API reads ``pg_locks`` for that key
+(:class:`PlaybackProcess`). A process that died, or one started with another configuration, holds
+no such lock; a process whose loop hangs still holds it, so it reads as running.
 """
 
 from __future__ import annotations
 
+import contextlib
+import hashlib
 import logging
 import threading
 import time
 import uuid
 from collections.abc import Callable, Iterable
+from typing import Final
 
 import psycopg
 
 from exulanica.api.society_runtime import SocietyRuntime
+from exulanica.canonical import canonical_json
 from exulanica.db.session import Database
 from exulanica.selection.validation import Session
 from exulanica.world.society_control_repository import SocietyControlRepository
@@ -50,13 +64,17 @@ def host_playback_refusal(
     worker: SocietyControlWorker | None,
     thread: threading.Thread | None,
     workspace: uuid.UUID,
+    process: PlaybackProcess | None = None,
 ) -> str | None:
     """Why this host does not play ``workspace``, by a code of ``HOST_PLAYBACK_REFUSALS``, or None.
 
     It plays a workspace when its worker thread is alive and the worker's last authority snapshot
     names the workspace. The snapshot is the one the worker's own rounds use, so a workspace that
     account discovery drops stops being played here in the same round it stops being claimed.
+    Where a process of its own plays them (``process``), that process is asked instead.
     """
+    if process is not None:
+        return process.refusal(workspace)
     if worker is None:
         return "no_playback_worker"
     if thread is None or not thread.is_alive():
@@ -64,6 +82,132 @@ def host_playback_refusal(
     if workspace not in worker.workspaces:
         return "workspace_not_played"
     return None
+
+
+#: The profile of the document a playback host's configuration digest is taken over.
+PLAYBACK_CONFIGURATION_PROFILE: Final = "exulanica.playback-configuration/v1"
+#: How long an API process trusts what it last read of a playback process before reading again.
+PRESENCE_SECONDS: Final = 5.0
+#: Whether a session holds the shared playback host lock for a key text, as any role reads it.
+_PRESENCE: Final = (
+    "with host as (select hashtextextended(%s, 0) as k) "
+    "select exists(select 1 from pg_locks, host where locktype = 'advisory' and granted "
+    "and mode = 'ShareLock' and objsubid = 1 "
+    "and classid = ((k >> 32) & 4294967295)::text::oid "
+    "and objid = (k & 4294967295)::text::oid) as alive"
+)
+
+
+def playback_configuration_sha256(
+    workspaces: Iterable[uuid.UUID], *, account_discovery: bool, base_tick_interval_ms: int
+) -> str:
+    """The digest of what a playback host plays: the workspaces it lists, whether it also plays
+    every active account-owned workspace, and its base wait. A playback process and the API that
+    leaves playback to it compute it from the same settings."""
+    return hashlib.sha256(
+        canonical_json(
+            {
+                "profile": PLAYBACK_CONFIGURATION_PROFILE,
+                "workspaces": sorted(str(workspace) for workspace in workspaces),
+                "account_discovery": account_discovery,
+                "base_tick_interval_ms": base_tick_interval_ms,
+            }
+        )
+    ).hexdigest()
+
+
+def playback_host_key(configuration_sha256: str) -> str:
+    """The text whose ``hashtextextended`` is a playback host's advisory lock key."""
+    return f"{PLAYBACK_CONFIGURATION_PROFILE}:{configuration_sha256}"
+
+
+class PlaybackHostLock:
+    """Held by a playback process while it runs: a shared session advisory lock on one idle
+    connection, keyed by its configuration. Shared, so several processes with one configuration
+    each hold it; released when the connection closes, so a process that dies holds nothing."""
+
+    def __init__(self, database: Database, configuration_sha256: str) -> None:
+        self._database = database
+        self._key = playback_host_key(configuration_sha256)
+        self._held = contextlib.ExitStack()
+
+    def __enter__(self) -> PlaybackHostLock:
+        with contextlib.ExitStack() as unless_held:
+            connection = unless_held.enter_context(self._database.unscoped())
+            connection.execute(
+                "select pg_advisory_lock_shared(hashtextextended(%s, 0))", (self._key,)
+            )
+            # A session lock outlives the transaction its statement opened. Ending it leaves the
+            # connection idle, holding no snapshot for as long as the process runs.
+            connection.commit()
+            self._held = unless_held.pop_all()
+        return self
+
+    def __exit__(self, *_exc: object) -> None:
+        self._held.close()
+
+
+class PlaybackProcess:
+    """What an API process that leaves playback to a process of its own says of that process.
+
+    It plays a workspace when a process holds the playback host lock for this host's own
+    configuration (:class:`PlaybackHostLock`) and the workspace is one that configuration plays:
+    listed, or, with account discovery, an active account-owned workspace. Both are read again at
+    most every :data:`PRESENCE_SECONDS`.
+    """
+
+    def __init__(
+        self,
+        database: Database,
+        *,
+        workspaces: Iterable[uuid.UUID],
+        account_discovery: bool,
+        workspace_source: Callable[[], Iterable[uuid.UUID]] | None,
+        base_tick_interval_ms: int,
+        clock: Callable[[], float] = time.monotonic,
+    ) -> None:
+        self._database = database
+        self._listed = frozenset(workspaces)
+        self._workspace_source = workspace_source
+        self.configuration_sha256 = playback_configuration_sha256(
+            self._listed,
+            account_discovery=account_discovery,
+            base_tick_interval_ms=base_tick_interval_ms,
+        )
+        self._clock = clock
+        self._lock = threading.Lock()
+        self._read: tuple[float, bool, frozenset[uuid.UUID]] | None = None
+
+    def refusal(self, workspace: uuid.UUID) -> str | None:
+        """``playback_worker_stopped``, ``workspace_not_played`` or None, as a thread's host
+        answers (:func:`host_playback_refusal`)."""
+        alive, played = self._state()
+        if not alive:
+            return "playback_worker_stopped"
+        if workspace not in played:
+            return "workspace_not_played"
+        return None
+
+    @property
+    def alive(self) -> bool:
+        return self._state()[0]
+
+    def _state(self) -> tuple[bool, frozenset[uuid.UUID]]:
+        now = self._clock()
+        with self._lock:
+            if self._read is not None and now - self._read[0] < PRESENCE_SECONDS:
+                return self._read[1], self._read[2]
+        with self._database.unscoped() as connection:
+            alive = bool(
+                connection.execute(
+                    _PRESENCE, (playback_host_key(self.configuration_sha256),)
+                ).fetchone()["alive"]
+            )
+        discovered = () if self._workspace_source is None else self._workspace_source()
+        played = self._listed | frozenset(discovered)
+        with self._lock:
+            self._read = (now, alive, played)
+        return alive, played
 
 
 class SocietyControlWorker:
