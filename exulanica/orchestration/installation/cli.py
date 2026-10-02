@@ -1,6 +1,6 @@
 """``exulanica-installation``: the one procedure an installation, and its acceptance, runs.
 
-    exulanica-installation init
+    exulanica-installation init [--adopt]
     exulanica-installation facts
     exulanica-installation check
     exulanica-installation backup
@@ -49,7 +49,11 @@ from exulanica.api.installation import (
 )
 from exulanica.db.cli import provision_database
 from exulanica.db.session import Database
-from exulanica.deletion.restore import RestoreRefused, initialise_restore_state
+from exulanica.deletion.restore import (
+    RestoreRefused,
+    adopt_restore_state,
+    initialise_restore_state,
+)
 from exulanica.env import env_get, resolve_data_dir
 from exulanica.orchestration.installation.backup_set import (
     BackupSetRefused,
@@ -138,7 +142,15 @@ def _print(value: Mapping[str, Any]) -> None:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="exulanica-installation", description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
-    commands.add_parser("init", help="write the profile's restore marker, state none, if absent")
+    init = commands.add_parser(
+        "init", help="write the profile's restore marker, state none, if absent"
+    )
+    init.add_argument(
+        "--adopt",
+        action="store_true",
+        help="an installed database without a marker: write the marker its own restore state "
+        "supports, or refuse",
+    )
     commands.add_parser("facts", help="this installation's facts document")
     commands.add_parser("check", help="facts, and exit 1 unless it serves on a current schema")
     commands.add_parser("backup", help="take one verified-in-order backup set")
@@ -182,6 +194,11 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _run(args: argparse.Namespace) -> int:
+    if args.command == "init" and args.adopt:
+        path = _restore_state_path()
+        adopted = adopt_restore_state(Database(_setting("RESTORE_DATABASE_URL")), path)
+        _print({"restore_state_path": str(path), "written": True, "state": adopted["state"]})
+        return 0
     if args.command == "init":
         path = _restore_state_path()
         if not path.exists():
@@ -198,7 +215,8 @@ def _run(args: argparse.Namespace) -> int:
                 raise RestoreRefused(
                     "the restore marker is missing on an installed database: restore its newest "
                     "copy from custody (an older copy can name a restore that has since "
-                    "completed), or complete the restore it belonged to; nothing was written"
+                    "completed), or complete the restore it belonged to, or, for a database that "
+                    "never had a marker, adopt it with init --adopt; nothing was written"
                 )
         written = initialise_restore_state(path)
         _print({"restore_state_path": str(path), "written": written})

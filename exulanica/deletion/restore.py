@@ -75,6 +75,7 @@ __all__ = [
     "MAX_EXPORT_LAG",
     "RestoreRefused",
     "abandon_declared_restore",
+    "adopt_restore_state",
     "checkpoint",
     "complete_committed_replay",
     "completed_restores",
@@ -830,6 +831,96 @@ def initialise_restore_state(path: Path) -> bool:
         return False
     _write(path, {"profile": "exulanica.restore-state/v1", "state": "none"})
     return True
+
+
+def adopt_restore_state(database: Database, path: Path) -> dict[str, Any]:
+    """Write the first marker for an installed database that has never had one, from its own
+    restore state, or refuse with nothing written.
+
+    A database installed without a profile has no marker, and on an installed database a missing
+    marker is lost custody (:func:`initialise_restore_state`). Adopting reads what the database
+    itself records. No ``restore_control`` row means no restore was ever declared here, and the
+    marker is ``none``. A ``complete`` row whose replay receipt matches it means the last restore
+    finished, and the marker is ``complete`` for that attempt, with the attempt in ``completed`` so
+    the same checkpoint is never restored again. Anything else is a restore in progress, or a
+    record that does not agree with itself, and is refused.
+
+    What this cannot tell apart is a database that has served all along from a backup loaded into
+    it by hand without a replay: both read the same. The operator who adopts states that the
+    database is the installation's live one.
+    """
+    if path.exists():
+        raise RestoreRefused(
+            "the restore marker already exists, so there is nothing to adopt; nothing was written"
+        )
+    with database.unscoped() as connection:
+        cursor = connection.cursor(row_factory=dict_row)
+        found = cursor.execute(
+            "select to_regclass('schema_migrations') is not null as installed, "
+            "to_regclass('restore_control') is not null as controlled"
+        ).fetchone()
+        if found is None or not found["installed"]:
+            raise RestoreRefused(
+                "the database has no applied schema: a first install runs init without --adopt; "
+                "nothing was written"
+            )
+        if not found["controlled"]:
+            raise RestoreRefused(
+                "the database's schema predates the restore controls: migrate it, then adopt; "
+                "nothing was written"
+            )
+        control = cursor.execute(
+            "select checkpoint_id, checkpoint_sha256, state, restore_id from restore_control"
+        ).fetchone()
+        if control is None:
+            receipts = cursor.execute("select count(*) as n from restore_replay_receipt").fetchone()
+            if receipts is not None and receipts["n"]:
+                raise RestoreRefused(
+                    "the database holds restore receipts but no restore control row, so its "
+                    "restore record does not agree with itself; nothing was written"
+                )
+            marker: dict[str, Any] = {"profile": "exulanica.restore-state/v1", "state": "none"}
+        else:
+            if control["state"] != "complete":
+                raise RestoreRefused(
+                    f"the database's restore control is {control['state']}: a checkpoint is sealed "
+                    "or a replay is unfinished, so finish that restore before adopting; nothing "
+                    "was written"
+                )
+            receipt = (
+                None
+                if control["restore_id"] is None
+                else cursor.execute(
+                    "select checkpoint_id, checkpoint_sha256 from restore_replay_receipt "
+                    "where restore_id=%s",
+                    (control["restore_id"],),
+                ).fetchone()
+            )
+            if (
+                receipt is None
+                or receipt["checkpoint_id"] != control["checkpoint_id"]
+                or receipt["checkpoint_sha256"] != control["checkpoint_sha256"]
+            ):
+                raise RestoreRefused(
+                    "the database's completed restore has no replay receipt that matches it; "
+                    "nothing was written"
+                )
+            attempt = {
+                "checkpoint_sha256": control["checkpoint_sha256"],
+                "restore_id": str(control["restore_id"]),
+            }
+            marker = {
+                "profile": "exulanica.restore-state/v1",
+                "state": "complete",
+                "restore_id": attempt["restore_id"],
+                "checkpoint_id": str(control["checkpoint_id"]),
+                "checkpoint_sha256": attempt["checkpoint_sha256"],
+                "completed": [attempt],
+            }
+    marker["adopted_at"] = dt.datetime.now(dt.UTC).isoformat()
+    _write(path, marker)
+    verify_restore(database, path)
+    return marker
 
 
 def verify_restore(database: Database, marker_path: Path | None = None) -> None:

@@ -1181,6 +1181,19 @@ holds no secret, host or account. Every profile names its restore marker
 no applied schema, before the API first starts; a marker missing on an installed database is lost
 custody, and both `init` and the API refuse.
 
+A database installed without a profile has never had a marker, and `exulanica-installation init
+--adopt` gives it one from the database's own restore record, or refuses with nothing written. No
+`restore_control` row and no replay receipt is a database no restore was declared on, and the
+marker is `none`. A `complete` row whose replay receipt matches it (the same restore id, checkpoint
+id and checkpoint digest) is a finished restore, and the marker is `complete` for that attempt,
+which it also records as completed, so a restore of the same checkpoint is refused as reopening it.
+Adopting refuses: a marker already at the profile's path, a database with no applied schema (a
+first install runs `init`), a schema older than the restore controls (migrate first), a `sealed`
+or `replaying` row (finish that restore first), a `complete` row without a matching receipt, and
+receipts with no control row. Adopting cannot tell a database that has served all along from a
+backup loaded into it without a replay, because both read the same: running it states that the
+database is the installation's live one.
+
 `exulanica.api.installation.installation_facts` answers `exulanica.installation-facts/v1` in process
 for the capability projection: each component's state (`not_installed`, `unavailable`, `configured`,
 `ready`, `degraded` or `refused`) with a stable reason, the model mode and paid admission, the store,
@@ -1355,7 +1368,8 @@ database still holds the same bytes is the exception: the replay completes, leav
 open with its jobs queued for the ordinary purger, as normal operation does, keeps the bytes, and
 the command's result lists it with those targets under `tombstones_left_open`. The restore marker is always the one the API reads:
 `exulanica-installation restore` refuses to run unless the profile (or `EXULANICA_RESTORE_STATE_PATH`)
-declares it, a different `--marker` is refused, and `init` writes it only on a first install.
+declares it, a different `--marker` is refused, and `init` writes it only on a first install or,
+with `--adopt`, from an installed database's own restore record (9.1).
 
 Bytes written after the backup stay in a store the restore reuses, and the restored database never
 references them, so no tombstone will name them and later backup sets would copy them. A restore
