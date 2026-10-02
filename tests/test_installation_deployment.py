@@ -7,8 +7,11 @@ nginx configuration exactly, so the two cannot drift apart.
 
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
+
+import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 CLIENT = ROOT / "deploy" / "installation" / "client.Dockerfile"
@@ -22,15 +25,87 @@ def _instructions(path: Path) -> list[str]:
     ]
 
 
-def test_the_client_image_serves_the_reviewer_images_nginx_configuration():
+MIB = 1024 * 1024
+
+
+def _reviewer_configuration() -> str:
     reviewer = (ROOT / "deploy" / "judge" / "web.Dockerfile").read_text(encoding="utf-8")
     embedded = reviewer.split("COPY <<'CONF' /etc/nginx/conf.d/default.conf\n", 1)[1]
-    embedded = embedded.split("\nCONF\n", 1)[0] + "\n"
-    ours = (ROOT / "deploy" / "installation" / "client-nginx.conf").read_text(encoding="utf-8")
-    assert ours == embedded
+    return embedded.split("\nCONF\n", 1)[0] + "\n"
+
+
+def _installation_configuration() -> str:
+    return (ROOT / "deploy" / "installation" / "client-nginx.conf").read_text(encoding="utf-8")
+
+
+def _body_cap(conf: str) -> int:
+    caps = re.findall(r"^\s*client_max_body_size (\d+)m;$", conf, re.M)
+    assert len(caps) == 1
+    return int(caps[0]) * MIB
+
+
+def _without_body_cap(conf: str) -> str:
+    """The configuration with its body cap, the comment above it and the cap's refusal removed."""
+    lines = conf.splitlines()
+    start = next(i for i, line in enumerate(lines) if line.strip().startswith("# BODY CAP."))
+    end = next(i for i, line in enumerate(lines) if "client_max_body_size" in line)
+    kept = lines[:start] + lines[end + 1 :]
+    return "\n".join(re.sub(r"\d{6,}", "N", line) for line in kept)
+
+
+def test_the_client_image_serves_the_reviewer_images_nginx_configuration_but_its_body_cap():
+    """One proxy configuration for both, so they cannot drift apart, except the body cap: the
+    installation's people upload photographs and a reviewer's token cannot."""
+    ours, reviewer = _installation_configuration(), _reviewer_configuration()
+    assert _without_body_cap(ours) == _without_body_cap(reviewer)
     assert "COPY deploy/installation/client-nginx.conf /etc/nginx/conf.d/default.conf" in (
         _instructions(CLIENT)
     )
+
+
+def test_the_installation_proxy_passes_every_body_the_api_accepts():
+    """The browser sends every chosen photograph in one POST /intake, so a cap below the API's own
+    body limit refuses at the proxy an upload the API would take."""
+    from exulanica.api.body_limit import MAX_BODY_BYTES
+
+    assert _body_cap(_installation_configuration()) == MAX_BODY_BYTES
+    assert _body_cap(_reviewer_configuration()) == 8 * MIB
+
+
+@pytest.mark.parametrize("which", ["installation", "reviewer"])
+def test_the_proxys_own_refusals_take_the_problem_shape(which):
+    """The browser reads a failure's code and detail; nginx's own pages are HTML. A refusal that
+    retrying cures says when; one that it does not, or that may have run, does not invite it."""
+    conf = _installation_configuration() if which == "installation" else _reviewer_configuration()
+    # Answers from the API pass through unchanged.
+    assert not re.search(r"^\s*proxy_intercept_errors", conf, re.M)
+    pages = dict(re.findall(r"^\s*error_page (\d{3}) = @([a-z_]+);$", conf, re.M))
+    assert set(pages) == {"413", "429", "502", "504"}
+    expected = {
+        "413": ("body_too_large", None),
+        "429": ("rate_limited", 2),
+        "502": ("upstream_unavailable", 5),
+        "504": ("upstream_timeout", None),
+    }
+    for status, location in pages.items():
+        block = conf.split(f"location @{location} {{", 1)[1].split("\n    }", 1)[0]
+        assert "default_type application/json;" in block
+        answered = re.search(r"^\s*return (\d{3}) '(.*)';$", block, re.M)
+        assert answered is not None and answered.group(1) == status
+        body = json.loads(answered.group(2))
+        code, retry_after = expected[status]
+        assert body["code"] == code
+        assert isinstance(body["detail"], str) and body["detail"]
+        header = re.search(r'add_header Retry-After "(\d+)" always;', block)
+        assert (int(header.group(1)) if header else None) == retry_after
+        assert body.get("retry_after_seconds") == retry_after
+        if status == "413":
+            assert body["limit_bytes"] == _body_cap(conf)
+        if status == "504":
+            timeout = re.search(r"proxy_read_timeout (\d+)s;", conf)
+            assert timeout is not None and f"within {timeout.group(1)} seconds" in body["detail"]
+    # The write limit's Retry-After is its rate: one write every two seconds.
+    assert "rate=30r/m;" in conf
 
 
 def test_the_client_image_fetches_nothing_and_states_its_provenance():

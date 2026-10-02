@@ -89,10 +89,51 @@ server {
     server_name _;
     root /usr/share/nginx/html;
 
-    # A generous ceiling rather than nginx's 1m default. Nothing a judge does uploads, but a
-    # Selection plan with a long question is a POST body and a 413 from the proxy would look
-    # like the Companion refusing to answer.
+    # BODY CAP. A reviewer's token cannot upload, but a Selection plan with a long question is a
+    # POST body and a 413 from the proxy would look like the Companion refusing to answer, so the
+    # cap is a generous 8 MiB rather than nginx's 1m default (deployment.md 8).
     client_max_body_size 8m;
+
+    # This proxy's own refusals, in the problem shape the API answers with ({"code", "detail"}),
+    # because the browser reads a failure's code and detail and nothing else. Answers from the API
+    # pass through unchanged: proxy_intercept_errors is off, so these apply only to responses this
+    # proxy makes itself.
+    error_page 413 = @body_too_large;
+    error_page 429 = @rate_limited;
+    error_page 502 = @upstream_unavailable;
+    error_page 504 = @upstream_timeout;
+
+    # BODY CAP REFUSAL. Sending the same body again is refused again, so no Retry-After.
+    location @body_too_large {
+        default_type application/json;
+        add_header Cache-Control "no-store" always;
+        return 413 '{"code":"body_too_large","detail":"the request body is larger than the 8388608 bytes this installation accepts","limit_bytes":8388608}';
+    }
+
+    # The write limit below admits one write every two seconds per address after its burst.
+    location @rate_limited {
+        default_type application/json;
+        add_header Retry-After "2" always;
+        add_header Cache-Control "no-store" always;
+        return 429 '{"code":"rate_limited","detail":"this address has sent more writes than this installation accepts at once; nothing was passed on, so the same request can be sent again after 2 seconds","retry_after_seconds":2}';
+    }
+
+    # The API closed the connection or could not be reached: restarting, stopped, or ended the
+    # request early. Whether a request it had begun ran is not known, so the detail says so.
+    location @upstream_unavailable {
+        default_type application/json;
+        add_header Retry-After "5" always;
+        add_header Cache-Control "no-store" always;
+        return 502 '{"code":"upstream_unavailable","detail":"the API closed the connection or could not be reached; whether the request ran is not known, so send it again after 5 seconds only if repeating it is safe","retry_after_seconds":5}';
+    }
+
+    # The API did not answer within proxy_read_timeout. The work may still finish, so no
+    # Retry-After invites sending it a second time.
+    location @upstream_timeout {
+        default_type application/json;
+        add_header Cache-Control "no-store" always;
+        return 504 '{"code":"upstream_timeout","detail":"the API did not answer within 300 seconds; whether the request ran is not known"}';
+    }
 
     # The API, same origin, prefix stripped by the trailing slash on proxy_pass.
     location /api/ {

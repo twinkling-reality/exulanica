@@ -353,10 +353,24 @@ bounds to `MAX_BODY_BYTES` (512 MiB):
   counted as it arrives and cut off the moment the running total crosses the limit. The overshoot
   is one chunk rather than the whole body.
 
-The composition has no reverse proxy and no static client host (open item D-13), so these are the
-only bounds. Whatever terminates TLS for a chosen host should carry a body limit of its own
-(`client_max_body_size` on nginx, `proxy-body-size` on an ingress), because a proxy refuses before
-the application is involved at all.
+In front of the API, each composition's client proxy carries a body cap of its own, set by the
+installation profile it serves:
+
+| Profile | Proxy | Body cap | Why |
+| --- | --- | --- | --- |
+| `single-host`, `single-host-server-only`, `shared-store` | `deploy/installation/client-nginx.conf`, the `client` service of `compose.yaml` | 512 MiB, the API's own limit | People upload photographs, and the browser sends every photograph a person chooses in one `POST /intake`, so the API decides every body it would accept |
+| `reviewer` | the web proxy embedded in `deploy/judge/web.Dockerfile` (section 8) | 8 MiB | A reviewer's token cannot upload; a long question is still a POST body. The TLS edge in front of it states `max_size 8MB` (8.1) |
+
+A proxy refuses a body over its cap with 413 `body_too_large` (5.4.8) before the API is involved.
+Each proxy reads a request's body into its container's temporary directory before passing it on
+(nginx's request buffering, left on), so an upload in progress through it holds up to its size on
+that container's disk, and the API's upload slot is held only while the proxy passes the whole body
+on. The per-address write limit serves a burst of twenty above one write every two seconds, so about
+twenty-one writes at once from one address: up to about 10.5 GiB of buffered bodies at the
+installation's cap, or 168 MiB at the reviewer's. Nothing in the proxy bounds how many addresses do
+that at once; a public host needs an edge that does (D-13). A host that puts its own proxy in front
+should carry a body limit of its own (`client_max_body_size` on nginx, `proxy-body-size` on an
+ingress) no smaller than the profile's cap here.
 
 #### 5.1.3 Runtime row-level security is checked at startup
 
@@ -853,9 +867,10 @@ another host or about more than one process.
   write limit answered 19 with its own HTML 429, the API admitted 2 and refused 19, and the client
   received 18 of those refusals as 503 `capacity_exhausted` and one as the proxy's HTML 502. The run
   kept no proxy log; the likeliest cause of the 502 is the API answering and closing while the proxy
-  was still sending it the body. A client therefore treats a 502 or an HTML 429 during an upload as
-  "send it again later" too. The proxy's 429 carries no `Retry-After`: its limit admits one write
-  every two seconds per address after a burst of twenty.
+  was still sending it the body. That run predates both the drain and the proxy's own refusals in
+  the problem shape (5.4.8), which now answer that 429 as `rate_limited` with `Retry-After` and that
+  502 as `upstream_unavailable` with `Retry-After`. A client treats either during an upload as "send
+  it again later".
 - **Inhabited worlds beside the supported load:** eight towns whose societies the API process plays
   at four times speed, each town's traffic read every five seconds, beside the supported load for
   three minutes. The towns advanced 72 to 73 percent of the ticks their speed sets (85 to 87 of
@@ -872,6 +887,23 @@ another host or about more than one process.
 
 Not measured: load past the limits for longer than two minutes, more towns or more traffic than
 above or both together with the overload, more than one API process, and any other host.
+
+#### 5.4.8 The client proxy's own refusals
+
+The client proxy (5.1.2) answers some requests itself, without the API. Each such answer takes
+the problem shape every API refusal takes, `{"code", "detail"}` as JSON with `Cache-Control:
+no-store`, because the browser reads a failure's code and detail and nothing else:
+
+| Status | `code` | When | `Retry-After` |
+| --- | --- | --- | --- |
+| 413 | `body_too_large` | A body over the profile's cap (5.1.2); `limit_bytes` states the cap | none: the same body is refused again |
+| 429 | `rate_limited` | A write past the per-address limit (section 8) | 2 s, the limit's rate, also as `retry_after_seconds` |
+| 502 | `upstream_unavailable` | The API could not be reached or closed the connection without an answer | 5 s, also as `retry_after_seconds`; whether the request ran is not known, so only a request that is safe to repeat is sent again |
+| 504 | `upstream_timeout` | The API did not answer within the proxy's 300 second read timeout | none: the work may still finish |
+
+An answer the API makes, a 503 `capacity_exhausted` included, passes through the proxy unchanged
+(`proxy_intercept_errors` is off). `tests/test_installation_deployment.py` holds each row for both
+configurations.
 
 ## 6. Health check
 
@@ -1014,10 +1046,10 @@ provisioned for it.
 
 The browser client's proxy in `deploy/judge/web.Dockerfile` limits writes per client address: any
 `/api` request other than `GET`, `HEAD` and `OPTIONS` is counted at 30 a minute with a burst of 20,
-and the excess is refused with 429. Every route that can call a hosted model is a write, so the
-limit paces a script against the model budget; it is a stated bound, not a measurement of how fast
-a person works. The address comes from `X-Forwarded-For` only when the connection arrives from a
-private container range.
+and the excess is refused with 429 `rate_limited` in the problem shape (5.4.8). Every route that can
+call a hosted model is a write, so the limit paces a script against the model budget; it is a stated
+bound, not a measurement of how fast a person works. The address comes from `X-Forwarded-For` only
+when the connection arrives from a private container range.
 
 ### 8.1 Serving it over HTTPS from one host
 
@@ -1119,7 +1151,8 @@ runtime capacity contract owns them). At those defaults one API process holds up
 connections (twice its request and upload slots, four stream pollers and two readiness checks),
 which fits PostgreSQL's default of 100 beside maintenance and the workers; a second API process
 does not. Decoding and upload bodies take about 1.2 GB at the defaults, and each worker process
-about 512 MB more. These were measured on one 18-core, 64 GiB development machine; a smaller host
+about 512 MB more. The client proxy buffers request bodies on its container's disk: up to about
+10.5 GiB from one address at the installation profiles' cap (5.1.2). These were measured on one 18-core, 64 GiB development machine; a smaller host
 is not covered. The composition gives uvicorn `--timeout-graceful-shutdown 10`, so a stop does not
 wait for open progress streams.
 
@@ -1380,7 +1413,7 @@ stopped virtual machine's compute is not charged.
 | D-6 | The embedding role has no fallback and no recovery path | Precomputing the vectors a deployment needs, or accepting the single dependency and saying so |
 | D-7 | The fallback rule has never run against the live platform | Forcing a primary to fail |
 | D-9 | No cloud account, project, region, domain or host is provisioned. Section 8.1 is the recipe for one Nebius AI Cloud virtual machine serving the reviewer stack | Provisioning it and running the smoke check against the public address |
-| D-13 | `compose.yaml` has no reverse proxy and no static client host. The reviewer stack has both: the web image serves the client and proxies `/api`, and `edge.yaml` terminates TLS in front of it (section 8.1) | Choosing a host for the general composition (D-9) |
+| D-13 | `compose.yaml` serves the client and proxies `/api` with a per-address write limit and a body cap (5.1.2), bound to loopback, but has no TLS edge and nothing bounding how many addresses write at once. The reviewer stack adds one: `edge.yaml` terminates TLS in front of its web proxy (section 8.1) | Choosing a host for the general composition (D-9) |
 
 ## 12. Changes declined
 
