@@ -841,13 +841,15 @@ def adopt_restore_state(database: Database, path: Path) -> dict[str, Any]:
     marker is lost custody (:func:`initialise_restore_state`). Adopting reads what the database
     itself records. No ``restore_control`` row means no restore was ever declared here, and the
     marker is ``none``. A ``complete`` row whose replay receipt matches it means the last restore
-    finished, and the marker is ``complete`` for that attempt, with the attempt in ``completed`` so
-    the same checkpoint is never restored again. Anything else is a restore in progress, or a
-    record that does not agree with itself, and is refused.
+    finished, and the marker is ``complete`` for that attempt, with every restore the database
+    holds a receipt for in ``completed``, so none of those checkpoints is restored again. Anything
+    else is a restore in progress, or a record that does not agree with itself, and is refused.
 
     What this cannot tell apart is a database that has served all along from a backup loaded into
     it by hand without a replay: both read the same. The operator who adopts states that the
-    database is the installation's live one.
+    database is the installation's live one. Nor can it rebuild what only a marker held: a declared
+    recovery's declaration, ``left_open``, ``returning``, an abandoned attempt, or a completed
+    restore whose receipt this database does not hold. A lost marker is restored from custody.
     """
     if path.exists():
         raise RestoreRefused(
@@ -905,17 +907,26 @@ def adopt_restore_state(database: Database, path: Path) -> dict[str, Any]:
                     "the database's completed restore has no replay receipt that matches it; "
                     "nothing was written"
                 )
-            attempt = {
-                "checkpoint_sha256": control["checkpoint_sha256"],
-                "restore_id": str(control["restore_id"]),
-            }
+            # A receipt is written in the transaction that completes its replay, so every receipt
+            # the database holds is a restore that completed here, the current one among them.
+            # All of them go into completed, so none of their checkpoints is restored again.
+            completed = [
+                {
+                    "checkpoint_sha256": row["checkpoint_sha256"],
+                    "restore_id": str(row["restore_id"]),
+                }
+                for row in cursor.execute(
+                    "select restore_id, checkpoint_sha256 from restore_replay_receipt "
+                    "order by completed_at, restore_id"
+                ).fetchall()
+            ]
             marker = {
                 "profile": "exulanica.restore-state/v1",
                 "state": "complete",
-                "restore_id": attempt["restore_id"],
+                "restore_id": str(control["restore_id"]),
                 "checkpoint_id": str(control["checkpoint_id"]),
-                "checkpoint_sha256": attempt["checkpoint_sha256"],
-                "completed": [attempt],
+                "checkpoint_sha256": control["checkpoint_sha256"],
+                "completed": completed,
             }
     marker["adopted_at"] = dt.datetime.now(dt.UTC).isoformat()
     _write(path, marker)

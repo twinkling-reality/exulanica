@@ -1185,8 +1185,16 @@ A database installed without a profile has never had a marker, and `exulanica-in
 --adopt` gives it one from the database's own restore record, or refuses with nothing written. No
 `restore_control` row and no replay receipt is a database no restore was declared on, and the
 marker is `none`. A `complete` row whose replay receipt matches it (the same restore id, checkpoint
-id and checkpoint digest) is a finished restore, and the marker is `complete` for that attempt,
-which it also records as completed, so a restore of the same checkpoint is refused as reopening it.
+id and checkpoint digest) is a finished restore, and the marker is `complete` for that attempt. A
+receipt is written in the transaction that completes its replay, so the marker records every
+restore the database holds a receipt for as completed, and a restore of any of their checkpoints is
+refused as reopening it.
+
+Adopting is for a database that never had a marker. A marker that existed and was lost is restored
+from custody instead, its newest copy, because the database does not hold everything the marker did:
+a declared recovery's declaration (its receipt keeps only the window), the tombstones a replay left
+open, a return to the source in progress, an abandoned attempt, and any completed restore whose
+receipt the database no longer holds, such as one completed on a database that was replaced since.
 Adopting refuses: a marker already at the profile's path, a database with no applied schema (a
 first install runs `init`), a schema older than the restore controls (migrate first), a `sealed`
 or `replaying` row (finish that restore first), a `complete` row without a matching receipt, and

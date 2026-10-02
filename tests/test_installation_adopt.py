@@ -88,13 +88,18 @@ def _control(
 
 
 def _receipt(
-    database: Database, restore_id: uuid.UUID, checkpoint_id: uuid.UUID, digest: str
+    database: Database,
+    restore_id: uuid.UUID,
+    checkpoint_id: uuid.UUID,
+    digest: str,
+    completed_at: str = "2026-01-01T00:00:00Z",
 ) -> None:
     with database.unscoped() as connection:
         connection.execute(
             "insert into restore_replay_receipt "
-            "(restore_id,checkpoint_id,checkpoint_sha256,tombstone_count) values (%s,%s,%s,0)",
-            (restore_id, checkpoint_id, digest),
+            "(restore_id,checkpoint_id,checkpoint_sha256,tombstone_count,completed_at) "
+            "values (%s,%s,%s,0,%s)",
+            (restore_id, checkpoint_id, digest, completed_at),
         )
 
 
@@ -117,20 +122,15 @@ def test_a_database_with_no_restore_record_adopts_none(adopting, capsys):
     assert json.loads(marker.read_text()) == written
 
 
-def test_a_completed_restore_with_its_receipt_adopts_complete_and_is_never_reopened(
-    adopting, capsys, tmp_path
-):
-    database, marker = adopting
-    restore_id, checkpoint_id = uuid.uuid4(), uuid.uuid4()
-    # A sealed checkpoint with no tombstones, so its digest names a real checkpoint file.
+def _sealed_checkpoint(path: Path, checkpoint_id: uuid.UUID) -> str:
+    """A sealed checkpoint with no tombstones, so a digest names a real checkpoint file."""
     record = {
         "profile": "exulanica.restore-tombstone-checkpoint/v1",
         "checkpoint_id": str(checkpoint_id),
         "tombstones": [],
     }
     digest = hashlib.sha256(canonical_json(record)).hexdigest()
-    checkpoint = tmp_path / "checkpoint.json"
-    checkpoint.write_bytes(
+    path.write_bytes(
         canonical_json(
             {
                 "profile": "exulanica.digest-bound-record/v1",
@@ -140,21 +140,35 @@ def test_a_completed_restore_with_its_receipt_adopts_complete_and_is_never_reope
             }
         )
     )
-    _control(database, "complete", restore_id, checkpoint_id, digest)
-    _receipt(database, restore_id, checkpoint_id, digest)
+    return digest
+
+
+def test_completed_restores_adopt_complete_and_none_is_ever_reopened(adopting, tmp_path):
+    """Two restores completed here: the earlier one's receipt outlives its control row, which the
+    later one replaced. A marker lost and adopted must still refuse both checkpoints."""
+    database, marker = adopting
+    earlier, latest = tmp_path / "earlier.json", tmp_path / "latest.json"
+    earlier_id, latest_id = uuid.uuid4(), uuid.uuid4()
+    earlier_digest = _sealed_checkpoint(earlier, earlier_id)
+    latest_digest = _sealed_checkpoint(latest, latest_id)
+    earlier_restore, latest_restore = uuid.uuid4(), uuid.uuid4()
+    _receipt(database, earlier_restore, earlier_id, earlier_digest, "2026-01-01T00:00:00Z")
+    _control(database, "complete", latest_restore, latest_id, latest_digest)
+    _receipt(database, latest_restore, latest_id, latest_digest, "2026-02-01T00:00:00Z")
     assert main(["init", "--adopt"]) == 0
     written = json.loads(marker.read_text())
     assert (written["state"], written["restore_id"], written["checkpoint_id"]) == (
         "complete",
-        str(restore_id),
-        str(checkpoint_id),
+        str(latest_restore),
+        str(latest_id),
     )
     assert completed_restores(written) == [
-        {"checkpoint_sha256": digest, "restore_id": str(restore_id)}
+        {"checkpoint_sha256": earlier_digest, "restore_id": str(earlier_restore)},
+        {"checkpoint_sha256": latest_digest, "restore_id": str(latest_restore)},
     ]
-    # The marker carries the attempt, so the same checkpoint is never restored again.
-    with pytest.raises(RestoreRefused, match="already complete"):
-        prepare_restore(checkpoint, marker)
+    for checkpoint in (earlier, latest):
+        with pytest.raises(RestoreRefused, match="already complete"):
+            prepare_restore(checkpoint, marker)
 
 
 @pytest.mark.parametrize("state", ["sealed", "replaying"])
