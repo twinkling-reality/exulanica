@@ -61,7 +61,7 @@ from exulanica.world.episode_worker import (
     Line,
     worker_pool,
 )
-from exulanica.world.generated_worlds import states_records, town_records
+from exulanica.world.generated_worlds import generation_receipt, states_records, town_records
 from exulanica.world.traffic_episodes import (
     EPISODE,
     PackedTrafficEpisode,
@@ -288,13 +288,18 @@ def saved_world_roads(
         raise TrafficRefused(
             "roads_not_stated", f"world {world_id} states no records, so no roads to drive"
         )
-    generated = town_records(connection, workspace_id, world_id, snapshot_id)
-    key = ("saved", str(workspace_id), world_id, generated.receipt_sha256)
+    # An input made from this receipt is answered as it is. Generating a town's records again
+    # takes seconds, and the records kept (``town_records``) are fewer than the inputs kept here, so
+    # a host reading more towns in turn than records are kept would otherwise generate each town
+    # again at every read. Within one process the records a receipt generates do not change.
+    receipt_sha256, _receipt = generation_receipt(connection, workspace_id, world_id, snapshot_id)
+    key = ("saved", str(workspace_id), world_id, receipt_sha256)
     with _inputs_lock:
         found = _inputs.get(key)
         if found is not None:
             _inputs.move_to_end(key)
             return found
+    generated = town_records(connection, workspace_id, world_id, snapshot_id)
     records = road_records(generated.records)
     if not any(isinstance(record, LaneRecord) for record in records):
         raise TrafficRefused("roads_not_stated", f"world {world_id}'s records state no lane")

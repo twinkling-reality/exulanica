@@ -13,15 +13,17 @@ from __future__ import annotations
 
 import dataclasses
 import uuid
+from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
 from types import MappingProxyType
 
 import pytest
 from exulanica.api.permissions import ROUTE_RULES, SELF_CHARGING_TILE_ROUTES, Permission
 from exulanica.traffic.errors import UnsupportedNetworkError
+from exulanica.world import generated_worlds, traffic_host
 from exulanica.world import saved_entries as saved_entries_module
-from exulanica.world import traffic_host
 from exulanica.world import world_recipes as recipe_catalog
+from exulanica.world.composers import city_grammar_town, receipt_sha256
 from exulanica.world.generated_worlds import compose_specified_world, generation_receipt
 from exulanica.world.traffic_episodes import EPISODE, prepared, traffic_input
 from exulanica.world.world_recipes import (
@@ -149,6 +151,38 @@ def test_a_saved_towns_traffic_is_served_to_its_world_from_its_own_records(made,
     assert 0 <= body["clock_second"] - body["from_second"] <= 30
     # A stranger is told the world does not exist.
     assert _traffic(api, entry, token=STRANGER_TOKEN).status_code == 404
+
+
+def test_towns_read_in_turn_generate_each_towns_records_once(made, monkeypatch):
+    """A town's traffic input is found by its receipt before its records are generated again.
+
+    Records are kept for fewer worlds than traffic inputs are (four and eight), and towns read in
+    turn miss the records cache every time. Here it keeps one world, so the three towns a workspace
+    may hold, read twice in turn, are more than it keeps: each town's records are generated once.
+    """
+    api = made
+    connection, workspace = api.repository.connection, api.repository.workspace_id
+    towns = [_made(api, f"Town {index}") for index in range(3)]
+    monkeypatch.setattr(traffic_host, "_inputs", OrderedDict())
+    monkeypatch.setattr(generated_worlds, "_records_kept", OrderedDict())
+    monkeypatch.setattr(generated_worlds, "_RECORDS_KEPT", 1)
+    generated: list[str] = []
+    records = city_grammar_town.records
+
+    def counting(receipt):
+        generated.append(receipt_sha256(receipt))
+        return records(receipt)
+
+    monkeypatch.setattr(city_grammar_town, "records", counting)
+    versions = [
+        traffic_host.saved_world_roads(
+            connection, workspace, town["world_id"], uuid.UUID(town["source_snapshot_id"])
+        ).version_id
+        for _ in range(2)
+        for town in towns
+    ]
+    assert sorted(generated) == sorted(set(generated)) and len(generated) == len(towns)
+    assert versions[: len(towns)] == versions[len(towns) :]
 
 
 def test_refusals_name_what_is_wrong(made, monkeypatch):
