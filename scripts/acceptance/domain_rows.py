@@ -1640,10 +1640,14 @@ def row_h3(stack: Stack, transcripts: Any, out: Path, town: Mapping[str, Any]) -
     candidate_drawing = drawing.stdout.strip()
     recorded_drawing = (record.get("source") or {}).get("drawing_code_sha256")
     row.expect(
-        drawing.returncode == 0 and candidate_drawing == recorded_drawing,
-        f"the record measured drawing code {recorded_drawing}, the candidate's is "
-        f"{candidate_drawing or drawing.stderr.strip()[-200:]}",
+        drawing.returncode == 0, f"the drawing digest did not compute: {drawing.stderr[-200:]}"
     )
+    if drawing.returncode == 0 and candidate_drawing != recorded_drawing:
+        # A-39: the record measured other code, so H3 waits for a quiet-window re-measure.
+        row.blocked_by.append(
+            f"the record measured drawing code {recorded_drawing}, the candidate's is "
+            f"{candidate_drawing}: V7's line needs a re-measure in a quiet window (A-39)"
+        )
     graphs = record.get("graphs") or []
     points = record.get("points") or []
     row.expect(
@@ -2707,6 +2711,13 @@ SIGNAL_SEAL_SECONDS = 180
 SIGNAL_WINDOW_SECONDS = 5
 
 
+def without_clock(read: Any) -> Any:
+    """A traffic read without the server's current second, which moves between two reads."""
+    return (
+        {k: v for k, v in read.items() if k != "clock_second"} if isinstance(read, dict) else read
+    )
+
+
 def roles_read(c: Any, step: str, entry: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
     _, read = c.call(step, "GET", F.version_path(entry, MODELS), query=F.world_query(entry))
     return {role.get("key"): role for role in (read or {}).get("roles") or []}
@@ -2911,7 +2922,11 @@ def row_x1(stack: Stack, transcripts: Any, out: Path) -> Row:
             f"the chosen signal's traffic read answered {traffic[0]} with {len(sealed)} sealed "
             "segments",
         )
-        row.expect(again == traffic, "the sealed traffic read differently the second time")
+        # The read serves the server's clock beside the window; everything else is the window's.
+        row.expect(
+            again[0] == traffic[0] and without_clock(again[1]) == without_clock(traffic[1]),
+            "the sealed traffic read differently the second time",
+        )
         row.expect(
             len(scripted_log(stack)) == calls_signal, "reading the sealed traffic asked a model"
         )
