@@ -16,9 +16,9 @@
 
 {$EXULANICA_PUBLIC_HOST} {
 	tls {$EXULANICA_TLS}
-	# The same ceiling as the web proxy's client_max_body_size.
+	# The same ceiling as the web proxy's client_max_body_size, 8 MiB.
 	request_body {
-		max_size 8MB
+		max_size 8MiB
 	}
 	encode zstd gzip
 	reverse_proxy web:8080 {
@@ -30,5 +30,24 @@
 	log {
 		output stdout
 		format json
+	}
+	# The edge's own refusals, in the problem shape the API and the web proxy answer with
+	# ({"code", "detail"}), with the web proxy's codes and Retry-After. handle_errors runs only for
+	# errors the edge raises itself; an answer from the web proxy or the API passes through as sent.
+	handle_errors 413 {
+		header Content-Type application/json
+		header Cache-Control no-store
+		respond `{"code":"body_too_large","detail":"the request body is larger than the 8388608 bytes this installation accepts","limit_bytes":8388608}` 413
+	}
+	handle_errors 502 {
+		header Content-Type application/json
+		header Cache-Control no-store
+		header Retry-After 5
+		respond `{"code":"upstream_unavailable","detail":"the installation's web proxy closed the connection or could not be reached; whether the request ran is not known, so send it again after 5 seconds only if repeating it is safe","retry_after_seconds":5}` 502
+	}
+	handle_errors 504 {
+		header Content-Type application/json
+		header Cache-Control no-store
+		respond `{"code":"upstream_timeout","detail":"the installation's web proxy did not answer within 300 seconds; whether the request ran is not known"}` 504
 	}
 }

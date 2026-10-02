@@ -297,3 +297,34 @@ def test_the_web_image_context_carries_everything_the_bundle_imports_from_outsid
         if path.startswith("web/"):
             continue
         assert any(path == c or path.startswith(c.rstrip("/") + "/") for c in copied), path
+
+
+def test_the_edges_own_refusals_take_the_web_proxys_problem_shape():
+    """The edge answers a body over its cap and a web proxy it cannot reach itself; those answers
+    carry the codes, cap and Retry-After the web proxy's own refusals carry."""
+    import json
+
+    from test_installation_deployment import _body_cap, _reviewer_configuration
+
+    conf = _directives(CADDYFILE)
+    assert re.search(r"max_size 8MiB$", conf, re.M)
+    blocks = dict(re.findall(r"handle_errors (\d{3}) \{(.*?)\n\t\}", CADDYFILE, re.S))
+    assert set(blocks) == {"413", "502", "504"}
+    expected = {
+        "413": ("body_too_large", None),
+        "502": ("upstream_unavailable", 5),
+        "504": ("upstream_timeout", None),
+    }
+    for status, block in blocks.items():
+        assert "header Content-Type application/json" in block
+        answered = re.search(r"respond `(.*)` (\d{3})$", block, re.M)
+        assert answered is not None and answered.group(2) == status
+        body = json.loads(answered.group(1))
+        code, retry_after = expected[status]
+        assert body["code"] == code and body["detail"]
+        header = re.search(r"header Retry-After (\d+)$", block, re.M)
+        assert (int(header.group(1)) if header else None) == retry_after
+        assert body.get("retry_after_seconds") == retry_after
+    assert json.loads(re.search(r"respond `(.*)` 413", blocks["413"]).group(1))["limit_bytes"] == (
+        _body_cap(_reviewer_configuration())
+    )

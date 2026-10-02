@@ -359,7 +359,7 @@ installation profile it serves:
 | Profile | Proxy | Body cap | Why |
 | --- | --- | --- | --- |
 | `single-host`, `single-host-server-only`, `shared-store` | `deploy/installation/client-nginx.conf`, the `client` service of `compose.yaml` | 512 MiB, the API's own limit | People upload photographs, and the browser sends every photograph a person chooses in one `POST /intake`, so the API decides every body it would accept |
-| `reviewer` | the web proxy embedded in `deploy/judge/web.Dockerfile` (section 8) | 8 MiB | A reviewer's token cannot upload; a long question is still a POST body. The TLS edge in front of it states `max_size 8MB` (8.1) |
+| `reviewer` | the web proxy embedded in `deploy/judge/web.Dockerfile` (section 8) | 8 MiB | A reviewer's token cannot upload; a long question is still a POST body. The TLS edge in front of it states the same 8 MiB (8.1) |
 
 A proxy refuses a body over its cap with 413 `body_too_large` (5.4.8) before the API is involved.
 Each proxy reads a request's body into its container's temporary directory before passing it on
@@ -903,7 +903,10 @@ no-store`, because the browser reads a failure's code and detail and nothing els
 
 An answer the API makes, a 503 `capacity_exhausted` included, passes through the proxy unchanged
 (`proxy_intercept_errors` is off). `tests/test_installation_deployment.py` holds each row for both
-configurations.
+configurations. The reviewer stack's TLS edge (8.1) answers the refusals it makes itself, a body
+over its 8 MiB, and a web proxy it cannot reach or that does not answer in time, as the 413, 502
+and 504 rows, through Caddy's `handle_errors`; whatever the web proxy or the API answers passes
+through it as sent (`tests/test_judge_edge.py`).
 
 ## 6. Health check
 
