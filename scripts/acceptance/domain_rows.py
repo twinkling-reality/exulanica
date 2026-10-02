@@ -1722,6 +1722,10 @@ PARAMETRIC_FAMILY = "makehuman-parametric/v1"
 REMOVED_PART = "feminine/hair/long01"
 REMOVED_BASE = "feminine"
 LAYERED_CATALOG_ID = "exulanica-characters"
+#: The layered catalog's revision the repository carries, which a fresh run's launcher publishes.
+REPOSITORY_LAYERED_REVISION = json.loads(
+    (HERE.parents[1] / "assets" / "characters" / "catalog.json").read_text()
+)["revision"]
 CHARACTER_SOURCE = Path("assets/characters")
 NOT_SERVED_FAMILY = "quaternius-modular-v2"
 E_TESTS = (
@@ -1832,6 +1836,22 @@ def row_e1(stack: Stack, transcripts: Any, out: Path) -> tuple[Row, dict[str, An
         f"current look and the history read the same. {NOT_SERVED_FAMILY} is not a served family.",
     )
     c = F.client(stack, transcripts, "w1", "token")
+    # The launcher's test database outlives a stack, and E2 withdraws the repository's layered
+    # catalog in it: a database an earlier characters run used no longer serves catalog A (A-47).
+    _, listing = c.call("E1", "GET", CATALOGS)
+    served = {
+        (p.get("catalog_id"), p.get("revision"), p.get("state"))
+        for p in (listing or {}).get("publications", [])
+    }
+    if not any(cid == LAYERED_CATALOG_ID and state == "current" for cid, _, state in served) or any(
+        cid == LAYERED_CATALOG_ID and revision != REPOSITORY_LAYERED_REVISION
+        for cid, revision, _ in served
+    ):
+        row.blocked_by.append(
+            "this stack's database carries an earlier run's catalog publication or withdrawal: "
+            f"{sorted(map(str, served))}; run characters on a fresh test database"
+        )
+        return row.close(), {}
     actor = stack.state["actor"]
     status, entry = starter(c, "E1", "Q10 E1")
     row.expect(status == 200, f"the starter answered {status}")
@@ -2676,7 +2696,9 @@ SIGNAL_ROLE = "junction_signal"
 NOT_OFFERED = {"provider": "nebius_token_factory", "model_id": "Qwen/Qwen3-Embedding-8B"}
 #: How long the host may take to ask a chosen person's model once the society plays, and how long
 #: past a signal choice's effective second its first sealed segment may take.
-PERSON_DECISION_SECONDS = 180
+PERSON_DECISION_SECONDS = 300
+#: How many of the town's people X1 chooses the model for, at most.
+PEOPLE_CHOSEN_MOST = 16
 SIGNAL_SEAL_SECONDS = 180
 SIGNAL_WINDOW_SECONDS = 5
 
@@ -2818,8 +2840,12 @@ def row_x1(stack: Stack, transcripts: Any, out: Path) -> Row:
             status_refused == 422 and F.problem_code(body) == wanted[key],
             f"{key} answered {status_refused} {F.problem_code(body)}",
         )
+    # As many people as the role lets one choice name, up to a bound: a few chosen people may meet
+    # no choice point for many simulated minutes (A-46).
+    most = person.get("model_subjects_maximum") or PEOPLE_CHOSEN_MOST
+    chosen_people = inhabitants[: min(int(most), PEOPLE_CHOSEN_MOST)]
     status_people, people_choice = choose_model(
-        c, "X1", entry, PERSON_ROLE, inhabitants[:2], GOING_MODEL
+        c, "X1", entry, PERSON_ROLE, chosen_people, GOING_MODEL
     )
     row.expect(status_people == 200, f"the people's choice answered {status_people}")
     status_signal, signal_choice = (
@@ -2899,7 +2925,7 @@ def row_x1(stack: Stack, transcripts: Any, out: Path) -> Row:
         },
         "refusals": {k: [v[0], F.problem_code(v[1])] for k, v in refusals.items()},
         "choices": {
-            "people": [status_people, (people_choice or {}).get("choice_seq")],
+            "people": [status_people, (people_choice or {}).get("choice_seq"), len(chosen_people)],
             "signal": [status_signal, (signal_choice or {}).get("effective_second")],
         },
         "person_decisions": [
