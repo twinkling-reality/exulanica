@@ -22,10 +22,14 @@ attaches itself, and otherwise the plan's explicit ``BudgetGuard`` bounds.
 The plan (``profile`` ``q10-scripted-model-plan/v1``) is an ordered list of rules. A request takes
 the first rule whose every ``match`` field holds: ``model`` equals the payload's model and
 ``contains`` is a substring of its serialized messages. A rule answers ``content`` wrapped as a
-chat completion, or a whole provider ``body``, with an optional ``status``. A request no rule
-matches is answered 500, as an unavailable provider would be, so the product's own fallback runs.
-Every request is appended to ``EXULANICA_SCRIPTED_MODEL_LOG`` as one JSON line holding the model,
-the matched rule and the payload's digest, never headers. ``/readyz`` answers with an added
+chat completion, a whole provider ``body``, or ``choose``: one of the options the request itself
+offers, the first whose label contains ``choose.containing`` or else the first offered, answered
+the way the request asks for it (the one forced tool call, or the strict JSON schema's object).
+Each takes an optional ``status``. A request no rule matches, and one a ``choose`` rule matches
+that offers no options, is answered 500, as an unavailable provider would be, so the product's own
+fallback runs. Every request is appended to ``EXULANICA_SCRIPTED_MODEL_LOG`` as one JSON line
+holding the model, the matched rule, the option a ``choose`` rule chose and the payload's digest,
+never headers. ``/readyz`` answers with an added
 ``acceptance_model`` member naming the mode and the plan's digest; the application's own answer is
 otherwise unchanged, because the member is added by wrapping the application, not in it.
 """
@@ -55,6 +59,11 @@ UNMATCHED_STATUS = 500
 LOOPBACK = "127.0.0.1"
 #: The name the readiness answer carries the mode under.
 READINESS_MEMBER = "acceptance_model"
+#: How a rule answers: exactly one of these.
+ANSWERS = ("content", "body", "choose")
+#: The one function and argument a product choice is asked by (``exulanica.models.choice``).
+CHOICE_FUNCTION = "act"
+CHOICE_ARGUMENT = "action"
 
 
 class Refused(SystemExit):
@@ -86,8 +95,14 @@ def load_plan(path: Path) -> tuple[dict[str, Any], str]:
     if not isinstance(rules, list):
         raise Refused("the plan states no rules list")
     for index, rule in enumerate(rules):
-        if ("content" in rule) == ("body" in rule):
-            raise Refused(f"rule {index} must answer with exactly one of content and body")
+        if sum(answer in rule for answer in ANSWERS) != 1:
+            raise Refused(f"rule {index} must answer with exactly one of {', '.join(ANSWERS)}")
+        if "choose" in rule and (
+            not isinstance(rule["choose"], dict)
+            or set(rule["choose"]) != {"containing"}
+            or not isinstance(rule["choose"]["containing"], str)
+        ):
+            raise Refused(f"rule {index} must choose by one containing text")
         unknown = set(rule.get("match", {})) - {"model", "contains"}
         if unknown:
             raise Refused(f"rule {index} matches on unknown fields {sorted(unknown)}")
@@ -112,6 +127,59 @@ def completion(content: str, model: str) -> dict[str, Any]:
         ],
         "usage": {"prompt_tokens": 100, "completion_tokens": 50, "total_tokens": 150},
     }
+
+
+def offered(payload: Mapping[str, Any]) -> tuple[list[str], str] | None:
+    """The options a request offers and how it asks for the answer (``tool`` or ``schema``), or
+    None for a request that offers none."""
+    for tool in payload.get("tools") or []:
+        function = (tool.get("function") or {}) if isinstance(tool, Mapping) else {}
+        if function.get("name") == CHOICE_FUNCTION:
+            properties = (function.get("parameters") or {}).get("properties") or {}
+            options = (properties.get(CHOICE_ARGUMENT) or {}).get("enum")
+            if isinstance(options, list) and options:
+                return [str(option) for option in options], "tool"
+    response_format = payload.get("response_format") or {}
+    schema = (response_format.get("json_schema") or {}).get("schema") or {}
+    options = ((schema.get("properties") or {}).get(CHOICE_ARGUMENT) or {}).get("enum")
+    if isinstance(options, list) and options:
+        return [str(option) for option in options], "schema"
+    return None
+
+
+def chosen_completion(option: str, asked: str, model: str) -> dict[str, Any]:
+    """A completion choosing ``option`` the way the request asked: its forced tool call, or the
+    strict schema's object as the message content."""
+    if asked == "schema":
+        return completion(json.dumps({CHOICE_ARGUMENT: option}), model)
+    body = completion("", model)
+    choice = body["choices"][0]
+    choice["finish_reason"] = "tool_calls"
+    choice["message"] = {
+        "role": "assistant",
+        "content": None,
+        "tool_calls": [
+            {
+                "id": "call_scripted",
+                "type": "function",
+                "function": {
+                    "name": CHOICE_FUNCTION,
+                    "arguments": json.dumps({CHOICE_ARGUMENT: option}),
+                },
+            }
+        ],
+    }
+    return body
+
+
+def choose(rule: Mapping[str, Any], payload: Mapping[str, Any]) -> tuple[str, str] | None:
+    """The option a ``choose`` rule picks from what the request offers, and how it was asked."""
+    found = offered(payload)
+    if found is None:
+        return None
+    options, asked = found
+    wanted = rule["choose"]["containing"]
+    return next((o for o in options if wanted in o), options[0]), asked
 
 
 class ScriptedTransport:
@@ -148,6 +216,11 @@ class ScriptedTransport:
         del url, headers, timeout
         index = self.match(payload)
         model = str(payload.get("model"))
+        picked = (
+            choose(self.rules[index], payload)
+            if index is not None and "choose" in self.rules[index]
+            else None
+        )
         with self._lock:
             self.calls += 1
             if self.log is not None:
@@ -158,6 +231,7 @@ class ScriptedTransport:
                                 "call": self.calls,
                                 "model": model,
                                 "rule": index,
+                                "chose": None if picked is None else picked[0],
                                 "payload_sha256": hashlib.sha256(
                                     json.dumps(payload, sort_keys=True).encode()
                                 ).hexdigest(),
@@ -165,11 +239,16 @@ class ScriptedTransport:
                         )
                         + "\n"
                     )
-        if index is None:
+        if index is None or ("choose" in self.rules[index] and picked is None):
             body = {"error": {"message": "no scripted rule matches this request"}}
             return self.response_type(status_code=UNMATCHED_STATUS, text=json.dumps(body))
         rule = self.rules[index]
-        body = rule["body"] if "body" in rule else completion(str(rule["content"]), model)
+        if picked is not None:
+            body = chosen_completion(picked[0], picked[1], model)
+        elif "body" in rule:
+            body = rule["body"]
+        else:
+            body = completion(str(rule["content"]), model)
         return self.response_type(status_code=int(rule.get("status", 200)), text=json.dumps(body))
 
     def get_json(self, url: str, *, headers: Mapping[str, str], timeout: float) -> Any:

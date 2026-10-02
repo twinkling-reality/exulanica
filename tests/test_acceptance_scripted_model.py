@@ -84,7 +84,10 @@ def test_durable_spending_without_its_witness_is_refused(tmp_path):
     [
         ({"profile": "other/v1"}, "profile"),
         ({"rules": {"not": "a list"}}, "no rules list"),
-        ({"rules": [{"content": "a", "body": {}}]}, "exactly one of content and body"),
+        ({"rules": [{"content": "a", "body": {}}]}, "exactly one of content, body, choose"),
+        ({"rules": [{"match": {}}]}, "exactly one of content, body, choose"),
+        ({"rules": [{"choose": {"containing": "a", "first": True}}]}, "one containing text"),
+        ({"rules": [{"choose": "a"}]}, "one containing text"),
         ({"rules": [{"match": {"role": "vision"}, "content": "a"}]}, "unknown fields"),
         ({"bounds": {"ceiling_usd": "1"}}, "bounds"),
     ],
@@ -124,6 +127,66 @@ def test_the_first_matching_rule_answers_and_an_unmatched_request_fails_like_a_p
     assert [c["rule"] for c in calls] == [0, 1, None]
     assert transport.calls == 3
     assert "Bearer" not in log.read_text()
+
+
+def _choice(options: list[str], asked: str) -> dict:
+    """A request offering ``options`` as the product's choices ask: a forced tool or a schema."""
+    schema = {
+        "type": "object",
+        "properties": {"action": {"type": "string", "enum": options}},
+        "required": ["action"],
+        "additionalProperties": False,
+    }
+    if asked == "tool":
+        return {
+            "model": "m/one",
+            "messages": [],
+            "tools": [{"type": "function", "function": {"name": "act", "parameters": schema}}],
+            "tool_choice": {"type": "function", "function": {"name": "act"}},
+        }
+    return {
+        "model": "m/one",
+        "messages": [],
+        "response_format": {
+            "type": "json_schema",
+            "json_schema": {"name": "act", "strict": True, "schema": schema},
+        },
+    }
+
+
+def test_a_choose_rule_answers_an_offered_option_the_way_the_request_asks(tmp_path):
+    plan, _ = SCRIPTED.load_plan(
+        _plan(tmp_path, rules=[{"match": {"model": "m/one"}, "choose": {"containing": " m away"}}])
+    )
+    log = tmp_path / "calls.jsonl"
+    transport = SCRIPTED.ScriptedTransport(plan, log, HttpResponse)
+    options = ["wait here a minute", "go to the bench, 12 m away", "go to the stall, 30 m away"]
+
+    by_tool = json.loads(
+        transport.post_json("u", headers={}, payload=_choice(options, "tool"), timeout=1).text
+    )
+    by_schema = json.loads(
+        transport.post_json("u", headers={}, payload=_choice(options, "schema"), timeout=1).text
+    )
+    none_contains = json.loads(
+        transport.post_json(
+            "u", headers={}, payload=_choice(["stand still", "wait"], "tool"), timeout=1
+        ).text
+    )
+    offers_nothing = transport.post_json(
+        "u", headers={}, payload={"model": "m/one", "messages": []}, timeout=1
+    )
+
+    (call,) = by_tool["choices"][0]["message"]["tool_calls"]
+    assert call["function"]["name"] == "act"
+    assert json.loads(call["function"]["arguments"]) == {"action": options[1]}
+    assert json.loads(by_schema["choices"][0]["message"]["content"]) == {"action": options[1]}
+    assert json.loads(
+        none_contains["choices"][0]["message"]["tool_calls"][0]["function"]["arguments"]
+    ) == {"action": "stand still"}
+    assert offers_nothing.status_code == SCRIPTED.UNMATCHED_STATUS
+    calls = [json.loads(line) for line in log.read_text().splitlines()]
+    assert [c["chose"] for c in calls] == [options[1], options[1], "stand still", None]
 
 
 def test_the_transport_declares_no_egress_so_the_client_knows_it_reaches_no_network(tmp_path):

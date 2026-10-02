@@ -1,0 +1,46 @@
+{
+ "profile": "q10-scripted-model-plan/v1",
+ "bounds": {
+  "ceiling_usd": "20.00",
+  "max_calls": 60000
+ },
+ "rules": [
+  {
+   "match": {
+    "model": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+    "contains": "Green elapsed:"
+   },
+   "choose": {
+    "containing": "keep this green"
+   }
+  },
+  {
+   "match": {
+    "model": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+    "contains": "Green elapsed:"
+   },
+   "status": 500,
+   "body": {
+    "error": {
+     "message": "scripted: this model leaves every signal point unanswered"
+    }
+   }
+  },
+  {
+   "match": {
+    "model": "Qwen/Qwen3-235B-A22B-Instruct-2507"
+   },
+   "choose": {
+    "containing": " m away"
+   }
+  },
+  {
+   "match": {
+    "model": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
+   },
+   "choose": {
+    "containing": "wait here"
+   }
+  }
+ ]
+}

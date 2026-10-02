@@ -14,6 +14,7 @@ the slot table.
 from __future__ import annotations
 
 import ast
+import hashlib
 import importlib.util
 import io
 import json
@@ -780,3 +781,58 @@ def test_a_run_publishes_the_character_catalogs_before_its_api_starts(tmp_path):
     assert environment["PATH"] == "/usr/bin"
     source = inspect.getsource(launch.up)
     assert source.index("publication_command(") < source.index("api_command(")
+
+
+def test_a_depth_worker_replaces_the_apis_worker_and_is_refused_beside_it(tmp_path, temporary):
+    worktree = _checkout(tmp_path / "checkout")
+    arguments = LAUNCH.build_parser().parse_args(
+        ["up", "--worktree", str(worktree), "--depth-worker"]
+    )
+    assert _refusal(LAUNCH.up, arguments) == "depth-worker-shape"
+    assert not list(temporary.iterdir())
+
+
+def test_the_depth_checkpoint_is_the_pinned_revision_in_the_local_cache_or_refused(tmp_path):
+    manifest = json.loads((ROOT / "exulanica" / "models" / "models.manifest.json").read_text())
+    revision = manifest["local_models"][LAUNCH.DEPTH_MODEL]["revision"]
+    cache = tmp_path / "hf"
+    environ = {"HF_HOME": str(cache)}
+    assert _refusal(LAUNCH.depth_checkpoint, ROOT, environ) == "depth-checkpoint-missing"
+
+    snapshot = cache / "hub" / "models--Ruicheng--moge-2-vitl" / "snapshots"
+    (snapshot / "an-older-revision").mkdir(parents=True)
+    (snapshot / "an-older-revision" / LAUNCH.DEPTH_CHECKPOINT).write_bytes(b"old")
+    assert _refusal(LAUNCH.depth_checkpoint, ROOT, environ) == "depth-checkpoint-missing"
+
+    (snapshot / revision).mkdir()
+    (snapshot / revision / LAUNCH.DEPTH_CHECKPOINT).write_bytes(b"pinned weights")
+    found = LAUNCH.depth_checkpoint(ROOT, environ)
+    assert found["revision"] == revision
+    assert found["bytes"] == str(len(b"pinned weights"))
+    assert found["sha256"] == hashlib.sha256(b"pinned weights").hexdigest()
+
+
+def test_database_latency_takes_the_spare_port_and_is_refused_beside_a_second_api(
+    tmp_path, temporary
+):
+    worktree = _checkout(tmp_path / "checkout")
+    arguments = LAUNCH.build_parser().parse_args(
+        ["up", "--worktree", str(worktree), "--database-latency", "--second-api"]
+    )
+    assert _refusal(LAUNCH.up, arguments) == "database-latency-shape"
+    assert not list(temporary.iterdir())
+
+
+def test_the_api_alone_connects_through_the_proxy():
+    exports = {
+        "EXULANICA_DATABASE_URL": "postgresql://exulanica_app:p@127.0.0.1:19430/exulanica",
+        "EXULANICA_READONLY_DATABASE_URL": "postgresql://exulanica_read:p@127.0.0.1:19430/exulanica",
+        "EXULANICA_PURGE_DATABASE_URL": "postgresql://exulanica_purge:p@127.0.0.1:19430/exulanica",
+        "OWNER_URL": "postgresql://owner@127.0.0.1:19430/exulanica",
+    }
+    proxied = LAUNCH.through_proxy(exports, 19434)
+
+    assert proxied["EXULANICA_DATABASE_URL"].endswith("@127.0.0.1:19434/exulanica")
+    assert proxied["EXULANICA_READONLY_DATABASE_URL"].endswith("@127.0.0.1:19434/exulanica")
+    assert proxied["EXULANICA_PURGE_DATABASE_URL"] == exports["EXULANICA_PURGE_DATABASE_URL"]
+    assert proxied["OWNER_URL"] == exports["OWNER_URL"]

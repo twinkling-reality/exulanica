@@ -209,7 +209,10 @@ serves the API through `scripts/acceptance/scripted_model.py`, whose model trans
 the plan while the model client, hosted-request policy, budget and receipts run as they do with a
 provider; it refuses to start when any provider credential, provider variable or egress allowlist
 is set, labels itself in `/readyz` with the plan's digest, and establishes mechanics only, never
-model quality. `--spending process|durable` states its `EXULANICA_SPENDING` explicitly: the plan's
+model quality. A plan rule answers with fixed content, a whole provider body, or `choose`: one
+of the options the request itself offers, the first whose label contains the rule's text, answered
+by the tool call or the strict schema the request asks for, so a scripted arm can make valid
+choices on any ground. `--spending process|durable` states its `EXULANICA_SPENDING` explicitly: the plan's
 own bounds, or the durable spending authority with its witness directory in the run directory. The wheel and every image leave `scripts/` out, which
 `tests/test_acceptance_scripted_model.py` checks. `restart-api` stops the recorded API and starts
 it again on the same port, database, store and grants, and with `--revoke <token file>` leaves that
@@ -248,6 +251,17 @@ volumes afterwards; `--distinct-probes` gives each test photograph its own size.
 `scripts/acceptance/chaos.py run` checks the formation stream and the derivative queue under faults
 on a running stack: resumes, a held table lock, a client that leaves, a cancelled upload and a
 worker killed mid-job by stopping the API it runs in. Neither makes a timing claim.
+
+`scripts/acceptance/domain_rows.py` checks domain rows on a launcher stack of their own, as the same
+kind of independent client. `comparisons` plays a comparison of two scripted models with a control
+on a generated town's people and a signal comparison of fixed timing against two models, reads both
+back from outside (a separate developer-client process holding `world.read` alone among them), and
+cancels a comparison while a host plays it. It also checks that the living town's reading line is
+bound to the measurement record that states it and serves what the record derives. `assets` admits,
+prepares, places and withdraws a workspace asset, running the installation's preparation process
+itself, and checks each refused admission against the run's database and store. `characters` saves
+looks in two character families, then publishes and withdraws a catalog revision as the host
+administrator. Each re-runs its owners' lane tests on the checkout, and none makes a timing claim.
 
 **Reading the result.** The run directory holds `result.json`, described by
 `scripts/rehearsal/result.schema.json`, a `summary.txt` table, a JPEG screenshot of every observed

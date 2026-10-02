@@ -6,6 +6,8 @@
                                                 [--society-playback [--society-tick-interval-ms MS]]
                                                 [--tiles] [--port-base PORT] [--workspaces K]
                                                 [--read-only-token] [--scripted-model PLAN]
+                                                [--no-derivative-worker --depth-worker]
+                                                [--database-latency]
     python3 scripts/acceptance/launch.py status --worktree PATH
     python3 scripts/acceptance/launch.py restart-api --worktree PATH [--revoke TOKEN_FILE]
     python3 scripts/acceptance/launch.py down   --worktree PATH
@@ -32,7 +34,9 @@ imports the code it starts.
     must be before anybody is drawn; its lines are kept in ``logs/character-catalogs.txt`` and the
     run state.
 4.  Starts the API as the non-owner runtime role with the read-only and purge URLs, a
-    content-addressed store in the run directory and no Google configuration. With ``--model``
+    content-addressed store in the run directory and no Google configuration. The purge URL is
+    also written to ``purge-url`` in the run directory at 0600, named by the run state and never
+    printed, for a client that runs the purge as an installation does. With ``--model``
     it also passes ``NEBIUS_API_KEY``, ``EXULANICA_EGRESS_ALLOWLIST``, ``EXULANICA_BUDGET_USD``,
     ``EXULANICA_BUDGET_MAX_CALLS`` and ``EXULANICA_SPENDING``
     from this process's environment, and refuses without any of them: a run with a model always
@@ -70,6 +74,15 @@ starts exactly what it always did:
   ``world.read`` alone, so a client can be shown a refusal its grant earns.
 - ``--peer-token`` adds ``token-peer``: a second actor in the first workspace with the same
   permissions, so a client can be shown what one actor's private work looks like to another.
+- ``--depth-worker``, with ``--no-derivative-worker``, runs the production derivative worker
+  (``exulanica-derivative-worker``) for every workspace of the run in place of the API's, with the
+  depth model the manifest pins, read offline (``HF_HUB_OFFLINE``) from the local model cache on
+  the CPU. It refuses when the pinned checkpoint is not in the cache, and never downloads it; the
+  run state records the checkpoint's path, size and digest.
+- ``--database-latency`` starts ``latency_proxy.py`` on the slot's spare port between the API
+  and its PostgreSQL server and points the API's database URLs at it, so a run can add connection
+  latency by writing whole milliseconds to ``database-delay-ms`` in the run directory (0 at start);
+  workers and evidence reads connect directly. It takes the port ``--second-api`` would.
 - ``--second-api`` starts a second API process on the slot's spare port with the same database,
   store, spending witness and grants, so clients can race through two processes at once.
   ``restart-api --api second`` restarts that one instead of the first.
@@ -118,6 +131,20 @@ SLOT_WIDTH = 5
 SLOT_COUNT = 7
 PORT_ROLES = ("database", "api", "vite", "browser", "spare")
 PORT_LIMIT = PORT_BASE + SLOT_WIDTH * SLOT_COUNT - 1
+#: The file in the run directory holding the purge role's URL, readable by its owner alone.
+PURGE_URL_NAME = "purge-url"
+#: The depth model the manifest pins, read from this local cache only: ``--depth-worker`` never
+#: downloads it (``HF_HUB_OFFLINE``), and records the file's path and digest.
+DEPTH_MODEL = "Ruicheng/moge-2-vitl"
+DEPTH_CHECKPOINT = "model.pt"
+DEPTH_WORKER_NAME = "acceptance-depth"
+DEPTH_WORKER_START_SECONDS = 300
+#: The file in the run directory naming the delay ``--database-latency`` adds, in milliseconds;
+#: a run changes it while the stack runs.
+DATABASE_DELAY_NAME = "database-delay-ms"
+LATENCY_PROXY_START_SECONDS = 30
+#: The database URLs the API connects with, which ``--database-latency`` points at the proxy.
+API_DATABASE_URLS = ("EXULANICA_DATABASE_URL", "EXULANICA_READONLY_DATABASE_URL")
 
 #: The ports a moved slot table may use: unprivileged ones, the whole run inside the port range.
 PORT_MINIMUM = 1024
@@ -201,6 +228,14 @@ REFUSALS = {
     "workspace-partition": "the synthetic workspace has no embedding partition",
     "tile-quota": "--tiles did not declare the synthetic workspace's tile quota",
     "tile-worker-startup": "the generated-tile worker did not report a successful startup",
+    "depth-worker-shape": "--depth-worker replaces the API's derivative worker: add "
+    "--no-derivative-worker",
+    "depth-checkpoint-missing": "the depth model's pinned checkpoint is not in the local model "
+    "cache, and --depth-worker never downloads it",
+    "depth-worker-startup": "the depth-capable derivative worker did not report a startup",
+    "database-latency-shape": "--database-latency takes the slot's spare port, which "
+    "--second-api also takes",
+    "latency-proxy-startup": "the database latency proxy did not report a startup",
     "model-key-missing": "--model needs NEBIUS_API_KEY in this environment",
     "model-allowlist-missing": "--model needs EXULANICA_EGRESS_ALLOWLIST in this environment",
     "budget-missing": "--model needs EXULANICA_BUDGET_USD, the bound the API enforces",
@@ -679,6 +714,134 @@ def start_tile_worker(
     refuse("tile-worker-startup", log.read_text(errors="replace")[-REFUSAL_EXCERPT_CHARACTERS:])
 
 
+def depth_checkpoint(worktree: Path, environ: Mapping[str, str] | None = None) -> dict[str, str]:
+    """The depth checkpoint the manifest pins, found in the local Hugging Face cache by its
+    revision, with its digest: what a depth-capable worker will load, offline."""
+    environ = os.environ if environ is None else environ
+    manifest = json.loads((worktree / "exulanica" / "models" / "models.manifest.json").read_text())
+    revision = manifest["local_models"][DEPTH_MODEL]["revision"]
+    hub = Path(environ.get("HF_HOME") or Path(environ.get("HOME", "~")) / ".cache" / "huggingface")
+    snapshot = hub.expanduser() / "hub" / f"models--{DEPTH_MODEL.replace('/', '--')}" / "snapshots"
+    checkpoint = snapshot / revision / DEPTH_CHECKPOINT
+    if not checkpoint.is_file():
+        refuse("depth-checkpoint-missing", str(checkpoint))
+    digest = hashlib.sha256()
+    with checkpoint.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1 << 22), b""):
+            digest.update(chunk)
+    return {
+        "model": DEPTH_MODEL,
+        "revision": revision,
+        "path": str(checkpoint),
+        "resolved": str(checkpoint.resolve()),
+        "bytes": str(checkpoint.stat().st_size),
+        "sha256": digest.hexdigest(),
+    }
+
+
+def start_depth_worker(
+    worktree: Path,
+    exports: Mapping[str, str],
+    data_dir: Path,
+    workspaces: list[str],
+    logs: Path,
+    state: dict,
+    state_file: Path,
+) -> None:
+    """Start the production derivative worker with the depth model, offline, for every workspace
+    of the run, as a deployment runs it beside its API, and wait for its startup event."""
+    program = worktree / ".venv" / "bin" / "exulanica-derivative-worker"
+    if not program.exists():
+        refuse("toolchain-missing", f"the checkout lacks {program}")
+    state["depth_worker"] = {"checkpoint": depth_checkpoint(worktree)}
+    environment = clean_environment()
+    environment.update(
+        {
+            "EXULANICA_DATABASE_URL": exports["EXULANICA_DATABASE_URL"],
+            "EXULANICA_DATA_DIR": str(data_dir),
+            "EXULANICA_DEPTH_MODEL": "moge",
+            "EXULANICA_DEPTH_DEVICE": "cpu",
+            "HF_HUB_OFFLINE": "1",
+        }
+    )
+    command = [str(program), "--name", DEPTH_WORKER_NAME]
+    for workspace in workspaces:
+        command += ["--workspace", workspace]
+    log = logs / "depth-worker.log"
+    state["pids"]["depth_worker"] = spawn(command, worktree, environment, log)
+    write_state(state_file, state)
+    deadline = time.monotonic() + DEPTH_WORKER_START_SECONDS
+    while time.monotonic() < deadline:
+        events = []
+        for line in log.read_text(errors="replace").splitlines() if log.exists() else []:
+            try:
+                event = json.loads(line)
+            except ValueError:
+                continue
+            if isinstance(event, dict) and event.get("component") == "derivative-worker":
+                events.append(event.get("event"))
+        if "startup_failed" in events or not command_of(state["pids"]["depth_worker"]):
+            break
+        if "startup" in events:
+            state["depth_worker"]["environment"] = {
+                key: environment[key]
+                for key in ("EXULANICA_DEPTH_MODEL", "EXULANICA_DEPTH_DEVICE", "HF_HUB_OFFLINE")
+            }
+            write_state(state_file, state)
+            return
+        time.sleep(0.5)
+    refuse("depth-worker-startup", log.read_text(errors="replace")[-REFUSAL_EXCERPT_CHARACTERS:])
+
+
+def through_proxy(exports: Mapping[str, str], port: int) -> dict[str, str]:
+    """The exports with the API's database URLs pointed at the latency proxy on ``port``."""
+    proxied = dict(exports)
+    for name in API_DATABASE_URLS:
+        upstream = url_port(proxied[name])
+        proxied[name] = proxied[name].replace(f":{upstream}/", f":{port}/", 1)
+    return proxied
+
+
+def start_latency_proxy(
+    worktree: Path,
+    upstream: int,
+    port: int,
+    run_dir: Path,
+    logs: Path,
+    state: dict,
+    state_file: Path,
+) -> None:
+    """Start ``latency_proxy.py`` between the API and its PostgreSQL server, with no delay until a
+    run writes one to the delay file, and wait for its startup event."""
+    delay_file = run_dir / DATABASE_DELAY_NAME
+    delay_file.write_text("0")
+    log = logs / "latency-proxy.log"
+    command = [
+        sys.executable,
+        str(Path(__file__).resolve().parent / "latency_proxy.py"),
+        "--listen",
+        str(port),
+        "--upstream",
+        str(upstream),
+        "--delay-file",
+        str(delay_file),
+    ]
+    state["pids"]["latency_proxy"] = spawn(command, worktree, clean_environment(), log)
+    state["database_latency"] = {"port": port, "upstream": upstream, "delay_file": str(delay_file)}
+    write_state(state_file, state)
+    deadline = time.monotonic() + LATENCY_PROXY_START_SECONDS
+    while time.monotonic() < deadline:
+        text = log.read_text(errors="replace") if log.exists() else ""
+        if '"event": "startup"' in text:
+            return
+        if not command_of(state["pids"]["latency_proxy"]):
+            break
+        time.sleep(0.2)
+    refuse(
+        "latency-proxy-startup", (log.read_text(errors="replace") if log.exists() else "")[-400:]
+    )
+
+
 def command_of(pid: int) -> str:
     completed = subprocess.run(
         ["ps", "-p", str(pid), "-o", "command="], capture_output=True, text=True, check=False
@@ -843,6 +1006,10 @@ def write_state(state_file: Path, state: Mapping[str, object]) -> None:
 def up(arguments: argparse.Namespace) -> None:
     worktree = checkout(arguments.worktree)
     python = check_toolchain(worktree)
+    if arguments.database_latency and arguments.second_api:
+        refuse("database-latency-shape", REFUSALS["database-latency-shape"])
+    if arguments.depth_worker and not arguments.no_derivative_worker:
+        refuse("depth-worker-shape", REFUSALS["depth-worker-shape"])
     if arguments.scripted_model is not None:
         if arguments.model:
             refuse("scripted-with-model", REFUSALS["scripted-with-model"])
@@ -858,7 +1025,8 @@ def up(arguments: argparse.Namespace) -> None:
         refuse("state-exists", str(state_file))
     chosen = ports(arguments.slot, arguments.port_base)
     count = workspace_count(arguments.workspaces)
-    for role in ("api", "vite", "browser", *(("spare",) if arguments.second_api else ())):
+    spare = arguments.second_api or arguments.database_latency
+    for role in ("api", "vite", "browser", *(("spare",) if spare else ())):
         if listening(chosen[role]):
             refuse("port-in-use", f"port {chosen[role]} ({role})")
 
@@ -931,6 +1099,12 @@ def up(arguments: argparse.Namespace) -> None:
             "lane_server_root": after["root"],
         }
     )
+    # The purge role's URL, for a client that runs the purge as an installation does: in a file of
+    # its own at 0600, named by the state and never printed with it.
+    purge_url_file = run_dir / PURGE_URL_NAME
+    purge_url_file.write_text(exports["EXULANICA_PURGE_DATABASE_URL"])
+    purge_url_file.chmod(0o600)
+    state["purge_url_file"] = str(purge_url_file)
     write_state(state_file, state)
     if not after["running"] or database_port != after["port"]:
         refuse(
@@ -1043,8 +1217,14 @@ def up(arguments: argparse.Namespace) -> None:
     state["character_catalogs"] = [line for line in published.splitlines() if line.strip()]
     write_state(state_file, state)
 
+    api_exports = exports
+    if arguments.database_latency:
+        start_latency_proxy(
+            worktree, database_port, chosen["spare"], run_dir, logs, state, state_file
+        )
+        api_exports = through_proxy(exports, chosen["spare"])
     environment = api_environment(
-        exports=exports,
+        exports=api_exports,
         grant=grant,
         data_dir=data_dir,
         model=arguments.model,
@@ -1116,6 +1296,16 @@ def up(arguments: argparse.Namespace) -> None:
         }
         write_state(state_file, state)
     start_tile_worker(worktree, exports, data_dir, workspace_id, logs, state, state_file)
+    if arguments.depth_worker:
+        start_depth_worker(
+            worktree,
+            exports,
+            data_dir,
+            [workspace_id, *(w["workspace_id"] for w in state.get("other_workspaces", []))],
+            logs,
+            state,
+            state_file,
+        )
     probe_status, probe_body = wait_http(
         f"{api_url(chosen)}/world-entries",
         TOKEN_PROBE_SECONDS,
@@ -1337,6 +1527,8 @@ def restart_api(arguments: argparse.Namespace) -> None:
     if state.get("model"):
         model_environment()  # refuse before the running API is stopped, not after
     exports = served_exports((logs / "database-serve.txt").read_text())
+    if isinstance(state.get("database_latency"), Mapping):
+        exports = through_proxy(exports, int(state["database_latency"]["port"]))
     grant = {(run_dir / name).read_text(): granted for name, granted in grants.items()}
     playback = state.get("society_playback")
     environment = api_environment(
@@ -1404,6 +1596,10 @@ def down(arguments: argparse.Namespace) -> None:
     state = json.loads(state_file.read_text())
     if "tile_worker" in state["pids"]:
         stop_tile_worker(state)
+    if "latency_proxy" in state["pids"]:
+        stop(state["pids"]["latency_proxy"], "latency_proxy.py", "latency proxy")
+    if "depth_worker" in state["pids"]:
+        stop(state["pids"]["depth_worker"], DEPTH_WORKER_NAME, "depth worker")
     if "vite" in state["pids"]:
         stop(state["pids"]["vite"], "vite", "app")
     if "api_2" in state["pids"]:
@@ -1523,6 +1719,19 @@ def build_parser() -> argparse.ArgumentParser:
                 "--read-only-token",
                 action="store_true",
                 help="also write token-read, granting the first workspace world.read alone",
+            )
+            command.add_argument(
+                "--database-latency",
+                action="store_true",
+                help="put latency_proxy.py between the API and PostgreSQL on the slot's spare "
+                "port, adding the delay the run directory's database-delay-ms names "
+                "(default: no proxy)",
+            )
+            command.add_argument(
+                "--depth-worker",
+                action="store_true",
+                help="with --no-derivative-worker, run the production derivative worker with the "
+                "depth model from the local model cache, offline (default: no depth)",
             )
             command.add_argument(
                 "--society-tick-interval-ms",
