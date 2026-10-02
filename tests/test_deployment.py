@@ -196,7 +196,9 @@ def test_runtime_containers_use_the_rls_role_and_only_migrations_use_the_owner()
     a runtime role may only read). Every long-running process connects as the RLS role."""
     directives = _directives(COMPOSE)
     runtime_urls = [line for line in directives.splitlines() if "EXULANICA_DATABASE_URL:" in line]
-    assert len(runtime_urls) == 5, runtime_urls
+    # The owner twice (migrate, catalogs), then the API, the derivative, scene and preparation
+    # workers as the RLS role.
+    assert len(runtime_urls) == 6, runtime_urls
     assert all("postgresql://${POSTGRES_USER:-exulanica}:" in url for url in runtime_urls[:2])
     assert all("postgresql://exulanica_app:" in line for line in runtime_urls[2:]), runtime_urls
     assert "EXULANICA_APP_ROLE_PASSWORD:?" in COMPOSE
@@ -248,7 +250,8 @@ def test_the_pose_worker_is_separate_restartable_and_provenance_configured():
 
 
 def test_non_http_workers_do_not_inherit_the_api_health_probe():
-    assert COMPOSE.count('"import os; os.kill(1, 0)"') == 2
+    # The derivative, scene and preparation workers serve no HTTP.
+    assert COMPOSE.count('"import os; os.kill(1, 0)"') == 3
 
 
 def test_no_deployment_artefact_names_a_target():

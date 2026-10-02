@@ -34,7 +34,17 @@
       "unavailable_reason": "image_built_without_extra"
     },
     "preparation": {
-      "installed": false
+      "installed": true,
+      "queue_bound_seconds": 900,
+      "preparers": {
+        "exulanica.makehuman-parametric-preparer@1": {
+          "installed": false,
+          "reason": "preparer_tool_absent"
+        },
+        "exulanica.static-glb-preparer@1": {
+          "installed": true
+        }
+      }
     },
     "materials": {
       "installed": false

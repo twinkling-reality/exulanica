@@ -21,7 +21,7 @@ import signal
 import sys
 import threading
 import uuid
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from typing import Any, Final
 
 from exulanica.db.account_workspaces import ACCOUNT_DATABASE_URL_ENV, AccountWorkspaceSource
@@ -30,7 +30,7 @@ from exulanica.db.roles import assert_runtime_role
 from exulanica.db.session import Database
 from exulanica.env import env_get, env_name
 from exulanica.store.configured import content_stores
-from exulanica.world.asset_preparation import AssetPreparationWorker
+from exulanica.world.asset_preparation import PREPARERS, AssetPreparationWorker, Preparer
 from exulanica.world.workspace_preparations import retained_bytes_limit
 
 __all__ = ["WORKSPACES_ENV", "main"]
@@ -56,7 +56,11 @@ def _workspaces(values: list[str], environ: Mapping[str, str]) -> frozenset[uuid
     return frozenset(uuid.UUID(value) for value in raw)
 
 
-def _build(args: argparse.Namespace, environ: Mapping[str, str]) -> AssetPreparationWorker:
+def _build(
+    args: argparse.Namespace,
+    environ: Mapping[str, str],
+    preparers: Mapping[tuple[str, int], Preparer] = PREPARERS,
+) -> AssetPreparationWorker:
     database = Database.from_env(environ)
     verify_schema(database)
     with database.unscoped() as connection:
@@ -73,6 +77,7 @@ def _build(args: argparse.Namespace, environ: Mapping[str, str]) -> AssetPrepara
         database,
         content_stores(environ).workspace_assets,
         workspaces,
+        preparers=preparers,
         name=args.name or f"{platform.node() or 'unknown'}:{os.getpid()}:{uuid.uuid4().hex[:8]}",
         poll_seconds=args.poll_seconds,
         workspace_source=source,
@@ -85,7 +90,12 @@ def main(
     *,
     environ: Mapping[str, str] | None = None,
     stream: Any = None,
+    preparers: Callable[[Mapping[str, str]], Mapping[tuple[str, int], Preparer]] | None = None,
 ) -> int:
+    """Run the worker. ``preparers`` chooses which registered preparers run from the environment;
+    the installed command passes the installation's declaration
+    (:mod:`exulanica.orchestration.installation.preparation`), and without it every registered
+    preparer the host can run is run."""
     parser = argparse.ArgumentParser(
         prog="exulanica-asset-preparation",
         description="Prepare admitted workspace assets, one preparation at a time.",
@@ -100,7 +110,9 @@ def main(
     environment = os.environ if environ is None else environ
 
     try:
-        worker = _build(args, environment)
+        worker = _build(
+            args, environment, PREPARERS if preparers is None else preparers(environment)
+        )
     except Exception as error:
         _emit(output, "startup_failed", failure_class=type(error).__name__, message=str(error))
         return 1

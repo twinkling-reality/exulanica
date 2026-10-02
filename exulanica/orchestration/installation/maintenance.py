@@ -61,7 +61,7 @@ from exulanica.orchestration.installation.custody import (
 from exulanica.store.base import ContentAddressedStore, PurgeAuthorization, privileged_purger
 from exulanica.store.configured import ContentStores
 
-__all__ = ["QUEUE_QUERIES", "Maintenance", "MaintenanceStores"]
+__all__ = ["PREPARER_QUEUE_QUERY", "QUEUE_QUERIES", "Maintenance", "MaintenanceStores"]
 
 #: How old the oldest item each queued component is waiting on, read across workspaces. Items
 #: that are waiting for a retry time are not late, so the derivative and tile queues count only
@@ -78,11 +78,20 @@ QUEUE_QUERIES: Final[Mapping[str, str]] = {
     "pose_scene": "select min(created_at) as oldest from reconstruction_scene_job "
     "where status = 'queued'",
     "materials": "select min(requested_at) as oldest from material_bake where state = 'requested'",
+    "preparation": "select min(requested_at) as oldest from workspace_preparation "
+    "where state = 'requested'",
     # Each world's oldest unstarted comparison, then the oldest of those: an age across worlds.
     "comparison": "select min(oldest) as oldest from (select world_id, min(created_at) as oldest "
     "from society_comparison_start where finished_at is null and lease_token is null "
     "group by world_id) per_world",
 }
+
+
+#: The oldest requested preparation of each preparer, by its pin's parts.
+PREPARER_QUEUE_QUERY: Final = (
+    "select preparer_id, preparer_version, min(requested_at) as oldest from workspace_preparation "
+    "where state = 'requested' group by preparer_id, preparer_version"
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -363,7 +372,7 @@ class Maintenance:
 
     def _queues(self, status: dict[str, Any]) -> None:
         now = self.now()
-        queues: dict[str, dict[str, int]] = {}
+        queues: dict[str, dict[str, Any]] = {}
         with self._database.unscoped() as raw:
             connection = raw.cursor(row_factory=dict_row)
             for component, query in QUEUE_QUERIES.items():
@@ -374,6 +383,15 @@ class Maintenance:
                     if oldest is None
                     else max(0, int((now - oldest).total_seconds()))
                 }
+            # Preparation per preparer as well: a profile may install some preparers and not
+            # others, and a request for one it does not run waits by design.
+            preparers = {
+                f"{row['preparer_id']}@{row['preparer_version']}": max(
+                    0, int((now - row["oldest"]).total_seconds())
+                )
+                for row in connection.execute(PREPARER_QUEUE_QUERY).fetchall()
+            }
+            queues["preparation"]["preparers"] = preparers
         status["queues"] = queues
 
     def run_pass(self) -> dict[str, Any]:

@@ -156,10 +156,15 @@ class Effect:
     #: The installation component whose state decides the effect where the installation's facts
     #: state it; ``availability`` stands where they do not.
     component: str | None = None
+    #: ``preparation`` only: the preparer (``id@version``) whose own state in the facts decides
+    #: the effect where the profile declares preparers one by one.
+    preparer: str | None = None
 
     def __post_init__(self) -> None:
         if self.component is not None and self.component not in COMPONENTS:
             raise ValueError(f"{self.component!r} is not an installation component")
+        if self.preparer is not None and self.component != "preparation":
+            raise ValueError("only a preparation effect names a preparer")
 
 
 @dataclass(frozen=True, slots=True)
@@ -416,13 +421,19 @@ def _effect(effect: Effect, components: Mapping[str, Mapping[str, Any]]) -> Effe
     entry = None if effect.component is None else components.get(effect.component)
     if effect.component is None or entry is None:
         return effect
+    if effect.preparer is not None:
+        # A profile that declares preparers one by one decides each one's effect by its own state.
+        entry = next(
+            (one for one in entry.get("preparers", ()) if one["preparer"] == effect.preparer),
+            entry,
+        )
     if entry.get("reason") == _UNDECLARED:
         decided = unknown(_UNDECLARED)
     elif entry["state"] in _PREVENTING:
         decided = unavailable(_component_refusal(effect.component, entry))
     else:
         decided = AVAILABLE
-    return Effect(effect.on, decided, effect.component)
+    return Effect(effect.on, decided, effect.component, effect.preparer)
 
 
 def describe(

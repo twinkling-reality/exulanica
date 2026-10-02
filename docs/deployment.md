@@ -1167,10 +1167,11 @@ runs, the reason one it runs cannot work here, the queue bound past which a comp
 degraded, and its recovery bounds (9.4). `reviewer` is the seeded stack of section 8 and is not a
 complete installation: it runs the database, schema, API, client, ingestion and simulation.
 `single-host` runs on one host the database, schema, API, client, maintenance, ingestion,
-derivatives, pose and scene reconstruction (`pose_scene`), simulation and comparison. No shipped
-profile installs asset and body preparation (`preparation`), material bakes (`materials`) or
-generated tiles (`generated_tiles`): each reports not installed, and `compose.yaml` runs no worker
-for them. `single-host-server-only` is
+derivatives, pose and scene reconstruction (`pose_scene`), workspace asset preparation
+(`preparation`), simulation and comparison. No shipped profile installs material bakes (`materials`)
+or generated tiles (`generated_tiles`): each reports not installed, and `compose.yaml` runs no worker
+for them, so a material bake requested on an installation waits, and a town created on one stays
+"being built" and is not drawn (its tiles are never baked). `single-host-server-only` is
 the same built without the reconstruction and pose extras, whose workers then report unavailable,
 and is what `compose.yaml` and `.env.example` select by default (`EXULANICA_PROFILE`);
 `shared-store` keeps its bytes in an S3-compatible bucket, composed by adding
@@ -1178,7 +1179,22 @@ and is what `compose.yaml` and `.env.example` select by default (`EXULANICA_PROF
 API and workers and the purge identity to maintenance and the restore job alone. A process whose
 `EXULANICA_STORE_KIND` differs from its profile's store refuses to start (`store_kind_conflict`): its
 bytes would be outside the installation's backups. A profile names processes, not features, and
-holds no secret, host or account. Every profile names its restore marker
+holds no secret, host or account.
+
+`preparation` may also name its preparers one by one (`preparers`, each by `id@version`, installed
+or not, with a reason). The three installation profiles install the static GLB preparer and
+declare the character body preparer not installed (`preparer_tool_absent`): it needs a pinned
+Blender with its parametric inputs, which no image carries. `compose.yaml` starts the `preparation`
+service, `exulanica-asset-preparation` from the backend image, which runs the preparers the profile
+installs and nothing else, and refuses to start by name when the profile installs one it cannot run
+(`declared_preparer_unavailable`, `declared_preparer_unknown`) or does not install preparation at
+all (`preparation_not_installed`). Without a profile, or with a profile that names no preparer, it
+runs every registered preparer its host can. The facts report each declared preparer's state, a
+capability whose effect names a preparer takes that preparer's state, and maintenance observes the
+preparation queue per preparer, so a request for a preparer the installation does not run waits
+without making the component `degraded`.
+
+Every profile names its restore marker
 (`recovery.restore_state_path`), which every process of the installation reads, and
 `exulanica-installation init` writes it in state `none` only on a first install, a database with
 no applied schema, before the API first starts; a marker missing on an installed database is lost

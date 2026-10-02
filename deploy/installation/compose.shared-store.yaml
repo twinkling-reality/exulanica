@@ -38,6 +38,8 @@ services:
     environment: *runtime-identity
   scene-worker:
     environment: *runtime-identity
+  preparation:
+    environment: *runtime-identity
   maintenance:
     environment: *purge-identity
   restore:

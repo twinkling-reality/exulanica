@@ -84,9 +84,12 @@ def test_a_first_pass_exports_backs_up_verifies_and_reports(purged, tmp_path):
         "derivatives",
         "generated_tiles",
         "pose_scene",
+        "preparation",
         "materials",
         "comparison",
     }
+    # Preparation is observed per preparer too; nothing is waiting here.
+    assert status["queues"]["preparation"] == {"oldest_queued_seconds": 0, "preparers": {}}
     written = json.loads((tmp_path / "status" / "maintenance.json").read_bytes())
     assert written["written_at"] == status["written_at"]
     # The API reads exactly this file.
@@ -100,6 +103,7 @@ def test_a_first_pass_exports_backs_up_verifies_and_reports(purged, tmp_path):
     components = {entry["component"]: entry for entry in facts["components"]}
     assert components["maintenance"]["state"] == "ready"
     assert components["derivatives"]["state"] == "configured"
+    assert components["preparation"]["state"] == "configured"
     assert facts["recovery"]["withdrawal_authority"]["kind"] == "periodic_export"
 
 

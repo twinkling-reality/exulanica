@@ -172,7 +172,7 @@ exulanica-material-bake = "exulanica.world.material_bake_command:main"
 # `uv run exulanica-asset-preparation --workspace <uuid> --once`. Prepares the static assets people
 # admitted to their workspaces (migration 0126): validates, measures and normalizes each one, and
 # records each output before its bytes are written. Pure Python; downloads nothing.
-exulanica-asset-preparation = "exulanica.world.asset_preparation_command:main"
+exulanica-asset-preparation = "exulanica.orchestration.installation.preparation:main"
 # `uv run exulanica-generated-tile-worker --workspace <uuid> --once`. Bakes the tiles worlds
 # generated from a recipe are waiting for, off the request: claims each job as the runtime role and
 # publishes each bake through the owner connection migration 0072 requires. Needs Node and web/.

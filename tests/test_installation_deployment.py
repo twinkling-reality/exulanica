@@ -197,6 +197,40 @@ def test_the_default_composition_claims_no_worker_it_does_not_start():
     assert "${EXULANICA_BACKEND_EXTRAS:---extra server}" in compose
 
 
+def test_every_profile_that_installs_preparation_is_composed_with_a_preparation_worker():
+    """A profile that says preparation is installed is one compose starts a worker for by default,
+    and the worker reads that profile, which names every registered preparer: a preparer added in
+    code is declared installed or not, never left for the worker to run unannounced."""
+    import json
+
+    import yaml
+    from exulanica.world.asset_preparation import PREPARERS
+
+    service = yaml.safe_load((ROOT / "compose.yaml").read_text(encoding="utf-8"))["services"][
+        "preparation"
+    ]
+    assert "profiles" not in service
+    assert service["command"] == ["exulanica-asset-preparation"]
+    assert service["environment"]["EXULANICA_INSTALLATION_PROFILE"] == (
+        "/app/deploy/profiles/${EXULANICA_PROFILE:-single-host-server-only}.json"
+    )
+    for credential in ("BACKUP", "PURGE", "RESTORE", "TILE_PUBLISHER"):
+        assert not any(credential in key for key in service["environment"]), credential
+    registered = {f"{key[0]}@{key[1]}" for key in PREPARERS}
+    for name in ("single-host", "single-host-server-only", "shared-store"):
+        profile = json.loads((ROOT / "deploy" / "profiles" / f"{name}.json").read_text())
+        preparation = profile["components"]["preparation"]
+        assert preparation["installed"] is True, name
+        assert set(preparation["preparers"]) == registered, name
+        assert preparation["preparers"]["exulanica.static-glb-preparer@1"] == {"installed": True}
+        assert preparation["preparers"]["exulanica.makehuman-parametric-preparer@1"] == {
+            "installed": False,
+            "reason": "preparer_tool_absent",
+        }
+    reviewer = json.loads((ROOT / "deploy" / "profiles" / "reviewer.json").read_text())
+    assert reviewer["components"]["preparation"] == {"installed": False}
+
+
 def test_the_shared_store_override_gives_the_purge_identity_to_maintenance_and_restore_alone():
     import yaml
 
@@ -229,7 +263,7 @@ def test_the_shared_store_override_gives_the_purge_identity_to_maintenance_and_r
     }
     assert purge == {"maintenance", "restore"}
     publishes = {"catalogs"} if _publishes_character_catalogs() else set()
-    assert runtime == {"api", "derivative-worker", "scene-worker"} | publishes
+    assert runtime == {"api", "derivative-worker", "scene-worker", "preparation"} | publishes
 
 
 def _publishes_character_catalogs() -> bool:

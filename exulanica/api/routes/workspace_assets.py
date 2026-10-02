@@ -333,7 +333,12 @@ def _limits(connection: psycopg.Connection) -> dict[str, Any]:
 #: Whether an admitted asset is prepared here depends on a preparation process this server cannot
 #: see: the installation facts state it (their ``preparation`` component), and where a process has
 #: none the effect's state is not known.
-_PREPARATION: Final = Effect("preparation", unknown(), component="preparation")
+_PREPARATION: Final = Effect(
+    "preparation",
+    unknown(),
+    component="preparation",
+    preparer=f"{static_glb.PREPARER_ID}@{static_glb.PREPARER_VERSION}",
+)
 #: The code every count bound is refused with, whichever bound it is.
 _QUOTA: Final = "workspace_asset_quota_exceeded"
 

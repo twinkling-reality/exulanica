@@ -213,6 +213,34 @@ services:
       migrate:
         condition: service_completed_successfully
 
+  # Workspace asset preparation (docs/deployment.md 9.1): the preparers the installation's profile
+  # installs and nothing else, from the same backend image. The static GLB preparer is pure Python;
+  # the character body preparer needs a pinned Blender no image carries, so every shipped profile
+  # declares it not installed, and the worker refuses to start if a preparer the profile installs
+  # cannot run here.
+  preparation:
+    build: *backend-build
+    command: ["exulanica-asset-preparation"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os; os.kill(1, 0)"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+    environment:
+      EXULANICA_DATABASE_URL: postgresql://exulanica_app:${EXULANICA_APP_ROLE_PASSWORD}@postgres:5432/${POSTGRES_DB:-exulanica}
+      # As the derivative worker: static workspaces, the verified account-role source, or both;
+      # the command refuses startup when both are absent.
+      EXULANICA_WORKSPACE_IDS: ${EXULANICA_WORKSPACE_IDS:-}
+      EXULANICA_ACCOUNT_DATABASE_URL: ${EXULANICA_ACCOUNT_DATABASE_URL:-}
+      EXULANICA_DATA_DIR: /var/lib/exulanica
+      EXULANICA_INSTALLATION_PROFILE: /app/deploy/profiles/${EXULANICA_PROFILE:-single-host-server-only}.json
+    volumes:
+      - media:/var/lib/exulanica
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
   # Unattended maintenance: withdrawal exports on change, purges, backup sets, their purge and
   # verification, retention and queue ages, one bounded pass at a time (docs/deployment.md 9.3).
   # Backups and custody are bind mounts the operator names, because they belong on storage apart

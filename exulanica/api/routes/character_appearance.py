@@ -321,7 +321,12 @@ def families(
 #: as for a workspace asset (``exulanica/api/routes/workspace_assets.py``): the installation facts
 #: state it (their ``preparation`` component), and where a process has none the effect's state is
 #: not known.
-_PREPARATION_EFFECT: Final = Effect("preparation", unknown(), component="preparation")
+_PREPARATION_EFFECT: Final = Effect(
+    "preparation",
+    unknown(),
+    component="preparation",
+    preparer=f"{PREPARER_ID}@{PREPARER_VERSION}",
+)
 
 
 def capability_operations(context: VersionContext) -> list[Operation]:

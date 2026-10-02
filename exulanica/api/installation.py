@@ -33,6 +33,7 @@ import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
+from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Final
 
 from psycopg.rows import dict_row
@@ -55,6 +56,7 @@ __all__ = [
     "Installation",
     "InstallationProfile",
     "InstallationRefused",
+    "PreparerSpec",
     "installation_facts",
     "installation_summary",
     "load_installation",
@@ -97,7 +99,17 @@ COMPONENTS: Final = (
 STATES: Final = ("not_installed", "unavailable", "configured", "ready", "degraded", "refused")
 
 #: Components whose queued work only the maintenance process can observe across workspaces.
-_QUEUED: Final = ("derivatives", "pose_scene", "materials", "generated_tiles", "comparison")
+_QUEUED: Final = (
+    "derivatives",
+    "pose_scene",
+    "preparation",
+    "materials",
+    "generated_tiles",
+    "comparison",
+)
+
+#: A preparer as a profile and a preparation row name it: its id and version, ``id@version``.
+_PREPARER_PIN: Final = re.compile(r"^[a-z][a-z0-9.-]*@[1-9][0-9]{0,5}$")
 
 _CODE: Final = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 _SETTING: Final = re.compile(r"^(EXULANICA_|NEBIUS_)[A-Z0-9_]{1,64}$")
@@ -116,6 +128,15 @@ class InstallationRefused(ValueError):
 
 
 @dataclass(frozen=True, slots=True)
+class PreparerSpec:
+    """One preparer as a profile's ``preparation`` component declares it."""
+
+    installed: bool
+    #: Why it is not installed, or why, installed, it cannot run, as a stable code.
+    reason: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class ComponentSpec:
     """One component as a profile declares it."""
 
@@ -124,6 +145,10 @@ class ComponentSpec:
     unavailable_reason: str | None = None
     #: How old the oldest queued item may be before the component reports ``degraded``.
     queue_bound_seconds: int | None = None
+    #: ``preparation`` only: each preparer by its pin (``id@version``). A preparation worker runs
+    #: the installed ones and nothing else, and refuses to start when one cannot run. None where
+    #: the profile names none: the worker then runs every registered preparer its host can.
+    preparers: Mapping[str, PreparerSpec] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -169,6 +194,31 @@ def _exact_keys(value: Any, keys: set[str], optional: set[str], where: str) -> d
     return value
 
 
+def _preparers(value: Any) -> Mapping[str, PreparerSpec]:
+    """``components.preparation.preparers``: each pin's installation, and a reason by code."""
+    if not isinstance(value, dict) or not value:
+        raise InstallationRefused("profile_invalid", "components.preparation.preparers")
+    preparers: dict[str, PreparerSpec] = {}
+    for pin, entry in value.items():
+        if not isinstance(pin, str) or not _PREPARER_PIN.match(pin):
+            raise InstallationRefused(
+                "profile_invalid", "components.preparation.preparers: a key is id@version"
+            )
+        where = f"components.preparation.preparers.{pin}"
+        body = _exact_keys(entry, {"installed"}, {"reason"}, where)
+        if not isinstance(body["installed"], bool):
+            raise InstallationRefused("profile_invalid", f"{where}.installed")
+        reason = body.get("reason")
+        if reason is not None and (not isinstance(reason, str) or not _CODE.match(reason)):
+            raise InstallationRefused("profile_invalid", f"{where}.reason")
+        preparers[pin] = PreparerSpec(body["installed"], reason)
+    if not any(spec.installed for spec in preparers.values()):
+        raise InstallationRefused(
+            "profile_invalid", "components.preparation.preparers installs no preparer"
+        )
+    return MappingProxyType(preparers)
+
+
 def load_profile(path: Path) -> InstallationProfile:
     """Read and validate a profile, refusing anything it does not state exactly."""
     try:
@@ -194,7 +244,8 @@ def load_profile(path: Path) -> InstallationProfile:
         entry = _exact_keys(
             declared[name],
             {"installed"},
-            {"unavailable_reason", "queue_bound_seconds"},
+            {"unavailable_reason", "queue_bound_seconds"}
+            | ({"preparers"} if name == "preparation" else set()),
             f"components.{name}",
         )
         if not isinstance(entry["installed"], bool):
@@ -211,7 +262,12 @@ def load_profile(path: Path) -> InstallationProfile:
             raise InstallationRefused(
                 "profile_invalid", f"components.{name} is not installed and so has no reason"
             )
-        components[name] = ComponentSpec(entry["installed"], reason, bound)
+        preparers = _preparers(entry["preparers"]) if "preparers" in entry else None
+        if preparers is not None and not entry["installed"]:
+            raise InstallationRefused(
+                "profile_invalid", f"components.{name} is not installed and so runs no preparer"
+            )
+        components[name] = ComponentSpec(entry["installed"], reason, bound, preparers)
     for required in ("database", "schema", "api"):
         if not components[required].installed:
             raise InstallationRefused("profile_invalid", f"every installation runs {required}")
@@ -565,6 +621,9 @@ def _queued(
     queues = status["document"].get("queues", {})
     seen = queues.get(name) if isinstance(queues, dict) else None
     oldest = seen.get("oldest_queued_seconds") if isinstance(seen, dict) else None
+    if spec.preparers is not None and isinstance(seen, dict):
+        # A request for a preparer this installation does not run waits by design, and is not late.
+        oldest = _installed_preparers_oldest(spec.preparers, seen.get("preparers"))
     if isinstance(oldest, int) and not isinstance(oldest, bool):
         if oldest > spec.queue_bound_seconds:
             return _component(
@@ -576,6 +635,41 @@ def _queued(
             )
         return None
     return _component(name, "degraded", "queue_progress_unobserved")
+
+
+def _installed_preparers_oldest(preparers: Mapping[str, PreparerSpec], seen: Any) -> int | None:
+    """The oldest wait among the installed preparers' requests, from maintenance's observation."""
+    if not isinstance(seen, dict):
+        return None
+    oldest = 0
+    for pin, spec in preparers.items():
+        value = seen.get(pin, 0)
+        if isinstance(value, bool) or not isinstance(value, int):
+            return None
+        if spec.installed:
+            oldest = max(oldest, value)
+    return oldest
+
+
+def _preparer_states(
+    spec: ComponentSpec, component: Mapping[str, Any]
+) -> list[dict[str, Any]] | None:
+    """Each declared preparer's state: its own declaration, else the component's state."""
+    if spec.preparers is None:
+        return None
+    states: list[dict[str, Any]] = []
+    for pin, preparer in sorted(spec.preparers.items()):
+        if not preparer.installed:
+            state, reason = "not_installed", preparer.reason
+        elif preparer.reason is not None:
+            state, reason = "unavailable", preparer.reason
+        else:
+            state, reason = component["state"], component.get("reason")
+        entry: dict[str, Any] = {"preparer": pin, "state": state}
+        if reason is not None:
+            entry["reason"] = reason
+        states.append(entry)
+    return states
 
 
 def _components(
@@ -645,7 +739,10 @@ def _components(
     )
     entries.append(declared("derivatives", running_here=services.runs_derivative_worker))
     entries.append(declared("pose_scene"))
-    entries.append(declared("preparation"))
+    preparation = declared("preparation")
+    if (preparers := _preparer_states(spec("preparation"), preparation)) is not None:
+        preparation["preparers"] = preparers
+    entries.append(preparation)
     if services.materials is None:
         entries.append(_component("materials", "unavailable", "material_catalog_absent"))
     else:

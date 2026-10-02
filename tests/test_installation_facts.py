@@ -180,7 +180,25 @@ def test_facts_use_frozen_names_and_states_and_carry_no_secret(purged, tmp_path,
     assert facts["identity"]["code_revision"] == "a" * 40
     components = _by_name(facts)
     assert components["database"]["state"] == "ready"
-    assert components["preparation"] == {"component": "preparation", "state": "not_installed"}
+    # Installed, with no maintenance status yet to observe its queue; each preparer as declared.
+    assert components["preparation"] == {
+        "component": "preparation",
+        "state": "degraded",
+        "reason": "queue_progress_unobserved",
+        "preparers": [
+            {
+                "preparer": "exulanica.makehuman-parametric-preparer@1",
+                "state": "not_installed",
+                "reason": "preparer_tool_absent",
+            },
+            {
+                "preparer": "exulanica.static-glb-preparer@1",
+                "state": "degraded",
+                "reason": "queue_progress_unobserved",
+            },
+        ],
+    }
+    assert {one["state"] for one in components["preparation"]["preparers"]} <= set(STATES)
 
 
 def test_the_schema_is_ready_only_when_applied_equals_expected(purged, monkeypatch):
