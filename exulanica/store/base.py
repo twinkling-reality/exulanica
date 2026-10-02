@@ -25,21 +25,32 @@ nothing exposes a filesystem path.
 from __future__ import annotations
 
 import abc
+import contextlib
+import hashlib
 import os
+import tempfile
 from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import IO
+from typing import IO, Final
 
-from exulanica.errors import PurgeNotAuthorisedError
+from exulanica.errors import IntegrityError, PurgeNotAuthorisedError
 from exulanica.evidence.blob import BlobId
 
 __all__ = [
+    "VERIFY_CHUNK_BYTES",
     "ContentAddressedStore",
     "PrivilegedPurger",
     "PurgeAuthorization",
     "PutResult",
     "privileged_purger",
 ]
+
+#: How much of a blob ``open_verified`` reads and writes at once: the memory a verified read holds.
+VERIFY_CHUNK_BYTES: Final = 1 << 20
+#: The prefix of a store's temporary files, which ``sweep_incomplete_writes`` removes once stale.
+#: An unnamed file has a name for an instant on a host that cannot make one without it, so a crash
+#: in that instant leaves a file the sweep finds.
+_TEMPORARY_PREFIX: Final = "put-"
 
 
 @dataclass(frozen=True, slots=True)
@@ -89,8 +100,42 @@ class ContentAddressedStore(abc.ABC):
         """Open a blob for streaming reads.
 
         The caller gets the bytes without an integrity check, because verifying a stream means
-        buffering it. Use ``get`` when the check matters and the object fits in memory.
+        buffering it. Use ``get`` when the check matters and the object fits in memory, and
+        ``open_verified`` when it matters and the object should not be held in memory.
         """
+
+    def open_verified(self, blob_id: BlobId) -> IO[bytes]:
+        """A blob's bytes, verified to hash to the key, in a file of the caller's own.
+
+        Verifying a stream means buffering it, and ``get`` buffers it in memory. This buffers it
+        on this store's host instead, :data:`VERIFY_CHUNK_BYTES` at a time, in a temporary file
+        that is unlinked as it is made: it has no name, nobody else can open it, and its space is
+        freed when the caller closes it or the process ends, however it ends. The file is returned
+        open at its start. A missing blob raises what ``open`` raises, and bytes that do not hash
+        to the key raise :class:`~exulanica.errors.IntegrityError`, with nothing returned.
+        """
+        with contextlib.ExitStack() as unless_returned:
+            spool = unless_returned.enter_context(
+                tempfile.TemporaryFile(prefix=_TEMPORARY_PREFIX, dir=self._spool_directory())
+            )
+            hasher = hashlib.sha256()
+            with self.open(blob_id) as source:
+                while chunk := source.read(VERIFY_CHUNK_BYTES):
+                    hasher.update(chunk)
+                    spool.write(chunk)
+            if hasher.digest() != blob_id.digest:
+                raise IntegrityError(
+                    f"stored bytes under {self.key_for(blob_id)} hash to {hasher.hexdigest()}. "
+                    "The key is a claim about the content, and the claim is false."
+                )
+            spool.seek(0)
+            unless_returned.pop_all()
+        return spool
+
+    def _spool_directory(self) -> str | os.PathLike[str] | None:
+        """Where ``open_verified`` keeps its unnamed file: a directory on this store's host, or
+        None for the process's temporary directory."""
+        return None
 
     @abc.abstractmethod
     def exists(self, blob_id: BlobId) -> bool: ...

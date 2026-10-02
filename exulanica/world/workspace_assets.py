@@ -57,7 +57,6 @@ from exulanica.evidence.blob import BlobId
 from exulanica.store.namespaces import WorkspaceStores, workspace_asset_lock_key
 from exulanica.world.asset_import import MAX_ASSET_BYTES
 from exulanica.world.static_glb import (
-    MEDIA_TYPE,
     PREPARER_ID,
     PREPARER_VERSION,
     StaticGlbRefused,
@@ -67,6 +66,7 @@ from exulanica.world.workspace_preparations import (
     DEFAULT_RETAINED_BYTES,
     PREPARATION_COLUMNS,
     RECEIPT_PROFILE,
+    AuthorizedOutput,
     PreparationBlocked,
     PreparationError,
     PreparationFinished,
@@ -333,14 +333,23 @@ class AdmissionResult:
 
 @dataclass(frozen=True, slots=True)
 class AuthorizedAssetBytes:
-    """Prepared bytes this workspace may be sent now, checked and still current."""
+    """Prepared bytes this workspace may be sent now, checked and still current.
 
-    data: bytes
-    content_sha256: str
+    ``output`` holds them in a file of its own until it is closed (:class:`AuthorizedOutput`).
+    """
+
+    output: AuthorizedOutput
     asset_id: uuid.UUID
     licence_id: str | None
     attribution: str | None
-    media_type: str = MEDIA_TYPE
+
+    @property
+    def content_sha256(self) -> str:
+        return self.output.content_sha256
+
+    @property
+    def media_type(self) -> str:
+        return self.output.media_type
 
 
 @dataclass(frozen=True, slots=True)
@@ -665,8 +674,7 @@ class WorkspaceAssetRepository:
                 f"asset {asset_id}'s prepared output stopped being current"
             ) from blocked
         return AuthorizedAssetBytes(
-            data=output.data,
-            content_sha256=output.content_sha256,
+            output=output,
             asset_id=asset_id,
             licence_id=asset.licence_id,
             attribution=asset.attribution,

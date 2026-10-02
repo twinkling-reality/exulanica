@@ -39,8 +39,10 @@ from exulanica.api.dependencies import (
     CurrentSession,
     ReadOnlyConnection,
     ScopedConnection,
+    ScopedSessions,
     get_services,
 )
+from exulanica.api.verified_body import VerifiedBodyResponse
 from exulanica.api.world_scope import WorldId
 from exulanica.canonical import canonical_json
 from exulanica.errors import IntegrityError
@@ -758,42 +760,44 @@ def read_preparation_bytes(
     subject_kind: Kind,
     subject_id: uuid.UUID,
     preparation_id: uuid.UUID,
-    connection: ScopedConnection,
+    sessions: ScopedSessions,
     session: CurrentSession,
     request: Request,
     world_id: WorldId,
     society_id: uuid.UUID | None = None,
 ) -> Any:
+    # Authorized on a connection of its own, closed before the first byte is sent; the bytes sent
+    # are the ones checked before the final check, streamed from a file of the request's own.
     try:
-        bodies, record = _character_record(
-            request,
-            connection,
-            session,
-            world_id,
-            version_id,
-            _subject(subject_kind, subject_id, society_id),
-            preparation_id,
-        )
-        runtime = get_services(request).character_appearance
-        registry = runtime.catalogs if runtime is not None else None
-        if registry is None:
-            raise AppearanceUnavailable("no character catalogs are served here")
-        catalog, family = (
-            record.inputs.get("catalog_sha256"),
-            record.parameters.get("family_sha256"),
-        )
-        output = bodies.queue.read_output(
-            preparation_id,
-            still_current=lambda current: registry.served(current).derives(
-                str(catalog), str(family)
-            ),
-        )
+        with sessions() as connection:
+            bodies, record = _character_record(
+                request,
+                connection,
+                session,
+                world_id,
+                version_id,
+                _subject(subject_kind, subject_id, society_id),
+                preparation_id,
+            )
+            runtime = get_services(request).character_appearance
+            registry = runtime.catalogs if runtime is not None else None
+            if registry is None:
+                raise AppearanceUnavailable("no character catalogs are served here")
+            catalog, family = (
+                record.inputs.get("catalog_sha256"),
+                record.parameters.get("family_sha256"),
+            )
+            output = bodies.queue.read_output(
+                preparation_id,
+                still_current=lambda current: registry.served(current).derives(
+                    str(catalog), str(family)
+                ),
+            )
     except _REFUSALS as error:
         return _refused(error)
     # The output digest names these exact bytes and the queue never rewrites them: immutable.
-    return Response(
-        content=output.data,
-        media_type=output.media_type,
+    return VerifiedBodyResponse(
+        output,
         headers={
             "ETag": f'"{output.content_sha256}"',
             "Cache-Control": "private, max-age=31536000, immutable",

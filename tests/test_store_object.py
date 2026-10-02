@@ -35,7 +35,9 @@ from exulanica.errors import (
 )
 from exulanica.evidence import BlobId
 from exulanica.store import ContentAddressedStore, PurgeAuthorization, privileged_purger
+from exulanica.store import base as base_module
 from exulanica.store import object as object_module
+from exulanica.store.base import VERIFY_CHUNK_BYTES
 from exulanica.store.configured import (
     ContentStores,
     local_content_stores,
@@ -312,7 +314,58 @@ def test_a_missing_blob_raises_rather_than_returning_empty(backend):
         store.size(absent)
     with pytest.raises(BlobNotFoundError):
         store.open(absent)
+    with pytest.raises(BlobNotFoundError):
+        store.open_verified(absent)
     assert store.exists(absent) is False
+
+
+def _named_files(store: ContentAddressedStore) -> list[Path]:
+    """The files with a name in the directory a verified read keeps its copy in."""
+    return sorted(path for path in Path(store._spool_directory()).iterdir() if path.is_file())  # type: ignore[arg-type]
+
+
+@pytest.fixture
+def copies(monkeypatch) -> list[object]:
+    """Every file a verified read makes, kept so a test can ask whether it was closed."""
+    made: list[object] = []
+    make = base_module.tempfile.TemporaryFile
+
+    def recorded(*args: object, **kwargs: object) -> object:
+        made.append(make(*args, **kwargs))  # type: ignore[arg-type]
+        return made[-1]
+
+    monkeypatch.setattr(base_module.tempfile, "TemporaryFile", recorded)
+    return made
+
+
+def test_a_verified_read_is_the_bytes_in_an_unnamed_copy_and_never_the_whole_in_memory(
+    backend, copies, monkeypatch
+):
+    """``open_verified`` is ``get``'s check without ``get``'s buffer: the exact bytes, at their
+    start, in a file of the reader's own that has no name, read a chunk at a time."""
+    store, _ = backend
+    payload = bytes(range(256)) * ((2 * VERIFY_CHUNK_BYTES + 777) // 256)
+    blob = store.put_bytes(payload).blob_id
+
+    def whole(*_args: object) -> bytes:
+        raise AssertionError("a verified read never reads the whole object into memory")
+
+    monkeypatch.setattr(type(store), "get", whole)
+    with store.open_verified(blob) as body:
+        assert body.tell() == 0
+        assert body.read() == payload
+        assert _named_files(store) == []
+    assert len(copies) == 1 and copies[0].closed  # type: ignore[attr-defined]
+
+
+def test_a_verified_read_of_changed_bytes_refuses_and_keeps_no_copy(backend, copies):
+    store, tamper = backend
+    blob = store.put_bytes(b"original bytes").blob_id
+    tamper(blob, b"tampered bytes")
+    with pytest.raises(IntegrityError):
+        store.open_verified(blob)
+    assert len(copies) == 1 and copies[0].closed  # type: ignore[attr-defined]
+    assert _named_files(store) == []
 
 
 # -- key parity and namespaces ---------------------------------------------------------------------

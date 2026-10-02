@@ -712,10 +712,12 @@ is opened:
   seconds between pieces, or 60 seconds in total for a request (600 for an upload, which is 512 MB
   at about 0.9 MB/s). A client can hold a slot for at most its class's total; a limit per address
   belongs to a reverse proxy (5.1.2).
-- `GET /workspace-assets/{asset_id}/prepared/bytes` is in the requests class and answers the whole
-  prepared output, up to 32 MiB, from memory, so at the defaults 24 such downloads can hold about
-  768 MiB that the decode-memory bound in 5.4.4 does not count; streaming it from the store is
-  later work.
+- `GET /workspace-assets/{asset_id}/prepared/bytes` and a character body's
+  `.../preparations/{preparation_id}/bytes` are in the requests class. Each copies the prepared
+  output (a workspace asset's is at most 32 MiB) from the store to a file of its own, checking its
+  hash, asks the final read check, closes its database connection and then sends the file 1 MiB
+  at a time. A download holds its slot until its last byte is sent; its memory and disk are in
+  5.4.4.
 - A route missing from the application while `CAPACITY_ROUTES` still names it stops the build, so a
   renamed route cannot fall back to `requests` unnoticed.
 - `/readyz` reports each class's limit and share and the decode limit (6.2). The counts (in flight,
@@ -777,6 +779,11 @@ intake route reads into memory before it probes anything (`MAX_PART_BYTES` plus 
 defaults that is about 1.2 GB. The dedicated derivative worker is a separate process with one
 delivery thread, so budget about another 512 MB for each worker process. The levers are the decode
 limit, the uploads limit, `MAX_PART_BYTES` and `MAX_PIXELS`.
+
+A prepared output download (5.4.1) adds a 1 MiB chunk of memory and keeps the output on disk
+instead: up to its size per download in progress, in a file under `EXULANICA_DATA_DIR` that has no
+name and is freed when the download ends or the process does. At the default requests limit,
+downloads of 32 MiB workspace assets hold at most 24 x 32 MiB = 768 MiB of that disk.
 
 #### 5.4.5 A formation stream holds a place, not a thread
 

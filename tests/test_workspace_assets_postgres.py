@@ -11,20 +11,27 @@ import hashlib
 import io
 import json
 import uuid
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import UTC, datetime
+from typing import IO
 
 import psycopg
 import pytest
+from exulanica.db.session import Database
+from exulanica.evidence.blob import BlobId
 from exulanica.orchestration.judge_seed import (
     SeedRefused,
     _refuse_private_workspace_assets,
     export_seed,
 )
+from exulanica.store.local import LocalContentAddressedStore
 from exulanica.store.namespaces import workspace_asset_lock_key
 from exulanica.world import asset_preparation_command
 from exulanica.world.asset_preparation import PreparationOutcome, decode_texture
 from exulanica.world.static_glb import inspect_static_glb, prepare_static_glb
-from exulanica.world.workspace_assets import WorkspaceAssetRuntime
+from exulanica.world.workspace_assets import WorkspaceAssetRepository, WorkspaceAssetRuntime
+from exulanica.world.workspace_preparations import AuthorizedOutput
 
 from static_glb_builder import CUBE_CORNERS, Gltf, cube, png
 from workspace_asset_support import AssetsApi, assets_api, declaration, without
@@ -433,6 +440,95 @@ def test_withdrawal_is_final_hides_everything_and_destroys_nothing(api: AssetsAp
     assert api.namespace_files() == files  # hidden, not erased
     with pytest.raises(psycopg.errors.IntegrityConstraintViolation):
         api.sql("delete from workspace_asset_withdrawal")
+
+
+def _sessions_opened(monkeypatch: pytest.MonkeyPatch) -> list[psycopg.Connection]:
+    """Every connection the application opens through ``Database.session``, as it opens them."""
+    opened: list[psycopg.Connection] = []
+    session = Database.session
+
+    @contextmanager
+    def recording(self: Database, workspace_id: uuid.UUID) -> Iterator[psycopg.Connection]:
+        with session(self, workspace_id) as connection:
+            opened.append(connection)
+            yield connection
+
+    monkeypatch.setattr(Database, "session", recording)
+    return opened
+
+
+def test_prepared_bytes_stream_from_their_checked_copy_with_no_connection_held(
+    api: AssetsApi, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The bytes checked before the final check are sent a chunk at a time, the connection the
+    route authorized on is closed before the first chunk, and the store's whole-object read, which
+    held every prepared output in memory, is not used."""
+    view = api.admitted(cube(offset=(0.0, 0.0, 0.0), texture=png(64, 64)).build())
+    asset, output = view["asset_id"], view["preparation"]["output"]
+    opened = _sessions_opened(monkeypatch)
+    closed_at_first_chunk: list[bool] = []
+    chunks = AuthorizedOutput.chunks
+
+    def watched(self: AuthorizedOutput) -> Iterator[bytes]:
+        closed_at_first_chunk.append(all(connection.closed for connection in opened))
+        yield from chunks(self)
+
+    def whole(*_args: object) -> bytes:
+        raise AssertionError("a delivery never reads a whole prepared output into memory")
+
+    monkeypatch.setattr(AuthorizedOutput, "chunks", watched)
+    monkeypatch.setattr(LocalContentAddressedStore, "get", whole)
+    delivered = api.get(f"/workspace-assets/{asset}/prepared/bytes")
+    assert delivered.status_code == 200, delivered.text
+    assert hashlib.sha256(delivered.content).hexdigest() == output["content_sha256"]
+    assert delivered.headers["content-length"] == str(len(delivered.content))
+    assert delivered.headers["content-type"] == "model/gltf-binary"
+    assert delivered.headers["cache-control"] == "private, no-store"
+    assert delivered.headers["etag"] == f'"{output["content_sha256"]}"'
+    assert delivered.headers["x-exulanica-licence"] == "own-work"
+    assert opened and closed_at_first_chunk == [True]
+
+
+def test_the_checked_copy_is_closed_once_sent_and_when_a_late_withdrawal_refuses_it(
+    api: AssetsApi, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    view = api.admitted(cube().build())
+    asset = view["asset_id"]
+    copies: list[IO[bytes]] = []
+    open_verified = LocalContentAddressedStore.open_verified
+
+    def kept(self: LocalContentAddressedStore, blob_id: BlobId) -> IO[bytes]:
+        copies.append(open_verified(self, blob_id))
+        return copies[-1]
+
+    monkeypatch.setattr(LocalContentAddressedStore, "open_verified", kept)
+    assert api.get(f"/workspace-assets/{asset}/prepared/bytes").status_code == 200
+    assert len(copies) == 1 and copies[0].closed
+
+    def withdrawn_once_read(self: LocalContentAddressedStore, blob_id: BlobId) -> IO[bytes]:
+        copy = kept(self, blob_id)
+        with api.database.session(api.owner) as other:
+            WorkspaceAssetRepository(other, api.owner, api.actor, stores=api.stores).withdraw(
+                uuid.UUID(asset)
+            )
+        return copy
+
+    # A withdrawal committed between the read and the final check: refused, and nothing sent.
+    monkeypatch.setattr(LocalContentAddressedStore, "open_verified", withdrawn_once_read)
+    refused = api.get(f"/workspace-assets/{asset}/prepared/bytes")
+    assert (refused.status_code, refused.json()["code"]) == (410, "withdrawn")
+    assert len(copies) == 2 and copies[1].closed
+
+
+def test_prepared_bytes_that_changed_on_disk_are_refused_and_not_sent(api: AssetsApi) -> None:
+    view = api.admitted(cube().build())
+    digest = view["preparation"]["output"]["content_sha256"]
+    (stored,) = [path for path in api.namespace_files() if path.name == digest]
+    original = stored.read_bytes()
+    stored.chmod(0o644)  # the store writes read-only files; this test plays a damaged disk
+    stored.write_bytes(original[:-4] + b"\0\0\0\0")
+    refused = api.get(f"/workspace-assets/{view['asset_id']}/prepared/bytes")
+    assert (refused.status_code, refused.json()["code"]) == (500, "integrity_failure")
 
 
 def test_a_prepared_asset_cannot_be_cancelled(api: AssetsApi) -> None:

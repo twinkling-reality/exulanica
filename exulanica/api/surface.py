@@ -16,8 +16,9 @@ Nothing here enumerates routes by reading route modules: the rows come from the 
 router through :func:`exulanica.api.routes.mounted_routes`, the walk ``routable_paths`` reads too.
 
 **The database role** is the role of the connection a route is given by dependency injection:
-``runtime`` for :data:`~exulanica.api.dependencies.ScopedConnection` (the non-owner runtime role
-behind ``Services.database``), ``read-only`` for
+``runtime`` for :data:`~exulanica.api.dependencies.ScopedConnection` and
+:data:`~exulanica.api.dependencies.ScopedSessions` (the non-owner runtime role behind
+``Services.database``), ``read-only`` for
 :data:`~exulanica.api.dependencies.ReadOnlyConnection` and
 :data:`~exulanica.api.dependencies.ReadOnlySessions` (``Services.readonly_database``), and
 ``not injected`` for a route given neither. The last does not mean a route touches no database:
@@ -38,7 +39,12 @@ from fastapi import FastAPI
 from fastapi.routing import APIRoute
 
 from exulanica.api.admission import AdmissionSettings
-from exulanica.api.dependencies import readonly_connection, readonly_sessions, scoped_connection
+from exulanica.api.dependencies import (
+    readonly_connection,
+    readonly_sessions,
+    scoped_connection,
+    scoped_sessions,
+)
 from exulanica.api.permissions import Authentication, Public, Requires, rule_for
 from exulanica.api.routes import mounted_routes
 from exulanica.world.society_controls import DEFAULT_BASE_TICK_INTERVAL_MS
@@ -54,6 +60,7 @@ __all__ = [
 #: The connection dependencies a route can be given, and the role each one connects as.
 DATABASE_ROLES: Final[dict[Callable[..., Any], str]] = {
     scoped_connection: "runtime",
+    scoped_sessions: "runtime",
     readonly_connection: "read-only",
     readonly_sessions: "read-only",
 }

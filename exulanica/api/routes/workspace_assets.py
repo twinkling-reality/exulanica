@@ -16,7 +16,9 @@ shape of an answer, and ``docs/workspace-asset-admission.md`` states it.
     200 once prepared); ``POST .../preparation/cancel`` stops one that has not finished.
 *   ``POST .../withdraw`` ends the asset for good. It hides; it does not erase.
 *   ``GET .../prepared/bytes`` serves the prepared container after the 0041 final check, private
-    and never cached, so a withdrawal is not outlived by a copy.
+    and never cached, so a withdrawal is not outlived by a copy. It streams the bytes checked
+    before that check from a file of the request's own, a chunk at a time, and holds no database
+    connection while it sends them.
 
 An asset that never existed here and another workspace's answer the same 404; a withdrawn one is
 410. A deployment whose database role may not append these tables (the judge) answers every write
@@ -54,9 +56,11 @@ from exulanica.api.dependencies import (
     CurrentSession,
     HeldPermissions,
     ScopedConnection,
+    ScopedSessions,
     get_services,
 )
 from exulanica.api.permissions import Permission
+from exulanica.api.verified_body import VerifiedBodyResponse
 from exulanica.selection.validation import Session
 from exulanica.world import static_glb
 from exulanica.world.asset_import import MAX_ASSET_BYTES
@@ -544,15 +548,17 @@ def withdraw_workspace_asset(
     responses={200: {"content": {static_glb.MEDIA_TYPE: {}}}},
 )
 def read_workspace_asset_prepared_bytes(
-    asset_id: uuid.UUID, request: Request, connection: ScopedConnection, session: CurrentSession
+    asset_id: uuid.UUID, request: Request, sessions: ScopedSessions, session: CurrentSession
 ) -> Response:
+    # Authorized on a connection of its own, closed before the first byte is sent, so a slow
+    # download holds no connection; the bytes sent are the ones checked before the final check.
     try:
-        authorized = _repository(request, connection, session).read_prepared(asset_id)
+        with sessions() as connection:
+            authorized = _repository(request, connection, session).read_prepared(asset_id)
     except (PreparationError, _Unavailable) as error:
         return _refused(error)
-    return Response(
-        content=authorized.data,
-        media_type=authorized.media_type,
+    return VerifiedBodyResponse(
+        authorized.output,
         headers={
             **_PRIVATE,
             "ETag": f'"{authorized.content_sha256}"',

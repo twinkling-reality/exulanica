@@ -163,6 +163,14 @@ commits first is never outlived by a response. The answer is `private, no-store`
 output digest as its ETag, and names the asset and its licence in `X-Exulanica-Asset-Id` and
 `X-Exulanica-Licence`.
 
+The bytes are copied from the store into a file of the request's own that has no name on disk,
+and checked against the output digest as they are copied, before the final check is asked. Once
+it is answered, the route closes its database connection and sends that file 1 MiB at a time with
+its length declared. So the bytes sent are the bytes checked, the whole output is never held in
+memory, nothing is read from the store or sent while the lock is held, and the file is gone when
+the response ends, however it ends. A withdrawal that commits after the final check does not cut
+short a response it already permitted.
+
 ## Placement and what placed objects mean elsewhere
 
 A prepared, placeable asset composes through the composition routes as source kind
@@ -279,10 +287,9 @@ without asset namespaces serves no descriptor; every asset route answers it 503
   bytes route; until both are in place, the browser's support for these versions is a gap.
 - Preparation time and memory at the largest admitted inputs are bounded by the limits above and
   by the preparer's timeout; they are not a measured capacity.
-- `GET /workspace-assets/{asset_id}/prepared/bytes` answers the whole prepared output, up to 32
-  MiB, from memory as an ordinary request, so one API process at its default request limit can
-  hold about 768 MiB of downloads that the deployment's memory bound does not count
-  ([deployment](deployment.md#541-admission)); streaming it from the store is later work.
+- A download holds its requests slot until its last byte is sent, and up to the output's size of
+  disk under the data directory until it ends
+  ([deployment](deployment.md#544-decode-memory-the-term-that-sizes-the-box)).
 
 ## Supporting code and tests
 

@@ -156,6 +156,12 @@ class LocalContentAddressedStore(ContentAddressedStore):
     def open(self, blob_id: BlobId) -> IO[bytes]:
         return self._require(blob_id).open("rb")
 
+    def _spool_directory(self) -> Path:
+        # The directory a streamed write lands in first: the store's own disk.
+        incoming = self._root / _PREFIX / "_incoming"
+        incoming.mkdir(parents=True, exist_ok=True)
+        return incoming
+
     def exists(self, blob_id: BlobId) -> bool:
         return self._path_for(blob_id).is_file()
 

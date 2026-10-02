@@ -1570,6 +1570,11 @@ class ObjectContentAddressedStore(ContentAddressedStore):
     def open(self, blob_id: BlobId) -> IO[bytes]:
         return io.BufferedReader(self._reader(blob_id), buffer_size=_CHUNK)
 
+    def _spool_directory(self) -> Path:
+        # The host-local directory a stream is spooled to before it is uploaded.
+        self._spool.mkdir(parents=True, exist_ok=True, mode=0o700)
+        return self._spool
+
     def exists(self, blob_id: BlobId) -> bool:
         self._guard.require()
         return self._requests.head(self._object_key(blob_id)) is not None

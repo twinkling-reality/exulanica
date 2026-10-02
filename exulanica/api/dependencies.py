@@ -75,6 +75,7 @@ __all__ = [
     "ReadOnlyConnection",
     "ReadOnlySessions",
     "ScopedConnection",
+    "ScopedSessions",
     "WorkspaceIdentity",
     "authorise_route",
     "current_session",
@@ -248,10 +249,26 @@ async def readonly_sessions(
     return lambda: database.session(workspace_id)
 
 
+async def scoped_sessions(
+    request: Request, session: CurrentSession
+) -> Callable[[], AbstractContextManager[psycopg.Connection]]:
+    """Short connections as the runtime role, bound to the caller's workspace, opened when the
+    route asks: :func:`readonly_sessions` for a route that needs the runtime role, such as one
+    that authorizes bytes under the final read check and then streams them, so no connection is
+    held while they are sent.
+    """
+    database = get_services(request).database
+    workspace_id = session.workspace_id
+    return lambda: database.session(workspace_id)
+
+
 ScopedConnection = Annotated[psycopg.Connection, Depends(scoped_connection)]
 ReadOnlyConnection = Annotated[psycopg.Connection, Depends(readonly_connection)]
 ReadOnlySessions = Annotated[
     Callable[[], AbstractContextManager[psycopg.Connection]], Depends(readonly_sessions)
+]
+ScopedSessions = Annotated[
+    Callable[[], AbstractContextManager[psycopg.Connection]], Depends(scoped_sessions)
 ]
 
 

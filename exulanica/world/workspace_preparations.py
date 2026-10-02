@@ -34,13 +34,14 @@ from __future__ import annotations
 
 import datetime as dt
 import hashlib
+import io
 import json
 import time
 import uuid
 from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Any, Final, TypeVar
+from typing import IO, Any, Final, TypeVar
 
 import psycopg
 from psycopg.types.json import Jsonb
@@ -50,10 +51,12 @@ from exulanica.db.read_check import final_read_check
 from exulanica.env import env_get, env_name
 from exulanica.errors import BlobNotFoundError, ExulanicaError, IntegrityError
 from exulanica.evidence.blob import BlobId
+from exulanica.store.base import VERIFY_CHUNK_BYTES
 from exulanica.store.namespaces import WorkspaceStores, workspace_asset_lock_key
 
 __all__ = [
     "DEFAULT_RETAINED_BYTES",
+    "DELIVERY_CHUNK_BYTES",
     "DETERMINISTIC_FAILURES",
     "INPUT_KINDS",
     "MEDIA_TYPE",
@@ -87,6 +90,8 @@ __all__ = [
 
 RECEIPT_PROFILE: Final = "exulanica.workspace-preparation-receipt/v1"
 MEDIA_TYPE: Final = "model/gltf-binary"
+#: How much of a prepared output a delivery holds in memory at once, as it reads or sends it.
+DELIVERY_CHUNK_BYTES: Final = VERIFY_CHUNK_BYTES
 INPUT_KINDS: Final = ("workspace_asset", "character_recipe")
 #: Failures a second run of the same preparation cannot change: a request answers them as they
 #: are rather than spending another run.
@@ -236,12 +241,39 @@ class PreparationRecord:
 
 @dataclass(frozen=True, slots=True)
 class AuthorizedOutput:
-    """A prepared output this workspace may be sent now, checked and still current."""
+    """A prepared output this workspace may be sent now, checked and still current.
 
-    data: bytes
+    ``body`` holds the exact bytes that were hash-checked before the final read check, in a file of
+    this delivery's own with no name on disk (``ContentAddressedStore.open_verified``), so a
+    delivery holds one chunk of an output in memory, never the whole of it. Close it once it is
+    sent, or use the output as a context manager.
+    """
+
+    body: IO[bytes]
+    byte_size: int
     content_sha256: str
     preparation_id: uuid.UUID
     media_type: str = MEDIA_TYPE
+
+    def chunks(self) -> Iterator[bytes]:
+        """The bytes from their start, :data:`DELIVERY_CHUNK_BYTES` at a time."""
+        self.body.seek(0)
+        while chunk := self.body.read(DELIVERY_CHUNK_BYTES):
+            yield chunk
+
+    def read(self) -> bytes:
+        """The whole output in memory, for a reader that wants it so."""
+        self.body.seek(0)
+        return self.body.read()
+
+    def close(self) -> None:
+        self.body.close()
+
+    def __enter__(self) -> AuthorizedOutput:
+        return self
+
+    def __exit__(self, *_exc: object) -> None:
+        self.close()
 
 
 PREPARATION_COLUMNS: Final = (
@@ -604,7 +636,8 @@ class WorkspacePreparationRepository:
         """The prepared output, hash-checked, released only if still current afterwards.
 
         ``still_current`` is the consumer's own question about its rows (a character family
-        revision still served, say), asked inside the final check at the same instant.
+        revision still served, say), asked inside the final check at the same instant. The output
+        holds its bytes in a file of its own until the caller closes it; a refusal closes it first.
         """
         row = self._row("p.preparation_id = %s", (preparation_id,))
         if row is None:
@@ -621,37 +654,54 @@ class WorkspacePreparationRepository:
                 "select pg_advisory_xact_lock(hashtextextended(%s, 0))",
                 (workspace_asset_lock_key(self.workspace_id, digest),),
             )
+        # Read and hash-checked before the final check, into a file of this delivery's own, so the
+        # bytes sent are the bytes checked and the whole output is never held in memory.
         try:
-            data = self.stores.for_workspace(self.workspace_id).get(BlobId.from_hex(digest))
+            body = self.stores.for_workspace(self.workspace_id).open_verified(
+                BlobId.from_hex(digest)
+            )
         except BlobNotFoundError as error:
             raise PreparedBytesMissing(
                 f"preparation {preparation_id}'s bytes are missing; request it again"
             ) from error
-        if len(data) != row["output_byte_size"]:
-            raise IntegrityError(
-                f"preparation {preparation_id}'s bytes are not the length recorded"
-            )
-        with final_read_check(
-            self.connection, not_idle="a final preparation authorization needs an idle connection"
-        ):
-            current = self.connection.execute(
-                "select p.output_sha256, p.state, "
-                "  tombstone_blocks_workspace_preparation(p.workspace_id, p.asset_id) as blocked, "
-                "  (select b.purged_at from workspace_asset_blob b "
-                "    where b.workspace_id = p.workspace_id "
-                "      and b.content_sha256 = p.output_sha256) as purged_at "
-                "from workspace_preparation p "
-                "where p.workspace_id = %s and p.preparation_id = %s",
-                (self.workspace_id, preparation_id),
-            ).fetchone()
-            consumer_holds = True if still_current is None else still_current(self.connection)
-        if (
-            current is None
-            or current["blocked"]
-            or current["purged_at"] is not None
-            or current["state"] != "prepared"
-            or current["output_sha256"] != digest
-            or not consumer_holds
-        ):
-            raise PreparationBlocked(f"preparation {preparation_id} stopped being current")
-        return AuthorizedOutput(data=data, content_sha256=digest, preparation_id=preparation_id)
+        output = AuthorizedOutput(
+            body=body,
+            byte_size=body.seek(0, io.SEEK_END),
+            content_sha256=digest,
+            preparation_id=preparation_id,
+        )
+        try:
+            body.seek(0)
+            if output.byte_size != row["output_byte_size"]:
+                raise IntegrityError(
+                    f"preparation {preparation_id}'s bytes are not the length recorded"
+                )
+            with final_read_check(
+                self.connection,
+                not_idle="a final preparation authorization needs an idle connection",
+            ):
+                current = self.connection.execute(
+                    "select p.output_sha256, p.state, "
+                    "  tombstone_blocks_workspace_preparation(p.workspace_id, p.asset_id) "
+                    "    as blocked, "
+                    "  (select b.purged_at from workspace_asset_blob b "
+                    "    where b.workspace_id = p.workspace_id "
+                    "      and b.content_sha256 = p.output_sha256) as purged_at "
+                    "from workspace_preparation p "
+                    "where p.workspace_id = %s and p.preparation_id = %s",
+                    (self.workspace_id, preparation_id),
+                ).fetchone()
+                consumer_holds = True if still_current is None else still_current(self.connection)
+            if (
+                current is None
+                or current["blocked"]
+                or current["purged_at"] is not None
+                or current["state"] != "prepared"
+                or current["output_sha256"] != digest
+                or not consumer_holds
+            ):
+                raise PreparationBlocked(f"preparation {preparation_id} stopped being current")
+        except BaseException:
+            output.close()
+            raise
+        return output
