@@ -3,45 +3,57 @@
  * duration or stacking layer is chosen. Components and layout read these roles and never write a
  * literal of their own (test/ui-system-tokens.test.ts holds that).
  *
- * To retune the look, change a value here. The accent is one hue; status colours are kept for
- * status. Light values come first and are the default, matching the light world the page draws;
- * data-ui-scheme="dark" on the root element chooses the dark scheme, and "system" follows the
- * operating system.
+ * To retune the look, change a value here. The accent is one hue and the signal one more; status
+ * colours are kept for status. Light values come first and are the default, matching the light
+ * world the page draws; data-ui-scheme="dark" on the root element chooses the dark scheme, and
+ * "system" follows the operating system (the Settings choice "Light or dark" writes it).
  *
  * World profiles keep their own roles (--ui-companion-*, --ui-spectrum-*) in
  * @exulanica/presentation/tokens.css; this file does not replace them.
  */
 :root {
   /* Surfaces */
-  --color-surface: rgb(251 251 248 / 0.94);
-  --color-surface-solid: #fbfbf8;
+  --color-surface: rgb(251 252 250 / 0.94);
+  --color-surface-solid: #fbfcfa;
   --color-surface-raised: #ffffff;
-  --color-surface-sunken: #eef1ef;
-  --color-surface-hover: #1c23260d;
-  --color-surface-pressed: #1c23261a;
-  --color-surface-selected: var(--color-accent-soft);
-  --color-scrim: rgb(17 24 28 / 0.32);
+  --color-surface-sunken: #edf3fa;
+  --color-surface-hover: #f4ff9159;
+  --color-surface-pressed: #f4ff91a6;
+  --color-surface-selected: var(--color-signal);
+  --color-scrim: rgb(16 30 48 / 0.32);
   --surface-blur: 16px;
 
   /* Text */
-  --color-text: #1c2326;
-  --color-text-muted: #4a565b;
-  --color-text-faint: #5f6b72;
-  --color-text-disabled: #8a959a;
+  --color-text: #1b2430;
+  --color-text-muted: #46536a;
+  --color-text-faint: #5a6678;
+  --color-text-disabled: #8c97a6;
   --color-text-on-accent: #ffffff;
   --color-text-on-status: #ffffff;
 
   /* Lines */
-  --color-border: #1c232624;
-  --color-border-strong: #1c232647;
+  --color-border: #1b243024;
+  --color-border-strong: #1b243047;
 
-  /* The one accent */
-  --color-accent: #0b6b67;
-  --color-accent-hover: #095a57;
-  --color-accent-pressed: #074845;
-  --color-accent-disabled: #9fb9b7;
-  --color-accent-soft: #0b6b6717;
-  --color-accent-text: #0a5f5b;
+  /*
+   * The brand: a calm light base and two signature colours, used by rule (interface-system.md 2).
+   * Blue carries words, links and primary actions; yellow signals what is selected, live or
+   * actionable and always carries dark words; the blend of the two is kept for brand moments.
+   * Both come from the spheres on the landing page (landing/src/ui/gradient-forms/presets.ts).
+   */
+  --brand-blue: #c6e1ff;
+  --brand-yellow: #f4ff91;
+  --brand-blend: linear-gradient(100deg, var(--brand-blue), var(--brand-yellow));
+  --color-signal: #f4ff91;
+  --color-signal-ink: #1b2430;
+
+  /* The one accent: a deep blue of the spheres' hue, so words in it read at AA */
+  --color-accent: #2c67a6;
+  --color-accent-hover: #255a92;
+  --color-accent-pressed: #1e4c7d;
+  --color-accent-disabled: #a9c2de;
+  --color-accent-soft: #2c67a614;
+  --color-accent-text: #265a91;
 
   /* Status */
   --color-positive: #2f7a3d;
@@ -170,27 +182,27 @@
 
 @media (prefers-color-scheme: dark) {
   :root[data-ui-scheme='system'] {
-    --color-surface: rgb(24 30 33 / 0.92);
-    --color-surface-solid: #181e21;
-    --color-surface-raised: #20282c;
-    --color-surface-sunken: #12171a;
-    --color-surface-hover: #ffffff12;
-    --color-surface-pressed: #ffffff1f;
+    --color-surface: rgb(23 29 36 / 0.92);
+    --color-surface-solid: #171d24;
+    --color-surface-raised: #1f2731;
+    --color-surface-sunken: #11161c;
+    --color-surface-hover: #f4ff9114;
+    --color-surface-pressed: #f4ff9124;
     --color-scrim: rgb(0 0 0 / 0.5);
-    --color-text: #eef2f1;
-    --color-text-muted: #b9c4c2;
-    --color-text-faint: #98a5a3;
-    --color-text-disabled: #6e7a79;
-    --color-text-on-accent: #0b1f1e;
+    --color-text: #eef2f6;
+    --color-text-muted: #bcc6d2;
+    --color-text-faint: #9aa6b4;
+    --color-text-disabled: #6c7886;
+    --color-text-on-accent: #10233a;
     --color-text-on-status: #0b1214;
     --color-border: #ffffff24;
     --color-border-strong: #ffffff42;
-    --color-accent: #5fc6bd;
-    --color-accent-hover: #7ad3cb;
-    --color-accent-pressed: #96ddd6;
-    --color-accent-disabled: #335f5b;
-    --color-accent-soft: #5fc6bd24;
-    --color-accent-text: #7ad3cb;
+    --color-accent: #c6e1ff;
+    --color-accent-hover: #d8eaff;
+    --color-accent-pressed: #e6f1ff;
+    --color-accent-disabled: #3a4f66;
+    --color-accent-soft: #c6e1ff24;
+    --color-accent-text: #c6e1ff;
     --color-positive: #6fc47d;
     --color-positive-soft: #6fc47d24;
     --color-positive-text: #8fd39a;
@@ -207,31 +219,33 @@
     --elevation-2: 0 4px 16px #00000059;
     --elevation-3: 0 10px 32px #00000066;
     --elevation-4: 0 18px 56px #00000080;
+    --color-signal: #3a4135;
+    --color-signal-ink: #f4ff91;
   }
 }
 
 :root[data-ui-scheme='dark'] {
-  --color-surface: rgb(24 30 33 / 0.92);
-  --color-surface-solid: #181e21;
-  --color-surface-raised: #20282c;
-  --color-surface-sunken: #12171a;
-  --color-surface-hover: #ffffff12;
-  --color-surface-pressed: #ffffff1f;
+  --color-surface: rgb(23 29 36 / 0.92);
+  --color-surface-solid: #171d24;
+  --color-surface-raised: #1f2731;
+  --color-surface-sunken: #11161c;
+  --color-surface-hover: #f4ff9114;
+  --color-surface-pressed: #f4ff9124;
   --color-scrim: rgb(0 0 0 / 0.5);
-  --color-text: #eef2f1;
-  --color-text-muted: #b9c4c2;
-  --color-text-faint: #98a5a3;
-  --color-text-disabled: #6e7a79;
-  --color-text-on-accent: #0b1f1e;
+  --color-text: #eef2f6;
+  --color-text-muted: #bcc6d2;
+  --color-text-faint: #9aa6b4;
+  --color-text-disabled: #6c7886;
+  --color-text-on-accent: #10233a;
   --color-text-on-status: #0b1214;
   --color-border: #ffffff24;
   --color-border-strong: #ffffff42;
-  --color-accent: #5fc6bd;
-  --color-accent-hover: #7ad3cb;
-  --color-accent-pressed: #96ddd6;
-  --color-accent-disabled: #335f5b;
-  --color-accent-soft: #5fc6bd24;
-  --color-accent-text: #7ad3cb;
+  --color-accent: #c6e1ff;
+  --color-accent-hover: #d8eaff;
+  --color-accent-pressed: #e6f1ff;
+  --color-accent-disabled: #3a4f66;
+  --color-accent-soft: #c6e1ff24;
+  --color-accent-text: #c6e1ff;
   --color-positive: #6fc47d;
   --color-positive-soft: #6fc47d24;
   --color-positive-text: #8fd39a;
@@ -248,6 +262,8 @@
   --elevation-2: 0 4px 16px #00000059;
   --elevation-3: 0 10px 32px #00000066;
   --elevation-4: 0 18px 56px #00000080;
+  --color-signal: #3a4135;
+  --color-signal-ink: #f4ff91;
 }
 
 /* Reduced transparency and high contrast make surfaces opaque and remove the blur. */

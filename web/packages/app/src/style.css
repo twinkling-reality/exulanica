@@ -238,6 +238,19 @@ body {
   text-transform: uppercase;
 }
 
+/* Brand moments: the blend of the spheres' blue and yellow marks the way in and the opening of a
+ * world, and nowhere else (interface-system.md 2). */
+.gate-wordmark::after,
+.startup-thinking-copy::before {
+  content: '';
+  display: block;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--brand-blend);
+}
+.gate-wordmark::after { width: 4.5rem; margin: 1.6rem auto 0; }
+.startup-thinking-copy::before { width: 3rem; height: 4px; margin-bottom: 0.4rem; }
+
 .credential-gate {
   align-items: center;
   justify-content: center;

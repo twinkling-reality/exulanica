@@ -96,11 +96,16 @@ export interface DeviceSettingWords {
 }
 
 /**
- * The words of the settings this device holds for itself, which no server registry states: the
- * reading overrides and the region plan. Keyed by the preference field (`AtlasPreferences`);
+ * The words of the settings this device holds for itself, which no server registry states: light
+ * or dark, the reading overrides and the region plan. Keyed by the preference field (`AtlasPreferences`);
  * a choice's value is the preference's own (`preferences.ts`), a toggle's `on` and `off`.
  */
 export const DEVICE_SETTING_WORDS = Object.freeze({
+  scheme: {
+    label: 'Light or dark',
+    note: 'For the panels and controls. The world keeps its own light.',
+    choices: { light: 'Light', dark: 'Dark', system: 'Follow the system' },
+  },
   contrast: {
     label: 'Contrast',
     note: 'Strengthens edges and reading surfaces without changing evidence colors.',

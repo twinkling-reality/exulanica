@@ -1,6 +1,7 @@
 /** Proposals, explicit identity and account-holder decisions over server-resolved states. */
 import { buildPersonRegionEditor, type PersonRegionEditorInput } from './person-region-editor.js';
 import { el, replace } from './dom.js';
+import { technicalRecord } from './system/components.js';
 
 /** One region as the review endpoint reports it. */
 export interface ReviewRegion {
@@ -100,10 +101,11 @@ function partSentence(region: ReviewRegion): string {
   return PART_COPY[region.part] ?? 'A trace of a person.';
 }
 
+/** Who proposed this region, in words. The detector's id goes into the technical record. */
 function provenance(region: ReviewRegion): string {
   if (region.detectorId === null) return 'Added by a person reviewing this photograph.';
-  const band = region.confidence === null ? 'no stated confidence' : `${region.confidence} confidence`;
-  return `Proposed by ${region.detectorId} at ${band}. A proposal, not a decision.`;
+  const band = region.confidence === null ? ', with no stated confidence' : ` at ${region.confidence} confidence`;
+  return `Proposed by the photo check${band}. A proposal, not a decision.`;
 }
 
 export function buildPersonReview(input: PersonReviewInput): HTMLElement {
@@ -170,7 +172,7 @@ export function buildPersonReview(input: PersonReviewInput): HTMLElement {
       controls.append(el('p', { text: 'Identity not linked. Select matching regions or identify this person separately.' }));
       if (input.onIdentify) controls.append(button('Identify as a separate person', () => input.onIdentify?.(region.regionKey)));
     } else {
-      controls.append(el('p', { text: `Person ${region.subjectId}` }));
+      controls.append(el('p', { class: 'person-review-identity', text: 'Linked to a person.' }));
       if (input.onUnlink) controls.append(button('Unlink incorrect identity', () => input.onUnlink?.(region.regionKey)));
       const choice = el('select', { 'aria-label': 'Account-holder decision for this region' });
       choice.append(el('option', { value: '', text: 'Choose the actual decision' }));
@@ -198,6 +200,7 @@ export function buildPersonReview(input: PersonReviewInput): HTMLElement {
       el('p', { class: 'person-review-state', text: STATE_COPY[region.state] }),
       el('p', { class: 'person-review-provenance', text: provenance(region) }),
       controls,
+      technicalRecord({ region: region.regionKey, detector: region.detectorId, person: region.subjectId }),
     );
     body.push(item);
   }

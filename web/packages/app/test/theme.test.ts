@@ -13,6 +13,7 @@ import {
 afterEach(() => {
   document.documentElement.removeAttribute('data-theme');
   document.documentElement.removeAttribute('data-contrast');
+  document.documentElement.removeAttribute('data-ui-scheme');
   document.documentElement.removeAttribute('data-transparency');
   document.documentElement.removeAttribute('data-world-style');
   document.documentElement.removeAttribute('data-ui-texture');
@@ -46,6 +47,15 @@ describe('Atlas presentation theme', () => {
     expect(document.documentElement.dataset['theme']).toBe('dawn');
     expect(document.documentElement.dataset['contrast']).toBe('high');
     expect(document.documentElement.dataset['transparency']).toBe('reduced');
+  });
+
+  it('writes the interface scheme, light unless one was chosen or stored', () => {
+    applyDocumentAppearance(DEFAULT_PREFERENCES, true);
+    expect(document.documentElement.dataset['uiScheme']).toBe('light');
+    applyDocumentAppearance(normalisePreferences({ ...DEFAULT_PREFERENCES, scheme: 'system' }), false);
+    expect(document.documentElement.dataset['uiScheme']).toBe('system');
+    applyDocumentAppearance(normalisePreferences({ ...DEFAULT_PREFERENCES, scheme: 'sepia' }), false);
+    expect(document.documentElement.dataset['uiScheme']).toBe('light');
   });
 
   it('replaces the world-owned skin while restoring protected system geometry', () => {

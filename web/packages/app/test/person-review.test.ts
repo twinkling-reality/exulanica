@@ -80,6 +80,20 @@ describe('the person review screen', () => {
     expect(panel().textContent).toContain('A proposal, not a decision.');
   });
 
+  it('says who proposed a region in words and keeps the ids in the technical record', () => {
+    const node = panel({ regions: [detected({ action: 'confirmed', subjectId: 'person-1' })] });
+    const technical = node.querySelector('.person-review-region details.x-technical');
+    expect(technical?.hasAttribute('open')).toBe(false);
+    expect(technical?.textContent).toContain('detector: recorded-vision-observation/v1');
+    expect(technical?.textContent).toContain('person: person-1');
+    technical?.remove();
+    expect(node.querySelector('.person-review-provenance')?.textContent)
+      .toBe('Proposed by the photo check at medium confidence. A proposal, not a decision.');
+    expect(node.querySelector('.person-review-identity')?.textContent).toBe('Linked to a person.');
+    expect(node.textContent).not.toContain('recorded-vision-observation');
+    expect(node.textContent).not.toContain('person-1');
+  });
+
   it('lets a reviewer reject a false positive', () => {
     const deleted: string[] = [];
     const node = panel({ onDelete: (key) => deleted.push(key) });

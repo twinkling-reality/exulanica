@@ -198,6 +198,8 @@
 .x-chip[data-tone='danger'] { --chip-ink: var(--color-danger-text); --chip-fill: var(--color-danger-soft); }
 .x-chip[data-tone='info'] { --chip-ink: var(--color-info-text); --chip-fill: var(--color-info-soft); }
 .x-chip[data-tone='accent'] { --chip-ink: var(--color-accent-text); --chip-fill: var(--color-accent-soft); }
+/* Live: what is running now takes the signal. */
+.x-chip[data-state='running'] { --chip-ink: var(--color-signal-ink); --chip-fill: var(--color-signal); }
 .x-chip[data-state='running'] .x-icon { animation: x-spin 900ms linear infinite; }
 
 /* -- Status line ----------------------------------------------------------------------------- */

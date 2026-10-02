@@ -289,6 +289,12 @@ payload asks, so a reviewer who deletes every false positive leaves the photogra
 panel says "screened, and nobody was found" and "nobody has looked" as different sentences, and a
 test renders both.
 
+**Each region says who proposed it in words.** A detected region reads "Proposed by the photo check
+at high confidence. A proposal, not a decision.", a drawn one "Added by a person reviewing this
+photograph.", and a linked one "Linked to a person." The region key, the detector's id and the
+subject id sit in that region's technical details, as the
+[interface system](interface-system.md#5-voice-and-words) asks of every id.
+
 `POST /identity/subjects/link` and `POST /identity/subjects/unlink` link and unlink regions to a
 subject, and `POST /person-subjects/{subject_id}/consents` records a consent decision; their
 request rules are in [personal-admission.md](personal-admission.md#ordinary-api-batch-path).

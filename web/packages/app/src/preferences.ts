@@ -17,6 +17,8 @@ import {
 export const PREFERENCES_KEY = 'exulanica.atlas.preferences.v1';
 
 export type AppearancePreference = 'dawn';
+/** Light or dark interface surfaces; the world keeps its own light. */
+export type SchemePreference = 'light' | 'dark' | 'system';
 export type ContrastPreference = 'standard' | 'high';
 export type TransparencyPreference = 'layered' | 'reduced';
 export type VignettePreference = 'off' | 'subtle' | 'strong';
@@ -34,6 +36,7 @@ export type CompanionFacePreference = CompanionFaceVariant;
 export interface AtlasPreferences {
   readonly version: 1;
   readonly appearance: AppearancePreference;
+  readonly scheme: SchemePreference;
   readonly contrast: ContrastPreference;
   readonly transparency: TransparencyPreference;
   readonly worldArtProfile: WorldArtProfileId;
@@ -66,6 +69,7 @@ export interface AtlasPreferences {
 export const DEFAULT_PREFERENCES: AtlasPreferences = Object.freeze({
   version: 1,
   appearance: 'dawn',
+  scheme: 'light',
   contrast: 'standard',
   transparency: 'layered',
   worldArtProfile: 'origin-landscape',
@@ -91,6 +95,7 @@ interface PreferenceStorage {
 }
 
 const APPEARANCE = new Set<AppearancePreference>(['dawn']);
+const SCHEME = new Set<SchemePreference>(['light', 'dark', 'system']);
 const CONTRAST = new Set<ContrastPreference>(['standard', 'high']);
 const TRANSPARENCY = new Set<TransparencyPreference>(['layered', 'reduced']);
 // Alternate profiles remain renderer test fixtures. Stored legacy choices return to the one
@@ -133,6 +138,9 @@ export function normalisePreferences(value: unknown): AtlasPreferences {
     appearance: APPEARANCE.has(record['appearance'] as AppearancePreference)
       ? (record['appearance'] as AppearancePreference)
       : DEFAULT_PREFERENCES.appearance,
+    scheme: SCHEME.has(record['scheme'] as SchemePreference)
+      ? (record['scheme'] as SchemePreference)
+      : DEFAULT_PREFERENCES.scheme,
     contrast: CONTRAST.has(record['contrast'] as ContrastPreference)
       ? (record['contrast'] as ContrastPreference)
       : DEFAULT_PREFERENCES.contrast,

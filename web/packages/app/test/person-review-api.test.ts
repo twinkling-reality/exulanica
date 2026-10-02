@@ -175,9 +175,12 @@ describe('the client and the panel, joined', () => {
     expect(rendered[0]!.dataset.regionKey).toBe('a'.repeat(64));
     expect(rendered[0]!.dataset.state).toBe('unknown');
     expect(rendered[1]!.dataset.state).toBe('shown');
-    // The detector's own words reach the reviewer, so a proposal is legible as a proposal.
-    expect(panel.textContent).toContain('recorded-vision-observation/v1');
+    // A proposal is legible as a proposal, and the detector the route named reaches the
+    // technical record rather than the sentence.
+    expect(panel.textContent).toContain('Proposed by the photo check');
     expect(panel.textContent).toContain('A proposal, not a decision.');
+    expect(rendered[0]!.querySelector('details.x-technical')?.textContent)
+      .toContain('detector: recorded-vision-observation/v1');
     // And the panel never claims the decision is the subject's.
     expect(panel.textContent).toContain('not the decision of the person in the photograph');
   });

@@ -115,6 +115,7 @@ export function applyDocumentAppearance(
 ): PresentationTheme {
   const theme = themeForPreferences(preferences, systemDark);
   applyDocumentTheme(theme, root);
+  root.dataset['uiScheme'] = preferences.scheme;
   root.dataset['contrast'] = preferences.contrast;
   root.dataset['transparency'] = preferences.transparency;
   return theme;

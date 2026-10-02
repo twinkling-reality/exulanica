@@ -150,7 +150,8 @@
   cursor: pointer;
 }
 .x-rail-item:hover:not(:disabled) { background: var(--color-surface-hover); color: var(--color-text); }
-.x-rail-item[aria-pressed='true'], .x-rail-item[aria-expanded='true'] {
+.x-rail-item:is([aria-pressed='true'], [aria-expanded='true']),
+.x-rail-item:is([aria-pressed='true'], [aria-expanded='true']):hover:not(:disabled) {
   background: var(--color-surface-selected);
   color: var(--color-accent-text);
 }

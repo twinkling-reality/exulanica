@@ -42,6 +42,24 @@ describe('Settings', () => {
     expect(view.root.querySelector<HTMLButtonElement>('.settings-reset')?.hidden).toBe(true);
   });
 
+  it('offers light, dark or the system for the interface, light unless changed', () => {
+    const onChange = vi.fn();
+    const view = buildControlsGuide({
+      preferences: DEFAULT_PREFERENCES,
+      onChange,
+      onClose: vi.fn(),
+      onShowCustomize: vi.fn(),
+    });
+    const scheme = view.root.querySelector<HTMLSelectElement>('[aria-label="Light or dark"]')!;
+    expect([...scheme.options].map((o) => o.textContent)).toEqual(['Light', 'Dark', 'Follow the system']);
+    expect(scheme.value).toBe('light');
+    scheme.value = 'system';
+    scheme.dispatchEvent(new Event('change'));
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ scheme: 'system' }));
+    view.root.querySelector<HTMLButtonElement>('.settings-reset')!.click();
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ scheme: 'light' }));
+  });
+
   it('resets only the active category', () => {
     const onChange = vi.fn();
     const view = buildControlsGuide({

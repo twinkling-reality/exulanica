@@ -3,6 +3,7 @@ import {
   normalisePreferences,
   type AtlasPreferences,
   type ContrastPreference,
+  type SchemePreference,
   type TransparencyPreference,
 } from '../preferences.js';
 import {
@@ -93,6 +94,7 @@ export function buildControlsGuide(options: ControlsGuideOptions): ControlsGuide
   );
   customize.addEventListener('click', options.onShowCustomize);
 
+  const scheme = deviceSelect('scheme');
   const contrast = deviceSelect('contrast');
   const transparency = deviceSelect('transparency');
   const regionMinimap = deviceSelect('regionMinimap');
@@ -138,6 +140,7 @@ export function buildControlsGuide(options: ControlsGuideOptions): ControlsGuide
   const displayPage = page('display', 'Display & accessibility', [
     el('p', { class: 'settings-page-intro', text: 'Reading overrides take priority over every world design.' }),
     el('div', { class: 'settings-rows' }, [
+      settingRow(DEVICE_SETTING_WORDS.scheme.label, scheme, DEVICE_SETTING_WORDS.scheme.note),
       settingRow(DEVICE_SETTING_WORDS.contrast.label, contrast, DEVICE_SETTING_WORDS.contrast.note),
       settingRow(DEVICE_SETTING_WORDS.transparency.label, transparency, DEVICE_SETTING_WORDS.transparency.note),
     ]),
@@ -162,7 +165,11 @@ export function buildControlsGuide(options: ControlsGuideOptions): ControlsGuide
   /** What resetting a category writes: each of its settings at its default. */
   const defaults = (section: SettingsSection): Partial<AtlasPreferences> => {
     if (section === 'display') {
-      return { contrast: DEFAULT_PREFERENCES.contrast, transparency: DEFAULT_PREFERENCES.transparency };
+      return {
+        scheme: DEFAULT_PREFERENCES.scheme,
+        contrast: DEFAULT_PREFERENCES.contrast,
+        transparency: DEFAULT_PREFERENCES.transparency,
+      };
     }
     if (section !== 'movement') return {};
     const patch: Record<string, InteractionValue> = { regionMinimap: DEFAULT_PREFERENCES.regionMinimap };
@@ -175,6 +182,7 @@ export function buildControlsGuide(options: ControlsGuideOptions): ControlsGuide
   };
 
   const render = (): void => {
+    scheme.value = current.scheme;
     contrast.value = current.contrast;
     transparency.value = current.transparency;
     regionMinimap.value = current.regionMinimap ? 'on' : 'off';
@@ -209,6 +217,7 @@ export function buildControlsGuide(options: ControlsGuideOptions): ControlsGuide
     settle: () => undefined,
   };
 
+  scheme.addEventListener('change', () => commit({ scheme: scheme.value as SchemePreference }));
   contrast.addEventListener('change', () => commit({ contrast: contrast.value as ContrastPreference }));
   transparency.addEventListener('change', () =>
     commit({ transparency: transparency.value as TransparencyPreference }));

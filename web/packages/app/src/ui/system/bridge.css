@@ -45,7 +45,10 @@
 #shell .x-region [hidden] { display: none !important; }
 
 /* -- 2. Older variables take the tokens inside regions ------------------------------------------ */
-#shell .x-region:not([data-region='dock']) {
+/* A panel that sets its own (redesign.css gives the world panel and the confirmation the world
+   profile's ink) is pointed back here too, or its secondary words keep a light-scheme ink. */
+#shell .x-region:not([data-region='dock']),
+#shell .x-region:not([data-region='dock']) > :is(.world-panel, .confirm) {
   --ink: var(--color-text);
   --ink-soft: var(--color-text-muted);
   --ink-faint: var(--color-text-faint);
@@ -105,7 +108,8 @@
   border-radius: var(--radius-sm);
   font: var(--weight-medium) var(--text-sm) / 1 var(--font-ui);
 }
-#shell .x-region .world-local-nav button[aria-expanded='true'] {
+#shell .x-region .world-local-nav button[aria-expanded='true'],
+#shell .x-region .world-local-nav button[aria-expanded='true']:hover {
   color: var(--color-accent-text);
   background: var(--color-surface-selected);
 }
@@ -175,7 +179,7 @@
   transition: background-color var(--duration-fast) var(--ease-standard);
 }
 #shell .x-region:not([data-region='dock']) button:not(.x-btn, .x-rail-item, .x-tab, .object-placement-choose, .scene-segment-select):hover:not(:disabled) {
-  background: var(--color-surface-sunken);
+  background: var(--color-surface-hover);
 }
 #shell .x-region:not([data-region='dock']) button:not(.x-btn, .x-rail-item, .x-tab, .object-placement-choose, .scene-segment-select):disabled {
   color: var(--color-text-disabled);
@@ -197,7 +201,9 @@
   border-color: var(--color-accent-disabled);
 }
 #shell .x-region:not([data-region='dock']) button:is(.object-placement-remove):not(:disabled) { color: var(--color-danger-text); }
-#shell .x-region:not([data-region='dock']) button:is([aria-pressed='true'], [aria-expanded='true']):not(.x-btn, .x-rail-item, .x-tab, .object-placement-choose, .scene-segment-select) {
+/* Selected stays selected under the pointer. */
+#shell .x-region:not([data-region='dock']) button:is([aria-pressed='true'], [aria-expanded='true']):not(.x-btn, .x-rail-item, .x-tab, .object-placement-choose, .scene-segment-select),
+#shell .x-region:not([data-region='dock']) button:is([aria-pressed='true'], [aria-expanded='true']):not(.x-btn, .x-rail-item, .x-tab, .object-placement-choose, .scene-segment-select):hover:not(:disabled) {
   color: var(--color-accent-text);
   background: var(--color-surface-selected);
   border-color: var(--color-accent);

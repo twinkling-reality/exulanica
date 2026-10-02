@@ -49,15 +49,24 @@ describe('token contrast', () => {
       const base = block(':root {');
       const own = scheme === 'light' ? base : new Map([...base, ...block(selector)]);
       const failing: string[] = [];
-      for (const text of TEXT) {
-        for (const surface of SURFACES) {
-          const ratio = contrast(hex(own.get(text)!), hex(own.get(surface)!));
-          if (ratio < 4.5) failing.push(`${text} on ${surface}: ${ratio.toFixed(2)}`);
-        }
+      const pairs: [string, string][] = [
+        ...TEXT.flatMap((text) => SURFACES.map((surface): [string, string] => [text, surface])),
+        // The signal (selected, live) carries its own ink, and the accent's words on what is selected.
+        ['--color-signal-ink', '--color-signal'],
+        ['--color-accent-text', '--color-signal'],
+        ['--color-text', '--color-signal'],
+      ];
+      for (const [text, surface] of pairs) {
+        const ratio = contrast(hex(own.get(text)!), hex(own.get(surface)!));
+        if (ratio < 4.5) failing.push(`${text} on ${surface}: ${ratio.toFixed(2)}`);
       }
       expect(failing).toEqual([]);
     });
   }
+
+  it('following the system chooses exactly the dark scheme', () => {
+    expect(block("  :root[data-ui-scheme='system'] {")).toEqual(block(":root[data-ui-scheme='dark'] {"));
+  });
 
   it('words on the accent and on danger read at AA', () => {
     const base = block(':root {');

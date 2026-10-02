@@ -27,10 +27,13 @@ surfaces written before the system in its tokens and only shrinks as they move o
 Components and layout read semantic roles and never write a literal of their own.
 
 - Colour roles: surface (with raised, sunken, hover, pressed, selected, scrim), text (muted, faint,
-  disabled, on accent, on status), border, one accent, and the status roles positive, caution,
-  danger and info, each with hover, pressed, disabled, soft and text variants. Light is the
-  default; `data-ui-scheme="dark"` on the root element chooses the dark scheme and `"system"`
-  follows the operating system. Reduced transparency and high contrast make surfaces opaque.
+  disabled, on accent, on status), border, one accent, one signal (with its own ink), the brand
+  blend, and the status roles positive, caution, danger and info, each with hover, pressed,
+  disabled, soft and text variants. Light is the default; `data-ui-scheme="dark"` on the root
+  element chooses the dark scheme and `"system"` follows the operating system. The Settings choice
+  "Light or dark" (Light, Dark, Follow the system; Light unless changed) writes that attribute, and
+  the page sets it before its first paint. Reduced transparency and high contrast make surfaces
+  opaque.
 - Space, type, radius, elevation, control and region sizes, and motion durations, which are zero
   under `prefers-reduced-motion` or `data-motion="reduced"`.
 - Two retuning switches: `--panel-tilt` (0deg keeps panels flat; the earlier plates used -10deg) and
@@ -41,6 +44,34 @@ Components and layout read semantic roles and never write a literal of their own
 
 **DECISION**: one accent hue, with status colours reserved for status. The alternative, a palette
 per surface, is what made the same role look different in each panel.
+
+### The brand colours
+
+A calm light base and two signature colours, the blue (`#c6e1ff`) and the yellow (`#f4ff91`) of
+the spheres on the landing page (`web/packages/landing/src/ui/gradient-forms/presets.ts`). They are
+used sparingly and by rule, so that a colour on screen always means something:
+
+| Colour | Role | Where |
+| --- | --- | --- |
+| Deep blue (`--color-accent`, `--color-accent-text`) | words that act, links, primary actions | primary buttons, quiet buttons and links, the focus ring, a selected tab's rule, icons in a panel header |
+| Yellow (`--color-signal`, with `--color-signal-ink`) | what is selected, live or actionable | a selected rail item, panel tab or Search row, a running state such as the playing clock, the hover and press of a control |
+| The blend (`--brand-blend`) | a brand moment | under the wordmark at the way in, and above "Opening your world"; nowhere else |
+
+- The deep blue is the spheres' hue made dark enough to read as words (at least 4.5:1); the pale
+  sphere blue itself is 1.3:1 on white and so is never used for words or lines on a light surface.
+  In the dark scheme the sphere blue is the accent as it is.
+- Yellow is a fill, never a word or a line on a light surface, and it always carries dark ink. In
+  the dark scheme the signal is a dark olive fill with yellow ink.
+- What never takes colour: running text, panel surfaces and borders, panel headers (plain, with
+  `--panel-header-fill` transparent), the world itself, and status meanings, which keep the status
+  roles. A panel header, a card or a list row never wears the blend.
+
+`web/packages/app/test/ui-system-contrast.test.ts` holds every text role, the signal's ink and the
+accent's words on the signal at AA in both schemes, and holds "Follow the system" to exactly the
+dark values. The dark scheme recolours the surfaces this file's tokens dress (the top bar, the tool
+rail, the inspector panels, the confirmation, Search and notices); the World menu, the major
+surfaces on the overlay layer and the Companion's speech strip still take the world profile's
+design.
 
 ## 3. Layout regions
 

@@ -24,6 +24,9 @@
           localStorage.getItem('exulanica.atlas.preferences.v1') || '{}',
         );
         document.documentElement.dataset.theme = 'dawn';
+        document.documentElement.dataset.uiScheme = ['dark', 'system'].includes(saved.scheme)
+          ? saved.scheme
+          : 'light';
         document.documentElement.dataset.contrast = saved.contrast === 'high' ? 'high' : 'standard';
         document.documentElement.dataset.transparency = saved.transparency === 'reduced'
           ? 'reduced'
