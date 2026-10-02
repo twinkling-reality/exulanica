@@ -102,11 +102,11 @@ def test_the_discovery_finds_every_family_and_no_unknown_shape():
     assert set(found) == {ENTRY_SHAPE, CITED_SHAPE, GLYPH_SHAPE}, sorted(found)
     # Counted from the tree, so adding a catalog to a family is visible here as a number: eighteen
     # city catalogs, city version 4's edition of the street hierarchy and city version 5's edition
-    # of the material catalog, twenty-nine society catalogs (the living society's five and a town's
+    # of the material catalog, thirty-one society catalogs (the living society's five and a town's
     # three, the purposeful routine's two versions, what is
     # recorded and said of each kind of its activity, the legacy identities of the first three
-    # engines, a person's decision contract's two in two versions each, four versions of a
-    # person's score, three of the protocol, five of the seeds a comparison of models reads,
+    # engines, a person's decision contract's two in two versions each, five versions of a
+    # person's score, four of the protocol, five of the seeds a comparison of models reads,
     # and a catalog of measured typical comparison costs),
     # the grounds a society stands on, the words both the inspector and the
     # Companion say of a simulated person and of each kind of activity, the world object
@@ -117,7 +117,7 @@ def test_the_discovery_finds_every_family_and_no_unknown_shape():
     # plus the signal role registry and its policy, observation and response catalogs, the world
     # clock's two profiles, the protocol and seeds a comparison of signal models reads, and the
     # replay line a comparison of a living town's people is read by.
-    assert len(found[ENTRY_SHAPE]) == 74
+    assert len(found[ENTRY_SHAPE]) == 76
     # The traffic catalogs: vehicle classes, right-of-way policies, signal plans, the two access
     # mappings, the road derivation and the signal placement.
     assert len(found[CITED_SHAPE]) == 7

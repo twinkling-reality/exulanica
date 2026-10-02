@@ -424,6 +424,12 @@ requests and receipts
 run of minutes held outside a society, as a comparison's run or the test role's, replays through
 `replay_minutes`, which rebuilds every request to the byte, answers it from the stored receipt and
 holds every minute's state to its recorded digest; a difference is refused as `run_replay_mismatch`.
+The loop may start from a later state than a genesis, numbering its receipts on from the last one
+recorded before it, and the minute that leaves the genesis alone consumes every input, so a run
+played on from where its previous hour ended is that hour of the whole run. A run stopped part way
+goes on through `resume_minutes`: every minute whose receipts it recorded is answered from them,
+as a replay answers, and only the later minutes are asked, so nothing recorded is asked again; a
+stored request the loop does not rebuild stops it by name.
 
 ## Implementation and evidence
 

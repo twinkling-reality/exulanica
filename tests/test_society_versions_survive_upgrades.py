@@ -149,6 +149,12 @@ def test_released_catalog_versions_never_change_in_place():
 #: the codes each kind of activity records, the legacy identities of the first three engines and
 #: the living town's routine; a new version adds a line here, and no line ever changes.
 RELEASED_CATALOGS = {
+    "society-person-score.v5.json": (
+        "bcce3e884eb496ad5cfdaa575b0608db73bdf89c41f2c663491c9e3b0f11eff1"
+    ),
+    "society-comparison-protocol.v4.json": (
+        "490f77d4da11cfd2ba0e567a6c5ea4cdf23663a6cdfe1e5878d8d6b4e0f3622b"
+    ),
     "society-person-score.v4.json": (
         "adb7e8f1c49a0370201b091ba2cf8d6db754333698483d88248bfc13150cb55e"
     ),

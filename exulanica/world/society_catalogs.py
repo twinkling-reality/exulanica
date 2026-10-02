@@ -78,6 +78,9 @@ __all__ = [
     "COMPARISON_SCORE_BY_FAMILY",
     "COMPARISON_SEEDS_CATALOG",
     "COMPARISON_VERSIONS",
+    "COMPARISON_WINDOWS",
+    "DAY_COMPARISON_VERSIONS",
+    "DAY_SCORE_BY_FAMILY",
     "HELD_OUT_SEED_TEXT",
     "LEGACY_IDENTITY_CATALOG",
     "LEGACY_IDENTITY_DIGESTS",
@@ -207,6 +210,20 @@ COMPARISON_VERSIONS: Final = {
 #: A run keeps the score semantics for the state family its stored engine writes. The
 #: comparison protocol and seed catalog remain the same for both families.
 COMPARISON_SCORE_BY_FAMILY: Final = {"purposeful": 3, "living": 4}
+#: The windows a comparison runs over: an hour, under the versions above, or a day.
+COMPARISON_WINDOWS: Final = ("hour", "day")
+#: The versions a comparison over a day is defined under: the fifth score, the fourth's terms over
+#: the day assembled exactly from its hours, the fourth protocol, whose window is a day, and the
+#: seeds an hour's comparison is defined under.
+DAY_COMPARISON_VERSIONS: Final = {
+    PERSON_SCORE_CATALOG: 5,
+    COMPARISON_PROTOCOL_CATALOG: 4,
+    COMPARISON_SEEDS_CATALOG: 5,
+}
+#: The state families a comparison may run over a day, by the score its day is scored under: a
+#: living town's, whose people keep the day of its clock. A purposeful society keeps no time of
+#: day, so its comparisons run an hour.
+DAY_SCORE_BY_FAMILY: Final = {"living": 5}
 #: Whether a score term is weighed or only reported, and what a term reads: a run's minutes, the
 #: events the engine appended, or the host's record of each call, which only a reader outside the
 #: score reads.
@@ -629,7 +646,7 @@ SCHEMAS: Final[dict[tuple[str, int], CatalogSchema]] = {
             ),
             entry_check=_score_v2_bounds,
         )
-        for version in (2, 3, 4)
+        for version in (2, 3, 4, 5)
     },
     **{
         (COMPARISON_PROTOCOL_CATALOG, version): CatalogSchema(
@@ -1209,9 +1226,20 @@ def load_comparison_catalogs(
     )
 
 
-def comparison_catalogs_for_engine(engine_profile: str) -> ComparisonCatalogs:
-    """The score version a new comparison of this stored engine's state family uses."""
+def comparison_catalogs_for_engine(engine_profile: str, window: str = "hour") -> ComparisonCatalogs:
+    """The catalogs a new comparison of this stored engine's state family is defined under over
+    ``window``: an hour's, with the score of its family, or a day's, for a family whose people
+    keep a day (:data:`DAY_SCORE_BY_FAMILY`)."""
     family = society_engine(engine_profile).state_family
+    if window == "day":
+        score = DAY_SCORE_BY_FAMILY.get(family)
+        if score is None:
+            raise CatalogError(f"no comparison over a day of a {family} society")
+        return load_comparison_catalogs(
+            versions={**DAY_COMPARISON_VERSIONS, PERSON_SCORE_CATALOG: score}
+        )
+    if window != "hour":
+        raise CatalogError(f"no comparison window {window!r}")
     score = COMPARISON_SCORE_BY_FAMILY.get(family)
     if score is None:
         raise CatalogError(f"no comparison score for {family} society")

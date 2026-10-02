@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "catalog_id": "society-comparison-protocol",
+  "catalog_version": 4,
+  "entries": [
+    {
+      "key": "bootstrap_resamples",
+      "value": 10000,
+      "reason": "Resamples of the seeds, with replacement, from which an interval and a two-sided test are read: ten thousand leaves the percentile ends of a mean over eight seeds steady to well under the precision a score is shown at, and costs a fraction of a second to draw.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica model comparison protocol; see the entry reason"
+      }
+    },
+    {
+      "key": "family_alpha_per_mille",
+      "value": 50,
+      "reason": "The chance of calling any registered difference real when none is, held for the whole family of hypotheses a comparison registers by Holm's step-down procedure: five percent, the level the interval is read at.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica model comparison protocol; see the entry reason"
+      }
+    },
+    {
+      "key": "interval_per_mille",
+      "value": 950,
+      "reason": "The share of resampled means an interval holds, the middle ninety-five percent: the conventional level, stated once so every interval a comparison shows is read at the same level.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica model comparison protocol; see the entry reason"
+      }
+    },
+    {
+      "key": "need_relief_floor_per_person",
+      "value": 355200,
+      "reason": "A seed counts only when the routine's day spares the scored people at least this much need above each supported need's threshold against waiting's day, per scored person, in need-thousandths times person-minutes, the living score's unit. Measured before any model was asked, on the eight development seeds over the four towns the living town's reading line was measured on (small towns of 38 and 52 people, market towns of 74 and 88), each anchor's day played hour by hour as a day comparison's host plays it (docs/evaluation/2026-10-02-living-day-anchors.json, sha256 878c20f54a88b96e9fc325e9e198f8a83402a52b1aec4dc5b014d79db24730fb, written by scripts/measure_living_day_anchors.py): the routine's day spared from 1377094.8243 to 1467886.4038 per person, median 1421019.3346. A quarter of the median, rounded down to the hundred, the first protocol's rule, so no seed that counts weighs more than four times the median seed in a mean. A seed under it is excluded by name, never scored.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica model comparison protocol; see the entry reason"
+      }
+    },
+    {
+      "key": "pair_replay_budget_ms",
+      "value": 10000,
+      "reason": "The most a seed's two runs may take to be read, as the third protocol states it. A day's run is read one hour at a time, the hour replayed from the state its previous hour sealed and held to what it recorded, and the page reads the two sides' same hour at once while one process replays them one after the other, so each hour's read is held to half of this. Ten seconds is the longest a person keeps their attention on a wait they are told about (Nielsen, Usability Engineering, 1993, chapter 5). How many people a day's comparison runs, and how many of them a model may decide for, are derived from this and the living town's line for a day's hours (exulanica/world/society_comparison_reading.py), never stated.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica model comparison protocol; see the entry reason"
+      }
+    },
+    {
+      "key": "runs_at_once",
+      "value": 2,
+      "reason": "How many runs a runner plays at the same time. Each asks at most the decision policy's eight concurrent calls, so two keep a comparison inside sixteen open requests to one provider, while halving the time a comparison takes.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica model comparison protocol; see the entry reason"
+      }
+    },
+    {
+      "key": "window_ticks",
+      "value": 1440,
+      "reason": "A comparison over a day runs a living town's whole day with each arm: 1440 minutes of its 60-second tick, from its genesis at the start of its day (06:00 for a town's routine) to the same minute the next day, through its shifts, its opening hours and its night. Each run is played, sealed, resumed and read one hour at a time, and every run of one comparison runs exactly this many minutes.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica model comparison protocol; see the entry reason"
+      }
+    }
+  ]
+}

@@ -33,6 +33,17 @@ with no client at all, then holds every rebuilt request and receipt to the store
 minute's state to its recorded digest. A replay that differs anywhere is refused by name
 (:class:`ReplayMismatch`), never shown.
 
+**A day, hour by hour.** A run whose window is longer than an hour (a living town's day,
+:data:`~exulanica.world.society_catalogs.DAY_COMPARISON_VERSIONS`) is played, sealed, resumed and
+read one hour at a time (:data:`HOUR_TICKS`), from where its previous hour ended
+(:class:`HourStart`): :func:`play_hour` plays an hour on from that state, numbering its receipts on
+from the last one before it; :func:`replay_hour` plays an hour again from that state and the
+receipts it stored, held to the hour's digests; and :func:`resume_hour` plays on an hour a host
+stopped part way through, answering every minute it stored from what it stored and asking only
+the minutes after them. A minute's state is a function of the state before it, the run's seed and
+the minute's receipts alone, so an hour played on from the state its previous hour ended in is
+that hour of the whole run, minute for minute and receipt for receipt.
+
 Nothing here reads or writes a database or the live society: a run is its own, and the world it
 ran over is unchanged by it.
 """
@@ -54,6 +65,7 @@ from exulanica.world.role_decisions import (
     ReplayMismatch,
     play_minutes,
     replay_minutes,
+    resume_minutes,
 )
 from exulanica.world.society import SocietyEvent, society_state_sha256
 from exulanica.world.society_choice import WAIT_KEY
@@ -75,16 +87,23 @@ from exulanica.world.society_planner import (
 
 __all__ = [
     "DECIDER_KINDS",
+    "HOUR_TICKS",
     "OTHER_DECIDER_KINDS",
     "ROUTINE",
     "Asking",
+    "HourStart",
     "PlayedRun",
     "ReplayMismatch",
     "RunPlan",
+    "first_hour",
+    "hours_of",
     "plan_role",
     "play",
+    "play_hour",
     "replay",
+    "replay_hour",
     "request_id",
+    "resume_hour",
 ]
 
 #: Who decides for the people of a run: their routine, nobody (they wait), or a model.
@@ -94,6 +113,9 @@ DECIDER_KINDS: Final = ("routine", "wait", "model")
 OTHER_DECIDER_KINDS: Final = ("routine", "model")
 #: The routine's decider, for a person nobody chose a model for.
 ROUTINE: Final = {"kind": "routine"}
+#: The minutes a run longer than an hour is played, sealed, resumed and read in: an hour, the
+#: window an hour's comparison runs and its reading lines were measured over.
+HOUR_TICKS: Final = 60
 
 
 @dataclass(frozen=True, slots=True)
@@ -337,10 +359,14 @@ def _minutes(
     start: dict[str, Any],
     on_minute: Callable[[int, Sequence[dict[str, Any]], Sequence[dict[str, Any]]], None]
     | None = None,
+    ticks: int | None = None,
+    first_sequence: int = 0,
 ) -> PlayedMinutes:
-    """``plan``'s minutes, by the one loop every role runs by, under the role the run's contract
-    names (:func:`plan_role`): the arm's model asked for its people, its waiting anchor as the
-    seam each minute begins from, the routine for the rest."""
+    """``plan``'s minutes from ``start``, ``ticks`` of them (left out, the plan's whole window),
+    by the one loop every role runs by, under the role the run's contract names
+    (:func:`plan_role`): the arm's model asked for its people, its waiting anchor as the seam each
+    minute begins from, the routine for the rest. Receipts are numbered on from
+    ``first_sequence``."""
     role = plan_role(plan)
     waiting = _wait_policy(plan.contract)
     family = _family(plan)
@@ -363,7 +389,7 @@ def _minutes(
             start=start,
             sources=plan.inputs,
             seed=seed,
-            ticks=plan.ticks,
+            ticks=plan.ticks if ticks is None else ticks,
             step=family.step,
             config_for=config_for,
             request_id_for=lambda subject, tick: request_id(plan.run_id, subject, tick),
@@ -371,6 +397,7 @@ def _minutes(
             seam=seam,
             contract=plan.contract,
             on_minute=on_minute,
+            first_sequence=first_sequence,
         )
 
 
@@ -424,3 +451,129 @@ def replay(
         play=lambda asking: _minutes(plan, asking, start=start),
     )
     return _run(start, minutes)
+
+
+# -- a day, hour by hour ------------------------------------------------------------------------
+
+
+def hours_of(plan: RunPlan) -> int:
+    """How many hours ``plan``'s window holds: one for an hour's comparison, 24 for a day's. A
+    window that is not a whole number of hours is refused."""
+    if plan.ticks % HOUR_TICKS:
+        raise ValueError("a run's window is a whole number of hours")
+    return plan.ticks // HOUR_TICKS
+
+
+@dataclass(frozen=True, slots=True)
+class HourStart:
+    """Where one hour of a run starts: its index in the run, the state at its first minute (the
+    run's genesis for the first hour, the state its previous hour ended in for every later one) and
+    the decision sequence of the last receipt the run recorded before it."""
+
+    hour: int
+    state: dict[str, Any]
+    first_sequence: int = 0
+
+
+def first_hour(plan: RunPlan) -> HourStart:
+    """The first hour of ``plan``: its genesis, with every person of its group one of the run's."""
+    start = genesis(plan)
+    if plan.group is not None and not plan.group <= {p["id"] for p in start["inhabitants"]}:
+        raise ValueError("group_person_not_in_run: every person of a group is one of the run's")
+    return HourStart(0, start, 0)
+
+
+def _held(plan: RunPlan, start: HourStart) -> None:
+    if not 0 <= start.hour < hours_of(plan):
+        raise ValueError("hour_not_in_window: the run's window holds no such hour")
+    if int(start.state["tick"]) != start.hour * HOUR_TICKS or start.first_sequence < 0:
+        raise ValueError("an hour starts at its own first minute, after the receipts before it")
+
+
+def _hour_run(start: HourStart, minutes: PlayedMinutes) -> PlayedRun:
+    return _run(start.state, minutes)
+
+
+def play_hour(
+    plan: RunPlan,
+    asking: Asking,
+    *,
+    start: HourStart,
+    on_minute: Callable[[int, Sequence[dict[str, Any]], Sequence[dict[str, Any]]], None]
+    | None = None,
+) -> PlayedRun:
+    """Play one hour of ``plan`` on from ``start``, asking ``asking`` for a model arm's people, as
+    :func:`play` plays a whole run: ``on_minute`` is called after each minute's answers are
+    receipted and before the minute advances. Its receipts are numbered on from
+    ``start.first_sequence``."""
+    _held(plan, start)
+    return _hour_run(
+        start,
+        _minutes(
+            plan,
+            asking,
+            start=start.state,
+            on_minute=on_minute,
+            ticks=HOUR_TICKS,
+            first_sequence=start.first_sequence,
+        ),
+    )
+
+
+def replay_hour(
+    plan: RunPlan,
+    stored: Sequence[tuple[Mapping[str, Any], Mapping[str, Any]]],
+    *,
+    start: HourStart,
+    minute_digests: Sequence[str],
+) -> PlayedRun:
+    """Play one hour of ``plan`` again from ``start`` and the requests and receipts the run stored
+    in it, asking nothing, and hold it to the hour's record, as :func:`replay` holds a whole run:
+    every rebuilt request and receipt to the stored bytes, and every minute's state to the digest
+    ``minute_digests`` records for it."""
+    _held(plan, start)
+    minutes = replay_minutes(
+        stored,
+        minute_digests=minute_digests,
+        play=lambda asking: _minutes(
+            plan,
+            asking,
+            start=start.state,
+            ticks=HOUR_TICKS,
+            first_sequence=start.first_sequence,
+        ),
+    )
+    return _hour_run(start, minutes)
+
+
+def resume_hour(
+    plan: RunPlan,
+    stored: Sequence[tuple[Mapping[str, Any], Mapping[str, Any]]],
+    live: Asking,
+    *,
+    start: HourStart,
+    on_minute: Callable[[int, Sequence[dict[str, Any]], Sequence[dict[str, Any]]], None]
+    | None = None,
+) -> PlayedRun:
+    """Play on an hour of ``plan`` a host stopped part way through: every minute whose receipts the
+    run stored in it (``stored``, whole minutes in decision order) is answered from them, each
+    rebuilt request held to its stored bytes, and every later minute asks ``live``
+    (:func:`~exulanica.world.role_decisions.resume_minutes`). Nothing the run recorded is asked
+    again; a stored request the hour does not rebuild is a :class:`ReplayMismatch`, and the run
+    cannot go on under the receipts it holds. ``on_minute`` is called for every minute, those
+    answered from what was stored too, so a caller that stores what it paid for skips every minute
+    through :func:`~exulanica.world.role_decisions.stored_through`."""
+    _held(plan, start)
+    minutes = resume_minutes(
+        stored,
+        live=live,
+        play=lambda asking: _minutes(
+            plan,
+            asking,
+            start=start.state,
+            on_minute=on_minute,
+            ticks=HOUR_TICKS,
+            first_sequence=start.first_sequence,
+        ),
+    )
+    return _hour_run(start, minutes)

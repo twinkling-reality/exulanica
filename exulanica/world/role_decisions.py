@@ -15,7 +15,9 @@ adapter (:mod:`exulanica.world.decision_roles`):
     engine's seam (:func:`apply_receipts`), and every receipt it consumed appends its events.
 *   **A run of minutes** asks through an :class:`Asking` port, and :func:`replay_minutes` answers
     from what a run stored, with no client at all, holding every rebuilt request and receipt to
-    the stored bytes and every minute's state to its recorded digest.
+    the stored bytes and every minute's state to its recorded digest. A run stopped part way goes
+    on with :func:`resume_minutes`: the minutes it stored are answered from what it stored, as a
+    replay answers them, and only the minutes after them are asked.
 
 The model is asked elsewhere, through one hosted call path (:mod:`exulanica.api.decision_host`).
 Nothing here reads or writes a database.
@@ -60,10 +62,12 @@ __all__ = [
     "context_bytes",
     "play_minutes",
     "replay_minutes",
+    "resume_minutes",
     "role_receipt",
     "role_request",
     "seal",
     "sealed_receipt",
+    "stored_through",
     "validate_role_receipt",
     "validate_role_request",
     "written_messages",
@@ -473,23 +477,27 @@ def play_minutes(
     contract: DecisionContract | None = None,
     on_minute: Callable[[int, Sequence[dict[str, Any]], Sequence[dict[str, Any]]], None]
     | None = None,
+    first_sequence: int = 0,
 ) -> PlayedMinutes:
     """Play ``ticks`` minutes from ``start``, asking ``asking`` for ``role``'s subjects.
 
-    The first minute consumes every input of ``sources``, each later one the last, as a step
-    consumes queued inputs. Each minute, every subject at a choice point for whom ``config_for``
-    names a model is asked, with the options the ask may offer, and each answer is a receipt; the
-    roles an engine hosts (``roles``) then apply the minute's receipts over the seam ``seam``
-    starts from, and ``step`` advances it. ``on_minute(tick, requests, receipts)`` is called after
-    each minute's answers are receipted and before the minute advances.
+    The minute that leaves the genesis, at tick 0, consumes every input of ``sources``, and every
+    later one the last, as a step consumes queued inputs, so a run played on from a later state
+    consumes what that minute of the whole run would. Each minute, every subject at a choice point
+    for whom ``config_for`` names a model is asked, with the options the ask may offer, and each
+    answer is a receipt; the roles an engine hosts (``roles``) then apply the minute's receipts
+    over the seam ``seam`` starts from, and ``step`` advances it. ``on_minute(tick, requests,
+    receipts)`` is called after each minute's answers are receipted and before the minute
+    advances. ``first_sequence`` is the decision sequence of the last receipt recorded before
+    ``start``, from which the receipts of minutes played on from a later state are numbered.
     """
     contract = contract or role.contract()
     state = start
     played = PlayedMinutes()
     latest = sources[-1]
-    sequence = 0
-    for minute in range(1, ticks + 1):
-        consumed = list(sources) if minute == 1 else [latest]
+    sequence = first_sequence
+    for _minute in range(ticks):
+        consumed = list(sources) if state["tick"] == 0 else [latest]
         due = [s for s in sorted(role.adapter.subjects(state)) if role.adapter.due(state, s)]
         played.choice_points.update(due)
         asked: dict[str, Sequence[RoleOption]] = {}
@@ -600,13 +608,78 @@ def replay_minutes(
     played = play(answering)
     if len(played.states) != len(minute_digests):
         raise ReplayMismatch("the run recorded another number of minutes")
-    for minute, (found, recorded) in enumerate(
-        zip(played.minute_digests, minute_digests, strict=True), 1
+    for state, found, recorded in zip(
+        played.states, played.minute_digests, minute_digests, strict=True
     ):
         if found != recorded:
-            raise ReplayMismatch("the minute ends in another state", minute=minute)
+            raise ReplayMismatch("the minute ends in another state", minute=int(state["tick"]))
     if [dict(receipt) for _, receipt in stored] != played.receipts:
         raise ReplayMismatch("a stored receipt is not the one its request rebuilds")
     if answering.used != set(receipts):
+        raise ReplayMismatch("a stored receipt answers no request the run asks")
+    return played
+
+
+def stored_through(stored: Sequence[tuple[Mapping[str, Any], Mapping[str, Any]]]) -> int | None:
+    """The tick of the last minute whose receipts ``stored`` holds, or None for none: the minute
+    a run that stopped had asked and recorded last. A minute's receipts are recorded together, in
+    one transaction, so every minute up to it is whole."""
+    return max((int(request["base_tick"]) for request, _receipt in stored), default=None)
+
+
+@dataclass(frozen=True, slots=True)
+class _Resumed:
+    """Answers a run played on after it stopped: every minute through ``through`` from what it
+    stored, every later one from ``live``."""
+
+    stored: _Stored
+    live: Asking
+    through: int | None
+
+    def _replayed(self, tick: int) -> bool:
+        return self.through is not None and tick <= self.through
+
+    def offerable(
+        self, tick: int, due: Mapping[str, Sequence[RoleOption]]
+    ) -> Mapping[str, frozenset[str]]:
+        if self._replayed(tick):
+            return self.stored.offerable(tick, due)
+        return self.live.offerable(tick, due)
+
+    def answers(self, requests: Sequence[dict[str, Any]]) -> Sequence[dict[str, Any]]:
+        ticks = {int(request["base_tick"]) for request in requests}
+        if len(ticks) != 1:
+            raise ValueError("a minute's requests are asked over one tick")
+        if self._replayed(ticks.pop()):
+            return self.stored.answers(requests)
+        return self.live.answers(requests)
+
+
+def resume_minutes(
+    stored: Sequence[tuple[Mapping[str, Any], Mapping[str, Any]]],
+    *,
+    live: Asking,
+    play: Callable[[Asking], PlayedMinutes],
+) -> PlayedMinutes:
+    """Play on from where a run stopped, asking only what it did not record.
+
+    ``stored`` is every request the run recorded with its receipt since the state ``play`` starts
+    from, in decision order, and ``play`` the run's minutes from that state, numbering receipts
+    from the last one recorded before it. Every minute through the last one ``stored`` answers
+    (:func:`stored_through`) is answered from it, as :func:`replay_minutes` answers, each rebuilt
+    request held to its stored bytes; every later minute asks ``live``. So nothing the run already
+    paid for and recorded is asked again. A rebuilt request that is not the stored one, a stored
+    receipt that is not rebuilt to the same bytes or that no minute asks for: each is a
+    :class:`ReplayMismatch`, and the run cannot go on under the receipts it holds.
+    """
+    requests = {(str(r["subject_id"]), int(r["base_tick"])): dict(r) for r, _ in stored}
+    receipts = {str(receipt["request_id"]): dict(receipt) for _, receipt in stored}
+    if len(requests) != len(stored) or len(receipts) != len(stored):
+        raise ReplayMismatch("a subject is asked twice in one minute, or a request answered twice")
+    replayed = _Stored(requests, receipts, set())
+    played = play(_Resumed(replayed, live, stored_through(stored)))
+    if [dict(receipt) for _, receipt in stored] != played.receipts[: len(stored)]:
+        raise ReplayMismatch("a stored receipt is not the one its request rebuilds")
+    if replayed.used != set(receipts):
         raise ReplayMismatch("a stored receipt answers no request the run asks")
     return played

@@ -833,9 +833,11 @@ type = "forbidden"
 source_modules = [
   "exulanica.world.society_comparison_claim",
   "exulanica.world.society_comparison_verdict",
+  "exulanica.world.society_comparison_verdict_v5",
   "exulanica.world.society_score",
   "exulanica.world.society_score_v2",
   "exulanica.world.society_score_v3",
+  "exulanica.world.society_score_v5",
 ]
 forbidden_modules = [
   "exulanica.api",

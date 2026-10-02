@@ -105,8 +105,18 @@ each recorded routine threshold for every supported need of each scored person i
 its raw unit is a sum of need-thousandths times person-minutes, so a raw urgency from the third
 score cannot be compared directly with it. Missing, extra or malformed needs refuse the run, and
 the stored terms record the need keys, thresholds and unit. Variety counts only performed
-catalogued actions, never travel or a selected goal. A purposeful society is defined under the
-third score, declared in `assets/catalogs/society/society-person-score.v3.json` and computed by
+catalogued actions, never travel or a selected goal. A living town's day is scored under the fifth
+score, declared in `assets/catalogs/society/society-person-score.v5.json` and computed by
+[`exulanica/world/society_score_v5.py`](../exulanica/world/society_score_v5.py): the fourth score
+over a window of a day, its weights, anchors and classes unchanged. A day's run is played and
+sealed hour by hour, so its terms are assembled from its hours: each hour keeps the fourth score's
+terms with the kinds each scored person did in it, held to that hour's own count of them, and the
+day sums every count and unites each person's kinds, so a kind counts once per person in the day as
+it counts once in an hour's window. The assembled terms are the fourth score's over every minute
+of the day ([`tests/test_society_score_v5.py`](../tests/test_society_score_v5.py)). A day's raw
+urgency and variety are a day's, so a day's score is never compared with an hour's. A purposeful
+society is defined under the third score, declared in
+`assets/catalogs/society/society-person-score.v3.json` and computed by
 [`exulanica/world/society_score_v3.py`](../exulanica/world/society_score_v3.py): half need relief,
 the second version's term described next, and half variety, how many different kinds of thing each
 of the group's people did in the hour (resting, visiting, standing and talking, the routine's own
@@ -194,6 +204,23 @@ ran on, and an entry that states a held-out seed's text is refused (`held_out_se
 fourth keeps the development seeds and their text and commits eight held-out seeds drawn afresh,
 none of an earlier version's, by digest alone, which the town comparison of 2026-09-30 spent; the
 fifth, which a new comparison is defined under, does the same with eight more.
+
+A comparison of a living town over a day is defined under the fourth protocol
+(`assets/catalogs/society/society-comparison-protocol.v4.json`), the fifth score and the fifth
+seeds; a comparison over an hour stays under the third protocol. The fourth's window is 1440
+minutes, the town's day from its genesis to the same minute the next day, and its floor is 355,200
+need-thousandths times person-minutes per scored person, in the living score's unit: a quarter of
+the median need a routine's day spares each person against waiting's day, rounded down to the
+hundred, over the eight development seeds on the small towns of 38 and 52 people and the market
+towns of 74 and 88 that the living town's reading line was measured on, where the routine's day
+spared from 1,377,094.8 to 1,467,886.4 per person, median 1,421,019.3
+([record](evaluation/2026-10-02-living-day-anchors.json),
+[`scripts/measure_living_day_anchors.py`](../scripts/measure_living_day_anchors.py)). Every other
+value is the third's. It states no replay line, since a living town is read by its own, and only
+keys the verdict already reads, so neither the verdict module nor any binding an earlier comparison
+registered changes ([`tests/test_comparison_day_protocol.py`](../tests/test_comparison_day_protocol.py)).
+A day's comparison registers the fifth binding, which also names the fifth score's module and its
+reader, [`exulanica/world/society_comparison_verdict_v5.py`](../exulanica/world/society_comparison_verdict_v5.py).
 
 ### Judged comparisons
 

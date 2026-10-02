@@ -23,6 +23,7 @@ from exulanica.models.manifest import load_manifest
 from exulanica.world import society_score_v3
 from exulanica.world.society_catalogs import (
     COMPARISON_VERSIONS,
+    DAY_COMPARISON_VERSIONS,
     ROUTINE_DIRECTORY,
     _versions_present,
     load_comparison_catalogs,
@@ -294,12 +295,14 @@ def test_the_served_result_keeps_each_runs_integer_terms_and_reasons_by_class():
 
 
 def test_each_protocol_version_states_only_values_a_reader_reads():
+    day = DAY_COMPARISON_VERSIONS["society-comparison-protocol"]
     for version in _versions_present("society-comparison-protocol"):
         catalogs = load_comparison_catalogs(
             versions={**COMPARISON_VERSIONS, "society-comparison-protocol": version}
         )
         assert set(protocol_values(catalogs)) <= PROTOCOL_READS
-        assert protocol_value(catalogs, "window_ticks") == 60
+        # Every version an hour's comparison has been defined under runs an hour; the day's, a day.
+        assert protocol_value(catalogs, "window_ticks") == (1440 if version == day else 60)
 
 
 def test_a_value_the_protocol_does_not_state_or_a_key_no_reader_reads_is_refused_by_name():
@@ -322,7 +325,7 @@ def test_a_protocol_version_is_claimed_by_its_file_alone(tmp_path):
     document = json.loads((tmp_path / "society-comparison-protocol.v3.json").read_text())
     document["catalog_version"] = 9
     (tmp_path / "society-comparison-protocol.v9.json").write_text(json.dumps(document))
-    assert _versions_present("society-comparison-protocol", tmp_path) == (1, 2, 3, 9)
+    assert _versions_present("society-comparison-protocol", tmp_path) == (1, 2, 3, 4, 9)
 
 
 # -- the binding ---------------------------------------------------------------------------------
