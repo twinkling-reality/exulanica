@@ -696,11 +696,11 @@ is opened:
 - A refused request that declares a body is answered at once, and its connection is closed only
   after its body has been read and discarded, so a client that sends its whole body before it
   reads meets the answer rather than a reset (a socket closed with bytes unread is reset). Each
-  drain is bounded by the body limit (512 MiB, 5.1.2) and 10 seconds, and at most 16 refusals
+  drain is bounded by the body limit (512 MiB, 5.1.2) and 10 seconds, and at most 64 refusals
   drain at once in one process. A drain holds no slot, no thread and no connection. A refusal
   whose client waits for `100 Continue` has sent no body and is closed at once; so is one past
   those bounds (a client that cannot finish its body within 10 seconds, a body without a declared
-  length that passes the limit, a seventeenth at once), and a client still sending then reads a
+  length that passes the limit, a sixty-fifth at once), and a client still sending then reads a
   reset. `GET /operations/capacity` counts how each refusal with a body ended under
   `refusal_drains`: `drained` (read to its end), `left` (the client went first), `cut` (a bound
   reached first) and `closed` (not drained).

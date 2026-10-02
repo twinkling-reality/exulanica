@@ -143,9 +143,11 @@ DRAIN_BYTES: Final = MAX_BODY_BYTES
 #: before.
 DRAIN_SECONDS: Final = 10.0
 
-#: How many refusals one process drains at once. At about 320 KiB buffered each (uvicorn pauses
-#: reading at 64 KiB, plus one 256 KiB socket read) the set holds about 5 MiB.
-DRAIN_SLOTS: Final = 16
+#: How many refusals one process drains at once. A burst of uploads arrives together and is
+#: refused together, so this is sized for bursts rather than for the two upload slots. At about
+#: 320 KiB buffered each (uvicorn pauses reading at 64 KiB, plus one 256 KiB socket read) the set
+#: holds about 20 MiB.
+DRAIN_SLOTS: Final = 64
 
 #: Threads kept free of admitted requests for the short work around them: multipart spooling and a
 #: stream resolving its caller before it starts.
