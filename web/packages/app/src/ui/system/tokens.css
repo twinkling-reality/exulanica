@@ -8,8 +8,9 @@
  * world the page draws; data-ui-scheme="dark" on the root element chooses the dark scheme, and
  * "system" follows the operating system (the Settings choice "Light or dark" writes it).
  *
- * World profiles keep their own roles (--ui-companion-*, --ui-spectrum-*) in
- * @exulanica/presentation/tokens.css; this file does not replace them.
+ * These colour every application surface. The world profile keeps the Companion's roles
+ * (--ui-companion-*) and the hues of the meaning roles (provenance, caution, error), which
+ * bridge.css section 4 reads at these surfaces' lightness.
  */
 :root {
   /* Surfaces */
@@ -44,6 +45,8 @@
   --brand-blue: #c6e1ff;
   --brand-yellow: #f4ff91;
   --brand-blend: linear-gradient(100deg, var(--brand-blue), var(--brand-yellow));
+  /* Words on the blend; the blend stays pale in both schemes, so its ink stays dark. */
+  --color-text-on-brand: #1b2430;
   --color-signal: #f4ff91;
   --color-signal-ink: #1b2430;
 

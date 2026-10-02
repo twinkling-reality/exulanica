@@ -120,9 +120,24 @@ versions, but cannot use recipe data to introduce executable behavior. Adding a 
 capability still requires a reviewed frontend module and capability-registry entry.
 
 The profile contains one shared visual DNA palette. The renderer consumes its sky, field, source,
-relationship, and unresolved roots directly. A trusted deterministic adapter derives interface
-ground, surface, ink, focus, provenance, uncertainty, and Companion roles from those same roots and
-corrects them to minimum contrast. A profile cannot author a second, unrelated UI palette.
+relationship, and unresolved roots directly. A trusted deterministic adapter derives the
+Companion's roles and the meaning roles (provenance, uncertainty, caution and error) from those
+same roots and corrects them to minimum contrast. A profile cannot author a second, unrelated UI
+palette.
+
+**DECISION**: the application is the brand, and the world is the world's. The application's own
+surfaces (the top bar, the tool rail, the panels, the confirmation, Search, notices, the World
+menu, Settings, Library, Character, Compare, Design, Make a world, Photos and the way in) take their
+ground, surface, ink, focus and accent from the interface's brand tokens
+([interface system](interface-system.md#the-brand-colours)), in the light or dark scheme the person
+chose. The world keeps the canvas, the Companion's speech, choices and command buttons (section 8),
+Design's previews of the world, and the hues of its meaning roles wherever they are drawn. On an
+application surface a meaning role keeps the world's hue and only moves its lightness to read at its
+floor on that surface, in either scheme (`meaningRolesOn` in
+`web/packages/presentation/src/world-style-model.ts`, applied by `web/packages/app/src/theme.ts`).
+So changing a world's Design changes the world, the Companion and those hues, and not the
+application's panels. The alternative, deriving the panels from each world, made the tools change
+colour with the place and left a dark scheme nothing to stand on.
 
 Four profile-agnostic constraints bind the adapter, all in
 `web/packages/presentation/src/world-style-model.ts`:

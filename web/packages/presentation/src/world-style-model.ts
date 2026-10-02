@@ -556,6 +556,44 @@ export function deriveWorldUiColors(
   });
 }
 
+/** The world's meaning roles that are drawn on application surfaces as well as on its own. */
+export interface WorldMeaningRoles {
+  readonly warning: string;
+  readonly error: string;
+  readonly user: string;
+  readonly capture: string;
+  readonly inference: string;
+  readonly external: string;
+  readonly userMark: string;
+  readonly captureMark: string;
+  readonly inferenceMark: string;
+  readonly externalMark: string;
+}
+
+const MEANING_TEXT = ['warning', 'error', 'user', 'capture', 'inference', 'external'] as const;
+const MEANING_MARKS = ['userMark', 'captureMark', 'inferenceMark', 'externalMark'] as const;
+
+/**
+ * The world's meaning roles, read on surfaces the world does not draw: the application's own
+ * light or dark panels. Each keeps the hue the world gave it and moves only its lightness, and
+ * only where it fails the floor on one of `surfaces`, as the roles were first corrected against
+ * the world's own surface. The surfaces must be all light or all dark, so one direction of walk
+ * clears every one of them.
+ */
+export function meaningRolesOn(colors: WorldUiColors, surfaces: readonly string[]): WorldMeaningRoles {
+  const onEvery = (role: string, minimum: number): string => {
+    let tone = role;
+    for (let pass = 0; pass < 3; pass += 1) {
+      for (const surface of surfaces) tone = accessibleTone(tone, surface, minimum);
+    }
+    return tone;
+  };
+  const roles: Record<string, string> = {};
+  for (const name of MEANING_TEXT) roles[name] = onEvery(colors[name], READING_FLOOR);
+  for (const name of MEANING_MARKS) roles[name] = onEvery(colors[name], MARK_FLOOR);
+  return Object.freeze(roles) as unknown as WorldMeaningRoles;
+}
+
 /** A coherent five-field navigation spectrum rotated with the world's interface identity. */
 export function deriveWorldUiChromatic(
   palette: WorldPalette,

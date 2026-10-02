@@ -293,3 +293,168 @@
   bottom: auto;
   width: min(22rem, 100%);
 }
+
+/* -- 4. The application is the brand ----------------------------------------------------------- */
+/*
+ * The major surfaces on the overlay layer and the World menu take the brand's surfaces, ink, focus
+ * and edges in both schemes (interface-system.md 2, atlas-world-customization-contract.md 4). The
+ * world keeps the canvas, the Companion's strip and the hues of its meaning roles. The second
+ * selector outranks the world profile's high-contrast ink, which the tokens' own high-contrast
+ * values replace.
+ */
+#shell :is(
+  .index-workspace.rail, .detail, .settings-view.system-overlay, .atlas-instrument.options-view.system-overlay,
+  .world-recipes, .character-studio, .society-comparison, .society-experiment-result, .lazy-panel, .photos-drawer,
+  .world-menu
+),
+:root[data-contrast] #shell :is(
+  .index-workspace.rail, .detail, .settings-view.system-overlay, .atlas-instrument.options-view.system-overlay,
+  .world-recipes, .character-studio, .society-comparison, .society-experiment-result, .lazy-panel, .photos-drawer,
+  .world-menu
+) {
+  --ink: var(--color-text);
+  --ink-soft: var(--color-text-muted);
+  --ink-faint: var(--color-text-faint);
+  --accent: var(--color-accent);
+  --focus: var(--focus-ring-color);
+  --edge: var(--color-border);
+  --surface: var(--color-surface-sunken);
+  --raised: var(--color-surface-raised);
+  --atlas-plane: var(--color-surface-solid);
+  --chromatic-ink-soft: var(--color-text-muted);
+  --chromatic-ink-faint: var(--color-text-faint);
+  --chromatic-edge: var(--color-border);
+  --ui-chromatic-ink: var(--color-text);
+  --ui-chromatic-paper: var(--color-surface-raised);
+  --ui-chromatic-accent: var(--color-accent);
+  --inspector-ink: var(--color-text);
+  --inspector-muted: var(--color-text-muted);
+  --app-shadow: var(--elevation-3);
+}
+
+/*
+ * The world's meaning roles on the application's surfaces: the same hues, at the lightness these
+ * surfaces need (theme.ts brandMeaningProperties). The Companion's strip keeps the world's own.
+ */
+#shell .x-region:not([data-region='dock']),
+#shell :is(
+  .index-workspace.rail, .detail, .settings-view.system-overlay, .atlas-instrument.options-view.system-overlay,
+  .world-recipes, .character-studio, .society-comparison, .society-experiment-result, .lazy-panel, .photos-drawer,
+  .world-menu
+) {
+  --warning: var(--on-brand-warning);
+  --error: var(--on-brand-error);
+  --user: var(--on-brand-user);
+  --capture: var(--on-brand-capture);
+  --inference: var(--on-brand-inference);
+  --external: var(--on-brand-external);
+  --user-mark: var(--on-brand-user-mark);
+  --capture-mark: var(--on-brand-capture-mark);
+  --inference-mark: var(--on-brand-inference-mark);
+  --external-mark: var(--on-brand-external-mark);
+}
+:root[data-ui-scheme='dark'] #shell .x-region:not([data-region='dock']),
+:root[data-ui-scheme='dark'] #shell :is(
+  .index-workspace.rail, .detail, .settings-view.system-overlay, .atlas-instrument.options-view.system-overlay,
+  .world-recipes, .character-studio, .society-comparison, .society-experiment-result, .lazy-panel, .photos-drawer,
+  .world-menu
+) {
+  --warning: var(--on-brand-dark-warning);
+  --error: var(--on-brand-dark-error);
+  --user: var(--on-brand-dark-user);
+  --capture: var(--on-brand-dark-capture);
+  --inference: var(--on-brand-dark-inference);
+  --external: var(--on-brand-dark-external);
+  --user-mark: var(--on-brand-dark-user-mark);
+  --capture-mark: var(--on-brand-dark-capture-mark);
+  --inference-mark: var(--on-brand-dark-inference-mark);
+  --external-mark: var(--on-brand-dark-external-mark);
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-ui-scheme='system'] #shell .x-region:not([data-region='dock']),
+  :root[data-ui-scheme='system'] #shell :is(
+    .index-workspace.rail, .detail, .settings-view.system-overlay, .atlas-instrument.options-view.system-overlay,
+  .world-recipes, .character-studio, .society-comparison, .society-experiment-result, .lazy-panel, .photos-drawer,
+  .world-menu
+  ) {
+    --warning: var(--on-brand-dark-warning);
+    --error: var(--on-brand-dark-error);
+    --user: var(--on-brand-dark-user);
+    --capture: var(--on-brand-dark-capture);
+    --inference: var(--on-brand-dark-inference);
+    --external: var(--on-brand-dark-external);
+    --user-mark: var(--on-brand-dark-user-mark);
+    --capture-mark: var(--on-brand-dark-capture-mark);
+    --inference-mark: var(--on-brand-dark-inference-mark);
+    --external-mark: var(--on-brand-dark-external-mark);
+  }
+}
+
+/* The World menu: plain cards; the World tile carries the blend, a brand moment. */
+#shell .world-menu-entry,
+#shell :is(.world-menu-world, .world-menu-character, .world-menu-library, .world-menu-map, .world-menu-companion) {
+  --entry-background: var(--color-surface-raised);
+  color: var(--color-text);
+  border-color: var(--color-border);
+  box-shadow: var(--elevation-2);
+}
+#shell .world-menu-entry::before,
+#shell .world-menu-entry::after { display: none; }
+#shell .world-menu-world { --entry-background: var(--brand-blend); color: var(--color-text-on-brand); }
+#shell .world-menu-world :is(.world-menu-entry-detail, kbd) { color: var(--color-text-on-brand); }
+#shell .world-menu-entry .atlas-command-icon,
+#shell :is(.world-menu-customize, .world-menu-settings) .atlas-command-icon { color: var(--color-accent); }
+#shell .world-menu-entry-detail,
+#shell .world-menu-companion .world-menu-entry-detail { color: var(--color-text-muted); }
+#shell .world-menu-entry kbd,
+#shell .world-menu-companion kbd { color: var(--color-text-faint); }
+#shell .world-menu-entry:is(:hover, :focus-visible):not(.world-menu-world),
+#shell .world-menu-companion:is(:hover, :focus-visible) {
+  color: var(--color-text);
+  background: linear-gradient(var(--color-surface-hover), var(--color-surface-hover)), var(--color-surface-raised);
+  border-color: var(--color-accent);
+}
+#shell .world-menu-world:is(:hover, :focus-visible) { border-color: var(--color-accent); }
+#shell .world-menu-entry[aria-disabled='true'] { cursor: not-allowed; }
+#shell .world-menu-make .world-menu-entry-label { white-space: normal; }
+#shell .world-menu-rail {
+  width: auto;
+  justify-self: start;
+  padding: var(--space-1) var(--space-3);
+  color: var(--color-text);
+  background: var(--color-surface);
+  border-radius: var(--radius-md);
+  box-shadow: var(--elevation-1);
+  text-shadow: none;
+}
+#shell .world-menu-rail-action,
+#shell .world-menu-rail-action:hover { color: var(--color-text); }
+#shell .world-menu-rail :is(kbd) {
+  color: var(--color-text);
+  background: var(--color-surface-sunken);
+  border-color: var(--color-border-strong);
+}
+
+/* Literal whites and inks the older surfaces wrote for a light world, on brand surfaces. */
+#shell .world-menu-companion :is(.world-menu-entry-detail, kbd) { color: var(--color-text-faint); }
+#shell .world-menu-companion .world-menu-entry-detail { color: var(--color-text-muted); }
+#shell .world-menu-session { color: var(--color-text-muted); }
+#shell .world-panel > details { background: var(--color-surface-raised); border-color: var(--color-border); }
+#shell .world-traffic-note { background: var(--color-surface); border-color: var(--color-border); color: var(--color-text); }
+#shell .settings-actions kbd { background: var(--color-surface-raised); color: var(--color-text); }
+#shell .options-view .overlay-close { color: var(--color-text); background: var(--color-surface-raised); border-color: var(--color-border); }
+#shell .options-view .overlay-close:is(:hover, :focus-visible) {
+  color: var(--color-text);
+  background: linear-gradient(var(--color-surface-hover), var(--color-surface-hover)), var(--color-surface-raised);
+}
+#shell .character-description .character-apply { color: var(--color-text-on-accent); background: var(--color-accent); }
+#shell :is(
+  .index-workspace.rail, .detail, .settings-view.system-overlay, .atlas-instrument.options-view.system-overlay,
+  .world-recipes, .character-studio, .society-comparison, .society-experiment-result, .photos-drawer
+) :is(input:not([type]), input[type='text'], input[type='search'], input[type='number'], textarea, select) {
+  color: var(--color-text);
+  background-color: var(--color-surface-raised);
+  border-color: var(--color-border-strong);
+}
+/* The credential gate and other start-up gates: the brand's surface and ink in both schemes. */
+#shell .gate { background: var(--color-surface-solid); color: var(--color-text); }

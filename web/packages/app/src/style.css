@@ -238,8 +238,27 @@ body {
   text-transform: uppercase;
 }
 
+/* The way in (the credential gate, the saved-world list, opening a world) reads the brand's
+ * surfaces and ink, in both schemes; its primary actions take the accent (interface-system.md 2). */
+#shell {
+  --ui-light-canvas: var(--color-surface-solid);
+  --ui-light-ink: var(--color-text);
+  --ui-light-ink-soft: var(--color-text-muted);
+  --ui-light-ink-faint: var(--color-text-faint);
+  --ui-light-focus: var(--focus-ring-color);
+}
+#shell .world-entry-gate .world-entry-primary,
+#shell .credential-submit:not(:disabled),
+#shell .account-sign-in-label,
+#shell .account-sign-in-arrow {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-text-on-accent);
+}
+#shell .world-entry-gate .world-entry-primary:hover:not(:disabled) { background: var(--color-accent-hover); }
+
 /* Brand moments: the blend of the spheres' blue and yellow marks the way in and the opening of a
- * world, and nowhere else (interface-system.md 2). */
+ * world here, and the World menu's World tile (bridge.css 4); nowhere else (interface-system.md 2). */
 .gate-wordmark::after,
 .startup-thinking-copy::before {
   content: '';

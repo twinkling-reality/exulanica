@@ -55,7 +55,7 @@ used sparingly and by rule, so that a colour on screen always means something:
 | --- | --- | --- |
 | Deep blue (`--color-accent`, `--color-accent-text`) | words that act, links, primary actions | primary buttons, quiet buttons and links, the focus ring, a selected tab's rule, icons in a panel header |
 | Yellow (`--color-signal`, with `--color-signal-ink`) | what is selected, live or actionable | a selected rail item, panel tab or Search row, a running state such as the playing clock, the hover and press of a control |
-| The blend (`--brand-blend`) | a brand moment | under the wordmark at the way in, and above "Opening your world"; nowhere else |
+| The blend (`--brand-blend`, with `--color-text-on-brand`) | a brand moment | under the wordmark at the way in, above "Opening your world", and the World tile of the World menu; nowhere else |
 
 - The deep blue is the spheres' hue made dark enough to read as words (at least 4.5:1); the pale
   sphere blue itself is 1.3:1 on white and so is never used for words or lines on a light surface.
@@ -64,14 +64,30 @@ used sparingly and by rule, so that a colour on screen always means something:
   the dark scheme the signal is a dark olive fill with yellow ink.
 - What never takes colour: running text, panel surfaces and borders, panel headers (plain, with
   `--panel-header-fill` transparent), the world itself, and status meanings, which keep the status
-  roles. A panel header, a card or a list row never wears the blend.
+  roles. A panel header, a list row or any card but the World tile never wears the blend.
 
 `web/packages/app/test/ui-system-contrast.test.ts` holds every text role, the signal's ink and the
 accent's words on the signal at AA in both schemes, and holds "Follow the system" to exactly the
-dark values. The dark scheme recolours the surfaces this file's tokens dress (the top bar, the tool
-rail, the inspector panels, the confirmation, Search and notices); the World menu, the major
-surfaces on the overlay layer and the Companion's speech strip still take the world profile's
-design.
+dark values.
+
+### What is the brand's and what is the world's
+
+The application is the brand; the world, and what speaks from inside it, is the world's
+([customization contract](atlas-world-customization-contract.md#4-profile-compatibility-and-programmable-controls)).
+
+| Surface | Takes its colours from |
+| --- | --- |
+| Top bar, tool rail, inspector panels, confirmation, Search, notices, heads-up notes | the brand tokens |
+| World menu (plain cards; the World tile wears the blend), Settings, Library, Character, Compare, Design, Make a world, Photos, the recorded-result reader | the brand tokens |
+| The way in: the credential gate, the saved-world list, opening a world | the brand tokens |
+| The world on the canvas; the Companion's speech, choices and command buttons; Design's previews of the world | the world's profile |
+| Provenance, uncertainty, caution and error, wherever they are drawn | the world's hue, at the lightness the surface under them needs |
+
+Every brand surface follows the Settings choice "Light or dark"; the world keeps its own light.
+`web/packages/app/src/ui/system/bridge.css` section 4 points the older surfaces' variables at the
+tokens; `web/packages/app/test/ui-brand-surfaces.test.ts` holds Aeroheart's meaning roles at their
+floor (text 4.5, marks 3) on every brand surface in both schemes, words on the blend at AA, and
+bridge.css reading exactly the meaning roles theme.ts writes.
 
 ## 3. Layout regions
 
@@ -176,6 +192,9 @@ and so on). The names do not change when words do; drivers select with `ACTION(i
   attachments are never closed, and surfaces appended to the shell are routed to their region.
 - `web/packages/app/test/ui-system-geometry.test.ts`: the region boxes computed from the real tokens
   and `layout.css` stay apart at 1440x900, 1280x800 and 1024x700 with the inspector open and closed.
+- `web/packages/app/test/ui-system-contrast.test.ts` and `ui-brand-surfaces.test.ts`: the contrast
+  of every text role, the signal and the blend in both schemes, and the world's meaning roles on
+  brand surfaces.
 - `web/packages/app/test/ui-system-sources.test.ts`: no numeric z-index in application CSS or inline
   styles; every z token used is defined; the system stylesheets hold no colour literal; older
   stylesheets hold no more colour literals than their recorded ceilings; only `icon.ts` imports lucide.

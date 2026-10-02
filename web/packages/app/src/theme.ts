@@ -1,9 +1,30 @@
 import {
   PRESENTATION_THEMES,
+  meaningRolesOn,
   type PresentationTheme,
   type WorldArtProfile,
+  type WorldMeaningRoles,
 } from '@exulanica/presentation';
 import { resolvedAppearance, type AtlasPreferences } from './preferences.js';
+import { BRAND_SURFACES } from './ui/system/token-values.js';
+
+/** A meaning role's CSS name: `userMark` is `--user-mark`. */
+const meaningProperty = (role: string): string => `--${role.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`;
+
+/**
+ * The world's meaning roles (provenance, caution, error) as the application's own surfaces show
+ * them: `--on-brand-<role>` for its light surfaces and `--on-brand-dark-<role>` for its dark ones.
+ * bridge.css points `--<role>` at these inside those surfaces; the world's own surfaces, such as
+ * the Companion's strip, keep the roles as the world derived them.
+ */
+export function brandMeaningProperties(colors: WorldArtProfile['ui']['colors']): Readonly<Record<string, string>> {
+  const properties: Record<string, string> = {};
+  for (const [prefix, surfaces] of [['--on-brand', BRAND_SURFACES.light], ['--on-brand-dark', BRAND_SURFACES.dark]] as const) {
+    const roles: WorldMeaningRoles = meaningRolesOn(colors, surfaces);
+    for (const [role, value] of Object.entries(roles)) properties[`${prefix}${meaningProperty(role).slice(1)}`] = value;
+  }
+  return properties;
+}
 
 export function themeForPreferences(
   preferences: AtlasPreferences,
@@ -104,6 +125,7 @@ export function applyDocumentWorldStyle(
     '--motion-easing': motion.easing,
   };
   for (const [name, value] of Object.entries(properties)) root.style.setProperty(name, value);
+  for (const [name, value] of Object.entries(brandMeaningProperties(colors))) root.style.setProperty(name, value);
   return profile;
 }
 
