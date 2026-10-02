@@ -386,3 +386,28 @@
 .x-clock[hidden] { display: none; }
 .x-clock-speed { width: auto; min-height: var(--control-sm); padding: 0 var(--space-2); font-size: var(--text-sm); }
 .x-technical { margin-top: var(--space-1); }
+
+/* -- A Companion plan on the sheet (ui/companion-plan.ts) ------------------------------------- */
+.companion-plan-utterance { margin: 0 0 var(--space-2); color: var(--color-text-muted); font-style: italic; }
+.companion-plan-intro { margin: 0 0 var(--space-3); color: var(--color-text); }
+.companion-plan-steps { display: grid; gap: var(--space-2); margin: 0 0 var(--space-3); padding: 0; list-style: none; }
+.companion-plan-step {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: start;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+}
+.companion-plan-step > .x-icon { margin-top: 2px; color: var(--color-accent); }
+.companion-plan-step[data-progress='running'] { border-color: var(--color-accent); }
+.companion-plan-step-words { display: grid; gap: 2px; }
+.companion-plan-step-label { color: var(--color-text); font-weight: var(--weight-medium); }
+.companion-plan-step-detail,
+.companion-plan-step-held { color: var(--color-text-muted); font-size: var(--text-sm); line-height: var(--text-sm-line); }
+.companion-plan-spends { display: flex; align-items: center; gap: var(--space-2); margin: 0 0 var(--space-2); color: var(--color-text-muted); }
+.companion-plan-summary { margin: 0 0 var(--space-2); color: var(--color-text); }
+.companion-plan-summary:empty { display: none; }
+.companion-plan-choices { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0 0 var(--space-3); }

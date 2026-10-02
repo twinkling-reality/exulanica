@@ -1,0 +1,39 @@
+[
+ {
+  "body": {
+   "control": {
+    "current_tick": 4,
+    "mode": "paused",
+    "revision": 1,
+    "speed": 1
+   },
+   "society": {
+    "current_tick": 4,
+    "state_sha256": "3a28ef8a94cc985c601ca19cb937f525e0efb8e79472890079fd3c52536939a2"
+   }
+  },
+  "status": 200
+ },
+ {
+  "body": {
+   "control": {
+    "current_tick": 5,
+    "mode": "paused",
+    "revision": 1,
+    "speed": 1
+   },
+   "society": {
+    "current_tick": 5,
+    "state_sha256": "3fa5b8208f72f9f0ff06441d12d49aa11b4c5e53153fe9df7fe5d3c41863a602"
+   }
+  },
+  "status": 200
+ },
+ {
+  "body": {
+   "code": "stale_society_state",
+   "detail": "society changed; reload before advancing"
+  },
+  "status": 409
+ }
+]

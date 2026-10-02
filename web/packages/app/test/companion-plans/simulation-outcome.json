@@ -1,0 +1,84 @@
+{
+ "alternatives": [],
+ "current": {
+  "edit_seq": 1,
+  "society": {
+   "control_revision": 1,
+   "engine": "exulanica-society/v2",
+   "mode": "paused",
+   "society_id": "9eb75841-cbc5-55b9-be4a-6cd78212c6af",
+   "speed": 1,
+   "state_sha256": "feeb658e6097826bf44e31751a5854cdde61eb1d2d495785647000b094e84f24",
+   "tick": 3,
+   "tick_interval_ms": 8000
+  },
+  "state_sha256": "bc935b53741501c5ebccd17b6c9789b3bafd15f48cd29dd8b8345c4fee0c6f1a"
+ },
+ "plan_sha256": "f78da7a56649c7a4f4d15713d80ab9d722bc42c92d698e0259dce1578a746f66",
+ "profile": "exulanica.companion-action-outcome/v1",
+ "state": "applied",
+ "steps": [
+  {
+   "code": null,
+   "index": 0,
+   "matches_preview": null,
+   "operation": "POST /world/versions/{version_id}/society/control/steps",
+   "receipts": [
+    {
+     "document_sha256": "3e4828f81dec5889db9c8931d93665451ab5206699135ef934458670cf06e496",
+     "event_seq": 2,
+     "operation": "POST /world/versions/{version_id}/society/control/steps",
+     "revision": 1,
+     "state_sha256": "9289eb80cfe04e0855a36065c55e47697aa5323a6ad33d44d1e3083c08fb280e",
+     "tick": 1,
+     "version_id": "64403426-1cba-4998-bd36-53ab6bab218d",
+     "world_id": "world:authored:3d8172cf-447a-4774-8520-7c64a9c5072d"
+    }
+   ],
+   "repeats": [],
+   "state": "applied"
+  },
+  {
+   "code": null,
+   "index": 1,
+   "matches_preview": null,
+   "operation": "POST /world/versions/{version_id}/society/control/steps",
+   "receipts": [
+    {
+     "document_sha256": "8fa8159f323965d06d8bbf6be54045b02934a58351ea0fb8240056f2a3f4e2d7",
+     "event_seq": 3,
+     "operation": "POST /world/versions/{version_id}/society/control/steps",
+     "revision": 1,
+     "state_sha256": "67d61e565f757cc980cf2f9ce90654a74f73214f9d793579b7195d1ac16c1f6b",
+     "tick": 2,
+     "version_id": "64403426-1cba-4998-bd36-53ab6bab218d",
+     "world_id": "world:authored:3d8172cf-447a-4774-8520-7c64a9c5072d"
+    }
+   ],
+   "repeats": [],
+   "state": "applied"
+  },
+  {
+   "code": null,
+   "index": 2,
+   "matches_preview": null,
+   "operation": "POST /world/versions/{version_id}/society/control/steps",
+   "receipts": [
+    {
+     "document_sha256": "09fc405d117cc3ec4c9f37349286480974407f730ce1757dc27972e04801420f",
+     "event_seq": 4,
+     "operation": "POST /world/versions/{version_id}/society/control/steps",
+     "revision": 1,
+     "state_sha256": "feeb658e6097826bf44e31751a5854cdde61eb1d2d495785647000b094e84f24",
+     "tick": 3,
+     "version_id": "64403426-1cba-4998-bd36-53ab6bab218d",
+     "world_id": "world:authored:3d8172cf-447a-4774-8520-7c64a9c5072d"
+    }
+   ],
+   "repeats": [],
+   "state": "applied"
+  }
+ ],
+ "version_id": "64403426-1cba-4998-bd36-53ab6bab218d",
+ "world_id": "world:authored:3d8172cf-447a-4774-8520-7c64a9c5072d"
+}

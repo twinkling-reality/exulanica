@@ -75,6 +75,12 @@ function duration(latencyMs: number): string {
  */
 export function provenanceSentence(provenance: AnswerProvenance): string {
   const spent = duration(provenance.latencyMs);
+  if (provenance.planned === true) {
+    // The classifier read the request; any later call filled the plan's form. Nothing changes
+    // until a person confirms a plan, whatever this answer says.
+    const model = provenance.plannedByName ?? provenance.servedModelName;
+    return model === null ? say('provenance.proposalNone') : fill('provenance.planned', { model, duration: spent });
+  }
   switch (provenance.composed) {
     case 'none':
       return say('provenance.none');

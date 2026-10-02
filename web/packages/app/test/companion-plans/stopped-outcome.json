@@ -1,0 +1,64 @@
+{
+ "alternatives": [],
+ "current": {
+  "edit_seq": 1,
+  "society": {
+   "control_revision": 1,
+   "engine": "exulanica-society/v2",
+   "mode": "paused",
+   "society_id": "9eb75841-cbc5-55b9-be4a-6cd78212c6af",
+   "speed": 1,
+   "state_sha256": "3fa5b8208f72f9f0ff06441d12d49aa11b4c5e53153fe9df7fe5d3c41863a602",
+   "tick": 5,
+   "tick_interval_ms": 8000
+  },
+  "state_sha256": "bc935b53741501c5ebccd17b6c9789b3bafd15f48cd29dd8b8345c4fee0c6f1a"
+ },
+ "plan_sha256": "b6d9e1a92a5353f3196b62bf8ba732ac03768e4bddc3852145ddbf37a204703f",
+ "profile": "exulanica.companion-action-outcome/v1",
+ "state": "applied",
+ "steps": [
+  {
+   "code": null,
+   "index": 0,
+   "matches_preview": null,
+   "operation": "POST /world/versions/{version_id}/society/control/steps",
+   "receipts": [
+    {
+     "document_sha256": "4ce8f1120e1229f270b832f19ff600ee7bff228e11da78ff942b4fc1930472b4",
+     "event_seq": 5,
+     "operation": "POST /world/versions/{version_id}/society/control/steps",
+     "revision": 1,
+     "state_sha256": "3a28ef8a94cc985c601ca19cb937f525e0efb8e79472890079fd3c52536939a2",
+     "tick": 4,
+     "version_id": "64403426-1cba-4998-bd36-53ab6bab218d",
+     "world_id": "world:authored:3d8172cf-447a-4774-8520-7c64a9c5072d"
+    }
+   ],
+   "repeats": [],
+   "state": "applied"
+  },
+  {
+   "code": null,
+   "index": 1,
+   "matches_preview": null,
+   "operation": "POST /world/versions/{version_id}/society/control/steps",
+   "receipts": [
+    {
+     "document_sha256": "73ab0b56aa2fcffb23c8e9d7c52f7e8fbddd169db72217748c901f305c727fa5",
+     "event_seq": 6,
+     "operation": "POST /world/versions/{version_id}/society/control/steps",
+     "revision": 1,
+     "state_sha256": "3fa5b8208f72f9f0ff06441d12d49aa11b4c5e53153fe9df7fe5d3c41863a602",
+     "tick": 5,
+     "version_id": "64403426-1cba-4998-bd36-53ab6bab218d",
+     "world_id": "world:authored:3d8172cf-447a-4774-8520-7c64a9c5072d"
+    }
+   ],
+   "repeats": [],
+   "state": "applied"
+  }
+ ],
+ "version_id": "64403426-1cba-4998-bd36-53ab6bab218d",
+ "world_id": "world:authored:3d8172cf-447a-4774-8520-7c64a9c5072d"
+}

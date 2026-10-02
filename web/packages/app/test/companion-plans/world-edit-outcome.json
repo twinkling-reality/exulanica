@@ -1,0 +1,34 @@
+{
+ "alternatives": [],
+ "current": {
+  "edit_seq": 1,
+  "state_sha256": "bc935b53741501c5ebccd17b6c9789b3bafd15f48cd29dd8b8345c4fee0c6f1a"
+ },
+ "plan_sha256": "d567aca5147c9e1489d269c6496d3d86b29ae3ebad766fbc209d2f320d74cfac",
+ "profile": "exulanica.companion-action-outcome/v1",
+ "state": "applied",
+ "steps": [
+  {
+   "code": null,
+   "index": 0,
+   "matches_preview": true,
+   "operation": "POST /world/versions/{version_id}/compositions/apply",
+   "receipts": [
+    {
+     "edit_id": "1b8cf4c8-ddfa-4b3f-b4fc-325222e3546e",
+     "edit_seq": 1,
+     "kind": "add_object",
+     "object_id": "companion:cc0.bench:53080b57544e",
+     "operation": "POST /world/versions/{version_id}/compositions/apply",
+     "result_state_sha256": "bc935b53741501c5ebccd17b6c9789b3bafd15f48cd29dd8b8345c4fee0c6f1a",
+     "version_id": "64403426-1cba-4998-bd36-53ab6bab218d",
+     "world_id": "world:authored:3d8172cf-447a-4774-8520-7c64a9c5072d"
+    }
+   ],
+   "repeats": [],
+   "state": "applied"
+  }
+ ],
+ "version_id": "64403426-1cba-4998-bd36-53ab6bab218d",
+ "world_id": "world:authored:3d8172cf-447a-4774-8520-7c64a9c5072d"
+}

@@ -22,6 +22,7 @@ import {
   type ToastStack,
 } from '../system/components.js';
 import { icon } from '../system/icon.js';
+import type { PlannedRequest } from './planned.js';
 import {
   ACTIONS,
   actionsFor,
@@ -32,6 +33,7 @@ import {
   type ActionAvailability,
   type ActionGroup,
   type ActionSpec,
+  type RefusalWords,
 } from './registry.js';
 
 export interface ActionBinding {
@@ -51,6 +53,8 @@ export interface ActionHost {
   /** Called when the capabilities or the state an action reads changed; returns the unsubscribe. */
   onChange(listener: () => void): () => void;
   readonly toasts: ToastStack;
+  /** Sends a request a Companion plan step was built into (`planned.ts`); absent, none is sent. */
+  readonly send?: (request: PlannedRequest) => Promise<unknown>;
 }
 
 /** What a control for this action should show now. */
@@ -92,6 +96,49 @@ export async function perform(host: ActionHost, id: string, control?: HTMLButton
     const words = refusalWords(spec, code);
     const toast = host.toasts.show({ tone: 'danger', message: `${words.happened} ${words.next}` });
     toast.querySelector('.x-toast-message')?.after(technicalRecord({ action: spec.id, code, detail }));
+  } finally {
+    if (control !== undefined) setButtonBusy(control, false);
+  }
+}
+
+/** What sending one planned step came to. */
+export type PlannedResult =
+  /** Sent, and the route answered with this body. */
+  | { readonly kind: 'ran'; readonly response: unknown }
+  /** Sent, and the route refused: its code, and the action's words for it. */
+  | { readonly kind: 'refused'; readonly code: string | null; readonly detail: string; readonly words: RefusalWords }
+  /** Not sent: the action is not available now, in the action's words for why. */
+  | { readonly kind: 'not-run'; readonly state: string; readonly code: string | null; readonly words: RefusalWords };
+
+/**
+ * Send one Companion plan step through the same path as the action's own control: the same
+ * availability (the descriptor's, read in the same order), the same busy state on its control and
+ * the same words for a refusal. It differs in two ways only. The request is the plan's, built
+ * by `plannedRequest` from the registry entry, so the server's stale checks see the pins the
+ * person confirmed; and the binding's own precondition is not asked, because a plan carries the
+ * clock read its bases came from (a chain pauses before it advances). It shows no toast: the
+ * plan's sheet says each step's result, and the caller decides whether a chain goes on.
+ */
+export async function performPlanned(
+  host: ActionHost, request: PlannedRequest, control?: HTMLButtonElement,
+): Promise<PlannedResult> {
+  const spec = actionSpec(request.actionId);
+  const found = availability(spec, host.capabilities());
+  if (found.state !== 'available' || host.send === undefined) {
+    return {
+      kind: 'not-run', state: found.state, code: found.code,
+      words: found.words ?? { happened: 'This step was not sent.', next: 'Nothing was changed.' },
+    };
+  }
+  if (control !== undefined) setButtonBusy(control, true);
+  try {
+    return { kind: 'ran', response: await host.send(request) };
+  } catch (error) {
+    const code = error instanceof ApiError ? error.code : null;
+    const detail = error instanceof ApiError
+      ? error.message.replace(`${error.code}: `, '')
+      : error instanceof Error ? error.message : String(error);
+    return { kind: 'refused', code, detail, words: refusalWords(spec, code) };
   } finally {
     if (control !== undefined) setButtonBusy(control, false);
   }

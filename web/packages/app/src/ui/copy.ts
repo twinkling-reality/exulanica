@@ -307,6 +307,9 @@ export const COPY: Readonly<Record<string, string>> = Object.freeze({
   // anything about evidence here would be false, because none was read.
   'provenance.refused':
     '{model} read that in {duration}. The reviewed design has no way to make that change.',
+  // A model read a request for a change to the world and the Companion planned it, asked about
+  // it or could not plan it. A plan is only ever carried out by the person's Confirm.
+  'provenance.planned': '{model} read that in {duration}. Nothing changes unless you confirm a plan.',
   'provenance.none': 'No model was asked. This is what the search found.',
   // A proposal or a refusal with no model to name. There was no search, so none is mentioned.
   'provenance.proposalNone': 'No model was asked.',

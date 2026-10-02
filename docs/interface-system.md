@@ -122,7 +122,7 @@ Below 60rem the application shows its narrow-window notice; the region rules for
 ## 4. Actions
 
 Each action is declared once in `ACTIONS`: label, hint, icon, group, placements (`rail`, `top-bar`,
-`palette`, a panel), keyboard shortcut, the route key of the operation it performs (the descriptor's
+`palette`, a panel, `companion` for an action offered only as a Companion plan step), keyboard shortcut, the route key of the operation it performs (the descriptor's
 `operation`, as in `tests/snapshots/api-routes.json`), and words for each refusal code it can meet.
 The composition root binds each one to the call its older control makes, so a rail button, a palette
 row, a panel button and the Companion's starter offer are one action with one result.
@@ -147,6 +147,16 @@ The interface keeps these states distinct and gives each one look and one defaul
 unavailable, unsupported ("Not in this world"), not permitted ("Not allowed"), unknown ("Can't tell
 yet"), queued ("Waiting"), running ("Working"), ready, failed, stale ("Out of date"), cancelled and
 partial ("Partly done").
+
+A Companion plan's step is one of these actions (`web/packages/app/src/ui/actions/planned.ts`): its
+typed action picks the registry entry, so the step on the plan's sheet has the entry's label, icon,
+availability and refusal words, and it is sent through `performPlanned`, the same path as the
+entry's own control, to the entry's own route with the plan's path values, body and pins. A step
+whose action maps to no entry, or whose plan names another route than the entry's, is never sent.
+The sheet says before its one Confirm whether carrying the plan out can ask a chosen model, then each
+step's result: done, not done (in the action's words) or not reached, with "Partly done" for a chain
+that stopped, and Play when a stopped chain left the world paused
+([world actions](companion-question.md#the-browsers-path)).
 
 Every interactive control a driver needs carries a `data-action` name (`people.bring-in`,
 `clock.advance`, `objects.place`, `objects.undo`, `object.remove`, `panel.people`, `confirm.accept`

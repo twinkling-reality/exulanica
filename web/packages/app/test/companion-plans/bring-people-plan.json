@@ -1,0 +1,84 @@
+{
+ "atomic": false,
+ "capabilities": null,
+ "clarification": null,
+ "clock": {
+  "answered_at": "2026-10-02T20:37:46.393124+00:00",
+  "catchup_ticks_maximum": 3,
+  "clock_profile": "exulanica.world-clock/legacy-v1",
+  "crossings_fed": false,
+  "era": 0,
+  "era_mapping": null,
+  "last_event_seq": 0,
+  "lead_ticks": 0,
+  "presented_at": null,
+  "presented_through_tick": null,
+  "presented_through_world_second": null,
+  "profile": "exulanica.world-clock/v1",
+  "revision": 0,
+  "society": null,
+  "state": "paused",
+  "timebases": {
+   "flight": "unix",
+   "society": "tick",
+   "traffic": "unix"
+  },
+  "traffic": null,
+  "version_id": "64403426-1cba-4998-bd36-53ab6bab218d",
+  "world_id": "world:authored:3d8172cf-447a-4774-8520-7c64a9c5072d"
+ },
+ "execution": {
+  "calls": [],
+  "prompt_version": "action-plan-2",
+  "rejections": []
+ },
+ "kind": "simulation",
+ "names": {},
+ "outcome": "plan",
+ "plan_sha256": "9d7194075c148a0431a6e0c45d9c72d898403f2cb87c9e9b1ab7fdf12db3b7b9",
+ "profile": "exulanica.companion-action-plan/v1",
+ "proposal_speech": null,
+ "refusal": null,
+ "spends": false,
+ "spends_by": [],
+ "steps": [
+  {
+   "action": {
+    "minutes": null,
+    "operation": "bring_people",
+    "region_id": "region:starter",
+    "speed": null
+   },
+   "bind": {
+    "version_id": "64403426-1cba-4998-bd36-53ab6bab218d"
+   },
+   "bind_from": null,
+   "body": {
+    "profile": "exulanica-society/v2",
+    "region_id": "region:starter"
+   },
+   "body_from": null,
+   "code": null,
+   "compensation": null,
+   "confirmation": "required",
+   "effects": [],
+   "index": 0,
+   "operation": "POST /world/versions/{version_id}/society",
+   "permitted": true,
+   "pins": null,
+   "preview": null,
+   "query": {
+    "world_id": "world:authored:3d8172cf-447a-4774-8520-7c64a9c5072d"
+   },
+   "receipt": "society_created",
+   "replay": "held_society_returned",
+   "requires": [
+    "world.write"
+   ],
+   "spends": false,
+   "state": "prepared"
+  }
+ ],
+ "version_id": "64403426-1cba-4998-bd36-53ab6bab218d",
+ "world_id": "world:authored:3d8172cf-447a-4774-8520-7c64a9c5072d"
+}

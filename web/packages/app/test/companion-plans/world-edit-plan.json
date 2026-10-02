@@ -1,0 +1,203 @@
+{
+ "atomic": false,
+ "capabilities": null,
+ "clarification": null,
+ "clock": null,
+ "execution": {
+  "calls": [
+   {
+    "attempts": 1,
+    "completion_tokens": 50,
+    "cost_basis": "known",
+    "latency_ms": 1,
+    "outcome": "completed",
+    "prompt_tokens": 100,
+    "reasoning_tokens": null,
+    "requested_model": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+    "requested_model_name": "Qwen3 235B Instruct",
+    "role": "structured_extraction",
+    "served_model": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+    "served_model_name": "Qwen3 235B Instruct",
+    "served_model_unavailable": null,
+    "usd": "0.00005000",
+    "used_fallback": false
+   },
+   {
+    "attempts": 1,
+    "completion_tokens": 50,
+    "cost_basis": "known",
+    "latency_ms": 0,
+    "outcome": "completed",
+    "prompt_tokens": 100,
+    "reasoning_tokens": null,
+    "requested_model": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+    "requested_model_name": "Qwen3 235B Instruct",
+    "role": "structured_extraction",
+    "served_model": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+    "served_model_name": "Qwen3 235B Instruct",
+    "served_model_unavailable": null,
+    "usd": "0.00005000",
+    "used_fallback": false
+   }
+  ],
+  "prompt_version": "action-plan-2",
+  "rejections": []
+ },
+ "kind": "world_edit",
+ "names": {},
+ "outcome": "plan",
+ "plan_sha256": "d567aca5147c9e1489d269c6496d3d86b29ae3ebad766fbc209d2f320d74cfac",
+ "profile": "exulanica.companion-action-plan/v1",
+ "proposal_speech": null,
+ "refusal": null,
+ "spends": false,
+ "spends_by": [],
+ "steps": [
+  {
+   "action": {
+    "arrangement_key": null,
+    "arrangement_version": null,
+    "asset_key": "cc0.bench",
+    "object_id": null,
+    "operation": "place_object"
+   },
+   "bind": {
+    "version_id": "64403426-1cba-4998-bd36-53ab6bab218d"
+   },
+   "bind_from": null,
+   "body": {
+    "base_state_sha256": "b42557ee1fc8f83170fd24e88748dcbbcf5879fbc45f02df62b6c298b420f8fa",
+    "placement": {
+     "behaviour": null,
+     "origin_role": "fictional",
+     "region_id": "region:starter",
+     "source_anchor": null,
+     "subject_id": "companion:cc0.bench:53080b57544e",
+     "transform": {
+      "scale_milli": 1000,
+      "x_mm": -6000,
+      "y_mm": 0,
+      "yaw_microradians": 0,
+      "z_mm": 4000
+     }
+    },
+    "saved_entry": {
+     "authored_edit_seq": 0,
+     "authored_state_sha256": "b42557ee1fc8f83170fd24e88748dcbbcf5879fbc45f02df62b6c298b420f8fa",
+     "base_revision": 1,
+     "entry_id": "01a0fe56-5046-73f9-8e9e-998be5bddf18"
+    },
+    "source": {
+     "asset_key": "cc0.bench",
+     "kind": "reviewed_asset"
+    }
+   },
+   "body_from": null,
+   "code": null,
+   "compensation": {
+    "operation": "POST /world/versions/{version_id}/objects/undo"
+   },
+   "confirmation": "required",
+   "effects": [
+    {
+     "code": null,
+     "on": "society",
+     "state": "available"
+    }
+   ],
+   "index": 0,
+   "operation": "POST /world/versions/{version_id}/compositions/apply",
+   "permitted": true,
+   "pins": {
+    "base_state_sha256": "b42557ee1fc8f83170fd24e88748dcbbcf5879fbc45f02df62b6c298b420f8fa",
+    "edit_seq": 0
+   },
+   "preview": {
+    "body": {
+     "base_state_sha256": "b42557ee1fc8f83170fd24e88748dcbbcf5879fbc45f02df62b6c298b420f8fa",
+     "placement": {
+      "behaviour": null,
+      "origin_role": "fictional",
+      "region_id": "region:starter",
+      "source_anchor": null,
+      "subject_id": "companion:cc0.bench:53080b57544e",
+      "transform": {
+       "scale_milli": 1000,
+       "x_mm": -6000,
+       "y_mm": 0,
+       "yaw_microradians": 0,
+       "z_mm": 4000
+      }
+     },
+     "source": {
+      "asset_key": "cc0.bench",
+      "kind": "reviewed_asset"
+     }
+    },
+    "document": {
+     "availability": "ready",
+     "blocked_detail": null,
+     "blocked_reason": null,
+     "source": {
+      "asset_key": "cc0.bench",
+      "bytes": "available",
+      "content_sha256": "8ea23ec0a432a8f4fcbf58558fd34b7531698eb74089aa54ed324360082d7d09",
+      "kind": "reviewed_asset"
+     },
+     "version": {
+      "authored_version_id": "64403426-1cba-4998-bd36-53ab6bab218d",
+      "edit_seq": 0,
+      "source_snapshot_id": "b34089db-aa87-4388-a0a9-bb0a0c66f5d1",
+      "state_sha256": "b42557ee1fc8f83170fd24e88748dcbbcf5879fbc45f02df62b6c298b420f8fa",
+      "style_version_id": "01a0fe56-5027-7de5-a58b-7951f79f109b",
+      "world_id": "world:authored:3d8172cf-447a-4774-8520-7c64a9c5072d"
+     },
+     "would_change": {
+      "document": {
+       "asset_sha256": "8ea23ec0a432a8f4fcbf58558fd34b7531698eb74089aa54ed324360082d7d09",
+       "behaviour": null,
+       "object_id": "companion:cc0.bench:53080b57544e",
+       "origin": {
+        "kind": "authored",
+        "role": "fictional"
+       },
+       "region_id": "region:starter",
+       "removed": false,
+       "transform": {
+        "coordinate_space": "region_local",
+        "coordinate_unit": "millimetre",
+        "scale_milli": 1000,
+        "x_mm": -6000,
+        "y_mm": 0,
+        "yaw_microradians": 0,
+        "z_mm": 4000
+       }
+      },
+      "kind": "add_object",
+      "preserves": [
+       "source_snapshot_id",
+       "style_version_id",
+       "other_subjects",
+       "prior_edits"
+      ],
+      "subject_id": "companion:cc0.bench:53080b57544e"
+     }
+    },
+    "document_sha256": "bbf29ba77a2ff736c2a756301facd23b247fbac0e0e430f8fce8791f2b52831f",
+    "operation": "POST /world/versions/{version_id}/compositions/preview"
+   },
+   "query": {
+    "world_id": "world:authored:3d8172cf-447a-4774-8520-7c64a9c5072d"
+   },
+   "receipt": "version_edit",
+   "replay": "stale_base_refused",
+   "requires": [
+    "world.write"
+   ],
+   "spends": false,
+   "state": "prepared"
+  }
+ ],
+ "version_id": "64403426-1cba-4998-bd36-53ab6bab218d",
+ "world_id": "world:authored:3d8172cf-447a-4774-8520-7c64a9c5072d"
+}

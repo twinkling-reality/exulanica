@@ -194,6 +194,11 @@ export interface AnswerProvenance {
   /** Every call this answer made, added up. What the person actually waited for. */
   readonly latencyMs: number;
   readonly usedFallback: boolean;
+  /**
+   * An answer about a Companion plan (`composition/companion-plan.ts`): a plan shown, a question
+   * asked before one, or a request it could not plan. Said under its own line, and not kept.
+   */
+  readonly planned?: true;
 }
 
 /**
@@ -479,7 +484,8 @@ function namesOf(body: { readonly names?: Readonly<Record<string, string>> }): R
  * attempt that returned no result, whose cost is not known. An absent one comes from a server
  * that listed only the results it received.
  */
-function callsOf(calls: readonly WireCall[] | undefined): ModelCall[] {
+/** The calls an answer's `execution` names, as the Companion reports them. */
+export function callsOf(calls: readonly WireCall[] | undefined): ModelCall[] {
   return (calls ?? []).map((call): ModelCall => ({
     role: call.role,
     requestedModel: call.requested_model,
@@ -833,6 +839,8 @@ function asAskFailure(error: unknown): AskUnavailable {
  * allowance.
  */
 const PROPOSE_TIMEOUT_MS = 170_000;
+/** The same wait, for a Companion plan, which drafts an appearance change the same way. */
+export const COMPANION_DRAFT_WAIT_MS = PROPOSE_TIMEOUT_MS;
 
 /**
  * Why an appearance request produced no proposal.
@@ -928,7 +936,7 @@ export interface CompanionProposal {
   readonly names?: Readonly<Record<string, string>>;
 }
 
-interface WireProposal {
+export interface WireProposal {
   readonly classification: string;
   readonly proposal: {
     readonly profile: {
@@ -985,50 +993,59 @@ export class CompanionProposalClient {
     } catch {
       return asQuestion(utterance);
     }
-    if (body.classification !== 'appearance') return asQuestion(utterance);
-
-    const calls = callsOf(body.execution?.calls);
-    const names = namesOf(body);
-    const promptVersion = body.execution?.prompt_version ?? '';
-    const wire = body.proposal;
-    const refusal = body.refusal;
-    return {
-      utterance,
-      classification: 'appearance',
-      proposal:
-        wire === null || wire === undefined
-          ? null
-          : {
-              profileId: wire.profile.profile_id,
-              profileVersion: wire.profile.profile_version,
-              parameters: { ...wire.profile.parameters },
-              modules: [...wire.profile.modules],
-              changed: [...wire.profile.changed],
-              referenceIds: [...wire.reference_ids],
-              modelId: wire.model_id,
-              promptVersion: wire.prompt_version,
-              spoken: wire.spoken,
-              base: {
-                styleVersionId: wire.base_style_version_id,
-                topologyDigest: wire.base_topology_digest,
-              },
-            },
-      // An unrecognised code becomes `not_drafted` rather than being passed through, because
-      // the surface picks a reviewed sentence by this value and a key nobody wrote renders as
-      // the key. A newer server naming a refusal this client has no words for should say the
-      // most general true thing, not print an identifier at somebody.
-      refusal:
-        refusal === null || refusal === undefined
-          ? null
-          : {
-              code: knownRefusal(refusal.code),
-              detail: refusal.detail,
-            },
-      promptVersion,
-      calls,
-      ...(Object.keys(names).length === 0 ? {} : { names }),
-    };
+    return proposalFromWire(utterance, body);
   }
+}
+
+/**
+ * An appearance response, as the Companion reads it: `POST /selection/appearance`'s body, or the
+ * same body built from a `POST /selection/actions` appearance plan (`appearanceWireFromPlan` in
+ * `composition/companion-plan.ts`), so a proposal from either route is read by this one function
+ * and recorded the same way.
+ */
+export function proposalFromWire(utterance: string, body: WireProposal): CompanionProposal {
+  if (body.classification !== 'appearance') return asQuestion(utterance);
+  const calls = callsOf(body.execution?.calls);
+  const names = namesOf(body);
+  const promptVersion = body.execution?.prompt_version ?? '';
+  const wire = body.proposal;
+  const refusal = body.refusal;
+  return {
+    utterance,
+    classification: 'appearance',
+    proposal:
+      wire === null || wire === undefined
+        ? null
+        : {
+            profileId: wire.profile.profile_id,
+            profileVersion: wire.profile.profile_version,
+            parameters: { ...wire.profile.parameters },
+            modules: [...wire.profile.modules],
+            changed: [...wire.profile.changed],
+            referenceIds: [...wire.reference_ids],
+            modelId: wire.model_id,
+            promptVersion: wire.prompt_version,
+            spoken: wire.spoken,
+            base: {
+              styleVersionId: wire.base_style_version_id,
+              topologyDigest: wire.base_topology_digest,
+            },
+          },
+    // An unrecognised code becomes `not_drafted` rather than being passed through, because
+    // the surface picks a reviewed sentence by this value and a key nobody wrote renders as
+    // the key. A newer server naming a refusal this client has no words for should say the
+    // most general true thing, not print an identifier at somebody.
+    refusal:
+      refusal === null || refusal === undefined
+        ? null
+        : {
+            code: knownRefusal(refusal.code),
+            detail: refusal.detail,
+          },
+    promptVersion,
+    calls,
+    ...(Object.keys(names).length === 0 ? {} : { names }),
+  };
 }
 
 /** A code this client has words for, or the most general true thing it can say instead. */

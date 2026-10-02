@@ -723,6 +723,35 @@ never make a step permitted, and the planner imports neither the interaction-pol
 conversation (`tests/test_companion_action_policy_boundary.py`). Scripted tests hold the mechanics;
 how well a live model reads requests into these plans is not measured.
 
+### The browser's path
+
+The browser does not decide what a sentence asks for: the runtime's parse knows names, relations and
+whether words ask, nothing about world actions. With a world open, every sentence the Companion is
+asked to read goes to `POST /selection/actions` first, in the place `POST /selection/appearance`
+held (`web/packages/app/src/composition/companion-plan.ts`). The classifier is therefore
+`classify_action`'s five kinds in place of the appearance route's two (`classify_request`);
+appearance drafting is unchanged, because both routes call the same drafter with the same default
+basis. A question goes on to `POST /selection/ask`. An appearance plan's first step carries the
+drafted proposal, which is read by the same function as the appearance route's answer and reviewed
+in Customize as before, with no second drafting call; its two style steps are never sent from a
+plan, and a basis other than `evidence` takes the old path. A world edit or simulated time is shown
+as a plan on the sheet with its spending stated before the one confirmation. "What can I do here"
+is said from the action registry's words. Where the route cannot answer (no model, unreachable,
+past the appearance route's wait) or no world is open, the sentence takes the path it took before.
+
+A confirmed plan is sent step by step through the action registry
+(`web/packages/app/src/ui/actions/planned.ts`): a step's typed action picks its registry entry, and
+the request goes to that entry's own route, never to a route the plan names. The plan supplies only
+the route's path values, the body and the pins in it, and a chained step's bases from the response
+before it (`body_from`); the world scope is the page's. A step whose typed action maps to no entry,
+or whose route key differs from its entry's operation, is refused in the browser and never sent.
+Each later world-edit step is prepared again against the state the step before it left. The first
+refusal stops the chain; each step then reads as done, not done (with the action's own words) or not
+reached, and Play is offered when the outcome read says a chain left the world paused. The outcome
+read finds receipts by the bases a step was sent with, whoever sent them, so a step refused because
+another writer moved the world first can read as applied there; each step's own answer is what the
+sheet shows.
+
 ## Evidence and limits
 
 The [model selection record](model-and-service-selection.md) identifies implemented callers and

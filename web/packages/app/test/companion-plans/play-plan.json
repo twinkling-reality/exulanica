@@ -1,0 +1,108 @@
+{
+ "atomic": false,
+ "capabilities": null,
+ "clarification": null,
+ "clock": {
+  "answered_at": "2026-10-02T20:37:46.985771+00:00",
+  "catchup_ticks_maximum": 3,
+  "clock_profile": "exulanica.world-clock/legacy-v1",
+  "crossings_fed": false,
+  "era": 0,
+  "era_mapping": null,
+  "last_event_seq": 0,
+  "lead_ticks": 0,
+  "presented_at": null,
+  "presented_through_tick": null,
+  "presented_through_world_second": null,
+  "profile": "exulanica.world-clock/v1",
+  "revision": 0,
+  "society": {
+   "control_revision": 1,
+   "engine": "exulanica-society/v2",
+   "mode": "paused",
+   "society_id": "9eb75841-cbc5-55b9-be4a-6cd78212c6af",
+   "speed": 1,
+   "state_sha256": "feeb658e6097826bf44e31751a5854cdde61eb1d2d495785647000b094e84f24",
+   "tick": 3,
+   "tick_interval_ms": 8000
+  },
+  "state": "paused",
+  "timebases": {
+   "flight": "unix",
+   "society": "tick",
+   "traffic": "unix"
+  },
+  "traffic": null,
+  "version_id": "64403426-1cba-4998-bd36-53ab6bab218d",
+  "world_id": "world:authored:3d8172cf-447a-4774-8520-7c64a9c5072d"
+ },
+ "execution": {
+  "calls": [],
+  "prompt_version": "action-plan-2",
+  "rejections": []
+ },
+ "kind": "simulation",
+ "names": {},
+ "outcome": "plan",
+ "plan_sha256": "afeeed5fd657bccc065dd2f017ea4a166d1a09b04f9d1118cc338a6bb028721d",
+ "profile": "exulanica.companion-action-plan/v1",
+ "proposal_speech": null,
+ "refusal": null,
+ "spends": false,
+ "spends_by": [],
+ "steps": [
+  {
+   "action": {
+    "minutes": null,
+    "operation": "play",
+    "region_id": null,
+    "speed": 1
+   },
+   "bind": {
+    "version_id": "64403426-1cba-4998-bd36-53ab6bab218d"
+   },
+   "bind_from": null,
+   "body": {
+    "base_clock_revision": 0,
+    "base_revision": 1,
+    "mode": "playing",
+    "speed": 1
+   },
+   "body_from": null,
+   "code": null,
+   "compensation": {
+    "operation": "PUT /world/versions/{version_id}/society/control"
+   },
+   "confirmation": "required",
+   "effects": [
+    {
+     "code": "no_playback_worker",
+     "on": "playback",
+     "state": "unavailable"
+    }
+   ],
+   "index": 0,
+   "operation": "PUT /world/versions/{version_id}/society/control",
+   "permitted": true,
+   "pins": {
+    "clock_revision": 0,
+    "control_revision": 1,
+    "society_state_sha256": "feeb658e6097826bf44e31751a5854cdde61eb1d2d495785647000b094e84f24",
+    "tick": 3
+   },
+   "preview": null,
+   "query": {
+    "world_id": "world:authored:3d8172cf-447a-4774-8520-7c64a9c5072d"
+   },
+   "receipt": "control_configured",
+   "replay": "stale_society_state_refused",
+   "requires": [
+    "world.write"
+   ],
+   "spends": false,
+   "state": "prepared"
+  }
+ ],
+ "version_id": "64403426-1cba-4998-bd36-53ab6bab218d",
+ "world_id": "world:authored:3d8172cf-447a-4774-8520-7c64a9c5072d"
+}

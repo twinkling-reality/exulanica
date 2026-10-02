@@ -56,6 +56,7 @@ import { WorldSpecificationClient } from './world-specification.js';
 import { GENERATED_WORLD_READY_EVENT, type GeneratedWorldReady } from './composition/generated-world-ready.js';
 import { buildWorldIdentity } from './ui/world-identity.js';
 import {
+  COMPANION_DRAFT_WAIT_MS,
   CompanionAskClient,
   CompanionProposalClient,
   type CompanionCityContext,
@@ -75,6 +76,11 @@ import { createLayout, MODAL_BACKGROUND_REGIONS, type Layout } from './ui/system
 import { mountActions, type MountedActions } from './composition/actions.js';
 import { actionState, perform } from './ui/actions/surfaces.js';
 import { actionSpec } from './ui/actions/registry.js';
+import type { PlannedRequest } from './ui/actions/planned.js';
+import { buildPlanSheet } from './ui/companion-plan.js';
+import { CompanionActionsClient, type ActionPageContext } from './companion-actions-api.js';
+import { mountCompanionPlans, type CompanionPlans } from './composition/companion-plan.js';
+import { openWorldPath } from './world-scope.js';
 import { createFirstUseGuidance, type FirstUseMode } from './ui/first-use-guidance.js';
 import { buildWorldIndex } from './ui/world-index.js';
 import { MapPeek } from './ui/map-peek.js';
@@ -116,6 +122,7 @@ import {
 import { createAppEnvironment, createSessionState } from './composition/session-state.js';
 import { EnvironmentSelectionClient } from './environment-selection-api.js';
 import {
+  parseVersion,
   WorldObjectsClient,
   type AlternateVersion,
   type SavedEntryWriteBinding,
@@ -630,6 +637,8 @@ async function mount(): Promise<void> {
   // the detail pane and a Companion answer. Not in the preview, which has no decisions to read.
   const placeNames = preview ? undefined : new PlaceNameRightsClient(currentCredentials);
   let companionCityContext: CompanionCityContext | null = null;
+  // The Companion's world actions, set once the action host exists (below the Companion's mount).
+  let companionPlans: CompanionPlans | null = null;
 
   // The one thing the Companion may DO, and it is still not a write. `POST /selection/appearance`
   // reads an utterance as a bounded proposal drawn from the reviewed style catalogue; the world
@@ -677,7 +686,12 @@ async function mount(): Promise<void> {
     openSimulation: (cited, answer) => environmentSelection.showSimulation(cited, answer),
     ...(companionPropose === null
       ? {}
-      : { proposeAppearance: (utterance: string) => companionPropose.propose(utterance) }),
+      : {
+        proposeAppearance: (utterance: string) => companionPropose.propose(utterance),
+        planActions: (utterance: string) => companionPlans === null
+          ? Promise.resolve({ route: 'fallback' } as const)
+          : companionPlans.route(utterance),
+      }),
     persistedMemory,
     rememberAnswer: async (answer) => {
       await companionMemory.rememberAnswer(answerToRemember(answer));
@@ -1143,9 +1157,35 @@ async function mount(): Promise<void> {
   const inspectorPanel = (id: string): HTMLElement | null => layout?.regions.inspector.querySelector(`#${id}`) ?? null;
   const panelOpen = (id: string): boolean => inspectorPanel(id)?.hidden === false;
   const offerPhotos = (): boolean => state.activeWorldEntry !== null && state.activeWorldEntry.takesPhotographs !== false;
+  // A Companion plan step's request, sent once the person confirmed the plan. The route is the
+  // registry entry's (`ui/actions/planned.ts`); the world scope is this page's. A world edit is
+  // then recorded as the objects panel records its own: the saved entry advances, the objects are
+  // read again and the people hear of the edit.
+  const planClient = state.activeWorldEntry === null
+    ? null
+    : new CompanionActionsClient({ ...currentCredentials, worldId: state.activeWorldEntry.worldId });
+  const PLANNED_EDITS = new Set(['objects.place', 'objects.move', 'objects.remove', 'objects.undo', 'arrangements.place']);
+  const sendPlanned = async (request: PlannedRequest): Promise<unknown> => {
+    const active = state.activeWorldEntry;
+    if (planClient === null || active === null) throw new Error('No world is open to change.');
+    const binding = PLANNED_EDITS.has(request.actionId) ? activeEntryWriteBinding() : null;
+    const body = await planClient.send({
+      method: request.method,
+      path: openWorldPath(request.path, active.worldId, 'a planned change'),
+      body: request.body,
+    });
+    if (binding !== null) {
+      const version = parseVersion(request.actionId === 'arrangements.place' ? (body as { version: unknown }).version : body);
+      await recordAuthoredEntryAdvance(version, binding);
+      await objects.begin(version.versionId);
+      await environmentSelection.afterAuthoredEdit(version.versionId);
+    }
+    return body;
+  };
   actions = mountActions({
     layout,
     credentials: currentCredentials,
+    send: sendPlanned,
     worldId: state.activeWorldEntry?.worldId ?? null,
     versionId: () => state.activeWorldEntry?.authoredVersionId ?? null,
     people: environmentSelection.people,
@@ -1246,6 +1286,54 @@ async function mount(): Promise<void> {
     if (actions !== null) worldMenu.setMake(actionState(actions.host, actionSpec('world.make')));
   };
   actions.host.onChange(reflectMake);
+  // The Companion's plans: the sheet in the sheet region, and the route the Companion asks first.
+  if (planClient !== null && layout !== null) {
+    const sheet = buildPlanSheet({
+      onConfirm: () => companionPlans?.confirm(),
+      onCancel: () => companionPlans?.cancel(),
+      onChoose: (clarification, value) => companionPlans?.choose(clarification, value),
+      onPlay: () => {
+        if (actions !== null) void perform(actions.host, 'clock.play');
+        companionPlans?.cancel();
+      },
+    });
+    layout.place('sheet', sheet.root, { close: () => companionPlans?.cancel() });
+    const planPage = (): ActionPageContext | null => {
+      const active = state.activeWorldEntry;
+      if (active === null) return null;
+      const here = objects.selectionContext();
+      return {
+        versionId: active.authoredVersionId,
+        baseStateSha256: active.authoredStateSha256,
+        // The person's own choice for anything added, never inferred: the plan asks them.
+        originRole: null,
+        context: {
+          ...(here.placement === null ? {} : { placement: here.placement }),
+          ...(here.viewer === null ? {} : { viewer: here.viewer }),
+          ...(here.selected_object_id === null ? {} : { selected_object_id: here.selected_object_id }),
+        },
+        savedEntry: {
+          entry_id: active.entryId,
+          base_revision: active.revision,
+          authored_state_sha256: active.authoredStateSha256,
+          authored_edit_seq: active.authoredEditSeq,
+          ...(active.styleVersionId == null ? {} : { style_version_id: active.styleVersionId }),
+        },
+      };
+    };
+    companionPlans = mountCompanionPlans({
+      client: () => planClient,
+      page: planPage,
+      host: () => actions?.host ?? null,
+      sheet,
+      afterTime: () => environmentSelection.people.reread(),
+      particular: (step) => objects.titleOf({
+        assetKey: typeof step.action['asset_key'] === 'string' ? step.action['asset_key'] : null,
+        objectId: typeof step.action['object_id'] === 'string' ? step.action['object_id'] : null,
+      }),
+      waitMs: COMPANION_DRAFT_WAIT_MS,
+    });
+  }
   reflectMake();
   void intake.begin();
 

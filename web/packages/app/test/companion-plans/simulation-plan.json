@@ -1,0 +1,205 @@
+{
+ "atomic": false,
+ "capabilities": null,
+ "clarification": null,
+ "clock": {
+  "answered_at": "2026-10-02T20:37:46.550076+00:00",
+  "catchup_ticks_maximum": 3,
+  "clock_profile": "exulanica.world-clock/legacy-v1",
+  "crossings_fed": false,
+  "era": 0,
+  "era_mapping": null,
+  "last_event_seq": 0,
+  "lead_ticks": 0,
+  "presented_at": null,
+  "presented_through_tick": null,
+  "presented_through_world_second": null,
+  "profile": "exulanica.world-clock/v1",
+  "revision": 0,
+  "society": {
+   "control_revision": 0,
+   "engine": "exulanica-society/v2",
+   "mode": "paused",
+   "society_id": "9eb75841-cbc5-55b9-be4a-6cd78212c6af",
+   "speed": 1,
+   "state_sha256": "e5035c5500b497e76562396a96d6cccdd087af3c3a4d3fef6d1d5e1c60d180c9",
+   "tick": 0,
+   "tick_interval_ms": null
+  },
+  "state": "paused",
+  "timebases": {
+   "flight": "unix",
+   "society": "tick",
+   "traffic": "unix"
+  },
+  "traffic": null,
+  "version_id": "64403426-1cba-4998-bd36-53ab6bab218d",
+  "world_id": "world:authored:3d8172cf-447a-4774-8520-7c64a9c5072d"
+ },
+ "execution": {
+  "calls": [],
+  "prompt_version": "action-plan-2",
+  "rejections": []
+ },
+ "kind": "simulation",
+ "names": {},
+ "outcome": "plan",
+ "plan_sha256": "f78da7a56649c7a4f4d15713d80ab9d722bc42c92d698e0259dce1578a746f66",
+ "profile": "exulanica.companion-action-plan/v1",
+ "proposal_speech": null,
+ "refusal": null,
+ "spends": false,
+ "spends_by": [],
+ "steps": [
+  {
+   "action": {
+    "minute": 1,
+    "minutes": 3,
+    "operation": "advance",
+    "region_id": null,
+    "speed": null
+   },
+   "bind": {
+    "version_id": "64403426-1cba-4998-bd36-53ab6bab218d"
+   },
+   "bind_from": null,
+   "body": {
+    "base_clock_revision": 0,
+    "base_revision": 0,
+    "base_state_sha256": "e5035c5500b497e76562396a96d6cccdd087af3c3a4d3fef6d1d5e1c60d180c9",
+    "base_tick": 0
+   },
+   "body_from": null,
+   "code": null,
+   "compensation": null,
+   "confirmation": "required",
+   "effects": [],
+   "index": 0,
+   "operation": "POST /world/versions/{version_id}/society/control/steps",
+   "permitted": true,
+   "pins": {
+    "clock_revision": 0,
+    "control_revision": 0,
+    "society_state_sha256": "e5035c5500b497e76562396a96d6cccdd087af3c3a4d3fef6d1d5e1c60d180c9",
+    "tick": 0
+   },
+   "preview": null,
+   "query": {
+    "world_id": "world:authored:3d8172cf-447a-4774-8520-7c64a9c5072d"
+   },
+   "receipt": "control_manual_step",
+   "replay": "stale_society_state_refused",
+   "requires": [
+    "world.write"
+   ],
+   "spends": false,
+   "state": "prepared"
+  },
+  {
+   "action": {
+    "minute": 2,
+    "minutes": 3,
+    "operation": "advance",
+    "region_id": null,
+    "speed": null
+   },
+   "bind": {
+    "version_id": "64403426-1cba-4998-bd36-53ab6bab218d"
+   },
+   "bind_from": null,
+   "body": {
+    "base_clock_revision": 0,
+    "base_revision": null,
+    "base_state_sha256": null,
+    "base_tick": null
+   },
+   "body_from": {
+    "base_revision": {
+     "field": "control.revision",
+     "step": 0
+    },
+    "base_state_sha256": {
+     "field": "society.state_sha256",
+     "step": 0
+    },
+    "base_tick": {
+     "field": "society.current_tick",
+     "step": 0
+    }
+   },
+   "code": null,
+   "compensation": null,
+   "confirmation": "chained",
+   "effects": [],
+   "index": 1,
+   "operation": "POST /world/versions/{version_id}/society/control/steps",
+   "permitted": true,
+   "pins": null,
+   "preview": null,
+   "query": {
+    "world_id": "world:authored:3d8172cf-447a-4774-8520-7c64a9c5072d"
+   },
+   "receipt": "control_manual_step",
+   "replay": "stale_society_state_refused",
+   "requires": [
+    "world.write"
+   ],
+   "spends": false,
+   "state": "pending"
+  },
+  {
+   "action": {
+    "minute": 3,
+    "minutes": 3,
+    "operation": "advance",
+    "region_id": null,
+    "speed": null
+   },
+   "bind": {
+    "version_id": "64403426-1cba-4998-bd36-53ab6bab218d"
+   },
+   "bind_from": null,
+   "body": {
+    "base_clock_revision": 0,
+    "base_revision": null,
+    "base_state_sha256": null,
+    "base_tick": null
+   },
+   "body_from": {
+    "base_revision": {
+     "field": "control.revision",
+     "step": 1
+    },
+    "base_state_sha256": {
+     "field": "society.state_sha256",
+     "step": 1
+    },
+    "base_tick": {
+     "field": "society.current_tick",
+     "step": 1
+    }
+   },
+   "code": null,
+   "compensation": null,
+   "confirmation": "chained",
+   "effects": [],
+   "index": 2,
+   "operation": "POST /world/versions/{version_id}/society/control/steps",
+   "permitted": true,
+   "pins": null,
+   "preview": null,
+   "query": {
+    "world_id": "world:authored:3d8172cf-447a-4774-8520-7c64a9c5072d"
+   },
+   "receipt": "control_manual_step",
+   "replay": "stale_society_state_refused",
+   "requires": [
+    "world.write"
+   ],
+   "spends": false,
+   "state": "pending"
+  }
+ ],
+ "version_id": "64403426-1cba-4998-bd36-53ab6bab218d",
+ "world_id": "world:authored:3d8172cf-447a-4774-8520-7c64a9c5072d"
+}

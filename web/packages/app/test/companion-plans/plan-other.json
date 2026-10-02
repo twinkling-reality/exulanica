@@ -1,0 +1,82 @@
+{
+ "atomic": false,
+ "capabilities": null,
+ "clarification": null,
+ "clock": null,
+ "execution": {
+  "calls": [
+   {
+    "attempts": 1,
+    "completion_tokens": 50,
+    "cost_basis": "known",
+    "latency_ms": 2,
+    "outcome": "completed",
+    "prompt_tokens": 100,
+    "reasoning_tokens": null,
+    "requested_model": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+    "requested_model_name": "Qwen3 235B Instruct",
+    "role": "structured_extraction",
+    "served_model": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+    "served_model_name": "Qwen3 235B Instruct",
+    "served_model_unavailable": null,
+    "usd": "0.00005000",
+    "used_fallback": false
+   },
+   {
+    "attempts": 1,
+    "completion_tokens": 50,
+    "cost_basis": "known",
+    "latency_ms": 2,
+    "outcome": "reply_refused",
+    "prompt_tokens": 100,
+    "reasoning_tokens": null,
+    "requested_model": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+    "requested_model_name": "Qwen3 235B Instruct",
+    "role": "structured_extraction",
+    "served_model": null,
+    "served_model_name": null,
+    "served_model_unavailable": "result_not_returned",
+    "usd": "0.00005000",
+    "used_fallback": false
+   },
+   {
+    "attempts": 1,
+    "completion_tokens": 50,
+    "cost_basis": "known",
+    "latency_ms": 0,
+    "outcome": "reply_refused",
+    "prompt_tokens": 100,
+    "reasoning_tokens": null,
+    "requested_model": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+    "requested_model_name": "Qwen3 235B Instruct",
+    "role": "structured_extraction",
+    "served_model": null,
+    "served_model_name": null,
+    "served_model_unavailable": "result_not_returned",
+    "usd": "0.00005000",
+    "used_fallback": false
+   }
+  ],
+  "prompt_version": "action-plan-2",
+  "rejections": []
+ },
+ "kind": "world_edit",
+ "names": {},
+ "outcome": "refused",
+ "plan_sha256": "d0ee8fe0bcf2d502bb7078014e7a0d9b5ab62052d7046075bbf6261601969c41",
+ "profile": "exulanica.companion-action-plan/v1",
+ "proposal_speech": null,
+ "refusal": {
+  "alternatives": [],
+  "capability": null,
+  "code": "not_drafted",
+  "detail": "the model could not fill the form twice",
+  "operation": null,
+  "step": null
+ },
+ "spends": false,
+ "spends_by": [],
+ "steps": [],
+ "version_id": "64403426-1cba-4998-bd36-53ab6bab218d",
+ "world_id": "world:authored:3d8172cf-447a-4774-8520-7c64a9c5072d"
+}

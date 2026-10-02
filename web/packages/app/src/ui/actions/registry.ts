@@ -20,7 +20,8 @@ import type { IconName } from '../system/icon.js';
 import { REQUEST_REFUSALS } from '../words/problems.js';
 
 export type ActionGroup = 'build' | 'people' | 'ask' | 'explore' | 'system';
-export type ActionPlacement = 'rail' | 'top-bar' | 'palette' | 'panel:people' | 'panel:objects';
+/** `companion`: offered only as a step of a Companion plan (`ui/actions/planned.ts`). */
+export type ActionPlacement = 'rail' | 'top-bar' | 'palette' | 'panel:people' | 'panel:objects' | 'companion';
 
 /** A refusal as a person reads it: what happened, then what to do next. */
 export interface RefusalWords {
@@ -57,6 +58,10 @@ const SOCIETY = 'POST /world/versions/{version_id}/society';
 const CONTROL = 'PUT /world/versions/{version_id}/society/control';
 const CONTROL_STEP = 'POST /world/versions/{version_id}/society/control/steps';
 const OBJECT_UNDO = 'POST /world/versions/{version_id}/objects/undo';
+const OBJECT_PLACE = 'POST /world/versions/{version_id}/compositions/apply';
+const OBJECT_MOVE = 'POST /world/versions/{version_id}/objects/{object_id}/move';
+const OBJECT_REMOVE = 'POST /world/versions/{version_id}/objects/{object_id}/remove';
+const ARRANGEMENT_PLACE = 'POST /world/versions/{version_id}/arrangements/apply';
 /** Making a town, read from the workspace's creation descriptors (`GET /worlds/capabilities`). */
 const MAKE_GENERATED = 'POST /worlds/generated';
 
@@ -76,6 +81,21 @@ const CLOCK_REFUSED: RefusalWords = {
   happened: 'The world’s clock did not change.',
   next: 'Look at People for what the world is doing now, then try again.',
 };
+const CLOCK_STALE: RefusalWords = {
+  happened: 'The world moved on while you were deciding, so its clock did not change.',
+  next: 'Look at People for what the world is doing now, then try again.',
+};
+/** What every clock action can meet, whether a rail button or a Companion plan step sent it. */
+const CLOCK_REFUSALS: Readonly<Record<string, RefusalWords>> = {
+  society_unavailable: NOBODY_HERE,
+  invalid_society_control: CLOCK_REFUSED,
+  stale_society_state: CLOCK_STALE,
+  stale_clock_revision: CLOCK_STALE,
+  clock_lead_exhausted: {
+    happened: 'The people cannot run further ahead of this town’s traffic yet.',
+    next: 'Let the traffic catch up, then try again.',
+  },
+};
 
 export const ACTIONS: readonly ActionSpec[] = Object.freeze([
   {
@@ -90,6 +110,26 @@ export const ACTIONS: readonly ActionSpec[] = Object.freeze([
       stale_object_base: STALE_WORLD,
       invalidated_source_version: SOURCE_GONE,
     },
+  },
+  {
+    id: 'objects.place', label: 'Place an object', hint: 'Place a reviewed object where you are pointing',
+    icon: 'object', group: 'build', placement: ['companion'], operation: OBJECT_PLACE,
+    refusals: { stale_object_base: STALE_WORLD, invalidated_source_version: SOURCE_GONE },
+  },
+  {
+    id: 'objects.move', label: 'Move an object', hint: 'Move an object to where you are pointing',
+    icon: 'arrange', group: 'build', placement: ['companion'], operation: OBJECT_MOVE,
+    refusals: { stale_object_base: STALE_WORLD, invalidated_source_version: SOURCE_GONE },
+  },
+  {
+    id: 'objects.remove', label: 'Remove an object', hint: 'Take an object out of this world',
+    icon: 'remove', group: 'build', placement: ['companion'], operation: OBJECT_REMOVE,
+    refusals: { stale_object_base: STALE_WORLD, invalidated_source_version: SOURCE_GONE },
+  },
+  {
+    id: 'arrangements.place', label: 'Place an arrangement', hint: 'Place a published group of objects in one change',
+    icon: 'place', group: 'build', placement: ['companion'], operation: ARRANGEMENT_PLACE,
+    refusals: { stale_object_base: STALE_WORLD, invalidated_source_version: SOURCE_GONE },
   },
   {
     id: 'people.open', label: 'People', hint: 'See who lives here and what they are doing',
@@ -116,17 +156,22 @@ export const ACTIONS: readonly ActionSpec[] = Object.freeze([
   {
     id: 'clock.play', label: 'Play', hint: 'Let the world run on its own',
     icon: 'play', group: 'people', placement: ['top-bar', 'palette'], operation: CONTROL,
-    refusals: { society_unavailable: NOBODY_HERE, invalid_society_control: CLOCK_REFUSED },
+    refusals: CLOCK_REFUSALS,
   },
   {
     id: 'clock.pause', label: 'Pause', hint: 'Stop the world where it is',
     icon: 'pause', group: 'people', placement: ['top-bar', 'palette'], operation: CONTROL,
-    refusals: { society_unavailable: NOBODY_HERE, invalid_society_control: CLOCK_REFUSED },
+    refusals: CLOCK_REFUSALS,
+  },
+  {
+    id: 'clock.speed', label: 'Change speed', hint: 'Change how fast the world plays',
+    icon: 'clock', group: 'people', placement: ['companion'], operation: CONTROL,
+    refusals: CLOCK_REFUSALS,
   },
   {
     id: 'clock.advance', label: 'Next minute', hint: 'Advance the world by one minute',
     icon: 'next-minute', group: 'people', placement: ['top-bar', 'palette'], operation: CONTROL_STEP,
-    refusals: { society_unavailable: NOBODY_HERE, invalid_society_control: CLOCK_REFUSED },
+    refusals: CLOCK_REFUSALS,
   },
   {
     id: 'compare.open', label: 'Compare', hint: 'See what different models chose for the same people',

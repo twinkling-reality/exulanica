@@ -1,0 +1,47 @@
+[
+ {
+  "body": {
+   "control": {
+    "current_tick": 1,
+    "mode": "paused",
+    "revision": 1,
+    "speed": 1
+   },
+   "society": {
+    "current_tick": 1,
+    "state_sha256": "9289eb80cfe04e0855a36065c55e47697aa5323a6ad33d44d1e3083c08fb280e"
+   }
+  },
+  "status": 200
+ },
+ {
+  "body": {
+   "control": {
+    "current_tick": 2,
+    "mode": "paused",
+    "revision": 1,
+    "speed": 1
+   },
+   "society": {
+    "current_tick": 2,
+    "state_sha256": "67d61e565f757cc980cf2f9ce90654a74f73214f9d793579b7195d1ac16c1f6b"
+   }
+  },
+  "status": 200
+ },
+ {
+  "body": {
+   "control": {
+    "current_tick": 3,
+    "mode": "paused",
+    "revision": 1,
+    "speed": 1
+   },
+   "society": {
+    "current_tick": 3,
+    "state_sha256": "feeb658e6097826bf44e31751a5854cdde61eb1d2d495785647000b094e84f24"
+   }
+  },
+  "status": 200
+ }
+]

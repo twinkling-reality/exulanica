@@ -32,6 +32,7 @@ import type { PeopleControls } from './environment-selection.js';
 import { operationAvailability } from '../ui/actions/registry.js';
 import type { ObjectOperation } from '../ui/object-placement.js';
 import type { PeopleOperation } from '../ui/world-inhabitants.js';
+import type { PlannedRequest } from '../ui/actions/planned.js';
 import { PLAYBACK_SPEEDS, type SocietyPlaybackSpeed } from '../society-control-api.js';
 
 export interface MountActionsDeps {
@@ -41,6 +42,11 @@ export interface MountActionsDeps {
   /** The version the open world's saved entry points at now; it moves with every saved change. */
   readonly versionId: () => string | null;
   readonly bindings: Readonly<Record<string, ActionBinding>>;
+  /**
+   * Sends a Companion plan step's request, built from its registry entry, and shows its write as
+   * the panel that owns the action would (`performPlanned`). Absent, no plan step is sent.
+   */
+  readonly send?: (request: PlannedRequest) => Promise<unknown>;
   readonly people: PeopleControls;
   /** Where the clock sits in the top bar; it is inserted before this node. */
   readonly clockSlot: HTMLElement | null;
@@ -154,6 +160,7 @@ export function mountActions(deps: MountActionsDeps): MountedActions {
     capabilities: () => descriptors,
     onChange: (listener) => { listeners.add(listener); return () => listeners.delete(listener); },
     toasts,
+    ...(deps.send === undefined ? {} : { send: deps.send }),
   };
 
   const rail = buildRail(host);

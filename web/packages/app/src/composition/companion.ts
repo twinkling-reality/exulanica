@@ -41,6 +41,7 @@ import type { CompanionStarterActions } from '../ui/companion-choice-rail.js';
 import type { PlaceNameRightsSource } from '../place-name-rights-api.js';
 import type { FirstUsePromptAction } from '../ui/first-use-guidance.js';
 import type { SessionState } from './session-state.js';
+import type { PlanRouting } from './companion-plan.js';
 
 export interface CompanionDependencies {
   readonly state: SessionState;
@@ -94,6 +95,13 @@ export interface CompanionDependencies {
    * propose" and "this sentence was a question" the same observation.
    */
   readonly proposeAppearance?: (utterance: string) => Promise<CompanionProposal>;
+  /**
+   * Read one utterance with the world open as a plan of world actions, first
+   * (`composition/companion-plan.ts`): a question goes on to `ask`, an appearance change is the
+   * proposal it carries in place of `proposeAppearance`'s, a plan or a refusal is said, and where
+   * it cannot answer the utterance takes the path above. Absent, that path is the only one.
+   */
+  readonly planActions?: (utterance: string) => Promise<PlanRouting>;
   /** Retained for harness compatibility; the presence now docks directly into the encounter. */
   readonly stageParent?: HTMLElement;
   /**
@@ -242,9 +250,17 @@ export function mountCompanion(deps: CompanionDependencies): MountedCompanion {
       direct = null;
       return answer();
     }
-    const propose = deps.proposeAppearance;
-    if (propose === undefined) return deps.ask(utterance);
-    const outcome = await propose(utterance);
+    const planned = deps.planActions === undefined ? null : await deps.planActions(utterance);
+    if (planned?.route === 'question') return deps.ask(utterance);
+    if (planned?.route === 'answer') return plannedAnswer(utterance, planned);
+    let outcome: CompanionProposal;
+    if (planned?.route === 'appearance') {
+      outcome = planned.proposal;
+    } else {
+      const propose = deps.proposeAppearance;
+      if (propose === undefined) return deps.ask(utterance);
+      outcome = await propose(utterance);
+    }
     if (outcome.classification === 'question') return deps.ask(utterance);
     if (outcome.proposal === null) return refusalAnswer(outcome);
 
@@ -483,8 +499,9 @@ export function mountCompanion(deps: CompanionDependencies): MountedCompanion {
     }),
     onAnswerShown: (answer) => {
       const remember = deps.rememberAnswer;
-      // An answer about the world's people is not kept (`aboutSociety` says why).
-      if (remember === undefined || answer.aboutSociety === true) return;
+      // An answer about the world's people is not kept (`aboutSociety` says why), nor one about a
+      // plan, which speaks of a sheet that is gone once the page is.
+      if (remember === undefined || answer.aboutSociety === true || answer.provenance.planned === true) return;
       void remember(answer).catch((error: unknown) => {
         // Said under the answer rather than in place of it. A durability failure is not an
         // answer failure: what is on the screen is still correct and still cited, and what is
@@ -677,6 +694,22 @@ function spokenAnswer(
  * there is no evidence and no search. What happened is that the reviewed design has no such
  * control, and the model that read the request is named for having read it.
  */
+/** What the Companion says about a plan it prepared, a question it asks first or a refusal. */
+function plannedAnswer(
+  utterance: string,
+  planned: Extract<PlanRouting, { readonly route: 'answer' }>,
+): CompanionAnswer {
+  const spoken = spokenAnswer({
+    utterance,
+    classification: 'appearance',
+    proposal: null,
+    refusal: null,
+    promptVersion: planned.promptVersion,
+    calls: [...planned.calls],
+  }, planned.sentences, planned.refused ? 'refused' : 'proposed');
+  return { ...spoken, provenance: { ...spoken.provenance, planned: true } };
+}
+
 function refusalAnswer(outcome: CompanionProposal): CompanionAnswer {
   const refusal = outcome.refusal;
   if (refusal === null) {

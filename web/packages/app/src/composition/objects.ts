@@ -217,6 +217,21 @@ export interface ObjectsDependencies {
   readonly loadBytes?: (asset: ReviewedAsset, islandId: IslandId) => Promise<ArrayBuffer>;
 }
 
+/** The page's own part of a Companion plan request, in the wire's names. */
+export interface CompanionSelectionContext {
+  readonly placement: {
+    readonly region_id: string;
+    readonly transform: {
+      readonly x_mm: number; readonly y_mm: number; readonly z_mm: number;
+      readonly yaw_microradians: number; readonly scale_milli: number;
+    };
+  } | null;
+  readonly viewer: {
+    readonly x_mm: number; readonly z_mm: number; readonly yaw_microradians: number; readonly region_id?: string;
+  } | null;
+  readonly selected_object_id: string | null;
+}
+
 export interface MountedObjects {
   readonly panel: ObjectPlacementPanel;
   readonly confirm: GatedConfirmPanel;
@@ -232,6 +247,14 @@ export interface MountedObjects {
   undoable(): boolean;
   /** What the world's capability descriptors allow; see `ObjectPlacementPanel.setOperationGate`. */
   setOperationGate(gate: ObjectOperationGate): void;
+  /**
+   * Where the person points and stands, and what is selected, as a Companion plan request's
+   * `context` takes it (`ActionContextBody`): the ground ahead of them in the region they stand
+   * in, the place they stand for an arrangement, and the selected object. It engages nothing.
+   */
+  selectionContext(): CompanionSelectionContext;
+  /** A reviewed object's title by its asset key, or a placed object's by its id; null if unknown. */
+  titleOf(key: { readonly assetKey?: string | null; readonly objectId?: string | null }): string | null;
   /** Read the authority and draw what it holds. Awaited by tests; fire and forget in the app. */
   begin(versionId?: string): Promise<void>;
   dispose(): void;
@@ -1757,6 +1780,38 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
       setPanelVisible(!panel.visible());
     },
     smallSquareOffered: () => client !== null && (deps.authoredRegion !== undefined || deps.declaredFloor !== undefined),
+    titleOf: ({ assetKey, objectId }) => {
+      if (typeof objectId === 'string') {
+        return version?.objects.find((placed) => placed.objectId === objectId)?.asset.title ?? null;
+      }
+      if (typeof assetKey === 'string') return client?.assets().find((asset) => asset.assetKey === assetKey)?.title ?? null;
+      return null;
+    },
+    selectionContext: (): CompanionSelectionContext => {
+      const region = placementRegion();
+      const binding = state.atlas?.binding;
+      if (region === null || binding === undefined) {
+        return { placement: null, viewer: null, selected_object_id: selectedId };
+      }
+      const pose = binding.playerPose();
+      const ground = groundMmIn(region, region.sceneId, pose);
+      const ahead = placementPoseBeforeVisitor(region.placement, pose, DEFAULT_PLACEMENT_DISTANCE_MM, ground);
+      const standing = placementPoseBeforeVisitor(region.placement, pose, 0, ground);
+      return {
+        placement: {
+          region_id: String(region.regionId),
+          transform: {
+            x_mm: ahead.xMm, y_mm: ahead.yMm, z_mm: ahead.zMm,
+            yaw_microradians: ahead.yawMicroradians, scale_milli: ahead.scaleMilli,
+          },
+        },
+        viewer: {
+          x_mm: standing.xMm, z_mm: standing.zMm, yaw_microradians: standing.yawMicroradians,
+          ...(deps.declaredFloor === undefined ? {} : { region_id: String(region.regionId) }),
+        },
+        selected_object_id: selectedId,
+      };
+    },
     undo: () => proposeUndo(),
     setOperationGate: (gate) => panel.setOperationGate(gate),
     undoable: () => lastUndoable() !== undefined,

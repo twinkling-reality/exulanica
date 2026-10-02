@@ -207,6 +207,11 @@ export interface PeopleControls {
   pause(): Promise<void>;
   setSpeed(speed: SocietyPlaybackSpeed): Promise<void>;
   advance(): Promise<void>;
+  /**
+   * Read the society and its control again and redraw, after a write this panel did not make
+   * (a Companion plan step sent to the same routes).
+   */
+  reread(): Promise<void>;
 }
 
 /** The People and clock refusals this surface meets, in words (codes stay in the technical record). */
@@ -2163,6 +2168,7 @@ export function mountEnvironmentSelection(
       pause: () => configurePlayback('paused'),
       setSpeed: (speed) => configurePlayback(societyControl?.mode ?? 'paused', speed),
       advance: () => stepPlayback(),
+      reread: () => refreshPlayback(true),
     },
     showSimulation: (cited, references) => {
       const names = societyNames();
