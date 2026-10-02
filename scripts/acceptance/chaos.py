@@ -19,9 +19,12 @@ product, as an operator or a network would make it:
   phase, with no event id twice and no duplicated output;
 - R1's lane tests at ``-n 2`` on a private PostgreSQL server.
 
-Added latency on the database connection is not exercised: the stack has no proxy between the API
-and PostgreSQL, and the row says so. Nothing here makes a timing claim; durations are recorded as
-this fixture's.
+- on a stack started with ``--database-latency``, a batch uploaded and read to its end while the
+  latency proxy holds every chunk between the API and PostgreSQL ``LATENCY_MS`` each way: the
+  same terminal phase as the reference, no id twice and as many outputs. On a stack without the
+  proxy the row says this arm is not exercised.
+
+Nothing here makes a timing claim; durations are recorded as this fixture's.
 
 The lock is an evidence-side operation through the owner URL the launcher recorded for evidence
 reads, and so are the counts of batches and artifacts. Outputs under ``--out``: ``results.json``,
@@ -95,8 +98,13 @@ OUTPUTS = (
 )
 NOT_EXERCISED = (
     "added latency on the database connection: the stack has no proxy between the API and "
-    "PostgreSQL to add it"
+    "PostgreSQL to add it (launch.py up --database-latency)"
 )
+#: The delay the latency arm adds to every chunk in each direction between the API and
+#: PostgreSQL, so every query's round trip takes at least twice it; and how long its stream may
+#: take, beyond the plain stream's bound, since every one of its polls is slower.
+LATENCY_MS = 50
+LATENCY_STREAM_SECONDS = 600
 
 
 # -- the client ------------------------------------------------------------------------------------
@@ -527,6 +535,55 @@ def worker_killed(row: Row, stack: Any, api: Api, owner: Owner, first: dict[str,
     row.expect(outputs == reference_outputs, f"outputs {outputs} against {reference_outputs}")
 
 
+def added_latency(row: Row, stack: Any, api: Api, owner: Owner, first: dict[str, Any]) -> None:
+    """With the API's database connections through the latency proxy, a batch uploaded while
+    every chunk is held ``LATENCY_MS`` reads to the reference's terminal phase, with no id twice
+    and as many outputs as the reference; the delay is then taken off again."""
+    proxy = stack.state["database_latency"]
+    delay_file = Path(proxy["delay_file"])
+    log = Path(stack.state["run_dir"]) / "logs" / "latency-proxy.log"
+    delay_file.write_text(str(LATENCY_MS))
+    try:
+        until(lambda: f'"milliseconds": {LATENCY_MS}' in log.read_text(errors="replace"), 30)
+        started = time.monotonic()
+        status, answer = api.upload(photograph(40))
+        batch = answer.get("batch_id") if isinstance(answer, dict) else None
+        stream = Stream(api, batch).read(LATENCY_STREAM_SECONDS) if batch else None
+        seconds = round(time.monotonic() - started, 1)
+    finally:
+        delay_file.write_text("0")
+    applied = f'"milliseconds": {LATENCY_MS}' in log.read_text(errors="replace")
+    ids = stream.ids if stream else []
+    outputs = owner.count(OUTPUTS, batch) if batch else -1
+    reference_outputs = owner.count(OUTPUTS, first["batch"])
+    row.expect(applied, f"the proxy never applied {LATENCY_MS} ms")
+    row.expect(status == 202, f"the upload under latency answered {status}")
+    row.expect(
+        stream is not None
+        and stream.terminal is not None
+        and stream.phases[-1:] == first["phases"][-1:],
+        f"under latency the stream ended in phase {stream.phases[-1:] if stream else None}, the "
+        f"reference in {first['phases'][-1:]}",
+    )
+    row.expect(len(ids) == len(set(ids)), "under latency the stream sent an id twice")
+    row.expect(
+        outputs == reference_outputs,
+        f"under latency the batch made {outputs} outputs, the reference {reference_outputs}",
+    )
+    row.observed["added_latency"] = {
+        "milliseconds_each_way_per_chunk": LATENCY_MS,
+        "applied": applied,
+        "upload": status,
+        "batch": batch,
+        "terminal": stream.terminal if stream else None,
+        "phase": stream.phases[-1:] if stream else None,
+        "retry": stream.retry if stream else None,
+        "events": len(ids),
+        "outputs": [outputs, reference_outputs],
+        "fixture_seconds": seconds,
+    }
+
+
 def _job(api: Api, job: str) -> dict[str, Any]:
     status, body = api.call("GET", f"/operations/derivative-jobs/{job}")
     return body if status == 200 and isinstance(body, dict) else {}
@@ -549,7 +606,9 @@ def lane_tests(row: Row, out: Path, worktree: Path) -> None:
         check=False,
     )  # fmt: skip
     (out / "evidence" / "r1-lane-tests.txt").write_text(completed.stdout + completed.stderr)
-    counts = [line for line in completed.stdout.splitlines() if " passed" in line or " failed" in line]
+    counts = [
+        line for line in completed.stdout.splitlines() if " passed" in line or " failed" in line
+    ]
     tail = counts[-1:] or [""]
     row.observed["lane_tests"] = {
         "files": list(R1_TESTS),
@@ -575,6 +634,7 @@ def run(arguments: argparse.Namespace) -> int:
     out = Path(arguments.out).resolve()
     (out / "evidence").mkdir(parents=True, exist_ok=True)
     started = dt.datetime.now(dt.UTC).isoformat()
+    latency = isinstance(stack.state.get("database_latency"), dict)
     row = Row(
         "J2",
         "load.chaos",
@@ -586,7 +646,13 @@ def run(arguments: argparse.Namespace) -> int:
         "which resuming completes it; a client that leaves and a cancelled upload give their "
         "places back with no batch; a worker killed mid-job by an API restart is reclaimed after "
         "its lease and the resumed stream reaches the same terminal phase with no id twice and no "
-        "duplicated output; R1's lane tests pass. Added database latency is not exercised.",
+        "duplicated output; R1's lane tests pass. "
+        + (
+            f"With every chunk between the API and PostgreSQL held {LATENCY_MS} ms each way, a "
+            "batch reads to the reference's terminal phase with no id twice and as many outputs."
+            if latency
+            else "Added database latency is not exercised."
+        ),
     )
     api, other = Api(stack, "token"), Api(stack, "token-2")
     owner = Owner(stack)
@@ -600,10 +666,12 @@ def run(arguments: argparse.Namespace) -> int:
             leaving(row, api, owner, first)
             cancelled_upload(row, api, owner)
             worker_killed(row, stack, Api(stack, "token"), owner, first)
+            if latency:
+                added_latency(row, stack, Api(stack, "token"), owner, first)
     finally:
         owner.close()
     lane_tests(row, out, worktree)
-    row.observed["not_exercised"] = [NOT_EXERCISED]
+    row.observed["not_exercised"] = [] if latency else [NOT_EXERCISED]
     row.close()
     results = {
         "profile": "q10-chaos-acceptance-results/v1",

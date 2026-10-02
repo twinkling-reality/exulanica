@@ -8,6 +8,7 @@ names is one the migrations create, so a renamed table fails here rather than as
 
 from __future__ import annotations
 
+import contextlib
 import importlib.util
 import re
 import sys
@@ -76,3 +77,37 @@ def test_every_table_the_driver_names_is_created_by_a_migration():
     named = {driver.LEDGER, *re.findall(r"from ([a-z_]+)", driver.OUTPUTS)}
     named |= set(re.findall(r'"select count\(\*\) from ([a-z_]+)"', source))
     assert named <= created, named - created
+
+
+def test_the_latency_arm_always_takes_its_delay_off_again(tmp_path):
+    """A failed upload under added latency must not leave every later query of the stack slow."""
+    chaos = _load()
+    delay_file = tmp_path / "database-delay-ms"
+    delay_file.write_text("0")
+    (tmp_path / "logs").mkdir()
+    (tmp_path / "logs" / "latency-proxy.log").write_text(
+        f'{{"component": "latency-proxy", "event": "delay", "milliseconds": {chaos.LATENCY_MS}}}\n'
+    )
+
+    class Stack:
+        def __init__(self) -> None:
+            self.state = {
+                "database_latency": {"delay_file": str(delay_file)},
+                "run_dir": str(tmp_path),
+            }
+
+    class Api:
+        def upload(self, photo: bytes):
+            assert delay_file.read_text() == str(chaos.LATENCY_MS)
+            raise ConnectionError("the upload failed under latency")
+
+    row = chaos.Row("J2", "load.chaos", "expected")
+    with contextlib.suppress(ConnectionError):
+        chaos.added_latency(
+            row,
+            Stack(),
+            Api(),
+            owner=None,
+            first={"terminal": "x", "phases": ["succeeded"], "batch": None},
+        )
+    assert delay_file.read_text() == "0"
