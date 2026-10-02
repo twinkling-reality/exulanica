@@ -358,7 +358,10 @@ A comparison of models run by the local command spends from its own process's bu
 of it back; one started from the application spends within the bound its owner stated, a part of
 the playing process's budget, and leaves the contract's share for the process's other work. A
 world's hourly bounds do not apply to either, since a comparison writes nothing the live world reads
-([comparisons of models](society-experiments.md#comparisons-of-models)).
+([comparisons of models](society-experiments.md#comparisons-of-models)). A comparison over a day
+asks each person a model decides for at most once a minute for 1440 minutes, 24 times what an
+hour's can, and its plan states that most for one decided person before anything starts
+([running a comparison](society-experiments.md#running-a-comparison)).
 
 ## What a decision does in its minute
 

@@ -14,11 +14,13 @@ the contract's request and ``ask_person``. What is shown:
 *   a caller of another world, and an unknown comparison, read the same answer;
 *   a host with no client fails a model's runs by name, and the comparison reads incomplete;
 *   a run a process stopped part way is closed as interrupted, and nothing is asked again;
-*   a comparison id another world of the workspace holds is refused as a conflict by name.
+*   a comparison id another world of the workspace holds is refused as a conflict by name;
+*   a purposeful society, which keeps no time of day, is not defined over a day, by name.
 """
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import os
 import uuid
@@ -34,10 +36,13 @@ from exulanica.models.client import ModelClient
 from exulanica.models.manifest import load_manifest
 from exulanica.models.transport import HttpResponse
 from exulanica.orchestration.compare import comparison_body
+from exulanica.world import society_comparison_reading as reading
+from exulanica.world.society_catalogs import DAY_COMPARISON_VERSIONS
 from exulanica.world.society_comparison_repository import (
     ComparisonConflict,
     SocietyComparisonRepository,
 )
+from exulanica.world.society_comparison_verdict import ComparisonRefused
 from exulanica.world.society_decision_contract import person_role
 
 import test_society_stay_requests_api as stays
@@ -435,6 +440,35 @@ def _cut(document: dict[str, Any]) -> dict[str, Any]:
         "decisions": document["decisions"][:KEPT],
         "events": document["events"][:KEPT],
     }
+
+
+@pytest.mark.parametrize("saved_world", [2], indirect=True)
+def test_a_purposeful_society_is_not_defined_over_a_day(app, monkeypatch, tmp_path):
+    world, client = app
+    stays._inhabited(world, client)
+    # A line over a day stands in the reading catalog, so the reading bound does not refuse the
+    # day first: what refuses it is that the society keeps none.
+    document = json.loads(reading.READING_CATALOG.read_text(encoding="utf-8"))
+    [hour] = document["entries"]
+    document["entries"].append({**hour, "key": "living-1440", "window_ticks": 1440})
+    lines = tmp_path / "society-comparison-reading.v1.json"
+    lines.write_text(json.dumps(document), encoding="utf-8")
+    monkeypatch.setattr(reading, "READING_CATALOG", lines)
+    runner = _runner(world, client.app.state.services, _Chooser())
+    # The positive control: over an hour, the same selection is defined.
+    runner.define(
+        world["binding"].version_id,
+        comparison_id=uuid.uuid4(),
+        body=comparison_body(runner, _models()[:1], SEEDS[:1], control=False),
+    )
+    day = dataclasses.replace(runner, catalogs=seeded_catalogs(versions=DAY_COMPARISON_VERSIONS))
+    with pytest.raises(ComparisonRefused) as refused:
+        day.define(
+            world["binding"].version_id,
+            comparison_id=uuid.uuid4(),
+            body=comparison_body(day, _models()[:1], SEEDS[:1], control=False),
+        )
+    assert refused.value.code == "window_not_offered"
 
 
 @pytest.mark.parametrize("saved_world", [2], indirect=True)

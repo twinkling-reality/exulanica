@@ -76,7 +76,7 @@ from exulanica.api.capabilities import (
     unsupported,
 )
 from exulanica.api.comparison_spending import close_comparison_bounds
-from exulanica.api.decision_host import offered_providers
+from exulanica.api.decision_host import ask_bound_usd, offered_providers
 from exulanica.api.dependencies import CurrentSession, ScopedConnection, get_services
 from exulanica.api.services import Services
 from exulanica.api.society_comparison_runner import (
@@ -100,6 +100,7 @@ from exulanica.api.society_comparison_start import (
     spending_plan_refusal,
     stopped_host_usd,
     typical_per_person_hour,
+    window_catalogs,
 )
 from exulanica.api.society_comparison_worker import CANCELLED_REASON
 from exulanica.api.world_scope import WorldId
@@ -109,8 +110,21 @@ from exulanica.models.spending import SpendingRefused
 from exulanica.world.comparison_facts import ComparisonFacts, run_progress
 from exulanica.world.decision_roles import DecisionRole, RoleRefused, decision_roles
 from exulanica.world.society import UnavailableSocietyInput, UnknownSociety
-from exulanica.world.society_catalogs import load_comparison_catalogs
-from exulanica.world.society_comparison import ReplayMismatch
+from exulanica.world.society_catalogs import COMPARISON_WINDOWS, load_comparison_catalogs
+from exulanica.world.society_comparison import (
+    HOUR_TICKS,
+    HourStart,
+    ReplayMismatch,
+    first_hour,
+    hours_of,
+    replay_hour,
+)
+from exulanica.world.society_comparison_day import (
+    day_document,
+    hour_events_sha256,
+    hour_window,
+    state_from_bytes,
+)
 from exulanica.world.society_comparison_drawing import (
     DrawingCorrupt,
     decode,
@@ -120,6 +134,7 @@ from exulanica.world.society_comparison_drawing import (
 from exulanica.world.society_comparison_reading import (
     decided_maximum,
     decided_people,
+    measured_line,
     population_maximum,
     reading_refusal,
 )
@@ -156,6 +171,10 @@ __all__ = ["capability_operations", "router"]
 
 #: A run that has no completed hour to draw, answered by name rather than as a missing run.
 RUN_NOT_COMPLETED: Final = "run_not_completed"
+#: An hour a read names that its run's window does not hold.
+HOUR_NOT_IN_WINDOW: Final = "hour_not_in_window"
+#: A day's read asked of a comparison whose window is an hour.
+COMPARISON_NOT_A_DAY: Final = "comparison_not_a_day"
 PLAN_PROFILE: Final = "exulanica.society-comparison-plan/v1"
 #: What prices a model's asks where this server has no client: the manifest's prices, no ceiling.
 _ESTIMATOR: Final = BudgetGuard(ceiling_usd=Decimal(0), max_calls=0)
@@ -214,22 +233,26 @@ def _with_progress(
     session: CurrentSession,
     world_id: str,
     comparison_id: uuid.UUID,
+    comparisons: SocietyComparisonRepository,
 ) -> dict[str, Any]:
     """``document``'s runs, each unfinished one with where it stands: running while a host plays
-    it under the start's live lease, else queued; a finished run states none, and so does a run
-    not yet reserved, which has no id."""
+    it under the start's live lease, else queued, and, for a day's run, how many of its hours it
+    sealed; a finished run states none, and so does a run not yet reserved, which has no id."""
     starts = SocietyComparisonStarts(connection, session.workspace_id)
     start = starts.read(world_id, [comparison_id]).get(comparison_id)
     facts = ComparisonFacts(connection, session.workspace_id, world_id, "society")
     begun = facts.run_starts(comparison_id)
+    day = int(document.get("window_ticks", HOUR_TICKS)) > HOUR_TICKS
+    sealed = comparisons.hours_sealed([comparison_id]) if day else {}
     now = starts.now()
     for seed in document.get("seeds", ()):
         for run in seed["runs"].values():
-            run["progress"] = (
-                None
-                if run["status"] in ("completed", "failed") or run["run_id"] is None
-                else run_progress(start, begun.get(uuid.UUID(run["run_id"]), []), now)
-            )
+            if run["status"] in ("completed", "failed") or run["run_id"] is None:
+                run["progress"] = None
+                continue
+            run["progress"] = run_progress(start, begun.get(uuid.UUID(run["run_id"]), []), now)
+            if day:
+                run["progress"]["hours_sealed"] = sealed.get(uuid.UUID(run["run_id"]), 0)
     return document
 
 
@@ -260,7 +283,13 @@ def society_comparisons(
     counts = comparisons.run_counts(ids)
     starts = _starts(connection, session, world_id, ids, comparisons)
     try:
-        return listing_document(rows, counts, model_name=load_manifest().model_name, starts=starts)
+        return listing_document(
+            rows,
+            counts,
+            model_name=load_manifest().model_name,
+            starts=starts,
+            hours_sealed=comparisons.comparison_hours_sealed(ids),
+        )
     except (ComparisonRefused, ScoreRefused) as exc:
         return _unreadable(exc)
 
@@ -281,16 +310,20 @@ def plan_society_comparison(
     seeds: Annotated[int, Query(ge=1, le=_SEEDS_MOST)] = 1,
     input_seq: Annotated[int | None, Query(ge=1)] = None,
     bound_usd: Annotated[str | None, Query(pattern=_BOUND_PATTERN)] = None,
+    window: Literal["hour", "day"] = "hour",
 ) -> Any:
     """What a start would do, writing nothing: the roles, groups, models and development seeds
-    this server offers a comparison of the version's society, and, for the selection the query
-    names (``model`` as ``<provider>/<model id>``, once or twice; ``person`` for a named group;
-    ``input_seq`` for an earlier stored input to freeze; ``bound_usd`` for the bound a start
-    would state), the runs it plans, the input it freezes, the most it can cost and what one like
-    it typically cost, or the refusal a start of it would meet, by the same predicates a start's
-    allowance and grant checks read (``Services.allowance_refusal``,
-    ``Services.bound_room_refusal``). Without a bound, the grant is judged on the calls the
-    selection can make alone."""
+    this server offers a comparison of the version's society, the windows it may run over (an
+    hour, or a day where the society's engine keeps one and a reading line was measured for its
+    day), and, for the selection the query names (``model`` as ``<provider>/<model id>``, once or
+    twice; ``person`` for a named group; ``input_seq`` for an earlier stored input to freeze;
+    ``bound_usd`` for the bound a start would state; ``window`` for the window, an hour unless
+    named), the runs it plans, the input it freezes, the most it can cost and what one like it
+    typically cost, with the most one decided person's run can ask and call, each model's
+    reservation for one ask and the most its asking can take, or the refusal a start of it would
+    meet, by the same predicates a start's allowance and grant checks read
+    (``Services.allowance_refusal``, ``Services.bound_room_refusal``). Without a bound, the grant
+    is judged on the calls the selection can make alone."""
     comparisons = _comparisons(connection, session, request, world_id)
     society = _society(comparisons, version_id)
     navigation = comparisons.navigation_profile(society)
@@ -308,10 +341,15 @@ def plan_society_comparison(
         else {"code": "engine_takes_no_comparison", "detail": f"{engine} takes no comparison"}
     )
     running = SocietyComparisonStarts(connection, session.workspace_id).unfinished(world_id)
-    catalogs = services.comparison_catalogs or load_comparison_catalogs()
     population = int(society["population_size"])
-    # A run is read by the line measured on its engine's state family.
+    # A run is read by the line measured on its engine's state family, over its window.
     family = society_engine(engine).state_family
+    windows = _windows(services, engine, population, family)
+    chosen = next(held for held in windows if held["window"] == window)
+    try:
+        catalogs = window_catalogs(services.comparison_catalogs, window, engine)
+    except StartRefused:
+        catalogs = None
     document: dict[str, Any] = {
         "profile": PLAN_PROFILE,
         "refusal": refused,
@@ -321,10 +359,12 @@ def plan_society_comparison(
         else [],
         "seeds_available": len(services.comparison_seeds),
         "models_most": MODELS_MOST,
-        "window_ticks": protocol_value(catalogs, "window_ticks"),
+        "windows": windows,
+        "window": window,
+        "window_ticks": chosen["window_ticks"],
         "population": population,
-        "population_most": population_maximum(catalogs, family),
-        "decided_most": decided_maximum(catalogs, population, family),
+        "population_most": chosen["population_most"],
+        "decided_most": chosen["decided_most"],
         # Everybody a named group may be chosen from, by id and name, as the society's state
         # names them: a group of more people than one owner's choice holds is chosen from these.
         "people": sorted(
@@ -343,12 +383,15 @@ def plan_society_comparison(
     if role is None or group is None or not model:
         return document
     try:
-        chosen = []
+        if catalogs is None or chosen["refusal"] is not None:
+            refusal = chosen["refusal"] or {"code": "window_not_offered", "detail": window}
+            raise StartRefused(refusal["code"], refusal["detail"])
+        models_named = []
         for named in model:
             provider, _, model_id = named.partition("/")
             if not provider or not model_id:
                 raise StartRefused("model_not_offered", f"{named!r} is not <provider>/<model id>")
-            chosen.append(ChosenModel(provider=provider, model_id=model_id))
+            models_named.append(ChosenModel(provider=provider, model_id=model_id))
         prepared = _prepare(
             services,
             connection,
@@ -358,11 +401,12 @@ def plan_society_comparison(
             society,
             role_key=role,
             group=ChosenGroup(kind=group, choice_seq=choice_seq, people=person or None),
-            models=chosen,
+            models=models_named,
             control=control,
             seed_count=seeds,
             navigation=navigation,
             input_seq=input_seq,
+            window=window,
         )
     except StartRefused as exc:
         document["plan_refusal"] = {"code": exc.code, "detail": exc.detail}
@@ -387,8 +431,45 @@ def plan_society_comparison(
         **prepared.cost.document(),
         "input_seq": prepared.input_seq,
         "minutes": _minutes(prepared, population, navigation),
+        # The durable bound a start opens of each provider it asks holds the stated bound and
+        # every call the comparison can make, under that provider's grant.
+        "providers": [
+            {"provider": provider, "calls_most": prepared.cost.calls} for provider in providers
+        ],
     }
     return document
+
+
+def _windows(services: Services, engine: str, population: int, family: str) -> list[dict[str, Any]]:
+    """Each window this server offers a comparison of the society over, with its minutes and
+    hours, the most people a comparison over it runs and the most of them a model may decide for,
+    the measured reading line it is read by, or why it is not offered: a day of a society whose
+    engine keeps none, or one no reading line was measured for."""
+    found = []
+    for window in COMPARISON_WINDOWS:
+        held: dict[str, Any] = {
+            "window": window,
+            "window_ticks": None,
+            "hours": None,
+            "population_most": None,
+            "decided_most": None,
+            "reading_record": None,
+            "refusal": None,
+        }
+        try:
+            catalogs = window_catalogs(services.comparison_catalogs, window, engine)
+            ticks = protocol_value(catalogs, "window_ticks")
+            held.update(window_ticks=ticks, hours=max(1, ticks // HOUR_TICKS))
+            held["population_most"] = population_maximum(catalogs, family)
+            held["decided_most"] = decided_maximum(catalogs, population, family)
+            line = measured_line(family, ticks)
+            held["reading_record"] = None if line is None else line["source"]
+        except StartRefused as exc:
+            held["refusal"] = {"code": exc.code, "detail": exc.detail}
+        except ComparisonRefused as exc:
+            held["refusal"] = {"code": exc.code, "detail": str(exc)}
+        found.append(held)
+    return found
 
 
 def _minutes(prepared: _Prepared, population: int, navigation: str | None) -> list[dict[str, Any]]:
@@ -401,19 +482,38 @@ def _minutes(prepared: _Prepared, population: int, navigation: str | None) -> li
     contract = prepared.role.contract()
     decided = decided_people(prepared.body, population)
     manifest = load_manifest()
-    return [
-        {
-            "arm": key,
-            "model_id": arm["provider_config"]["model_id"],
-            "name": manifest.model_name(arm["provider_config"]["model_id"]),
-            "decided": decided[key],
-            "answers_per_minute": answers_per_minute(
-                contract, arm["provider_config"]["model_id"], navigation
-            ),
-        }
-        for key, arm in sorted(prepared.body["arms"].items())
-        if arm["provider_config"] is not None
-    ]
+    seed = prepared.body["seeds"][0]
+    found = []
+    for key, arm in sorted(prepared.body["arms"].items()):
+        if arm["provider_config"] is None:
+            continue
+        spec = manifest.offered(prepared.role.chosen, arm["provider_config"]["model_id"])
+        one_run = comparison_cost(
+            prepared.body,
+            population,
+            prepared.role,
+            _ESTIMATOR,
+            manifest,
+            at_once=1,
+            navigation_profile=navigation,
+            runs_left=[(key, seed)],
+        )
+        found.append(
+            {
+                "arm": key,
+                "model_id": spec.model_id,
+                "name": manifest.model_name(spec.model_id),
+                "decided": decided[key],
+                "answers_per_minute": answers_per_minute(contract, spec.model_id, navigation),
+                # What one ask of the arm's model holds reserved until its usage is recorded, and
+                # the most one run of the arm can reserve, every person it asks asked every minute.
+                "ask_bound_usd": format(
+                    ask_bound_usd(prepared.role, _ESTIMATOR, spec, contract), "f"
+                ),
+                "most_usd_per_run": format(one_run.most_usd, "f"),
+            }
+        )
+    return found
 
 
 @router.get("/{comparison_id}")
@@ -437,7 +537,7 @@ def society_comparison(
         )
     except (ComparisonRefused, ScoreRefused) as exc:
         return _unreadable(exc)
-    return _with_progress(document, connection, session, world_id, comparison_id)
+    return _with_progress(document, connection, session, world_id, comparison_id, comparisons)
 
 
 @router.get("/{comparison_id}/runs/{run_id}")
@@ -449,9 +549,22 @@ def society_comparison_run(
     session: CurrentSession,
     request: Request,
     world_id: WorldId,
+    hour: Annotated[int | None, Query(ge=0)] = None,
 ) -> Any:
+    """One run as the page draws it. A day's run is read one hour at a time (``hour``, its first
+    where none is named): the hour replayed from the state the hour before it sealed, its genesis
+    for the first, from the receipts the hour recorded, held to the hour's record, and drawn as an
+    hour's run is, with where the hour lies in the day. An hour the window does not hold is
+    refused (``hour_not_in_window``), and one the run has not sealed is ``run_not_completed``."""
     comparisons = _comparisons(connection, session, request, world_id)
-    comparisons.definition(version_id, comparison_id)
+    row = comparisons.definition(version_id, comparison_id)
+    if int(row["document"]["window_ticks"]) > HOUR_TICKS:
+        return _day_hour(comparisons, comparison_id, run_id, 0 if hour is None else hour)
+    if hour not in (None, 0):
+        return JSONResponse(
+            status_code=422,
+            content={"code": HOUR_NOT_IN_WINDOW, "detail": "this comparison's window is an hour"},
+        )
     outcome = comparisons.outcome(run_id)
     try:
         plan, definition = comparisons.read_plan(comparison_id, run_id)
@@ -507,6 +620,147 @@ def society_comparison_run(
     )
 
 
+def _day_hour(
+    comparisons: SocietyComparisonRepository,
+    comparison_id: uuid.UUID,
+    run_id: uuid.UUID,
+    hour: int,
+) -> Any:
+    """One sealed hour of a day's run, replayed from the state the hour before it ended in and the
+    receipts it recorded, held to the hour's record and drawn; the inputs' rights asked after the
+    replay and before anything drawn from them is answered, as an hour's run is read."""
+    try:
+        plan, definition = comparisons.read_plan(comparison_id, run_id)
+    except UnavailableSocietyInput as exc:
+        return _unavailable(exc)
+    except ComparisonRefused as exc:
+        return _unreadable(exc)
+    sealed = {int(found["hour"]): found for found in comparisons.hours(run_id)}
+    held = sealed.get(hour)
+    played = mismatch = None
+    if held is not None and 0 <= hour < hours_of(plan):
+        try:
+            if hour == 0:
+                start = first_hour(plan)
+            else:
+                state = comparisons.hour_state(run_id, hour - 1)
+                assert state is not None, "an hour is sealed after the hour before it"
+                start = HourStart(
+                    hour, state_from_bytes(*state), int(sealed[hour - 1]["decision_seq_end"])
+                )
+            document = held["document"]
+            played = replay_hour(
+                plan,
+                comparisons.stored_between(
+                    run_id, start.first_sequence, int(held["decision_seq_end"])
+                ),
+                start=start,
+                minute_digests=document["minutes"]["state_sha256"],
+            )
+            if (
+                hour_events_sha256(played) != document["events_sha256"]
+                or len(played.receipts) != document["receipts"]["count"]
+            ):
+                raise ReplayMismatch("the hour's events are not the ones it recorded")
+        except (ReplayMismatch, ValueError) as exc:
+            mismatch = exc if isinstance(exc, ReplayMismatch) else ReplayMismatch(str(exc))
+            played = None
+    try:
+        comparisons.authorize_inputs(plan.inputs)
+    except UnavailableSocietyInput as exc:
+        return _unavailable(exc)
+    if not 0 <= hour < hours_of(plan):
+        return JSONResponse(
+            status_code=422,
+            content={
+                "code": HOUR_NOT_IN_WINDOW,
+                "detail": f"this comparison's day holds hours 0 to {hours_of(plan) - 1}",
+            },
+        )
+    if held is None:
+        return JSONResponse(
+            status_code=409,
+            content={"code": RUN_NOT_COMPLETED, "detail": "this run has not sealed that hour"},
+        )
+    if mismatch is not None:
+        return JSONResponse(
+            status_code=409, content={"code": mismatch.code, "detail": str(mismatch)}
+        )
+    assert played is not None
+    drawn = replay_document(
+        plan,
+        definition,
+        held["document"]["arm"],
+        held["document"]["seed_digest"],
+        played,
+        model_name=load_manifest().model_name,
+    )
+    return {**drawn, "window": hour_window(plan, held["document"])}
+
+
+@router.get("/{comparison_id}/runs/{run_id}/day")
+def society_comparison_run_day(
+    version_id: uuid.UUID,
+    comparison_id: uuid.UUID,
+    run_id: uuid.UUID,
+    connection: ScopedConnection,
+    session: CurrentSession,
+    request: Request,
+    world_id: WorldId,
+) -> Any:
+    """A day's run over every hour it sealed, from its sealed hours alone, with no replay: each
+    hour's terms for the group and what its asking took, and every person's minutes, coded as the
+    run's drawing classifies a minute, with the activities and places the codes name, so two runs'
+    days can be set side by side minute by minute without drawing every hour. Answered for a run
+    still playing or one that failed too, over the hours it sealed; the inputs' rights are asked
+    before anything drawn from them is answered. A comparison whose window is an hour is
+    ``comparison_not_a_day``."""
+    comparisons = _comparisons(connection, session, request, world_id)
+    row = comparisons.definition(version_id, comparison_id)
+    try:
+        plan, _definition = comparisons.read_plan(comparison_id, run_id)
+    except UnavailableSocietyInput as exc:
+        return _unavailable(exc)
+    except ComparisonRefused as exc:
+        return _unreadable(exc)
+    hours = [found["document"] for found in comparisons.hours(run_id)]
+    outcome = comparisons.outcome(run_id)
+    reserved = comparisons._run(run_id)
+    try:
+        comparisons.authorize_inputs(plan.inputs)
+    except UnavailableSocietyInput as exc:
+        return _unavailable(exc)
+    if int(row["document"]["window_ticks"]) <= HOUR_TICKS:
+        return JSONResponse(
+            status_code=409,
+            content={"code": COMPARISON_NOT_A_DAY, "detail": "this comparison runs an hour"},
+        )
+    manifest = load_manifest()
+    people = first_hour(plan).state["inhabitants"]
+    deciders = {}
+    for person in people:
+        decider, _config = plan.decider_for(person["id"])
+        deciders[person["id"]] = (
+            {"kind": decider["kind"]}
+            if decider["kind"] != "model"
+            else {
+                "kind": "model",
+                "provider": decider["provider"],
+                "model_id": decider["model_id"],
+                "name": manifest.model_name(decider["model_id"]),
+            }
+        )
+    return day_document(
+        plan,
+        hours,
+        arm=reserved["arm"],
+        seed_digest_text=reserved["seed_digest"],
+        status=None if outcome is None else outcome["status"],
+        deciders=deciders,
+        names={person["id"]: person_label(person) for person in people},
+    )
+
+
 # -- a comparison planned and started from the application -------------------------------------
 
 
@@ -540,6 +794,8 @@ class ComparisonStartBody(BaseModel):
     bound_usd: Annotated[str, Field(pattern=_BOUND_PATTERN)]
     #: An earlier stored input of the society to freeze; left out, its newest.
     input_seq: Annotated[int, Field(ge=1)] | None = None
+    #: The window every run plays: an hour, or a day of a society whose engine keeps one.
+    window: Literal["hour", "day"] = "hour"
 
 
 #: What a host refusal says, where this server starts no comparison for the workspace.
@@ -594,9 +850,10 @@ def _prepare(
     seed_count: int,
     navigation: str | None,
     input_seq: int | None = None,
+    window: str = "hour",
 ) -> _Prepared:
-    """What a start of this selection would define, through the one definition path, or the
-    refusal it would meet (:class:`StartRefused`); reads only."""
+    """What a start of this selection would define over ``window``, through the one definition
+    path, or the refusal it would meet (:class:`StartRefused`); reads only."""
     refusal = services.comparison_refusal(session.workspace_id)
     if refusal is not None:
         raise StartRefused(refusal, _HOST_DETAIL[refusal])
@@ -607,15 +864,24 @@ def _prepare(
     runner = services.comparison_runner(session.workspace_id, world_id, session.actor)
     if runner is None:
         raise StartRefused("comparisons_not_run_here", "this server runs no society")
-    runner = dataclasses.replace(runner, decision_role=role)
     engine = str(society["engine_version"])
     if not society_engine(engine).comparisons:
         raise StartRefused("engine_takes_no_comparison", f"{engine} takes no comparison")
     if not role.hosted_by(engine):
         raise StartRefused("role_not_hosted", f"{engine} hosts no {role.key} decisions")
+    runner = dataclasses.replace(
+        runner,
+        decision_role=role,
+        catalogs=window_catalogs(services.comparison_catalogs, window, engine),
+    )
     population = int(society["population_size"])
     family = society_engine(engine).state_family
-    refused = reading_refusal(runner.catalogs, population, family=family)
+    try:
+        refused = reading_refusal(runner.catalogs, population, family=family)
+    except ComparisonRefused as exc:
+        if exc.code in START_REFUSALS:
+            raise StartRefused(exc.code, str(exc)) from exc
+        raise
     if refused is not None:
         raise StartRefused(*refused)
     arms = [ComparisonArm(model.provider, model.model_id) for model in models]
@@ -800,6 +1066,7 @@ def start_society_comparison(
             seed_count=body.seeds,
             navigation=comparisons.navigation_profile(society),
             input_seq=body.input_seq,
+            window=body.window,
         )
         try:
             bound = Decimal(body.bound_usd)

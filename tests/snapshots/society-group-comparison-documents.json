@@ -72,6 +72,9 @@
             "kind": "owner_choice"
           }
         },
+        "hours": 1,
+        "hours_expected": null,
+        "hours_sealed": null,
         "phase": "development",
         "runs": 4,
         "runs_completed": 4,
@@ -79,7 +82,8 @@
         "runs_finished": 4,
         "score_version": 3,
         "seeds": 1,
-        "start": null
+        "start": null,
+        "window_ticks": 60
       }
     ],
     "profile": "exulanica.society-comparisons/v2"
@@ -168,6 +172,7 @@
         "kind": "owner_choice"
       }
     },
+    "hours": 1,
     "input": {
       "document_sha256": "37a5b46b59420c3d5fb82fc8cc62579123350b53d72def6c347b1d792e70e3a9",
       "input_seq": 1
@@ -589,6 +594,7 @@
       "model_a": {
         "cost_known": true,
         "cost_usd_per_hour": "0.0035",
+        "cost_usd_per_run": "0.0029",
         "held_out": {
           "activities_per_person": "3.0000",
           "first_answers_refused": "0.0000",
@@ -641,6 +647,7 @@
       "model_b": {
         "cost_known": true,
         "cost_usd_per_hour": "0.0018",
+        "cost_usd_per_run": "0.0015",
         "held_out": {
           "activities_per_person": "3.0000",
           "first_answers_refused": "0.0000",
@@ -693,6 +700,7 @@
       "routine": {
         "cost_known": true,
         "cost_usd_per_hour": null,
+        "cost_usd_per_run": null,
         "held_out": {
           "activities_per_person": "4.0000",
           "first_answers_refused": null,
@@ -734,6 +742,7 @@
       "wait": {
         "cost_known": true,
         "cost_usd_per_hour": null,
+        "cost_usd_per_run": null,
         "held_out": {
           "activities_per_person": "0.0000",
           "first_answers_refused": null,

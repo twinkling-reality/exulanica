@@ -1,10 +1,10 @@
-"""Run the same hour of a saved world with two open models and score it: the local command.
+"""Run the same hour, or day, of a saved world with two open models and score it: the local command.
 
     EXULANICA_BUDGET_USD=<bound> python -m exulanica.orchestration.compare \\
         --workspace <uuid> --world <world id> --version <uuid> --actor <uuid> \\
         --model <provider>/<model id> [--model <provider>/<model id>] [--control] \\
         [--group-choice <n> | --group <person id> [--group <person id> ...]] \\
-        [--seeds <file>] [--seed-count <n>]
+        [--seeds <file>] [--seed-count <n>] [--window hour|day]
 
 It defines a comparison over the version's purposeful society as it stands, with the routine and
 waiting as its two anchors, one arm per ``--model`` and, with ``--control``, the first model run a
@@ -15,6 +15,10 @@ world owner's choice ``--group-choice`` named, or the people ``--group`` names; 
 keeps what the owner's latest choice for them names, a model or their routine, in every arm. A
 comparison this command defines runs on development seeds and is never judged: a judged comparison
 is pre-registered, and its record is written by the measurement that registered it.
+
+With ``--window day`` every run plays the society's whole day hour by hour, for a society whose
+engine keeps a day, and a run the command stopped part way goes on from the last hour it sealed
+when the command is run again with the same ``--comparison``, asking only what it did not record.
 
 The first ``--seed-count`` development seeds, in the seed catalog's order, are run: the catalog
 commits their text. ``--seeds`` may name a file of seeds instead, one per line, of which a seed is
@@ -30,6 +34,7 @@ run is within it, and a run the bound stops is recorded as failed by name. The d
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import json
 import os
 import sys
@@ -44,12 +49,14 @@ from exulanica.api.society_comparison_runner import ComparisonArm
 from exulanica.api.society_comparison_start import (
     PHASE,
     ComparisonSelection,
+    StartRefused,
     comparison_body,
     definition_body,
+    window_catalogs,
 )
 from exulanica.api.society_comparison_start import development_seeds as committed_seeds
 from exulanica.models.usage import usd_string
-from exulanica.world.society_catalogs import load_comparison_catalogs
+from exulanica.world.society_catalogs import COMPARISON_WINDOWS, load_comparison_catalogs
 from exulanica.world.society_comparison_repository import seed_digest
 from exulanica.world.society_comparison_result import comparison_result
 
@@ -136,6 +143,7 @@ def parser() -> argparse.ArgumentParser:
     held.add_argument("--seeds", type=Path, default=None)
     held.add_argument("--seed-count", type=int, default=1)
     held.add_argument("--comparison", type=uuid.UUID, default=None)
+    held.add_argument("--window", choices=COMPARISON_WINDOWS, default="hour")
     return held
 
 
@@ -173,6 +181,19 @@ def main(argv: Sequence[str] | None = None) -> int:
     runner = services.comparison_runner(arguments.workspace, arguments.world, arguments.actor)
     if runner is None:
         raise SystemExit("this environment configures no society runtime")
+    with services.database.session(arguments.workspace) as connection:
+        society = runner._repository(connection).society._row(arguments.version)
+    if society is None:
+        raise SystemExit("the version holds no society")
+    try:
+        runner = dataclasses.replace(
+            runner,
+            catalogs=window_catalogs(
+                services.comparison_catalogs, arguments.window, str(society["engine_version"])
+            ),
+        )
+    except StartRefused as exc:
+        raise SystemExit(str(exc)) from exc
     seeds = development_seeds(arguments.seeds, arguments.seed_count)
     comparison_id = arguments.comparison or uuid.uuid4()
     runner.define(

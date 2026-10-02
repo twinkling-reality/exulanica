@@ -2782,7 +2782,7 @@
      "society"
     ],
     "summary": "Plan Society Comparison",
-    "description": "What a start would do, writing nothing: the roles, groups, models and development seeds\nthis server offers a comparison of the version's society, and, for the selection the query\nnames (``model`` as ``<provider>/<model id>``, once or twice; ``person`` for a named group;\n``input_seq`` for an earlier stored input to freeze; ``bound_usd`` for the bound a start\nwould state), the runs it plans, the input it freezes, the most it can cost and what one like\nit typically cost, or the refusal a start of it would meet, by the same predicates a start's\nallowance and grant checks read (``Services.allowance_refusal``,\n``Services.bound_room_refusal``). Without a bound, the grant is judged on the calls the\nselection can make alone.",
+    "description": "What a start would do, writing nothing: the roles, groups, models and development seeds\nthis server offers a comparison of the version's society, the windows it may run over (an\nhour, or a day where the society's engine keeps one and a reading line was measured for its\nday), and, for the selection the query names (``model`` as ``<provider>/<model id>``, once or\ntwice; ``person`` for a named group; ``input_seq`` for an earlier stored input to freeze;\n``bound_usd`` for the bound a start would state; ``window`` for the window, an hour unless\nnamed), the runs it plans, the input it freezes, the most it can cost and what one like it\ntypically cost, with the most one decided person's run can ask and call, each model's\nreservation for one ask and the most its asking can take, or the refusal a start of it would\nmeet, by the same predicates a start's allowance and grant checks read\n(``Services.allowance_refusal``, ``Services.bound_room_refusal``). Without a bound, the grant\nis judged on the calls the selection can make alone.",
     "operationId": "plan_society_comparison_world_versions__version_id__society_comparisons_plan_get",
     "parameters": [
      {
@@ -2948,6 +2948,20 @@
       }
      },
      {
+      "name": "window",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "enum": [
+        "hour",
+        "day"
+       ],
+       "type": "string",
+       "default": "hour",
+       "title": "Window"
+      }
+     },
+     {
       "name": "authorization",
       "in": "header",
       "required": false,
@@ -3074,7 +3088,116 @@
      "society"
     ],
     "summary": "Society Comparison Run",
+    "description": "One run as the page draws it. A day's run is read one hour at a time (``hour``, its first\nwhere none is named): the hour replayed from the state the hour before it sealed, its genesis\nfor the first, from the receipts the hour recorded, held to the hour's record, and drawn as an\nhour's run is, with where the hour lies in the day. An hour the window does not hold is\nrefused (``hour_not_in_window``), and one the run has not sealed is ``run_not_completed``.",
     "operationId": "society_comparison_run_world_versions__version_id__society_comparisons__comparison_id__runs__run_id__get",
+    "parameters": [
+     {
+      "name": "version_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Version Id"
+      }
+     },
+     {
+      "name": "comparison_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Comparison Id"
+      }
+     },
+     {
+      "name": "run_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Run Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "hour",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "integer",
+         "minimum": 0
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Hour"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Society Comparison Run World Versions  Version Id  Society Comparisons  Comparison Id  Runs  Run Id  Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/world/versions/{version_id}/society/comparisons/{comparison_id}/runs/{run_id}/day": {
+   "get": {
+    "tags": [
+     "society"
+    ],
+    "summary": "Society Comparison Run Day",
+    "description": "A day's run over every hour it sealed, from its sealed hours alone, with no replay: each\nhour's terms for the group and what its asking took, and every person's minutes, coded as the\nrun's drawing classifies a minute, with the activities and places the codes name, so two runs'\ndays can be set side by side minute by minute without drawing every hour. Answered for a run\nstill playing or one that failed too, over the hours it sealed; the inputs' rights are asked\nbefore anything drawn from them is answered. A comparison whose window is an hour is\n``comparison_not_a_day``.",
+    "operationId": "society_comparison_run_day_world_versions__version_id__society_comparisons__comparison_id__runs__run_id__day_get",
     "parameters": [
      {
       "name": "version_id",
@@ -3140,7 +3263,7 @@
       "content": {
        "application/json": {
         "schema": {
-         "title": "Response Society Comparison Run World Versions  Version Id  Society Comparisons  Comparison Id  Runs  Run Id  Get"
+         "title": "Response Society Comparison Run Day World Versions  Version Id  Society Comparisons  Comparison Id  Runs  Run Id  Day Get"
         }
        }
       }
@@ -20985,6 +21108,15 @@
        }
       ],
       "title": "Input Seq"
+     },
+     "window": {
+      "type": "string",
+      "enum": [
+       "hour",
+       "day"
+      ],
+      "title": "Window",
+      "default": "hour"
      }
     },
     "additionalProperties": false,

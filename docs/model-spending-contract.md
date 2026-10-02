@@ -42,7 +42,8 @@ admission:
 - **Bound.** A piece of work (a comparison, a run) opens a bound under the workspace's grant,
   idempotently by its key, and may close it; it cannot open a grant. A comparison started from the
   application opens one for each provider it asks, keyed `comparison:<comparison id>:<provider>`,
-  with the bound its owner stated and the most calls it can make, valid while the grant is, and
+  with the bound its owner stated and the most calls it can make over the window its runs play,
+  which its plan states for each provider (`providers`), valid while the grant is, and
   admits every ask under its provider's bound; it closes them when it is finished and when it is
   cancelled (`exulanica/api/comparison_spending.py`,
   [comparisons](society-experiments.md#running-a-comparison)). A start whose bound or calls the

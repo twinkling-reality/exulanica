@@ -324,6 +324,12 @@ class SocietyComparisonWorker:
             )
             return money and calls
 
+        def fence(connection: psycopg.Connection) -> None:
+            """Every write of a day's run is made while this host holds the start: one another
+            claim took over writes nothing more."""
+            if not SocietyComparisonStarts(connection, claim.workspace_id, claim.kind).holds(claim):
+                raise ClaimLost
+
         host = RunHost(
             minute=minute,
             stopping=stop.is_set,
@@ -331,6 +337,7 @@ class SocietyComparisonWorker:
             admit=admit,
             cancelled=lambda: self._cancelled(claim),
             started=lambda run_id: self._started(claim, run_id),
+            fence=fence,
         )
         order = [run["run_id"] for run in open_runs]
         try:

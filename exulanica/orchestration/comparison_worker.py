@@ -10,7 +10,9 @@ the API, which then serves starts without playing them, so one host plays each s
 does nothing else, so its asks keep none of its model budget back for other work, as the local
 compare command keeps none; each comparison still plays under the bound its owner stated. The
 model's key is read from the environment by the application's own client, and the database is the
-one ``EXULANICA_DATABASE_URL`` names.
+one ``EXULANICA_DATABASE_URL`` names. It plays nothing on a database whose recorded migrations
+differ from this package's, or through a connection for which row-level security is no boundary,
+checked before anything is claimed as the API and the derivative workers check at their start.
 """
 
 from __future__ import annotations
@@ -20,6 +22,8 @@ import threading
 from collections.abc import Sequence
 
 from exulanica.api.services import build_services
+from exulanica.db.migrate import verify_schema
+from exulanica.db.roles import assert_runtime_role
 
 __all__ = ["main"]
 
@@ -27,6 +31,9 @@ __all__ = ["main"]
 def main(argv: Sequence[str] | None = None) -> int:
     del argv
     services = build_services(spending_label="comparison-worker")
+    verify_schema(services.database)
+    with services.database.unscoped() as connection:
+        assert_runtime_role(connection)
     worker = services.build_comparison_worker(keeps_share=False)
     if worker is None:
         raise SystemExit(

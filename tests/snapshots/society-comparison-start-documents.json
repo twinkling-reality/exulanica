@@ -50,6 +50,9 @@
             "kind": "everyone"
           }
         },
+        "hours": 1,
+        "hours_expected": null,
+        "hours_sealed": null,
         "phase": "development",
         "runs": 3,
         "runs_completed": 3,
@@ -67,7 +70,8 @@
           "spent_usd": "0.01246000",
           "started_at": "2026-09-30T02:21:17.071644+00:00",
           "state": "finished"
-        }
+        },
+        "window_ticks": 60
       }
     ],
     "profile": "exulanica.society-comparisons/v2"
@@ -167,7 +171,31 @@
     "running": null,
     "seeds_available": 2,
     "typical_record": "docs/evaluation/2026-09-26-society-group-comparison.json",
-    "window_ticks": 60
+    "window": "hour",
+    "window_ticks": 60,
+    "windows": [
+      {
+        "decided_most": 8,
+        "hours": 1,
+        "population_most": 111,
+        "reading_record": null,
+        "refusal": null,
+        "window": "hour",
+        "window_ticks": 60
+      },
+      {
+        "decided_most": null,
+        "hours": null,
+        "population_most": null,
+        "reading_record": null,
+        "refusal": {
+          "code": "window_not_offered",
+          "detail": "no comparison over a day of a purposeful society"
+        },
+        "window": "day",
+        "window_ticks": null
+      }
+    ]
   },
   "planned": {
     "decided_most": 8,
@@ -215,17 +243,31 @@
         {
           "answers_per_minute": 136,
           "arm": "model_a",
+          "ask_bound_usd": "0.00571480",
           "decided": 8,
           "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+          "most_usd_per_run": "2.74310400",
           "name": "Qwen3 235B Instruct"
         }
       ],
       "most_usd": "2.74310400",
+      "per_person": {
+        "asks_most": 60,
+        "calls_most": 120
+      },
+      "providers": [
+        {
+          "calls_most": 960,
+          "provider": "nebius_token_factory"
+        }
+      ],
       "runs": 3,
+      "seconds_most": 1200,
       "suggested_usd": "0.05691840",
       "typical_matches": true,
       "typical_record": "docs/evaluation/2026-09-26-society-group-comparison.json",
-      "typical_usd": "0.01120000"
+      "typical_usd": "0.01120000",
+      "window_ticks": 60
     },
     "plan_refusal": null,
     "population": 8,
@@ -284,7 +326,31 @@
     "running": null,
     "seeds_available": 2,
     "typical_record": "docs/evaluation/2026-09-26-society-group-comparison.json",
-    "window_ticks": 60
+    "window": "hour",
+    "window_ticks": 60,
+    "windows": [
+      {
+        "decided_most": 8,
+        "hours": 1,
+        "population_most": 111,
+        "reading_record": null,
+        "refusal": null,
+        "window": "hour",
+        "window_ticks": 60
+      },
+      {
+        "decided_most": null,
+        "hours": null,
+        "population_most": null,
+        "reading_record": null,
+        "refusal": {
+          "code": "window_not_offered",
+          "detail": "no comparison over a day of a purposeful society"
+        },
+        "window": "day",
+        "window_ticks": null
+      }
+    ]
   },
   "result": {
     "arms": [
@@ -372,6 +438,7 @@
         "kind": "everyone"
       }
     },
+    "hours": 1,
     "input": {
       "document_sha256": "745c0b0b9a03e2c3525028ffbd4209774a01942658d78c07d5fffc4423f335c4",
       "input_seq": 1
@@ -618,6 +685,7 @@
       "model_a": {
         "cost_known": true,
         "cost_usd_per_hour": "0.0125",
+        "cost_usd_per_run": "0.0132",
         "held_out": {
           "activities_per_person": "3.3750",
           "first_answers_refused": "0.0000",
@@ -673,6 +741,7 @@
       "routine": {
         "cost_known": true,
         "cost_usd_per_hour": null,
+        "cost_usd_per_run": null,
         "held_out": {
           "activities_per_person": "3.8750",
           "first_answers_refused": null,
@@ -714,6 +783,7 @@
       "wait": {
         "cost_known": true,
         "cost_usd_per_hour": null,
+        "cost_usd_per_run": null,
         "held_out": {
           "activities_per_person": "0.0000",
           "first_answers_refused": null,
@@ -807,6 +877,9 @@
             "kind": "everyone"
           }
         },
+        "hours": 1,
+        "hours_expected": null,
+        "hours_sealed": null,
         "phase": "development",
         "runs": 3,
         "runs_completed": 0,
@@ -824,7 +897,8 @@
           "spent_usd": "0.00000000",
           "started_at": "2026-09-30T02:21:17.071644+00:00",
           "state": "waiting"
-        }
+        },
+        "window_ticks": 60
       }
     ],
     "profile": "exulanica.society-comparisons/v2"

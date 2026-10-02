@@ -211,6 +211,9 @@ INSERT_ONLY_TABLES: Final = (
     # Migration 0121 appends a completed comparison run's verified drawing and refuses every
     # update and delete of it.
     "society_comparison_replay",
+    # Migration 0136 appends each sealed hour of a day's comparison run and refuses every update
+    # and delete of one.
+    "society_comparison_hour",
     # A signal's owner choice, bounded ask, receipt and sealed traffic minute are immutable.
     "world_traffic_signal_choice",
     "world_traffic_signal_decision_request",

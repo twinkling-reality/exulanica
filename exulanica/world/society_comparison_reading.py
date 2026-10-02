@@ -21,9 +21,18 @@ that engine reads its runs. The catalog :data:`READING_CATALOG` states the line 
 family measured apart from the protocol's, bound to the measurement record it was read from by
 path and digest; a family it does not name reads the protocol's own line. Which family a
 comparison's runs are is the family whose score its catalogs hold
-(:data:`~exulanica.world.society_catalogs.COMPARISON_SCORE_BY_FAMILY`), the table a definition
-is held to when it is recorded, or the family its caller names. The pair's budget is the
-protocol's for every family.
+(:data:`~exulanica.world.society_catalogs.COMPARISON_SCORE_BY_FAMILY`, and for a day
+:data:`~exulanica.world.society_catalogs.DAY_SCORE_BY_FAMILY`), the tables a definition is held
+to when it is recorded, or the family its caller names. The pair's budget is the protocol's for
+every family.
+
+**A day, by the hour.** A comparison whose window is longer than an hour is read one hour at a
+time, each hour replayed from the state its previous hour sealed, so a read of it is an hour's;
+but a day's later hours are not its first, and the hour's line was measured on a run's first hour
+alone. So a day is read by a line measured over every hour of a day, which the catalog states for
+a family by the window it was measured over (``window_ticks``, an hour where an entry states
+none). A day of a family the catalog states no such line for is refused by name
+(``window_not_offered``), never read by an hour's line.
 
 So the most people a comparison runs, and the most of them a model may decide for in any one of
 its runs, are derived, never stated (:class:`ReadingBound`). A comparison whose dearest run would
@@ -45,7 +54,11 @@ from functools import cache
 from pathlib import Path
 from typing import Any, Final
 
-from exulanica.world.society_catalogs import COMPARISON_SCORE_BY_FAMILY, ComparisonCatalogs
+from exulanica.world.society_catalogs import (
+    COMPARISON_SCORE_BY_FAMILY,
+    DAY_SCORE_BY_FAMILY,
+    ComparisonCatalogs,
+)
 from exulanica.world.society_comparison_verdict import (
     ComparisonRefused,
     protocol_values,
@@ -57,6 +70,7 @@ __all__ = [
     "PAIR_RUNS",
     "READING_CATALOG",
     "READING_REFUSALS",
+    "WINDOW_NOT_OFFERED",
     "ReadingBound",
     "decided_maximum",
     "decided_people",
@@ -75,6 +89,10 @@ PAIR_RUNS: Final = 2
 _US_PER_MS: Final = 1000
 #: Why a comparison's reading does not fit, by the code it is refused with.
 READING_REFUSALS: Final = ("population_over_comparison_bound", "decided_over_comparison_bound")
+#: Why a comparison over a window is not offered: no line read over that window was measured.
+WINDOW_NOT_OFFERED: Final = "window_not_offered"
+#: The window an entry of the reading catalog was measured over where it states none: an hour.
+_HOUR_TICKS: Final = 60
 #: The four figures a reading line states, by the names the protocol states its own under.
 LINE_KEYS: Final = (
     "replay_fixed_ms",
@@ -134,31 +152,43 @@ class ReadingBound:
 
 
 def family_of(catalogs: ComparisonCatalogs) -> str | None:
-    """The state family whose score ``catalogs`` hold, as the definition table states each
-    family's score, or None for a score no family is defined under now (an earlier comparison's)."""
+    """The state family whose score ``catalogs`` hold, as the definition tables state each
+    family's score over an hour and over a day, or None for a score no family is defined under now
+    (an earlier comparison's)."""
     held = score_version(catalogs)
     return next(
-        (family for family, score in COMPARISON_SCORE_BY_FAMILY.items() if score == held), None
+        (
+            family
+            for table in (COMPARISON_SCORE_BY_FAMILY, DAY_SCORE_BY_FAMILY)
+            for family, score in table.items()
+            if score == held
+        ),
+        None,
     )
 
 
 @cache
-def _catalog_lines(path: Path) -> dict[str, dict[str, Any]]:
-    """Each family's measured line the catalog at ``path`` states, with where it was read from;
-    refused by name where the catalog is not one this code reads."""
+def _catalog_lines(path: Path) -> dict[tuple[str, int], dict[str, Any]]:
+    """Each family's measured line the catalog at ``path`` states, by family and the window it was
+    measured over, with where it was read from; refused by name where the catalog is not one this
+    code reads."""
     document = json.loads(path.read_text(encoding="utf-8"))
     if document.get("catalog_id") != _CATALOG_ID or document.get("catalog_version") != (
         _CATALOG_VERSION
     ):
         raise ComparisonRefused("reading_catalog", "not a comparison reading catalog this reads")
-    lines: dict[str, dict[str, Any]] = {}
+    lines: dict[tuple[str, int], dict[str, Any]] = {}
     for entry in document["entries"]:
         family = entry.get("state_family")
+        window = entry.get("window_ticks", _HOUR_TICKS)
         values = {key: entry.get(key) for key in LINE_KEYS}
         if (
-            entry.get("key") != family
+            entry.get("key") != (family if window == _HOUR_TICKS else f"{family}-{window}")
             or family not in COMPARISON_SCORE_BY_FAMILY
-            or family in lines
+            or type(window) is not int
+            or window < _HOUR_TICKS
+            or window % _HOUR_TICKS
+            or (family, window) in lines
             or entry.get("extraction") != _EXTRACTION
             or not isinstance(entry.get("source"), str)
             or not isinstance(entry.get("source_sha256"), str)
@@ -167,32 +197,44 @@ def _catalog_lines(path: Path) -> dict[str, dict[str, Any]]:
             or values["replay_per_decided_person_us"] < 1
         ):
             raise ComparisonRefused("reading_catalog", f"entry {entry.get('key')!r} is malformed")
-        lines[family] = {
+        lines[(family, window)] = {
             **values,
             "source": entry["source"],
             "source_sha256": entry["source_sha256"],
+            "window_ticks": window,
         }
     return lines
 
 
-def measured_line(family: str | None) -> dict[str, Any] | None:
-    """The line measured for ``family`` apart from the protocol's, with the record it was read
-    from, or None where the reading catalog names none for it (it then reads the protocol's own).
-    The catalog ships with the code: one that is missing is an error, never a quiet fallback."""
+def measured_line(family: str | None, window: int = _HOUR_TICKS) -> dict[str, Any] | None:
+    """The line measured for ``family`` over ``window`` apart from the protocol's, with the record
+    it was read from, or None where the reading catalog names none for it (an hour's comparison
+    then reads the protocol's own). The catalog ships with the code: one that is missing is an
+    error, never a quiet fallback."""
     if family is None:
         return None
-    return _catalog_lines(READING_CATALOG).get(family)
+    return _catalog_lines(READING_CATALOG).get((family, window))
 
 
 def reading_bound(catalogs: ComparisonCatalogs, family: str | None = None) -> ReadingBound | None:
     """The protocol's bound on reading one run of a comparison of ``family`` (left out, the family
     whose score ``catalogs`` hold), or None for a protocol that states no replay line, an earlier
     one stating its population maximum instead. The pair's budget is always the protocol's; the
-    line is the family's measured one where the reading catalog states it, else the protocol's."""
+    line is the family's measured one where the reading catalog states it, else the protocol's.
+    A window longer than an hour is read by its family's line over that window alone, and one the
+    catalog states none for is refused by name (``window_not_offered``)."""
     values = protocol_values(catalogs)
     if "pair_replay_budget_ms" not in values:
         return None
-    measured = measured_line(family_of(catalogs) if family is None else family)
+    window = values["window_ticks"]
+    named = family_of(catalogs) if family is None else family
+    measured = measured_line(named, window)
+    if window > _HOUR_TICKS and measured is None:
+        raise ComparisonRefused(
+            WINDOW_NOT_OFFERED,
+            f"no line has been measured for reading a {named or 'society'}'s runs over "
+            f"{window} minutes",
+        )
     line = values if measured is None else measured
     if line["replay_per_person_us"] < 1 or line["replay_per_decided_person_us"] < 1:
         raise ComparisonRefused(

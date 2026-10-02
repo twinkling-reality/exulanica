@@ -37,22 +37,27 @@ from exulanica.world.society_planner import ordered_events_document
 
 __all__ = [
     "ACTIVITY_CODES",
+    "DAY_PROFILE",
     "DAY_RUN_PROFILE",
     "HOUR_PROFILE",
     "WAITING",
     "WALKING",
     "combined_calls",
+    "day_document",
     "day_outcome",
     "hour_document",
+    "hour_events_sha256",
+    "hour_window",
     "minute_record",
     "state_bytes",
     "state_from_bytes",
     "vocabulary",
 ]
 
-#: A sealed hour of a run, and a run's completed day.
+#: A sealed hour of a run, a run's completed day, and what a read of a run's day serves.
 HOUR_PROFILE: Final = "exulanica.society-comparison-hour/v1"
 DAY_RUN_PROFILE: Final = "exulanica.society-comparison-run/v3"
+DAY_PROFILE: Final = "exulanica.society-comparison-run-day/v1"
 #: How a minute is coded in a person's record of an hour: walking, waiting where they are, or one
 #: of the run's activities by its place in the run's vocabulary (:func:`vocabulary`), as the
 #: run's drawing classifies a minute.
@@ -119,6 +124,12 @@ def minute_record(states: Sequence[Mapping[str, Any]], plan: RunPlan) -> dict[st
         subject: {"doing": "".join(held["doing"]), "heading": held["heading"]}
         for subject, held in sorted(record.items())
     }
+
+
+def hour_events_sha256(played: PlayedRun) -> str:
+    """The digest of an hour's events, in the order its minutes appended them, as its sealed
+    document records it."""
+    return society_state_sha256(ordered_events_document(tuple(played.events)))
 
 
 def state_bytes(state: Mapping[str, Any]) -> bytes:
@@ -193,7 +204,7 @@ def hour_document(
             "clock": {"start": _clock(start.state), "end": _clock(played.states[-1])},
             "start_state_sha256": society_state_sha256(start.state),
             "minutes": {"count": len(played.states), "state_sha256": played.minute_digests},
-            "events_sha256": society_state_sha256(ordered_events_document(tuple(played.events))),
+            "events_sha256": hour_events_sha256(played),
             "receipts": {
                 "count": len(receipts),
                 "first_sequence": start.first_sequence,
@@ -262,4 +273,94 @@ def day_outcome(
         "terms": society_score_v5.day_terms([hour["terms"] for hour in hours]),
         "calls": combined_calls([hour["calls"] for hour in hours]),
         "others_calls": combined_calls([hour["others_calls"] for hour in hours]),
+    }
+
+
+def hour_window(plan: RunPlan, hour: Mapping[str, Any]) -> dict[str, Any]:
+    """Where a sealed hour lies in its run's day, as a read of the hour serves it beside the
+    drawing: its index, how many hours the day holds, its first minute and its clock."""
+    return {
+        "hour": int(hour["hour"]),
+        "hours": plan.ticks // HOUR_TICKS,
+        "first_tick": int(hour["first_tick"]),
+        "clock": dict(hour["clock"]),
+    }
+
+
+def _hour_summary(hour: Mapping[str, Any]) -> dict[str, Any]:
+    terms = hour["terms"]
+    calls = hour["calls"]
+    return {
+        "hour": int(hour["hour"]),
+        "first_tick": int(hour["first_tick"]),
+        "clock": dict(hour["clock"]),
+        "terms": {
+            "urgency": int(terms["urgency"]),
+            "variety": sum(int(count) for count in terms["activities"].values()),
+            "choice_points": int(terms["choice_points"]),
+            "turns": int(terms["turns"]),
+            "classes": dict(terms["classes"]),
+            "person_minutes": dict(terms["person_minutes"]),
+        },
+        "calls": None
+        if calls is None
+        else {
+            "asked": int(calls["asked"]),
+            "cost_usd": calls["cost_usd"],
+            "cost_known": bool(calls["cost_known"]),
+        },
+    }
+
+
+def day_document(
+    plan: RunPlan,
+    hours: Sequence[Mapping[str, Any]],
+    *,
+    arm: str,
+    seed_digest_text: str,
+    status: str | None,
+    deciders: Mapping[str, Mapping[str, Any]],
+    names: Mapping[str, str],
+) -> dict[str, Any]:
+    """A day's run as a read of its day serves it, from its sealed hours alone and with no replay:
+    each sealed hour's group terms and asking, and every person's minutes over the hours sealed,
+    coded as the run's drawing classifies a minute, with the activities and places the codes name.
+    ``deciders`` names who decides for each person, ``names`` what the society calls them, and
+    ``status`` is the run's outcome, None while it has none."""
+    activities, places = vocabulary(plan)
+    minutes: dict[str, dict[str, Any]] = {}
+    for hour in hours:
+        offset = int(hour["first_tick"])
+        for subject, record in hour["people"].items():
+            held = minutes.setdefault(subject, {"doing": [], "heading": []})
+            held["doing"].append(record["doing"])
+            for at, place in record["heading"]:
+                if not held["heading"] or held["heading"][-1][1] != place:
+                    held["heading"].append([offset + int(at), place])
+    return {
+        "profile": DAY_PROFILE,
+        "run_id": str(plan.run_id),
+        "arm": arm,
+        "seed_digest": seed_digest_text,
+        "status": status,
+        "window_ticks": plan.ticks,
+        "hours": plan.ticks // HOUR_TICKS,
+        "hours_sealed": len(hours),
+        "codes": {"walking": WALKING, "waiting": WAITING},
+        "activities": activities,
+        "places": places,
+        "people": [
+            {
+                "id": subject,
+                "name": names[subject],
+                "in_group": plan.group is None or subject in plan.group,
+                "decider": dict(deciders[subject]),
+            }
+            for subject in sorted(names)
+        ],
+        "hour_summaries": [_hour_summary(hour) for hour in hours],
+        "minutes": {
+            subject: {"doing": "".join(held["doing"]), "heading": held["heading"]}
+            for subject, held in sorted(minutes.items())
+        },
     }

@@ -311,6 +311,25 @@ class SocietyComparisonStarts:
             ).rowcount
         return changed == 1
 
+    def holds(self, claim: ComparisonClaim) -> bool:
+        """Whether the host still holds ``claim``, read in the caller's open transaction and kept
+        from changing until it ends: its lease the claim's and not run out, and the start not
+        finished. The start is locked, so no claim takes it over and no cancel closes it before the
+        caller's transaction ends, and a write the host makes in that transaction is one it made
+        while it held the start (a claim skips a locked start). The lock is the row's update lock,
+        never a share a later update of the same transaction would have to raise: two runs a host
+        plays at once each take it in turn, and the transaction that seals an hour also sets the
+        start's claim count back (:meth:`ran`)."""
+        return (
+            self.connection.execute(
+                f"select 1 from {self.table} where workspace_id=%s and world_id=%s "
+                "and comparison_id=%s and lease_token=%s and lease_expires_at>clock_timestamp() "
+                "and finished_at is null for update",
+                (claim.workspace_id, claim.world_id, claim.comparison_id, claim.token),
+            ).fetchone()
+            is not None
+        )
+
     def renew(self, claim: ComparisonClaim) -> bool:
         """Extend the claim's lease by ``LEASE_SECONDS`` from now; False once the host no longer
         holds it, its lease having run out or been taken over."""

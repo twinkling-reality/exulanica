@@ -46,13 +46,14 @@ from exulanica.world.society import (
 )
 from exulanica.world.society_catalogs import (
     COMPARISON_SCORE_BY_FAMILY,
+    DAY_SCORE_BY_FAMILY,
     PERSON_SCORE_CATALOG,
     ComparisonCatalogs,
     load_comparison_catalogs,
 )
 from exulanica.world.society_comparison import RunPlan
 from exulanica.world.society_comparison_drawing import StoredDrawing
-from exulanica.world.society_comparison_reading import reading_refusal
+from exulanica.world.society_comparison_reading import WINDOW_NOT_OFFERED, reading_refusal
 from exulanica.world.society_comparison_result import (
     DEFINITION_PROFILES,
     ComparisonRefused,
@@ -202,6 +203,13 @@ class SocietyComparisonRepository:
             )
             catalogs = replace(
                 catalogs, score=scored.score, versions=scored.versions, sha256=scored.sha256
+            )
+        day_score = DAY_SCORE_BY_FAMILY.get(family)
+        if int(catalogs.versions[PERSON_SCORE_CATALOG]) in DAY_SCORE_BY_FAMILY.values() and (
+            day_score != int(catalogs.versions[PERSON_SCORE_CATALOG])
+        ):
+            raise ComparisonRefused(
+                WINDOW_NOT_OFFERED, f"a {family} society keeps no day to compare over"
             )
         check_definition_body(body, catalogs)
         if not society_engine(row["engine_version"]).comparisons:
@@ -553,6 +561,99 @@ class SocietyComparisonRepository:
             ),
         )
         return sealed
+
+    # -- a day's run, hour by hour ------------------------------------------------------------
+
+    def seal_hour(
+        self,
+        comparison_id: uuid.UUID,
+        run_id: uuid.UUID,
+        document: Mapping[str, Any],
+        end_state: bytes,
+    ) -> None:
+        """Append one sealed hour of a day's run (``exulanica.society-comparison-hour/v1``), with
+        the canonical bytes of the state it ended in. Migration 0136 holds it to its run, its order
+        and the receipts recorded since the hour before it, and computes the state's digest."""
+        receipts = document["receipts"]
+        self.connection.execute(
+            "insert into society_comparison_hour(workspace_id,world_id,comparison_id,run_id,hour,"
+            "decision_seq_end,document,document_sha256,end_state,end_state_sha256) "
+            "values(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+            (
+                self.workspace_id,
+                self.world_id,
+                comparison_id,
+                run_id,
+                document["hour"],
+                int(receipts["first_sequence"]) + int(receipts["count"]),
+                Jsonb(dict(document)),
+                document["document_sha256"],
+                end_state,
+                document["minutes"]["state_sha256"][-1],
+            ),
+        )
+
+    def hours(self, run_id: uuid.UUID) -> list[dict[str, Any]]:
+        """A run's sealed hours in order, each its hour, the decision sequence it ends at and its
+        document; the states they ended in are read one at a time (:meth:`hour_state`)."""
+        return self.connection.execute(
+            "select hour,decision_seq_end,document from society_comparison_hour "
+            "where workspace_id=%s and world_id=%s and run_id=%s order by hour",
+            (self.workspace_id, self.world_id, run_id),
+        ).fetchall()
+
+    def hour_state(self, run_id: uuid.UUID, hour: int) -> tuple[bytes, str] | None:
+        """The canonical bytes of the state a run's sealed ``hour`` ended in, with their digest, or
+        None where it has not sealed that hour."""
+        row = self.connection.execute(
+            "select end_state,end_state_sha256 from society_comparison_hour "
+            "where workspace_id=%s and world_id=%s and run_id=%s and hour=%s",
+            (self.workspace_id, self.world_id, run_id, hour),
+        ).fetchone()
+        return None if row is None else (bytes(row["end_state"]), str(row["end_state_sha256"]))
+
+    def stored_between(
+        self, run_id: uuid.UUID, after: int, through: int | None = None
+    ) -> list[tuple[dict[str, Any], dict[str, Any]]]:
+        """A run's stored requests and receipts after decision sequence ``after``, through
+        ``through`` where it is named, in decision order."""
+        rows = self.connection.execute(
+            "select request,receipt from society_comparison_decision where workspace_id=%s "
+            "and world_id=%s and run_id=%s and decision_seq>%s "
+            "and (%s::bigint is null or decision_seq<=%s) order by decision_seq",
+            (self.workspace_id, self.world_id, run_id, after, through, through),
+        ).fetchall()
+        return [(row["request"], row["receipt"]) for row in rows]
+
+    def receipt_digests(self, run_id: uuid.UUID) -> list[str]:
+        """Every receipt a run recorded, by digest, in decision order."""
+        rows = self.connection.execute(
+            "select receipt_sha256 from society_comparison_decision where workspace_id=%s "
+            "and world_id=%s and run_id=%s order by decision_seq",
+            (self.workspace_id, self.world_id, run_id),
+        ).fetchall()
+        return [str(row["receipt_sha256"]) for row in rows]
+
+    def comparison_hours_sealed(self, comparison_ids: Sequence[uuid.UUID]) -> dict[uuid.UUID, int]:
+        """How many hours the runs of each of ``comparison_ids`` sealed together, by comparison
+        id: a comparison none of whose runs sealed an hour is absent."""
+        rows = self.connection.execute(
+            "select comparison_id,count(*) as hours from society_comparison_hour "
+            "where workspace_id=%s and world_id=%s and comparison_id=any(%s) "
+            "group by comparison_id",
+            (self.workspace_id, self.world_id, list(comparison_ids)),
+        ).fetchall()
+        return {row["comparison_id"]: int(row["hours"]) for row in rows}
+
+    def hours_sealed(self, comparison_ids: Sequence[uuid.UUID]) -> dict[uuid.UUID, int]:
+        """How many hours each run of ``comparison_ids`` sealed, by run id: a run that sealed none
+        is absent."""
+        rows = self.connection.execute(
+            "select run_id,count(*) as hours from society_comparison_hour where workspace_id=%s "
+            "and world_id=%s and comparison_id=any(%s) group by run_id",
+            (self.workspace_id, self.world_id, list(comparison_ids)),
+        ).fetchall()
+        return {row["run_id"]: int(row["hours"]) for row in rows}
 
     # -- a completed run's stored drawing ------------------------------------------------------
 

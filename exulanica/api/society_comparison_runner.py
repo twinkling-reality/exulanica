@@ -66,14 +66,27 @@ from exulanica.models.spending import SPENDING_REFUSALS, SpendingRefused
 from exulanica.models.usage import usd_string
 from exulanica.selection.validation import Session
 from exulanica.world.decision_roles import DecisionRole, RoleOption, decision_roles
+from exulanica.world.role_decisions import stored_through
 from exulanica.world.society import UnavailableSocietyInput
 from exulanica.world.society_catalogs import ComparisonCatalogs, load_comparison_catalogs
 from exulanica.world.society_comparison import (
+    HOUR_TICKS,
+    HourStart,
     PlayedRun,
     ReplayMismatch,
     RunPlan,
+    first_hour,
+    hours_of,
     plan_role,
     play,
+    play_hour,
+    resume_hour,
+)
+from exulanica.world.society_comparison_day import (
+    day_outcome,
+    hour_document,
+    state_bytes,
+    state_from_bytes,
 )
 from exulanica.world.society_comparison_drawing import (
     DrawingCorrupt,
@@ -247,6 +260,11 @@ class RunHost:
     #: Called with a run's id as the host starts playing it, so readers tell a run being played
     #: from one waiting for its turn (:mod:`exulanica.world.comparison_facts`).
     started: Callable[[uuid.UUID], None] = field(default=lambda _run: None)
+    #: Called with the connection of every transaction that writes a day's run, its receipts, its
+    #: sealed hours and its outcome, before the write: it raises :class:`ClaimLost` where the host
+    #: no longer holds the start's lease, so a host another claim took over writes nothing more.
+    #: Left out, nothing is fenced, as for the local command, which holds no lease.
+    fence: Callable[[psycopg.Connection], None] = field(default=lambda _connection: None)
 
 
 def call_facts(receipts: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
@@ -712,10 +730,12 @@ class SocietyComparisonRunner:
             definition = repository._definition(comparison_id)["document"]  # type: ignore[index]
             arms = definition["arms"]
             reserved = {run_id: repository._run(run_id) for run_id in run_ids}
-            # A run that holds receipts was stopped part way: it asks nothing more, and is closed
-            # as interrupted when it is played, whatever the bound holds.
+            # A run that holds receipts was stopped part way: an hour's asks nothing more, and is
+            # closed as interrupted when it is played, whatever the bound holds; a day's goes on
+            # from where it stopped once its seed is admitted.
             resumed = {row["run_id"] for row in repository.open_runs(comparison_id) if row["asked"]}
         roles = {run_id: arms[row["arm"]]["role"] for run_id, row in reserved.items()}
+        day = int(definition["window_ticks"]) > HOUR_TICKS
         found: dict[uuid.UUID, dict] = {}
 
         def played(wave: Sequence[uuid.UUID]) -> None:
@@ -747,6 +767,11 @@ class SocietyComparisonRunner:
                 if not closing and (not fresh or host.admit(fresh)):
                     played(anchors[digest])
                     played(models[digest])
+                elif day:
+                    # A day's run a host stopped part way would go on asking where it stopped, so
+                    # a seed that is not admitted closes it too, asking nothing more, its receipts
+                    # and sealed hours kept.
+                    closing.extend(seed)
                 else:
                     played([run_id for run_id in seed if run_id in resumed])
                     closing.extend(fresh)
@@ -769,6 +794,7 @@ class SocietyComparisonRunner:
         process. Its hour is not played again, which would ask the models again for receipts it
         already holds: before anything is asked, it is recorded as failed, ``interrupted``, as
         the host closes what a stopped claim left open, and running it again is a new comparison.
+        A day's run goes on instead from the last hour it sealed (:meth:`_run_day`).
         Under a claiming ``host``, the claim is renewed before the run and after each minute, a
         host that is stopping closes the run as ``interrupted`` at its next minute, a run whose
         society's inputs are no longer available is closed as ``input_unavailable``, and every
@@ -792,6 +818,12 @@ class SocietyComparisonRunner:
             done = repository.outcome(run_id)
             if done is not None:
                 return done
+            # A day's run is played hour by hour, and one a host stopped part way goes on from the
+            # last hour it sealed rather than being closed (:meth:`_run_day`).
+            day = (
+                int(repository._definition(comparison_id)["document"]["window_ticks"])  # type: ignore[index]
+                > HOUR_TICKS
+            )
             if host is not None and host.cancelled():
                 # Cancelled before this run's turn, or while it was stopped part way: it asks
                 # nothing more, and any receipts it holds stay recorded.
@@ -807,7 +839,7 @@ class SocietyComparisonRunner:
                         ),
                     ),
                 )
-            if repository.stored(run_id):
+            if not day and repository.stored(run_id):
                 reserved = repository._run(run_id)
                 definition = repository._definition(comparison_id)["document"]  # type: ignore[index]
                 return recorded(
@@ -856,6 +888,8 @@ class SocietyComparisonRunner:
                         ),
                     )
         digest = seed_digest(plan.seed)
+        if day:
+            return self._run_day(comparison_id, run_id, plan, definition, arm, digest, host)
 
         asking: _Asking | _Anchor | None = None
         stored: list[int] = []
@@ -909,6 +943,179 @@ class SocietyComparisonRunner:
                 connection, self._repository(connection).finish(comparison_id, run_id, outcome)
             )
 
+    def _run_day(
+        self,
+        comparison_id: uuid.UUID,
+        run_id: uuid.UUID,
+        plan: RunPlan,
+        definition: Mapping[str, Any],
+        arm: str,
+        digest: str,
+        host: RunHost | None,
+    ) -> dict[str, Any]:
+        """Play a day's run hour by hour from where it stands, and record its one outcome.
+
+        A run starts at its genesis, or goes on from the state the last hour it sealed ended in:
+        every minute it recorded after that hour is answered from what it recorded, as a replay
+        answers, and only the minutes after them are asked
+        (:func:`~exulanica.world.society_comparison.resume_hour`), so nothing a host recorded is
+        asked again, and nothing is asked until the minutes it recorded are rebuilt to the receipts
+        it stored. A minute's receipts are recorded together, in one transaction, so the minutes it
+        recorded are whole. Each hour is sealed as it ends (:meth:`_seal_hour`). The run fails by
+        name where the host ends its asking, as an hour's run does; where the receipts it holds are
+        not the ones its hour rebuilds, it cannot go on under them and fails ``interrupted``. A host
+        that is stopping leaves it open for the next claim (:class:`HostStopping`), and one whose
+        lease another claim took writes nothing more (:class:`ClaimLost`, by the host's fence).
+        """
+        fence = (lambda _connection: None) if host is None else host.fence
+        with self.database.session(self.workspace_id) as connection:
+            repository = self._repository(connection)
+            sealed = repository.hours(run_id)
+            if sealed:
+                last = int(sealed[-1]["hour"])
+                held = repository.hour_state(run_id, last)
+                assert held is not None, "a sealed hour holds the state it ended in"
+                start = HourStart(
+                    last + 1, state_from_bytes(*held), int(sealed[-1]["decision_seq_end"])
+                )
+            else:
+                start = first_hour(plan)
+            pending = repository.stored_between(run_id, start.first_sequence)
+        catalogs = self._catalogs_for(definition)
+        asking: _Asking | _Anchor | None = None
+        replayed_through = stored_through(pending)
+        held = [dict(receipt) for _request, receipt in pending]
+        rebuilt: list[dict] = []
+
+        def store(tick: int, requests: Sequence[dict], receipts: Sequence[dict]) -> None:
+            if replayed_through is not None and tick - 1 <= replayed_through:
+                # A minute answered from what the run recorded is recorded already, and the minutes
+                # are held to it before the first minute after them is asked.
+                rebuilt.extend(receipts)
+                if tick - 1 == replayed_through and rebuilt != held:
+                    raise ReplayMismatch("a stored receipt is not the one its request rebuilds")
+            elif receipts:
+                with (
+                    self.database.session(self.workspace_id) as connection,
+                    connection.transaction(),
+                ):
+                    fence(connection)
+                    self._repository(connection).append(comparison_id, run_id, requests, receipts)
+            stopped = next(
+                (r["reason"] for r in receipts if r["reason"] in RUN_FAILURE_CODES), None
+            )
+            if stopped == "process_budget_spent" and asking is not None and asking.bound_refused():
+                stopped = BOUND_SPENT
+            elif (
+                stopped in SPENDING_REFUSALS
+                and asking is not None
+                and asking.durable_bound_refused() is not None
+            ):
+                stopped = stopped_by_bound(stopped, None if host is None else host.cancelled)
+            if stopped is not None:
+                raise _RunStopped(stopped)
+            if host is not None:
+                host.minute()
+                if host.stopping():
+                    raise HostStopping
+
+        if host is not None:
+            host.started(run_id)
+        try:
+            asking = self._asking(
+                plan,
+                _recorded_answering(definition, arm),
+                cancelled=host.cancelled if host is not None else None,
+            )
+            for hour in range(start.hour, hours_of(plan)):
+                if pending:
+                    played = resume_hour(plan, pending, asking, start=start, on_minute=store)
+                else:
+                    played = play_hour(plan, asking, start=start, on_minute=store)
+                pending, replayed_through = [], None
+                self._seal_hour(
+                    comparison_id,
+                    run_id,
+                    plan,
+                    definition,
+                    arm,
+                    digest,
+                    start,
+                    played,
+                    catalogs,
+                    host,
+                )
+                start = HourStart(
+                    hour + 1, played.states[-1], start.first_sequence + len(played.receipts)
+                )
+        except _RunStopped as stop:
+            outcome = self._failed(definition, arm, digest, stop.code)
+        except ReplayMismatch:
+            outcome = self._failed(definition, arm, digest, INTERRUPTED)
+        except UnavailableSocietyInput:
+            outcome = self._failed(definition, arm, digest, INPUT_UNAVAILABLE)
+        else:
+            with self.database.session(self.workspace_id) as connection:
+                repository = self._repository(connection)
+                hours = [row["document"] for row in repository.hours(run_id)]
+                receipts = repository.receipt_digests(run_id)
+            outcome = day_outcome(definition, arm, digest, hours, receipts)
+        with self.database.session(self.workspace_id) as connection, connection.transaction():
+            fence(connection)
+            finished = self._repository(connection).finish(comparison_id, run_id, outcome)
+            if host is not None:
+                host.recorded(connection)
+            return finished
+
+    def _seal_hour(
+        self,
+        comparison_id: uuid.UUID,
+        run_id: uuid.UUID,
+        plan: RunPlan,
+        definition: Mapping[str, Any],
+        arm: str,
+        digest: str,
+        start: HourStart,
+        played: PlayedRun,
+        catalogs: ComparisonCatalogs,
+        host: RunHost | None,
+    ) -> None:
+        """Seal one hour of a day's run: its document and the state it ended in, in a transaction
+        that also sets back the start's count of claims that finished nothing, since a host that
+        seals an hour made progress. The inputs' rights are asked again first, in a transaction of
+        their own, so a day never goes on for hours over an input that lost them."""
+        with self.database.session(self.workspace_id) as connection, connection.transaction():
+            self._repository(connection).authorize_inputs(plan.inputs)
+        grouped = [
+            receipt
+            for receipt in played.receipts
+            if plan.group is None or receipt["subject_id"] in plan.group
+        ]
+        outside = [
+            receipt
+            for receipt in played.receipts
+            if plan.group is not None and receipt["subject_id"] not in plan.group
+        ]
+        document = hour_document(
+            plan,
+            definition,
+            arm,
+            digest,
+            start,
+            played,
+            catalogs,
+            calls=call_facts(grouped) if plan.decider["kind"] == "model" else None,
+            others_calls=call_facts(outside) if outside else None,
+        )
+        with self.database.session(self.workspace_id) as connection, connection.transaction():
+            if host is not None:
+                host.fence(connection)
+            self._repository(connection).seal_hour(
+                comparison_id, run_id, document, state_bytes(played.states[-1])
+            )
+            if host is not None:
+                host.recorded(connection)
+
     def draw_all(
         self,
         comparison_id: uuid.UUID,
@@ -922,9 +1129,15 @@ class SocietyComparisonRunner:
         and a run left undrawn is read by a replay as before. A run that cannot be drawn is logged
         and the rest are drawn; ``stopping`` ends it between runs."""
         with self.database.session(self.workspace_id) as connection:
+            repository = self._repository(connection)
+            definition = repository._definition(comparison_id)["document"]  # type: ignore[index]
+            if int(definition["window_ticks"]) > HOUR_TICKS:
+                # A day's hours are replayed on each read from the state the hour before sealed:
+                # a day's drawing would be a day of every person's minutes, and none is stored.
+                return 0
             completed = [
                 run["run_id"]
-                for run in self._repository(connection).runs(comparison_id)
+                for run in repository.runs(comparison_id)
                 if run.get("status") == "completed"
             ]
         stored = 0

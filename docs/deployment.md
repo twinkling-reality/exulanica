@@ -382,9 +382,9 @@ containers with credentials that own no table and hold neither SUPERUSER nor BYP
 
 A connection string is not proof of the role behind it. Startup queries `pg_roles` and the current
 schema and refuses to serve or drain when the current role is a superuser, has BYPASSRLS, or owns
-any row-level-security table. The API lifespan and the derivative, scene and material bake
-workers run this check before they accept work; the purge worker checks its own role instead
-(5.1.1). `tests/test_row_level_security.py` exercises both directions against PostgreSQL.
+any row-level-security table. The API lifespan, the derivative, scene and material bake workers
+and the comparison worker's own process (5.2.12) run this check before they accept work; the purge
+worker checks its own role instead (5.1.1). `tests/test_row_level_security.py` exercises both directions against PostgreSQL.
 
 Every table under FORCE row-level security is keyed on `current_workspace()`.
 `tests/test_migration.py` lists those tables from a migrated schema and fails when one is keyed on
@@ -648,7 +648,9 @@ its own role. The [local database](local-database.md) guide owns its steps.
 - `python -m exulanica.orchestration.comparison_worker` plays the comparisons started from the
   application for the workspaces `EXULANICA_SOCIETY_CONTROL_WORKSPACES` lists, from the settings in
   5.1, when the API runs with `EXULANICA_COMPARISON_WORKER=process`; each plays within the bound its
-  owner stated ([running a comparison](society-experiments.md#running-a-comparison)).
+  owner stated ([running a comparison](society-experiments.md#running-a-comparison)). Before it
+  claims any, it checks the database's recorded migrations against its own and its role as the API
+  does (5.1.3).
 - `exulanica-playback-worker` plays the societies of the workspaces 5.1.5's settings name and seals
   their coupled traffic, from the settings in 5.1, when the API runs with
   `EXULANICA_PLAYBACK_WORKER=process` (5.1.5). It checks the schema, the runtime role and the

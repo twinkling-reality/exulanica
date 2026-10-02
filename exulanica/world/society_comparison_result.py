@@ -849,6 +849,9 @@ def comparison_result(
             "cost_usd_per_hour": None
             if arms[arm]["decider"]["kind"] != "model"
             else _hourly_cost(calls, definition),
+            "cost_usd_per_run": None
+            if arms[arm]["decider"]["kind"] != "model"
+            else _run_cost(calls),
             "cost_known": all(found["cost_known"] for found in calls),
             "others_cost_usd_per_hour": _hourly_cost(others_of[arm], definition),
             "others_cost_known": all(found["cost_known"] for found in others_of[arm]),
@@ -871,6 +874,7 @@ def comparison_result(
         "score_version": reading.version,
         "start": None if start is None else dict(start),
         "window_ticks": definition["window_ticks"],
+        "hours": max(1, int(definition["window_ticks"]) // MINUTES_PER_HOUR),
         "population": definition["population"],
         # The society's input the comparison froze: every run starts at the society's genesis and
         # consumes the inputs up to this one. Migration 0113 holds every stored definition to one.
@@ -946,6 +950,16 @@ def _hourly_cost(calls: Sequence[Mapping[str, Any]], definition: Mapping[str, An
     return decimal_text(spent / len(calls) * MINUTES_PER_HOUR / definition["window_ticks"])
 
 
+def _run_cost(calls: Sequence[Mapping[str, Any]]) -> str | None:
+    """What the asking of an arm's completed runs cost for the whole window, on average; None where
+    none of them asked anybody."""
+    if not calls:
+        return None
+    return decimal_text(
+        sum((Fraction(Decimal(c["cost_usd"])) for c in calls), Fraction(0)) / len(calls)
+    )
+
+
 def _first_refused(calls: Sequence[Mapping[str, Any]]) -> str | None:
     asked = sum(c["asked"] for c in calls)
     if asked == 0:
@@ -959,10 +973,13 @@ def listing_document(
     *,
     model_name: Callable[[str], str],
     starts: Mapping[uuid.UUID, Mapping[str, Any]],
+    hours_sealed: Mapping[uuid.UUID, int] | None = None,
 ) -> dict[str, Any]:
-    """A version's comparisons, newest first, each with its arms, who it scores, how far its runs
-    got and, for one started from the application, its start (``starts``, by comparison id: its
-    bound, what it spent and where it stands); ``model_name`` names each model a decider asks."""
+    """A version's comparisons, newest first, each with its arms, who it scores, the window its
+    runs play, how far its runs got (for a day's, how many of their hours they sealed, from
+    ``hours_sealed``, the hours each comparison's runs sealed together) and, for one started from
+    the application, its start (``starts``, by comparison id: its bound, what it spent and where
+    it stands); ``model_name`` names each model a decider asks."""
     comparisons = []
     for row in rows:
         definition = row["document"]
@@ -982,10 +999,20 @@ def listing_document(
                 "group": {"source": group["source"], "size": group["size"]},
                 "arms": [_arm_document(arm, arms[arm], model_name) for arm in _arm_order(arms)],
                 "seeds": len(definition["seeds"]),
+                "window_ticks": int(definition["window_ticks"]),
+                "hours": max(1, int(definition["window_ticks"]) // MINUTES_PER_HOUR),
                 "runs": runs,
                 "runs_completed": completed,
                 "runs_finished": finished,
                 "runs_expected": len(definition["seeds"]) * len(arms),
+                "hours_sealed": None
+                if int(definition["window_ticks"]) <= MINUTES_PER_HOUR
+                else (hours_sealed or {}).get(row["comparison_id"], 0),
+                "hours_expected": None
+                if int(definition["window_ticks"]) <= MINUTES_PER_HOUR
+                else len(definition["seeds"])
+                * len(arms)
+                * (int(definition["window_ticks"]) // MINUTES_PER_HOUR),
                 "start": None
                 if (start := starts.get(row["comparison_id"])) is None
                 else dict(start),

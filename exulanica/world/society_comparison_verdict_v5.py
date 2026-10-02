@@ -16,7 +16,6 @@ from typing import Any
 from exulanica.world import society_score_v4, society_score_v5
 from exulanica.world.society_catalogs import PERSON_SCORE_CATALOG, ComparisonCatalogs
 from exulanica.world.society_comparison_verdict import ComparisonRefused, Reading
-from exulanica.world.society_comparison_verdict import protocol_value as _protocol_value
 from exulanica.world.society_comparison_verdict_v4 import (
     read_comparison as read_fourth_comparison,
 )
@@ -31,14 +30,15 @@ def read_comparison(
     *,
     binding_held: bool,
 ) -> Reading:
-    """Hold each completed run's terms to the protocol's day, then read them as the fourth
-    score's: the fifth score is the fourth's over a day, assembled from its hours."""
+    """Hold each completed run's terms to its definition's day, the window the definition was held
+    to its protocol's by when it was recorded, then read them as the fourth score's: the fifth
+    score is the fourth's over a day, assembled from its hours."""
     if int(catalogs.versions[PERSON_SCORE_CATALOG]) != society_score_v5.CATALOG_VERSION:
         raise ComparisonRefused(
             "score_version_unknown", "a day's verdict reads fifth-score catalogs"
         )
     society_score_v5.score(catalogs.score)
-    window = _protocol_value(catalogs, "window_ticks")
+    window = int(definition["window_ticks"])
     for run in runs:
         if run.get("status") != "completed":
             continue
@@ -46,7 +46,7 @@ def read_comparison(
         society_score_v5.validate_terms(terms)
         if int(terms["ticks"]) != window or society_score_v5.KINDS in terms:
             raise ComparisonRefused(
-                "day_terms_not_the_window", "a day's run is scored over the protocol's whole day"
+                "day_terms_not_the_window", "a day's run is scored over its definition's whole day"
             )
     fourth = replace(
         catalogs,

@@ -32,6 +32,7 @@ the most it can cost, and a host's comparison worker plays it under that bound
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import uuid
 from collections.abc import Mapping, Sequence
@@ -43,12 +44,18 @@ from typing import Any, Final
 
 from exulanica.api.decision_host import ask_bound_usd
 from exulanica.api.society_comparison_runner import ComparisonArm, SocietyComparisonRunner
+from exulanica.grammar.errors import CatalogError
 from exulanica.models.budget import BudgetGuard
 from exulanica.models.manifest import Manifest
 from exulanica.models.spending import SpendingRefused
 from exulanica.models.usage import USD_QUANTUM
 from exulanica.world.decision_roles import DecisionContract, DecisionRole
-from exulanica.world.society_catalogs import ComparisonCatalogs
+from exulanica.world.society_catalogs import (
+    COMPARISON_WINDOWS,
+    ComparisonCatalogs,
+    comparison_catalogs_for_engine,
+    load_comparison_catalogs,
+)
 from exulanica.world.society_comparison_repository import seed_digest
 from exulanica.world.society_comparison_result import (
     GROUP_SOURCES,
@@ -86,6 +93,7 @@ __all__ = [
     "typical_figures",
     "typical_latency_ms",
     "typical_per_person_hour",
+    "window_catalogs",
 ]
 
 #: The phase a comparison defined here runs on: development seeds, looked at freely and never
@@ -164,6 +172,9 @@ START_REFUSALS: Final = {
     "seeds_out_of_range": 422,
     # The input it freezes: a sequence the society holds no input at.
     "input_not_in_society": 422,
+    # The window: a day of a society whose engine keeps no day, or one no reading line has been
+    # measured for (exulanica/world/society_comparison_reading.py).
+    "window_not_offered": 409,
     # The bound: above the most the comparison can cost, or more than this server's model budget
     # has left beside the part its decision contract keeps for other work, or, where a durable
     # spending authority admits this server's calls, more than the live grant of a provider it
@@ -326,6 +337,24 @@ def development_seeds_in(text: str, catalogs: ComparisonCatalogs) -> tuple[str, 
         for entry in catalogs.seeds.values()
         if entry["phase"] == PHASE and str(entry["seed_digest"]) in held
     )
+
+
+def window_catalogs(
+    base: ComparisonCatalogs | None, window: str, engine_profile: str
+) -> ComparisonCatalogs:
+    """The catalogs a comparison over ``window`` of a society on ``engine_profile`` is defined
+    under: an hour's, the server's own (``base``) where it holds any, else the committed ones; or
+    a day's, for a society whose engine keeps a day, with the seeds ``base`` commits. A day of any
+    other society is refused by name (``window_not_offered``)."""
+    if window not in COMPARISON_WINDOWS:
+        raise StartRefused("window_not_offered", f"no comparison over a {window}")
+    if window == "hour":
+        return load_comparison_catalogs() if base is None else base
+    try:
+        day = comparison_catalogs_for_engine(engine_profile, "day")
+    except CatalogError as exc:
+        raise StartRefused("window_not_offered", str(exc)) from exc
+    return day if base is None else dataclasses.replace(day, seeds=base.seeds)
 
 
 def _judged_comparison(record: Mapping[str, Any]) -> tuple[dict[str, Decimal], dict[str, int]]:
@@ -510,6 +539,14 @@ class ComparisonCost:
     typical_matches: bool
     #: The measurement the typical figure was read from.
     typical_record: str
+    #: The window each run plays, in minutes, and what one decided person's run of it can ask at
+    #: most: one ask a minute, each answered as often as the contract allows.
+    window_ticks: int = 0
+    asks_per_person: int = 0
+    calls_per_person: int = 0
+    #: The most the asking of its runs can take, in seconds: every minute of a run that asks
+    #: anybody ends by the contract's deadline, and the protocol's runs at once play together.
+    seconds_most: int = 0
 
     @property
     def suggested_usd(self) -> Decimal | None:
@@ -532,6 +569,12 @@ class ComparisonCost:
             "held_usd": format(self.held_usd, "f"),
             "suggested_usd": None if suggested is None else format(suggested, "f"),
             "typical_matches": self.typical_matches,
+            "window_ticks": self.window_ticks,
+            "per_person": {
+                "asks_most": self.asks_per_person,
+                "calls_most": self.calls_per_person,
+            },
+            "seconds_most": self.seconds_most,
         }
 
 
@@ -660,6 +703,8 @@ def comparison_cost(
         for key, pairs in asked.items()
     }
     held_by_run = sorted((held_by_arm[key] for key, _digest in runs), reverse=True)
+    asking = sum(1 for key, _digest in runs if asked[key])
+    attempts = contract.value("answer_attempts_maximum")
     return ComparisonCost(
         runs=len(runs),
         asks=asks,
@@ -680,6 +725,13 @@ def comparison_cost(
         ),
         typical_matches=matches,
         typical_record=TYPICAL_RECORD if figures is None else figures.record,
+        window_ticks=window,
+        asks_per_person=window,
+        calls_per_person=window * attempts,
+        seconds_most=-(-asking // max(1, at_once))
+        * window
+        * contract.value("decision_deadline_ms")
+        // 1000,
     )
 
 

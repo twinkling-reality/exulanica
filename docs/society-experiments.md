@@ -94,6 +94,21 @@ runner refuses a definition that records another answering than the contract and
 (`answering_not_the_models`), and stops a run before it asks anything when they would now ask one of
 its models otherwise (`provider_configuration_changed`).
 
+Migration 0136 records a run over a day hour by hour. `society_comparison_hour` appends each hour
+of a day's run as it ends, keyed by the run and the hour within its workspace, under forced
+row-level security, and never changed: the hour's document (`exulanica.society-comparison-hour/v1`:
+where the hour lies in the day, its minutes' state digests, its events and receipts digests, the
+fourth score's terms for the hour with the kinds each scored person did in it, what its asking took
+and every person's minutes, coded as the run's drawing classifies a minute) and the state the hour
+ended in, as the canonical bytes its last minute's digest names, which the database holds to that
+digest by its own SHA-256. Its trigger seals an hour only of a run whose definition's window is
+longer than an hour and holds that hour, only while the run has no outcome, in order from the
+first, and each holding exactly the receipts the run recorded since the hour before it. A day's run
+completes with a third-version outcome (`exulanica.society-comparison-run/v3`), which 0136 admits
+only with every hour of the window sealed and the last holding every receipt; an hour's run never
+completes as a day's, nor a day's as an hour's
+([`tests/test_comparison_hour_migration.py`](../tests/test_comparison_hour_migration.py)).
+
 ### Score
 
 A comparison is scored under the score version it was defined under. A living town is defined
@@ -260,15 +275,16 @@ receipts with no billed call.
 
 ### Reads
 
-Four routes read what a comparison recorded or what a start of one would be; none asks a model or
+Five routes read what a comparison recorded or what a start of one would be; none asks a model or
 writes anything.
 
 | Method and path | Permission | Result |
 | --- | --- | --- |
-| `GET /world/versions/{version_id}/society/comparisons` | `world.read` | The version's comparisons, newest first, with their arms, the group they decide for, how far their runs got and, for one started from the application, its start: the bound, what its asks spent, what hosts that stopped are presumed to have spent unrecorded, and where it stands |
-| `GET /world/versions/{version_id}/society/comparisons/plan` | `world.read` | What this server offers a comparison of the version's society, the roles its engine hosts with their groups and models, the most people a comparison runs and the most of the society's people a model may decide for ([what it can read](#running-a-comparison)), the society's people by id and name, from whom a named group is chosen, and for a selection its runs, the most it can cost, what one like it typically costs and how many of a minute's asks each of its models can have answered, or the refusal a start of it would meet ([running a comparison](#running-a-comparison)) |
+| `GET /world/versions/{version_id}/society/comparisons` | `world.read` | The version's comparisons, newest first, with their arms, the group they decide for, the window their runs play, how far their runs got (over a day, also how many of their hours are sealed of how many, `hours_sealed` and `hours_expected`) and, for one started from the application, its start: the bound, what its asks spent, what hosts that stopped are presumed to have spent unrecorded, and where it stands |
+| `GET /world/versions/{version_id}/society/comparisons/plan` | `world.read` | What this server offers a comparison of the version's society, the roles its engine hosts with their groups and models, the windows it may run over (`windows`, an hour or a day, each with the most people a comparison over it runs and the most of the society's people a model may decide for, or why it is not offered; [what it can read](#running-a-comparison)), the society's people by id and name, from whom a named group is chosen, and for a selection over the window it names (`window`, an hour unless named) its runs, the most it can cost, what one like it typically costs, the most one decided person's run can ask and call, and how many of a minute's asks each of its models can have answered, or the refusal a start of it would meet ([running a comparison](#running-a-comparison)) |
 | `GET /world/versions/{version_id}/society/comparisons/{comparison_id}` | `world.read` | Scores per seed and per arm with intervals and, beside each, what its arm's model answered; the group and who decides for everybody else; the registered differences and the server's verdict |
-| `GET /world/versions/{version_id}/society/comparisons/{comparison_id}/runs/{run_id}` | `world.read` | One completed run as the page draws it, naming who decides for each person: the drawing the host stored once it had played the comparison's runs, replaying each from its stored requests and receipts with no model call and held to its recorded minute digests, events and receipts, served while it was drawn by the code reading it and the data that code reads (the digest taken when the server started), and read as the drawing its digest names; otherwise, and for stored bytes that are not that drawing, the run replayed and held to them here, and a replay that differs is refused as `run_replay_mismatch`. Either way its inputs' rights are asked before anything drawn from them is answered |
+| `GET /world/versions/{version_id}/society/comparisons/{comparison_id}/runs/{run_id}` | `world.read` | One completed run as the page draws it, naming who decides for each person: the drawing the host stored once it had played the comparison's runs, replaying each from its stored requests and receipts with no model call and held to its recorded minute digests, events and receipts, served while it was drawn by the code reading it and the data that code reads (the digest taken when the server started), and read as the drawing its digest names; otherwise, and for stored bytes that are not that drawing, the run replayed and held to them here, and a replay that differs is refused as `run_replay_mismatch`. A day's run is read one sealed hour at a time (`hour`, from 0, its first where none is named): the hour replayed from the state the hour before it sealed, its genesis for the first, through the receipts the hour recorded, held to the hour's record and drawn as an hour's run is, with where the hour lies in the day (`window`). An hour the window does not hold is refused (422, `hour_not_in_window`), as is any hour but the first of an hour's run, and one the run has not sealed is `run_not_completed` (409). Either way its inputs' rights are asked before anything drawn from them is answered |
+| `GET /world/versions/{version_id}/society/comparisons/{comparison_id}/runs/{run_id}/day` | `world.read` | A day's run over the hours it sealed, from its sealed hours alone, with no replay: each hour's terms for the group and what its asking took, and every person's minutes, coded as the run's drawing classifies a minute, with the activities and places the codes name, so two runs' days can be set side by side minute by minute. Served for a run still playing or one that failed too, its inputs' rights asked before anything drawn from them is answered; a comparison over an hour is `comparison_not_a_day` (409) |
 
 No response carries a run's seed or a raw state. A comparison or run under another workspace or
 world is an unknown reference, and a run whose inputs lost their rights before or while it was
@@ -358,7 +374,13 @@ the least bound that lets a comparison spending the typical figure finish (`sugg
 whether that figure was measured on this society's kind of ground (`typical_matches`). The page
 says "at least" that bound lets it finish only where it was; elsewhere it says where the figure was
 measured and that a bound that low may stop it. The plan route and the page give all of these, and
-the person states the bound, at most the most; nothing starts until they do.
+the person states the bound, at most the most; nothing starts until they do. For the window it
+names, the plan also states the most one decided person's run can ask, once a minute, and call,
+every answer the contract allows (`per_person`); for each model arm, what one ask of its model holds
+reserved (`ask_bound_usd`) and the most one run of it can reserve (`most_usd_per_run`); the longest
+its asking can take (`seconds_most`: its runs that ask anybody, `runs_at_once` at a time, every
+minute of each ending by the contract's decision deadline); and, for each provider it asks, the
+calls the durable bound a start opens of it holds (`providers`).
 
 **What it can read.** Every read of a run replays it ([reads](#reads)), and the page reads a
 seed's two runs at once, which one process replays one after the other, so how many people a
@@ -412,6 +434,23 @@ so for a living town the ground is the bound that applies. The plan route and a 
 town's society by this line, and every other engine by the protocol's, which stays at its third
 version.
 
+**A day.** A start and a plan name the window every run plays (`window`): `hour`, the default, or
+`day`. A day is a living town's, whose engine keeps the time of day: from its genesis at 06:00 to
+the same minute the next day, 1440 minutes, defined under the fourth protocol, the fifth score and
+the fifth seeds ([claim](#claim)). A purposeful society keeps no time of day and is not compared
+over one. A day is offered only where the reading catalog binds a line measured over the day's
+window, as an entry of its own for the state family and the window (`living-1440`), since a run is
+read by the hour and a town's hours differ through its day; the catalog binds none, so a start of a
+day is refused by name (`window_not_offered`, 409), and the plan states each window with the line
+it is read by or the refusal it meets. A day's run is played hour by hour, each hour sealed as it
+ends ([records](#records)) once its inputs' rights are asked again, so a run whose inputs lost their
+rights fails as `input_unavailable` at the end of the hour it lost them in and seals no later one.
+Each hour is read by a replay from the state the hour before it sealed ([reads](#reads)), never by
+one from the genesis, and no drawing of a day is stored; a read of a run's day sets out every
+person's minutes from its sealed hours with no replay. A day's run asks at most 24 times what an
+hour's can, which the plan states for the window it names (what it can cost, above)
+([`tests/test_comparison_day_postgres.py`](../tests/test_comparison_day_postgres.py)).
+
 **Where it runs.** A host's comparison worker (`exulanica/api/society_comparison_worker.py`) plays
 it off the request path, for the workspaces the host asks models for
 (`EXULANICA_SOCIETY_CONTROL_WORKSPACES`), by the lease the playback worker claims a society by: it
@@ -450,8 +489,10 @@ none does, the seed still needs what its runs can hold reserved at once (`held_u
 logs it. The seed's anchors play once it is admitted. A seed it does not admit closes its model runs and every later
 seed's, asking nothing, as `comparison_bound_before_seed`, and the start closes by that name, so the
 seeds already played are kept and scored ([`tests/test_comparison_seed_admission_postgres.py`](../tests/test_comparison_seed_admission_postgres.py)).
-A run left part way with receipts is closed as `interrupted` whatever the bound holds. The bound
-itself is unchanged: no ask is admitted past it. An attempt
+A run over an hour left part way with receipts is closed as `interrupted` whatever the bound
+holds. A day's run left part way goes on only once its seed is admitted, and is otherwise closed
+with the seed by its name, its receipts and sealed hours kept. The bound itself is unchanged: no ask
+is admitted past it. An attempt
 whose cost is unknown, such as one that timed out, counts at the most it can have cost, so a
 provider slow to answer spends the bound faster than its answers alone would. A comparison writes no
 world decision, so a live world's hourly bounds neither count nor limit it; the comparison and the
@@ -460,8 +501,18 @@ person's ask, that person follows their routine (`process_budget_spent` or `proc
 the models route) until the process restarts.
 
 **A host that stops.** A host that stops part way leaves its lease to run out and at most
-`runs_at_once` runs with receipts and no outcome. The next claim records each of those as failed,
-`interrupted`, before asking anything, and plays the rest, from the bound less what the comparison's
+`runs_at_once` runs with receipts and no outcome. The next claim records each of those over an hour
+as failed, `interrupted`, before asking anything, and goes on with each over a day from the last
+hour it sealed: every minute the run recorded after that hour is answered from what it recorded, as
+a replay answers, and only the minutes after them are asked. A minute's receipts are recorded
+together, in one transaction, once all of its asks are answered, so a host killed inside a minute,
+between two of its asks or between two of the receipts its transaction inserts, has stored none of
+that minute, and the next claim asks the whole minute again; asks of it that were sent are paid
+twice, which the takeover's presumption below covers. A day's run whose stored receipts are not the
+ones its minutes rebuild fails as `interrupted` before it asks the next minute. Every receipt a
+day's run appends, every hour it seals and its outcome are written in a transaction that first
+locks the claim's live lease token, so a host whose lease another claim took writes nothing more of
+it. The next claim plays the rest, from the bound less what the comparison's
 receipts say it spent and less what claims that took it over presumed. A claim that takes over a
 lease that ran out cannot tell a host killed in the middle of a minute from one that stalled before
 it, so it presumes the most one minute of a run can cost for as many open runs as the stopped host
@@ -493,13 +544,15 @@ recorded and counted.
 **Progress.** The reads serve a cancelled start's cancellation (`cancel`, when it was requested)
 and, for each run with no outcome yet, where it stands (`progress`): `running` while a host plays
 it under the start's live lease, since a host records each run it starts (migration 0130), and
-`queued` otherwise.
+`queued` otherwise, with, for a day's run, how many of its hours it sealed (`hours_sealed`). A
+cancelled day's run keeps the hours it sealed, which stay readable.
 
 **Stored drawings.** A host draws a completed run once, when it records the run's outcome, under
 the digest of the drawing code and the data that code reads (migration 0121). A server whose drawing
 code or data differ finds no drawing under its own digest and replays the run on each read instead,
 held to the run's record. Nothing draws stored runs again, so every run drawn before such a change
-is served by replay; the rows drawn under the earlier digest are kept.
+is served by replay; the rows drawn under the earlier digest are kept. A day's run is not drawn:
+each of its hours is replayed on its read from the state the hour before it sealed.
 
 **An earlier input.** A start may name `input_seq`, an earlier stored input of the society, to
 freeze instead of its newest; the plan takes the same parameter and states the input a start of
@@ -520,11 +573,12 @@ EXULANICA_BUDGET_USD=<bound> python -m exulanica.orchestration.compare --workspa
   --world <world id> --version <uuid> --actor <uuid> --model <provider>/<model id> \
   [--model <provider>/<model id>] [--control] \
   [--group-choice <n> | --group <person id> [--group <person id> ...]] \
-  [--seeds <file>] [--seed-count <n>] [--comparison <uuid>]
+  [--seeds <file>] [--seed-count <n>] [--comparison <uuid>] [--window hour|day]
 ```
 
 It takes one or two models. `--comparison` names the comparison's id, a fresh one when it is left
-out. It defines a development comparison over the version's society as it stands, its group
+out, and `--window` the window its runs play, an hour unless named. It defines a development
+comparison over the version's society as it stands, its group
 everybody, the people the owner's choice `--group-choice` named, or the people `--group` names, and
 everybody else keeping what the owner's latest choice for them names; reserves every run; plays them
 `runs_at_once` at a time, the anchors first, with no connection held while a model is asked; and
