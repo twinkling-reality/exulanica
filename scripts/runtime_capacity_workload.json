@@ -92,6 +92,29 @@
         "uploads_every_seconds": 60,
         "photos_per_upload": 3
       }
+    },
+    "sharing_process": {
+      "kind": "sharing",
+      "seconds": 180,
+      "drain_seconds": 120,
+      "warmup_seconds": 20,
+      "towns": 8,
+      "recipe": "small_town",
+      "profile": "exulanica-society/v5",
+      "speed": 4,
+      "base_tick_interval_ms": 8000,
+      "traffic_every_seconds": 5,
+      "photo": {
+        "width": 2000,
+        "height": 1500
+      },
+      "per_workspace": {
+        "held_streams": 6,
+        "reads_per_second": 3,
+        "uploads_every_seconds": 60,
+        "photos_per_upload": 3
+      },
+      "playback": "process"
     }
   },
   "chaos": {

@@ -29,7 +29,10 @@ comparable line by line. Phases:
 
 *   ``knee``: small reads by closed loops at rising concurrency, for latency against concurrency.
 *   ``supported``, ``overload``, ``sharing``: open-loop small reads, held progress streams, uploads
-    whose progress is watched to its end, and (``sharing``) inhabited worlds played by the host.
+    whose progress is watched to its end, and (``sharing``) inhabited worlds played by the host:
+    by the API process, or, where the phase states ``"playback": "process"``, by the playback
+    worker's own process (``exulanica-playback-worker``) beside an API that plays nothing. A
+    sharing phase pauses its towns once it is measured, so a later phase plays only its own.
 *   ``chaos``: a client killed while it holds streams, requests cancelled mid-body, a stalled
     upload body, a held table lock, the derivative worker killed and paused past its lease, and the
     API restarted mid-stream. Each checks that slots come back, that every watched batch reaches one
@@ -203,6 +206,8 @@ class Stack:
     readonly_url: str = ""
     api: subprocess.Popen | None = None
     worker: subprocess.Popen | None = None
+    #: The playback worker's own process, while a sharing phase plays its towns in one.
+    playback: subprocess.Popen | None = None
     extra_workers: list[subprocess.Popen] = field(default_factory=list)
     server: Any = None
     api_environment: dict[str, str] = field(default_factory=dict)
@@ -357,6 +362,32 @@ class Stack:
         else:
             self.extra_workers.append(process)
         return process
+
+    def start_playback(self, **extra: str) -> subprocess.Popen:
+        """The playback worker's own process (``exulanica-playback-worker``), as an installation
+        runs it beside an API set to ``EXULANICA_PLAYBACK_WORKER=process``."""
+        with open(self.run_dir / "playback-worker.log", "ab") as log:
+            self.playback = subprocess.Popen(
+                [str(ROOT / ".venv/bin/python"), "-m", "exulanica.orchestration.playback_worker"],
+                cwd=ROOT,
+                env=self.environment(**extra),
+                stdout=log,
+                stderr=subprocess.STDOUT,
+                start_new_session=True,
+            )
+        self.extra_workers.append(self.playback)
+        return self.playback
+
+    def stop_playback(self, timeout: float = 60.0) -> None:
+        """Stop the playback process as an operator does, letting a round in progress end."""
+        if self.playback is not None and self.playback.poll() is None:
+            self.playback.send_signal(signal.SIGTERM)
+            try:
+                self.playback.wait(timeout)
+            except subprocess.TimeoutExpired:
+                self.playback.kill()
+                self.playback.wait()
+        self.playback = None
 
     def stop_api(self, sig: int = signal.SIGTERM, timeout: float = 30.0) -> float:
         started = time.monotonic()
@@ -550,6 +581,9 @@ class Sampler:
                 api = self.built.api
                 if api is not None and api.poll() is None:
                     sample["api"] = _process(api.pid)
+                playback = self.built.playback
+                if playback is not None and playback.poll() is None:
+                    sample["playback"] = _process(playback.pid)
                 health_started = time.monotonic()
                 with contextlib.suppress(httpx.HTTPError):
                     health = client.get(self.built.base_url + "/healthz")
@@ -648,6 +682,15 @@ def summarise_samples(samples: list[dict[str, Any]], idle: list[float]) -> dict[
             "mean": round(statistics.fmean(idle), 1) if idle else None,
             "minimum": min(idle) if idle else None,
         },
+        **(
+            {
+                "playback_threads_peak": peak(["playback", "threads"]),
+                "playback_rss_kib_peak": peak(["playback", "rss_kib"]),
+                "playback_cpu_percent_peak": peak(["playback", "cpu_percent"]),
+            }
+            if any("playback" in sample for sample in samples)
+            else {}
+        ),
     }
 
 
@@ -1130,6 +1173,26 @@ def play_towns(built: Stack, towns: list[dict[str, Any]], speed: int) -> None:
         client.close()
 
 
+def pause_towns(built: Stack, towns: list[dict[str, Any]]) -> None:
+    """Pause a phase's towns once it is measured, so a later phase plays only its own."""
+    import httpx
+
+    for town in towns:
+        with httpx.Client(
+            base_url=built.base_url,
+            headers={"Authorization": f"Bearer {town['token']}"},
+            timeout=60,
+        ) as client:
+            control = f"/world/versions/{town['version']}/society/control"
+            read = client.get(control, params=town["scope"])
+            read.raise_for_status()
+            client.put(
+                control,
+                params=town["scope"],
+                json={"base_revision": read.json()["revision"], "mode": "paused", "speed": 1},
+            ).raise_for_status()
+
+
 def town_ticks(built: Stack, towns: list[dict[str, Any]]) -> list[int]:
     import httpx
 
@@ -1160,12 +1223,18 @@ async def phase_sharing(built: Stack, spec: dict[str, Any], name: str) -> dict[s
     """The supported load again, beside towns the host plays and pages reading their traffic."""
     towns = await asyncio.to_thread(make_towns, built, spec)
     listed = json.dumps([town["workspace"] for town in towns])
+    playing = {
+        "EXULANICA_SOCIETY_CONTROL_WORKSPACES": listed,
+        "EXULANICA_SOCIETY_TICK_INTERVAL_MS": str(spec.get("base_tick_interval_ms", 8000)),
+    }
+    # ``process``: the API plays nothing and the playback worker's own process plays the towns.
+    in_process = spec.get("playback") == "process"
+    if in_process:
+        playing["EXULANICA_PLAYBACK_WORKER"] = "process"
     await asyncio.to_thread(built.stop_api)
-    await asyncio.to_thread(
-        built.start_api,
-        EXULANICA_SOCIETY_CONTROL_WORKSPACES=listed,
-        EXULANICA_SOCIETY_TICK_INTERVAL_MS=str(spec.get("base_tick_interval_ms", 8000)),
-    )
+    await asyncio.to_thread(built.start_api, **playing)
+    if in_process:
+        await asyncio.to_thread(built.start_playback, **playing)
     await asyncio.to_thread(play_towns, built, towns, spec["speed"])
     await asyncio.sleep(spec.get("warmup_seconds", 20))
     ticks_before = await asyncio.to_thread(town_ticks, built, towns)
@@ -1184,11 +1253,15 @@ async def phase_sharing(built: Stack, spec: dict[str, Any], name: str) -> dict[s
     await traffic_clients.close()
     ticks_after = await asyncio.to_thread(town_ticks, built, towns)
     wall = time.monotonic() - started
+    await asyncio.to_thread(pause_towns, built, towns)
+    if in_process:
+        await asyncio.to_thread(built.stop_playback)
     traffic = [r for r in traffic_observed.reads]
     return {
         **mixed,
         "towns": {
             "count": len(towns),
+            "played_by": "process" if in_process else "api",
             "recipe": spec["recipe"],
             "profile": spec["profile"],
             "speed": spec["speed"],
