@@ -50,9 +50,6 @@ import { buildCredentialGate } from './ui/credential-gate.js';
 import type { AtlasCommand } from './ui/atlas-commands.js';
 import { buildWorldChrome } from './ui/world-chrome.js';
 import { buildWorldMenu } from './ui/world-menu.js';
-import { buildWorldRecipes } from './ui/world-recipes.js';
-import { attachWorldDescription } from './composition/world-description.js';
-import { WorldSpecificationClient } from './world-specification.js';
 import { GENERATED_WORLD_READY_EVENT, type GeneratedWorldReady } from './composition/generated-world-ready.js';
 import { buildWorldIdentity } from './ui/world-identity.js';
 import {
@@ -72,6 +69,7 @@ import {
   worldOpeningReason,
 } from './ui/startup-state.js';
 import { el, replace } from './ui/dom.js';
+import { button, errorState } from './ui/system/components.js';
 import { createLayout, MODAL_BACKGROUND_REGIONS, type Layout } from './ui/system/layout.js';
 import { mountActions, type MountedActions } from './composition/actions.js';
 import { actionState, perform } from './ui/actions/surfaces.js';
@@ -104,7 +102,7 @@ import { createSavedWorldFlight } from './composition/saved-world-flight.js';
 import { lazyPanel } from './composition/lazy-panel.js';
 import { createSegmentSession, mountSegments, segmentsFirst } from './composition/segments.js';
 import { mountWritePath, type MountedWritePath } from './composition/write-path.js';
-import { disposeCompanionStage, mountCompanion } from './composition/companion.js';
+import { disposeCompanionStage, mountCompanion, plannedAnswer } from './composition/companion.js';
 import { disposeFormationWatch, mountFormation } from './composition/formation.js';
 import { disposeRenderer, mountRenderer } from './composition/renderer.js';
 import { disposeMountListeners, mountInputModes } from './composition/input-modes.js';
@@ -321,38 +319,79 @@ shell.addEventListener(GENERATED_WORLD_READY_EVENT, (event) => {
   })();
 });
 
+/** Make a world, as the shell holds it: the stand-in until its code arrives, then the panel. */
+interface MakeWorldSurface {
+  readonly isConnected: boolean;
+  remove(): void;
+}
+
 /**
  * The presets a new world can be generated from, and the values a person may change. A world made
  * from one is opened the way a chosen saved world is: its entry becomes the active one and the
  * world is mounted afresh.
+ *
+ * Its code loads when it is first opened, so the page starts without it. Until it arrives the shell
+ * holds a stand-in where the panel will be, saying "Opening Make a world."; a load that fails says
+ * so with Try again, and a stand-in closed meanwhile is never replaced by the panel.
  */
-function showWorldRecipes(onClose: () => void): HTMLElement | null {
+function showWorldRecipes(onClose: () => void): MakeWorldSurface | null {
   const client = state.worldEntries;
   const credentials = state.credentials;
   if (client === null || credentials === null) return null;
   shell.querySelector('.world-recipes')?.remove();
-  const specification = new WorldSpecificationClient(credentials);
-  const panel = buildWorldRecipes({
-    specification: () => specification.specification(),
-    make: (preset, values) => client.makeGenerated(preset.key, preset.label, values),
-    open: async (entry) => {
-      panel.root.remove();
-      state.savedWorldEntries = await client.entries();
-      await openWorldEntryContext(state, entry);
-      state.worldEntryError = null;
-      shell.removeAttribute('data-world-state');
-      await mount();
-    },
-    onClose,
+  const stand = el('section', {
+    class: 'world-recipes lazy-panel', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Make a world', tabindex: '-1',
   });
-  // A dialog over the world, opened and closed through the shell state like the other major
-  // surfaces, so it cannot stay open under the next one and Escape takes it back.
-  panel.root.setAttribute('aria-modal', 'true');
-  shell.append(panel.root);
-  attachWorldDescription(panel, { credentials, specification: () => specification.specification() });
-  window.setTimeout(() => panel.root.querySelector<HTMLElement>('button, select, input, textarea')
-    ?.focus({ preventScroll: true }));
-  return panel.root;
+  let current: HTMLElement = stand;
+  const load = (): void => {
+    stand.replaceChildren(el('p', { class: 'lazy-panel-opening', role: 'status', text: 'Opening Make a world.' }));
+    void Promise.all([
+      import('./ui/world-recipes.js'),
+      import('./composition/world-description.js'),
+      import('./world-specification.js'),
+    ]).then(([{ buildWorldRecipes }, { attachWorldDescription }, { WorldSpecificationClient }]) => {
+      if (!stand.isConnected) return;
+      const specification = new WorldSpecificationClient(credentials);
+      const panel = buildWorldRecipes({
+        specification: () => specification.specification(),
+        make: (preset, values) => client.makeGenerated(preset.key, preset.label, values),
+        open: async (entry) => {
+          panel.root.remove();
+          state.savedWorldEntries = await client.entries();
+          await openWorldEntryContext(state, entry);
+          state.worldEntryError = null;
+          shell.removeAttribute('data-world-state');
+          await mount();
+        },
+        onClose,
+      });
+      // A dialog over the world, opened and closed through the shell state like the other major
+      // surfaces, so it cannot stay open under the next one and Escape takes it back.
+      panel.root.setAttribute('aria-modal', 'true');
+      stand.replaceWith(panel.root);
+      current = panel.root;
+      attachWorldDescription(panel, { credentials, specification: () => specification.specification() });
+      window.setTimeout(() => panel.root.querySelector<HTMLElement>('button, select, input, textarea')
+        ?.focus({ preventScroll: true }));
+    }, (error: unknown) => {
+      if (!stand.isConnected) return;
+      const retry = button({ label: 'Try again', variant: 'primary', onClick: load });
+      stand.replaceChildren(errorState({
+        happened: 'Make a world did not open.',
+        next: 'Check the connection, then try again.',
+        action: retry,
+        technical: { detail: error instanceof Error ? error.message : String(error) },
+      }));
+      retry.focus({ preventScroll: true });
+    });
+  };
+  shell.append(stand);
+  stand.focus({ preventScroll: true });
+  load();
+  return {
+    get isConnected() { return current.isConnected; },
+    remove() { current.remove(); },
+  };
 }
 
 /** Show the list. Only `mountNoWorld` calls this, and only when there is a choice to make. */
@@ -571,7 +610,7 @@ async function mount(): Promise<void> {
   const stage = el('div', { class: 'stage' });
 
   let shellState = initialWorldShell();
-  let makeWorld: HTMLElement | null = null;
+  let makeWorld: MakeWorldSurface | null = null;
   const returnFocus: Array<HTMLElement | null> = [];
   let reflectShell = (): void => undefined;
   const dispatchShell = (event: WorldShellEvent): void => {
@@ -1332,6 +1371,7 @@ async function mount(): Promise<void> {
         objectId: typeof step.action['object_id'] === 'string' ? step.action['object_id'] : null,
       }),
       waitMs: COMPANION_DRAFT_WAIT_MS,
+      onSaid: (utterance, said) => companion.panel.showAnswer(plannedAnswer(utterance, said)),
     });
   }
   reflectMake();

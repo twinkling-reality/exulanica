@@ -49,6 +49,7 @@ interface Harness {
   readonly sheet: ReturnType<typeof buildPlanSheet>;
   readonly sent: PlannedRequest[];
   readonly afterTime: ReturnType<typeof vi.fn>;
+  readonly onSaid: ReturnType<typeof vi.fn>;
   readonly client: { plan: ReturnType<typeof vi.fn>; prepare: ReturnType<typeof vi.fn>; outcome: ReturnType<typeof vi.fn> };
 }
 
@@ -80,6 +81,7 @@ function harness(options: {
   });
   document.body.replaceChildren(sheet.root);
   const afterTime = vi.fn(async () => undefined);
+  const onSaid = vi.fn();
   const deps: CompanionPlansDeps = {
     client: () => client as unknown as CompanionActionsClient,
     page: () => PAGE,
@@ -88,9 +90,10 @@ function harness(options: {
     afterTime,
     particular: (step) => (step.action['asset_key'] === 'cc0.bench' ? 'Bench' : null),
     waitMs: 1000,
+    onSaid,
   };
   plans = mountCompanionPlans(deps);
-  return { plans, sheet, sent, afterTime, client };
+  return { plans, sheet, sent, afterTime, onSaid, client };
 }
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
@@ -246,5 +249,42 @@ describe('a confirmed plan', () => {
     await h.plans.confirm();
     await settle();
     expect(h.sent).toEqual([]);
+  });
+});
+
+describe('a question asked before a plan', () => {
+  // The plan the planner gives when it needs the person's own role for the bench first.
+  const clarify = (): unknown => {
+    const planned = fixture('world-edit-plan') as { steps: { action: object }[] };
+    return { ...planned, outcome: 'clarify', steps: [], clarification: {
+      code: 'origin_role_required', step: 0, slot: null,
+      candidates: [{ value: 'fictional', title: '', selected: false }, { value: 'personal', title: '', selected: false }],
+      actions: [planned.steps[0]!.action],
+    } };
+  };
+
+  it('asks it on the sheet in words, then shows the plan and says so once answered', async () => {
+    const h = harness({ plan: async () => clarify() });
+    // Preparing the answered question asks no model, as /selection/actions/prepare does not.
+    const prepared = fixture('world-edit-plan') as { execution: object };
+    h.client.prepare.mockResolvedValueOnce(parseActionPlan({ ...prepared, execution: { ...prepared.execution, calls: [] } }));
+    const routed = await h.plans.route('put a bench here');
+    expect(routed).toMatchObject({ route: 'answer', refused: false });
+    const choices = [...h.sheet.root.querySelectorAll<HTMLButtonElement>('[data-action="plan.choose"]')];
+    expect(choices.map((b) => b.textContent)).toEqual(['Invented for this world', 'Connected to something I experienced']);
+    choices[0]!.click();
+    for (let i = 0; i < 10 && h.onSaid.mock.calls.length === 0; i += 1) await settle();
+    // The role chosen is sent as the person's own choice, with no model.
+    expect(h.client.prepare).toHaveBeenCalledWith(expect.objectContaining({ originRole: 'fictional' }), expect.any(Array));
+    expect(h.sheet.root.querySelector('[data-action="plan.confirm"]')).not.toBeNull();
+    // And the Companion stops asking: it now says what the sheet shows.
+    expect(h.onSaid).toHaveBeenCalledWith('put a bench here', expect.objectContaining({
+      sentences: ['Here is what I would do. Check it, then confirm.'],
+    }));
+    // Under it, the model that read the sentence, not "no model was asked".
+    const said = h.onSaid.mock.calls[0]![1] as { calls: readonly unknown[] };
+    const read = (fixture('world-edit-plan') as { execution: { calls: unknown[] } }).execution.calls;
+    expect(said.calls.length).toBe(read.length);
+    expect(read.length).toBeGreaterThan(0);
   });
 });

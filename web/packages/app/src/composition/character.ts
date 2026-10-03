@@ -33,8 +33,9 @@ import {
 } from '../character-catalog.js';
 import { lookInCatalog, sameLook } from '../character-look.js';
 import { PreviewLookStore, StaleLookError, WorkspaceLookStore, worldLookTarget, type LookStore, type SavedChoice, type SavedLooks } from '../character-looks-store.js';
-import { buildCharacterStudio, type PeopleChoice } from '../ui/character-studio.js';
+import type { buildCharacterStudio, PeopleChoice } from '../ui/character-studio.js';
 import { el } from '../ui/dom.js';
+import { button, errorState } from '../ui/system/components.js';
 import { characterStatusWords } from '../ui/words/character.js';
 import type { AppEnvironment, SessionState } from './session-state.js';
 
@@ -89,6 +90,77 @@ export function editableChoice(people: ServedLayeredCatalog, choice: PeopleChoic
   if (choice.kind !== 'catalog') return { choice, moved: false };
   const look = lookInCatalog(people.catalog, people.looks, choice.look);
   return { choice: { kind: 'catalog', look }, moved: !sameLook(look, choice.look) };
+}
+
+type StudioView = ReturnType<typeof buildCharacterStudio>;
+type StudioCallbacks = Parameters<typeof buildCharacterStudio>[0];
+
+/**
+ * The character studio's view, separated from the person's figure the world draws at start.
+ *
+ * The figure (`attach`, `wear`, the catalogs) needs no studio: it only reports to it. So the
+ * studio's code loads when it is first opened. Until then each call the figure's code makes to the
+ * view is held, the latest of each kind in the order they were last made, and replayed into the
+ * view once it is built; the shell holds a stand-in where the studio will be, which says "Opening
+ * Character." while it loads and Try again if it cannot.
+ */
+export function deferredStudio(callbacks: StudioCallbacks) {
+  const stand = el('section', {
+    class: 'character-studio lazy-panel', role: 'dialog', 'aria-label': 'Character', tabindex: '-1', hidden: true,
+  });
+  let built: StudioView | null = null;
+  let building: Promise<void> | null = null;
+  /** Whether the studio is wanted open now; a load that finishes after it was closed opens nothing. */
+  let wanted = false;
+  const held = new Map<string, readonly unknown[]>();
+  const view = new Proxy({} as StudioView, {
+    get(_target, name: string) {
+      if (name === 'root') return built?.root ?? stand;
+      // Not a promise: whatever awaits the view must not take it for one.
+      if (name === 'then') return undefined;
+      if (built !== null) {
+        const value = (built as unknown as Record<string, unknown>)[name];
+        return typeof value === 'function' ? value.bind(built) : value;
+      }
+      if (name === 'canvas') throw new Error('The character studio is not open yet.');
+      return (...args: readonly unknown[]) => { held.delete(name); held.set(name, args); };
+    },
+  });
+  function build(): Promise<void> {
+    building ??= import('../ui/character-studio.js').then(({ buildCharacterStudio: buildStudio }) => {
+      const real = buildStudio(callbacks);
+      for (const [name, args] of held) (real as unknown as Record<string, (...a: readonly unknown[]) => void>)[name]!(...args);
+      held.clear();
+      built = real;
+      if (stand.isConnected) stand.replaceWith(real.root);
+    });
+    building.catch(() => { building = null; });
+    return building;
+  }
+  const studio = {
+    view,
+    built: () => built !== null,
+    /** Show the stand-in, load the studio, then `then` (the real open) if it is still wanted. */
+    open(then: () => void): void {
+      wanted = true;
+      stand.hidden = false;
+      stand.replaceChildren(el('p', { class: 'lazy-panel-opening', role: 'status', text: 'Opening Character.' }));
+      stand.focus({ preventScroll: true });
+      build().then(() => { if (wanted) then(); }, (error: unknown) => {
+        if (!wanted) return;
+        const retry = button({ label: 'Try again', variant: 'primary', onClick: () => studio.open(then) });
+        stand.replaceChildren(errorState({
+          happened: 'Character did not open.',
+          next: 'Check the connection, then try again.',
+          action: retry,
+          technical: { detail: error instanceof Error ? error.message : String(error) },
+        }));
+        retry.focus({ preventScroll: true });
+      });
+    },
+    close(): void { wanted = false; stand.hidden = true; },
+  };
+  return studio;
 }
 
 export function mountCharacter(deps: { env: AppEnvironment; state: SessionState; onClose(): void }) {
@@ -188,7 +260,7 @@ export function mountCharacter(deps: { env: AppEnvironment; state: SessionState;
     },
     failed: error => view.setFailure(error instanceof Error ? error.message : 'Preview update failed. Adjust a setting or try again.'),
   });
-  const view = buildCharacterStudio({
+  const callbacks: StudioCallbacks = {
     onPreviewLook: look => { void showPerson(look); },
     onApplyChoice: choice => { void applyChoice(choice); },
     onResetLook: restoreRevision => { void resetLook(restoreRevision); },
@@ -202,7 +274,9 @@ export function mountCharacter(deps: { env: AppEnvironment; state: SessionState;
     onMotion: motion => preview?.setMotion(motion),
     onGestures: enabled => { state.characterGestures = enabled; if (!enabled) gesture?.cancel(); },
     onRetry: () => { if (failedBodyRecipe) bodyUpdates.request(failedBodyRecipe); else void open(); },
-  });
+  };
+  const studio = deferredStudio(callbacks);
+  const view = studio.view;
   view.setGestures(state.characterGestures);
   function reducedMotion(): boolean {
     return env.systemReducedMotion.matches || state.preferences.transition === 'fade';
@@ -584,13 +658,20 @@ export function mountCharacter(deps: { env: AppEnvironment; state: SessionState;
       if (!disposed) view.setStatus(error instanceof Error ? error.message : 'This look could not be applied.', true);
     } finally { applying = false; }
   }
-  return {
-    root: view.root, gestureRoot: gestureCanvas,
+  const surface = {
+    get root() { return view.root; },
+    gestureRoot: gestureCanvas,
     reach() {
       if (env.preview && gestureReady && state.characterGestures && !reducedMotion() &&
         !opened && binding?.cameraMode === 'first-person') gesture?.play(state.preferences.fieldOfView);
     },
     setVisible(visible: boolean) {
+      // The studio's code arrives on first open; until then the shell shows its stand-in.
+      if (visible && !studio.built()) {
+        studio.open(() => surface.setVisible(true));
+        return;
+      }
+      studio.close();
       const changed = opened !== visible;
       opened = visible;
       if (visible) gesture?.cancel();
@@ -646,4 +727,5 @@ export function mountCharacter(deps: { env: AppEnvironment; state: SessionState;
     },
     dispose() { disposed = true; bodyUpdates.dispose(); unsubscribeResidents?.(); crowd?.destroy(); lifetime.abort(); previewRevision++; gestureRevision++; preview?.destroy(); gesture?.destroy(); },
   };
+  return surface;
 }

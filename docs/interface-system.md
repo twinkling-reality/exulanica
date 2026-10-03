@@ -112,9 +112,12 @@ on the overlay layer. While one is open every region except `toast` is inert
 not the one open. While anything is visible in `inspector` or `sheet`, `#shell` carries
 `data-inspector-open` and the dock, toasts and heads-up stack centre themselves in what is left.
 
-Compare and the recorded-result reader load when first opened
-(`web/packages/app/src/composition/lazy-panel.ts`): until then a stand-in says "Opening Compare."
-and a load that fails says so with Try again.
+Compare, the recorded-result reader, Make a world and the character studio load when first opened
+(`web/packages/app/src/composition/lazy-panel.ts`; `showWorldRecipes` in
+`web/packages/app/src/main.ts`; `deferredStudio` in `web/packages/app/src/composition/character.ts`):
+until then a stand-in says "Opening Compare." (or the surface's name), and a load that fails says so
+with Try again. The person's figure in the world does not wait for the studio: what it reports to
+the studio before it exists is held and shown when the studio opens.
 
 Below 60rem the application shows its narrow-window notice; the region rules for narrow screens
 (a bottom bar and a bottom sheet) exist in `layout.css` for when that notice is lifted.

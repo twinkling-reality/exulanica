@@ -68,6 +68,11 @@ export interface CompanionPlansDeps {
   readonly particular: (step: PlanStep) => string | null;
   /** How long a plan may take: the appearance route's own wait, since it drafts the same way. */
   readonly waitMs: number;
+  /**
+   * What the Companion says once a question it asked about a plan is answered on the sheet: the
+   * plan now shown, or why there is none. Without it the Companion would still be asking.
+   */
+  readonly onSaid?: (utterance: string, said: Extract<PlanRouting, { readonly route: 'answer' }>) => void;
 }
 
 export interface CompanionPlans {
@@ -302,7 +307,12 @@ export function mountCompanionPlans(deps: CompanionPlansDeps): CompanionPlans {
       void client.prepare(answered, actions).then(
         (next) => {
           const said = present(next, asked.utterance, answered);
-          if (said.route === 'answer' && said.refused) deps.sheet.say(refusedWords(next));
+          if (said.route !== 'answer') return;
+          if (said.refused) deps.sheet.say(refusedWords(next));
+          // The answer is to the person's sentence, which a model read before the question was
+          // asked; preparing the answer asks none. Both are said under it.
+          const first = asked.plan.raw['execution'] as { calls?: Parameters<typeof callsOf>[0] } | undefined;
+          deps.onSaid?.(asked.utterance, { ...said, calls: [...callsOf(first?.calls), ...said.calls] });
         },
         () => deps.sheet.say(planRefusalWords('stale_version')),
       );

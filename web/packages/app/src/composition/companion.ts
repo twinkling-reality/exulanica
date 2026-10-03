@@ -695,7 +695,7 @@ function spokenAnswer(
  * control, and the model that read the request is named for having read it.
  */
 /** What the Companion says about a plan it prepared, a question it asks first or a refusal. */
-function plannedAnswer(
+export function plannedAnswer(
   utterance: string,
   planned: Extract<PlanRouting, { readonly route: 'answer' }>,
 ): CompanionAnswer {
