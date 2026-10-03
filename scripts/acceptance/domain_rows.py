@@ -1585,6 +1585,22 @@ def assets(arguments: argparse.Namespace) -> int:
 READING_CATALOG_PATH = (
     "from exulanica.world.society_comparison_reading import READING_CATALOG; print(READING_CATALOG)"
 )
+
+
+def hour_entry(catalog: Mapping[str, Any], family: str) -> dict[str, Any]:
+    """The family's hour line in a reading catalog, or an empty entry. A catalog may state a
+    family's line for longer windows too (``window_ticks``); the hour's is the one keyed by the
+    family's name alone, as the catalog's reader requires of it, whatever the entries' order."""
+    return next(
+        (
+            dict(e)
+            for e in catalog.get("entries", [])
+            if e.get("state_family") == family and e.get("key") == family
+        ),
+        {},
+    )
+
+
 #: How the record's script names the drawing code it measured: the module's own digest, read by
 #: the candidate's interpreter as the script reads it (``scripts/measure_living_comparison_replay.py``).
 DRAWING_DIGEST = (
@@ -1636,7 +1652,7 @@ def row_h3(stack: Stack, transcripts: Any, out: Path, town: Mapping[str, Any]) -
         f"the candidate names no reading catalog: {named.stderr.strip()[-200:]}",
     )
     catalog = json.loads(catalog_path.read_text()) if catalog_path.is_file() else {}
-    entry = next((e for e in catalog.get("entries", []) if e.get("state_family") == "living"), {})
+    entry = hour_entry(catalog, "living")
     living_record = str(entry.get("source") or "")
     record_path = worktree / living_record
     record_sha = (

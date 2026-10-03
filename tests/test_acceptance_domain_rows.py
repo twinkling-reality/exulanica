@@ -112,7 +112,7 @@ def test_the_line_it_derives_gives_the_records_own_populations():
     from exulanica.world.society_comparison_reading import READING_CATALOG
 
     catalog = json.loads(Path(READING_CATALOG).read_text())
-    (living,) = [e for e in catalog["entries"] if e["state_family"] == "living"]
+    living = DRIVE.hour_entry(catalog, "living")
     record = json.loads((ROOT / living["source"]).read_text())["record"]
     population_most, decided_most = DRIVE.line_bound(
         record["line"], record["derived"]["run_budget_us"]
@@ -154,3 +154,18 @@ def test_the_e4_revision_is_one_the_product_publishes_with_its_new_colour_served
     assert publication_families(layered)
     repository = json.loads((ROOT / "assets" / "characters" / "catalog.json").read_text())
     assert DRIVE.NEW_COLOUR not in repository["families"][0]["colours"][DRIVE.NEW_COLOUR_SLOT]
+
+
+def test_h3_reads_the_hour_line_whatever_other_windows_the_catalog_states():
+    hour = {"key": "living", "state_family": "living", "source": "hour.json"}
+    day = {
+        "key": "living-1440",
+        "state_family": "living",
+        "window_ticks": 1440,
+        "source": "day.json",
+    }
+    other = {"key": "quiet", "state_family": "quiet", "source": "quiet.json"}
+
+    for entries in ([hour, day, other], [day, hour], [other, day, hour]):
+        assert DRIVE.hour_entry({"entries": entries}, "living") == hour
+    assert DRIVE.hour_entry({"entries": [day, other]}, "living") == {}
