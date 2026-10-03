@@ -79,6 +79,12 @@ RECORD_PROFILE = "exulanica.digest-bound-record/v1"
 ROUTE = "/selection/actions"
 #: Which token file each fixture's workspace answers to; ``square-playing`` is ``square-people``.
 FIXTURE_TOKENS = {"square": "token", "square-people": "token-2", "bare": "token-3"}
+#: How long the harness waits for one plan. The server's own bound for one plan on 61d99d9a is
+#: 150 s, as ``action_bound_seconds`` sums it: three structured-extraction calls, each walking a
+#: chain of two models at the manifest's 25 s. This is that bound with a margin of 150 s for the
+#: version, capability, preview and clock reads around the calls, so the server, never the
+#: harness, decides when a plan has failed. A test holds it above the candidate's bound.
+PLAN_TIMEOUT_SECONDS = 300.0
 PLAYING = "square-playing"
 FIXTURE_OF = {
     "square": "square",
@@ -328,6 +334,19 @@ def cost_of(calls: Sequence[Mapping[str, Any]]) -> tuple[Decimal, bool]:
     return total, known
 
 
+def served_by(calls: Sequence[Mapping[str, Any]]) -> tuple[list[str], bool]:
+    """The models that answered a request's calls, by the execution record, and whether any
+    call was answered by another model than the one requested (a fallback in the role's chain).
+    A fallback answer is reported apart, never pooled with the requested model's."""
+    served = sorted({str(c["served_model"]) for c in calls if c.get("served_model")})
+    fallback = any(
+        c.get("used_fallback")
+        or (c.get("served_model") and c.get("served_model") != c.get("requested_model"))
+        for c in calls
+    )
+    return served, fallback
+
+
 def provider_error(status: int, calls: Sequence[Mapping[str, Any]]) -> bool:
     return status != 200 or any(call.get("outcome") in FAILED_ATTEMPTS for call in calls)
 
@@ -395,10 +414,30 @@ def watched_counts(stack: Any) -> dict[str, list[Any]]:
     return json.loads(completed.stdout)
 
 
-def clients(stack: Any, transcripts: Any) -> dict[str, Any]:
-    return {
+def clients(stack: Any, transcripts: Any, timeout: float | None = None) -> dict[str, Any]:
+    """One client per fixture's workspace; ``timeout`` replaces the developer client's default."""
+    made = {
         name: F.client(stack, transcripts, name, token) for name, token in FIXTURE_TOKENS.items()
     }
+    if timeout is not None:
+        for name, c in made.items():
+            c.http = F.WorldClient(
+                stack.base_url,
+                stack.token_file(FIXTURE_TOKENS[name]).read_text(),
+                timeout=timeout,
+                on_exchange=transcripts.recorder(name, lambda c=c: c.step),
+            )
+    return made
+
+
+def ask(c: Any, step: str, query: Mapping[str, str], body: Mapping[str, Any]) -> tuple[int, Any]:
+    """One plan request. A failure on the client's side (its wait ended, the connection dropped)
+    is answered as status 0 with no execution record, so its cost is unknown and the run stops
+    on the pre-registered rule instead of crashing."""
+    try:
+        return c.call(step, "POST", ROUTE, query=query, body=body)
+    except (OSError, F.ClientError) as failed:
+        return 0, {"code": f"client_failure:{type(failed).__name__}"}
 
 
 def placement(entry: Mapping[str, Any], name: str, kind: str, where: Sequence[int]) -> dict:
@@ -529,7 +568,7 @@ def run(arguments: argparse.Namespace) -> int:
     if results_path.exists():
         raise SystemExit(f"{results_path} exists: a run never appends to another")
     transcripts = F.Transcripts(out / "transcripts")
-    by_fixture = clients(stack, transcripts)
+    by_fixture = clients(stack, transcripts, timeout=PLAN_TIMEOUT_SECONDS)
     people = by_fixture["square-people"]
     people_entry = F.read_entry(people, "start", fixtures["square-people"]["entry_id"])
     budget = Budget(Decimal(arguments.ceiling_usd))
@@ -573,23 +612,25 @@ def run(arguments: argparse.Namespace) -> int:
             c = by_fixture[FIXTURE_OF[item["fixture"]]]
             before = watched_counts(stack)
             started = time.monotonic()
-            status, body = c.call(
+            status, body = ask(
+                c,
                 f"pass-{number}:{item['id']}",
-                "POST",
-                ROUTE,
-                query={"world_id": fixture["world_id"]},
-                body=request_body(item, fixtures),
+                {"world_id": fixture["world_id"]},
+                request_body(item, fixtures),
             )
             wall_ms = round((time.monotonic() - started) * 1000)
             after = watched_counts(stack)
             calls = calls_of(body)
             cost, known = cost_of(calls)
+            # No answer means no execution record: what the attempt cost is not known.
+            known = known and status != 0
             budget.add(cost)
             plan = body if status == 200 and isinstance(body, Mapping) else {}
             seen = observe(plan, names_of(fixture)) if plan else {}
             found = planted_found(plan, item.get("planted") or [])
             changed = {t: [before[t], after[t]] for t in WATCHED if before[t] != after[t]}
             failed = provider_error(status, calls)
+            served, fallback = served_by(calls)
             errors += failed
             line = {
                 "pass": number,
@@ -608,6 +649,8 @@ def run(arguments: argparse.Namespace) -> int:
                 "planted_found": found,
                 "watched_changed": changed,
                 "provider_error": failed,
+                "served_models": served,
+                "fallback": fallback,
                 "calls": [
                     {
                         key: call.get(key)
@@ -622,6 +665,7 @@ def run(arguments: argparse.Namespace) -> int:
                             "prompt_tokens",
                             "completion_tokens",
                             "attempts",
+                            "used_fallback",
                         )
                     }
                     for call in calls
@@ -717,9 +761,17 @@ def score(arguments: argparse.Namespace) -> int:
                         "not_drafted": 0,
                         "provider_errors": 0,
                         "planted_found": 0,
+                        "fallback_answers": 0,
+                        "fallback_exact": 0,
                     },
                 )
                 row["requests"] += 1
+                if line.get("fallback"):
+                    # Answered by a fallback model: counted apart, never in the scored model's.
+                    row["fallback_answers"] += 1
+                    row["fallback_exact"] += bool(line["match"].get("exact"))
+                    row["planted_found"] += bool(line["planted_found"])
+                    continue
                 row["provider_errors"] += line["provider_error"]
                 row["planted_found"] += bool(line["planted_found"])
                 row["not_drafted"] += (line["observed"].get("refusal") or {}).get(

@@ -460,3 +460,96 @@ def test_the_drafters_object_labels_put_the_selected_object_first_then_newest():
         "stall": "object-4",
     }
     assert H.object_labels(FIXTURES["bare"], None) == {}
+
+
+def test_the_harness_waits_longer_for_a_plan_than_the_server_can_take():
+    from exulanica.models.client import ModelClient
+    from exulanica.selection.action_plan import action_bound_seconds
+
+    from model_fakes import FakeTransport, RecordingPolicy
+
+    # The API builds its client with the manifest's timeouts and one attempt, as this one does.
+    served = ModelClient(
+        api_key="test-key-not-real", transport=FakeTransport(), policy=RecordingPolicy()
+    )
+
+    assert action_bound_seconds(served) < H.PLAN_TIMEOUT_SECONDS
+
+
+def test_a_plan_the_client_gives_up_on_is_an_unknown_cost_never_a_crash():
+    class Stalled:
+        def call(self, *arguments, **fields):
+            raise TimeoutError("timed out")
+
+    status, body = H.ask(Stalled(), "pass-1:world_edit-02", {"world_id": "w"}, {})
+
+    assert status == 0
+    assert body == {"code": "client_failure:TimeoutError"}
+    assert H.calls_of(body) == []
+    assert H.provider_error(status, H.calls_of(body)) is True
+
+
+def test_a_fallback_answer_is_named_and_kept_out_of_the_requested_models_score(tmp_path):
+    qwen = "Qwen/Qwen3-235B-A22B-Instruct-2507"
+    other = "deepseek-ai/DeepSeek-V4-Flash-0731"
+    first = {"requested_model": qwen, "served_model": qwen, "used_fallback": False}
+    fell = {"requested_model": qwen, "served_model": other, "used_fallback": True}
+
+    assert H.served_by([first, first]) == ([qwen], False)
+    assert H.served_by([first, fell]) == (sorted([qwen, other]), True)
+    assert H.served_by([]) == ([], False)
+
+    record, set_sha = H.load_set(SET)
+    prefix = "c" * 64
+    assignment = [[r["id"], H.split_of(prefix, r["utterance"])] for r in record["records"]]
+    record["split"] = {
+        "prefix_sha256": hashlib.sha256(prefix.encode()).hexdigest(),
+        "assignment_sha256": hashlib.sha256(
+            json.dumps(assignment, separators=(",", ":")).encode()
+        ).hexdigest(),
+    }
+    document = {
+        "profile": H.RECORD_PROFILE,
+        "record": record,
+        "record_sha256": hashlib.sha256(H.canonical(record)).hexdigest(),
+    }
+    (tmp_path / "set.json").write_text(json.dumps(document))
+    _, set_sha = H.load_set(tmp_path / "set.json")
+    held = [r for r in record["records"] if H.split_of(prefix, r["utterance"]) == "held_out"]
+    lines = [
+        {
+            "pass": 1,
+            "id": r["id"],
+            "provider_error": False,
+            "planted_found": [],
+            "observed": {},
+            "wall_ms": 1,
+            "usd": "0",
+            "fallback": index == 0,
+            "match": {"scored": True, "exact": True, "parts": {"outcome": True, "kind": True}},
+        }
+        for index, r in enumerate(held[:2])
+    ]
+    run = tmp_path / "run"
+    run.mkdir()
+    (run / "results.jsonl").write_text("".join(json.dumps(x) + "\n" for x in lines))
+    (run / "run.json").write_text(json.dumps({"set_sha256": set_sha}))
+    (tmp_path / "prefix").write_text(prefix)
+    H.main(
+        [
+            "score",
+            "--set",
+            str(tmp_path / "set.json"),
+            "--run",
+            str(run),
+            "--prefix-file",
+            str(tmp_path / "prefix"),
+        ]
+    )
+    overall = json.loads((run / "score.json").read_text())["passes"]["held_out"]["per_pass"]["1"][
+        "overall"
+    ]
+
+    assert overall["requests"] == 2
+    assert (overall["scored"], overall["exact"]) == (1, 1)
+    assert (overall["fallback_answers"], overall["fallback_exact"]) == (1, 1)

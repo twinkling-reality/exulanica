@@ -1,0 +1,70 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record_sha256": "dcafa78fee1dcfb12a092ab290516ee2604890468370076f95b9528034504ab8",
+  "record": {
+    "kind": "exulanica.evaluation.companion-action-plans-amendment/v1",
+    "written": "2026-10-02",
+    "author": "lane ACC",
+    "amends": {
+      "path": "docs/evaluation/2026-10-02-companion-action-plans-preregistration.json",
+      "file_sha256": "599783d03f62d0286b4ea5246bedd751e4cd61d437dfe162bab6c93254c1129b",
+      "record_sha256": "4eac31da2e1e0ceaea7d76c42c08891c561f2dc1060a32950b8fc4e5d373297c"
+    },
+    "bound_files": {
+      "scripts/measure_companion_action_plans.py": "cf44c337fe23ec7e46d93524b3d64778b9e54df4ab7a36ad9d9811a424abef84",
+      "tests/test_measure_companion_action_plans.py": "65728333a5e9f338ec98827ccfce0f3e1a655de2cbc0a5948573a0f298fab2a4",
+      "docs/evaluation/2026-10-02-companion-action-plans-set.json": "8110a9593c92b362e2efa8a84a838b7a130d8bbdbb3b8a8f7b076d068fb5bf79"
+    },
+    "first_attempt": {
+      "tree": "main 61d99d9a",
+      "started": "2026-10-02T22:21:34-04:00",
+      "ended": "2026-10-02T22:22:33-04:00",
+      "requests_sent": 2,
+      "answers": [
+        {
+          "id": "world_edit-01",
+          "status": 200,
+          "wall_ms": 2216,
+          "calls": 2,
+          "usd": "0.00024740",
+          "cost_basis": "known"
+        },
+        {
+          "id": "world_edit-02",
+          "status": null,
+          "what_happened": "the classifier call settled at USD 0.00008200; the world-edit draft ran 25 s to 2048 completion tokens and was refused as truncated, settled at USD 0.00136880; its repair attempt was dispatched and never settled, because the harness's HTTP client gave up at its 30 s default and its cleanup took the stack down"
+        }
+      ],
+      "ledger": {
+        "settled_usd": "0.00169820",
+        "settled_reservations": 4,
+        "unsettled_reservations": 1,
+        "unsettled_reserved_usd": "0.00143180",
+        "spent_at_most_usd": "0.00313000"
+      },
+      "why_it_stopped": "a harness defect: the client's 30 s wait is below the server's own bound for one plan, so a slow plan crashed the harness instead of being answered; no stop rule fired",
+      "its_answers": "kept as evidence, not scored"
+    },
+    "changes": [
+      "the plan requests wait 300 s: the server's bound for one plan on 61d99d9a is 150 s (three structured-extraction calls, each walking the role's chain of two models at 25 s) and the margin of 150 s covers the version, capability, preview and clock reads around the calls; a test holds the wait above the candidate's bound",
+      "a failure on the client's side is recorded as a result line (status 0, no execution record) and stops the run under the pre-registered unknown-cost rule, never a crash",
+      "each result line names the models that served its calls, from the execution record, and whether any was a fallback; scoring counts a fallback answer apart and never in the requested model's score"
+    ],
+    "facts_corrected": [
+      "the structured-extraction role's chain is Qwen/Qwen3-235B-A22B-Instruct-2507 then deepseek-ai/DeepSeek-V4-Flash-0731, the second used only when the first is unavailable; the pre-registration did not state it"
+    ],
+    "unchanged": [
+      "the set, its expectations and its split",
+      "the metrics",
+      "the stop rules",
+      "the requested model and the passes"
+    ],
+    "fresh_run": {
+      "sends": "the whole set again, in the same order, three passes, from a fresh stack",
+      "campaign_ceiling_usd": "0.25",
+      "harness_ceiling_usd": "0.24687",
+      "ceiling_basis": "USD 0.25 less the first attempt's spend at most, USD 0.00313000",
+      "before_it": "one scripted pass of this harness on the landed tree, named in the result"
+    }
+  }
+}
