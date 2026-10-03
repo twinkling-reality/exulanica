@@ -91,12 +91,12 @@ def _plan(town: dict[str, Any]) -> dict[str, Any]:
 
 def _protocol_line_only(monkeypatch, tmp_path: Path) -> None:
     """The reading catalog as it would be with no line measured apart from the protocol's."""
-    empty = tmp_path / "society-comparison-reading.v1.json"
+    empty = tmp_path / "society-comparison-reading.v2.json"
     empty.write_text(
         json.dumps(
             {
                 "catalog_id": "society-comparison-reading",
-                "catalog_version": 1,
+                "catalog_version": 2,
                 "source_build": "A test catalog that states no family's own line.",
                 "entries": [],
             }

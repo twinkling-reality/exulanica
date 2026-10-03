@@ -34,12 +34,12 @@ LIVING = {
 
 
 def _catalog(tmp_path: Path, entries: list[dict[str, Any]]) -> Path:
-    path = tmp_path / "society-comparison-reading.v1.json"
+    path = tmp_path / "society-comparison-reading.v2.json"
     path.write_text(
         json.dumps(
             {
                 "catalog_id": "society-comparison-reading",
-                "catalog_version": 1,
+                "catalog_version": 2,
                 "source_build": "A test catalog of one measured line, read as the shipped one is.",
                 "entries": entries,
             }
@@ -159,6 +159,26 @@ def test_a_catalog_naming_one_family_twice_is_refused(tmp_path, monkeypatch):
         reading.population_maximum(_catalogs(COMPARISON_SCORE_BY_FAMILY["living"]))
 
 
+def test_a_catalog_of_another_version_is_refused(tmp_path, monkeypatch):
+    path = _catalog(tmp_path, [_living_entry()])
+    document = json.loads(path.read_text(encoding="utf-8"))
+    path.write_text(json.dumps({**document, "catalog_version": 1}), encoding="utf-8")
+    monkeypatch.setattr(reading, "READING_CATALOG", path)
+    with pytest.raises(ComparisonRefused, match="reading_catalog"):
+        reading.population_maximum(_catalogs(COMPARISON_SCORE_BY_FAMILY["living"]))
+
+
+def test_the_code_reads_the_newest_reading_catalog():
+    """Every version of the reading catalog stays beside the others, and the code reads the
+    newest, the one its own version names."""
+    versions = {
+        json.loads(path.read_text(encoding="utf-8"))["catalog_version"]: path
+        for path in reading.READING_CATALOG.parent.glob("society-comparison-reading.v*.json")
+    }
+    assert versions[max(versions)] == reading.READING_CATALOG
+    assert max(versions) == json.loads(reading.READING_CATALOG.read_text())["catalog_version"]
+
+
 def test_the_reading_catalog_ships_with_the_code(tmp_path, monkeypatch):
     assert reading.READING_CATALOG.is_file()
     monkeypatch.setattr(reading, "READING_CATALOG", tmp_path / "absent.json")
@@ -166,19 +186,31 @@ def test_the_reading_catalog_ships_with_the_code(tmp_path, monkeypatch):
         reading.population_maximum(_catalogs(3))
 
 
-def test_the_shipped_living_line_is_the_one_its_measurement_record_fitted():
-    """The catalog states the living engine's line and names the record it was read from: that
-    record exists under the path the entry names, digests to the entry's digest, measured the
-    living town under the gate without being discarded, and fitted exactly these four figures."""
+#: The measurement that fits a living town's line over each window a comparison may run.
+RECORD_KINDS = {
+    60: "exulanica.living-comparison-replay-measurement/v1",
+    1440: "exulanica.living-day-replay-measurement/v1",
+}
+
+
+def test_every_shipped_living_line_is_the_one_its_measurement_record_fitted():
+    """The catalog states the living engine's line over an hour, and over any longer window it
+    names, each naming the record it was read from. That record exists under the path the entry
+    names and digests to the entry's digest. It measured the living town over the entry's window
+    under the gate without being discarded, and fitted exactly these four figures."""
     root = reading.READING_CATALOG.parents[3]
     document = json.loads(reading.READING_CATALOG.read_text(encoding="utf-8"))
-    (entry,) = [row for row in document["entries"] if row["state_family"] == "living"]
-    source = root / entry["source"]
-    assert hashlib.sha256(source.read_bytes()).hexdigest() == entry["source_sha256"]
-    record = json.loads(source.read_text(encoding="utf-8"))["record"]
-    assert record["kind"] == "exulanica.living-comparison-replay-measurement/v1"
-    assert record["engine"] == "exulanica-society/v5"
-    assert record["discard"] is False
-    assert {key: record["line"][key] for key in reading.LINE_KEYS} == {
-        key: entry[key] for key in reading.LINE_KEYS
-    }
+    living = [row for row in document["entries"] if row["state_family"] == "living"]
+    assert [row.get("window_ticks", 60) for row in living].count(60) == 1
+    for entry in living:
+        window = entry.get("window_ticks", 60)
+        source = root / entry["source"]
+        assert hashlib.sha256(source.read_bytes()).hexdigest() == entry["source_sha256"]
+        record = json.loads(source.read_text(encoding="utf-8"))["record"]
+        assert record["kind"] == RECORD_KINDS[window]
+        assert record["engine"] == "exulanica-society/v5"
+        assert record["window_ticks"] == window
+        assert record["discard"] is False
+        assert {key: record["line"][key] for key in reading.LINE_KEYS} == {
+            key: entry[key] for key in reading.LINE_KEYS
+        }

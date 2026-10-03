@@ -167,7 +167,7 @@ derived from how long reading a run may take, by a line measured on the engine t
 runs ([what a comparison can read](society-experiments.md#running-a-comparison)). A generated
 town's society runs the living town's engine, whose line lets a model decide for everybody in each
 town measured, small towns of 38 and 52 people and market towns of 74 and 88
-([record](evaluation/2026-10-01-living-comparison-replay.json)). A town whose society was made
+([record](evaluation/2026-10-02-living-comparison-replay.json)). A town whose society was made
 before that engine keeps the earlier one, whose line allows at most 24 of 56 people or 11 of 86.
 Besides the small square's, two judged comparisons ran over a
 small town of 52 people for a group of 12: the first stopped incomplete, and the second found no

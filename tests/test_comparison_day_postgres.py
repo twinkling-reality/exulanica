@@ -80,9 +80,8 @@ MODEL = MANIFEST.offered_models(person_role().chosen)[0]
 #: The day these tests compare over: three hours, every other value the day's.
 HOURS = 3
 WINDOW = HOURS * HOUR_TICKS
-LINE = Path(__file__).resolve().parents[1] / (
-    "assets/catalogs/society-comparison-cost/society-comparison-reading.v1.json"
-)
+#: The reading catalog the code ships.
+LINE = reading.READING_CATALOG
 
 
 def _day_catalogs():
@@ -97,9 +96,9 @@ def _line_over_the_window(tmp_path: Path) -> Path:
     """The reading catalog with a living line over the tests' window beside the hour's: the
     hour's own figures, standing for a line measured over every hour of a day."""
     document = json.loads(LINE.read_text(encoding="utf-8"))
-    [hour] = document["entries"]
+    hour = next(entry for entry in document["entries"] if entry["key"] == "living")
     document["entries"].append({**hour, "key": f"living-{WINDOW}", "window_ticks": WINDOW})
-    path = tmp_path / "society-comparison-reading.v1.json"
+    path = tmp_path / "society-comparison-reading.v2.json"
     path.write_text(json.dumps(document), encoding="utf-8")
     return path
 

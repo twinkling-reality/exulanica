@@ -100,17 +100,17 @@ LINE_KEYS: Final = (
     "replay_per_decided_person_us",
     "replay_per_decided_pair_us",
 )
-#: The lines measured apart from the protocol's, by state family: a derived catalog, each entry
-#: naming the measurement record it was read from, its digest and how it was read.
+#: The lines measured apart from the protocol's, by state family and window: a derived catalog,
+#: each entry naming the measurement record it was read from, its digest and how it was read.
 READING_CATALOG: Final = (
     Path(__file__).resolve().parents[2]
     / "assets"
     / "catalogs"
     / "society-comparison-cost"
-    / "society-comparison-reading.v1.json"
+    / "society-comparison-reading.v2.json"
 )
 _CATALOG_ID: Final = "society-comparison-reading"
-_CATALOG_VERSION: Final = 1
+_CATALOG_VERSION: Final = 2
 #: How an entry's line is read from its record: the record's fitted ``line``.
 _EXTRACTION: Final = "replay_line"
 

@@ -415,24 +415,27 @@ the page says that in a minute when more of them have a choice the rest follow t
 does not refuse such a group.
 
 **A living town's line.** A living town (`exulanica-society/v5`), the engine a generated town's
-society runs, is read by a line measured on its own replay rather than the protocol's: [`assets/catalogs/society-comparison-cost/society-comparison-reading.v1.json`](../assets/catalogs/society-comparison-cost/society-comparison-reading.v1.json)
+society runs, is read by a line measured on its own replay rather than the protocol's:
+[`assets/catalogs/society-comparison-cost/society-comparison-reading.v2.json`](../assets/catalogs/society-comparison-cost/society-comparison-reading.v2.json)
 names it for the state family the engine reads (`living`) and binds it by path and digest to its
-[measurement record](evaluation/2026-10-01-living-comparison-replay.json), which [`scripts/measure_living_comparison_replay.py`](../scripts/measure_living_comparison_replay.py) wrote
-under the quiet slot's idle gate. Measured: the 95th percentile read at 61 points, with scripted
-answers the engine applies, on generated small towns of 38 and 52 people, market towns of 74 and 88,
-and one stress town of 128 at the society ground's bound, outside the admitted specification and
-composed only to measure a run there; each at its own population and at stated smaller ones, with
-nobody or everybody decided for, and at stated groups. The machine was 81.34 percent idle over ten
-seconds before the run and 77.47 percent after it, with the one-minute load under 8 before every
-point. Derived from those reads: the least-margin line on or above every point, 25 ms for any run,
-10134 µs for each of the society's people, 1250 µs for each person a model decides for, and 108 µs
-more for each of those for each person of the society. By that line and the protocol's ten-second
-pair budget (half of it for each run), a model may decide for everybody in each measured town, up to
-the stress town's 128, whose everybody-decided run the line puts at 3251624 µs; and it would let a
-run hold 485 people where a model decides for one of them, more than the 128 a town's ground allows,
-so for a living town the ground is the bound that applies. The plan route and a start judge a living
-town's society by this line, and every other engine by the protocol's, which stays at its third
-version.
+[measurement record](evaluation/2026-10-02-living-comparison-replay.json), which
+[`scripts/measure_living_comparison_replay.py`](../scripts/measure_living_comparison_replay.py)
+wrote under the quiet slot's idle gate. The record names the drawing code it measured by its digest.
+Measured: the 95th percentile read at 61 points, with scripted answers the engine applies, on
+generated small towns of 38 and 52 people, market towns of 74 and 88, and one stress town of 128 at
+the society ground's bound, outside the admitted specification and composed only to measure a run
+there; each at its own population and at stated smaller ones, with nobody or everybody decided for,
+and at stated groups. The machine was 79.11 percent idle over ten seconds before the run and 76.77
+percent after it, with the one-minute load under 8 before every point. Derived from those reads: the
+least-margin line on or above every point, 0 ms for any run, 12387 µs for each of the society's
+people, 1755 µs for each person a model decides for, and 131 µs more for each of those for each
+person of the society. By that line and the protocol's ten-second pair budget (half of it for each
+run), a model may decide for everybody in each measured town, up to the stress town's 128, whose
+everybody-decided run the line puts at 3956480 µs; and it would let a run hold 399 people where a
+model decides for one of them, more than the 128 a town's ground allows, so for a living town the
+ground is the bound that applies. The plan route and a start judge a living town's society by this
+line, and every other engine by the protocol's, which stays at its third version. It reads an hour's
+run; a day is read by a line of its own (a day, below).
 
 **A day.** A start and a plan name the window every run plays (`window`): `hour`, the default, or
 `day`. A day is a living town's, whose engine keeps the time of day: from its genesis at 06:00 to
