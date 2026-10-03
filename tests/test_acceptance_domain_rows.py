@@ -109,7 +109,11 @@ def test_a_declaration_names_its_bytes_by_digest_and_size():
 
 
 def test_the_line_it_derives_gives_the_records_own_populations():
-    record = json.loads((ROOT / DRIVE.LIVING_RECORD).read_text())["record"]
+    from exulanica.world.society_comparison_reading import READING_CATALOG
+
+    catalog = json.loads(Path(READING_CATALOG).read_text())
+    (living,) = [e for e in catalog["entries"] if e["state_family"] == "living"]
+    record = json.loads((ROOT / living["source"]).read_text())["record"]
     population_most, decided_most = DRIVE.line_bound(
         record["line"], record["derived"]["run_budget_us"]
     )

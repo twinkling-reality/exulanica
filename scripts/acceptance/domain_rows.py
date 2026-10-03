@@ -1580,9 +1580,11 @@ def assets(arguments: argparse.Namespace) -> int:
 
 # -- H3: the living town's reading line, from V7's record on the candidate --------------------------
 
-READING_CATALOG = Path("assets/catalogs/society-comparison-cost/society-comparison-reading.v1.json")
-LIVING_RECORD = "docs/evaluation/2026-10-01-living-comparison-replay.json"
-PROTOCOL_CATALOG = Path("assets/catalogs/society/society-comparison-protocol.v3.json")
+#: Which reading catalog the candidate reads, named by the candidate itself, so a re-measured line
+#: in a newer catalog is checked with no change here; the record is the one its entry names.
+READING_CATALOG_PATH = (
+    "from exulanica.world.society_comparison_reading import READING_CATALOG; print(READING_CATALOG)"
+)
 #: How the record's script names the drawing code it measured: the module's own digest, read by
 #: the candidate's interpreter as the script reads it (``scripts/measure_living_comparison_replay.py``).
 DRAWING_DIGEST = (
@@ -1610,8 +1612,9 @@ def row_h3(stack: Stack, transcripts: Any, out: Path, town: Mapping[str, Any]) -
     row = Row(
         "H3",
         "compare.capacity_record",
-        "Passed on V7's record (A-39) only when, computed on the candidate: the reading catalog "
-        "binds the living-town record by path and the sha256 of the file; the record's drawing "
+        "Passed on the living line's record (A-39) only when, computed on the candidate: the "
+        "reading catalog the candidate reads binds the record its living entry names by the "
+        "sha256 of the file; the record's drawing "
         "code digest equals the candidate's, by the record script's own method, so the record "
         "measured this source; the record names each graph's total population and every point's "
         "model-decided population; and on H1's live town the plan serves population_most and "
@@ -1619,16 +1622,34 @@ def row_h3(stack: Stack, transcripts: Any, out: Path, town: Mapping[str, Any]) -
         "measured here.",
     )
     worktree = stack.worktree
-    catalog = json.loads((worktree / READING_CATALOG).read_text())
-    entry = next((e for e in catalog.get("entries", []) if e.get("state_family") == "living"), {})
-    record_path = worktree / LIVING_RECORD
-    record_sha = hashlib.sha256(record_path.read_bytes()).hexdigest()
-    row.expect(
-        entry.get("source") == LIVING_RECORD and entry.get("source_sha256") == record_sha,
-        f"the catalog binds {entry.get('source')} {entry.get('source_sha256')}, the file is "
-        f"{record_sha}",
+    named = subprocess.run(
+        [str(worktree / ".venv" / "bin" / "python"), "-c", READING_CATALOG_PATH],
+        cwd=worktree,
+        env=LAUNCH.clean_environment(),
+        capture_output=True,
+        text=True,
+        check=False,
     )
-    record = json.loads(record_path.read_text()).get("record") or {}
+    catalog_path = Path(named.stdout.strip())
+    row.expect(
+        named.returncode == 0 and catalog_path.is_file(),
+        f"the candidate names no reading catalog: {named.stderr.strip()[-200:]}",
+    )
+    catalog = json.loads(catalog_path.read_text()) if catalog_path.is_file() else {}
+    entry = next((e for e in catalog.get("entries", []) if e.get("state_family") == "living"), {})
+    living_record = str(entry.get("source") or "")
+    record_path = worktree / living_record
+    record_sha = (
+        hashlib.sha256(record_path.read_bytes()).hexdigest() if record_path.is_file() else ""
+    )
+    row.expect(
+        record_path.is_file() and entry.get("source_sha256") == record_sha,
+        f"the catalog binds {living_record} {entry.get('source_sha256')}, the file is "
+        f"{record_sha or 'absent'}",
+    )
+    record = (
+        (json.loads(record_path.read_text()).get("record") or {}) if record_path.is_file() else {}
+    )
     drawing = subprocess.run(
         [str(worktree / ".venv" / "bin" / "python"), "-c", DRAWING_DIGEST],
         cwd=worktree,
@@ -1662,16 +1683,8 @@ def row_h3(stack: Stack, transcripts: Any, out: Path, town: Mapping[str, Any]) -
         ),
         "a point names no total or model-decided population",
     )
-    protocol = json.loads((worktree / PROTOCOL_CATALOG).read_text())
-    pair_ms = next(
-        (
-            e["value"]
-            for e in protocol.get("entries", [])
-            if e.get("key") == "pair_replay_budget_ms"
-        ),
-        None,
-    )
-    run_us = int(pair_ms) * 1000 // 2 if pair_ms is not None else 0
+    # Half the pair's read budget for one run, as the record derived it from its protocol.
+    run_us = int((record.get("derived") or {}).get("run_budget_us") or 0)
     line = record.get("line") or {}
     line_keys = (
         "replay_fixed_ms",
@@ -1699,7 +1712,10 @@ def row_h3(stack: Stack, transcripts: Any, out: Path, town: Mapping[str, Any]) -
         f"derives {decided_most(population) if isinstance(population, int) else None}",
     )
     row.observed = {
-        "record": LIVING_RECORD,
+        "reading_catalog": str(catalog_path.relative_to(worktree))
+        if catalog_path.is_relative_to(worktree)
+        else str(catalog_path),
+        "record": living_record,
         "record_sha256": record_sha,
         "catalog_binds": [entry.get("source"), entry.get("source_sha256")],
         "drawing_code_sha256": {"record": recorded_drawing, "candidate": candidate_drawing},
