@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import datetime as dt
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 
 import psycopg
 from psycopg.rows import dict_row
@@ -41,6 +42,43 @@ from exulanica.world.world_clock_repository import ClockLeadExhausted, WorldCloc
 PLAYABLE_PROFILES = PLAYABLE_ENGINES
 
 
+class _RoundInputs:
+    """Every society input a playback round asks to authorize, authorized once, at the round's end.
+
+    A round runs its minutes holding the workspace lock, so nothing that changes the society's
+    state, inputs or decisions can commit while it runs; what can is a guarded write that changes
+    whether an input is permitted (``docs/asset-read-currency.md``). So the minutes are computed
+    and written first, and every input they read is authorized afterwards, in the round's own
+    transaction, through the runtime's ``authorize``: the stored bytes of all of them are read,
+    then the global asset read lock is taken and held until the round commits, and under it only
+    rows are read. An input asked for twice is authorized once; two different documents under one
+    digest are refused, before the lock.
+    """
+
+    def __init__(self) -> None:
+        self._asked: list[tuple[uuid.UUID, dict]] = []
+
+    def record(self, actor: uuid.UUID, document: dict) -> None:
+        self._asked.append((actor, document))
+
+    def authorize(
+        self, connection: psycopg.Connection, authorizer: Callable[[uuid.UUID, dict], None]
+    ) -> None:
+        once: dict[str, tuple[uuid.UUID, dict]] = {}
+        for actor, document in self._asked:
+            digest = document.get("document_sha256") if isinstance(document, dict) else None
+            if not isinstance(digest, str):
+                # Authorized as it was asked for, which refuses it by name.
+                once[f"unnamed:{len(once)}"] = (actor, document)
+                continue
+            first = once.setdefault(digest, (actor, document))[1]
+            if first is not document and first != document:
+                raise ValueError("a round read two different society inputs under one digest")
+        with inputs_ahead(connection, [document for _, document in once.values()]):
+            for actor, document in once.values():
+                authorizer(actor, document)
+
+
 class SocietyControlRepository:
     def __init__(
         self,
@@ -56,20 +94,35 @@ class SocietyControlRepository:
         self.world_id = world_id
         self.input_authorizer = input_authorizer
         self.base_tick_interval_ms = base_tick_interval_ms
+        #: The inputs the running playback round has asked to authorize (:meth:`execute`).
+        self._round: _RoundInputs | None = None
         connection.row_factory = dict_row
         set_workspace(connection, workspace_id)
 
     def _society(self, actor: uuid.UUID | None = None) -> SocietyRepository:
+        authorizer = self.input_authorizer
+        round_inputs = self._round
         return SocietyRepository(
             self.connection,
             self.workspace_id,
             world_id=self.world_id,
             input_authorizer=(
                 None
-                if self.input_authorizer is None or actor is None
-                else lambda doc: self.input_authorizer(actor, doc)
+                if authorizer is None or actor is None
+                else (lambda doc: authorizer(actor, doc))
+                if round_inputs is None
+                else (lambda doc: round_inputs.record(actor, doc))
             ),
         )
+
+    @contextmanager
+    def _authorizing_at_the_end(self) -> Iterator[_RoundInputs]:
+        """While a round computes its minutes, authorizations are recorded, not run."""
+        self._round = _RoundInputs()
+        try:
+            yield self._round
+        finally:
+            self._round = None
 
     def _scope(self, version_id: uuid.UUID) -> dict:
         self._society()._lock()
@@ -443,7 +496,11 @@ class SocietyControlRepository:
         """Run a claimed batch: the minutes due, at most ``MAX_CATCHUP_TICKS``, or ``max_ticks``.
 
         A world that runs people by models is advanced one minute per claim (``max_ticks=1``), so
-        each minute's choice points are asked before it; the minutes skipped are recorded.
+        each minute's choice points are asked before it; the minutes skipped are recorded. The
+        inputs the minutes read are authorized after the minutes are computed and before the
+        batch commits (:class:`_RoundInputs`), so the asset read lock is held from that
+        authorization to the commit and not while the engine runs. An input refused then rolls
+        the minutes back and pauses the society, with the receipt a refusal before them writes.
         """
         if max_ticks is not None and not 1 <= max_ticks <= MAX_CATCHUP_TICKS:
             raise ValueError(f"a claim runs 1 to {MAX_CATCHUP_TICKS} minutes, not {max_ticks}")
@@ -492,28 +549,35 @@ class SocietyControlRepository:
             }
             try:
                 with self.connection.transaction():
-                    self._ready(society, claim.actor)
-                    current = society
-                    executed = 0
-                    for _ in range(count):
-                        self._check_lease(control, claim)
-                        try:
-                            after = self._society(claim.actor).advance(
-                                claim.version_id,
-                                base_tick=current["current_tick"],
-                                base_state_sha256=current["state_sha256"],
-                            )
-                        except ClockLeadExhausted:
-                            # The count above keeps inside the lead, so this is a guard: stop at
-                            # the minutes committed rather than pause a world that only waits.
-                            break
-                        executed += 1
-                        current = {
-                            **current,
-                            "current_tick": after["current_tick"],
-                            "state_sha256": after["state_sha256"],
-                        }
+                    with self._authorizing_at_the_end() as round_inputs:
+                        self._ready(society, claim.actor)
+                        current = society
+                        executed = 0
+                        for _ in range(count):
+                            self._check_lease(control, claim)
+                            try:
+                                after = self._society(claim.actor).advance(
+                                    claim.version_id,
+                                    base_tick=current["current_tick"],
+                                    base_state_sha256=current["state_sha256"],
+                                )
+                            except ClockLeadExhausted:
+                                # The count above keeps inside the lead, so this is a guard: stop
+                                # at the minutes committed rather than pause a world that only
+                                # waits.
+                                break
+                            executed += 1
+                            current = {
+                                **current,
+                                "current_tick": after["current_tick"],
+                                "state_sha256": after["state_sha256"],
+                            }
                     count = executed
+                    # Every input the minutes read is authorized now, once: their bytes are read,
+                    # then the asset read lock is taken and held until this round commits. A
+                    # refusal rolls the minutes back and pauses the society below.
+                    if self.input_authorizer is not None:
+                        round_inputs.authorize(self.connection, self.input_authorizer)
                     self._check_lease(control, claim)
             except (UnavailableSocietyInput, ValueError) as exc:
                 self._check_lease(control, claim)

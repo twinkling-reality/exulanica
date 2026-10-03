@@ -1110,6 +1110,14 @@ fresh connection. Execution checks workspace, branch, revision, token and deadli
 ticks and before returning to commit. A revoked, replaced or expired claim cannot commit its batch.
 At most three overdue ticks run in one transaction; a receipt records overdue/executed/skipped tick
 counts, timing, speed, previous/result hashes and exact transition input ranges and event hashes.
+The batch computes and writes its ticks first and then authorizes every input they read, once,
+under the global asset read lock, which it holds until it commits
+([asset read currency](asset-read-currency.md#society-inputs-under-the-barrier)). An input refused
+there rolls the ticks back and pauses the society with `source_unavailable`, and the receipt is
+the one a refusal before the ticks writes. So a withdrawal of an input made while a batch computes
+is accepted, not refused busy, and that batch commits no tick. A deletion that writes a tombstone
+is refused busy while the batch holds its workspace's lock
+([asset read currency](asset-read-currency.md#writers-under-the-barrier)).
 The next deadline is completion plus the configured wait. Excess wall-clock debt is discarded;
 it is not silently replayed as unlimited offline time.
 

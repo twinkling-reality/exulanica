@@ -159,6 +159,22 @@ the world's place, because that write takes the barrier's shared side. An input 
 still authorized: its bytes are read under the barrier and the log names the defect
 (`society_input_not_announced`).
 
+A playback round authorizes last (`execute` in
+[`society_control_repository.py`](../exulanica/world/society_control_repository.py)). It holds the
+workspace lock, so nothing that changes its society's state, inputs or decisions commits while it
+runs, and it computes and writes its minutes first. Then, still inside the transaction that holds
+those minutes, it authorizes every input they read, each once: the bytes of all of them are read,
+the barrier is taken, rows are checked under it, and the barrier is held until the round commits.
+The invariant is the one every writer keeps: each committed minute was permitted at one
+authorization instant inside its own transaction, and no guarded write commits between that
+instant and the minute's commit. A withdrawal made while a round computes is therefore accepted
+rather than refused busy; the round's authorization sees it, the round's minutes roll back, and
+the society pauses as `source_unavailable` with the same receipt a refusal before the minutes
+writes. A deletion that writes a tombstone is the exception: the round holds its workspace's
+lock while it computes, so the tombstone is refused busy, as
+[writers under the barrier](#writers-under-the-barrier) states. So a round holds the barrier for
+its authorization and its last writes, not while its minutes are computed.
+
 A reviewed asset row, or a district's admitted source, that names other bytes under the barrier
 than when they were read changed in between, which only a direct change to the registry or a right
 taking effect in that moment does (the importer refuses to rebind or republish a key). That is the
