@@ -1,0 +1,85 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record_sha256": "e85591cbdadd67c018c0f7b5d58bcc60a8e5e7aedc8492ae2d0b313bb1ab567d",
+  "record": {
+    "kind": "exulanica.evaluation.companion-action-plans-amendment/v1",
+    "written": "2026-10-02",
+    "author": "lane ACC",
+    "amends": [
+      {
+        "path": "docs/evaluation/2026-10-02-companion-action-plans-preregistration.json",
+        "file_sha256": "599783d03f62d0286b4ea5246bedd751e4cd61d437dfe162bab6c93254c1129b",
+        "record_sha256": "4eac31da2e1e0ceaea7d76c42c08891c561f2dc1060a32950b8fc4e5d373297c"
+      },
+      {
+        "path": "docs/evaluation/2026-10-02-companion-action-plans-amendment.json",
+        "file_sha256": "ebf1c513e255c788d54a578fdfb9930eb5caceeba98596dcc2685fb7ebd8ceb3",
+        "record_sha256": "dcafa78fee1dcfb12a092ab290516ee2604890468370076f95b9528034504ab8"
+      }
+    ],
+    "ruling": {
+      "by": "the wave's orchestrator, on the operator's campaign allocation",
+      "at": "2026-10-02T22:51:00-04:00",
+      "made_after_observing": "the second attempt's stop on the unknown-cost rule: a world-edit draft ran to the 2048-token cap and its repair attempt timed out with a cost the execution record could not state",
+      "rule_before": "any attempt whose cost_basis is unknown stops the run",
+      "rule_after": "an attempt the record cannot price no longer stops the run; the request's cost is the spending ledger's charge across it, which holds that attempt at its reservation, and it counts toward the harness's ceiling; the attempt counts as a provider error under the 10 percent per-pass rule; a request with a server answer is scored on that answer, so a 502 model_refused after a truncated draft is a wrong answer, not an error"
+    },
+    "second_attempt": {
+      "tree": "main a6a6cb3e",
+      "harness_sha256": "cf44c337fe23ec7e46d93524b3d64778b9e54df4ab7a36ad9d9811a424abef84",
+      "started": "2026-10-02T22:49:24-04:00",
+      "ended": "2026-10-02T22:50:16-04:00",
+      "requests_sent": 3,
+      "answers": [
+        {
+          "id": "world_edit-01",
+          "status": 200,
+          "exact": true,
+          "usd": "0.00024740"
+        },
+        {
+          "id": "world_edit-02",
+          "status": 200,
+          "exact": true,
+          "usd": "0.00025500"
+        },
+        {
+          "id": "world_edit-03",
+          "status": 502,
+          "code": "model_refused",
+          "what_happened": "classifier 0.65 s; world-edit draft ran 21 s to 2048 completion tokens, refused as truncated; its repair attempt timed out at 25 s, cost unknown"
+        }
+      ],
+      "ledger": {
+        "settled_usd": "0.00195440",
+        "unknown_charged_at_reservation_usd": "0.00143280",
+        "charged_usd": "0.00338720"
+      },
+      "its_answers": "kept as evidence, not scored"
+    },
+    "campaign_spend_before_the_third_attempt": {
+      "first_attempt_at_most_usd": "0.00313000",
+      "second_attempt_usd": "0.00338720",
+      "total_at_most_usd": "0.00651720"
+    },
+    "bound_files": {
+      "scripts/measure_companion_action_plans.py": "3060e5bb90f4d14679c98150ba9579eb93adf0d176701b08895897fb1c372bac",
+      "tests/test_measure_companion_action_plans.py": "f072422de57e858dd8cbded5ea6d65a7c97f9d4921342299ceb7a139256368bc",
+      "docs/evaluation/2026-10-02-companion-action-plans-set.json": "8110a9593c92b362e2efa8a84a838b7a130d8bbdbb3b8a8f7b076d068fb5bf79"
+    },
+    "unchanged": [
+      "the set, its expectations and its split",
+      "the metrics",
+      "the USD 0.25 campaign ceiling, counting both earlier attempts",
+      "the requested model and the passes",
+      "the other stop rules"
+    ],
+    "third_attempt": {
+      "sends": "the whole set again, in the same order, three passes, from a fresh stack",
+      "harness_ceiling_usd": "0.24348",
+      "ceiling_basis": "USD 0.25 less both earlier attempts' spend at most, USD 0.00651720, rounded down",
+      "reports": "the rate of runaway world-edit drafts (a reply refused as truncated at the token cap), logged as product defect DRAFT-1"
+    },
+    "earlier_answers": "the five answers of the first two attempts are kept as evidence, not scored"
+  }
+}
