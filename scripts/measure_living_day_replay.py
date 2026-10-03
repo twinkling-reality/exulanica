@@ -37,12 +37,18 @@ This measures both for the living town (``exulanica-society/v5``) at every hour 
   - From it and the fourth protocol's pair budget come the most people a day's comparison of a
     living town runs and the most of them a model may decide for.
 
-The machine gate is the hour line's:
-- at least 70 percent CPU idle over ten seconds before the run, refused otherwise;
-- the one-minute load under 8 before every point;
-- a record whose mean idle falls under 50 percent is written with ``discard: true``.
+It runs in phases, and the record states each and whether it was gated:
+- **Compose and play**, not gated and not timed: every graph composed and every point's day played
+  and sealed, which takes whatever the machine gives it.
+- **Gate**, right before the first read: the hour line's idle gate, at least 70 percent CPU idle
+  over ten seconds, sampled until it holds for at most ``--gate-wait-seconds`` (twenty minutes),
+  and refused, with nothing read and no record written, once that wait is spent.
+- **Reads**, gated: before every point's reads the one-minute load is waited for to fall under 8,
+  for at most ten minutes, or the run stops. The mean idle is taken over the reads alone, from the
+  gate's sample and one after the last read, and a record whose mean falls under 50 percent is
+  written with ``discard: true``.
 
-Run it inside ``.exulanica/bin/quiet-slot``. ``--smoke`` runs it without the gate, for trying the
+Run it inside ``.exulanica/bin/quiet-slot``. ``--smoke`` runs it without the gates, for trying the
 script, and always writes ``discard: true``. Every duration is in whole microseconds and every
 share a decimal string, in the digest-bound form every retained record takes. The code a replay
 executes is bound by the drawing digest (``CODE_SHA256``).
@@ -56,8 +62,10 @@ import json
 import os
 import platform
 import sys
+import time
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
 from typing import Any, Final
@@ -72,6 +80,7 @@ from measure_comparison_replay import (
     IDLE_BEFORE_PERCENT,
     IDLE_MEAN_PERCENT,
     LOAD_MOST,
+    LOAD_WAIT_SECONDS,
     idle_share,
     load_average,
     settled,
@@ -108,6 +117,10 @@ PROFILE: Final = "exulanica.digest-bound-record/v1"
 KIND: Final = "exulanica.living-day-replay-measurement/v1"
 #: What a sealed hour names its definition by, where no definition is stored.
 _DEFINITION: Final = {"document_sha256": "0" * 64}
+#: How long the reads' idle gate is waited for before the run is refused, and how often it is
+#: sampled meanwhile (each sample itself takes the gate's ten seconds).
+GATE_WAIT_SECONDS: Final = 1200
+GATE_POLL_SECONDS: Final = 20
 
 
 def _named(model_id: str) -> str:
@@ -123,12 +136,17 @@ def _reads(action: Callable[[], bytes], repeats: int) -> tuple[bytes, dict[str, 
     return body, hour_line._spread(walls)
 
 
-def point(
-    world: dict[str, Any], decided: int, repeats: int, window: int, catalogs: Any
-) -> dict[str, Any]:
-    """One day of ``world``'s people, a model deciding for ``decided`` of them (nobody: the
-    routine; all of them: everybody): played once hour by hour, every hour sealed, then each hour
-    and the day read ``repeats`` times as the routes read them."""
+@dataclass(frozen=True)
+class Day:
+    """One point's day, played and sealed hour by hour: what its reads replay."""
+
+    world: dict[str, Any]
+    decided: int
+    plan: RunPlan
+    sealed: tuple[dict[str, Any], ...]
+
+
+def _plan(world: dict[str, Any], decided: int, window: int) -> RunPlan:
     population = world["population"]
     base = {
         "run_id": uuid.uuid5(uuid.NAMESPACE_URL, f"{world['world_id']}:day:{decided}"),
@@ -142,24 +160,25 @@ def point(
     }
     routine = RunPlan(decider={"kind": "routine"}, provider_config=None, **base)
     if decided == 0:
-        plan = routine
-    else:
-        people = sorted(person["id"] for person in genesis(routine)["inhabitants"])
-        plan = RunPlan(
-            decider=hour_line._MODEL,
-            provider_config=hour_line._config(),
-            group=None if decided >= population else frozenset(people[:decided]),
-            **base,
-        )
-    # The day, played and sealed hour by hour as a host seals it.
+        return routine
+    people = sorted(person["id"] for person in genesis(routine)["inhabitants"])
+    return RunPlan(
+        decider=hour_line._MODEL,
+        provider_config=hour_line._config(),
+        group=None if decided >= population else frozenset(people[:decided]),
+        **base,
+    )
+
+
+def play_day(world: dict[str, Any], decided: int, window: int, catalogs: Any) -> Day:
+    """One day of ``world``'s people, a model deciding for ``decided`` of them (nobody: the
+    routine; all of them: everybody), played once hour by hour and every hour sealed as a host
+    seals it. Nothing here is timed: the play is not read."""
+    plan = _plan(world, decided, window)
     sealed: list[dict[str, Any]] = []
-    play_wall_us = 0
     start = first_hour(plan)
     for hour in range(hours_of(plan)):
-        played, wall_us, _cpu_us = hour_line._microseconds(
-            lambda start=start: play_hour(plan, hour_line._Applied(), start=start)
-        )
-        play_wall_us += wall_us
+        played = play_hour(plan, hour_line._Applied(), start=start)
         document = hour_document(
             plan,
             _DEFINITION,
@@ -183,6 +202,13 @@ def point(
         )
         start = HourStart(hour + 1, end, start.first_sequence + len(played.receipts))
         del played
+    return Day(world, decided, plan, tuple(sealed))
+
+
+def read_day(day: Day, repeats: int) -> dict[str, Any]:
+    """Every hour of ``day`` read ``repeats`` times as the run route reads one, and the day as the
+    day route reads it, with the dearest of those reads, which the line is fitted on."""
+    plan, sealed = day.plan, day.sealed
 
     def read_hour(hour: int) -> bytes:
         held = sealed[hour]
@@ -211,7 +237,7 @@ def point(
         body = {**drawn, "window": hour_window(plan, document)}
         return JSONResponse(content=jsonable_encoder(body)).body
 
-    def read_day() -> bytes:
+    def read_whole_day() -> bytes:
         people = first_hour(plan).state["inhabitants"]
         deciders = {}
         for person in people:
@@ -249,15 +275,14 @@ def point(
                 "read_wall_us": spread,
             }
         )
-    day_body, day_spread = _reads(read_day, repeats)
+    day_body, day_spread = _reads(read_whole_day, repeats)
     dearest = max(hours, key=lambda found: found["read_wall_us"]["p95"])
     dearest_read = max(dearest["read_wall_us"]["p95"], day_spread["p95"])
     return {
-        "graph": world["world_id"],
-        "population": population,
-        "decided": min(decided, population),
+        "graph": day.world["world_id"],
+        "population": day.world["population"],
+        "decided": min(day.decided, day.world["population"]),
         "receipts": sum(found["receipts"] for found in hours),
-        "play_wall_us": play_wall_us,
         "hours": hours,
         "day_read_wall_us": day_spread,
         "day_body_bytes": len(day_body),
@@ -269,6 +294,20 @@ def point(
             "hour": dearest["hour"],
         },
     }
+
+
+def point(
+    world: dict[str, Any], decided: int, repeats: int, window: int, catalogs: Any
+) -> dict[str, Any]:
+    """One point: its day played and sealed, then read."""
+    return read_day(play_day(world, decided, window, catalogs), repeats)
+
+
+def decided_counts(world: dict[str, Any]) -> list[int]:
+    """Whom a model decides for at a graph's points: nobody, everybody and each stated group
+    smaller than the town."""
+    own = world["population"]
+    return [0, own, *(group for group in hour_line.STATED_GROUPS if group < own)]
 
 
 def refusal(idle_before: float | None, *, smoke: bool) -> str | None:
@@ -284,6 +323,102 @@ def discarded(mean_idle: Decimal | None, *, smoke: bool) -> bool:
     """Whether a record is written to be discarded: every smoke run's, and a run's whose mean idle
     fell under the gate's least."""
     return smoke or (mean_idle is not None and mean_idle < Decimal(str(IDLE_MEAN_PERCENT)))
+
+
+def wait_for_idle(
+    *,
+    smoke: bool,
+    wait_seconds: float = GATE_WAIT_SECONDS,
+    poll_seconds: float = GATE_POLL_SECONDS,
+    idle: Callable[[], float | None] | None = None,
+    clock: Callable[[], float] = time.monotonic,
+    sleep: Callable[[float], None] = time.sleep,
+) -> tuple[float | None, int, str | None]:
+    """The idle share the reads' gate admitted them at, how many seconds it was waited for, and,
+    once the wait is spent without the gate holding, its refusal. A smoke run is not gated."""
+    sample = idle or idle_share
+    started = clock()
+    while True:
+        share = sample()
+        refused = refusal(share, smoke=smoke)
+        waited = round(clock() - started)
+        if refused is None or clock() - started >= wait_seconds:
+            return share, waited, refused
+        sleep(poll_seconds)
+
+
+def run(
+    graphs: Sequence[dict[str, Any]],
+    *,
+    repeats: int,
+    window: int,
+    catalogs: Any,
+    smoke: bool,
+    wait_seconds: float = GATE_WAIT_SECONDS,
+) -> dict[str, Any]:
+    """The run's phases over ``graphs``: every point's day played (not gated, not timed), the
+    reads' idle gate waited for, then every point's day read, each once the one-minute load is
+    under the gate's most. The phases as the record states them, the points read, whether the
+    record is discarded, and the gate's refusal, where it refused and nothing was read."""
+    days = [
+        play_day(world, count, window, catalogs)
+        for world in graphs
+        for count in decided_counts(world)
+    ]
+    phases: dict[str, Any] = {
+        "play": {"gated": False, "timed": False, "days": len(days), "load_after": load_average()}
+    }
+    idle_before, waited, refused = wait_for_idle(smoke=smoke, wait_seconds=wait_seconds)
+    phases["gate"] = {
+        "gated": not smoke,
+        "idle_percent": hour_line._percent(idle_before),
+        "idle_percent_least": str(IDLE_BEFORE_PERCENT),
+        "waited_seconds": waited,
+        "wait_seconds_most": round(wait_seconds),
+        "refused": refused,
+    }
+    if refused is not None:
+        return {"phases": phases, "points": [], "discard": True, "refused": refused}
+    load_before = load_average()
+    points = []
+    for day in days:
+        load = Decimal(str(round(os.getloadavg()[0], 2))) if smoke else settled()
+        found = read_day(day, repeats)
+        found["load_1m"] = {"before": str(load), "after": str(round(os.getloadavg()[0], 2))}
+        points.append(found)
+        print(
+            json.dumps(
+                {
+                    key: found[key]
+                    for key in ("graph", "population", "decided", "read_wall_us", "load_1m")
+                }
+            ),
+            flush=True,
+        )
+    idle_after = idle_share()
+    mean_idle = (
+        None
+        if idle_before is None or idle_after is None
+        else (Decimal(str(idle_before)) + Decimal(str(idle_after))) / 2
+    )
+    phases["reads"] = {
+        "gated": not smoke,
+        "timed": True,
+        "idle_percent_before": hour_line._percent(idle_before),
+        "idle_percent_after": hour_line._percent(idle_after),
+        "idle_percent_mean": None if mean_idle is None else str(mean_idle),
+        "idle_percent_mean_least": str(IDLE_MEAN_PERCENT),
+        "load_most_before_each_point": str(LOAD_MOST),
+        "load_wait_seconds_most": LOAD_WAIT_SECONDS,
+        "load_before": load_before,
+        "load_after": load_average(),
+    }
+    return {
+        "phases": phases,
+        "points": points,
+        "discard": discarded(mean_idle, smoke=smoke),
+        "refused": None,
+    }
 
 
 def _derived(line: dict[str, Any], populations: list[int], catalogs: Any) -> dict[str, Any]:
@@ -321,19 +456,21 @@ def main() -> int:
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--no-stress", action="store_true", help="measure no stress town")
     parser.add_argument(
+        "--gate-wait-seconds",
+        type=float,
+        default=GATE_WAIT_SECONDS,
+        help="how long the reads' idle gate is waited for",
+    )
+    parser.add_argument(
         "--smoke", action="store_true", help="no machine gate; the record is always discarded"
     )
     args = parser.parse_args()
     source = hour_line._source()
-    idle_before, load_before = idle_share(), load_average()
-    refused = refusal(idle_before, smoke=args.smoke)
-    if refused is not None:
-        print(refused)
-        return 3
     catalogs = comparison_catalogs_for_engine(LIVING_TOWN_PROFILE, "day")
     window = protocol_value(catalogs, "window_ticks")
     if window % HOUR_TICKS:
         raise SystemExit("a day's window is a whole number of hours")
+    load_at_start = load_average()
     graphs: list[dict[str, Any]] = []
     surveyed: dict[str, list[int]] = {}
     for preset in hour_line.PRESETS:
@@ -357,34 +494,18 @@ def main() -> int:
             break
     if stress is not None:
         graphs.append(stress)
-    points = []
-    for world in graphs:
-        own = world["population"]
-        decided = [0, own, *(group for group in hour_line.STATED_GROUPS if group < own)]
-        for count in decided:
-            load = settled() if not args.smoke else Decimal(str(round(os.getloadavg()[0], 2)))
-            found = point(world, count, args.repeats, window, catalogs)
-            found["load_1m"] = {"before": str(load), "after": str(round(os.getloadavg()[0], 2))}
-            points.append(found)
-            print(
-                json.dumps(
-                    {
-                        "graph": found["graph"],
-                        "population": found["population"],
-                        "decided": found["decided"],
-                        "play_wall_us": found["play_wall_us"],
-                        "read_wall_us": found["read_wall_us"],
-                        "load_1m": found["load_1m"],
-                    }
-                ),
-                flush=True,
-            )
-    idle_after, load_after = idle_share(), load_average()
-    mean_idle = (
-        None
-        if idle_before is None or idle_after is None
-        else (Decimal(str(idle_before)) + Decimal(str(idle_after))) / 2
+    measured = run(
+        graphs,
+        repeats=args.repeats,
+        window=window,
+        catalogs=catalogs,
+        smoke=args.smoke,
+        wait_seconds=args.gate_wait_seconds,
     )
+    if measured["refused"] is not None:
+        print(measured["refused"], flush=True)
+        return 3
+    points = measured["points"]
     line = hour_line._fit(points, pairs=True)
     record = {
         "kind": KIND,
@@ -400,16 +521,11 @@ def main() -> int:
             "python": sys.version.split()[0],
             "cpus": os.cpu_count(),
         },
-        "gate": {
-            "idle_percent_before": hour_line._percent(idle_before),
-            "idle_percent_after": hour_line._percent(idle_after),
-            "idle_percent_before_least": str(IDLE_BEFORE_PERCENT),
-            "idle_percent_mean_least": str(IDLE_MEAN_PERCENT),
-            "load_most_before_each_point": str(LOAD_MOST),
-            "load_before": load_before,
-            "load_after": load_after,
+        "phases": {
+            "compose": {"gated": False, "timed": False, "load_before": load_at_start},
+            **measured["phases"],
         },
-        "discard": discarded(mean_idle, smoke=args.smoke),
+        "discard": measured["discard"],
         "surveyed_populations": surveyed,
         "graphs": [
             {
@@ -437,6 +553,7 @@ def main() -> int:
             "stated group decided for.",
             "A sealed hour's asking facts are left out: scripted answers make no provider call.",
             "The stress town is outside the admitted specification and is never offered as a world.",
+            "Composing and playing are neither gated nor timed; only the reads are.",
         ],
     }
     text = canonical_json(record).decode()

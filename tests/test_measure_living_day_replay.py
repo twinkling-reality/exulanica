@@ -91,3 +91,100 @@ def test_a_run_is_gated_unless_it_is_a_smoke_run_and_a_smoke_record_is_discarded
     assert measure.discarded(least, smoke=False) is False
     assert measure.discarded(None, smoke=False) is False
     assert measure.discarded(least + 20, smoke=True) is True
+
+
+class _Phases:
+    """The run's phases recorded in the order they happen, every play, sample and read a fake."""
+
+    def __init__(self, monkeypatch, idle: list[float | None]) -> None:
+        self.events: list[str] = []
+        self.idle = list(idle)
+        monkeypatch.setattr(measure, "play_day", self.play)
+        monkeypatch.setattr(measure, "read_day", self.read)
+        monkeypatch.setattr(measure, "idle_share", self.sample)
+        monkeypatch.setattr(measure, "settled", self.settle)
+        monkeypatch.setattr(measure, "load_average", lambda: "load")
+
+    def play(self, world, count, window, catalogs):
+        self.events.append("play")
+        return (world, count)
+
+    def read(self, day, repeats):
+        self.events.append("read")
+        world, count = day
+        return {
+            "graph": world["world_id"],
+            "population": world["population"],
+            "decided": count,
+            "read_wall_us": {"p95": 1},
+        }
+
+    def sample(self):
+        self.events.append("idle")
+        return self.idle.pop(0)
+
+    def settle(self):
+        self.events.append("settle")
+        return 1.0
+
+
+#: A town of five, whose points decide for nobody, everybody and a group of four.
+TOWN = {"world_id": "world:generated:measured-0", "population": 5}
+
+
+def _run(**changes):
+    arguments = {"repeats": 1, "window": HOUR_TICKS, "catalogs": CATALOGS, "smoke": False}
+    return measure.run([TOWN], **(arguments | changes))
+
+
+def test_the_gate_is_applied_before_the_reads_and_not_before_the_play(monkeypatch):
+    phases = _Phases(monkeypatch, [80.0, 75.0])
+    measured = _run()
+    # Every day is played before the machine is sampled; each read waits for the load first.
+    assert phases.events == ["play"] * 3 + ["idle"] + ["settle", "read"] * 3 + ["idle"]
+    assert measured["refused"] is None and len(measured["points"]) == 3
+    assert measured["phases"]["play"]["gated"] is False
+    assert measured["phases"]["gate"]["gated"] is True
+    assert measured["phases"]["reads"]["gated"] is True
+
+
+@pytest.mark.parametrize(("after", "discard"), [(40.0, False), (10.0, True)])
+def test_discard_is_computed_over_the_reads_alone(monkeypatch, after, discard):
+    phases = _Phases(monkeypatch, [80.0, after])
+    measured = _run()
+    reads = measured["phases"]["reads"]
+    assert (reads["idle_percent_before"], reads["idle_percent_after"]) == ("80.0", str(after))
+    assert measured["discard"] is discard
+    assert phases.events.count("idle") == 2
+
+
+def test_a_smoke_run_waits_for_no_gate_and_is_discarded(monkeypatch):
+    # The gate would refuse the first sample, and the mean, 52.5, would not discard the record:
+    # what admits the reads and discards the record is the smoke run alone.
+    phases = _Phases(monkeypatch, [5.0, 100.0])
+    measured = _run(smoke=True)
+    assert "settle" not in phases.events and measured["refused"] is None
+    assert measured["discard"] is True
+    assert measured["phases"]["gate"]["gated"] is False
+
+
+def test_the_gate_is_waited_for_and_a_spent_wait_reads_nothing(monkeypatch):
+    now = [0.0]
+
+    def sleep(seconds):
+        now[0] += seconds
+
+    shares = iter([60.0, 65.0, 75.0])
+    found = measure.wait_for_idle(
+        smoke=False,
+        wait_seconds=100,
+        poll_seconds=20,
+        idle=lambda: next(shares),
+        clock=lambda: now[0],
+        sleep=sleep,
+    )
+    assert found == (75.0, 40, None)
+    phases = _Phases(monkeypatch, [50.0] * 100)
+    measured = _run(wait_seconds=0)
+    assert measured["refused"].startswith("refused") and measured["points"] == []
+    assert "read" not in phases.events and measured["discard"] is True
