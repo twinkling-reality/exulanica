@@ -96,7 +96,7 @@ def test_a_run_is_gated_unless_it_is_a_smoke_run_and_a_smoke_record_is_discarded
 class _Phases:
     """The run's phases recorded in the order they happen, every play, sample and read a fake."""
 
-    def __init__(self, monkeypatch, idle: list[float | None]) -> None:
+    def __init__(self, monkeypatch, idle: list[float | None], loads=lambda: 1.0) -> None:
         self.events: list[str] = []
         self.idle = list(idle)
         monkeypatch.setattr(measure, "play_day", self.play)
@@ -104,6 +104,8 @@ class _Phases:
         monkeypatch.setattr(measure, "idle_share", self.sample)
         monkeypatch.setattr(measure, "settled", self.settle)
         monkeypatch.setattr(measure, "load_average", lambda: "load")
+        # The one-minute load the machine shows, by default a quiet machine's.
+        monkeypatch.setattr(measure.os, "getloadavg", lambda: (loads(), 0.0, 0.0))
 
     def play(self, world, count, window, catalogs):
         self.events.append("play")
@@ -188,3 +190,33 @@ def test_the_gate_is_waited_for_and_a_spent_wait_reads_nothing(monkeypatch):
     measured = _run(wait_seconds=0)
     assert measured["refused"].startswith("refused") and measured["points"] == []
     assert "read" not in phases.events and measured["discard"] is True
+
+
+def test_a_point_read_under_load_is_read_again_and_every_attempt_recorded(monkeypatch):
+    # The first point's first reads end with the machine at 9, over the gate's 8; every later
+    # read ends quiet.
+    after = iter([9.0, 5.0, 5.0, 5.0])
+    phases = _Phases(monkeypatch, [80.0, 75.0], loads=lambda: next(after))
+    measured = _run()
+    assert phases.events == ["play"] * 3 + ["idle"] + ["settle", "read"] * 4 + ["idle"]
+    first = measured["points"][0]
+    assert [attempt["load_1m"]["after"] for attempt in first["attempts"]] == ["9.0", "5.0"]
+    assert first["load_1m"] == first["attempts"][-1]["load_1m"]
+    assert [len(point["attempts"]) for point in measured["points"]] == [2, 1, 1]
+    reads = measured["phases"]["reads"]
+    assert (reads["load_most_after_each_point"], reads["reads_again_most"]) == ("8.0", 2)
+
+
+def test_a_point_whose_every_read_ends_under_load_stops_the_run(monkeypatch):
+    phases = _Phases(monkeypatch, [80.0, 75.0], loads=lambda: 9.0)
+    with pytest.raises(SystemExit, match="stopped: the one-minute load ended over"):
+        _run()
+    # Read once and again twice, then stopped, with nothing after it read.
+    assert phases.events == ["play"] * 3 + ["idle"] + ["settle", "read"] * 3
+
+
+def test_a_smoke_run_reads_each_point_once_whatever_the_load(monkeypatch):
+    phases = _Phases(monkeypatch, [80.0, 80.0], loads=lambda: 9.0)
+    measured = _run(smoke=True)
+    assert phases.events.count("read") == 3
+    assert [len(point["attempts"]) for point in measured["points"]] == [1, 1, 1]

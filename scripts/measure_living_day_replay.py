@@ -44,7 +44,9 @@ It runs in phases, and the record states each and whether it was gated:
   over ten seconds, sampled until it holds for at most ``--gate-wait-seconds`` (twenty minutes),
   and refused, with nothing read and no record written, once that wait is spent.
 - **Reads**, gated: before every point's reads the one-minute load is waited for to fall under 8,
-  for at most ten minutes, or the run stops. The mean idle is taken over the reads alone, from the
+  for at most ten minutes, or the run stops. A point whose reads end with the load at 8 or over is
+  read again, up to twice, every attempt recorded and only the last kept; one whose every read ends
+  so stops the run. The mean idle is taken over the reads alone, from the
   gate's sample and one after the last read, and a record whose mean falls under 50 percent is
   written with ``discard: true``.
 
@@ -121,6 +123,9 @@ _DEFINITION: Final = {"document_sha256": "0" * 64}
 #: sampled meanwhile (each sample itself takes the gate's ten seconds).
 GATE_WAIT_SECONDS: Final = 1200
 GATE_POLL_SECONDS: Final = 20
+#: How many times more a point is read where its reads end with the one-minute load over the
+#: gate's most; a point whose every read ends so stops the run.
+READS_AGAIN_MOST: Final = 2
 
 
 def _named(model_id: str) -> str:
@@ -382,9 +387,28 @@ def run(
     load_before = load_average()
     points = []
     for day in days:
-        load = Decimal(str(round(os.getloadavg()[0], 2))) if smoke else settled()
-        found = read_day(day, repeats)
-        found["load_1m"] = {"before": str(load), "after": str(round(os.getloadavg()[0], 2))}
+        attempts: list[dict[str, Any]] = []
+        for _attempt in range(1 + READS_AGAIN_MOST):
+            load = Decimal(str(round(os.getloadavg()[0], 2))) if smoke else settled()
+            found = read_day(day, repeats)
+            after = Decimal(str(round(os.getloadavg()[0], 2)))
+            attempts.append(
+                {
+                    "load_1m": {"before": str(load), "after": str(after)},
+                    "read_wall_us": found["read_wall_us"],
+                }
+            )
+            # A point whose reads end with the machine busier than the gate allows may have been
+            # read under another process's load: it is read again, and only the last is kept.
+            if smoke or after < Decimal(str(LOAD_MOST)):
+                break
+        else:
+            raise SystemExit(
+                f"stopped: the one-minute load ended over {LOAD_MOST} after each of "
+                f"{len(attempts)} reads of {found['graph']} with {found['decided']} decided"
+            )
+        found["load_1m"] = attempts[-1]["load_1m"]
+        found["attempts"] = attempts
         points.append(found)
         print(
             json.dumps(
@@ -409,6 +433,8 @@ def run(
         "idle_percent_mean": None if mean_idle is None else str(mean_idle),
         "idle_percent_mean_least": str(IDLE_MEAN_PERCENT),
         "load_most_before_each_point": str(LOAD_MOST),
+        "load_most_after_each_point": str(LOAD_MOST),
+        "reads_again_most": READS_AGAIN_MOST,
         "load_wait_seconds_most": LOAD_WAIT_SECONDS,
         "load_before": load_before,
         "load_after": load_average(),
