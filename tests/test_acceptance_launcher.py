@@ -427,6 +427,16 @@ def test_a_model_run_is_refused_until_it_has_a_key_an_allowlist_and_a_bound():
     }
 
 
+def test_a_durable_model_run_spends_with_the_runs_own_witness(tmp_path):
+    durable = {"EXULANICA_SPENDING": "durable"}
+
+    assert LAUNCH.model_witness_environment(durable, tmp_path) == {
+        "EXULANICA_SPENDING_WITNESS_DIR": str(tmp_path / LAUNCH.SPENDING_WITNESS_NAME)
+    }
+    assert LAUNCH.model_witness_environment({"EXULANICA_SPENDING": "process"}, tmp_path) == {}
+    assert LAUNCH.model_witness_environment({}, tmp_path) == {}
+
+
 def test_up_refuses_a_model_run_without_a_bound_before_it_starts_anything(
     tmp_path, temporary, monkeypatch
 ):

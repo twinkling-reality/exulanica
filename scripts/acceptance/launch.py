@@ -40,7 +40,8 @@ imports the code it starts.
     it also passes ``NEBIUS_API_KEY``, ``EXULANICA_EGRESS_ALLOWLIST``, ``EXULANICA_BUDGET_USD``,
     ``EXULANICA_BUDGET_MAX_CALLS`` and ``EXULANICA_SPENDING``
     from this process's environment, and refuses without any of them: a run with a model always
-    states the bound the API enforces and how it spends. Nothing writes the key anywhere. With
+    states the bound the API enforces and how it spends, and a durable one is given the run's
+    spending witness directory, as a scripted durable run is. Nothing writes the key anywhere. With
     ``--society-playback`` the API also plays the synthetic workspace's societies on their own
     (``EXULANICA_SOCIETY_CONTROL_WORKSPACES`` names that workspace alone), at the host's declared
     base wait or at ``--society-tick-interval-ms``, which the API validates. Without it the API
@@ -327,6 +328,15 @@ def scripted_environment(run_dir: Path, logs: Path, spending: str) -> dict[str, 
     if spending == "durable":
         environment["EXULANICA_SPENDING_WITNESS_DIR"] = str(run_dir / SPENDING_WITNESS_NAME)
     return environment
+
+
+def model_witness_environment(environment: Mapping[str, str], run_dir: Path) -> dict[str, str]:
+    """What a ``--model`` API spending under the durable authority is given beyond
+    ``model_environment``: the run's witness directory, the one its operator's grants are written
+    with. A process without one refuses to spend under a witnessed authority."""
+    if environment.get("EXULANICA_SPENDING") != "durable":
+        return {}
+    return {"EXULANICA_SPENDING_WITNESS_DIR": str(run_dir / SPENDING_WITNESS_NAME)}
 
 
 def api_command(python: Path, worktree: Path, port: int, plan: Path | None) -> list[str]:
@@ -1234,6 +1244,7 @@ def up(arguments: argparse.Namespace) -> None:
             arguments.society_tick_interval_ms,
         ),
     )
+    environment.update(model_witness_environment(environment, run_dir))
     plan = None
     if arguments.scripted_model is not None:
         plan = run_dir / SCRIPTED_PLAN_NAME
@@ -1542,6 +1553,7 @@ def restart_api(arguments: argparse.Namespace) -> None:
             playback.get("base_tick_interval_ms") if isinstance(playback, Mapping) else None,
         ),
     )
+    environment.update(model_witness_environment(environment, run_dir))
     scripted = state.get("scripted_model")
     if isinstance(scripted, Mapping):
         environment.update(
