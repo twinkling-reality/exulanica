@@ -70,10 +70,10 @@ class BranchedVersionView(AlternateVersionView):
     left_behind: list[LeftBehindView]
 
 
-#: What stops a branch because another write was in flight, with nothing written: a deadlock with a
-#: search or training right's stop, which takes the asset read lock before its tombstone takes the
-#: workspace lock (the branch takes them the other way round), or a serialization refusal. The
-#: same request can be sent again; the code is the one the place-name decision routes answer.
+#: What stops a branch because another write was in flight, with nothing written: a serialization
+#: refusal, or a deadlock the database ended. A search or training right's stop does not wait for
+#: the workspace lock a branch holds: its tombstone is refused instead (migration 0137). The same
+#: request can be sent again; the code is the one the place-name decision routes answer.
 _BUSY: Final = (psycopg.errors.DeadlockDetected, psycopg.errors.SerializationFailure)
 
 

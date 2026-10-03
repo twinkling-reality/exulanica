@@ -400,6 +400,11 @@ Rules:
 
 1. The tombstone is written **in the same transaction** as the user-visible state change, before any
    asynchronous work is enqueued. If the purge worker dies, the tombstone is the durable record.
+   A tombstone never waits for its workspace's lock (migration 0137): while another transaction
+   holds it, such as a playback round or an authored edit, the deletion or withdrawal is refused
+   `busy` (409; SQLSTATE 40001) and writes nothing, neither the tombstone nor the change it
+   records, and is to be sent again
+   ([asset read currency](asset-read-currency.md#writers-under-the-barrier)).
 2. **Every writer checks the tombstone before persisting a derivative**, enforced by the
    `BEFORE INSERT` triggers of section 5.1 inside the writing transaction. "Tombstoned" is a
    terminal, non-retryable error class. This is the retry race that silently resurrects data: a

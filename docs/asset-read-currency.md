@@ -117,6 +117,18 @@ between workspaces and global stage mutations without scanning workspaces throug
 security; its cost is brief cross-workspace contention, sometimes a retry for an unrelated mutation.
 Applications must retry the whole failed transaction, not its final statement.
 
+A writer that reads assets as it writes takes its workspace's lock
+([`lock_workspace`](../exulanica/world/workspace_lock.py)) before the barrier's exclusive side: an
+authored edit, a branch, a society's minute and a playback round. A tombstone takes the barrier's
+shared side first, from its first trigger, and migration 0020's structural invalidation takes the
+workspace's lock after it, so a tombstone never waits for that lock (migration 0137). Its first
+AFTER trigger takes the lock with try-lock; held by another transaction, it refuses the tombstone
+with retryable 40001, which the API answers `409 busy`, and the transaction that wrote it, a
+stopped search right's included, writes nothing. A transaction that already holds its workspace's
+lock takes it again. A tombstone that waited would hold what a reader between its two locks waits
+for while waiting for what that reader holds, a cycle PostgreSQL ends by aborting one of them
+([`tests/test_tombstone_workspace_lock_postgres.py`](../tests/test_tombstone_workspace_lock_postgres.py)).
+
 `privacy_currency_lock` takes the training-source lock shared before the privacy lock, the order
 export uses when it holds training-source exclusively, and covers an earlier admission or read in a
 writer's transaction as well as the insert trigger; this removes a deadlock between training export

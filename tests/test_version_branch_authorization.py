@@ -368,7 +368,7 @@ def test_a_branch_copies_some_rows_leaves_a_removed_one_out_and_takes_an_edit_on
 def test_a_branch_stopped_by_a_concurrent_write_is_busy_and_writes_nothing(
     api, monkeypatch, refusal
 ):
-    """A stop that took the asset read lock before the workspace lock can deadlock the branch."""
+    """A branch a concurrent write ended, by a deadlock or a serialization refusal, is busy."""
     entry, _ = _with_an_estimate(api)
     before = _versions(api, entry)
     plan = WorldObjectRepository.carry_plan
