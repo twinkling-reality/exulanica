@@ -862,7 +862,11 @@ Measured with `scripts/measure_runtime_capacity.py` and `scripts/runtime_capacit
 one host: an 18-core Apple M5 Max with 64 GiB, PostgreSQL 18 on the same host (`fsync` on,
 `max_connections` 100), one API process with the default limits, and the dedicated derivative
 worker with a vision model that answers after one second. A local record, not a statement about
-another host or about more than one process.
+another host or about more than one process. The two items on inhabited worlds read their figures
+from the [lock-holder record](evaluation/2026-10-02-asset-lock-holders.json):
+`scripts/measure_asset_lock_holders.py` running this harness's sharing phases on main 61d99d9a, the
+towns played by the API process and then by the playback process
+(`tests/test_measured_envelope_record.py` holds each figure to the record).
 
 - **Supported load:** eight workspaces, each holding six progress streams and watching each of its
   uploads to its outcome, reading three times a second and uploading three photographs a minute,
@@ -909,17 +913,23 @@ another host or about more than one process.
   it again later".
 - **Inhabited worlds beside the supported load:** eight towns whose societies the API process plays
   at four times speed, each town's traffic read every five seconds, beside the supported load for
-  three minutes. The towns advanced 72 to 73 percent of the ticks their speed sets (85 to 87 of
-  about 119), and traffic reads took 1.8 s p50, 3.4 s p95 and at most 11 s. Small reads rose to 250
-  ms p95, and 57 of 4,327 were refused when the requests class reached its 24. Progress arrived at
-  3.4 s p95, every watched upload reached its outcome with no event twice and none of another
-  workspace's, and `/healthz` answered every probe at 48 ms p95. The process peaked at 51 threads
-  and 529 MiB, the database at 19 client backends. 8 of 24 uploads answered 409 `busy` and 26 of the
-  48 photographs in accepted uploads were refused `busy`: playing towns and traffic reads both take
-  migration 0041's global asset read lock (`exulanica/api/society_runtime.py`,
-  `exulanica/world/traffic_host.py`), and a guarded intake write that meets it is refused (5.4.6),
-  which the supported load without towns did for no upload and no photograph. The supported figures
-  above therefore hold for an API process that plays no towns.
+  three minutes. The towns advanced 87 to 88 percent of the ticks their speed sets (96 to 97 ticks),
+  and traffic reads took 1.2 s p50, 2.7 s p95 and at most 11 s. Small reads answered at 29 ms p95,
+  and 26 of 4,298 were refused when the requests class reached its 24. 24 of 24 uploads were
+  accepted and 6 of 72 photographs were refused `busy` (5.4.6): a playback round holds migration
+  0041's global asset read lock from its authorization to its commit
+  ([asset read currency](asset-read-currency.md#society-inputs-under-the-barrier)), and a guarded
+  intake write that meets it is refused. The record's sampler saw the lock held in 3.7 percent of
+  its samples, and 13 of the 14 guarded writes refused met a round holding it. No traffic read held
+  it. The API process peaked at 531 MiB. The supported figures above therefore hold for an API
+  process that plays no towns.
+- **The same towns played by the playback process:** with `EXULANICA_PLAYBACK_WORKER=process`
+  (5.1.5) and the same load, the towns advanced 85 percent of the ticks their speed sets (104
+  ticks), traffic reads took 29 ms p50, 3.7 s p95 and at most 14 s, and small reads answered at 19
+  ms p95, with 59 of 4,323 refused at the requests limit. 24 of 24 uploads were accepted and 4 of 72
+  photographs were refused `busy`; the lock was held in 5.1 percent of its samples, and 22 of the 23
+  guarded writes refused met a round of the playback process. The API process peaked at 289 MiB and
+  the playback process at 500 MiB.
 
 Not measured: load past the limits for longer than two minutes, more towns or more traffic than
 above or both together with the overload, more than one API process, and any other host.
