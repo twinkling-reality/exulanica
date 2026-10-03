@@ -553,3 +553,24 @@ def test_a_fallback_answer_is_named_and_kept_out_of_the_requested_models_score(t
     assert overall["requests"] == 2
     assert (overall["scored"], overall["exact"]) == (1, 1)
     assert (overall["fallback_answers"], overall["fallback_exact"]) == (1, 1)
+
+
+def test_a_refused_draft_is_an_answer_and_a_timed_out_attempt_is_an_error():
+    truncated = {"outcome": "reply_refused", "cost_basis": "known", "usd": "0.00136940"}
+    timed_out = {"outcome": "timed_out", "cost_basis": "unknown", "usd": None}
+
+    # A 502 whose attempts were all answered (a truncated draft refused twice) is scored, not an
+    # error; one with an attempt that timed out is also an error (root's ruling of 22:51).
+    assert H.provider_error(502, [truncated, truncated]) is False
+    assert H.provider_error(502, [truncated, timed_out]) is True
+    assert H.provider_error(503, []) is True
+    assert H.provider_error(0, []) is True
+
+
+def test_an_attempt_the_record_cannot_price_is_counted_at_the_ledgers_charge():
+    known = [{"cost_basis": "known", "usd": "0.00008260"}]
+    unknown = [*known, {"cost_basis": "unknown", "usd": None}]
+    charged = Decimal("0.00151540")
+
+    assert H.request_cost(known, charged) == (Decimal("0.00008260"), "execution_record")
+    assert H.request_cost(unknown, charged) == (charged, "ledger")

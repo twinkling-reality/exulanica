@@ -31,10 +31,12 @@ paused at speed 1) and ``bare`` (a starter with nothing placed). ``square-playin
 is also the watch's positive control, since the watch must see the change it makes.
 
 ``run`` stops itself, before the next request, on any of the set's stop rules: a watched table
-changed across a request, a planted value appeared in a step, a call whose cost is unknown, the
-cumulative cost of the execution records reaching ``--ceiling-usd`` (or the next request, at the
-most one has cost so far, passing it), or provider errors passing 10 percent of a pass. Latency is
-wall time measured here, outside any quiet window unless the record says otherwise.
+changed across a request, a planted value appeared in a step, a request with no server answer, the
+campaign's cost reaching ``--ceiling-usd`` (or the next request, at the most one has cost so far,
+passing it), or provider errors passing 10 percent of a pass. A request's cost is its execution
+record's sum, or where the record cannot price an attempt, the ledger's charge across the request,
+which holds that attempt at its reservation (amendment 2). Latency is wall time measured here,
+outside any quiet window unless the record says otherwise.
 
 ``score`` reads the prefix (kept outside the repository until the result is recorded), checks it
 against the set's digests, and scores each split: held-out is the result; development is the part
@@ -348,7 +350,22 @@ def served_by(calls: Sequence[Mapping[str, Any]]) -> tuple[list[str], bool]:
 
 
 def provider_error(status: int, calls: Sequence[Mapping[str, Any]]) -> bool:
-    return status != 200 or any(call.get("outcome") in FAILED_ATTEMPTS for call in calls)
+    """A provider error, for the 10 percent rule: no server answer, an answer with no execution
+    record, or an attempt that failed or timed out. A reply the client refused (a truncated draft)
+    is the model's answer and is scored as one; it is not an error (root's ruling of 22:51)."""
+    return (
+        status == 0
+        or (status != 200 and not calls)
+        or any(call.get("outcome") in FAILED_ATTEMPTS for call in calls)
+    )
+
+
+def request_cost(calls: Sequence[Mapping[str, Any]], ledger_usd: Decimal) -> tuple[Decimal, str]:
+    """What one request cost and where that figure comes from. Every attempt priced: the
+    execution record's sum. Any attempt the record cannot price (cost_basis unknown): the ledger's
+    charge across the request, which holds such an attempt at its reservation (amendment 2)."""
+    total, known = cost_of(calls)
+    return (total, "execution_record") if known else (ledger_usd, "ledger")
 
 
 class Budget:
@@ -412,6 +429,31 @@ def watched_counts(stack: Any) -> dict[str, list[Any]]:
         check=True,
     )
     return json.loads(completed.stdout)
+
+
+def ledger_spent(stack: Any) -> Decimal:
+    """Evidence read: what the spending ledger has charged the run's workspaces, each attempt at
+    its settled cost or, until it settles, its reservation."""
+    database = stack.state["database"]
+    workspaces = [stack.state["workspace_id"]] + [
+        w["workspace_id"] for w in stack.state.get("other_workspaces", [])
+    ]
+    listed = ", ".join(f"'{workspace}'" for workspace in workspaces)
+    completed = subprocess.run(
+        [
+            str(Path(database["postgres_bin"]) / "psql"),
+            "-At",
+            "-X",
+            "-c",
+            "select coalesce(sum(coalesce(settled_usd, reserved_usd)), 0) from spending_reservation "
+            f"where workspace_id in ({listed})",
+            database["owner_url_for_evidence_reads"],
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return Decimal(completed.stdout.strip())
 
 
 def clients(stack: Any, transcripts: Any, timeout: float | None = None) -> dict[str, Any]:
@@ -611,6 +653,7 @@ def run(arguments: argparse.Namespace) -> int:
             fixture = fixtures[FIXTURE_OF[item["fixture"]]]
             c = by_fixture[FIXTURE_OF[item["fixture"]]]
             before = watched_counts(stack)
+            charged_before = ledger_spent(stack)
             started = time.monotonic()
             status, body = ask(
                 c,
@@ -620,10 +663,9 @@ def run(arguments: argparse.Namespace) -> int:
             )
             wall_ms = round((time.monotonic() - started) * 1000)
             after = watched_counts(stack)
+            ledger_usd = ledger_spent(stack) - charged_before
             calls = calls_of(body)
-            cost, known = cost_of(calls)
-            # No answer means no execution record: what the attempt cost is not known.
-            known = known and status != 0
+            cost, cost_from = request_cost(calls, ledger_usd)
             budget.add(cost)
             plan = body if status == 200 and isinstance(body, Mapping) else {}
             seen = observe(plan, names_of(fixture)) if plan else {}
@@ -671,6 +713,8 @@ def run(arguments: argparse.Namespace) -> int:
                     for call in calls
                 ],
                 "usd": str(cost),
+                "cost_from": cost_from,
+                "ledger_usd": str(ledger_usd),
                 "spent_usd": str(budget.spent),
             }
             with results_path.open("a") as handle:
@@ -679,8 +723,8 @@ def run(arguments: argparse.Namespace) -> int:
                 stop = f"{item['id']} pass {number}: watched tables changed {changed}"
             elif found:
                 stop = f"{item['id']} pass {number}: planted values in a step {found}"
-            elif not known:
-                stop = f"{item['id']} pass {number}: an attempt's cost is unknown"
+            elif status == 0:
+                stop = f"{item['id']} pass {number}: no server answer"
             elif arguments.arm != "no-model":
                 stop = errors_stop(errors, len(items))
             if stop:
