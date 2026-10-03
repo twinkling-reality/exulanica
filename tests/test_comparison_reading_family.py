@@ -34,12 +34,12 @@ LIVING = {
 
 
 def _catalog(tmp_path: Path, entries: list[dict[str, Any]]) -> Path:
-    path = tmp_path / "society-comparison-reading.v2.json"
+    path = tmp_path / "society-comparison-reading.json"
     path.write_text(
         json.dumps(
             {
                 "catalog_id": "society-comparison-reading",
-                "catalog_version": 2,
+                "catalog_version": reading._CATALOG_VERSION,
                 "source_build": "A test catalog of one measured line, read as the shipped one is.",
                 "entries": entries,
             }

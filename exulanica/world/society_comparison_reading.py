@@ -107,10 +107,10 @@ READING_CATALOG: Final = (
     / "assets"
     / "catalogs"
     / "society-comparison-cost"
-    / "society-comparison-reading.v2.json"
+    / "society-comparison-reading.v3.json"
 )
 _CATALOG_ID: Final = "society-comparison-reading"
-_CATALOG_VERSION: Final = 2
+_CATALOG_VERSION: Final = 3
 #: How an entry's line is read from its record: the record's fitted ``line``.
 _EXTRACTION: Final = "replay_line"
 

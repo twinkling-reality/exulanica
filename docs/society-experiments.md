@@ -416,7 +416,7 @@ does not refuse such a group.
 
 **A living town's line.** A living town (`exulanica-society/v5`), the engine a generated town's
 society runs, is read by a line measured on its own replay rather than the protocol's:
-[`assets/catalogs/society-comparison-cost/society-comparison-reading.v2.json`](../assets/catalogs/society-comparison-cost/society-comparison-reading.v2.json)
+[`assets/catalogs/society-comparison-cost/society-comparison-reading.v3.json`](../assets/catalogs/society-comparison-cost/society-comparison-reading.v3.json)
 names it for the state family the engine reads (`living`) and binds it by path and digest to its
 [measurement record](evaluation/2026-10-02-living-comparison-replay.json), which
 [`scripts/measure_living_comparison_replay.py`](../scripts/measure_living_comparison_replay.py)
@@ -443,16 +443,36 @@ the same minute the next day, 1440 minutes, defined under the fourth protocol, t
 the fifth seeds ([claim](#claim)). A purposeful society keeps no time of day and is not compared
 over one. A day is offered only where the reading catalog binds a line measured over the day's
 window, as an entry of its own for the state family and the window (`living-1440`), since a run is
-read by the hour and a town's hours differ through its day; the catalog binds none, so a start of a
-day is refused by name (`window_not_offered`, 409), and the plan states each window with the line
-it is read by or the refusal it meets. A day's run is played hour by hour, each hour sealed as it
-ends ([records](#records)) once its inputs' rights are asked again, so a run whose inputs lost their
-rights fails as `input_unavailable` at the end of the hour it lost them in and seals no later one.
-Each hour is read by a replay from the state the hour before it sealed ([reads](#reads)), never by
-one from the genesis, and no drawing of a day is stored; a read of a run's day sets out every
-person's minutes from its sealed hours with no replay. A day's run asks at most 24 times what an
-hour's can, which the plan states for the window it names (what it can cost, above)
-([`tests/test_comparison_day_postgres.py`](../tests/test_comparison_day_postgres.py)).
+read by the hour and a town's hours differ through its day; a day of a family the catalog binds no
+such line for is refused by name (`window_not_offered`, 409), and the plan states each window with
+the line it is read by or the refusal it meets.
+[`assets/catalogs/society-comparison-cost/society-comparison-reading.v3.json`](../assets/catalogs/society-comparison-cost/society-comparison-reading.v3.json)
+binds the living town's line over a day by path and digest to its
+[measurement record](evaluation/2026-10-02-living-day-replay.json), which
+[`scripts/measure_living_day_replay.py`](../scripts/measure_living_day_replay.py) wrote under the
+quiet slot. Measured: 25 points on the hour line's graphs, small towns of 38 and 52 people, market
+towns of 74 and 88 and the stress town of 128, each at its own population with nobody, everybody and
+groups of 4, 8 and 16 decided for; each day played and sealed hour by hour with scripted answers the
+engine applies, then every hour read three times as the run route reads one and the day as the day
+route reads it, a point's read the dearest of them. Composing and playing were neither gated nor
+timed; the reads' gate passed at 79.81 percent idle, the reads' mean idle was 83.17 percent, and the
+one-minute load was under 8 before every point. Derived: the least-margin line on or above every
+point, 0 ms for any run, 14853 µs for each of the society's people, 111130 µs for each person a
+model decides for, and 0 µs more for each of those for each person of the society. One point sets
+its figure for each decided person: the town of 52 with everybody decided, whose hour 14 read at
+2.34 to 6.55 s while the one-minute load rose from 7.74 before the point to 17.55 after it, during
+another project's build; the bound therefore errs toward fewer decided people. By that line and the
+protocol's pair budget, a model may decide over a day for all 38 people of the town of 38, and at
+most 38 of 52, 35 of 74, 33 of 88 and 27 of 128; a run would hold 329 people where a model decides
+for one of them, so the ground's 128 is the bound on a day's population. The plan route and a start
+judge a day of a living town's society by this line. A day's run is played hour by hour, each hour
+sealed as it ends ([records](#records)) once its inputs' rights are asked again, so a run whose
+inputs lost their rights fails as `input_unavailable` at the end of the hour it lost them in and
+seals no later one. Each hour is read by a replay from the state the hour before it sealed
+([reads](#reads)), never by one from the genesis, and no drawing of a day is stored; a read of a
+run's day sets out every person's minutes from its sealed hours with no replay. A day's run asks at
+most 24 times what an hour's can, which the plan states for the window it names (what it can cost,
+above) ([`tests/test_comparison_day_postgres.py`](../tests/test_comparison_day_postgres.py)).
 
 **Where it runs.** A host's comparison worker (`exulanica/api/society_comparison_worker.py`) plays
 it off the request path, for the workspaces the host asks models for

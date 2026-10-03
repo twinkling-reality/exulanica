@@ -443,17 +443,13 @@ def _cut(document: dict[str, Any]) -> dict[str, Any]:
 
 
 @pytest.mark.parametrize("saved_world", [2], indirect=True)
-def test_a_purposeful_society_is_not_defined_over_a_day(app, monkeypatch, tmp_path):
+def test_a_purposeful_society_is_not_defined_over_a_day(app):
     world, client = app
     stays._inhabited(world, client)
-    # A line over a day stands in the reading catalog, so the reading bound does not refuse the
-    # day first: what refuses it is that the society keeps none.
+    # The reading catalog binds a line over a day, so the reading bound does not refuse the day
+    # first: what refuses it is that the society keeps none.
     document = json.loads(reading.READING_CATALOG.read_text(encoding="utf-8"))
-    hour = next(entry for entry in document["entries"] if entry["key"] == "living")
-    document["entries"].append({**hour, "key": "living-1440", "window_ticks": 1440})
-    lines = tmp_path / "society-comparison-reading.v2.json"
-    lines.write_text(json.dumps(document), encoding="utf-8")
-    monkeypatch.setattr(reading, "READING_CATALOG", lines)
+    assert any(entry["key"] == "living-1440" for entry in document["entries"])
     runner = _runner(world, client.app.state.services, _Chooser())
     # The positive control: over an hour, the same selection is defined.
     runner.define(
