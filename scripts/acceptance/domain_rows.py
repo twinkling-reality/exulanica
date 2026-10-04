@@ -11,8 +11,9 @@ restarts that stack's API with ``launch.py restart-api`` where a row needs a fre
 leaves the stack running:
 
 - ``comparisons``: H1 (two models deciding for a generated town's people, a same-model control and
-  a cancel), H2 (fixed signal timing against two models) and H3 (the living town's reading line,
-  from V7's record on the candidate). The stack is started with ``--workspaces 2
+  a cancel), H2 (fixed signal timing against two models), H3 (the living town's reading line,
+  from V7's record on the candidate) and H4 (its day line, from the day record the candidate's
+  catalog binds). The stack is started with ``--workspaces 2
   --read-only-token --scripted-model scripts/acceptance/plans/comparisons.json --spending process
   --society-playback --no-derivative-worker``: the plan answers each model's asks by choosing
   among the options the request itself offers, so the two models choose differently and the same
@@ -42,6 +43,7 @@ Outputs under ``--out``: ``results.json``, ``transcripts/<client>.jsonl``, ``evi
 from __future__ import annotations
 
 import argparse
+import ast
 import datetime as dt
 import hashlib
 import importlib.util
@@ -284,6 +286,7 @@ def plan_of(
     control: bool,
     seeds: int,
     people: Sequence[str] = (),
+    window: str = "hour",
 ) -> tuple[int, dict[str, Any]]:
     query: dict[str, Any] = {
         **F.world_query(entry),
@@ -292,6 +295,8 @@ def plan_of(
         "seeds": str(seeds),
         "control": "true" if control else "false",
     }
+    if window != "hour":
+        query["window"] = window
     # The client takes one value per name, so repeated names ride in a list the server reads.
     pairs = [*query.items(), *(("model", model_text(m)) for m in models)]
     pairs += [("person", person) for person in people]
@@ -1601,6 +1606,164 @@ def hour_entry(catalog: Mapping[str, Any], family: str) -> dict[str, Any]:
     )
 
 
+def window_entry(catalog: Mapping[str, Any], family: str, window_ticks: int) -> dict[str, Any]:
+    """The family's line over a window longer than an hour, keyed ``<family>-<ticks>`` with its
+    ``window_ticks``, as the catalog's reader requires of it, or an empty entry."""
+    return next(
+        (
+            dict(e)
+            for e in catalog.get("entries", [])
+            if e.get("state_family") == family
+            and e.get("key") == f"{family}-{window_ticks}"
+            and e.get("window_ticks") == window_ticks
+        ),
+        {},
+    )
+
+
+#: Every file the drawing digest covers, named by the candidate's interpreter as the digest reads
+#: them (its modules by source path, its data files), each relative to the checkout where it is
+#: inside it, and each data file's directory with the glob the digest reads it by.
+DRAWING_FILES = """
+import importlib.util, json
+from exulanica.world import society_comparison_drawing as d
+print(json.dumps({
+    "modules": [importlib.util.find_spec(m).origin for m in d.DRAWING_MODULES],
+    "data": [str(p) for p in d.drawing_data()],
+}))
+"""
+#: What A-56 lets a drawing digest move for, as a seeds catalog file's name.
+SEEDS_FILE = re.compile(r"society-comparison-seeds\.v[0-9]+\.json")
+#: The constant naming the seeds catalog in the catalogs module: A-56 lets the version a table maps
+#: it to, and the versions its schemas are built for, change, and nothing else.
+SEEDS_CONSTANT = "COMPARISON_SEEDS_CATALOG"
+
+
+class _SeedsVersionsBlanked(ast.NodeTransformer):
+    """The module with the seeds catalog's version in every table and its schemas' versions blanked,
+    so two sources differing only there, or in comments, dump alike."""
+
+    def visit_Dict(self, node: ast.Dict) -> ast.AST:
+        self.generic_visit(node)
+        node.values = [
+            ast.Constant("seeds-version")
+            if isinstance(key, ast.Name) and key.id == SEEDS_CONSTANT
+            else value
+            for key, value in zip(node.keys, node.values, strict=True)
+        ]
+        return node
+
+    def visit_DictComp(self, node: ast.DictComp) -> ast.AST:
+        self.generic_visit(node)
+        key = node.key
+        if (
+            isinstance(key, ast.Tuple)
+            and key.elts
+            and isinstance(key.elts[0], ast.Name)
+            and key.elts[0].id == SEEDS_CONSTANT
+        ):
+            for generator in node.generators:
+                generator.iter = ast.Constant("seeds-versions")
+        return node
+
+
+def seeds_versions_only(before: str, after: str) -> bool:
+    """Whether two sources of the catalogs module differ only in the seeds catalog's versions
+    (A-56): the version a table maps the seeds constant to and the versions its schemas are built
+    for, or in comments."""
+
+    def blanked(source: str) -> str:
+        return ast.dump(_SeedsVersionsBlanked().visit(ast.parse(source)))
+
+    return blanked(before) == blanked(after)
+
+
+def seeds_entries_kept(before: str | None, after: str | None) -> bool:
+    """Whether a seeds catalog file kept every entry it held (A-56): a new file holds none to keep;
+    a removed file keeps nothing."""
+    if after is None:
+        return False
+    if before is None:
+        return True
+    old, new = json.loads(before), json.loads(after)
+    return all(entry in new.get("entries", []) for entry in old.get("entries", [])) and {
+        k: v for k, v in old.items() if k not in ("entries", "catalog_version")
+    } == {k: v for k, v in new.items() if k not in ("entries", "catalog_version")}
+
+
+def drawing_drift(worktree: Path, record_head: str) -> dict[str, Any]:
+    """The drawing files that differ between the commit a record measured and the candidate's
+    checkout, computed here (A-56), each with whether A-56 lets it differ: a seeds catalog file
+    keeping its entries, or the catalogs module changing only the seeds catalog's versions. The
+    files are the ones the candidate's own digest reads; a file at the record's head the candidate
+    no longer has is found by its directory's glob."""
+    named = subprocess.run(
+        [str(worktree / ".venv" / "bin" / "python"), "-c", DRAWING_FILES],
+        cwd=worktree,
+        env=LAUNCH.clean_environment(),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if named.returncode != 0:
+        return {"computed": False, "why": f"the drawing files: {named.stderr.strip()[-200:]}"}
+    listed = json.loads(named.stdout)
+
+    def relative(path: str) -> str:
+        return str(Path(path).resolve().relative_to(worktree.resolve()))
+
+    def git(*args: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            ["git", "-C", str(worktree), *args], capture_output=True, text=True, check=False
+        )
+
+    if git("cat-file", "-e", f"{record_head}^{{commit}}").returncode != 0:
+        return {"computed": False, "why": f"the record's head {record_head} is not in this clone"}
+    files = sorted({relative(p) for p in listed["modules"] + listed["data"]})
+    globs = sorted({f":(glob){Path(relative(p)).parent}/*.json" for p in listed["data"]})
+    changed = git("diff", "--name-only", record_head, "--", *files, *globs).stdout.split()
+    changed += git("ls-files", "--others", "--exclude-standard", "--", *globs).stdout.split()
+    found = []
+    for path in sorted(set(changed)):
+        shown = git("show", f"{record_head}:{path}")
+        before = shown.stdout if shown.returncode == 0 else None
+        after = (worktree / path).read_text() if (worktree / path).is_file() else None
+        if SEEDS_FILE.fullmatch(Path(path).name):
+            allowed = seeds_entries_kept(before, after)
+        elif path == "exulanica/world/society_catalogs.py" and before and after:
+            allowed = seeds_versions_only(before, after)
+        else:
+            allowed = False
+        found.append({"path": path, "at_head": before is not None, "allowed": allowed})
+    return {
+        "computed": True,
+        "record_head": record_head,
+        "changed": found,
+        "stands": all(f["allowed"] for f in found),
+    }
+
+
+def drawing_verdict(row: Row, worktree: Path, record: Mapping[str, Any], candidate: str) -> Any:
+    """Block ``row`` unless the record measured the candidate's drawing code, or the drawing files
+    that differ since the record's head are all ones A-56 lets differ; the computed drift, or None
+    where the digests are equal."""
+    source = record.get("source") or {}
+    if candidate == source.get("drawing_code_sha256"):
+        return None
+    drift = drawing_drift(worktree, str(source.get("head") or ""))
+    if not drift.get("stands"):
+        row.blocked_by.append(
+            f"the record measured drawing code {source.get('drawing_code_sha256')}, the "
+            f"candidate's is {candidate}, and the drawing files changed since its head are not all "
+            f"ones A-56 allows: {drift}; the line needs a re-measure in a quiet window (A-39)"
+        )
+    return drift
+
+
+#: A day, in the simulated minutes a comparison's window counts.
+DAY_TICKS = 1440
+
+
 #: How the record's script names the drawing code it measured: the module's own digest, read by
 #: the candidate's interpreter as the script reads it (``scripts/measure_living_comparison_replay.py``).
 DRAWING_DIGEST = (
@@ -1632,7 +1795,8 @@ def row_h3(stack: Stack, transcripts: Any, out: Path, town: Mapping[str, Any]) -
         "reading catalog the candidate reads binds the record its living entry names by the "
         "sha256 of the file; the record's drawing "
         "code digest equals the candidate's, by the record script's own method, so the record "
-        "measured this source; the record names each graph's total population and every point's "
+        "measured this source, or the drawing files changed since the record's head are only "
+        "ones A-56 lets change, computed here; the record names each graph's total population and every point's "
         "model-decided population; and on H1's live town the plan serves population_most and "
         "decided_most as the record's line derives them for that population. No timing is "
         "measured here.",
@@ -1679,12 +1843,13 @@ def row_h3(stack: Stack, transcripts: Any, out: Path, town: Mapping[str, Any]) -
     row.expect(
         drawing.returncode == 0, f"the drawing digest did not compute: {drawing.stderr[-200:]}"
     )
-    if drawing.returncode == 0 and candidate_drawing != recorded_drawing:
-        # A-39: the record measured other code, so H3 waits for a quiet-window re-measure.
-        row.blocked_by.append(
-            f"the record measured drawing code {recorded_drawing}, the candidate's is "
-            f"{candidate_drawing}: V7's line needs a re-measure in a quiet window (A-39)"
-        )
+    # A-39: a record that measured other code blocks H3 until a quiet-window re-measure, unless
+    # the drawing files changed since its head are ones A-56 lets change.
+    drift = (
+        drawing_verdict(row, worktree, record, candidate_drawing)
+        if drawing.returncode == 0
+        else None
+    )
     graphs = record.get("graphs") or []
     points = record.get("points") or []
     row.expect(
@@ -1735,6 +1900,7 @@ def row_h3(stack: Stack, transcripts: Any, out: Path, town: Mapping[str, Any]) -
         "record_sha256": record_sha,
         "catalog_binds": [entry.get("source"), entry.get("source_sha256")],
         "drawing_code_sha256": {"record": recorded_drawing, "candidate": candidate_drawing},
+        "drawing_drift": drift,
         "record_head": (record.get("source") or {}).get("head"),
         "graphs": [
             {k: g.get(k) for k in ("world_id", "population", "outside_specification")}
@@ -1748,6 +1914,138 @@ def row_h3(stack: Stack, transcripts: Any, out: Path, town: Mapping[str, Any]) -
             "decided_most": decided_most(population) if isinstance(population, int) else None,
         },
         "plan": {k: plan.get(k) for k in ("population", "population_most", "decided_most")},
+        "town": town.get("entry_id"),
+    }
+    return row.close()
+
+
+def row_h4(stack: Stack, transcripts: Any, out: Path, town: Mapping[str, Any]) -> Row:
+    row = Row(
+        "H4",
+        "compare.day_record",
+        "A living town's day, read by its day line (A-57), passed only when, computed on the "
+        "candidate: the reading catalog the candidate reads binds the record its living day entry "
+        "(window_ticks 1440) names by the sha256 of the file; the record measured a window of 1440 "
+        "minutes and the candidate's drawing code, by the record script's own method, or drawing "
+        "files changed since its head only as A-56 allows, computed here; the catalog's "
+        "day line is the record's; and on H1's live town the plan offers the day window, reads it "
+        "by that record, and serves population_most and decided_most for a day as the line derives "
+        "them with the record's run budget. No timing is measured here.",
+    )
+    worktree = stack.worktree
+    named = subprocess.run(
+        [str(worktree / ".venv" / "bin" / "python"), "-c", READING_CATALOG_PATH],
+        cwd=worktree,
+        env=LAUNCH.clean_environment(),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    catalog_path = Path(named.stdout.strip())
+    row.expect(
+        named.returncode == 0 and catalog_path.is_file(),
+        f"the candidate names no reading catalog: {named.stderr.strip()[-200:]}",
+    )
+    catalog = json.loads(catalog_path.read_text()) if catalog_path.is_file() else {}
+    entry = window_entry(catalog, "living", DAY_TICKS)
+    day_record = str(entry.get("source") or "")
+    record_path = worktree / day_record
+    record_sha = (
+        hashlib.sha256(record_path.read_bytes()).hexdigest() if record_path.is_file() else ""
+    )
+    row.expect(
+        bool(day_record) and record_path.is_file() and entry.get("source_sha256") == record_sha,
+        f"the catalog binds {day_record or 'no day record'} {entry.get('source_sha256')}, the "
+        f"file is {record_sha or 'absent'}",
+    )
+    record = (
+        (json.loads(record_path.read_text()).get("record") or {}) if record_path.is_file() else {}
+    )
+    row.expect(
+        record.get("window_ticks") == DAY_TICKS,
+        f"the record measured a window of {record.get('window_ticks')} minutes",
+    )
+    drawing = subprocess.run(
+        [str(worktree / ".venv" / "bin" / "python"), "-c", DRAWING_DIGEST],
+        cwd=worktree,
+        env=LAUNCH.clean_environment(),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    candidate_drawing = drawing.stdout.strip()
+    recorded_drawing = (record.get("source") or {}).get("drawing_code_sha256")
+    row.expect(
+        drawing.returncode == 0, f"the drawing digest did not compute: {drawing.stderr[-200:]}"
+    )
+    drift = (
+        drawing_verdict(row, worktree, record, candidate_drawing)
+        if drawing.returncode == 0
+        else None
+    )
+    run_us = int((record.get("derived") or {}).get("run_budget_us") or 0)
+    line = record.get("line") or {}
+    line_keys = (
+        "replay_fixed_ms",
+        "replay_per_person_us",
+        "replay_per_decided_person_us",
+        "replay_per_decided_pair_us",
+    )
+    row.expect(
+        bool(line) and {k: line.get(k) for k in line_keys} == {k: entry.get(k) for k in line_keys},
+        "the catalog's day line is not the record's",
+    )
+    population_most, decided_most = line_bound(line, run_us) if line else (None, lambda _: None)
+    c = F.client(stack, transcripts, "w1", "token")
+    status, plan = plan_of(c, "H4", town, [GOING_MODEL], control=False, seeds=1, window="day")
+    population = plan.get("population")
+    offered = next((w for w in plan.get("windows") or [] if w.get("window") == "day"), {})
+    row.expect(status == 200, f"the plan answered {status}")
+    row.expect(
+        offered.get("refusal") is None and offered.get("window_ticks") == DAY_TICKS,
+        f"the day window is {offered.get('window_ticks')} minutes, refused {offered.get('refusal')}",
+    )
+    row.expect(
+        offered.get("reading_record") == day_record,
+        f"the day is read by {offered.get('reading_record')}, the catalog names {day_record}",
+    )
+    row.expect(
+        plan.get("window") == "day" and plan.get("window_ticks") == DAY_TICKS,
+        f"the plan answers window {plan.get('window')} of {plan.get('window_ticks')} minutes",
+    )
+    row.expect(
+        plan.get("population_most") == population_most,
+        f"the plan serves population_most {plan.get('population_most')} for a day, the line "
+        f"derives {population_most}",
+    )
+    row.expect(
+        isinstance(population, int) and plan.get("decided_most") == decided_most(population),
+        f"the plan serves decided_most {plan.get('decided_most')} for {population} over a day, "
+        f"the line derives {decided_most(population) if isinstance(population, int) else None}",
+    )
+    row.observed = {
+        "reading_catalog": str(catalog_path.relative_to(worktree))
+        if catalog_path.is_relative_to(worktree)
+        else str(catalog_path),
+        "record": day_record,
+        "record_sha256": record_sha,
+        "catalog_binds": [entry.get("key"), entry.get("source"), entry.get("source_sha256")],
+        "window_ticks": record.get("window_ticks"),
+        "drawing_code_sha256": {"record": recorded_drawing, "candidate": candidate_drawing},
+        "drawing_drift": drift,
+        "record_head": (record.get("source") or {}).get("head"),
+        "line": {k: line.get(k) for k in line_keys},
+        "run_budget_us": run_us,
+        "derived": {
+            "population_most": population_most,
+            "decided_most": decided_most(population) if isinstance(population, int) else None,
+        },
+        "day_window": offered,
+        "plan": {
+            k: plan.get(k)
+            for k in ("window", "window_ticks", "population", "population_most", "decided_most")
+        },
+        "plan_refusal": plan.get("plan_refusal"),
         "town": town.get("entry_id"),
     }
     return row.close()
@@ -3357,7 +3655,12 @@ def comparisons(arguments: argparse.Namespace) -> int:
     transcripts = Transcripts(out / "transcripts")
     started = dt.datetime.now(dt.UTC).isoformat()
     h1, town = row_h1(stack, transcripts, out)
-    rows = [h1, row_h2(stack, transcripts, out, town), row_h3(stack, transcripts, out, town)]
+    rows = [
+        h1,
+        row_h2(stack, transcripts, out, town),
+        row_h3(stack, transcripts, out, town),
+        row_h4(stack, transcripts, out, town),
+    ]
     write_results(out, stack, rows, started, sys.argv[1:])
     return 0 if all(row.status != "failed" for row in rows) else 1
 

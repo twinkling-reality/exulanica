@@ -129,3 +129,36 @@ def test_the_driver_names_the_code_it_started_with_and_says_when_that_changed():
     assert source.count('"driver_sha256": DRIVER_SHA256_AT_START') == source.count(
         '"driver_changed_during_run":'
     )
+
+
+def test_the_companion_plans_drafts_fill_the_form_the_product_builds():
+    """Each world-edit draft the Companion rows script names only the fields the product's form
+    offers, so a scripted reply is refused for the reason its row means and never for its shape
+    (A-55: the old slots were refused on every draft)."""
+    import json
+
+    from exulanica.selection import action_plan as plan
+
+    from test_companion_action_plan import _world
+
+    step = plan._world_edit_form(_world()).model_json_schema()["$defs"]["WorldEditStep"]
+    offered = set(step["properties"])
+    drafts = [
+        json.loads(rule["content"])
+        for rule in json.loads(DRIVE.COMPANION_PLAN.read_text())["rules"]
+        if rule["match"]["contains"].startswith("The request:")
+    ]
+
+    assert drafts
+    for draft in drafts:
+        for drafted in draft["steps"]:
+            assert set(drafted) <= offered, drafted
+            assert drafted["operation"] in plan.WorldEditOperation._value2member_map_
+
+
+def test_a_confirmation_of_a_plan_with_no_step_is_answered_and_sends_nothing():
+    class Refusing:
+        def call(self, *arguments, **keywords):
+            raise AssertionError("a step that is not there was sent")
+
+    assert DRIVE.confirm(Refusing(), "F1", {}, {}) == (0, {})

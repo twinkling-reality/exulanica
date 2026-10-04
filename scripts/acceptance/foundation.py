@@ -3385,7 +3385,11 @@ def ask_companion(
 
 
 def confirm(c: Client, step: str, entry: Mapping[str, Any], planned: Mapping[str, Any]):
-    """Send a prepared step's own request to the route it names, as a direct client would."""
+    """Send a prepared step's own request to the route it names, as a direct client would. A plan
+    that holds no step is answered as status 0 here, so the row fails on its expectations instead
+    of the driver stopping before it writes its results (A-55)."""
+    if not planned.get("operation"):
+        return 0, {}
     method, template = planned["operation"].split(" ", 1)
     path = template
     for key, value in (planned.get("bind") or {}).items():
@@ -3520,8 +3524,8 @@ def companion(arguments: argparse.Namespace) -> int:
         f"a repeated confirmation answered {status_again} {problem_code(again)}",
     )
     e1 = read_entry(w1, "F1", e1["entry_id"])
-    # The world now holds an object, so the form offers an objects slot: the second ask is the one
-    # the scripted plan answers with that slot.
+    # The world now holds an object, so the form's options list it too: the second ask is the one
+    # the scripted plan answers on that form.
     status_second, second = ask_companion(w1, "F1", e1, utterances["bench_by_stall"])
     second_step = (second.get("steps") or [{}])[0]
     parity.expect(
@@ -3547,6 +3551,62 @@ def companion(arguments: argparse.Namespace) -> int:
         "control": control,
     }
     rows.append(parity.close())
+
+    # F5: one undo per drafted plan. e1 holds F1's confirmed bench, so there is an edit to undo.
+    undo_row = Row(
+        "F5",
+        "companion.one_undo",
+        "On a world holding one confirmed edit, with nothing written in either case: a draft of one "
+        "undo_last_edit step is planned as one prepared step naming the undo route; a draft of two "
+        "undo_last_edit steps is refused action_not_offered at step 1, so no plan takes back an "
+        "edit nobody named. Whether the form sent to the model lists each step's options last is "
+        "not read here: the scripted model's log keeps a digest of each request, not its schema.",
+    )
+    e1 = read_entry(w1, "F5", e1["entry_id"])
+    control_equal, _ = no_write_control(stack, w1, e1)
+    undo_row.expect(control_equal, "the evidence method saw a change across a plain read")
+    before = stack.evidence_digest()
+    calls = scripted_calls(stack)
+    status_one, one = ask_companion(w1, "F5", e1, utterances["undo_one"])
+    status_two, two = ask_companion(w1, "F5", e1, utterances["undo_two"])
+    undo_row.expect(
+        stack.evidence_digest() == before, "planning an undo wrote to the database or store"
+    )
+    undo_row.expect(scripted_calls(stack) - calls == 4, "the two asks did not make two calls each")
+    one_steps = one.get("steps") or []
+    undo_row.expect(
+        status_one == 200 and one.get("outcome") == "plan" and one.get("kind") == "world_edit",
+        f"one undo answered {status_one} {one.get('outcome')} {one.get('kind')} "
+        f"{(one.get('refusal') or {}).get('code')}",
+    )
+    undo_row.expect(
+        [step.get("operation") for step in one_steps]
+        == ["POST /world/versions/{version_id}/objects/undo"]
+        and one_steps[0].get("state") == "prepared",
+        f"one undo planned {[(s.get('operation'), s.get('state')) for s in one_steps]}",
+    )
+    refused = two.get("refusal") or {}
+    undo_row.expect(
+        status_two == 200
+        and two.get("outcome") == "refused"
+        and refused.get("code") == "action_not_offered"
+        and refused.get("step") == 1
+        and not two.get("steps"),
+        f"two undos answered {status_two} {two.get('outcome')} {refused.get('code')} at step "
+        f"{refused.get('step')} with {len(two.get('steps') or [])} steps",
+    )
+    undo_row.observed = {
+        "one": {
+            "outcome": one.get("outcome"),
+            "operations": [step.get("operation") for step in one_steps],
+        },
+        "two": {
+            "outcome": two.get("outcome"),
+            "refusal": {k: refused.get(k) for k in ("code", "step", "operation")},
+            "steps": len(two.get("steps") or []),
+        },
+    }
+    rows.append(undo_row.close())
 
     # N1.i: the journey's bench through the Companion, on a world whose people can use it.
     journey_row = Row(
