@@ -13,8 +13,40 @@ export type {
   GeneratedTileMetrics,
   GeneratedTileMount,
 } from './binding-contract.js';
-export type { Rgb, TileContactShadowMode, TileLook, TileShadowFilter, TileToneMapping } from './look.js';
-export { TILE_LOOK_ID, TILE_LOOK_V1, TileLookError, sunDirection, validateTileLook } from './look.js';
+export type {
+  RenderClouds,
+  RenderEdge,
+  RenderFog,
+  RenderLook,
+  RenderPost,
+  RenderShading,
+  RenderShadowFilter,
+  RenderSky,
+  RenderToon,
+  Rgb,
+  ShadingModel,
+  TileContactShadowMode,
+  TileLook,
+  TileLookV1,
+  TileShadowFilter,
+  TileToneMapping,
+} from './look.js';
+export {
+  RENDER_LOOK_ID,
+  TILE_LOOK_ID,
+  TILE_LOOK_V1,
+  TileLookError,
+  isRenderLook,
+  sunDirection,
+  validateLook,
+  validateRenderLook,
+  validateTileLook,
+} from './look.js';
+export { cloudNoise, cubeFaceDirection, latticeHash, renderSkyFaces, renderSkyRadiance } from './sky.js';
+export type { ShadingChunks } from './shading.js';
+export { applyShading, shadingChunks } from './shading.js';
+export type { InkOptions, TileInk } from './ink.js';
+export { INK_OPTIONS, attachTileInk, inkSegments } from './ink.js';
 export type { PreparedTextureSet, TileMaterialReference, TileTextureResolution } from './texture-materials.js';
 export {
   TileTextureLibrary,
@@ -38,7 +70,7 @@ export { GLAZING_FRESNEL_CHUNK, GLAZING_FRESNEL_GLSL, GLAZING_FRESNEL_WGSL, glaz
 export type { SurfaceBatch } from './surface-mesh.js';
 export { buildSurfaceMesh, validateSurfaceBatch } from './surface-mesh.js';
 export type { TileEnvironment } from './environment.js';
-export { applyTileEnvironment, skyRadiance } from './environment.js';
+export { RENDER_SHADOW_TYPES, applyTileEnvironment, skyRadiance } from './environment.js';
 export { createUnavailableMaterial, unavailablePatternTexels } from './unavailable-surface.js';
 export type {
   DrawnTileRange,

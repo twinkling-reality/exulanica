@@ -10,7 +10,8 @@ import {
 } from '@exulanica/atlas-core';
 import { coveragePreservingMips } from './cutout-coverage.js';
 import { GLAZING_FRESNEL_CHUNK, GLAZING_FRESNEL_GLSL, GLAZING_FRESNEL_WGSL } from './glazing-fresnel.js';
-import type { TileLook } from './look.js';
+import { isRenderLook, type TileLook } from './look.js';
+import { applyShading } from './shading.js';
 import { createUnavailableMaterial } from './unavailable-surface.js';
 
 /**
@@ -448,6 +449,8 @@ export class TileTextureUploads {
       material.heightMapFactor = this.look.surface.parallaxFactor;
     }
     material.update();
+    // A render look's shading model reaches every set but glass, whose own chunk draws its fresnel.
+    if (isRenderLook(this.look) && set.materialClass !== 'glazing') applyShading(material, this.look.shading);
     return { set, material, textures, residentBytes };
   }
 

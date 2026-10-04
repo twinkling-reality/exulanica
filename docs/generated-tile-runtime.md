@@ -26,6 +26,7 @@ the sets are the [texture package](texture-package.md)'s.
 - [4. Loading a tile](#4-loading-a-tile)
 - [5. Standing and walking](#5-standing-and-walking)
 - [6. The look, measured](#6-the-look-measured)
+- [6.1 The render look a style chooses](#61-the-render-look-a-style-chooses)
 - [7. The evaluation entry](#7-the-evaluation-entry)
 - [8. Budget](#8-budget)
 - [8.1 The walk on a baked street](#81-the-walk-on-a-baked-street)
@@ -328,6 +329,38 @@ changing by 8 or more, and would add 8,738,133 bytes of decoded texture for the 
 seven sets. At
 four times the physical factor it changed at most 0.79 per cent of pixels by 8 or more. It does not
 help at eye level, so look version 1 sets `surface.parallax` false and the map is never uploaded.
+
+## 6.1 The render look a style chooses
+
+A second descriptor, `RenderLook` in `look.ts` (id `exulanica.render-look`), carries the light,
+sky, atmosphere and finish a style pack chooses. It sits beside the tile look rather than replacing
+it: the tile look (`TileLookV1`) stays the default, and a world draws exactly as section 6 describes
+until a style names a render look. The type `TileLook` names either descriptor; the tile runtime
+passes the one it is given on unread except for the id, version, surface and unavailable rules both
+state alike, and the environment reads which one it is by its id. `validateRenderLook` refuses an
+unknown or missing key, a wrong kind and an out-of-range value by the same rules as the tile look,
+and `validateLook` reads either descriptor by its id; a caller validates a look before handing it to
+the runtime. Every field is a reviewed renderer capability with bounded parameters: a style chooses
+and sets them and can never supply shader code.
+
+| Capability | What it does |
+| --- | --- |
+| Sky (`sky.ts`) | A high dynamic range sky from a function of direction: horizon to zenith, the ground below, a glow and a disc toward the sun, and clouds above the horizon from integer-hashed noise, so one seed draws one sky on every machine. Drawn at `faceTexels` per face |
+| Image light | Prefiltered from the same function with the look's `bounceGround` below the horizon and no sun disc, so a coloured ground does not tint every wall and the sun is not counted twice |
+| Fog | Linear, held to the 40 to 60 m onset target, or exponential, at most 0.006 per metre |
+| Sun and shadows | Elevation, azimuth, colour and intensity; shadow maps up to 4096 texels in up to four cascades; one-tap, three-tap, five-tap or soft (PCSS) filtering, with a penumbra only for PCSS |
+| Contact shadowing and the probe | As the tile look: neither has an off switch |
+| Finish | The camera frame's bloom, grading, colour enhancement, vignette and temporal anti-aliasing, each optional or bounded |
+| Shading model (`shading.ts`) | `pbr`, the engine's own; `toon`, two lit bands whose edges and share the look states; `flat`, each fragment's normal from screen-space derivatives, so every triangle is a facet. The chunk text is this module's in GLSL and WGSL; only validated numbers reach it. Each texture set's material takes the model when it is uploaded, all but glass, whose own chunk draws its reflection |
+| Edge ground | A ground plane round the world's origin, below every carriageway, so a world never stands in a void; the environment adds it and takes it away |
+| Ink (`ink.ts`) | `attachTileInk` lays one-pixel lines on the creases and outlines of the opaque meshes a tile drew (never glass or leaves), matching edges by end points to a tenth of a millimetre, so triangulation diagonals and seams between coplanar pieces are never drawn, and lifting each line 25 mm off its faces |
+
+`web/packages/atlas-react/test/generated-tile-render-look.test.ts` holds the descriptor's refusals,
+the sky's colours at the zenith, horizon and nadir, the disc kept out of the image light, the clouds'
+seed, the shading chunks in both languages and on the uploaded sets, the ink edges of a cube and of
+two coplanar pieces, the environment and its restoration, and a conformance tile drawn with a render
+look, inked and removed again. What each capability costs per frame is measured by the style pack
+work that first sets one.
 
 ## 7. The evaluation entry
 

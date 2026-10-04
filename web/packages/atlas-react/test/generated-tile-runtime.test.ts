@@ -602,7 +602,7 @@ describe('drawing a tile into the Atlas scene', () => {
     }
     expect(triples(drawn)).toEqual(triples(expected));
     expect(renders[0]!.meshInstances[0]!.mesh.indexBuffer[0]?.numIndices).toBe(4072 * 3);
-    expect(app.scene.fog.start).toBe(tile.look.fog.startM);
+    expect(app.scene.fog.start).toBe(TILE_LOOK_V1.fog.startM);
     attachment.dispose();
     expect(environmentRoot.findByName('generated-tile:tile-conformance')).toBeNull();
     expect(app.scene.fog.start).toBe(fogBefore);
