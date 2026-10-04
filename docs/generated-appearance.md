@@ -385,7 +385,8 @@ section 2 holds with the slot as the structure: the kind fixes the slot and what
 with the part, and the piece is appearance inside it.
 
 **Status.** Prototype. The records, the post-process, the writer and a contact sheet run end to end
-with a stub in place of the models (`python -m exulanica_appearance assets dry-run`), and a test
+with a stub in place of the models (`python -m exulanica_appearance assets dry-run`), through the
+same runner a job on a rented GPU uses, and a test
 prepares every stub piece through the product's own static profile and finds it placeable at the
 size its receipt states. No model has made a piece, no GPU has run, and the budgets are the style
 pack format's provisional numbers.
@@ -431,7 +432,24 @@ regeneration sentence). A seed is drawn from the request digest under a prefix. 
 under the digest of its request, weights listing and post-process version; a request that carries a
 description may hold a person's words and is cached within its workspace only.
 
-**Planned, not built:** the container and the job runner on Nebius Serverless AI, the measured
-trial of both routes, the admission's `generated` rights basis, the generation queue under the
-spending authority, and the Companion's offer of new pieces for a pack.
+**The job (built, not yet run).** A job runs on Nebius Serverless AI from a public Python image
+pinned by digest and installs at start from a hash-locked requirements file per route
+(`ml/appearance/container/assets/lock-route-a.txt` and `lock-route-b.txt`, binary wheels only), so
+no image is built for it. It fetches the pinned upstream code as GitHub archives and holds each
+extracted tree to its commit's tree id, computed without git; Step1X-3D's package is patched to
+import only its models. Modules the upstream code imports but the job never uses, among them
+plyfile (GPL-3.0), easydict (LGPL-3.0) and pymeshlab (GPL-3.0), are replaced by small stand-ins
+(`container/assets/standins/`), and nvdiffrast is never installed. Weights are fetched once at their
+pinned revisions into the job's bucket and every file is checked against its manifest; the DINOv2
+file TRELLIS loads through torch.hub is not on Hugging Face, so its digest is recorded on its first
+fetch and later jobs are held to it. The job record's stop bounds the whole job, setup included. On
+the operator's machine, `python -m exulanica_appearance assets nebius stage | submit | status |
+fetch | cancel` drives the aws and nebius command lines; submit refuses a job whose worst case
+(its timeout, at least the service's one hour, times the day's rate) exceeds the allocated bound,
+and no credential passes through the code. Route A's colour comes from TRELLIS's Gaussians; route
+B's is a prototype projection of the cut-out seen from the front, approximate by construction.
+
+**Planned, not built:** the measured trial of both routes, the admission's `generated` rights
+basis, the generation queue under the spending authority, and the Companion's offer of new pieces
+for a pack.
 

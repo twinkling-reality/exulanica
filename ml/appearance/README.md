@@ -67,6 +67,16 @@ scripts/fetch-hf-metadata.sh <repo> <40-hex revision> METADATA/<repo>@<revision>
 # generated assets, PROTOTYPE: requests, a job, pieces, receipts and a contact sheet, with a stub
 # in place of the models (docs/generated-appearance.md section 11)
 .venv/bin/python -m exulanica_appearance assets dry-run --repository ../.. --out OUT
+
+# a generated asset job on Nebius Serverless AI (container/assets/job.sh runs it there): stage the
+# code, job record and requests in the bucket, submit within an allocated bound, then follow it
+EXULANICA_GEN_S3_CREDENTIALS=/path/outside/the/repository \
+  .venv/bin/python -m exulanica_appearance assets nebius stage --repository ../.. --job JOB.json \
+  --requests REQUESTS --bucket BUCKET --region REGION
+.venv/bin/python -m exulanica_appearance assets nebius submit --job JOB.json --job-sha256 SHA \
+  --code-sha256 SHA --bucket-id ID --subnet-id ID --platform ID --preset PRESET --profile PROFILE \
+  --rate-cents CENTS_PER_HOUR --bound-cents CENTS
+.venv/bin/python -m exulanica_appearance assets nebius status --id JOB_ID --profile PROFILE
 ```
 
 Large outputs (layers, frames, sheets, metadata) live under `.exulanica/appearance/`, which git

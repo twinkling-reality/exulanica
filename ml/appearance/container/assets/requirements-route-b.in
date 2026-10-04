@@ -1,0 +1,26 @@
+# Route B: Step1X-3D's geometry pipeline (fetched by commit in the job), at the diffusers and transformers
+# versions its repository pins, plus the post-process. Its training stack (pytorch-lightning, datasets,
+# deepspeed) is not installed: the job imports only step1x3d_geometry.models, with stand-ins for the
+# logging helpers, rembg and pymeshlab.
+torch==2.8.0
+torchvision==0.23.0
+diffusers==0.32.2
+transformers==4.48.0
+accelerate>=1.5,<2
+safetensors>=0.4,<1
+huggingface-hub>=0.26,<1
+# 2.3.0 needs antlr4-python3-runtime 4.9, published as source only, which a binary-only lock refuses;
+# 2.4.0rc1 is the newest release with a wheel and no such dependency. A pre-release, pinned on purpose.
+omegaconf==2.4.0rc1
+jaxtyping>=0.2.28,<1
+typeguard>=4,<5
+einops>=0.8,<1
+packaging>=24
+beautifulsoup4>=4.12,<5
+scikit-image>=0.23,<1
+trimesh>=4.3,<5
+numpy>=1.26,<3
+pillow>=10,<12
+scipy>=1.13,<2
+fast-simplification>=0.2,<1
+tqdm>=4.66,<5

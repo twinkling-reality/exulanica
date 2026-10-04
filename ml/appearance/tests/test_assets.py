@@ -281,7 +281,7 @@ def test_a_piece_over_budget_says_which_measure_and_a_receipt_cannot_hide_it(
     assert piece.verdict == {"over": ["glb_bytes"], "within": False}
 
     run = dry_run(repository, tmp_path)
-    receipts = sorted(tmp_path.glob("receipt-*.json"))
+    receipts = sorted((tmp_path / "receipts").glob("*.json"))
     requests = {
         sha256_hex(p.read_bytes()): read_request(p.read_bytes())
         for p in tmp_path.glob("request-*.json")

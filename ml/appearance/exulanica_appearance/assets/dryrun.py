@@ -9,28 +9,23 @@ candidate piece; its route is ``S`` and its container ``stub``.
 
 from __future__ import annotations
 
+import io
 import json
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Final
 
 import numpy as np
+from PIL import Image
 
-from exulanica_appearance.assets.colour import read_table
-from exulanica_appearance.assets.mesh import Mesh, cluster_simplify
-from exulanica_appearance.assets.postprocess import POSTPROCESS_VERSION, make_piece
-from exulanica_appearance.assets.records import (
-    REGENERATION,
-    build_job,
-    build_receipt,
-    build_request,
-    cache_key,
-    read_job,
-    read_request,
-)
+from exulanica_appearance.assets.job import RawMesh, run_job
+from exulanica_appearance.assets.mesh import Mesh, Simplifier, cluster_simplify
+from exulanica_appearance.assets.postprocess import POSTPROCESS_VERSION
+from exulanica_appearance.assets.records import build_job, build_request, cache_key
 from exulanica_appearance.assets.sheet import draw_sheet
 from exulanica_appearance.canonical import canonical_bytes, sha256_hex
 
-__all__ = ["STUB_PACK", "dry_run", "stub_mesh"]
+__all__ = ["STUB_PACK", "StubBackend", "dry_run", "stub_mesh"]
 
 STUB_PACK: Final = {
     "id": "stub.toon-town",
@@ -222,9 +217,41 @@ def stub_mesh(look_role: str) -> Mesh:
     raise ValueError(f"the stub has no shape for {look_role}")
 
 
+class StubBackend:
+    """Route S: fixed pictures and fixed shapes, so every step after the models runs for real."""
+
+    route = "S"
+
+    def simplifier(self) -> Simplifier:
+        return cluster_simplify
+
+    def concept(self, prompt: str, seed: int) -> bytes:
+        # A flat picture whose colour follows the seed: enough to have a digest, nothing to judge.
+        shade = (seed % 200) + 30
+        return _png(Image.new("RGB", (64, 64), (shade, shade, 220 - shade // 2)))
+
+    def cutout(self, picture: bytes) -> bytes:
+        image = Image.open(io.BytesIO(picture)).convert("RGBA")
+        alpha = Image.new("L", image.size, 0)
+        alpha.paste(255, (8, 8, image.width - 8, image.height - 8))
+        image.putalpha(alpha)
+        return _png(image)
+
+    def mesh(self, cutout: bytes, seed: int, request: Mapping[str, Any]) -> RawMesh:
+        return RawMesh(stub_mesh(request["look_role"]), up="+Z", front="-Y")
+
+    def runtime(self) -> dict[str, Any]:
+        return {"machine": "dry run, no GPU"}
+
+
+def _png(image: Image.Image) -> bytes:
+    buffer = io.BytesIO()
+    image.save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
 def dry_run(repository: Path, out: Path) -> dict[str, Any]:
-    """Run the stub route end to end and write every record and GLB under ``out``."""
-    table, table_sha256 = read_table(repository)
+    """Run the stub route end to end and write every record, piece and a contact sheet."""
     out.mkdir(parents=True, exist_ok=True)
     requests = []
     for spec in STUB_REQUESTS:
@@ -244,55 +271,16 @@ def dry_run(repository: Path, out: Path) -> dict[str, Any]:
     )
     job_sha256 = sha256_hex(job_raw)
     (out / f"job-{job_sha256}.json").write_bytes(job_raw)
-    summary = []
-    for item in read_job(job_raw)["items"]:
-        raw = next(r for r in requests if sha256_hex(r) == item["request_sha256"])
-        request = read_request(raw)
-        mesh = stub_mesh(request["look_role"])
-        piece = make_piece(
-            mesh, up="+Z", front="-Y", request=request, simplifier=cluster_simplify, table=table
+    results = run_job(
+        job_raw=job_raw, requests=requests, backend=StubBackend(), repository=repository, out=out
+    )
+    pieces = [
+        dict(
+            item,
+            cache_key=cache_key(item["request_sha256"], components_sha256, POSTPROCESS_VERSION),
         )
-        (out / f"piece-{piece.sha256}.glb").write_bytes(piece.glb)
-        receipt = build_receipt(
-            {
-                "components_sha256": components_sha256,
-                "inputs": {
-                    "colour_table": table_sha256,
-                    "raw_mesh": sha256_hex(
-                        mesh.positions.tobytes() + mesh.triangles.tobytes() + mesh.colours.tobytes()
-                    ),
-                },
-                "job_sha256": job_sha256,
-                "licence": "CC0-1.0",
-                "measured": piece.measured,
-                "origin": "generated",
-                "output": {"bytes": len(piece.glb), "sha256": piece.sha256},
-                "postprocess": {"steps": piece.steps, "version": POSTPROCESS_VERSION},
-                "profile": "exulanica.generated-asset/v1",
-                "regeneration": REGENERATION,
-                "request_sha256": item["request_sha256"],
-                "runtime": {"machine": "dry run, no GPU"},
-                "seconds": {"concept": 0, "cutout": 0, "mesh": 0, "postprocess": 0},
-                "seed": item["seed"],
-                "truth": "invented",
-                "variant": item["variant"],
-                "verdict": piece.verdict,
-            },
-            request,
-        )
-        (out / f"receipt-{sha256_hex(receipt)}.json").write_bytes(receipt)
-        summary.append(
-            {
-                "cache_key": cache_key(
-                    item["request_sha256"], components_sha256, POSTPROCESS_VERSION
-                ),
-                "look_role": request["look_role"],
-                "piece": piece.sha256,
-                "size_mm": piece.measured["size_mm"],
-                "triangles": piece.measured["triangles"],
-                "within": piece.verdict["within"],
-            }
-        )
+        for item in results["items"]
+    ]
     draw_sheet(
         [
             (
@@ -301,11 +289,12 @@ def dry_run(repository: Path, out: Path) -> dict[str, Any]:
                     f"{item['size_mm']['width']} x {item['size_mm']['height']} x "
                     f"{item['size_mm']['depth']} mm\nstub shape, not a model's"
                 ),
-                (out / f"piece-{item['piece']}.glb").read_bytes(),
+                (out / "pieces" / f"{item['piece']}.glb").read_bytes(),
             )
-            for item in summary
+            for item in pieces
+            if "piece" in item
         ],
         out / "sheet.png",
     )
-    (out / "summary.json").write_text(json.dumps(summary, indent=1, sort_keys=True) + "\n")
-    return {"job": job_sha256, "pieces": summary}
+    (out / "summary.json").write_text(json.dumps(pieces, indent=1, sort_keys=True) + "\n")
+    return {"job": job_sha256, "pieces": pieces}

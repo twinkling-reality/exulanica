@@ -13,6 +13,13 @@ import json
 from pathlib import Path
 
 import pytest
+
+#: The generated asset writer reads and writes meshes with numpy, which arrives with the
+#: `reconstruction` extra; a plain `uv sync`, as CI runs, does not install it.
+pytest.importorskip(
+    "numpy", reason="numpy is absent; install it with `uv sync --extra reconstruction`"
+)
+
 from exulanica.world import static_glb
 from exulanica.world.asset_preparation import decode_texture
 
@@ -26,9 +33,9 @@ def dry_run_pieces(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> list[tupl
 
     dry_run(ROOT, tmp_path)
     pieces = []
-    for receipt_path in sorted(tmp_path.glob("receipt-*.json")):
+    for receipt_path in sorted((tmp_path / "receipts").glob("*.json")):
         receipt = json.loads(receipt_path.read_bytes())
-        glb = (tmp_path / f"piece-{receipt['output']['sha256']}.glb").read_bytes()
+        glb = (tmp_path / "pieces" / f"{receipt['output']['sha256']}.glb").read_bytes()
         pieces.append((glb, receipt))
     return pieces
 

@@ -298,6 +298,9 @@ _JOB_KEYS: Final = (
     "stop",
 )
 _ITEM_KEYS: Final = ("prompt", "request_sha256", "seed", "variant")
+#: An item may instead start from a cut-out another job made, named by its sha256, so two routes
+#: are compared on the same pictures.
+_ITEM_OPTIONAL: Final = ("cutout_sha256",)
 
 
 def build_job(
@@ -308,8 +311,12 @@ def build_job(
     code_sha256: str,
     container: str,
     estimate_seconds: int,
+    cutouts: Mapping[tuple[str, int], str] | None = None,
 ) -> bytes:
-    """One batch: every variant of every request, its prompt and seed, fixed before it runs."""
+    """One batch: every variant of every request, its prompt and seed, fixed before it runs.
+
+    ``cutouts`` maps (request sha256, variant) to the cut-out an item starts from instead of a
+    concept picture of its own."""
     items = []
     for raw in requests:
         request = read_request(raw)
@@ -317,14 +324,15 @@ def build_job(
             raise Refused("every request in a job takes the job's route")
         digest = sha256_hex(raw)
         for variant in range(request["variants"]):
-            items.append(
-                {
-                    "prompt": prompt_for(request),
-                    "request_sha256": digest,
-                    "seed": seed_for(digest, variant),
-                    "variant": variant,
-                }
-            )
+            item = {
+                "prompt": prompt_for(request),
+                "request_sha256": digest,
+                "seed": seed_for(digest, variant),
+                "variant": variant,
+            }
+            if cutouts and (digest, variant) in cutouts:
+                item["cutout_sha256"] = cutouts[(digest, variant)]
+            items.append(item)
     document = {
         "code_sha256": code_sha256,
         "components_sha256": components_sha256,
@@ -372,7 +380,14 @@ def read_job(raw: bytes) -> dict[str, Any]:
         raise Refused("a job has at least one item")
     seen = set()
     for index, item in enumerate(items):
-        exact_keys(item, _ITEM_KEYS, f"job.items[{index}]")
+        if not isinstance(item, dict) or not set(_ITEM_KEYS) <= set(item) <= set(
+            _ITEM_KEYS + _ITEM_OPTIONAL
+        ):
+            raise Refused(
+                f"job.items[{index}] has {', '.join(_ITEM_KEYS)} and optionally a cut-out"
+            )
+        if "cutout_sha256" in item and not is_sha256(item["cutout_sha256"]):
+            raise Refused(f"job.items[{index}].cutout_sha256 is a sha256")
         if not is_sha256(item["request_sha256"]) or not is_count(item["variant"]):
             raise Refused(f"job.items[{index}] names a request and a variant")
         if item["seed"] != seed_for(item["request_sha256"], item["variant"]):

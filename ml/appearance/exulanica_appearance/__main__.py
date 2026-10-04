@@ -16,6 +16,8 @@
     runner dry-run   --repository . --out DIR
     runner gate      --results DIR --staged DIR --billed-seconds N --budget-seconds N --rate-cents N --out FILE
     assets dry-run   --repository ROOT --out DIR
+    assets remote prepare|run ...   on the rented machine, from container/assets/job.sh
+    assets nebius stage|submit|status|fetch|cancel ...   on this Mac
 
 Every command reads and writes files only. None downloads a model, and none needs a GPU.
 """
@@ -295,6 +297,86 @@ def _assets_dry_run(args: argparse.Namespace) -> int:
     return 0
 
 
+def _assets_remote_prepare(args: argparse.Namespace) -> int:
+    from exulanica_appearance.assets.remote import prepare
+    from exulanica_appearance.canonical import canonical_bytes
+
+    report = prepare(
+        code=Path(args.code),
+        route=args.route,
+        upstream=Path(args.upstream),
+        weights=Path(args.weights),
+        torch_home=Path(args.torch_home),
+        hf_home=Path(args.hf_home),
+    )
+    Path(args.report).write_bytes(canonical_bytes(report))
+    print(json.dumps(report, indent=1, sort_keys=True))
+    return 0
+
+
+def _assets_remote_run(args: argparse.Namespace) -> int:
+    from exulanica_appearance.assets.job import run_job
+    from exulanica_appearance.assets.remote import backend_for
+
+    requests = [path.read_bytes() for path in sorted(Path(args.requests).glob("*.json"))]
+    cutouts = {}
+    if Path(args.cutouts).is_dir():
+        from exulanica_appearance.canonical import sha256_hex
+
+        for path in Path(args.cutouts).glob("*.png"):
+            data = path.read_bytes()
+            cutouts[sha256_hex(data)] = data
+    results = run_job(
+        job_raw=Path(args.job).read_bytes(),
+        requests=requests,
+        backend=backend_for(args.route, Path(args.weights)),
+        repository=Path(args.code),
+        out=Path(args.out),
+        cutouts=cutouts,
+    )
+    print(json.dumps(results, indent=1, sort_keys=True))
+    return 0 if all("piece" in item for item in results["items"]) else REFUSED
+
+
+def _assets_nebius(args: argparse.Namespace) -> int:
+    from exulanica_appearance.assets import nebius
+    from exulanica_appearance.assets.records import read_job
+
+    if args.step == "stage":
+        result: object = nebius.stage(
+            repository=Path(args.repository),
+            job=Path(args.job),
+            requests=Path(args.requests),
+            bucket=args.bucket,
+            region=args.region,
+            cutouts=Path(args.cutouts) if args.cutouts else None,
+        )
+    elif args.step == "submit":
+        job = read_job(Path(args.job).read_bytes())
+        result = nebius.submit(
+            route=job["route"],
+            job_sha256=args.job_sha256,
+            code_sha256=args.code_sha256,
+            bucket_id=args.bucket_id,
+            subnet_id=args.subnet_id,
+            platform=args.platform,
+            preset=args.preset,
+            timeout_seconds=job["stop"]["stop_at_seconds"],
+            rate_cents_per_hour=args.rate_cents,
+            bound_cents=args.bound_cents,
+            preemptible=args.preemptible,
+            profile=args.profile,
+        )
+    elif args.step == "status":
+        result = nebius.status(args.id, args.profile)
+    elif args.step == "cancel":
+        result = nebius.cancel(args.id, args.profile)
+    else:
+        result = nebius.fetch(bucket=args.bucket, region=args.region, out=Path(args.out))
+    print(json.dumps(result, indent=1, sort_keys=True) if not isinstance(result, str) else result)
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m exulanica_appearance")
     groups = parser.add_subparsers(dest="group", required=True)
@@ -391,6 +473,49 @@ def main(argv: list[str] | None = None) -> int:
     assets_dry.add_argument("--repository", required=True)
     assets_dry.add_argument("--out", required=True)
     assets_dry.set_defaults(run=_assets_dry_run)
+
+    remote = assets.add_parser("remote").add_subparsers(dest="step", required=True)
+    remote_prepare = remote.add_parser("prepare")
+    for name in (
+        "--code",
+        "--route",
+        "--upstream",
+        "--weights",
+        "--torch-home",
+        "--hf-home",
+        "--report",
+    ):
+        remote_prepare.add_argument(name, required=True)
+    remote_prepare.set_defaults(run=_assets_remote_prepare)
+    remote_run = remote.add_parser("run")
+    for name in ("--code", "--route", "--job", "--requests", "--weights", "--cutouts", "--out"):
+        remote_run.add_argument(name, required=True)
+    remote_run.set_defaults(run=_assets_remote_run)
+
+    on_nebius = assets.add_parser("nebius").add_subparsers(dest="step", required=True)
+    nebius_stage = on_nebius.add_parser("stage")
+    for name in ("--repository", "--job", "--requests", "--bucket", "--region"):
+        nebius_stage.add_argument(name, required=True)
+    nebius_stage.add_argument("--cutouts")
+    nebius_submit = on_nebius.add_parser("submit")
+    for name in (
+        "--job", "--job-sha256", "--code-sha256", "--bucket-id", "--subnet-id", "--platform",
+        "--preset", "--profile",
+    ):  # fmt: skip
+        nebius_submit.add_argument(name, required=True)
+    nebius_submit.add_argument("--rate-cents", type=int, required=True)
+    nebius_submit.add_argument("--bound-cents", type=int, required=True)
+    nebius_submit.add_argument("--preemptible", action="store_true")
+    for step in ("status", "cancel"):
+        command = on_nebius.add_parser(step)
+        command.add_argument("--id", required=True)
+        command.add_argument("--profile", required=True)
+    nebius_fetch = on_nebius.add_parser("fetch")
+    for name in ("--bucket", "--region", "--out"):
+        nebius_fetch.add_argument(name, required=True)
+    on_nebius.required = True
+    for command in on_nebius.choices.values():
+        command.set_defaults(run=_assets_nebius)
 
     args = parser.parse_args(argv)
     try:
