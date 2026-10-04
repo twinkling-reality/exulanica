@@ -247,9 +247,52 @@ def response_format_for_schema(schema: dict[str, Any], name: str) -> dict[str, A
     }
 
 
-def response_format_for(model: type[BaseModel], *, name: str | None = None) -> dict[str, Any]:
-    """The complete ``response_format`` value. The only one the client will send."""
-    return response_format_for_schema(strict_json_schema(model), name or model.__name__)
+def _is_array(schema: Mapping[str, Any], defs: Mapping[str, Any]) -> bool:
+    reference = schema.get("$ref")
+    if isinstance(reference, str):
+        schema = defs.get(reference.rsplit("/", 1)[-1], {})
+    kind = schema.get("type")
+    if kind == "array" or (isinstance(kind, list) and "array" in kind):
+        return True
+    return any(_is_array(choice, defs) for choice in schema.get("anyOf") or ())
+
+
+def _arrays_last(schema: Any, defs: Mapping[str, Any]) -> Any:
+    """``schema`` with each object's array properties listed after its other properties."""
+    if isinstance(schema, list):
+        return [_arrays_last(item, defs) for item in schema]
+    if not isinstance(schema, Mapping):
+        return schema
+    out = {key: _arrays_last(value, defs) for key, value in schema.items()}
+    properties = out.get("properties")
+    if isinstance(properties, Mapping):
+        names = list(properties)
+        ordered = [n for n in names if not _is_array(properties[n], defs)]
+        ordered += [n for n in names if _is_array(properties[n], defs)]
+        out["properties"] = {name: properties[name] for name in ordered}
+        if isinstance(out.get("required"), list):
+            out["required"] = [name for name in ordered if name in out["required"]]
+    return out
+
+
+def response_format_for(
+    model: type[BaseModel], *, name: str | None = None, arrays_last: bool = False
+) -> dict[str, Any]:
+    """The complete ``response_format`` value. The only one the client will send.
+
+    ``arrays_last`` lists each object's array properties after its other properties in the schema
+    sent, and so in the order the model writes them; the model class and every other use of its
+    schema are untouched. Key order changes nothing a reply is validated for. It is a decoding
+    concern: under a strict schema a field written after an array needs a comma there, and a
+    model that wrote a line break in its place was measured writing whitespace to the token limit,
+    since the schema then admits only the comma or whitespace. An array listed last can be followed
+    only by its object's closing brace. Off by default; a caller whose form has such an array turns
+    it on.
+    """
+    schema = strict_json_schema(model)
+    if arrays_last:
+        schema = _arrays_last(schema, schema.get("$defs") or {})
+    return response_format_for_schema(schema, name or model.__name__)
 
 
 def _json_array_spans(content: str) -> list[tuple[int, int]]:

@@ -26,6 +26,7 @@ from exulanica.selection.calls import CallLog
 from exulanica.selection.plan import SelectionPlan
 from exulanica.selection.prompts import _EMPTY_CATALOGUE, _PLANNER_SYSTEM, PROMPT_VERSION
 from exulanica.selection.request_names import RequestNames
+from exulanica.selection.runaway_repair import runaway_repair
 
 __all__ = [
     "MAX_CATALOGUE",
@@ -46,6 +47,11 @@ MAX_CATALOGUE: Final = 60
 #: used to be two literal 2s: widening the loop alone changed nothing, which made a test that
 #: thought it was holding the retry bound hold nothing at all.
 PLANNER_ATTEMPTS: Final = 2
+#: The most a plan's reply may spend: the structured-extraction role's floor (its fallback reasons
+#: inline before it answers). The longest plan the records hold is well inside it, and a reply that
+#: runs on fills any ceiling it is given, so a lower one bounds the wait for a reply that will be
+#: refused rather than the plan.
+PLANNER_MAX_TOKENS: Final = 640
 
 
 @dataclass(frozen=True, slots=True)
@@ -211,7 +217,11 @@ def propose_plan(
                 messages,
                 SelectionPlan,
                 prompt_version=PROMPT_VERSION,
+                max_tokens=PLANNER_MAX_TOKENS,
                 placeholders=names.placeholders,
+                # The plan's lists (its time windows, an entity selector's ids) are written last
+                # in their objects, so none is followed by a field that needs a comma after it.
+                arrays_last=True,
             )
             if log is not None:
                 log.record(proposed.call)
@@ -229,21 +239,14 @@ def propose_plan(
                     ),
                 }
             )
-        except TruncatedResponseError:
+        except TruncatedResponseError as cut:
             # Measured on the live planner: a cross-content plan written correctly as far as its
             # scope and then whitespace until the token limit, in 2 draws of 5 on one question. A
             # plan is a small fraction of the role's limit, so this is the model running on, not
-            # a budget too small for the answer, and asking again is the repair it needs. It
-            # counts against the same attempts, and a second failure is raised as it always was.
+            # a budget too small for the answer, and asking again is the repair it needs, told
+            # how the reply ran on. It counts against the same attempts, and a second failure is
+            # raised as it always was; the answer path abstains on it.
             if attempt == PLANNER_ATTEMPTS:
                 raise
-            messages.append(
-                {
-                    "role": "user",
-                    "content": (
-                        "That form ran on past its end and was cut off before it was complete. "
-                        "Fill it in again, and stop at its closing brace."
-                    ),
-                }
-            )
+            messages.append({"role": "user", "content": runaway_repair(cut)})
     raise AssertionError("unreachable: the loop above either returns or raises")

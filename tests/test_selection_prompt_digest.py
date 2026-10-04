@@ -21,10 +21,14 @@ PINNED = {
     "selection-8": "127e11c1d78fa9bed8f222ab06a087a6d8ee7388f5751f32949a1a41df83ea20",
     # `selection-9` adds the society composer's prompt to the family's texts.
     "selection-9": "9200a1322581ab6df098c87531dae7505640b0ca19a8747cb66e90d0d4f6fb55",
+    # The same texts: `selection-10` sends the planner's form with its lists last.
+    "selection-10": "9200a1322581ab6df098c87531dae7505640b0ca19a8747cb66e90d0d4f6fb55",
     "proposal-2": "7c6b2cb2633943e0858cd7064e97bda1dcfa42cd9c520ed6c9f901f9b0d61665",
     # The same texts: `proposal-3` changed the draft schema's construction and no prompt.
     "proposal-3": "7c6b2cb2633943e0858cd7064e97bda1dcfa42cd9c520ed6c9f901f9b0d61665",
     "proposal-4": "c5d95ac33e52e9a22fe41d4056788b18a05588260506499ac91a2792b4e005ae",
+    # The same texts: `proposal-5` sends the draft with its references list last.
+    "proposal-5": "c5d95ac33e52e9a22fe41d4056788b18a05588260506499ac91a2792b4e005ae",
     "environment-proposal-1": "88314630219bea7f6571a54fff583920ac765581a25efa581e20f4b04e9e0a92",
     # The Companion's world actions: its five-way classifier and the world-edit drafter.
     "action-plan-1": "a9c3708ef441cbeeae00b2972628d89de75dc787aebf0a37f0cf658b8273da88",

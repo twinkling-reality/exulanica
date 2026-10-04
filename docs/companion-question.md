@@ -37,6 +37,18 @@ version they are recorded under are in [prompts](../exulanica/selection/prompts.
 records per-question model execution with [calls](../exulanica/selection/calls.py) rather than
 inferring execution from the manifest.
 
+The planner's form is sent with each object's lists last (its time windows, an entity selector's
+ids), only in the schema the model is given, so the Selection model and its API description keep
+their own order. Its reply may spend at most 640 completion tokens (`PLANNER_MAX_TOKENS`, the
+structured-extraction role's floor); the longest plan a record holds, 263 tokens
+(`docs/evaluation/2026-09-22-companion-planner-outcome.json`), leaves room inside it for the role's
+fallback, which reasons in its reply before it answers. A plan cut at that limit is repaired once,
+told how it ran on, as the Companion's drafters are (see World actions), and a plan cut or refused
+twice is answered with an abstention that says the question could not be turned into a search, never
+an error. Putting lists last removes one place a reply was measured running on, after a list; a plan
+has also run on in whitespace after a single value, which only the ceiling, the repair and the
+abstention bound.
+
 The browser's `companion-ask-api.ts` calls `POST /selection/ask` and obtains the packet needed to
 resolve citations. The [application composition](../web/packages/app/src/main.ts) connects question,
 appearance and conversation-memory clients. The [customization contract](atlas-world-customization-contract.md#7-frontend-integration-boundary)
@@ -594,17 +606,22 @@ names the controls it changes and never the modules that own them: the proposal'
 ones the registry says own a control that moved, so a change is never refused for a module the
 draft left out.
 
-When no draft can be read after its repair, or a draft is cut at its token limit, the request is
-refused as `not_drafted`. The page says that a model's reply could not be read
-(`provenance.undrafted`), and keeps "The reviewed design has no way to make that change"
-(`provenance.refused`) for a refusal that states a limit of the design, such as `not_in_catalogue`.
-The page waits for the route as long as the server may take: `appearance_bound_seconds` in the
-proposal implementation, the classifier and the draft and its repair at their role's worst case,
-plus the page's read allowance, held by
-[test_companion_propose_deadline.py](../tests/test_companion_propose_deadline.py). Apply remains a separate
-reviewed operation through the [appearance authority](world-version-authorities.md#appearance-authority) and the
-[customization contract](atlas-world-customization-contract.md). Conflicts require review against
-the relevant version; natural language does not bypass the same validation as direct controls.
+The draft is sent with its references list last, and its reply may spend at most 1024 completion
+tokens (`DRAFT_MAX_TOKENS` in the proposal implementation); its longest measured successful reply,
+404 tokens (`docs/evaluation/2026-09-24-appearance-draft-grid-outcome.json`), leaves room inside it
+for the role's fallback to reason before it answers. A draft cut at that limit is repaired once,
+told how it ran on and to keep `spoken` to one or two sentences. When no draft can be read after its
+repair, or a draft is cut at its token limit, the request is refused as `not_drafted`. The page says
+that a model's reply could not be read (`provenance.undrafted`), and keeps "The reviewed design has
+no way to make that change" (`provenance.refused`) for a refusal that states a limit of the design,
+such as `not_in_catalogue`. The page waits for the route as long as the server may take:
+`appearance_bound_seconds` in the proposal implementation, the classifier and the draft and its
+repair at their role's worst case, plus the page's read allowance, held by
+[test_companion_propose_deadline.py](../tests/test_companion_propose_deadline.py). Apply remains a
+separate reviewed operation through the [appearance
+authority](world-version-authorities.md#appearance-authority) and the [customization
+contract](atlas-world-customization-contract.md). Conflicts require review against the relevant
+version; natural language does not bypass the same validation as direct controls.
 
 Structural edits and simulation controls the Companion prepares are the
 [world actions](#world-actions); environment proposals follow their own registered capabilities and

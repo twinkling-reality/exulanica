@@ -762,12 +762,17 @@ class ModelClient:
         photographs: Iterable[uuid.UUID] = (),
         placeholders: Mapping[uuid.UUID, str] | None = None,
         deadline_s: float | None = None,
+        arrays_last: bool = False,
     ) -> StructuredResult[T]:
         """The only path by which model output may become canonical state.
 
         Returns a validated instance of ``schema`` or raises. There is no partial success and no
         best-effort parse: a body that does not validate is a failure, because a half-parsed
         object is a fact with a piece missing rather than a smaller fact.
+
+        ``arrays_last`` orders the schema sent so each object's arrays come last
+        (:func:`exulanica.models.schema.response_format_for`); the reply is validated against the
+        schema sent, and parsed into ``schema`` as always.
         """
         role = Role(role)
         spec = self._manifest[role].primary
@@ -782,7 +787,7 @@ class ModelClient:
             prompt_version=prompt_version,
             max_tokens=max_tokens,
             temperature=temperature,
-            response_format=response_format_for(schema),
+            response_format=response_format_for(schema, arrays_last=arrays_last),
             extra=extra,
             image_prompt_tokens=image_prompt_tokens,
             use_cache=use_cache,

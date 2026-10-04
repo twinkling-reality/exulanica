@@ -60,6 +60,7 @@ from exulanica.models.errors import StructuredOutputError, TruncatedResponseErro
 from exulanica.models.manifest import Role
 from exulanica.selection.calls import CallLog, ModelCall
 from exulanica.selection.request_names import RequestNames
+from exulanica.selection.runaway_repair import runaway_repair
 from exulanica.selection.validation import Session
 from exulanica.store.base import ContentAddressedStore
 from exulanica.world import STYLE_REGISTRY, InvalidStyleData, StyleReference, StyleRegistry
@@ -150,7 +151,10 @@ __all__ = [
 #:
 #: ``proposal-4`` takes the module list off the form and its one instruction out of the drafter's
 #: prompt: which modules a change touches is the registry's to say (:func:`_validate_draft`).
-PROMPT_VERSION: Final = "proposal-4"
+#:
+#: ``proposal-5`` changes no text: the draft is sent with its references list last, and its reply
+#: may spend 1024 tokens rather than the role's 2048.
+PROMPT_VERSION: Final = "proposal-5"
 
 #: The drafter's prompt for a design choice drawn from no evidence (``authored_design``), its own
 #: family so the evidence drafter's measured wording and version stay exactly as they are. The
@@ -168,6 +172,10 @@ MAX_REFERENCE_CATALOGUE: Final = 24
 #: default proposal to fall back to. An empty proposal is not "no change", it is every control
 #: at its default, which is a change nobody asked for presented as the one they did.
 DRAFT_ATTEMPTS: Final = 2
+#: The most a draft's reply may spend. Its longest measured successful reply is about two fifths of
+#: this, and the role's fallback reasons inline before it answers, so the ceiling leaves room for
+#: that reasoning and a whole draft; a reply that runs on still ends inside the role's timeout.
+DRAFT_MAX_TOKENS: Final = 1024
 
 #: How many times one utterance is classified: once, because a failure is a question
 #: (:func:`classify_request`) and is never retried.
@@ -592,7 +600,11 @@ def draft_appearance(
                 messages,
                 schema,
                 prompt_version=prompt_version,
+                max_tokens=DRAFT_MAX_TOKENS,
                 placeholders=placeholders,
+                # The references list is written last, so it is followed by the closing brace
+                # and never by a field that needs a comma after it.
+                arrays_last=True,
             )
             if log is not None:
                 log.record(drafted.call)
@@ -607,11 +619,9 @@ def draft_appearance(
                         # A truncated reply is a runaway rather than a wrong answer. Measured:
                         # a successful draft never exceeded 296 completion tokens against a
                         # ceiling of 2048, and raising that ceiling to 4096 and 8192 changed
-                        # nothing, so the call is not cramped. What it needs is to be told to
-                        # stop, not to be given more room.
-                        "That form ran past the room it had. Fill it in again and keep it "
-                        "short: the same change, one or two sentences in `spoken`, and nothing "
-                        "repeated."
+                        # nothing, so the call is not cramped. What it needs is to be told how
+                        # it ran on and to stop, not to be given more room.
+                        f"{runaway_repair(rejected)} Keep `spoken` to one or two sentences."
                         if isinstance(rejected, TruncatedResponseError)
                         else "That form was refused:\n"
                         f"{rejected}\n\nFill it in again, fixing exactly that. Change nothing "

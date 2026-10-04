@@ -1,7 +1,7 @@
 """What ``answer_question`` returns on every one of its exits, held whole to a golden document.
 
-``answer_question`` has twenty ways to return an :class:`AnsweredQuestion` and three to raise, and
-the answer path's split keeps it where it is because tests replace its module globals. Each exit
+``answer_question`` has twenty-one ways to return an :class:`AnsweredQuestion` and three to raise,
+and the answer path's split keeps it where it is because tests replace its module globals. Each exit
 is driven here through the product's own code over a workspace with a person and a place saved on
 a photograph's sign, and what it returns is reduced to a document: the answer, the plan, what the
 Selection and the packet held, the flags, the refusals, the calls and the names. Identifiers are
@@ -73,6 +73,12 @@ _UUID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
 def _reply(value: Any) -> HttpResponse:
     body = value if isinstance(value, str) else json.dumps(value)
     return HttpResponse(status_code=200, text=json.dumps(chat_body(body)))
+
+
+def _cut() -> HttpResponse:
+    """A planner reply cut at its token limit after running on in whitespace."""
+    body = chat_body('{"intent": "captures",' + "\n   " * 300, finish_reason="length")
+    return HttpResponse(status_code=200, text=json.dumps(body))
 
 
 def _answer(*clauses: AnswerClause) -> HttpResponse:
@@ -262,6 +268,7 @@ EXITS: dict[str, Callable[[Context], AnsweredQuestion]] = {
     "the planner could not fill the form": lambda c: c.ask(
         [_reply(_REFUSED_PLAN), _reply(_REFUSED_PLAN)]
     ),
+    "the planner's reply was cut twice": lambda c: c.ask([_cut(), _cut()]),
     "the planner named an entity nobody has": lambda c: c.ask(
         [
             _reply(
@@ -471,7 +478,7 @@ def test_each_exit_returns_the_document_it_always_has(context, exit_name):
 
 
 def test_every_exit_is_a_different_document():
-    """The control: twenty-one ways to leave the function, twenty-one things said."""
+    """The control: twenty-four ways to leave the function, twenty-four things said."""
     golden = json.loads(GOLDEN.read_text(encoding="utf-8"))
     assert sorted(golden) == sorted(EXITS)
     documents = [json.dumps(golden[name], sort_keys=True) for name in sorted(golden)]

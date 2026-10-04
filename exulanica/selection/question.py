@@ -877,9 +877,10 @@ def _planned(
                 log=log,
                 society=planner_line(readable),
             )
-        except StructuredOutputError as refused:
-            # The endpoint answered and the answer was not a plan, twice. Nothing was searched
-            # and nothing is claimed about the library.
+        except (StructuredOutputError, TruncatedResponseError) as refused:
+            # The endpoint answered and the answer was not a plan, twice: refused by the form, or
+            # cut at the planner's token limit. Nothing was searched and nothing is claimed about
+            # the library; a cut plan is no more an error of the server's than a refused one.
             answer, reason = abstain_without_a_selection(str(refused))
             return AnsweredQuestion(
                 answer=answer, abstention=reason, rejections=(str(refused),), calls=log.calls

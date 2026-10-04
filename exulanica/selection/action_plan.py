@@ -62,10 +62,10 @@ from exulanica.canonical import canonical_json
 from exulanica.models.client import ModelClient
 from exulanica.models.errors import StructuredOutputError, TruncatedResponseError
 from exulanica.models.manifest import Role
-from exulanica.models.response import Runaway
 from exulanica.selection.calls import CallLog, ModelCall
 from exulanica.selection.proposal import RefusalCode, appearance_change, source_catalogue
 from exulanica.selection.request_names import RequestNames
+from exulanica.selection.runaway_repair import RUNAWAY_REPAIRS as _RUNAWAY_REPAIRS
 from exulanica.selection.validation import Session
 from exulanica.store.base import ContentAddressedStore
 from exulanica.world import WorldNotConfigured, WorldStyleRepository
@@ -615,26 +615,6 @@ def _draft_world_edit(
                 return None
             messages.append(_repair(rejected))
     raise AssertionError("unreachable: the loop above returns")
-
-
-#: What a drafter's repair says after a reply the token limit cut, by how it ran on
-#: (``TruncatedResponseError.runaway``; None when it was neither plainly). The model never sees the
-#: reply it wrote, so the message names what went wrong instead of asking it to be shorter.
-_RUNAWAY_REPAIRS: Final[Mapping[str | None, str]] = {
-    Runaway.WHITESPACE: (
-        "That form ran on in blank space after one of its values until it was cut off. Fill it in "
-        "again on one line, with no line breaks and no spaces between its parts, a comma between "
-        "fields, and stop at its closing brace."
-    ),
-    Runaway.REPETITION: (
-        "That form named the same option over and over until it was cut off. Fill it in again, "
-        "naming each option once, and stop at its closing brace."
-    ),
-    None: (
-        "That form ran on until it was cut off. Fill it in again on one line, naming each option "
-        "once, and stop at its closing brace."
-    ),
-}
 
 
 def _repair(rejected: StructuredOutputError | TruncatedResponseError) -> dict[str, Any]:

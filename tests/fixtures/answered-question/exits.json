@@ -1353,6 +1353,58 @@
     "result": null,
     "society_packet": null
   },
+  "the planner's reply was cut twice": {
+    "abstention": "UNANSWERABLE_NOT_UNDERSTOOD",
+    "answer": [
+      {
+        "citations": [],
+        "text": "I could not turn that into a search of your photographs, so I have not looked. Ask it another way and I will try again.",
+        "type": "meta",
+        "value_refs": []
+      }
+    ],
+    "calls": [
+      {
+        "attempts": 1,
+        "completion_tokens": 200,
+        "cost_basis": "known",
+        "outcome": "reply_refused",
+        "prompt_tokens": 100,
+        "reasoning_tokens": null,
+        "requested_model": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+        "role": "structured_extraction",
+        "served_model": null,
+        "served_model_unavailable": "result_not_returned",
+        "usd": "0.00014000",
+        "used_fallback": false
+      },
+      {
+        "attempts": 1,
+        "completion_tokens": 200,
+        "cost_basis": "known",
+        "outcome": "reply_refused",
+        "prompt_tokens": 100,
+        "reasoning_tokens": null,
+        "requested_model": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+        "role": "structured_extraction",
+        "served_model": null,
+        "served_model_unavailable": "result_not_returned",
+        "usd": "0.00014000",
+        "used_fallback": false
+      }
+    ],
+    "content_packet": null,
+    "deterministic": false,
+    "names": [],
+    "packet": null,
+    "plan": null,
+    "rejections": [
+      "Qwen/Qwen3-235B-A22B-Instruct-2507 ran on in whitespace until the token limit cut it (200 completion tokens). A partial answer is never salvaged, and a higher max_tokens would only be filled the same way."
+    ],
+    "repaired": false,
+    "result": null,
+    "society_packet": null
+  },
   "the world's people could not be read": {
     "abstention": "UNANSWERABLE_NOT_CAPTURED",
     "answer": [

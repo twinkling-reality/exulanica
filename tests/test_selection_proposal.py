@@ -29,6 +29,7 @@ from exulanica.models.errors import StructuredOutputError, TruncatedResponseErro
 from exulanica.models.schema import strict_json_schema
 from exulanica.models.transport import HttpResponse
 from exulanica.selection.proposal import (
+    DRAFT_MAX_TOKENS,
     MAX_REFERENCE_CATALOGUE,
     PROMPT_VERSION,
     AppearanceProposal,
@@ -44,6 +45,7 @@ from exulanica.selection.proposal import (
     propose_appearance,
     source_catalogue,
 )
+from exulanica.selection.runaway_repair import RUNAWAY_REPAIRS
 from exulanica.selection.validation import Session
 from exulanica.store.local import LocalContentAddressedStore
 from exulanica.world import STYLE_REGISTRY, StyleReference, TopologyContract, TopologySourceSlot
@@ -239,7 +241,10 @@ def test_the_whole_path_classifies_then_drafts_and_asks_for_nothing_else(
     _seed_world(repository, tmp_path, photo_dir)
 
     outcome = propose_appearance(
-        repository.connection, client, "make the horizon softer", session,
+        repository.connection,
+        client,
+        "make the horizon softer",
+        session,
         current=current_reference(),
         world_id=WORLD,
         store=None,
@@ -274,9 +279,7 @@ def test_a_tempo_outside_its_narrower_range_is_refused_even_though_it_is_inside_
     Chosen because it is the case a single shared bound would get wrong: 0.5 is a legal value
     for six of this profile's seven controls and an illegal one for the seventh.
     """
-    outcome = validated(
-        draft(parameters={"horizon_softness": None, "world_tempo": 0.5})
-    )
+    outcome = validated(draft(parameters={"horizon_softness": None, "world_tempo": 0.5}))
 
     assert isinstance(outcome, ProposalRefusal)
     assert outcome.code is RefusalCode.OUT_OF_RANGE
@@ -465,7 +468,7 @@ def test_the_prompt_version_is_this_paths_own_and_not_the_question_paths():
     # Pinned as a literal on purpose. It is stored on every world style proposal this path
     # creates and it keys the response cache, so a bump has to be a decision somebody made
     # rather than a constant that drifted.
-    assert PROMPT_VERSION == "proposal-4"
+    assert PROMPT_VERSION == "proposal-5"
     assert PROMPT_VERSION != QUESTION_PROMPT_VERSION
 
 
@@ -492,7 +495,10 @@ def test_a_question_is_classified_as_one_and_produces_no_proposal_and_no_refusal
     session = Session(workspace_id=repository.workspace_id, actor=uuid.uuid4())
 
     outcome = propose_appearance(
-        repository.connection, client, "who is in these photographs?", session,
+        repository.connection,
+        client,
+        "who is in these photographs?",
+        session,
         current=current_reference(),
         world_id=WORLD,
         store=None,
@@ -773,9 +779,7 @@ def test_a_module_whose_only_control_was_restated_is_not_named_as_touched():
 
 
 def test_a_control_restated_beside_one_that_moved_is_left_out_of_what_changed():
-    outcome = validated(
-        draft(parameters={"vitality": current_reference().parameters["vitality"]})
-    )
+    outcome = validated(draft(parameters={"vitality": current_reference().parameters["vitality"]}))
 
     assert isinstance(outcome, AppearanceProposal)
     assert outcome.changed == ("horizon-softness",)
@@ -851,9 +855,9 @@ def test_the_module_lookup_uses_the_registry_it_was_given():
     """A registry that gives a capability to another module must move the answer, or the injection
     point is decoration."""
     document = json.loads(
-        (
-            __import__("pathlib").Path("exulanica/world/style-registry.v1.json")
-        ).read_text(encoding="utf-8")
+        (__import__("pathlib").Path("exulanica/world/style-registry.v1.json")).read_text(
+            encoding="utf-8"
+        )
     )
     for module in document["modules"]:
         if module["module_id"] == "aeroheart-optics-v1":
@@ -979,7 +983,7 @@ def test_a_truncated_draft_is_repaired_once_rather_than_refused_on_the_first_att
     """
     truncated = HttpResponse(
         status_code=200,
-        text=json.dumps(chat_body("{\"profile\": \"origin", finish_reason="length")),
+        text=json.dumps(chat_body('{"profile": "origin', finish_reason="length")),
     )
     client, transport = scripted(truncated, reply(draft()))
 
@@ -1000,22 +1004,23 @@ def test_a_truncated_draft_is_told_it_ran_long_rather_than_handed_a_schema_error
     """
     truncated = HttpResponse(
         status_code=200,
-        text=json.dumps(chat_body("{\"profile\": \"origin", finish_reason="length")),
+        text=json.dumps(chat_body('{"profile": "origin', finish_reason="length")),
     )
     client, transport = scripted(truncated, reply(draft()))
     draft_appearance(client, "softer horizon", current_reference(), catalogue())
 
     repair = transport.requests[1]["payload"]["messages"][-1]["content"]
-    assert "ran past the room it had" in repair
-    assert "keep it short" in repair
+    # A short cut reply is neither shape, so it is told it ran on, and to keep `spoken` short.
+    assert repair == f"{RUNAWAY_REPAIRS[None]} Keep `spoken` to one or two sentences."
     assert "was refused" not in repair
+    assert [r["payload"]["max_tokens"] for r in transport.requests] == [DRAFT_MAX_TOKENS] * 2
 
 
 def test_twice_truncated_is_still_a_refusal_rather_than_a_third_attempt():
     """One repair, then refuse. The bound is `DRAFT_ATTEMPTS` and it did not move."""
     truncated = HttpResponse(
         status_code=200,
-        text=json.dumps(chat_body("{\"profile\": \"origin", finish_reason="length")),
+        text=json.dumps(chat_body('{"profile": "origin', finish_reason="length")),
     )
     client, transport = scripted(truncated, truncated, reply(draft()))
 

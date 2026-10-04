@@ -98,7 +98,9 @@ __all__ = ["PROMPT_VERSION"]
 #: answer cites at least one line, as the validator requires of it; every sentence names only people
 #: its cited lines name, and gives a reason only from the one line that says it. The photograph
 #: composer is told a "Simulation:" prefix is not prose either, as it is told of every clause type.
-PROMPT_VERSION: Final = "selection-9"
+#: ``selection-10`` changes no text: the planner's form is sent with each object's lists last, and
+#: its reply may spend 640 tokens rather than the role's 2048.
+PROMPT_VERSION: Final = "selection-10"
 
 
 _PLANNER_SYSTEM: Final = """You turn a question about somebody's own photograph library into a \
