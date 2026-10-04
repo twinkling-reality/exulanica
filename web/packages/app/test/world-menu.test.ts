@@ -48,18 +48,31 @@ describe('World menu', () => {
     expect(onCompare).toHaveBeenCalledOnce();
   });
 
-  it('names and opens the recipe action as making a world', () => {
+  it('names and opens the recipe action as creating a world', () => {
     const onMakeWorld = vi.fn();
     const menu = buildWorldMenu({
       preview: false, onResume: vi.fn(), onWorld: vi.fn(), onMakeWorld,
       onCommand: vi.fn(),
     });
     const make = menu.root.querySelector<HTMLButtonElement>('[data-command=make]')!;
-    expect(make.querySelector('.world-menu-entry-label')?.textContent).toBe('Make a world');
+    expect(make.querySelector('.world-menu-entry-label')?.textContent).toBe('Create a world');
     expect(make.querySelector('.world-menu-entry-detail')?.textContent).toBe('Start a new town');
-    expect(make.getAttribute('aria-label')).toBe('Make a world');
+    expect(make.getAttribute('aria-label')).toBe('Create a world');
     make.click();
     expect(onMakeWorld).toHaveBeenCalledOnce();
+  });
+
+  it('offers the way back to Your worlds only where there is a list to go back to', () => {
+    const onYourWorlds = vi.fn();
+    const menu = buildWorldMenu({
+      preview: false, onResume: vi.fn(), onWorld: vi.fn(), onYourWorlds, onCommand: vi.fn(),
+    });
+    const worlds = menu.root.querySelector<HTMLButtonElement>('[data-command=worlds]')!;
+    expect(worlds.querySelector('.world-menu-entry-label')?.textContent).toBe('Your worlds');
+    worlds.click();
+    expect(onYourWorlds).toHaveBeenCalledOnce();
+    const preview = buildWorldMenu({ preview: true, onResume: vi.fn(), onWorld: vi.fn(), onCommand: vi.fn() });
+    expect(preview.root.querySelector('[data-command=worlds]')).toBeNull();
   });
 
   it('keeps the short menu titles distinct and names each action', () => {
@@ -70,7 +83,7 @@ describe('World menu', () => {
     const labels = [...menu.root.querySelectorAll('.world-menu-entry-label')]
       .map((node) => node.textContent);
     expect(labels).toEqual([
-      'World', 'Character', 'Library', 'Map', 'Compare', 'Companion', 'Make a world',
+      'World', 'Character', 'Library', 'Map', 'Compare', 'Companion', 'Create a world',
       'Design', 'Settings',
     ]);
     expect(menu.root.querySelector('[data-command=experiment]')).toBeNull();

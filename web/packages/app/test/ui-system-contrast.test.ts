@@ -66,6 +66,8 @@ describe('token contrast', () => {
 
   it('following the system chooses exactly the dark scheme', () => {
     expect(block("  :root[data-ui-scheme='system'] {")).toEqual(block(":root[data-ui-scheme='dark'] {"));
+    // The stage (the way in) is dark in every scheme, with exactly the dark values.
+    expect(block("[data-ui-stage='dark'] {")).toEqual(block(":root[data-ui-scheme='dark'] {"));
   });
 
   it('words on the accent and on danger read at AA', () => {

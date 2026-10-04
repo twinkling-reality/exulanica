@@ -202,7 +202,7 @@ export const ACTIONS: readonly ActionSpec[] = Object.freeze([
     icon: 'info', group: 'explore', placement: ['palette'],
   },
   {
-    id: 'world.make', label: 'Make a world', hint: 'Start a new town from a recipe',
+    id: 'world.make', label: 'Create a world', hint: 'Start a new town from a recipe',
     icon: 'world', group: 'system', placement: ['palette'], operation: MAKE_GENERATED,
     refusals: {
       world_limit_reached: {

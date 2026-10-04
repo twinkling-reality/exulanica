@@ -9,114 +9,370 @@ import type {
 } from '../world-entry-api.js';
 import { fill, say } from '../ui/copy.js';
 import { el } from '../ui/dom.js';
+import '../ui/your-worlds.css';
 
 export interface WorldEntrySurface {
   readonly entries: readonly SavedWorldEntry[];
   readonly open: (entry: SavedWorldEntry) => Promise<void>;
   readonly adoptLatest: (entry: SavedWorldEntry) => Promise<void>;
   /**
-   * Why no world opened by itself, when that is known. A person reaching a list has a choice to
-   * make either way, so this is a line above the list rather than the subject of the screen.
+   * Why no world opened, when that is known. A person reaching the list has a choice to make
+   * either way, so this is a line under the chosen world rather than the subject of the screen.
    */
   readonly arrivalFailure?: string | null;
   /** The offer to make a world from reviewed photographs, placed after the saved worlds. */
   readonly personalWorld?: PersonalWorldControl;
+  /** Opens Create a world; absent where no saved worlds are served. */
+  readonly create?: () => void;
+  /** A picture of a saved world, or null where there is none to show. */
+  readonly picture?: (entry: SavedWorldEntry) => string | null;
+}
+
+/** What Your worlds offers for making a world, as the action registry reads it from the server. */
+export interface WorldEntryCreateState {
+  readonly state: string;
+  readonly words: { readonly happened: string } | null;
+}
+
+export interface WorldEntrySurfaceHandle {
+  readonly root: HTMLElement;
+  /** Whether Create a world is offered, and why not where it is refused. */
+  setCreate(state: WorldEntryCreateState): void;
+}
+
+const DAY = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
+const SHORT_DAY = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+
+/** A day as a person reads it, from an ISO time the server served; null when it is not one. */
+function servedDay(iso: string, format: Intl.DateTimeFormat): string | null {
+  const time = Date.parse(iso);
+  return Number.isNaN(time) ? null : format.format(time);
 }
 
 /**
- * Pick between saved worlds. Only ever built for a real choice, which means more than one.
+ * The starter every workspace is given, untouched: a person who has it and nothing else has not
+ * made a world yet, so Your worlds asks them to create one rather than to choose.
+ */
+export function onlyUntouchedStarter(entries: readonly SavedWorldEntry[]): boolean {
+  const only = entries.length === 1 ? entries[0]! : null;
+  return only !== null && only.sourceKind === 'authored' && only.authoredScene !== null
+    && only.currentAuthoredEditSeq === 0;
+}
+
+/** What kind of world an entry is, in the words the card's detail and the meta line use. */
+function worldKind(entry: SavedWorldEntry): string {
+  if (entry.generatedGround != null) return fill('world.entry.generated', { recipe: entry.generatedGround.recipeLabel });
+  return entry.sourceKind === 'authored'
+    ? say('yourWorlds.kind.authored')
+    : say('yourWorlds.kind.personal');
+}
+
+/** The sentence under a world's title: what it is, and that it opens where it was left. */
+function worldAbout(entry: SavedWorldEntry): string {
+  if (entry.availability !== 'available') return unavailableMessage(entry.unavailableReason);
+  if (entry.generatedGround != null) {
+    const label = entry.generatedGround.recipeLabel;
+    return fill('yourWorlds.about.generated', { recipe: label.charAt(0).toLowerCase() + label.slice(1) });
+  }
+  return entry.sourceKind === 'authored'
+    ? (entry.currentAuthoredEditSeq === 0 ? say('yourWorlds.about.starter') : say('yourWorlds.about.authored'))
+    : say('yourWorlds.about.personal');
+}
+
+const kbd = (text: string): HTMLElement => el('kbd', { text });
+
+/** Whether a key press belongs to a field a person is typing in, where no shortcut may fire. */
+function typing(target: EventTarget | null): boolean {
+  return target instanceof HTMLElement
+    && (target.isContentEditable || target.closest('input, textarea, select') !== null);
+}
+
+/**
+ * Your worlds: the first thing a signed-in person sees, before any world opens.
  *
- * `main.ts` sends a session with one world, or none, to {@link buildWorldOpeningFailure}
- * instead. This surface carries a reading column, a list and a reconciliation control, and none
- * of that is an honest frame for "the one world you have did not load its appearance".
+ * The chosen world is named large with what it is, when it was established and its actions; under
+ * it a strip of cards holds every saved world, newest first, and Create a world. Moving to a card
+ * (pointer or arrow keys) chooses it; pressing a card, or Open, opens it. A person whose only world
+ * is the untouched starter is asked to create one instead. Keys: arrows choose, Enter opens, N
+ * creates; none fires while a person types.
  *
- * NO TRY AGAIN BUTTON. A reload returns to exactly this screen, because more than one saved
- * world means the choice is still required. Pressing a world is the action, and pressing it
- * reports its own failure in the status line.
+ * Opening a world that fails says why in the status line under the title and leaves the choice
+ * open. A world changed elsewhere keeps its reconciliation: the acknowledgement and the adopt
+ * button sit under the title while that world is chosen.
  */
 export function buildWorldEntrySurface(deps: WorldEntrySurface): HTMLElement {
+  return buildYourWorlds(deps).root;
+}
+
+export function buildYourWorlds(deps: WorldEntrySurface): WorldEntrySurfaceHandle {
+  const entries = [...deps.entries].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
+  const first = onlyUntouchedStarter(entries);
   const arrivalFailure = deps.arrivalFailure ?? null;
   const status = el('p', {
-    class: 'gate-failure world-entry-status', role: 'status', 'aria-live': 'polite',
+    class: 'gate-failure world-entry-status your-worlds-status', role: 'status', 'aria-live': 'polite',
   });
   status.hidden = arrivalFailure === null;
   if (arrivalFailure !== null) status.textContent = arrivalFailure;
 
-  const root = el('main', { class: 'gate world-entry-gate' }, [
-    el('header', { class: 'world-entry-heading' }, [
-      el('p', { class: 'world-entry-brand', text: 'Exulanica' }),
-      el('h1', { text: 'Choose a saved world' }),
-      el('p', {
-        class: 'world-entry-introduction',
-        text: 'Open a saved world exactly where you left it.',
-      }),
-      status,
+  const heading = el('h1', { class: 'your-worlds-title' });
+  const about = el('p', { class: 'your-worlds-about' });
+  const meta = el('p', { class: 'your-worlds-meta' });
+  const openButton = el('button', { type: 'button', class: 'your-worlds-open', 'data-action': 'worlds.open' }, [
+    el('span', { text: say('yourWorlds.open') }), kbd('↵'),
+  ]);
+  const values = el('button', {
+    type: 'button', class: 'your-worlds-secondary your-worlds-values', 'data-action': 'worlds.values',
+    'aria-disabled': 'true', 'aria-describedby': 'your-worlds-values-why',
+  }, [el('span', { text: say('yourWorlds.values') })]);
+  const valuesWhy = el('span', { id: 'your-worlds-values-why', class: 'your-worlds-hint', text: say('yourWorlds.values.unavailable') });
+  const createButton = el('button', {
+    type: 'button', class: 'your-worlds-secondary your-worlds-create-action', 'data-action': 'worlds.create',
+  }, [el('span', { text: say('yourWorlds.create') }), kbd('N')]);
+  const reconcile = el('div', { class: 'your-worlds-reconcile' });
+  const actions = el('div', { class: 'your-worlds-actions' }, [openButton, values, createButton]);
+
+  const lede = el('section', { class: 'your-worlds-lede', 'aria-live': 'polite', 'aria-atomic': 'false' }, [
+    el('p', { class: 'your-worlds-overline' }),
+    heading, about, actions, valuesWhy, meta, status, reconcile,
+  ]);
+  const list = el('section', { class: 'world-entry-list your-worlds-strip', 'aria-label': say('yourWorlds.strip') });
+  const keys = el('p', { class: 'your-worlds-keys', 'aria-hidden': 'true' }, [
+    el('span', {}, [kbd('← →'), say('yourWorlds.key.choose')]),
+    el('span', {}, [kbd('↵'), say('yourWorlds.key.open')]),
+    el('span', { class: 'your-worlds-key-create' }, [kbd('N'), say('yourWorlds.create')]),
+  ]);
+  const corner = el('header', { class: 'your-worlds-corner' }, [
+    el('span', { class: 'your-worlds-mark', 'aria-hidden': 'true' }, [el('i'), el('i')]),
+    el('span', { class: 'your-worlds-rule', 'aria-hidden': 'true' }),
+    el('p', { class: 'world-entry-brand your-worlds-label' }, [
+      el('span', { text: 'Exulanica' }), el('span', { text: say('yourWorlds.label') }),
     ]),
   ]);
-  const list = el('section', { class: 'world-entry-list', 'aria-label': 'Saved worlds' });
-  for (const entry of deps.entries) {
-    const item = el('article', { class: 'world-entry-item' });
+  // The chosen world's picture behind the page, faded into it at the edges; two layers so a new
+  // choice fades in over the last. A world with no picture shows the plain page.
+  const layers = [el('img', { alt: '', decoding: 'async' }), el('img', { alt: '', decoding: 'async' })];
+  const backdrop = el('div', { class: 'your-worlds-backdrop', 'aria-hidden': 'true' }, layers);
+  let front = 0;
+  const showBackdrop = (picture: string | null): void => {
+    const current = layers[front]!;
+    if (picture === null) {
+      for (const layer of layers) layer.classList.remove('is-shown');
+      root.dataset['backdrop'] = 'none';
+      return;
+    }
+    root.dataset['backdrop'] = 'picture';
+    if (current.classList.contains('is-shown') && current.getAttribute('src') === picture) return;
+    front = 1 - front;
+    const next = layers[front]!;
+    next.setAttribute('src', picture);
+    next.classList.add('is-shown');
+    current.classList.remove('is-shown');
+  };
+  const root = el('main', {
+    class: 'gate world-entry-gate your-worlds', 'data-variant': first ? 'first' : 'worlds',
+    // The way in is a stage: dark in every scheme (tokens.css), as the world keeps its own light.
+    'data-ui-stage': 'dark',
+  }, [backdrop, corner, keys, lede, list]);
+
+  const cards: HTMLButtonElement[] = [];
+  let chosen: SavedWorldEntry | null = null;
+  let createState: WorldEntryCreateState = { state: deps.create === undefined ? 'unsupported' : 'unknown', words: null };
+  let busy = false;
+
+  const createOffered = (): boolean => deps.create !== undefined
+    && (createState.state === 'available' || createState.state === 'unknown');
+
+  const openEntry = (entry: SavedWorldEntry, control: HTMLButtonElement): void => {
+    if (busy) return;
+    if (entry.availability !== 'available') {
+      status.hidden = false;
+      status.textContent = unavailableMessage(entry.unavailableReason);
+      return;
+    }
+    busy = true;
+    status.hidden = true;
+    control.setAttribute('aria-busy', 'true');
+    openButton.disabled = true;
+    root.dataset['state'] = 'opening';
+    void deps.open(entry).catch((error: unknown) => {
+      status.hidden = false;
+      status.textContent = entryFailure(error, 'The saved world could not be opened.');
+    }).finally(() => {
+      busy = false;
+      control.removeAttribute('aria-busy');
+      openButton.disabled = chosen === null || chosen.availability !== 'available';
+      delete root.dataset['state'];
+    });
+  };
+
+  const showReconcile = (entry: SavedWorldEntry): void => {
+    reconcile.replaceChildren();
+    if (entry.unavailableReason !== 'authored_version_changed') return;
+    const acknowledge = el('input', { type: 'checkbox' }) as HTMLInputElement;
+    const adopt = el('button', {
+      type: 'button', class: 'world-entry-secondary your-worlds-secondary',
+      text: 'Use the latest saved changes and open', disabled: true,
+    });
+    acknowledge.addEventListener('change', () => { adopt.disabled = !acknowledge.checked; });
+    adopt.addEventListener('click', () => {
+      adopt.disabled = true;
+      status.hidden = true;
+      void deps.adoptLatest(entry).catch((error: unknown) => {
+        adopt.disabled = !acknowledge.checked;
+        status.hidden = false;
+        status.textContent = entryFailure(
+          error, 'The latest changes could not be adopted. Reload and compare again.',
+        );
+      });
+    });
+    reconcile.append(el('section', { class: 'world-entry-reconcile' }, [
+      el('p', {
+        text: `Your opening point includes ${entry.authoredEditSeq} saved changes. `
+          + `The latest state includes ${entry.currentAuthoredEditSeq}.`,
+      }),
+      el('label', {}, [acknowledge, ' I understand this will use changes saved elsewhere.']),
+      adopt,
+    ]));
+  };
+
+  const overline = lede.querySelector('.your-worlds-overline') as HTMLElement;
+  const choose = (entry: SavedWorldEntry): void => {
+    if (chosen === entry) return;
+    chosen = entry;
+    for (const card of cards) card.setAttribute('aria-current', String(card.dataset['entryId'] === entry.entryId));
+    overline.textContent = first ? '' : fill('yourWorlds.position', {
+      position: String(entries.indexOf(entry) + 1), count: String(entries.length),
+    });
+    heading.textContent = first ? say('yourWorlds.first.title') : entry.title;
+    about.textContent = first ? say('yourWorlds.first.about') : worldAbout(entry);
+    const established = servedDay(entry.createdAt, DAY);
+    meta.replaceChildren(...[
+      established === null ? null : el('b', { text: fill('yourWorlds.established', { day: established }) }),
+      el('span', {
+        text: entry.generatedGround != null
+          ? fill('yourWorlds.from', { recipe: entry.generatedGround.recipeLabel })
+          : say(entry.sourceKind === 'authored' ? 'yourWorlds.kind.authored' : 'yourWorlds.kind.personal'),
+      }),
+    ].filter((part): part is HTMLElement => part !== null));
+    openButton.disabled = entry.availability !== 'available';
+    openButton.querySelector('span')!.textContent = first
+      ? fill('yourWorlds.openNamed', { title: entry.title })
+      : say('yourWorlds.open');
+    // With only the untouched starter, creating is the action asked for and opening the starter
+    // the alternative, so the two swap places and weight.
+    actions.dataset['primary'] = first ? 'create' : 'open';
+    showBackdrop(first ? null : deps.picture?.(entry) ?? null);
+    values.hidden = entry.generatedGround == null;
+    valuesWhy.hidden = values.hidden;
+    showReconcile(entry);
+  };
+
+  for (const entry of entries) {
+    const picture = deps.picture?.(entry) ?? null;
+    const established = servedDay(entry.createdAt, SHORT_DAY);
     const unavailable = entry.availability !== 'available';
-    const button = el('button', {
-      type: 'button', class: 'world-entry-choice', disabled: unavailable,
+    const card = el('button', {
+      type: 'button', class: 'world-entry-choice your-worlds-card', 'data-entry-id': entry.entryId,
+      'aria-disabled': unavailable ? 'true' : undefined,
     }, [
+      el('span', { class: 'your-worlds-picture', 'aria-hidden': 'true' }, picture === null ? [] : [
+        el('img', { src: picture, alt: '', loading: 'lazy', decoding: 'async' }),
+      ]),
+      el('span', { class: 'your-worlds-caption', text: established === null ? '' : fill('yourWorlds.caption', { day: established }) }),
       el('span', { class: 'world-entry-choice-title', text: entry.title }),
       el('span', {
         class: 'world-entry-choice-detail',
-        text: unavailable
-          ? unavailableMessage(entry.unavailableReason)
-          : entry.generatedGround != null
-            ? fill('world.entry.generated', { recipe: entry.generatedGround.recipeLabel })
-            : entry.sourceKind === 'authored'
-              ? 'Authored world · saved changes and appearance'
-              : 'Personal world · saved changes and appearance',
+        text: unavailable ? unavailableMessage(entry.unavailableReason) : `${worldKind(entry)} · saved changes and appearance`,
       }),
     ]);
-    button.addEventListener('click', () => {
-      status.hidden = true;
-      button.disabled = true;
-      void deps.open(entry).catch((error: unknown) => {
-        button.disabled = false;
-        status.hidden = false;
-        status.textContent = entryFailure(error, 'The saved world could not be opened.');
-      });
+    card.addEventListener('focus', () => choose(entry));
+    card.addEventListener('pointerenter', () => choose(entry));
+    card.addEventListener('click', () => {
+      choose(entry);
+      openEntry(entry, card);
     });
-    item.append(button);
-    if (entry.unavailableReason === 'authored_version_changed') {
-      const acknowledge = el('input', { type: 'checkbox' }) as HTMLInputElement;
-      const adopt = el('button', {
-        type: 'button', class: 'world-entry-secondary',
-        text: 'Use the latest saved changes and open', disabled: true,
-      });
-      acknowledge.addEventListener('change', () => { adopt.disabled = !acknowledge.checked; });
-      adopt.addEventListener('click', () => {
-        adopt.disabled = true;
-        status.hidden = true;
-        void deps.adoptLatest(entry).catch((error: unknown) => {
-          adopt.disabled = !acknowledge.checked;
-          status.hidden = false;
-          status.textContent = entryFailure(
-            error, 'The latest changes could not be adopted. Reload and compare again.',
-          );
-        });
-      });
-      item.append(el('section', { class: 'world-entry-reconcile' }, [
-        el('p', {
-          text: `Your opening point includes ${entry.authoredEditSeq} saved changes. `
-            + `The latest state includes ${entry.currentAuthoredEditSeq}.`,
-        }),
-        el('label', {}, [
-          acknowledge,
-          ' I understand this will use changes saved elsewhere.',
-        ]),
-        adopt,
-      ]));
-    }
-    list.append(item);
+    cards.push(card);
+    list.append(el('article', { class: 'world-entry-item' }, [card]));
   }
-  root.append(list);
-  if (deps.personalWorld !== undefined) root.append(deps.personalWorld.root);
-  return root;
+
+  const createCard = el('button', {
+    type: 'button', class: 'your-worlds-card your-worlds-create', 'data-action': 'worlds.create-card',
+  }, [
+    el('span', { class: 'your-worlds-picture', 'aria-hidden': 'true' }, [el('span', { class: 'your-worlds-plus', text: '+' })]),
+    el('span', { class: 'your-worlds-caption', text: say('yourWorlds.create.caption') }),
+    el('span', { class: 'world-entry-choice-title', text: say('yourWorlds.create') }),
+    el('span', { class: 'world-entry-choice-detail your-worlds-create-detail', text: say('yourWorlds.create.detail') }),
+  ]);
+  list.append(el('article', { class: 'world-entry-item' }, [createCard]));
+
+  const create = (): void => {
+    if (deps.create === undefined) return;
+    if (!createOffered()) {
+      status.hidden = false;
+      status.textContent = createState.words?.happened ?? say('yourWorlds.create.unavailable');
+      return;
+    }
+    deps.create();
+  };
+  createCard.addEventListener('click', create);
+  createButton.addEventListener('click', create);
+  openButton.addEventListener('click', () => {
+    if (chosen === null) return;
+    const card = cards.find((one) => one.dataset['entryId'] === chosen!.entryId);
+    if (card !== undefined) openEntry(chosen, card);
+  });
+  values.addEventListener('click', () => {
+    status.hidden = false;
+    status.textContent = say('yourWorlds.values.unavailable');
+  });
+
+  root.addEventListener('keydown', (event) => {
+    if (event.metaKey || event.ctrlKey || event.altKey || typing(event.target)) return;
+    const all = [...cards, createCard];
+    const at = all.indexOf(document.activeElement as HTMLButtonElement);
+    if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
+      event.preventDefault();
+      const step = event.key === 'ArrowRight' ? 1 : -1;
+      const from = at >= 0 ? at : Math.max(0, cards.findIndex((card) => card.dataset['entryId'] === chosen?.entryId));
+      all[Math.min(all.length - 1, Math.max(0, from + step))]?.focus();
+      return;
+    }
+    if ((event.key === 'n' || event.key === 'N') && !event.shiftKey) {
+      event.preventDefault();
+      create();
+      return;
+    }
+    // Enter on a focused control is that control's own press; elsewhere it opens the chosen world.
+    if (event.key === 'Enter' && !(event.target instanceof HTMLButtonElement) && chosen !== null) {
+      event.preventDefault();
+      openButton.click();
+    }
+  });
+
+  if (deps.personalWorld !== undefined) {
+    root.append(el('section', { class: 'your-worlds-more' }, [deps.personalWorld.root]));
+  }
+
+  const setCreate = (state: WorldEntryCreateState): void => {
+    createState = state;
+    const offered = createOffered();
+    root.dataset['create'] = deps.create === undefined ? 'unsupported' : state.state;
+    for (const control of [createCard, createButton]) {
+      if (offered) control.removeAttribute('aria-disabled');
+      else control.setAttribute('aria-disabled', 'true');
+    }
+    createCard.hidden = deps.create === undefined;
+    createButton.hidden = deps.create === undefined;
+    (keys.querySelector('.your-worlds-key-create') as HTMLElement).hidden = deps.create === undefined;
+    const detail = createCard.querySelector('.your-worlds-create-detail') as HTMLElement;
+    detail.textContent = offered || state.words === null ? say('yourWorlds.create.detail') : state.words.happened;
+  };
+  setCreate(createState);
+  if (entries[0] !== undefined) choose(entries[0]);
+  // The first world's own card is the button of record when it is the untouched starter: creating
+  // is the action asked for, opening the starter the alternative.
+  root.dataset['first'] = String(first);
+  return { root, setCreate };
 }
 
 /** How the choice to make a world from reviewed photographs reaches the server and the world. */

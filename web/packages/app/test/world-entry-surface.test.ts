@@ -167,8 +167,10 @@ describe('choosing between saved worlds', () => {
       availability: 'unavailable', unavailableReason: 'source_deleted',
     })]);
     expect(deleted.textContent).toContain('source material was deleted');
-    expect((deleted.querySelector('button.world-entry-choice') as HTMLButtonElement).disabled)
-      .toBe(true);
+    // Still focusable, so the reason can be read; pressing it says why and opens nothing.
+    const card = deleted.querySelector('button.world-entry-choice') as HTMLButtonElement;
+    expect(card.getAttribute('aria-disabled')).toBe('true');
+    expect(card.disabled).toBe(false);
     expect(surface([entry({
       availability: 'unavailable', unavailableReason: 'authored_version_changed',
       currentAuthoredStateSha256: 'b'.repeat(64), currentAuthoredEditSeq: 6,

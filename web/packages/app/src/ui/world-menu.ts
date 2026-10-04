@@ -76,6 +76,8 @@ export function buildWorldMenu(options: {
   readonly onCompare?: () => void;
   /** Offers the recipes a new world can be generated from; absent where no worlds are saved. */
   readonly onMakeWorld?: () => void;
+  /** Leaves this world for Your worlds; absent in the development preview, which has no list. */
+  readonly onYourWorlds?: () => void;
   readonly onCommand: (command: AtlasCommand) => void;
 }): WorldMenu {
   const root = el('section', {
@@ -88,7 +90,7 @@ export function buildWorldMenu(options: {
   let activate = (action: () => void): void => action();
 
   const entry = (
-    command: AtlasCommand | 'world' | 'compare' | 'make',
+    command: AtlasCommand | 'world' | 'compare' | 'make' | 'worlds',
     label: string,
     detail: string,
     key: string,
@@ -96,7 +98,7 @@ export function buildWorldMenu(options: {
     accessibleName?: string,
   ): HTMLButtonElement => {
     const icon = command === 'world' || command === 'compare'
-      || command === 'make' ? [] : [commandIcon(command)];
+      || command === 'make' || command === 'worlds' ? [] : [commandIcon(command)];
     const button = el('button', {
       type: 'button',
       class: `world-menu-entry ${className}`.trim(),
@@ -114,7 +116,9 @@ export function buildWorldMenu(options: {
           ? options.onCompare!
           : command === 'make'
             ? options.onMakeWorld!
-            : () => options.onCommand(command)));
+            : command === 'worlds'
+              ? options.onYourWorlds!
+              : () => options.onCommand(command)));
     return button;
   };
 
@@ -135,6 +139,9 @@ export function buildWorldMenu(options: {
     ]),
     entry('companion', 'Companion', 'Ask and act', 'X', 'world-menu-companion'),
     ...(makeEntry === null ? [] : [makeEntry]),
+    ...(options.onYourWorlds === undefined ? [] : [
+      entry('worlds', say('worldMenu.worlds'), say('worldMenu.worlds.detail'), '', 'world-menu-worlds'),
+    ]),
     entry('options', 'Design', 'Light and material', 'O', 'world-menu-customize', 'Customize world'),
     entry('controls', 'Settings', 'Display and controls', '?', 'world-menu-settings'),
   ]);

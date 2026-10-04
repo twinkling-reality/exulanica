@@ -84,7 +84,10 @@ export function attachWorldDescription(panel: SpecificationPanel, options: {
       words: specificationWords(specification),
       maximumCharacters: DESCRIPTION_CHARACTERS,
     });
-    const presets = panel.root.querySelector('.world-recipes-list');
-    panel.root.insertBefore(description.root, presets);
+    // Above the recipes and the line that introduces them: describing the town is the main way in.
+    const presets = panel.root.querySelector('.world-recipes-list-label')
+      ?? panel.root.querySelector('.world-recipes-list');
+    if (presets?.parentElement) presets.parentElement.insertBefore(description.root, presets);
+    else panel.root.append(description.root);
   });
 }

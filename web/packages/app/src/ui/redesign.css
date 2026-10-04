@@ -992,6 +992,13 @@
 #shell .world-menu-companion { grid-column: span 2; }
 #shell .world-menu-settings { grid-column: span 2; }
 #shell .world-menu-grid:has(> .world-menu-entry:nth-child(7):last-child) .world-menu-settings { grid-column: span 1; }
+/* With Your worlds in the menu, Create a world, Your worlds, Design and Settings share one row. */
+#shell .world-menu-grid:has(> .world-menu-worlds) .world-menu-settings { grid-column: span 1; }
+#shell .world-menu-grid:has(> .world-menu-worlds) :is(.world-menu-make, .world-menu-worlds, .world-menu-customize, .world-menu-settings) .world-menu-entry-label {
+  font-size: clamp(21px, 1.9vw, 26px);
+  white-space: normal;
+}
+#shell .world-menu-worlds { --field-main: var(--ui-spectrum-blue); --field-counter: var(--ui-spectrum-green); --pigment-x: 92%; --pigment-y: 0%; }
 #shell .world-menu-rail {
   display: flex;
   align-items: center;

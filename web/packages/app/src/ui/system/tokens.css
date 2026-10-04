@@ -269,6 +269,53 @@
   --color-signal-ink: #f4ff91;
 }
 
+/*
+ * The stage: the way in (Your worlds, Create a world) shows worlds full screen and is dark in every
+ * scheme, as the world itself keeps its own light. These are exactly the dark values;
+ * ui-system-contrast.test.ts holds them equal.
+ */
+[data-ui-stage='dark'] {
+  --color-surface: rgb(23 29 36 / 0.92);
+  --color-surface-solid: #171d24;
+  --color-surface-raised: #1f2731;
+  --color-surface-sunken: #11161c;
+  --color-surface-hover: #f4ff9114;
+  --color-surface-pressed: #f4ff9124;
+  --color-scrim: rgb(0 0 0 / 0.5);
+  --color-text: #eef2f6;
+  --color-text-muted: #bcc6d2;
+  --color-text-faint: #9aa6b4;
+  --color-text-disabled: #6c7886;
+  --color-text-on-accent: #10233a;
+  --color-text-on-status: #0b1214;
+  --color-border: #ffffff24;
+  --color-border-strong: #ffffff42;
+  --color-accent: #c6e1ff;
+  --color-accent-hover: #d8eaff;
+  --color-accent-pressed: #e6f1ff;
+  --color-accent-disabled: #3a4f66;
+  --color-accent-soft: #c6e1ff24;
+  --color-accent-text: #c6e1ff;
+  --color-positive: #6fc47d;
+  --color-positive-soft: #6fc47d24;
+  --color-positive-text: #8fd39a;
+  --color-caution: #e6a64a;
+  --color-caution-soft: #e6a64a24;
+  --color-caution-text: #f0bd72;
+  --color-danger: #f08a82;
+  --color-danger-soft: #f08a8224;
+  --color-danger-text: #f5a59f;
+  --color-info: #8fb4ec;
+  --color-info-soft: #8fb4ec24;
+  --color-info-text: #a8c5f1;
+  --elevation-1: 0 1px 2px #00000047;
+  --elevation-2: 0 4px 16px #00000059;
+  --elevation-3: 0 10px 32px #00000066;
+  --elevation-4: 0 18px 56px #00000080;
+  --color-signal: #3a4135;
+  --color-signal-ink: #f4ff91;
+}
+
 /* Reduced transparency and high contrast make surfaces opaque and remove the blur. */
 :root[data-transparency='reduced'],
 :root[data-contrast='high'] {

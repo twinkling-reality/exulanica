@@ -73,7 +73,7 @@ import { button, errorState } from './ui/system/components.js';
 import { createLayout, MODAL_BACKGROUND_REGIONS, type Layout } from './ui/system/layout.js';
 import { mountActions, type MountedActions } from './composition/actions.js';
 import { actionState, perform } from './ui/actions/surfaces.js';
-import { actionSpec } from './ui/actions/registry.js';
+import { actionSpec, availability } from './ui/actions/registry.js';
 import type { PlannedRequest } from './ui/actions/planned.js';
 import { buildPlanSheet } from './ui/companion-plan.js';
 import { CompanionActionsClient, type ActionPageContext } from './companion-actions-api.js';
@@ -94,9 +94,11 @@ import { mountAppearance } from './composition/appearance.js';
 import { mountObjects } from './composition/objects.js';
 import {
   buildPersonalWorldChoice,
-  buildWorldEntrySurface,
+  buildYourWorlds,
   type PersonalWorldControl,
 } from './composition/world-entry.js';
+import { keepWorldPicture, worldPicture } from './composition/world-pictures.js';
+import { CapabilitiesClient } from './capabilities-api.js';
 import { mountEnvironmentSelection } from './composition/environment-selection.js';
 import { createSavedWorldFlight } from './composition/saved-world-flight.js';
 import { lazyPanel } from './composition/lazy-panel.js';
@@ -125,6 +127,9 @@ import {
   type AlternateVersion,
   type SavedEntryWriteBinding,
 } from './world-objects-api.js';
+
+/** How long a world draws before its picture for Your worlds is taken: past the arrival's fade. */
+const WORLD_PICTURE_DELAY_MS = 6000;
 
 const env = createAppEnvironment();
 const state = createSessionState();
@@ -209,7 +214,8 @@ async function start(token: string, csrfToken?: string): Promise<void> {
     );
     return;
   }
-  if (!preview && state.activeWorldEntry === null) {
+  // Your worlds comes first: a signed-in person chooses or creates a world before one opens.
+  if (!preview) {
     await mountNoWorld({ retry: () => start(token, csrfToken) });
     return;
   }
@@ -217,13 +223,11 @@ async function start(token: string, csrfToken?: string): Promise<void> {
 }
 
 /**
- * The no-world states, told apart by whether the person has anything to decide.
+ * Before a world opens: Your worlds whenever there is a saved world to show, else the failure.
  *
- * A LIST OF ONE IS NOT A CHOICE. Every one of these used to reach the saved-world chooser, so a
- * person whose only world failed to load its appearance was shown "Choose a saved world" over a
- * list containing that world, with nothing saying anything had gone wrong. Nothing in the
- * product gives a workspace a second world, so the chooser's own subject never occurred and the
- * only state it ever actually showed was the one it did not describe.
+ * Your worlds is the way into every world, one or many: it names the world that would open, says
+ * why it did not open where start-up already tried, and offers Create a world. A workspace with no
+ * saved world at all reached here because its starter could not be made, which the failure says.
  */
 async function mountNoWorld(deps: {
   readonly retry: () => Promise<void>;
@@ -243,21 +247,8 @@ async function mountNoWorld(deps: {
       state.worldEntryError = error;
     }
   }
-  if (state.savedWorldEntries.length > 1) {
+  if (state.savedWorldEntries.length > 0) {
     await mountWorldEntry();
-    return;
-  }
-  const only = state.savedWorldEntries[0] ?? null;
-  // A world whose source material is gone cannot be opened by trying again, and a world that
-  // changed elsewhere needs the acknowledgement the list carries. Neither is a Try again.
-  if (only !== null && only.availability !== 'available') {
-    if (only.unavailableReason === 'authored_version_changed') {
-      await mountWorldEntry();
-      return;
-    }
-    showWorldOpeningFailure(
-      'Its source material was deleted. The saved record remains, but it cannot be opened.', null,
-    );
     return;
   }
   showWorldOpeningFailure(
@@ -319,7 +310,7 @@ shell.addEventListener(GENERATED_WORLD_READY_EVENT, (event) => {
   })();
 });
 
-/** Make a world, as the shell holds it: the stand-in until its code arrives, then the panel. */
+/** Create a world, as the shell holds it: the stand-in until its code arrives, then the panel. */
 interface MakeWorldSurface {
   readonly isConnected: boolean;
   remove(): void;
@@ -331,7 +322,7 @@ interface MakeWorldSurface {
  * world is mounted afresh.
  *
  * Its code loads when it is first opened, so the page starts without it. Until it arrives the shell
- * holds a stand-in where the panel will be, saying "Opening Make a world."; a load that fails says
+ * holds a stand-in where the panel will be, saying "Opening Create a world."; a load that fails says
  * so with Try again, and a stand-in closed meanwhile is never replaced by the panel.
  */
 function showWorldRecipes(onClose: () => void): MakeWorldSurface | null {
@@ -340,11 +331,12 @@ function showWorldRecipes(onClose: () => void): MakeWorldSurface | null {
   if (client === null || credentials === null) return null;
   shell.querySelector('.world-recipes')?.remove();
   const stand = el('section', {
-    class: 'world-recipes lazy-panel', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Make a world', tabindex: '-1',
+    class: 'world-recipes lazy-panel', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Create a world', tabindex: '-1',
+    'data-ui-stage': 'dark',
   });
   let current: HTMLElement = stand;
   const load = (): void => {
-    stand.replaceChildren(el('p', { class: 'lazy-panel-opening', role: 'status', text: 'Opening Make a world.' }));
+    stand.replaceChildren(el('p', { class: 'lazy-panel-opening', role: 'status', text: 'Opening Create a world.' }));
     void Promise.all([
       import('./ui/world-recipes.js'),
       import('./composition/world-description.js'),
@@ -377,7 +369,7 @@ function showWorldRecipes(onClose: () => void): MakeWorldSurface | null {
       if (!stand.isConnected) return;
       const retry = button({ label: 'Try again', variant: 'primary', onClick: load });
       stand.replaceChildren(errorState({
-        happened: 'Make a world did not open.',
+        happened: 'Create a world did not open.',
         next: 'Check the connection, then try again.',
         action: retry,
         technical: { detail: error instanceof Error ? error.message : String(error) },
@@ -394,7 +386,7 @@ function showWorldRecipes(onClose: () => void): MakeWorldSurface | null {
   };
 }
 
-/** Show the list. Only `mountNoWorld` calls this, and only when there is a choice to make. */
+/** Show Your worlds. Only `mountNoWorld` calls this. */
 async function mountWorldEntry(): Promise<void> {
   const entries = state.worldEntries;
   canvas.hidden = true;
@@ -405,9 +397,23 @@ async function mountWorldEntry(): Promise<void> {
     shell.removeAttribute('data-world-state');
     await mount();
   };
-  replace(shell, [buildWorldEntrySurface({
+  // Create a world opens over Your worlds and returns to it when closed.
+  let creating: MakeWorldSurface | null = null;
+  const closeCreate = (): void => {
+    creating?.remove();
+    creating = null;
+    (shell.querySelector('.your-worlds-create') as HTMLElement | null)?.focus({ preventScroll: true });
+  };
+  const yourWorlds = buildYourWorlds({
     entries: state.savedWorldEntries,
     open,
+    picture: worldPicture,
+    ...(entries === null ? {} : {
+      create: () => {
+        if (creating?.isConnected === true) return;
+        creating = showWorldRecipes(closeCreate);
+      },
+    }),
     arrivalFailure: worldOpeningReason(state.worldEntryError),
     ...(() => {
       const personalWorld = personalWorldControl();
@@ -420,8 +426,19 @@ async function mountWorldEntry(): Promise<void> {
         candidate.entryId === adopted.entryId ? adopted : candidate));
       await open(adopted);
     },
-  })]);
+  });
+  replace(shell, [yourWorlds.root]);
   shell.removeAttribute('aria-busy');
+  shell.removeAttribute('data-booting');
+  // Create a world's availability, read the way a mounted world's registry reads it.
+  if (entries !== null && state.credentials !== null) {
+    const spec = actionSpec('world.make');
+    const client = new CapabilitiesClient({ ...state.credentials, worldId: null });
+    void client.creation()
+      .then((creation) => yourWorlds.setCreate(availability(spec, creation)))
+      .catch(() => yourWorlds.setCreate(availability(spec, null)));
+  }
+  (yourWorlds.root.querySelector('.your-worlds-card') as HTMLElement | null)?.focus({ preventScroll: true });
 }
 
 function activeEntryWriteBinding(): SavedEntryWriteBinding {
@@ -1059,6 +1076,16 @@ async function mount(): Promise<void> {
         void perform(actions.host, 'world.make');
       },
     }),
+    ...(preview ? {} : {
+      // Back to Your worlds: keep this world's picture, then load the page afresh, which starts there.
+      onYourWorlds: () => {
+        const binding = state.atlas?.binding;
+        const entryId = state.activeWorldEntry?.entryId ?? null;
+        const leave = (): void => window.location.reload();
+        if (binding === undefined || entryId === null) return leave();
+        void keepWorldPicture(binding, entryId).finally(leave);
+      },
+    }),
     onCommand: handleAtlasCommand,
   });
   // Compare and the recorded-result reader load when first opened (composition/lazy-panel.ts).
@@ -1531,6 +1558,14 @@ async function mount(): Promise<void> {
   retainedLoading.remove();
   shell.removeAttribute('aria-busy');
   shell.removeAttribute('data-booting');
+  // A picture of this world for its card on Your worlds, once it has drawn for a few seconds.
+  const pictured = state.activeWorldEntry?.entryId ?? null;
+  if (!preview && pictured !== null) {
+    window.setTimeout(() => {
+      const binding = state.atlas?.binding;
+      if (binding !== undefined && state.activeWorldEntry?.entryId === pictured) void keepWorldPicture(binding, pictured);
+    }, WORLD_PICTURE_DELAY_MS);
+  }
   if (preview) {
     const { companionPreviewScenario, showCompanionPreviewScenario } =
       await import('./dev/companion-scenarios.js');

@@ -25,6 +25,8 @@ import {
   type SpecificationValue,
   type WorldSpecification,
 } from '../world-specification.js';
+import { recipePicture } from './recipe-pictures.js';
+import './create-world.css';
 import { fill, say } from './copy.js';
 import { el } from './dom.js';
 
@@ -81,16 +83,38 @@ export function buildWorldRecipes(options: {
   const make = el('button', { type: 'button', class: 'world-recipes-make', text: say('worldRecipes.make'), hidden: true });
   const close = el('button', { type: 'button', class: 'world-recipes-close', text: say('worldRecipes.close') });
   close.addEventListener('click', () => options.onClose());
+  // Keys: Escape goes back; Command or Control with Enter creates the town once its values are
+  // admitted, which works from a field because it is a modified press.
+  const keys = (event: KeyboardEvent): void => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopPropagation();
+      options.onClose();
+      return;
+    }
+    if (event.key === 'Enter' && (event.metaKey || event.ctrlKey) && !make.hidden && !make.disabled) {
+      event.preventDefault();
+      make.click();
+    }
+  };
   const root = el('section', {
     class: 'world-recipes', role: 'dialog', 'aria-label': say('worldRecipes.heading'),
+    'data-ui-stage': 'dark',
   }, [
-    el('h2', { text: say('worldRecipes.heading') }),
-    el('p', { text: say('worldRecipes.introduction') }),
-    list,
-    controls,
-    status,
-    el('div', { class: 'world-recipes-actions' }, [make, close]),
+    el('div', { class: 'world-recipes-main' }, [
+      el('h2', { text: say('worldRecipes.heading') }),
+      el('p', { class: 'world-recipes-introduction', text: say('worldRecipes.introduction') }),
+      el('p', { class: 'world-recipes-list-label', text: say('worldRecipes.recipes') }),
+      list,
+    ]),
+    el('div', { class: 'world-recipes-side' }, [
+      controls,
+      status,
+      el('div', { class: 'world-recipes-actions' }, [make, close]),
+    ]),
   ]);
+
+  root.addEventListener('keydown', keys);
 
   let specification: WorldSpecification | null = null;
   let preset: SpecificationPreset | null = null;
@@ -134,6 +158,11 @@ export function buildWorldRecipes(options: {
     controls.replaceChildren();
     sliders = new Map();
     if (specification === null || preset === null) return;
+    // Shares (thousandths) set the mix of buildings and shops; they sit together behind one
+    // disclosure so the town's shape reads first.
+    const more = el('details', { class: 'world-recipes-more' }, [
+      el('summary', { text: say('worldRecipes.more') }),
+    ]);
     for (const value of specification.values.filter((one) => one.adjustable)) {
       const current = chosen[value.key] ?? value.value ?? '';
       const output = el('output', { text: shown(value, current) });
@@ -158,7 +187,7 @@ export function buildWorldRecipes(options: {
         narrow(true);
         check();
       });
-      controls.append(el('div', { class: 'world-recipes-parameter' }, [
+      (value.unit === 'permille' ? more : controls).append(el('div', { class: 'world-recipes-parameter' }, [
         el('label', { class: 'world-recipes-value' }, [
           el('span', { text: value.label }), input, output,
         ]),
@@ -168,6 +197,7 @@ export function buildWorldRecipes(options: {
         ]),
       ]));
     }
+    if (more.childElementCount > 1) controls.append(more);
   };
 
   const choose = (next: SpecificationPreset): void => {
@@ -207,6 +237,10 @@ export function buildWorldRecipes(options: {
         type: 'button', class: 'world-recipes-choice', 'data-recipe': offered.key, text: offered.label,
         'aria-pressed': 'false',
       });
+      // A frame of a town made from this recipe, where one ships with the page; the label stays
+      // the button's only text.
+      const picture = recipePicture(offered.key);
+      if (picture !== null) choice.style.setProperty('--recipe-picture', `url("${picture}")`);
       choice.addEventListener('click', () => choose(offered));
       list.append(choice);
     }

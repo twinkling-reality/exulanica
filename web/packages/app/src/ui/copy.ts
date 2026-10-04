@@ -408,20 +408,53 @@ export const COPY: Readonly<Record<string, string>> = Object.freeze({
   'world.about.generated-tile':
     'A world generated from the city grammar\'s catalogs. Its streets, buildings and shops are '
     + 'generated, not recorded from a real place.',
+  // Your worlds: the first screen after signing in, before any world opens.
+  'yourWorlds.label': 'Your worlds',
+  'yourWorlds.strip': 'Your saved worlds',
+  'yourWorlds.position': 'World {position} of {count}',
+  'yourWorlds.open': 'Open',
+  'yourWorlds.openNamed': 'Open {title}',
+  'yourWorlds.values': 'View values',
+  'yourWorlds.values.unavailable': 'The values a world was made with are not shown here yet.',
+  'yourWorlds.create': 'Create a world',
+  'yourWorlds.create.caption': 'New world',
+  'yourWorlds.create.detail': 'Start from a town, or describe one',
+  'yourWorlds.create.unavailable': 'Creating a world is not offered here.',
+  'yourWorlds.key.choose': 'Choose',
+  'yourWorlds.key.open': 'Open',
+  'yourWorlds.established': 'Established {day}',
+  'yourWorlds.caption': 'Established {day}',
+  'yourWorlds.from': 'From {recipe}',
+  'yourWorlds.kind.authored': 'Authored world',
+  'yourWorlds.kind.personal': 'Personal world',
+  'yourWorlds.about.generated':
+    'Generated from {recipe}. Your changes and appearance are kept, and it opens where you left it.',
+  'yourWorlds.about.starter': 'An empty square to build on. It opens where you left it.',
+  'yourWorlds.about.authored': 'Your changes and appearance are kept, and it opens where you left it.',
+  'yourWorlds.about.personal': 'Laid out from your photographs. It opens where you left it.',
+  'yourWorlds.first.title': 'Create your world',
+  'yourWorlds.first.about':
+    'Start from a town recipe and change any of its values, or describe the town you want in your '
+    + 'own words. Your empty square stays here too.',
   // Making a world from a recipe: the World menu's offer, and the panel that lists the recipes.
-  'worldMenu.make': 'Make a world',
+  'worldMenu.make': 'Create a world',
   'worldMenu.make.detail': 'Start a new town',
-  'worldRecipes.heading': 'Make a world',
+  'worldMenu.worlds': 'Your worlds',
+  'worldMenu.worlds.detail': 'Choose another world',
+  'worldRecipes.heading': 'Create a world',
   'worldRecipes.introduction':
-    'Choose a town recipe, adjust its values, and save it as your world.',
+    'Say the town you want and an open model drafts its values, or start from a recipe. Nothing is '
+    + 'created until you create the town.',
+  'worldRecipes.recipes': 'Or start from a recipe',
+  'worldRecipes.more': 'The mix of buildings and shops',
   'worldRecipes.loading': 'Reading what a world can be made from…',
-  'worldRecipes.make': 'Make this town',
+  'worldRecipes.make': 'Create this town',
   'worldRecipes.metres': '{metres} m',
   'worldRecipes.permille': '{thousandths} of 1,000',
   'worldRecipes.refused': 'Not offered: {reason}',
-  'worldRecipes.making': 'Making {recipe}…',
+  'worldRecipes.making': 'Creating {recipe}…',
   'worldRecipes.close': 'Close',
-  'worldRecipes.failed': 'The world was not made: {reason}',
+  'worldRecipes.failed': 'The world was not created: {reason}',
   // Why a generated world shows no vehicles, by the traffic route's refusal code.
   'world.traffic.roads_unavailable':
     'No cars drive this town: its traffic cannot use one of its junctions.',
@@ -455,8 +488,7 @@ export const COPY: Readonly<Record<string, string>> = Object.freeze({
   // checks them and samples one town of them, and nothing is made until the person makes it.
   'worldDescription.heading': 'Describe it',
   'worldDescription.introduction':
-    'Say what town you want in your own words. An open model drafts its values from them; the '
-    + 'server checks them, and nothing is made until you make the town.',
+    'In your own words. An open model drafts the values and the server checks every one.',
   'worldDescription.label': 'Your description of the town',
   'worldDescription.placeholder': 'A quiet town with short blocks and low buildings',
   'worldDescription.draft': 'Draft the values',

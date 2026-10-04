@@ -287,7 +287,7 @@ describe('the choice to make a world from reviewed photographs', () => {
       open: vi.fn(), adoptLatest: vi.fn(), personalWorld: control,
     });
     const list = surface.querySelector('.world-entry-list')!;
-    expect(surface.lastElementChild).toBe(control.root);
+    expect(surface.lastElementChild?.contains(control.root)).toBe(true);
     expect(list.compareDocumentPosition(control.root) & Node.DOCUMENT_POSITION_FOLLOWING)
       .toBeTruthy();
   });

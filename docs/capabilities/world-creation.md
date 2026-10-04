@@ -61,7 +61,7 @@ holds more people within that budget, or a larger budget for a host that runs ou
 application's process, and a city grammar version whose towns two tiles deep lay junctions traffic
 can drive.
 
-A person can also describe the town they want in their own words: Make a world, Describe it. An
+A person can also describe the town they want in their own words: Create a world, Describe it. An
 open model reads the specification the server serves and drafts a preset and values from the words
 (`POST /worlds/specification/drafts`,
 [`exulanica/selection/world_drafting.py`](../../exulanica/selection/world_drafting.py)). The server

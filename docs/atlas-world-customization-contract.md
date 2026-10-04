@@ -127,7 +127,7 @@ palette.
 
 **DECISION**: the application is the brand, and the world is the world's. The application's own
 surfaces (the top bar, the tool rail, the panels, the confirmation, Search, notices, the World
-menu, Settings, Library, Character, Compare, Design, Make a world, Photos and the way in) take their
+menu, Settings, Library, Character, Compare, Design, Create a world, Photos and the way in) take their
 ground, surface, ink, focus and accent from the interface's brand tokens
 ([interface system](interface-system.md#the-brand-colours)), in the light or dark scheme the person
 chose. The world keeps the canvas, the Companion's speech, choices and command buttons (section 8),

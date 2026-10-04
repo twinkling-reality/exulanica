@@ -1,0 +1,411 @@
+/*
+ * Your worlds: the first screen after signing in (composition/world-entry.ts).
+ *
+ * One plain title for the chosen world, a short line, one primary pill with its key, a quiet line
+ * of facts, and a strip of world cards with the chosen one larger, over the chosen world's own
+ * picture. Brand tokens only, on the dark stage (`data-ui-stage`) in every scheme.
+ */
+
+#shell .gate.world-entry-gate.your-worlds {
+  --yw-gutter: clamp(1.5rem, 8vw, 8rem);
+  --yw-card: 9.5rem;
+  --yw-card-chosen: 13.25rem;
+  position: fixed;
+  inset: 0;
+  display: grid;
+  grid-template-rows: auto 1fr auto auto;
+  grid-template-columns: minmax(0, 1fr);
+  justify-content: stretch;
+  align-content: stretch;
+  align-items: start;
+  gap: 0;
+  padding: clamp(1.75rem, 6vh, 3.5rem) var(--yw-gutter) clamp(1.75rem, 6vh, 3.5rem);
+  overflow: hidden auto;
+  background: var(--color-surface-solid);
+  color: var(--color-text);
+  font-family: var(--font-ui);
+  text-align: left;
+  isolation: isolate;
+}
+
+/*
+ * The chosen world behind the page: its picture large on the right, fading into the page towards
+ * the words, the top and the strip, drifting slowly. Hidden for a world with no picture.
+ */
+#shell .your-worlds > .your-worlds-backdrop {
+  position: fixed;
+  z-index: var(--z-local-0);
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(74vw, 78rem);
+  margin: 0;
+  overflow: hidden;
+  pointer-events: none;
+  -webkit-mask-image:
+    linear-gradient(to right, transparent 0%, black 42%),
+    linear-gradient(to bottom, transparent 0%, black 22%, black 62%, transparent 92%);
+  -webkit-mask-composite: source-in;
+  mask-image:
+    linear-gradient(to right, transparent 0%, black 42%),
+    linear-gradient(to bottom, transparent 0%, black 22%, black 62%, transparent 92%);
+  mask-composite: intersect;
+}
+
+.your-worlds-backdrop img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transform: scale(1.06);
+  transition: opacity var(--duration-slow) var(--ease-standard);
+}
+
+.your-worlds-backdrop img.is-shown {
+  opacity: 0.72;
+  animation: your-worlds-drift 24s var(--ease-standard) infinite alternate;
+}
+
+@keyframes your-worlds-drift {
+  from { transform: scale(1.06) translate3d(1.5%, 0, 0); }
+  to { transform: scale(1.06) translate3d(-1.5%, -1%, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .your-worlds-backdrop img.is-shown { animation: none; }
+}
+
+:root[data-motion='reduced'] .your-worlds-backdrop img.is-shown { animation: none; }
+
+#shell .your-worlds > * {
+  position: relative;
+  z-index: var(--z-local-1);
+  width: auto;
+  max-width: none;
+  margin-inline: 0;
+  justify-self: stretch;
+}
+
+#shell .your-worlds > .your-worlds-keys { position: absolute; }
+
+.your-worlds-corner {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.your-worlds-mark {
+  position: relative;
+  width: 1.375rem;
+  height: 1.375rem;
+  flex: none;
+}
+
+.your-worlds-mark i {
+  position: absolute;
+  width: 0.95rem;
+  height: 0.95rem;
+  border-radius: 50%;
+}
+
+.your-worlds-mark i:first-child { left: 0; top: 0; background: var(--brand-blue); }
+.your-worlds-mark i:last-child { right: 0; bottom: 0; background: var(--brand-yellow); opacity: 0.92; }
+
+.your-worlds-rule {
+  width: 1px;
+  height: 1.5rem;
+  background: var(--color-border);
+}
+
+#shell .your-worlds .your-worlds-label {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  font: var(--weight-medium) 0.66rem / 1.35 var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.your-worlds-keys {
+  position: absolute;
+  top: clamp(1.75rem, 6vh, 3.5rem);
+  right: clamp(1.25rem, 4vw, 3.5rem);
+  display: flex;
+  gap: 1.1rem;
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.your-worlds-keys kbd,
+.your-worlds-actions kbd {
+  font: var(--weight-medium) 0.66rem / 1 var(--font-mono);
+}
+
+.your-worlds-keys kbd {
+  margin-right: 0.4rem;
+  padding: 0.25rem 0.375rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+}
+
+#shell .your-worlds > .your-worlds-lede {
+  align-self: start;
+  max-width: 34rem;
+  margin-top: clamp(2.5rem, 12vh, 7.5rem);
+}
+
+.your-worlds-overline {
+  min-height: 1rem;
+  margin: 0 0 1.1rem;
+  font: var(--weight-medium) 0.66rem / 1 var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+}
+
+#shell .your-worlds .your-worlds-title {
+  margin: 0;
+  font: 600 clamp(2.25rem, 3.3vw, 2.875rem) / 1.08 var(--font-ui);
+  letter-spacing: -0.022em;
+  color: var(--color-text);
+}
+
+.your-worlds-about {
+  max-width: 28rem;
+  margin: 1.1rem 0 0;
+  font-size: 0.97rem;
+  line-height: 1.6;
+  color: var(--color-text-muted);
+}
+
+.your-worlds-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1.85rem;
+}
+
+#shell .your-worlds .your-worlds-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.625rem;
+  min-height: 2.5rem;
+  padding: 0 0.5rem 0 1.125rem;
+  border-radius: var(--radius-full);
+  font: 560 0.9rem / 1 var(--font-ui);
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-standard);
+}
+
+/* The primary pill: the text colour as its fill, so it inverts with the scheme. */
+#shell .your-worlds .your-worlds-actions[data-primary='open'] .your-worlds-open,
+#shell .your-worlds .your-worlds-actions[data-primary='create'] .your-worlds-create-action {
+  order: -1;
+  border: 1px solid var(--color-text);
+  background: var(--color-text);
+  color: var(--color-surface-solid);
+}
+
+#shell .your-worlds .your-worlds-actions[data-primary='open'] .your-worlds-open kbd,
+#shell .your-worlds .your-worlds-actions[data-primary='create'] .your-worlds-create-action kbd {
+  padding: 0.3rem 0.45rem;
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--color-surface-solid) 18%, transparent);
+}
+
+#shell .your-worlds .your-worlds-actions[data-primary='open'] .your-worlds-create-action,
+#shell .your-worlds .your-worlds-actions[data-primary='create'] .your-worlds-open,
+#shell .your-worlds .your-worlds-actions .your-worlds-values {
+  border: 1px solid var(--color-border-strong);
+  background: transparent;
+  color: var(--color-text);
+}
+
+#shell .your-worlds .your-worlds-actions[data-primary='open'] .your-worlds-create-action kbd,
+#shell .your-worlds .your-worlds-actions[data-primary='create'] .your-worlds-open kbd {
+  padding: 0.3rem 0.45rem;
+  border-radius: var(--radius-full);
+  background: var(--color-surface-sunken);
+  color: var(--color-text-muted);
+}
+
+#shell .your-worlds .your-worlds-actions .your-worlds-values { padding-right: 1.125rem; }
+
+#shell .your-worlds .your-worlds-actions button:is(:disabled, [aria-disabled='true']) {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.your-worlds-hint {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.your-worlds-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.25rem;
+  margin: 1.4rem 0 0;
+  font-size: 0.82rem;
+  color: var(--color-text-faint);
+}
+
+.your-worlds-meta > * { display: inline; }
+
+.your-worlds-meta b {
+  font-weight: var(--weight-medium);
+  color: var(--color-text-muted);
+}
+
+#shell .your-worlds .your-worlds-status {
+  max-width: 30rem;
+  margin: 1rem 0 0;
+  text-align: left;
+}
+
+.your-worlds-reconcile:empty { display: none; }
+
+.your-worlds-reconcile {
+  max-width: 30rem;
+  margin-top: 1rem;
+}
+
+/* The strip: every saved world, then Create a world. */
+#shell .your-worlds .your-worlds-strip {
+  display: flex;
+  align-items: flex-end;
+  gap: 1.375rem;
+  width: auto;
+  margin: 2.5rem calc(-1 * var(--yw-gutter)) 0 0;
+  padding: 0.5rem var(--yw-gutter) 0.25rem 0.25rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+#shell .your-worlds .your-worlds-strip .world-entry-item {
+  flex: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+
+#shell .your-worlds .your-worlds-card {
+  display: flex;
+  flex-direction: column;
+  width: var(--yw-card);
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--color-text-muted);
+  text-align: left;
+  cursor: pointer;
+  transition: width var(--duration-base) var(--ease-standard);
+}
+
+#shell .your-worlds .your-worlds-card[aria-current='true'] { width: var(--yw-card-chosen); }
+
+.your-worlds-picture {
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius-sm);
+  background: var(--brand-blend);
+  outline: 1px solid var(--color-border);
+  outline-offset: -1px;
+  opacity: 0.86;
+  transition: opacity var(--duration-base) var(--ease-standard);
+}
+
+.your-worlds-picture img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.your-worlds-card[aria-current='true'] .your-worlds-picture {
+  opacity: 1;
+  outline: 2px solid var(--color-text);
+  outline-offset: 3px;
+}
+
+#shell .your-worlds .your-worlds-card:focus-visible { outline: none; box-shadow: none; background: none; }
+
+.your-worlds-card:focus-visible .your-worlds-picture {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: 3px;
+}
+
+.your-worlds-card[aria-disabled='true'] .your-worlds-picture { opacity: 0.45; }
+
+.your-worlds-caption {
+  margin-top: 0.75rem;
+  font: var(--weight-medium) 0.625rem / 1 var(--font-mono);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+}
+
+#shell .your-worlds .your-worlds-card .world-entry-choice-title {
+  margin-top: 0.4rem;
+  font: 520 0.82rem / 1.25 var(--font-ui);
+  color: var(--color-text-muted);
+}
+
+#shell .your-worlds .your-worlds-card[aria-current='true'] .world-entry-choice-title { color: var(--color-text); }
+
+/* The detail is read by assistive technology; the lede says it on screen. */
+#shell .your-worlds .your-worlds-card .world-entry-choice-detail {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+#shell .your-worlds .your-worlds-create .your-worlds-picture {
+  background: var(--color-surface-sunken);
+  outline: 1px dashed var(--color-border-strong);
+  opacity: 1;
+}
+
+.your-worlds-plus {
+  font: 300 1.75rem / 1 var(--font-ui);
+  color: var(--color-text-muted);
+}
+
+#shell .your-worlds .your-worlds-create[aria-disabled='true'] { cursor: default; }
+
+/* The offer of a world from photographs keeps its own words, quietly, under the strip. */
+#shell .your-worlds > .your-worlds-more {
+  max-width: 34rem;
+  margin-top: 1.5rem;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+#shell .your-worlds .your-worlds-more h3 {
+  margin: 0 0 0.25rem;
+  font: var(--weight-medium) 0.66rem / 1.35 var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+}
+
+#shell .your-worlds .your-worlds-more p { margin: 0.25rem 0 0; }
+
+#shell .your-worlds[data-state='opening'] .your-worlds-card[aria-busy='true'] .your-worlds-picture {
+  outline-color: var(--color-accent);
+}

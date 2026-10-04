@@ -32,7 +32,9 @@ Components and layout read semantic roles and never write a literal of their own
   disabled, soft and text variants. Light is the default; `data-ui-scheme="dark"` on the root
   element chooses the dark scheme and `"system"` follows the operating system. The Settings choice
   "Light or dark" (Light, Dark, Follow the system; Light unless changed) writes that attribute, and
-  the page sets it before its first paint. Reduced transparency and high contrast make surfaces
+  the page sets it before its first paint. The way in (Your worlds and Create a world) is a stage:
+  `data-ui-stage="dark"` on its root gives it exactly the dark values in every scheme, because it
+  shows worlds full screen and a world keeps its own light. Reduced transparency and high contrast make surfaces
   opaque.
 - Space, type, radius, elevation, control and region sizes, and motion durations, which are zero
   under `prefers-reduced-motion` or `data-motion="reduced"`.
@@ -67,8 +69,8 @@ used sparingly and by rule, so that a colour on screen always means something:
   roles. A panel header, a list row or any card but the World tile never wears the blend.
 
 `web/packages/app/test/ui-system-contrast.test.ts` holds every text role, the signal's ink and the
-accent's words on the signal at AA in both schemes, and holds "Follow the system" to exactly the
-dark values.
+accent's words on the signal at AA in both schemes, and holds "Follow the system" and the stage to
+exactly the dark values.
 
 ### What is the brand's and what is the world's
 
@@ -78,12 +80,13 @@ The application is the brand; the world, and what speaks from inside it, is the 
 | Surface | Takes its colours from |
 | --- | --- |
 | Top bar, tool rail, inspector panels, confirmation, Search, notices, heads-up notes | the brand tokens |
-| World menu (plain cards; the World tile wears the blend), Settings, Library, Character, Compare, Design, Make a world, Photos, the recorded-result reader | the brand tokens |
-| The way in: the credential gate, the saved-world list, opening a world | the brand tokens |
+| World menu (plain cards; the World tile wears the blend), Settings, Library, Character, Compare, Design, Photos, the recorded-result reader | the brand tokens |
+| The way in: the credential gate, opening a world | the brand tokens |
+| Your worlds and Create a world | the brand tokens on the dark stage, whatever the Light or dark choice |
 | The world on the canvas; the Companion's speech, choices and command buttons; Design's previews of the world | the world's profile |
 | Provenance, uncertainty, caution and error, wherever they are drawn | the world's hue, at the lightness the surface under them needs |
 
-Every brand surface follows the Settings choice "Light or dark"; the world keeps its own light.
+Every brand surface but the stage follows the Settings choice "Light or dark"; the world keeps its own light.
 `web/packages/app/src/ui/system/bridge.css` section 4 points the older surfaces' variables at the
 tokens; `web/packages/app/test/ui-brand-surfaces.test.ts` holds Aeroheart's meaning roles at their
 floor (text 4.5, marks 3) on every brand surface in both schemes, words on the blend at AA, and
@@ -105,14 +108,14 @@ surface keeps its own open and close behaviour; the layout watches its `hidden` 
 | `hud` | progress and notes about the world (forming, tile progress, traffic note, scene segments, the Map caption) | stacked at the top left of the world |
 | `overlay` | the command palette | modal |
 
-The World menu, Library, Character, Compare, Design, Settings, Make a world and Photos are major
+The World menu, Library, Character, Compare, Design, Settings, Create a world and Photos are major
 surfaces that the shell state (`web/packages/app/src/world-shell.ts`) opens one at a time; they sit
 on the overlay layer. While one is open every region except `toast` is inert
 (`MODAL_BACKGROUND_REGIONS`), so Tab stays in the open surface; the Library is inert whenever it is
 not the one open. While anything is visible in `inspector` or `sheet`, `#shell` carries
 `data-inspector-open` and the dock, toasts and heads-up stack centre themselves in what is left.
 
-Compare, the recorded-result reader, Make a world and the character studio load when first opened
+Compare, the recorded-result reader, Create a world and the character studio load when first opened
 (`web/packages/app/src/composition/lazy-panel.ts`; `showWorldRecipes` in
 `web/packages/app/src/main.ts`; `deferredStudio` in `web/packages/app/src/composition/character.ts`):
 until then a stand-in says "Opening Compare." (or the surface's name), and a load that fails says so
@@ -121,6 +124,35 @@ the studio before it exists is held and shown when the studio opens.
 
 Below 60rem the application shows its narrow-window notice; the region rules for narrow screens
 (a bottom bar and a bottom sheet) exist in `layout.css` for when that notice is lifted.
+
+### Your worlds and Create a world
+
+Your worlds (`web/packages/app/src/composition/world-entry.ts`, `ui/your-worlds.css`) is the first
+screen after signing in, before any world opens, whether the person has one saved world or many.
+It names the chosen world large, with one line on what it is, its actions (Open, View values,
+Create a world) and when it was established; under it a strip of cards holds every saved world,
+the most recently changed first, and a last card for Create a world. Moving to a card chooses it;
+pressing a card or Open opens it. A person whose only world is the untouched starter square sees
+"Create your world", with Create a world as the primary action. A world that cannot open says why
+when chosen and pressed; Create a world refused by the workspace says the action's words. Keys:
+the arrows choose, Enter opens, N creates; none fires while a person types. The World menu's
+Your worlds entry keeps a picture of the open world and loads the page afresh, which starts here.
+Behind the page the chosen world's picture fills the right side, fading into the page towards the
+words, the top and the strip and drifting slowly (still under reduced motion); a world with no
+picture of its own or from its recipe shows the plain page, never a stand-in.
+
+A card's picture is the world's own frame, kept in the person's browser only a few seconds after
+the world opens and again when they leave it for Your worlds; until there is one, a world made from
+a recipe shows a frame of a town made from that recipe, captured from the running application and
+shipped in `web/packages/app/public/your-worlds/`, and any other world shows the brand blend. View
+values is shown for a generated world and stays unavailable until the saved world entry serves the
+values the world was made with.
+
+Create a world (`ui/world-recipes.ts`, `ui/world-description.ts`, `ui/create-world.css`) is one full
+sheet in the same language: describing the town in the person's own words comes first, the recipes
+as picture cards under it, and the values with Create this town in the right column; the shares
+that set the mix of buildings and shops sit behind one disclosure. Escape goes back; Command or
+Control with Enter creates the town once its values are admitted.
 
 ## 4. Actions
 
@@ -132,11 +164,11 @@ row, a panel button and the Companion's starter offer are one action with one re
 
 Availability is the server's. An action with an operation takes its descriptor's state from
 `GET /world/versions/{version_id}/capabilities`, read in the order unsupported, not permitted,
-unavailable, unknown, available. Make a world needs no open world: it reads the generated town's
+unavailable, unknown, available. Create a world needs no open world: it reads the generated town's
 create from `GET /worlds/capabilities` (`exulanica.world-creation/v1`), read when a world mounts and
 again with every refresh. Where the workspace refuses it (the world limit, a server that builds no
 towns, a role that registers no worlds) the World menu entry says why in place of its detail and
-stays reachable, choosing it shows the two sentences, and the Make a world surface never opens. Before the first read it is unknown, never assumed available. An
+stays reachable, choosing it shows the two sentences, and the Create a world surface never opens. Before the first read it is unknown, never assumed available. An
 action with no operation (opening a panel, the map) is local and available. A world that never
 supports an action leaves it out of the rail and lists it in the palette with why.
 
@@ -197,7 +229,7 @@ and so on). The names do not change when words do; drivers select with `ACTION(i
 | appearance editing | Design | Customize |
 | the index | Library | Index |
 | placing and arranging | Build | Create |
-| making a new world | Make a world | Create |
+| making a new world | Create a world | Make |
 
 ## 6. What holds it
 
