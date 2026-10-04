@@ -1,0 +1,436 @@
+{
+  "schema_version": 1,
+  "catalog_id": "kind-bound",
+  "catalog_version": 1,
+  "entries": [
+    {
+      "key": "boundary_height_mm",
+      "minimum": 300,
+      "maximum": 6000,
+      "reason": "A boundary is from a 300 mm kerb-like edge to a 6 m hoarding or wall.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "boundary_thickness_mm",
+      "minimum": 50,
+      "maximum": 600,
+      "reason": "From a 50 mm fence to a 600 mm wall.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "candidates",
+      "minimum": 4,
+      "maximum": 4,
+      "reason": "Four seed candidates bound a request for a world, as a town's preset states: a candidate whose layout does not fit or whose people cannot reach where they go is refused and the next is tried.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "description_characters",
+      "minimum": 0,
+      "maximum": 80,
+      "reason": "A part's description is a few plain words, which a model generating its look may read.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "door_width_mm",
+      "minimum": 900,
+      "maximum": 6000,
+      "reason": "A door is at least 900 mm, a walker's capsule with clearance, and at most 6 m, a barn's or a garage's.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "entry_width_mm",
+      "minimum": 900,
+      "maximum": 12000,
+      "reason": "An entry is at least a doorway, 900 mm (a 680 mm walking capsule with clearance), and no wider than the widest path.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "fixture_places",
+      "minimum": 0,
+      "maximum": 12,
+      "reason": "A fixture seats or stands at most twelve people along its front, each 700 mm (the society's standing spacing) from the next.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "fixture_size_mm",
+      "minimum": 200,
+      "maximum": 12000,
+      "reason": "A fixture is from 200 mm, a stool, to 12 m, a long stall or a stack of materials, on each side.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "gate_width_mm",
+      "minimum": 900,
+      "maximum": 12000,
+      "reason": "A gate is at least a doorway and at most a wide yard gate.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "holding_count",
+      "minimum": 0,
+      "maximum": 64,
+      "reason": "A holding places at most 64 of its part.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "holdings",
+      "minimum": 1,
+      "maximum": 12,
+      "reason": "A zone or a room holds at most twelve kinds of part.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "label_characters",
+      "minimum": 1,
+      "maximum": 60,
+      "reason": "A label is a few words.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "module_indoor_mm",
+      "minimum": 100,
+      "maximum": 100,
+      "reason": "Inside a building everything is laid on a 100 mm grid, the step furniture and inner walls are set out on.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "module_open_mm",
+      "minimum": 500,
+      "maximum": 500,
+      "reason": "Open ground is laid on a 500 mm grid: fine enough for a yard, a field or a laydown area, coarse enough that a 256 m site is 512 steps.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "offsite_residents",
+      "minimum": 0,
+      "maximum": 128,
+      "reason": "People who come in from homes off the site through its entry, at most the most people a living society's tick was measured to hold.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "parameters",
+      "minimum": 0,
+      "maximum": 16,
+      "reason": "A kind offers a person at most sixteen values to change.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "parts",
+      "minimum": 1,
+      "maximum": 48,
+      "reason": "A kind states at most 48 parts, enough for a farm or a harbour and few enough to review.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "path_width_mm",
+      "minimum": 1500,
+      "maximum": 12000,
+      "reason": "A path is at least 1.5 m, wide enough for two people to pass (two 340 mm walking capsules with room between), and at most 12 m, a wide yard road.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "presets",
+      "minimum": 1,
+      "maximum": 8,
+      "reason": "A kind names one to eight presets, the starting points a person or a model picks from.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "residents",
+      "minimum": 1,
+      "maximum": 128,
+      "reason": "A sample world houses at least one person and at most 128, the most people one tick of a living society was measured to hold (the society ground of a generated town states the same figure and why).",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "room_share",
+      "minimum": 1,
+      "maximum": 100,
+      "reason": "A room's share of its structure's inside, weighed against its neighbours'.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "rooms",
+      "minimum": 0,
+      "maximum": 12,
+      "reason": "A structure holds at most twelve rooms in a row along its front.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "site_depth_mm",
+      "minimum": 8000,
+      "maximum": 256000,
+      "reason": "As the width: at least 8 m and at most 256 m from the entry to the far edge.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "site_width_mm",
+      "minimum": 8000,
+      "maximum": 256000,
+      "reason": "A site is at least 8 m across, a spine with a lot either side, and at most 256 m, two 128 m tiles: the length of the longest generated town but one, so a kind's world is no larger to walk than a town.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "sleepers",
+      "minimum": 0,
+      "maximum": 2,
+      "reason": "A bed sleeps one or two.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "storey_height_mm",
+      "minimum": 2400,
+      "maximum": 6000,
+      "reason": "A storey is from 2.4 m, a low cottage, to 6 m, a barn's or a workshop's.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "storeys",
+      "minimum": 1,
+      "maximum": 6,
+      "reason": "One to six storeys; only the ground storey is walked inside in this version.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "structure_depth_mm",
+      "minimum": 2000,
+      "maximum": 40000,
+      "reason": "A structure is from 2 m to 40 m deep.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "structure_width_mm",
+      "minimum": 2000,
+      "maximum": 60000,
+      "reason": "A structure is from a 2 m shed to a 60 m barn or hall along its front.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "summary_characters",
+      "minimum": 1,
+      "maximum": 200,
+      "reason": "A summary is one or two sentences.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "use_classes",
+      "minimum": 0,
+      "maximum": 12,
+      "reason": "A kind states at most twelve workplaces, shops and homes of its own.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "walking_nodes",
+      "minimum": 1,
+      "maximum": 962,
+      "reason": "Measured: the largest walking graph a living society's tick was measured to hold within its budget, 962 places in the market towns of the world specification's tick measurement (exulanica/world/world_recipes.py, TICK_BUDGET_REASON); a kind whose sample worlds walk larger graphs is refused until a site graph is measured itself.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "zones",
+      "minimum": 1,
+      "maximum": 12,
+      "reason": "A kind lays out at most twelve zones.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    }
+  ]
+}

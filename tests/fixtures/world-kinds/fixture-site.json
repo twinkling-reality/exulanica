@@ -1,0 +1,345 @@
+{
+  "profile": "exulanica.world-kind/v1",
+  "kind": "fixture_building_site",
+  "version": 1,
+  "label": "A test building site",
+  "summary": "A hand-written test fixture: a block going up, a site office, a canteen, materials and a crane zone.",
+  "origin": "authored",
+  "provenance": {
+    "by": "Exulanica tests"
+  },
+  "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP"
+  },
+  "generator": {
+    "key": "site-plan",
+    "version": 1
+  },
+  "site": {
+    "enclosure": "open",
+    "width_mm": 80000,
+    "depth_mm": 64000,
+    "ground": "ground.compacted_earth",
+    "spine": "haul_road",
+    "boundary": "hoarding",
+    "entry_width_mm": 6000
+  },
+  "society": {
+    "employment_permille": 1000,
+    "offsite_residents": {
+      "parameter": "workers"
+    }
+  },
+  "parameters": [
+    {
+      "key": "workers",
+      "label": "Workers on site",
+      "minimum": 8,
+      "maximum": 40,
+      "step": 4,
+      "reason": "Test fixture."
+    },
+    {
+      "key": "storeys",
+      "label": "Storeys going up",
+      "minimum": 2,
+      "maximum": 6,
+      "step": 1,
+      "reason": "Test fixture."
+    }
+  ],
+  "presets": [
+    {
+      "key": "small_job",
+      "label": "A small job",
+      "values": {
+        "workers": 16,
+        "storeys": 3
+      }
+    }
+  ],
+  "use_classes": [
+    {
+      "key": "construction",
+      "label": "construction",
+      "kind": "workplace",
+      "role_key": "builder",
+      "role_label": "builder",
+      "staff_per_unit": 12,
+      "visitor_capacity": 0,
+      "resident_capacity": 0,
+      "visitor_affordances": [],
+      "opening_minute": 420,
+      "closing_minute": 960,
+      "shifts": [
+        "early",
+        "day"
+      ]
+    },
+    {
+      "key": "site_office",
+      "label": "site office",
+      "kind": "workplace",
+      "role_key": "site_manager",
+      "role_label": "site manager",
+      "staff_per_unit": 2,
+      "visitor_capacity": 0,
+      "resident_capacity": 0,
+      "visitor_affordances": [],
+      "opening_minute": 420,
+      "closing_minute": 1020,
+      "shifts": [
+        "day"
+      ]
+    },
+    {
+      "key": "canteen",
+      "label": "canteen",
+      "kind": "workplace",
+      "role_key": "cook",
+      "role_label": "cook",
+      "staff_per_unit": 1,
+      "visitor_capacity": 12,
+      "resident_capacity": 0,
+      "visitor_affordances": [
+        "eat"
+      ],
+      "opening_minute": 600,
+      "closing_minute": 900,
+      "shifts": [
+        "day"
+      ]
+    }
+  ],
+  "parts": [
+    {
+      "key": "haul_road",
+      "label": "haul road",
+      "description": "a rutted haul road",
+      "form": "path",
+      "roles": [
+        "path",
+        "road"
+      ],
+      "look": "road.haul_road",
+      "use_class": "",
+      "width_mm": 6000
+    },
+    {
+      "key": "hoarding",
+      "label": "hoarding",
+      "description": "a plywood site hoarding",
+      "form": "boundary",
+      "roles": [
+        "boundary"
+      ],
+      "look": "boundary.hoarding",
+      "use_class": "",
+      "height_mm": 2400,
+      "thickness_mm": 100,
+      "gate_width_mm": 6000
+    },
+    {
+      "key": "new_block",
+      "label": "new block",
+      "description": "a concrete frame going up",
+      "form": "structure",
+      "roles": [
+        "workplace"
+      ],
+      "look": "structure.concrete_frame",
+      "use_class": "construction",
+      "width_mm": {
+        "from": 18000,
+        "to": 24000
+      },
+      "depth_mm": {
+        "from": 12000,
+        "to": 16000
+      },
+      "storeys": {
+        "parameter": "storeys"
+      },
+      "storey_height_mm": 3000,
+      "roof_form": "flat",
+      "roof_look": "roof.formwork",
+      "wall_look": "wall.bare_concrete",
+      "door_width_mm": 2000,
+      "rooms": []
+    },
+    {
+      "key": "office_cabin",
+      "label": "site office",
+      "description": "a stacked site cabin",
+      "form": "structure",
+      "roles": [
+        "workplace"
+      ],
+      "look": "structure.site_cabin",
+      "use_class": "site_office",
+      "width_mm": 6000,
+      "depth_mm": 3000,
+      "storeys": 1,
+      "storey_height_mm": 2600,
+      "roof_form": "flat",
+      "roof_look": "roof.cabin",
+      "wall_look": "wall.cabin_panel",
+      "door_width_mm": 900,
+      "rooms": []
+    },
+    {
+      "key": "canteen_cabin",
+      "label": "canteen",
+      "description": "a welfare cabin",
+      "form": "structure",
+      "roles": [
+        "shop"
+      ],
+      "look": "structure.site_cabin",
+      "use_class": "canteen",
+      "width_mm": 9000,
+      "depth_mm": 3000,
+      "storeys": 1,
+      "storey_height_mm": 2600,
+      "roof_form": "flat",
+      "roof_look": "roof.cabin",
+      "wall_look": "wall.cabin_panel",
+      "door_width_mm": 900,
+      "rooms": []
+    },
+    {
+      "key": "pallet_stack",
+      "label": "stacked pallets",
+      "description": "pallets of bricks",
+      "form": "fixture",
+      "roles": [
+        "obstruction"
+      ],
+      "look": "prop.brick_pallet",
+      "use_class": "",
+      "width_mm": 1200,
+      "depth_mm": 1000,
+      "height_mm": 1200,
+      "seats": 0,
+      "stands": 0,
+      "sleepers": 0,
+      "blocks": 1
+    },
+    {
+      "key": "bench",
+      "label": "bench",
+      "description": "a scaffold-board bench",
+      "form": "fixture",
+      "roles": [
+        "seat"
+      ],
+      "look": "fixture.bench",
+      "use_class": "",
+      "width_mm": 1800,
+      "depth_mm": 500,
+      "height_mm": 900,
+      "seats": 2,
+      "stands": 0,
+      "sleepers": 0,
+      "blocks": 1
+    },
+    {
+      "key": "crane_base",
+      "label": "crane base",
+      "description": "a tower crane's base",
+      "form": "fixture",
+      "roles": [
+        "obstruction"
+      ],
+      "look": "vehicle.tower_crane",
+      "use_class": "",
+      "width_mm": 6000,
+      "depth_mm": 6000,
+      "height_mm": 9000,
+      "seats": 0,
+      "stands": 0,
+      "sleepers": 0,
+      "blocks": 1
+    }
+  ],
+  "zones": [
+    {
+      "key": "welfare",
+      "label": "welfare area",
+      "placement": "front",
+      "share": 300,
+      "ground": "ground.gravel",
+      "access": "open",
+      "boundary": "",
+      "holds": [
+        {
+          "part": "office_cabin",
+          "count": 1,
+          "pattern": "row"
+        },
+        {
+          "part": "canteen_cabin",
+          "count": 1,
+          "pattern": "row"
+        },
+        {
+          "part": "bench",
+          "count": 2,
+          "pattern": "row"
+        }
+      ]
+    },
+    {
+      "key": "build",
+      "label": "the build",
+      "placement": "right",
+      "share": 700,
+      "ground": "ground.compacted_earth",
+      "access": "open",
+      "boundary": "",
+      "holds": [
+        {
+          "part": "new_block",
+          "count": 1,
+          "pattern": "row"
+        }
+      ]
+    },
+    {
+      "key": "laydown",
+      "label": "laydown",
+      "placement": "right",
+      "share": 500,
+      "ground": "ground.gravel",
+      "access": "open",
+      "boundary": "",
+      "holds": [
+        {
+          "part": "pallet_stack",
+          "count": {
+            "from": 6,
+            "to": 10
+          },
+          "pattern": "grid"
+        }
+      ]
+    },
+    {
+      "key": "crane_zone",
+      "label": "crane zone",
+      "placement": "edge_back",
+      "share": 250,
+      "ground": "ground.compacted_earth",
+      "access": "closed",
+      "boundary": "",
+      "holds": [
+        {
+          "part": "crane_base",
+          "count": 1,
+          "pattern": "centre"
+        }
+      ]
+    }
+  ]
+}

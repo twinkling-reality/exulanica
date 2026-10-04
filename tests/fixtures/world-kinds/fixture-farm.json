@@ -1,0 +1,434 @@
+{
+  "profile": "exulanica.world-kind/v1",
+  "kind": "fixture_farm",
+  "version": 1,
+  "label": "A test farm",
+  "summary": "A hand-written test fixture: a farmhouse, barns, fields and a pond on a track.",
+  "origin": "authored",
+  "provenance": {
+    "by": "Exulanica tests"
+  },
+  "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP"
+  },
+  "generator": {
+    "key": "site-plan",
+    "version": 1
+  },
+  "site": {
+    "enclosure": "open",
+    "width_mm": {
+      "parameter": "width_mm"
+    },
+    "depth_mm": 128000,
+    "ground": "ground.grass",
+    "spine": "farm_track",
+    "boundary": "fence",
+    "entry_width_mm": 4000
+  },
+  "society": {
+    "employment_permille": 1000,
+    "offsite_residents": 0
+  },
+  "parameters": [
+    {
+      "key": "width_mm",
+      "label": "Width of the farm",
+      "minimum": 64000,
+      "maximum": 128000,
+      "step": 32000,
+      "reason": "Test fixture."
+    },
+    {
+      "key": "barns",
+      "label": "How many barns",
+      "minimum": 1,
+      "maximum": 2,
+      "step": 1,
+      "reason": "Test fixture."
+    }
+  ],
+  "presets": [
+    {
+      "key": "small_farm",
+      "label": "A small farm",
+      "values": {
+        "width_mm": 96000,
+        "barns": 1
+      }
+    }
+  ],
+  "use_classes": [
+    {
+      "key": "dairy",
+      "label": "dairy",
+      "kind": "workplace",
+      "role_key": "dairy_hand",
+      "role_label": "dairy hand",
+      "staff_per_unit": 2,
+      "visitor_capacity": 0,
+      "resident_capacity": 0,
+      "visitor_affordances": [],
+      "opening_minute": 300,
+      "closing_minute": 1140,
+      "shifts": [
+        "early"
+      ]
+    },
+    {
+      "key": "crop_field",
+      "label": "field",
+      "kind": "workplace",
+      "role_key": "farmer",
+      "role_label": "farmer",
+      "staff_per_unit": 1,
+      "visitor_capacity": 0,
+      "resident_capacity": 0,
+      "visitor_affordances": [],
+      "opening_minute": 360,
+      "closing_minute": 1080,
+      "shifts": [
+        "day"
+      ]
+    },
+    {
+      "key": "pond_edge",
+      "label": "pond",
+      "kind": "furniture",
+      "role_key": "none",
+      "role_label": "none",
+      "staff_per_unit": 0,
+      "visitor_capacity": 3,
+      "resident_capacity": 0,
+      "visitor_affordances": [
+        "visit"
+      ],
+      "opening_minute": 0,
+      "closing_minute": 1440,
+      "shifts": []
+    }
+  ],
+  "parts": [
+    {
+      "key": "farm_track",
+      "label": "farm track",
+      "description": "a gravel track",
+      "form": "path",
+      "roles": [
+        "path",
+        "road"
+      ],
+      "look": "path.track",
+      "use_class": "",
+      "width_mm": 4000
+    },
+    {
+      "key": "fence",
+      "label": "fence",
+      "description": "a timber post and rail fence",
+      "form": "boundary",
+      "roles": [
+        "boundary"
+      ],
+      "look": "boundary.fence_wood",
+      "use_class": "",
+      "height_mm": 1200,
+      "thickness_mm": 100,
+      "gate_width_mm": 3000
+    },
+    {
+      "key": "farmhouse",
+      "label": "farmhouse",
+      "description": "an old stone farmhouse",
+      "form": "structure",
+      "roles": [
+        "home"
+      ],
+      "look": "structure.farmhouse",
+      "use_class": "",
+      "width_mm": {
+        "from": 10000,
+        "to": 14000
+      },
+      "depth_mm": {
+        "from": 8000,
+        "to": 10000
+      },
+      "storeys": 2,
+      "storey_height_mm": 2800,
+      "roof_form": "gable",
+      "roof_look": "roof.tile",
+      "wall_look": "wall.stone",
+      "door_width_mm": 1000,
+      "rooms": [
+        {
+          "part": "kitchen",
+          "count": 1
+        },
+        {
+          "part": "bedroom",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "key": "kitchen",
+      "label": "kitchen",
+      "description": "",
+      "form": "room",
+      "roles": [
+        "home"
+      ],
+      "look": "ground.floor_tile",
+      "use_class": "",
+      "share": 3,
+      "holds": [
+        {
+          "part": "table",
+          "count": 1,
+          "pattern": "centre"
+        }
+      ]
+    },
+    {
+      "key": "bedroom",
+      "label": "bedroom",
+      "description": "",
+      "form": "room",
+      "roles": [
+        "home"
+      ],
+      "look": "ground.floor_wood",
+      "use_class": "",
+      "share": 2,
+      "holds": [
+        {
+          "part": "bed",
+          "count": {
+            "from": 1,
+            "to": 2
+          },
+          "pattern": "back_wall"
+        }
+      ]
+    },
+    {
+      "key": "table",
+      "label": "table",
+      "description": "a farmhouse table",
+      "form": "fixture",
+      "roles": [
+        "decoration"
+      ],
+      "look": "fixture.table",
+      "use_class": "",
+      "width_mm": 1600,
+      "depth_mm": 900,
+      "height_mm": 750,
+      "seats": 0,
+      "stands": 0,
+      "sleepers": 0,
+      "blocks": 1
+    },
+    {
+      "key": "bed",
+      "label": "bed",
+      "description": "a single bed",
+      "form": "fixture",
+      "roles": [
+        "bed"
+      ],
+      "look": "fixture.bed",
+      "use_class": "",
+      "width_mm": 1000,
+      "depth_mm": 2000,
+      "height_mm": 600,
+      "seats": 0,
+      "stands": 0,
+      "sleepers": 1,
+      "blocks": 1
+    },
+    {
+      "key": "barn",
+      "label": "barn",
+      "description": "a red timber barn",
+      "form": "structure",
+      "roles": [
+        "workplace"
+      ],
+      "look": "structure.barn",
+      "use_class": "dairy",
+      "width_mm": {
+        "from": 12000,
+        "to": 16000
+      },
+      "depth_mm": {
+        "from": 8000,
+        "to": 12000
+      },
+      "storeys": 1,
+      "storey_height_mm": 4500,
+      "roof_form": "gable",
+      "roof_look": "roof.metal",
+      "wall_look": "wall.timber",
+      "door_width_mm": 3000,
+      "rooms": []
+    },
+    {
+      "key": "bench",
+      "label": "bench",
+      "description": "a weathered wooden bench",
+      "form": "fixture",
+      "roles": [
+        "seat"
+      ],
+      "look": "fixture.bench",
+      "use_class": "",
+      "width_mm": 1800,
+      "depth_mm": 500,
+      "height_mm": 900,
+      "seats": 2,
+      "stands": 0,
+      "sleepers": 0,
+      "blocks": 1
+    },
+    {
+      "key": "hay_bale",
+      "label": "hay bale",
+      "description": "a round hay bale",
+      "form": "fixture",
+      "roles": [
+        "obstruction"
+      ],
+      "look": "prop.hay_bale",
+      "use_class": "",
+      "width_mm": 1200,
+      "depth_mm": 1200,
+      "height_mm": 1000,
+      "seats": 0,
+      "stands": 0,
+      "sleepers": 0,
+      "blocks": 1
+    },
+    {
+      "key": "field",
+      "label": "field",
+      "description": "rows of wheat",
+      "form": "area",
+      "roles": [
+        "field",
+        "workplace"
+      ],
+      "look": "ground.crop_rows",
+      "use_class": "crop_field"
+    },
+    {
+      "key": "pond",
+      "label": "duck pond",
+      "description": "a small duck pond",
+      "form": "area",
+      "roles": [
+        "water"
+      ],
+      "look": "water.pond",
+      "use_class": ""
+    },
+    {
+      "key": "pond_rail",
+      "label": "pond rail",
+      "description": "a rail to lean on by the water",
+      "form": "fixture",
+      "roles": [
+        "gathering"
+      ],
+      "look": "fixture.rail",
+      "use_class": "pond_edge",
+      "width_mm": 2400,
+      "depth_mm": 200,
+      "height_mm": 1000,
+      "seats": 0,
+      "stands": 3,
+      "sleepers": 0,
+      "blocks": 1
+    }
+  ],
+  "zones": [
+    {
+      "key": "farmyard",
+      "label": "farmyard",
+      "placement": "front",
+      "share": 400,
+      "ground": "ground.gravel",
+      "access": "open",
+      "boundary": "",
+      "holds": [
+        {
+          "part": "farmhouse",
+          "count": 1,
+          "pattern": "row"
+        },
+        {
+          "part": "barn",
+          "count": {
+            "parameter": "barns"
+          },
+          "pattern": "row"
+        },
+        {
+          "part": "bench",
+          "count": 2,
+          "pattern": "row"
+        },
+        {
+          "part": "hay_bale",
+          "count": {
+            "from": 3,
+            "to": 6
+          },
+          "pattern": "scatter"
+        }
+      ]
+    },
+    {
+      "key": "fields",
+      "label": "fields",
+      "placement": "back",
+      "share": 500,
+      "ground": "ground.grass",
+      "access": "open",
+      "boundary": "fence",
+      "holds": [
+        {
+          "part": "field",
+          "count": {
+            "from": 2,
+            "to": 3
+          },
+          "pattern": "fill"
+        }
+      ]
+    },
+    {
+      "key": "pond_corner",
+      "label": "pond corner",
+      "placement": "right",
+      "share": 200,
+      "ground": "ground.grass",
+      "access": "open",
+      "boundary": "",
+      "holds": [
+        {
+          "part": "pond",
+          "count": 1,
+          "pattern": "fill"
+        },
+        {
+          "part": "pond_rail",
+          "count": 1,
+          "pattern": "row"
+        }
+      ]
+    }
+  ]
+}

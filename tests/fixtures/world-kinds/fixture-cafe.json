@@ -1,0 +1,261 @@
+{
+  "profile": "exulanica.world-kind/v1",
+  "kind": "fixture_cafe",
+  "version": 1,
+  "label": "A test cafe",
+  "summary": "A hand-written test fixture: a cafe inside one building, its counter, tables and kitchen.",
+  "origin": "authored",
+  "provenance": {
+    "by": "Exulanica tests"
+  },
+  "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP"
+  },
+  "generator": {
+    "key": "site-plan",
+    "version": 1
+  },
+  "site": {
+    "enclosure": "indoor",
+    "width_mm": 16000,
+    "depth_mm": 20000,
+    "ground": "ground.floor_wood",
+    "spine": "aisle",
+    "boundary": "outer_wall",
+    "entry_width_mm": 1200
+  },
+  "society": {
+    "employment_permille": 300,
+    "offsite_residents": {
+      "parameter": "people"
+    }
+  },
+  "parameters": [
+    {
+      "key": "people",
+      "label": "People who come in",
+      "minimum": 6,
+      "maximum": 24,
+      "step": 2,
+      "reason": "Test fixture."
+    }
+  ],
+  "presets": [
+    {
+      "key": "quiet_cafe",
+      "label": "A quiet cafe",
+      "values": {
+        "people": 10
+      }
+    }
+  ],
+  "use_classes": [
+    {
+      "key": "espresso_bar",
+      "label": "espresso bar",
+      "kind": "workplace",
+      "role_key": "barista",
+      "role_label": "barista",
+      "staff_per_unit": 2,
+      "visitor_capacity": 6,
+      "resident_capacity": 0,
+      "visitor_affordances": [
+        "eat"
+      ],
+      "opening_minute": 420,
+      "closing_minute": 1140,
+      "shifts": [
+        "day"
+      ]
+    },
+    {
+      "key": "cafe_kitchen",
+      "label": "kitchen",
+      "kind": "workplace",
+      "role_key": "cook",
+      "role_label": "cook",
+      "staff_per_unit": 1,
+      "visitor_capacity": 0,
+      "resident_capacity": 0,
+      "visitor_affordances": [],
+      "opening_minute": 420,
+      "closing_minute": 1140,
+      "shifts": [
+        "day"
+      ]
+    }
+  ],
+  "parts": [
+    {
+      "key": "aisle",
+      "label": "aisle",
+      "description": "the way in between the tables",
+      "form": "path",
+      "roles": [
+        "path"
+      ],
+      "look": "path.floor",
+      "use_class": "",
+      "width_mm": 1600
+    },
+    {
+      "key": "outer_wall",
+      "label": "wall",
+      "description": "a brick wall",
+      "form": "boundary",
+      "roles": [
+        "boundary"
+      ],
+      "look": "wall.brick",
+      "use_class": "",
+      "height_mm": 3200,
+      "thickness_mm": 200,
+      "gate_width_mm": 1000
+    },
+    {
+      "key": "inner_wall",
+      "label": "inner wall",
+      "description": "a plastered wall",
+      "form": "boundary",
+      "roles": [
+        "boundary"
+      ],
+      "look": "wall.plaster",
+      "use_class": "",
+      "height_mm": 3200,
+      "thickness_mm": 120,
+      "gate_width_mm": 1000
+    },
+    {
+      "key": "counter",
+      "label": "counter",
+      "description": "a long wooden counter",
+      "form": "fixture",
+      "roles": [
+        "shop"
+      ],
+      "look": "fixture.counter",
+      "use_class": "espresso_bar",
+      "width_mm": 3000,
+      "depth_mm": 700,
+      "height_mm": 1100,
+      "seats": 0,
+      "stands": 3,
+      "sleepers": 0,
+      "blocks": 1
+    },
+    {
+      "key": "table",
+      "label": "table",
+      "description": "a small round table with two chairs",
+      "form": "fixture",
+      "roles": [
+        "seat"
+      ],
+      "look": "fixture.cafe_table",
+      "use_class": "",
+      "width_mm": 1400,
+      "depth_mm": 800,
+      "height_mm": 750,
+      "seats": 2,
+      "stands": 0,
+      "sleepers": 0,
+      "blocks": 1
+    },
+    {
+      "key": "stove",
+      "label": "stove",
+      "description": "a steel stove",
+      "form": "fixture",
+      "roles": [
+        "workplace"
+      ],
+      "look": "fixture.stove",
+      "use_class": "cafe_kitchen",
+      "width_mm": 1200,
+      "depth_mm": 700,
+      "height_mm": 900,
+      "seats": 0,
+      "stands": 1,
+      "sleepers": 0,
+      "blocks": 1
+    },
+    {
+      "key": "plant",
+      "label": "plant",
+      "description": "a potted fig",
+      "form": "fixture",
+      "roles": [
+        "decoration"
+      ],
+      "look": "plant.potted_fig",
+      "use_class": "",
+      "width_mm": 600,
+      "depth_mm": 600,
+      "height_mm": 1500,
+      "seats": 0,
+      "stands": 0,
+      "sleepers": 0,
+      "blocks": 1
+    }
+  ],
+  "zones": [
+    {
+      "key": "counter_side",
+      "label": "counter",
+      "placement": "left",
+      "share": 400,
+      "ground": "ground.floor_tile",
+      "access": "open",
+      "boundary": "",
+      "holds": [
+        {
+          "part": "counter",
+          "count": 1,
+          "pattern": "row"
+        },
+        {
+          "part": "plant",
+          "count": 2,
+          "pattern": "perimeter"
+        }
+      ]
+    },
+    {
+      "key": "seating",
+      "label": "seating",
+      "placement": "right",
+      "share": 600,
+      "ground": "ground.floor_wood",
+      "access": "open",
+      "boundary": "",
+      "holds": [
+        {
+          "part": "table",
+          "count": {
+            "from": 3,
+            "to": 5
+          },
+          "pattern": "grid"
+        }
+      ]
+    },
+    {
+      "key": "kitchen",
+      "label": "kitchen",
+      "placement": "back",
+      "share": 400,
+      "ground": "ground.floor_tile",
+      "access": "open",
+      "boundary": "inner_wall",
+      "holds": [
+        {
+          "part": "stove",
+          "count": 1,
+          "pattern": "row"
+        }
+      ]
+    }
+  ]
+}

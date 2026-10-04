@@ -1,0 +1,247 @@
+{
+  "schema_version": 1,
+  "catalog_id": "look-family",
+  "catalog_version": 1,
+  "entries": [
+    {
+      "key": "animal",
+      "fit": "contain",
+      "dressing": "primitive",
+      "fill_minimum_permille": 0,
+      "fill_maximum_permille": 0,
+      "reason": "An animal is drawn as the engine's primitive of its slot until an animal catalog with rigged bodies exists; a pack may not dress it with a static mesh.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "boundary",
+      "fit": "tile",
+      "dressing": "module",
+      "fill_minimum_permille": 0,
+      "fill_maximum_permille": 0,
+      "reason": "A fence, hedge or wall run repeats a module along its length, ends trimmed, so any run length is dressed without stretching.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "character",
+      "fit": "contain",
+      "dressing": "catalog",
+      "fill_minimum_permille": 0,
+      "fill_maximum_permille": 0,
+      "reason": "A person's look comes from the published character catalogs and the character studio; a pack names catalog looks or an outfit palette, never a mesh of its own.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "door",
+      "fit": "fill",
+      "dressing": "module",
+      "fill_minimum_permille": 800,
+      "fill_maximum_permille": 1250,
+      "reason": "A door module fills its opening so no hole shows round it; it may stretch on each axis only within the bounds below of its authored size, else the next variant or the fallback is drawn. A filled module is drawn when each axis of the slot lies from 800 to 1,250 per mille of the module's authored size, so an opening is never filled by a module stretched past a quarter or squeezed past a fifth.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "fixture",
+      "fit": "contain",
+      "dressing": "module",
+      "fill_minimum_permille": 0,
+      "fill_maximum_permille": 0,
+      "reason": "A bed, a bench or a workbench is scaled uniformly into its slot with its base on the floor, so its proportions hold.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "ground",
+      "fit": "surface",
+      "dressing": "surface",
+      "fill_minimum_permille": 0,
+      "fill_maximum_permille": 0,
+      "reason": "Open ground and floors are dressed with a material laid at physical scale through the slot's UV frame.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "path",
+      "fit": "surface",
+      "dressing": "surface",
+      "fill_minimum_permille": 0,
+      "fill_maximum_permille": 0,
+      "reason": "A walking way is dressed with a material laid at physical scale through the slot's UV frame.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "plant",
+      "fit": "contain",
+      "dressing": "module",
+      "fill_minimum_permille": 0,
+      "fill_maximum_permille": 0,
+      "reason": "A tree, a hedge plant or a crop clump is scaled uniformly into its slot with its base on the ground.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "prop",
+      "fit": "contain",
+      "dressing": "module",
+      "fill_minimum_permille": 0,
+      "fill_maximum_permille": 0,
+      "reason": "A thing only drawn (a crate, a hay bale) is scaled uniformly into its slot with its base on the ground.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "road",
+      "fit": "surface",
+      "dressing": "surface",
+      "fill_minimum_permille": 0,
+      "fill_maximum_permille": 0,
+      "reason": "A driving way is dressed with a material laid at physical scale through the slot's UV frame.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "roof",
+      "fit": "surface",
+      "dressing": "both",
+      "fill_minimum_permille": 0,
+      "fill_maximum_permille": 0,
+      "reason": "A roof takes a material over its surfaces and, optionally, a roof module fitted to its structure's slot.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "structure",
+      "fit": "contain",
+      "dressing": "module",
+      "fill_minimum_permille": 0,
+      "fill_maximum_permille": 0,
+      "reason": "A whole structure module is scaled uniformly into its slot; its doors and walls stay the engine's, which the module must not cover.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "vehicle",
+      "fit": "contain",
+      "dressing": "module",
+      "fill_minimum_permille": 0,
+      "fill_maximum_permille": 0,
+      "reason": "A vehicle is scaled uniformly into its slot with its wheels on the ground; in this version it stands still.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "wall",
+      "fit": "surface",
+      "dressing": "surface",
+      "fill_minimum_permille": 0,
+      "fill_maximum_permille": 0,
+      "reason": "A wall's faces are dressed with a material laid at physical scale through the slot's UV frame.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "water",
+      "fit": "surface",
+      "dressing": "surface",
+      "fill_minimum_permille": 0,
+      "fill_maximum_permille": 0,
+      "reason": "Water is dressed with a material over its surface; nothing stands or walks on it.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "window",
+      "fit": "fill",
+      "dressing": "module",
+      "fill_minimum_permille": 800,
+      "fill_maximum_permille": 1250,
+      "reason": "A window module fills its opening so no hole shows round it, within the bounds below of its authored size. A filled module is drawn when each axis of the slot lies from 800 to 1,250 per mille of the module's authored size, so an opening is never filled by a module stretched past a quarter or squeezed past a fifth.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    }
+  ]
+}

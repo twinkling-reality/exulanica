@@ -1,0 +1,237 @@
+{
+  "schema_version": 1,
+  "catalog_id": "kind-role",
+  "catalog_version": 1,
+  "entries": [
+    {
+      "key": "bed",
+      "forms": [
+        "fixture"
+      ],
+      "reason": "Sleeps one or two; the beds in a home's rooms set how many people live there.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "boundary",
+      "forms": [
+        "boundary"
+      ],
+      "reason": "A fence or a wall round a zone or the site, with a gate where a path meets it; nobody walks through it but at its gate.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "decoration",
+      "forms": [
+        "fixture"
+      ],
+      "reason": "Drawn only; the engine does nothing with it beyond keeping walkers clear when it blocks.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "field",
+      "forms": [
+        "area"
+      ],
+      "reason": "An outdoor work area, reached at its access point; with the workplace role and a workplace use class, staff work its shifts there.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "gathering",
+      "forms": [
+        "fixture"
+      ],
+      "reason": "A place people stand at a while (a notice board, a pond's edge), with standing places in front of it; its use class admits visitors.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "ground",
+      "forms": [
+        "area"
+      ],
+      "reason": "Open ground people walk on: a yard, a lawn, a square.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "home",
+      "forms": [
+        "structure",
+        "room"
+      ],
+      "reason": "People live here: a structure with this role is a home whose residents are the sleepers of the beds in its rooms, or its use class's residents when it has none; a room with it is a bedroom of such a home.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "no_go",
+      "forms": [
+        "area"
+      ],
+      "reason": "Ground nobody walks onto: a crane's reach, a private patch.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "obstruction",
+      "forms": [
+        "fixture"
+      ],
+      "reason": "Blocks walking, like stacked materials or machinery.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "parking",
+      "forms": [
+        "area"
+      ],
+      "reason": "Where movers stop: a car park, a berth. Drawn and kept clear in this version; nothing drives to it until roads run in worlds other than towns.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "path",
+      "forms": [
+        "path"
+      ],
+      "reason": "A walking way; the spine from the entry is one. Every path is walked.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "road",
+      "forms": [
+        "path"
+      ],
+      "reason": "A driving way as well as a walking one. Drawn as a surface in this version; vehicles drive a kind's roads once roads run in worlds other than towns.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "seat",
+      "forms": [
+        "fixture"
+      ],
+      "reason": "A place to rest, with seats along its front; its use class admits visitors to rest.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "shop",
+      "forms": [
+        "structure",
+        "fixture",
+        "room"
+      ],
+      "reason": "Visitors eat, shop or visit here in its opening hours; its use class is a workplace that admits visitors.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "water",
+      "forms": [
+        "area"
+      ],
+      "reason": "Water: never walked. Drawn as a surface; boats wait for a movement module of their own.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "workplace",
+      "forms": [
+        "structure",
+        "area",
+        "fixture",
+        "room"
+      ],
+      "reason": "Staff work here on their shifts; its use class is a workplace.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    }
+  ]
+}
