@@ -1,0 +1,41 @@
+{
+  "family": "IBM Plex Sans and IBM Plex Mono, upright variable, IBM Latin1 split, unmodified",
+  "licence": "SIL Open Font License 1.1, Reserved Font Name \"Plex\"",
+  "archives": [
+    {
+      "url": "https://github.com/IBM/plex/releases/download/%40ibm/plex-mono-variable%401.0.0/plex-mono-variable.zip",
+      "release": "@ibm/plex-mono-variable@1.0.0",
+      "bytes": 1231040,
+      "sha256": "46bbde4aeab959180ebad197f5b841c6bb5c8070146ba02c31240556e1e0b40d"
+    },
+    {
+      "url": "https://github.com/IBM/plex/releases/download/%40ibm/plex-sans-variable%400.2.0/plex-sans-variable.zip",
+      "release": "@ibm/plex-sans-variable@0.2.0",
+      "bytes": 2922481,
+      "sha256": "f83825d527be6cd39c8971c932b9bf22688a3ad3e5ac6305b6143d02f52b87b6"
+    }
+  ],
+  "files": [
+    {
+      "path": "IBMPlexMonoVar-Roman-Latin1.woff2",
+      "archive": "https://github.com/IBM/plex/releases/download/%40ibm/plex-mono-variable%401.0.0/plex-mono-variable.zip",
+      "member": "fonts/split/woff2/IBM Plex Mono Var-Roman-Latin1.woff2",
+      "sha256": "632cb6cee5e90d89bd4354ff362bcffcef1384c19b603ddd2830561716e1f440",
+      "bytes": 32576
+    },
+    {
+      "path": "IBMPlexSansVar-Roman-Latin1.woff2",
+      "archive": "https://github.com/IBM/plex/releases/download/%40ibm/plex-sans-variable%400.2.0/plex-sans-variable.zip",
+      "member": "fonts/split/woff2/IBM Plex Sans Var-Roman-Latin1.woff2",
+      "sha256": "a18d94ea83c93f0a465d0976d8bc8ecbb031225dbaf76fd201d4e724a972034f",
+      "bytes": 68988
+    },
+    {
+      "path": "OFL.txt",
+      "archive": "https://github.com/IBM/plex/releases/download/%40ibm/plex-sans-variable%400.2.0/plex-sans-variable.zip",
+      "member": "fonts/split/woff2/license.txt",
+      "sha256": "91c25c350d3cac39da2736d74f7ba37ef648f5237a4e330a240615bc8d8c4360",
+      "bytes": 4360
+    }
+  ]
+}

@@ -1,7 +1,7 @@
 /* Application surfaces stay legible independently of physical world materials. */
 @keyframes world-tool-arrive { from { opacity: .4; translate: 0 7px; } to { opacity: 1; translate: 0 0; } }
 #shell {
-  --ui-font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --ui-font-body: var(--font-ui);
   --ui-font-utility: var(--ui-font-body); --companion-utility-font: var(--ui-font-body);
   --ink: #202a2f; --ink-soft: #4e5d64; --ink-faint: #66747a;
   --accent: #40545d; --focus: #294955; --edge: #c5cfd2;
@@ -538,7 +538,7 @@
   border-bottom: 1px solid var(--edge);
   background: var(--chromatic-head);
 }
-#shell .options-view .overlay-head h1 { color: var(--ink); font: 300 44px/1 "Helvetica Neue", var(--ui-font-display); letter-spacing: -.055em; }
+#shell .options-view .overlay-head h1 { color: var(--ink); font: 300 44px/1 var(--font-display); letter-spacing: -.055em; }
 #shell .options-view .overlay-head .overlay-kicker { color: var(--ink); }
 #shell .options-view .overlay-close {
   min-height: 44px;
@@ -795,7 +795,7 @@
   outline-offset: calc(-1 * var(--focus-ring-width));
 }
 #shell .world-menu-entry-label {
-  font: 400 clamp(27px, 2.6vw, 34px)/1.04 "Helvetica Neue", var(--ui-font-display);
+  font: 300 clamp(27px, 2.6vw, 34px)/1.04 var(--font-display);
   letter-spacing: -.05em;
   white-space: nowrap;
 }

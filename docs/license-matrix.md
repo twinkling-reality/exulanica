@@ -689,3 +689,16 @@ read on 2026-08-27, since it may name a catalog identifier rather than a Hugging
 | `TencentARC/Pixal3D` | `b0cb2e1b794cab9aa0ac38a95d794a4d9337437f` | mit, but its `pipeline.json` names the same DINOv3 encoder and RMBG-2.0; its NOTICE lists DINOv2 and not DINOv3, and the pipeline file is what runs | **BLOCKED** by section 6 |
 | `stepfun-ai/Step1X-3D`, texture model | `bf7084495b3a72222f36549b7942948aa4d9daa7` | apache-2.0, but `step1x_3d_texture_synthesis_pipeline.py` at GitHub `cb5ac944709c6c913109070c7b90c3447f57f3d4` loads `stabilityai/stable-diffusion-xl-base-1.0` (openrail++), and its baker reuses Hunyuan3D 2.0's rasteriser code | **BLOCKED** by section 6: OpenRAIL carries use restrictions |
 | `tencent/Hunyuan3D-2.1` | `0b94677654c57bb9a6b6845cd7b704ccf551d327` | other, `tencent-hunyuan-community` | **BLOCKED**: excludes the EU, the UK and South Korea, and forbids improving other models |
+
+## 13. Interface typefaces
+
+| Item | Licence | Where | Verdict |
+| --- | --- | --- | --- |
+| IBM Plex Sans and IBM Plex Mono, upright variable Latin1 files from IBM's releases `@ibm/plex-sans-variable@0.2.0` and `@ibm/plex-mono-variable@1.0.0` | SIL OFL 1.1, Reserved Font Name "Plex" | `web/packages/presentation/src/fonts/ibm-plex/`, with `OFL.txt` and `SOURCE.json` | **SHIP**, unmodified only |
+
+The reserved name is why these files live outside `assets/fonts/`, whose rule refuses a Reserved
+Font Name because the lettering tool converts outlines into Modified Versions. The interface fonts
+are never converted, subset or renamed internally; a change to them that is not IBM's own release
+needs a new entry here first. The files, sizes and digests are in `THIRD_PARTY_NOTICES.md`
+("Interface typefaces"), held there and to `SOURCE.json` by
+`web/packages/presentation/test/interface-typefaces.test.ts`.

@@ -78,6 +78,17 @@ describe('Your worlds', () => {
     expect(root.querySelector('.your-worlds-card .your-worlds-caption')?.textContent).toBe('Established 4 Oct');
   });
 
+  it('says what each world is and that it keeps its changes, once', () => {
+    const { root } = build([quiet, starter(3)]);
+    const details = [...root.querySelectorAll('.world-entry-choice .world-entry-choice-detail')]
+      .map((node) => node.textContent ?? '');
+    // Newest first: the starter changed on 4 October, Quiet corner on 30 September.
+    expect(details).toEqual([
+      'Authored world · saved changes and appearance',
+      'Generated world · A small town · saved changes and appearance',
+    ]);
+  });
+
   it('chooses with the arrow keys and opens the chosen world with Enter', () => {
     const { root, open } = build([quiet, entry()]);
     (root.querySelector('.your-worlds-card') as HTMLElement).focus();

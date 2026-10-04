@@ -101,9 +101,10 @@
   --space-12: 48px;
 
   /* Type */
-  --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
-  --font-display: "Avenir Next", "Segoe UI Variable Display", var(--font-ui);
-  --font-mono: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  /* One family everywhere the brand speaks: IBM Plex (presentation/src/tokens.css loads it). */
+  --font-ui: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+  --font-display: var(--font-ui);
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
   --text-xs: 12px;
   --text-xs-line: 16px;
   --text-sm: 13px;

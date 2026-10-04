@@ -51,8 +51,8 @@
 
 #shell section.world-recipes .world-recipes-main > h2 {
   margin: 0;
-  font: 600 clamp(2.125rem, 3vw, 2.75rem) / 1.08 var(--font-ui);
-  letter-spacing: -0.022em;
+  font: 200 clamp(2.375rem, 3.3vw, 3rem) / 1.06 var(--font-display);
+  letter-spacing: -0.02em;
   color: var(--color-text);
 }
 

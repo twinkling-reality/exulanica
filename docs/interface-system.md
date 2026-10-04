@@ -36,6 +36,13 @@ Components and layout read semantic roles and never write a literal of their own
   `data-ui-stage="dark"` on its root gives it exactly the dark values in every scheme, because it
   shows worlds full screen and a world keeps its own light. Reduced transparency and high contrast make surfaces
   opaque.
+- Type: one family wherever the brand speaks. IBM Plex Sans sets interface text and titles
+  (`--font-ui`, with `--font-display` the same family), IBM Plex Mono sets labels, keys and codes
+  (`--font-mono`); `web/packages/presentation/src/tokens.css` loads both, so the landing page and the
+  application share them. Large titles on the stage are weight 200, other titles
+  `--weight-display` (300), text 400 and controls `--weight-medium`. A world's own style keeps its
+  own typography (the Companion's speech, Design's previews). The files and their licence are in
+  `docs/license-matrix.md` section 13.
 - Space, type, radius, elevation, control and region sizes, and motion durations, which are zero
   under `prefers-reduced-motion` or `data-motion="reduced"`.
 - Two retuning switches: `--panel-tilt` (0deg keeps panels flat; the earlier plates used -10deg) and

@@ -535,6 +535,34 @@ is NOT a product dependency: it lives in `tools/lettering` with its own `pyproje
 import contract `The product never imports the lettering tool` in `pyproject.toml` hold both halves
 of that. The product reads the catalogs and parses no font.
 
+## Interface typefaces (2026-10-04)
+
+The browser application and the landing page set their interface text in IBM Plex Sans and their
+labels in IBM Plex Mono. Two files are retained under `web/packages/presentation/src/fonts/ibm-plex/`,
+byte for byte as IBM publishes them: the upright variable Latin1 files of IBM's own split builds,
+from the release archives `@ibm/plex-sans-variable@0.2.0` and `@ibm/plex-mono-variable@1.0.0` at
+`github.com/IBM/plex/releases`. `SOURCE.json` beside them records each archive's URL, size and
+SHA-256 and each file's member path, size and SHA-256. The files are not subset, renamed inside,
+converted or otherwise modified; only the file names on disk lose their spaces.
+
+**Licence: SIL Open Font License, Version 1.1, with the Reserved Font Name "Plex".** The full text is
+the `OFL.txt` beside the files, IBM's `license.txt` from the same archives (identical in both). The
+reserved name means a Modified Version may not be called Plex; the product ships the files
+unmodified and names them by their family names. Characters outside the files' ranges fall back to
+the next face in each stack. `web/packages/presentation/test/interface-typefaces.test.ts` fails if a
+file in that folder is not recorded in `SOURCE.json` and named here, if its size or digest changes,
+or if `OFL.txt` stops declaring exactly the reserved name "Plex".
+
+The required copyright notice, verbatim from `OFL.txt`:
+
+- Copyright © 2017 IBM Corp. with Reserved Font Name "Plex"
+
+| Retained file | Bytes | SHA-256 |
+| --- | --- | --- |
+| `web/packages/presentation/src/fonts/ibm-plex/IBMPlexMonoVar-Roman-Latin1.woff2` | 32,576 | `632cb6cee5e90d89bd4354ff362bcffcef1384c19b603ddd2830561716e1f440` |
+| `web/packages/presentation/src/fonts/ibm-plex/IBMPlexSansVar-Roman-Latin1.woff2` | 68,988 | `a18d94ea83c93f0a465d0976d8bc8ecbb031225dbaf76fd201d4e724a972034f` |
+| `web/packages/presentation/src/fonts/ibm-plex/OFL.txt` | 4,360 | `91c25c350d3cac39da2736d74f7ba37ef648f5237a4e330a240615bc8d8c4360` |
+
 ## Copied test vectors (2026-09-30)
 
 The request signer of the S3-compatible content store (`exulanica/store/sigv4.py`) is checked

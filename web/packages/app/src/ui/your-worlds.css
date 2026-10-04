@@ -170,8 +170,8 @@
 
 #shell .your-worlds .your-worlds-title {
   margin: 0;
-  font: 600 clamp(2.25rem, 3.3vw, 2.875rem) / 1.08 var(--font-ui);
-  letter-spacing: -0.022em;
+  font: 200 clamp(2.5rem, 3.6vw, 3.125rem) / 1.06 var(--font-display);
+  letter-spacing: -0.02em;
   color: var(--color-text);
 }
 

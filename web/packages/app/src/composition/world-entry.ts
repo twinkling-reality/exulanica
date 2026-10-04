@@ -59,12 +59,11 @@ export function onlyUntouchedStarter(entries: readonly SavedWorldEntry[]): boole
     && only.currentAuthoredEditSeq === 0;
 }
 
-/** What kind of world an entry is, in the words the card's detail and the meta line use. */
+/** What kind of world an entry is, and that it keeps its changes: a card's detail, said once. */
 function worldKind(entry: SavedWorldEntry): string {
   if (entry.generatedGround != null) return fill('world.entry.generated', { recipe: entry.generatedGround.recipeLabel });
-  return entry.sourceKind === 'authored'
-    ? say('yourWorlds.kind.authored')
-    : say('yourWorlds.kind.personal');
+  return `${say(entry.sourceKind === 'authored' ? 'yourWorlds.kind.authored' : 'yourWorlds.kind.personal')}`
+    + ' · saved changes and appearance';
 }
 
 /** The sentence under a world's title: what it is, and that it opens where it was left. */
@@ -282,7 +281,7 @@ export function buildYourWorlds(deps: WorldEntrySurface): WorldEntrySurfaceHandl
       el('span', { class: 'world-entry-choice-title', text: entry.title }),
       el('span', {
         class: 'world-entry-choice-detail',
-        text: unavailable ? unavailableMessage(entry.unavailableReason) : `${worldKind(entry)} · saved changes and appearance`,
+        text: unavailable ? unavailableMessage(entry.unavailableReason) : worldKind(entry),
       }),
     ]);
     card.addEventListener('focus', () => choose(entry));
