@@ -34,6 +34,7 @@ from exulanica.models.manifest import load_manifest
 from PIL import Image
 from PIL.TiffImagePlugin import IFDRational
 
+import ast_parse_race
 from model_fakes import FakeTransport, RecordingPolicy
 from pg_harness import migrated_schema, open_scratch_connection
 
@@ -565,6 +566,8 @@ def pytest_configure(config):
     from exulanica.env import env_get, env_name
 
     global _private_server
+    # Before any test parses source: a thread printing a traceback must not fail a source scan.
+    ast_parse_race.install()
     mode = env_get("TEST_POSTGRES")
     worker = getattr(config, "workerinput", None)
     explicit = env_get("TEST_DATABASE_URL")

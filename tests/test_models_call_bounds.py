@@ -40,12 +40,40 @@ MESSAGES = [{"role": "user", "content": "hi"}]
 #: is tested; this is scheduling slack, and it is far below every stall the servers impose.
 SLACK_S = 0.5
 
+#: How long closing an endpoint waits for each request thread. Woken, a stalled reply ends in
+#: milliseconds; this bounds one that does not, so it fails its test instead of hanging it.
+REQUEST_THREAD_JOIN_S = 10.0
+
 
 # -- a local endpoint ------------------------------------------------------------------------
 
 
+class _Server(http.server.ThreadingHTTPServer):
+    """Serves each request on a thread of its own and keeps every thread it starts."""
+
+    def __init__(self, handler: type[http.server.BaseHTTPRequestHandler]) -> None:
+        #: Set when the endpoint closes. A stalled reply waits on it, not on the clock alone.
+        self.closing = threading.Event()
+        self.request_threads: list[threading.Thread] = []
+        super().__init__(("127.0.0.1", 0), handler)
+
+    def process_request(self, request: Any, client_address: Any) -> None:
+        thread = threading.Thread(
+            target=self.process_request_thread, args=(request, client_address), daemon=True
+        )
+        self.request_threads.append(thread)
+        thread.start()
+
+
 class _Endpoint:
-    """A loopback server whose next reply is chosen by the test: late, trickled, or an error."""
+    """A loopback server whose next reply is chosen by the test: late, trickled, or an error.
+
+    No request thread outlives it: each reply closes its connection, and ``close`` wakes a reply
+    that is still stalled and waits for every request thread. A thread left stalled would wake
+    inside a later test, read the connection its client had reset, and print the error with a
+    traceback, and formatting a traceback on CPython 3.11 calls ``ast.parse``, which can fail a
+    source-scanning test's own ``ast.parse`` (``tests/ast_parse_race.py`` has the mechanism).
+    """
 
     def __init__(self) -> None:
         self.behaviour: Callable[[http.server.BaseHTTPRequestHandler], None] = _answer
@@ -58,21 +86,46 @@ class _Endpoint:
             def log_message(self, *args: Any) -> None:
                 pass
 
+            def end_headers(self) -> None:
+                self.send_header("connection", "close")
+                super().end_headers()
+
             def do_POST(self) -> None:
+                # One request per connection, and the client is told so: a thread that waited
+                # for a second request would read a connection the client had reset.
+                self.close_connection = True
                 self.rfile.read(int(self.headers.get("content-length") or 0))
                 endpoint.requests += 1
                 # The client may stop waiting, which is what these tests want.
                 with contextlib.suppress(BrokenPipeError, ConnectionResetError):
                     endpoint.behaviour(self)
 
-        self._server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-        self._server.daemon_threads = True
-        self.origin = f"http://localhost:{self._server.server_port}"
-        threading.Thread(target=self._server.serve_forever, daemon=True).start()
+        self._server = _Server(Handler)
+        self.port = self._server.server_port
+        self.origin = f"http://localhost:{self.port}"
+        self._serving = threading.Thread(target=self._server.serve_forever, daemon=True)
+        self._serving.start()
+
+    @property
+    def request_threads(self) -> list[threading.Thread]:
+        return self._server.request_threads
 
     def close(self) -> None:
+        self._server.closing.set()
         self._server.shutdown()
         self._server.server_close()
+        self._serving.join()
+        for thread in self.request_threads:
+            thread.join(REQUEST_THREAD_JOIN_S)
+        alive = [thread.name for thread in self.request_threads if thread.is_alive()]
+        assert alive == [], f"request threads outlived the endpoint: {alive}"
+
+
+def _stall(handler: http.server.BaseHTTPRequestHandler, seconds: float) -> None:
+    """Wait ``seconds``, or until the endpoint closes: no stall outlasts its test."""
+    server = handler.server
+    assert isinstance(server, _Server)
+    server.closing.wait(seconds)
 
 
 def _send(handler: http.server.BaseHTTPRequestHandler, status: int, body: bytes) -> None:
@@ -89,7 +142,7 @@ def _answer(handler: http.server.BaseHTTPRequestHandler) -> None:
 
 def _late(seconds: float) -> Callable[[http.server.BaseHTTPRequestHandler], None]:
     def behave(handler: http.server.BaseHTTPRequestHandler) -> None:
-        time.sleep(seconds)
+        _stall(handler, seconds)
         _answer(handler)
 
     return behave
@@ -109,7 +162,7 @@ def _trickled(gap_s: float, pieces: int) -> Callable[[http.server.BaseHTTPReques
         for start in range(0, len(body), size):
             handler.wfile.write(body[start : start + size])
             handler.wfile.flush()
-            time.sleep(gap_s)
+            _stall(handler, gap_s)
 
     return behave
 
@@ -126,6 +179,29 @@ def endpoint() -> Iterator[_Endpoint]:
     served = _Endpoint()
     yield served
     served.close()
+
+
+def test_no_request_thread_outlives_its_endpoint():
+    """A reply told to stall for ten minutes, on a connection its client still holds open, ends
+    with its endpoint: neither the stall nor a wait for a second request keeps its thread."""
+    served = _Endpoint()
+    arrived = threading.Event()
+
+    def stalled(handler: http.server.BaseHTTPRequestHandler) -> None:
+        arrived.set()
+        _late(600.0)(handler)
+
+    served.behaviour = stalled
+    with socket.create_connection(("127.0.0.1", served.port)) as client:
+        client.sendall(b"POST /v1/chat/completions HTTP/1.1\r\ncontent-length: 0\r\n\r\n")
+        assert arrived.wait(REQUEST_THREAD_JOIN_S)
+        (thread,) = served.request_threads
+        assert thread.is_alive()
+        served.close()
+        assert not thread.is_alive()
+        reply = client.makefile("rb").read()
+    assert reply.startswith(b"HTTP/1.1 200")
+    assert b"\r\nconnection: close\r\n" in reply
 
 
 def _manifest_at(origin: str):
