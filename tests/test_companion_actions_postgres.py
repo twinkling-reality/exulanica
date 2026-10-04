@@ -79,13 +79,10 @@ def kind(value: str) -> HttpResponse:
     return reply({"kind": value})
 
 
-def step(operation: str, *, kinds=(), objects=None, arrangements=()) -> dict:
-    """One drafted step, with the slots the form offers: ``objects`` only once the version holds
-    an object, as the form is built from the reads."""
-    drafted = {"operation": operation, "kinds": list(kinds), "arrangements": list(arrangements)}
-    if objects is not None:
-        drafted["objects"] = list(objects)
-    return drafted
+def step(operation: str, *, kinds=(), objects=(), arrangements=()) -> dict:
+    """One drafted step as the form takes it: its operation, then one list of the options it
+    names, whichever list each was offered from."""
+    return {"operation": operation, "options": [*kinds, *objects, *arrangements]}
 
 
 def edits(*steps: dict) -> HttpResponse:

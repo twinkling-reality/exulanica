@@ -19,9 +19,11 @@ each the answer to something measured:
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping
 from decimal import Decimal
-from typing import Any
+from enum import StrEnum
+from typing import Any, Final
 
 from exulanica.models.budget import BudgetGuard
 from exulanica.models.choice import ChoiceRequest
@@ -42,7 +44,50 @@ from exulanica.models.schema import (
 )
 from exulanica.models.usage import CallUsage
 
-__all__ = ["checked_payload", "embedding_from_body", "result_from_body"]
+__all__ = [
+    "RUNAWAY_REPEATS",
+    "RUNAWAY_WHITESPACE_CHARS",
+    "Runaway",
+    "checked_payload",
+    "embedding_from_body",
+    "result_from_body",
+    "runaway_shape",
+]
+
+
+class Runaway(StrEnum):
+    """How a reply cut on the token limit ran on, when it plainly did."""
+
+    WHITESPACE = "whitespace"
+    REPETITION = "repetition"
+
+
+#: A cut answer ran on in whitespace only when it ends in at least this many whitespace
+#: characters. A schema-constrained reply may put any whitespace between its tokens, and a model
+#: that writes a line break where a comma belongs can then write nothing else; a form written
+#: indented carries a few dozen at most between two values.
+RUNAWAY_WHITESPACE_CHARS: Final = 256
+#: A cut answer ran on by repetition only when its last this many whole items, split on commas
+#: and line breaks, are one item. The item the limit cut is not counted.
+RUNAWAY_REPEATS: Final = 8
+_ITEM_SEPARATOR: Final = re.compile(r"[,\n]")
+
+
+def runaway_shape(answer: str) -> Runaway | None:
+    """How a partial answer ran on, or None when it is not plainly either shape.
+
+    Deliberately conservative: a long answer that is neither (a form still being written, prose)
+    is None, because a caller tells the model what it did wrong from this, and a wrong shape would
+    tell it the wrong thing.
+    """
+    if len(answer) - len(answer.rstrip()) >= RUNAWAY_WHITESPACE_CHARS:
+        return Runaway.WHITESPACE
+    items = [item.strip() for item in _ITEM_SEPARATOR.split(answer.rstrip())]
+    whole = [item for item in items[:-1] if item]
+    tail = whole[-RUNAWAY_REPEATS:]
+    if len(tail) == RUNAWAY_REPEATS and len(set(tail)) == 1:
+        return Runaway.REPETITION
+    return None
 
 
 def _record_attempt(
@@ -137,6 +182,18 @@ def result_from_body(
             "task. Raise max_tokens."
         )
     if finish_reason == "length":
+        # Read from the content as it came: the split answer is trimmed, and a run of trailing
+        # whitespace is one of the shapes.
+        runaway = runaway_shape(str(message.get("content") or ""))
+        if runaway is not None:
+            # More room is not what this needs: a reply running on in either shape fills any
+            # ceiling it is given, so the advice is to stop it, not to raise max_tokens.
+            raise TruncatedResponseError(
+                f"{spec.model_id} ran on in {runaway} until the token limit cut it "
+                f"({usage.completion_tokens} completion tokens). A partial answer is never "
+                "salvaged, and a higher max_tokens would only be filled the same way.",
+                runaway=runaway,
+            )
         raise TruncatedResponseError(
             f"{spec.model_id} truncated the answer on the token limit. A partial answer is "
             "never salvaged: half a result that happens to parse is a plausible fact with a "

@@ -874,13 +874,14 @@ def object_labels(fixture: Mapping[str, Any], selected: str | None) -> dict[str,
 
 
 def drafted_world_edit(item: Mapping[str, Any], fixture: Mapping[str, Any]) -> dict[str, Any]:
-    """The world-edit form a model meeting the expectation fills."""
+    """The world-edit form a model meeting the expectation fills: each step an operation, then
+    one list of the options it names."""
     _, selected = parse_context(item["context"])
     labels = object_labels(fixture, selected)
     expected = item["expected"]
     steps: list[dict[str, Any]] = []
     if expected["outcome"] == "refused":
-        steps.append({"operation": "other"})
+        steps.append({"operation": "other", "options": []})
     elif expected["outcome"] == "clarify":
         code = expected["clarification"]["code"]
         candidates = expected["clarification"]["candidates"]
@@ -890,31 +891,26 @@ def drafted_world_edit(item: Mapping[str, Any], fixture: Mapping[str, Any]) -> d
                 if "emove" in item["utterance"] or "away" in item["utterance"]
                 else "move_object"
             )
-            steps.append({"operation": operation, "objects": [labels[c] for c in candidates]})
+            steps.append({"operation": operation, "options": [labels[c] for c in candidates]})
         elif code == "asset_ambiguous":
-            steps.append({"operation": "place_object", "kinds": list(candidates)})
+            steps.append({"operation": "place_object", "options": list(candidates)})
         elif code == "object_required":
-            steps.append({"operation": "move_object"})
+            steps.append({"operation": "move_object", "options": []})
         elif code == "viewer_required":
-            steps.append({"operation": "place_arrangement", "arrangements": ["small_square"]})
+            steps.append({"operation": "place_arrangement", "options": ["small_square"]})
         else:
             asset = "cc0.bench" if "bench" in item["utterance"] else "cc0.lamp-post"
-            steps.append({"operation": "place_object", "kinds": [asset]})
+            steps.append({"operation": "place_object", "options": [asset]})
     else:
         for step in expected["steps"]:
-            drafted: dict[str, Any] = {"operation": step["operation"]}
+            options: list[str] = []
             if "asset_key" in step:
-                drafted["kinds"] = [step["asset_key"]]
+                options.append(step["asset_key"])
             if "object" in step:
-                drafted["objects"] = [labels[step["object"]]]
+                options.append(labels[step["object"]])
             if "arrangement_key" in step:
-                drafted["arrangements"] = [step["arrangement_key"]]
-            steps.append(drafted)
-    for drafted in steps:
-        drafted.setdefault("kinds", [])
-        drafted.setdefault("arrangements", [])
-        if fixture["objects"]:
-            drafted.setdefault("objects", [])
+                options.append(step["arrangement_key"])
+            steps.append({"operation": step["operation"], "options": options})
     return {"steps": steps}
 
 

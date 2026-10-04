@@ -30,6 +30,11 @@ PINNED = {
     "action-plan-1": "a9c3708ef441cbeeae00b2972628d89de75dc787aebf0a37f0cf658b8273da88",
     # `action-plan-2` adds the simulation drafter's prompt; the other two texts are unchanged.
     "action-plan-2": "f6d753b9d112b6b61f29c787fcea5beb65807248f19c66aee7d7a6eb63d4e6c9",
+    # `action-plan-3`: the world-edit drafter's step is an operation then one options list, named
+    # once each, written on one line; the classifier and simulation texts are unchanged.
+    "action-plan-3": "aa66c6c57167604ee4824c79c7222bf65f3dd8828ba2732c0839db7aa61cd00e",
+    # `action-plan-5`: the world-edit drafter is no longer asked to write the form on one line.
+    "action-plan-5": "ea26b399ae2499732432cd0f279aec2ae30dc0e39dc32d39c801c6fd4b14d9d0",
     # The appearance drafter for a design choice drawn from no evidence; its own family, so the
     # evidence drafter's texts and `proposal-4` are untouched.
     "proposal-authored-1": "7b840134c24bc8152ab423f0665362b1d37bdd3cfb9b96cf208cfc6a46308d9a",

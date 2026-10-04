@@ -432,7 +432,7 @@ def test_the_scripted_plan_answers_every_request_and_fills_only_the_offered_slot
         for rule in plan["rules"]:
             draft = json.loads(rule["content"])
             for step in draft.get("steps", []):
-                assert {"operation", "kinds", "arrangements"} <= set(step)
+                assert set(step) == {"operation", "options"}
         bare = [
             r
             for r in record["records"]
@@ -441,7 +441,8 @@ def test_the_scripted_plan_answers_every_request_and_fills_only_the_offered_slot
         for item in bare:
             wanted = H.escaped(f'The request:\n"""{item["utterance"]}"""')
             (rule,) = [r for r in plan["rules"] if r["match"]["contains"] == wanted]
-            assert all("objects" not in s for s in json.loads(rule["content"])["steps"])
+            steps = json.loads(rule["content"])["steps"]
+            assert not any(o.startswith("object-") for s in steps for o in s["options"])
 
 
 def test_the_drafters_object_labels_put_the_selected_object_first_then_newest():

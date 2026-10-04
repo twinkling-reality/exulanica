@@ -185,7 +185,16 @@ class TruncatedResponseError(ModelError):
     opens a reasoning block and never closes it was cut mid-thought while the endpoint reported
     an ordinary stop: ``finish_reason`` cannot see that one, and
     ``exulanica.models.reasoning.SplitContent.complete`` is what does.
+
+    ``runaway`` says how a partial answer ran on, when it plainly did (``exulanica.models.response.
+    runaway_shape``): ``"whitespace"`` or ``"repetition"``, otherwise None. It names a shape and
+    never carries the reply's text, so a caller can tell the model what went wrong without
+    keeping what it wrote.
     """
+
+    def __init__(self, message: str, *, runaway: str | None = None) -> None:
+        super().__init__(message)
+        self.runaway = runaway
 
 
 class BudgetExceededError(ModelError):

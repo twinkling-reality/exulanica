@@ -8,6 +8,7 @@ its content and nothing about how it was paid for.
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import uuid
 
@@ -93,17 +94,24 @@ def test_the_form_offers_exactly_the_options_the_reads_listed():
     schema = plan._world_edit_form(_world()).model_json_schema()
     step = schema["$defs"]["WorldEditStep"]["properties"]
     assert _values(step["operation"]) == [operation.value for operation in Op]
-    assert _values(step["kinds"]["items"]) == ["cc0.bench", "cc0.seating-planter"]
-    assert _values(step["objects"]["items"]) == ["object-1"]
-    assert _values(step["arrangements"]["items"]) == ["small_square"]
-    assert step["kinds"]["maxItems"] == plan.MAX_CANDIDATES
+    assert _values(step["options"]["items"]) == [
+        "cc0.bench",
+        "cc0.seating-planter",
+        "object-1",
+        "small_square",
+    ]
+    assert step["options"]["maxItems"] == plan.MAX_CANDIDATES
     # No field could carry a position, an identifier, a permission or a route.
-    assert set(step) == {"operation", "kinds", "objects", "arrangements"}
+    assert set(step) == {"operation", "options"}
 
 
-def test_a_slot_with_no_options_is_left_off_the_form():
-    schema = plan._world_edit_form(_world(objects=False)).model_json_schema()
-    assert "objects" not in schema["$defs"]["WorldEditStep"]["properties"]
+def test_an_option_list_with_nothing_listed_is_left_off_the_form():
+    world = dataclasses.replace(_world(objects=False), assets=(), arrangements=())
+    schema = plan._world_edit_form(world).model_json_schema()
+    assert set(schema["$defs"]["WorldEditStep"]["properties"]) == {"operation"}
+    without_objects = plan._world_edit_form(_world(objects=False)).model_json_schema()
+    items = without_objects["$defs"]["WorldEditStep"]["properties"]["options"]["items"]
+    assert "object-1" not in _values(items)
 
 
 def test_objects_reach_the_model_by_label_and_title_only():
@@ -114,7 +122,7 @@ def test_objects_reach_the_model_by_label_and_title_only():
 
 def test_a_drafted_label_resolves_to_the_value_its_read_listed():
     verdict = plan._typed_from_draft(
-        [{"operation": "remove_object", "kinds": [], "objects": ["object-1"], "arrangements": []}],
+        [{"operation": "remove_object", "options": ["object-1"]}],
         _world(),
     )
     assert verdict.refusal is None and verdict.clarification is None
@@ -123,14 +131,7 @@ def test_a_drafted_label_resolves_to_the_value_its_read_listed():
 
 def test_two_options_for_one_slot_are_asked_about():
     verdict = plan._typed_from_draft(
-        [
-            {
-                "operation": "place_object",
-                "kinds": ["cc0.bench", "cc0.seating-planter"],
-                "objects": [],
-                "arrangements": [],
-            }
-        ],
+        [{"operation": "place_object", "options": ["cc0.bench", "cc0.seating-planter"]}],
         _world(),
     )
     assert verdict.clarification is not None
@@ -143,17 +144,13 @@ def test_two_options_for_one_slot_are_asked_about():
 
 
 def test_a_change_the_operations_cannot_express_is_refused_by_name():
-    verdict = plan._typed_from_draft(
-        [{"operation": "other", "kinds": [], "objects": [], "arrangements": []}], _world()
-    )
+    verdict = plan._typed_from_draft([{"operation": "other", "options": []}], _world())
     assert verdict.refusal is not None
     assert verdict.refusal["code"] == "action_not_offered"
 
 
 def test_a_placement_naming_nothing_listed_is_not_in_the_catalogue():
-    verdict = plan._typed_from_draft(
-        [{"operation": "place_object", "kinds": [], "objects": [], "arrangements": []}], _world()
-    )
+    verdict = plan._typed_from_draft([{"operation": "place_object", "options": []}], _world())
     assert verdict.refusal is not None
     assert verdict.refusal["code"] == "not_in_catalogue"
 

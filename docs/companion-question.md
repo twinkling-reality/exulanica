@@ -645,6 +645,24 @@ stated choice. What is missing is asked about before anything is prepared (`asse
 `placement_required`, `viewer_required`); the answer goes to `POST /selection/actions/prepare`
 (`world.read`, no model), which validates typed actions as any direct body is validated.
 
+A step the operations cannot express (`other`) refuses the whole plan. A drafted plan takes back at
+most one change: a second `undo_last_edit` step is refused `action_not_offered`, and asking again
+takes back the next. Each world-edit step the model fills is an operation and then one list of up to
+three options drawn from the listed kinds, objects and arrangements; the list is read in the one its
+operation takes options from, and an option from another list names nothing. The list is the step's
+last field, so a list that names something can be followed only by the step's closing brace: under a
+strict schema a list followed by another field needs a comma, and a model that writes a line break
+there instead can then write only whitespace. The world-edit and simulation drafters each make one
+try and one repair, and each reply may spend at most 640 completion tokens (`DRAFT_MAX_TOKENS`, the
+structured-extraction role's floor), well above what a filled form takes, so a reply that runs on is
+cut inside the role's timeout rather than at it. A reply cut at that limit is classified by how it
+ran on (`runaway_shape` in [response.py](../exulanica/models/response.py)): whitespace when it ends
+in at least 256 whitespace characters, repetition when its last 8 whole items are one item,
+otherwise neither. The repair tells the model which, without showing it the reply, and a second
+refused reply is refused `not_drafted`. The limit of the ceiling: the role's fallback reasons in its
+reply before it answers, so a three-step form with every list full, drafted by the fallback, may not
+fit in 640 tokens and is then refused `not_drafted`.
+
 Availability and permission are the version capability read's (`GET /world/versions/{version_id}/capabilities`,
 read in process). An operation it calls unsupported, unavailable or not permitted is refused with
 its own descriptor (`action_unsupported`, `action_unavailable`, `action_not_permitted`), never

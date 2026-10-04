@@ -497,11 +497,7 @@ def run_actions(world: World) -> Witness:
         [
             _json_reply({"kind": "world_edit"}, Role.STRUCTURED_EXTRACTION),
             _json_reply(
-                {
-                    "steps": [
-                        {"operation": "place_object", "kinds": ["cc0.bench"], "arrangements": []}
-                    ]
-                },
+                {"steps": [{"operation": "place_object", "options": ["cc0.bench"]}]},
                 Role.STRUCTURED_EXTRACTION,
             ),
             _json_reply(

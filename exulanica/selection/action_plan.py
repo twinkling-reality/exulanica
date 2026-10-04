@@ -62,6 +62,7 @@ from exulanica.canonical import canonical_json
 from exulanica.models.client import ModelClient
 from exulanica.models.errors import StructuredOutputError, TruncatedResponseError
 from exulanica.models.manifest import Role
+from exulanica.models.response import Runaway
 from exulanica.selection.calls import CallLog, ModelCall
 from exulanica.selection.proposal import RefusalCode, appearance_change, source_catalogue
 from exulanica.selection.request_names import RequestNames
@@ -121,13 +122,18 @@ __all__ = [
 ]
 
 #: Bumped when a prompt below or a form's construction changes; recorded with every plan.
-ACTION_PROMPT_VERSION: Final = "action-plan-2"
+ACTION_PROMPT_VERSION: Final = "action-plan-5"
 PLAN_PROFILE: Final = "exulanica.companion-action-plan/v1"
 
 #: One try and one repair for the drafter, then a refusal; the classifier is asked once and a
 #: failure is a question, as the appearance path's is.
 DRAFT_ATTEMPTS: Final = 2
 CLASSIFIER_CALLS: Final = 1
+#: The most a drafter's reply may spend, the role's floor (the chain's fallback reasons inline
+#: before it answers). A filled form is a few dozen tokens, so this is room, not a squeeze. A reply
+#: that runs on fills whatever ceiling it is given, so a lower one is what bounds the wait for a
+#: reply that will be refused: it ends inside the role's timeout rather than at it.
+DRAFT_MAX_TOKENS: Final = 640
 #: Every hosted call one utterance can make on this path, as the role and the most times it is
 #: sent: the classifier, then one drafter and its repair (world edit, appearance or simulation,
 #: never two of them).
@@ -457,7 +463,7 @@ filled-in form. You do not apply anything. What you fill in is shown to the pers
 it or throws it away, and nothing changes until they do.
 
 The form has one step for each change the request asks for, at most three, in the order asked. \
-Each step says which kind of change it is and which of the listed options it names. You cannot \
+Each step says which kind of change it is, then the listed options it names. You cannot \
 give a position, a size, an identifier that is not listed, a permission or anything else: every \
 value is one of the listed options. Where something goes comes from where the person is pointing, \
 not from you.
@@ -467,8 +473,9 @@ person is pointing. 'remove_object' takes a listed object away. 'undo_last_edit'
 newest change. 'place_arrangement' adds one of the listed arrangements.
 - 'other' is a change these cannot express: turning or resizing something, changing its colour or \
 what it does, making something that is not listed. Never approximate it with a nearby change.
-- In each list, name every option the words could mean: one when the request is clear, two or \
-three when it could be any of them, none when it names nothing listed.
+- In a step's options, name every option the words could mean for that kind of change: one when \
+the request is clear, two or three when it could be any of them, none when it names nothing \
+listed. Name each option once.
 - The object marked (selected) is the one the person has selected; 'this', 'that' or 'it' usually \
 means it.
 
@@ -514,15 +521,23 @@ def classify_action(
 
 
 def _option_list(choices: Sequence[_Choice]) -> Any:
-    values = tuple(choice.label for choice in choices)
+    values = tuple(dict.fromkeys(choice.label for choice in choices))
     return Annotated[list[Literal[values]], Field(max_length=MAX_CANDIDATES)]  # type: ignore[valid-type]
 
 
 def _world_edit_form(world: _World) -> type[BaseModel]:
-    """The form, built from the reads: an enum per slot, a slot only where options exist.
+    """The form, built from the reads: an operation, then one list of the listed options.
 
-    ``Literal[()]`` is not a type, so a slot with no options is left off the form rather than
-    offered empty; the operation that needs it is then refused or clarified by name.
+    The list is the step's last field, so a list that names something can only be followed by the
+    step's closing brace. A list followed by another field needs a comma there, and measured
+    against the live endpoint a model that wrote a line break in its place could then write
+    nothing but whitespace until the token limit: the schema allows only a comma or whitespace at
+    that point. One list also holds every option whatever the operation; :func:`_typed_from_draft`
+    reads it in the list the operation takes options from.
+
+    ``Literal[()]`` is not a type, so with nothing listed at all the list is left off the form
+    rather than offered empty; the operation that needs an option is then refused or clarified by
+    name.
     """
     fields: dict[str, Any] = {
         "operation": (
@@ -530,20 +545,11 @@ def _world_edit_form(world: _World) -> type[BaseModel]:
             Field(description="Which kind of change this step is."),
         )
     }
-    if world.assets:
-        fields["kinds"] = (
-            _option_list(world.assets),
-            Field(description="The listed kinds this step could mean placing."),
-        )
-    if world.objects:
-        fields["objects"] = (
-            _option_list(world.objects),
-            Field(description="The listed objects this step could mean."),
-        )
-    if world.arrangements:
-        fields["arrangements"] = (
-            _option_list(world.arrangements),
-            Field(description="The listed arrangements this step could mean."),
+    options = (*world.assets, *world.objects, *world.arrangements)
+    if options:
+        fields["options"] = (
+            _option_list(options),
+            Field(description="The listed kinds, objects or arrangements this step could mean."),
         )
     step = create_model("WorldEditStep", __config__=ConfigDict(extra="forbid"), **fields)
     return create_model(
@@ -599,6 +605,7 @@ def _draft_world_edit(
                 messages,
                 form,
                 prompt_version=ACTION_PROMPT_VERSION,
+                max_tokens=DRAFT_MAX_TOKENS,
                 placeholders=placeholders,
             )
             log.record(drafted.call)
@@ -610,12 +617,32 @@ def _draft_world_edit(
     raise AssertionError("unreachable: the loop above returns")
 
 
+#: What a drafter's repair says after a reply the token limit cut, by how it ran on
+#: (``TruncatedResponseError.runaway``; None when it was neither plainly). The model never sees the
+#: reply it wrote, so the message names what went wrong instead of asking it to be shorter.
+_RUNAWAY_REPAIRS: Final[Mapping[str | None, str]] = {
+    Runaway.WHITESPACE: (
+        "That form ran on in blank space after one of its values until it was cut off. Fill it in "
+        "again on one line, with no line breaks and no spaces between its parts, a comma between "
+        "fields, and stop at its closing brace."
+    ),
+    Runaway.REPETITION: (
+        "That form named the same option over and over until it was cut off. Fill it in again, "
+        "naming each option once, and stop at its closing brace."
+    ),
+    None: (
+        "That form ran on until it was cut off. Fill it in again on one line, naming each option "
+        "once, and stop at its closing brace."
+    ),
+}
+
+
 def _repair(rejected: StructuredOutputError | TruncatedResponseError) -> dict[str, Any]:
     """The one message a drafter's repair adds: what was wrong with the form it filled."""
     return {
         "role": "user",
         "content": (
-            "That form ran past the room it had. Fill it in again and keep it short."
+            _RUNAWAY_REPAIRS[rejected.runaway]
             if isinstance(rejected, TruncatedResponseError)
             else f"That form was refused:\n{rejected}\n\nFill it in again, fixing exactly that."
         ),
@@ -688,6 +715,7 @@ def _typed_from_draft(steps: Sequence[Mapping[str, Any]], world: _World) -> _Ver
     """
     verdict = _Verdict()
     pending: list[tuple[_Action, str, list[_Choice]]] = []
+    undone = False
     for index, step in enumerate(steps):
         operation = WorldEditOperation(step["operation"])
         if operation is WorldEditOperation.OTHER:
@@ -697,8 +725,20 @@ def _typed_from_draft(steps: Sequence[Mapping[str, Any]], world: _World) -> _Ver
                 step=index,
             )
             return verdict
+        if operation is WorldEditOperation.UNDO_LAST_EDIT:
+            # One request takes back the newest edit, once. A draft has been measured padding an
+            # undo out to the form's three steps, and a plan that took back edits nobody named is
+            # not offered whatever the words were; asking again takes back the next one.
+            if undone:
+                verdict.refusal = _refusal(
+                    "action_not_offered",
+                    "one request takes back one change; ask again to take back another",
+                    step=index,
+                )
+                return verdict
+            undone = True
         if operation is WorldEditOperation.PLACE_OBJECT:
-            candidates = _by_label(world.assets, step.get("kinds") or ())
+            candidates = _by_label(world.assets, step.get("options") or ())
             if not candidates:
                 verdict.refusal = _refusal(
                     "not_in_catalogue",
@@ -709,11 +749,11 @@ def _typed_from_draft(steps: Sequence[Mapping[str, Any]], world: _World) -> _Ver
             action = _Action(operation, asset_key=candidates[0].value)
             pending.append((action, "asset_key", candidates))
         elif operation in (WorldEditOperation.MOVE_OBJECT, WorldEditOperation.REMOVE_OBJECT):
-            candidates = _by_label(world.objects, step.get("objects") or ())
+            candidates = _by_label(world.objects, step.get("options") or ())
             action = _Action(operation, object_id=candidates[0].value if candidates else None)
             pending.append((action, "object_id", candidates))
         elif operation is WorldEditOperation.PLACE_ARRANGEMENT:
-            candidates = _by_label(world.arrangements, step.get("arrangements") or ())
+            candidates = _by_label(world.arrangements, step.get("options") or ())
             if not candidates:
                 verdict.refusal = _refusal(
                     "not_in_catalogue",
@@ -1381,6 +1421,7 @@ def _draft_simulation(
                 messages,
                 _SimulationDraft,
                 prompt_version=ACTION_PROMPT_VERSION,
+                max_tokens=DRAFT_MAX_TOKENS,
                 placeholders=placeholders,
             )
             log.record(drafted.call)

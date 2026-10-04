@@ -147,9 +147,9 @@ def _answer(*clauses: AnswerClause) -> HttpResponse:
     return _chat(Answer(clauses=list(clauses)).model_dump_json())
 
 
-#: A world-edit draft a fresh starter's form accepts at once: the form offers objects only once the
-#: version holds one, so a draft that needed its one repair would send the drafter twice a run.
-_BENCH_STEP = {"operation": "place_object", "kinds": ["cc0.bench"], "arrangements": []}
+#: A world-edit draft a fresh starter's form accepts at once; a draft that needed its one repair
+#: would send the drafter twice a run.
+_BENCH_STEP = {"operation": "place_object", "options": ["cc0.bench"]}
 #: Words that ask for time to move on: the action classifier is answered ``simulation`` for a
 #: request carrying them and ``world_edit`` for any other.
 _TIME_ASKED = "move time on"
