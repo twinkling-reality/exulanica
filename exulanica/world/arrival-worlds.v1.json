@@ -1,0 +1,13 @@
+{
+  "profile": "exulanica.arrival-worlds/v1",
+  "reason": "The worlds a visitor's workspace starts with. Each names a recipe, its values and a fixed identity: a generated town's seed is drawn from the recipe and the identity, so every workspace's copy is the same town, and its tiles, baked once on the installation, are every copy's at once. The identity was chosen so the recipe's first seed candidates generate; a recipe or grammar change that stops it generating refuses the arrival world by name.",
+  "worlds": [
+    {
+      "key": "small-town",
+      "recipe": "small_town",
+      "values": null,
+      "title": "A small town",
+      "world_id": "world:generated:8d8ea411-9010-446b-9699-dce63add6a2a"
+    }
+  ]
+}

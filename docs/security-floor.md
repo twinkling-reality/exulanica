@@ -333,8 +333,9 @@ transport is shown not to have been called. No command constructs this guard.
 ## 5. Database roles
 
 Row-level security keys every workspace table on `current_workspace()`; the roles decide what a
-connection may do at all. `exulanica-db` provisions the first four after the migrations, in one
-order, and `exulanica-seed role` provisions the fifth for the reviewer stack
+connection may do at all. `exulanica-db` provisions the first five after the migrations, in one
+order (with the backup role, [deployment](deployment.md#92-backup-sets)), and `exulanica-seed role`
+provisions the last for the reviewer stack
 ([deployment](deployment.md#8-a-seeded-deployment-for-a-reviewer)). Startup refuses a superuser, a
 BYPASSRLS role or the owner of a row-level-security table
 ([deployment](deployment.md#513-runtime-row-level-security-is-checked-at-startup)).
@@ -345,6 +346,7 @@ BYPASSRLS role or the owner of a row-level-security table
 | `exulanica_ro` | Select and nothing else, never on the spending authority tables and ledger; execute on the spending facts function | The Selection executor runs a plan derived from model output. It must not be able to write whatever happened upstream of it |
 | `exulanica_purge` | A cross-workspace read of the holder columns of the tables in `PURGE_CROSS_WORKSPACE_TABLES` (`capture`, `artifact`, `reconstruction_scene_member` and `person_derivative_dependency`); column-level updates of purge markers; delete on `embedding` only | Stored bytes may be shared across workspaces, so the destroy decision needs every holder. A person vector has no harmless stub, so the purger removes that row while every other table stays outside its delete authority |
 | `exulanica_accounts` | The account tables and nothing in any workspace | Sign-in state lives outside workspace scope, and the application roles cannot read it ([deployment](deployment.md#514-browser-accounts)) |
+| `exulanica_tiles` | Execute on `record_baked_tile_bake` (migration 0138), which runs with its owner's rights; usage on the schema; nothing else | A baked tile is global: every workspace whose world covers it is served it. The generated-tile worker publishes as this role, so the long-running process that runs the tessellator never holds the owner. No other role, and not PUBLIC, may execute the function, and `assert_tiles_role` refuses a publisher that can reach a table or another SECURITY DEFINER function |
 | `exulanica_judge` | Select everywhere but the spending authority tables and ledger, execute on the spending facts function, insert and update on an allowlist of tables, no delete | The reviewer stack's API connects as it, so "may read, may not write a source or a deletion" is enforced by the database |
 
 Migration 0074 gives `tombstone` a trigger: every change but `purge_completed_at` is refused for

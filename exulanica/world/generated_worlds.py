@@ -195,7 +195,21 @@ def create_generated_authorities(
         style_version_id=style.version_id,
         created_by=actor,
     )
+    # A tile whose bake is already stored, by the digest over its inputs, is the same bytes this
+    # world's tile would bake to: it queues no job, and the tile reads baked at once, as a world
+    # with no job for a tile is read (generated_tiles). A tile stored with a fault still queues one,
+    # whose job then fails as every bake of it does.
+    composer = composed.receipt["composer"]
+    inputs = {
+        (int(tile_x), int(tile_y)): digest
+        for (tile_x, tile_y), digest in composer_module(
+            composer["key"], composer["version"]
+        ).tile_inputs(composed.receipt)
+    }
     for tile_x, tile_y in composed.receipt["tiles"]:
+        stored = current_bake(connection, inputs[(int(tile_x), int(tile_y))])
+        if stored is not None and stored.state == "baked":
+            continue
         connection.execute(
             "insert into job (workspace_id,kind,payload) values (%s,%s,%s)",
             (

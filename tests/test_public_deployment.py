@@ -36,7 +36,7 @@ CREDENTIAL_PROBE = "must-not-be-written-anywhere"
 
 #: The services that serve for the life of the server, each with a restart policy of its own in
 #: compose.yaml or here.
-LONG_RUNNING = ("postgres", "api", "client", "maintenance", "preparation", "edge")
+LONG_RUNNING = ("postgres", "api", "client", "maintenance", "preparation", "tile-worker", "edge")
 
 
 def _directives(text: str) -> str:
@@ -146,7 +146,7 @@ def test_each_recipe_runs_under_one_image_name_the_script_loads():
     assert "reconstruction" not in _directives(script)
     declared = {
         re.search(rf'^{variable}="(\S+)"$', script, re.M).group(1)
-        for variable in ("backend_image", "maintenance_image", "client_image")
+        for variable in ("backend_image", "maintenance_image", "client_image", "tiles_image")
     }
     assert set(named.values()) == declared
 
@@ -250,10 +250,13 @@ def test_init_writes_secrets_private_and_leaves_the_fuse_to_the_operator(tmp_pat
         "EXULANICA_PURGE_ROLE_PASSWORD",
         "EXULANICA_BACKUP_ROLE_PASSWORD",
         "EXULANICA_ACCOUNT_ROLE_PASSWORD",
+        "EXULANICA_TILES_ROLE_PASSWORD",
     )
     passwords = [lines[name] for name in roles]
     assert all(re.fullmatch(r"[0-9a-f]{48}", value) for value in passwords)
     assert len(set(passwords)) == len(roles)
+    # The public profile, whose tile worker publishes only as the tile role.
+    assert lines["EXULANICA_PROFILE"] == "public"
     assert lines["EXULANICA_BUDGET_USD"] == ""
     assert lines["EXULANICA_BUDGET_MAX_CALLS"] == ""
     # The model credential is passed through at `up`, never written.

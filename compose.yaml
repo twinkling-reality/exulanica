@@ -59,6 +59,9 @@ services:
       EXULANICA_APP_ROLE_PASSWORD: ${EXULANICA_APP_ROLE_PASSWORD:?set EXULANICA_APP_ROLE_PASSWORD; the runtime must not use the owner}
       EXULANICA_EXECUTOR_ROLE_PASSWORD: ${EXULANICA_EXECUTOR_ROLE_PASSWORD:?set EXULANICA_EXECUTOR_ROLE_PASSWORD; the executor has its own read-only role}
       EXULANICA_ACCOUNT_ROLE_PASSWORD: ${EXULANICA_ACCOUNT_ROLE_PASSWORD:-}
+      # The tile role publishes a baked tile and does nothing else (migration 0138); only the
+      # tile-worker service below connects as it.
+      EXULANICA_TILES_ROLE_PASSWORD: ${EXULANICA_TILES_ROLE_PASSWORD:-}
       # The purge role destroys stored bytes and the backup role reads every row for a backup;
       # only the maintenance service below connects as either (docs/deployment.md 9.2, 9.3).
       EXULANICA_PURGE_ROLE_PASSWORD: ${EXULANICA_PURGE_ROLE_PASSWORD:?set EXULANICA_PURGE_ROLE_PASSWORD; maintenance purges as its own role}
@@ -242,6 +245,40 @@ services:
       EXULANICA_DATABASE_URL: postgresql://exulanica_app:${EXULANICA_APP_ROLE_PASSWORD}@postgres:5432/${POSTGRES_DB:-exulanica}
       # As the derivative worker: static workspaces, the verified account-role source, or both;
       # the command refuses startup when both are absent.
+      EXULANICA_WORKSPACE_IDS: ${EXULANICA_WORKSPACE_IDS:-}
+      EXULANICA_ACCOUNT_DATABASE_URL: ${EXULANICA_ACCOUNT_DATABASE_URL:-}
+      EXULANICA_DATA_DIR: /var/lib/exulanica
+      EXULANICA_INSTALLATION_PROFILE: /app/deploy/profiles/${EXULANICA_PROFILE:-single-host-server-only}.json
+    volumes:
+      - media:/var/lib/exulanica
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  # The generated-tile worker (docs/deployment.md 9.1): bakes the tiles generated towns wait for,
+  # off the request, with the tessellator compiled to JavaScript and run by Node
+  # (deploy/installation/tiles.Dockerfile), and publishes each bake as the tile role, which may do
+  # nothing else (migration 0138). Started only with `--profile tiles`, by an installation whose
+  # profile installs generated_tiles (`public`); every other shipped profile declares it not
+  # installed, and creation reads unavailable there.
+  tile-worker:
+    profiles: ["tiles"]
+    build:
+      context: .
+      dockerfile: deploy/installation/tiles.Dockerfile
+      additional_contexts:
+        backend: service:api
+    command: ["exulanica-generated-tile-worker"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os; os.kill(1, 0)"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+    environment:
+      EXULANICA_DATABASE_URL: postgresql://exulanica_app:${EXULANICA_APP_ROLE_PASSWORD}@postgres:5432/${POSTGRES_DB:-exulanica}
+      EXULANICA_TILE_PUBLISHER_DATABASE_URL: postgresql://exulanica_tiles:${EXULANICA_TILES_ROLE_PASSWORD:-}@postgres:5432/${POSTGRES_DB:-exulanica}
+      # As the derivative worker: static workspaces, the verified account-role source, or both.
       EXULANICA_WORKSPACE_IDS: ${EXULANICA_WORKSPACE_IDS:-}
       EXULANICA_ACCOUNT_DATABASE_URL: ${EXULANICA_ACCOUNT_DATABASE_URL:-}
       EXULANICA_DATA_DIR: /var/lib/exulanica

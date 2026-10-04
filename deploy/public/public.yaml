@@ -7,8 +7,9 @@
 #
 # WHAT IT ADDS TO THE INSTALLATION. A TLS edge in front of the installation's own client proxy, the
 # one way in from outside; the API's published port taken away; durable spending; the process's
-# model ceilings stated by the operator; one image name per recipe, so a host loads three images
-# rather than one per service; bounded logs on every long-running service.
+# model ceilings stated by the operator; one image name per recipe, so a host loads four images
+# rather than one per service; the generated-tile worker; bounded logs on every long-running
+# service.
 #
 # WHY THE INSTALLATION AND NOT THE REVIEWER STACK. Visitors make worlds of their own, choose the
 # models that run their people and compare them. The reviewer stack serves one seeded workspace
@@ -101,6 +102,13 @@ services:
 
   client:
     image: exulanica-public-client
+    logging: *bounded-logs
+
+  # Bakes the tiles of the towns visitors make, and of the arrival worlds once, as the tile role.
+  # public.sh starts it with the `tiles` compose profile, under the `public` installation profile,
+  # where the worker refuses any wider publisher than the tile role.
+  tile-worker:
+    image: exulanica-public-tiles
     logging: *bounded-logs
 
 volumes:

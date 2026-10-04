@@ -42,6 +42,8 @@ services:
     environment: *runtime-identity
   playback-worker:
     environment: *runtime-identity
+  tile-worker:
+    environment: *runtime-identity
   maintenance:
     environment: *purge-identity
   restore:

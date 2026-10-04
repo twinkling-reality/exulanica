@@ -115,6 +115,8 @@ boundary ([security floor](security-floor.md)).
 | Scene worker | `exulanica-scene-worker` | Recovers camera poses and publishes scenes for queued scene jobs | 5.2.3 |
 | Purge worker | `exulanica-purge` | Destroys stored bytes that committed tombstones ask for | 5.2.4 |
 | Material bake worker | `exulanica-material-bake` | Bakes requested material recipes in a Node process | 5.2.5 |
+| Generated-tile worker | `exulanica-generated-tile-worker` | Bakes the tiles generated towns wait for, in a Node process, and publishes each as the tile role | 9.1 |
+| Arrival worlds | `exulanica-arrival-worlds` | Makes the installation's arrival worlds in its own workspace, so their tiles are baked before a visitor's copy | 8.2 |
 | Ingest | `exulanica-ingest` | Ingests a directory of photographs from the command line | 5.2.6 |
 | Catalog preflight | `exulanica-preflight` | Checks every model identifier against its provider's catalog | 5.2.7, 7 |
 | Restore | `python -m exulanica.orchestration.restore` | Replays every withdrawal into a restored database | 5.2.8 |
@@ -491,7 +493,7 @@ the model settings in 5.1 apply; the decision contract's spend bounds are in
 | Variable | Purpose |
 | --- | --- |
 | `EXULANICA_DATABASE_URL` | The bootstrap owner's connection. Migrations and role grants run in one command because there is one correct order |
-| `EXULANICA_APP_ROLE_PASSWORD`, `EXULANICA_EXECUTOR_ROLE_PASSWORD`, `EXULANICA_PURGE_ROLE_PASSWORD`, `EXULANICA_ACCOUNT_ROLE_PASSWORD` | Passwords for `exulanica_app`, `exulanica_ro`, `exulanica_purge` and `exulanica_accounts`. Each is optional and set only when supplied, because a role that authenticates by certificate or by peer has none |
+| `EXULANICA_APP_ROLE_PASSWORD`, `EXULANICA_EXECUTOR_ROLE_PASSWORD`, `EXULANICA_PURGE_ROLE_PASSWORD`, `EXULANICA_ACCOUNT_ROLE_PASSWORD`, `EXULANICA_TILES_ROLE_PASSWORD` | Passwords for `exulanica_app`, `exulanica_ro`, `exulanica_purge`, `exulanica_accounts` and `exulanica_tiles`. Each is optional and set only when supplied, because a role that authenticates by certificate or by peer has none |
 
 Every path that creates or upgrades a serving database then runs
 `exulanica-character-catalog publish --apply`. It uses the same owner connection and the data
@@ -1196,36 +1198,46 @@ The public server is the installation composition instead (`compose.yaml`, profi
   model attempt is admitted by the spending authority as well as the process fuse. The fuse
   (`EXULANICA_BUDGET_USD`, `EXULANICA_BUDGET_MAX_CALLS`) has no default here.
 - **Images.** It names one image per recipe: `exulanica-public-backend`,
-  `exulanica-public-maintenance` and `exulanica-public-client`. A host therefore loads three images.
+  `exulanica-public-maintenance`, `exulanica-public-client` and `exulanica-public-tiles`. A host
+  therefore loads four images.
+- **The tile worker.** `public.sh` selects the `public` installation profile and the `tiles` compose
+  profile, so the generated-tile worker runs and publishes only as `exulanica_tiles` (9.1).
 - **Logs.** It bounds every long-running service's logs to ten 10 MB files.
 
 The edge caps a body at 8 MiB. Nobody on this server uploads photographs; the largest body is a
 question, a world's description or a picture to draft from. The reconstruction workers do not run.
 `tests/test_public_deployment.py` holds these properties.
 
+**Arrival worlds.** The worlds a newcomer's workspace starts with are a versioned catalog,
+`exulanica/world/arrival-worlds.v1.json` (`EXULANICA_ARRIVAL_WORLDS` names another). Each entry is
+a recipe, its values, a title and a fixed world identity. A generated town's seed is drawn from its
+recipe and its identity, so every workspace's copy of an arrival world is the same town, and a tile
+already baked queues no job. `prepare-towns` makes them once in the operator's own workspace, and
+the tile worker bakes them there. Identities are keyed by workspace, so one identity in many
+workspaces names many worlds, each its workspace's own.
+
 **Built and not built.**
-- Built: the composition, `deploy/public/public.sh` and the host's health and preflight timers.
+- Built: the composition, `deploy/public/public.sh`, the tile worker and the arrival worlds, and the
+  host's health and preflight timers.
 - Not built:
-  - a visitor's own entry (a guest session with a workspace of its own and an allowance from the
-    authority);
-  - towns that open with their tiles already baked;
+  - a visitor's own entry (a guest session with a workspace of its own, its arrival world and an
+    allowance from the authority);
   - models for workspaces found through accounts.
 
   Until they exist, the server admits holders of tokens the operator mints (`mint`). The people of
-  those tokens' workspaces play, and may be decided by models under each workspace's grant. A
-  town created there reads unavailable (`generated_tiles_not_installed`), and a starter world
-  works (9.1).
+  those tokens' workspaces play, and may be decided by models under each workspace's grant.
 
 `deploy/public/public.sh` runs every step. Every step but `build`, `images` and `save` reads the
 secrets directory `EXULANICA_DEPLOY_DIR`:
 
 | Command | What it does |
 | --- | --- |
-| `build` | On the build host, from a clean checkout: builds the client bundle with no `VITE_` setting, then builds the three images for `EXULANICA_BUILD_PLATFORM` (default `linux/amd64`), and prints their IDs. `EXULANICA_REHEARSAL_BUILD=1` allows a working tree with changes, for a rehearsal only |
-| `images`, `save <file>` | Print the image IDs; write the three images to one gzip archive and print its sha256 |
-| `init` | Writes `public.env` (mode 0600, in a directory created 0700). It holds six generated role passwords, the host, issuer, edge address and ports, the backup and custody directories, and the model endpoint's allowlist. It also writes the operator's token, whose grant holds `operations.read` alone. Custody inside the backup directory is refused. The fuse is left empty |
+| `build` | On the build host, from a clean checkout: builds the client bundle with no `VITE_` setting and compiles the tessellator (`tsc --build`), then builds the four images for `EXULANICA_BUILD_PLATFORM` (default `linux/amd64`), and prints their IDs. `EXULANICA_REHEARSAL_BUILD=1` allows a working tree with changes, for a rehearsal only |
+| `images`, `save <file>` | Print the image IDs; write the four images to one gzip archive and print its sha256 |
+| `init` | Writes `public.env` (mode 0600, in a directory created 0700). It holds seven generated role passwords, the `public` profile, the host, issuer, edge address and ports, the backup and custody directories, and the model endpoint's allowlist. It also writes the operator's token, whose grant holds `operations.read` alone. Custody inside the backup directory is refused. The fuse is left empty |
 | `mint <label>`, `revoke <label>` | Add or remove a token for a workspace of its own, minted by the image's `exulanica-seed token` with the reviewer's permissions. The next `up` serves the change and plays those workspaces |
 | `up` | Starts the server from loaded images, never building. It refuses until the fuse is filled in. `restore-marker`, `migrate` and `catalogs` run to completion on every start |
+| `prepare-towns` | Makes the arrival worlds in the operator's workspace, inside the API's container (`exulanica-arrival-worlds prepare`), and prints each tile's state; run it again to read them once baked |
 | `issue-authority`, `grant <label>`, `spending` | Issue the server's spending authority from `EXULANICA_AUTHORITY_USD`, `EXULANICA_AUTHORITY_CALLS` and `EXULANICA_AUTHORITY_VALID_UNTIL`; grant a minted workspace `EXULANICA_GRANT_USD` and `EXULANICA_GRANT_CALLS` under it; print the authorities' state. Each runs `python -m exulanica.spending` as the owner in a one-shot container on the server's network, with the witness volume |
 | `backup-now` | One maintenance pass now (9.3) |
 | `status` | The containers, readiness from inside the client container, Docker's disk use and the backup and custody file systems |
@@ -1253,7 +1265,7 @@ a second disk for backups. The layout the systemd units name:
    `EXULANICA_EDGE_ADDRESS=0.0.0.0`, `EXULANICA_BACKUP_PATH` and `EXULANICA_CUSTODY_PATH`. Then fill
    in the fuse in `public.env`.
 3. `read -rs NEBIUS_API_KEY && export NEBIUS_API_KEY`, then `up`, then `issue-authority` with the
-   allowance the operator approved.
+   allowance the operator approved, then `prepare-towns`, run again until every tile reads baked.
 4. Install the four units in `deploy/public/` into `/etc/systemd/system`, then
    `systemctl enable --now exulanica-public-watch.timer exulanica-public-preflight.timer`. The watch
    timer runs every minute and the preflight daily; both write to the journal.
@@ -1266,7 +1278,7 @@ a second disk for backups. The layout the systemd units name:
 1. `build` with `EXULANICA_BUILD_PLATFORM` set to the machine's own platform.
 2. `init` with `EXULANICA_TLS=internal`, `EXULANICA_EDGE_ADDRESS=127.0.0.1` and ports of the
    machine's own.
-3. `mint`, `up`, `issue-authority` and `grant`.
+3. `mint`, `up`, `issue-authority`, `grant` and `prepare-towns`.
 4. `scripts/judge_smoke.py`, with `--cafile` naming the edge's local root
    (`/data/caddy/pki/authorities/local/root.crt` in the edge container).
 5. A starter world made and read again after `down` and `up`.
@@ -1278,7 +1290,10 @@ a second disk for backups. The layout the systemd units name:
 
 A rehearsal's plain-HTTP redirect names the standard port, not the one the rehearsal published.
 
-**Limits.** No off-host copy of the backups is made, so the loss of the host loses both disks. A
+**Limits.** A tile's bake is shared by every world whose tiles it is: if the second bake of a tile
+ever differs from the first, the stored tile is marked and reads failed for every copy of that
+arrival world, not only the one being baked (migration 0072's rule). No off-host copy of the backups
+is made, so the loss of the host loses both disks. A
 restore has not been timed on the host (D-3). The process fuse starts again at every restart; the
 authority does not. Per-address limits do not bound how many addresses write at once.
 
@@ -1319,13 +1334,26 @@ degraded, and its recovery bounds (9.4). `reviewer` is the seeded stack of secti
 complete installation: it runs the database, schema, API, client, ingestion and simulation.
 `single-host` runs on one host the database, schema, API, client, maintenance, ingestion,
 derivatives, pose and scene reconstruction (`pose_scene`), workspace asset preparation
-(`preparation`), simulation and comparison. No shipped profile installs material bakes (`materials`)
-or generated tiles (`generated_tiles`): each reports not installed, and `compose.yaml` runs no worker
-for them. So on an installation the creation read (`GET /worlds/capabilities`) lists a generated
-town unavailable (`generated_tiles_not_installed`), because nothing would bake its tiles and it
-would never be drawn, and a material bake request is refused 409 `materials_not_installed` rather
-than queued for a worker that does not run. A town created by calling the route directly still
-stays "being built". `single-host-server-only` is
+(`preparation`), simulation and comparison. No shipped profile installs material bakes
+(`materials`), and only `public` (8.2) installs generated tiles (`generated_tiles`). Where generated
+tiles are not installed, the creation read (`GET /worlds/capabilities`) lists a generated town
+unavailable (`generated_tiles_not_installed`), because nothing would bake its tiles and it would
+never be drawn; a town created by calling the route directly still stays "being built". A material
+bake request is refused 409 `materials_not_installed` rather than queued for a worker that does not
+run.
+
+`public` is `single-host-server-only` with generated tiles installed (a 900 second queue bound).
+`compose.yaml`'s `tile-worker` service runs `exulanica-generated-tile-worker` under the compose
+profile `tiles`, from `deploy/installation/tiles.Dockerfile`: the backend image with Node 22's binary
+and the tessellator compiled to JavaScript (`tsc --build` of `web/packages/loom-tess`), and no
+package manager or dependency. It claims each bake job as `exulanica_app`, in the job's workspace,
+for the workspaces it is configured with and those active accounts own. It publishes each bake as
+`exulanica_tiles`, which may execute `record_baked_tile_bake` and nothing else (migration 0138,
+[security floor](security-floor.md#5-database-roles)). Under the `public` profile the worker refuses
+any wider publisher, the owner included. Elsewhere it accepts one with a `publisher_not_narrow`
+warning, so an installation that has not provisioned the role keeps baking. A tile whose bake is
+already stored queues no job when a world is made, so a world whose tiles another world shares is
+drawn at once. `single-host-server-only` is
 the same built without the reconstruction and pose extras, whose workers then report unavailable,
 and is what `compose.yaml` and `.env.example` select by default (`EXULANICA_PROFILE`);
 `shared-store` keeps its bytes in an S3-compatible bucket, composed by adding

@@ -112,6 +112,7 @@ def _write_status(path, *, written_at=None, queues=None, failures=()):
 def test_every_shipped_profile_declares_exactly_the_frozen_components():
     shipped = sorted(PROFILES.glob("*.json"))
     assert {path.stem for path in shipped} == {
+        "public",
         "reviewer",
         "shared-store",
         "single-host",
@@ -123,6 +124,14 @@ def test_every_shipped_profile_declares_exactly_the_frozen_components():
         assert profile.id == path.stem
     assert load_profile(PROFILES / "shared-store.json").store_kind == "object"
     assert not load_profile(PROFILES / "reviewer.json").components["maintenance"].installed
+    # The public server is the server-only installation with the tile worker, and nothing else.
+    public = load_profile(PROFILES / "public.json")
+    server_only = load_profile(PROFILES / "single-host-server-only.json")
+    assert public.components["generated_tiles"].installed
+    assert {
+        name: spec for name, spec in public.components.items() if name != "generated_tiles"
+    } == {name: spec for name, spec in server_only.components.items() if name != "generated_tiles"}
+    assert public.recovery == server_only.recovery
 
 
 @pytest.mark.parametrize(

@@ -306,7 +306,14 @@ def test_the_shared_store_override_gives_the_purge_identity_to_maintenance_and_r
     publishes = {"catalogs"} if _publishes_character_catalogs() else set()
     assert (
         runtime
-        == {"api", "derivative-worker", "scene-worker", "preparation", "playback-worker"}
+        == {
+            "api",
+            "derivative-worker",
+            "scene-worker",
+            "preparation",
+            "playback-worker",
+            "tile-worker",
+        }
         | publishes
     )
 

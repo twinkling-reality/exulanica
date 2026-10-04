@@ -1,0 +1,6 @@
+# The tile worker image takes the compiled tessellator and its package manifest from the checkout,
+# and nothing else: everything else comes from images. An allowlist, as the root .dockerignore is,
+# so no `.env` or credential can reach the image by a forgotten line.
+*
+!web/packages/loom-tess/package.json
+!web/packages/loom-tess/dist/src/**/*.js

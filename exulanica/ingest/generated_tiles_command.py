@@ -1,13 +1,23 @@
 """``exulanica-generated-tile-worker``: the process that bakes generated worlds' tiles.
 
-It owns no HTTP surface. Workspaces are deployment configuration, as for the derivative worker:
-``EXULANICA_WORKSPACE_IDS`` and ``--workspace``. It claims and reads each job as the runtime role
-(``EXULANICA_DATABASE_URL``, refused if it is an owner or a superuser) and publishes each baked tile
-through ``EXULANICA_TILE_PUBLISHER_DATABASE_URL``, the owner connection migration 0072 requires for
-that write and for nothing else. Baked tiles go to the tile store under ``EXULANICA_DATA_DIR``.
+It owns no HTTP surface. Its workspaces are ``EXULANICA_WORKSPACE_IDS`` and ``--workspace``, and,
+when ``EXULANICA_ACCOUNT_DATABASE_URL`` is set, the workspaces active accounts own, read again on
+every pass, as the derivative and preparation workers read them. It claims and reads each job as
+the runtime role (``EXULANICA_DATABASE_URL``, refused if it is an owner or a superuser) and
+publishes each baked tile through ``EXULANICA_TILE_PUBLISHER_DATABASE_URL``.
 
-Nothing here downloads anything. Node and the web package's dependencies must already be installed
-(``EXULANICA_WEB_DIRECTORY``, or the checkout's ``web/``).
+The publisher is ``exulanica_tiles`` (migration 0138), which may execute the publish function and
+nothing else, and :func:`~exulanica.db.tiles_role.assert_tiles_role` checks it at startup. A wider
+role, the owner included, is refused where the installation's profile is ``public``, a server
+anybody can reach, and accepted with a ``publisher_not_narrow`` warning elsewhere, so an
+installation that has not yet provisioned the role keeps baking. Baked tiles go to the tile store
+under ``EXULANICA_DATA_DIR``.
+
+Nothing here downloads anything. The tessellator runs either compiled (``EXULANICA_TESS_CLI``, a
+``cli.js`` built by ``tsc``, run by ``EXULANICA_NODE`` or the ``node`` on ``PATH``), as the tile
+worker's image carries it, or from the checkout's TypeScript through ``tsx``
+(``EXULANICA_WEB_DIRECTORY``, or the checkout's ``web/``), whose dependencies must already be
+installed.
 """
 
 from __future__ import annotations
@@ -16,6 +26,7 @@ import argparse
 import json
 import os
 import platform
+import shutil
 import sys
 import time
 import uuid
@@ -27,16 +38,21 @@ from typing import Any, Final
 import psycopg
 from psycopg.rows import dict_row
 
+from exulanica.db.account_workspaces import ACCOUNT_DATABASE_URL_ENV, AccountWorkspaceSource
 from exulanica.db.migrate import verify_schema
 from exulanica.db.roles import assert_runtime_role
 from exulanica.db.session import Database
+from exulanica.db.tiles_role import TilesRoleUnsafe, assert_tiles_role
 from exulanica.env import env_get, env_name
 from exulanica.ingest.generated_tiles import GeneratedTileBaker
 from exulanica.store.configured import content_stores
 
-__all__ = ["PUBLISHER_ENV", "main"]
+__all__ = ["PUBLIC_PROFILE", "PUBLISHER_ENV", "check_publisher", "main"]
 
 PUBLISHER_ENV: Final = env_name("TILE_PUBLISHER_DATABASE_URL")
+#: The installation profile of a server anybody can reach, where only the narrow publisher role
+#: is accepted.
+PUBLIC_PROFILE: Final = "public"
 _CHECKOUT_WEB: Final = Path(__file__).resolve().parents[2] / "web"
 
 
@@ -56,6 +72,47 @@ def _workspaces(values: list[str], environ: Mapping[str, str]) -> frozenset[uuid
         if part.strip()
     )
     return frozenset(uuid.UUID(value) for value in raw)
+
+
+def check_publisher(url: str, environ: Mapping[str, str]) -> str | None:
+    """Why the publisher is wider than the tile role, as a warning, or None when it is that role.
+
+    Refused, by raising :class:`~exulanica.db.tiles_role.TilesRoleUnsafe`, where the installation's
+    profile is ``public``: a server anybody can reach publishes only as the tile role.
+    """
+    with psycopg.connect(url, autocommit=True, row_factory=dict_row) as connection:
+        try:
+            assert_tiles_role(connection)
+        except TilesRoleUnsafe as refusal:
+            if _profile_id(environ) == PUBLIC_PROFILE:
+                raise TilesRoleUnsafe(
+                    f"the {PUBLIC_PROFILE} profile publishes only as the tile role: {refusal}"
+                ) from refusal
+            return str(refusal)
+    return None
+
+
+def _profile_id(environ: Mapping[str, str]) -> str | None:
+    """The ``id`` of the installation profile ``EXULANICA_INSTALLATION_PROFILE`` names, or None.
+
+    Read here rather than through the API's loader, which this layer does not import; the API
+    validates the whole profile at its own startup, and an unreadable one stops it there."""
+    named = env_get("INSTALLATION_PROFILE", environ)
+    if not named:
+        return None
+    document = json.loads(Path(named).read_text(encoding="utf-8"))
+    return str(document["id"]) if isinstance(document, dict) and "id" in document else None
+
+
+def _compiled(environ: Mapping[str, str]) -> tuple[Path, Path] | None:
+    """The compiled tessellator and the Node that runs it, when ``EXULANICA_TESS_CLI`` names one."""
+    cli = env_get("TESS_CLI", environ)
+    if not cli:
+        return None
+    node = env_get("NODE", environ) or shutil.which("node")
+    if not node:
+        raise ValueError("EXULANICA_TESS_CLI is set and no node was found; set EXULANICA_NODE")
+    return Path(node), Path(cli)
 
 
 def main(
@@ -81,10 +138,18 @@ def main(
             assert_runtime_role(connection)
         publisher_url = environment.get(PUBLISHER_ENV)
         if not publisher_url:
-            raise ValueError(f"set {PUBLISHER_ENV}: a baked tile is published by the owner")
+            raise ValueError(f"set {PUBLISHER_ENV}: the role a baked tile is published as")
+        narrow = check_publisher(publisher_url, environment)
+        if narrow is not None:
+            _emit(output, "publisher_not_narrow", message=narrow)
+        account_url = environment.get(ACCOUNT_DATABASE_URL_ENV)
+        source = AccountWorkspaceSource(account_url, database.url).verify() if account_url else None
         workspaces = _workspaces(args.workspace, environment)
-        if not workspaces:
-            raise ValueError("no workspace was configured; a worker that bakes nothing is not well")
+        if not workspaces and source is None:
+            raise ValueError(
+                "no workspace was configured and no account source is set; a worker that bakes "
+                "nothing is not well"
+            )
 
         @contextmanager
         def publisher() -> Iterator[psycopg.Connection]:
@@ -98,6 +163,7 @@ def main(
             store=content_stores(environment).tiles,
             web_directory=Path(web) if web else _CHECKOUT_WEB,
             worker=f"{platform.node() or 'unknown'}:{os.getpid()}:{uuid.uuid4().hex[:8]}",
+            compiled=_compiled(environment),
         )
     except Exception as error:
         _emit(output, "startup_failed", failure_class=type(error).__name__, message=str(error))
@@ -105,7 +171,7 @@ def main(
     _emit(output, "startup", workspaces=len(workspaces), mode="once" if args.once else "daemon")
     while True:
         failed = 0
-        for outcome in baker.drain(workspaces):
+        for outcome in baker.drain(workspaces | (source() if source is not None else frozenset())):
             failed += outcome.status != "baked"
             _emit(
                 output,

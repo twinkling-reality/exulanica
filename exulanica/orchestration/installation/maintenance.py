@@ -80,10 +80,12 @@ QUEUE_QUERIES: Final[Mapping[str, str]] = {
     "materials": "select min(requested_at) as oldest from material_bake where state = 'requested'",
     "preparation": "select min(requested_at) as oldest from workspace_preparation "
     "where state = 'requested'",
-    # Each world's oldest unstarted comparison, then the oldest of those: an age across worlds.
-    "comparison": "select min(oldest) as oldest from (select world_id, min(created_at) as oldest "
-    "from society_comparison_start where finished_at is null and lease_token is null "
-    "group by world_id) per_world",
+    # Each world's oldest unstarted comparison, then the oldest of those: an age across worlds. A
+    # world is its workspace's: one identity can name a world in many (an arrival world).
+    "comparison": "select min(oldest) as oldest from (select workspace_id, world_id, "
+    "min(created_at) as oldest from society_comparison_start "
+    "where finished_at is null and lease_token is null "
+    "group by workspace_id, world_id) per_world",
 }
 
 

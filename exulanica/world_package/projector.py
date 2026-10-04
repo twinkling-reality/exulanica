@@ -241,13 +241,18 @@ def project_world_package(
 
 def _current_pointers(cursor: psycopg.Cursor, world_id: str) -> dict[str, uuid.UUID | None]:
     structure = cursor.execute(
-        "select current_snapshot_id from world_structure_state where world_id=%s", (world_id,)
+        "select current_snapshot_id from world_structure_state "
+        "where workspace_id=current_workspace() and world_id=%s",
+        (world_id,),
     ).fetchone()
     style = cursor.execute(
-        "select current_style_version_id from world_style_state where world_id=%s", (world_id,)
+        "select current_style_version_id from world_style_state "
+        "where workspace_id=current_workspace() and world_id=%s",
+        (world_id,),
     ).fetchone()
     interaction = cursor.execute(
-        "select current_version_id from world_interaction_policy_state where world_id=%s",
+        "select current_version_id from world_interaction_policy_state "
+        "where workspace_id=current_workspace() and world_id=%s",
         (world_id,),
     ).fetchone()
     return {
@@ -805,14 +810,15 @@ def _structure(
         "select snapshot_id,revision,parent_snapshot_id,graph_sha256,reconstruction_sha256,"
         "topology_sha256,layout_sha256,placement_sha256,neighborhood_sha256,snapshot_sha256,"
         "composer_key,composer_version,topology,layout,placement,neighborhood,package_projection "
-        "from world_structure_snapshot where world_id=%s and snapshot_id=%s",
+        "from world_structure_snapshot "
+        "where workspace_id=current_workspace() and world_id=%s and snapshot_id=%s",
         (world_id, snapshot_id),
     ).fetchone()
     if row is None:
         raise PackageError("current structure pointer does not resolve inside the snapshot")
     invalidated = cursor.execute(
         "select count(*) as n from world_structure_invalidation "
-        "where world_id=%s and snapshot_id=%s",
+        "where workspace_id=current_workspace() and world_id=%s and snapshot_id=%s",
         (world_id, snapshot_id),
     ).fetchone()["n"]
     structure = {
@@ -856,12 +862,13 @@ def _style(cursor: psycopg.Cursor, world_id: str, version_id: uuid.UUID | None) 
         "global_profile_version,global_parameters,rollback_target_version_id,origin,"
         "origin_reference,reference_ids,model_id,prompt_version,refines_proposal_id,"
         "recipe_binding,capability_mapping from world_style_version "
-        "where world_id=%s and version_id=%s",
+        "where workspace_id=current_workspace() and world_id=%s and version_id=%s",
         (world_id, version_id),
     ).fetchone()
     regions = cursor.execute(
         "select region_id,profile_id,profile_version,parameters from world_region_style_version "
-        "where world_id=%s and version_id=%s order by region_id",
+        "where workspace_id=current_workspace() and world_id=%s and version_id=%s "
+        "order by region_id",
         (world_id, version_id),
     ).fetchall()
     registry = cursor.execute(
@@ -923,7 +930,7 @@ def _interaction(
     row = cursor.execute(
         "select version_id,revision,parent_version_id,parameters,policy_sha256,"
         "rollback_target_version_id,origin,origin_reference from world_interaction_policy_version "
-        "where world_id=%s and version_id=%s",
+        "where workspace_id=current_workspace() and world_id=%s and version_id=%s",
         (world_id, version_id),
     ).fetchone()
     if row is None:

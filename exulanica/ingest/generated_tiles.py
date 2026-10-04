@@ -217,17 +217,30 @@ class GeneratedTileBaker:
         store: ContentAddressedStore,
         web_directory: Path,
         worker: str,
+        compiled: tuple[Path, Path] | None = None,
     ) -> None:
+        """``compiled`` is ``(node, cli.js)``: the tessellator compiled to JavaScript, as the tile
+        worker's image carries it, run by Node with no package installed. Without it the checkout's
+        TypeScript runs through ``tsx`` from ``web_directory``. Both bake the same bytes
+        (``tests/test_generated_tile_runner.py``)."""
         self._session = session
         self._publisher = publisher
         self._store = store
-        self._cli = web_directory / "packages" / "loom-tess" / "src" / "node" / "cli.ts"
-        self._tsx = web_directory / "node_modules" / ".bin" / "tsx"
-        self._web = web_directory
+        if compiled is None:
+            cli = web_directory / "packages" / "loom-tess" / "src" / "node" / "cli.ts"
+            tsx = web_directory / "node_modules" / ".bin" / "tsx"
+            self._command: tuple[str, ...] = (str(tsx), str(cli))
+            self._cwd = web_directory
+            required: tuple[Path, ...] = (cli, tsx)
+        else:
+            node, cli = compiled
+            self._command = (str(node), str(cli))
+            self._cwd = cli.parent
+            required = (node, cli)
         self._worker = worker
-        for required in (self._cli, self._tsx):
-            if not required.exists():
-                raise FileNotFoundError(f"the tessellator needs {required}; install web/ first")
+        for path in required:
+            if not path.exists():
+                raise FileNotFoundError(f"the tessellator needs {path}; install or compile it")
 
     def drain(self, workspaces: Iterable[uuid.UUID]) -> list[BakeOutcome]:
         """End each workspace's stranded bakes, then bake every claimable job, one at a time, and
@@ -305,10 +318,10 @@ class GeneratedTileBaker:
 
     def _bake(self, document: Path, container: Path) -> dict[str, Any]:
         result = subprocess.run(
-            [str(self._tsx), str(self._cli), "bake", str(document), str(container)],
+            [*self._command, "bake", str(document), str(container)],
             capture_output=True,
             text=True,
-            cwd=self._web,
+            cwd=self._cwd,
             env=child_environment(os.environ),
             timeout=BAKE_TIMEOUT_SECONDS,
             check=False,

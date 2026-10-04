@@ -407,9 +407,18 @@ class SavedWorldEntryRepository:
         recipe_key: str,
         created_by: uuid.UUID,
         values: Mapping[str, object] | None = None,
+        fixed_world_id: str | None = None,
     ) -> SavedWorldEntry:
         """Generate a world from a preset, with ``values`` in place of its own, and save its entry,
         in one transaction.
+
+        ``fixed_world_id`` fixes the identity instead of drawing one, for the installation's arrival
+        worlds (:mod:`exulanica.world.arrival_worlds`): the seed is drawn from the recipe and the
+        identity, so every workspace's copy of an arrival world is the same town, and its tiles,
+        once baked, are every copy's at once. Identities are keyed by workspace, so the same one in
+        two workspaces names two worlds. A fixed identity is tried alone: when none of its seed
+        candidates generate, the world is refused rather than given another identity. No route
+        passes one.
 
         The world is generated for a fresh identity before the transaction, so no lock is held
         while it runs; everything it writes is written together or not at all. When none of the
@@ -436,8 +445,9 @@ class SavedWorldEntryRepository:
         recipe = town_recipe(recipe_key, values)
         refuse_past_limit(self.connection, self.workspace_id, GENERATED)
         refused: dict[str, GeneratedWorldRefused] = {}
-        for _ in range(GENERATED_WORLD_DRAWS):
-            world_id = new_world_id(GENERATED)
+        fixed = fixed_world_id
+        for _ in range(1 if fixed is not None else GENERATED_WORLD_DRAWS):
+            world_id = fixed if fixed is not None else new_world_id(GENERATED)
             try:
                 composed = compose_generated_world(recipe, world_id)
             except GeneratedWorldRefused as exc:
@@ -446,6 +456,7 @@ class SavedWorldEntryRepository:
             break
         else:
             raise GeneratedWorldIdentitiesRefused(recipe.key, refused)
+        assert world_id is not None
         with self.connection.transaction():
             self._lock_workspace()
             _, style, authored_version_id = create_generated_authorities(

@@ -175,8 +175,13 @@ exulanica-material-bake = "exulanica.world.material_bake_command:main"
 exulanica-asset-preparation = "exulanica.orchestration.installation.preparation:main"
 # `uv run exulanica-generated-tile-worker --workspace <uuid> --once`. Bakes the tiles worlds
 # generated from a recipe are waiting for, off the request: claims each job as the runtime role and
-# publishes each bake through the owner connection migration 0072 requires. Needs Node and web/.
+# publishes each bake as the tile role (migration 0138). Needs Node and the tessellator, compiled
+# or from web/.
 exulanica-generated-tile-worker = "exulanica.ingest.generated_tiles_command:main"
+# `uv run exulanica-arrival-worlds check|prepare --workspace <uuid>`. Makes the installation's
+# arrival worlds (exulanica/world/arrival-worlds.v1.json) once in its own workspace, so their tiles
+# are baked before any visitor's copy is made. Downloads nothing.
+exulanica-arrival-worlds = "exulanica.world.arrival_worlds:main"
 # `uv run exulanica-installation check|facts|backup|verify|maintenance|restore`. A complete
 # installation's profile facts, backup sets, unattended maintenance and declared crash recovery;
 # docs/deployment.md section 9 owns its settings and procedures.

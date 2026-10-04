@@ -4,13 +4,15 @@
 #
 #   EXULANICA_DEPLOY_DIR=<secrets directory> deploy/public/public.sh <command>
 #
-#   build             on the build host: the client bundle, then the three images, from a clean checkout
+#   build             on the build host: the client bundle and the compiled tessellator, then the four
+#                     images, from a clean checkout
 #   images            print each image's ID and the commit it was built from
-#   save <file>       write the three images to one gzip archive and print its sha256
+#   save <file>       write the four images to one gzip archive and print its sha256
 #   init              write <dir>/public.env: generated passwords, the operator's token, the values below
 #   mint <label>      a rehearsal visitor: a token for a workspace of its own
 #   revoke <label>    delete that rehearsal token; `up` then serves without it
 #   up                start the server; the first run installs, migrates and publishes the catalogs
+#   prepare-towns     make the arrival worlds once in the operator's workspace, so their tiles bake
 #   issue-authority   issue the server's spending authority from the EXULANICA_AUTHORITY_* values
 #   grant <label>     grant a rehearsal visitor's workspace an allowance under the authority
 #   spending          the authority's state, as the operator command prints it
@@ -41,7 +43,8 @@ project="${EXULANICA_PUBLIC_PROJECT:-exulanica-public}"
 backend_image="exulanica-public-backend"
 maintenance_image="exulanica-public-maintenance"
 client_image="exulanica-public-client"
-images="$backend_image $maintenance_image $client_image"
+tiles_image="exulanica-public-tiles"
+images="$backend_image $maintenance_image $client_image $tiles_image"
 
 case "${1:-}" in
   "" | build | images | save) deploy_dir="" ;;
@@ -98,8 +101,9 @@ compose() {
     EXULANICA_WORKSPACE_IDS="00000000-0000-0000-0000-000000000000"
   fi
   export EXULANICA_API_TOKENS EXULANICA_SOCIETY_CONTROL_WORKSPACES EXULANICA_WORKSPACE_IDS
+  # The tile worker's compose profile is always on here: the public profile installs it.
   docker compose -p "$project" --project-directory "$root" --env-file "$env_file" \
-    -f "$root/compose.yaml" -f "$here/public.yaml" "$@"
+    -f "$root/compose.yaml" -f "$here/public.yaml" --profile tiles "$@"
 }
 
 merge_tokens() {
@@ -152,6 +156,9 @@ case "$command" in
     # The client bundle is built here from the offline store and copied into the client image, as
     # deploy/installation/client.Dockerfile requires, with its provenance as build arguments.
     (cd web && pnpm --filter @exulanica/app build)
+    # The tessellator compiled to JavaScript for the tile worker's image, which carries no package
+    # manager and no dependency (deploy/installation/tiles.Dockerfile).
+    (cd web/packages/loom-tess && rm -rf dist && ../../node_modules/.bin/tsc --build tsconfig.node.json)
     tree_sha256="$(python3 - web/packages/app/dist <<'PY'
 import hashlib, pathlib, sys
 dist = pathlib.Path(sys.argv[1])
@@ -175,7 +182,7 @@ PY
       EXULANICA_NODE_VERSION="$(node --version)" EXULANICA_PNPM_VERSION="$(cd web && pnpm --version)" \
       DOCKER_DEFAULT_PLATFORM="${EXULANICA_BUILD_PLATFORM:-linux/amd64}" \
       docker compose -p "$project" --project-directory "$root" \
-      -f "$root/compose.yaml" -f "$here/public.yaml" build api maintenance client
+      -f "$root/compose.yaml" -f "$here/public.yaml" --profile tiles build api maintenance client tile-worker
     "$0" images
     ;;
 
@@ -220,7 +227,8 @@ EXULANICA_EXECUTOR_ROLE_PASSWORD=$(secret)
 EXULANICA_PURGE_ROLE_PASSWORD=$(secret)
 EXULANICA_BACKUP_ROLE_PASSWORD=$(secret)
 EXULANICA_ACCOUNT_ROLE_PASSWORD=$(secret)
-EXULANICA_PROFILE=${EXULANICA_PROFILE:-single-host-server-only}
+EXULANICA_TILES_ROLE_PASSWORD=$(secret)
+EXULANICA_PROFILE=public
 EXULANICA_BACKUP_PATH=$backup
 EXULANICA_CUSTODY_PATH=$custody
 EXULANICA_PUBLIC_HOST=$EXULANICA_PUBLIC_HOST
@@ -301,6 +309,15 @@ PY
     # the third publishes the catalogs the image carries.
     compose up -d --wait --no-build --pull missing
     compose ps
+    ;;
+
+  prepare-towns)
+    # The arrival worlds (exulanica/world/arrival-worlds.v1.json in the image) made once in the
+    # operator's own workspace, as the runtime role, inside the API's container. The tile worker
+    # drains that workspace and bakes them; run again to read each tile's state.
+    need_env_file
+    workspace="$(python3 -c 'import json,sys; print(next(iter(json.load(open(sys.argv[1])).values()))["workspace_id"])' "$token_dir/operator.json")"
+    compose exec -T api exulanica-arrival-worlds prepare --workspace "$workspace"
     ;;
 
   issue-authority)

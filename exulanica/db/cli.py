@@ -32,6 +32,7 @@ from exulanica.db.roles import (
     provision_runtime_role,
 )
 from exulanica.db.session import Database
+from exulanica.db.tiles_role import TILES_ROLE, provision_tiles_role
 from exulanica.env import env_get, env_name
 
 __all__ = [
@@ -68,6 +69,7 @@ def provision_database(database: Database, stream: Any) -> int:
     purge_password = env_get("PURGE_ROLE_PASSWORD")
     account_password = env_get("ACCOUNT_ROLE_PASSWORD")
     backup_password = env_get("BACKUP_ROLE_PASSWORD")
+    tiles_password = env_get("TILES_ROLE_PASSWORD")
     with database.unscoped() as connection:
         provision_runtime_role(connection, role=RUNTIME_ROLE, password=app_password)
         provision_runtime_role(
@@ -76,13 +78,15 @@ def provision_database(database: Database, stream: Any) -> int:
         provision_purge_role(connection, role=PURGE_ROLE, password=purge_password)
         provision_account_role(connection, role=ACCOUNT_ROLE, password=account_password)
         provision_backup_role(connection, role=BACKUP_ROLE, password=backup_password)
+        provision_tiles_role(connection, role=TILES_ROLE, password=tiles_password)
     print(
         f"roles: {RUNTIME_ROLE} may select, insert and update and may not delete; "
         f"{EXECUTOR_ROLE} may select and nothing else; {PURGE_ROLE} may mark bytes purged "
         "and may read every workspace's content hashes, which is the one question a shared "
         "blob makes unanswerable inside one workspace; "
         f"{ACCOUNT_ROLE} may access only account persistence; "
-        f"{BACKUP_ROLE} may read every row for a backup and write nothing",
+        f"{BACKUP_ROLE} may read every row for a backup and write nothing; "
+        f"{TILES_ROLE} may publish a baked tile and do nothing else",
         file=stream,
     )
     return 0
