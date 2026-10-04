@@ -214,11 +214,12 @@ COMPARISON_SCORE_BY_FAMILY: Final = {"purposeful": 3, "living": 4}
 COMPARISON_WINDOWS: Final = ("hour", "day")
 #: The versions a comparison over a day is defined under: the fifth score, the fourth's terms over
 #: the day assembled exactly from its hours, the fourth protocol, whose window is a day, and the
-#: seeds an hour's comparison is defined under.
+#: sixth seeds, whose held-out seeds no comparison has run: the fifth's, which an hour's comparison
+#: is still defined under, were spent by a judged comparison of a town's hour.
 DAY_COMPARISON_VERSIONS: Final = {
     PERSON_SCORE_CATALOG: 5,
     COMPARISON_PROTOCOL_CATALOG: 4,
-    COMPARISON_SEEDS_CATALOG: 5,
+    COMPARISON_SEEDS_CATALOG: 6,
 }
 #: The state families a comparison may run over a day, by the score its day is scored under: a
 #: living town's, whose people keep the day of its clock. A purposeful society keeps no time of
@@ -680,7 +681,7 @@ SCHEMAS: Final[dict[tuple[str, int], CatalogSchema]] = {
             ),
             entry_check=_seed_v3_bounds,
         )
-        for version in (3, 4, 5)
+        for version in (3, 4, 5, 6)
     },
 }
 

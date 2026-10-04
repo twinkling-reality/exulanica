@@ -20,11 +20,13 @@ from exulanica.api.society_comparison_start import development_seeds
 from exulanica.grammar.errors import CatalogError
 from exulanica.world.society_catalogs import (
     COMPARISON_VERSIONS,
+    DAY_COMPARISON_VERSIONS,
     HELD_OUT_SEED_TEXT,
     ROUTINE_DIRECTORY,
     load_comparison_catalogs,
 )
 
+EVALUATION = Path(__file__).resolve().parents[1] / "docs" / "evaluation"
 SEEDS_V2 = ROUTINE_DIRECTORY / "society-comparison-seeds.v2.json"
 SEEDS_V3 = ROUTINE_DIRECTORY / "society-comparison-seeds.v3.json"
 #: The seeds a new comparison is defined under.
@@ -64,7 +66,7 @@ def _catalogs_with(tmp_path: Path, change) -> Path:
     return tmp_path
 
 
-@pytest.mark.parametrize("version", [4, 5])
+@pytest.mark.parametrize("version", [4, 5, 6])
 def test_each_later_version_keeps_development_seeds_and_draws_held_out_seeds_afresh(version):
     third = _entries(SEEDS_V3)
     later = _entries(ROUTINE_DIRECTORY / f"society-comparison-seeds.v{version}.json")
@@ -92,6 +94,27 @@ def test_a_held_out_entry_that_states_its_text_is_refused_by_name(tmp_path):
 
     with pytest.raises(CatalogError, match=HELD_OUT_SEED_TEXT):
         load_comparison_catalogs(_catalogs_with(tmp_path, stated))
+
+
+def test_a_days_held_out_seeds_were_run_by_no_comparison_registered_under_other_seeds():
+    """A judged comparison's records name the seed catalog they were registered under and the
+    held-out seeds they ran, by digest. A held-out seed of the catalog a day is defined under that
+    a record naming no such catalog holds was spent by another comparison, which is how the fifth
+    version's were found spent by the judged town comparison of 2026-09-30."""
+    assert DAY_COMPARISON_VERSIONS["society-comparison-seeds"] == 6
+    name = "society-comparison-seeds.v6.json"
+    held_out = {
+        entry["seed_digest"]
+        for entry in _entries(ROUTINE_DIRECTORY / name)
+        if entry["phase"] == "held_out"
+    }
+    assert len(held_out) == 8
+    records = sorted(EVALUATION.rglob("*.json"))
+    assert len(records) > 100
+    for path in records:
+        text = path.read_text(encoding="utf-8")
+        if name not in text:
+            assert not {digest for digest in held_out if digest in text}, path.name
 
 
 def test_a_development_seed_whose_text_is_not_its_digest_is_refused(tmp_path):

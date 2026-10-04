@@ -218,10 +218,13 @@ held-out seeds are the second version's twelve, by digest alone, which the secon
 ran on, and an entry that states a held-out seed's text is refused (`held_out_seed_text`). The
 fourth keeps the development seeds and their text and commits eight held-out seeds drawn afresh,
 none of an earlier version's, by digest alone, which the town comparison of 2026-09-30 spent; the
-fifth, which a new comparison is defined under, does the same with eight more.
+fifth, which a comparison over an hour is defined under, does the same with eight more, which the
+second town comparison of that day spent; and the sixth, which a comparison over a day is defined
+under, does the same with eight more again, none of which a comparison registered under another
+version holds ([`tests/test_comparison_development_seeds.py`](../tests/test_comparison_development_seeds.py)).
 
 A comparison of a living town over a day is defined under the fourth protocol
-(`assets/catalogs/society/society-comparison-protocol.v4.json`), the fifth score and the fifth
+(`assets/catalogs/society/society-comparison-protocol.v4.json`), the fifth score and the sixth
 seeds; a comparison over an hour stays under the third protocol. The fourth's window is 1440
 minutes, the town's day from its genesis to the same minute the next day, and its floor is 355,200
 need-thousandths times person-minutes per scored person, in the living score's unit: a quarter of
@@ -241,7 +244,11 @@ reader, [`exulanica/world/society_comparison_verdict_v5.py`](../exulanica/world/
 
 A judged comparison is pre-registered before any of its held-out seeds is run, and its record is
 written by the measurement that registered it. Each record below replayed every run from its
-receipts with no billed call.
+receipts with no billed call. A comparison over a day is registered, played and recorded by
+[`scripts/measure_day_comparison.py`](../scripts/measure_day_comparison.py), which first plays the
+same design on one development seed, so the bound it registers is at least that day's spend for
+every held-out seed with a quarter more, and whose record reads every hour of every run back
+through the run route and every run's day through the day route.
 
 - [2026-09-26-society-model-comparison.json](evaluation/2026-09-26-society-model-comparison.json)
   ([pre-registration](evaluation/2026-09-26-society-model-comparison-preregistration.json),
@@ -440,7 +447,7 @@ run; a day is read by a line of its own (a day, below).
 **A day.** A start and a plan name the window every run plays (`window`): `hour`, the default, or
 `day`. A day is a living town's, whose engine keeps the time of day: from its genesis at 06:00 to
 the same minute the next day, 1440 minutes, defined under the fourth protocol, the fifth score and
-the fifth seeds ([claim](#claim)). A purposeful society keeps no time of day and is not compared
+the sixth seeds ([claim](#claim)). A purposeful society keeps no time of day and is not compared
 over one. A day is offered only where the reading catalog binds a line measured over the day's
 window, as an entry of its own for the state family and the window (`living-1440`), since a run is
 read by the hour and a town's hours differ through its day; a day of a family the catalog binds no
