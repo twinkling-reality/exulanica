@@ -170,9 +170,9 @@ runs ([what a comparison can read](society-experiments.md#running-a-comparison))
 town's society runs the living town's engine, whose line lets a model decide for everybody in each
 town measured, small towns of 38 and 52 people and market towns of 74 and 88
 ([record](evaluation/2026-10-02-living-comparison-replay.json)). Over a day the town's runs are
-read by a line of their own, which lets a model decide for at most 38 of the town of 52, 35 of 74
-or 33 of 88, a bound one point read during another project's build sets low
-([record](evaluation/2026-10-02-living-day-replay.json)). A town whose society was made before
+read by a line of their own, which also lets a model decide for everybody in each town measured,
+and in a stress town of 128 at the town ground's bound
+([record](evaluation/2026-10-04-living-day-replay.json)). A town whose society was made before
 that engine keeps the earlier one, whose line allows at most 24 of 56 people or 11 of 86.
 Besides the small square's, two judged comparisons ran over a
 small town of 52 people for a group of 12: the first stopped incomplete, and the second found no
