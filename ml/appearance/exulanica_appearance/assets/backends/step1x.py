@@ -16,10 +16,10 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+from exulanica_pieces.geometry.mesh import Mesh, Simplifier
 
 from exulanica_appearance.assets.backends.shared import Shared, quadric_simplify
 from exulanica_appearance.assets.job import RawMesh
-from exulanica_appearance.assets.mesh import Mesh, Simplifier
 
 __all__ = ["Step1XBackend", "project_colours"]
 

@@ -24,14 +24,7 @@ import re
 from collections.abc import Mapping, Sequence
 from typing import Any, Final
 
-from exulanica_appearance.assets.vocabulary import (
-    BUDGETS_STATUS,
-    FIT,
-    GENERATED_FAMILIES,
-    budget_for,
-    split_role,
-)
-from exulanica_appearance.canonical import (
+from exulanica_pieces.canonical import (
     Refused,
     canonical_bytes,
     exact_keys,
@@ -40,6 +33,13 @@ from exulanica_appearance.canonical import (
     is_text,
     parse_canonical,
     sha256_hex,
+)
+from exulanica_pieces.vocabulary import (
+    BUDGETS_STATUS,
+    FIT,
+    GENERATED_FAMILIES,
+    budget_for,
+    split_role,
 )
 
 __all__ = [
@@ -138,7 +138,8 @@ def _check_request(document: object) -> dict[str, Any]:
     keys = set(document)
     if not set(_REQUEST_KEYS) <= keys or not keys <= set(_REQUEST_KEYS) | set(_REQUEST_OPTIONAL):
         raise Refused(
-            f"a request has {', '.join(_REQUEST_KEYS)} and optionally {', '.join(_REQUEST_OPTIONAL)}"
+            f"a request has {', '.join(_REQUEST_KEYS)} and optionally "
+            f"{', '.join(_REQUEST_OPTIONAL)}"
         )
     if document["profile"] != REQUEST_PROFILE:
         raise Refused(f"a request's profile is {REQUEST_PROFILE}")

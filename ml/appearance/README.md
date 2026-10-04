@@ -65,7 +65,9 @@ scripts/fetch-hf-metadata.sh <repo> <40-hex revision> METADATA/<repo>@<revision>
 .venv/bin/python -m exulanica_appearance weights build --spec weights/asset-candidates.json --metadata METADATA --out weights/
 
 # generated assets, PROTOTYPE: requests, a job, pieces, receipts and a contact sheet, with a stub
-# in place of the models (docs/generated-appearance.md section 11)
+# in place of the models (docs/generated-appearance.md section 11). The formats are the shared
+# package exulanica_pieces at the repository root, which must be on the path (the root venv's
+# editable install puts it there; the job's code archive carries it).
 .venv/bin/python -m exulanica_appearance assets dry-run --repository ../.. --out OUT
 
 # a generated asset job on Nebius Serverless AI (container/assets/job.sh runs it there): stage the

@@ -1,8 +1,8 @@
 """Look roles, fit rules and budgets: what a generated piece is for and what it may weigh.
 
-A look role is ``family.leaf``. The families are a closed list shared by world kinds, style packs and
-generated assets; leaves are open, so a drafted kind may name ``structure.milking_parlour``. Each
-family has one fit rule, which says how a piece meets its slot:
+A look role is ``family.leaf``. The families are a closed list shared by world kinds, style packs
+and generated assets; leaves are open, so a drafted kind may name ``structure.milking_parlour``.
+Each family has one fit rule, which says how a piece meets its slot:
 
 - ``contain``: uniform scale until the piece fits inside the slot, base on the floor;
 - ``fill``: the page stretches the piece to the slot, each axis within 0.8 to 1.25 of the piece's
@@ -26,7 +26,7 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Final
 
-from exulanica_appearance.canonical import Refused
+from exulanica_pieces.canonical import Refused
 
 __all__ = [
     "BUDGETS",

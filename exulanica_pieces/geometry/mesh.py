@@ -15,9 +15,9 @@ from typing import Final
 
 import numpy as np
 
-from exulanica_appearance.assets.colour import nearest_swatch
-from exulanica_appearance.assets.vocabulary import FILL_RATIO_PER_MILLE
-from exulanica_appearance.canonical import Refused
+from exulanica_pieces.canonical import Refused
+from exulanica_pieces.geometry.palette import nearest_swatch
+from exulanica_pieces.vocabulary import FILL_RATIO_PER_MILLE
 
 __all__ = [
     "AXES",

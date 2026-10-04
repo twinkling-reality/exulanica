@@ -35,7 +35,7 @@ python -m pip install --quiet --no-deps --require-hashes --only-binary :all: \
 
 echo "phase prepare $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 export TORCH_HOME="$data/torch-home" HF_HOME="$data/hf-home"
-PYTHONPATH="$code/ml/appearance" python -m exulanica_appearance assets remote prepare \
+PYTHONPATH="$code:$code/ml/appearance" python -m exulanica_appearance assets remote prepare \
   --code "$code" --route "$ROUTE" --upstream /opt/upstream --weights "$data/weights" \
   --torch-home "$TORCH_HOME" --hf-home "$HF_HOME" --report "$run/prepare-$(date -u +%Y%m%dT%H%M%SZ).json"
 
@@ -46,7 +46,7 @@ case "$ROUTE" in
   A) upstream="/opt/upstream/trellis:/opt/upstream/utils3d" ;;
   B) upstream="/opt/upstream/step1x" ;;
 esac
-PYTHONPATH="$standins:$upstream:$code/ml/appearance" python -m exulanica_appearance assets remote run \
+PYTHONPATH="$standins:$upstream:$code:$code/ml/appearance" python -m exulanica_appearance assets remote run \
   --code "$code" --route "$ROUTE" --job "$run/job.json" --requests "$run/requests" \
   --weights "$data/weights" --cutouts "$data/out/inputs" --out "$data/out"
 echo "phase done $(date -u +%Y-%m-%dT%H:%M:%SZ)"

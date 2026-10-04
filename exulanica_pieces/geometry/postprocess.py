@@ -12,8 +12,9 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Final
 
-from exulanica_appearance.assets.glb import write_glb
-from exulanica_appearance.assets.mesh import (
+from exulanica_pieces.canonical import sha256_hex
+from exulanica_pieces.geometry.glb import write_glb
+from exulanica_pieces.geometry.mesh import (
     Mesh,
     Simplifier,
     fit,
@@ -21,8 +22,7 @@ from exulanica_appearance.assets.mesh import (
     orient,
     simplify_to,
 )
-from exulanica_appearance.assets.records import verdict
-from exulanica_appearance.canonical import sha256_hex
+from exulanica_pieces.records import verdict
 
 __all__ = ["POSTPROCESS_VERSION", "Piece", "make_piece"]
 

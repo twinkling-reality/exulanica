@@ -29,6 +29,8 @@ import json
 import sys
 from pathlib import Path
 
+from exulanica_pieces.canonical import Refused as PieceRefused
+
 from exulanica_appearance.canonical import Refused
 
 REFUSED = 3
@@ -339,8 +341,9 @@ def _assets_remote_run(args: argparse.Namespace) -> int:
 
 
 def _assets_nebius(args: argparse.Namespace) -> int:
+    from exulanica_pieces.records import read_job
+
     from exulanica_appearance.assets import nebius
-    from exulanica_appearance.assets.records import read_job
 
     if args.step == "stage":
         result: object = nebius.stage(
@@ -520,7 +523,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         return args.run(args)
-    except Refused as refusal:
+    except (Refused, PieceRefused) as refusal:
         print(f"refused: {refusal}", file=sys.stderr)
         return REFUSED
 

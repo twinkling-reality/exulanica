@@ -26,18 +26,17 @@ from pathlib import Path
 from typing import Any, Final, Protocol
 
 import numpy as np
-
-from exulanica_appearance.assets.colour import read_table
-from exulanica_appearance.assets.mesh import Mesh, Simplifier
-from exulanica_appearance.assets.postprocess import POSTPROCESS_VERSION, make_piece
-from exulanica_appearance.assets.records import (
+from exulanica_pieces.canonical import Refused, canonical_bytes, sha256_hex
+from exulanica_pieces.colour import read_table
+from exulanica_pieces.geometry.mesh import Mesh, Simplifier
+from exulanica_pieces.geometry.postprocess import POSTPROCESS_VERSION, make_piece
+from exulanica_pieces.records import (
     RECEIPT_PROFILE,
     REGENERATION,
     build_receipt,
     read_job,
     read_request,
 )
-from exulanica_appearance.canonical import Refused, canonical_bytes, sha256_hex
 
 __all__ = ["RESULTS_PROFILE", "Backend", "RawMesh", "run_job"]
 

@@ -1,4 +1,4 @@
-"""Palette colours as a piece's vertex colours, exactly, and the nearest swatch to a model's colour.
+"""Palette colours as a piece's vertex colours, exactly: the committed sRGB-to-linear table.
 
 glTF vertex colours (``COLOR_0``) are linear, and a palette swatch is an 8-bit sRGB colour. A piece
 stores each swatch as ``VEC4`` ``UNSIGNED_SHORT`` normalized: the first three channels are the
@@ -12,26 +12,22 @@ it to.
 Every one of the 256 values is distinct, so a stored triple names exactly one sRGB colour and the
 page maps it back to its swatch by equality.
 
-Snapping a model's colour to the nearest swatch is done in OKLab (Björn Ottosson, 2020), where
-distance follows what a person sees better than in sRGB; a tie goes to the swatch listed first.
+Snapping a model's colour to the nearest swatch needs numpy and is in
+``exulanica_pieces.geometry.palette``.
 """
 
 from __future__ import annotations
 
-from collections.abc import Sequence
 from decimal import ROUND_HALF_EVEN, Decimal, localcontext
 from pathlib import Path
 from typing import Final
 
-import numpy as np
-
-from exulanica_appearance.canonical import Refused, canonical_bytes, parse_canonical, sha256_hex
+from exulanica_pieces.canonical import Refused, canonical_bytes, parse_canonical, sha256_hex
 
 __all__ = [
     "TABLE_PATH",
     "TABLE_PROFILE",
     "linear16_table",
-    "nearest_swatch",
     "read_table",
     "table_document",
 ]
@@ -78,35 +74,3 @@ def read_table(repository: Path) -> tuple[tuple[int, ...], str]:
 def table_bytes() -> bytes:
     """The file's bytes: canonical JSON and one newline."""
     return canonical_bytes(table_document()) + b"\n"
-
-
-def _oklab(srgb8: np.ndarray) -> np.ndarray:
-    """OKLab coordinates of 8-bit sRGB colours, shape (n, 3)."""
-    v = srgb8.astype(np.float64) / 255.0
-    linear = np.where(v <= 0.04045, v / 12.92, ((v + 0.055) / 1.055) ** 2.4)
-    m1 = np.array(
-        [
-            [0.4122214708, 0.5363325363, 0.0514459929],
-            [0.2119034982, 0.6806995451, 0.1073969566],
-            [0.0883024619, 0.2817188376, 0.6299787005],
-        ]
-    )
-    m2 = np.array(
-        [
-            [0.2104542553, 0.7936177850, -0.0040720468],
-            [1.9779984951, -2.4285922050, 0.4505937099],
-            [0.0259040371, 0.7827717662, -0.8086757660],
-        ]
-    )
-    return np.cbrt(linear @ m1.T) @ m2.T
-
-
-def nearest_swatch(colours: np.ndarray, palette: Sequence[Sequence[int]]) -> np.ndarray:
-    """For each 8-bit sRGB colour (n, 3), the index of the nearest palette swatch in OKLab."""
-    if len(palette) == 0:
-        raise Refused("a palette holds at least one swatch")
-    swatches = _oklab(np.asarray(palette, dtype=np.int64))
-    points = _oklab(np.asarray(colours, dtype=np.int64).reshape(-1, 3))
-    distances = ((points[:, None, :] - swatches[None, :, :]) ** 2).sum(axis=2)
-    # argmin returns the first of equal minima: a tie goes to the swatch listed first.
-    return np.argmin(distances, axis=1)

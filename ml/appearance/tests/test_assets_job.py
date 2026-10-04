@@ -18,14 +18,14 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+from exulanica_pieces.canonical import Refused, sha256_hex
+from exulanica_pieces.records import build_job, build_request, read_receipt
 
 from exulanica_appearance.assets import nebius, remote
 from exulanica_appearance.assets.backends.step1x import project_colours
 from exulanica_appearance.assets.dryrun import STUB_PACK, StubBackend, dry_run
 from exulanica_appearance.assets.gittree import tree_id
 from exulanica_appearance.assets.job import run_job
-from exulanica_appearance.assets.records import build_job, build_request, read_receipt
-from exulanica_appearance.canonical import Refused, sha256_hex
 
 STANDINS = Path(__file__).resolve().parents[1] / "container" / "assets" / "standins"
 GIT = shutil.which("git")

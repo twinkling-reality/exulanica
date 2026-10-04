@@ -16,14 +16,14 @@ from pathlib import Path
 from typing import Any, Final
 
 import numpy as np
+from exulanica_pieces.canonical import canonical_bytes, sha256_hex
+from exulanica_pieces.geometry.mesh import Mesh, Simplifier, cluster_simplify
+from exulanica_pieces.geometry.postprocess import POSTPROCESS_VERSION
+from exulanica_pieces.records import build_job, build_request, cache_key
 from PIL import Image
 
 from exulanica_appearance.assets.job import RawMesh, run_job
-from exulanica_appearance.assets.mesh import Mesh, Simplifier, cluster_simplify
-from exulanica_appearance.assets.postprocess import POSTPROCESS_VERSION
-from exulanica_appearance.assets.records import build_job, build_request, cache_key
 from exulanica_appearance.assets.sheet import draw_sheet
-from exulanica_appearance.canonical import canonical_bytes, sha256_hex
 
 __all__ = ["STUB_PACK", "StubBackend", "dry_run", "stub_mesh"]
 

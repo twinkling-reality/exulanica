@@ -17,8 +17,8 @@ from typing import Final
 
 import numpy as np
 
-from exulanica_appearance.assets.mesh import Mesh
-from exulanica_appearance.canonical import Refused
+from exulanica_pieces.canonical import Refused
+from exulanica_pieces.geometry.mesh import Mesh
 
 __all__ = ["GENERATOR", "write_glb"]
 
@@ -47,7 +47,7 @@ def write_glb(
     mesh: Mesh, swatch: np.ndarray, palette: Sequence[Sequence[int]], table: Sequence[int]
 ) -> bytes:
     """``mesh`` is flat (three unshared vertices per triangle) and ``swatch`` names each triangle's
-    palette entry, as :func:`~exulanica_appearance.assets.mesh.flat_palette` returns them."""
+    palette entry, as :func:`~exulanica_pieces.geometry.mesh.flat_palette` returns them."""
     if len(table) != 256:
         raise Refused("the colour table has 256 values")
     triangles = mesh.triangles

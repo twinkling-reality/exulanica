@@ -407,7 +407,14 @@ post-processing of both routes (nvdiffrast's NVIDIA Source Code License limits u
 non-commercial; a Gaussian rasteriser of the INRIA lineage; GPL mesh repair). This package's own
 post-process replaces it.
 
-**Post-process** (`exulanica_appearance/assets/`), every step recorded in the receipt:
+**Where the code is.** The formats every side shares are one package, `exulanica_pieces` at the
+repository root, which imports neither the product nor `ml/`: its records, vocabulary and colour
+table are plain Python the product may read, and its `geometry` subpackage (the steps below and
+the writer) needs numpy and is imported only by the GPU job and tooling. Import contracts and
+`tests/test_pieces_boundary.py` hold those rules. The GPU job itself (backends, runner, Nebius
+commands) stays in `ml/appearance/exulanica_appearance/assets/`.
+
+**Post-process** (`exulanica_pieces/geometry/`), every step recorded in the receipt:
 
 | Step | What it does |
 | --- | --- |

@@ -21,8 +21,10 @@ import urllib.request
 from pathlib import Path
 from typing import Any, Final
 
+from exulanica_pieces.canonical import Refused, canonical_bytes
+
 from exulanica_appearance.assets.gittree import tree_id
-from exulanica_appearance.canonical import Refused, canonical_bytes
+from exulanica_appearance.canonical import Refused as WeightsRefused
 from exulanica_appearance.weights import read_weights, verify_directory
 
 __all__ = ["ROUTE_WEIGHTS", "fetch_upstream", "prepare", "weights_directory"]
@@ -141,7 +143,7 @@ def _fetch_weights(manifest_raw: bytes, directory: Path) -> int:
     manifest = read_weights(manifest_raw)
     try:
         return verify_directory(manifest_raw, directory)
-    except Refused:
+    except WeightsRefused:
         snapshot_download(
             repo_id=manifest["repository"],
             revision=manifest["revision"],

@@ -24,7 +24,7 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, Final
 
-from exulanica_appearance.canonical import Refused, sha256_hex
+from exulanica_pieces.canonical import Refused, sha256_hex
 
 __all__ = [
     "IMAGE",
@@ -38,6 +38,7 @@ IMAGE: Final = "python:3.12-slim-bookworm@sha256:782412e85d0f0984994c290652577d4
 #: What the job's code archive holds, relative to the repository root.
 _CODE: Final = (
     "assets/colour",
+    "exulanica_pieces",
     "ml/appearance/container/assets",
     "ml/appearance/exulanica_appearance",
     "ml/appearance/pyproject.toml",

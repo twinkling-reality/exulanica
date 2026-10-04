@@ -15,8 +15,7 @@ from pathlib import Path
 from typing import Any, Final
 
 import numpy as np
-
-from exulanica_appearance.assets.mesh import Mesh
+from exulanica_pieces.geometry.mesh import Mesh
 
 __all__ = ["CONCEPT_SETTINGS", "Shared", "quadric_simplify"]
 
