@@ -135,28 +135,29 @@
     {
       "id": "access-gate",
       "session": "arrival",
-      "action": "Open the application, try an access token this instance does not hold, then enter the run's own.",
+      "action": "Open the application, try an access token this instance does not hold, then enter the run's own and choose the one world Your worlds lists.",
       "gates": ["delivery:Release rehearsal"],
       "requires": ["clean-start"],
-      "owner_area": "access: web/packages/app/src/main.ts (askForAccess) and the API's bearer authentication",
+      "owner_area": "access: web/packages/app/src/main.ts (askForAccess) and the API's bearer authentication; Your worlds: web/packages/app/src/composition/world-entry.ts",
       "expect": {
         "page": [
           {"id": "gate-shown", "says": "The production build shows its credential gate with an access-token field, and offers account sign-in only when GET /auth/session says accounts are configured, which this runtime does not."},
           {"id": "wrong-token-refused", "says": "A token the instance does not hold is refused at the gate with a stated reason, and no world opens."},
-          {"id": "token-opens-world", "says": "The run's token opens the world: the world title field appears and the shell stops booting."}
+          {"id": "your-worlds-first", "says": "After the run's token, Your worlds is the first screen: it lists exactly the one saved world GET /world-entries holds, by its title, and offers Create a world."},
+          {"id": "token-opens-world", "says": "Choosing that world's card opens it: the world title field appears and the shell stops booting."}
         ]
       }
     },
     {
       "id": "enter-owned-starter",
       "session": "arrival",
-      "action": "Arrive with an empty account: the application creates and opens the person's own starter space.",
+      "action": "Arrive with an empty account: the application creates the person's own starter space, lists it in Your worlds, and opens it when chosen.",
       "gates": ["foundation:World entry"],
       "requires": ["access-gate"],
       "owner_area": "saved-world entry: web/packages/app/src/composition/session-and-geometry.ts and exulanica/api/routes/world_entries.py",
       "expect": {
         "page": [
-          {"id": "starter-opens", "says": "The world canvas opens directly with the world title field, the World menu, Add object and Add photos; there is no introductory form."},
+          {"id": "starter-opens", "says": "Chosen from Your worlds, the world canvas opens with the world title field, the World menu, Add object and Add photos; there is no introductory form."},
           {"id": "first-use-card", "says": "The first-use card welcomes the person to their world and offers Meet your Companion."},
           {"id": "renderer-mounted", "says": "The canvas reports its engine and at least one mounted world module."}
         ],
@@ -1163,7 +1164,7 @@
     {
       "id": "make-town-with-values",
       "session": "town",
-      "action": "Open Make a world from the World menu, choose A market town, move two of its values to other values inside the ranges the server serves, press Make this town, and wait while its tiles are baked until the town opens.",
+      "action": "Open Create a world from the World menu, choose A market town, move two of its values to other values inside the ranges the server serves, press Create this town, and wait while its tiles are baked until the town opens.",
       "gates": ["milestone:A world to run", "delivery:Usable world"],
       "gates_reason": "A small town from the catalogs opens as a saved version in the application: the town is generated from values the person sets, saved, baked off the request and drawn.",
       "requires": ["enter-owned-starter"],
@@ -1178,8 +1179,8 @@
       "owner_area": "towns: web/packages/app/src/ui/world-recipes.ts, web/packages/app/src/world-specification.ts and web/packages/app/src/composition/generated-world.ts; exulanica/api/routes/generated_worlds.py, exulanica/world/world_recipes.py and exulanica/ingest/generated_tiles.py",
       "expect": {
         "page": [
-          {"id": "values-offered", "says": "Make a world offers the presets the server serves and, for the chosen one, each adjustable value as a control inside the range the server states."},
-          {"id": "town-drawn", "says": "After Make this town the page says the town is being built until its tiles are baked, then opens it: the world is mounted, the waiting line is gone and no tile is reported failed."}
+          {"id": "values-offered", "says": "Create a world offers the presets the server serves and, for the chosen one, each adjustable value as a control inside the range the server states."},
+          {"id": "town-drawn", "says": "After Create this town the page says the town is being built until its tiles are baked, then opens it: the world is mounted, the waiting line is gone and no tile is reported failed."}
         ],
         "api": [
           {"id": "made-with-the-values", "says": "POST /worlds/generated answered 201 for the preset with the two values the person set, each inside its served range and other than the preset's, and the saved world is listed as a generated world."},
@@ -1333,7 +1334,7 @@
     {
       "id": "describe-town-and-use-the-draft",
       "session": "town",
-      "action": "Open Make a world, write the town you want under Describe it, press Draft the values, read the drafted values and the sample town, press Use these values, then Make this town and wait while it is baked.",
+      "action": "Open Create a world, write the town you want under Describe it, press Draft the values, read the drafted values and the sample town, press Use these values, then Create this town and wait while it is baked.",
       "gates": ["milestone:A world to run"],
       "gates_reason": "A town from the catalogs, specified in a person's own words by an open model whose draft the server checks and samples, opens as a saved version.",
       "requires": ["enter-owned-starter"],
@@ -1351,7 +1352,7 @@
         "page": [
           {"id": "draft-shown", "says": "After Draft the values the page repeats the words, names the model that drafted the values and the preset it started from, lists each value, and describes one sample town of those values."},
           {"id": "values-used", "says": "After Use these values the preset is chosen and each control holds the value the draft states."},
-          {"id": "drafted-town-drawn", "says": "After Make this town the page waits for its tiles and opens the town."}
+          {"id": "drafted-town-drawn", "says": "After Create this town the page waits for its tiles and opens the town."}
         ],
         "api": [
           {"id": "drafted-by-the-model", "says": "POST /worlds/specification/drafts answered a valid proposal from the model it names, with a sample the server generated from it."},

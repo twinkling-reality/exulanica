@@ -23,7 +23,8 @@ import { setTimeout as sleep } from 'node:timers/promises';
 
 import { open as openBrowser } from '../rehearsal/cdp.mjs';
 import {
-  ACTION, OBJECT_PANEL, OPEN_CONFIRM, confirm, confirmation, liveObjects, open, openObjects, savedWorld,
+  ACTION, OBJECT_PANEL, OPEN_CONFIRM, SAVED_WORLD_CARDS, SAVED_WORLD_LIST, WORLD_READY, chooseMenu,
+  chooseSavedWorld, confirm, confirmation, enter, liveObjects, open, openObjects, savedWorld,
 } from '../rehearsal/app.mjs';
 import {
   INSPECT, INSPECTOR, PEOPLE, ROW, inspectorSeen, openPeopleNearby, societyPath, waitForEdit,
@@ -39,9 +40,29 @@ const MINUTES_MOST = 60;
 // The stall is moved this far aside before the bench is placed, so the two do not share a spot.
 const MOVE_PRESSES = 8;
 const MOVE_KEY = 'ArrowRight';
-// The steps, in order: each one is a person's action in the page.
-const STEPS = ['journey-open', 'journey-stall', 'journey-people', 'journey-bench', 'journey-response',
-  'journey-why'];
+// The steps, in order: each one is a person's action in the page. Your worlds comes first after
+// signing in (N1.k), the journey follows (N1.j), and Your worlds with two worlds and Create a world
+// close it (N1.l), so neither changes the world the journey uses.
+const STEPS = ['worlds-first', 'journey-open', 'journey-stall', 'journey-people', 'journey-bench',
+  'journey-response', 'journey-why', 'worlds-create'];
+// The second saved world N1.l makes through the API, so Your worlds lists two.
+const SECOND_WORLD_TITLE = 'Q10 second world';
+const SECOND_WORLD_RECIPE = 'small_town';
+// Create a world, as Your worlds opens it.
+const RECIPES = `document.querySelector('section.world-recipes')`;
+
+const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+
+/** What Your worlds shows: its variant, the chosen world, its cards in order and its actions. */
+const yourWorlds = (page) => page.evaluate(`(() => { const gate = ${SAVED_WORLD_LIST}; if (!gate) return null;
+  return { variant: gate.dataset.variant ?? null,
+    primary: gate.querySelector('.your-worlds-actions')?.dataset.primary ?? null,
+    heading: gate.querySelector('.your-worlds-title')?.textContent ?? null,
+    cards: ${SAVED_WORLD_CARDS}.map(b => ({ entry_id: b.dataset.entryId ?? null,
+      title: b.querySelector('.world-entry-choice-title')?.textContent ?? null,
+      current: b.getAttribute('aria-current') })),
+    create_card: !!gate.querySelector('[data-action="worlds.create-card"]'),
+    create_action: !!gate.querySelector('[data-action="worlds.create"]') }; })()`);
 
 /** The words the inspector's why-button reads, from the catalog the page draws them from. */
 function whyWords() {
@@ -160,6 +181,71 @@ async function place(ctx, assetKey) {
 }
 
 const STEP_HANDLERS = {
+  async 'worlds-first'(ctx) {
+    const surface = await enter(ctx, () => ctx.page.navigate(plan.runtime.app_url), undefined, { choose: false });
+    const seen = await yourWorlds(ctx.page);
+    const { entries, entry } = await savedWorld(ctx);
+    ctx.observe('your-worlds-first', surface === 'list' && entries.length === 1 && seen?.cards.length === 1
+      && seen.cards[0].entry_id === entry?.entry_id && seen.cards[0].title === entry?.title
+      && seen.create_card && seen.create_action,
+    { surface, seen, entries: entries.map((e) => [e.entry_id, e.title, e.authored_edit_seq]) });
+    // The untouched starter is not yet a world of the person's own: Create is the action asked for.
+    ctx.observe('untouched-starter-asks-to-create', entry?.authored_edit_seq === 0
+      && seen?.variant === 'first' && seen?.primary === 'create',
+    { edit_seq: entry?.authored_edit_seq ?? null, variant: seen?.variant ?? null, primary: seen?.primary ?? null });
+    await ctx.screenshot('your-worlds', 'Your worlds, the first screen after the credential gate');
+    await chooseSavedWorld(ctx);
+    const title = await ctx.page.evaluate(`document.querySelector('input[aria-label="World title"]')?.value ?? null`);
+    ctx.observe('card-opens-its-world', await ctx.page.evaluate(WORLD_READY) && title === entry?.title,
+      { title, entry_title: entry?.title ?? null });
+  },
+  async 'worlds-create'(ctx) {
+    // A workspace holds one starter, so the second world is a town from the smallest recipe. It is
+    // the newest card; the journey's starter, second, is the one opened, so no tile need be baked.
+    const made = await ctx.api('POST', '/worlds/generated', { recipe: SECOND_WORLD_RECIPE, title: SECOND_WORLD_TITLE });
+    ctx.observe('second-world-saved', made.status === 201, { status: made.status, entry_id: made.body?.entry_id ?? null });
+    const surface = await enter(ctx, () => ctx.page.reload(), undefined, { choose: false });
+    const listed = (await ctx.api('GET', '/world-entries')).body ?? [];
+    const newestFirst = [...listed].sort((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at)).map((e) => e.entry_id);
+    const seen = await yourWorlds(ctx.page);
+    ctx.observe('worlds-newest-first', surface === 'list' && listed.length === 2
+      && same(seen?.cards.map((c) => c.entry_id), newestFirst) && seen?.variant === 'worlds' && seen?.primary === 'open',
+    { surface, cards: seen?.cards ?? null, newest_first: newestFirst, variant: seen?.variant ?? null, primary: seen?.primary ?? null });
+    await ctx.screenshot('two-worlds', 'Your worlds with two saved worlds');
+    // Arrows choose and Enter opens: from the first card, one step right chooses the second.
+    await ctx.page.evaluate(`${SAVED_WORLD_CARDS}[0].focus()`);
+    await ctx.page.key('ArrowRight', 'ArrowRight');
+    await sleep(PAGE_SETTLE_MS);
+    const chose = await yourWorlds(ctx.page);
+    const second = listed.find((e) => e.entry_id === newestFirst[1]) ?? null;
+    ctx.observe('arrow-chooses', chose?.cards[1]?.current === 'true' && chose?.heading === second?.title,
+      { cards: chose?.cards ?? null, heading: chose?.heading ?? null, second: second?.title ?? null });
+    // Enter on the focused card is the card's own press, which a key types as a carriage return.
+    await ctx.page.key('Enter', 'Enter', { text: '\r' });
+    await ctx.page.waitFor(WORLD_READY, SETTLE_MS * 3, 'the chosen world to open');
+    const title = await ctx.page.evaluate(`document.querySelector('input[aria-label="World title"]')?.value ?? null`);
+    ctx.observe('enter-opens-the-chosen-world', title === second?.title, { title, chosen: second?.title ?? null });
+    // The World menu's Your worlds comes back to the list.
+    const back = await enter(ctx, () => chooseMenu(ctx.page, 'worlds'), undefined, { choose: false });
+    ctx.observe('world-menu-returns-to-your-worlds', back !== null && !!await ctx.page.evaluate(SAVED_WORLD_LIST),
+      { surface: back });
+    // N creates: Create a world opens with describing the town first, then the served recipes.
+    await ctx.page.evaluate(`${SAVED_WORLD_CARDS}[0].focus()`);
+    await ctx.page.key('KeyN', 'n', { text: 'n' });
+    await ctx.page.waitFor(`${RECIPES}?.querySelectorAll('button.world-recipes-choice').length > 0 ? true : null`,
+      SETTLE_MS, 'Create a world to show its recipes');
+    const served = ((await ctx.api('GET', '/worlds/specification')).body?.presets ?? []).map((p) => p.key).sort();
+    const sheet = await ctx.page.evaluate(`(() => { const r = ${RECIPES}; const d = document.querySelector('section.world-description');
+      return { visible: !!r && r.checkVisibility(), presets: [...r.querySelectorAll('button.world-recipes-choice')].map(b => b.dataset.recipe),
+        description_first: !!d && d.checkVisibility() && !!(d.compareDocumentPosition(r.querySelector('button.world-recipes-choice')) & Node.DOCUMENT_POSITION_FOLLOWING) }; })()`);
+    ctx.observe('n-opens-create-a-world', sheet.visible && same([...sheet.presets].sort(), served) && sheet.description_first,
+      { sheet, served });
+    await ctx.screenshot('create-a-world', 'Create a world, opened from Your worlds with N');
+    await ctx.page.key('Escape', 'Escape');
+    await sleep(PAGE_SETTLE_MS);
+    const closed = await ctx.page.evaluate(`!(${RECIPES}?.checkVisibility() ?? false) && !!${SAVED_WORLD_LIST}?.checkVisibility()`);
+    ctx.observe('escape-returns-to-your-worlds', closed, { closed });
+  },
   async 'journey-open'(ctx) {
     await open(ctx);
     const { entries, entry } = await savedWorld(ctx);

@@ -59,3 +59,26 @@ def test_the_runner_registers_nothing_in_the_rehearsal_step_list():
     # The rehearsal's registry is HANDLERS; the runner's own map is STEP_HANDLERS.
     assert re.search(r"\bHANDLERS\b", runner) is None
     assert "steps.json" not in runner
+
+
+def test_every_step_a_row_reads_is_a_step_the_runner_runs():
+    """N1.j, N1.k and N1.l are read from the runner's outcomes by step id: a step the driver names
+    that the runner does not run would leave its row failed as never reached."""
+    import importlib.util
+    import sys
+
+    path = ROOT / "scripts" / "acceptance" / "foundation.py"
+    spec = importlib.util.spec_from_file_location("exulanica_acceptance_foundation_steps", path)
+    assert spec is not None and spec.loader is not None
+    driver = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = driver
+    spec.loader.exec_module(driver)
+    runner = RUNNER.read_text()
+    listed = re.search(r"const STEPS = \[(.*?)\];", runner, re.S)
+    assert listed is not None
+    runs = re.findall(r"'([a-z-]+)'", listed.group(1))
+    read = [*driver.JOURNEY_STEPS, *(step for _, _, step, _ in driver.WORLDS_ROWS)]
+
+    assert sorted(read) == sorted(runs)
+    for step in runs:
+        assert f"async '{step}'(ctx)" in runner, step

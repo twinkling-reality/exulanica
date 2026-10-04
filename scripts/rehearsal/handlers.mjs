@@ -15,8 +15,9 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import { addUsd, increaseUsd } from './usd.mjs';
 import { hostProgresses } from './continuation.mjs';
 import {
-  ACTION, BUTTON, OBJECT_PANEL, OPEN_CONFIRM, PLACEHOLDER, SAVED_WORLD_LIST, TITLE_FIELD, WORLD_MENU_BUTTON, WORLD_READY,
-  chooseMenu, confirm, confirmation, enter, focusCanvas, liveObjects, objectRows, objectStatus, open,
+  ACTION, BUTTON, OBJECT_PANEL, OPEN_CONFIRM, PLACEHOLDER, SAVED_WORLD_CARDS, SAVED_WORLD_LIST, TITLE_FIELD,
+  WORLD_MENU_BUTTON, WORLD_READY,
+  chooseMenu, chooseSavedWorld, confirm, confirmation, enter, focusCanvas, liveObjects, objectRows, objectStatus, open,
   openEntryId, openObjects, reload, savedWorld, waitForWorld,
 } from './app.mjs';
 
@@ -100,8 +101,24 @@ async function accessGate(ctx) {
 
   await page.typeInto(TOKEN_FIELD, ctx.token);
   await page.click(ENTER, 'Enter Exulanica');
+  // Your worlds comes first after signing in, with the starter the arrival made as its one card.
+  const after = await page.waitFor(`${WORLD_READY} ? 'world' : (${SAVED_WORLD_LIST} ? 'list' : null)`,
+    90_000, 'Your worlds after the token');
+  const listed = after === 'list' ? await page.evaluate(`(() => {
+    const gate = ${SAVED_WORLD_LIST};
+    return { cards: ${SAVED_WORLD_CARDS}.map(b => b.querySelector('.world-entry-choice-title')?.textContent ?? null),
+      create: !!gate.querySelector('[data-action="worlds.create"], [data-action="worlds.create-card"]'),
+      variant: gate.getAttribute('data-variant') }; })()`) : null;
+  const entries = (await ctx.api('GET', '/world-entries')).body;
+  ctx.observe('your-worlds-first', after === 'list' && Array.isArray(entries) && entries.length === 1
+    && listed.cards.length === 1 && listed.cards[0] === entries[0].title && listed.create,
+  { first_after_token: after, ...listed, entries: Array.isArray(entries) ? entries.map(e => e.title) : null });
+  if (after === 'list') {
+    await ctx.screenshot('your-worlds', 'Your worlds, the first screen after the token, with the starter as its one card');
+    await chooseSavedWorld(ctx);
+  }
   await waitForWorld(page);
-  ctx.observe('token-opens-world', await page.evaluate(WORLD_READY),
+  ctx.observe('token-opens-world', after === 'list' && await page.evaluate(WORLD_READY),
     { title_field: await page.evaluate(`${TITLE_FIELD}?.value ?? null`) });
 }
 
@@ -2627,14 +2644,14 @@ const RECIPES = `document.querySelector('section.world-recipes')`;
 const DESCRIPTION = `document.querySelector('section.world-description')`;
 const WAITING = `document.querySelector('[data-generated-world-waiting]')`;
 
-/** Open Make a world and wait for the served specification to be drawn. */
+/** Open Create a world and wait for the served specification to be drawn. */
 async function openRecipes(page) {
   if (!await page.evaluate(`${RECIPES}?.checkVisibility() ?? false`)) await chooseMenu(page, 'make');
   await page.waitFor(`${RECIPES}?.querySelectorAll('button.world-recipes-choice').length > 0 ? true : null`,
-    SETTLE_MS, 'the presets Make a world offers');
+    SETTLE_MS, 'the presets Create a world offers');
 }
 
-/** What Make a world shows: its presets, each value's control with its range, and its state. */
+/** What Create a world shows: its presets, each value's control with its range, and its state. */
 const recipesSeen = (page) => page.evaluate(`(() => { const r = ${RECIPES}; if (!r || !r.checkVisibility()) return null;
   return { state: r.getAttribute('data-specification-state'),
     presets: [...r.querySelectorAll('button.world-recipes-choice')].map(b => ({ key: b.dataset.recipe, label: b.textContent.trim(), pressed: b.getAttribute('aria-pressed') })),
@@ -2644,7 +2661,7 @@ const recipesSeen = (page) => page.evaluate(`(() => { const r = ${RECIPES}; if (
     make: (() => { const b = r.querySelector('button.world-recipes-make'); return b ? { hidden: b.hidden, disabled: b.disabled, text: b.textContent.trim() } : null; })() }; })()`);
 
 /**
- * After Make this town: the page opens the new entry, says it is being built while its tiles bake,
+ * After Create this town: the page opens the new entry, says it is being built while its tiles bake,
  * and draws it once they are. Returns the entry and what was seen, read from the API as it waits.
  */
 async function townOpened(ctx, entryId, seconds) {
@@ -2684,7 +2701,7 @@ async function makeTownWithValues(ctx) {
   const moved = {};
   for (const key of changing) {
     const control = offered?.values.find((v) => v.key === key);
-    if (control === undefined) throw new Error(`Make a world shows no control for ${key}`);
+    if (control === undefined) throw new Error(`Create a world shows no control for ${key}`);
     const [value, min, max, step] = [control.value, control.min, control.max, control.step].map(Number);
     const next = value + step <= max ? value + step : value - step;
     if (next < min || next === value) throw new Error(`${key}'s range ${min} to ${max} holds no other value than ${value}`);
@@ -2696,9 +2713,9 @@ async function makeTownWithValues(ctx) {
   ctx.observe('values-offered', offered !== null && offered.presets.map((p) => p.key).sort().join() === specification.presets.map((p) => p.key).sort().join()
     && offered.values.map((v) => v.key).sort().join() === adjustable.sort().join() && set?.state === 'admitted' && set?.make?.disabled === false,
   { presets: offered?.presets ?? null, controls: offered?.values ?? null, after_setting: set, served_adjustable: adjustable });
-  await ctx.screenshot('values', `Make a world with ${preset.label} and two values moved`);
+  await ctx.screenshot('values', `Create a world with ${preset.label} and two values moved`);
   const postsBefore = (await responses(ctx, 'POST', '/api/worlds/generated')).length;
-  await page.click(`${RECIPES}.querySelector('button.world-recipes-make')`, 'Make this town');
+  await page.click(`${RECIPES}.querySelector('button.world-recipes-make')`, 'Create this town');
   const made = await until('the town to be made', SETTLE_MS * 4, async () =>
     (await responses(ctx, 'POST', '/api/worlds/generated')).slice(postsBefore).find((r) => r.status !== null) ?? null);
   if (made.status !== 201) {
@@ -3075,7 +3092,7 @@ async function describeTownAndUseTheDraft(ctx) {
   ctx.observe('values-used', used?.presets.find((p) => p.pressed === 'true')?.key === proposal.preset && holds && used?.state === 'admitted',
     { preset: proposal.preset, drafted: proposal.values, controls: used?.values ?? null, state: used?.state ?? null });
   const postsBefore = (await responses(ctx, 'POST', '/api/worlds/generated')).length;
-  await page.click(`${RECIPES}.querySelector('button.world-recipes-make')`, 'Make this town');
+  await page.click(`${RECIPES}.querySelector('button.world-recipes-make')`, 'Create this town');
   const made = await until('the drafted town to be made', SETTLE_MS * 4, async () =>
     (await responses(ctx, 'POST', '/api/worlds/generated')).slice(postsBefore).find((r) => r.status !== null) ?? null);
   const entryId = made.response_body?.entry_id ?? null;

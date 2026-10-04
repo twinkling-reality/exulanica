@@ -3804,6 +3804,33 @@ JOURNEY_STEPS = (
     "journey-response",
     "journey-why",
 )
+#: The rows of Your worlds and Create a world (A-59), each one step of the same browser session:
+#: Your worlds before the journey, two worlds and Create a world after it.
+WORLDS_ROWS = (
+    (
+        "N1.k",
+        "worlds.first",
+        "worlds-first",
+        "In the production build, after the credential gate and before any world opens, Your "
+        "worlds is the first screen: it lists exactly the one saved world GET /world-entries "
+        "holds, by its entry id and title, with Create a world as a card and an action; that world "
+        "being the untouched starter (no edit), the page asks to create one (variant first, Create "
+        "the primary action); pressing its card opens that world under its title.",
+    ),
+    (
+        "N1.l",
+        "worlds.choose_and_create",
+        "worlds-create",
+        "After the journey, with a second saved world, a town from the smallest recipe made "
+        "through the API (the stack started with --tiles): Your worlds lists "
+        "both, newest first by the entries' update times, with Open the primary action; from the "
+        "first card one ArrowRight chooses the second (its card current, its title the heading) "
+        "and Enter opens that world; the World menu's Your worlds returns to the list; N opens "
+        "Create a world, which offers describing the town before the recipe choices and exactly "
+        "the presets GET /worlds/specification serves; Escape returns to Your worlds. Functional "
+        "only; how the pages look stays with the experience owner.",
+    ),
+)
 
 
 def _rehearsal() -> Any:
@@ -3824,7 +3851,9 @@ def browser(arguments: argparse.Namespace) -> int:
     stack = Stack.read(worktree)
     app = stack.state.get("app") or {}
     if app.get("mode") != "production" or not stack.state.get("society_playback"):
-        raise SystemExit("browser needs a stack started with --production --society-playback")
+        raise SystemExit(
+            "browser needs a stack started with --production --society-playback --tiles"
+        )
     rehearse = _rehearsal()
     steps = json.loads((REPOSITORY / "scripts" / "rehearsal" / "steps.json").read_text())
     out = Path(arguments.out).resolve()
@@ -3900,6 +3929,21 @@ def browser(arguments: argparse.Namespace) -> int:
         "build": app.get("build", {}).get("index_html_sha256"),
     }
     row.close()
+    worlds_rows = []
+    for row_id, check, step, statement in WORLDS_ROWS:
+        worlds_row = Row(row_id, check, statement)
+        outcome = outcomes.get(step) or {}
+        worlds_row.expect(
+            outcome.get("status") == "passed",
+            f"{step}: {outcome.get('status') or 'not reached'} {outcome.get('reason') or ''}".strip(),
+        )
+        worlds_row.observed = {
+            "step": outcome.get("status"),
+            "observations": outcome.get("observations"),
+            "build": app.get("build", {}).get("index_html_sha256"),
+        }
+        worlds_rows.append(worlds_row.close())
+    rows = [row, *worlds_rows]
     results = {
         "profile": "q10-foundation-acceptance-results/v1",
         "candidate": stack.state["tree"],
@@ -3907,8 +3951,8 @@ def browser(arguments: argparse.Namespace) -> int:
         "started_at": started,
         "finished_at": dt.datetime.now(dt.UTC).isoformat(),
         "timing_claims": False,
-        "rows": [row.document()],
-        "counts": {state: int(row.status == state) for state in STATES},
+        "rows": [one.document() for one in rows],
+        "counts": {state: sum(one.status == state for one in rows) for state in STATES},
     }
     (out / "results.json").write_text(json.dumps(results, indent=2, sort_keys=True))
     (out / "manifest.json").write_text(
@@ -3929,8 +3973,9 @@ def browser(arguments: argparse.Namespace) -> int:
             sort_keys=True,
         )
     )
-    print(f"{row.row:16} {row.status:8} {'; '.join(row.failures or row.blocked_by)}")
-    return 0 if row.status != "failed" else 1
+    for one in rows:
+        print(f"{one.row:16} {one.status:8} {'; '.join(one.failures or one.blocked_by)}")
+    return 0 if all(one.status != "failed" for one in rows) else 1
 
 
 def build_parser() -> argparse.ArgumentParser:

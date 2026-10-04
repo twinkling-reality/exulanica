@@ -34,8 +34,10 @@ export const menuEntry = (command) => `document.querySelector('section.world-men
 export const WORLD_READY = `(() => { const shell = document.querySelector('#shell');
   return !!shell && !shell.hasAttribute('data-booting') && !document.querySelector('#shell .startup-thinking')
     && !!document.querySelector('input[aria-label="World title"]'); })()`;
-/** The list of saved worlds the application shows when a person has more than one. */
+/** Your worlds: the list of saved worlds the application shows first after signing in. */
 export const SAVED_WORLD_LIST = `document.querySelector('main.world-entry-gate')`;
+/** The saved worlds' cards on Your worlds, each a button naming its entry; Create a world is not one. */
+export const SAVED_WORLD_CARDS = `[...document.querySelectorAll('main.world-entry-gate button.world-entry-choice')]`;
 const GATE_OR_WORLD = `document.querySelector('form.credential-gate') ? 'gate'
   : (${WORLD_READY} ? 'world' : (${SAVED_WORLD_LIST} ? 'list'
     : (document.querySelector('#shell')?.getAttribute('data-world-state') || null)))`;
@@ -48,10 +50,21 @@ const WORLD_OR_LIST = `${WORLD_READY} ? 'world' : (${SAVED_WORLD_LIST} ? 'list' 
  */
 export const openEntryId = (ctx, entryId) => entryId ?? ctx.facts.open_entry_id ?? ctx.facts.entry_id ?? null;
 
-/** Choose a saved world in the list by the title the API holds for it, and wait for it to open. */
+/**
+ * Choose a saved world in the list by the title the API holds for it, and wait for it to open.
+ * With no world named, the list's only card is chosen, as a person with one world chooses it; a
+ * list of more than one with none named is refused rather than guessed.
+ */
 export async function chooseSavedWorld(ctx, entryId) {
   const { page } = ctx;
   const wanted = openEntryId(ctx, entryId);
+  if (wanted === null) {
+    const titles = await page.evaluate(`${SAVED_WORLD_CARDS}.map(b => b.querySelector('.world-entry-choice-title')?.textContent ?? null)`);
+    if (titles.length !== 1) throw new Error(`the list of saved worlds shows ${titles.length} worlds and no saved world was named`);
+    await page.click(`${SAVED_WORLD_CARDS}[0]`, `the only saved world "${titles[0]}"`);
+    await waitForWorld(page);
+    return null;
+  }
   const listed = await ctx.api('GET', '/world-entries');
   const entry = (Array.isArray(listed.body) ? listed.body : []).find((e) => e.entry_id === wanted);
   if (entry === undefined) throw new Error(`the list of saved worlds was shown and no saved world ${wanted} is listed`);
@@ -63,10 +76,10 @@ export async function chooseSavedWorld(ctx, entryId) {
 
 /**
  * Load the application and pass its credential gate with the run's token, the way an operator
- * does: the production build keeps no token, so every page load asks again. When the person has
- * more than one saved world the application lists them, and the world `entryId` names (see
- * `openEntryId`) is chosen there, or, with `choose: false`, the list is left open. Returns what
- * the first surface was, or 'list' when the list was left open.
+ * does: the production build keeps no token, so every page load asks again. After signing in the
+ * application shows Your worlds, and the world `entryId` names (see `openEntryId`) is chosen there,
+ * else the only one listed, or, with `choose: false`, the list is left open. Returns what the
+ * first surface was, or 'list' when the list was left open.
  */
 export async function enter(ctx, load, entryId, { choose = true } = {}) {
   const { page } = ctx;
@@ -84,8 +97,8 @@ export async function enter(ctx, load, entryId, { choose = true } = {}) {
   } else if (first !== 'world' && first !== 'list') {
     throw new Error(`the application opened on its "${first}" surface instead of a world`);
   }
-  // More than one saved world: the application asks which, as it asks a person. A step that reads
-  // the list itself stops there.
+  // Your worlds: the application asks which, as it asks a person. A step that reads the list
+  // itself stops there.
   if (next === 'list' && !choose) return 'list';
   if (next === 'list') await chooseSavedWorld(ctx, entryId);
   await waitForWorld(page);
