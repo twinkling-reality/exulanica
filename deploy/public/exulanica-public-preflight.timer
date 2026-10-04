@@ -1,0 +1,11 @@
+# Daily. A failure names the identifier that is gone; nothing restarts or changes on its account.
+[Unit]
+Description=Exulanica model catalog preflight, daily
+
+[Timer]
+OnCalendar=daily
+RandomizedDelaySec=1h
+Persistent=true
+
+[Install]
+WantedBy=timers.target

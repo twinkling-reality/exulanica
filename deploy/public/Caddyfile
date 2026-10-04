@@ -1,0 +1,56 @@
+# The public server's edge. deploy/public/public.yaml mounts this file and supplies the two values
+# it reads from the environment.
+#
+# `tls` takes an email address, which asks a public certificate authority for a certificate
+# through ACME, or the word `internal`, which issues from Caddy's own local authority for a
+# rehearsal. Caddy redirects plain HTTP to HTTPS on its own.
+#
+# It proxies to `client`, never to `api`: `client` holds the single-origin `/api` prefix strip, the
+# per-address write limit and its own refusals, and an edge that reached `api` directly would
+# bypass them.
+#
+# Caddy's access log records request headers with Authorization and Cookie values redacted, so a
+# bearer token or a session cookie does not reach the log.
+{
+	admin off
+}
+
+{$EXULANICA_PUBLIC_HOST} {
+	tls {$EXULANICA_TLS}
+	# Visitors on this server upload no photographs: the largest body a visitor sends is a question,
+	# a world's description or a picture to draft from. 8 MiB, as the reviewer edge; the client
+	# proxy's own cap (512 MiB) stays the API's.
+	request_body {
+		max_size 8MiB
+	}
+	encode zstd gzip
+	reverse_proxy client:8080 {
+		transport http {
+			# Answering a question runs a model call; the client proxy allows 300 s for the same reason.
+			read_timeout 300s
+		}
+	}
+	log {
+		output stdout
+		format json
+	}
+	# The edge's own refusals, in the problem shape the API and the client proxy answer with
+	# ({"code", "detail"}), with the client proxy's codes and Retry-After. handle_errors runs only for
+	# errors the edge raises itself; an answer from the client proxy or the API passes through as sent.
+	handle_errors 413 {
+		header Content-Type application/json
+		header Cache-Control no-store
+		respond `{"code":"body_too_large","detail":"the request body is larger than the 8388608 bytes this installation accepts","limit_bytes":8388608}` 413
+	}
+	handle_errors 502 {
+		header Content-Type application/json
+		header Cache-Control no-store
+		header Retry-After 5
+		respond `{"code":"upstream_unavailable","detail":"the installation's client proxy closed the connection or could not be reached; whether the request ran is not known, so send it again after 5 seconds only if repeating it is safe","retry_after_seconds":5}` 502
+	}
+	handle_errors 504 {
+		header Content-Type application/json
+		header Cache-Control no-store
+		respond `{"code":"upstream_timeout","detail":"the installation's client proxy did not answer within 300 seconds; whether the request ran is not known"}` 504
+	}
+}

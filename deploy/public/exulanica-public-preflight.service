@@ -1,0 +1,11 @@
+# The model catalog preflight (docs/deployment.md section 7), from the backend image the server
+# runs: one public catalog read, no credential, no model call. Its report goes to the journal.
+[Unit]
+Description=Exulanica model catalog preflight
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+Environment=EXULANICA_DEPLOY_DIR=/srv/exulanica/secrets
+ExecStart=/srv/exulanica/app/deploy/public/public.sh preflight

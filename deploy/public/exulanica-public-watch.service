@@ -1,0 +1,12 @@
+# One health check of the public server through its own edge (public.sh watch), run by the timer
+# beside it every minute. Installed by docs/deployment.md section 8.2 with the layout it names:
+# the copied repository files under /srv/exulanica/app, the secrets under /srv/exulanica/secrets.
+[Unit]
+Description=Exulanica public server health check
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+Environment=EXULANICA_DEPLOY_DIR=/srv/exulanica/secrets
+ExecStart=/srv/exulanica/app/deploy/public/public.sh watch

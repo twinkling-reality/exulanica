@@ -1,0 +1,108 @@
+# The public server: an overlay on the repository's `compose.yaml`, used as
+#
+#   docker compose -f compose.yaml -f deploy/public/public.yaml ...
+#
+# and normally through `public.sh` beside it, which supplies the environment. docs/deployment.md
+# section 8.2 is the runbook.
+#
+# WHAT IT ADDS TO THE INSTALLATION. A TLS edge in front of the installation's own client proxy, the
+# one way in from outside; the API's published port taken away; durable spending; the process's
+# model ceilings stated by the operator; one image name per recipe, so a host loads three images
+# rather than one per service; bounded logs on every long-running service.
+#
+# WHY THE INSTALLATION AND NOT THE REVIEWER STACK. Visitors make worlds of their own, choose the
+# models that run their people and compare them. The reviewer stack serves one seeded workspace
+# through a role that registers no world, so none of that works there (docs/judge-access.md).
+#
+# WHY THE EDGE PROXIES TO `client` AND NEVER TO `api`. `client` holds the single-origin `/api`
+# prefix strip, the per-address write limit and the problem shape of its own refusals. An edge
+# that reached `api` directly would bypass all three.
+#
+# Like `compose.yaml`, nothing here names a cloud, a region, a host or an account: the host name,
+# the certificate issuer and the edge's bind address are environment values with no default.
+
+services:
+  edge:
+    # An exact version, as the reviewer edge pins it: a moving tag is a proxy that changes under a
+    # running server.
+    image: caddy:2.11.4-alpine
+    restart: unless-stopped
+    ports:
+      # No default for the address. A public host states 0.0.0.0; a rehearsal states 127.0.0.1 and
+      # ports of its own, so nobody opens 80 and 443 on a shared machine by leaving it unset.
+      - "${EXULANICA_EDGE_ADDRESS:?set EXULANICA_EDGE_ADDRESS; 0.0.0.0 on a public host, 127.0.0.1 in a rehearsal}:${EXULANICA_EDGE_HTTP_PORT:-80}:80"
+      - "${EXULANICA_EDGE_ADDRESS:?set EXULANICA_EDGE_ADDRESS; 0.0.0.0 on a public host, 127.0.0.1 in a rehearsal}:${EXULANICA_EDGE_HTTPS_PORT:-443}:443"
+    environment:
+      EXULANICA_PUBLIC_HOST: ${EXULANICA_PUBLIC_HOST:?set EXULANICA_PUBLIC_HOST to the host name visitors open}
+      EXULANICA_TLS: ${EXULANICA_TLS:?set EXULANICA_TLS to an ACME contact email, or internal for a rehearsal}
+    volumes:
+      # Relative to the project directory, which is the first compose file's: the repository root
+      # on the build host and the copied layout on the server alike.
+      - ./deploy/public/Caddyfile:/etc/caddy/Caddyfile:ro
+      # The issued certificate and the account key, kept across restarts so a restart does not ask
+      # the certificate authority again and meet its rate limit.
+      - edge_data:/data
+      - edge_config:/config
+    logging: &bounded-logs
+      driver: json-file
+      options:
+        # Ten files of 10 MB per service. A log that grows until the disk fills stops PostgreSQL
+        # first, which is the worst service to lose.
+        max-size: "10m"
+        max-file: "10"
+    depends_on:
+      - client
+
+  postgres:
+    logging: *bounded-logs
+
+  restore-marker:
+    image: exulanica-public-backend
+
+  migrate:
+    image: exulanica-public-backend
+
+  catalogs:
+    image: exulanica-public-backend
+
+  api:
+    image: exulanica-public-backend
+    # The installation publishes the API's port for a host that puts its own proxy in front. Here
+    # the edge is that proxy, and a published API port would be a second way in that skips the
+    # client proxy's write limit and body cap. `!reset` removes the base file's list.
+    ports: !reset []
+    environment:
+      # Every attempt is admitted by the durable spending authority as well as this process's own
+      # fuse (docs/model-spending-contract.md): the authority is the money and survives restarts;
+      # the fuse stops a runaway loop. No `process` mode on a server anybody can reach.
+      EXULANICA_SPENDING: durable
+      # The process fuse: no default here, although the API has one, because the figure is the
+      # operator's to state. Each is a ceiling for one process life.
+      EXULANICA_BUDGET_USD: ${EXULANICA_BUDGET_USD:?set EXULANICA_BUDGET_USD; this server states its process model spend ceiling}
+      EXULANICA_BUDGET_MAX_CALLS: ${EXULANICA_BUDGET_MAX_CALLS:?set EXULANICA_BUDGET_MAX_CALLS; this server states its process model call ceiling}
+    logging: *bounded-logs
+
+  preparation:
+    image: exulanica-public-backend
+    logging: *bounded-logs
+
+  playback-worker:
+    image: exulanica-public-backend
+    environment:
+      EXULANICA_SPENDING: durable
+    logging: *bounded-logs
+
+  maintenance:
+    image: exulanica-public-maintenance
+    logging: *bounded-logs
+
+  restore:
+    image: exulanica-public-maintenance
+
+  client:
+    image: exulanica-public-client
+    logging: *bounded-logs
+
+volumes:
+  edge_data:
+  edge_config:

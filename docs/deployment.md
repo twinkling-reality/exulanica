@@ -57,6 +57,7 @@ worker. The repository holds the recipes; no cloud account, host or domain is pr
   - [7.4 Limits](#74-limits)
 - [8. A seeded deployment for a reviewer](#8-a-seeded-deployment-for-a-reviewer)
   - [8.1 Serving it over HTTPS from one host](#81-serving-it-over-https-from-one-host)
+  - [8.2 The public server](#82-the-public-server)
 - [9. Backups and recovery](#9-backups-and-recovery)
   - [9.0 Sizing one host](#90-sizing-one-host)
   - [9.1 Installation profiles and facts](#91-installation-profiles-and-facts)
@@ -80,6 +81,7 @@ worker. The repository holds the recipes; no cloud account, host or domain is pr
 | `.dockerignore` | An allowlist rather than a denylist, because `exulanica/models/credentials.py` reads a `.env` file from the working directory or a parent, and a denylist is one forgotten line away from an image that carries a credential |
 | `compose.yaml` | A local composition: PostgreSQL 18 with pgvector 0.8.6 (`pgvector/pgvector:0.8.6-pg18`), the one-shot `migrate` service, the API, the derivative worker and the scene worker. It names no cloud, region, domain or account |
 | `deploy/judge/` | The seeded stack for a reviewer, its HTTPS edge overlay and the operator script `stack.sh` (section 8) |
+| `deploy/public/` | The public server: an overlay on `compose.yaml` with a TLS edge, the operator script `public.sh` and the host's systemd units (8.2) |
 | `deploy/material-bake/Dockerfile` | The image recipe for `exulanica-material-bake`, which `compose.yaml` does not start |
 | `deploy/gsplat/` | The CUDA scene-training image and the launcher that runs the scene worker on a GPU host; [scene training](gsplat-scene-jobs.md) owns both |
 | `.github/workflows/check.yml` | Continuous integration: `ruff`, the import contracts, the backend suite with `EXULANICA_REQUIRE_POSTGRES=1`, the web workspace's `pnpm check` and an image build. The backend run's skips are held to `tests/expected_skips.toml` by `scripts/run_backend_suite.py --check-skips` |
@@ -1177,6 +1179,109 @@ stack has no per-judge spend limit, no backup of its volumes (D-3) and no monito
 health status Docker records, which nothing acts on, and `status`; a revoked token stays valid
 until the next `up`.
 
+### 8.2 The public server
+
+The reviewer stack serves one seeded workspace through a role that registers no world, so it
+cannot serve visitors who make worlds, choose the models that run their people and compare them.
+The public server is the installation composition instead (`compose.yaml`, profile
+`single-host-server-only`, section 9.1), with `deploy/public/public.yaml` layered on it.
+
+**What the overlay changes:**
+- **An edge in front.** It adds the reviewer stack's Caddy edge (8.1), configured by
+  `deploy/public/Caddyfile`. The edge forwards to the installation's `client` proxy and never to
+  `api`.
+- **The API's port.** It removes the API's published port (`ports: !reset []`). A published port
+  would let a request reach the API around the client proxy's write limit and body cap.
+- **Spending.** It sets `EXULANICA_SPENDING=durable` on the API and the playback worker, so every
+  model attempt is admitted by the spending authority as well as the process fuse. The fuse
+  (`EXULANICA_BUDGET_USD`, `EXULANICA_BUDGET_MAX_CALLS`) has no default here.
+- **Images.** It names one image per recipe: `exulanica-public-backend`,
+  `exulanica-public-maintenance` and `exulanica-public-client`. A host therefore loads three images.
+- **Logs.** It bounds every long-running service's logs to ten 10 MB files.
+
+The edge caps a body at 8 MiB. Nobody on this server uploads photographs; the largest body is a
+question, a world's description or a picture to draft from. The reconstruction workers do not run.
+`tests/test_public_deployment.py` holds these properties.
+
+**Built and not built.**
+- Built: the composition, `deploy/public/public.sh` and the host's health and preflight timers.
+- Not built:
+  - a visitor's own entry (a guest session with a workspace of its own and an allowance from the
+    authority);
+  - towns that open with their tiles already baked;
+  - models for workspaces found through accounts.
+
+  Until they exist, the server admits holders of tokens the operator mints (`mint`). The people of
+  those tokens' workspaces play, and may be decided by models under each workspace's grant. A
+  town created there reads unavailable (`generated_tiles_not_installed`), and a starter world
+  works (9.1).
+
+`deploy/public/public.sh` runs every step. Every step but `build`, `images` and `save` reads the
+secrets directory `EXULANICA_DEPLOY_DIR`:
+
+| Command | What it does |
+| --- | --- |
+| `build` | On the build host, from a clean checkout: builds the client bundle with no `VITE_` setting, then builds the three images for `EXULANICA_BUILD_PLATFORM` (default `linux/amd64`), and prints their IDs. `EXULANICA_REHEARSAL_BUILD=1` allows a working tree with changes, for a rehearsal only |
+| `images`, `save <file>` | Print the image IDs; write the three images to one gzip archive and print its sha256 |
+| `init` | Writes `public.env` (mode 0600, in a directory created 0700). It holds six generated role passwords, the host, issuer, edge address and ports, the backup and custody directories, and the model endpoint's allowlist. It also writes the operator's token, whose grant holds `operations.read` alone. Custody inside the backup directory is refused. The fuse is left empty |
+| `mint <label>`, `revoke <label>` | Add or remove a token for a workspace of its own, minted by the image's `exulanica-seed token` with the reviewer's permissions. The next `up` serves the change and plays those workspaces |
+| `up` | Starts the server from loaded images, never building. It refuses until the fuse is filled in. `restore-marker`, `migrate` and `catalogs` run to completion on every start |
+| `issue-authority`, `grant <label>`, `spending` | Issue the server's spending authority from `EXULANICA_AUTHORITY_USD`, `EXULANICA_AUTHORITY_CALLS` and `EXULANICA_AUTHORITY_VALID_UNTIL`; grant a minted workspace `EXULANICA_GRANT_USD` and `EXULANICA_GRANT_CALLS` under it; print the authorities' state. Each runs `python -m exulanica.spending` as the owner in a one-shot container on the server's network, with the witness volume |
+| `backup-now` | One maintenance pass now (9.3) |
+| `status` | The containers, readiness from inside the client container, Docker's disk use and the backup and custody file systems |
+| `watch` | One liveness and readiness read through the edge, resolved to this machine. Three liveness failures in a row recreate the API container, because Docker restarts a container that exits and never one that only fails its health check (section 9) |
+| `preflight` | The catalog preflight (section 7) from the backend image. Its allowlist is the catalog origins the image's manifest declares; the API's allowlist stays the model endpoint |
+| `logs`, `down`, `destroy --yes-delete-volumes` | Follow the logs; stop and keep the volumes; stop and delete them, the database, store and spending witness included |
+
+The model credential is never written to a file: `up` passes `NEBIUS_API_KEY` through from the
+calling shell.
+
+**On one host.** The machine is section 8.1's: a `cpu-d3` virtual machine with Ubuntu 24.04, a
+public address, and inbound TCP 80 and 443, with 22 limited to the operator's address. It also has
+a second disk for backups. The layout the systemd units name:
+- `/srv/exulanica/app`: `compose.yaml` and `deploy/public/` from the commit served;
+- `/srv/exulanica/secrets`: the secrets directory;
+- `/srv/exulanica/custody`: custody;
+- the second disk for backup sets, mounted apart from Docker's volumes.
+
+1. On the build host, from a clean checkout of the commit to serve:
+   `deploy/public/public.sh build`, then `deploy/public/public.sh save public-images.tar.gz`.
+   Copy the archive, `compose.yaml` and `deploy/public/` to the host. Then
+   `gunzip -c public-images.tar.gz | docker load` and `deploy/public/public.sh images`; the IDs
+   must equal the build host's.
+2. Run `init` with `EXULANICA_PUBLIC_HOST`, `EXULANICA_TLS` (the certificate contact email),
+   `EXULANICA_EDGE_ADDRESS=0.0.0.0`, `EXULANICA_BACKUP_PATH` and `EXULANICA_CUSTODY_PATH`. Then fill
+   in the fuse in `public.env`.
+3. `read -rs NEBIUS_API_KEY && export NEBIUS_API_KEY`, then `up`, then `issue-authority` with the
+   allowance the operator approved.
+4. Install the four units in `deploy/public/` into `/etc/systemd/system`, then
+   `systemctl enable --now exulanica-public-watch.timer exulanica-public-preflight.timer`. The watch
+   timer runs every minute and the preflight daily; both write to the journal.
+5. From another machine, run `scripts/judge_smoke.py` against the public origin with one minted
+   token's file and `--rate-limit`. It checks the client, liveness, readiness, a refused and an
+   accepted read, the world list and the write limit, and exits 0 when all pass.
+6. Run `backup-now`, then confirm in `status` that a backup set was taken and verified.
+
+**Rehearsal checklist.** Run this on a development machine before every deployment:
+1. `build` with `EXULANICA_BUILD_PLATFORM` set to the machine's own platform.
+2. `init` with `EXULANICA_TLS=internal`, `EXULANICA_EDGE_ADDRESS=127.0.0.1` and ports of the
+   machine's own.
+3. `mint`, `up`, `issue-authority` and `grant`.
+4. `scripts/judge_smoke.py`, with `--cafile` naming the edge's local root
+   (`/data/caddy/pki/authorities/local/root.crt` in the edge container).
+5. A starter world made and read again after `down` and `up`.
+6. `backup-now`.
+7. `watch` with the API container paused (`docker pause`, never `docker kill`); it must recreate
+   the API on the third failure.
+8. `preflight`.
+9. `destroy --yes-delete-volumes`.
+
+A rehearsal's plain-HTTP redirect names the standard port, not the one the rehearsal published.
+
+**Limits.** No off-host copy of the backups is made, so the loss of the host loses both disks. A
+restore has not been timed on the host (D-3). The process fuse starts again at every restart; the
+authority does not. Per-address limits do not bound how many addresses write at once.
+
 ## 9. Backups and recovery
 
 - **Personal install:** `exulanica-local-db` backs up on every stop and around every upgrade, and
@@ -1507,8 +1612,8 @@ stopped virtual machine's compute is not charged.
 | D-5 | The preflight treats an unreachable catalog as a failure, which is right for a deployment step and wrong for a scheduled check | Retry with backoff, and distinguish the two outcomes in the report |
 | D-6 | The embedding role has no fallback and no recovery path | Precomputing the vectors a deployment needs, or accepting the single dependency and saying so |
 | D-7 | The fallback rule has never run against the live platform | Forcing a primary to fail |
-| D-9 | No cloud account, project, region, domain or host is provisioned. Section 8.1 is the recipe for one Nebius AI Cloud virtual machine serving the reviewer stack | Provisioning it and running the smoke check against the public address |
-| D-13 | `compose.yaml` serves the client and proxies `/api` with a per-address write limit and a body cap (5.1.2), bound to loopback, but has no TLS edge and nothing bounding how many addresses write at once. The reviewer stack adds one: `edge.yaml` terminates TLS in front of its web proxy (section 8.1) | Choosing a host for the general composition (D-9) |
+| D-9 | No cloud account, project, region, domain or host is provisioned. Section 8.1 is the recipe for one Nebius AI Cloud virtual machine serving the reviewer stack, and 8.2 the public server's | Provisioning it and running the smoke check against the public address |
+| D-13 | `compose.yaml` serves the client and proxies `/api` with a per-address write limit and a body cap (5.1.2), bound to loopback, and has nothing bounding how many addresses write at once. The reviewer stack (8.1) and the public server (8.2) add a TLS edge in front of their client proxies | An edge that bounds concurrent addresses, and a provisioned host (D-9) |
 
 ## 12. Changes declined
 
