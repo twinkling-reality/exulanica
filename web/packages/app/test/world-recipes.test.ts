@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, vi } from 'vitest';
 import { buildWorldRecipes } from '../src/ui/world-recipes.js';
+import { attachWorldDescription } from '../src/composition/world-description.js';
 import { parseWorldSpecification } from '../src/world-specification.js';
 import type { SavedWorldEntry } from '../src/world-entry-api.js';
 import { servedSpecification } from './world-specification-document.js';
@@ -127,5 +128,42 @@ describe('the panel that makes a world', () => {
     const broken = servedSpecification();
     (broken['values'] as Record<string, unknown>[]).push({ ...values.at(-2)!, choice_labels: ['Local street'] });
     expect(() => parseWorldSpecification(broken)).toThrow('choice labels');
+  });
+});
+
+describe('focus when Create a world opens', () => {
+  const open = (specification: () => Promise<ReturnType<typeof parseWorldSpecification>>) => {
+    const onClose = vi.fn();
+    const built = buildWorldRecipes({
+      specification, make: vi.fn(), open: vi.fn(async () => undefined), onClose,
+    });
+    document.body.replaceChildren(built.root);
+    return { built, onClose };
+  };
+  const escape = (): void => {
+    (document.activeElement ?? document.body).dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+  };
+
+  it('is inside the sheet from the moment it opens, so Escape closes it', () => {
+    // The served document has not arrived: the only button is hidden Create this town and Close.
+    const { built, onClose } = open(() => new Promise(() => undefined));
+    built.focus();
+    expect(built.root.contains(document.activeElement)).toBe(true);
+    expect((document.activeElement as HTMLElement).closest('[hidden]')).toBeNull();
+    escape();
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it('moves to Describe it once it is attached, the main way in', async () => {
+    const served = servedSpecification();
+    const { built } = open(async () => parseWorldSpecification(served));
+    built.focus();
+    attachWorldDescription(built, {
+      credentials: { baseUrl: 'http://127.0.0.1:1', token: 'test' } as never,
+      specification: async () => served as never,
+    });
+    await settle();
+    expect(document.activeElement?.classList.contains('world-description-input')).toBe(true);
   });
 });

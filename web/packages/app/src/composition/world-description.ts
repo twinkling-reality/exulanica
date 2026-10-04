@@ -41,9 +41,11 @@ export interface ServedSpecification {
   readonly presets: readonly { readonly key: string; readonly label: string }[];
 }
 
-/** The panel the description is attached to, by the one hook it offers. */
+/** The panel the description is attached to, by the hooks it offers. */
 export interface SpecificationPanel {
   readonly root: HTMLElement;
+  /** Put focus in the panel; called again once Describe it is in place, if focus was waiting. */
+  focus?(): void;
   setValues(
     presetKey: string,
     values: Readonly<Record<string, number | string>>,
@@ -89,5 +91,7 @@ export function attachWorldDescription(panel: SpecificationPanel, options: {
       ?? panel.root.querySelector('.world-recipes-list');
     if (presets?.parentElement) presets.parentElement.insertBefore(description.root, presets);
     else panel.root.append(description.root);
+    // Focus held on the panel itself was waiting for this field, the main way in.
+    if (document.activeElement === panel.root) panel.focus?.();
   });
 }

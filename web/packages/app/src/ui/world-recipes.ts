@@ -46,7 +46,18 @@ export interface WorldRecipesPanel {
     presetKey: string,
     values: Readonly<Record<string, number | string>>,
   ): Promise<WorldRecipesRefusal | null>;
+  /**
+   * Put focus in the panel: Describe it's field once it is there, else the first recipe, else the
+   * panel itself, so Escape and the panel's keys work from the moment it opens and Describe it can
+   * take focus when it arrives. A hidden or disabled control is never chosen: focus would fall back
+   * to the page.
+   */
+  focus(): void;
 }
+
+/** Whether a person can reach a control: not inside anything hidden, not disabled. */
+const usable = (control: HTMLElement): boolean => control.closest('[hidden]') === null
+  && !(control as HTMLButtonElement).disabled;
 
 /** A value as a person reads it: millimetres in metres, a share in thousandths out of a thousand, a
  * key by its words where the server states them, anything else as its number or key. */
@@ -99,7 +110,7 @@ export function buildWorldRecipes(options: {
   };
   const root = el('section', {
     class: 'world-recipes', role: 'dialog', 'aria-label': say('worldRecipes.heading'),
-    'data-ui-stage': 'dark',
+    'data-ui-stage': 'dark', tabindex: '-1',
   }, [
     el('div', { class: 'world-recipes-main' }, [
       el('h2', { text: say('worldRecipes.heading') }),
@@ -252,6 +263,12 @@ export function buildWorldRecipes(options: {
 
   return {
     root,
+    focus() {
+      const describe = root.querySelector<HTMLElement>('.world-description-input');
+      const target = describe !== null && usable(describe) ? describe
+        : [...list.querySelectorAll<HTMLElement>('button')].find(usable) ?? root;
+      target.focus({ preventScroll: true });
+    },
     async setValues(presetKey, values) {
       await loaded;
       const next = specification?.presets.find((offered) => offered.key === presetKey);

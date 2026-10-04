@@ -362,9 +362,10 @@ function showWorldRecipes(onClose: () => void): MakeWorldSurface | null {
       panel.root.setAttribute('aria-modal', 'true');
       stand.replaceWith(panel.root);
       current = panel.root;
+      // Focus moves into the panel as it replaces the stand-in, which took it with it; Describe it
+      // takes it once attached (composition/world-description.ts).
+      panel.focus();
       attachWorldDescription(panel, { credentials, specification: () => specification.specification() });
-      window.setTimeout(() => panel.root.querySelector<HTMLElement>('button, select, input, textarea')
-        ?.focus({ preventScroll: true }));
     }, (error: unknown) => {
       if (!stand.isConnected) return;
       const retry = button({ label: 'Try again', variant: 'primary', onClick: load });
