@@ -1,0 +1,53 @@
+{
+  "read_on": "2026-10-04",
+  "note": "Generated assets (lane GEN), routes A and B. Every repository, revision, pattern and lineage claim below was read from Hugging Face metadata at the pinned revision on read_on; no weights file was fetched. TRELLIS-image-large also loads DINOv2 ViT-L/14 with registers through torch.hub from facebookresearch/dinov2 (Apache-2.0 code and weights), which is not a Hugging Face repository and is pinned by its own digest when it is first fetched on the rented machine. Upstream post-processing of both routes (nvdiffrast, a Gaussian rasteriser of the INRIA lineage, pymeshfix, igraph) is not used.",
+  "repositories": [
+    {
+      "repository": "microsoft/TRELLIS-image-large",
+      "revision": "25e0d31ffbebe4b5a97464dd851910efc3002d96",
+      "candidates": ["A"],
+      "include": [
+        "pipeline.json",
+        "ckpts/ss_dec_conv3d_16l8_fp16.*",
+        "ckpts/ss_flow_img_dit_L_16l8_fp16.*",
+        "ckpts/slat_flow_img_dit_L_64l8p2_fp16.*",
+        "ckpts/slat_dec_gs_swin8_B_64l8gs32_fp16.*",
+        "ckpts/slat_dec_mesh_swin8_B_64l8m256c_fp16.*"
+      ],
+      "reason": "The pipeline, both flow models and the decoders route A reads: the mesh decoder for shape and the Gaussian decoder for colour. The radiance-field decoder and both encoders are not loaded.",
+      "lineage": []
+    },
+    {
+      "repository": "stepfun-ai/Step1X-3D",
+      "revision": "bf7084495b3a72222f36549b7942948aa4d9daa7",
+      "candidates": ["B"],
+      "include": ["Step1X-3D-Geometry-1300m/*"],
+      "reason": "The base geometry pipeline only. The label pipeline is not used, and the texture model is refused: it runs on stable-diffusion-xl-base-1.0 (openrail++), outside section 6.",
+      "lineage": [
+        {
+          "component": "Step1X-3D-Geometry-1300m/visual_encoder/",
+          "kind": "card",
+          "repository": "facebook/dinov2-with-registers-large",
+          "revision": "e4c89a4e05589de9b3e188688a303d0f3c04d0f3",
+          "evidence": "visual_encoder/config.json names dino_type facebook/dinov2-with-registers-large; the encoder builds that architecture from its config and loads this repository's own weights, whose size differs from the source's, so they are not byte-identical"
+        }
+      ]
+    },
+    {
+      "repository": "facebook/dinov2-with-registers-large",
+      "revision": "e4c89a4e05589de9b3e188688a303d0f3c04d0f3",
+      "candidates": ["B"],
+      "include": ["config.json", "preprocessor_config.json"],
+      "reason": "Route B's encoder reads only this configuration; its weights come from Step1X-3D's own visual_encoder.",
+      "lineage": []
+    },
+    {
+      "repository": "ZhengPeng7/BiRefNet",
+      "revision": "e2bf8e4460fc8fa32bba5ea4d94b3233d367b0e4",
+      "candidates": ["A", "B"],
+      "include": ["config.json", "BiRefNet_config.py", "birefnet.py", "model.safetensors"],
+      "reason": "Background removal for both routes: the configuration, the two code files the loader runs and the weights. Replaces RMBG-1.4 and RMBG-2.0, whose licences are non-commercial.",
+      "lineage": []
+    }
+  ]
+}

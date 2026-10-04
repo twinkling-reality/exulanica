@@ -15,6 +15,7 @@
     runner check     --out DIR
     runner dry-run   --repository . --out DIR
     runner gate      --results DIR --staged DIR --billed-seconds N --budget-seconds N --rate-cents N --out FILE
+    assets dry-run   --repository ROOT --out DIR
 
 Every command reads and writes files only. None downloads a model, and none needs a GPU.
 """
@@ -281,6 +282,19 @@ def _look_record(args: argparse.Namespace) -> int:
     return 0
 
 
+def _assets_dry_run(args: argparse.Namespace) -> int:
+    from exulanica_appearance.assets.dryrun import dry_run
+
+    result = dry_run(Path(args.repository), Path(args.out))
+    for piece in result["pieces"]:
+        print(
+            f"{piece['look_role']} {piece['piece'][:12]} triangles={piece['triangles']} "
+            f"size_mm={piece['size_mm']} within={piece['within']}"
+        )
+    print(f"job {result['job'][:12]}; records, pieces and sheet.png under {args.out}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m exulanica_appearance")
     groups = parser.add_subparsers(dest="group", required=True)
@@ -371,6 +385,12 @@ def main(argv: list[str] | None = None) -> int:
     dry.add_argument("--repository", required=True)
     dry.add_argument("--out", required=True)
     dry.set_defaults(run=_runner_dry_run)
+
+    assets = groups.add_parser("assets").add_subparsers(dest="command", required=True)
+    assets_dry = assets.add_parser("dry-run")
+    assets_dry.add_argument("--repository", required=True)
+    assets_dry.add_argument("--out", required=True)
+    assets_dry.set_defaults(run=_assets_dry_run)
 
     args = parser.parse_args(argv)
     try:

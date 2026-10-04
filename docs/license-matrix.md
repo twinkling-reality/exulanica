@@ -636,7 +636,9 @@ normalized predecessor and, when consent requires it, a current mask of that pre
 ## 12. Generated appearance models
 
 Status: VERIFIED from raw Hugging Face card data (`/api/models/<id>/revision/<revision>`) and the
-recursive file tree at the revisions below, read 2026-09-17. Every
+recursive file tree at the revisions below, read 2026-09-17, and for the generated asset rows
+(the last four of 12.1 and of 12.2, [generated-appearance.md](generated-appearance.md) section 11)
+read 2026-10-04. Every
 weights file of an accepted row is pinned by its LFS sha256, and every small file by its git blob
 id, in `ml/appearance/weights/`, which also holds each component's lineage evidence.
 `ml/appearance/exulanica_appearance/licences.py` holds section 6's decision over what a card
@@ -667,6 +669,10 @@ read on 2026-08-27, since it may name a catalog identifier rather than a Hugging
 | `black-forest-labs/FLUX.2-klein-base-4B` | `a3b4f4849157f664bdbc776fd7453c2783562f4d` | apache-2.0, with an Apache 2.0 `LICENSE.md` | Only the 4B klein models are Apache; every 9B klein model and FLUX.2 [dev] are non-commercial. `vae/config.json` names `FLUX.2-dev`; the publisher's README at `black-forest-labs/flux2` commit `50fe5162777813d869182b139e83b10743caef15` (sha256 `435753749320bbb395c15983e63e3dc73936c03f0f1870c628e7bf922c55eef7`) states the FLUX.2 autoencoder is released under Apache 2.0. Text encoder is Qwen3ForCausalLM at Qwen3-4B's size | **SHIP** |
 | `DiffSynth-Studio/Template-KleinBase4B-ControlNet` | `14338668d53038eba59de16845c021415545a495` | apache-2.0 | Control weights on klein base 4B; its README loads the encoder and VAE from `FLUX.2-klein-4B` (apache-2.0 at `e7b7dc27f91deacad38e78976d1f2b499d76a294`), whose files are byte-identical to klein base's | **SHIP** |
 | `Ruicheng/moge-2-vitl-normal` | `cb0e8bbd6b1e243589717c78e750b1ba4c093acf` | mit | Base model `facebook/dinov2-large` (apache-2.0 at `47b73eefe95e8d44ec3623f8890bd894b6ea2d6c`). Measurement only, never a generator | **SHIP** |
+| `microsoft/TRELLIS-image-large` | `25e0d31ffbebe4b5a97464dd851910efc3002d96` | mit | Image encoder DINOv2 ViT-L/14 with registers, loaded through torch.hub from `facebookresearch/dinov2` (Apache-2.0 code and weights; its file is pinned by digest on first fetch). Its upstream GLB export is not used: it imports nvdiffrast (NVIDIA Source Code License, use limited to non-commercial), a Gaussian rasteriser of the INRIA lineage, pymeshfix and igraph (GPL) | **SHIP**, with the package's own post-process |
+| `stepfun-ai/Step1X-3D` | `bf7084495b3a72222f36549b7942948aa4d9daa7` | apache-2.0 | Geometry pipeline only (`Step1X-3D-Geometry-1300m/`). Its visual encoder builds the `facebook/dinov2-with-registers-large` architecture (apache-2.0 at `e4c89a4e05589de9b3e188688a303d0f3c04d0f3`) from that repository's configuration and loads its own weights | **SHIP**, geometry only |
+| `facebook/dinov2-with-registers-large` | `e4c89a4e05589de9b3e188688a303d0f3c04d0f3` | apache-2.0 | Configuration files only, for Step1X-3D's encoder | **SHIP** |
+| `ZhengPeng7/BiRefNet` | `e2bf8e4460fc8fa32bba5ea4d94b3233d367b0e4` | mit | Background removal; the configuration, its two code files and the weights | **SHIP** |
 
 ### 12.2 Refused, read the same day
 
@@ -679,3 +685,7 @@ read on 2026-08-27, since it may name a catalog identifier rather than a Hugging
 | `black-forest-labs/FLUX.1-dev` | `3de623fc3c33e44ffbe2bad470d0f45bccf2eb21` | other, `flux-1-dev-non-commercial-license`, gated | **BLOCKED** |
 | `gvecchio/StableMaterials` | `4d452731535bd5c74261d6645623a573326f6f36` | openrail | **BLOCKED** by section 6: OpenRAIL carries use restrictions |
 | `InstantX/Qwen-Image-ControlNet-Union` | `b13036f066d6dee7c20513e263d3d673055e9de8` | apache-2.0 | Allowed, not used: trained for the original Qwen-Image, where the Fun union control above is trained for 2512 |
+| `microsoft/TRELLIS.2-4B` | `af44b45f2e35a493886929c6d786e563ec68364d` | mit, but its `pipeline.json` conditions on `facebook/dinov3-vitl16-pretrain-lvd1689m` (other, `dinov3-license`, gated; Meta's licence page dated 2025-08-14 states a grant that terminates on breach, use restrictions and terms Meta may modify) and removes backgrounds with `briaai/RMBG-2.0` (CC BY-NC 4.0) | **BLOCKED** by section 6: the flow models are trained on DINOv3's features, so the encoder cannot be replaced |
+| `TencentARC/Pixal3D` | `b0cb2e1b794cab9aa0ac38a95d794a4d9337437f` | mit, but its `pipeline.json` names the same DINOv3 encoder and RMBG-2.0; its NOTICE lists DINOv2 and not DINOv3, and the pipeline file is what runs | **BLOCKED** by section 6 |
+| `stepfun-ai/Step1X-3D`, texture model | `bf7084495b3a72222f36549b7942948aa4d9daa7` | apache-2.0, but `step1x_3d_texture_synthesis_pipeline.py` at GitHub `cb5ac944709c6c913109070c7b90c3447f57f3d4` loads `stabilityai/stable-diffusion-xl-base-1.0` (openrail++), and its baker reuses Hunyuan3D 2.0's rasteriser code | **BLOCKED** by section 6: OpenRAIL carries use restrictions |
+| `tencent/Hunyuan3D-2.1` | `0b94677654c57bb9a6b6845cd7b704ccf551d327` | other, `tencent-hunyuan-community` | **BLOCKED**: excludes the EU, the UK and South Korea, and forbids improving other models |

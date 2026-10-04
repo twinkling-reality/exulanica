@@ -3,7 +3,9 @@
 Status: research, not a product surface. Track A measured 64 model-made texture sets on exact
 structure (section 9): seams sit inside the published sets' own range, structure edges are kept,
 and every picked tile was looked at at 1:1. No model-made set is published or pinned, and Track B
-has not run. The code is `ml/appearance/` ([its README](../ml/appearance/README.md)).
+has not run. Generated assets (section 11), static pieces a model makes for a style pack, are a
+prototype: the records, the post-process and the writer run with a stub in place of the models, and
+no model has made a piece. The code is `ml/appearance/` ([its README](../ml/appearance/README.md)).
 
 ## 1. In plain words
 
@@ -371,3 +373,65 @@ No candidate has been handed to the texture package, and Track B has not run.
   carry that diagnostic answer it: a line whose latent row stands 8 or more robust sigma out is the
   latent's, and a line over a level latent is the decoder's or the crop's. Nothing from that set goes
   onward until it is answered.
+
+## 11. Generated assets (prototype)
+
+A style pack dresses a world kind's look roles (`family.leaf`, such as `prop.bench`), and each part
+of a kind states its slot: a box in millimetres with a front. A generated asset is a static piece
+for one look role, made by an open model and turned into a plain `exulanica.static-glb/v1`
+container, so it enters the product through the
+[workspace asset admission](workspace-asset-admission.md) exactly as an upload does. The rule of
+section 2 holds with the slot as the structure: the kind fixes the slot and what the engine does
+with the part, and the piece is appearance inside it.
+
+**Status.** Prototype. The records, the post-process, the writer and a contact sheet run end to end
+with a stub in place of the models (`python -m exulanica_appearance assets dry-run`), and a test
+prepares every stub piece through the product's own static profile and finds it placeable at the
+size its receipt states. No model has made a piece, no GPU has run, and the budgets are the style
+pack format's provisional numbers.
+
+**Routes.** Both start from a concept picture of the piece drawn by an already-pinned image model
+from a prompt the request alone determines, cut out by BiRefNet:
+
+| Route | 3D model | Shape and colour | Weights licence |
+| --- | --- | --- | --- |
+| A | `microsoft/TRELLIS-image-large` | shape from the mesh decoder, colour sampled from the Gaussian decoder at each vertex | MIT; image encoder DINOv2 (Apache-2.0) |
+| B | `stepfun-ai/Step1X-3D`, geometry only | watertight shape; colour from the concept picture and the palette | Apache-2.0; encoder configuration from DINOv2 with registers (Apache-2.0) |
+
+Refused under [license-matrix.md](license-matrix.md) section 6, read 2026-10-04:
+`microsoft/TRELLIS.2-4B` and `TencentARC/Pixal3D` (their pipelines condition on DINOv3, whose
+licence is revocable and amendable by its publisher, and remove backgrounds with RMBG-2.0, CC
+BY-NC 4.0); Step1X-3D's texture model (it runs on Stable Diffusion XL, OpenRAIL++); and the upstream
+post-processing of both routes (nvdiffrast's NVIDIA Source Code License limits use to
+non-commercial; a Gaussian rasteriser of the INRIA lineage; GPL mesh repair). This package's own
+post-process replaces it.
+
+**Post-process** (`exulanica_appearance/assets/`), every step recorded in the receipt:
+
+| Step | What it does |
+| --- | --- |
+| orient | a proper rotation taking the model's up to glTF +Y and its front to +Z |
+| simplify | to the family's triangle budget (a stand-in clusterer in tests; the rented machine runs a quadric simplifier behind the same interface) |
+| fit | `contain` scales uniformly into the slot; `fill` (doors, windows) also refuses a piece the page could not stretch to its slot within 0.8 to 1.25 per axis; `tile` (boundaries) fits one module; the base centre goes to the origin |
+| palette | one swatch per triangle, the nearest in OKLab to the model's colour, flat shaded |
+| write | `POSITION`, `NORMAL` and `COLOR_0` only; no texture, extension or compression |
+
+`COLOR_0` is `VEC4` `UNSIGNED_SHORT` normalized: the first three channels are the swatch's sRGB
+bytes through the committed table [`assets/colour/srgb8-linear16.v1.json`](../assets/colour/srgb8-linear16.v1.json)
+(IEC 61966-2-1 to linear, times 65535, rounded half to even; all 256 values distinct), the fourth
+65535. The page and the writer read the same table, so a stored colour names its swatch exactly.
+
+**Records.** `exulanica.generated-asset-request/v1` (look role, slot, fit, an optional plain
+description of at most 80 characters, the pack's id, version, digest, palette and style words, the
+budget, variants and route), `exulanica.generated-asset-job/v1` (one batch fixed before it runs:
+every prompt and seed, the weights listing, code, container and stop at 150 per cent of the
+estimate) and `exulanica.generated-asset/v1` (one piece: every input by digest, every step, the GLB,
+what was measured against the budget, origin generated, truth invented, CC0-1.0 and the
+regeneration sentence). A seed is drawn from the request digest under a prefix. An output is cached
+under the digest of its request, weights listing and post-process version; a request that carries a
+description may hold a person's words and is cached within its workspace only.
+
+**Planned, not built:** the container and the job runner on Nebius Serverless AI, the measured
+trial of both routes, the admission's `generated` rights basis, the generation queue under the
+spending authority, and the Companion's offer of new pieces for a pack.
+

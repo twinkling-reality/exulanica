@@ -18,6 +18,7 @@ from exulanica_appearance.weights import (
 )
 
 WEIGHTS = Path(__file__).resolve().parents[1] / "weights"
+SPECS = ("candidates.json", "asset-candidates.json")
 REVISION = "a" * 40
 OTHER = "b" * 40
 BIG = b"weights " * 64
@@ -187,8 +188,10 @@ def test_verify_directory_checks_sizes_and_digests(metadata, tmp_path):
 
 
 def test_every_committed_manifest_reads_and_names_an_allowed_licence():
-    manifests = sorted(path for path in WEIGHTS.glob("*.json") if path.name != "candidates.json")
-    assert len(manifests) == 10
+    # The two spec files name what is pinned; every other file is a manifest. Ten for the
+    # appearance tracks and four for generated assets.
+    manifests = sorted(path for path in WEIGHTS.glob("*.json") if path.name not in SPECS)
+    assert len(manifests) == 14
     for path in manifests:
         document = read_weights(path.read_bytes())
         name = f"{document['repository'].replace('/', '__')}@{document['revision'][:12]}.json"
@@ -206,8 +209,9 @@ def test_committed_manifests_rebuild_from_the_fetched_metadata(repository):
         if (directory / "source.txt").is_file():
             read = MetadataDirectory.read(directory)
             metadata[(read.repository, read.revision)] = read
-    spec = json.loads((WEIGHTS / "candidates.json").read_bytes())
-    for entry in spec["repositories"]:
-        raw = build_weights(entry, spec["read_on"], metadata)
-        name = f"{entry['repository'].replace('/', '__')}@{entry['revision'][:12]}.json"
-        assert (WEIGHTS / name).read_bytes() == raw, name
+    for spec_name in SPECS:
+        spec = json.loads((WEIGHTS / spec_name).read_bytes())
+        for entry in spec["repositories"]:
+            raw = build_weights(entry, spec["read_on"], metadata)
+            name = f"{entry['repository'].replace('/', '__')}@{entry['revision'][:12]}.json"
+            assert (WEIGHTS / name).read_bytes() == raw, name

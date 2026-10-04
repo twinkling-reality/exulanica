@@ -62,6 +62,11 @@ container/run.sh sha256:<image id> appearance-local@sha256:<image id> STAGED WEI
 # weights manifests from Hugging Face metadata only (no weights file is fetched)
 scripts/fetch-hf-metadata.sh <repo> <40-hex revision> METADATA/<repo>@<revision>
 .venv/bin/python -m exulanica_appearance weights build --spec weights/candidates.json --metadata METADATA --out weights/
+.venv/bin/python -m exulanica_appearance weights build --spec weights/asset-candidates.json --metadata METADATA --out weights/
+
+# generated assets, PROTOTYPE: requests, a job, pieces, receipts and a contact sheet, with a stub
+# in place of the models (docs/generated-appearance.md section 11)
+.venv/bin/python -m exulanica_appearance assets dry-run --repository ../.. --out OUT
 ```
 
 Large outputs (layers, frames, sheets, metadata) live under `.exulanica/appearance/`, which git
