@@ -10,6 +10,7 @@ import json
 from pathlib import Path
 
 import pytest
+from exulanica_pieces.budgets import read_budgets
 from exulanica_pieces.canonical import Refused, canonical_bytes, sha256_hex
 from exulanica_pieces.records import REGENERATION, read_receipt, read_request
 
@@ -20,7 +21,7 @@ def test_dry_run_receipts_read_back_and_refuse_tampering(repository: Path, tmp_p
     run = dry_run(repository, tmp_path)
     receipts = sorted((tmp_path / "receipts").glob("*.json"))
     requests = {
-        sha256_hex(p.read_bytes()): read_request(p.read_bytes())
+        sha256_hex(p.read_bytes()): read_request(p.read_bytes(), read_budgets(repository))
         for p in tmp_path.glob("request-*.json")
     }
     document = json.loads(receipts[0].read_bytes())
@@ -48,4 +49,4 @@ def test_dry_run_receipts_read_back_and_refuse_tampering(repository: Path, tmp_p
         with pytest.raises(Refused, match=match):
             read_receipt(canonical_bytes(dict(document, **change)), request_of)
     assert all(piece["within"] for piece in run["pieces"])
-    assert len(run["pieces"]) == 5
+    assert len(run["pieces"]) == 7  # bench, lantern, sword, tree, car, shop door, picket fence

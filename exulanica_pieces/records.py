@@ -3,10 +3,13 @@
 Each is canonical JSON named by its sha256 and read strictly (exact keys, integers only, every
 value checked), like every appearance record.
 
-- ``exulanica.generated-asset-request/v1``: what piece is wanted: the look role, the slot and its
+- ``exulanica.generated-asset-request/v2``: what piece is wanted: the look role, the slot and its
   fit, the optional plain description, the pack (id, version, digest, palette, style words), the
-  budget, how many variants, and which route. Nothing about who asked. A request with a description
-  may carry a person's words, so it is cached within its workspace only (:func:`cache_scope`).
+  budget with the digest of the piece budgets file it came from, how many variants, and which
+  route. Nothing about who asked. A request with a description may carry a person's words, so it
+  is cached within its workspace only (:func:`cache_scope`). A ``v1`` request, whose budget came
+  from a table this module held before the pack format's file existed, is still read as it was;
+  only ``v2`` requests are built.
 - ``exulanica.generated-asset-job/v1``: one batch, fixed before it runs: the requests, the route's
   weights listing digest, every prompt and seed, the code and container, and the stop.
 - ``exulanica.generated-asset/v1``: one output: the request, job, variant and seed; every input
@@ -22,8 +25,10 @@ from __future__ import annotations
 import hashlib
 import re
 from collections.abc import Mapping, Sequence
+from types import MappingProxyType
 from typing import Any, Final
 
+from exulanica_pieces.budgets import PieceBudget, PieceBudgets
 from exulanica_pieces.canonical import (
     Refused,
     canonical_bytes,
@@ -35,7 +40,6 @@ from exulanica_pieces.canonical import (
     sha256_hex,
 )
 from exulanica_pieces.vocabulary import (
-    BUDGETS_STATUS,
     FIT,
     GENERATED_FAMILIES,
     budget_for,
@@ -47,6 +51,7 @@ __all__ = [
     "RECEIPT_PROFILE",
     "REGENERATION",
     "REQUEST_PROFILE",
+    "REQUEST_PROFILE_V1",
     "ROUTES",
     "build_job",
     "build_receipt",
@@ -60,7 +65,8 @@ __all__ = [
     "seed_for",
 ]
 
-REQUEST_PROFILE: Final = "exulanica.generated-asset-request/v1"
+REQUEST_PROFILE: Final = "exulanica.generated-asset-request/v2"
+REQUEST_PROFILE_V1: Final = "exulanica.generated-asset-request/v1"
 JOB_PROFILE: Final = "exulanica.generated-asset-job/v1"
 RECEIPT_PROFILE: Final = "exulanica.generated-asset/v1"
 REGENERATION: Final = (
@@ -123,6 +129,14 @@ _REQUEST_KEYS: Final = (
 _REQUEST_OPTIONAL: Final = ("description", "tile_module_mm")
 _PACK_KEYS: Final = ("id", "palette", "sha256", "style", "version")
 _BUDGET_KEYS: Final = (
+    "budgets_sha256",
+    "glb_bytes",
+    "materials",
+    "texture_side_px",
+    "triangles",
+    "vertices",
+)
+_BUDGET_KEYS_V1: Final = (
     "glb_bytes",
     "materials",
     "status",
@@ -130,9 +144,24 @@ _BUDGET_KEYS: Final = (
     "triangles",
     "vertices",
 )
+#: What a v1 request's budget was checked against, kept so a v1 request reads as it always did. Its
+#: kilobytes were read as 1,000 bytes; the pack format's file, which v2 names, reads 1,024.
+_V1_STATUS: Final = "provisional: the style pack format's numbers, until that format is approved"
+_V1_BUDGETS: Final = MappingProxyType(
+    {
+        "window": PieceBudget(400, 0, 2, 256, 64_000),
+        "door": PieceBudget(1_500, 0, 3, 512, 160_000),
+        "fixture": PieceBudget(1_500, 0, 2, 256, 160_000),
+        "prop": PieceBudget(1_500, 0, 2, 256, 160_000),
+        "plant": PieceBudget(3_000, 0, 2, 512, 300_000),
+        "plant.shrub": PieceBudget(800, 0, 2, 512, 300_000),
+        "vehicle": PieceBudget(4_000, 0, 3, 512, 400_000),
+        "boundary": PieceBudget(0, 200, 2, 256, 64_000),
+    }
+)
 
 
-def _check_request(document: object) -> dict[str, Any]:
+def _check_request(document: object, budgets: PieceBudgets | None) -> dict[str, Any]:
     if not isinstance(document, dict):
         raise Refused("a request is an object")
     keys = set(document)
@@ -141,8 +170,8 @@ def _check_request(document: object) -> dict[str, Any]:
             f"a request has {', '.join(_REQUEST_KEYS)} and optionally "
             f"{', '.join(_REQUEST_OPTIONAL)}"
         )
-    if document["profile"] != REQUEST_PROFILE:
-        raise Refused(f"a request's profile is {REQUEST_PROFILE}")
+    if document["profile"] not in (REQUEST_PROFILE, REQUEST_PROFILE_V1):
+        raise Refused(f"a request's profile is {REQUEST_PROFILE} or {REQUEST_PROFILE_V1}")
     role = document["look_role"]
     family, _ = split_role(role)
     if family not in GENERATED_FAMILIES:
@@ -173,8 +202,20 @@ def _check_request(document: object) -> dict[str, Any]:
         if key in seen:
             raise Refused("no two palette swatches are alike")
         seen.add(key)
-    budget = exact_keys(document["budget"], _BUDGET_KEYS, "budget")
-    expected = _expected_budget(role, slot, document.get("tile_module_mm"))
+    module = document.get("tile_module_mm")
+    if document["profile"] == REQUEST_PROFILE_V1:
+        budget = exact_keys(document["budget"], _BUDGET_KEYS_V1, "budget")
+        expected = _expected_budget_v1(role, module)
+    else:
+        budget = exact_keys(document["budget"], _BUDGET_KEYS, "budget")
+        if budgets is None:
+            raise Refused("a v2 request is read against the piece budgets file it names")
+        if budget["budgets_sha256"] != budgets.sha256:
+            raise Refused(
+                f"budget names piece budgets {budget['budgets_sha256']!r}, "
+                f"not the file read ({budgets.sha256})"
+            )
+        expected = _expected_budget(role, module, budgets)
     if budget != expected:
         raise Refused(f"budget is the pack format's for {role}: {expected}")
     if not is_count(document["variants"], 1) or document["variants"] > 16:
@@ -184,17 +225,36 @@ def _check_request(document: object) -> dict[str, Any]:
     return document
 
 
-def _expected_budget(role: str, slot: Mapping[str, int], module_mm: object) -> dict[str, Any]:
-    budget = budget_for(role)
+def _expected_budget(role: str, module_mm: object, budgets: PieceBudgets) -> dict[str, Any]:
+    budget = budget_for(role, budgets.families)
     triangles = budget.triangles
-    if budget.per_metre:
+    if budget.triangles_per_metre:
         if not is_count(module_mm, 100):
             raise Refused("a tiled piece states its module length, 100 mm to the slot's width")
-        triangles = max(1, budget.triangles * module_mm // 1000)  # type: ignore[operator]
+        triangles = budget.triangle_limit(module_mm)  # type: ignore[arg-type]
+        if triangles < 1:
+            raise Refused(f"a {role} module of {module_mm} mm is allowed no triangle")
+    return {
+        "budgets_sha256": budgets.sha256,
+        "glb_bytes": budget.glb_bytes,
+        "materials": budget.materials,
+        "texture_side_px": budget.texture_side_px,
+        "triangles": triangles,
+        "vertices": budgets.vertices_per_triangle * triangles,
+    }
+
+
+def _expected_budget_v1(role: str, module_mm: object) -> dict[str, Any]:
+    budget = budget_for(role, _V1_BUDGETS)
+    triangles = budget.triangles
+    if budget.triangles_per_metre:
+        if not is_count(module_mm, 100):
+            raise Refused("a tiled piece states its module length, 100 mm to the slot's width")
+        triangles = max(1, budget.triangles_per_metre * module_mm // 1000)  # type: ignore[operator]
     return {
         "glb_bytes": budget.glb_bytes,
         "materials": budget.materials,
-        "status": BUDGETS_STATUS,
+        "status": _V1_STATUS,
         "texture_side_px": budget.texture_side_px,
         "triangles": triangles,
         "vertices": 3 * triangles,
@@ -208,14 +268,15 @@ def build_request(
     pack: Mapping[str, Any],
     variants: int,
     route: str,
+    budgets: PieceBudgets,
     description: str | None = None,
     tile_module_mm: int | None = None,
 ) -> bytes:
-    """A request's canonical bytes; its budget is filled from the pack format's table."""
+    """A v2 request's canonical bytes; its budget is filled from the pack format's file."""
     family, _ = split_role(look_role)
-    budget_for(look_role)  # refuses a family generation does not make
+    budget_for(look_role, budgets.families)  # refuses a family generation does not make
     document: dict[str, Any] = {
-        "budget": _expected_budget(look_role, slot_mm, tile_module_mm),
+        "budget": _expected_budget(look_role, tile_module_mm, budgets),
         "fit": FIT[family],
         "look_role": look_role,
         "pack": dict(pack),
@@ -229,12 +290,14 @@ def build_request(
     if tile_module_mm is not None:
         document["tile_module_mm"] = tile_module_mm
     raw = canonical_bytes(document)
-    read_request(raw)
+    read_request(raw, budgets)
     return raw
 
 
-def read_request(raw: bytes) -> dict[str, Any]:
-    return _check_request(parse_canonical(raw, "request"))
+def read_request(raw: bytes, budgets: PieceBudgets | None) -> dict[str, Any]:
+    """A request, strictly. A v2 request is checked against ``budgets``, the file it names; a v1
+    request against the table it was made with, so ``budgets`` may be None for it."""
+    return _check_request(parse_canonical(raw, "request"), budgets)
 
 
 def cache_scope(request: Mapping[str, Any]) -> str:
@@ -312,6 +375,7 @@ def build_job(
     code_sha256: str,
     container: str,
     estimate_seconds: int,
+    budgets: PieceBudgets | None,
     cutouts: Mapping[tuple[str, int], str] | None = None,
 ) -> bytes:
     """One batch: every variant of every request, its prompt and seed, fixed before it runs.
@@ -320,7 +384,7 @@ def build_job(
     concept picture of its own."""
     items = []
     for raw in requests:
-        request = read_request(raw)
+        request = read_request(raw, budgets)
         if request["route"] != route:
             raise Refused("every request in a job takes the job's route")
         digest = sha256_hex(raw)

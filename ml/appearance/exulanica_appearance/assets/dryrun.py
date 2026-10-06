@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any, Final
 
 import numpy as np
+from exulanica_pieces.budgets import read_budgets
 from exulanica_pieces.canonical import canonical_bytes, sha256_hex
 from exulanica_pieces.geometry.mesh import Mesh, Simplifier, cluster_simplify
 from exulanica_pieces.geometry.postprocess import POSTPROCESS_VERSION
@@ -44,9 +45,12 @@ STUB_PACK: Final = {
     "version": 1,
 }
 
-#: What the stub is asked for: the trial's four pieces, the shopfront dressed per opening.
+#: What the stub is asked for: the trial's six pieces, the shopfront dressed per opening. The sword
+#: stands upright, blade along +Y in glTF, its pommel at the base centre.
 STUB_REQUESTS: Final = (
     {"look_role": "prop.bench", "slot_mm": {"width": 1800, "height": 900, "depth": 700}},
+    {"look_role": "prop.lantern", "slot_mm": {"width": 300, "height": 450, "depth": 300}},
+    {"look_role": "prop.sword", "slot_mm": {"width": 120, "height": 1000, "depth": 50}},
     {"look_role": "plant.tree", "slot_mm": {"width": 5000, "height": 8000, "depth": 5000}},
     {"look_role": "vehicle.car", "slot_mm": {"width": 1900, "height": 1600, "depth": 4600}},
     {"look_role": "door.shop_door", "slot_mm": {"width": 1200, "height": 2400, "depth": 300}},
@@ -184,6 +188,24 @@ def stub_mesh(look_role: str) -> Mesh:
                 (*_box((1.6, 0.05, 0), (1.7, 0.55, 0.45)), dark),
             ]
         )
+    if look_role == "prop.lantern":
+        return _join(
+            [
+                (*_box((-0.15, -0.15, 0), (0.15, 0.15, 0.05)), dark),
+                (*_box((-0.11, -0.11, 0.05), (0.11, 0.11, 0.32)), cream),
+                (*_box((-0.14, -0.14, 0.32), (0.14, 0.14, 0.37)), dark),
+                (*_box((-0.02, -0.02, 0.37), (0.02, 0.02, 0.45)), dark),
+            ]
+        )
+    if look_role == "prop.sword":
+        return _join(
+            [
+                (*_box((-0.025, -0.02, 0), (0.025, 0.02, 0.03)), dark),
+                (*_box((-0.015, -0.015, 0.03), (0.015, 0.015, 0.2)), wood),
+                (*_box((-0.06, -0.015, 0.2), (0.06, 0.015, 0.25)), dark),
+                (*_box((-0.02, -0.005, 0.25), (0.02, 0.005, 1.0)), cream),
+            ]
+        )
     if look_role == "plant.tree":
         return _join(
             [(*_box((-0.3, -0.3, 0), (0.3, 0.3, 3)), wood), (*_sphere((0, 0, 4.5), 2.4, 4), leaf)]
@@ -254,8 +276,9 @@ def dry_run(repository: Path, out: Path) -> dict[str, Any]:
     """Run the stub route end to end and write every record, piece and a contact sheet."""
     out.mkdir(parents=True, exist_ok=True)
     requests = []
+    budgets = read_budgets(repository)
     for spec in STUB_REQUESTS:
-        raw = build_request(pack=STUB_PACK, variants=1, route="S", **spec)
+        raw = build_request(pack=STUB_PACK, variants=1, route="S", budgets=budgets, **spec)
         requests.append(raw)
         (out / f"request-{sha256_hex(raw)}.json").write_bytes(raw)
     components_sha256 = sha256_hex(
@@ -268,6 +291,7 @@ def dry_run(repository: Path, out: Path) -> dict[str, Any]:
         code_sha256=sha256_hex(Path(__file__).read_bytes()),
         container="stub",
         estimate_seconds=1,
+        budgets=budgets,
     )
     job_sha256 = sha256_hex(job_raw)
     (out / f"job-{job_sha256}.json").write_bytes(job_raw)

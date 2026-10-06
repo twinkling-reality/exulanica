@@ -388,8 +388,10 @@ with the part, and the piece is appearance inside it.
 with a stub in place of the models (`python -m exulanica_appearance assets dry-run`), through the
 same runner a job on a rented GPU uses, and a test
 prepares every stub piece through the product's own static profile and finds it placeable at the
-size its receipt states. No model has made a piece, no GPU has run, and the budgets are the style
-pack format's provisional numbers.
+size its receipt states. No model has made a piece and no GPU has run. The budgets are the style
+pack format's, read from [`assets/style-packs/piece-budgets.v1.json`](../assets/style-packs/piece-budgets.v1.json)
+by `exulanica_pieces.budgets`, the same file the [style pack contract](style-pack-contract.md) holds
+pieces to.
 
 **Routes.** Both start from a concept picture of the piece drawn by an already-pinned image model
 from a prompt the request alone determines, cut out by BiRefNet:
@@ -429,9 +431,11 @@ bytes through the committed table [`assets/colour/srgb8-linear16.v1.json`](../as
 (IEC 61966-2-1 to linear, times 65535, rounded half to even; all 256 values distinct), the fourth
 65535. The page and the writer read the same table, so a stored colour names its swatch exactly.
 
-**Records.** `exulanica.generated-asset-request/v1` (look role, slot, fit, an optional plain
+**Records.** `exulanica.generated-asset-request/v2` (look role, slot, fit, an optional plain
 description of at most 80 characters, the pack's id, version, digest, palette and style words, the
-budget, variants and route), `exulanica.generated-asset-job/v1` (one batch fixed before it runs:
+budget with the digest of the piece budgets file it came from, variants and route; a request is
+read only against that file, and a `v1` request, whose budget came from an earlier built-in table,
+still reads as it did), `exulanica.generated-asset-job/v1` (one batch fixed before it runs:
 every prompt and seed, the weights listing, code, container and stop at 150 per cent of the
 estimate) and `exulanica.generated-asset/v1` (one piece: every input by digest, every step, the GLB,
 what was measured against the budget, origin generated, truth invented, CC0-1.0 and the

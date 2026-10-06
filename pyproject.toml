@@ -772,11 +772,12 @@ forbidden_modules = ["exulanica", "exulanica_appearance"]
 [[tool.importlinter.contracts]]
 # numpy is not a product dependency (only the reconstruction and segmentation extras bring it), so
 # what the product may read of the piece formats is plain Python: the records, the vocabulary, the
-# colour table and their readers. The numpy half, `exulanica_pieces.geometry`, is for the GPU job
+# piece budgets, the colour table and their readers. The numpy half, `exulanica_pieces.geometry`, is for the GPU job
 # and tooling only.
 name = "The piece formats the product reads need no numpy"
 type = "forbidden"
 source_modules = [
+  "exulanica_pieces.budgets",
   "exulanica_pieces.canonical",
   "exulanica_pieces.colour",
   "exulanica_pieces.records",

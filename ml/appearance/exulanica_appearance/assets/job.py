@@ -26,6 +26,7 @@ from pathlib import Path
 from typing import Any, Final, Protocol
 
 import numpy as np
+from exulanica_pieces.budgets import read_budgets
 from exulanica_pieces.canonical import Refused, canonical_bytes, sha256_hex
 from exulanica_pieces.colour import read_table
 from exulanica_pieces.geometry.mesh import Mesh, Simplifier
@@ -105,7 +106,8 @@ def run_job(
     if job["route"] != backend.route:
         raise Refused(f"the job takes route {job['route']}, the backend is route {backend.route}")
     job_sha256 = sha256_hex(job_raw)
-    by_digest = {sha256_hex(raw): read_request(raw) for raw in requests}
+    budgets = read_budgets(repository)
+    by_digest = {sha256_hex(raw): read_request(raw, budgets) for raw in requests}
     table, table_sha256 = read_table(repository)
     runtime = backend.runtime()
     started = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())

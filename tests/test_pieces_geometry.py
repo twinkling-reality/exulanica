@@ -19,6 +19,7 @@ pytest.importorskip(
 
 import numpy as np
 from exulanica_pieces import colour
+from exulanica_pieces.budgets import read_budgets
 from exulanica_pieces.canonical import Refused
 from exulanica_pieces.geometry.glb import write_glb
 from exulanica_pieces.geometry.mesh import (
@@ -160,7 +161,10 @@ def test_the_written_colours_are_exactly_the_table_values_of_the_swatches() -> N
 
 def test_a_piece_over_budget_says_which_measure() -> None:
     table, _ = colour.read_table(ROOT)
-    request = read_request(build_request(pack=PACK, variants=1, route="S", **BENCH))
+    budgets = read_budgets(ROOT)
+    request = read_request(
+        build_request(pack=PACK, variants=1, route="S", budgets=budgets, **BENCH), budgets
+    )
     tight = dict(request, budget=dict(request["budget"], glb_bytes=100))
     piece = make_piece(
         _box((1.8, 0.6, 0.9)),

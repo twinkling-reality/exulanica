@@ -43,7 +43,8 @@ def dry_run_pieces(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> list[tupl
 def test_every_generated_piece_is_admitted_placeable_at_its_receipt_s_size(
     dry_run_pieces: list[tuple[bytes, dict]],
 ) -> None:
-    assert len(dry_run_pieces) == 5
+    # bench, lantern, sword, tree, car, shop door, picket fence
+    assert len(dry_run_pieces) == 7
     for glb, receipt in dry_run_pieces:
         prepared = static_glb.prepare_static_glb(
             glb,

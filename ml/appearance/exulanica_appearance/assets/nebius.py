@@ -38,6 +38,7 @@ IMAGE: Final = "python:3.12-slim-bookworm@sha256:782412e85d0f0984994c290652577d4
 #: What the job's code archive holds, relative to the repository root.
 _CODE: Final = (
     "assets/colour",
+    "assets/style-packs/piece-budgets.v1.json",
     "exulanica_pieces",
     "ml/appearance/container/assets",
     "ml/appearance/exulanica_appearance",

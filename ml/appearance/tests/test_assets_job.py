@@ -18,6 +18,8 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+from conftest import REPOSITORY
+from exulanica_pieces.budgets import read_budgets
 from exulanica_pieces.canonical import Refused, sha256_hex
 from exulanica_pieces.records import build_job, build_request, read_receipt
 
@@ -26,6 +28,8 @@ from exulanica_appearance.assets.backends.step1x import project_colours
 from exulanica_appearance.assets.dryrun import STUB_PACK, StubBackend, dry_run
 from exulanica_appearance.assets.gittree import tree_id
 from exulanica_appearance.assets.job import run_job
+
+BUDGETS = read_budgets(REPOSITORY)
 
 STANDINS = Path(__file__).resolve().parents[1] / "container" / "assets" / "standins"
 GIT = shutil.which("git")
@@ -133,6 +137,7 @@ def test_route_b_starts_from_route_a_s_cut_outs(repository: Path, tmp_path: Path
     cutout_sha256 = receipt["inputs"]["cutout"]
     cutout = (tmp_path / "a" / "inputs" / f"{cutout_sha256}.png").read_bytes()
     request = build_request(
+        budgets=BUDGETS,
         pack=STUB_PACK,
         variants=1,
         route="S",
@@ -140,6 +145,7 @@ def test_route_b_starts_from_route_a_s_cut_outs(repository: Path, tmp_path: Path
         slot_mm={"width": 1800, "height": 900, "depth": 700},
     )
     job = build_job(
+        budgets=BUDGETS,
         route="S",
         components_sha256="1" * 64,
         requests=[request],
@@ -185,6 +191,7 @@ def test_one_item_s_failure_is_recorded_and_the_run_goes_on(
 
     requests = [
         build_request(
+            budgets=BUDGETS,
             pack=STUB_PACK,
             variants=1,
             route="S",
@@ -194,6 +201,7 @@ def test_one_item_s_failure_is_recorded_and_the_run_goes_on(
         for role in ("plant.tree", "prop.bench")
     ]
     job = build_job(
+        budgets=BUDGETS,
         route="S",
         components_sha256="1" * 64,
         requests=requests,
@@ -316,6 +324,7 @@ def test_stage_and_submit_call_the_clis_with_no_key_in_the_environment(
     requests = tmp_path / "requests"
     requests.mkdir()
     request = build_request(
+        budgets=BUDGETS,
         pack=STUB_PACK,
         variants=1,
         route="A",
@@ -326,6 +335,7 @@ def test_stage_and_submit_call_the_clis_with_no_key_in_the_environment(
     job = tmp_path / "job.json"
     job.write_bytes(
         build_job(
+            budgets=BUDGETS,
             route="A",
             components_sha256="1" * 64,
             requests=[request],
