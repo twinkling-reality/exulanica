@@ -162,3 +162,31 @@ def test_a_confirmation_of_a_plan_with_no_step_is_answered_and_sends_nothing():
             raise AssertionError("a step that is not there was sent")
 
     assert DRIVE.confirm(Refusing(), "F1", {}, {}) == (0, {})
+
+
+class _Recorder:
+    """A client that keeps each request body and answers 200 with nothing."""
+
+    def __init__(self) -> None:
+        self.bodies: list[dict] = []
+
+    def call(self, step, method, path, query=None, body=None):
+        self.bodies.append(body)
+        return 200, {}
+
+
+def test_the_outcome_read_sends_each_confirmed_steps_own_answer():
+    """A-61: an accepted edit answers with the edit_seq and state_sha256 at the top of its body, a
+    refusal with its problem code; a step not sent goes back as it came."""
+    accepted = DRIVE.edit_answer(201, {"edit_seq": 4, "state_sha256": "a" * 64, "edits": []})
+    refused = DRIVE.edit_answer(409, {"code": "stale_saved_world_entry", "edit_seq": 9})
+    assert accepted == {"status": 201, "edit_seq": 4, "state_sha256": "a" * 64}
+    assert refused == {"status": 409, "code": "stale_saved_world_entry"}
+    client = _Recorder()
+    entry = {"world_id": "w", "authored_version_id": "v"}
+    plan = {"plan_sha256": "p", "steps": [{"operation": "one"}, {"operation": "two"}]}
+    DRIVE.outcome(client, "F1", entry, plan, [accepted])
+    DRIVE.outcome(client, "F1", entry, plan)
+    sent, bare = (body["steps"] for body in client.bodies)
+    assert sent == [{"operation": "one", "answer": accepted}, {"operation": "two"}]
+    assert bare == plan["steps"]

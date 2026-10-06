@@ -3399,7 +3399,35 @@ def confirm(c: Client, step: str, entry: Mapping[str, Any], planned: Mapping[str
     )
 
 
-def outcome(c: Client, step: str, entry: Mapping[str, Any], plan: Mapping[str, Any]):
+def edit_answer(status: int | None, body: Any) -> dict[str, Any]:
+    """What an edit step's own request was answered with, as docs/companion-question.md states it
+    (A-61): its status, and the ``edit_seq`` and ``state_sha256`` at the top of an accepted
+    response, or the problem ``code`` of a refusal."""
+    if status is not None and 200 <= status < 300 and isinstance(body, dict):
+        return {
+            "status": status,
+            "edit_seq": body.get("edit_seq"),
+            "state_sha256": body.get("state_sha256"),
+        }
+    return {"status": status, "code": problem_code(body)}
+
+
+def outcome(
+    c: Client,
+    step: str,
+    entry: Mapping[str, Any],
+    plan: Mapping[str, Any],
+    answers: Sequence[Mapping[str, Any] | None] = (),
+):
+    """The outcome read of ``plan``, each step sent back with its own answer when one is given."""
+    steps = [
+        dict(planned) if answer is None else {**planned, "answer": dict(answer)}
+        for planned, answer in zip(
+            plan.get("steps", []),
+            [*answers, *[None] * len(plan.get("steps", []))],
+            strict=False,
+        )
+    ]
     return c.call(
         step,
         "POST",
@@ -3408,9 +3436,85 @@ def outcome(c: Client, step: str, entry: Mapping[str, Any], plan: Mapping[str, A
         body={
             "version_id": entry["authored_version_id"],
             "plan_sha256": plan.get("plan_sha256"),
-            "steps": plan.get("steps", []),
+            "steps": steps,
         },
     )
+
+
+def row_f6(
+    c: Client,
+    entry: Mapping[str, Any],
+    plan: Mapping[str, Any],
+    first: Mapping[str, Any],
+    confirmed: Mapping[str, Any],
+    repeated: Mapping[str, Any],
+) -> Row:
+    """F6 (A-62): F1's step read back with each answer it could carry. ``first`` is its own
+    accepted confirmation's answer and ``repeated`` the stale refusal of sending it again."""
+    row = Row(
+        "F6",
+        "companion.own_answer",
+        "The outcome read credits a step only with the record its own answer names: F1's step read "
+        "with its accepted confirmation's answer is applied, its receipt that confirmation's edit, "
+        "with no repeats; with the repeated confirmation's own answer (409 stale) it is "
+        "superseded, with no receipt and that edit under repeats; with no answer it is "
+        "superseded, with no receipt and that edit under repeats; with a success answer naming an "
+        "edit that does not exist it is superseded, with no receipt.",
+    )
+    edit_id = (confirmed.get("edits") or [{}])[-1].get("edit_id")
+    row.expect(
+        first.get("status") == 201 and isinstance(first.get("edit_seq"), int) and edit_id,
+        f"F1's confirmation gave no answer to read with: {first}",
+    )
+    row.expect(
+        repeated.get("status") == 409 and repeated.get("code") == "stale_saved_world_entry",
+        f"the repeated confirmation was answered {repeated}",
+    )
+    absent = {
+        "status": 201,
+        "edit_seq": int(first.get("edit_seq") or 0) + 1,
+        "state_sha256": first.get("state_sha256"),
+    }
+    reads: dict[str, Any] = {}
+    for name, answer in (
+        ("own", first),
+        ("repeated", repeated),
+        ("none", None),
+        ("absent", absent),
+    ):
+        status, read = outcome(c, "F6", entry, plan, [answer])
+        found = (read.get("steps") or [{}])[0]
+        reads[name] = {
+            "status": status,
+            "plan_state": read.get("state"),
+            "state": found.get("state"),
+            "receipts": [r.get("edit_id") for r in found.get("receipts") or []],
+            "repeats": [r.get("edit_id") for r in found.get("repeats") or []],
+        }
+        row.expect(status == 200, f"the {name} read answered {status}")
+    own = reads["own"]
+    row.expect(
+        own["state"] == "applied" and own["receipts"] == [edit_id] and own["repeats"] == [],
+        f"with its own answer the step reads {own}",
+    )
+    for name in ("repeated", "none"):
+        found = reads[name]
+        row.expect(
+            found["state"] == "superseded"
+            and found["receipts"] == []
+            and found["repeats"] == [edit_id],
+            f"with the {name} answer the step reads {found}",
+        )
+    row.expect(
+        reads["absent"]["state"] == "superseded" and reads["absent"]["receipts"] == [],
+        f"with an answer naming no record the step reads {reads['absent']}",
+    )
+    row.observed = {
+        "edit_id": edit_id,
+        "answers": {"own": first, "repeated": repeated, "absent": absent},
+        "reads": reads,
+    }
+    return row.close()
 
 
 def companion(arguments: argparse.Namespace) -> int:
@@ -3490,7 +3594,8 @@ def companion(arguments: argparse.Namespace) -> int:
         "the plan's preview differs from the direct preview route's answer",
     )
     status_confirm, confirmed = confirm(w1, "F1", e1, planned)
-    status_outcome, read = outcome(w1, "F1", e1, plan)
+    first_answer = edit_answer(status_confirm, confirmed)
+    status_outcome, read = outcome(w1, "F1", e1, plan, [first_answer])
     receipt = ((read.get("steps") or [{}])[0].get("receipts") or [{}])[0]
     parity.expect(status_confirm == 201, f"confirmation answered {status_confirm}")
     parity.expect(status_outcome == 200, f"the outcome read answered {status_outcome}")
@@ -3533,7 +3638,7 @@ def companion(arguments: argparse.Namespace) -> int:
         f"a second plan answered {status_second} {second.get('outcome')}",
     )
     status_ro, refused_ro = confirm(read_only, "F1", e1, second_step) if second_step else (None, {})
-    _, read_ro = outcome(w1, "F1", e1, second)
+    _, read_ro = outcome(w1, "F1", e1, second, [edit_answer(status_ro, refused_ro)])
     parity.expect(status_ro == 404, f"a read-only confirmation answered {status_ro}")
     parity.expect(read_ro.get("state") == "not_applied", f"it reads {read_ro.get('state')}")
     parity.observed = {
@@ -3551,6 +3656,7 @@ def companion(arguments: argparse.Namespace) -> int:
         "control": control,
     }
     rows.append(parity.close())
+    rows.append(row_f6(w1, e1, plan, first_answer, confirmed, edit_answer(status_again, again)))
 
     # F5: one undo per drafted plan. e1 holds F1's confirmed bench, so there is an edit to undo.
     undo_row = Row(

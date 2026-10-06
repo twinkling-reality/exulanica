@@ -260,3 +260,27 @@ def test_a56_globs_only_a_directory_the_digest_reads_whole(tmp_path):
     # A JSON file there that the digest does not read means the digest does not read it whole.
     (whole / "c.v1.json").write_text("{}")
     assert DRIVE.globbed_directories(data) == []
+
+
+def test_a5_reads_the_newest_recipe_catalog_by_its_version_number(tmp_path):
+    folder = tmp_path / DRIVE.RECIPE_CATALOGS
+    folder.mkdir(parents=True)
+    for version in (2, 10, 9):
+        entries = [{"key": "small_town", "specification": f"s{version}", "values": {}}]
+        (folder / f"world-recipe.v{version}.json").write_text(json.dumps({"entries": entries}))
+    name, entry = DRIVE.newest_recipe(tmp_path, "small_town")
+    assert (name, entry["specification"]) == ("world-recipe.v10.json", "s10")
+
+
+def test_a5_asks_two_served_permille_values_each_unlike_the_preset():
+    specification = {
+        "values": [
+            {"key": "storey_band_low", "minimum": 1, "maximum": 6},
+            {"key": "cross_street_hierarchy", "choices": ["local_street"]},
+            {"key": "a_permille", "minimum": 0, "maximum": 1000},
+            {"key": "b_permille", "minimum": 0, "maximum": 1000},
+            {"key": "c_permille", "minimum": 0, "maximum": 1000},
+        ]
+    }
+    preset = {"storey_band_low": 2, "a_permille": 500, "b_permille": 0, "c_permille": 7}
+    assert DRIVE.asked_values(specification, preset) == {"a_permille": 0, "b_permille": 1000}

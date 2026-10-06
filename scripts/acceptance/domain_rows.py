@@ -5,6 +5,7 @@
     .venv/bin/python scripts/acceptance/domain_rows.py assets      --worktree PATH --out DIR
     .venv/bin/python scripts/acceptance/domain_rows.py characters  --worktree PATH --out DIR
     .venv/bin/python scripts/acceptance/domain_rows.py catalog     --worktree PATH --out DIR
+    .venv/bin/python scripts/acceptance/domain_rows.py made-with   --worktree PATH --out DIR
 
 Each subcommand checks rows against the stack ``launch.py up`` started for ``--worktree``,
 restarts that stack's API with ``launch.py restart-api`` where a row needs a fresh process, and
@@ -26,6 +27,9 @@ leaves the stack running:
 - ``catalog``: E4 (an option the host publishes appears in the production page's look editor
   without a rebuild), through ``catalog_browser.mjs`` under gpu-slot then quiet-slot, on a
   ``--production`` stack.
+- ``made-with``: A5 (a generated world's saved entry states what it was made with, and a new world
+  made from those values states the same). The stack is started with ``--workspaces 2
+  --no-derivative-worker``.
 
 Every row ends ``passed``, ``failed`` or ``blocked``, by the rules of ``foundation.py``, whose
 records, clients and stack this file uses. Like it, this is an independent client: it imports
@@ -3649,6 +3653,155 @@ def catalog(arguments: argparse.Namespace) -> int:
     return 0 if all(row.status != "failed" for row in rows) else 1
 
 
+# -- A5: what a generated world was made with ------------------------------------------------------
+
+#: The recipe catalogs as files: A5 reads the preset from the newest one itself (A-63).
+RECIPE_CATALOGS = Path("assets") / "catalogs" / "world-recipes"
+A5_RECIPE = "small_town"
+
+
+def newest_recipe(worktree: Path, key: str) -> tuple[str, dict[str, Any]]:
+    """The newest recipe catalog file's name and its entry ``key``, read from the file."""
+    files = sorted(
+        (worktree / RECIPE_CATALOGS).glob("world-recipe.v*.json"),
+        key=lambda path: int(path.stem.rsplit(".v", 1)[1]),
+    )
+    catalog = json.loads(files[-1].read_text())
+    return files[-1].name, next(entry for entry in catalog["entries"] if entry["key"] == key)
+
+
+def asked_values(specification: Mapping[str, Any], preset: Mapping[str, Any]) -> dict[str, int]:
+    """Two integer values the specification serves, each set to an end of its range that differs
+    from the preset's."""
+    asked: dict[str, int] = {}
+    for value in specification.get("values", []):
+        key = value.get("key")
+        if not isinstance(value.get("minimum"), int) or not isinstance(value.get("maximum"), int):
+            continue
+        if key not in preset or not str(key).endswith("_permille"):
+            continue
+        end = value["minimum"] if preset[key] != value["minimum"] else value["maximum"]
+        if end != preset[key]:
+            asked[key] = end
+        if len(asked) == 2:
+            break
+    return asked
+
+
+def row_a5(stack: Stack, transcripts: Any, worktree: Path) -> Row:
+    row = Row(
+        "A5",
+        "worlds.made_with",
+        "A town made from the small_town preset with two values asked states, on its entry and in "
+        "the list, the specification and every value the preset's catalog file names with the two "
+        "asked in their place; a second town made from the first's recipe_key and values states "
+        "the same values; the first town's entry reads the same before and after; the starter "
+        "states generated_ground null; the other workspace is answered 404 for both towns and "
+        "lists neither.",
+    )
+    w1 = F.client(stack, transcripts, "w1", "token")
+    w2 = F.client(stack, transcripts, "w2", "token-2")
+    catalog_file, preset = newest_recipe(worktree, A5_RECIPE)
+    status, specification = w1.call("A5", "GET", "/worlds/specification")
+    row.expect(status == 200, f"the specification answered {status}")
+    asked = asked_values(specification, preset["values"])
+    row.expect(len(asked) == 2, f"found {len(asked)} values to ask")
+    expected = {**preset["values"], **asked}
+    status_starter, starter = w1.call(
+        "A5", "POST", "/world-entries/starter", body={"title": "Q10 made-with starter"}
+    )
+    row.expect(status_starter == 200, f"the starter answered {status_starter}")
+    status_first, first = w1.call(
+        "A5",
+        "POST",
+        "/worlds/generated",
+        body={"recipe": A5_RECIPE, "title": "Q10 asked", "values": asked},
+    )
+    row.expect(
+        status_first == 201, f"the asked town answered {status_first} {F.problem_code(first)}"
+    )
+    if status_first != 201:
+        return row.close()
+    first_entry = F.read_entry(w1, "A5", first["entry_id"])
+    ground = first_entry.get("generated_ground") or {}
+    _, listed = w1.call("A5", "GET", "/world-entries")
+    listed_ground = (
+        next(
+            (r.get("generated_ground") for r in listed if r.get("entry_id") == first["entry_id"]),
+            None,
+        )
+        or {}
+    )
+    for name, found in (("entry", ground), ("list", listed_ground)):
+        row.expect(
+            found.get("specification") == preset["specification"],
+            f"the {name} states specification {found.get('specification')}",
+        )
+        row.expect(found.get("values") == expected, f"the {name} states other values")
+    dropped = dict(expected)
+    dropped.pop(next(iter(asked)))
+    mutant_fails = ground.get("values") != dropped
+    row.expect(mutant_fails, "the values check passed with a key dropped")
+    status_second, second = w1.call(
+        "A5",
+        "POST",
+        "/worlds/generated",
+        body={
+            "recipe": ground.get("recipe_key"),
+            "title": "Q10 again",
+            "values": ground.get("values"),
+        },
+    )
+    row.expect(status_second == 201, f"the second town answered {status_second}")
+    second_ground = (
+        (F.read_entry(w1, "A5", second["entry_id"]).get("generated_ground") or {})
+        if status_second == 201
+        else {}
+    )
+    row.expect(second_ground.get("values") == expected, "the second town states other values")
+    row.expect(
+        F.read_entry(w1, "A5", first["entry_id"]) == first_entry,
+        "the first town's entry changed when the second was made",
+    )
+    row.expect(
+        F.read_entry(w1, "A5", starter["entry_id"]).get("generated_ground", "absent") is None
+        if status_starter == 200
+        else False,
+        "the starter does not state generated_ground null",
+    )
+    towns = [first["entry_id"], *([second["entry_id"]] if status_second == 201 else [])]
+    stranger = [w2.call("A5", "GET", f"/world-entries/{town}")[0] for town in towns]
+    _, theirs = w2.call("A5", "GET", "/world-entries")
+    row.expect(stranger == [404] * len(towns), f"the other workspace was answered {stranger}")
+    row.expect(
+        not {r.get("entry_id") for r in theirs} & set(towns), "the other workspace lists a town"
+    )
+    row.observed = {
+        "catalog_file": catalog_file,
+        "specification": preset["specification"],
+        "asked": asked,
+        "values": ground.get("values"),
+        "second_values_equal": second_ground.get("values") == expected,
+        "mutant_dropped_key_fails": mutant_fails,
+        "stranger": stranger,
+    }
+    return row.close()
+
+
+def made_with(arguments: argparse.Namespace) -> int:
+    worktree = LAUNCH.checkout(arguments.worktree)
+    stack = Stack.read(worktree)
+    if len(workspace_ids(stack)) < 2:
+        raise SystemExit("made-with needs a stack started with --workspaces 2")
+    out = Path(arguments.out).resolve()
+    (out / "evidence").mkdir(parents=True, exist_ok=True)
+    transcripts = Transcripts(out / "transcripts")
+    started = dt.datetime.now(dt.UTC).isoformat()
+    rows = [row_a5(stack, transcripts, worktree)]
+    write_results(out, stack, rows, started, sys.argv[1:])
+    return 0 if all(row.status != "failed" for row in rows) else 1
+
+
 def comparisons(arguments: argparse.Namespace) -> int:
     worktree = LAUNCH.checkout(arguments.worktree)
     stack = Stack.read(worktree)
@@ -3701,6 +3854,9 @@ def build_parser() -> argparse.ArgumentParser:
     stored = commands.add_parser("assets")
     stored.add_argument("--worktree", required=True)
     stored.add_argument("--out", required=True)
+    made = commands.add_parser("made-with")
+    made.add_argument("--worktree", required=True)
+    made.add_argument("--out", required=True)
     return parser
 
 
@@ -3714,6 +3870,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "roles": roles,
         "reviews": reviews,
         "catalog": catalog,
+        "made-with": made_with,
     }
     return commands[arguments.command](arguments)
 
