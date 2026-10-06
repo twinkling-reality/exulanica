@@ -42,14 +42,28 @@ const MOVE_PRESSES = 8;
 const MOVE_KEY = 'ArrowRight';
 // The steps, in order: each one is a person's action in the page. Your worlds comes first after
 // signing in (N1.k), the journey follows (N1.j), and Your worlds with two worlds and Create a world
-// close it (N1.l), so neither changes the world the journey uses.
+// close it (N1.l), so neither changes the world the journey uses. N1.l's town is then opened in each
+// look (N1.m) and its values shown in Create a world (N1.n).
 const STEPS = ['worlds-first', 'journey-open', 'journey-stall', 'journey-people', 'journey-bench',
-  'journey-response', 'journey-why', 'worlds-create'];
+  'journey-response', 'journey-why', 'worlds-create', 'worlds-look', 'worlds-values'];
 // The second saved world N1.l makes through the API, so Your worlds lists two.
 const SECOND_WORLD_TITLE = 'Q10 second world';
 const SECOND_WORLD_RECIPE = 'small_town';
 // Create a world, as Your worlds opens it.
 const RECIPES = `document.querySelector('section.world-recipes')`;
+// What the shell states of a generated world's look (docs/style-pack-contract.md): the pack asked
+// for, whether it was drawn and why not, as JSON.
+const WORLD_LOOK = `document.querySelector('#shell')?.getAttribute('data-world-look') ?? null`;
+// N1.m (A-65): the town opened with no look named, with the tile look and with the toon pack, and
+// what the shell states for each, from the contract's words for the team's packs.
+const LOOKS = [
+  { query: '', look: { pack: 'exulanica.cozy-town', drawn: true, reason: null } },
+  { query: '?look=today', look: { pack: null, drawn: false, reason: null } },
+  { query: '?look=toon', look: { pack: 'exulanica.toon-town', drawn: true, reason: null } },
+];
+// How long the town's tiles may take to bake before the page can draw it, and how often to look.
+const BAKE_MS = 600_000;
+const BAKE_LOOK_MS = 5_000;
 
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
@@ -204,6 +218,7 @@ const STEP_HANDLERS = {
     // the newest card; the journey's starter, second, is the one opened, so no tile need be baked.
     const made = await ctx.api('POST', '/worlds/generated', { recipe: SECOND_WORLD_RECIPE, title: SECOND_WORLD_TITLE });
     ctx.observe('second-world-saved', made.status === 201, { status: made.status, entry_id: made.body?.entry_id ?? null });
+    ctx.facts.town_entry_id = made.body?.entry_id ?? null;
     const surface = await enter(ctx, () => ctx.page.reload(), undefined, { choose: false });
     const listed = (await ctx.api('GET', '/world-entries')).body ?? [];
     const newestFirst = [...listed].sort((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at)).map((e) => e.entry_id);
@@ -245,6 +260,86 @@ const STEP_HANDLERS = {
     await sleep(PAGE_SETTLE_MS);
     const closed = await ctx.page.evaluate(`!(${RECIPES}?.checkVisibility() ?? false) && !!${SAVED_WORLD_LIST}?.checkVisibility()`);
     ctx.observe('escape-returns-to-your-worlds', closed, { closed });
+  },
+  async 'worlds-look'(ctx) {
+    // N1.m: the town's tiles are baked first, read from its entry, so the page draws rather than waits.
+    const town = ctx.facts.town_entry_id;
+    if (!town) throw new Error('N1.l made no town to open');
+    const deadline = Date.now() + BAKE_MS;
+    let tiles = [];
+    while (Date.now() < deadline) {
+      tiles = (await ctx.api('GET', `/world-entries/${town}`)).body?.generated_ground?.tiles ?? [];
+      if (tiles.length > 0 && tiles.every((t) => t.state !== 'baking')) break;
+      await sleep(BAKE_LOOK_MS);
+    }
+    ctx.observe('town-tiles-baked', tiles.length > 0 && tiles.every((t) => t.state === 'baked'),
+      { states: tiles.map((t) => t.state) });
+    const title = (await ctx.api('GET', `/world-entries/${town}`)).body?.title ?? null;
+    const seen = [];
+    for (const { query, look } of LOOKS) {
+      await enter(ctx, () => ctx.page.navigate(`${ctx.runtime.app_url}${query}`), town);
+      const stated = await ctx.page.waitFor(WORLD_LOOK, SETTLE_MS * 2, `the town's look for "${query}"`);
+      const opened = await ctx.page.evaluate(`document.querySelector('input[aria-label="World title"]')?.value ?? null`);
+      const read = JSON.parse(stated);
+      seen.push({ query, stated: read, opened });
+      ctx.observe(`look${query || '-default'}`, read?.pack === look.pack && read?.drawn === look.drawn && read?.reason === look.reason && opened === title, { query, stated: read, expected: look, opened, title });
+      await ctx.screenshot(`look${query.replace(/[^a-z]/g, '-') || '-default'}`, `the town opened with "${query || 'no look named'}"`);
+    }
+    // The check can tell the looks apart: the three addresses stated three different looks.
+    ctx.observe('looks-differ', new Set(seen.map((one) => JSON.stringify([one.stated?.pack, one.stated?.drawn]))).size === LOOKS.length,
+      { stated: seen.map((one) => one.stated) });
+    ctx.facts.town_looks = seen;
+  },
+  async 'worlds-values'(ctx) {
+    // N1.n: View values on the town opens Create a world with the town's own values.
+    const town = ctx.facts.town_entry_id;
+    if (!town) throw new Error('N1.l made no town to show');
+    const before = (await ctx.api('GET', `/world-entries/${town}`)).body;
+    const values = before?.generated_ground?.values ?? null;
+    ctx.observe('town-states-its-values', values !== null && Object.keys(values).length > 0,
+      { recipe_key: before?.generated_ground?.recipe_key ?? null, keys: values === null ? null : Object.keys(values).length });
+    const surface = await enter(ctx, () => ctx.page.navigate(ctx.runtime.app_url), undefined, { choose: false });
+    if (surface !== 'list' && surface !== 'gate') throw new Error(`the page opened on ${surface}, not Your worlds`);
+    // Choose the town's card with the arrows, as N1.l does, then press View values.
+    const ids = await ctx.page.evaluate(`${SAVED_WORLD_CARDS}.map(b => b.dataset.entryId ?? null)`);
+    const index = ids.indexOf(town);
+    if (index < 0) throw new Error('Your worlds does not list the town');
+    await ctx.page.evaluate(`${SAVED_WORLD_CARDS}[0].focus()`);
+    for (let i = 0; i < index; i += 1) await ctx.page.key('ArrowRight', 'ArrowRight');
+    await sleep(PAGE_SETTLE_MS);
+    const current = await ctx.page.evaluate(`${SAVED_WORLD_CARDS}.find(b => b.getAttribute('aria-current') === 'true')?.dataset.entryId ?? null`);
+    ctx.observe('town-chosen', current === town, { current, town });
+    await ctx.page.click(`document.querySelector('main.world-entry-gate [data-action="worlds.values"]')`, 'View values');
+    await ctx.page.waitFor(`(${RECIPES}?.querySelectorAll('[data-parameter]').length ?? 0) > 0
+      && !(document.querySelector('p.world-recipes-origin')?.hidden ?? true) ? true : null`, SETTLE_MS, 'Create a world with the town\'s values');
+    await sleep(PAGE_SETTLE_MS);
+    const shown = await ctx.page.evaluate(`(() => { const r = ${RECIPES};
+      return { visible: !!r && r.checkVisibility(), origin: r.querySelector('p.world-recipes-origin')?.textContent ?? null,
+        controls: [...r.querySelectorAll('[data-parameter]')].map(i => ({ key: i.dataset.parameter, kind: i.tagName.toLowerCase(),
+          value: i.value, step: i.getAttribute('step') })) }; })()`);
+    // A range is drawn snapped to its step, so it holds the value within half a step; a choice exactly.
+    const held = (control, from = values) => {
+      const wanted = from?.[control.key];
+      if (control.kind === 'select') return control.value === String(wanted);
+      return typeof wanted === 'number' && Math.abs(Number(control.value) - wanted) <= Number(control.step ?? 1) / 2;
+    };
+    const mismatched = shown.controls.filter((c) => !held(c)).map((c) => ({ ...c, wanted: values?.[c.key] ?? null }));
+    ctx.observe('values-from-the-town', shown.visible && (shown.origin ?? '').includes(before?.title ?? '\u0000')
+      && same(shown.controls.map((c) => c.key).sort(), Object.keys(values ?? {}).sort()) && mismatched.length === 0,
+    { origin: shown.origin, title: before?.title ?? null, controls: shown.controls.length, keys: Object.keys(values ?? {}).length, mismatched });
+    // The comparison can fail: against the town's values with the first control's value altered
+    // (a range moved ten steps, a choice renamed) that control does not hold.
+    const first = shown.controls[0];
+    const altered = first === undefined ? null : { ...values, [first.key]: first.kind === 'select'
+      ? `${values?.[first.key]}-altered` : Number(values?.[first.key]) + 10 * Number(first.step ?? 1) };
+    ctx.observe('altered-values-not-held', altered !== null && !held(first, altered), { key: first?.key ?? null });
+    await ctx.screenshot('values', 'Create a world holding the town\'s own values');
+    await ctx.page.key('Escape', 'Escape');
+    await sleep(PAGE_SETTLE_MS);
+    const closed = await ctx.page.evaluate(`!(${RECIPES}?.checkVisibility() ?? false) && !!${SAVED_WORLD_LIST}?.checkVisibility()`);
+    const after = (await ctx.api('GET', `/world-entries/${town}`)).body;
+    ctx.observe('escape-returns-to-your-worlds', closed, { closed });
+    ctx.observe('town-unchanged', same(after, before), { changed: !same(after, before) });
   },
   async 'journey-open'(ctx) {
     await open(ctx);

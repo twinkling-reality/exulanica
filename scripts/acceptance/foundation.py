@@ -3901,7 +3901,9 @@ def companion(arguments: argparse.Namespace) -> int:
 # -- the production browser journey (N1.j) -------------------------------------------------------------
 
 JOURNEY_RUNNER = HERE / "journey_browser.mjs"
-JOURNEY_BUDGET_SECONDS = 1200
+#: The session's allowance: the journey, Your worlds and N1.m's wait of at most 600 s for the town's
+#: tiles to bake, with its three page loads.
+JOURNEY_BUDGET_SECONDS = 2100
 JOURNEY_STEPS = (
     "journey-open",
     "journey-stall",
@@ -3935,6 +3937,26 @@ WORLDS_ROWS = (
         "Create a world, which offers describing the town before the recipe choices and exactly "
         "the presets GET /worlds/specification serves; Escape returns to Your worlds. Functional "
         "only; how the pages look stays with the experience owner.",
+    ),
+    (
+        "N1.m",
+        "worlds.look",
+        "worlds-look",
+        "N1.l's town, its tiles baked, opened with no look in the address states in the shell's "
+        "data-world-look the cozy pack (exulanica.cozy-town) drawn; opened with ?look=today the "
+        "tile look (no pack); opened with ?look=toon the toon pack (exulanica.toon-town) drawn; "
+        "each time under the town's title (A-65). Functional only; how each look appears stays "
+        "with the experience owner.",
+    ),
+    (
+        "N1.n",
+        "worlds.view_values",
+        "worlds-values",
+        "From Your worlds, with N1.l's town chosen, View values opens Create a world saying the "
+        "values came from the town (its title) and holding exactly the values GET "
+        "/world-entries/{id} states in generated_ground.values (a range within half its step, a "
+        "choice exactly); the town's entry reads the same afterwards; Escape returns to Your "
+        "worlds (A-66). Functional only.",
     ),
 )
 

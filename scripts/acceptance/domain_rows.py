@@ -6,6 +6,7 @@
     .venv/bin/python scripts/acceptance/domain_rows.py characters  --worktree PATH --out DIR
     .venv/bin/python scripts/acceptance/domain_rows.py catalog     --worktree PATH --out DIR
     .venv/bin/python scripts/acceptance/domain_rows.py made-with   --worktree PATH --out DIR
+    .venv/bin/python scripts/acceptance/domain_rows.py packs       --worktree PATH --out DIR
 
 Each subcommand checks rows against the stack ``launch.py up`` started for ``--worktree``,
 restarts that stack's API with ``launch.py restart-api`` where a row needs a fresh process, and
@@ -30,6 +31,8 @@ leaves the stack running:
 - ``made-with``: A5 (a generated world's saved entry states what it was made with, and a new world
   made from those values states the same). The stack is started with ``--workspaces 2
   --no-derivative-worker``.
+- ``packs``: S1 (the committed style pack library the host serves, against the committed files).
+  Any stack with two workspaces.
 
 Every row ends ``passed``, ``failed`` or ``blocked``, by the rules of ``foundation.py``, whose
 records, clients and stack this file uses. Like it, this is an independent client: it imports
@@ -3802,6 +3805,154 @@ def made_with(arguments: argparse.Namespace) -> int:
     return 0 if all(row.status != "failed" for row in rows) else 1
 
 
+# -- S1: the style pack library over HTTP -------------------------------------------------------------
+
+#: The committed packs as files: S1 reads every manifest and listed file itself (A-64).
+STYLE_PACKS = Path("assets") / "style-packs" / "packs"
+
+
+def canonical_manifest(raw: bytes) -> bytes | None:
+    """The bytes a committed manifest is identified and served as: the file, which is its canonical
+    JSON and one newline, without that newline (A-67); None for a file not ending in exactly one."""
+    if not raw.endswith(b"\n") or raw.endswith(b"\n\n"):
+        return None
+    return raw[:-1]
+
+
+def committed_packs(worktree: Path) -> list[dict[str, Any]]:
+    """Each committed pack: its manifest's bytes and document, and every file it lists, read."""
+    packs = []
+    for manifest in sorted((worktree / STYLE_PACKS).glob("*/manifest.json")):
+        raw = manifest.read_bytes()
+        document = json.loads(raw)
+        files = [
+            {**listed, "data": (manifest.parent / listed["path"]).read_bytes()}
+            for listed in document.get("files", [])
+        ]
+        packs.append({"raw": raw, "document": document, "files": files})
+    return packs
+
+
+def unauthenticated(stack: Stack, path: str) -> int:
+    """The status a request with no session is answered with."""
+    try:
+        with urllib.request.urlopen(f"{stack.base_url}{path}", timeout=60) as response:
+            return response.status
+    except urllib.error.HTTPError as refused:
+        return refused.code
+
+
+def row_s1(stack: Stack, transcripts: Any, worktree: Path) -> Row:
+    row = Row(
+        "S1",
+        "style_packs.library",
+        "GET /world/style-packs lists exactly the committed packs, each with its manifest's id, "
+        "version and licence and the SHA-256 of its canonical bytes (the committed file without "
+        "its one final newline, A-67), the same for both workspaces; each manifest is served by "
+        "that digest as those bytes, as JSON; every "
+        "file a manifest lists is served by its digest with the manifest's media type and the "
+        "committed bytes; an unknown digest is 404 unknown_reference; no session is 401; a served "
+        "content answer is marked immutable.",
+    )
+    w1 = F.client(stack, transcripts, "w1", "token")
+    w2 = F.client(stack, transcripts, "w2", "token-2")
+    committed = committed_packs(worktree)
+    row.expect(len(committed) > 0, "no pack is committed")
+    status, listing = w1.call("S1", "GET", "/world/style-packs")
+    _, theirs = w2.call("S1", "GET", "/world/style-packs")
+    row.expect(status == 200, f"the listing answered {status}")
+    row.expect(listing == theirs, "the two workspaces were listed different packs")
+    listed = {p.get("pack_id"): p for p in (listing.get("packs") or [])}
+    expected = {
+        pack["document"]["pack_id"]: {
+            "version": pack["document"]["version"],
+            "manifest_sha256": hashlib.sha256(canonical_manifest(pack["raw"]) or b"").hexdigest(),
+            "licence": pack["document"]["licence"]["id"],
+        }
+        for pack in committed
+    }
+    row.expect(sorted(listed) == sorted(expected), f"listed {sorted(listed)}")
+    for pack_id, wanted in expected.items():
+        found = listed.get(pack_id) or {}
+        got = {
+            "version": found.get("version"),
+            "manifest_sha256": found.get("manifest_sha256"),
+            "licence": (found.get("licence") or {}).get("id"),
+        }
+        row.expect(got == wanted, f"{pack_id} is listed as {got}, committed {wanted}")
+    served: list[dict[str, Any]] = []
+    mutant_fails = None
+    for pack in committed:
+        canonical = canonical_manifest(pack["raw"])
+        row.expect(
+            canonical is not None,
+            f"{pack['document']['pack_id']}'s manifest does not end in exactly one newline",
+        )
+        canonical = canonical or pack["raw"]
+        digest = hashlib.sha256(canonical).hexdigest()
+        status, headers, body = raw_call(stack, "token", "GET", f"/world/style-packs/{digest}")
+        # Header names as the server sent them; HTTP reads them without regard to case.
+        named = {name.lower(): value for name, value in headers.items()}
+        kind = named.get("content-type", "")
+        cache = named.get("cache-control", "")
+        row.expect(
+            status == 200 and body == canonical and kind.startswith("application/json"),
+            f"the {pack['document']['pack_id']} manifest answered {status} {kind}",
+        )
+        row.expect("immutable" in cache, f"a manifest is served with Cache-Control {cache!r}")
+        if mutant_fails is None:
+            changed = bytes([canonical[0] ^ 1]) + canonical[1:]
+            mutant_fails = body != changed
+        for listed_file in pack["files"]:
+            status, headers, body = raw_call(
+                stack, "token", "GET", f"/world/style-packs/{listed_file['sha256']}"
+            )
+            ok = (
+                status == 200
+                and body == listed_file["data"]
+                and {k.lower(): v for k, v in headers.items()}.get("content-type", "").split(";")[0]
+                == listed_file["media_type"]
+                and hashlib.sha256(listed_file["data"]).hexdigest() == listed_file["sha256"]
+            )
+            row.expect(ok, f"{pack['document']['pack_id']} {listed_file['path']} answered {status}")
+            served.append({"path": listed_file["path"], "status": status, "equal": ok})
+    row.expect(bool(mutant_fails), "the manifest check passed with one byte changed")
+    unknown = hashlib.sha256(b"q10 s1 no such pack content").hexdigest()
+    status_unknown, _, body_unknown = raw_call(
+        stack, "token", "GET", f"/world/style-packs/{unknown}"
+    )
+    code = (json.loads(body_unknown or b"{}") if status_unknown == 404 else {}).get("code")
+    row.expect(
+        status_unknown == 404 and code == "unknown_reference",
+        f"an unknown digest answered {status_unknown} {code}",
+    )
+    status_anonymous = unauthenticated(stack, "/world/style-packs")
+    row.expect(status_anonymous == 401, f"no session was answered {status_anonymous}")
+    row.observed = {
+        "packs": expected,
+        "files_served": len(served),
+        "files_equal": sum(item["equal"] for item in served),
+        "unknown": [status_unknown, code],
+        "anonymous": status_anonymous,
+        "mutant_one_byte_fails": mutant_fails,
+    }
+    return row.close()
+
+
+def packs(arguments: argparse.Namespace) -> int:
+    worktree = LAUNCH.checkout(arguments.worktree)
+    stack = Stack.read(worktree)
+    if len(workspace_ids(stack)) < 2:
+        raise SystemExit("packs needs a stack started with --workspaces 2")
+    out = Path(arguments.out).resolve()
+    (out / "evidence").mkdir(parents=True, exist_ok=True)
+    transcripts = Transcripts(out / "transcripts")
+    started = dt.datetime.now(dt.UTC).isoformat()
+    rows = [row_s1(stack, transcripts, worktree)]
+    write_results(out, stack, rows, started, sys.argv[1:])
+    return 0 if all(row.status != "failed" for row in rows) else 1
+
+
 def comparisons(arguments: argparse.Namespace) -> int:
     worktree = LAUNCH.checkout(arguments.worktree)
     stack = Stack.read(worktree)
@@ -3857,6 +4008,9 @@ def build_parser() -> argparse.ArgumentParser:
     made = commands.add_parser("made-with")
     made.add_argument("--worktree", required=True)
     made.add_argument("--out", required=True)
+    library = commands.add_parser("packs")
+    library.add_argument("--worktree", required=True)
+    library.add_argument("--out", required=True)
     return parser
 
 
@@ -3871,6 +4025,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "reviews": reviews,
         "catalog": catalog,
         "made-with": made_with,
+        "packs": packs,
     }
     return commands[arguments.command](arguments)
 

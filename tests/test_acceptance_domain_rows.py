@@ -284,3 +284,30 @@ def test_a5_asks_two_served_permille_values_each_unlike_the_preset():
     }
     preset = {"storey_band_low": 2, "a_permille": 500, "b_permille": 0, "c_permille": 7}
     assert DRIVE.asked_values(specification, preset) == {"a_permille": 0, "b_permille": 1000}
+
+
+def test_s1_reads_each_committed_pack_and_every_file_it_lists(tmp_path):
+    """A-64: S1's expectations come from the committed files, read here as the row reads them."""
+    folder = tmp_path / DRIVE.STYLE_PACKS / "a.pack"
+    (folder / "pieces").mkdir(parents=True)
+    piece = b"glTF piece bytes"
+    (folder / "pieces" / "door.glb").write_bytes(piece)
+    manifest = {
+        "pack_id": "a.pack",
+        "version": 2,
+        "licence": {"id": "CC0-1.0", "attribution": None},
+        "files": [{"path": "pieces/door.glb", "media_type": "model/gltf-binary"}],
+    }
+    raw = (json.dumps(manifest, sort_keys=True) + "\n").encode()
+    (folder / "manifest.json").write_bytes(raw)
+    (read,) = DRIVE.committed_packs(tmp_path)
+    assert read["raw"] == raw and read["document"]["pack_id"] == "a.pack"
+    assert [(f["path"], f["data"]) for f in read["files"]] == [("pieces/door.glb", piece)]
+
+
+def test_s1_identifies_a_manifest_by_its_canonical_bytes_without_the_final_newline():
+    """A-67: a committed manifest is its canonical JSON and one newline; the host names and serves
+    it without that newline, and a file not ending in exactly one is refused by the row."""
+    assert DRIVE.canonical_manifest(b'{"a":1}\n') == b'{"a":1}'
+    assert DRIVE.canonical_manifest(b'{"a":1}') is None
+    assert DRIVE.canonical_manifest(b'{"a":1}\n\n') is None
