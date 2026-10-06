@@ -44,6 +44,8 @@ def overlay_routine(base: RoutineModel, overlay: Mapping[str, Any]) -> RoutineMo
     """``base`` with ``overlay``'s use classes added and its employment share in place."""
     if overlay.get("profile") != OVERLAY_PROFILE:
         raise CatalogError(f"a routine overlay is {OVERLAY_PROFILE}")
+    if base.overlay is not None:
+        raise CatalogError("a routine is overlaid once, over the catalogs alone")
     affordances = {activity.affordance for activity in base.activities.values()}
     added: dict[str, UseClass] = {}
     for stated in overlay["use_classes"]:
@@ -86,6 +88,7 @@ def overlay_routine(base: RoutineModel, overlay: Mapping[str, Any]) -> RoutineMo
         use_classes={**base.use_classes, **added},
         policy={**base.policy, "employment_share_milli": share},
         sha256=sha256_of_canonical({"base": base.sha256, "overlay": dict(overlay)}).hex(),
+        overlay=dict(overlay),
     )
 
 

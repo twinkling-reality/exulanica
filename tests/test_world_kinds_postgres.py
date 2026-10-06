@@ -158,23 +158,32 @@ def test_the_town_made_from_its_kind_is_the_town_made_from_its_preset(made):
     assert receipt["recipe"] == town_recipe("small_town", {}).reference()
 
 
-def test_people_are_not_brought_into_a_site_world_and_nothing_is_written(made):
+def test_people_live_in_a_site_world_on_its_own_surfaces_under_its_own_routine(made):
     api = made
     _keep(api, "cafe")
     entry = _world(api, "fixture_cafe", "quiet_cafe", "Our cafe")
     society = f"/world/versions/{entry['authored_version_id']}/society?world_id={entry['world_id']}"
-    refused = api.post(society, {"region_id": "region:generated", "profile": LIVING})
-    # The society ground catalog states no ground for the site grammar's composer, so the runtime
-    # cannot read what people would walk on and says so by name.
-    assert refused.status_code == 424, refused.text
-    assert refused.json()["code"] == "unavailable_society_input"
-    assert "'site-plan'" in refused.json()["detail"]
+    created = api.post(society, {"region_id": "region:generated", "profile": LIVING})
+    assert created.status_code in (200, 201), created.text
+    body = created.json()
     with api.database.session(api.repository.workspace_id) as connection:
-        count = connection.execute(
-            "select count(*) as n from world_society where workspace_id=%s and world_id=%s",
+        document = connection.execute(
+            "select i.document from world_society_input i join world_society s on "
+            "s.workspace_id=i.workspace_id and s.society_id=i.society_id where "
+            "s.workspace_id=%s and s.world_id=%s and i.input_seq=1",
             (api.repository.workspace_id, entry["world_id"]),
-        ).fetchone()["n"]
-    assert count == 0
+        ).fetchone()["document"]
+    assert document["profile"] == "exulanica.society-input/walking-surfaces-v2"
+    assert document["navigation"]["profile"] == "site-walking-surfaces/v1"
+    routine = document["living"]["routine"]
+    assert routine["overlay"]["profile"] == "exulanica.routine-overlay/v1"
+    place = document["living"]["place"]
+    # Everybody here comes in from a home off the site: the kind's preset says ten.
+    residents = sum(d["resident_capacity"] for d in place["destinations"])
+    assert residents == document["population"]["size"] == 10
+    assert len(body["state"]["inhabitants"]) == residents
+    assert {ref["kind"] for ref in document["dependency_refs"]} >= {"site_place"}
+    assert "city_place" not in {ref["kind"] for ref in document["dependency_refs"]}
 
 
 def test_a_kind_version_is_append_only_and_stays_in_its_workspace(made):
@@ -307,7 +316,9 @@ def test_a_site_world_is_never_generated_on_a_request_s_thread(made, monkeypatch
 
     monkeypatch.setattr(site_plan, "records", generated_here)
     worker = kind_worker()
-    worker.drawings = Kept(16)  # nothing kept: the drawing is generated again, in the worker
+    # Nothing kept: the drawing and the place are generated again, in the worker.
+    monkeypatch.setattr(worker, "drawings", Kept(16))
+    monkeypatch.setattr(worker, "places", Kept(16))
     version, world = entry["authored_version_id"], entry["world_id"]
     served = api.get(f"/world/versions/{version}/site?world_id={world}")
     assert served.status_code == 200, served.text
@@ -324,6 +335,16 @@ def test_a_site_world_is_never_generated_on_a_request_s_thread(made, monkeypatch
         town_records(
             connection, api.repository.workspace_id, world, uuid.UUID(entry["source_snapshot_id"])
         )
+
+    # People brought in walk the place the worker makes; none of it is made on this thread.
+    def placed_here(*args: Any) -> dict[str, Any]:
+        raise AssertionError("a site's place was made on a request's thread")
+
+    monkeypatch.setattr(site_plan, "society_place", placed_here)
+    society = f"/world/versions/{version}/society?world_id={world}"
+    created = api.post(society, {"region_id": "region:generated", "profile": LIVING})
+    assert created.status_code in (200, 201), created.text
+    assert created.json()["state"]["inhabitants"]
 
 
 def test_a_lone_surrogate_a_client_sends_is_said_back_escaped_not_with_a_500(made):

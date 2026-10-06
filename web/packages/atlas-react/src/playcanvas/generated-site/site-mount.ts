@@ -3,7 +3,7 @@ import { applyTileEnvironment } from '../generated-tile/environment.js';
 import { TILE_LOOK_V1, type TileLook } from '../generated-tile/look.js';
 import type { SiteDrawing } from './site-drawing.js';
 import { siteNavigationWorld, siteStart } from './site-navigation.js';
-import { drawSiteSlots } from './site-primitives.js';
+import { drawSiteSlots, type DrawnSiteSlots } from './site-primitives.js';
 
 /**
  * A world made from a world kind, ready for the binding: where a person walks, where they open and
@@ -20,10 +20,18 @@ export interface GeneratedSiteMount extends GeneratedTileMount {
   readonly drawing: SiteDrawing;
 }
 
+/**
+ * Dresses a drawn site, such as with a style pack: it runs once the slots are drawn and returns a
+ * disposer, which runs before the slots are taken away and puts back everything it changed. It
+ * never changes a slot, the walk or the seats; the mount stays the one owner of its entities.
+ */
+export type SiteDresser = (host: GeneratedTileHost, drawn: DrawnSiteSlots, drawing: SiteDrawing) => () => void;
+
 export interface SiteMountOptions {
   /** The bytes the drawing was served as, which the attachment reports as transferred. */
   readonly servedBytes: number;
   readonly look?: TileLook;
+  readonly dress?: SiteDresser;
 }
 
 /** The mount for a checked site drawing. */
@@ -39,6 +47,7 @@ export function siteMount(drawing: SiteDrawing, options: SiteMountOptions): Gene
       const environment = applyTileEnvironment(host.app, host.camera, look);
       const slots = drawSiteSlots(host.app.graphicsDevice, drawing);
       host.environmentRoot.addChild(slots.root);
+      const undress = options.dress?.(host, slots, drawing) ?? null;
       let disposed = false;
       return {
         metrics: Object.freeze({
@@ -55,6 +64,7 @@ export function siteMount(drawing: SiteDrawing, options: SiteMountOptions): Gene
         dispose(): void {
           if (disposed) return;
           disposed = true;
+          undress?.();
           slots.destroy();
           environment.dispose();
         },

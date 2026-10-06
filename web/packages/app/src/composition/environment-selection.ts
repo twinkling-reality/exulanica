@@ -1872,8 +1872,10 @@ export function mountEnvironmentSelection(
     const binding = deps.state.atlas?.binding;
     // A generated world's people live in the one region its entry declares, in the city's frame
     // its tiles are drawn in, standing where a person arrives (`hostGeneratedSociety`).
-    if (entry.generatedGround != null) {
-      const { regionId, arrivalMm } = entry.generatedGround;
+    // A world made from a world kind is drawn in its site's frame the same way.
+    const generated = entry.generatedGround ?? entry.generatedSite ?? null;
+    if (generated != null) {
+      const { regionId, arrivalMm } = generated;
       return binding?.generatedTile == null || hostGeneratedSociety(binding, regionId, arrivalMm[1]) === null
         ? null : regionId;
     }
@@ -1930,9 +1932,11 @@ export function mountEnvironmentSelection(
       preview: false, credentials: deps.credentials, worldId: entry.worldId,
       versionId: entry.authoredVersionId, placeId: null, regionId,
       // The engine a saved world's society is created with is the engine table's for its ground:
-      // a town's, where the served entry declares a generated ground, and a saved world's own
+      // a town's, where the served entry declares a generated ground or a world kind's site,
+      // whose people live the town's routine with the kind's own places, and a saved world's own
       // otherwise. Opening the world never creates anything; the person asks.
-      profile: engineCreatedOver(entry.generatedGround != null ? 'town' : 'saved_world'),
+      profile: engineCreatedOver(entry.generatedGround != null || entry.generatedSite != null
+        ? 'town' : 'saved_world'),
       createOnConnect: false, places: true,
       ...(deps.societyClient ? { client: deps.societyClient } : {}),
       onChange: reflectSavedWorldSociety,
@@ -1963,7 +1967,8 @@ export function mountEnvironmentSelection(
     }
     const entry = deps.state.activeWorldEntry;
     if (!deps.env.preview && entry != null
-      && (entry.authoredScene != null || entry.declaredFloor != null || entry.generatedGround != null)) {
+      && (entry.authoredScene != null || entry.declaredFloor != null || entry.generatedGround != null
+        || entry.generatedSite != null)) {
       try {
         const regionId = await societyRegion(entry);
         if ((phase as string) === 'disposed') return;

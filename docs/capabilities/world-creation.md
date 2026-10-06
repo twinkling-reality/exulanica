@@ -86,8 +86,9 @@ document passes its checks and sample worlds at every preset and every value's e
 people who reach everything they use, and a refusal names what failed and where. `POST
 /worlds/kinds/{kind}/worlds` makes a world of a kind with a preset and values, held to the kind's
 ranges as a town's are, and saves its entry. The application draws such a world from the drawing
-its version serves, and a person walks into its buildings through their doors. Making the town as a
-kind makes the same town as its preset.
+its version serves, and a person walks into its buildings through their doors. People live there
+under the living town's routine with the kind's own workplaces, shops and homes; those who live off
+the site come in through its entry. Making the town as a kind makes the same town as its preset.
 
 Reviewed appearance controls and bounded language-driven appearance proposals
 have preview/apply/rollback contracts. Source snapshots, alternate versions,
@@ -159,11 +160,11 @@ hand a town's traffic lights to an open model ([people and models](simulation.md
 decides whenever the model does not, and no evaluation record measures whether that helps traffic. The page still
 offers Add photos in a generated world, which the server refuses by name.
 
-A world made from a world kind holds no people, and bringing them in is refused by name. No model
-drafts a kind through the product: the library ships the town and keeps a workspace's uploaded
-kinds. Such a world is drawn in the engine's own shapes and colours, with no style pack; it is at
-most 256 m on a side, nothing drives on its roads and only the ground storey of a building is
-walked inside.
+No model drafts a kind through the product: the library ships the town and keeps a workspace's
+uploaded kinds. A world made from a world kind is drawn in the engine's own shapes and colours,
+with no style pack; it is at most 256 m on a side and houses at most 128 people, nothing drives on
+its roads, only the ground storey of a building is walked inside, and a worker on shift is
+counted inside their workplace and not drawn, rather than standing at a place in it.
 
 A description sets only the values the specification offers; water, hills, a particular building
 or a value past its range is named back as not in the town rather than approximated. The sample's

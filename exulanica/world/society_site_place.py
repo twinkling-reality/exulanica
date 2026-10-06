@@ -711,7 +711,7 @@ def place_from_site_records(
         # and are not drawn once they have gone back out.
         destination(
             OFFSITE_HOME_ID,
-            "site.extent:offsite-home",
+            "site.extent:offsite",
             entry,
             "premises",
             "residential",

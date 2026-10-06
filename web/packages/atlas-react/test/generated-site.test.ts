@@ -154,6 +154,33 @@ describe('drawing a site', () => {
     expect(slotColour({ ...ground!, leaf: 'yard' }, 'indoor')).toEqual([0.66, 0.55, 0.42]);
   });
 
+  it('hands a dresser every drawn slot by identity and undresses before the slots go', () => {
+    const { app, camera, environmentRoot } = nullApp();
+    const seen: string[] = [];
+    let stillThere: boolean | null = null;
+    const mount = siteMount(drawing, {
+      servedBytes: 1,
+      dress: (_host, drawn, dressed) => {
+        seen.push(...drawn.entities.keys());
+        expect(dressed).toBe(drawing);
+        const bench = drawn.entities.get('bench')!;
+        bench.enabled = false;
+        return () => {
+          stillThere = bench.parent !== null;
+          bench.enabled = true;
+        };
+      },
+    });
+    const attachment = mount.attach({ app, camera, environmentRoot });
+    // Every slot but the door, which draws nothing until a pack fills it.
+    expect(seen.sort()).toEqual(
+      drawing.slots.filter((slot) => slot.primitive !== 'none').map((slot) => slot.identity).sort(),
+    );
+    attachment.dispose();
+    expect(stillThere).toBe(true);
+    expect(environmentRoot.children).toEqual([]);
+  });
+
   it('attaches under the environment root with the tile look, and takes everything away again', () => {
     const { app, camera, environmentRoot } = nullApp();
     const lightsBefore = app.root.findComponents('light').length;

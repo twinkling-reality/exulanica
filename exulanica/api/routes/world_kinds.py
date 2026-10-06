@@ -415,11 +415,13 @@ def upload_kind(
 
 class _WorkerComposer:
     """Composes one identity's world of a kind in the kind worker for one workspace, and keeps the
-    drawing of the last world it made, which is the world saved when the making succeeds."""
+    drawing and the society's place of the last world it made, which is the world saved when the
+    making succeeds."""
 
     def __init__(self, workspace: uuid.UUID) -> None:
         self.workspace = str(workspace)
         self.drawn: tuple[str, dict[str, Any]] | None = None
+        self.placed: tuple[str, dict[str, Any]] | None = None
 
     def __call__(
         self, kind: KindDocument, values: Mapping[str, int], world_id: str
@@ -443,6 +445,7 @@ class _WorkerComposer:
             composed.receipt_sha256,
             {"status": "done", "body": answer["body"], "sha256": answer["sha256"]},
         )
+        self.placed = (f"{composed.receipt_sha256}:{answer['place_id']}", answer["placed"])
         return composed
 
 
@@ -510,10 +513,13 @@ def create_kind_world(
                 created_by=session.actor,
                 compose=composer,
             )
+            worker = kind_worker()
             if composer.drawn is not None:
                 # The page reads the new world's drawing next: it is kept, made with the world.
-                worker = kind_worker()
                 worker.drawings.put(f"drawing:{composer.drawn[0]}", composer.drawn[1])
+            if composer.placed is not None:
+                # Bringing people in reads the place its society walks: kept, made with the world.
+                worker.places.put(f"place:{composer.placed[0]}", composer.placed[1])
     except UnknownWorldRecipe as exc:
         return _problem(404, exc.code, str(exc))
     except KindValueRefused as exc:

@@ -112,6 +112,12 @@ AreaSource = Literal["ground", "declared"]
 #: How a saved world's input names its area: this prefix and the authored region's identity.
 _PLACE_PREFIX: Final = "authored:"
 
+
+def ground_place_id(region_id: str) -> str:
+    """The place identity a society on a saved world's ground publishes for ``region_id``."""
+    return f"{_PLACE_PREFIX}{region_id}"
+
+
 #: How a place's node is named: this prefix, the object's own identity and the place's index in
 #: the order ``destination_places`` fills them, so a place keeps its identity when another drops.
 PLACE_NODE_PREFIX: Final = "place:"
@@ -203,7 +209,7 @@ class SocietyGround:
     @property
     def place_id(self) -> str:
         """The spatial identity this ground publishes as the society input's area identity."""
-        return f"{_PLACE_PREFIX}{self.region_id}"
+        return ground_place_id(self.region_id)
 
     def document(self) -> dict[str, Any]:
         """The canonical descriptor, digest included, that the input binds and replay rechecks.

@@ -49,7 +49,7 @@ from dataclasses import dataclass, field
 from functools import cache
 from pathlib import Path
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Final
+from typing import TYPE_CHECKING, Any, Final
 
 from exulanica.grammar.catalogs import (
     Catalog,
@@ -781,6 +781,10 @@ class RoutineModel:
     sha256: str
     #: The shifts its use classes name; empty for a routine that reads no shift catalog.
     shifts: Mapping[str, Shift] = field(default_factory=dict)
+    #: The overlay a world kind laid over these catalogs (``exulanica.routine-overlay/v1``: the
+    #: kind's own use classes and employment share), or None for a routine read from the catalogs
+    #: alone (:mod:`exulanica.world.kinds.routine`).
+    overlay: Mapping[str, Any] | None = None
 
     @property
     def keeps_hours(self) -> bool:
@@ -789,8 +793,16 @@ class RoutineModel:
         return any(use.opening is not None for use in self.use_classes.values())
 
     def binding(self) -> dict[str, object]:
-        """What a society records about the model it was advanced under."""
-        return {"catalog_versions": dict(sorted(self.versions.items())), "sha256": self.sha256}
+        """What a society records about the model it was advanced under. An overlaid routine also
+        records its overlay, so it is read again from its binding alone; a routine read from the
+        catalogs alone records exactly its catalog versions and digest, as it always has."""
+        stated: dict[str, object] = {
+            "catalog_versions": dict(sorted(self.versions.items())),
+            "sha256": self.sha256,
+        }
+        if self.overlay is not None:
+            stated["overlay"] = dict(self.overlay)
+        return stated
 
 
 @dataclass(frozen=True, slots=True)

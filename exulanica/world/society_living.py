@@ -235,10 +235,7 @@ def input_routine(document: dict[str, Any]) -> RoutineModel:
     if document["profile"] not in LIVING_INPUTS:
         return current_routine()
     named = document["living"]["routine"]
-    routine = _routine(
-        tuple(sorted((str(k), int(v)) for k, v in named["catalog_versions"].items())),
-        society_catalogs.ROUTINE_DIRECTORY,
-    )
+    routine = _bound_routine(named)
     _require(
         routine.binding() == named, "the input names a living routine these catalogs differ from"
     )
@@ -248,11 +245,24 @@ def input_routine(document: dict[str, Any]) -> RoutineModel:
 def routine_for(state: dict[str, Any]) -> RoutineModel:
     """The routine a stored society recorded: the catalog versions it names, read side by side
     with any newer ones. A changed catalog file fails the digest check."""
-    versions = state["routine"]["catalog_versions"]
-    return _routine(
-        tuple(sorted((str(k), int(v)) for k, v in versions.items())),
+    return _bound_routine(state["routine"])
+
+
+def _bound_routine(named: dict[str, Any]) -> RoutineModel:
+    """The routine a binding names: its catalog versions read side by side with any newer ones,
+    and, where a world kind laid an overlay over them, that overlay laid again
+    (:func:`~exulanica.world.kinds.routine.overlay_routine`). A binding with no overlay reads
+    exactly as it always has."""
+    routine = _routine(
+        tuple(sorted((str(k), int(v)) for k, v in named["catalog_versions"].items())),
         society_catalogs.ROUTINE_DIRECTORY,
     )
+    overlay = named.get("overlay")
+    if overlay is None:
+        return routine
+    from exulanica.world.kinds.routine import overlay_routine
+
+    return overlay_routine(routine, overlay)
 
 
 #: How many prepared places one process keeps, the least recently read dropped first: a place is a

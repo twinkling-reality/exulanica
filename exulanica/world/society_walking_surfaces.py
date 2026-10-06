@@ -67,7 +67,12 @@ from exulanica.world.society_input_policy import (
 )
 from exulanica.world.society_living import current_routine
 from exulanica.world.society_place import ceil_distance
-from exulanica.world.society_planner import CLEARANCE_MM, input_sha256, validate_society_input
+from exulanica.world.society_planner import (
+    CLEARANCE_MM,
+    SITE_NAVIGATION_PROFILE,
+    input_sha256,
+    validate_society_input,
+)
 
 __all__ = [
     "SEAT_NODE_PREFIX",
@@ -84,8 +89,6 @@ SEAT_NODE_PREFIX: Final = "seat:"
 #: rested at. Anything else the world holds is somewhere people pass, not an activity.
 _VISIT: Final = "visit"
 _REST: Final = "rest"
-#: What a record subject is named by in a target: the kind of record and its identity.
-_SUBJECT_KIND: Final = {"premises": "city.premises", "furniture": "city.street_furniture"}
 
 
 def walking_surfaces_ground(
@@ -159,8 +162,7 @@ def _world_target_record(
     version_id: uuid.UUID, destination: Mapping[str, Any], affordance: str
 ) -> dict[str, Any]:
     """An activity of the world's own that no place can be kept for, recorded as unreachable."""
-    object_id = destination["destination_id"].split(":", 1)[1]
-    subject_id = f"{_SUBJECT_KIND[destination['origin']]}:{object_id}"
+    object_id, subject_id = _subject(destination)
     return {
         "target_id": f"{subject_id}:{affordance}",
         "subject_id": subject_id,
@@ -169,6 +171,17 @@ def _world_target_record(
         "affordance": affordance,
         "reason": UNREACHABLE,
     }
+
+
+def _subject(destination: Mapping[str, Any]) -> tuple[str, str]:
+    """A destination's object and the record subject it names: the place states its subject
+    (``city.premises:<identity>`` for a city's premises, ``site.structure:<identity>`` for a site's
+    structure), whose identity is the destination's own after its prefix."""
+    object_id = destination["destination_id"].split(":", 1)[1]
+    subject_id = str(destination["subject_id"])
+    if subject_id.split(":", 1)[1] != object_id:
+        raise ValueError("a destination's subject names another record than the destination")
+    return object_id, subject_id
 
 
 def _affordance(destination: Mapping[str, Any]) -> str | None:
@@ -302,8 +315,7 @@ def build_walking_surfaces_input(
         if not places:
             records_list.append(_world_target_record(version.version_id, destination, affordance))
             continue
-        object_id = destination["destination_id"].split(":", 1)[1]
-        subject_id = f"{_SUBJECT_KIND[destination['origin']]}:{object_id}"
+        object_id, subject_id = _subject(destination)
         if destination["origin"] == "furniture":
             access = by_node[destination["node_id"]]
             for node_id, position in places:
@@ -366,7 +378,13 @@ def build_walking_surfaces_input(
         )
     )
     refs.append(
-        {"kind": "city_place", "identity": ground.place_id, "sha256": place["document_sha256"]}
+        {
+            "kind": "site_place"
+            if ground.navigation_profile == SITE_NAVIGATION_PROFILE
+            else "city_place",
+            "identity": ground.place_id,
+            "sha256": place["document_sha256"],
+        }
     )
     navigation = {
         "profile": ground.navigation_profile,

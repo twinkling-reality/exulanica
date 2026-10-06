@@ -106,19 +106,20 @@ validation report, `exulanica.world-kind-validation/v1`, which a kept kind store
 Everything generated from a kind runs in the kind worker
 ([`worker.py`](../exulanica/world/kinds/worker.py)), one spawned process apart from the request's
 thread, as a town's sample does: stage B, composing a world of a kind, and generating a site
-world's records again for its drawing. No site is generated on a request's thread: the reader every
+world's records again for its drawing or for the place its society walks. No site is generated on a request's thread: the reader every
 other generated world's records go through refuses a site world, and a site world states no roads,
 so the reads that ask a world for its roads (capabilities, the clock, traffic and the role hosts)
 answer without generating it. The worker's bounds:
 
-- a check waits at most 40 s, a world's composition 15 s and a drawing 15 s;
+- a check waits at most 40 s, a world's composition 15 s, a drawing 15 s and a place 15 s;
 - one request waits for a job; asking for a job already running is answered at once;
 - at most four jobs wait besides the one running, and one workspace has at most two jobs waiting or
   running, each counting until it finishes, whoever stopped waiting for it;
 - finished checks (by the workspace and the kind document's digest, 32 kept, so one workspace is
-  told nothing of another's check of the same document) and drawings (by the receipt's digest,
-  16 kept) are kept, so asking again reads them; a composed world is never kept, since each is made
-  for a fresh identity, and its drawing is kept as it is made;
+  told nothing of another's check of the same document), drawings (by the receipt's digest, 16
+  kept) and places (by the receipt's digest and the place, 16 kept) are kept, so asking again reads
+  them; a composed world is never kept, since each is made for a fresh identity, and its drawing
+  and its society's place are kept as they are made;
 - a process whose oldest job runs past 160 s is replaced, checked at every request.
 
 A job the worker does not finish in time, cannot take or loses answers 503 `kind_work_overran`,
@@ -166,13 +167,23 @@ destinations. People the kind states as off-site residents live in one home at t
 A kind's routine is the living town's routine with an **overlay**
 ([`routine.py`](../exulanica/world/kinds/routine.py)), `exulanica.routine-overlay/v1`: the kind's
 use classes and its employment share. The overlaid routine is named by SHA-256 over the base
-routine's digest and the overlay. The kind's checks build every sample world's place and hold it to
-the society's place check under that routine.
+routine's digest and the overlay, and its binding states the overlay, so a society reads the same
+routine again from its input alone. A routine with no overlay is the base routine, unchanged: a
+town's input, binding and every minute played from it are the bytes they were before overlays
+existed (`tests/test_town_society_unchanged_by_site_worlds.py`). The kind's checks build every
+sample world's place and hold it to the society's place check under that routine.
 
-A site world holds no people. The society ground catalog states no ground for the `site-plan`
-composer, so a request to bring people into a site world answers 424
-`unavailable_society_input`, naming the composer, and writes nothing. The
-[society contract](synthetic-society-contract.md) owns inputs and engines.
+A site world's society uses the walking-surfaces input profile
+(`exulanica.society-input/walking-surfaces-v2`) with the navigation profile
+`site-walking-surfaces/v1`, site record subjects and a `site_place` dependency in place of a
+city's `city_place`. The living engine is `exulanica-society/v5`, unchanged; the
+[society contract](synthetic-society-contract.md) owns inputs and engines. A site world's society
+ground is the society ground catalog's `generated_site` entry (catalog version 3). The page hosts
+a site world's people in the site's frame, as it hosts a town's. The place a site world's society
+walks is made in the kind worker from the world's receipt, never on a request's thread, kept by the
+receipt and the place, and made with the world when the world is made; while the worker has not
+made it, bringing people in is refused by name (424 `unavailable_society_input`, saying the place is
+still being made), and asking again reads it.
 
 ## A world made from a kind
 
@@ -281,7 +292,6 @@ town's receipt or digest depends on the adapter.
 
 ## Limits
 
-- A site world holds no people; bringing them in is refused by name.
 - The application draws a site's slots as the engine's primitives in fallback colours; no style
   pack dresses them.
 - No model drafts a kind through the product. The API keeps only a creator's upload; `drafted` is

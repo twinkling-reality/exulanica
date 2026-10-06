@@ -117,7 +117,17 @@ WALKING_SURFACES_BY_FAMILY: Final[Mapping[str, str]] = {
 #: person placed, per input profile: a record's subject is its kind and its identity.
 WORLD_RECORD_SUBJECTS: Final[Mapping[str, tuple[str, ...]]] = {
     WALKING_SURFACES_INPUT: ("city.premises", "city.street_furniture"),
-    WALKING_SURFACES_INPUT_V2: ("city.premises", "city.street_furniture"),
+    # A site world's records (a world made from a world kind) are walked through the same living
+    # input: its structures, areas and fixtures, and the home at its entry of everybody who lives
+    # off the site.
+    WALKING_SURFACES_INPUT_V2: (
+        "city.premises",
+        "city.street_furniture",
+        "site.area",
+        "site.extent",
+        "site.fixture",
+        "site.structure",
+    ),
 }
 #: Why an activity may be recorded as unavailable on its own, per input profile. A profile only
 #: ever gains reasons in a new version, so a stored input is read with the vocabulary it was

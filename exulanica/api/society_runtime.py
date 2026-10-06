@@ -53,8 +53,10 @@ from exulanica.selection.validation import Session
 from exulanica.store.base import ContentAddressedStore
 from exulanica.world.arrival_selection import ArrivalDescriptor
 from exulanica.world.authored_delta import AlternateVersion
+from exulanica.world.composers import site_plan
 from exulanica.world.errors import InvalidStructuralData, UnknownWorldResource
-from exulanica.world.generated_worlds import generation_receipt, town_records
+from exulanica.world.generated_worlds import generation_receipt, states_site, town_records
+from exulanica.world.kinds.worker import PLACE_SECONDS, KindWorkWaiting, kind_worker, place_job
 from exulanica.world.object_repository import WorldObjectRepository
 from exulanica.world.objects import AuthoredObject
 from exulanica.world.society import (
@@ -175,6 +177,41 @@ class _TownRead:
     refusal: str | None
     records: tuple[object, ...] = ()
     living_places: dict[str, Mapping[str, Any]] = field(default_factory=dict)
+    #: For a world made from a world kind, its receipt: the place and the routine its society
+    #: lives under come from it (:mod:`exulanica.world.composers.site_plan`), not from the town's.
+    site_receipt: Mapping[str, Any] | None = None
+    #: For a world made from a world kind whose place the kind worker has not made yet, why
+    #: (``kind_work_*`` and its words): asked again later, it is read from what the worker kept.
+    waiting: str | None = None
+
+
+def _site_read(
+    connection: psycopg.Connection, binding: AuthoredWorldSocietyBinding, ground: SocietyGround
+) -> _TownRead:
+    """A site world's place, made in the kind worker from the world's receipt, never on the
+    request's thread, and kept by the receipt and the place (made with the world when it was
+    made); a place the worker does not make in time is a refusal that asking again resolves."""
+    digest, receipt = generation_receipt(
+        connection, binding.workspace_id, binding.world_id, ground.snapshot_id
+    )
+    worker = kind_worker()
+    outcome = worker.run(
+        f"place:{digest}:{ground.place_id}",
+        PLACE_SECONDS,
+        place_job,
+        dict(receipt),
+        digest,
+        ground.place_id,
+        workspace=str(binding.workspace_id),
+        kept=worker.places,
+    )
+    if outcome.status != "done" or outcome.value is None:
+        waiting = KindWorkWaiting(outcome.status, kept=True, reason=outcome.reason)
+        return _TownRead(None, None, None, waiting=f"{waiting.code}: {waiting}")
+    answer = outcome.value
+    if answer["status"] != "done":
+        return _TownRead(None, None, str(answer["detail"]))
+    return _TownRead(digest, answer["place"], None, (), site_receipt=receipt)
 
 
 #: What a saved world's input says of the edit it follows, not of what its society reads: its
@@ -432,15 +469,19 @@ class SocietyRuntime:
     ) -> None:
         """Generate a generated world's records and their place before the asset read lock.
 
-        For a ground whose people walk the world's own surfaces, once a transaction: the records
-        through the world's receipt (:func:`town_records`, which generates them again on a cold
-        cache) and the place they make. A refusal is kept and raised when the input is composed,
-        so a transaction that composes nothing is not refused for a world it does not read.
+        For a ground whose people walk the world's own surfaces, once a transaction: a town's
+        records through the world's receipt (:func:`town_records`, which generates them again on a
+        cold cache) and the place they make; a site world's place from the kind worker
+        (:func:`_site_read`). A refusal is kept and raised when the input is composed, so a
+        transaction that composes nothing is not refused for a world it does not read.
         """
         key = (binding.world_id, ground.snapshot_id)
         if read.locked or ground.navigation_form != "walking_surfaces" or key in read.towns:
             return
         try:
+            if states_site(connection, binding.workspace_id, binding.world_id, ground.snapshot_id):
+                read.towns[key] = _site_read(connection, binding, ground)
+                return
             generated = town_records(
                 connection, binding.workspace_id, binding.world_id, ground.snapshot_id
             )
@@ -1481,6 +1522,10 @@ class SocietyRuntime:
                 raise UnavailableSocietyInput(
                     "the world's records were not read before the asset read lock"
                 )
+            if town.waiting is not None:
+                raise UnavailableSocietyInput(
+                    f"the world's place is still being made ({town.waiting})"
+                )
             if town.refusal is not None or town.place is None:
                 raise UnavailableSocietyInput(f"the world's records are unreadable: {town.refusal}")
             try:
@@ -1498,7 +1543,19 @@ class SocietyRuntime:
                 )
             routine = None
             place = town.place
-            if chosen == WALKING_SURFACES_COMPOSITION_V2:
+            if town.site_receipt is not None:
+                # A world made from a world kind is walked only by the living society, under the
+                # routine its receipt names, over the place made from its records under it.
+                if chosen != WALKING_SURFACES_COMPOSITION_V2:
+                    raise UnavailableSocietyInput(
+                        "a world made from a world kind is lived in by the living society only"
+                    )
+                routine = site_plan.receipt_routine(town.site_receipt)
+                if living_routine is not None and living_routine.sha256 != routine.sha256:
+                    raise UnavailableSocietyInput(
+                        "the input names another routine than the world's"
+                    )
+            elif chosen == WALKING_SURFACES_COMPOSITION_V2:
                 routine = town_routine() if living_routine is None else living_routine
                 place = town.living_places.get(routine.sha256)
                 if place is None:

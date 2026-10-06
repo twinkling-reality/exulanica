@@ -97,6 +97,13 @@ function gableMesh(device: pc.GraphicsDevice): pc.Mesh {
 /** What drawing a site's slots put in the scene: their root, counts and how to take them away. */
 export interface DrawnSiteSlots {
   readonly root: pc.Entity;
+  /**
+   * Each drawn slot's entity by the slot's identity: the entity at the slot's base, turned by its
+   * quarter turns, whose one child (`<identity>:shape`) holds the primitive. A `none` slot has
+   * none. The drawing owns these entities; a dresser may disable one or give its shape another
+   * material instance, and puts back what it changed when its disposer runs.
+   */
+  readonly entities: ReadonlyMap<string, pc.Entity>;
   /** Slots drawn as an entity; a `none` slot draws nothing and is not counted. */
   readonly drawn: number;
   readonly triangles: number;
@@ -122,6 +129,7 @@ export function drawSiteSlots(device: pc.GraphicsDevice, drawing: SiteDrawing): 
     return made;
   };
   let gable: pc.Mesh | null = null;
+  const entities = new Map<string, pc.Entity>();
   let drawn = 0;
   let triangles = 0;
   for (const slot of drawing.slots) {
@@ -151,11 +159,13 @@ export function drawSiteSlots(device: pc.GraphicsDevice, drawing: SiteDrawing): 
     }
     entity.addChild(shape);
     root.addChild(entity);
+    entities.set(slot.identity, entity);
     drawn += 1;
   }
   let destroyed = false;
   return {
     root,
+    entities,
     drawn,
     triangles,
     destroy(): void {

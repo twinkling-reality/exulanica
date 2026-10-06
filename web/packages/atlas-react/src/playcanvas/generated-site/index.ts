@@ -19,5 +19,5 @@ export { SITE_DRAWING_PROFILE, SiteDrawingError, parseSiteDrawing } from './site
 export { SITE_WALKER_RADIUS_M, siteNavigationWorld, siteStart, siteSurface } from './site-navigation.js';
 export type { DrawnSiteSlots } from './site-primitives.js';
 export { drawSiteSlots, slotColour } from './site-primitives.js';
-export type { GeneratedSiteMount, SiteMountOptions } from './site-mount.js';
+export type { GeneratedSiteMount, SiteDresser, SiteMountOptions } from './site-mount.js';
 export { siteMount } from './site-mount.js';

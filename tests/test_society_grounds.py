@@ -25,6 +25,7 @@ from exulanica.world.society_comparison_reading import population_maximum
 from exulanica.world.society_engines import COMPARISON_ENGINES, CREATES
 from exulanica.world.society_grounds import (
     CATALOG_DIRECTORY,
+    CATALOG_VERSION,
     UnknownSocietyGround,
     load_society_grounds,
     society_ground_for_composer,
@@ -121,9 +122,10 @@ def test_every_stated_ground_can_be_compared_under_the_comparison_protocol():
 def _malformed(tmp_path, change) -> None:
     for path in CATALOG_DIRECTORY.glob("*.json"):
         (tmp_path / path.name).write_bytes(path.read_bytes())
-    document = json.loads((CATALOG_DIRECTORY / "society-ground.v2.json").read_text("utf-8"))
+    current = f"society-ground.v{CATALOG_VERSION}.json"
+    document = json.loads((CATALOG_DIRECTORY / current).read_text("utf-8"))
     change(document["entries"])
-    (tmp_path / "society-ground.v2.json").write_text(json.dumps(document), encoding="utf-8")
+    (tmp_path / current).write_text(json.dumps(document), encoding="utf-8")
     load_society_grounds(tmp_path)
 
 
@@ -158,8 +160,8 @@ def test_a_malformed_ground_catalog_is_refused(tmp_path, change, message):
 def test_a_file_the_catalog_has_no_schema_for_is_refused(tmp_path):
     for path in CATALOG_DIRECTORY.glob("*.json"):
         (tmp_path / path.name).write_bytes(path.read_bytes())
-    source = CATALOG_DIRECTORY / "society-ground.v2.json"
-    (tmp_path / "society-ground.v3.json").write_bytes(source.read_bytes())
+    source = CATALOG_DIRECTORY / f"society-ground.v{CATALOG_VERSION}.json"
+    (tmp_path / f"society-ground.v{CATALOG_VERSION + 1}.json").write_bytes(source.read_bytes())
     with pytest.raises(CatalogError, match="files with no schema"):
         load_society_grounds(tmp_path)
 

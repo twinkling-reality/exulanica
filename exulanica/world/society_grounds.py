@@ -62,7 +62,7 @@ __all__ = [
 ]
 
 CATALOG_ID: Final = "society-ground"
-CATALOG_VERSION: Final = 2
+CATALOG_VERSION: Final = 3
 CATALOG_DIRECTORY: Final = (
     Path(__file__).resolve().parents[2].joinpath("assets", "catalogs", CATALOG_ID)
 )
@@ -191,6 +191,28 @@ def _entry_check(where: str, values: Mapping[str, Any]) -> None:
 _NON_NEGATIVE = integer_field(_STATES_NONE, sys.maxsize)
 
 
+#: What version 2's entries carry, and version 3's: version 3 states the ground of a world made from
+#: a world kind (``generated_site``) beside version 2's grounds, in the same fields.
+_FIELDS_V2: Final = (
+    ("composer_key", text_field),
+    ("navigation_profile", text_field),
+    ("navigation", _choice(GROUND_NAVIGATIONS)),
+    ("navigation_reason", text_field),
+    ("arrival", _choice(GROUND_ARRIVALS)),
+    ("arrival_reason", text_field),
+    ("floor", _choice(GROUND_FLOORS)),
+    ("floor_reason", text_field),
+    ("population_rule", _choice(POPULATION_RULES)),
+    ("population", _POSITIVE),
+    ("population_reason", text_field),
+    ("lattice_mm", _NON_NEGATIVE),
+    ("lattice_reason", text_field),
+    ("declared_half_extent_mm", _NON_NEGATIVE),
+    ("declared_area_reason", text_field),
+    ("reason", text_field),
+)
+
+
 _SCHEMAS: Final = MappingProxyType(
     {
         1: CatalogSchema(
@@ -213,29 +235,8 @@ _SCHEMAS: Final = MappingProxyType(
             ),
             entry_check=_entry_check,
         ),
-        2: CatalogSchema(
-            CATALOG_ID,
-            2,
-            (
-                ("composer_key", text_field),
-                ("navigation_profile", text_field),
-                ("navigation", _choice(GROUND_NAVIGATIONS)),
-                ("navigation_reason", text_field),
-                ("arrival", _choice(GROUND_ARRIVALS)),
-                ("arrival_reason", text_field),
-                ("floor", _choice(GROUND_FLOORS)),
-                ("floor_reason", text_field),
-                ("population_rule", _choice(POPULATION_RULES)),
-                ("population", _POSITIVE),
-                ("population_reason", text_field),
-                ("lattice_mm", _NON_NEGATIVE),
-                ("lattice_reason", text_field),
-                ("declared_half_extent_mm", _NON_NEGATIVE),
-                ("declared_area_reason", text_field),
-                ("reason", text_field),
-            ),
-            entry_check=_entry_check,
-        ),
+        2: CatalogSchema(CATALOG_ID, 2, _FIELDS_V2, entry_check=_entry_check),
+        3: CatalogSchema(CATALOG_ID, 3, _FIELDS_V2, entry_check=_entry_check),
     }
 )
 

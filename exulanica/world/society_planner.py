@@ -85,6 +85,13 @@ NAVIGATION_PROFILES = {
     WALKING_SURFACES_INPUT: "city-walking-surfaces/v1",
     WALKING_SURFACES_INPUT_V2: "city-walking-surfaces/v1",
 }
+#: The navigation profile of a site world's own walking surfaces (a world made from a world kind
+#: by the site grammar, :mod:`exulanica.world.society_site_place`). Its input is the living
+#: walking-surfaces-v2 input, which states which producer's surfaces it walks by this profile.
+SITE_NAVIGATION_PROFILE: Final = "site-walking-surfaces/v1"
+#: The navigation profiles an input profile also admits beside its own, each naming another
+#: producer of the same input's surfaces.
+ALSO_NAVIGATION_PROFILES: Final = {WALKING_SURFACES_INPUT_V2: (SITE_NAVIGATION_PROFILE,)}
 #: The frame a walking-surfaces input's positions are in: east and south millimetres about its
 #: region's origin, with no altitude: the surface a person stands on stays in the world's records.
 WALKING_SURFACES_FRAME: Final = "generated-ground-local-mm"
@@ -332,7 +339,8 @@ def _validate_society_input(document: dict[str, Any]) -> None:
         navigation_fields.add("standing_spacing_mm")
     _require(isinstance(nav, dict) and set(nav) == navigation_fields, "invalid navigation fields")
     _require(
-        nav["profile"] == NAVIGATION_PROFILES[profile] and nav["clearance_mm"] == CLEARANCE_MM,
+        nav["profile"] in (NAVIGATION_PROFILES[profile], *ALSO_NAVIGATION_PROFILES.get(profile, ()))
+        and nav["clearance_mm"] == CLEARANCE_MM,
         "unsupported navigation profile",
     )
     _require(
@@ -599,9 +607,19 @@ def _validate_living(document: dict[str, Any]) -> None:
     living = document["living"]
     _require(isinstance(living, dict) and set(living) == {"routine", "place"}, "invalid living")
     routine = living["routine"]
+    overlay = routine.get("overlay") if isinstance(routine, dict) else None
     _require(
         isinstance(routine, dict)
-        and set(routine) == {"catalog_versions", "sha256"}
+        and set(routine) - {"overlay"} == {"catalog_versions", "sha256"}
+        and (
+            "overlay" not in routine
+            or (
+                isinstance(overlay, dict)
+                and overlay.get("profile") == "exulanica.routine-overlay/v1"
+                and isinstance(overlay.get("use_classes"), list)
+                and _integer(overlay.get("employment_share_milli"), 1, 1000)
+            )
+        )
         and isinstance(routine["catalog_versions"], dict)
         and all(
             _text(key) and _integer(value, 1, 10_000)
@@ -621,14 +639,30 @@ def _validate_living(document: dict[str, Any]) -> None:
         and place.get("routine_sha256") == routine["sha256"],
         "invalid living place",
     )
+    # A city's records make a city place and a site's a site place; the input names its place
+    # under the kind its navigation profile says made it, and no other.
+    kind = (
+        "site_place"
+        if document["navigation"].get("profile") == SITE_NAVIGATION_PROFILE
+        else "city_place"
+    )
     named = [
         ref["sha256"]
         for ref in document["dependency_refs"]
-        if isinstance(ref, dict) and ref.get("kind") == "city_place"
+        if isinstance(ref, dict)
+        and ref.get("kind") in ("city_place", "site_place")
+        and ref.get("kind") == kind
+    ]
+    others = [
+        ref
+        for ref in document["dependency_refs"]
+        if isinstance(ref, dict)
+        and ref.get("kind") in ("city_place", "site_place")
+        and ref.get("kind") != kind
     ]
     _require(
-        named == [place["document_sha256"]],
-        "the living place is not the city place the input names",
+        named == [place["document_sha256"]] and not others,
+        f"the living place is not the {kind.replace('_', ' ')} the input names",
     )
 
 
