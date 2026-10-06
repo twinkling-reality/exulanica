@@ -326,6 +326,16 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
         if comparison_worker is not None
         else None
     )
+    # Reference jobs (notes on what the things in a person's words look like) are played here
+    # unless the configuration sets EXULANICA_REFERENCE_WORKER off; each is short and bounded.
+    reference_worker = services.build_reference_worker() if services.runs_reference_worker else None
+    reference_thread = (
+        threading.Thread(
+            target=reference_worker.run, args=(society_stop,), name="references", daemon=True
+        )
+        if reference_worker is not None
+        else None
+    )
     worker = services.build_derivative_worker()
     app.state.derivative_worker = worker
     if worker is not None:
@@ -335,6 +345,8 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
             society_thread.start()
         if comparison_thread is not None:
             comparison_thread.start()
+        if reference_thread is not None:
+            reference_thread.start()
         if services.playback_player != "process":
             traffic_signals.start()
         # What startup made lives as long as the server. A full garbage collection walks every
@@ -355,6 +367,8 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
             await asyncio.to_thread(society_thread.join)
         if comparison_thread is not None:
             await asyncio.to_thread(comparison_thread.join)
+        if reference_thread is not None:
+            await asyncio.to_thread(reference_thread.join)
         await asyncio.to_thread(traffic_signals.close)
         if worker is not None:
             worker.stop()

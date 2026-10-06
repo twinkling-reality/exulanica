@@ -35,15 +35,20 @@ class ReferenceSourceUnavailable(ExulanicaError):
     """A source answered nothing usable. ``code`` is one of :data:`SOURCE_REFUSALS`.
 
     ``charged`` says whether the source may have counted the call against its allowance: a request
-    that reached it and was answered, however badly, may have been.
+    that reached it and was answered, however badly, may have been; ``credits`` is what the source
+    said the call cost, where it said.
     """
 
-    def __init__(self, code: str, detail: str, *, charged: bool) -> None:
+    def __init__(
+        self, code: str, detail: str, *, charged: bool, credits: int | None = None
+    ) -> None:
         if code not in SOURCE_REFUSALS:
             raise ValueError(f"unknown source refusal {code!r}")
         super().__init__(f"{code}: {detail}")
         self.code = code
         self.charged = charged
+        #: The credits the source reported for the call, where it reported any.
+        self.credits = credits
 
 
 @dataclass(frozen=True, slots=True)
@@ -77,6 +82,8 @@ class ReferenceAdapter(Protocol):
     source: ReferenceSource
 
     def search(self, query: AdmittedQuery) -> Leads: ...
+
+    def close(self) -> None: ...
 
 
 def source_transport(source: ReferenceSource, egress: EgressAllowlist) -> HttpxTransport:

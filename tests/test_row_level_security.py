@@ -97,9 +97,7 @@ def isolated():
             )
             provision_workspace(admin, workspace)
 
-        admin.execute(
-            "select set_config('exulanica.workspace_id', %s, false)", (str(workspace_a),)
-        )
+        admin.execute("select set_config('exulanica.workspace_id', %s, false)", (str(workspace_a),))
         digest = bytes(range(32))
         admin.execute(
             "insert into blob (blob_sha256, byte_size, media_type) values (%s, 1, 'image/jpeg')",
@@ -473,15 +471,19 @@ def test_consent_record_is_isolated_by_the_workspace_session(scoped):
     """
     # Built so this file does not spell the withdrawn product name the rename guard forbids.
     historical_tenant_guc = "".join(("ori", "mera.tenant_id"))
-    forced = scoped.connect(_APP_ROLE, scoped.workspace_a).execute(
-        "select c.relrowsecurity, c.relforcerowsecurity, p.qual, p.with_check "
-        "from pg_class c "
-        "join pg_namespace n on n.oid = c.relnamespace "
-        "join pg_policies p on p.schemaname = n.nspname and p.tablename = c.relname "
-        "where n.nspname = %s and c.relname = 'consent_record' "
-        "and p.policyname = 'tenant_isolation'",
-        (scoped.scratch,),
-    ).fetchone()
+    forced = (
+        scoped.connect(_APP_ROLE, scoped.workspace_a)
+        .execute(
+            "select c.relrowsecurity, c.relforcerowsecurity, p.qual, p.with_check "
+            "from pg_class c "
+            "join pg_namespace n on n.oid = c.relnamespace "
+            "join pg_policies p on p.schemaname = n.nspname and p.tablename = c.relname "
+            "where n.nspname = %s and c.relname = 'consent_record' "
+            "and p.policyname = 'tenant_isolation'",
+            (scoped.scratch,),
+        )
+        .fetchone()
+    )
     assert forced["relrowsecurity"] is True
     assert forced["relforcerowsecurity"] is True
     assert "current_workspace()" in forced["qual"]
@@ -498,12 +500,18 @@ def test_consent_record_is_isolated_by_the_workspace_session(scoped):
     try:
         own = _insert_consent_record(mine, scoped.workspace_a)
         extra.append(own)
-        assert mine.execute(
-            "select consent_id from consent_record where consent_id = %s", (own,)
-        ).fetchone()["consent_id"] == own
-        assert theirs.execute(
-            "select consent_id from consent_record where consent_id = %s", (own,)
-        ).fetchone() is None
+        assert (
+            mine.execute(
+                "select consent_id from consent_record where consent_id = %s", (own,)
+            ).fetchone()["consent_id"]
+            == own
+        )
+        assert (
+            theirs.execute(
+                "select consent_id from consent_record where consent_id = %s", (own,)
+            ).fetchone()
+            is None
+        )
 
         with pytest.raises(psycopg.errors.InsufficientPrivilege), theirs.transaction():
             _insert_consent_record(theirs, scoped.workspace_a)
@@ -511,12 +519,18 @@ def test_consent_record_is_isolated_by_the_workspace_session(scoped):
         extra.append(theirs_own)
         assert _count(mine, "consent_record") == 2
         assert _count(theirs, "consent_record") == 1
-        assert theirs.execute(
-            "select consent_id from consent_record where consent_id = %s", (theirs_own,)
-        ).fetchone()["consent_id"] == theirs_own
-        assert mine.execute(
-            "select consent_id from consent_record where consent_id = %s", (theirs_own,)
-        ).fetchone() is None
+        assert (
+            theirs.execute(
+                "select consent_id from consent_record where consent_id = %s", (theirs_own,)
+            ).fetchone()["consent_id"]
+            == theirs_own
+        )
+        assert (
+            mine.execute(
+                "select consent_id from consent_record where consent_id = %s", (theirs_own,)
+            ).fetchone()
+            is None
+        )
 
         executor = scoped.connect(_EXECUTOR_ROLE, scoped.workspace_a)
         assert _count(executor, "consent_record") == 2
@@ -545,6 +559,70 @@ def test_consent_record_is_isolated_by_the_workspace_session(scoped):
 
         if extra:
             with scratch_database(scoped.scratch).unscoped() as admin:
-                admin.execute(
-                    "delete from consent_record where consent_id = any(%s)", (extra,)
-                )
+                admin.execute("delete from consent_record where consent_id = any(%s)", (extra,))
+
+
+def _reference_request(connection: psycopg.Connection, workspace: uuid.UUID):
+    """A queued reference request made as the runtime role, the way the route makes one."""
+    from exulanica.references import store
+
+    made, _ = store.create_request(
+        connection,
+        workspace,
+        offered_to=(workspace,),
+        owner_actor_id=uuid.uuid4(),
+        purpose="kind",
+        web=True,
+        description="a harbour town",
+        withheld_words=(),
+        prompts_sha256="e" * 64,
+    )
+    return made
+
+
+def test_reference_requests_and_their_searches_are_isolated_for_the_runtime_role(scoped):
+    """Migration 0148's two tables, read and claimed as a role row-level security binds."""
+    from exulanica.references import store
+
+    mine = scoped.connect(_APP_ROLE, scoped.workspace_a)
+    theirs = scoped.connect(_APP_ROLE, scoped.workspace_b)
+    made = _reference_request(mine, scoped.workspace_a)
+    claimed = store.claim(mine, scoped.workspace_a, worker="isolation")
+    assert claimed is not None and claimed.request.reference_id == made.reference_id
+    store.record_lookup(
+        mine,
+        claimed,
+        source="tavily_search",
+        aspect="buildings",
+        query="whitewashed island houses",
+        outcome="answered",
+        credits=1,
+        result_count=1,
+        provider_request_id=None,
+    )
+    assert _count(mine, "reference_request") >= 1 and _count(mine, "reference_lookup") >= 1
+    assert _count(theirs, "reference_request") == 0
+    assert _count(theirs, "reference_lookup") == 0
+    assert store.read_request(theirs, scoped.workspace_b, made.reference_id) is None
+    # Workspace B claims nothing, whichever workspace its query names.
+    other = _reference_request(mine, scoped.workspace_a)
+    assert store.claim(theirs, scoped.workspace_b, worker="isolation") is None
+    assert store.claim(theirs, scoped.workspace_a, worker="isolation") is None
+    assert store.read_request(mine, scoped.workspace_a, other.reference_id).status == "queued"
+
+
+def test_a_reference_request_cannot_name_another_workspace_s_job(scoped):
+    """A foreign key is checked past row-level security, so it names the job with its workspace."""
+    mine = scoped.connect(_APP_ROLE, scoped.workspace_a)
+    theirs = scoped.connect(_APP_ROLE, scoped.workspace_b)
+    job_id = mine.execute(
+        "insert into job (workspace_id, kind, payload) values (%s, 'reference_bundle', '{}') "
+        "returning job_id",
+        (scoped.workspace_a,),
+    ).fetchone()["job_id"]
+    with pytest.raises(psycopg.errors.ForeignKeyViolation):
+        theirs.execute(
+            "insert into reference_request (workspace_id, owner_actor_id, purpose, web, job_id, "
+            "prompts_sha256) values (%s, %s, 'kind', true, %s, %s)",
+            (scoped.workspace_b, uuid.uuid4(), job_id, "e" * 64),
+        )

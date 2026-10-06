@@ -470,12 +470,19 @@ def test_an_explicit_timeout_overrides_every_role(manifest):
     assert client.worst_case_seconds(Role.EMBEDDING) == pytest.approx(7.0)
 
 
+#: Roles whose timeout basis is another role's measurement of the same primary, named here so the
+#: copied figures are still read from the record: reference_drafting was declared after the
+#: 2026-09-24 survey with structured_extraction's chain, and is re-measured on its own calls in the
+#: references live check.
+BASIS_MEASURED_AS = {"reference_drafting": "structured_extraction"}
+
+
 def test_every_role_timeout_follows_from_its_basis_and_the_record_it_names(manifest):
     """The basis is the survey record's own numbers, and the timeout is the rule applied to them."""
     for role, binding in manifest.roles.items():
         basis = binding.timeout_basis
         record = json.loads((ROOT / basis["record"]).read_text(encoding="utf-8"))["record"]
-        measured = record["measured"]["roles"][str(role)]
+        measured = record["measured"]["roles"][BASIS_MEASURED_AS.get(str(role), str(role))]
         assert measured["primary"] == binding.primary.model_id == basis["model"]
         primary = measured["primary_measured"]
         for key in ("rows", "p50_ms", "p99_ms", "longest_ms"):

@@ -60,6 +60,10 @@ RUNTIME_UPDATES: dict[str, str] = {
     "place_record": "a state event locks its record and applies to it",
     "reconstruction_scene": "a build becomes its scene's current job",
     "reconstruction_scene_job": "the scene queue claims, fails and retries; a tombstone cancels",
+    "reference_request": (
+        "a reference job moves its request's status, steps and bundle while it runs, under the "
+        "job's claim (references/store.py)"
+    ),
     "route_permission_refusal": "a repeated refusal is counted in place (api/permissions.py)",
     "scene_training_right": "withdrawal, once; migration 0080 refuses every other change",
     "society_comparison_start": (

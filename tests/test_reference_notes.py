@@ -11,6 +11,7 @@ import uuid
 
 import pytest
 from exulanica.references.bundle import (
+    BundleCall,
     BundleError,
     BundleNote,
     BundlePicture,
@@ -24,7 +25,6 @@ WORKSPACE = uuid.UUID("11111111-1111-4111-8111-111111111111")
 PICTURE = uuid.UUID("22222222-2222-4222-8222-222222222222")
 RIGHT = uuid.UUID("33333333-3333-4333-8333-333333333333")
 LOOKUP = uuid.UUID("44444444-4444-4444-8444-444444444444")
-CALL = uuid.UUID("55555555-5555-4555-8555-555555555555")
 
 SOURCE_TEXT = (
     "Cube-shaped houses with flat roofs and bright blue doors line the narrow stepped lanes "
@@ -89,7 +89,16 @@ def _bundle(**changes) -> ReferenceBundle:
                 ("nebius_token_factory", "reference_vision", "openbmb/MiniCPM-V-4_5"),
             ),
         ),
-        model_calls=(CALL,),
+        model_calls=(
+            BundleCall(
+                "nebius_token_factory",
+                "structured_extraction",
+                "Qwen/Qwen3-235B-A22B-Instruct-2507",
+                812,
+                96,
+                "0.00022000",
+            ),
+        ),
         outcome="complete",
         missed=(),
     )
@@ -100,7 +109,9 @@ def _bundle(**changes) -> ReferenceBundle:
 EXPECTED_BYTES = (
     b'{"lookups":["44444444-4444-4444-8444-444444444444"],'
     b'"missed":[],'
-    b'"model_calls":["55555555-5555-4555-8555-555555555555"],'
+    b'"model_calls":[{"completion_tokens":96,"model_id":"Qwen/Qwen3-235B-A22B-Instruct-2507",'
+    b'"prompt_tokens":812,"provider":"nebius_token_factory","role":"structured_extraction",'
+    b'"usd":"0.00022000"}],'
     b'"notes":[{"aspect":"buildings","basis":"web_description","picture_id":null,'
     b'"text":"whitewashed cube houses"},'
     b'{"aspect":"materials_and_colour","basis":"own_picture",'
@@ -147,6 +158,9 @@ REFUSED = {
     "a complete bundle naming a missed step": lambda d: d.update(missed=["search"]),
     "an id in another spelling": lambda d: d.update(workspace_id=WORKSPACE.hex),
     "too many lookups": lambda d: d.update(lookups=[str(uuid.uuid4()) for _ in range(4)]),
+    "a call cost as a float": lambda d: d["model_calls"][0].update(usd=0.00022),
+    "a call cost not to eight places": lambda d: d["model_calls"][0].update(usd="0.00022"),
+    "a call with no provider": lambda d: d["model_calls"][0].pop("provider"),
     "an unknown purpose": lambda d: d.update(purpose="everything"),
 }
 

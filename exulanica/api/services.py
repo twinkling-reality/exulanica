@@ -86,6 +86,14 @@ from exulanica.models.client import PROVIDER_CREDENTIAL_ABSENT, ModelClient
 from exulanica.models.egress import EGRESS_ALLOWLIST_ENV
 from exulanica.models.manifest import MANIFEST_PATH, Role, load_manifest
 from exulanica.models.spending import SpendingRefused
+from exulanica.references.adapters import ReferenceAdapter
+from exulanica.references.catalogs import ReferenceSource, load_reference_catalogs
+from exulanica.references.settings import (
+    configured_adapter,
+    plays_references_here,
+    reference_workspaces,
+)
+from exulanica.references.worker import WEB_SOURCE, ReferenceWorker
 from exulanica.spending import (
     DURABLE,
     PROCESS,
@@ -287,6 +295,16 @@ class Services:
     #: True when the configuration names a process of its own that plays them
     #: (``EXULANICA_COMPARISON_WORKER=process``). With neither, no start is accepted.
     comparisons_played_elsewhere: bool = False
+    #: True when this process plays the reference jobs requests queue
+    #: (``EXULANICA_REFERENCE_WORKER``, on unless set off); off for a hand-constructed Services, as
+    #: the derivative worker is.
+    runs_reference_worker: bool = False
+    #: The workspaces that may ask for web notes (``EXULANICA_REFERENCE_WORKSPACES``); none when
+    #: absent. A source offered to the operator only is offered to these alone.
+    reference_workspaces: tuple[uuid.UUID, ...] = ()
+    #: A reference source's adapter from this process's configuration, or a refusal naming what is
+    #: missing; None for a hand-constructed Services.
+    reference_adapter_for: Callable[[ReferenceSource], ReferenceAdapter] | None = None
     #: The place-name right's resolver, asked by every workspace policy this instance attaches
     #: whether a confirmed place's name may go to a hand-over. ``build_services`` injects the
     #: right's own (``exulanica.consent.place_name_rights``); the one that releases nothing is
@@ -505,6 +523,48 @@ class Services:
             workspaces=self.society_control_workspaces,
             keeps_share=keeps_share,
             signal_runner_for=self.signal_comparison_runner,
+        )
+
+    def references_offered_here(self) -> bool:
+        """Whether this installation may offer the web source at all: a source offered to the
+        operator only is offered on no installation whose profile is ``public``."""
+        source = load_reference_catalogs().sources[WEB_SOURCE]
+        profile = self.installation.profile if self.installation is not None else None
+        return source.availability == "everyone" or profile is None or profile.id != "public"
+
+    def build_reference_worker(self) -> ReferenceWorker | None:
+        """What plays the reference jobs of the workspaces that may ask for web notes, or None
+        where this process has no model client, no durable spending, no such workspace or no
+        source configuration. Each job's requests carry the workspace's rules, with no place's
+        name released: a search is not a use a place-name right offers."""
+        if (
+            self.model_client is None
+            or self.spending is None
+            or not self.reference_workspaces
+            or self.reference_adapter_for is None
+            or not self.references_offered_here()
+        ):
+            return None
+        database = self.database
+        readonly = self.readonly_database
+        workspaces = self.reference_workspaces
+
+        def policy_for(workspace_id: uuid.UUID) -> WorkspaceRequestPolicy:
+            # Saved names and rights are read on the read-only database, as a person's decisions
+            # read them.
+            return self.request_policy(
+                workspace_id,
+                lambda: readonly.session(workspace_id),
+                released_places=no_place_released,
+            )
+
+        return ReferenceWorker(
+            database,
+            client=self.model_client,
+            policy_for=policy_for,
+            spending=self.spending,
+            adapter_for=self.reference_adapter_for,
+            workspaces=lambda: workspaces,
         )
 
     def model_host_refusal(self, workspace_id: uuid.UUID, role: DecisionRole) -> str | None:
@@ -918,6 +978,9 @@ def build_services(
         comparison_seeds=development_seeds(load_comparison_catalogs()),
         runs_comparison_worker=comparison_player == "here",
         comparisons_played_elsewhere=comparison_player == "process",
+        runs_reference_worker=plays_references_here(env_get("REFERENCE_WORKER", environ)),
+        reference_workspaces=reference_workspaces(env_get("REFERENCE_WORKSPACES", environ)),
+        reference_adapter_for=lambda source: configured_adapter(source, environ),
         # A declared installation's marker is its profile's; otherwise the setting, if any.
         restore_state_path=installation.restore_state_path,
         installation=installation,

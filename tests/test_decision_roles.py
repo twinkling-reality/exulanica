@@ -527,8 +527,9 @@ def test_the_preflight_holds_a_registered_role_s_models_to_the_role_s_use_cases(
 def test_the_deployment_gate_fails_when_a_role_s_model_loses_the_role_s_use_case(tmp_path, capsys):
     """``exulanica-preflight``, the gate docs/deployment.md section 7.3 wires into the build, gives
     the model package's check the registry's roles. A model only a registered role reaches (here
-    the structured extraction fallback, unbound in a copy of the manifest) that no longer declares
-    the role's use case fails it, naming the role; the model package's own check passes it."""
+    the structured extraction fallback, unbound from every role in a copy of the manifest) that
+    no longer declares the role's use case fails it, naming the role; the model package's own
+    check passes it."""
     from exulanica.models import preflight
     from exulanica.orchestration import catalog_preflight
 
@@ -536,7 +537,9 @@ def test_the_deployment_gate_fails_when_a_role_s_model_loses_the_role_s_use_case
 
     document = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
     only_offered = document["roles"]["structured_extraction"]["fallback"]
-    document["roles"]["structured_extraction"]["fallback"] = None
+    for binding in document["roles"].values():
+        if binding["fallback"] == only_offered:
+            binding["fallback"] = None
     manifest_path = tmp_path / "manifest.json"
     manifest_path.write_text(json.dumps(document), encoding="utf-8")
     manifest = parse_manifest(

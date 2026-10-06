@@ -23,12 +23,21 @@ from exulanica.references.adapters.base import Leads, ReferenceSourceUnavailable
 from exulanica.references.boundary import AdmittedQuery
 from exulanica.references.catalogs import ReferenceSource
 
-__all__ = ["MAX_PASSAGE_CHARACTERS", "MAX_PICTURE_DESCRIPTIONS", "TavilySearch"]
+__all__ = [
+    "MAX_ANSWER_CHARACTERS",
+    "MAX_PASSAGE_CHARACTERS",
+    "MAX_PICTURE_DESCRIPTIONS",
+    "TavilySearch",
+]
 
 #: An excerpt longer than this is cut: the basic depth returns chunks of at most 500 characters,
 #: three per result, as Tavily's search reference (read 2026-10-06) states.
 MAX_PASSAGE_CHARACTERS: Final = 1600
 MAX_PICTURE_DESCRIPTIONS: Final = 40
+#: An answer longer than this is refused unread: five results at the basic depth with picture
+#: descriptions are well under 100,000 characters. The shared transport has read it by then, within
+#: its deadline; this bounds what the adapter parses and holds.
+MAX_ANSWER_CHARACTERS: Final = 1_000_000
 MAX_DESCRIPTION_CHARACTERS: Final = 400
 _REQUEST_ID: Final = re.compile(r"[A-Za-z0-9-]{1,64}")
 _TIMEOUT_SECONDS: Final = 20.0
@@ -54,6 +63,12 @@ class TavilySearch:
         self.source = source
         self._transport = transport
         self._credential = credential
+
+    def close(self) -> None:
+        """Release the transport's connections; the adapter sends nothing after."""
+        close = getattr(self._transport, "close", None)
+        if callable(close):
+            close()
 
     def payload(self, query: AdmittedQuery) -> dict[str, Any]:
         """The request body for ``query``: the catalog's shape and nothing else."""
@@ -96,6 +111,10 @@ class TavilySearch:
                 f"Tavily answered HTTP {response.status_code}",
                 charged=response.status_code >= 500,
             )
+        if len(response.text) > MAX_ANSWER_CHARACTERS:
+            raise ReferenceSourceUnavailable(
+                "reference_answer_unreadable", "Tavily's answer is larger than read", charged=True
+            )
         try:
             body = response.json_body()
         except TransportError as failure:
@@ -117,6 +136,7 @@ class TavilySearch:
                 f"the call cost {credits} credits where the catalog admits "
                 f"{self.source.cost_per_call}",
                 charged=True,
+                credits=credits,
             )
         results = body.get("results")
         if not isinstance(results, Sequence) or isinstance(results, str | bytes):

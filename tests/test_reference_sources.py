@@ -279,3 +279,46 @@ def test_no_request_id_that_is_not_one_is_kept() -> None:
         credential=CREDENTIAL,
     )
     assert adapter.search(_query()).request_id is None
+
+
+def test_the_planner_and_reader_ceilings_meet_their_role_s_floor() -> None:
+    # A ceiling under the chain's floor is refused by the client before any call, and the worker
+    # reads that refusal as a missed step: every reference would quietly come back empty.
+    from exulanica.models.manifest import Role, load_manifest
+    from exulanica.references.drafting import PLAN_MAX_TOKENS, READ_MAX_TOKENS
+
+    floor = max(spec.min_max_tokens for spec in load_manifest()[Role.REFERENCE_DRAFTING].chain)
+    assert floor == 640
+    assert floor <= PLAN_MAX_TOKENS and floor <= READ_MAX_TOKENS
+
+
+def test_the_reference_role_keeps_the_extraction_chain_and_its_measured_basis() -> None:
+    # The basis figures are copied from structured_extraction's, which measured the same primary;
+    # a change to either entry without the other fails here until the live check re-measures.
+    import json as _json
+
+    from exulanica.models.manifest import MANIFEST_PATH
+
+    roles = _json.loads(MANIFEST_PATH.read_text())["roles"]
+    reference, extraction = roles["reference_drafting"], roles["structured_extraction"]
+    for key in ("primary", "fallback", "timeout_seconds", "required_use_cases"):
+        assert reference[key] == extraction[key], key
+    copied = {k: v for k, v in reference["timeout_basis"].items() if k != "note"}
+    assert copied == {k: v for k, v in extraction["timeout_basis"].items() if k != "note"}
+
+
+def test_an_oversized_answer_is_refused_and_a_cost_change_reports_its_credits() -> None:
+    from exulanica.references.adapters.tavily import MAX_ANSWER_CHARACTERS
+
+    huge = HttpResponse(200, " " * (MAX_ANSWER_CHARACTERS + 1))
+    with pytest.raises(ReferenceSourceUnavailable) as refused:
+        TavilySearch(_source(), transport=FakeTransport([huge]), credential=CREDENTIAL).search(
+            _query()
+        )
+    assert refused.value.code == "reference_answer_unreadable"
+    adapter = TavilySearch(
+        _source(), transport=FakeTransport([_answer(credits=4)]), credential=CREDENTIAL
+    )
+    with pytest.raises(ReferenceSourceUnavailable) as changed:
+        adapter.search(_query())
+    assert (changed.value.code, changed.value.credits) == ("reference_cost_changed", 4)

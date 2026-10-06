@@ -11,7 +11,8 @@ bytes. It is drafting input, never world content and never a claim about the rea
   or picture of a source is here or anywhere else;
 * ``pictures``: each picture the person gave, with the model rights it was read under and the
   model that read it;
-* ``model_calls``: the execution records of the planning, reading and vision calls;
+* ``model_calls``: each planning, reading and vision call: the provider (the account it is charged
+  to), role, model, tokens and USD, as the call reported them;
 * ``outcome``: ``complete``, or ``partial`` with the steps that did not finish (a source down or
   out of budget, a deadline passed), so a drafter and the person see what is missing.
 
@@ -39,6 +40,7 @@ __all__ = [
     "MISSED_STEPS",
     "PROFILE",
     "PURPOSES",
+    "BundleCall",
     "BundleError",
     "BundleNote",
     "BundlePicture",
@@ -75,6 +77,10 @@ _KEYS: Final = frozenset(
 _NOTE_KEYS: Final = frozenset({"aspect", "text", "basis", "picture_id"})
 _PICTURE_KEYS: Final = frozenset({"picture_id", "model_right_ids", "model"})
 _MODEL_KEYS: Final = frozenset({"provider", "role", "model_id"})
+_CALL_KEYS: Final = frozenset(
+    {"provider", "role", "model_id", "prompt_tokens", "completion_tokens", "usd"}
+)
+_USD: Final = re.compile(r"(0|[1-9][0-9]{0,5})\.[0-9]{8}")
 _NAME: Final = re.compile(r"[a-z][a-z0-9_]{0,62}")
 _MODEL_ID: Final = re.compile(r"[A-Za-z0-9][A-Za-z0-9._/-]{0,199}")
 
@@ -89,6 +95,19 @@ class BundleNote:
     text: str
     basis: str
     picture_id: uuid.UUID | None
+
+
+@dataclass(frozen=True, slots=True)
+class BundleCall:
+    """One model call a bundle took, charged to ``provider``'s account."""
+
+    provider: str
+    role: str
+    model_id: str
+    prompt_tokens: int
+    completion_tokens: int
+    #: USD with eight decimal places, as the ledger writes it.
+    usd: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -107,7 +126,7 @@ class ReferenceBundle:
     notes: tuple[BundleNote, ...]
     lookups: tuple[uuid.UUID, ...]
     pictures: tuple[BundlePicture, ...]
-    model_calls: tuple[uuid.UUID, ...]
+    model_calls: tuple[BundleCall, ...]
     outcome: str
     missed: tuple[str, ...]
 
@@ -141,7 +160,17 @@ class ReferenceBundle:
                 }
                 for picture in self.pictures
             ],
-            "model_calls": [str(item) for item in self.model_calls],
+            "model_calls": [
+                {
+                    "provider": call.provider,
+                    "role": call.role,
+                    "model_id": call.model_id,
+                    "prompt_tokens": call.prompt_tokens,
+                    "completion_tokens": call.completion_tokens,
+                    "usd": call.usd,
+                }
+                for call in self.model_calls
+            ],
             "outcome": self.outcome,
             "missed": list(self.missed),
         }
@@ -199,6 +228,31 @@ def _ids(where: str, value: object, maximum: int) -> tuple[uuid.UUID, ...]:
     return ids
 
 
+def _model(where: str, provider: object, role: object, model_id: object) -> tuple[str, str, str]:
+    if not (
+        isinstance(provider, str)
+        and _NAME.fullmatch(provider)
+        and isinstance(role, str)
+        and _NAME.fullmatch(role)
+        and isinstance(model_id, str)
+        and _MODEL_ID.fullmatch(model_id)
+    ):
+        raise BundleError(f"{where} names a provider, a role and a model")
+    return provider, role, model_id
+
+
+def _call(where: str, value: object) -> BundleCall:
+    call = _object(where, value, _CALL_KEYS)
+    provider, role, model_id = _model(where, call["provider"], call["role"], call["model_id"])
+    counts = (call["prompt_tokens"], call["completion_tokens"])
+    if any(type(count) is not int or count < 0 for count in counts):
+        raise BundleError(f"{where} states its tokens as whole numbers")
+    usd = call["usd"]
+    if not isinstance(usd, str) or _USD.fullmatch(usd) is None:
+        raise BundleError(f"{where}.usd is USD with eight decimal places, as a string")
+    return BundleCall(provider, role, model_id, *counts, usd)  # type: ignore[arg-type]
+
+
 def read_bundle(document: object, *, catalogs: ReferenceCatalogs | None = None) -> ReferenceBundle:
     """``document`` as a reference bundle, or :class:`BundleError` naming where it fails."""
     return ReferenceBundle(
@@ -219,17 +273,9 @@ def _parts(document: object, catalogs: ReferenceCatalogs) -> dict[str, Any]:
         where = f"pictures[{index}]"
         picture = _object(where, item, _PICTURE_KEYS)
         model = _object(f"{where}.model", picture["model"], _MODEL_KEYS)
-        provider, role = model["provider"], model["role"]
-        model_id = model["model_id"]
-        if not (
-            isinstance(provider, str)
-            and _NAME.fullmatch(provider)
-            and isinstance(role, str)
-            and _NAME.fullmatch(role)
-            and isinstance(model_id, str)
-            and _MODEL_ID.fullmatch(model_id)
-        ):
-            raise BundleError(f"{where}.model names a provider, a role and a model")
+        provider, role, model_id = _model(
+            f"{where}.model", model["provider"], model["role"], model["model_id"]
+        )
         rights = _ids(f"{where}.model_right_ids", picture["model_right_ids"], MAX_RIGHTS)
         if not rights:
             raise BundleError(f"{where} was read under at least one model right")
@@ -282,7 +328,10 @@ def _parts(document: object, catalogs: ReferenceCatalogs) -> dict[str, Any]:
         notes=tuple(notes),
         lookups=_ids("lookups", raw["lookups"], MAX_LOOKUPS),
         pictures=tuple(pictures),
-        model_calls=_ids("model_calls", raw["model_calls"], MAX_MODEL_CALLS),
+        model_calls=tuple(
+            _call(f"model_calls[{index}]", item)
+            for index, item in enumerate(_list("model_calls", raw["model_calls"], MAX_MODEL_CALLS))
+        ),
         outcome=outcome,
         missed=missed,
     )

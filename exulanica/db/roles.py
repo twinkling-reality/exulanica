@@ -258,6 +258,9 @@ INSERT_ONLY_TABLES: Final = (
     "workspace_asset_withdrawal",
     "workspace_preparation_request",
     "workspace_asset_blob",
+    # Migration 0148 appends our own record of each search a reference request sent and refuses
+    # every update of one.
+    "reference_lookup",
 )
 
 #: The vocabulary is administered, not generated. Without revoking this the role could insert a

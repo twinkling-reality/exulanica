@@ -64,6 +64,10 @@ from exulanica.models.manifest import (
 )
 from exulanica.models.policy import HostedRequestRefused, request_parts
 from exulanica.models.transport import HttpResponse
+from exulanica.references.adapters.base import Leads
+from exulanica.references.boundary import SearchSubject, admit_query
+from exulanica.references.catalogs import load_reference_catalogs
+from exulanica.references.drafting import plan_subjects, read_notes
 from exulanica.selection import action_plan
 from exulanica.selection.answer import Answer, AnswerClause, ClauseType
 from exulanica.selection.calls import CallLog
@@ -86,7 +90,7 @@ from exulanica.selection.world_drafting import propose_world_specification, spec
 from exulanica.world.society_decision_contract import decision_contract, person_role
 
 from conftest import ingest_observed, write_photo
-from model_fakes import FakeTransport, chat_body
+from model_fakes import FakeTransport, RecordingPolicy, chat_body
 from test_companion_saved_names import (
     PERSON,
     PLACE,
@@ -134,6 +138,8 @@ HOSTED_CALL_PATHS: Mapping[str, tuple[str, str]] = {
     "action classifier": ("exulanica.selection.action_plan", "classify_action"),
     "world-edit drafter": ("exulanica.selection.action_plan", "_draft_world_edit"),
     "simulation drafter": ("exulanica.selection.action_plan", "_draft_simulation"),
+    "reference planner": ("exulanica.references.drafting", "plan_subjects"),
+    "reference reader": ("exulanica.references.drafting", "read_notes"),
 }
 
 _PATH_AT = {site: path for path, site in HOSTED_CALL_PATHS.items()}
@@ -539,6 +545,36 @@ def run_specification(world: World) -> Witness:
     return transport
 
 
+def run_reference_planning(world: World) -> Witness:
+    """The reference planner, handed a description as a reference job hands it."""
+    plan = {"subjects": [{"aspect": "buildings", "text": "whitewashed island houses"}]}
+    client, transport = world.hosted([_json_reply(plan, Role.REFERENCE_DRAFTING)])
+    plan_subjects(client, f"a harbour town where {PERSON} lives beside {PLACE}", purpose="kind")
+    return transport
+
+
+def run_reference_reading(world: World) -> Witness:
+    """The reference reader, handed what a search found, which may name anything at all."""
+    source = load_reference_catalogs().sources["tavily_search"]
+    query = admit_query(
+        SearchSubject("whitewashed island houses", "buildings"),
+        source=source,
+        policy=RecordingPolicy(),
+    )
+    leads = Leads(
+        query=query,
+        passages=(f"Whitewashed houses line the quay where {PERSON} keeps {PLACE}.",),
+        picture_descriptions=("White walls and blue doors",),
+        result_count=1,
+        credits=1,
+        request_id=None,
+    )
+    reading = {"notes": [{"aspect": "buildings", "text": "white cube houses"}]}
+    client, transport = world.hosted([_json_reply(reading, Role.REFERENCE_DRAFTING)])
+    read_notes(client, [leads])
+    return transport
+
+
 def run_caption(world: World) -> Witness:
     """The derivative worker's caption pass over the process's client."""
     transport = Witness([_vector_reply()])
@@ -690,6 +726,8 @@ SCENARIOS: Mapping[str, tuple[Callable[[World], Witness], str]] = {
     "action classifier": (run_actions, "put a bench"),
     "world-edit drafter": (run_actions, "KINDS THAT CAN BE PLACED"),
     "simulation drafter": (run_actions, "LISTED SPEEDS"),
+    "reference planner": (run_reference_planning, "a harbour town"),
+    "reference reader": (run_reference_reading, "Whitewashed houses"),
 }
 
 #: The paths whose call site replaces saved names itself, and the modules it replaces them with.

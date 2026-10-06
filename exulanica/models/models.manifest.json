@@ -355,6 +355,22 @@
       "required_use_cases": ["text"],
       "rationale": "Drafts a world's specification from a person's description (exulanica/selection/world_drafting.py): a preset and the values the served specification allows, and the parts of the description it cannot say copied word for word; the server's gate judges the draft and nothing is made until the person makes the world. Chosen by the rule pre-registered in docs/evaluation/2026-09-29-world-drafting-models-v2-preregistration.json over the five text models whose licence entry is resolved: a model was eligible at 10 of 12 drafts the gate would make on the first try and 10 of 12 matching the words by rule; Super, Qwen3 235B, Nano and Lightning were eligible (DeepSeek V4 Flash drafted 9 and timed out 3 times), Super was the NVIDIA model with the lowest slowest-of-12 draft time within 15 s, and the next in that order, Qwen3 235B, is the fallback. Model-unavailability errors select the fallback; a refused form is repaired once and then refused, never escalated to a larger model."
     },
+    "reference_drafting": {
+      "primary": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+      "fallback": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "timeout_seconds": 25,
+      "timeout_basis": {
+        "record": "docs/evaluation/2026-09-24-hosted-call-latency.json",
+        "model": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+        "rows": 217,
+        "p50_ms": 1864,
+        "p99_ms": 7772,
+        "longest_ms": 12326,
+        "note": "The structured-extraction role's measurement of the same primary: single classifier, planner and drafter calls of the same size as a reference plan or reading. Re-measured on this role's own calls in the live check."
+      },
+      "required_use_cases": ["text"],
+      "rationale": "Plans a reference's web searches from a person's description and drafts notes from what they found, each a structured answer validated before it is kept. A role of its own so that no place-name right or personal model right granted for another role reaches a web lookup: it is offered in neither place-name-uses.v1.json nor model-right-uses.v1.json. The declared DeepSeek fallback handles model-unavailability errors."
+    },
     "embedding": {
       "primary": "Qwen/Qwen3-Embedding-8B",
       "fallback": null,
