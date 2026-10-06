@@ -39,8 +39,9 @@ protocol's values, the verdict rule, the plan route's figures for the selection 
 person's run can ask and call, what each arm's run can reserve, the longest the asking can take
 and the calls each provider's bound holds), the bound and the process call ceiling, the stop
 rules, the development day read from its stored runs with every run's integer terms, the scoring
-binding and the tree it measures. It refuses a bound under what one seed needs to be admitted or
-under the development day's spend for every seed with a quarter more.
+binding and the tree it measures. It refuses a bound under the development day's spend for every
+seed with a quarter more, or under what admitting the last seed needs: that spend for every seed
+before it, and what one seed needs left to be admitted.
 
 **The run** (``run``) is judged once: it refuses when its record exists, when the tree is not the
 registered one apart from ``docs/evaluation/``, when this script is not the registered one and when
@@ -201,15 +202,25 @@ def nearest_rank(values: Sequence[int], per_mille: int) -> int | None:
 
 
 def least_bound(one_seed_suggested: str, development_spend: str, seeds: int) -> dict[str, str]:
-    """The least judged bound: what the host needs left to admit one seed, and the development
-    day's spend for every seed with a quarter more; the larger binds."""
+    """The least judged bound: the development day's spend for every seed with a quarter more, or
+    what admitting the last seed needs, the larger. A seed is admitted only while what is left of
+    the bound holds what one seed needs left (the plan's suggested figure), so the last seed needs
+    that on top of what every seed before it spent."""
     admitted = Decimal(one_seed_suggested)
-    projected = Decimal(development_spend) * seeds * SPEND_MARGIN
+    per_seed = Decimal(development_spend) * SPEND_MARGIN
+    projected = per_seed * seeds
+    last = per_seed * (seeds - 1) + admitted
     return {
         "one_seed_admitted_usd": str(admitted),
         "projected_from_development_usd": str(projected),
-        "least_usd": str(max(admitted, projected)),
+        "last_seed_admitted_usd": str(last),
+        "least_usd": str(max(projected, last)),
     }
+
+
+def same_group(stored: Sequence[Mapping[str, Any]], ids: Sequence[str]) -> bool:
+    """Whether a stored definition's group, people named by ``id`` and ``name``, is ``ids``."""
+    return sorted(str(person["id"]) for person in stored) == sorted(ids)
 
 
 def resumed_bound(
@@ -270,6 +281,11 @@ def _environment(state: Mapping[str, Any], bound_usd: str, max_calls: int) -> No
     os.environ["EXULANICA_SOCIETY_CONTROL_WORKSPACES"] = json.dumps([state["workspace_id"]])
     os.environ[BUDGET_VARIABLE] = bound_usd
     os.environ[CALLS_VARIABLE] = str(max_calls)
+    # The bound above is this process's own: it spends within it alone, as a process holding a
+    # provider's credential must say (exulanica/spending/config.py).
+    from exulanica.spending.config import PROCESS, SPENDING_ENV
+
+    os.environ[SPENDING_ENV] = PROCESS
     # The application's services need a token directory; this process serves no request, so it
     # holds one random token of its own, granted to read the world alone.
     os.environ["EXULANICA_API_TOKENS"] = json.dumps(
@@ -918,9 +934,9 @@ def preregister(arguments: argparse.Namespace) -> None:
     every = _plan(state, str(version), world_id, ids, models, len(held_out))
     ceiling = int((Decimal(every["calls_most"]) * CALL_MARGIN).to_integral_value(ROUND_CEILING))
     development = _definition(state, world_id, arguments.development)["document"]
-    if development.get("phase") != "development" or sorted(
-        development["group"]["people"]
-    ) != sorted(ids):
+    if development.get("phase") != "development" or not same_group(
+        development["group"]["people"], ids
+    ):
         raise SystemExit("the development comparison is not this design on a development seed")
     asking = _asking(state, world_id, arguments.development)
     spend = _spend(asking)
@@ -1001,8 +1017,9 @@ def preregister(arguments: argparse.Namespace) -> None:
         "bound": {
             "bound_usd": str(bound),
             **least,
-            "rule": "at least what the host needs left to admit one seed (the plan's suggested_usd "
-            f"for one seed) and the development day's spend times the seeds times {SPEND_MARGIN}",
+            "rule": f"at least the development day's spend times the seeds times {SPEND_MARGIN}, "
+            f"and that spend times {SPEND_MARGIN} for every seed before the last plus what the "
+            "host needs left to admit one seed (the plan's suggested_usd for one seed)",
         },
         "stops": [
             "the bound: an ask past it is never sent; a seed the bound cannot hold is closed "
