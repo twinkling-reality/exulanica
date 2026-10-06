@@ -31,7 +31,17 @@ from exulanica.models.client import ModelClient
 from exulanica.models.errors import TransportError
 from exulanica.models.manifest import Role, load_manifest
 from exulanica.models.transport import HttpResponse
-from exulanica.selection.action_plan import ACTION_PROMPT_VERSION, ARRANGE, PLACE, UNDO
+from exulanica.selection.action_plan import (
+    ACTION_PROMPT_VERSION,
+    ARRANGE,
+    BRING_PEOPLE,
+    CONTROL,
+    CONTROL_STEP,
+    MOVE,
+    PLACE,
+    REMOVE,
+    UNDO,
+)
 from exulanica.selection.validation import Session
 from exulanica.store.local import LocalContentAddressedStore
 from exulanica.world.assets import seed_reviewed_assets
@@ -48,6 +58,8 @@ pytestmark = pytest.mark.postgres
 OWNER = "companion-actions-owner-token-long-enough"
 READER = "companion-actions-reader-token-long-enough"
 STRANGER = "companion-actions-stranger-token-long-enough"
+#: Another person in the owner's workspace, who may write too.
+COLLEAGUE = "companion-actions-colleague-token-long-enough"
 RUNTIME_ROLE = "exulanica_companion_actions_suite"
 READER_ROLE = "exulanica_companion_actions_reader"
 #: The model the manifest binds the structured-extraction role to, as a reply names it.
@@ -67,6 +79,40 @@ WATCHED = (
     "world_society",
     "world_society_event",
 )
+
+
+def answer(plan_step: dict, response) -> dict:
+    """What a client sends back for one sent step: the status its request was answered with and
+    the identity that answer named, read from the response by the step's route."""
+    body = response.json()
+    if not response.is_success:
+        return {"status": response.status_code, "code": body.get("code")}
+    operation = plan_step["operation"]
+    found: dict = {"status": response.status_code}
+    if operation in (PLACE, MOVE, REMOVE, UNDO):
+        found |= {"edit_seq": body["edit_seq"], "state_sha256": body["state_sha256"]}
+    elif operation == ARRANGE:
+        version = body["version"]
+        found |= {"edit_seq": version["edit_seq"], "state_sha256": version["state_sha256"]}
+    elif operation == CONTROL_STEP:
+        receipt = body["receipt"]
+        found |= {
+            "event_seq": receipt["event_seq"],
+            "document_sha256": receipt["document_sha256"],
+        }
+    elif operation == CONTROL:
+        found |= {"revision": body["revision"], "last_event_seq": body["last_event_seq"]}
+    elif operation == BRING_PEOPLE:
+        found |= {"society_id": body["society_id"]}
+    return found
+
+
+def with_answers(steps, sent) -> list[dict]:
+    """``steps`` with each sent one's answer: ``sent`` maps a step's position to its response."""
+    return [
+        dict(item, answer=answer(item, sent[index])) if index in sent else item
+        for index, item in enumerate(steps)
+    ]
 
 
 def reply(payload: dict) -> HttpResponse:
@@ -143,15 +189,16 @@ class Actions:
         assert method == "POST"
         return self.post(path, plan_step["body"], token, world)
 
-    def outcome(self, entry: dict, plan: dict, steps=None):
+    def outcome(self, entry: dict, plan: dict, steps=None, sent=None, token: str = OWNER):
+        """The outcome read of ``plan``, each step in ``sent`` (by position) carrying its answer."""
         return self.post(
             "/selection/actions/outcome",
             {
                 "version_id": plan["version_id"],
                 "plan_sha256": plan["plan_sha256"],
-                "steps": steps if steps is not None else plan["steps"],
+                "steps": with_answers(steps if steps is not None else plan["steps"], sent or {}),
             },
-            OWNER,
+            token,
             entry["world_id"],
         )
 
@@ -185,6 +232,11 @@ def actions(tmp_path, repository, spine_schema) -> Iterator[Actions]:
         },
         STRANGER: {
             "workspace_id": str(uuid.uuid4()),
+            "actor": str(uuid.uuid4()),
+            "permissions": EVERY_PERMISSION,
+        },
+        COLLEAGUE: {
+            "workspace_id": str(repository.workspace_id),
             "actor": str(uuid.uuid4()),
             "permissions": EVERY_PERMISSION,
         },
@@ -287,7 +339,7 @@ def test_a_placement_plan_is_the_direct_request_with_the_authoritys_own_preview(
     assert receipt["base_state_sha256"] == version["state_sha256"]
     assert actions.entry(entry)["authored_state_sha256"] == receipt["result_state_sha256"]
 
-    read = actions.outcome(entry, plan)
+    read = actions.outcome(entry, plan, sent={0: confirmed})
     assert read.status_code == 200, read.text
     outcome = read.json()
     assert outcome["state"] == "applied"
@@ -311,7 +363,7 @@ def test_a_placement_plan_is_the_direct_request_with_the_authoritys_own_preview(
     again = actions.send(first)
     assert again.status_code == 409
     assert again.json()["code"] == "stale_saved_world_entry"
-    reread = actions.outcome(entry, plan).json()
+    reread = actions.outcome(entry, plan, sent={0: confirmed}).json()
     assert reread["steps"][0]["receipts"] == answered["receipts"]
     assert reread["steps"][0]["repeats"] == []
 
@@ -341,7 +393,35 @@ def test_an_unconfirmed_plan_reads_as_not_applied_and_a_moved_base_as_superseded
     refused = actions.send(plan["steps"][0])
     assert refused.status_code == 409
     assert refused.json() == {"code": "composition_blocked", "detail": "stale_base"}
-    assert actions.outcome(entry, plan).json()["state"] == "superseded"
+    assert actions.outcome(entry, plan, sent={0: refused}).json()["state"] == "superseded"
+
+
+def test_a_step_is_credited_only_with_the_record_its_own_request_produced(actions):
+    """The same plan open twice: a colleague's request lands first from the step's base, and the
+    step's own request is refused as stale. The colleague's edit has the step's base, kind and
+    subject, and it is never the step's receipt: only the answer the step's own request got says
+    what it did."""
+    entry, version = actions.starter()
+    plan = _bench_plan(actions, entry, version)
+    [first] = plan["steps"]
+    other = actions.send(first, token=COLLEAGUE)
+    assert other.status_code == 201, other.text
+    own = actions.send(first)
+    assert own.status_code == 409, own.text
+    edit = other.json()["edits"][-1]
+    assert (edit["base_state_sha256"], edit["kind"]) == (version["state_sha256"], "add_object")
+
+    read = actions.outcome(entry, plan, sent={0: own}).json()
+    [step] = read["steps"]
+    assert (read["state"], step["state"], step["receipts"]) == ("superseded", "superseded", [])
+    assert [repeat["edit_id"] for repeat in step["repeats"]] == [edit["edit_id"]]
+    # Sent back with no answer, or naming the colleague's record as its own: still not applied.
+    assert actions.outcome(entry, plan).json()["steps"][0]["state"] == "superseded"
+    assert actions.outcome(entry, plan, sent={0: other}).json()["steps"][0]["state"] == "superseded"
+    # The colleague's own read, with the answer its request got, is credited with that edit.
+    theirs = actions.outcome(entry, plan, sent={0: other}, token=COLLEAGUE).json()["steps"][0]
+    assert theirs["state"] == "applied"
+    assert [receipt["edit_id"] for receipt in theirs["receipts"]] == [edit["edit_id"]]
 
 
 def test_a_base_the_page_no_longer_shows_is_refused_before_any_model_is_asked(actions):
@@ -439,7 +519,7 @@ def test_a_revoked_grant_refuses_the_confirmation_itself(actions):
     revoked = actions.send(plan["steps"][0], token=READER)
     assert revoked.status_code == 404
     assert revoked.json()["code"] == "unknown_reference"
-    assert actions.outcome(entry, plan).json()["state"] == "not_applied"
+    assert actions.outcome(entry, plan, sent={0: revoked}).json()["state"] == "not_applied"
 
 
 # -- asking before preparing anything consequential ------------------------------------------------
@@ -704,7 +784,7 @@ def test_a_compound_request_prepares_one_step_and_reports_the_partial_state(acti
     assert prepared["refusal"]["code"] == "preview_blocked"
     assert prepared["steps"][0]["code"] == "invalid_object_state"
 
-    outcome = actions.outcome(entry, plan).json()
+    outcome = actions.outcome(entry, plan, sent={0: placed}).json()
     assert outcome["state"] == "partial"
     assert [item["state"] for item in outcome["steps"]] == ["applied", "pending"]
     # The applied step can be taken back, by the undo its plan named, while it is newest.
@@ -766,7 +846,7 @@ def test_an_authored_design_plan_cites_nothing_and_the_style_lifecycle_takes_it(
     assert applied.json()["appearance_basis"] == "authored_design"
     assert applied.json()["reference_ids"] == []
 
-    outcome = actions.outcome(entry, plan).json()
+    outcome = actions.outcome(entry, plan, sent={0: previewed, 1: applied}).json()
     assert outcome["state"] == "applied"
     assert outcome["steps"][1]["receipts"][0]["style_version_id"] == applied.json()["version_id"]
 
@@ -896,7 +976,7 @@ def test_a_refused_style_proposal_reads_as_refused_and_a_new_ask_gets_a_new_id(a
     stale = actions.send(first["steps"][0])
     assert stale.status_code == 409
     assert stale.json()["code"] == "stale_style_version"
-    read = actions.outcome(entry, first).json()
+    read = actions.outcome(entry, first, sent={0: stale}).json()
     assert read["steps"][0]["state"] == "superseded"
     assert read["steps"][0]["code"] == "stale"
     assert read["steps"][0]["receipts"] == []
@@ -1070,7 +1150,7 @@ def test_an_arrangement_plan_is_one_atomic_step_with_a_receipt_per_object(action
 
     applied = actions.send(first)
     assert applied.status_code == 201, applied.text
-    outcome = actions.outcome(entry, plan).json()
+    outcome = actions.outcome(entry, plan, sent={0: applied}).json()
     assert outcome["state"] == "applied"
     [answered] = outcome["steps"]
     assert [receipt["object_id"] for receipt in answered["receipts"]] == [
@@ -1107,7 +1187,7 @@ def test_move_remove_and_undo_plans_carry_the_new_previews_and_their_receipts(ac
     assert move["preview"]["document"] == direct.json()
     moved = actions.send(move)
     assert moved.status_code == 200, moved.text
-    assert actions.outcome(entry, plan).json()["steps"][0]["matches_preview"] is True
+    assert actions.outcome(entry, plan, sent={0: moved}).json()["steps"][0]["matches_preview"]
     version = moved.json()
 
     actions.script(kind("world_edit"), edits(step("remove_object", objects=["object-1"])))
@@ -1117,7 +1197,7 @@ def test_move_remove_and_undo_plans_carry_the_new_previews_and_their_receipts(ac
     [remove] = plan["steps"]
     removed = actions.send(remove)
     assert removed.status_code == 200, removed.text
-    assert actions.outcome(entry, plan).json()["state"] == "applied"
+    assert actions.outcome(entry, plan, sent={0: removed}).json()["state"] == "applied"
     version = removed.json()
 
     actions.script(kind("world_edit"), edits(step("undo_last_edit")))
@@ -1126,7 +1206,7 @@ def test_move_remove_and_undo_plans_carry_the_new_previews_and_their_receipts(ac
     assert undo["preview"]["document"]["would_change"]["undoes"]["kind"] == "remove_object"
     undone = actions.send(undo)
     assert undone.status_code == 200, undone.text
-    answered = actions.outcome(entry, plan).json()["steps"][0]
+    answered = actions.outcome(entry, plan, sent={0: undone}).json()["steps"][0]
     assert answered["state"] == "applied"
     assert answered["receipts"][0]["kind"] == "undo"
     assert answered["matches_preview"] is True

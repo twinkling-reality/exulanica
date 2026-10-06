@@ -29,6 +29,7 @@ from exulanica.world.world_recipes import CANDIDATES_MAXIMUM
 
 from personal_world_support import OWNER_TOKEN as MADE_OWNER
 from test_companion_actions_postgres import (
+    COLLEAGUE,
     OWNER,
     READER,
     REGION,
@@ -37,6 +38,7 @@ from test_companion_actions_postgres import (
     _compose,
     kind,
     reply,
+    with_answers,
 )
 from test_companion_actions_postgres import actions as imported_actions  # noqa: F401
 from test_society_made_world import made as imported_made  # noqa: F401
@@ -152,13 +154,15 @@ def _run(client, steps, token: str = OWNER, *, start: int = 0, responses=None) -
     return responses
 
 
-def _outcome(api, entry: Mapping[str, Any], plan: Mapping[str, Any]) -> dict:
+def _outcome(api, entry: Mapping[str, Any], plan: Mapping[str, Any], responses=()) -> dict:
+    """The outcome read of ``plan``, each step sent carrying the answer its own request got:
+    ``responses`` are the chain's, in step order from the first, as :func:`_run` returns them."""
     read = api.post(
         f"/selection/actions/outcome?world_id={entry['world_id']}",
         {
             "version_id": plan["version_id"],
             "plan_sha256": plan["plan_sha256"],
-            "steps": plan["steps"],
+            "steps": with_answers(plan["steps"], dict(enumerate(responses))),
         },
     )
     assert read.status_code == 200, read.text
@@ -221,7 +225,7 @@ def test_pausing_is_the_control_request_pinned_to_the_clock_read_and_read_back(a
     assert sent.status_code == 200, sent.text
     assert _control(actions, entry)["mode"] == "paused"
 
-    read = _outcome(actions, entry, plan)
+    read = _outcome(actions, entry, plan, [sent])
     assert read["state"] == "applied"
     (receipt,) = read["steps"][0]["receipts"]
     assert receipt["revision"] == playing["revision"] + 1
@@ -230,7 +234,7 @@ def test_pausing_is_the_control_request_pinned_to_the_clock_read_and_read_back(a
     # The same confirmation sent again meets a control that moved past its base.
     (again,) = _run(actions.client, plan["steps"])
     assert (again.status_code, again.json()["code"]) == (409, "stale_society_state")
-    assert _outcome(actions, entry, plan)["state"] == "applied"
+    assert _outcome(actions, entry, plan, [sent])["state"] == "applied"
 
 
 def test_asking_for_what_the_controls_hold_changes_nothing(actions):
@@ -292,7 +296,7 @@ def test_a_paused_world_moves_on_by_the_chain_and_each_minute_is_its_receipt(act
     after = _control(actions, entry)
     assert after["current_tick"] == society["current_tick"] + 3
 
-    read = _outcome(actions, entry, plan)
+    read = _outcome(actions, entry, plan, responses)
     assert read["state"] == "applied"
     ticks = [step["receipts"][0]["tick"] for step in read["steps"]]
     assert ticks == [society["current_tick"] + minute for minute in (1, 2, 3)]
@@ -323,7 +327,7 @@ def test_a_playing_world_is_paused_moved_on_and_played_again_at_its_speed(action
     control = _control(actions, entry)
     assert (control["mode"], control["speed"]) == ("playing", 2)
     assert control["current_tick"] == society["current_tick"] + 2
-    assert _outcome(actions, entry, plan)["state"] == "applied"
+    assert _outcome(actions, entry, plan, responses)["state"] == "applied"
 
 
 def _playback_minute(actions: Actions) -> None:
@@ -366,7 +370,7 @@ def test_a_world_that_plays_on_until_its_pause_is_read_from_where_the_pause_left
 
     (paused,) = _run(actions.client, plan["steps"][:1])
     assert paused.status_code == 200, paused.text
-    stopped = _outcome(actions, entry, plan)
+    stopped = _outcome(actions, entry, plan, [paused])
     # Its first minute is still to be sent, from where the pause left the world.
     assert [step["state"] for step in stopped["steps"]] == [
         "applied",
@@ -379,7 +383,7 @@ def test_a_world_that_plays_on_until_its_pause_is_read_from_where_the_pause_left
     rest = _run(actions.client, plan["steps"], start=1, responses=[paused])
     # The pause's own answer, then the two minutes and the play sent after it.
     assert [response.status_code for response in rest] == [200, 200, 200, 200]
-    read = _outcome(actions, entry, plan)
+    read = _outcome(actions, entry, plan, rest)
     assert read["state"] == "applied"
     assert [step["receipts"][0]["tick"] for step in read["steps"][1:3]] == [
         pinned + 2,
@@ -388,10 +392,11 @@ def test_a_world_that_plays_on_until_its_pause_is_read_from_where_the_pause_left
     assert read["alternatives"] == []
 
 
-def test_the_same_minute_sent_by_another_client_is_that_steps_record(actions):
-    """A step's receipt is found by the bases it was sent with, whoever sent them: the minute
-    another client ran from those bases is that minute's record, and the step itself is then
-    refused as stale."""
+def test_the_same_minute_sent_by_another_client_is_never_that_steps_record(actions):
+    """Another client, here the same person in another tab, runs the step's minute first from the
+    same bases, and the step's own request is refused as stale. That minute has the step's bases
+    and is never the step's receipt: the step is superseded, and the other client's own answer is
+    what credits that minute."""
     entry, _version = actions.starter()
     _people(actions, entry)
     version = actions.version(entry)
@@ -401,9 +406,16 @@ def test_the_same_minute_sent_by_another_client_is_that_steps_record(actions):
     assert other.status_code == 200, other.text
     (again,) = _run(actions.client, [step])
     assert (again.status_code, again.json()["code"]) == (409, "stale_society_state")
-    read = _outcome(actions, entry, plan.json())
-    assert read["state"] == "applied"
-    assert read["steps"][0]["receipts"][0]["tick"] == other.json()["society"]["current_tick"]
+    read = _outcome(actions, entry, plan.json(), [again])
+    assert (read["state"], read["steps"][0]["receipts"]) == ("superseded", [])
+    # Sent back without an answer: no record is credited either.
+    assert _outcome(actions, entry, plan.json())["steps"][0]["state"] == "superseded"
+    # The other client's answer names its own minute, which is then credited.
+    theirs = _outcome(actions, entry, plan.json(), [other])
+    assert theirs["state"] == "applied"
+    (receipt,) = theirs["steps"][0]["receipts"]
+    assert receipt["event_seq"] == other.json()["receipt"]["event_seq"]
+    assert receipt["tick"] == other.json()["society"]["current_tick"]
 
 
 def test_a_chain_stopped_after_its_pause_leaves_the_world_paused_and_offers_play(actions):
@@ -416,8 +428,7 @@ def test_a_chain_stopped_after_its_pause_leaves_the_world_paused_and_offers_play
     (paused,) = _run(actions.client, plan["steps"][:1])
     assert paused.status_code == 200, paused.text
     # Another client changes the paused world's speed first, from what the pause answered, so
-    # the control the next minute is pinned to has moved. (The same minute sent by another client
-    # from the same bases would be that minute's record, whoever sent it.)
+    # the control the next minute is pinned to has moved.
     changed = actions.client.put(
         _path(entry, "/society/control"),
         json={"base_revision": paused.json()["revision"], "mode": "paused", "speed": 2},
@@ -429,7 +440,7 @@ def test_a_chain_stopped_after_its_pause_leaves_the_world_paused_and_offers_play
     assert len(rest) == 2, "the chain went on past a refusal"
     assert (stopped.status_code, stopped.json()["code"]) == (409, "stale_society_state")
 
-    read = _outcome(actions, entry, plan)
+    read = _outcome(actions, entry, plan, rest)
     assert [step["state"] for step in read["steps"]] == [
         "applied",
         "superseded",
@@ -566,7 +577,7 @@ def test_a_world_with_nobody_offers_bringing_people_in_and_brings_them(actions):
     assert step["body"]["region_id"] == REGION
     (created,) = _run(actions.client, plan["steps"])
     assert created.status_code == 200, created.text
-    read = _outcome(actions, entry, plan)
+    read = _outcome(actions, entry, plan, [created])
     assert read["state"] == "applied"
     (receipt,) = read["steps"][0]["receipts"]
     assert receipt["society_id"] == created.json()["society_id"]
@@ -574,6 +585,29 @@ def test_a_world_with_nobody_offers_bringing_people_in_and_brings_them(actions):
 
     again = _ask(actions, entry, actions.version(entry), "bring people", _draft("bring_people"))
     assert again.json()["refusal"]["code"] == "no_change"
+
+
+def test_people_a_colleague_brought_in_first_are_the_step_s_only_as_its_own_answer_says(actions):
+    """The plan's step sent by a colleague first: the version holds the colleague's society, in
+    the step's region and with its engine. Sent back with no answer, or a refusal, it is not the
+    step's; the person's own request, idempotent, is answered with that society, and that answer
+    credits it."""
+    entry, _version = actions.starter()
+    _somewhere(actions, entry)
+    plan = _ask(actions, entry, actions.version(entry), "bring people in", _draft("bring_people"))
+    plan = plan.json()
+    (theirs,) = _run(actions.client, plan["steps"], token=COLLEAGUE)
+    assert theirs.status_code == 200, theirs.text
+    refused = {**plan["steps"][0], "answer": {"status": 409, "code": "society_exists"}}
+    for steps in ([plan["steps"][0]], [refused]):
+        read = _outcome(actions, entry, {**plan, "steps": steps})
+        assert (read["steps"][0]["state"], read["steps"][0]["receipts"]) == ("superseded", [])
+    (own,) = _run(actions.client, plan["steps"])
+    assert own.status_code == 200, own.text
+    assert own.json()["society_id"] == theirs.json()["society_id"]
+    read = _outcome(actions, entry, plan, [own])
+    assert read["steps"][0]["state"] == "applied"
+    assert read["steps"][0]["receipts"][0]["society_id"] == own.json()["society_id"]
 
 
 # -- the world clock: pins, the lead and what the page shows ---------------------------------------
@@ -626,7 +660,7 @@ def test_a_coupled_town_stops_the_chain_at_its_lead_and_says_how_far_it_went(mad
     assert [response.status_code for response in responses] == [200, 200, 409]
     assert responses[-1].json()["code"] == "clock_lead_exhausted"
 
-    read = _outcome(made, entry, plan)
+    read = _outcome(made, entry, plan, responses)
     assert read["state"] == "partial"
     assert [step["state"] for step in read["steps"]] == [
         "applied",
@@ -646,7 +680,7 @@ def test_a_plan_made_before_the_clock_was_coupled_is_refused_as_stale(made):
     _couple(made, entry)
     (refused,) = _run(made.client, plan["steps"], token=MADE_OWNER)
     assert (refused.status_code, refused.json()["code"]) == (409, "stale_clock_revision")
-    assert _outcome(made, entry, plan)["steps"][0]["state"] == "superseded"
+    assert _outcome(made, entry, plan, [refused])["steps"][0]["state"] == "superseded"
 
 
 def test_an_answer_about_a_coupled_towns_people_cites_no_minute_the_page_has_not_reached(actions):

@@ -10,26 +10,40 @@ read here, in the caller's workspace and world: a version edit whose base is the
 and whose kind and subject are the step's, a style proposal by the id the step carried, the style
 version applied from it. A plan altered on its way back can only make its own answer say less.
 
+**A step is credited only with the record its own request produced.** Two requests sent from the
+same bases make records of the same shape, and the second is refused as stale, so a record found by
+its bases alone may be another writer's, even the same person's in another tab. Each step a client
+sent therefore comes back with ``answer``: the status its own request was answered with and the
+identity that answer named (an edit's ``edit_seq`` and ``state_sha256``, a control step's
+``event_seq`` and ``document_sha256``, a configuration's ``revision`` and ``last_event_seq``, a
+society's ``society_id``). A record is the step's receipt only when the answer names it and it
+matches what the step asked; an edit or a playback control must also be the caller's own (bringing
+people in is idempotent, so a request sent after another's is answered with the society already
+there). A step sent back with no answer, or with a refusal, is never ``applied``; records others
+made from its bases are listed in ``repeats``.
+
 Per step:
 
-*   ``applied``: the record exists; ``receipts`` name it by the ids an accepted-operation reference
-    stores, and ``matches_preview`` says whether what was recorded is what the preview showed.
-*   ``not_applied``: no such record, and the version still stands at the step's pinned base, so
-    nothing happened. Sending the step again is still possible.
-*   ``superseded``: no such record, and the version moved past the pin: another change came first,
-    and the step's request would now be refused as stale.
+*   ``applied``: the step's answer names the record and the record exists; ``receipts`` name it by
+    the ids an accepted-operation reference stores, and ``matches_preview`` says whether what was
+    recorded is what the preview showed.
+*   ``not_applied``: no record of the step's own request, and the version still stands at the
+    step's pinned base, so nothing happened. Sending the step again is still possible.
+*   ``superseded``: no record of the step's own request, and the version moved past the pin:
+    another change came first, and the step's request would now be refused as stale.
 *   ``pending``: a later step of a compound plan, not yet prepared, so there is nothing to read.
 
-Content-addressed state can recur (an undo returns a version to an earlier digest), so a record
-made again from the same base after the first is reported in ``repeats``, never folded into it.
+Content-addressed state can recur (an undo returns a version to an earlier digest), and another
+request can be sent from the same bases, so every other record of the step's shape is reported in
+``repeats``, never folded into its receipt.
 
 A simulation plan's steps are a chain, read the way they were sent: from the first step's pins,
-each configuration is the control event that moved the control revision one past the step's base
-to the step's mode and speed, and each control step is the ``manual_step`` event that ran the
-society on from the minute and state the step before it left. The first step the records do not
-show stops the reading; every step after it is ``not_applied``. A chain that paused a playing
-world and stopped before playing it again leaves it paused: the answer says so, offers ``play``,
-and nothing resumes it.
+each configuration is the control event its answer names that moved the control revision one past
+the step's base to the step's mode and speed, and each control step is the ``manual_step`` event
+its answer names that ran the society on from the minute and state the step before it left. The
+first step the records do not show stops the reading; every step after it is ``not_applied``. A
+chain that paused a playing world and stopped before playing it again leaves it paused: the answer
+says so, offers ``play``, and nothing resumes it.
 """
 
 from __future__ import annotations
@@ -176,6 +190,15 @@ def _step(step: Mapping[str, Any], state: str, **found: Any) -> dict[str, Any]:
     }
 
 
+def _answer(step: Mapping[str, Any]) -> Mapping[str, Any] | None:
+    """What the step's own request was answered with, when it was answered with success; None for
+    a step never sent, sent back without its answer, or refused."""
+    answer = step.get("answer")
+    if not isinstance(answer, Mapping) or not 200 <= int(answer.get("status") or 0) < 300:
+        return None
+    return answer
+
+
 def _plan_state(steps: Sequence[Mapping[str, Any]]) -> str:
     """``applied`` when every step that could run has; ``partial`` when some have; otherwise the
     first step's own state."""
@@ -248,9 +271,11 @@ def _edit_step(
             raise ValueError("the step names nothing it would record")
         undone = _undone(step) if step.get("operation") == UNDO else None
         expected = _expected_after(step)
+        answer = _answer(step)
+        named = None if answer is None else (int(answer["edit_seq"]), str(answer["state_sha256"]))
     rows = connection.execute(
         "select edit_id,edit_seq,kind,object_id,undone_edit_id,base_state_sha256,"
-        "result_state_sha256,after_document from world_alternate_version_edit "
+        "result_state_sha256,after_document,actor from world_alternate_version_edit "
         "where workspace_id=%s and world_id=%s and version_id=%s and edit_seq>%s "
         "order by edit_seq",
         (session.workspace_id, world_id, version_id, after_seq),
@@ -272,20 +297,33 @@ def _edit_step(
             chain.append(following)
         if len(chain) == len(subjects):
             chains.append(chain)
-    if not chains:
+    # The step's own records: the chain its answer ends at, every row made by the caller.
+    own = next(
+        (
+            chain
+            for chain in chains
+            if named == (int(chain[-1]["edit_seq"]), chain[-1]["result_state_sha256"])
+            and all(row["actor"] == session.actor for row in chain)
+        ),
+        None,
+    )
+    others = [
+        _edit_reference(step, world_id, version_id, row)
+        for chain in chains
+        if chain is not own
+        for row in chain
+    ]
+    if own is None:
         state = "not_applied" if current["state_sha256"] == base else "superseded"
-        return _step(step, state)
-    first, *again = chains
+        return _step(step, state, repeats=others)
     return _step(
         step,
         "applied",
-        receipts=[_edit_reference(step, world_id, version_id, row) for row in first],
-        repeats=[
-            _edit_reference(step, world_id, version_id, row) for chain in again for row in chain
-        ],
-        matches_preview=len(expected) == len(first)
+        receipts=[_edit_reference(step, world_id, version_id, row) for row in own],
+        repeats=others,
+        matches_preview=len(expected) == len(own)
         and all(
-            _same(row["after_document"], item) for row, item in zip(first, expected, strict=True)
+            _same(row["after_document"], item) for row, item in zip(own, expected, strict=True)
         ),
     )
 
@@ -359,6 +397,10 @@ def _style_preview_step(
         # moved first is ``stale``, a reference it would not take is ``rejected``.
         state = "superseded" if row["proposal_status"] == "stale" else "not_applied"
         return _step(step, state, code=row["proposal_status"])
+    if _answer(step) is None:
+        # The proposal's preview is recorded, and this step's own request was not answered with
+        # it: sending the step again would be refused.
+        return _step(step, "superseded")
     return _step(
         step,
         "applied",
@@ -393,6 +435,8 @@ def _style_apply_step(
     ).fetchone()
     if row is None:
         return _step(step, "not_applied")
+    if _answer(step) is None:
+        return _step(step, "superseded")
     return _step(
         step,
         "applied",
@@ -423,9 +467,10 @@ def _control_chain(
     ``clock`` is the version's clock read now: a step pinned to a clock revision that moved is
     refused as stale whatever the controls hold, so it is ``superseded``, never ``not_applied``.
     A configuration leaves the society where it stood when the configuration landed, and a playing
-    world moves on until its pause does, so the control step after a configuration is the first
-    ``manual_step`` the controls recorded after it at its revision; a later one runs on from the
-    minute and state the step before it left. Each receipt comes after the one before it.
+    world moves on until its pause does, so the control step after a configuration is the
+    ``manual_step`` its answer names, recorded after it at its revision; a later one runs on from
+    the minute and state the step before it left. Each receipt comes after the one before it, and
+    each is the one its step's answer names.
     """
     society = clock.get("society")
     with _client_shape(steps[0]):
@@ -434,14 +479,25 @@ def _control_chain(
         revision = int(pins["control_revision"])
         #: The minute and state the next control step runs on from, or None after a configuration.
         base: tuple[int, str] | None = (int(pins["tick"]), str(pins["society_state_sha256"]))
-        wanted: list[tuple[Mapping[str, Any], tuple[str, int] | None]] = []
+        wanted: list[
+            tuple[Mapping[str, Any], tuple[str, int] | None, tuple[int, str | None] | None]
+        ] = []
         for step in steps:
             operation = str(step["operation"])
+            answer = _answer(step)
             if operation == CONTROL:
                 body = step.get("body") or {}
-                wanted.append((step, (str(body["mode"]), int(body["speed"]))))
+                # The configuration's event is the last its answer's control read names; the
+                # event's own revision is matched when it is read.
+                named = None if answer is None else (int(answer["last_event_seq"]), None)
+                wanted.append((step, (str(body["mode"]), int(body["speed"])), named))
             elif operation == CONTROL_STEP:
-                wanted.append((step, None))
+                named = (
+                    None
+                    if answer is None
+                    else (int(answer["event_seq"]), str(answer["document_sha256"]))
+                )
+                wanted.append((step, None, named))
             else:
                 raise ValueError("a simulation plan's steps are playback controls only")
     if society is None:
@@ -449,14 +505,20 @@ def _control_chain(
     society_id = uuid.UUID(str(society["society_id"]))
     after = 0
     answered: list[dict[str, Any]] = []
-    for step, configures in wanted:
+    for step, configures, named in wanted:
         if answered and answered[-1]["state"] != "applied":
             # A chain stops at its first step the records do not show: nothing after it was sent.
             answered.append(_step(step, "not_applied"))
             continue
         if configures is not None:
             event = _control_event(
-                connection, session, society_id, "configured", after=after, revision=revision + 1
+                connection,
+                session,
+                society_id,
+                "configured",
+                named,
+                after=after,
+                revision=revision + 1,
             )
             if event is not None and (event["mode"], event["speed"]) == configures:
                 revision, after, base = revision + 1, int(event["event_seq"]), None
@@ -468,7 +530,13 @@ def _control_chain(
         else:
             event = (
                 _control_event(
-                    connection, session, society_id, "manual_step", after=after, revision=revision
+                    connection,
+                    session,
+                    society_id,
+                    "manual_step",
+                    named,
+                    after=after,
+                    revision=revision,
                 )
                 if base is None
                 else _control_event(
@@ -476,6 +544,7 @@ def _control_chain(
                     session,
                     society_id,
                     "manual_step",
+                    named,
                     after=after,
                     tick_from=base[0],
                     previous=base[1],
@@ -506,20 +575,29 @@ def _control_event(
     session: Session,
     society_id: uuid.UUID,
     kind: str,
+    named: tuple[int, str | None] | None,
     *,
     after: int,
     revision: int | None = None,
     tick_from: int | None = None,
     previous: str | None = None,
 ) -> dict[str, Any] | None:
-    """The control event of ``kind`` a step would have left, recorded after event ``after``.
+    """The control event of ``kind`` the step's own request left, recorded after event ``after``.
 
-    A configuration is found by the revision it made, a control step by the minute and state it
-    ran on from, each one event at most, newest first; a control step after a configuration is the
-    first one recorded after it at its revision.
+    ``named`` is the event the step's answer names, by sequence (and, for a control step, digest);
+    None finds nothing. The event must also be the step's: a configuration made by the caller at
+    the revision it made, a control step requested by the caller from the minute and state it ran
+    on from, or after a configuration, at its revision.
     """
-    match = "document->>'kind'=%s and event_seq>%s"
-    values: list[Any] = [kind, after]
+    if named is None:
+        return None
+    event_seq, digest = named
+    actor = "requested_by" if kind == "manual_step" else "actor_id"
+    match = f"document->>'kind'=%s and event_seq>%s and event_seq=%s and document->>'{actor}'=%s"
+    values: list[Any] = [kind, after, event_seq, str(session.actor)]
+    if digest is not None:
+        match += " and document_sha256=%s"
+        values.append(digest)
     if revision is not None:
         match += " and (document->>'revision')::bigint=%s"
         values.append(revision)
@@ -528,12 +606,9 @@ def _control_event(
             " and (document->>'tick_from')::bigint=%s and document->>'previous_state_sha256'=%s"
         )
         values += [tick_from, previous]
-    first = kind == "manual_step" and tick_from is None
     row = connection.execute(
         "select event_seq,document,document_sha256 from world_society_control_event "
-        "where workspace_id=%s and society_id=%s and "
-        + match
-        + (" order by event_seq limit 1" if first else " order by event_seq desc limit 1"),
+        "where workspace_id=%s and society_id=%s and " + match,
         (session.workspace_id, society_id, *values),
     ).fetchone()
     if row is None:
@@ -594,6 +669,8 @@ def _bring_people_step(
         body = step.get("body") or {}
         region = str(body["region_id"])
         engine = body.get("profile")
+        answer = _answer(step)
+        named = None if answer is None else str(answer["society_id"])
     row = connection.execute(
         "select society_id,region_id,engine_version from world_society "
         "where workspace_id=%s and world_id=%s and version_id=%s",
@@ -601,9 +678,15 @@ def _bring_people_step(
     ).fetchone()
     if row is None:
         return _step(step, "not_applied")
-    if row["region_id"] != region or engine not in (None, row["engine_version"]):
-        # A version holds one society, and this one was brought in first, into another region or
-        # with another engine: the step's own request is refused.
+    if (
+        row["region_id"] != region
+        or engine not in (None, row["engine_version"])
+        or str(row["society_id"]) != named
+    ):
+        # A version holds one society, and this one is not what the step's own request was
+        # answered with (another region, another engine, or no answer naming it). Bringing people
+        # in is idempotent: the same request sent after another's is answered with the society
+        # already there, and that answer names it, whoever brought it in.
         return _step(step, "superseded")
     return _step(
         step,

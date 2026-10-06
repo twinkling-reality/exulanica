@@ -697,39 +697,61 @@ class _OneRow:
         return self.row
 
 
+#: The answer a step's own request got when it brought in society 9.
+_BROUGHT = {"status": 200, "society_id": str(uuid.UUID(int=9))}
+
+
 @pytest.mark.parametrize(
-    ("stored", "body", "state"),
+    ("stored", "body", "answer", "state"),
     [
-        (None, {"region_id": "region:town"}, "not_applied"),
+        (None, {"region_id": "region:town"}, None, "not_applied"),
         (
             {"region_id": "region:town", "engine_version": "v5"},
             {"region_id": "region:town"},
+            _BROUGHT,
             "applied",
         ),
         (
             {"region_id": "region:town", "engine_version": "v5"},
             {"region_id": "region:town", "profile": "v5"},
+            _BROUGHT,
             "applied",
+        ),
+        # The same society, but the step came back without its own answer naming it: not the
+        # step's, and its request would now meet a version that already holds one.
+        (
+            {"region_id": "region:town", "engine_version": "v5"},
+            {"region_id": "region:town"},
+            None,
+            "superseded",
+        ),
+        (
+            {"region_id": "region:town", "engine_version": "v5"},
+            {"region_id": "region:town"},
+            {"status": 409, "code": "society_exists"},
+            "superseded",
         ),
         # Brought in first by another client, with another engine or into another region: the
         # step's own request is refused, so it did not happen.
         (
             {"region_id": "region:town", "engine_version": "v2"},
             {"region_id": "region:town", "profile": "v5"},
+            _BROUGHT,
             "superseded",
         ),
         (
             {"region_id": "region:a", "engine_version": "v5"},
             {"region_id": "region:town"},
+            _BROUGHT,
             "superseded",
         ),
     ],
 )
 def test_people_brought_in_read_back_by_the_region_and_the_engine_the_step_named(
-    stored, body, state
+    stored, body, answer, state
 ):
     row = None if stored is None else {"society_id": uuid.UUID(int=9), **stored}
-    step = {"index": 0, "operation": plan.BRING_PEOPLE, "body": body}
+    step = {"index": 0, "operation": plan.BRING_PEOPLE, "body": body, "answer": answer}
     session = Session(workspace_id=uuid.UUID(int=1), actor=uuid.UUID(int=2))
     read = action_outcome._bring_people_step(_OneRow(row), session, "world:test", VERSION, step)
     assert read["state"] == state

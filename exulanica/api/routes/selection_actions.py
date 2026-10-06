@@ -202,6 +202,29 @@ class OutcomePinsBody(BaseModel):
     society_state_sha256: str | None = Field(default=None, pattern=_SHA256)
 
 
+class OutcomeAnswerBody(BaseModel):
+    """What one sent step's own request was answered with: its status and the identity that
+    answer named. The read credits a step only with the record its answer names; a step sent back
+    without one, or with a refusal, is never applied. Each identity field is the response's own,
+    by the step's route: ``edit_seq`` and ``state_sha256`` for an edit (an arrangement's from its
+    ``version``), ``event_seq`` and ``document_sha256`` for a control step (from its ``receipt``),
+    ``revision`` and ``last_event_seq`` for a configuration, ``society_id`` for people brought in;
+    a style step and a refused request send only ``status`` and ``code``."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    status: int = Field(ge=100, le=599)
+    #: The problem body's ``code`` when the request was refused.
+    code: str | None = Field(default=None, max_length=200)
+    edit_seq: int | None = Field(default=None, ge=0)
+    state_sha256: str | None = Field(default=None, pattern=_SHA256)
+    event_seq: int | None = Field(default=None, ge=0)
+    document_sha256: str | None = Field(default=None, pattern=_SHA256)
+    revision: int | None = Field(default=None, ge=0)
+    last_event_seq: int | None = Field(default=None, ge=0)
+    society_id: uuid.UUID | None = None
+
+
 class OutcomeStepBody(BaseModel):
     """One step as a plan gives it. The fields the read does not use are accepted and ignored,
     so a client can send the plan's steps back as they came."""
@@ -215,6 +238,8 @@ class OutcomeStepBody(BaseModel):
     pins: OutcomePinsBody | None = None
     body: dict[str, JsonValue] | None = None
     preview: dict[str, JsonValue] | None = None
+    #: What this step's own request was answered with; absent for a step not sent.
+    answer: OutcomeAnswerBody | None = None
 
 
 class OutcomeRequest(BaseModel):

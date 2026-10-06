@@ -26034,6 +26034,119 @@
     ],
     "title": "OperationRights"
    },
+   "OutcomeAnswerBody": {
+    "properties": {
+     "status": {
+      "type": "integer",
+      "maximum": 599.0,
+      "minimum": 100.0,
+      "title": "Status"
+     },
+     "code": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 200
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Code"
+     },
+     "edit_seq": {
+      "anyOf": [
+       {
+        "type": "integer",
+        "minimum": 0.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Edit Seq"
+     },
+     "state_sha256": {
+      "anyOf": [
+       {
+        "type": "string",
+        "pattern": "^[0-9a-f]{64}$"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "State Sha256"
+     },
+     "event_seq": {
+      "anyOf": [
+       {
+        "type": "integer",
+        "minimum": 0.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Event Seq"
+     },
+     "document_sha256": {
+      "anyOf": [
+       {
+        "type": "string",
+        "pattern": "^[0-9a-f]{64}$"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Document Sha256"
+     },
+     "revision": {
+      "anyOf": [
+       {
+        "type": "integer",
+        "minimum": 0.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Revision"
+     },
+     "last_event_seq": {
+      "anyOf": [
+       {
+        "type": "integer",
+        "minimum": 0.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Event Seq"
+     },
+     "society_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Society Id"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "status"
+    ],
+    "title": "OutcomeAnswerBody",
+    "description": "What one sent step's own request was answered with: its status and the identity that\nanswer named. The read credits a step only with the record its answer names; a step sent back\nwithout one, or with a refusal, is never applied. Each identity field is the response's own,\nby the step's route: ``edit_seq`` and ``state_sha256`` for an edit (an arrangement's from its\n``version``), ``event_seq`` and ``document_sha256`` for a control step (from its ``receipt``),\n``revision`` and ``last_event_seq`` for a configuration, ``society_id`` for people brought in;\na style step and a refused request send only ``status`` and ``code``."
+   },
    "OutcomePinsBody": {
     "properties": {
      "base_state_sha256": {
@@ -26266,6 +26379,16 @@
        }
       ],
       "title": "Preview"
+     },
+     "answer": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/OutcomeAnswerBody"
+       },
+       {
+        "type": "null"
+       }
+      ]
      }
     },
     "type": "object",

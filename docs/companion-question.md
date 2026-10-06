@@ -729,26 +729,44 @@ refused, never as applied: `superseded` with `code` `stale`, or `not_applied` wi
 `rejected`. A step that does not have the shape a plan gives it is refused
 `422 invalid_outcome_step`. The read trusts the plan it is sent only to decide what to look up:
 `plan_sha256` is echoed unverified and `matches_preview` compares the records with the preview the
-client sent back, so an outcome is that client's answer and no proof of a plan this server made. Sending a confirmed step again is refused by the
-authority as stale; a version whose content returns to the pinned state (after an undo) takes the
-same request again as a new edit, which the read lists under `repeats`. A plan is never a
+client sent back, so an outcome is that client's answer and no proof of a plan this server made.
+
+A step is credited only with the record its own request produced. Two requests sent from the same
+bases make records of the same shape, the later one refused as stale, and the other writer can be
+the same person in another tab, so neither the bases nor the actor tell them apart. Each step a
+client sent comes back with `answer`: the `status` its own request was answered with, the problem
+`code` when it was refused, and the identity that answer named, by the step's route. An edit
+(`compositions/apply`, `objects/{object_id}/move`, `remove`, `objects/undo`) names its `edit_seq`
+and `state_sha256`, an arrangement the same fields of the `version` it returns, a control step its
+`receipt`'s `event_seq` and `document_sha256`, a configuration its `revision` and `last_event_seq`,
+and bringing people in its `society_id`; a style step sends only `status` and `code`, because its
+proposal id is already the step's own. A record is the step's receipt only when the answer names
+it, it matches what the step asked, and, for an edit or a playback control, the caller's actor made
+it. Bringing people in is idempotent: the same request sent after another's is answered with the
+society already there, and that answer names it. A step sent back with no answer, or with a
+refusal, is never `applied`: it reads `not_applied` while its bases stand and `superseded` once
+they moved, and records other requests made from its bases are listed under `repeats`, never as its
+receipt. Sending a confirmed step again is refused by the authority as stale; a version whose
+content returns to the pinned state (after an undo) takes the same request again as a new edit,
+which the read lists under `repeats`. A plan is never a
 reservation: discarding one changes nothing, except an appearance plan's first step, which creates
 the style lifecycle's durable proposal and preview record once confirmed and is discarded through
 `DELETE /world/styles/previews/{preview_id}`. Each appearance plan carries a fresh proposal id, so
 confirming one plan twice is refused by the lifecycle and asking again makes a new proposal.
 
 A simulation plan is read as the chain it was sent as, from its first step's pins along the
-controls' own receipts: a configuration is the control event that moved the control revision one
-past its base to its mode and speed, and a control step is the `manual_step` event that ran the
-society on from the minute and state the step before it left, or, after a configuration, the first
-one recorded after it at its revision (a playing world moves on until its pause lands). A receipt is
-found by the bases the step was sent with, whoever sent them, as an edit step's is. Each receipt carries `operation`,
-`world_id`, `version_id`, `revision`, `tick` and `state_sha256` (both null for a configuration),
+controls' own receipts, each the event its step's answer names: a configuration is the control
+event that moved the control revision one past its base to its mode and speed, and a control step
+is the `manual_step` event that ran the society on from the minute and state the step before it
+left, or, after a configuration, one recorded after it at its revision (a playing world moves on
+until its pause lands). The first step without such a record stops the reading. Each receipt
+carries `operation`, `world_id`, `version_id`, `revision`, `tick` and `state_sha256` (both null for a configuration),
 the fields a project's context stores for it under the same names, and the event's own `event_seq`
 and `document_sha256`. A step pinned to a clock revision that moved reads `superseded`. A chain
 that paused a playing world and stopped before playing it again leaves it paused: the outcome's
 `current.society` says so and `alternatives` offers `play`, and nothing resumes it on its own.
-Bringing people in reads back the version's society in the region the step named.
+Bringing people in reads back the version's society in the region the step named, when the step's
+answer names it.
 
 Behaviour changes, photo point maps, environment instances, model choices, comparisons, character
 looks, style rollback, interaction policy, sending people away or bringing them back, and a
@@ -785,9 +803,8 @@ or whose route key differs from its entry's operation, is refused in the browser
 Each later world-edit step is prepared again against the state the step before it left. The first
 refusal stops the chain; each step then reads as done, not done (with the action's own words) or not
 reached, and Play is offered when the outcome read says a chain left the world paused. The outcome
-read finds receipts by the bases a step was sent with, whoever sent them, so a step refused because
-another writer moved the world first can read as applied there; each step's own answer is what the
-sheet shows.
+read is sent each step's own answer, so a step refused because another writer moved the world first
+reads as superseded, never as that writer's record.
 
 ## Evidence and limits
 
