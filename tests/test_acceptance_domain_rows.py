@@ -244,3 +244,19 @@ def test_a56_lets_a_seeds_file_be_added_or_extended_but_never_rewritten():
     assert not DRIVE.seeds_entries_kept(json.dumps(old), json.dumps(dict(old, catalog_id="other")))
     assert DRIVE.SEEDS_FILE.fullmatch("society-comparison-seeds.v6.json")
     assert not DRIVE.SEEDS_FILE.fullmatch("society-comparison-protocol.v4.json")
+
+
+def test_a56_globs_only_a_directory_the_digest_reads_whole(tmp_path):
+    whole, mixed = tmp_path / "routines", tmp_path / "world"
+    whole.mkdir()
+    mixed.mkdir()
+    for name in ("a.v1.json", "b.v1.json"):
+        (whole / name).write_text("{}")
+    (mixed / "engines.v2.json").write_text("{}")
+    (mixed / "arrival.v1.json").write_text("{}")
+    data = {whole / "a.v1.json", whole / "b.v1.json", mixed / "engines.v2.json"}
+
+    assert DRIVE.globbed_directories(data) == [whole]
+    # A JSON file there that the digest does not read means the digest does not read it whole.
+    (whole / "c.v1.json").write_text("{}")
+    assert DRIVE.globbed_directories(data) == []

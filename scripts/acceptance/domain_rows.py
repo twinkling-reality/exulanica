@@ -1691,12 +1691,20 @@ def seeds_entries_kept(before: str | None, after: str | None) -> bool:
     } == {k: v for k, v in new.items() if k not in ("entries", "catalog_version")}
 
 
+def globbed_directories(data: set[Path]) -> list[Path]:
+    """The directories the drawing digest reads whole: each whose every JSON file is a data file
+    it reads. A data file named alone (the engines file beside other catalogs) brings no glob, so
+    its neighbours are not drawing files; a glob finds a file the record's head had and the
+    candidate removed."""
+    return sorted({p.parent for p in data if set(p.parent.glob("*.json")) <= data}, key=str)
+
+
 def drawing_drift(worktree: Path, record_head: str) -> dict[str, Any]:
     """The drawing files that differ between the commit a record measured and the candidate's
     checkout, computed here (A-56), each with whether A-56 lets it differ: a seeds catalog file
     keeping its entries, or the catalogs module changing only the seeds catalog's versions. The
     files are the ones the candidate's own digest reads; a file at the record's head the candidate
-    no longer has is found by its directory's glob."""
+    no longer has is found by the glob of a directory the digest reads whole."""
     named = subprocess.run(
         [str(worktree / ".venv" / "bin" / "python"), "-c", DRAWING_FILES],
         cwd=worktree,
@@ -1720,7 +1728,10 @@ def drawing_drift(worktree: Path, record_head: str) -> dict[str, Any]:
     if git("cat-file", "-e", f"{record_head}^{{commit}}").returncode != 0:
         return {"computed": False, "why": f"the record's head {record_head} is not in this clone"}
     files = sorted({relative(p) for p in listed["modules"] + listed["data"]})
-    globs = sorted({f":(glob){Path(relative(p)).parent}/*.json" for p in listed["data"]})
+    globs = [
+        f":(glob){relative(str(d))}/*.json"
+        for d in globbed_directories({Path(p).resolve() for p in listed["data"]})
+    ]
     changed = git("diff", "--name-only", record_head, "--", *files, *globs).stdout.split()
     changed += git("ls-files", "--others", "--exclude-standard", "--", *globs).stdout.split()
     found = []
