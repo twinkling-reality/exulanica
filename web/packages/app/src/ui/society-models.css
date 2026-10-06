@@ -1,56 +1,201 @@
 /*
- * Who decides for the people of a saved world, beside the inhabitants panel: its buttons and
- * headings as that panel draws its own, and the choice laid out.
+ * Who decides for the people and traffic lights of a saved world, in its own panel: a title, one
+ * card per role that switches what is shown under it, the models as cards, the people, and one
+ * primary action that says what it will do.
  */
-#shell :is(.world-workspace, .world-panel) .society-models button {
-  color: var(--ink);
-  background: var(--raised);
-  border: 1px solid var(--edge);
-  border-radius: 4px;
-  min-height: 38px;
-  margin: 0 8px 16px 0;
-  padding: 9px 12px;
+#shell .society-models { display: flex; flex-direction: column; gap: 14px; }
+#shell .world-panel:has(.society-models:not([hidden])) .world-decides-empty { display: none; }
+#shell .world-panel .society-models h3.society-models-title {
+  margin: 4px 0 0;
+  font: 300 28px/1.15 var(--font-display);
+  letter-spacing: -.01em;
+  text-transform: none;
+  color: var(--color-text);
+}
+#shell .society-models-roles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+#shell .world-panel .society-models .society-models-roles > button.society-models-role {
+  display: grid;
+  gap: 4px;
+  min-height: 0;
+  margin: 0;
+  padding: 12px 14px;
+  text-align: left;
+  color: var(--color-text);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+}
+#shell .world-panel .society-models .society-models-roles > button.society-models-role[aria-selected="true"] {
+  border-color: var(--color-text);
+  box-shadow: inset 0 0 0 1px var(--color-text);
+}
+#shell .society-models-role-count { font: 400 var(--text-xs)/1.3 var(--font-ui); color: var(--color-text-muted); }
+#shell .society-models-role-words { font: 450 15px/1.3 var(--font-ui); }
+#shell :is(.society-models-lead, .society-models-host, .society-models-result, .society-models-limit) {
+  margin: 0;
   font-size: 13px;
-  font-weight: 550;
+  line-height: 1.55;
+  color: var(--color-text-muted);
 }
-#shell :is(.world-workspace, .world-panel) .society-models button:hover:not(:disabled) { border-color: var(--accent); }
-#shell :is(.world-workspace, .world-panel) .society-models button:disabled {
-  color: var(--ink-faint);
-  background: var(--surface);
-  opacity: .75;
+#shell .society-models-result:empty { display: none; }
+#shell .society-models-result { color: var(--color-text); }
+#shell .society-models-people-group,
+#shell .society-models-signals-group { display: flex; flex-direction: column; gap: 14px; }
+#shell .society-models-people-group[hidden],
+#shell .society-models-signals-group[hidden] { display: none; }
+#shell .society-models-choices { display: grid; gap: 8px; margin: 0; padding: 0; border: 0; }
+#shell :is(.society-models-choices, .society-models-people) legend {
+  margin: 0 0 8px;
+  padding: 0;
+  font: 500 11px/1.3 var(--font-mono);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
 }
-#shell .society-models h4 { margin: 16px 0 8px; font-size: 13px; }
-#shell .society-models { display: flex; flex-direction: column; }
-#shell .society-models .world-signal-models { order: -1; }
+#shell .society-models-card {
+  position: relative;
+  display: grid;
+  gap: 3px;
+  padding: 12px 14px;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  cursor: pointer;
+}
+#shell .society-models-card:hover { border-color: var(--color-border-strong); }
+#shell .society-models-card:has(input:checked) {
+  border-color: var(--color-text);
+  box-shadow: inset 3px 0 0 var(--color-text);
+}
+#shell .society-models-card:has(input:focus-visible) {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+#shell .society-models-card:has(input:disabled) { cursor: default; opacity: .7; }
+/* The radio stays in the accessibility tree and takes the keyboard; the card shows its state. */
+#shell .society-models-card input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: inherit;
+}
+#shell .society-models-card-name { font: 450 15px/1.3 var(--font-ui); color: var(--color-text); }
+#shell .society-models-card-line { font-size: 13px; line-height: 1.45; color: var(--color-text-muted); }
+#shell .society-models-card-cost {
+  margin-top: 4px;
+  font: 500 11px/1.3 var(--font-mono);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+#shell .society-models-people { display: grid; gap: 8px; margin: 0; padding: 0; border: 0; }
+#shell .society-models-people legend { margin-bottom: 0; }
+#shell .society-models-people-list {
+  display: grid;
+  max-height: 240px;
+  overflow-y: auto;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+}
+#shell .society-models-people-list label {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0 10px;
+  align-items: start;
+  padding: 8px 12px;
+  font-size: 13px;
+  line-height: 1.4;
+  border-top: 1px solid var(--color-border);
+}
+#shell .society-models-people-list label:first-child { border-top: 0; }
+#shell .society-models-people-list input { margin: 2px 0 0; grid-row: 1 / span 2; }
+#shell .society-models-person-name { color: var(--color-text); }
+#shell .society-models-person-decider { grid-column: 2; color: var(--color-text-muted); font-size: 12px; }
+#shell .world-panel .society-models .society-models-people > button.society-models-everyone {
+  justify-self: start;
+  margin: 0;
+  min-height: 32px;
+  padding: 6px 12px;
+  font-size: 13px;
+  color: var(--color-text);
+  background: transparent;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 999px;
+}
+#shell .world-panel .society-models .society-models-action > button.society-models-choose {
+  justify-self: start;
+  align-self: flex-start;
+  min-height: 42px;
+  margin: 0;
+  padding: 10px 20px;
+  font: 500 14px/1.2 var(--font-ui);
+  color: var(--color-surface-solid);
+  background: var(--color-text);
+  border: 1px solid var(--color-text);
+  border-radius: 999px;
+}
+#shell .world-panel .society-models .society-models-action > button.society-models-choose:disabled {
+  color: var(--color-text-faint);
+  background: transparent;
+  border-color: var(--color-border-strong);
+}
+#shell .society-models-action {
+  position: sticky;
+  /* Over the panel's own bottom padding too, so nothing shows beneath it while it is pinned. */
+  bottom: -22px;
+  display: grid;
+  gap: 8px;
+  margin: 0 -22px;
+  padding: 14px 22px 22px;
+  background: var(--color-surface-solid);
+  border-top: 1px solid var(--color-border);
+}
+#shell .society-models-about summary { font-size: 13px; color: var(--color-text-muted); cursor: pointer; }
+#shell .society-models-about p { margin: 8px 0 0; }
+#shell .world-panel .society-models .society-models-people-group > h4 { margin: 4px 0 0; font: 500 11px/1.3 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--color-text-muted); }
+#shell .society-models-summaries { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.6; color: var(--color-text); }
+
+/* The traffic lights' own controls, laid out under their card. */
+#shell .world-panel .society-models .world-signal-models > button[type="button"] {
+  justify-self: start;
+  min-height: 40px;
+  margin: 0 0 12px;
+  padding: 9px 18px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-surface-solid);
+  background: var(--color-text);
+  border: 1px solid var(--color-text);
+  border-radius: 999px;
+}
+#shell .world-panel .society-models .world-signal-models > button[type="button"]:disabled {
+  color: var(--color-text-faint);
+  background: transparent;
+  border-color: var(--color-border-strong);
+}
+#shell .world-signal-models > h4 { display: none; }
 #shell .society-models-model {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   margin: 0 0 12px;
   font-size: 13px;
-  color: var(--ink);
+  color: var(--color-text);
 }
 #shell .society-models-model select {
   flex: 1;
   min-width: 0;
-  min-height: 38px;
-  padding: 0 8px;
-  color: var(--ink);
-  background: var(--raised);
-  border: 1px solid var(--edge);
-  border-radius: 4px;
+  min-height: 40px;
+  padding: 0 10px;
+  color: var(--color-text);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
   font-size: 13px;
 }
-#shell .society-models-people {
-  display: grid;
-  gap: 6px;
-  margin: 0 0 12px;
-  padding: 8px 10px;
-  border: 1px solid var(--edge);
-  border-radius: 4px;
-  font-size: 13px;
-  line-height: 1.4;
+
+@media (prefers-reduced-motion: no-preference) {
+  #shell .society-models-card,
+  #shell .world-panel .society-models .society-models-roles > button.society-models-role { transition: border-color 120ms ease, box-shadow 120ms ease; }
 }
-#shell .society-models-people legend { padding: 0 4px; font-size: 12px; color: var(--ink-faint); }
-#shell :is(.society-models-host, .society-models-result) { margin: 0 0 12px; font-size: 13px; line-height: 1.5; }
-#shell .society-models-summaries { margin: 0 0 16px; padding-left: 18px; font-size: 13px; line-height: 1.6; }

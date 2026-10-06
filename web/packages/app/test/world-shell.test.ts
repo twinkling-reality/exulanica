@@ -118,6 +118,7 @@ describe('shell command ownership', () => {
     ['KeyM', 'm', 'toggle-map'],
     ['KeyO', 'o', 'toggle-options'],
     ['KeyK', 'k', 'toggle-character'],
+    ['KeyR', 'r', 'toggle-decides'],
     ['Slash', '?', 'toggle-controls'],
     ['Backspace', 'Backspace', 'selection-back'],
   ])('maps %s to its one shell command', (code, key, command) => {

@@ -997,18 +997,28 @@ async function pausePlayback(ctx) {
 
 // -- models deciding for people ------------------------------------------------------------------
 
-// "Who decides for them": the section beside People nearby where the owner chooses a model.
+// "Who decides": the world panel where the owner chooses a model for people. The section is in the
+// page whenever the server says these people take a model choice, open or not.
 const MODELS = `document.querySelector('section.society-models')`;
-const MODEL_SELECT = `${MODELS}?.querySelector('select[aria-label="Who decides"]')`;
+const MODELS_SHOWN = `(${MODELS} ? !${MODELS}.hidden : false)`;
+const MODEL_CARD = (value) => `${MODELS}?.querySelector('fieldset.society-models-choices input[type=radio][value="${value}"]')`;
 const MODEL_BOX = (id) => `${MODELS}?.querySelector('fieldset.society-models-people input[type=checkbox][value="${id}"]')`;
 
-/** What "Who decides for them" shows: its host line, the models it offers, each person's row, and its result. */
-const modelsSeen = (page) => page.evaluate(`(() => { const s = ${MODELS}; if (!s || !s.checkVisibility()) return null;
+/** What "Who decides" shows: its host line, the models it offers, each person's row, and its result. */
+const modelsSeen = (page) => page.evaluate(`(() => { const s = ${MODELS}; if (!s || s.hidden) return null;
   const text = (e) => e?.textContent.trim() ?? null;
   return { host: text(s.querySelector('p.society-models-host')), result: text(s.querySelector('p.society-models-result')),
-    options: [...s.querySelectorAll('select[aria-label="Who decides"] option')].map(o => ({ value: o.value, text: o.textContent.trim() })),
+    options: [...s.querySelectorAll('fieldset.society-models-choices input[type=radio]')]
+      .map(r => ({ value: r.value, text: text(r.closest('label')?.querySelector('.society-models-card-name')) })),
     people: [...s.querySelectorAll('fieldset.society-models-people label[data-subject-id]')].map(l => ({ id: l.dataset.subjectId, text: l.textContent.trim() })),
     summaries: [...s.querySelectorAll('ul.society-models-summaries > li')].map(li => ({ model: li.dataset.modelId ?? null, text: li.textContent.trim() })) }; })()`);
+
+/** Open the Who decides panel from its rail action, unless it is open. */
+async function openWhoDecides(page) {
+  if (await page.evaluate(`document.querySelector('#world-panel-decides')?.checkVisibility() ?? false`)) return;
+  await page.click(ACTION('people.decides'), 'Who decides');
+  await page.waitFor(`document.querySelector('#world-panel-decides')?.checkVisibility() ?? false`, 10_000, 'Who decides');
+}
 
 /** The inspector's details as pairs, by the label a person reads. */
 const inspectorDetails = (page) => page.evaluate(`(() => { const i = ${INSPECTOR}; if (!i || !i.checkVisibility()) return null;
@@ -1044,11 +1054,11 @@ const modelDecisionEvents = async (ctx, entry) => ((await ctx.api('GET', society
 async function chooseModelForAGroup(ctx) {
   const { page } = ctx;
   const { model, group_size: size } = ctx.parameters;
-  await openPeopleNearby(page);
+  await openWhoDecides(page);
   const { entry } = await savedWorld(ctx);
   const read = async () => (await ctx.api('GET', societyPath(entry, '/models'))).body;
   const before = await read();
-  await page.waitFor(`${MODELS}?.checkVisibility() ?? false`, SETTLE_MS, 'Who decides for them');
+  await page.waitFor(MODELS_SHOWN, SETTLE_MS, 'Who decides');
   const offered = await modelsSeen(page);
   const served = (before?.models ?? []).find((m) => m.provider === model.provider && m.model_id === model.model_id) ?? null;
   const value = `${model.provider} ${model.model_id}`;
@@ -1060,8 +1070,8 @@ async function chooseModelForAGroup(ctx) {
   const group = (offered?.people ?? []).slice(0, size).map((p) => p.id);
   if (group.length !== size) throw new Error(`People nearby lists ${offered?.people.length ?? 0} people; the step chooses ${size}`);
   for (const id of group) await page.click(MODEL_BOX(id), `the box beside ${id}`);
-  await page.setValue(MODEL_SELECT, value);
-  await page.click(BUTTON('Use for the chosen people', MODELS), 'Use for the chosen people');
+  await page.click(MODEL_CARD(value), `the card for ${served?.name ?? value}`);
+  await page.click(ACTION('people.decides.choose', MODELS), 'the choose button');
   const result = await page.waitFor(`(() => { const r = ${MODELS}?.querySelector('p.society-models-result')?.textContent.trim(); return r || null; })()`,
     SETTLE_MS, 'what the choice did');
   await sleep(PAGE_SETTLE_MS);
@@ -1070,7 +1080,7 @@ async function chooseModelForAGroup(ctx) {
   ctx.observe('group-chosen-in-words', new RegExp(`^${size} people are now decided by the model you chose`).test(result)
     && rows.length === size && rows.every((r) => r.text.endsWith(`${served?.name}, which you chose.`)),
   { result, rows, others: (seen?.people ?? []).filter((p) => !group.includes(p.id)) });
-  await ctx.screenshot('chosen', `Who decides for them after choosing ${served?.name ?? 'a model'} for ${size} people`);
+  await ctx.screenshot('chosen', `Who decides after choosing ${served?.name ?? 'a model'} for ${size} people`);
   const posted = (await responses(ctx, 'POST', `/api/world/versions/${entry.authored_version_id}/society/models`)).at(-1) ?? null;
   const after = await read();
   const choices = new Map((after?.choices ?? []).map((c) => [c.subject_id, c]));
@@ -2394,7 +2404,7 @@ async function madeWorldHostsPeople(ctx) {
   ctx.observe('people-on-the-floor', seen?.state === 'present' && people.length > 0
     && new RegExp(`\\b${people.length}\\b`).test(seen?.summary ?? '') && (seen?.help ?? []).some((h) => /walk inside a square/.test(h)),
   { seen, inhabitants_read: people.length });
-  await page.waitFor(`${MODELS}?.checkVisibility() ?? false`, SETTLE_MS, 'Who decides for them').catch(() => null);
+  await page.waitFor(MODELS_SHOWN, SETTLE_MS, 'Who decides').catch(() => null);
   const models = await modelsSeen(page);
   const served = (await ctx.api('GET', societyPath(entry, '/models'))).body;
   ctx.observe('model-panel-beside-them', models !== null && models.people.length === people.length
@@ -2404,7 +2414,7 @@ async function madeWorldHostsPeople(ctx) {
     && people.every((p) => p.synthetic === true && Array.isArray(p.position_mm) && inside(p)),
   { declared_floor: floor, walkable_area: area, region_id: society?.region_id ?? null, population_size: society?.population_size ?? null,
     positions_mm: people.map((p) => ({ id: p.id, position_mm: p.position_mm })) });
-  await ctx.screenshot('people', 'people on the made world\'s declared floor, with Who decides for them beside them');
+  await ctx.screenshot('people', 'people on the made world\'s declared floor, who decides for them read alongside');
 }
 
 // -- return --------------------------------------------------------------------------------------
@@ -3117,8 +3127,9 @@ async function chooseModelForTrafficLight(ctx) {
   const query = `world_id=${encodeURIComponent(entry.world_id)}`;
   const modelsPath = `/world/versions/${entry.authored_version_id}/models?${query}`;
   const readModels = async () => (await ctx.api('GET', modelsPath)).body;
-  await openPeopleNearby(page);
-  await ctx.screenshot('nearby', 'the first town with traffic-light controls in Nearby');
+  await openWhoDecides(page);
+  await page.click(`document.querySelector('button.society-models-role[data-role="signals"]')`, 'Traffic lights');
+  await ctx.screenshot('nearby', 'the first town with traffic-light controls in Who decides');
   const models = await readModels();
   const signal = models?.roles?.find((role) => role.subject === 'signal') ?? null;
   const subject = signal?.subjects?.[0] ?? null;

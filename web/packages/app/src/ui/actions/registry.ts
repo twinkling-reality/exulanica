@@ -174,6 +174,10 @@ export const ACTIONS: readonly ActionSpec[] = Object.freeze([
     refusals: CLOCK_REFUSALS,
   },
   {
+    id: 'people.decides', label: 'Who decides', hint: 'Choose an open model to decide for some of the people here',
+    icon: 'model', group: 'people', placement: ['rail', 'palette'], shortcut: 'R',
+  },
+  {
     id: 'compare.open', label: 'Compare', hint: 'See what different models chose for the same people',
     icon: 'compare', group: 'people', placement: ['rail', 'palette'],
   },

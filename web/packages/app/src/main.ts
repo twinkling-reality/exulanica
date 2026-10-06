@@ -1282,6 +1282,14 @@ async function mount(): Promise<void> {
         },
         active: () => panelOpen('world-panel-nearby'),
       },
+      'people.decides': {
+        run: () => {
+          if (panelOpen('world-panel-decides')) environmentSelection.closePanels();
+          else { companion.dismiss(); dispatchShell({ type: 'show-world' }); environmentSelection.openPanel('decides'); }
+        },
+        offered: () => environmentSelection.people.clock().society === 'present',
+        active: () => panelOpen('world-panel-decides'),
+      },
       'people.bring-in': {
         // Open People first, so whoever arrives, or the reason nobody did, is in view.
         run: () => {
@@ -1541,6 +1549,7 @@ async function mount(): Promise<void> {
     shellState: () => shellState,
     dispatchShell,
     handleAtlasCommand,
+    toggleDecides: () => { if (actions !== null) void perform(actions.host, 'people.decides'); },
     showTravelStatus,
     travelUsesReducedMotion,
     setInputMode: (mode) => { inputMode = mode; },

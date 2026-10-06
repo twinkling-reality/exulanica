@@ -303,7 +303,7 @@ societies of the workspaces `EXULANICA_SOCIETY_CONTROL_WORKSPACES` lists, or of 
 account-owned workspace when `EXULANICA_SOCIETY_CONTROL_WORKER` is on ([deployment](deployment.md)).
 For a model to decide for a person, the owner's token needs `model.invoke`, and the API needs
 `NEBIUS_API_KEY` and the egress allowlist above; the owner then chooses the model in the
-application's "Who decides for them" panel. A comparison of models runs from
+application's Who decides panel. A comparison of models runs from
 `uv run python -m exulanica.orchestration.compare` with `EXULANICA_BUDGET_USD` set
 ([people and models in a world](capabilities/simulation.md#comparing-models)).
 

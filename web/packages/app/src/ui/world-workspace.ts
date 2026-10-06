@@ -79,6 +79,10 @@ export function buildWorldWorkspace(parts: {
     parts.inhabitants, nearbyState,
     el('p', { class: 'world-help', text: 'Aim at a person or object and press E to inspect it.' }),
   ]);
+  // Who decides for the people and traffic lights here: the mount puts its section in this panel.
+  const decides = addPanel('decides', 'Who decides', [
+    el('p', { class: 'world-help world-decides-empty', text: 'Who decides is shown once people live here.' }),
+  ]);
   const previewNotice = el('p', {
     class: 'world-preview-notice',
     text: 'Development preview. Synthetic and recorded content is not saved and does not establish model or deployment evidence.',
@@ -140,7 +144,7 @@ export function buildWorldWorkspace(parts: {
     void arrival.offsetWidth;
     arrival.setAttribute('data-shown', '');
   };
-  root.append(arrival, nav, nearby, details, authoring, inspection);
+  root.append(arrival, nav, nearby, decides, details, authoring, inspection);
   const listeners = new AbortController();
   window.addEventListener('keydown', event => {
     if (event.key !== 'Escape' || document.pointerLockElement != null || active === null) return;
@@ -152,7 +156,7 @@ export function buildWorldWorkspace(parts: {
     if (document.pointerLockElement != null) close(false);
   }, { signal: listeners.signal });
   return {
-    nearby, details, authoring,
+    nearby, decides, details, authoring,
     setPlace(name: string) {
       parts.title.textContent = name;
       placeReady = true;
@@ -180,7 +184,7 @@ export function buildWorldWorkspace(parts: {
       camera.replaceChildren(...controls);
       camera.hidden = controls.length === 0;
     },
-    openPanel(name: 'nearby' | 'authoring' | 'details') { open(name); },
+    openPanel(name: 'nearby' | 'decides' | 'authoring' | 'details') { open(name); },
     inspect() { if (active !== 'inspection') open('inspection'); },
     close,
     dispose() { listeners.abort(); },

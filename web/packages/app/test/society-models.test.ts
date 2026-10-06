@@ -10,9 +10,13 @@ import {
   HOST_REFUSAL_WORDS,
   MODEL_REFUSAL_WORDS,
   buildSocietyModels,
+  chooseWords,
   choiceWords,
+  costWords,
   hostWords,
   latestDecisionWords,
+  modelLine,
+  peopleRoleWords,
   summaryWords,
 } from '../src/ui/society-models.js';
 
@@ -39,6 +43,13 @@ const read = (overrides: Record<string, unknown> = {}) => ({
   decisions_read: { counted: 5, maximum: 2000 },
   ...overrides,
 });
+
+/** Picks a model card as a person does: its radio checked, then its change. */
+function pick(root: HTMLElement, value: string): void {
+  const radio = root.querySelector<HTMLInputElement>(`input[type=radio][value="${value}"]`)!;
+  radio.checked = true;
+  radio.dispatchEvent(new Event('change'));
+}
 
 describe('reading who decides', () => {
   it('calls a model by the name the server gives it, even one this host no longer offers', () => {
@@ -161,8 +172,8 @@ describe('the mounted section', () => {
     const box = mounted.root.querySelector<HTMLInputElement>('input[type=checkbox]')!;
     box.checked = true;
     box.dispatchEvent(new Event('change'));
-    (mounted.root.querySelector('select') as HTMLSelectElement).value = `nebius_token_factory ${MODEL}`;
-    (mounted.root.querySelectorAll('button')[1] as HTMLButtonElement).click();
+    pick(mounted.root, `nebius_token_factory ${MODEL}`);
+    mounted.root.querySelector<HTMLButtonElement>('button.society-models-choose')!.click();
     await vi.waitFor(() => expect(fetcher).toHaveBeenCalledTimes(3));
     const [url, init] = fetcher.mock.calls[1]!;
     expect(String(url)).toContain('/world/versions/version/society/models?world_id=world%3Apersonal%3Aa');
@@ -170,6 +181,9 @@ describe('the mounted section', () => {
       people: ['ada'], model: { provider: 'nebius_token_factory', model_id: MODEL },
     });
     expect(mounted.root.textContent).toContain('One person is now decided by the model you chose');
+    // Once recorded, nobody stays ticked, so the action no longer offers the same choice again.
+    expect(mounted.root.querySelector<HTMLInputElement>('input[type=checkbox]')!.checked).toBe(false);
+    expect(mounted.root.querySelector('button.society-models-choose')!.textContent).toBe('Choose people to decide for');
   });
 
   it('reads nothing more at a new minute once the server says nobody here is decided for by a model', async () => {
@@ -197,7 +211,7 @@ describe('the mounted section', () => {
     const box = mounted.root.querySelector<HTMLInputElement>('input[type=checkbox]')!;
     box.checked = true;
     box.dispatchEvent(new Event('change'));
-    (mounted.root.querySelectorAll('button')[1] as HTMLButtonElement).click();
+    mounted.root.querySelector<HTMLButtonElement>('button.society-models-choose')!.click();
     await vi.waitFor(() => expect(mounted.root.textContent).toContain(CHOICE_REFUSAL_WORDS['too_many_model_people']));
   });
 
@@ -211,8 +225,8 @@ describe('the mounted section', () => {
     const box = mounted.root.querySelector<HTMLInputElement>('input[type=checkbox]')!;
     box.checked = true;
     box.dispatchEvent(new Event('change'));
-    (mounted.root.querySelector('select') as HTMLSelectElement).value = `nebius_token_factory ${MODEL}`;
-    (mounted.root.querySelectorAll('button')[1] as HTMLButtonElement).click();
+    pick(mounted.root, `nebius_token_factory ${MODEL}`);
+    mounted.root.querySelector<HTMLButtonElement>('button.society-models-choose')!.click();
     await vi.waitFor(() => expect(mounted.root.querySelector('.society-models-result')?.textContent).toBe(
       'The model you chose is recorded for one person, but they follow their own routine for now, '
       + 'because this server has no key for a model service.',
@@ -239,8 +253,8 @@ describe('the mounted section', () => {
     const box = mounted.root.querySelector<HTMLInputElement>('input[type=checkbox]')!;
     box.checked = true;
     box.dispatchEvent(new Event('change'));
-    (mounted.root.querySelector('select') as HTMLSelectElement).value = `nebius_token_factory ${MODEL}`;
-    (mounted.root.querySelectorAll('button')[1] as HTMLButtonElement).click();
+    pick(mounted.root, `nebius_token_factory ${MODEL}`);
+    mounted.root.querySelector<HTMLButtonElement>('button.society-models-choose')!.click();
     await vi.waitFor(() => expect(fetcher.mock.calls.some(([, init]) => init?.method === 'POST')).toBe(true));
     // The read begun before the choice ends now; the words must wait for the one after it.
     waiting[0]!();
@@ -315,5 +329,73 @@ describe('the mounted section', () => {
     } finally {
       vi.unstubAllGlobals();
     }
+  });
+});
+
+describe('the cards of who decides', () => {
+  const offered = (id: string, price: { input: string; output: string } | null) => ({
+    provider: 'nebius_token_factory', model_id: id, name: id,
+    description: `${id}, an open reasoning model from NVIDIA.`, provider_description: 'Nebius Token Factory.',
+    mechanism: 'tool_call', ...(price === null ? {} : { usd_per_mtok: price }), refusal: null,
+  });
+
+  it('compares each served price with the cheapest model offered beside it, and states none it was not served', () => {
+    const view = parseSocietyModels(read({ models: [
+      offered('cheap', { input: '0.06', output: '0.24' }),
+      offered('near', { input: '0.14', output: '0.28' }),
+      offered('dear', { input: '0.20', output: '0.60' }),
+      offered('unpriced', null),
+    ] }));
+    expect(view.models.map((model) => costWords(model, view.models))).toEqual([
+      'Lowest cost', 'Near the lowest cost', 'About 3 times the lowest cost', null,
+    ]);
+    // A price the server serves in another shape is refused, not guessed.
+    expect(() => parseSocietyModels(read({ models: [offered('odd', { input: '-1', output: '0.2' })] }))).toThrow();
+  });
+
+  it('shows a model\'s served description without repeating the name above it', () => {
+    const [model] = parseSocietyModels(read()).models;
+    expect(modelLine(model!)).toBe('An open reasoning model from NVIDIA.');
+    expect(modelLine({ ...model!, description: 'Served words of its own.' })).toBe('Served words of its own.');
+  });
+
+  it('says what its one action will do for the model and people chosen', () => {
+    const model = { provider: 'p', modelId: 'm', name: 'Qwen3 235B Instruct' };
+    expect(chooseWords(model, 0, false)).toBe('Choose people to decide for');
+    expect(chooseWords(model, 4, false)).toBe('Let Qwen3 235B Instruct decide for 4 people');
+    expect(chooseWords(null, 1, false)).toBe('Give one person their own routine');
+    expect(chooseWords(model, 4, true)).toBe('Choosing…');
+  });
+
+  it('says on the People card who decides for the people here now', () => {
+    const people = [{ id: 'ada', name: 'Ada' }, { id: 'grace', name: 'Grace' }];
+    const view = parseSocietyModels(read());
+    expect(peopleRoleWords(view, people)).toBe('1 by Nemotron 3 Nano 30B');
+    // Somebody no longer here is not counted, and nobody under a model is their own routine.
+    expect(peopleRoleWords(view, people.slice(1))).toBe('Their own routine');
+  });
+
+  it('shows people first, and the traffic lights under their own card when this world has them', () => {
+    const signals = document.createElement('div');
+    const section = buildSocietyModels({ onChoose: () => undefined, signals });
+    const cards = () => [...section.root.querySelectorAll<HTMLButtonElement>('button[role=tab]')];
+    const people = section.root.querySelector<HTMLElement>('.society-models-people-group')!;
+    section.setSignals({ count: 2, words: 'Fixed timing' });
+    section.render({ view: parseSocietyModels(read()), people: [{ id: 'ada', name: 'Ada' }], busy: false, message: '' });
+    expect(cards().filter((card) => !card.hidden).map((card) => card.textContent))
+      .toEqual(['People · 11 by Nemotron 3 Nano 30B', 'Traffic lights · 2Fixed timing']);
+    expect(people.hidden).toBe(false);
+    expect(signals.parentElement!.hidden).toBe(true);
+    cards()[1]!.click();
+    expect(people.hidden).toBe(true);
+    expect(signals.parentElement!.hidden).toBe(false);
+    // A world whose people take no model shows its traffic lights alone.
+    const lights = buildSocietyModels({ onChoose: () => undefined, signals: document.createElement('div') });
+    lights.setSignals({ count: 2, words: 'Fixed timing' });
+    lights.render({ view: parseSocietyModels(read({ takes_model_choices: false })), people: [], busy: false, message: '' });
+    expect(lights.root.hidden).toBe(false);
+    expect(lights.root.querySelector<HTMLElement>('.society-models-people-group')!.hidden).toBe(true);
+    lights.setSignals(null);
+    expect(lights.root.hidden).toBe(true);
   });
 });

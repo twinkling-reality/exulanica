@@ -49,11 +49,13 @@ world version rather than stored. Walking, flight and roads are the three built
 
 ## Choosing a model for a person or a group
 
-In the panel "Who decides for them", the world's owner chooses an open model for one person or a
-group, up to eight people at once. With no choice, the routine decides. A model is offered when its
-entry in the [model manifest](../../exulanica/models/models.manifest.json) names a verified way it
-answers a choice. `GET /world/versions/{version_id}/society/models` lists the offered models and
-whether this host can ask each.
+In the world's Who decides panel (its rail action, or R), the world's owner chooses an open model
+for one person or a group, up to eight people at once. With no choice, the routine decides. Each
+model's card states its served description and how its served price compares with the cheapest model
+offered beside it. A model is offered when its entry in the [model
+manifest](../../exulanica/models/models.manifest.json) names a verified way it answers a choice.
+`GET /world/versions/{version_id}/society/models` lists the offered models and whether this host can
+ask each.
 
 At each point where the routine would choose for a chosen person, the host asks their model through
 the one hosted policy boundary, which applies the egress allowlist, the budget and the person's

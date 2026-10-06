@@ -148,6 +148,13 @@ function mount() {
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
+/** Picks a model card as a person does: its radio checked, then its change. */
+function pick(root: HTMLElement, value: string): void {
+  const radio = root.querySelector<HTMLInputElement>(`input[type=radio][value="${value}"]`)!;
+  radio.checked = true;
+  radio.dispatchEvent(new Event('change'));
+}
+
 describe('a saved world holds inhabitants only when the person asks', () => {
   it('opening reads the saved world and creates nothing; the request brings them in and draws them', async () => {
     const { mounted, crowd, societyClient, panel, canvas, worldClient } = mount();
@@ -255,19 +262,22 @@ describe('a saved world holds inhabitants only when the person asks', () => {
     for (let i = 0; i < 6; i += 1) await settle();
     expect(modelsClient.read).toHaveBeenCalledWith('version');
     expect(section.hidden).toBe(false);
-    // Beside the people, after the inhabitants panel, in People nearby.
-    expect(panel().nextElementSibling).toBe(section);
+    // In its own panel, Who decides.
+    expect(section.closest('#world-panel-decides')).not.toBeNull();
     const rows = [...section.querySelectorAll<HTMLElement>('label[data-subject-id]')];
-    expect(rows[0]!.textContent).toBe(' Person 0 · Nemotron 3 Nano 30B, which you chose.');
-    expect(rows[1]!.textContent).toBe(' Person 1 · Their own routine.');
+    const row = (label: HTMLElement) => [...label.querySelectorAll('span')].map((span) => span.textContent);
+    expect(row(rows[0]!)).toEqual(['Person 0', 'Nemotron 3 Nano 30B, which you chose.']);
+    expect(row(rows[1]!)).toEqual(['Person 1', 'Their own routine.']);
     // A group: two people ticked, one model, sent for this saved world's version.
     for (const row of rows.slice(1, 3)) {
       const box = row.querySelector('input')!;
       box.checked = true;
       box.dispatchEvent(new Event('change'));
     }
-    section.querySelector('select')!.value = `${MODEL.provider} ${MODEL.model_id}`;
-    [...section.querySelectorAll('button')].find((b) => b.textContent === 'Use for the chosen people')!.click();
+    pick(section, `${MODEL.provider} ${MODEL.model_id}`);
+    const choose = section.querySelector<HTMLButtonElement>('button.society-models-choose')!;
+    expect(choose.textContent).toBe('Let Nemotron 3 Nano 30B decide for 2 people');
+    choose.click();
     for (let i = 0; i < 4; i += 1) await settle();
     expect(modelsClient.choose).toHaveBeenCalledWith(
       'version', ['person-1', 'person-2'], { provider: MODEL.provider, modelId: MODEL.model_id },

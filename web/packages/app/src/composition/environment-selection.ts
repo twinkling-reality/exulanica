@@ -160,7 +160,7 @@ export interface MountedEnvironmentSelection {
   begin(): Promise<void>;
   dispose(): void;
   closePanels(): void;
-  openPanel(name: 'nearby' | 'authoring' | 'details'): void;
+  openPanel(name: 'nearby' | 'decides' | 'authoring' | 'details'): void;
   setWelcomeVisible(visible: boolean): void;
   afterAuthoredEdit(versionId: string): Promise<void>;
   districtPlacement(): SocietyDistrictPlacement | null;
@@ -1900,7 +1900,7 @@ export function mountEnvironmentSelection(
     savedWorld = { worldId: entry.worldId, versionId: entry.authoredVersionId, regionId };
     offerInhabitantsPanel();
     societyModels = mountModels(savedWorld);
-    inhabitantsPanel.root.after(societyModels.root);
+    workspace.decides.append(societyModels.root);
     const atlas = deps.state.atlas?.binding;
     if (atlas?.authoredSociety == null) {
       inhabitantsPanel.unavailable('This world is not drawn here, so nobody can be shown in it.');
@@ -2080,7 +2080,7 @@ export function mountEnvironmentSelection(
           onChange: reflectLiveSociety,
         });
         societyModels = mountModels({ worldId: current.worldId, versionId: current.versionId });
-        liveControls.after(societyModels.root);
+        workspace.decides.append(societyModels.root);
         await liveSociety.connect();
         if ((phase as string) === 'disposed') return;
         void societyModels.refresh(society?.currentTick ?? null, societyPeople(), true);

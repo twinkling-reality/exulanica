@@ -46,6 +46,8 @@ export interface InputModeDependencies {
   readonly shellState: () => WorldShellState;
   readonly dispatchShell: (event: WorldShellEvent) => void;
   readonly handleAtlasCommand: (command: AtlasCommand) => void;
+  /** Who decides, opened or closed through its action, so it is refused where it is not offered. */
+  readonly toggleDecides: () => void;
   readonly showTravelStatus: (message: string, kind?: 'progress' | 'failure') => void;
   readonly travelUsesReducedMotion: () => boolean;
   readonly setInputMode: (mode: FirstUseMode) => void;
@@ -330,6 +332,11 @@ export function mountInputModes(deps: InputModeDependencies): MountedInputModes 
       if (command === 'toggle-options') {
         event.preventDefault();
         deps.handleAtlasCommand('options');
+        return;
+      }
+      if (command === 'toggle-decides') {
+        event.preventDefault();
+        deps.toggleDecides();
         return;
       }
       if (command === 'toggle-controls') {

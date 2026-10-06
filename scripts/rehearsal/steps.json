@@ -492,7 +492,7 @@
     {
       "id": "choose-model-for-a-group",
       "session": "living",
-      "action": "In People nearby, under Who decides for them, tick four people, choose DeepSeek V4 Flash and press Use for the chosen people.",
+      "action": "Open Who decides, choose DeepSeek V4 Flash, tick four people and press Let DeepSeek V4 Flash decide for 4 people.",
       "gates": ["milestone:A model per group", "delivery:Models in their roles"],
       "gates_reason": "The owner chooses the open model that decides for a group, through the one hosted policy boundary; one group under one model is part of each, which gates_in_part states.",
       "requires": ["bring-in-inhabitants"],
@@ -508,7 +508,7 @@
       "owner_area": "model choices: web/packages/app/src/ui/society-models.ts and web/packages/app/src/composition/society-models-mount.ts; exulanica/api/routes/society_models.py and exulanica/world/society_model_choice_repository.py",
       "expect": {
         "page": [
-          {"id": "models-offered", "says": "Who decides for them is shown beside the people, its host line says this server asks the models chosen before each simulated minute, and it offers the model by the name the server serves."},
+          {"id": "models-offered", "says": "Who decides lists the people, its host line says this server asks the models chosen before each simulated minute, and it offers the model by the name the server serves."},
           {"id": "group-chosen-in-words", "says": "After the choice it says that many people are decided by the model chosen, and each chosen person's row names the model, which you chose."}
         ],
         "api": [
@@ -1152,7 +1152,7 @@
       "expect": {
         "page": [
           {"id": "people-on-the-floor", "says": "People nearby shows them present, says how many, and says they walk inside a square around where the person arrives."},
-          {"id": "model-panel-beside-them", "says": "Who decides for them is shown beside them, listing each of them and offering every model the server offers."}
+          {"id": "model-panel-beside-them", "says": "Who decides is offered for them, listing each of them and offering every model the server offers."}
         ],
         "api": [
           {"id": "made-arrival-source-bound", "says": "The v4 made world's served arrival pose and authorized scene, point-map or photograph pin bind the same world, version, source snapshot and region, with exact source digests where that source has them."},
@@ -1242,7 +1242,7 @@
     {
       "id": "choose-model-for-a-town-group",
       "session": "town",
-      "action": "In People nearby in the town, under Who decides for them, tick four people, choose Nemotron 3 Nano 30B and press Use for the chosen people.",
+      "action": "In the town, open Who decides, choose Nemotron 3 Nano 30B, tick four people and press Let Nemotron 3 Nano 30B decide for 4 people.",
       "gates": ["milestone:A model per group", "delivery:Models in their roles"],
       "gates_reason": "The owner chooses the open model that decides for a group of the town's people, through the one hosted policy boundary; one group under one model is part of each, which gates_in_part states.",
       "requires": ["people-cross-tile-seams"],
@@ -1260,7 +1260,7 @@
       "owner_area": "model choices: web/packages/app/src/ui/society-models.ts and web/packages/app/src/composition/society-models-mount.ts; exulanica/api/routes/society_models.py and exulanica/world/society_model_choice_repository.py",
       "expect": {
         "page": [
-          {"id": "models-offered", "says": "Who decides for them is shown beside the town's people, its host line says this server asks the models chosen before each simulated minute, and it offers the model by the name the server serves."},
+          {"id": "models-offered", "says": "Who decides lists the town's people, its host line says this server asks the models chosen before each simulated minute, and it offers the model by the name the server serves."},
           {"id": "group-chosen-in-words", "says": "After the choice it says that many people are decided by the model chosen, and each chosen person's row names the model, which you chose."}
         ],
         "api": [

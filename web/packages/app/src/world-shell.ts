@@ -48,6 +48,7 @@ export type WorldCommand =
   | 'toggle-map'
   | 'toggle-options'
   | 'toggle-controls'
+  | 'toggle-decides'
   | 'selection-back';
 
 export interface CommandKeystroke {
@@ -173,6 +174,8 @@ export function commandForKeystroke(stroke: CommandKeystroke): WorldCommand | nu
       return 'toggle-map';
     case 'KeyO':
       return 'toggle-options';
+    case 'KeyR':
+      return 'toggle-decides';
     case 'Backspace':
       return 'selection-back';
     default:

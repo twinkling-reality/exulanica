@@ -32,8 +32,19 @@ export interface SocietyModel extends NamedModelRef {
   readonly description: string;
   readonly providerDescription: string;
   readonly mechanism: AnsweringMechanism;
+  /**
+   * What the manifest says the model costs, in US dollars per million input and output tokens, as
+   * the decimal strings the server serves; null where a read names no price.
+   */
+  readonly price: ModelPrice | null;
   /** Why this process asks nothing its provider serves, by code, or null when it may. */
   readonly refusal: string | null;
+}
+
+/** A model's served price, in US dollars per million tokens, as decimal strings. */
+export interface ModelPrice {
+  readonly input: string;
+  readonly output: string;
 }
 
 /** A person's current choice: a model, or null for their own routine. */
@@ -109,6 +120,13 @@ function modelRef(value: unknown): NamedModelRef {
   return { provider: text(held['provider']), modelId: text(held['model_id']), name: text(held['name']) };
 }
 
+const DECIMAL = /^\d+(\.\d+)?$/;
+function price(value: unknown): ModelPrice {
+  const held = object(value);
+  const amount = (raw: unknown): string => (typeof raw === 'string' && DECIMAL.test(raw) ? raw : invalid());
+  return { input: amount(held['input']), output: amount(held['output']) };
+}
+
 function mechanism(value: unknown): AnsweringMechanism {
   return value === 'tool_call' || value === 'json_schema' ? value : invalid();
 }
@@ -134,6 +152,7 @@ export function parseSocietyModels(value: unknown): SocietyModels {
         description: text(held['description']),
         providerDescription: text(held['provider_description']),
         mechanism: mechanism(held['mechanism']),
+        price: held['usd_per_mtok'] === undefined ? null : maybe(held['usd_per_mtok'], price),
         refusal: maybe(held['refusal'], text),
       };
     }),

@@ -300,8 +300,8 @@ not a failure, since people linger by design. It reads one inhabitant in the ins
 someone to use an object of the square, and pauses the world. These steps serve the first
 milestone's A world to run and the Usable world delivery gate with the town session's.
 
-**Models deciding for people.** In People nearby, under Who decides for them, the rehearsal ticks
-four of the starter's people and chooses DeepSeek V4 Flash for them before it presses Play. While the
+**Models deciding for people.** In Who decides, the rehearsal chooses DeepSeek V4 Flash for four
+of the starter's people before it presses Play. While the
 host plays the world it waits for a decision that model served and the minute applied, reads it in
 the inspector (Decided by, Latest decision) and reads the same decision from the API: the request
 with the options the person saw, the receipt naming the model that served it, and a replay of the
@@ -342,8 +342,8 @@ is asked for a change the reviewed design cannot make and must answer once, with
 open Customize, with a provenance line naming the model that read the request; after a reload it
 must redraw that answer in the same words with the same provenance line. The same holds for the
 proposal it makes and Customize shows. The last session places the small square in the made world
-and brings people in: they must stand on the floor the world declares, with Who decides for them
-beside them.
+and brings people in: they must stand on the floor the world declares, and Who decides must list
+each of them.
 
 **What it does not do.** It does not observe a person or record demonstration footage. It does not
 ask for a change Customize itself refuses, since no request in words makes one: that refusal follows

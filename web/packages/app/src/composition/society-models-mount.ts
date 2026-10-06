@@ -37,6 +37,15 @@ export interface MountedSocietyModels {
   dispose(): void;
 }
 
+/** What the traffic lights' card says: how many, and whether a model runs any of them. */
+function signalSummary(view: SignalRole): { readonly count: number; readonly words: string } {
+  const decided = view.choices.filter((choice) => choice.model !== null).length;
+  return {
+    count: view.subjects.length,
+    words: decided === 0 ? 'Fixed timing' : `${decided} by a model you chose`,
+  };
+}
+
 export function mountSocietyModels(options: {
   readonly credentials: Credentials;
   readonly world: { readonly worldId: string; readonly versionId: string };
@@ -70,13 +79,15 @@ export function mountSocietyModels(options: {
   let begun = 0;
   let ended = 0;
 
-  const section = buildSocietyModels({ onChoose: (chosen, model) => void choose(chosen, model) });
   const signals = buildSignalModels({ onChoose: (signalId, model) => void chooseSignal(signalId, model) });
-  section.root.append(signals.root);
+  const section = buildSocietyModels({
+    onChoose: (chosen, model) => void choose(chosen, model),
+    signals: signals.root,
+  });
   const render = () => {
-    section.render({ view, people, busy, message: [message, failure].filter(Boolean).join(' ') });
     signals.render(signalView, busy, [signalMessage, failure].filter(Boolean).join(' '));
-    section.root.hidden = (section.root.firstElementChild as HTMLElement).hidden && signals.root.hidden;
+    section.setSignals(signals.root.hidden || signalView === null ? null : signalSummary(signalView));
+    section.render({ view, people, busy, message: [message, failure].filter(Boolean).join(' ') });
   };
 
   async function read(tick: number | null): Promise<void> {
@@ -148,6 +159,7 @@ export function mountSocietyModels(options: {
     // A read already out began before the choice: the words wait for one begun after it.
     await readAfterNow();
     if (recorded && !disposed) {
+      section.clearPeople();
       // Said from the read that followed the choice, so it never names a model nobody asks.
       message = recordedWords(view, chosen, model);
       render();

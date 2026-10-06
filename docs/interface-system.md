@@ -108,7 +108,7 @@ surface keeps its own open and close behaviour; the layout watches its `hidden` 
 | --- | --- | --- |
 | `top-bar` | the world's title, the world clock, Add object, Add photos, Search, World menu | always present in a world |
 | `tool-rail` | the registry's rail actions, grouped | always present |
-| `inspector` | the objects panel, People here, Build, About this place, Selected, the reconstruction inspector | exclusive: a newly shown surface closes the one before through its own close handler |
+| `inspector` | the objects panel, People here, Who decides, Build, About this place, Selected, the reconstruction inspector | exclusive: a newly shown surface closes the one before through its own close handler |
 | `sheet` | the confirmation before a write | exclusive; drawn over the inspector column, which it dims, so the placement mark in the world stays visible |
 | `dock` | the Companion | centred in the free part of the world |
 | `toast` | short notices and receipts | newest first, at most three |
@@ -160,6 +160,22 @@ sheet in the same language: describing the town in the person's own words comes 
 as picture cards under it, and the values with Create this town in the right column; the shares
 that set the mix of buildings and shops sit behind one disclosure. Escape goes back; Command or
 Control with Enter creates the town once its values are admitted.
+
+### Who decides
+
+Who decides (`web/packages/app/src/ui/society-models.ts`, `ui/society-models.css`, mounted by
+`composition/society-models-mount.ts`) is the world panel where the owner chooses who decides for
+the people and traffic lights of a saved world. It is opened by its rail action or R, offered once
+people live there. Under the title "Who runs this world", one card per decision role says how many
+there are and who decides for them now ("Their own routine", "8 by Nemotron 3 Nano 30B", "Fixed
+timing"); choosing a card shows that role's choice under it, people first. For people, every model
+the server offers is a card with its served name and description, and a line comparing its served
+price with the cheapest model offered beside it ("Lowest cost", "About 3 times the lowest cost"); the
+card's title states the prices exactly. Their own routine is the first card. Under the cards come
+the people, each with who decides for them now, and one primary action kept at the panel's foot
+that says what it will do ("Let Qwen3 235B Instruct decide for 4 people", "Give one person their own
+routine"); once the server records a choice the people are unticked and the action says what the
+choice came to. What each model decided, and how the panel's models decide, follow below it.
 
 ## 4. Actions
 
