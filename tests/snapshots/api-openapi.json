@@ -23498,6 +23498,38 @@
       },
       "type": "array",
       "title": "Tiles"
+     },
+     "specification": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Specification"
+     },
+     "values": {
+      "anyOf": [
+       {
+        "additionalProperties": {
+         "anyOf": [
+          {
+           "type": "integer"
+          },
+          {
+           "type": "string"
+          }
+         ]
+        },
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Values"
      }
     },
     "additionalProperties": false,
@@ -23511,7 +23543,7 @@
      "tiles"
     ],
     "title": "GeneratedGroundView",
-    "description": "What the page draws of a world generated from a recipe: its tiles, the one region its\npeople live in and where a person arrives, in that region's frame (east, height, south)."
+    "description": "What the page draws of a world generated from a recipe: its tiles, the one region its\npeople live in and where a person arrives, in that region's frame (east, height, south); and\nwhat the world was made with, read-only. Nothing changes an existing world's values: a new\nworld made from them is ``POST /worlds/generated`` with ``recipe_key`` as its ``recipe`` and\nthese ``values``, and this world keeps its own receipt."
    },
    "GeneratedSceneBody": {
     "properties": {

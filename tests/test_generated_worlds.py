@@ -171,6 +171,59 @@ def test_a_recipe_makes_a_generated_world_with_its_receipt_entry_and_bakes(objec
     assert receipt["tiles"] == [list(tile) for tile in tiles]
 
 
+def test_a_saved_generated_world_states_every_value_it_was_made_with_and_no_other_world_does(
+    made, monkeypatch
+):
+    """A generated world's entry states its schema and every adjustable value it was made with:
+    the preset's, read here from the catalog file itself, with the values asked for in their
+    place. Both routes say the same; an authored world, a world of a version 1 recipe and another
+    workspace's world state none."""
+    api = made
+    starter = api.post("/world-entries/starter", {"title": "My world"})
+    assert starter.status_code == 200, starter.text
+    catalog = json.loads(
+        CATALOG_DIRECTORY.joinpath(
+            f"world-recipe.v{recipe_catalog.CATALOG_VERSION}.json"
+        ).read_text()
+    )
+    preset = next(entry for entry in catalog["entries"] if entry["key"] == "small_town")
+    asked = {"typology_weight_rowhouse_permille": 900, "ground_floor_use_weight_cafe_permille": 800}
+    assert all(preset["values"][key] != value for key, value in asked.items())
+    response = api.post(
+        "/worlds/generated", {"recipe": "small_town", "title": "Asked", "values": asked}
+    )
+    assert response.status_code == 201, response.text
+    tweaked = response.json()
+    plain = _town(api, "Plain")
+    listed = {row["entry_id"]: row for row in api.get("/world-entries").json()}
+    for town, expected in ((tweaked, {**preset["values"], **asked}), (plain, preset["values"])):
+        for ground in (
+            api.entry(town["entry_id"])["generated_ground"],
+            listed[town["entry_id"]]["generated_ground"],
+        ):
+            assert ground["specification"] == preset["specification"]
+            assert ground["values"] == expected
+            assert list(ground["values"]) == sorted(expected)
+        # A stranger is told the world does not exist, and lists none of it.
+        assert (
+            api.get(f"/world-entries/{town['entry_id']}", token=STRANGER_TOKEN).status_code == 404
+        )
+    strangers = api.get("/world-entries", token=STRANGER_TOKEN)
+    assert strangers.status_code == 200, strangers.text
+    assert not {row["entry_id"] for row in strangers.json()} & {
+        tweaked["entry_id"],
+        plain["entry_id"],
+    }
+    assert listed[starter.json()["entry_id"]]["generated_ground"] is None
+    # Version 1's recipe named a whole specification file and recorded no values: its world is
+    # drawn as before and states neither.
+    recipe = dataclasses.replace(_version_1("small_town"), candidates=CANDIDATES_MAXIMUM)
+    monkeypatch.setattr(recipe_catalog, "town_recipe", lambda key, values=None: recipe)
+    old = api.entry(_town(api, "Old")["entry_id"])["generated_ground"]
+    assert old["recipe_key"] == "small_town" and old["tiles"]
+    assert (old["specification"], old["values"]) == (None, None)
+
+
 def test_a_town_s_people_are_its_residents_walking_its_own_surfaces(made):
     api = made
     response = api.post("/worlds/generated", {"recipe": "small_town", "title": "Our town"})

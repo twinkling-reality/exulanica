@@ -366,6 +366,12 @@ class GeneratedGround:
     #: The way a person arriving faces, as a plan vector in the region's frame: east, then south.
     arrival_facing_mm: tuple[int, int]
     tiles: tuple[GeneratedTile, ...]
+    #: The specification schema the receipt names (``world-specification.v<N>``) and every
+    #: adjustable value the world was made with, the preset's with the asker's in place, as the
+    #: receipt records them. Both None for a world of a version 1 recipe, which named a whole
+    #: specification file and recorded no values.
+    specification: str | None = None
+    values: Mapping[str, int | str] | None = None
 
 
 def generated_ground(
@@ -374,8 +380,10 @@ def generated_ground(
     """The drawing a saved entry of a generated world declares."""
     _, receipt = generation_receipt(connection, workspace_id, world_id, snapshot_id)
     extent = generated_extent(connection, workspace_id, world_id, snapshot_id)
-    key = receipt["recipe"]["key"]
-    label = next((recipe.label for recipe in world_recipes() if recipe.key == key), key)
+    recipe = receipt["recipe"]
+    key = recipe["key"]
+    label = next((preset.label for preset in world_recipes() if preset.key == key), key)
+    values = recipe.get("values")
     return GeneratedGround(
         recipe_key=key,
         recipe_label=label,
@@ -387,4 +395,6 @@ def generated_ground(
             -receipt["arrival"]["facing_mm"][1],
         ),
         tiles=generated_tiles(connection, workspace_id, world_id, snapshot_id),
+        specification=None if values is None else recipe["specification"],
+        values=None if values is None else MappingProxyType(dict(sorted(values.items()))),
     )

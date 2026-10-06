@@ -130,7 +130,10 @@ class GeneratedTileView(BaseModel):
 
 class GeneratedGroundView(BaseModel):
     """What the page draws of a world generated from a recipe: its tiles, the one region its
-    people live in and where a person arrives, in that region's frame (east, height, south)."""
+    people live in and where a person arrives, in that region's frame (east, height, south); and
+    what the world was made with, read-only. Nothing changes an existing world's values: a new
+    world made from them is ``POST /worlds/generated`` with ``recipe_key`` as its ``recipe`` and
+    these ``values``, and this world keeps its own receipt."""
 
     model_config = ConfigDict(extra="forbid", from_attributes=True)
 
@@ -141,6 +144,14 @@ class GeneratedGroundView(BaseModel):
     #: The way a person arriving faces, a plan vector east then south: toward the nearest street.
     arrival_facing_mm: tuple[int, int]
     tiles: list[GeneratedTileView]
+    #: The specification schema the world's generation receipt names, ``world-specification.v<N>``:
+    #: ``GET /worlds/specification`` states its schema as that catalog id and version, with each
+    #: value's words, unit and range. Null for a world of a version 1 recipe.
+    specification: str | None = None
+    #: Every adjustable value the world was made with, keyed by that schema's value keys, each an
+    #: integer or a choice key: the preset's values with those asked for in their place, as the
+    #: receipt records them. Null for a world of a version 1 recipe, which recorded none.
+    values: dict[str, int | str] | None = None
 
 
 class SavedWorldEntryView(BaseModel):

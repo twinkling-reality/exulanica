@@ -61,6 +61,20 @@ source snapshot. Reads return
 `availability: unavailable` and `unavailable_reason: source_deleted`; the browser shows the
 recorded entry and refuses to open it. Authored work remains recorded by its existing authority.
 
+An entry of a world generated from a recipe carries `generated_ground`: its recipe, tiles, region
+and arrival, and what the world was made with, read from its generation receipt.
+`generated_ground.specification` is the specification schema the receipt names
+(`world-specification.v<N>`; `GET /worlds/specification` states its schema by that catalog id and
+version, with each value's words, unit and range). `generated_ground.values` is every adjustable
+value the world was made with, keyed by that schema's value keys, each an integer or a choice key:
+the preset's values with the ones asked for in their place, so the complete set and not only the
+changed ones. Fixed values are not listed, because no request may state them. Both fields are
+read-only; nothing changes an existing world's values. A new world made from them is
+`POST /worlds/generated` with `recipe` set to `generated_ground.recipe_key` and these `values`, and
+the earlier world, its people, runs and comparisons stay bound to its own receipt. A world made
+from a version 1 recipe, which named a whole specification file and recorded no values, states
+both as null.
+
 A world generated from a recipe is read through its receipt. When the receipt no longer generates
 what it recorded, reads return `availability: unavailable`, no `generated_ground`, and the reason
 named: `generated_world_grammar_changed` or `generated_world_catalogs_changed` when the grammar's

@@ -55,6 +55,13 @@ and the write returns the `world_id` every later route is given. It needs `admis
 `world.read` or `world.write`, because it reads the review state of each photograph. Its rule and
 refusals are in [saved-world-entry.md](../saved-world-entry.md#which-photographs-a-personal-source-world-is-composed-from).
 
+A saved entry of a generated world states what it was made with, read-only:
+`generated_ground.specification` names the specification schema and `generated_ground.values` holds
+every adjustable value from its generation receipt, the preset's with the asked ones in their place.
+Changing them makes a new world through `POST /worlds/generated`; the existing world keeps its
+receipt. Both are null for a world of a version 1 recipe, and `generated_ground` itself is null when
+the receipt cannot be read ([saved-world-entry.md](../saved-world-entry.md#stored-authority)).
+
 The `/world-read` routes need `library.read`. World Write records provenance; it does not deliver
 generated assets or execute behavior. The `/world/versions` routes are the object-editing surface,
 and their full contract, including every problem code, is
