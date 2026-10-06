@@ -348,7 +348,7 @@ and sets them and can never supply shader code.
 | Sky (`sky.ts`) | A high dynamic range sky from a function of direction: horizon to zenith, the ground below, a glow and a disc toward the sun, and clouds above the horizon from integer-hashed noise, so one seed draws one sky on every machine. Drawn at `faceTexels` per face |
 | Image light | Prefiltered from the same function with the look's `bounceGround` below the horizon and no sun disc, so a coloured ground does not tint every wall and the sun is not counted twice |
 | Fog | Linear, held to the 40 to 60 m onset target, or exponential, at most 0.006 per metre |
-| Sun and shadows | Elevation, azimuth, colour and intensity; shadow maps up to 4096 texels in up to four cascades; one-tap, three-tap, five-tap or soft (PCSS) filtering, with a penumbra only for PCSS |
+| Sun and shadows | Elevation, azimuth, colour and intensity; shadow maps up to 4096 texels in up to four cascades; one-tap, three-tap or five-tap filtering, or soft (PCSS) filtering with a penumbra, which a person may choose as a quality setting and a style pack may not, since it alone costs more than a frame (below) |
 | Contact shadowing and the probe | As the tile look: neither has an off switch |
 | Finish | The camera frame's bloom, grading, colour enhancement, vignette and temporal anti-aliasing, each optional or bounded |
 | Shading model (`shading.ts`) | `pbr`, the engine's own; `toon`, two lit bands whose edges and share the look states; `flat`, each fragment's normal from screen-space derivatives, so every triangle is a facet. The chunk text is this module's in GLSL and WGSL; only validated numbers reach it. Each texture set's material takes the model when it is uploaded, all but glass, whose own chunk draws its reflection |
@@ -359,8 +359,17 @@ and sets them and can never supply shader code.
 the sky's colours at the zenith, horizon and nadir, the disc kept out of the image light, the clouds'
 seed, the shading chunks in both languages and on the uploaded sets, the ink edges of a cube and of
 two coplanar pieces, the environment and its restoration, and a conformance tile drawn with a render
-look, inked and removed again. What each capability costs per frame is measured by the style pack
-work that first sets one.
+look, inked and removed again.
+
+What each capability costs was measured on 2026-10-04 on a production build of main 388fb520: the
+market town from its street view, the median GPU time per frame from the engine's timer queries over
+two passes of three seconds, at 1280 by 860, on an Apple M5 Max in Chrome with ANGLE on Metal, the
+machine at 75 per cent idle before and 64 per cent during. The tile look takes 1.7 to 1.8 ms.
+Removing its contact shadowing saves 0.7 ms, its multisampling 0.5 ms and its sun shadows 0.6 ms. A
+4096-texel, four-cascade, five-tap shadow adds 0.3 to 0.5 ms; bloom 0.2 to 0.4 ms; grading, vignette
+and colour enhancement together 0.04 to 0.11 ms; temporal anti-aliasing 0.2 to 0.3 ms; all of these
+at once 0.4 to 0.6 ms. Soft (PCSS) shadows take 26 to 27 ms on their own, more than the 16.7 ms a
+frame has at 60 frames a second.
 
 ## 7. The evaluation entry
 

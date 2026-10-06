@@ -644,3 +644,48 @@ export {
   parseTextureSetManifest,
   textureSetBlobPath,
 } from './texture-set.js';
+
+export type {
+  AxisStretch,
+  AxisStretches,
+  Dressing,
+  LookFamily,
+  ResolvedModule,
+  ResolvedStylePack,
+  Srgb8,
+  StylePackContext,
+  StylePackFile,
+  StylePackFog,
+  StylePackLicence,
+  StylePackLightPreset,
+  StylePackManifest,
+  StylePackOrigin,
+  StylePackProvenance,
+  StylePackRefusalReason,
+  StylePackSkyPreset,
+  StylePackSurface,
+  StylePackSwatch,
+  StylePackVariant,
+  StyleSlot,
+  StretchZone,
+} from './style-pack.js';
+export {
+  STYLE_PACK_COLOUR_ENCODING,
+  STYLE_PACK_LICENCES,
+  STYLE_PACK_MAX_TOTAL_BYTES,
+  STYLE_PACK_ORIGINS,
+  STYLE_PACK_PROFILE,
+  StylePackRefusal,
+  canonicalJson,
+  canonicalStylePackBytes,
+  fit,
+  readStylePackManifest,
+  resolveLookRole,
+  resolveStylePack,
+  splitLookRole,
+  stretchCoordinate,
+  swatchKeyOf,
+  variantIndex,
+} from './style-pack.js';
+export type { StylePiece, StylePieceGroup } from './style-piece.js';
+export { StylePieceRefusal, readStylePiece } from './style-piece.js';

@@ -7,7 +7,8 @@ Companion's own appearance. The server half, with its transactions, registry and
 the [appearance authority](world-version-authorities.md#appearance-authority). Global appearance
 customization is implemented, including Companion proposals drafted from a person's sentence; a
 regional renderer preview, a library of several complete styles and a structural topology editor
-are not built.
+are not built. The data object a complete style will be, a style pack, is the
+[style pack contract](style-pack-contract.md).
 
 ## 1. Protected topology
 

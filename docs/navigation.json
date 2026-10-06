@@ -64,6 +64,7 @@
         {"path": "generated-tile-runtime.md", "role": "contract", "owns": "Generated-tile loading, rendering and navigation in the development preview"},
         {"path": "representation-decisions.md", "role": "reference", "owns": "Generated-world representation decisions, supports and limits"},
         {"path": "texture-package.md", "role": "contract", "owns": "Texture sets, recipes, storage and publication; sets dress world objects and tiles"},
+        {"path": "style-pack-contract.md", "role": "contract", "owns": "Style packs: the manifest, look roles and their fit, palette and colour encoding, light presets, piece budgets and the readers"},
         {"path": "lettering.md", "role": "contract", "owns": "Glyph catalogs, layout and lettering geometry; nothing draws a letter"},
         {"path": "generated-appearance.md", "role": "reference", "owns": "Research on model-made textures over exact structure"},
         {"path": "owned-district-and-admission.md", "role": "contract", "owns": "External environment admission and the development-preview district"}
