@@ -626,26 +626,31 @@ above), refused by the same names.
 
 ### Browser view
 
-An authenticated saved world exposes **Compare** from the World menu. It
-lists the version's comparisons and opens the newest: the server's verdict in words, with the
-primary pair's answered shares in the same sentence; who each arm decides for and what decides for
-everybody else, with what a model outside the group means for the score where there is one; each
-arm's score with its interval and, beside it, its model's share of turns answered, refused and left
-to the routine, the same per choice point of the routine's own run where the comparison recorded one
-or, for a first-version comparison, in words, that it did not; its cost for the hour and its answer
-time; the registered differences; and every seed's scores, each with what its run's model answered.
-For a chosen seed and two arms it draws both runs from above on one clock (play, pause, speed and a
-minute scrubber), what each person did minute by minute on each side with a mark where the two hours
-went differently, and the inspector on a person of either side, saying who decided their latest turn
-and why, and for a person outside the group, that they keep that decider in every arm. The rows of
-what each person did come in two parts, the group the two sides decide for and then everybody else,
-each saying how many of its people's hours went differently and listing them by how many minutes
-did, most first, with each person's count. Everybody else is folded behind that summary until it is
-opened, since what the group did changes the hour around them: in a development comparison of four
-of a 48-person town's people, Nemotron 3 Nano 30B against Nemotron 3.5 Lightning, all 44 others'
-hours went differently, 42 to 60 of their 60 minutes, while they kept their routine on both sides.
-A town's page therefore opens on the group's rows. The page
-shows every number as the server wrote it and never decides whether two arms differ.
+An authenticated saved world exposes **Compare** from the World menu and the tool rail. It lists
+the version's comparisons and opens the newest. It leads with the server's verdict in words, large,
+with the primary pair's answered shares in the sentence under it; who each arm decides for and what
+decides for everybody else, with what a model outside the group means for the score where there is
+one, sits behind "Who it decides for". The seed and the two arms shown are chosen next. Every number
+is behind one disclosure, "Every number from this comparison": each arm's score with its interval
+and, beside it, its model's share of turns answered, refused and left to the routine, the same per
+choice point of the routine's own run where the comparison recorded one or, for a first-version
+comparison, in words, that it did not; its cost for the hour and its answer time; the registered
+differences; and every seed's scores, each with what its run's model answered. For the chosen seed
+each side says how its group fared, what its model answered, and what the group did: each kind of
+minute (walking, waiting, or an activity the routine names, one row for the same words) and how
+many of the group spent any minute in it, counted from the run's replay. Under it, both runs share
+one clock (play, pause, speed and a minute scrubber) for what each person did minute by minute on
+each side with a mark where the two hours went differently, the inspector on a person of either
+side, saying who decided their latest turn and why, and for a person outside the group, that they
+keep that decider in every arm, and each side's view from above behind "See them from above". The
+rows of what each person did come in two parts, the group the two sides decide for and then
+everybody else, each saying how many of its people's hours went differently and listing them by how
+many minutes did, most first, with each person's count. Everybody else is folded behind that
+summary until it is opened, since what the group did changes the hour around them: in a development
+comparison of four of a 48-person town's people, Nemotron 3 Nano 30B against Nemotron 3.5
+Lightning, all 44 others' hours went differently, 42 to 60 of their 60 minutes, while they kept
+their routine on both sides. A town's page therefore opens on the group's rows. The page shows every
+number as the server wrote it and never decides whether two arms differ.
 
 Above the list, the world's owner starts a comparison from what the plan route offers: who the
 models decide for (everybody, the people of one of their choices, or people they tick from the

@@ -30,7 +30,7 @@ import type {
 import { DECISION_WORDS, livingNeedLabel } from '../society-inhabitant-words.js';
 import { el, replace } from './dom.js';
 import { createLivingWorldInspector } from './living-world-inspector.js';
-import { buildComparisonPlan, classWords, minuteAt, minuteClass } from './society-comparison-plan.js';
+import { buildComparisonPlan, classWords, minuteAt, minuteClass, type MinuteClass } from './society-comparison-plan.js';
 import { buildComparisonStrips } from './society-comparison-strips.js';
 import { progressWords, startWords } from './society-comparison-start.js';
 import './society-comparison.css';
@@ -283,6 +283,40 @@ export function decidedWords(run: RunReplay, arm: ComparisonArm, subjectId: stri
   return `Their routine chose at minute ${latest.tick}, because ${DECISION_WORDS[why] ?? `of a reason this page has no words for (${why})`}.${keeps}`;
 }
 
+/** One kind of minute and how many of the group spent any minute of the run in it. */
+export interface GroupActivity {
+  readonly minuteClass: MinuteClass;
+  readonly words: string;
+  readonly people: number;
+}
+
+/**
+ * What the group did over one run, counted from its replay: for each kind of minute (walking,
+ * waiting, or an activity the routine names), how many of the group spent at least one minute in
+ * it, most first. A person counts once under each kind they did, so the counts add up to more than
+ * the group. Only people of the group are counted; everybody else keeps one decider in every arm.
+ */
+export function groupActivity(run: RunReplay): { readonly group: number; readonly kinds: readonly GroupActivity[] } {
+  const inGroup = new Set(run.people.filter((person) => person.inGroup).map((person) => person.id));
+  // By the words a person reads: walking a path and an activity the routine also calls walking are
+  // one row, counting each person once, under the kind of minute the first of them was.
+  const did = new Map<string, { minuteClass: MinuteClass; people: Set<string> }>();
+  for (const minute of run.minutes) {
+    for (const person of minute.people) {
+      if (!inGroup.has(person.id)) continue;
+      const found = minuteClass(run, person);
+      const words = classWords(run, found);
+      const held = did.get(words) ?? { minuteClass: found, people: new Set<string>() };
+      held.people.add(person.id);
+      did.set(words, held);
+    }
+  }
+  const kinds = [...did.entries()]
+    .map(([words, held]) => ({ minuteClass: held.minuteClass, words, people: held.people.size }))
+    .sort((a, b) => b.people - a.people || a.words.localeCompare(b.words));
+  return { group: inGroup.size, kinds };
+}
+
 export interface ComparisonDay {
   readonly seedDigest: string;
   readonly left: string;
@@ -414,6 +448,18 @@ function differencesList(result: ComparisonResult): HTMLElement {
   ])));
 }
 
+/** What the group did in one run, as a list a person reads down: each kind, and how many did it. */
+function didList(run: RunReplay): HTMLElement {
+  const { group, kinds } = groupActivity(run);
+  return el('div', { class: 'comparison-side-did' }, [
+    el('p', { class: 'comparison-side-did-head', text: `What the group of ${group} did` }),
+    el('ul', {}, kinds.map((kind) => el('li', { 'data-class': kind.minuteClass }, [
+      el('span', { class: 'comparison-side-did-kind', text: `${kind.words.charAt(0).toUpperCase()}${kind.words.slice(1)}` }),
+      el('span', { class: 'comparison-side-did-count', text: `${kind.people} of ${group}` }),
+    ]))),
+  ]);
+}
+
 /** The Compare view. Every choice is a handler: the view reads nothing itself. */
 export function buildSocietyComparisonView(handlers: {
   readonly onClose: () => void;
@@ -425,7 +471,9 @@ export function buildSocietyComparisonView(handlers: {
   const list = el('nav', { class: 'comparison-list', 'aria-label': 'Comparisons of this world' });
   const summary = el('section', { class: 'comparison-summary', 'aria-live': 'polite' });
   const dayPart = el('section', { class: 'comparison-day' });
-  const closer = el('button', { type: 'button', class: 'comparison-close', text: '← Return' });
+  const closer = el('button', { type: 'button', class: 'comparison-close' }, [
+    'Back to the world', el('kbd', { class: 'x-shortcut', text: 'Esc' }),
+  ]);
   closer.addEventListener('click', () => handlers.onClose());
   const receipt = el('button', {
     type: 'button', class: 'comparison-receipt', text: 'Open a result from a receipt',
@@ -494,29 +542,43 @@ export function buildSocietyComparisonView(handlers: {
           value: seed.seedDigest, text: seedLabel(seed, index), selected: seed.seedDigest === day.seedDigest,
         })));
       seedSelect.addEventListener('change', () => handlers.onDay({ ...day, seedDigest: seedSelect.value }));
+      const named = result.group.people;
+      const groupSize = named === null || result.group.source.kind === 'everyone' ? null : named.length;
+      const eyebrow = [
+        groupSize === null ? 'Everybody here' : `The same ${groupSize === 1 ? 'person' : `${groupSize} people`}`,
+        'the same start',
+        result.seeds.length === 1 ? 'one simulated hour' : `one simulated hour on each of ${result.seeds.length} seeds`,
+      ].join(' · ');
       replace(summary, [
         el('section', { class: 'comparison-verdict', 'data-verdict': result.verdict.code }, [
+          el('div', { class: 'comparison-eyebrow', text: eyebrow }),
           ...(result.start === null ? [] : [el('p', {
             class: 'comparison-progress',
             text: startWords(result.start, result.seeds.reduce((finished, seed) =>
               finished + Object.values(seed.runs).filter((run) => run.status !== 'incomplete').length, 0)),
           })]),
           el('h3', { text: VERDICT_WORDS[result.verdict.code] }),
-          el('p', { text: verdictDetail(result) }),
-          el('p', { class: 'comparison-group', text: groupWords(result) }),
+          el('p', { class: 'comparison-verdict-detail', text: verdictDetail(result) }),
+          el('details', { class: 'comparison-who' }, [
+            el('summary', { text: 'Who it decides for' }),
+            el('p', { class: 'comparison-group', text: groupWords(result) }),
+          ]),
           ...(result.preregistration === null ? [] : [el('p', {
             class: 'comparison-registration',
             text: `Registered before it ran: ${result.preregistration.record}`,
           })]),
         ]),
-        armsTable(result),
-        ...(result.differences.length === 0 ? [] : [
-          el('h3', { text: 'Registered differences' }), differencesList(result)]),
-        seedsTable(result),
         el('div', { class: 'comparison-choose' }, [
           el('label', {}, [el('span', { text: 'Seed' }), seedSelect]),
           el('label', {}, [el('span', { text: 'Left' }), choose('left')]),
           el('label', {}, [el('span', { text: 'Right' }), choose('right')]),
+        ]),
+        el('details', { class: 'comparison-numbers' }, [
+          el('summary', { text: 'Every number from this comparison' }),
+          armsTable(result),
+          ...(result.differences.length === 0 ? [] : [
+            el('h3', { text: 'Registered differences' }), differencesList(result)]),
+          seedsTable(result),
         ]),
       ]);
     },
@@ -647,7 +709,11 @@ export function buildSocietyComparisonView(handlers: {
                 text: reliabilityWords(arm, seed?.runs[arm.key]?.reliability ?? null),
               }),
             ]),
-            plans[side]!.root,
+            didList(sides[side]!.run!),
+            el('details', { class: 'comparison-from-above' }, [
+              el('summary', { text: 'See them from above' }),
+              plans[side]!.root,
+            ]),
           ]))),
         el('div', { class: 'comparison-clock' }, [play, ...speeds, scrubber, minuteLabel]),
         el('div', { class: 'comparison-detail' }, [

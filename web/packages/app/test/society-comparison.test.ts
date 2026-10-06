@@ -17,6 +17,7 @@ import {
 import {
   buildSocietyComparisonView,
   FAILURE_WORDS,
+  groupActivity,
   type ComparisonDay,
   type SocietyComparisonView,
 } from '../src/ui/society-comparison.js';
@@ -324,5 +325,56 @@ describe('a plan whose start the spending allowance would refuse', () => {
     const bare = planRefusalWords({ code: 'budget_exceeded', detail: 'spent' });
     expect(bare).toMatch(/more than this workspace's model allowance permits/);
     expect(bare).not.toContain('budget_exceeded');
+  });
+});
+
+describe('what the Compare view leads with', () => {
+  it('counts what the group did by the words a person reads, each person once, nobody outside the group', () => {
+    const minute = (people: readonly Record<string, unknown>[]) => ({ people });
+    const at = (id: string, action: string, status: string, path: number) =>
+      ({ id, action, status, path: Array.from({ length: path }, (_, i) => [i, 0]) });
+    const replay = {
+      people: [{ id: 'a', inGroup: true }, { id: 'b', inGroup: true }, { id: 'c', inGroup: false }],
+      activities: [{ kind: 'walk', label: 'walking' }, { kind: 'shop', label: 'shopping' }],
+      minutes: [
+        // a walks a path, b shops, c (outside the group) shops too.
+        minute([at('a', 'walk', 'active', 3), at('b', 'shop', 'active', 1), at('c', 'shop', 'active', 1)]),
+        // a's activity the routine calls walking is the same row as walking a path.
+        minute([at('a', 'walk', 'active', 1), at('b', 'shop', 'queued', 1), at('c', 'shop', 'active', 1)]),
+      ],
+    } as unknown as RunReplay;
+    const { group, kinds } = groupActivity(replay);
+    expect(group).toBe(2);
+    expect(kinds.map((kind) => [kind.words, kind.people])).toEqual([
+      ['shopping', 1], ['waiting where they are', 1], ['walking', 1],
+    ]);
+  });
+
+  it('puts the verdict first and every number behind one closed disclosure', () => {
+    const read = result();
+    const shown = view();
+    shown.showResult(read, day(read));
+    const summary = shown.root.querySelector('.comparison-summary')!;
+    const parts = [...summary.children].map((child) => child.className);
+    expect(parts).toEqual(['comparison-verdict', 'comparison-choose', 'comparison-numbers']);
+    const numbers = summary.querySelector<HTMLDetailsElement>('details.comparison-numbers')!;
+    expect(numbers.open).toBe(false);
+    expect(numbers.querySelector('table.comparison-arms')).not.toBeNull();
+    expect(numbers.querySelector('table.comparison-seeds')).not.toBeNull();
+    expect(summary.querySelector('.comparison-eyebrow')!.textContent).toMatch(/ · the same start · one simulated hour/);
+  });
+
+  it('says on each side what its group did, with the view from above folded under it', () => {
+    const read = result();
+    const shown = view();
+    shown.showResult(read, day(read));
+    shown.showDay(run('model_a'), run('model_b'));
+    const { group, kinds } = groupActivity(run('model_a'));
+    for (const side of shown.root.querySelectorAll('article.comparison-side')) {
+      const rows = [...side.querySelectorAll('.comparison-side-did li')]
+        .map((row) => row.querySelector('.comparison-side-did-count')!.textContent);
+      expect(rows).toEqual(kinds.map((kind) => `${kind.people} of ${group}`));
+      expect(side.querySelector('details.comparison-from-above svg.comparison-plan')).not.toBeNull();
+    }
   });
 });
