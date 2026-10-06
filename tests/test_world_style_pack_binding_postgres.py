@@ -154,7 +154,8 @@ def test_a_proposal_records_the_pack_as_it_named_it(repository):
     "change",
     [
         {"pack_id": "exulanica.nowhere-town"},
-        {"version": 2},
+        # A version the library does not hold: the committed one's next.
+        {"version": committed("exulanica.cozy-town").version + 1},
         {"manifest_sha256": "0" * 64},
     ],
 )

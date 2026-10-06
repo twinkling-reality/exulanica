@@ -34,6 +34,7 @@ lowercase `\u` escapes. Both readers write the same bytes.
 | `title`, `description`, `tags` | What a person reads in a library; tags are lowercase words |
 | `origin`, `provenance` | `authored`, `uploaded`, `drafted`, `generated` or `imported`, and what each requires: a drafted pack names the model, prompt version, execution and the digest of the words; a generated one names its generation receipts |
 | `licence`, `authors` | `CC0-1.0`, or `CC-BY-4.0` with its attribution; who made it |
+| `preview` | A listed picture (`.jpg`, `.png` or `.webp`, at most 512 KiB) that shows what the pack looks like, for a person choosing one, or none |
 | `base` | The pack this one is drawn on, by id, version and manifest digest, or none |
 | `light` | Named presets (at most six) and the default one; each preset is a sky, a fog, a sun with a one-tap, three-tap or five-tap shadow filter, image light, contact shadowing and a finish, in whole-number units. A pack may not choose soft (PCSS) shadows: they alone cost more than a frame ([render look](generated-tile-runtime.md#61-the-render-look-a-style-chooses)) |
 | `shading` | `pbr`, `toon` with its bands, or `flat`, and an ink colour or none |
@@ -41,7 +42,7 @@ lowercase `\u` escapes. Both readers write the same bytes.
 | `palette` | At most 64 swatches, each a distinct sRGB colour with roughness, metalness and emission |
 | `surfaces` | A look role of a surface family to a swatch or a texture set, with an optional swatch for upward faces |
 | `modules` | A look role of a module family to one to eight variants, each a piece file, an optional second level of detail, the piece's own size and, for a fill family, where it stretches |
-| `files` | Every file the pack carries, in path order: path, SHA-256, size and media type (`model/gltf-binary`) |
+| `files` | Every file the pack carries, in path order: path, SHA-256, size and the media type its extension states (`model/gltf-binary` for `.glb`, `image/jpeg`, `image/png` or `image/webp` for a picture); every file is a variant's piece or the preview |
 
 A pack with no base states its light and shading. A pack drawn on a base states only what it changes:
 its swatches, surfaces, modules, presets, shading and edge replace the base's, and anything it leaves
@@ -127,9 +128,9 @@ it, then the rules across sections, and refuses with the first fault by reason a
 
 | Reason | What it refuses |
 | --- | --- |
-| `shape` | An unknown or missing key, a value of the wrong kind, a fraction, a malformed id, role, path or text |
-| `range` | A whole number outside its bounds, a value not in its list, fog or toon bands out of order, a soft (PCSS) shadow filter, a stretch zone outside its piece or of no length |
-| `reference` | A role of an unknown family or of a family not dressed that way, a swatch, texture set, preset or file that is not there, a listed file no variant uses, provenance that is not the origin, a pack with no base and no light or shading, a stretch on a piece of a family that is not fill |
+| `shape` | An unknown or missing key, a value of the wrong kind, a fraction, a malformed id, role, path or text, a file whose media type is not its extension's |
+| `range` | A whole number outside its bounds, a value not in its list, fog or toon bands out of order, a soft (PCSS) shadow filter, a stretch zone outside its piece or of no length, a picture over 512 KiB |
+| `reference` | A role of an unknown family or of a family not dressed that way, a swatch, texture set, preset or file that is not there, a preview naming no listed file, a listed file nothing uses, provenance that is not the origin, a pack with no base and no light or shading, a stretch on a piece of a family that is not fill |
 | `duplicate` | Two swatches of one key or one colour, two files of one path |
 | `licence` | CC-BY-4.0 without attribution, attribution on CC0-1.0 |
 
@@ -162,20 +163,37 @@ host (section 9). A pack the page cannot read is not stood in for: the world ope
 and the shell's `data-world-look` attribute states the pack asked for, what chose it (`address`,
 `world` or `default`) and why it was not drawn.
 
+`redrawWorldLook(pack)` (`web/packages/app/src/composition/world-look-redraw.ts`) draws the open
+world in another pack, named exactly (null: the default), without opening the world again: the
+person stays where they stand, and its people and traffic go on. The pack is read and its pieces
+fetched first, and a pack the page cannot read leaves the world as it was and says why. The tiles
+are then loaded again from the bytes the page holds, in the new pack's light, and swapped on the
+same host: the old look is taken down before the new one goes up, and the traffic draws its vehicles
+in the new pack's bodies. Redraws run one after another in the order asked. Any part of the page may
+ask by dispatching `exulanica:world-look-redraw` on the shell with the pack as the event's detail;
+`data-world-look` then states the look drawn (source `redraw`) and `data-world-look-redraw` the
+redraw's own result with its time. Because the tiles are loaded again, a redraw takes nearly as long
+as opening the world. A redraw changes nothing the world's appearance names: that is the
+appearance's own Apply (section 10).
+
 ## 8. The authored packs
 
 Three packs are committed under `assets/style-packs/packs/`, each CC0-1.0 and authored by Exulanica:
 `exulanica.toon-town` (flat colour in two light bands with ink), `exulanica.cozy-town` (faceted,
-warm light, some windows lit) and `exulanica.finished-town` (the town's own materials, physically
-lit, slate roofs). Each states a day and an evening preset, surfaces for the town's materials and
-for every surface family's default, window and door frames that stretch, a hatchback, a sedan, one
-van for minivans and panel vans and a bus for the traffic (bicycles keep the traffic's boxes), a
-tree and a fence. `scripts/style_packs/authored_packs.py` writes every byte of them from boxes,
-prisms, cones and faceted spheres through the shared piece writer, and refuses a frame whose fixed
-parts would not fit the smallest opening the city grammar cuts or the smallest door a site cuts,
-each read from the grammars. `tests/test_authored_style_packs.py` holds the committed files to the
-script, the product's reader, the piece budgets and those openings;
-`web/packages/atlas-react/test/style-pack-authored.test.ts` reads them as the page does.
+warm light, some windows lit) and `exulanica.finished-town` (the town's own texture sets for every
+wall, road, path and ground material, physically lit, slate roofs). Each states a day and an evening
+preset, a preview picture, surfaces for the town's materials and for every surface family's default,
+window and door frames that stretch, a hatchback, a sedan, one van for minivans and panel vans and a
+bus for the traffic (bicycles keep the traffic's boxes), a tree and a fence. Every preview is the
+pack drawn by the product on one generated market town at its arrival camera, the same town and
+camera for all three, 1600 by 1000 pixels with the interface hidden.
+`scripts/style_packs/authored_packs.py` writes every byte of the pieces and manifests from boxes,
+prisms, cones and faceted spheres through the shared piece writer, lists each committed preview,
+and refuses a frame whose fixed parts would not fit the smallest opening the city grammar cuts or
+the smallest door a site cuts, each read from the grammars. `tests/test_authored_style_packs.py`
+holds the committed files to the script, the product's reader, the piece budgets, those openings
+and the previews' format and size; `web/packages/atlas-react/test/style-pack-authored.test.ts`
+reads them as the page does.
 
 ## 9. The library the host serves
 
@@ -190,7 +208,7 @@ dot is passed over; no pack id or listed path can start with one.
 
 | Route | Answer |
 | --- | --- |
-| `GET /world/style-packs` | `exulanica.style-pack-list/v1`: each pack's id, version and manifest digest, title, description and tags, origin, licence with the attribution it requires, authors, file count and bytes |
+| `GET /world/style-packs` | `exulanica.style-pack-list/v1`: each pack's id, version and manifest digest, title, description and tags, origin, licence with the attribution it requires, authors, file count and bytes, and its preview picture's digest and media type (`preview_sha256`, `preview_media_type`, or null) |
 | `GET /world/style-packs/{content_sha256}` | A manifest as its canonical bytes (`application/json`) or a file a manifest lists (its stated media type), named by the SHA-256 of exactly those bytes and cached as immutable; any other digest is 404 `unknown_reference` |
 
 Both need a session holding `world.read`. A request names a digest and nothing else, so no request

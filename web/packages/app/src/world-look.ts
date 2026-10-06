@@ -59,7 +59,7 @@ export interface WorldLookChoice {
   readonly packId: string | null;
   /** The manifest a world's appearance names exactly; null to read the host's list for the pack. */
   readonly manifestSha256: string | null;
-  readonly source: 'address' | 'world' | 'default';
+  readonly source: 'address' | 'world' | 'default' | 'redraw';
 }
 
 /** The address's pack, else the pack the world's appearance names, else the default. */
@@ -80,6 +80,9 @@ export interface ListedStylePack {
   readonly description: string;
   readonly authors: readonly string[];
   readonly licence: { readonly id: string; readonly attribution: string | null };
+  /** The pack's preview picture by digest, fetched like any piece; null for a pack with none. */
+  readonly preview_sha256?: string | null;
+  readonly preview_media_type?: string | null;
 }
 
 /** A pack read, resolved and its pieces fetched and checked, ready to draw a world in. */

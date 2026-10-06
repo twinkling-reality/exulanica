@@ -95,6 +95,11 @@ def test_a_manifest_and_a_piece_are_served_as_the_bytes_their_digest_names(clien
     assert response.headers["etag"] == f'"{digest}"'
     assert response.headers["cache-control"] == "private, max-age=31536000, immutable"
     assert response.headers["x-content-type-options"] == "nosniff"
+    picture = (PACKS / "exulanica.cozy-town" / manifest["preview"]).read_bytes()
+    response = _get(client, f"/world/style-packs/{hashlib.sha256(picture).hexdigest()}")
+    assert response.status_code == 200
+    assert response.content == picture
+    assert response.headers["content-type"] == "image/jpeg"
     listed = manifest["files"][0]
     piece = (PACKS / "exulanica.cozy-town" / listed["path"]).read_bytes()
     response = _get(client, f"/world/style-packs/{listed['sha256']}")

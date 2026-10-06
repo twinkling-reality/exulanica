@@ -26,7 +26,15 @@ export const STYLE_PACK_PROFILE = 'exulanica.style-pack/v1';
 export const STYLE_PACK_COLOUR_ENCODING = 'exulanica.srgb8-linear16/v1';
 export const STYLE_PACK_LICENCES = ['CC0-1.0', 'CC-BY-4.0'] as const;
 export const STYLE_PACK_ORIGINS = ['authored', 'uploaded', 'drafted', 'generated', 'imported'] as const;
-export const STYLE_PACK_MEDIA_TYPES = ['model/gltf-binary'] as const;
+/** The pictures a pack may carry, as its one preview: what it looks like, for a person choosing. */
+export const STYLE_PACK_IMAGE_MEDIA_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
+export const STYLE_PACK_MEDIA_TYPES = ['model/gltf-binary', 'image/jpeg', 'image/png', 'image/webp'] as const;
+/** The media type each listed file's extension must state. */
+export const STYLE_PACK_EXTENSION_MEDIA_TYPES: Readonly<Record<string, (typeof STYLE_PACK_MEDIA_TYPES)[number]>> = Object.freeze({
+  glb: 'model/gltf-binary', jpg: 'image/jpeg', png: 'image/png', webp: 'image/webp',
+});
+/** A pack's preview picture, at most. */
+export const STYLE_PACK_PREVIEW_MAX_BYTES = 512 * 1024;
 export const STYLE_PACK_TONE_MAPPINGS = ['aces', 'aces2', 'neutral', 'filmic', 'linear'] as const;
 /**
  * The sun shadow filters a pack may choose. PCSS soft shadows are not among them: measured at 26 to
@@ -164,6 +172,8 @@ export interface StylePackManifest {
   readonly provenance: StylePackProvenance;
   readonly licence: { readonly id: StylePackLicence; readonly attribution: string | null };
   readonly authors: readonly string[];
+  /** The listed picture that shows what the pack looks like, or null. */
+  readonly preview: string | null;
   readonly base: { readonly pack_id: string; readonly version: number; readonly manifest_sha256: string } | null;
   readonly light: { readonly default_preset: string; readonly presets: Readonly<Record<string, StylePackLightPreset>> } | null;
   readonly shading: {
@@ -201,6 +211,8 @@ const TAG = /^[a-z][a-z0-9-]{0,23}$/;
 const LEAF = /^[a-z][a-z0-9_]{0,47}$/;
 const SHA256 = /^[0-9a-f]{64}$/;
 const PATH = /^[a-z0-9][a-z0-9_-]{0,63}(\/[a-z0-9][a-z0-9_.-]{0,63}){0,3}\.glb$/;
+const IMAGE_PATH = /^[a-z0-9][a-z0-9_-]{0,63}(\/[a-z0-9][a-z0-9_.-]{0,63}){0,3}\.(jpg|png|webp)$/;
+const FILE_PATH = /^[a-z0-9][a-z0-9_-]{0,63}(\/[a-z0-9][a-z0-9_.-]{0,63}){0,3}\.(glb|jpg|png|webp)$/;
 const TEXT_MAX = { title: 80, description: 400, author: 120, attribution: 400, reference: 400, model: 200, prompt: 120 } as const;
 
 type Json = unknown;
@@ -374,6 +386,7 @@ export function readStylePackManifest(value: Json, context: StylePackContext): S
     provenance,
     licence: (v, p) => object(v, p, { id: oneOf(STYLE_PACK_LICENCES), attribution: nullable(text(TEXT_MAX.attribution)) }),
     authors: list(text(TEXT_MAX.author), 1, 16),
+    preview: nullable(pattern(IMAGE_PATH, 'a lowercase relative path ending .jpg, .png or .webp')),
     base: nullable((v, p) => object(v, p, {
       pack_id: pattern(PACK_ID, 'a namespaced id such as exulanica.cozy-town'), version: integer(1, 1_000_000), manifest_sha256: pattern(SHA256, 'a lowercase SHA-256'),
     })),
@@ -419,7 +432,7 @@ export function readStylePackManifest(value: Json, context: StylePackContext): S
       }), 1, STYLE_PACK_MAX_VARIANTS),
     }), 512),
     files: list((v, p) => object(v, p, {
-      path: pattern(PATH, 'a lowercase relative path ending .glb'),
+      path: pattern(FILE_PATH, 'a lowercase relative path ending .glb, .jpg, .png or .webp'),
       sha256: pattern(SHA256, 'a lowercase SHA-256'),
       bytes: integer(1, STYLE_PACK_MAX_TOTAL_BYTES),
       media_type: oneOf(STYLE_PACK_MEDIA_TYPES),
@@ -462,6 +475,11 @@ function checkWhole(manifest: StylePackManifest, context: StylePackContext): Sty
   manifest.files.forEach((file, index) => {
     if (listed.has(file.path)) fail('duplicate', `files[${index}].path`, `repeats ${JSON.stringify(file.path)}`);
     if (index > 0 && manifest.files[index - 1]!.path > file.path) fail('shape', `files[${index}].path`, 'files must be listed in path order');
+    const stated = STYLE_PACK_EXTENSION_MEDIA_TYPES[file.path.slice(file.path.lastIndexOf('.') + 1)]!;
+    if (file.media_type !== stated) fail('shape', `files[${index}].media_type`, `must be ${stated} for its extension`);
+    if ((STYLE_PACK_IMAGE_MEDIA_TYPES as readonly string[]).includes(file.media_type) && file.bytes > STYLE_PACK_PREVIEW_MAX_BYTES) {
+      fail('range', `files[${index}].bytes`, `a picture is at most ${STYLE_PACK_PREVIEW_MAX_BYTES} bytes`);
+    }
     listed.set(file.path, file);
     total += file.bytes;
   });
@@ -485,7 +503,11 @@ function checkWhole(manifest: StylePackManifest, context: StylePackContext): Sty
       });
     });
   }
-  for (const path of listed.keys()) if (!used.has(path)) fail('reference', 'files', `lists ${JSON.stringify(path)}, which no variant uses`);
+  if (manifest.preview !== null) {
+    if (!listed.has(manifest.preview)) fail('reference', 'preview', `names no listed file ${JSON.stringify(manifest.preview)}`);
+    used.add(manifest.preview);
+  }
+  for (const path of listed.keys()) if (!used.has(path)) fail('reference', 'files', `lists ${JSON.stringify(path)}, which nothing uses`);
   return manifest;
 }
 

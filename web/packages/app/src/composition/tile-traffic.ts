@@ -60,6 +60,11 @@ export interface TileTrafficDeps {
   readonly reader: TrafficReader;
   /** The bodies a style pack draws vehicles in, asked for when the layer is made; none draws boxes. */
   readonly bodies?: () => import('@exulanica/atlas-react/traffic').VehicleBodies | null;
+  /**
+   * Subscribes a listener told when those bodies change, as when the world is redrawn in another
+   * pack; the layer then asks `bodies` again. Returns the listener's removal.
+   */
+  readonly bodiesChanged?: (listener: () => void) => () => void;
   readonly now?: () => number;
   readonly setTimer?: (callback: () => void, ms: number) => unknown;
   readonly clearTimer?: (handle: unknown) => void;
@@ -99,12 +104,15 @@ export function withTraffic(
   reader: TrafficReader,
   report: (state: TileTrafficState) => void,
   bodies: () => import('@exulanica/atlas-react/traffic').VehicleBodies | null = () => null,
+  bodiesChanged?: (listener: () => void) => () => void,
 ): LoadedGeneratedTile {
   return {
     ...tile,
     attach(host: GeneratedTileHost): GeneratedTileAttachment {
       const attachment = tile.attach(host);
-      const traffic = startTileTraffic(host, tile, { reader, report, bodies });
+      const traffic = startTileTraffic(host, tile, {
+        reader, report, bodies, ...(bodiesChanged === undefined ? {} : { bodiesChanged }),
+      });
       return {
         metrics: attachment.metrics,
         get animating() {
@@ -158,6 +166,10 @@ export function startTileTraffic(
       reason,
     });
   };
+
+  // A redraw in another pack hands the layer that pack's bodies; a layer not made yet asks for them
+  // when it is made.
+  const unsubscribe = deps.bodiesChanged?.(() => layer?.setBodies(deps.bodies?.() ?? null)) ?? null;
 
   const ready = (async () => {
     const [{ TrafficLayer }, { tileToRenderer }] = await Promise.all([
@@ -234,6 +246,7 @@ export function startTileTraffic(
     },
     stop() {
       stopped = true;
+      unsubscribe?.();
       clearTimer(timer);
       reading?.abort();
       host.app.off('update', onUpdate);

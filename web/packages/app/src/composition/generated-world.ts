@@ -31,7 +31,9 @@
  * the host serves, whose light the tiles are loaded in and whose surfaces, windows and vehicles dress
  * them once attached. A pack the page cannot read is not stood in for: the world opens in the tile
  * look, and the shell's `data-world-look` attribute states the pack asked for, what chose it, and
- * why it was not drawn.
+ * why it was not drawn. While the world is open it can be redrawn in another pack at once
+ * (`./world-look-redraw.ts`): its tiles are loaded again from the bytes already held, in the new
+ * pack's light, and swapped on the same host, so the person stays where they stand.
  */
 
 import type { GeneratedTileAttachment, GeneratedTileHost, LoadedGeneratedTile } from '@exulanica/atlas-react/generated-tile';
@@ -48,6 +50,14 @@ import {
   type GeneratedWorldReady,
 } from './generated-world-ready.js';
 import { committedTextureLibrary } from '../texture-library.js';
+import {
+  WORLD_LOOK_REDRAW_ATTRIBUTE,
+  WORLD_LOOK_REDRAW_EVENT,
+  isRedrawableWorld,
+  setRedrawableWorld,
+  type RedrawableWorld,
+  type WorldLookRedraw,
+} from './world-look-redraw.js';
 
 /** The media type a baked tile's container is served as. */
 const CONTAINER_MEDIA_TYPE = 'application/vnd.exulanica.owd';
@@ -91,12 +101,21 @@ export interface GeneratedWorld {
    */
   readonly look: {
     readonly pack: string | null;
-    readonly source: 'address' | 'world' | 'default';
+    readonly source: 'address' | 'world' | 'default' | 'redraw';
     readonly drawn: boolean;
     readonly reason: string | null;
   };
   /** The bodies its traffic takes from its pack while its tiles are attached, if any. */
   readonly bodies: () => VehicleBodies | null;
+  /**
+   * The same tiles loaded again in another look, from the bytes already held; refused, and nothing
+   * loaded, when the pack cannot be read.
+   */
+  readonly relook: (choice: import('../world-look.js').WorldLookChoice) => Promise<{
+    readonly tile: LoadedGeneratedTile;
+    readonly bodies: () => VehicleBodies | null;
+    readonly look: GeneratedWorld['look'];
+  }>;
 }
 
 /** Why a saved generated world is not drawn yet: tiles still baking, or a bake that failed. */
@@ -190,29 +209,39 @@ export async function loadGeneratedWorld(
   const [first, ...rest] = containers;
   const neighbours: readonly { readonly name: string; readonly bytes: Uint8Array }[] = rest;
   const worldLook = await import('../world-look.js');
+  type Prepared = import('../world-look.js').PreparedWorldLook;
+  /** The pack a choice names, read and its pieces fetched; null for the tile look. Throws when it cannot be read. */
+  const prepare = (choice: import('../world-look.js').WorldLookChoice): Promise<Prepared | null> => (
+    choice.packId === null
+      ? Promise.resolve(null)
+      : worldLook.prepareWorldLook(
+        access, choice.packId, library.textureManifest, containers.map((one) => one.bytes), choice.manifestSha256,
+      )
+  );
+  /** The world's tiles loaded in a prepared pack's light and dressed by it, or in the tile look. */
+  const loadIn = async (prepared: Prepared | null): Promise<{ tile: LoadedGeneratedTile; bodies: () => VehicleBodies | null }> => {
+    const plain = await route.loadGeneratedTile({
+      name: first!.name,
+      bytes: first!.bytes,
+      manifest: parseTextureSetManifest(library.textureManifest),
+      fetchSet: (set) => library.textureSet(set.contentSha256),
+      ...(neighbours.length === 0 ? {} : { neighbours }),
+      ...(prepared === null ? {} : { look: prepared.look }),
+    });
+    const dressed = prepared === null ? null : worldLook.inWorldLook(plain, prepared);
+    return { tile: dressed?.tile ?? plain, bodies: dressed?.bodies ?? (() => null) };
+  };
   const choice = worldLook.worldLookChoice(search, bound);
   const pack = choice.packId;
-  let prepared: import('../world-look.js').PreparedWorldLook | null = null;
+  let prepared: Prepared | null = null;
   let reason: string | null = null;
-  if (pack !== null) {
-    try {
-      prepared = await worldLook.prepareWorldLook(
-        access, pack, library.textureManifest, containers.map((one) => one.bytes), choice.manifestSha256,
-      );
-    } catch (error) {
-      reason = error instanceof Error ? error.message : String(error);
-    }
+  try {
+    prepared = await prepare(choice);
+  } catch (error) {
+    reason = error instanceof Error ? error.message : String(error);
   }
-  const plain = await route.loadGeneratedTile({
-    name: first!.name,
-    bytes: first!.bytes,
-    manifest: parseTextureSetManifest(library.textureManifest),
-    fetchSet: (set) => library.textureSet(set.contentSha256),
-    ...(neighbours.length === 0 ? {} : { neighbours }),
-    ...(prepared === null ? {} : { look: prepared.look }),
-  });
-  const dressed = prepared === null ? null : worldLook.inWorldLook(plain, prepared);
-  const loaded = dressed?.tile ?? plain;
+  const drawn = await loadIn(prepared);
+  const loaded = drawn.tile;
   // Where a person arrives is the world's own spawn, served in the region's frame: east, height,
   // south. The renderer's frame is east, up and south in metres, so it is read across unchanged.
   // Its yaw 0 looks north with forward (-sin yaw, 0, -cos yaw), so a facing of (east, south) is
@@ -231,7 +260,100 @@ export async function loadGeneratedWorld(
     tile: { ...loaded, start },
     ground,
     look: { pack, source: choice.source, drawn: prepared !== null, reason },
-    bodies: dressed?.bodies ?? (() => null),
+    bodies: drawn.bodies,
+    async relook(next) {
+      const nextPrepared = await prepare(next);
+      const again = await loadIn(nextPrepared);
+      return {
+        tile: { ...again.tile, start },
+        bodies: again.bodies,
+        look: { pack: next.packId, source: next.source, drawn: nextPrepared !== null, reason: null },
+      };
+    },
+  };
+}
+
+/**
+ * The world's tiles as the page mounts them, with a look that can be swapped while they stay
+ * mounted: what `redrawWorldLook` draws in while this world is attached.
+ */
+export function switchableWorld(
+  world: GeneratedWorld,
+  stated: (look: GeneratedWorld['look']) => void,
+  shell: Element,
+): { readonly tile: LoadedGeneratedTile; readonly bodies: () => VehicleBodies | null; readonly bodiesChanged: (listener: () => void) => () => void } {
+  let current: { readonly tile: LoadedGeneratedTile; readonly bodies: () => VehicleBodies | null } = world;
+  let host: GeneratedTileHost | null = null;
+  let attachment: GeneratedTileAttachment | null = null;
+  const listeners = new Set<() => void>();
+  let queue: Promise<unknown> = Promise.resolve();
+  const redrawable: RedrawableWorld = {
+    redraw(pack) {
+      const run = queue.then(async (): Promise<WorldLookRedraw> => {
+        const started = performance.now();
+        const { DEFAULT_WORLD_LOOK } = await import('../world-look.js');
+        const packId = pack?.packId ?? DEFAULT_WORLD_LOOK;
+        const result = (drawn: boolean, reason: string | null): WorldLookRedraw => ({
+          pack: packId, source: 'redraw', drawn, reason, elapsedMs: Math.round(performance.now() - started),
+        });
+        let next: Awaited<ReturnType<GeneratedWorld['relook']>>;
+        try {
+          next = await world.relook({ packId, manifestSha256: pack?.manifestSha256 ?? null, source: 'redraw' });
+        } catch (error) {
+          return result(false, error instanceof Error ? error.message : String(error));
+        }
+        if (host === null) return result(false, 'The world was taken down before its new look was ready');
+        // The old look comes down before the new one goes up: each sets the scene's light, and
+        // taking one down after the other went up would undo the new one.
+        attachment?.dispose();
+        current = next;
+        attachment = current.tile.attach(host);
+        for (const listener of listeners) listener();
+        stated(next.look);
+        return result(next.look.drawn, null);
+      });
+      queue = run;
+      return run;
+    },
+  };
+  const onRedraw = (event: Event): void => {
+    const detail = (event as CustomEvent<WorldStylePackBinding | null>).detail ?? null;
+    void redrawable.redraw(detail).then((done) => {
+      shell.setAttribute(WORLD_LOOK_REDRAW_ATTRIBUTE, JSON.stringify(done));
+    });
+  };
+  return {
+    bodies: () => current.bodies(),
+    bodiesChanged(listener) {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+    tile: {
+      ...world.tile,
+      attach(next: GeneratedTileHost): GeneratedTileAttachment {
+        host = next;
+        attachment = current.tile.attach(next);
+        setRedrawableWorld(redrawable);
+        shell.addEventListener(WORLD_LOOK_REDRAW_EVENT, onRedraw);
+        let metrics = attachment.metrics;
+        return {
+          get metrics() {
+            metrics = attachment?.metrics ?? metrics;
+            return metrics;
+          },
+          get animating() {
+            return attachment?.animating ?? false;
+          },
+          dispose() {
+            shell.removeEventListener(WORLD_LOOK_REDRAW_EVENT, onRedraw);
+            if (isRedrawableWorld(redrawable)) setRedrawableWorld(null);
+            attachment?.dispose();
+            attachment = null;
+            host = null;
+          },
+        };
+      },
+    },
   };
 }
 
@@ -318,6 +440,7 @@ async function withWorldTraffic(
   entry: SavedWorldEntry,
   tile: LoadedGeneratedTile,
   bodies: () => VehicleBodies | null = () => null,
+  bodiesChanged?: (listener: () => void) => () => void,
 ): Promise<LoadedGeneratedTile> {
   const note = (): Element | null => env.shell.querySelector(`[${WORLD_TRAFFIC_NOTE_ATTRIBUTE}]`);
   const explain = (code: string): void => {
@@ -370,6 +493,7 @@ async function withWorldTraffic(
       explain(state.reason);
     },
     bodies,
+    bodiesChanged,
   ), TILE_TRAFFIC_ATTRIBUTE);
 }
 
@@ -388,8 +512,10 @@ export async function openGeneratedWorld(
   const loaded = await loadGeneratedWorld(access, entry, undefined, bound);
   if (loaded === null) return null;
   if (isGeneratedWorld(loaded)) {
-    env.shell.setAttribute(WORLD_LOOK_ATTRIBUTE, JSON.stringify(loaded.look));
-    return withWorldTraffic(env, access, entry, loaded.tile, loaded.bodies);
+    const stated = (look: GeneratedWorld['look']): void => env.shell.setAttribute(WORLD_LOOK_ATTRIBUTE, JSON.stringify(look));
+    stated(loaded.look);
+    const world = switchableWorld(loaded, stated, env.shell);
+    return withWorldTraffic(env, access, entry, world.tile, world.bodies, world.bodiesChanged);
   }
   const words = loaded.waiting === 'baking'
     ? fill('world.generated.baking', { recipe: loaded.ground.recipeLabel })

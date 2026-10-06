@@ -10,6 +10,10 @@ piece writer (``exulanica_pieces.geometry.glb``), so running this again reproduc
 ``tests/test_authored_style_packs.py`` holds the committed files to that and reads each manifest with
 the product's reader.
 
+Each pack also lists ``preview.jpg``: the pack drawn by the product on one generated market town at
+its arrival camera, the same town and camera for every pack, captured once at 1600x1000 and
+committed beside its pieces. This script lists it and writes it back unchanged; it never makes it.
+
 Pieces are glTF metres, +Y up, +Z front, pivot at the base centre. A window or a door is a frame
 whose bars keep their size, so it states stretch zones between them; a car, a tree and a fence are
 scaled whole. Positions are rounded to a tenth of a millimetre before they are written, so a float's
@@ -41,6 +45,10 @@ from exulanica_pieces.geometry.mesh import Mesh
 
 ROOT: Final = Path(__file__).resolve().parents[2]
 PACKS: Final = Path("assets/style-packs/packs")
+#: The packs' version: a change to any byte a manifest states moves it.
+VERSION: Final = 2
+#: Each pack's committed preview picture, inside its folder.
+PREVIEW: Final = "preview.jpg"
 
 
 def load_kind_catalogs_bounds() -> list[dict[str, Any]]:
@@ -946,11 +954,18 @@ FINISHED: Final = PackSpec(
         "wall.cast_concrete": textured("cc0.cast-concrete", "slate_warm"),
         "wall.painted_render": textured("cc0.painted-render", "slate_warm"),
         "wall.storefront_metal": textured("cc0.storefront-metal", "leads"),
+        "wall.painted_timber": textured("cc0.painted-timber", "slate_warm"),
+        "wall.awning_canvas": textured("cc0.awning-canvas"),
         "wall.default": surface("stone", "roof"),
         "roof.default": surface("roof"),
+        "road.carriageway_asphalt": textured("cc0.carriageway-asphalt"),
+        "road.kerb_stone": textured("cc0.kerb-stone"),
+        "road.road_paint_white": textured("cc0.road-paint-white"),
+        "road.road_paint_yellow": textured("cc0.road-paint-yellow"),
         "road.default": surface("asphalt"),
+        "path.footway_paving": textured("cc0.footway-paving"),
         "path.default": surface("paving"),
-        "ground.tree_pit_soil": surface("soil"),
+        "ground.tree_pit_soil": textured("cc0.tree-pit-soil"),
         "ground.default": surface("grass"),
         "water.default": surface("water"),
     },
@@ -1053,19 +1068,21 @@ def build(spec: PackSpec, table: Sequence[int]) -> dict[str, bytes]:
     add("plant.default", "pieces/tree.glb", tree_piece(trunk, leaves, shape), TREE_MM, none)
     add("boundary.default", "pieces/fence.glb", fence_piece(*spec.fence), FENCE_MM, none)
 
+    preview = (ROOT / PACKS / spec.pack_id / PREVIEW).read_bytes()
+    listed = {**pieces, PREVIEW: preview}
     files = [
         {
             "path": path,
             "sha256": hashlib.sha256(data).hexdigest(),
             "bytes": len(data),
-            "media_type": "model/gltf-binary",
+            "media_type": "image/jpeg" if path == PREVIEW else "model/gltf-binary",
         }
-        for path, data in sorted(pieces.items())
+        for path, data in sorted(listed.items())
     ]
     manifest = {
         "profile": style_packs.PROFILE,
         "pack_id": spec.pack_id,
-        "version": 1,
+        "version": VERSION,
         "title": spec.title,
         "description": spec.description,
         "tags": list(spec.tags),
@@ -1073,6 +1090,7 @@ def build(spec: PackSpec, table: Sequence[int]) -> dict[str, bytes]:
         "provenance": {"kind": "authored"},
         "licence": {"id": "CC0-1.0", "attribution": None},
         "authors": ["Exulanica"],
+        "preview": PREVIEW,
         "base": None,
         "light": {"default_preset": spec.default_preset, "presets": spec.presets},
         "shading": spec.shading,
@@ -1084,7 +1102,7 @@ def build(spec: PackSpec, table: Sequence[int]) -> dict[str, bytes]:
     }
     style_packs.read_manifest(manifest, style_packs.load_context(ROOT))
     out = {"manifest.json": (style_packs.canonical_json(manifest) + "\n").encode("ascii")}
-    out.update(pieces)
+    out.update(listed)
     return out
 
 

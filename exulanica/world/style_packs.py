@@ -36,6 +36,9 @@ from exulanica_pieces.budgets import BUDGETS_PROFILE, PieceBudget, read_budgets
 __all__ = [
     "BUDGETS_PROFILE",
     "COLOUR_ENCODING",
+    "EXTENSION_MEDIA_TYPES",
+    "IMAGE_MEDIA_TYPES",
+    "PREVIEW_MAX_BYTES",
     "PROFILE",
     "LookFamily",
     "PieceBudget",
@@ -53,7 +56,18 @@ PROFILE: Final = "exulanica.style-pack/v1"
 COLOUR_ENCODING: Final = "exulanica.srgb8-linear16/v1"
 LICENCES: Final = ("CC0-1.0", "CC-BY-4.0")
 ORIGINS: Final = ("authored", "uploaded", "drafted", "generated", "imported")
-MEDIA_TYPES: Final = ("model/gltf-binary",)
+#: The pictures a pack may carry, as its one preview: what it looks like, for a person choosing.
+IMAGE_MEDIA_TYPES: Final = ("image/jpeg", "image/png", "image/webp")
+MEDIA_TYPES: Final = ("model/gltf-binary", *IMAGE_MEDIA_TYPES)
+#: The media type each listed file's extension must state.
+EXTENSION_MEDIA_TYPES: Final = {
+    "glb": "model/gltf-binary",
+    "jpg": "image/jpeg",
+    "png": "image/png",
+    "webp": "image/webp",
+}
+#: A pack's preview picture, at most.
+PREVIEW_MAX_BYTES: Final = 512 * 1024
 TONE_MAPPINGS: Final = ("aces", "aces2", "neutral", "filmic", "linear")
 #: The sun shadow filters a pack may choose. PCSS soft shadows are not among them: measured at 26
 #: to 27 ms a frame on its own, it alone breaks the frame budget, so it stays a quality setting a
@@ -72,6 +86,12 @@ _TAG: Final = re.compile(r"[a-z][a-z0-9-]{0,23}")
 _LEAF: Final = re.compile(r"[a-z][a-z0-9_]{0,47}")
 _SHA256: Final = re.compile(r"[0-9a-f]{64}")
 _PATH: Final = re.compile(r"[a-z0-9][a-z0-9_-]{0,63}(/[a-z0-9][a-z0-9_.-]{0,63}){0,3}\.glb")
+_IMAGE_PATH: Final = re.compile(
+    r"[a-z0-9][a-z0-9_-]{0,63}(/[a-z0-9][a-z0-9_.-]{0,63}){0,3}\.(jpg|png|webp)"
+)
+_FILE_PATH: Final = re.compile(
+    r"[a-z0-9][a-z0-9_-]{0,63}(/[a-z0-9][a-z0-9_.-]{0,63}){0,3}\.(glb|jpg|png|webp)"
+)
 _TEXTURE_SET: Final = re.compile(r"[a-z0-9][a-z0-9.-]{0,63}")
 _CONTROL: Final = re.compile(r"[\x00-\x1f\x7f]")
 _TEXT_MAX: Final = {
@@ -477,6 +497,9 @@ def read_manifest(value: Any, context: StylePackContext) -> dict[str, Any]:
                 },
             ),
             "authors": _list(_text(_TEXT_MAX["author"]), 1, 16),
+            "preview": _nullable(
+                _pattern(_IMAGE_PATH, "a lowercase relative path ending .jpg, .png or .webp")
+            ),
             "base": _nullable(
                 lambda v, p: _object(
                     v,
@@ -583,7 +606,9 @@ def read_manifest(value: Any, context: StylePackContext) -> dict[str, Any]:
                     v,
                     p,
                     {
-                        "path": glb,
+                        "path": _pattern(
+                            _FILE_PATH, "a lowercase relative path ending .glb, .jpg, .png or .webp"
+                        ),
                         "sha256": sha,
                         "bytes": _integer(1, MAX_TOTAL_BYTES),
                         "media_type": _one_of(MEDIA_TYPES),
@@ -668,6 +693,13 @@ def _check_whole(manifest: dict[str, Any], context: StylePackContext) -> None:
             _fail("duplicate", f"files[{index}].path", f"repeats {json.dumps(file['path'])}")
         if previous is not None and _utf16_key(previous) > _utf16_key(file["path"]):
             _fail("shape", f"files[{index}].path", "files must be listed in path order")
+        stated = EXTENSION_MEDIA_TYPES[file["path"].rsplit(".", 1)[1]]
+        if file["media_type"] != stated:
+            _fail("shape", f"files[{index}].media_type", f"must be {stated} for its extension")
+        if file["media_type"] in IMAGE_MEDIA_TYPES and file["bytes"] > PREVIEW_MAX_BYTES:
+            _fail(
+                "range", f"files[{index}].bytes", f"a picture is at most {PREVIEW_MAX_BYTES} bytes"
+            )
         previous = file["path"]
         listed[file["path"]] = file
         total += file["bytes"]
@@ -696,9 +728,14 @@ def _check_whole(manifest: dict[str, Any], context: StylePackContext) -> None:
             for axis, z in enumerate(variant["stretch_mm"]):
                 if z is not None and not z[0] < z[1] <= variant["size_mm"][axis]:
                     _fail("range", f"{where}[{axis}]", "must lie within the piece, low below high")
+    preview = manifest["preview"]
+    if preview is not None:
+        if preview not in listed:
+            _fail("reference", "preview", f"names no listed file {json.dumps(preview)}")
+        used.add(preview)
     for path in listed:
         if path not in used:
-            _fail("reference", "files", f"lists {json.dumps(path)}, which no variant uses")
+            _fail("reference", "files", f"lists {json.dumps(path)}, which nothing uses")
 
 
 def _utf16_key(text: str) -> bytes:

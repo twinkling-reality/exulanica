@@ -14,10 +14,11 @@ one, so nothing it holds is ever served.
 
 The library lists each pack with what a person choosing one needs: its id, version and manifest
 digest; its title, description and tags; its origin; its licence with the attribution it requires,
-and its authors. It serves each manifest as its canonical bytes, so the digest that identifies a
-pack names exactly the bytes served, and each listed file as the media type its manifest states,
-all as committed content by digest (:mod:`exulanica.world.committed_content`). The host reads it
-once, when it starts (``exulanica.api.app``), and ``exulanica.api.routes.style_packs`` serves it.
+and its authors; and its preview picture's digest and media type, when it has one. It serves each
+manifest as its canonical bytes, so the digest that identifies a pack names exactly the bytes
+served, and each listed file as the media type its manifest states, all as committed content by
+digest (:mod:`exulanica.world.committed_content`). The host reads it once, when it starts
+(``exulanica.api.app``), and ``exulanica.api.routes.style_packs`` serves it.
 """
 
 from __future__ import annotations
@@ -81,6 +82,9 @@ class LibraryPack:
     files: int
     #: The bytes of the manifest and every file it lists.
     total_bytes: int
+    #: The preview picture's SHA-256 and media type, or None for a pack with no picture.
+    preview_sha256: str | None = None
+    preview_media_type: str | None = None
 
     def listing(self) -> dict[str, Any]:
         return {
@@ -95,6 +99,8 @@ class LibraryPack:
             "authors": list(self.authors),
             "files": self.files,
             "total_bytes": self.total_bytes,
+            "preview_sha256": self.preview_sha256,
+            "preview_media_type": self.preview_media_type,
         }
 
 
@@ -170,6 +176,15 @@ def _read_pack(folder: Path, context: StylePackContext) -> _Read:
     return _Read(read, tuple(items))
 
 
+def _preview(manifest: dict[str, Any]) -> dict[str, str | None]:
+    """The listed file a manifest names as its preview, by digest and media type."""
+    path = manifest["preview"]
+    file = next((file for file in manifest["files"] if file["path"] == path), None)
+    if file is None:
+        return {"preview_sha256": None, "preview_media_type": None}
+    return {"preview_sha256": file["sha256"], "preview_media_type": file["media_type"]}
+
+
 def load_style_pack_library(
     directory: Path = LIBRARY_DIRECTORY, context: StylePackContext | None = None
 ) -> StylePackLibrary:
@@ -209,6 +224,7 @@ def load_style_pack_library(
                 authors=tuple(read.manifest["authors"]),
                 files=len(read.manifest["files"]),
                 total_bytes=sum(len(item.data) for item in read.items),
+                **_preview(read.manifest),
             )
             for pack_id, read in sorted(packs.items())
         ),

@@ -126,3 +126,28 @@ def test_every_stretching_frame_fits_the_smallest_opening_the_grammars_cut(famil
                     assert fixed < smallest[axis], (role, variant["file"], axis)
                     seen += 1
     assert seen > 0
+
+
+def _jpeg_size(data: bytes) -> tuple[int, int]:
+    """A baseline or progressive JPEG's width and height, read from its frame header."""
+    assert data[:2] == b"\xff\xd8", "not a JPEG"
+    at = 2
+    while at < len(data):
+        assert data[at] == 0xFF
+        marker = data[at + 1]
+        length = struct.unpack(">H", data[at + 2 : at + 4])[0]
+        if marker in (0xC0, 0xC1, 0xC2):
+            height, width = struct.unpack(">HH", data[at + 5 : at + 9])
+            return width, height
+        at += 2 + length
+    raise AssertionError("no frame header")
+
+
+def test_every_pack_shows_itself_in_one_listed_picture_of_one_size() -> None:
+    for folder, manifest in _manifests().items():
+        preview = manifest["preview"]
+        listed = {file["path"]: file for file in manifest["files"]}
+        assert listed[preview]["media_type"] == "image/jpeg", folder
+        data = (PACKS / folder / preview).read_bytes()
+        assert len(data) <= style_packs.PREVIEW_MAX_BYTES, folder
+        assert _jpeg_size(data) == (1600, 1000), folder

@@ -73,7 +73,8 @@ def test_a_pack_named_in_camel_case_is_previewed_applied_and_read_back(world_api
     ("change", "status", "code"),
     [
         ({"pack_id": "exulanica.nowhere-town"}, 422, "invalid_style_data"),
-        ({"version": 2}, 422, "invalid_style_data"),
+        # A version the library does not hold: the committed one's next.
+        ({"version": committed("exulanica.cozy-town")["version"] + 1}, 422, "invalid_style_data"),
         ({"manifest_sha256": "0" * 64}, 422, "invalid_style_data"),
         # Malformed before any lookup: the body's own shape refuses it.
         ({"manifest_sha256": "not-a-digest"}, 422, None),

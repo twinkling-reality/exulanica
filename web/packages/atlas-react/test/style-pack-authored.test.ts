@@ -1,8 +1,9 @@
 // @vitest-environment happy-dom
 /**
  * The authored style packs, read the way the page reads them: each manifest by the browser's reader
- * against this tree's catalogs, each piece by its digest and the palette piece reader, and each
- * frame that stretches resolved into the smallest and largest openings the city grammar cuts.
+ * against this tree's catalogs, each piece by its digest and the palette piece reader, its one
+ * preview picture by its digest, and each frame that stretches resolved into the smallest and
+ * largest openings the city grammar cuts.
  */
 import { createHash } from 'node:crypto';
 import { readFileSync, readdirSync } from 'node:fs';
@@ -28,15 +29,21 @@ describe('the authored packs', () => {
     }
   });
 
-  it('carry only pieces whose bytes are their digests and whose colours are their palettes\'', () => {
+  it('carry pieces whose bytes are their digests and whose colours are their palettes\', and one preview picture', () => {
     for (const folder of folders) {
       const manifest = readStylePackManifest(JSON.parse(readFileSync(`${PACKS}/${folder}/manifest.json`, 'utf8')), { families, textureSets });
       const colours = new Set(manifest.palette.swatches.map((s) => s.srgb8.join(',')));
+      const pictures: string[] = [];
       for (const file of manifest.files) {
         const bytes = new Uint8Array(readFileSync(`${PACKS}/${folder}/${file.path}`));
         expect(createHash('sha256').update(bytes).digest('hex')).toBe(file.sha256);
+        if (file.media_type !== 'model/gltf-binary') {
+          pictures.push(file.path);
+          continue;
+        }
         for (const group of readStylePiece(bytes, TABLE).groups) expect(colours.has(group.srgb8.join(','))).toBe(true);
       }
+      expect(pictures).toEqual([manifest.preview]);
     }
   });
 

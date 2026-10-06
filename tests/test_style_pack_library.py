@@ -68,6 +68,10 @@ def test_the_library_is_the_committed_folders_each_listed_with_its_licence() -> 
         assert entry["origin"] == manifest["origin"]
         assert entry["files"] == len(manifest["files"])
         assert entry["total_bytes"] == len(canonical) + sum(f["bytes"] for f in manifest["files"])
+        picture = (PACKS / entry["pack_id"] / manifest["preview"]).read_bytes()
+        assert entry["preview_sha256"] == hashlib.sha256(picture).hexdigest()
+        assert entry["preview_media_type"] == "image/jpeg"
+        assert library.content.get(entry["preview_sha256"]).data == picture
 
 
 def test_it_serves_each_manifest_and_listed_file_by_digest_and_nothing_else() -> None:
@@ -156,10 +160,10 @@ def _derived(library: Path, base: dict) -> None:
 
 
 def test_a_base_must_be_a_pack_of_the_library_at_its_version_and_digest(tmp_path: Path) -> None:
-    _manifest, canonical = _committed()["exulanica.cozy-town"]
+    manifest, canonical = _committed()["exulanica.cozy-town"]
     stated = {
         "pack_id": "exulanica.cozy-town",
-        "version": 1,
+        "version": manifest["version"],
         "manifest_sha256": hashlib.sha256(canonical).hexdigest(),
     }
     library = _copy(tmp_path / "named")
@@ -167,7 +171,7 @@ def test_a_base_must_be_a_pack_of_the_library_at_its_version_and_digest(tmp_path
     assert _load(library).pack("exulanica.derived-town") is not None
     for wrong in (
         {**stated, "pack_id": "exulanica.nowhere-town"},
-        {**stated, "version": 2},
+        {**stated, "version": manifest["version"] + 1},
         {**stated, "manifest_sha256": "0" * 64},
     ):
         library = _copy(

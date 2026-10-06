@@ -137,6 +137,27 @@ describe('the traffic layer', () => {
     expect(asked.sort()).toEqual(['plain', 'styled']);
   });
 
+  it('draws every vehicle in the new bodies from the next frame when a redraw hands them in', () => {
+    const { root } = setup();
+    const made = (name: string) => ({ body: () => new pc.Entity(name) });
+    const layer = new TrafficLayer(root, () => 0, toRenderer, made('style-pack:cozy'));
+    layer.setWindow(trafficWindow([car('one', 3, true), car('two', 3, true)]), 0);
+    layer.update(1500);
+    const before = root.findByName('vehicle:one')!;
+    expect(before.children.map((child) => child.name)).toEqual(['style-pack:cozy']);
+    layer.setBodies(made('style-pack:toon'));
+    // Taken down at once, so nothing of the old pack's bodies is left to draw.
+    expect(root.findByName('vehicle:one')).toBeNull();
+    layer.update(1600);
+    for (const id of ['one', 'two']) {
+      expect(root.findByName(`vehicle:${id}`)!.children.map((child) => child.name)).toEqual(['style-pack:toon']);
+    }
+    expect(layer.drawnCount).toBe(2);
+    layer.setBodies(null);
+    layer.update(1700);
+    expect(root.findByName('vehicle:one')!.children.map((child) => child.name)).toContain('body');
+  });
+
   it('does not draw a vehicle where the drawn world has no ground', () => {
     const { root } = setup();
     const layer = new TrafficLayer(root, () => null, toRenderer);

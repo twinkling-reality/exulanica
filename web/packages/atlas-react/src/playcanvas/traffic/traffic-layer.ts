@@ -144,11 +144,23 @@ export class TrafficLayer {
     parent: pc.Entity,
     private readonly groundAt: GroundAt,
     private readonly toRenderer: ToRenderer,
-    private readonly bodies: VehicleBodies | null = null,
+    private bodies: VehicleBodies | null = null,
   ) {
     this.root = new pc.Entity('traffic');
     parent.addChild(this.root);
     this.lights = new SignalLights(this.root, groundAt, toRenderer);
+  }
+
+  /**
+   * Draw the vehicles in `bodies` from the next frame on, as when the world is redrawn in another
+   * style pack (null: in their boxes). Every vehicle's parts are taken down now and made again the
+   * next time it is drawn; what the traffic does is unchanged.
+   */
+  setBodies(bodies: VehicleBodies | null): void {
+    if (this.destroyed) return;
+    for (const drawn of this.drawn.values()) drawn.root.destroy();
+    this.drawn.clear();
+    this.bodies = bodies;
   }
 
   /**
