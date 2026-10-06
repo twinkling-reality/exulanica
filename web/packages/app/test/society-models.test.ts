@@ -399,3 +399,42 @@ describe('the cards of who decides', () => {
     expect(lights.root.hidden).toBe(true);
   });
 });
+
+describe('Who decides opened for chosen subjects', () => {
+  const people = [{ id: 'ada', name: 'Ada' }, { id: 'grace', name: 'Grace' }, { id: 'lin', name: 'Lin' }];
+  const ticked = (root: HTMLElement) => [...root.querySelectorAll<HTMLInputElement>('.society-models-people-list input[type=checkbox]')]
+    .filter((box) => box.checked).map((box) => box.value);
+
+  it('ticks exactly the subjects asked for, leaves out anybody not here, and says what it will do', () => {
+    const section = buildSocietyModels({ onChoose: () => undefined });
+    section.render({ view: parseSocietyModels(read()), people, busy: false, message: '' });
+    section.chooseFor(['grace']);
+    expect(section.chooseFor(['lin', 'ada', 'nobody'])).toBe(2);
+    expect(ticked(section.root)).toEqual(['ada', 'lin']);
+    expect(section.choose.textContent).toBe('Give 2 people their own routine');
+    expect(section.choose.disabled).toBe(false);
+  });
+
+  it('ticks them once they are listed when asked before the first read', () => {
+    const section = buildSocietyModels({ onChoose: () => undefined });
+    expect(section.chooseFor(['grace'])).toBe(0);
+    section.render({ view: parseSocietyModels(read()), people, busy: false, message: '' });
+    expect(ticked(section.root)).toEqual(['grace']);
+    // Once only: a later read keeps what the person changed since.
+    const box = section.root.querySelector<HTMLInputElement>('input[value="ada"]')!;
+    box.checked = true;
+    box.dispatchEvent(new Event('change'));
+    section.render({ view: parseSocietyModels(read()), people, busy: false, message: '' });
+    expect(ticked(section.root)).toEqual(['ada', 'grace']);
+  });
+
+  it('shows the traffic lights card when asked for that role', () => {
+    const signals = document.createElement('div');
+    const section = buildSocietyModels({ onChoose: () => undefined, signals });
+    section.setSignals({ count: 2, words: 'Fixed timing' });
+    section.render({ view: parseSocietyModels(read()), people, busy: false, message: '' });
+    section.showRole('signals');
+    expect(signals.parentElement!.hidden).toBe(false);
+    expect(section.root.querySelector<HTMLElement>('.society-models-people-group')!.hidden).toBe(true);
+  });
+});

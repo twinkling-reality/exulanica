@@ -182,6 +182,14 @@ export interface SocietyModelsSection {
   setSignals(summary: RoleSummary | null): void;
   /** Untick everyone, once a choice for them is recorded. */
   clearPeople(): void;
+  /**
+   * Show the People card with exactly `subjectIds` ticked, as a person ticks them, and bring the
+   * first into view; somebody not listed here is left out. A choice asked before the first read
+   * is made once the people are listed. Returns how many it ticked now.
+   */
+  chooseFor(subjectIds: readonly string[]): number;
+  /** Show one role's card: people, or the traffic lights where this world has them. */
+  showRole(role: 'people' | 'signals'): void;
 }
 
 /** The routine's option, and each model's: its provider and identifier, which hold no space. */
@@ -428,6 +436,7 @@ export function buildSocietyModels(handlers: {
       label.dataset['subjectId'] = person.id;
       return label;
     }));
+    if (wanted !== null) { const asked = wanted; wanted = null; tick(asked); }
     for (const radio of cards.querySelectorAll<HTMLInputElement>('input[type=radio]')) radio.disabled = busy;
     everyone.disabled = busy || people.length === 0;
     reflectChoose();
@@ -456,13 +465,39 @@ export function buildSocietyModels(handlers: {
     showTab();
   };
 
+  /** People asked for before they were listed, ticked by the render that lists them. */
+  let wanted: readonly string[] | null = null;
+  const tick = (subjectIds: readonly string[]): number => {
+    const boxes = [...peopleList.querySelectorAll<HTMLInputElement>('input[type=checkbox]')];
+    checked.clear();
+    for (const box of boxes) {
+      box.checked = subjectIds.includes(box.value);
+      if (box.checked) checked.add(box.value);
+    }
+    reflectChoose();
+    const first = boxes.find((box) => box.checked);
+    first?.closest('label')?.scrollIntoView({ block: 'nearest' });
+    return checked.size;
+  };
+  const chooseFor = (subjectIds: readonly string[]): number => {
+    pickedTab = 'people';
+    showTab();
+    if (!takes) { wanted = subjectIds; return 0; }
+    wanted = null;
+    return tick(subjectIds);
+  };
+  const showRole = (role: 'people' | 'signals'): void => {
+    pickedTab = role;
+    showTab();
+  };
+
   const clearPeople = () => {
     checked.clear();
     for (const box of peopleList.querySelectorAll<HTMLInputElement>('input[type=checkbox]')) box.checked = false;
     reflectChoose();
   };
 
-  return { root, choose, model, render, setSignals, clearPeople };
+  return { root, choose, model, render, setSignals, clearPeople, chooseFor, showRole };
 }
 
 /** Why a choice was refused, in words; the code stays available to the caller. */

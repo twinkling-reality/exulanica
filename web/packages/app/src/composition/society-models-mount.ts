@@ -25,6 +25,12 @@ import {
 } from '../ui/society-models.js';
 import { buildSignalModels } from '../ui/world-signals-models.js';
 
+/** Whose decider another surface asks Who decides to show, by role and the server's subject ids. */
+export interface DecidesTarget {
+  readonly role: 'people' | 'signals';
+  readonly subjectIds: readonly string[];
+}
+
 export interface MountedSocietyModels {
   readonly root: HTMLElement;
   /**
@@ -34,6 +40,11 @@ export interface MountedSocietyModels {
   refresh(tick: number | null, people: readonly ChoosablePerson[], force?: boolean): Promise<void>;
   /** A person's lines for the inspector: who decides for them, and their latest decision. */
   personDetails(subjectId: string): readonly (readonly [string, string])[];
+  /**
+   * Show who decides for these subjects of one role, chosen as a person chooses them: people
+   * ticked, or the one traffic light selected. Returns how many it chose.
+   */
+  chooseFor(target: DecidesTarget): number;
   dispose(): void;
 }
 
@@ -192,6 +203,12 @@ export function mountSocietyModels(options: {
   return {
     root: section.root,
     refresh,
+    chooseFor(target) {
+      if (target.role === 'people') return section.chooseFor(target.subjectIds);
+      section.showRole('signals');
+      const light = target.subjectIds.find((id) => signals.choose(id));
+      return light === undefined ? 0 : 1;
+    },
     personDetails(subjectId) {
       if (view === null || !view.takesModelChoices) return [];
       return [

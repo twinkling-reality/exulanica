@@ -40,7 +40,7 @@ import {
   type SocietyPlaybackSpeed,
 } from '../society-control-api.js';
 import { createLiveSociety, type LiveSociety, type LiveSocietyView } from './live-society.js';
-import { mountSocietyModels, type MountedSocietyModels } from './society-models-mount.js';
+import { mountSocietyModels, type DecidesTarget, type MountedSocietyModels } from './society-models-mount.js';
 import type { SocietyModelsClient } from '../society-models-api.js';
 import { unreadMinutes } from './society-unread-minutes.js';
 import { SocietyDistrictClient, type SocietyDistrictPlacement, type SocietyDistrictView } from '../society-district-api.js';
@@ -161,6 +161,11 @@ export interface MountedEnvironmentSelection {
   dispose(): void;
   closePanels(): void;
   openPanel(name: 'nearby' | 'decides' | 'authoring' | 'details'): void;
+  /**
+   * Open Who decides with these subjects chosen, for another surface (the thing card's model
+   * swap). Returns how many it chose; 0 where this world offers no such choice.
+   */
+  openDecides(target: DecidesTarget): number;
   setWelcomeVisible(visible: boolean): void;
   afterAuthoredEdit(versionId: string): Promise<void>;
   districtPlacement(): SocietyDistrictPlacement | null;
@@ -2113,6 +2118,10 @@ export function mountEnvironmentSelection(
     },
     closePanels: () => workspace.close(false),
     openPanel: (name) => workspace.openPanel(name),
+    openDecides: (target) => {
+      workspace.openPanel('decides');
+      return societyModels?.chooseFor(target) ?? 0;
+    },
     setWelcomeVisible: (visible) => workspace.setWelcomeVisible(visible),
     afterAuthoredEdit,
     districtPlacement: () => districtView?.placement ?? null,

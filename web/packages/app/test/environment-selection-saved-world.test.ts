@@ -283,6 +283,11 @@ describe('a saved world holds inhabitants only when the person asks', () => {
       'version', ['person-1', 'person-2'], { provider: MODEL.provider, modelId: MODEL.model_id },
     );
     expect(section.textContent).toContain('2 people are now decided by the model you chose');
+    // Another surface (the thing card) opens Who decides with one person chosen.
+    expect(mounted.openDecides({ role: 'people', subjectIds: ['person-3', 'not-here'] })).toBe(1);
+    expect(mounted.root.querySelector<HTMLElement>('#world-panel-decides')!.hidden).toBe(false);
+    expect([...section.querySelectorAll<HTMLInputElement>('.society-models-people-list input:checked')].map((box) => box.value))
+      .toEqual(['person-3']);
     // The inspector says who decides for this person and what their model last chose.
     controls.onInteract?.();
     for (let i = 0; i < 2; i += 1) await settle();

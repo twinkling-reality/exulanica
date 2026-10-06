@@ -40,6 +40,8 @@ export function signalChoiceWords(choice: SignalChoice | undefined, refusal: str
 export interface SignalModelsSection {
   readonly root: HTMLElement;
   render(view: SignalRole | null, busy: boolean, message: string): void;
+  /** Choose the traffic light `signalId` in the section, when it lists one; whether it did. */
+  choose(signalId: string): boolean;
 }
 
 export function buildSignalModels(handlers: {
@@ -101,5 +103,10 @@ export function buildSignalModels(handlers: {
       text: `${subject.label}: ${signalChoiceWords(choices.get(subject.signalId), refusal)}`,
     })));
   };
-  return { root, render };
+  const chooseLight = (signalId: string): boolean => {
+    if (![...signal.options].some((option) => option.value === signalId)) return false;
+    signal.value = signalId;
+    return true;
+  };
+  return { root, render, choose: chooseLight };
 }
