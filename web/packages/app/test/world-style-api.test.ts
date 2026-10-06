@@ -1003,3 +1003,61 @@ describe('reviewed historical recipe bindings', () => {
     await expect(new WorldStyleClient({ worldId: TEST_WORLD,baseUrl:'https://exulanica.test',token:'fixture',fetch}).connect()).rejects.toThrow('not executable');
   });
 });
+
+describe('the style pack a world is drawn in', () => {
+  const pack = { pack_id: 'exulanica.cozy-town', version: 1, manifest_sha256: 'c'.repeat(64) };
+
+  it('is read from the version the world names, and is none for a version that names none', async () => {
+    const fetch = connectedFetch((url) => {
+      if (url.pathname.endsWith('/world/styles/current')) {
+        return json({ ...state('v1', 1), current: { ...version('v1', 1), style_pack: pack } });
+      }
+      if (url.pathname.endsWith('/world/styles/versions')) {
+        return json([version('v0', 0), { ...version('v1', 1), style_pack: pack }]);
+      }
+      return undefined;
+    });
+    const client = new WorldStyleClient({ baseUrl: 'https://exulanica.test/api', token: 'private', fetch, worldId: TEST_WORLD });
+    const opened = await client.connect('v1');
+    expect(opened.state.current.stylePack).toEqual({ packId: 'exulanica.cozy-town', version: 1, manifestSha256: 'c'.repeat(64) });
+    const history = opened.versions.map((one) => one.stylePack);
+    expect(history).toEqual([null, { packId: 'exulanica.cozy-town', version: 1, manifestSha256: 'c'.repeat(64) }]);
+  });
+
+  it('is refused when the server names it by anything but a SHA-256', async () => {
+    const fetch = connectedFetch((url) => {
+      if (url.pathname.endsWith('/world/styles/current')) {
+        return json({ ...state('v1', 1), current: { ...version('v1', 1), style_pack: { ...pack, manifest_sha256: 'C'.repeat(64) } } });
+      }
+      return undefined;
+    });
+    const client = new WorldStyleClient({ baseUrl: 'https://exulanica.test/api', token: 'private', fetch, worldId: TEST_WORLD });
+    await expect(client.connect('v1')).rejects.toMatchObject({ code: 'invalid_style_pack' });
+  });
+});
+
+describe('naming the style pack a world is drawn in', () => {
+  it('previews the pack with the current look unchanged, and names none with null', async () => {
+    const bodies: Record<string, unknown>[] = [];
+    const fetch = connectedFetch((url, init) => {
+      if (url.pathname.endsWith('/world/styles/previews') && init.method === 'POST') {
+        const body = JSON.parse(String(init.body)) as Record<string, unknown>;
+        bodies.push(body);
+        return json(preview(`preview-${bodies.length}`, String(body['proposalId'])), 201);
+      }
+      if (url.pathname.includes('/world/styles/previews/') && init.method === 'DELETE') return new Response(null, { status: 204 });
+      return undefined;
+    });
+    const client = new WorldStyleClient({ baseUrl: 'https://exulanica.test/api', token: 'private', fetch, worldId: TEST_WORLD });
+    await client.connect('v0');
+    const pack = { packId: 'exulanica.cozy-town', version: 1, manifestSha256: 'c'.repeat(64) };
+    await client.previewStylePack(pack);
+    await client.previewStylePack(null);
+    expect(bodies.map((body) => body['stylePack'])).toEqual([pack, null]);
+    expect(bodies.every((body) => JSON.stringify(body['profile']) === JSON.stringify(bodies[0]!['profile']))).toBe(true);
+    expect((bodies[0]!['profile'] as { parameters: Record<string, unknown> }).parameters['vitality']).toBe(0.82);
+    // A Settings change that names no pack sends none, so the world keeps its own.
+    await client.previewSettings({ profileId: 'origin-landscape', profileVersion: 1, parameters: { vitality: 0.5 } });
+    expect('stylePack' in bodies[2]!).toBe(false);
+  });
+});

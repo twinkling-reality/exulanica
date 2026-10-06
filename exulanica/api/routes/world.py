@@ -58,6 +58,7 @@ from exulanica.world import (
     SavedWorldEntryRepository,
     StaleSavedWorldEntry,
     StaleStyleVersion,
+    StylePackBinding,
     StyleProposal,
     StyleProposalRecord,
     StyleReference,
@@ -108,6 +109,28 @@ class StyleScopeBody(BaseModel):
         if (self.kind == "global") != (self.region_id is None):
             raise ValueError("global scope has no region_id; region scope requires one")
         return self
+
+
+class StylePackBody(BaseModel):
+    """A style pack of the host's library, named exactly: id, version and manifest digest."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    pack_id: Annotated[
+        str,
+        Field(
+            pattern=r"^[a-z][a-z0-9-]{0,31}(\.[a-z][a-z0-9-]{0,31}){1,3}$",
+            validation_alias=AliasChoices("pack_id", "packId"),
+        ),
+    ]
+    version: Annotated[int, Field(ge=1, le=1_000_000)]
+    manifest_sha256: Annotated[
+        str,
+        Field(
+            pattern=r"^[0-9a-f]{64}$",
+            validation_alias=AliasChoices("manifest_sha256", "manifestSha256"),
+        ),
+    ]
 
 
 class PreviewBody(BaseModel):
@@ -170,6 +193,12 @@ class PreviewBody(BaseModel):
         Literal["evidence", "authored_design"] | None,
         Field(validation_alias=AliasChoices("appearance_basis", "appearanceBasis")),
     ] = None
+    #: The style pack the world is to be drawn in, a pack of the host's library, or null for none.
+    #: Absent keeps the base version's pack. Only a proposal over the whole world names one.
+    style_pack: Annotated[
+        StylePackBody | None,
+        Field(validation_alias=AliasChoices("style_pack", "stylePack")),
+    ] = None
 
 
 class SavedEntryStyleAdvanceBody(SavedEntryAdvanceBody):
@@ -220,6 +249,14 @@ class ProvenanceView(BaseModel):
     origin_reference: str | None
 
 
+class StylePackView(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    pack_id: str
+    version: int
+    manifest_sha256: str
+
+
 class StyleReferenceView(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -256,6 +293,8 @@ class StyleVersionView(BaseModel):
     refines_proposal_id: uuid.UUID | None
     #: The applied Companion proposal's basis, ``evidence`` or ``authored_design``; null otherwise.
     appearance_basis: str | None = None
+    #: The style pack the world is drawn in; null when it names none.
+    style_pack: StylePackView | None = None
 
 
 class StyleStateView(BaseModel):
@@ -314,6 +353,10 @@ class StyleProposalView(BaseModel):
     refines_proposal_id: uuid.UUID | None
     #: A Companion proposal's basis, ``evidence`` or ``authored_design``; null for other origins.
     appearance_basis: str | None = None
+    #: Whether the proposal named a style pack, and which (null for none). One that named none
+    #: kept its base version's pack.
+    style_pack_stated: bool = False
+    style_pack: StylePackView | None = None
     recipe_binding: dict[str, JsonValue]
     capability_mapping: dict[str, str]
     status: str
@@ -425,6 +468,8 @@ def preview(body: PreviewBody, repository: WriteWorld, session: CurrentSession) 
         prompt_version=body.prompt_version,
         refines_proposal_id=body.refines_proposal_id,
         appearance_basis=body.appearance_basis,
+        style_pack_stated="style_pack" in body.model_fields_set,
+        style_pack=_style_pack(body.style_pack),
     )
     created = repository.preview(proposal)
     return PreviewView(
@@ -588,9 +633,7 @@ def _commit_style(
         version = operation(before, after)
     except StaleSavedWorldEntry as exc:
         if preview_id is not None:
-            repository.close_stale_preview(
-                preview_id, exc, error_code="stale_saved_world_entry"
-            )
+            repository.close_stale_preview(preview_id, exc, error_code="stale_saved_world_entry")
         return JSONResponse(
             status_code=409,
             content={"code": "stale_saved_world_entry", "detail": str(exc)},
@@ -711,6 +754,21 @@ def _version_view(version: StyleVersion) -> StyleVersionView:
         prompt_version=version.prompt_version,
         refines_proposal_id=version.refines_proposal_id,
         appearance_basis=version.appearance_basis,
+        style_pack=_style_pack_view(version.style_pack),
+    )
+
+
+def _style_pack(body: StylePackBody | None) -> StylePackBinding | None:
+    return (
+        None if body is None else StylePackBinding(body.pack_id, body.version, body.manifest_sha256)
+    )
+
+
+def _style_pack_view(binding: StylePackBinding | None) -> StylePackView | None:
+    if binding is None:
+        return None
+    return StylePackView(
+        pack_id=binding.pack_id, version=binding.version, manifest_sha256=binding.manifest_sha256
     )
 
 
@@ -737,6 +795,8 @@ def _proposal_view(record: StyleProposalRecord) -> StyleProposalView:
         prompt_version=proposal.prompt_version,
         refines_proposal_id=proposal.refines_proposal_id,
         appearance_basis=proposal.appearance_basis,
+        style_pack_stated=proposal.style_pack_stated,
+        style_pack=_style_pack_view(proposal.style_pack),
         recipe_binding=dict(record.recipe_binding),
         capability_mapping=dict(record.capability_mapping),
         status=record.status,

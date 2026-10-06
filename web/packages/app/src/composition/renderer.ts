@@ -109,7 +109,9 @@ export async function mountRenderer(deps: RendererDependencies): Promise<Mounted
     // own version, once every one is baked; while one is not, the page says so and draws none.
     const generatedWorld = generatedTile === undefined && state.activeWorldEntry?.generatedGround != null
       && state.credentials !== null
-      ? await (await import('./generated-world.js')).openGeneratedWorld(env, state.credentials, state.activeWorldEntry)
+      ? await (await import('./generated-world.js')).openGeneratedWorld(
+        env, state.credentials, state.activeWorldEntry, state.worldStyleConnection?.state.current.stylePack ?? null,
+      )
       : undefined;
     const district = generatedTile === undefined && state.activeWorldEntry === null
       ? await ownedDistrict({ preview: env.preview })

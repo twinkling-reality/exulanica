@@ -8,8 +8,9 @@ the [appearance authority](world-version-authorities.md#appearance-authority). G
 customization is implemented, including Companion proposals drafted from a person's sentence; a
 regional renderer preview, choosing one of several complete styles for a world and a structural
 topology editor are not built. A complete style is a style pack: three are committed and served by
-the host, and the page draws a generated town in the cozy one unless its address names another
-([style pack contract](style-pack-contract.md)).
+the host, a world's appearance names the one it is drawn in, and the page draws a generated town in
+the pack its address names, else its appearance's, else the cozy one
+([style pack contract](style-pack-contract.md)); a control for choosing one is not built.
 
 ## 1. Protected topology
 
@@ -42,6 +43,7 @@ profile: profileId + profileVersion + validated parameter values
 referenceIds
 modelId + promptVersion (Companion only)
 refinesProposalId (optional)
+stylePack (optional): a pack of the host's library, or null for none; absent keeps the base's
 ```
 
 Preview creates an isolated candidate style version. It does not change current state. Apply is

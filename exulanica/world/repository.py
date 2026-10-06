@@ -39,6 +39,7 @@ from exulanica.world.models import (
     ProposalOrigin,
     ProposalProvenance,
     SourceMediaState,
+    StylePackBinding,
     StylePreview,
     StyleProposal,
     StyleProposalRecord,
@@ -51,6 +52,7 @@ from exulanica.world.models import (
 )
 from exulanica.world.registry import STYLE_REGISTRY, StyleRegistry
 from exulanica.world.reviewed_sources import lapsed_personal_captures
+from exulanica.world.style_pack_library import StylePackLibrary, style_pack_library
 from exulanica.world.style_structure import (
     AuthoredVersionRef,
     CompatibilityIntent,
@@ -143,11 +145,14 @@ class WorldStyleRepository:
         *,
         registry: StyleRegistry = STYLE_REGISTRY,
         world_id: str,
+        style_packs: StylePackLibrary | None = None,
     ) -> None:
         self.connection = connection
         self.workspace_id = workspace_id
         self.registry = registry
         self.world_id = world_id
+        #: The library a named style pack must belong to; the host's committed one unless given.
+        self._style_packs = style_packs
 
     # -- protected topology ---------------------------------------------------------------
 
@@ -363,6 +368,7 @@ class WorldStyleRepository:
             prompt_version=row["prompt_version"],
             refines_proposal_id=row["refines_proposal_id"],
             appearance_basis=row.get("appearance_basis"),
+            **_stated_style_pack(row.get("style_pack")),
         )
         return StyleProposalRecord(
             proposal=proposal,
@@ -474,6 +480,7 @@ class WorldStyleRepository:
                 self._validate_scope(proposal, state["current_topology_digest"])
                 reference = self.registry.validate_reference(proposal.profile)
                 self._validate_reference_compatibility(reference, state["current_topology_digest"])
+                self._validate_proposal_style_pack(proposal)
             except (
                 InvalidStyleData,
                 ProtectedTopologyConflict,
@@ -607,9 +614,14 @@ class WorldStyleRepository:
                     self._validate_reference_compatibility(
                         reference, state["current_topology_digest"]
                     )
+                # The library may have changed since the preview, as the registry may: new state
+                # never takes a pack this host does not hold.
+                if candidate.style_pack is not None:
+                    self._require_library_pack(candidate.style_pack)
                 current = self._version_by_id(state["current_style_version_id"])
                 version_id = uuid.uuid4()
                 basis = preview.get("appearance_basis")
+                pack_columns, pack_values = _style_pack_columns(candidate.style_pack)
                 row = self.connection.execute(
                     "insert into world_style_version "
                     "(version_id,workspace_id,world_id,revision,parent_version_id,topology_digest,"
@@ -618,8 +630,10 @@ class WorldStyleRepository:
                     "provenance_schema_version,reference_ids,model_id,prompt_version,"
                     "refines_proposal_id,recipe_binding,capability_mapping"
                     + ("" if basis is None else ",appearance_basis")
+                    + pack_columns
                     + ") values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,1,%s,%s,%s,%s,%s,%s"
                     + ("" if basis is None else ",%s")
+                    + ",%s" * len(pack_values)
                     + ") returning *",
                     (
                         version_id,
@@ -642,6 +656,7 @@ class WorldStyleRepository:
                         Jsonb(preview["recipe_binding"]),
                         Jsonb(preview["capability_mapping"]),
                         *(() if basis is None else (basis,)),
+                        *pack_values,
                     ),
                 ).fetchone()
                 assert row is not None
@@ -765,14 +780,22 @@ class WorldStyleRepository:
                 if region_id in current_regions
             }
             binding, capability_mapping = self._binding_for_reference(target.global_style)
+            # The version rolled back to names a pack this host must still hold: a rollback is
+            # new state, and new state never takes a stand-in.
+            if target.style_pack is not None:
+                self._require_library_pack(target.style_pack)
+            pack_columns, pack_values = _style_pack_columns(target.style_pack)
             version_id = uuid.uuid4()
             row = self.connection.execute(
                 "insert into world_style_version "
                 "(version_id,workspace_id,world_id,revision,parent_version_id,topology_digest,"
                 "global_profile_id,global_profile_version,global_parameters,"
                 "rollback_target_version_id,origin,actor,origin_reference,"
-                "provenance_schema_version,recipe_binding,capability_mapping) "
-                "values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,1,%s,%s) returning *",
+                "provenance_schema_version,recipe_binding,capability_mapping"
+                + pack_columns
+                + ") values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,1,%s,%s"
+                + ",%s" * len(pack_values)
+                + ") returning *",
                 (
                     version_id,
                     self.workspace_id,
@@ -789,6 +812,7 @@ class WorldStyleRepository:
                     provenance.origin_reference,
                     Jsonb(binding),
                     Jsonb(capability_mapping),
+                    *pack_values,
                 ),
             ).fetchone()
             assert row is not None
@@ -949,6 +973,21 @@ class WorldStyleRepository:
             provenance = ProposalProvenance(
                 ProposalOrigin(row["origin"]), row["actor"], row["origin_reference"]
             )
+        # Absent from a read that names its columns and from a row written before 0141: no pack.
+        style_pack = (
+            None
+            if row.get("style_pack_id") is None
+            else StylePackBinding(
+                row["style_pack_id"],
+                row["style_pack_version"],
+                row["style_pack_manifest_sha256"],
+            )
+        )
+        if resolve and style_pack is not None and not self._library_holds(style_pack):
+            warnings.append(
+                f"Style pack {style_pack.pack_id} version {style_pack.version} is not in this "
+                "host's library; the world is drawn without it."
+            )
         return StyleVersion(
             version_id=row["version_id"],
             revision=row["revision"],
@@ -970,6 +1009,7 @@ class WorldStyleRepository:
             # Absent from a history read that names its columns: such a row predates no rule,
             # it simply did not ask, and a version it builds is not a Companion one.
             appearance_basis=row.get("appearance_basis"),
+            style_pack=style_pack,
         )
 
     def _preview_row(self, preview_id: uuid.UUID, *, for_update: bool) -> Mapping[str, Any]:
@@ -1020,6 +1060,9 @@ class WorldStyleRepository:
             prompt_version=proposal.prompt_version,
             refines_proposal_id=proposal.refines_proposal_id,
             appearance_basis=proposal.appearance_basis,
+            # A proposal that names no pack keeps its base's: the base is the current version,
+            # checked under the state lock this preview holds.
+            style_pack=proposal.style_pack if proposal.style_pack_stated else current.style_pack,
         )
 
     def _candidate_from_document(self, value: Mapping[str, Any]) -> StyleVersion:
@@ -1060,6 +1103,8 @@ class WorldStyleRepository:
                 else uuid.UUID(value["refines_proposal_id"])
             ),
             appearance_basis=value.get("appearance_basis"),
+            # A candidate made before 0141 names none: no world had a pack then.
+            style_pack=_style_pack_from_document(value.get("style_pack")),
         )
 
     def _insert_proposal(
@@ -1069,6 +1114,12 @@ class WorldStyleRepository:
         # The basis column is written only by a proposal that states one (0128), so every other
         # proposal is written exactly as it was before the column existed.
         basis = proposal.appearance_basis
+        # Likewise the pack, written only by a proposal that names one (0141), as it named it.
+        stated = (
+            (Jsonb({"pack": _style_pack_document(proposal.style_pack)}),)
+            if proposal.style_pack_stated
+            else ()
+        )
         try:
             self.connection.execute(
                 "insert into world_style_proposal "
@@ -1078,8 +1129,10 @@ class WorldStyleRepository:
                 "reference_ids,model_id,prompt_version,refines_proposal_id,recipe_binding,"
                 "capability_mapping"
                 + ("" if basis is None else ",appearance_basis")
+                + ("" if not stated else ",style_pack")
                 + ") values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,1,%s,%s,%s,%s,%s,%s"
                 + ("" if basis is None else ",%s")
+                + ("" if not stated else ",%s")
                 + ")",
                 (
                     proposal.proposal_id,
@@ -1104,6 +1157,7 @@ class WorldStyleRepository:
                     Jsonb(binding),
                     Jsonb(capability_mapping),
                     *(() if basis is None else (basis,)),
+                    *stated,
                 ),
             )
         except psycopg.errors.UniqueViolation as exc:
@@ -1233,6 +1287,34 @@ class WorldStyleRepository:
             style=StyleVersionRef(base_style_version_id),
             composed=ComposedTopologyRef(base_topology_digest),
         )
+
+    def _library_holds(self, binding: StylePackBinding) -> bool:
+        """Whether the library holds ``binding``'s pack at exactly its version and manifest."""
+        library = self._style_packs if self._style_packs is not None else style_pack_library()
+        held = library.pack(binding.pack_id)
+        return (
+            held is not None
+            and held.version == binding.version
+            and held.manifest_sha256 == binding.manifest_sha256
+        )
+
+    def _require_library_pack(self, binding: StylePackBinding) -> None:
+        if not self._library_holds(binding):
+            raise InvalidStyleData(
+                f"style pack {binding.pack_id} version {binding.version} with manifest "
+                f"{binding.manifest_sha256} is not a pack of this host's library"
+            )
+
+    def _validate_proposal_style_pack(self, proposal: StyleProposal) -> None:
+        """A proposal names a pack for the whole world, and only a pack the library holds."""
+        if not proposal.style_pack_stated:
+            return
+        if proposal.scope.kind != "global":
+            raise InvalidStyleData(
+                "a style pack dresses the whole world; a regional proposal names none"
+            )
+        if proposal.style_pack is not None:
+            self._require_library_pack(proposal.style_pack)
 
     def _validate_scope(self, proposal: StyleProposal, topology_digest: str) -> None:
         if proposal.scope.kind == "global":
@@ -1856,7 +1938,48 @@ def _version_document(value: StyleVersion) -> dict[str, Any]:
         ),
         "appearance_basis": value.appearance_basis,
         "created_at": value.created_at.isoformat(),
+        # Only when the candidate names a pack, so a candidate naming none is the document it was.
+        **(
+            {}
+            if value.style_pack is None
+            else {"style_pack": _style_pack_document(value.style_pack)}
+        ),
     }
+
+
+def _style_pack_document(value: StylePackBinding | None) -> dict[str, Any] | None:
+    if value is None:
+        return None
+    return {
+        "pack_id": value.pack_id,
+        "version": value.version,
+        "manifest_sha256": value.manifest_sha256,
+    }
+
+
+def _style_pack_from_document(value: Mapping[str, Any] | None) -> StylePackBinding | None:
+    if value is None:
+        return None
+    return StylePackBinding(
+        str(value["pack_id"]), int(value["version"]), str(value["manifest_sha256"])
+    )
+
+
+def _stated_style_pack(value: Mapping[str, Any] | None) -> dict[str, Any]:
+    """A proposal row's request: no pack named (SQL null), or ``{"pack": null or a pack}``."""
+    if value is None:
+        return {}
+    return {"style_pack_stated": True, "style_pack": _style_pack_from_document(value["pack"])}
+
+
+def _style_pack_columns(value: StylePackBinding | None) -> tuple[str, tuple[object, ...]]:
+    """The columns and values naming a version's pack: none for a version that names no pack."""
+    if value is None:
+        return "", ()
+    return (
+        ",style_pack_id,style_pack_version,style_pack_manifest_sha256",
+        (value.pack_id, value.version, value.manifest_sha256),
+    )
 
 
 def _provenance_from_row(row: Mapping[str, Any]) -> ProposalProvenance:

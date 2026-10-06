@@ -81,6 +81,13 @@ export interface WorldStyleRecipeBinding {
   readonly capabilityMapping: Readonly<Record<string, string>>;
 }
 
+/** A style pack of the host's library, named exactly: what a version is drawn in. */
+export interface WorldStylePackBinding {
+  readonly packId: string;
+  readonly version: number;
+  readonly manifestSha256: string;
+}
+
 export interface WorldStyleVersionRecord {
   readonly versionId: string;
   readonly revision: number;
@@ -101,6 +108,8 @@ export interface WorldStyleVersionRecord {
   readonly modelName: string | null;
   readonly promptVersion: string | null;
   readonly refinesProposalId: string | null;
+  /** The style pack the world is drawn in; null (or absent from an older server) when it names none. */
+  readonly stylePack?: WorldStylePackBinding | null;
 }
 
 export interface WorldStyleState {
@@ -134,6 +143,9 @@ export interface WorldStyleProposalRecord {
   readonly validationIssues: readonly string[];
   readonly createdAt: string;
   readonly updatedAt: string;
+  /** Whether the proposal named a style pack, and which; one that named none kept its base's. */
+  readonly stylePackStated?: boolean;
+  readonly stylePack?: WorldStylePackBinding | null;
 }
 
 export interface UpstreamWorldStyleProposal {
@@ -166,6 +178,8 @@ interface PreviewRequest {
   readonly modelId: string | null;
   readonly promptVersion: string | null;
   readonly refinesProposalId: string | null;
+  /** The style pack the request names (null for none); absent keeps the base version's. */
+  readonly stylePack?: WorldStylePackBinding | null;
 }
 
 export interface ActiveWorldStylePreview {
@@ -480,6 +494,24 @@ export class WorldStyleClient {
     }));
   }
 
+  /**
+   * A Settings preview naming the style pack the world is drawn in (null for none), the world's
+   * current profile values unchanged. It is applied, refused and undone like any appearance change.
+   */
+  previewStylePack(pack: WorldStylePackBinding | null): Promise<ActiveWorldStylePreview> {
+    return this.#enqueuePreview(() => this.#replacePreview({
+      origin: 'settings',
+      originReference: 'appearance-panel',
+      scope: Object.freeze({ kind: 'global' }),
+      profile: validateLocalReference(this.#requireState().current.globalStyle),
+      referenceIds: Object.freeze([]),
+      modelId: null,
+      promptVersion: null,
+      refinesProposalId: null,
+      stylePack: pack,
+    }));
+  }
+
   previewUpstream(proposal: UpstreamWorldStyleProposal): Promise<ActiveWorldStylePreview> {
     if (proposal.origin === 'companion') {
       if (
@@ -781,6 +813,13 @@ export class WorldStyleClient {
         modelId: request.modelId,
         promptVersion: request.promptVersion,
         refinesProposalId: request.refinesProposalId,
+        ...(request.stylePack === undefined ? {} : {
+          stylePack: request.stylePack === null ? null : {
+            packId: request.stylePack.packId,
+            version: request.stylePack.version,
+            manifestSha256: request.stylePack.manifestSha256,
+          },
+        }),
       },
     ));
     return Object.freeze({
@@ -1000,6 +1039,22 @@ function parseVersion(value: unknown, historical = false): WorldStyleVersionReco
     modelName: nullableText(version['model_name'], 'model name'),
     promptVersion: nullableText(version['prompt_version'], 'prompt version'),
     refinesProposalId: nullableText(version['refines_proposal_id'], 'refined proposal ID'),
+    stylePack: parseStylePack(version['style_pack']),
+  });
+}
+
+/** A style pack binding as the server states it, or null when it names none (or predates them). */
+function parseStylePack(value: unknown): WorldStylePackBinding | null {
+  if (value === undefined || value === null) return null;
+  const pack = record(value, 'style pack');
+  const manifestSha256 = text(pack['manifest_sha256'], 'style pack manifest digest');
+  if (!/^[0-9a-f]{64}$/.test(manifestSha256)) {
+    throw new WorldStyleContractError('invalid_style_pack', 'A style pack is not named by a SHA-256.');
+  }
+  return Object.freeze({
+    packId: text(pack['pack_id'], 'style pack ID'),
+    version: positiveInteger(pack['version'], 'style pack version'),
+    manifestSha256,
   });
 }
 
@@ -1043,6 +1098,8 @@ function parseProposal(value: unknown): WorldStyleProposalRecord {
     validationIssues: freezeStrings(array(proposal['validation_issues'], 'proposal validation issues')),
     createdAt: text(proposal['created_at'], 'proposal creation time'),
     updatedAt: text(proposal['updated_at'], 'proposal update time'),
+    stylePackStated: proposal['style_pack_stated'] === true,
+    stylePack: parseStylePack(proposal['style_pack']),
   });
 }
 

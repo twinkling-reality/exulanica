@@ -9,9 +9,9 @@ the light and finish a preset becomes is the [render look](generated-tile-runtim
 
 Status: the manifest, both readers, the resolver, the fit rules, the piece budgets, the browser's
 reading of a palette piece, drawing a generated town in a pack (section 7), three authored packs
-(section 8) and the committed library the host serves (section 9) are built. Choosing a pack per
-world, binding a pack to a world's style version, a person's own packs (storing, uploading and
-downloading them) and drafting a pack with a model are planned and not built.
+(section 8), the committed library the host serves (section 9) and a world's appearance naming its
+pack (section 10) are built. A control for choosing a pack, a person's own packs (storing,
+uploading and downloading them) and drafting a pack with a model are planned and not built.
 
 ## 1. In plain words
 
@@ -154,10 +154,11 @@ down puts every material back and removes every piece.
 | Ink | A shading that draws ink outlines the tiles' opaque surfaces and the pack's baked pieces (`attachTileInk`) |
 
 The app draws a saved generated world in the pack its address names (`?look=toon`, `cozy`,
-`finished`, or `today` for the tile look) and otherwise in `DEFAULT_WORLD_LOOK`
-(`web/packages/app/src/world-look.ts`), the cozy town, reading the pack from the host (section 9).
-A pack the page cannot read is not stood in for: the world opens in the tile look, and the shell's
-`data-world-look` attribute states the pack asked for and why it was not drawn.
+`finished`, or `today` for the tile look), else the pack its appearance names (section 10), else
+`DEFAULT_WORLD_LOOK` (`web/packages/app/src/world-look.ts`), the cozy town, reading the pack from the
+host (section 9). A pack the page cannot read is not stood in for: the world opens in the tile look,
+and the shell's `data-world-look` attribute states the pack asked for, what chose it (`address`,
+`world` or `default`) and why it was not drawn.
 
 ## 8. The authored packs
 
@@ -198,3 +199,16 @@ it (`web/packages/app/src/world-look.ts`). The bytes are held by
 library of committed looks can share. `tests/test_style_pack_library.py` and
 `tests/test_style_pack_routes.py` hold the host's half, and `web/packages/app/test/world-look.test.ts`
 the page's.
+
+## 10. A world's pack
+
+A world's appearance names the pack it is drawn in. Its style version holds the pack's id, version
+and manifest digest, or none; naming one is an ordinary appearance change, previewed, applied and
+rolled back with the rest of the appearance and kept in its history
+([appearance authority](world-version-authorities.md#appearance-authority)). A pack the host's
+library does not hold at exactly that version and digest is refused when it is named, applied or
+rolled back to, so a world is never stored naming a pack its host cannot serve; a world read from
+history whose pack the host no longer holds says so in the version's warnings. The page fetches a
+world's pack by the manifest digest its appearance names, so it draws exactly the bytes the world
+was given. A pack states no structure, so naming one never moves the world's topology. A world
+package exported from a world does not yet carry the pack its appearance names.

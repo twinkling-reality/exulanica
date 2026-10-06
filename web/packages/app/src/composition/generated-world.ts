@@ -26,11 +26,12 @@
  * and the page then says why in words chosen by the refusal's code (`trafficRefusalWords`), never
  * a blank; the shell's `data-tile-traffic` attribute states what was served and drawn.
  *
- * A world is drawn in the look the page chooses (`../world-look.ts`): the tile look, or a style pack
+ * A world is drawn in the look the page chooses (`worldLookChoice` in `../world-look.ts`): the
+ * address's, else the pack its appearance names, else the default; the tile look, or a style pack
  * the host serves, whose light the tiles are loaded in and whose surfaces, windows and vehicles dress
  * them once attached. A pack the page cannot read is not stood in for: the world opens in the tile
- * look, and the shell's `data-world-look` attribute states the pack asked for and why it was not
- * drawn.
+ * look, and the shell's `data-world-look` attribute states the pack asked for, what chose it, and
+ * why it was not drawn.
  */
 
 import type { GeneratedTileAttachment, GeneratedTileHost, LoadedGeneratedTile } from '@exulanica/atlas-react/generated-tile';
@@ -39,6 +40,7 @@ import type { Credentials } from '../config.js';
 import { fill, say } from '../ui/copy.js';
 import { el } from '../ui/dom.js';
 import type { GeneratedGround, SavedWorldEntry } from '../world-entry-api.js';
+import type { WorldStylePackBinding } from '../world-style-api.js';
 import type { AppEnvironment } from './session-state.js';
 import {
   GENERATED_WORLD_READY_EVENT,
@@ -83,8 +85,16 @@ const TRAFFIC_NOT_LOADED = 'traffic_not_loaded';
 export interface GeneratedWorld {
   readonly tile: LoadedGeneratedTile;
   readonly ground: GeneratedGround;
-  /** The look it is drawn in: the pack asked for (null for the tile look), and why one was not drawn. */
-  readonly look: { readonly pack: string | null; readonly drawn: boolean; readonly reason: string | null };
+  /**
+   * The look it is drawn in: the pack asked for (null for the tile look), what chose it, whether it
+   * was drawn and why not.
+   */
+  readonly look: {
+    readonly pack: string | null;
+    readonly source: 'address' | 'world' | 'default';
+    readonly drawn: boolean;
+    readonly reason: string | null;
+  };
   /** The bodies its traffic takes from its pack while its tiles are attached, if any. */
   readonly bodies: () => VehicleBodies | null;
 }
@@ -162,6 +172,7 @@ export async function loadGeneratedWorld(
   access: Credentials,
   entry: SavedWorldEntry,
   search: string = typeof window === 'undefined' ? '' : window.location.search,
+  bound: WorldStylePackBinding | null = null,
 ): Promise<GeneratedWorld | GeneratedWorldWaiting | null> {
   const ground = entry.generatedGround ?? null;
   if (ground === null) return null;
@@ -179,12 +190,15 @@ export async function loadGeneratedWorld(
   const [first, ...rest] = containers;
   const neighbours: readonly { readonly name: string; readonly bytes: Uint8Array }[] = rest;
   const worldLook = await import('../world-look.js');
-  const pack = worldLook.chosenWorldLook(search);
+  const choice = worldLook.worldLookChoice(search, bound);
+  const pack = choice.packId;
   let prepared: import('../world-look.js').PreparedWorldLook | null = null;
   let reason: string | null = null;
   if (pack !== null) {
     try {
-      prepared = await worldLook.prepareWorldLook(access, pack, library.textureManifest, containers.map((one) => one.bytes));
+      prepared = await worldLook.prepareWorldLook(
+        access, pack, library.textureManifest, containers.map((one) => one.bytes), choice.manifestSha256,
+      );
     } catch (error) {
       reason = error instanceof Error ? error.message : String(error);
     }
@@ -216,7 +230,7 @@ export async function loadGeneratedWorld(
   return {
     tile: { ...loaded, start },
     ground,
-    look: { pack, drawn: prepared !== null, reason },
+    look: { pack, source: choice.source, drawn: prepared !== null, reason },
     bodies: dressed?.bodies ?? (() => null),
   };
 }
@@ -368,9 +382,10 @@ export async function openGeneratedWorld(
   env: AppEnvironment,
   access: Credentials,
   entry: SavedWorldEntry,
+  bound: WorldStylePackBinding | null = null,
 ): Promise<LoadedGeneratedTile | null> {
   env.shell.querySelector(`[${GENERATED_WORLD_WAITING_ATTRIBUTE}]`)?.remove();
-  const loaded = await loadGeneratedWorld(access, entry);
+  const loaded = await loadGeneratedWorld(access, entry, undefined, bound);
   if (loaded === null) return null;
   if (isGeneratedWorld(loaded)) {
     env.shell.setAttribute(WORLD_LOOK_ATTRIBUTE, JSON.stringify(loaded.look));

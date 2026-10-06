@@ -13,6 +13,7 @@ __all__ = [
     "ProposalOrigin",
     "ProposalProvenance",
     "SourceMediaState",
+    "StylePackBinding",
     "StyleParameterValue",
     "StylePreview",
     "StyleProposal",
@@ -55,6 +56,19 @@ class StyleReference:
 
 
 @dataclass(frozen=True, slots=True)
+class StylePackBinding:
+    """The style pack a world's appearance names: a pack of the host's committed library, exactly.
+
+    The manifest's SHA-256 names the very bytes the pack was when it was chosen, so a world is
+    drawn in what it was given and a pack changed under it is refused rather than reinterpreted.
+    """
+
+    pack_id: str
+    version: int
+    manifest_sha256: str
+
+
+@dataclass(frozen=True, slots=True)
 class StyleScope:
     kind: str
     region_id: str | None = None
@@ -76,6 +90,10 @@ class StyleProposal:
     #: reference id) or ``authored_design`` (a design choice citing none). Null for every other
     #: origin, and read as ``evidence`` on a Companion proposal written before the column.
     appearance_basis: str | None = None
+    #: Whether the proposal names a style pack. A proposal that does not keeps its base version's
+    #: pack; one that does sets ``style_pack``, a pack of the host's library or None for no pack.
+    style_pack_stated: bool = False
+    style_pack: StylePackBinding | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -111,6 +129,8 @@ class StyleVersion:
     #: The applied proposal's ``appearance_basis``: null for every version not from a Companion
     #: proposal and for a Companion one applied before the column.
     appearance_basis: str | None = None
+    #: The style pack the world is drawn in, or None when it names none (0141).
+    style_pack: StylePackBinding | None = None
 
 
 @dataclass(frozen=True, slots=True)

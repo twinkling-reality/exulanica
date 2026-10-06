@@ -27882,6 +27882,16 @@
        }
       ],
       "title": "Appearance Basis"
+     },
+     "style_pack": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/StylePackBody"
+       },
+       {
+        "type": "null"
+       }
+      ]
      }
     },
     "additionalProperties": false,
@@ -34485,6 +34495,59 @@
     "title": "StepSocietyBody",
     "description": "A minute, against the state the person was shown and, when pinned, the world clock's\nrevision (``GET .../clock``): another revision is refused, 409 ``stale_clock_revision``."
    },
+   "StylePackBody": {
+    "properties": {
+     "pack_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{0,31}(\\.[a-z][a-z0-9-]{0,31}){1,3}$",
+      "title": "Pack Id"
+     },
+     "version": {
+      "type": "integer",
+      "maximum": 1000000.0,
+      "minimum": 1.0,
+      "title": "Version"
+     },
+     "manifest_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Manifest Sha256"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "pack_id",
+     "version",
+     "manifest_sha256"
+    ],
+    "title": "StylePackBody",
+    "description": "A style pack of the host's library, named exactly: id, version and manifest digest."
+   },
+   "StylePackView": {
+    "properties": {
+     "pack_id": {
+      "type": "string",
+      "title": "Pack Id"
+     },
+     "version": {
+      "type": "integer",
+      "title": "Version"
+     },
+     "manifest_sha256": {
+      "type": "string",
+      "title": "Manifest Sha256"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "pack_id",
+     "version",
+     "manifest_sha256"
+    ],
+    "title": "StylePackView"
+   },
    "StyleProposalView": {
     "properties": {
      "proposal_id": {
@@ -34572,6 +34635,21 @@
        }
       ],
       "title": "Appearance Basis"
+     },
+     "style_pack_stated": {
+      "type": "boolean",
+      "title": "Style Pack Stated",
+      "default": false
+     },
+     "style_pack": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/StylePackView"
+       },
+       {
+        "type": "null"
+       }
+      ]
      },
      "recipe_binding": {
       "additionalProperties": {
@@ -34923,6 +35001,16 @@
        }
       ],
       "title": "Appearance Basis"
+     },
+     "style_pack": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/StylePackView"
+       },
+       {
+        "type": "null"
+       }
+      ]
      }
     },
     "additionalProperties": false,

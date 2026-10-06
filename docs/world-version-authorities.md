@@ -154,6 +154,21 @@ warning; and the original row stays intact for export and audit. Historical para
 discarded, never interpreted against a newer recipe. The fallback chain is validated at load and
 cannot contain a cycle; the default is `origin-landscape@1`.
 
+**The style pack.** A version may name the style pack the world is drawn in: a pack of the host's
+committed library ([style pack contract](style-pack-contract.md#9-the-library-the-host-serves)) by
+id, version and manifest digest, in three columns that are all set or all null (migration 0141); a
+version that names none, every version written before 0141 included, is drawn in the page's
+default look. A preview may name a pack (`style_pack`, or `stylePack`, absent, a pack, or null for
+none): a pack the library does not hold at exactly that version and digest is refused as
+`invalid_style_data` naming it, and so is any pack named by a regional proposal, since a pack
+dresses the whole world; a preview that names none keeps its base version's pack. Apply and
+Rollback check the pack again against the library they run beside, so a host that no longer holds
+it refuses the write by name rather than storing a pack it cannot serve; a version read from history
+whose pack the host does not hold carries a warning naming it. A proposal row keeps the request as
+sent (`{"pack": ...}`, or null when it named none), and each version, preview candidate and proposal
+view states it (`style_pack`, with `style_pack_stated` on a proposal). A pack states no structure,
+so naming one never touches the topology digest.
+
 **Transactions.** A style mutation locks the world's state row and compares both tokens:
 
 ```text
@@ -376,7 +391,10 @@ The problem codes are distinct because the recovery differs:
   write bases and the attachment tokens. `tests/test_world_style_open_previews.py` holds the
   read-back filter, the preview lifetime, its closing and `409 preview_expired`.
   `tests/test_world_api.py` holds route shapes, problem codes, actor derivation and cross-workspace
-  source behavior.
+  source behavior. `tests/test_world_style_pack_binding_postgres.py` and
+  `tests/test_world_style_pack_api_postgres.py` hold a version's style pack through preview, apply,
+  rollback and reads, and `tests/test_style_pack_binding_migration_postgres.py` holds 0141 over
+  earlier rows and its checks.
 - `tests/test_interaction_policy_postgres.py` covers registry parity, deterministic candidates,
   state-neutral discard, immutable apply, origin, model, prompt and refinement records, transcript
   exclusion, stale policy and structural bases, append-only rollback and recommendation

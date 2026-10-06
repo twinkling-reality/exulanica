@@ -13,9 +13,10 @@
  * records, its navigation or what anyone can walk on changes; taking the tiles down puts everything
  * back.
  *
- * Which pack: `DEFAULT_WORLD_LOOK`, unless the page's address names one (`?look=toon`, `cozy`,
- * `finished`, or `today` for the tile look). The address is presentation only, read from a closed
- * list of words for the team's packs.
+ * Which pack (`worldLookChoice`): the one the page's address names (`?look=toon`, `cozy`,
+ * `finished`, or `today` for the tile look), which is presentation only and read from a closed list
+ * of words for the team's packs; else the pack the world's appearance names (its style version's
+ * binding), fetched by the very manifest digest it names; else `DEFAULT_WORLD_LOOK`.
  */
 
 import type { LookFamily, ResolvedStylePack } from '@exulanica/atlas-core';
@@ -23,6 +24,7 @@ import type { GeneratedTileAttachment, GeneratedTileHost, LoadedGeneratedTile, R
 import type { FetchedPieces, OpeningSlot, PackVehicleBodies, TownLookRoles } from '@exulanica/atlas-react/style-pack';
 import type { VehicleBodies } from '@exulanica/atlas-react/traffic';
 import type { Credentials } from './config.js';
+import type { WorldStylePackBinding } from './world-style-api.js';
 import lookFamilyText from '../../../../assets/catalogs/world-kinds/look-family.v1.json?raw';
 import townRolesText from '../../../../assets/style-packs/town-look-roles.v1.json?raw';
 import colourTableText from '../../../../assets/colour/srgb8-linear16.v1.json?raw';
@@ -40,12 +42,32 @@ export const WORLD_LOOKS = Object.freeze({
 /** The pack a generated world opens in when the address names none: the cozy town. */
 export const DEFAULT_WORLD_LOOK: string | null = WORLD_LOOKS.cozy;
 
-/** The pack this page draws generated worlds in, or null for the tile look. */
-export function chosenWorldLook(search: string): string | null {
+/**
+ * The pack the page's address names: a pack id, null for the tile look (`today`), or undefined when
+ * it names none of the closed list's words.
+ */
+export function addressedWorldLook(search: string): string | null | undefined {
   const word = new URLSearchParams(search).get('look');
   if (word === 'today') return null;
   if (word !== null && Object.hasOwn(WORLD_LOOKS, word)) return WORLD_LOOKS[word as keyof typeof WORLD_LOOKS];
-  return DEFAULT_WORLD_LOOK;
+  return undefined;
+}
+
+/** The look a generated world is drawn in, and what chose it. */
+export interface WorldLookChoice {
+  /** The pack, or null for the tile look. */
+  readonly packId: string | null;
+  /** The manifest a world's appearance names exactly; null to read the host's list for the pack. */
+  readonly manifestSha256: string | null;
+  readonly source: 'address' | 'world' | 'default';
+}
+
+/** The address's pack, else the pack the world's appearance names, else the default. */
+export function worldLookChoice(search: string, bound: WorldStylePackBinding | null): WorldLookChoice {
+  const addressed = addressedWorldLook(search);
+  if (addressed !== undefined) return { packId: addressed, manifestSha256: null, source: 'address' };
+  if (bound !== null) return { packId: bound.packId, manifestSha256: bound.manifestSha256, source: 'world' };
+  return { packId: DEFAULT_WORLD_LOOK, manifestSha256: null, source: 'default' };
 }
 
 /** One pack as the host lists it. */
@@ -117,17 +139,23 @@ export async function stylePackContent(access: Credentials, sha256: string, what
 
 /**
  * Read the host's pack `packId` against the texture library the world is drawn with, fetch and
- * check its pieces, and find the windows of the world's tile `containers`.
+ * check its pieces, and find the windows of the world's tile `containers`. `manifestSha256` names
+ * the exact manifest a world's appearance names; without it the host's list names the current one.
  */
 export async function prepareWorldLook(
   access: Credentials,
   packId: string,
   textureManifest: Uint8Array,
   containers: readonly Uint8Array[],
+  manifestSha256: string | null = null,
 ): Promise<PreparedWorldLook> {
-  const listed = (await listedStylePacks(access)).find((entry) => entry.pack_id === packId);
-  if (listed === undefined) throw new Error(`The host serves no style pack ${packId}`);
-  const manifest = await stylePackContent(access, listed.manifest_sha256, `${packId} manifest`);
+  let digest = manifestSha256;
+  if (digest === null) {
+    const listed = (await listedStylePacks(access)).find((entry) => entry.pack_id === packId);
+    if (listed === undefined) throw new Error(`The host serves no style pack ${packId}`);
+    digest = listed.manifest_sha256;
+  }
+  const manifest = await stylePackContent(access, digest, `${packId} manifest`);
   const [style, { attachTileInk }, { parseTextureSetManifest, readStylePackManifest, resolveStylePack }] = await Promise.all([
     import('@exulanica/atlas-react/style-pack'),
     import('@exulanica/atlas-react/generated-tile'),

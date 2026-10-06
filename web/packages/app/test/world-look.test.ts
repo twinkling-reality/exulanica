@@ -7,8 +7,9 @@ import {
   DEFAULT_WORLD_LOOK,
   STYLE_PACK_LIST_PROFILE,
   WORLD_LOOKS,
-  chosenWorldLook,
+  addressedWorldLook,
   prepareWorldLook,
+  worldLookChoice,
 } from '../src/world-look.js';
 
 // Relative to web/, where the suite runs.
@@ -65,15 +66,24 @@ afterEach(() => {
 });
 
 describe('the look a generated world opens in', () => {
-  it('is the pack the address names from the closed list, the tile look for today, else the default', () => {
-    expect(chosenWorldLook('?look=cozy')).toBe('exulanica.cozy-town');
-    expect(chosenWorldLook('?look=toon')).toBe('exulanica.toon-town');
-    expect(chosenWorldLook('?look=finished')).toBe('exulanica.finished-town');
-    expect(chosenWorldLook('?look=today')).toBeNull();
-    expect(chosenWorldLook('')).toBe(DEFAULT_WORLD_LOOK);
+  const bound = { packId: 'exulanica.toon-town', version: 1, manifestSha256: 'a'.repeat(64) };
+
+  it('is the pack the address names from the closed list, the tile look for today, or none', () => {
+    expect(addressedWorldLook('?look=cozy')).toBe('exulanica.cozy-town');
+    expect(addressedWorldLook('?look=toon')).toBe('exulanica.toon-town');
+    expect(addressedWorldLook('?look=finished')).toBe('exulanica.finished-town');
+    expect(addressedWorldLook('?look=today')).toBeNull();
+    expect(addressedWorldLook('')).toBeUndefined();
     // A word that is not on the list, or a pack id written out, is not a way to name a pack.
-    expect(chosenWorldLook('?look=exulanica.cozy-town')).toBe(DEFAULT_WORLD_LOOK);
-    expect(chosenWorldLook('?look=constructor')).toBe(DEFAULT_WORLD_LOOK);
+    expect(addressedWorldLook('?look=exulanica.cozy-town')).toBeUndefined();
+    expect(addressedWorldLook('?look=constructor')).toBeUndefined();
+  });
+
+  it('is the pack the address names, else the pack the world names by its exact manifest, else the default', () => {
+    expect(worldLookChoice('?look=finished', bound)).toEqual({ packId: 'exulanica.finished-town', manifestSha256: null, source: 'address' });
+    expect(worldLookChoice('?look=today', bound)).toEqual({ packId: null, manifestSha256: null, source: 'address' });
+    expect(worldLookChoice('', bound)).toEqual({ packId: 'exulanica.toon-town', manifestSha256: 'a'.repeat(64), source: 'world' });
+    expect(worldLookChoice('?look=constructor', null)).toEqual({ packId: DEFAULT_WORLD_LOOK, manifestSha256: null, source: 'default' });
   });
 
   it('names only packs the committed library holds, the default among them', () => {
@@ -98,6 +108,27 @@ describe('a pack the host serves, prepared for a world', () => {
     expect(asked[0]!.url).toBe(`${ACCESS.baseUrl}/world/style-packs`);
     expect(asked.length).toBe(2 + files.size);
     for (const request of asked) expect(request.authorization).toBe(`Bearer ${ACCESS.token}`);
+  });
+
+  it('is read by the very manifest a world names, without the list', async () => {
+    const served = committedLibrary();
+    const listed = (served.list as { packs: { pack_id: string; manifest_sha256: string }[] }).packs;
+    const toon = listed.find((pack) => pack.pack_id === 'exulanica.toon-town')!;
+    const asked: { url: string; authorization: string | null }[] = [];
+    vi.stubGlobal('fetch', host({ ...served, list: { profile: STYLE_PACK_LIST_PROFILE, packs: [] } }, asked));
+    const prepared = await prepareWorldLook(ACCESS, 'exulanica.toon-town', TEXTURES, [], toon.manifest_sha256);
+    expect(prepared.packId).toBe('exulanica.toon-town');
+    expect(asked[0]!.url).toBe(`${ACCESS.baseUrl}/world/style-packs/${toon.manifest_sha256}`);
+    expect(asked.some((request) => request.url === `${ACCESS.baseUrl}/world/style-packs`)).toBe(false);
+  });
+
+  it('is refused when the manifest a world names is not the pack it names', async () => {
+    const served = committedLibrary();
+    const listed = (served.list as { packs: { pack_id: string; manifest_sha256: string }[] }).packs;
+    const cozy = listed.find((pack) => pack.pack_id === 'exulanica.cozy-town')!;
+    vi.stubGlobal('fetch', host(served, []));
+    await expect(prepareWorldLook(ACCESS, 'exulanica.toon-town', TEXTURES, [], cozy.manifest_sha256))
+      .rejects.toThrow('names exulanica.cozy-town');
   });
 
   it('is refused when the host does not list it, and nothing more is asked', async () => {
