@@ -280,9 +280,11 @@ def saved_world_roads(
 ) -> TrafficInput:
     """The road records a saved world's snapshot states, keyed by the world and its receipt.
 
-    ``roads_not_stated`` when the snapshot states no records or its records state no lane; a
-    world whose receipt no longer generates its records raises ``InvalidStructuralData``, named
-    by the reader (``unreadable_reason``).
+    ``roads_not_stated`` when the snapshot states no records read through ``town_records`` or its
+    records state no lane: a world made from a world kind is refused so before anything is
+    generated (its roads are drawn as surfaces nobody drives, and its records are generated only in
+    the kind worker). A world whose receipt no longer generates its records raises
+    ``InvalidStructuralData``, named by the reader (``unreadable_reason``).
     """
     if not states_records(connection, workspace_id, world_id, snapshot_id):
         raise TrafficRefused(

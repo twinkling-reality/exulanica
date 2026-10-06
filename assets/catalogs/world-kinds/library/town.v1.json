@@ -1,0 +1,110 @@
+{
+  "profile": "exulanica.world-kind-adapter/v1",
+  "kind": "town",
+  "version": 1,
+  "label": "A town",
+  "summary": "Streets, shops and homes laid out by the city grammar, with traffic on its streets: the presets and values of the world specification.",
+  "origin": "authored",
+  "provenance": {
+    "by": "Exulanica"
+  },
+  "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP"
+  },
+  "generator": {
+    "key": "city-grammar-town",
+    "version": 2
+  },
+  "specification": {
+    "name": "world-specification.v2",
+    "sha256": "18383aa6a9082489b0479dda923aa4eae8c335a067c8dcb320265e2a038b17cb"
+  },
+  "presets": {
+    "name": "world-recipe.v4",
+    "sha256": "5cbfe398340f2e80d98037337ecc804e88d39d84b054b4982a6e6fad7fd0fa14"
+  },
+  "parts": [
+    {
+      "key": "street",
+      "label": "street",
+      "description": "a street with lanes both ways and parking on a high street",
+      "form": "path",
+      "roles": [
+        "path",
+        "road"
+      ],
+      "look": "road.local_street"
+    },
+    {
+      "key": "footway",
+      "label": "footway",
+      "description": "the pavement beside a kerb",
+      "form": "path",
+      "roles": [
+        "path"
+      ],
+      "look": "path.footway"
+    },
+    {
+      "key": "home",
+      "label": "home",
+      "description": "the flats above the shops and in the residential blocks",
+      "form": "structure",
+      "roles": [
+        "home"
+      ],
+      "look": "structure.apartment_block"
+    },
+    {
+      "key": "shop",
+      "label": "shop",
+      "description": "a ground-floor premises with a shopfront",
+      "form": "structure",
+      "roles": [
+        "shop"
+      ],
+      "look": "structure.shophouse"
+    },
+    {
+      "key": "workplace",
+      "label": "workplace",
+      "description": "an office or a workshop",
+      "form": "structure",
+      "roles": [
+        "workplace"
+      ],
+      "look": "structure.office_block"
+    },
+    {
+      "key": "bench",
+      "label": "bench",
+      "description": "a street bench",
+      "form": "fixture",
+      "roles": [
+        "seat"
+      ],
+      "look": "fixture.bench"
+    },
+    {
+      "key": "street_tree",
+      "label": "street tree",
+      "description": "a tree in its pit on the footway",
+      "form": "fixture",
+      "roles": [
+        "decoration"
+      ],
+      "look": "plant.street_tree"
+    },
+    {
+      "key": "street_lamp",
+      "label": "street lamp",
+      "description": "a lamp post on the footway",
+      "form": "fixture",
+      "roles": [
+        "obstruction"
+      ],
+      "look": "fixture.street_lamp"
+    }
+  ]
+}

@@ -6,7 +6,10 @@
  */
 export const GENERATED_WORLD_READY_EVENT = 'exulanica:generated-world-ready';
 
-/** Marks the words saying why a generated world is not drawn yet: `baking` or `failed`. */
+/**
+ * Marks the words saying why a generated world is not drawn yet: `baking` (a town's tiles), `waiting`
+ * (a site world's drawing still being made) or `failed`.
+ */
 export const GENERATED_WORLD_WAITING_ATTRIBUTE = 'data-generated-world-waiting';
 
 /** What the ready event carries: the entry whose world can be opened again. */

@@ -7,7 +7,8 @@ The site is a rectangle with its entry at the middle of its south edge. The layo
    cross path the spine's width runs along that strip's front, so the far zone fronts a path too.
 2. **Lots.** Every other zone takes a lot on one side of the spine: the strips either side are cut
    north from the entry into lots, one per zone, in order of placement (front, then middle, left
-   and right, then back) and each as long as its share of its strip. A zone placed ``left`` or
+   and right, then back), each as long as its parts need and then its share of what is left of
+   its strip (:func:`_allot`). A zone placed ``left`` or
    ``right`` keeps that side; any other goes to the side holding less so far. Every lot fronts the
    spine, so every zone is reached from the entry.
 3. **A zone's contents**, in its lot's own frame (``u`` along the front, ``v`` into the lot): a
@@ -26,11 +27,17 @@ of whose seeds fit is refused by the kind's checks with that sentence.
 
 Every figure is an integer number of millimetres; every placed thing keeps the clearance stated
 for its enclosure below, and every draw is in the zone's or the structure's own domain.
+
+**The work a layout does is bounded by what it places, not by the size of the site.** A scattered
+holding draws its cells one at a time as it tries them, and a nearest-free search lists a band of
+points only when it needs it; with a :class:`LayoutBudget` every footprint tried and every point
+listed is counted, and a layout that would try more than the budget allows is refused by name
+(:class:`LayoutOverBudget`) before it does the work.
 """
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 from dataclasses import dataclass, field
 from itertools import pairwise
 from typing import Final
@@ -62,7 +69,14 @@ from exulanica.grammar.grammars.site.records import (
     SiteZoneRecord,
 )
 
-__all__ = ["DOOR_HEIGHT_MM", "SPACING", "Spacing", "lay_out"]
+__all__ = [
+    "DOOR_HEIGHT_MM",
+    "SPACING",
+    "LayoutBudget",
+    "LayoutOverBudget",
+    "Spacing",
+    "lay_out",
+]
 
 #: How tall a door's opening is: a standard doorway, 2,100 mm (2.1 m), and never taller than its
 #: wall.
@@ -130,6 +144,42 @@ SPACING: Final = {
 
 def _refuse(message: str) -> InvalidParameterError:
     return InvalidParameterError(message)
+
+
+class LayoutOverBudget(InvalidParameterError):
+    """A layout that would try more placements than its :class:`LayoutBudget` allows, refused by
+    name with where it was and the figure."""
+
+
+@dataclass(slots=True)
+class LayoutBudget:
+    """How many placement trials laying out a site may make: ``per_layout`` for one site and, when
+    stated, ``in_all`` for every site laid out with this budget (a kind's sample worlds share one).
+
+    A trial is one footprint tried against what is already placed, or one point a nearest-free
+    search lists; a search lists a band of points at a time, and the whole band is counted before
+    it is listed, so a layout is refused before it does the work the budget does not allow."""
+
+    per_layout: int
+    in_all: int | None = None
+    spent: int = 0
+    spent_in_all: int = 0
+
+    def begin(self) -> None:
+        """Start one site's layout: its own count starts again; the count in all carries on."""
+        self.spent = 0
+
+    def spend(self, trials: int, where: str) -> None:
+        self.spent += trials
+        self.spent_in_all += trials
+        if self.spent > self.per_layout:
+            raise LayoutOverBudget(
+                f"{where}: laying out the site tries more than {self.per_layout} placements"
+            )
+        if self.in_all is not None and self.spent_in_all > self.in_all:
+            raise LayoutOverBudget(
+                f"{where}: laying out these sites tries more than {self.in_all} placements in all"
+            )
 
 
 def _snap(value: int, module: int) -> int:
@@ -230,6 +280,7 @@ class _Emitter:
     """Collects records and numbers each owner's records of a kind from 0, in emission order."""
 
     context: StageContext
+    budget: LayoutBudget | None = None
     records: list[object] = field(default_factory=list)
     ordinals: dict[tuple[str, str], int] = field(default_factory=dict)
 
@@ -321,6 +372,115 @@ def _ring_walls(
         _wall(emitter, owner, part_key, frame, start, end, thickness, height, look, openings)
 
 
+def _by_distance(
+    us: range, vs: range, cu: int, cv: int, spend: _Spend
+) -> Iterator[tuple[int, int]]:
+    """Every point of the grid ``us`` by ``vs`` in order of its squared distance from ``(cu, cv)``,
+    then the point itself: the order sorting the whole grid by that key gives, found one band of
+    distance at a time outward, so a search that stops early never lists the far grid. Each band's
+    square of points is spent before it is listed."""
+    if not us or not vs:
+        return
+    step_u, step_v = us.step, vs.step
+    far_u = max(abs(us[0] - cu), abs(us[-1] - cu))
+    far_v = max(abs(vs[0] - cv), abs(vs[-1] - cv))
+    far = far_u * far_u + far_v * far_v
+    inner, radius = -1, max(step_u, step_v)
+    while True:
+        outer = radius * radius
+        i0 = max(0, -((us.start - (cu - radius)) // step_u))
+        i1 = min(len(us) - 1, (cu + radius - us.start) // step_u)
+        j0 = max(0, -((vs.start - (cv - radius)) // step_v))
+        j1 = min(len(vs) - 1, (cv + radius - vs.start) // step_v)
+        if i1 >= i0 and j1 >= j0:
+            spend((i1 - i0 + 1) * (j1 - j0 + 1))
+        band: list[tuple[int, tuple[int, int]]] = []
+        for i in range(i0, i1 + 1):
+            u = us.start + i * step_u
+            du = (u - cu) * (u - cu)
+            if du > outer:
+                continue
+            for j in range(j0, j1 + 1):
+                v = vs.start + j * step_v
+                d = du + (v - cv) * (v - cv)
+                if inner < d <= outer:
+                    band.append((d, (u, v)))
+        band.sort()
+        for _, point in band:
+            yield point
+        if outer >= far:
+            return
+        inner, radius = outer, radius * 2
+
+
+class _Spend:
+    """Counts trials against a layout's budget, or counts nothing when it has none."""
+
+    __slots__ = ("_budget", "_where")
+
+    def __init__(self, budget: LayoutBudget | None, where: str) -> None:
+        self._budget = budget
+        self._where = where
+
+    def __call__(self, trials: int) -> None:
+        if self._budget is not None:
+            self._budget.spend(trials, self._where)
+
+
+def _scattered(
+    columns: int, rows: int, cell: int, slack: int, area: _Rect, cursor: DomainCursor
+) -> Iterator[tuple[int, int, str]]:
+    """The cells of a ``columns`` by ``rows`` grid over ``area`` in a drawn order, each jittered
+    within its slack, drawn one at a time as they are tried: a Fisher and Yates shuffle that keeps
+    only the cells it has moved, so a holding draws for the cells it tries, however many the area
+    holds."""
+    total = columns * rows
+    moved: dict[int, int] = {}
+    for taken in range(total):
+        chosen = cursor.integer(taken, total - 1)
+        here = moved.pop(taken, taken)
+        if chosen == taken:
+            index = here
+        else:
+            index = moved.get(chosen, chosen)
+            moved[chosen] = here
+        column, row = index % columns, index // columns
+        jitter_u = cursor.integer(0, slack) - slack // 2 if slack > 0 else 0
+        jitter_v = cursor.integer(0, slack) - slack // 2 if slack > 0 else 0
+        yield (
+            area.a0 + column * cell + cell // 2 + jitter_u,
+            area.b0 + row * cell + cell // 2 + jitter_v,
+            "-v",
+        )
+
+
+class _Occupied:
+    """The rectangles placed things keep clear of, indexed by square cells so a trial asks only
+    the rectangles near it: the same answer as asking every one, which a full zone made slow."""
+
+    CELL: Final = 4_000
+
+    def __init__(self, rects: Sequence[_Rect]) -> None:
+        self._cells: dict[tuple[int, int], list[_Rect]] = {}
+        for rect in rects:
+            self.add(rect)
+
+    def _keys(self, rect: _Rect) -> Iterator[tuple[int, int]]:
+        cell = self.CELL
+        for cu in range(rect.a0 // cell, rect.a1 // cell + 1):
+            for cv in range(rect.b0 // cell, rect.b1 // cell + 1):
+                yield cu, cv
+
+    def add(self, rect: _Rect) -> None:
+        for key in self._keys(rect):
+            self._cells.setdefault(key, []).append(rect)
+
+    def clashes(self, rect: _Rect) -> bool:
+        return any(
+            rect.overlaps(other) for key in self._keys(rect) for other in self._cells.get(key, ())
+        )
+
+
 def _place(
     *,
     pattern: str,
@@ -331,10 +491,12 @@ def _place(
     clearance: int,
     cursor: DomainCursor,
     where: str,
+    budget: LayoutBudget | None = None,
 ) -> list[tuple[_Rect, str]]:
     """``count`` footprints for ``part`` inside the local rectangle ``area``, each with the local
     direction its front faces, clear of everything ``occupied`` and of each other; refused by name
-    when they do not all fit."""
+    when they do not all fit, and when trying them would spend more than ``budget`` allows."""
+    spend = _Spend(budget, where)
     w, d = part.width_mm, part.depth_mm
     width_u = area.a1 - area.a0
     depth_v = area.b1 - area.b0
@@ -358,25 +520,23 @@ def _place(
         first = area.a0 + (width_u - span) // 2 + size // 2
         return [first + pitch * index for index in range(number)]
 
-    candidates: list[tuple[int, int, str]] = []
+    candidates: Iterator[tuple[int, int, str]] | list[tuple[int, int, str]] = []
     if pattern == "row":
-        for cu in along(count, w):
-            candidates.append((cu, area.b0 + clearance + d // 2, "-v"))
+        candidates = [(cu, area.b0 + clearance + d // 2, "-v") for cu in along(count, w)]
     elif pattern == "grid":
         columns = 1
         while columns * columns < count:
             columns += 1
         rows = (count + columns - 1) // columns
         pitch_u, pitch_v = width_u // columns, depth_v // rows
-        for index in range(count):
-            row, column = divmod(index, columns)
-            candidates.append(
-                (
-                    area.a0 + pitch_u * column + pitch_u // 2,
-                    area.b0 + pitch_v * row + pitch_v // 2,
-                    "-v",
-                )
+        candidates = [
+            (
+                area.a0 + pitch_u * (index % columns) + pitch_u // 2,
+                area.b0 + pitch_v * (index // columns) + pitch_v // 2,
+                "-v",
             )
+            for index in range(count)
+        ]
     elif pattern in ("cluster", "centre"):
         centre_u, centre_v = (area.a0 + area.a1) // 2, (area.b0 + area.b1) // 2
         columns = 1
@@ -386,15 +546,15 @@ def _place(
         origin_u = centre_u - (pitch_u * (columns - 1)) // 2
         rows = (count + columns - 1) // columns
         origin_v = centre_v - (pitch_v * (rows - 1)) // 2
-        for index in range(count):
-            row, column = divmod(index, columns)
-            candidates.append((origin_u + pitch_u * column, origin_v + pitch_v * row, "-v"))
+        candidates = [
+            (origin_u + pitch_u * (index % columns), origin_v + pitch_v * (index // columns), "-v")
+            for index in range(count)
+        ]
     elif pattern in ("back_wall", "perimeter"):
         inset = 0 if pattern == "back_wall" else clearance // 2
         along_back = max(1, (width_u - clearance) // (w + clearance))
         back_count = count if pattern == "back_wall" else min(count, along_back)
-        for cu in along(back_count, w):
-            candidates.append((cu, area.b1 - inset - d // 2, "-v"))
+        lined = [(cu, area.b1 - inset - d // 2, "-v") for cu in along(back_count, w)]
         rest = count - back_count
         if rest:
             low_count = (rest + 1) // 2
@@ -403,42 +563,41 @@ def _place(
                 ("-u", rest - low_count, area.a1 - inset - d // 2),
             ):
                 pitch = max(w + clearance, (depth_v - d - 2 * clearance) // max(number, 1))
-                for index in range(number):
-                    candidates.append(
-                        (cu, area.b0 + d + clearance + pitch * index + pitch // 2, side)
-                    )
+                lined.extend(
+                    (cu, area.b0 + d + clearance + pitch * index + pitch // 2, side)
+                    for index in range(number)
+                )
+        candidates = lined
     elif pattern == "scatter":
         cell = max(w, d) + 2 * clearance
-        columns, rows = width_u // cell, depth_v // cell
-        cells = [(column, row) for row in range(rows) for column in range(columns)]
-        order = sorted(cells, key=lambda c: (cursor.number(), c))
-        slack = cell - max(w, d) - clearance
-        for column, row in order:
-            jitter_u = cursor.integer(0, max(slack, 0)) - slack // 2 if slack > 0 else 0
-            jitter_v = cursor.integer(0, max(slack, 0)) - slack // 2 if slack > 0 else 0
-            candidates.append(
-                (
-                    area.a0 + column * cell + cell // 2 + jitter_u,
-                    area.b0 + row * cell + cell // 2 + jitter_v,
-                    "-v",
-                )
-            )
+        candidates = _scattered(
+            max(width_u // cell, 0),
+            max(depth_v // cell, 0),
+            cell,
+            cell - max(w, d) - clearance,
+            area,
+            cursor,
+        )
     else:
         raise _refuse(f"{where}: a fixture is not laid out by {pattern}")
     step = max(200, (min(w, d) + clearance) // 2)
-    grid = [
-        (gu, gv)
-        for gu in range(area.a0 + step // 2, area.a1, step)
-        for gv in range(area.b0 + step // 2, area.b1, step)
-    ]
+    grid_u = range(area.a0 + step // 2, area.a1, step)
+    grid_v = range(area.b0 + step // 2, area.b1, step)
+    index = _Occupied(occupied)
 
     def fits(rect: _Rect) -> bool:
-        return rect.within(area) and not any(rect.overlaps(other) for other in occupied)
+        return rect.within(area) and not index.clashes(rect)
 
     placed: list[tuple[_Rect, str]] = []
-    for cu, cv, facing in candidates:
-        if len(placed) == count:
+    pending = iter(candidates)
+    # A candidate is taken only while one is still wanted, so a scattered holding draws no cell it
+    # does not try and a holding of none tries nothing.
+    while len(placed) < count:
+        candidate = next(pending, None)
+        if candidate is None:
             break
+        cu, cv, facing = candidate
+        spend(1)
         rect = footprint(cu, cv, facing)
         if not fits(rect):
             if pattern == "scatter":
@@ -448,15 +607,14 @@ def _place(
             # centred fixture steps to the nearest free point of a grid over the area.
             if pattern in ("row", "back_wall", "perimeter"):
                 if facing in ("-v", "+v"):
-                    line = [(gu, cv) for gu in range(area.a0 + step // 2, area.a1, step)]
+                    line = _by_distance(grid_u, range(cv, cv + 1), cu, cv, spend)
                 else:
-                    line = [(cu, gv) for gv in range(area.b0 + step // 2, area.b1, step)]
+                    line = _by_distance(range(cu, cu + 1), grid_v, cu, cv, spend)
             else:
-                line = grid
+                line = _by_distance(grid_u, grid_v, cu, cv, spend)
             found = None
-            for gu, gv in sorted(
-                line, key=lambda g: ((g[0] - cu) * (g[0] - cu) + (g[1] - cv) * (g[1] - cv), g)
-            ):
+            for gu, gv in line:
+                spend(1)
                 trial = footprint(gu, gv, facing)
                 if fits(trial):
                     found = trial
@@ -466,6 +624,7 @@ def _place(
             rect = found
         placed.append((rect, facing))
         occupied.append(rect.inflated(clearance))
+        index.add(occupied[-1])
     if len(placed) < count:
         raise _refuse(
             f"{where}: {count} of {part.key} ({w} by {d} mm) do not fit {pattern} in "
@@ -666,6 +825,8 @@ def _structure(
             fixture = parts[holding.part]
             assert isinstance(fixture, FixturePart)
             count = _draw(cursor, holding.count)
+            if count == 0:
+                continue
             placed = _place(
                 pattern=holding.pattern,
                 part=fixture,
@@ -675,6 +836,7 @@ def _structure(
                 clearance=spacing.clearance,
                 cursor=cursor,
                 where=f"{where} room {room.key} holding {holding_index}",
+                budget=emitter.budget,
             )
             _fixtures(emitter, room_identity, frame, placed, fixture)
     return door_u
@@ -832,6 +994,7 @@ def _zone(
             clearance=spacing.clearance,
             cursor=emitter.context.cursor(f"zone.{zone.key}.fixtures_{index}"),
             where=f"{where} holding {index}",
+            budget=emitter.budget,
         )
         _fixtures(emitter, identity, lot, placed, part)
     if zone.boundary:
@@ -906,13 +1069,18 @@ def _allot(plan: SitePlan, zones: Sequence[ZonePlan], length: int, front: str) -
     return lengths
 
 
-def lay_out(plan: SitePlan, context: StageContext) -> tuple[object, ...]:
+def lay_out(
+    plan: SitePlan, context: StageContext, budget: LayoutBudget | None = None
+) -> tuple[object, ...]:
     """Every record of a site, in emission order: extent, paths, zones with all they hold, and the
-    site's own boundary."""
+    site's own boundary; with ``budget``, refused by name (:class:`LayoutOverBudget`) as soon as it
+    would try more placements than the budget allows."""
     parts = plan.by_key()
     module = plan.module_mm
     width, depth = plan.width_mm, plan.depth_mm
-    emitter = _Emitter(context)
+    if budget is not None:
+        budget.begin()
+    emitter = _Emitter(context, budget)
     root = context.subject_identity
     spine = parts[plan.spine]
     assert isinstance(spine, PathPart)

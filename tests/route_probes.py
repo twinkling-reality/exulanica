@@ -596,6 +596,8 @@ PROBE_OVERRIDES: Final[dict[str, dict[str, Any]]] = {
             "bound_usd": "0.05",
         },
     },
+    "POST /worlds/kinds": {"json": {"document": {"profile": "exulanica.world-kind/v1"}}},
+    "POST /worlds/kinds/{kind}/worlds": {"json": {"preset": "small_farm", "title": "A probe"}},
     "POST /worlds/personal-source": {"json": {"topology_digest": _ZERO_DIGEST}},
 }
 

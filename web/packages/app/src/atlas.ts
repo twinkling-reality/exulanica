@@ -27,6 +27,7 @@
 
 import type { AtlasScene, DistrictInterpretation, IslandId, OwnedDistrict } from '@exulanica/atlas-core';
 import type { GeneratedTileMount } from '@exulanica/atlas-react/generated-tile';
+import type { GeneratedSiteMount } from '@exulanica/atlas-react/generated-site';
 import type {
   PresentationTheme,
   WorldArtProfile,
@@ -84,6 +85,8 @@ export async function mountAtlas(
     };
     /** Development evaluation only; see `composition/generated-tile.ts`. */
     readonly generatedTile?: GeneratedTileMount;
+    /** A world made from a world kind; see `composition/site-world.ts`. */
+    readonly generatedSite?: GeneratedSiteMount;
     readonly authoredRegion?: AuthoredRegion;
     /** Placed depth estimates for that region; ignored without one, because they have no root. */
     readonly authoredPointMaps?: readonly AuthoredPointMapPlacement[];
@@ -109,6 +112,9 @@ export async function mountAtlas(
     ...(presentation?.generatedTile === undefined
       ? {}
       : { generatedTile: presentation.generatedTile }),
+    ...(presentation?.generatedSite === undefined
+      ? {}
+      : { generatedSite: presentation.generatedSite }),
     ...(presentation?.authoredRegion === undefined
       ? {}
       : { authoredRegion: presentation.authoredRegion }),

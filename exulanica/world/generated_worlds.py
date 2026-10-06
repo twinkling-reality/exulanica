@@ -13,7 +13,10 @@ held to its output digest (:func:`town_records`): the records are never stored, 
 can drift from what the receipt says, and a world whose grammar or catalogs changed under it is
 refused by name. :func:`town_records` is the one interface through which anything reads a
 generated world's records, the society's ground and traffic alike; it keeps the few most recently
-read worlds' records in memory, keyed by the receipt's digest, which is immutable.
+read worlds' records in memory, keyed by the receipt's digest, which is immutable. A world made from
+a world kind (a site world) is the one exception: its kind came from a person, so its records are
+generated only in the kind worker (:mod:`exulanica.world.kinds.worker`), never on a request's
+thread, and :func:`town_records` refuses it (:class:`SiteRecordsElsewhere`).
 
 **Its tiles** are found by the digest over each tile's bake inputs (:func:`generated_tiles`): a
 tile is baked once, off the request, and a world whose tile is not yet baked says so rather than
@@ -51,18 +54,24 @@ from exulanica.world.worlds import GENERATED, register_world
 
 __all__ = [
     "BAKE_JOB_KIND",
+    "KIND_COMPOSERS",
     "GeneratedGround",
     "GeneratedRecords",
+    "GeneratedSite",
     "GeneratedTile",
+    "SiteRecordsElsewhere",
     "compose_generated_world",
     "compose_specified_world",
     "create_generated_authorities",
+    "create_kind_world_authorities",
     "generated_composer_keys",
     "generated_extent",
     "generated_ground",
+    "generated_site",
     "generated_tiles",
     "generation_receipt",
     "states_records",
+    "states_site",
     "town_records",
     "unreadable_reason",
 ]
@@ -118,6 +127,12 @@ _records_lock = threading.Lock()
 _records_kept: OrderedDict[str, tuple[object, ...]] = OrderedDict()
 
 
+class SiteRecordsElsewhere(RuntimeError):
+    """A site world's records asked of :func:`town_records`: they are generated in the kind worker
+    (:mod:`exulanica.world.kinds.worker`), never on the asking thread, so this is a defect in the
+    caller, not a refusal of the world."""
+
+
 def unreadable_reason(error: InvalidStructuralData) -> str:
     """The name a refusal to read a generated world carries: the composer's own when it names one of
     :data:`UNREADABLE_REASONS` first, else ``generated_world_unreadable``."""
@@ -125,9 +140,15 @@ def unreadable_reason(error: InvalidStructuralData) -> str:
     return named if named in UNREADABLE_REASONS else "generated_world_unreadable"
 
 
+#: The composers that make worlds from a world kind rather than from a recipe
+#: (:mod:`exulanica.world.composers.site_plan`).
+KIND_COMPOSERS: Final = frozenset({"site-plan"})
+
+
 def generated_composer_keys() -> frozenset[str]:
-    """Every composer a recipe names: the composers whose snapshots are generated worlds."""
-    return frozenset(recipe.composer_key for recipe in world_recipes())
+    """Every composer a recipe or a world kind names: the composers whose snapshots are generated
+    worlds."""
+    return frozenset(recipe.composer_key for recipe in world_recipes()) | KIND_COMPOSERS
 
 
 def compose_generated_world(recipe: WorldRecipe, world_id: str) -> ComposedWorld:
@@ -163,6 +184,48 @@ def create_generated_authorities(
     made for this world, generated before the transaction so no lock is held while it runs. The
     registration comes first because every world table names a registered world.
     """
+    return _create_authorities(
+        connection,
+        workspace_id=workspace_id,
+        actor=actor,
+        title=title,
+        reason=f"generated from world recipe {recipe.key}",
+        composed=composed,
+    )
+
+
+def create_kind_world_authorities(
+    connection: psycopg.Connection,
+    *,
+    workspace_id: uuid.UUID,
+    actor: uuid.UUID,
+    title: str,
+    kind: str,
+    version: int,
+    composed: ComposedWorld,
+) -> tuple[uuid.UUID, StyleVersion, uuid.UUID]:
+    """Register a world made from a world kind and write its receipt, snapshot, style and version,
+    as :func:`create_generated_authorities` does for a recipe's; a site world has no tiles, so no
+    bake is queued."""
+    return _create_authorities(
+        connection,
+        workspace_id=workspace_id,
+        actor=actor,
+        title=title,
+        reason=f"generated from world kind {kind} version {version}",
+        composed=composed,
+    )
+
+
+def _create_authorities(
+    connection: psycopg.Connection,
+    *,
+    workspace_id: uuid.UUID,
+    actor: uuid.UUID,
+    title: str,
+    reason: str,
+    composed: ComposedWorld,
+) -> tuple[uuid.UUID, StyleVersion, uuid.UUID]:
     world_id = str(composed.receipt["world_id"])
     register_world(
         connection,
@@ -170,7 +233,7 @@ def create_generated_authorities(
         world_id=world_id,
         kind=GENERATED,
         created_by=actor,
-        reason=f"generated from world recipe {recipe.key}",
+        reason=reason,
     )
     if receipt_sha256(composed.receipt) != composed.receipt_sha256:
         raise InvalidStructuralData("a generated world's receipt does not match its digest")
@@ -200,7 +263,8 @@ def create_generated_authorities(
     # world's tile would bake to: it queues no job, and the tile reads baked at once, as a world
     # with no job for a tile is read (generated_tiles). A bake of another stage is not read, so a
     # stage change rebakes. A tile stored with a fault the owner has not cleared still queues one,
-    # whose job then fails as every bake of it does.
+    # whose job then fails as every bake of it does. A world made from a world kind states no tiles:
+    # it is drawn from its records and never baked.
     composer = composed.receipt["composer"]
     inputs = {
         (int(tile_x), int(tile_y)): digest
@@ -208,7 +272,7 @@ def create_generated_authorities(
             composer["key"], composer["version"]
         ).tile_inputs(composed.receipt)
     }
-    for tile_x, tile_y in composed.receipt["tiles"]:
+    for tile_x, tile_y in composed.receipt.get("tiles", ()):
         stored = current_bake(connection, inputs[(int(tile_x), int(tile_y))])
         if stored is not None and stored.servable:
             continue
@@ -249,9 +313,10 @@ def _snapshot(
 def states_records(
     connection: psycopg.Connection, workspace_id: uuid.UUID, world_id: str, snapshot_id: uuid.UUID
 ) -> bool:
-    """Whether a world's snapshot states records: whether a recipe's composer composed it, so its
-    records are read through :func:`town_records`. A world of any other kind is composed from its
-    person's objects and photographs, and states none."""
+    """Whether a world's snapshot states records read through :func:`town_records`: whether a
+    recipe's composer composed it. A site world's records are read through the kind worker
+    (:func:`states_site`), and a world of any other kind is composed from its person's objects and
+    photographs and states none."""
     with connection.cursor(row_factory=dict_row) as cursor:
         row = cursor.execute(
             "select composer_key from world_structure_snapshot where workspace_id=%s and "
@@ -260,7 +325,8 @@ def states_records(
         ).fetchone()
     if row is None:
         raise UnknownWorldResource("no such structural snapshot")
-    return str(row["composer_key"]) in generated_composer_keys()
+    key = str(row["composer_key"])
+    return key in generated_composer_keys() and key not in KIND_COMPOSERS
 
 
 def generation_receipt(
@@ -300,9 +366,15 @@ def town_records(
 
     The one interface through which a generated world's records are read. The records are held
     to the receipt's output digest, and a world whose grammar or catalogs no longer generate it
-    is refused by name (``InvalidStructuralData``).
+    is refused by name (``InvalidStructuralData``). A site world's records are generated in the kind
+    worker, never here (:class:`SiteRecordsElsewhere`).
     """
     digest, receipt = generation_receipt(connection, workspace_id, world_id, snapshot_id)
+    if receipt["composer"]["key"] in KIND_COMPOSERS:
+        raise SiteRecordsElsewhere(
+            f"world {world_id} was made from a world kind: its records are generated in the kind "
+            "worker"
+        )
     with _records_lock:
         records = _records_kept.get(digest)
         if records is not None:
@@ -378,6 +450,54 @@ class GeneratedGround:
     #: specification file and recorded no values.
     specification: str | None = None
     values: Mapping[str, int | str] | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class GeneratedSite:
+    """What a saved entry says to draw of a world made from a world kind: its kind, its region and
+    where a person arrives in the region's frame (east, height, south), facing a plan vector (east,
+    south). The page reads the world's drawing through its version
+    (``GET /world/versions/{version_id}/site``)."""
+
+    kind: str
+    kind_version: int
+    kind_label: str
+    region_id: str
+    arrival_mm: tuple[int, int, int]
+    arrival_facing_mm: tuple[int, int]
+
+
+def states_site(
+    connection: psycopg.Connection, workspace_id: uuid.UUID, world_id: str, snapshot_id: uuid.UUID
+) -> bool:
+    """Whether a world's snapshot was composed from a world kind, so it is drawn from its site
+    drawing rather than from baked tiles; false for a town, a personal world or a starter alike."""
+    with connection.cursor(row_factory=dict_row) as cursor:
+        row = cursor.execute(
+            "select composer_key from world_structure_snapshot where workspace_id=%s and "
+            "world_id=%s and snapshot_id=%s",
+            (workspace_id, world_id, snapshot_id),
+        ).fetchone()
+    return row is not None and str(row["composer_key"]) in KIND_COMPOSERS
+
+
+def generated_site(
+    connection: psycopg.Connection, workspace_id: uuid.UUID, world_id: str, snapshot_id: uuid.UUID
+) -> GeneratedSite:
+    """The drawing a saved entry of a world made from a world kind declares."""
+    _, receipt = generation_receipt(connection, workspace_id, world_id, snapshot_id)
+    extent = generated_extent(connection, workspace_id, world_id, snapshot_id)
+    kind = receipt["kind"]
+    facing = receipt["arrival"]["facing_mm"]
+    return GeneratedSite(
+        kind=str(kind["kind"]),
+        kind_version=int(kind["version"]),
+        kind_label=str(kind["document"]["label"]),
+        region_id=extent.region_id,
+        arrival_mm=extent.arrival_mm,
+        # The receipt's facing is a site frame vector (east, north); the region states south.
+        arrival_facing_mm=(int(facing[0]), -int(facing[1])),
+    )
 
 
 def generated_ground(

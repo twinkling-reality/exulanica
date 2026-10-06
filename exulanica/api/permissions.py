@@ -546,6 +546,7 @@ _WORLD_READS: Final = _every(
     "GET /world/versions/{version_id}/clock/verify",
     "GET /world/versions/{version_id}/flight",
     "GET /world/versions/{version_id}/models",
+    "GET /world/versions/{version_id}/site",
     "GET /world/versions/{version_id}/society",
     "GET /world/versions/{version_id}/society/actions",
     "GET /world/versions/{version_id}/society/actions/{request_id}",
@@ -573,6 +574,7 @@ _WORLD_READS: Final = _every(
     "GET /world/versions/{version_id}/traffic/comparisons/{comparison_id}/runs/{run_id}/replay",
     "GET /worlds",
     "GET /worlds/capabilities",
+    "GET /worlds/kinds",
     "GET /worlds/recipes",
     "GET /worlds/specification",
 )
@@ -652,6 +654,8 @@ _WORLD_WRITES: Final = _every(
     "POST /world/versions/{version_id}/society/presence",
     "POST /world/versions/{version_id}/society/steps",
     "POST /worlds/generated",
+    "POST /worlds/kinds",
+    "POST /worlds/kinds/{kind}/worlds",
 )
 
 #: World writes that read admission state. Attach and rebind resolve and pin a human review,

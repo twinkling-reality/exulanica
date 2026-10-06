@@ -84,10 +84,12 @@ import {
   authoredFieldSupport,
   authoredRegionOf,
   describeWorldKind,
+  groundMount,
   worldNavigation,
   worldViews,
   type AuthoredRegion,
   type OwnedDistrictGround,
+  type GeneratedSiteMount,
   type WorldKind,
 } from './world-kind.js';
 import { cityView, worldStart, type CityView, type OpeningPlacements } from './camera-views.js';
@@ -433,11 +435,11 @@ export interface AtlasBindingOptions extends OpeningPlacements {
   /** Admitted owned geography. One semantic document drives rendering and collision. */
   readonly ownedDistrict?: OwnedDistrictGround;
   /**
-   * Development evaluation of one baked generated tile, reachable only from the preview route.
-   * Replaces the owned district: the tile supplies the ground, the collision and the opening
-   * stance, and draws itself into the environment root.
+   * A generated tile, or with `generatedSite` a world kind's site, in place of a district: it
+   * supplies the ground, the collision and the opening stance, and draws itself into the scene.
    */
   readonly generatedTile?: GeneratedTileMount;
+  readonly generatedSite?: GeneratedSiteMount;
   /** Optional current rights/record refinements for known renderer subjects. */
   readonly representationSubjects?: readonly RepresentationSubject[];
 }
@@ -1145,9 +1147,7 @@ export class AtlasBinding {
     binding.authoredPointMaps = authoredPointMaps;
     binding.authoredSociety = authoredSociety;
     binding.renderRoot.enabled = kind.memoryLayerVisible;
-    if (kind.ground.form === 'generated-tile') {
-      binding.generatedTile = kind.ground.tile.attach({ app, environmentRoot, camera });
-    }
+    binding.generatedTile = groundMount(kind)?.attach({ app, environmentRoot, camera }) ?? null;
     binding.initializeRepresentation(options.representationSubjects ?? []);
     binding.atmosphere.fogInDisplaySpace(kind.displaySpaceFog);
     return binding;

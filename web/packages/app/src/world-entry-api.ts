@@ -152,6 +152,13 @@ export interface SavedWorldEntry {
    * optional so entries built elsewhere need not name it.
    */
   readonly generatedGround?: GeneratedGround | null;
+  /**
+   * What the server declares the page draws of a world made from a world kind: its kind, the one
+   * region its people live in and where a person arrives; the drawing itself is read through the
+   * world's version. Null for every other world; optional so entries built elsewhere need not name
+   * it.
+   */
+  readonly generatedSite?: GeneratedSite | null;
   readonly arrival?: SavedArrivalDescriptor | null;
   readonly arrivalUnavailableReason?: 'arrival_source_unavailable' | null;
   readonly arrivalScene?: GraphPayload['reconstruction_scenes'][number] | null;
@@ -215,6 +222,17 @@ export interface GeneratedGround {
    * receipt records them; null for a world of a recipe that recorded none.
    */
   readonly values: Readonly<Record<string, number | string>> | null;
+}
+
+/** A world made from a world kind, as its saved entry declares it. */
+export interface GeneratedSite {
+  readonly kind: string;
+  readonly kindVersion: number;
+  readonly kindLabel: string;
+  readonly regionId: string;
+  readonly arrivalMm: readonly [east: number, height: number, south: number];
+  /** The way a person arriving faces, a plan vector: east, then south. */
+  readonly arrivalFacingMm: readonly [east: number, south: number];
 }
 
 /** A declared floor, in millimetres, as the server serves it on a saved world's entry. */
@@ -816,6 +834,7 @@ function parseEntry(value: unknown): SavedWorldEntry {
     throw new TypeError('Only an authored world entry carries an authored starter scene.');
   }
   const generatedGround = parseGeneratedGround(row['generated_ground']);
+  const generatedSite = parseGeneratedSite(row['generated_site']);
   const arrival = parseSavedArrival(row['arrival']);
   const arrivalUnavailableReason = row['arrival_unavailable_reason'];
   if (arrivalUnavailableReason !== undefined && arrivalUnavailableReason !== null
@@ -824,12 +843,14 @@ function parseEntry(value: unknown): SavedWorldEntry {
   }
   const arrivalScene = row['arrival_scene'] == null ? null
     : record(row['arrival_scene'], 'arrival scene') as unknown as GraphPayload['reconstruction_scenes'][number];
-  // Only a generated world declares a generated ground, and an available one always does. One
+  // Only a generated world declares what it is drawn from, its baked tiles (a town) or its site
+  // (a world made from a world kind), never both, and an available one always declares one. One
   // whose receipt no longer generates what it recorded is served unavailable, with the reason
-  // named and no ground, so the rest of the list still reads.
-  if (sourceKind !== 'generated' ? generatedGround !== null
-    : generatedGround === null && availability === 'available') {
-    throw new TypeError('A generated world entry, and only one, declares its generated ground.');
+  // named and neither, so the rest of the list still reads.
+  const declared = (generatedGround === null ? 0 : 1) + (generatedSite === null ? 0 : 1);
+  if (sourceKind !== 'generated' ? declared !== 0
+    : declared > 1 || (declared === 0 && availability === 'available')) {
+    throw new TypeError('A generated world entry, and only one, declares its generated ground or site.');
   }
   return Object.freeze({
     entryId: text(row['entry_id'], 'entry ID'),
@@ -859,6 +880,7 @@ function parseEntry(value: unknown): SavedWorldEntry {
     takesPhotographs: flag(row['takes_photographs'], 'photograph capability'),
     declaredFloor: parseDeclaredFloor(row['declared_floor']),
     generatedGround,
+    generatedSite,
     arrival,
     arrivalUnavailableReason: arrivalUnavailableReason ?? null,
     arrivalScene,
@@ -914,6 +936,35 @@ function parseSavedArrival(value: unknown): SavedArrivalDescriptor | null {
     positionLocalMm: Object.freeze(positionLocalMm) as unknown as SavedArrivalDescriptor['positionLocalMm'],
     forwardLocalMillionths: Object.freeze(forwardLocalMillionths) as unknown as SavedArrivalDescriptor['forwardLocalMillionths'],
     source: Object.freeze(pin),
+  });
+}
+
+/** A world kind's site as its entry declares it, or null when the entry names none. */
+function parseGeneratedSite(value: unknown): GeneratedSite | null {
+  if (value === undefined || value === null) return null;
+  const row = record(value, 'generated site');
+  const arrival = row['arrival_mm'];
+  const facing = row['arrival_facing_mm'];
+  if (!Array.isArray(arrival) || arrival.length !== 3) {
+    throw new TypeError('The server returned a generated site with no arrival point.');
+  }
+  if (!Array.isArray(facing) || facing.length !== 2) {
+    throw new TypeError('The server returned a generated site with no arrival facing.');
+  }
+  return Object.freeze({
+    kind: text(row['kind'], 'world kind'),
+    kindVersion: integer(row['kind_version'], 'world kind version'),
+    kindLabel: text(row['kind_label'], 'world kind label'),
+    regionId: text(row['region_id'], 'generated region ID'),
+    arrivalMm: Object.freeze([
+      integer(arrival[0], 'arrival east'),
+      integer(arrival[1], 'arrival height'),
+      integer(arrival[2], 'arrival south'),
+    ]) as GeneratedSite['arrivalMm'],
+    arrivalFacingMm: Object.freeze([
+      integer(facing[0], 'arrival facing east'),
+      integer(facing[1], 'arrival facing south'),
+    ]) as GeneratedSite['arrivalFacingMm'],
   });
 }
 

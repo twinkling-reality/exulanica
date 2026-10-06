@@ -131,6 +131,7 @@ from exulanica.api.routes import (
     world_environments,
     world_flight,
     world_generation,
+    world_kinds,
     world_models,
     world_objects,
     world_projects,
@@ -199,6 +200,7 @@ from exulanica.world import (
     seed_reviewed_assets,
 )
 from exulanica.world.flight_input import close_flight_worker
+from exulanica.world.kinds.worker import close_kind_worker
 from exulanica.world.society import SocietyBytesNotRead
 from exulanica.world.specification_samples import close_sample_worker
 from exulanica.world.style_pack_library import style_pack_library
@@ -362,6 +364,7 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
         await asyncio.to_thread(close_traffic_worker)
         # And the samples', at the first drafted specification.
         await asyncio.to_thread(close_sample_worker)
+        await asyncio.to_thread(close_kind_worker)
 
 
 def create_app(services: Services | None = None, *, verify: bool = True) -> FastAPI:
@@ -396,8 +399,9 @@ def create_app(services: Services | None = None, *, verify: bool = True) -> Fast
     # is read and before a thread or a connection is taken. Added first, because the middleware
     # added last is the outermost.
     app.add_middleware(AdmissionMiddleware, admission=app.state.admission)
-    # Pure ASGI and outermost, so it runs before routing and before any body is read.
-    app.add_middleware(BodyLimit)
+    # Pure ASGI and outermost, so it runs before routing and before any body is read; a route
+    # whose body is a small document states its own tighter limit beside the route.
+    app.add_middleware(BodyLimit, routes=world_kinds.BODY_LIMITS)
 
     app.include_router(health.router)
     app.include_router(accounts.router)
@@ -458,6 +462,8 @@ def create_app(services: Services | None = None, *, verify: bool = True) -> Fast
     app.include_router(worlds.router)
     app.include_router(generated_worlds.router)
     app.include_router(generated_worlds.tiles_router)
+    app.include_router(world_kinds.router)
+    app.include_router(world_kinds.site_router)
     app.include_router(world_drafts.router)
     # After the last router and before the application is handed to anybody: a route nobody
     # declared, or a declaration for a route that is gone, is a build failure with its name in it.

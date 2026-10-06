@@ -66,10 +66,11 @@ def test_a_receipt_whose_output_changed_is_refused_by_name():
     changed["seed"] = "7" * 64
     with pytest.raises(InvalidStructuralData, match="generated_world_output_changed"):
         SITE.records(changed)
+    # The catalogs' digests are a record of what the kind was checked against, not a gate: a world
+    # whose plan and records come out as they were regenerates after a catalog is edited.
     catalogs = copy.deepcopy(dict(composed.receipt))
-    catalogs["catalogs"] = {**catalogs["catalogs"], "kind-bound": "0" * 64}
-    with pytest.raises(InvalidStructuralData, match="generated_world_catalogs_changed"):
-        SITE.records(catalogs)
+    catalogs["catalogs"] = {**catalogs["catalogs"], "look-family": "0" * 64}
+    assert SITE.records(catalogs) == composed.records
     kind = copy.deepcopy(dict(composed.receipt))
     kind["kind"]["sha256"] = "0" * 64
     with pytest.raises(InvalidStructuralData, match="generated_world_unreadable"):

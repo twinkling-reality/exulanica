@@ -113,6 +113,12 @@ export async function mountRenderer(deps: RendererDependencies): Promise<Mounted
         env, state.credentials, state.activeWorldEntry, state.worldStyleConnection?.state.current.stylePack ?? null,
       )
       : undefined;
+    // A saved world made from a world kind draws its site's served drawing, read through its own
+    // version and held to the digest the route names; one that cannot be read is not drawn.
+    const generatedSite = generatedTile === undefined && state.activeWorldEntry?.generatedSite != null
+      && state.credentials !== null
+      ? await (await import('./site-world.js')).openSiteWorld(env, state.credentials, state.activeWorldEntry)
+      : undefined;
     const district = generatedTile === undefined && state.activeWorldEntry === null
       ? await ownedDistrict({ preview: env.preview })
       : undefined;
@@ -175,6 +181,7 @@ export async function mountRenderer(deps: RendererDependencies): Promise<Mounted
       ...(district === undefined ? {} : { ownedDistrict: district }),
       ...(generatedTile === undefined ? {} : { generatedTile }),
       ...(generatedWorld == null ? {} : { generatedTile: generatedWorld }),
+      ...(generatedSite == null ? {} : { generatedSite }),
       ...(state.placementRegionIds === undefined ? {} : { placementRegionIds: state.placementRegionIds }),
       ...(state.arrivalVerified && state.activeWorldEntry?.arrival != null
         ? { servedArrival: state.activeWorldEntry.arrival }

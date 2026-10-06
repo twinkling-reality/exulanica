@@ -6,7 +6,10 @@ with one, at most :data:`SAMPLES_MAXIMUM` samples. Each sample is made the way a
 is made (:func:`compose_site`): the kind's seed candidates are tried in order, and a candidate is
 kept only when
 
-* the site grammar lays it out (its parts fit their zones);
+* the site grammar lays it out (its parts fit their zones) within its layout budget: one world's
+  layout tries at most the bounds catalog's ``layout_trials`` placements, and every sample of one
+  kind's check together at most ``check_layout_trials``, so the work a kind asks for is bounded
+  whatever its document says;
 * its place passes the society's own place check (:func:`~exulanica.world.society_place.
   validate_place`) under the kind's routine;
 * its walking graph is no larger than the largest a living society's tick was measured on;
@@ -30,6 +33,7 @@ from typing import Any, Final
 from exulanica.canonical import sha256_of_canonical
 from exulanica.grammar.errors import InvalidParameterError, InvalidRecordError
 from exulanica.grammar.grammars.site import generate_site, site_records
+from exulanica.grammar.grammars.site.layout import LayoutBudget, LayoutOverBudget
 from exulanica.grammar.grammars.site.plan import SitePlan, plan_sha256
 from exulanica.world.kinds.catalogs import load_kind_catalogs
 from exulanica.world.kinds.document import KindDocument, KindRefused
@@ -37,6 +41,7 @@ from exulanica.world.kinds.routine import kind_routine
 from exulanica.world.society_catalogs import RoutineModel
 from exulanica.world.society_place import validate_place
 from exulanica.world.society_site_place import (
+    GraphOverBudget,
     SiteSociety,
     place_from_site_records,
     place_residents,
@@ -50,6 +55,7 @@ __all__ = [
     "SiteWorld",
     "check_samples",
     "compose_site",
+    "layout_budget",
     "sample_values",
     "site_seed",
 ]
@@ -65,6 +71,7 @@ _SAMPLE_NAMESPACE: Final = uuid.uuid5(
 #: The order a candidate's checks report a failure in, so a refusal names the first need unmet.
 _CODES: Final = (
     "kind_generation_refused",
+    "kind_layout_over_budget",
     "kind_graph_over_budget",
     "kind_population_out_of_bounds",
     "kind_unreachable",
@@ -188,6 +195,15 @@ def _needs(
     return None
 
 
+def layout_budget(*, in_all: bool = False) -> LayoutBudget:
+    """The layout budget the bounds catalog states: ``layout_trials`` for each world, and with
+    ``in_all`` also ``check_layout_trials`` for every sample world of one kind's check together."""
+    bounds = load_kind_catalogs().bounds
+    return LayoutBudget(
+        bounds["layout_trials"][1], bounds["check_layout_trials"][1] if in_all else None
+    )
+
+
 def compose_site(
     kind: KindDocument,
     values: Mapping[str, int],
@@ -195,14 +211,25 @@ def compose_site(
     *,
     routine: RoutineModel | None = None,
     candidates: int | None = None,
+    budget: LayoutBudget | None = None,
 ) -> SiteWorld:
     """The world ``kind`` makes with ``values`` for ``world_id``: the first seed candidate whose
-    site is laid out and meets every need; :class:`SiteRefused` with every candidate's sentence
+    site is laid out within ``budget`` (by default each candidate within the bounds catalog's
+    ``layout_trials``) and meets every need; :class:`SiteRefused` with every candidate's sentence
     when none does."""
     bounds = load_kind_catalogs().bounds
     tries = bounds["candidates"][0] if candidates is None else candidates
+    budget = layout_budget() if budget is None else budget
     routine = kind_routine(kind) if routine is None else routine
-    plan = kind.plan(values)
+    try:
+        plan = kind.plan(values)
+    except (InvalidParameterError, InvalidRecordError) as exc:
+        refusal = {
+            "candidate": 0,
+            "code": "kind_generation_refused",
+            "refusal": f"its values make no site plan: {str(exc)[:400]}",
+        }
+        raise SiteRefused("kind_generation_refused", [refusal]) from exc
     digest = plan_sha256(plan)
     society = kind.society(values)
     refused: list[dict[str, object]] = []
@@ -211,7 +238,18 @@ def compose_site(
         seed = site_seed(kind.reference(), values, world_id, candidate)
         identity = _identity(seed)
         try:
-            generation = generate_site(plan, seed=seed, subject_identity=identity)
+            generation = generate_site(plan, seed=seed, subject_identity=identity, budget=budget)
+        except LayoutOverBudget as exc:
+            refused.append(
+                {
+                    "candidate": candidate,
+                    "code": "kind_layout_over_budget",
+                    "refusal": str(exc)[:500],
+                }
+            )
+            if _CODES.index("kind_layout_over_budget") > _CODES.index(code):
+                code = "kind_layout_over_budget"
+            continue
         except (InvalidParameterError, InvalidRecordError) as exc:
             refused.append(
                 {
@@ -222,9 +260,26 @@ def compose_site(
             )
             continue
         records = site_records(generation)
-        place = place_from_site_records(
-            place_id=f"generated:{world_id}", records=records, society=society, routine=routine
-        )
+        try:
+            # The graph's budget is held while it is built, so an oversized site stops early.
+            place = place_from_site_records(
+                place_id=f"generated:{world_id}",
+                records=records,
+                society=society,
+                routine=routine,
+                node_limit=bounds["walking_nodes"][1],
+            )
+        except GraphOverBudget as exc:
+            refused.append(
+                {
+                    "candidate": candidate,
+                    "code": "kind_graph_over_budget",
+                    "refusal": f"{exc}, the most a living society's tick was measured on",
+                }
+            )
+            if _CODES.index("kind_graph_over_budget") > _CODES.index(code):
+                code = "kind_graph_over_budget"
+            continue
         try:
             validate_place(place, routine)
         except ValueError as exc:
@@ -281,13 +336,15 @@ def sample_values(kind: KindDocument) -> list[tuple[str, dict[str, int], int]]:
 
 def check_samples(kind: KindDocument) -> dict[str, Any]:
     """Build every sample world of a kind and refuse the kind by name at the first that fails;
-    the validation report when all pass."""
+    the validation report when all pass. Every sample's layouts share one budget in all
+    (:func:`layout_budget`)."""
     routine = kind_routine(kind)
+    budget = layout_budget(in_all=True)
     outcomes: list[dict[str, Any]] = []
     for label, values, seed in sample_values(kind):
         world_id = f"sample:{kind.sha256}:{seed}"
         try:
-            world = compose_site(kind, values, world_id, routine=routine)
+            world = compose_site(kind, values, world_id, routine=routine, budget=budget)
         except SiteRefused as exc:
             refusal = KindRefused(
                 exc.code,

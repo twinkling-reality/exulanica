@@ -6,10 +6,10 @@
     {
       "key": "animal",
       "fit": "contain",
-      "dressing": "primitive",
+      "dressing": "surface",
       "fill_minimum_permille": 0,
       "fill_maximum_permille": 0,
-      "reason": "An animal is drawn as the engine's primitive of its slot until an animal catalog with rigged bodies exists; a pack may not dress it with a static mesh.",
+      "reason": "An animal is drawn as the engine's primitive of its slot, coloured by the pack's swatch for the family, until an animal catalog with rigged bodies exists; a pack may not dress it with a static mesh.",
       "licence": {
         "spdx": "Apache-2.0",
         "verdict": "SHIP",
@@ -21,10 +21,10 @@
     {
       "key": "boundary",
       "fit": "tile",
-      "dressing": "module",
+      "dressing": "both",
       "fill_minimum_permille": 0,
       "fill_maximum_permille": 0,
-      "reason": "A fence, hedge or wall run repeats a module along its length, ends trimmed, so any run length is dressed without stretching.",
+      "reason": "A fence, hedge or wall run repeats a module along its length, ends trimmed, so any run length is dressed without stretching. A pack may instead colour the engine's own piece with the family's swatch.",
       "licence": {
         "spdx": "Apache-2.0",
         "verdict": "SHIP",
@@ -51,10 +51,10 @@
     {
       "key": "door",
       "fit": "fill",
-      "dressing": "module",
+      "dressing": "both",
       "fill_minimum_permille": 800,
       "fill_maximum_permille": 1250,
-      "reason": "A door module fills its opening so no hole shows round it; it may stretch on each axis only within the bounds below of its authored size, else the next variant or the fallback is drawn. A filled module is drawn when each axis of the slot lies from 800 to 1,250 per mille of the module's authored size, so an opening is never filled by a module stretched past a quarter or squeezed past a fifth.",
+      "reason": "A door module fills its opening so no hole shows round it; it may stretch on each axis only within the bounds below of its authored size, else the next variant or the fallback is drawn. A filled module is drawn when each axis of the slot lies from 800 to 1,250 per mille of the module's authored size, so an opening is never filled by a module stretched past a quarter or squeezed past a fifth. A pack may instead colour the engine's own piece with the family's swatch.",
       "licence": {
         "spdx": "Apache-2.0",
         "verdict": "SHIP",
@@ -66,10 +66,10 @@
     {
       "key": "fixture",
       "fit": "contain",
-      "dressing": "module",
+      "dressing": "both",
       "fill_minimum_permille": 0,
       "fill_maximum_permille": 0,
-      "reason": "A bed, a bench or a workbench is scaled uniformly into its slot with its base on the floor, so its proportions hold.",
+      "reason": "A bed, a bench or a workbench is scaled uniformly into its slot with its base on the floor, so its proportions hold. A pack may instead colour the engine's own piece with the family's swatch.",
       "licence": {
         "spdx": "Apache-2.0",
         "verdict": "SHIP",
@@ -111,10 +111,10 @@
     {
       "key": "plant",
       "fit": "contain",
-      "dressing": "module",
+      "dressing": "both",
       "fill_minimum_permille": 0,
       "fill_maximum_permille": 0,
-      "reason": "A tree, a hedge plant or a crop clump is scaled uniformly into its slot with its base on the ground.",
+      "reason": "A tree, a hedge plant or a crop clump is scaled uniformly into its slot with its base on the ground. A pack may instead colour the engine's own piece with the family's swatch.",
       "licence": {
         "spdx": "Apache-2.0",
         "verdict": "SHIP",
@@ -126,10 +126,10 @@
     {
       "key": "prop",
       "fit": "contain",
-      "dressing": "module",
+      "dressing": "both",
       "fill_minimum_permille": 0,
       "fill_maximum_permille": 0,
-      "reason": "A thing only drawn (a crate, a hay bale) is scaled uniformly into its slot with its base on the ground.",
+      "reason": "A thing only drawn (a crate, a hay bale) is scaled uniformly into its slot with its base on the ground. A pack may instead colour the engine's own piece with the family's swatch.",
       "licence": {
         "spdx": "Apache-2.0",
         "verdict": "SHIP",
@@ -171,10 +171,10 @@
     {
       "key": "structure",
       "fit": "contain",
-      "dressing": "module",
+      "dressing": "both",
       "fill_minimum_permille": 0,
       "fill_maximum_permille": 0,
-      "reason": "A whole structure module is scaled uniformly into its slot; its doors and walls stay the engine's, which the module must not cover.",
+      "reason": "A whole structure module is scaled uniformly into its slot; its doors and walls stay the engine's, which the module must not cover. A pack may instead colour the engine's own piece with the family's swatch.",
       "licence": {
         "spdx": "Apache-2.0",
         "verdict": "SHIP",
@@ -186,10 +186,10 @@
     {
       "key": "vehicle",
       "fit": "contain",
-      "dressing": "module",
+      "dressing": "both",
       "fill_minimum_permille": 0,
       "fill_maximum_permille": 0,
-      "reason": "A vehicle is scaled uniformly into its slot with its wheels on the ground; in this version it stands still.",
+      "reason": "A vehicle is scaled uniformly into its slot with its wheels on the ground; in this version it stands still. A pack may instead colour the engine's own piece with the family's swatch.",
       "licence": {
         "spdx": "Apache-2.0",
         "verdict": "SHIP",
@@ -231,10 +231,10 @@
     {
       "key": "window",
       "fit": "fill",
-      "dressing": "module",
+      "dressing": "both",
       "fill_minimum_permille": 800,
       "fill_maximum_permille": 1250,
-      "reason": "A window module fills its opening so no hole shows round it, within the bounds below of its authored size. A filled module is drawn when each axis of the slot lies from 800 to 1,250 per mille of the module's authored size, so an opening is never filled by a module stretched past a quarter or squeezed past a fifth.",
+      "reason": "A window module fills its opening so no hole shows round it, within the bounds below of its authored size. A filled module is drawn when each axis of the slot lies from 800 to 1,250 per mille of the module's authored size, so an opening is never filled by a module stretched past a quarter or squeezed past a fifth. A pack may instead colour the engine's own piece with the family's swatch.",
       "licence": {
         "spdx": "Apache-2.0",
         "verdict": "SHIP",

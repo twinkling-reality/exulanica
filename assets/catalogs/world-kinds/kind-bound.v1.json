@@ -43,6 +43,19 @@
       }
     },
     {
+      "key": "check_layout_trials",
+      "minimum": 1,
+      "maximum": 1000000,
+      "reason": "Every sample world of one kind's check together tries at most 1,000,000 placements, ten worlds at the most one world may try. Measured 2026-10-06 on the development machine: the hand-written test kinds try at most 5,268 across their whole checks. A check past it is refused by name, so the work one kind asks for is bounded whatever its document says.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
       "key": "description_characters",
       "minimum": 0,
       "maximum": 80,
@@ -121,6 +134,19 @@
       }
     },
     {
+      "key": "grid_points",
+      "minimum": 1,
+      "maximum": 262144,
+      "reason": "A site's grid, its width by its depth in modules of its enclosure, is at most 512 by 512 points: the largest open site, 256 m on its 500 mm module. An indoor site, on its 100 mm module, is then at most 51.2 m on a side. A larger grid is refused before anything is generated.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
       "key": "holding_count",
       "minimum": 0,
       "maximum": 64,
@@ -151,6 +177,19 @@
       "minimum": 1,
       "maximum": 60,
       "reason": "A label is a few words.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "layout_trials",
+      "minimum": 1,
+      "maximum": 100000,
+      "reason": "Laying out one world tries at most 100,000 placements: a placement is one footprint tried against what is placed, or one point a search for free ground lists. Measured 2026-10-06 on the development machine: the hand-written test kinds try at most 304 in a world, a holding scattered over a 256 m site 443, and small fixtures searching for room round larger ones 623,633, which took 0.37 s; a layout reaching 100,000 was refused in 0.05 s. A layout past it is refused by name before it does the work.",
       "licence": {
         "spdx": "Apache-2.0",
         "verdict": "SHIP",
@@ -229,6 +268,19 @@
       "minimum": 1500,
       "maximum": 12000,
       "reason": "A path is at least 1.5 m, wide enough for two people to pass (two 340 mm walking capsules with room between), and at most 12 m, a wide yard road.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "placed_things",
+      "minimum": 1,
+      "maximum": 512,
+      "reason": "Everything a kind places (each holding at its most, a structure's rooms and their fixtures included) is at most 512: about half the 962 walking places a living society's tick was measured on, since each placed thing a person uses adds at least one place, and room for a farm's or a cafe's furniture many times over. A kind placing more is refused before anything is generated.",
       "licence": {
         "spdx": "Apache-2.0",
         "verdict": "SHIP",

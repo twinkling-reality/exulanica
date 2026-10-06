@@ -60,6 +60,7 @@ __all__ = [
     "INDOOR_LATTICE_MM",
     "OFFSITE_HOME_ID",
     "SITE_RECORDS_PROFILE",
+    "GraphOverBudget",
     "PartUse",
     "SiteSociety",
     "place_from_site_records",
@@ -219,19 +220,64 @@ def _wall_boxes(record: SiteWallRecord) -> list[_Box]:
     return boxes
 
 
+class GraphOverBudget(ValueError):
+    """A site's walking graph grew past the most places it may hold, while it was being built."""
+
+    def __init__(self, limit: int) -> None:
+        super().__init__(f"its walking graph grew past {limit} places")
+        self.limit = limit
+
+
+class _Cells:
+    """Boxes indexed by the square cells they overlap, so a point or a short way asks only the boxes
+    near it: a box that holds a point overlaps the point's cell, and one a way passes through
+    overlaps a cell of the way's bounding rectangle, so the answers are the ones asking every box
+    gives."""
+
+    CELL: Final = 8_000
+
+    def __init__(self, boxes: Sequence[_Box]) -> None:
+        self.boxes = list(boxes)
+        self.cells: dict[tuple[int, int], list[int]] = {}
+        cell = self.CELL
+        for index, box in enumerate(self.boxes):
+            for cx in range(box.x0 // cell, box.x1 // cell + 1):
+                for cy in range(box.y0 // cell, box.y1 // cell + 1):
+                    self.cells.setdefault((cx, cy), []).append(index)
+
+    def holding(self, point: Point) -> list[_Box]:
+        cell = self.CELL
+        return [self.boxes[i] for i in self.cells.get((point[0] // cell, point[1] // cell), ())]
+
+    def near(self, a: Point, b: Point) -> list[_Box]:
+        cell = self.CELL
+        found: set[int] = set()
+        for cx in range(min(a[0], b[0]) // cell, max(a[0], b[0]) // cell + 1):
+            for cy in range(min(a[1], b[1]) // cell, max(a[1], b[1]) // cell + 1):
+                found.update(self.cells.get((cx, cy), ()))
+        return [self.boxes[i] for i in sorted(found)]
+
+
 class _Graph:
-    def __init__(self, blocked: Sequence[_Box]) -> None:
-        self.blocked = [box.inflated(CAPSULE_RADIUS_MM) for box in blocked]
+    def __init__(self, blocked: Sequence[_Box], node_limit: int | None = None) -> None:
+        self.blocked = _Cells([box.inflated(CAPSULE_RADIUS_MM) for box in blocked])
         self.nodes: dict[str, Point] = {}
         self.edges: dict[tuple[str, str], dict[str, Any]] = {}
+        self.node_limit = node_limit
 
     def free(self, point: Point) -> bool:
-        return not any(box.contains(point) for box in self.blocked)
+        return not any(box.contains(point) for box in self.blocked.holding(point))
 
     def clear(self, a: Point, b: Point) -> bool:
-        return not any(_blocks(box, a, b) for box in self.blocked)
+        return not any(_blocks(box, a, b) for box in self.blocked.near(a, b))
 
     def add(self, name: str, point: Point) -> None:
+        if (
+            self.node_limit is not None
+            and name not in self.nodes
+            and len(self.nodes) >= self.node_limit
+        ):
+            raise GraphOverBudget(self.node_limit)
         self.nodes[name] = point
 
     def join(self, a: str, b: str, kind: str) -> bool:
@@ -372,8 +418,12 @@ def place_from_site_records(
     society: SiteSociety,
     routine: RoutineModel,
     input_seq: int = 1,
+    node_limit: int | None = None,
 ) -> dict[str, Any]:
-    """Derive the place a site's records and its society's uses support, sealed by its digest."""
+    """Derive the place a site's records and its society's uses support, sealed by its digest.
+
+    With ``node_limit``, building stops with :class:`GraphOverBudget` as soon as the walking graph
+    would hold more places than that, rather than after the whole graph is built."""
     extent = next(r for r in records if isinstance(r, SiteExtentRecord))
     paths = [r for r in records if isinstance(r, SitePathRecord)]
     zones = [r for r in records if isinstance(r, SiteZoneRecord)]
@@ -398,7 +448,7 @@ def place_from_site_records(
     ]
     for wall in walls:
         blocked += _wall_boxes(wall)
-    graph = _Graph(blocked)
+    graph = _Graph(blocked, node_limit)
     walkable: list[str] = []
     spots: dict[str, dict[str, Any]] = {}
     destinations: list[dict[str, Any]] = []
@@ -670,14 +720,31 @@ def place_from_site_records(
             residents=society.offsite_residents,
         )
 
-    # Standing spots: on paths and yards, two standing radii apart and clear of everything.
+    # Standing spots: on paths and yards, two standing radii apart and clear of everything. A spot
+    # closer than two radii to another lies in its square of side two radii or a neighbouring one.
     radius = policy["standing_radius_mm"]
-    taken: list[Point] = [tuple(spot["position_mm"]) for spot in spots.values()]  # type: ignore[misc]
+    apart = 2 * radius
+    taken: dict[tuple[int, int], list[Point]] = {}
+
+    def take(point: Point) -> None:
+        taken.setdefault((point[0] // apart, point[1] // apart), []).append(point)
+
+    def crowded(point: Point) -> bool:
+        cx, cy = point[0] // apart, point[1] // apart
+        return any(
+            (point[0] - p[0]) ** 2 + (point[1] - p[1]) ** 2 < apart * apart
+            for dx in (-1, 0, 1)
+            for dy in (-1, 0, 1)
+            for p in taken.get((cx + dx, cy + dy), ())
+        )
+
+    for spot in spots.values():
+        take((spot["position_mm"][0], spot["position_mm"][1]))
     for name in sorted(walkable):
         point = graph.nodes[name]
         if not graph.free(point):
             continue
-        if any((point[0] - p[0]) ** 2 + (point[1] - p[1]) ** 2 < (2 * radius) ** 2 for p in taken):
+        if crowded(point):
             continue
         spots[name] = {
             "spot_id": name,
@@ -686,7 +753,7 @@ def place_from_site_records(
             "support_z_mm": 0,
             "destination_ids": [],
         }
-        taken.append(point)
+        take(point)
 
     records_digest = sha256_of_canonical(
         sorted(

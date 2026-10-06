@@ -34,7 +34,8 @@ Pure: no connection, no store, no clock.
 from __future__ import annotations
 
 import re
-from collections.abc import Mapping, Sequence
+import unicodedata
+from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Any, Final, cast
@@ -131,6 +132,14 @@ KIND_CODES: Final = (
         (
             "A sample world could not be laid out from the kind: its parts do not fit their zones "
             "for any seed tried."
+        ),
+    ),
+    (
+        "kind_layout_over_budget",
+        (
+            "Laying out a sample world would try more placements than the bounds catalog allows: "
+            "the kind asks for parts where they seldom fit, or for more searching than a world may "
+            "take."
         ),
     ),
     (
@@ -283,9 +292,17 @@ def _int(where: str, raw: object, bounds: tuple[int, int]) -> int:
     return raw
 
 
+#: Unicode categories text in a kind may not hold: control characters (NUL, CR and the rest),
+#: format characters (bidirectional controls, zero-width joiners), surrogates, private use and
+#: line and paragraph separators. A kind's words reach people and prompts as data.
+_REFUSED_CATEGORIES: Final = frozenset({"Cc", "Cf", "Cs", "Co", "Zl", "Zp"})
+
+
 def _text(where: str, raw: object, bounds: tuple[int, int]) -> str:
     if type(raw) is not str or raw != raw.strip() or "\n" in raw:
         raise _invalid(where, "is text on one line with no surrounding space")
+    if any(unicodedata.category(character) in _REFUSED_CATEGORIES for character in raw):
+        raise _invalid(where, "holds no control, format or private-use characters")
     if not bounds[0] <= len(raw) <= bounds[1]:
         raise KindRefused(
             "kind_out_of_bounds",
@@ -387,6 +404,8 @@ class _Reader:
             return _Figure(value=aligned(raw, where))
         if isinstance(raw, dict) and set(raw) == {"parameter"}:
             name = raw["parameter"]
+            if type(name) is not str:
+                raise _invalid(where, f"names a parameter by its key, not {name!r}")
             if name not in self.parameters:
                 raise KindRefused("kind_reference_unknown", f"names no parameter {name!r}", where)
             self.uses.setdefault(name, []).append((where, bound, module))
@@ -506,6 +525,8 @@ def _read_use_classes(reader: _Reader, raw: object) -> dict[str, dict[str, Any]]
         key = _key(f"{where}.key", entry["key"])
         if key in found or key in routine.use_classes:
             raise _invalid(where, f"use class {key} repeats one the kind or the society states")
+        for name in ("label", "role_label"):
+            _text(f"{where}.{name}", entry[name], reader.bound("label_characters"))
         values = _check_entry(
             ("society-use-class", 2), where, {**entry, "reason": "stated by a world kind"}
         )
@@ -726,6 +747,59 @@ def _check_roles(
     elif use_class and not ({"seat", "gathering"} & set(roles)):
         raise KindRefused(
             "kind_role_unmet", f"names use class {use_class} and takes no role that uses one", where
+        )
+
+
+def _most(reader: _Reader, figure: _Figure) -> int:
+    """The largest value a figure can take: itself, its parameter's maximum, or its span's end."""
+    if figure.value is not None:
+        return figure.value
+    if figure.parameter:
+        return reader.parameters[figure.parameter].maximum
+    return figure.end
+
+
+def _check_size(
+    reader: _Reader,
+    parts: Mapping[str, _ReadPart],
+    zones: Sequence[_ReadZone],
+    site: Mapping[str, Any],
+    module: int,
+) -> None:
+    """Refuse, before anything is generated, a kind whose site is laid on more grid points or
+    which places more things than the bounds catalog allows (``grid_points``,
+    ``placed_things``), each figure at its most."""
+    width, depth = _most(reader, site["width_mm"]), _most(reader, site["depth_mm"])
+    points = (width // module) * (depth // module)
+    low, high = reader.bound("grid_points")
+    if not low <= points <= high:
+        raise KindRefused(
+            "kind_out_of_bounds",
+            f"is laid on {points} grid points at its largest, outside {low} to {high}",
+            "site",
+        )
+
+    def inside(part: _ReadPart) -> int:
+        if part.form == "room":
+            return sum(_most(reader, count) for _name, count, _pattern in part.fields["holds"])
+        if part.form == "structure":
+            return sum(
+                _most(reader, count) * (1 + inside(parts[name]))
+                for name, count in part.fields["rooms"]
+            )
+        return 0
+
+    placed = sum(
+        _most(reader, count) * (1 + inside(parts[name]))
+        for zone in zones
+        for name, count, _pattern in zone.holds
+    )
+    low, high = reader.bound("placed_things")
+    if not low <= placed <= high:
+        raise KindRefused(
+            "kind_out_of_bounds",
+            f"places {placed} things at its most, outside {low} to {high}",
+            "zones",
         )
 
 
@@ -970,6 +1044,22 @@ def _provenance(where: str, origin: str, raw: object) -> None:
     _text(f"{where}.by", entry["by"], (1, 120))
 
 
+def _strings(node: object, where: str = "") -> Iterator[tuple[str, str]]:
+    """Every string a JSON document holds, its keys included, each with where it is, in document
+    order."""
+    if isinstance(node, str):
+        yield where, node
+    elif isinstance(node, dict):
+        for key, value in node.items():
+            at = f"{where}.{key}" if where else str(key)
+            if isinstance(key, str):
+                yield at, key
+            yield from _strings(value, at)
+    elif isinstance(node, list):
+        for index, value in enumerate(node):
+            yield from _strings(value, f"{where}[{index}]")
+
+
 def read_kind(
     document: object,
     *,
@@ -977,6 +1067,10 @@ def read_kind(
     catalogs: KindCatalogs | None = None,
 ) -> KindDocument:
     """Read a world kind and hold it to stage A; refuse it by name (:class:`KindRefused`)."""
+    for where, text in _strings(document):
+        if "\x00" in text:
+            # Not text a kind may hold anywhere, and not text the database's JSON can keep.
+            raise _invalid(where, "holds no control, format or private-use characters")
     if routine is None:
         from exulanica.world.society_living import town_routine
 
@@ -1035,10 +1129,12 @@ def read_kind(
         "ground": reader.look("site.ground", site_raw["ground"], ("ground",)),
     }
     spine = site_raw["spine"]
-    if parts.get(spine) is None or parts[spine].form != "path":
+    if type(spine) is not str or parts.get(spine) is None or parts[spine].form != "path":
         raise KindRefused("kind_reference_unknown", f"names no path part {spine!r}", "site.spine")
     site["spine"] = spine
     boundary = site_raw["boundary"]
+    if type(boundary) is not str:
+        raise _invalid("site.boundary", "is a boundary part's key, or empty for none")
     if boundary and (parts.get(boundary) is None or parts[boundary].form != "boundary"):
         raise KindRefused(
             "kind_reference_unknown", f"names no boundary part {boundary!r}", "site.boundary"
@@ -1073,6 +1169,8 @@ def read_kind(
         if entry["access"] not in ACCESS:
             raise _invalid(f"{where}.access", f"is one of {list(ACCESS)}")
         zone_boundary = entry["boundary"]
+        if type(zone_boundary) is not str:
+            raise _invalid(f"{where}.boundary", "is a boundary part's key, or empty for none")
         if zone_boundary and (
             parts.get(zone_boundary) is None or parts[zone_boundary].form != "boundary"
         ):
@@ -1165,6 +1263,7 @@ def read_kind(
                 MappingProxyType(dict(sorted(values.items()))),
             )
         )
+    _check_size(reader, parts, zones, site, module)
     return KindDocument(
         document=MappingProxyType(dict(raw)),
         sha256=sha256_of_canonical(raw).hex(),

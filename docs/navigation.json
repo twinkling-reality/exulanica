@@ -58,9 +58,10 @@
     {
       "id": "environments",
       "title": "Generated and admitted environments",
-      "purpose": "Generation vocabulary, generated streets and tiles, textures and lettering, and admitted city data. Generated tiles and the owned district appear in the development preview; texture sets also dress shipped world objects.",
+      "purpose": "Generation vocabulary, world kinds and the site grammar, generated streets and tiles, textures and lettering, and admitted city data. Generated tiles and the owned district appear in the development preview; texture sets also dress shipped world objects.",
       "documents": [
         {"path": "grammar-package.md", "role": "contract", "owns": "Generator contract, seeds, city stages and the catalog envelope every data catalog uses"},
+        {"path": "world-kinds-contract.md", "role": "contract", "owns": "World kinds as data: the kind document and its checks, the site grammar, a site world's people, receipt and drawing, and the kind routes"},
         {"path": "generated-corridor-street.md", "role": "reference", "owns": "Generated corridor structure and reproduction"},
         {"path": "generated-tile-runtime.md", "role": "contract", "owns": "Generated-tile loading, rendering and navigation in the development preview"},
         {"path": "representation-decisions.md", "role": "reference", "owns": "Generated-world representation decisions, supports and limits"},

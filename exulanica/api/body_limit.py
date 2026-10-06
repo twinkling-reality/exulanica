@@ -26,18 +26,26 @@ upstream of all of it.
 
 It applies to every route rather than to the upload route alone, deliberately. A limit that has
 to be remembered per route is a limit the next route will not have.
+
+**A route may state a tighter limit.** The server-wide limit is sized for photographs; a route
+whose body is a small document (a world kind) states its own beside the route (``routes``: a
+method, a path template and a limit), and this applies the smaller of the two the same way, both
+bounds, before the body is read or parsed.
 """
 
 from __future__ import annotations
 
 import json
+import re
+from collections.abc import Sequence
 from typing import Any, Final
 
 from starlette.datastructures import Headers
 from starlette.exceptions import HTTPException
+from starlette.routing import compile_path
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-__all__ = ["MAX_BODY_BYTES", "BodyLimit", "BodyTooLarge"]
+__all__ = ["MAX_BODY_BYTES", "BodyLimit", "BodyTooLarge", "route_path"]
 
 #: The largest request body this application will accept. Large enough for a phone's worth of
 #: photographs in one upload, small enough that a mistaken video does not fill a disk.
@@ -47,23 +55,53 @@ MAX_BODY_BYTES: Final = 512 * 1024 * 1024
 class BodyLimit:
     """Pure ASGI, so it runs ahead of routing and ahead of any body parsing."""
 
-    def __init__(self, app: ASGIApp, *, limit: int | None = None) -> None:
+    def __init__(
+        self,
+        app: ASGIApp,
+        *,
+        limit: int | None = None,
+        routes: Sequence[tuple[str, str, int]] = (),
+    ) -> None:
         self._app = app
         # Resolved at construction rather than bound as a default argument, so the module
         # constant is read when an application is built rather than when this file is imported.
         # A default argument would freeze it at import and a test could not vary it without
         # reaching inside the instance, which is a test asserting against a name nothing reads.
         self._limit = MAX_BODY_BYTES if limit is None else limit
+        # Each route's own limit, matched by method and by its path template as routing matches
+        # it, so ``/worlds/kinds/{kind}/worlds`` bounds every kind's path.
+        self._routes: tuple[tuple[str, re.Pattern[str], int], ...] = tuple(
+            (method, compile_path(path)[0], min(route_limit, self._limit))
+            for method, path, route_limit in routes
+        )
+
+    def _limit_for(self, scope: Scope) -> int:
+        method, path = scope.get("method"), route_path(scope)
+        for route_method, pattern, route_limit in self._routes:
+            if route_method == method and pattern.match(path):
+                return route_limit
+        return self._limit
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
             await self._app(scope, receive, send)
             return
+        limit = self._limit_for(scope)
         declared = _declared_length(scope)
-        if declared is not None and declared > self._limit:
-            await _refuse(send, declared, self._limit)
+        if declared is not None and declared > limit:
+            await _refuse(send, declared, limit)
             return
-        await self._app(scope, _counted(receive, self._limit), send)
+        await self._app(scope, _counted(receive, limit), send)
+
+
+def route_path(scope: Scope) -> str:
+    """The path routing matches, without the root path a proxy mounted the application under, as
+    admission reads it, so a route's own limit holds behind a proxy prefix too."""
+    path: str = scope.get("path", "")
+    root = scope.get("root_path", "")
+    if root and path.startswith(root) and (len(path) == len(root) or path[len(root)] == "/"):
+        return path[len(root) :] or "/"
+    return path
 
 
 def _declared_length(scope: Scope) -> int | None:

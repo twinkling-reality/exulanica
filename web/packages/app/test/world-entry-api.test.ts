@@ -224,6 +224,39 @@ describe('saved world entry client', () => {
       .rejects.toThrow('stored bake');
   });
 
+  it('reads a world made from a world kind, which declares its site and no tiles', async () => {
+    const site = {
+      kind: 'fixture_farm',
+      kind_version: 1,
+      kind_label: 'A test farm',
+      region_id: 'region:generated',
+      arrival_mm: [48000, 0, -4500],
+      arrival_facing_mm: [0, -1],
+    };
+    const client = (body: unknown) => new WorldEntryClient({
+      baseUrl: 'https://exulanica.test', token: 'private', fetch: vi.fn(async () => Response.json(body)),
+    });
+    const [entry] = await client([wire({ source_kind: 'generated', generated_site: site })]).entries();
+    expect(entry!.generatedGround).toBeNull();
+    expect(entry!.generatedSite).toEqual({
+      kind: 'fixture_farm',
+      kindVersion: 1,
+      kindLabel: 'A test farm',
+      regionId: 'region:generated',
+      arrivalMm: [48000, 0, -4500],
+      arrivalFacingMm: [0, -1],
+    });
+    // A generated entry declares its tiles or its site, never both, and only a generated one does.
+    const ground = {
+      recipe_key: 'small_town', recipe_label: 'A small town', region_id: 'region:generated',
+      arrival_mm: [0, 0, 0], arrival_facing_mm: [0, 1],
+      tiles: [{ tile_x: 0, tile_y: 0, tile_inputs_digest: 'f'.repeat(64), baked_tile_id: null, state: 'baking' }],
+    };
+    await expect(client([wire({ source_kind: 'generated', generated_site: site, generated_ground: ground })])
+      .entries()).rejects.toThrow('generated ground or site');
+    await expect(client([wire({ generated_site: site })]).entries()).rejects.toThrow('generated ground or site');
+  });
+
   it('opens a personal-source world a caller names without reading the list', async () => {
     const paths: string[] = [];
     const fetch = vi.fn(async (input: string | URL | Request) => {

@@ -8,6 +8,7 @@ document and the records, never read back from the code under test.
 
 from __future__ import annotations
 
+import contextlib
 import copy
 import json
 import shutil
@@ -179,6 +180,54 @@ def test_a_kind_that_houses_nobody_is_refused():
     assert caught.value.code == "kind_population_out_of_bounds"
 
 
+@pytest.mark.parametrize("character", ["\u0000", "\r", "\u202e", "\u200b", "\ufeff", "\ue000"])
+def test_text_holding_a_control_or_format_character_is_refused(character: str) -> None:
+    def marked(document: dict[str, Any]) -> None:
+        document["label"] = f"A {character}cafe"
+
+    refused = _refused(_mutated("cafe", marked))
+    assert (refused.code, refused.where) == ("kind_document_invalid", "label")
+
+
+def test_a_kind_too_big_to_generate_is_refused_before_anything_is_generated():
+    # An indoor site of 60 m by 60 m is 600 by 600 points on its 100 mm module, past the 512 by
+    # 512 the bounds catalog allows (grid_points); the same cafe holding ten times 64 tables
+    # places 640 things, past 512 (placed_things).
+    def wide(document: dict[str, Any]) -> None:
+        document["site"]["width_mm"] = 60_000
+        document["site"]["depth_mm"] = 60_000
+
+    def crowded(document: dict[str, Any]) -> None:
+        document["zones"][0]["holds"].extend(
+            {"part": "table", "count": 64, "pattern": "grid"} for _ in range(10)
+        )
+        document["zones"][0]["holds"] = document["zones"][0]["holds"][:12]
+
+    refused = _refused(_mutated("cafe", wide))
+    assert (refused.code, refused.where) == ("kind_out_of_bounds", "site")
+    assert "360000 grid points" in refused.detail
+    refused = _refused(_mutated("cafe", crowded))
+    assert (refused.code, refused.where) == ("kind_out_of_bounds", "zones")
+    assert "outside 1 to 512" in refused.detail
+
+
+def test_a_site_too_large_to_walk_is_refused_while_its_graph_is_built():
+    # The farm stretched to the largest site the bounds allow: its open ground needs more walking
+    # places than the 962 a living society's tick was measured on (the bounds catalog).
+    def huge(document: dict[str, Any]) -> None:
+        document["site"]["depth_mm"] = 256_000
+        width = document["parameters"][0]
+        width["minimum"], width["maximum"], width["step"] = 224_000, 256_000, 32_000
+        document["presets"][0]["values"]["width_mm"] = 256_000
+
+    kind = read_kind(_mutated("farm", huge))
+    with pytest.raises(KindRefused) as caught:
+        check_samples(kind)
+    assert caught.value.code == "kind_graph_over_budget"
+    # Refused from the budget held while the graph was built, not from counting it afterwards.
+    assert "grew past 962 places" in caught.value.detail
+
+
 def test_a_side_that_cannot_hold_its_zones_is_refused_with_every_figure():
     def crowd(document: dict[str, Any]) -> None:
         document["site"]["depth_mm"] = 24000
@@ -302,3 +351,58 @@ def test_the_kind_catalogs_state_the_site_grammars_words(tmp_path: Path) -> None
     (copied / "look-family.v1.json").write_text(json.dumps(families), encoding="utf-8")
     with pytest.raises(CatalogError, match="look-family catalog states"):
         load_kind_catalogs.__wrapped__(copied)  # type: ignore[attr-defined]
+
+
+#: Values a kind's JSON may hold in the wrong place: each lookup a value names must refuse it by
+#: name, never fail with another error (a list or an object where a key is read was once a 500).
+_WRONG: tuple[object, ...] = (None, True, [], {}, ["a"], {"a": 1}, "", "x" * 300, -1, 2**40)
+#: Text no kind may hold anywhere: a NUL (which the database's JSON cannot keep) and a zero-width
+#: space (a format character).
+_NEVER_KEPT: tuple[str, ...] = ("a\u0000b", "a​b")
+
+
+def _leaves(node: object, at: tuple[object, ...] = ()) -> list[tuple[object, ...]]:
+    found: list[tuple[object, ...]] = [at]
+    if isinstance(node, dict):
+        for key, value in node.items():
+            found.extend(_leaves(value, (*at, key)))
+    elif isinstance(node, list):
+        for index, value in enumerate(node):
+            found.extend(_leaves(value, (*at, index)))
+    return found
+
+
+def _put(document: dict[str, Any], at: tuple[object, ...], value: object) -> object:
+    if not at:
+        return value
+    changed = copy.deepcopy(document)
+    node: Any = changed
+    for step in at[:-1]:
+        node = node[step]
+    node[at[-1]] = value
+    return changed
+
+
+def test_every_value_of_a_kind_in_the_wrong_shape_is_refused_by_name_and_odd_text_never_kept():
+    farm = _document("farm")
+    for at in _leaves(farm):
+        for value in _WRONG:
+            with contextlib.suppress(KindRefused):
+                read_kind(_put(farm, at, value))
+        # Every place a value stands, a key's or a word's alike, refuses this text.
+        for text in _NEVER_KEPT:
+            with pytest.raises(KindRefused):
+                read_kind(_put(farm, at, text))
+
+
+def test_a_use_class_s_words_are_held_as_every_text_of_a_kind_is():
+    def zero_width(document: dict[str, Any]) -> None:
+        document["use_classes"][0]["role_label"] = "dairy​hand"
+
+    def long_label(document: dict[str, Any]) -> None:
+        document["use_classes"][0]["label"] = "a" * 61
+
+    refused = _refused(_mutated("farm", zero_width))
+    assert (refused.code, refused.where) == ("kind_document_invalid", "use_classes[0].role_label")
+    refused = _refused(_mutated("farm", long_label))
+    assert (refused.code, refused.where) == ("kind_out_of_bounds", "use_classes[0].label")

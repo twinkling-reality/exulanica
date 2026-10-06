@@ -72,6 +72,7 @@ export function onlyUntouchedStarter(entries: readonly SavedWorldEntry[]): boole
 /** What kind of world an entry is, and that it keeps its changes: a card's detail, said once. */
 function worldKind(entry: SavedWorldEntry): string {
   if (entry.generatedGround != null) return fill('world.entry.generated', { recipe: entry.generatedGround.recipeLabel });
+  if (entry.generatedSite != null) return fill('world.entry.generated', { recipe: entry.generatedSite.kindLabel });
   return `${say(entry.sourceKind === 'authored' ? 'yourWorlds.kind.authored' : 'yourWorlds.kind.personal')}`
     + ' · saved changes and appearance';
 }
@@ -83,6 +84,7 @@ function worldAbout(entry: SavedWorldEntry): string {
     const label = entry.generatedGround.recipeLabel;
     return fill('yourWorlds.about.generated', { recipe: label.charAt(0).toLowerCase() + label.slice(1) });
   }
+  if (entry.generatedSite != null) return fill('yourWorlds.about.site', { kind: entry.generatedSite.kindLabel });
   return entry.sourceKind === 'authored'
     ? (entry.currentAuthoredEditSeq === 0 ? say('yourWorlds.about.starter') : say('yourWorlds.about.authored'))
     : say('yourWorlds.about.personal');
@@ -260,6 +262,8 @@ export function buildYourWorlds(deps: WorldEntrySurface): WorldEntrySurfaceHandl
       el('span', {
         text: entry.generatedGround != null
           ? fill('yourWorlds.from', { recipe: entry.generatedGround.recipeLabel })
+          : entry.generatedSite != null
+          ? fill('yourWorlds.from', { recipe: entry.generatedSite.kindLabel })
           : say(entry.sourceKind === 'authored' ? 'yourWorlds.kind.authored' : 'yourWorlds.kind.personal'),
       }),
     ].filter((part): part is HTMLElement => part !== null));

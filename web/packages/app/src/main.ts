@@ -681,13 +681,13 @@ async function mount(): Promise<void> {
 
   const firstUse = createFirstUseGuidance(window.localStorage, {
     // A person who has already built in this world is not new, whatever this device remembers,
-    // and a world drawn from their photographs, or generated from a recipe, is not empty: its
-    // places or its streets are drawn content.
+    // and a world drawn from their photographs, or generated from a recipe or a world kind, is not
+    // empty: its places, its streets or its site are drawn content.
     worldHasContent: () => {
       const entry = state.activeWorldEntry;
       return entry !== null &&
         (entry.currentAuthoredEditSeq > 0 || entry.sourceAttachments.length > 0 ||
-          built.scene.islands.length > 0 || entry.generatedGround != null);
+          built.scene.islands.length > 0 || entry.generatedGround != null || entry.generatedSite != null);
     },
     smallSquareOffered: () => objects.smallSquareOffered(),
   });

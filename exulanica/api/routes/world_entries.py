@@ -154,6 +154,22 @@ class GeneratedGroundView(BaseModel):
     values: dict[str, int | str] | None = None
 
 
+class GeneratedSiteView(BaseModel):
+    """What the page draws of a world made from a world kind: its kind, the one region its people
+    live in and where a person arrives, in that region's frame (east, height, south). The drawing
+    itself is read through the world's version (``GET /world/versions/{version_id}/site``)."""
+
+    model_config = ConfigDict(extra="forbid", from_attributes=True)
+
+    kind: str
+    kind_version: int
+    kind_label: str
+    region_id: str
+    arrival_mm: tuple[int, int, int]
+    #: The way a person arriving faces, a plan vector east then south: into the site.
+    arrival_facing_mm: tuple[int, int]
+
+
 class SavedWorldEntryView(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -169,6 +185,8 @@ class SavedWorldEntryView(BaseModel):
     #: Set for a world generated from a recipe: the baked tiles the app draws, its region and where
     #: a person arrives.
     generated_ground: GeneratedGroundView | None = None
+    #: Set for a world made from a world kind: its kind, region and where a person arrives.
+    generated_site: GeneratedSiteView | None = None
     authored_version_id: uuid.UUID
     authored_state_sha256: str
     authored_edit_seq: int
@@ -349,6 +367,8 @@ def _view(entry: SavedWorldEntry) -> SavedWorldEntryView:
         values["declared_floor"] = DeclaredFloorView.model_validate(entry.declared_floor)
     if entry.generated_ground is not None:
         values["generated_ground"] = GeneratedGroundView.model_validate(entry.generated_ground)
+    if entry.generated_site is not None:
+        values["generated_site"] = GeneratedSiteView.model_validate(entry.generated_site)
     values["source_attachments"] = [
         SavedWorldSourceAttachmentView.model_validate(attachment)
         for attachment in entry.source_attachments

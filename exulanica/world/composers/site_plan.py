@@ -14,15 +14,17 @@ world it made as a structural snapshot and a receipt:
   the site's own records, served as its drawing (:mod:`exulanica.world.site_drawing`).
 * **The receipt** carries the world kind's whole document, so a world regenerates from its receipt
   alone and no change to a kind's library entry moves it; the values; the site grammar and its
-  descriptor digest; the kind catalogs' digests; the routine the society lives under (the town
+  descriptor digest; the kind catalogs' digests, as a record of what it was checked against (a
+  catalog edit that leaves its plan and records as they were does not unmake the world: the plan
+  and output digests are what hold it); the routine the society lives under (the town
   routine's binding and the kind's overlay); what each part is for; the candidate kept and each
   earlier refusal; the seed; the subject identity; the generation's output digest; and where a
   person arrives. The element's streaming key names the receipt's digest, so the snapshot binds it.
 * **Where a person arrives**: on the spine, :data:`ARRIVAL_INSIDE_MM` in from the entry, facing
   into the site.
 
-A receipt whose kind document, catalogs or grammar no longer read the same, or whose records come
-out otherwise, is refused by name (``generated_world_*``), never generated into something else.
+A receipt whose kind document, routine catalogs or grammar no longer read the same, or whose records
+come out otherwise, is refused by name (``generated_world_*``), never generated into something else.
 """
 
 from __future__ import annotations
@@ -32,6 +34,7 @@ import re
 from collections.abc import Mapping
 from typing import Any, Final
 
+from exulanica.grammar.errors import InvalidParameterError
 from exulanica.grammar.grammars.site import (
     SITE_DESCRIPTOR_PATH,
     SITE_GRAMMAR_ID,
@@ -39,6 +42,7 @@ from exulanica.grammar.grammars.site import (
     generate_site,
     site_records,
 )
+from exulanica.grammar.grammars.site.layout import LayoutOverBudget
 from exulanica.grammar.grammars.site.plan import plan_sha256
 from exulanica.grammar.grammars.site.records import SiteExtentRecord, SitePathRecord
 from exulanica.world.composers import (
@@ -52,7 +56,7 @@ from exulanica.world.errors import InvalidStructuralData
 from exulanica.world.kinds.catalogs import load_kind_catalogs
 from exulanica.world.kinds.document import KindDocument, KindRefused, read_kind
 from exulanica.world.kinds.routine import kind_overlay, overlay_routine
-from exulanica.world.kinds.samples import SiteWorld, compose_site
+from exulanica.world.kinds.samples import SiteWorld, compose_site, layout_budget
 from exulanica.world.society_catalogs import RoutineModel
 from exulanica.world.society_site_place import (
     CAPSULE_RADIUS_MM,
@@ -272,11 +276,6 @@ def _check_current(receipt: Mapping[str, Any]) -> None:
             "generated_world_grammar_changed: this world was generated under a site grammar this "
             "server does not generate"
         )
-    if receipt["catalogs"] != dict(load_kind_catalogs().sha256):
-        raise InvalidStructuralData(
-            "generated_world_catalogs_changed: this world was generated under world kind catalogs "
-            "this server no longer holds"
-        )
 
 
 def receipt_kind(receipt: Mapping[str, Any]) -> KindDocument:
@@ -315,17 +314,33 @@ def receipt_routine(receipt: Mapping[str, Any]) -> RoutineModel:
 
 
 def records(receipt: Mapping[str, Any]) -> tuple[object, ...]:
-    """The records a stored receipt generates again, held to its plan and output digests."""
+    """The records a stored receipt generates again, held to its plan and output digests, within
+    the layout budget a world is made under (a world laid out within it then is within it again,
+    unless the bounds catalog has since lowered it, which is refused by name)."""
     _check_current(receipt)
     kind = receipt_kind(receipt)
-    plan = kind.plan(receipt["values"])
+    try:
+        plan = kind.plan(receipt["values"])
+    except InvalidParameterError as exc:
+        raise InvalidStructuralData(
+            f"generated_world_output_changed: its kind and values make no plan: {exc}"
+        ) from exc
     if plan_sha256(plan) != receipt["plan_sha256"]:
         raise InvalidStructuralData(
             "generated_world_output_changed: its kind and values resolve to another plan"
         )
-    generation = generate_site(
-        plan, seed=receipt["seed"], subject_identity=receipt["subject_identity"]
-    )
+    try:
+        generation = generate_site(
+            plan,
+            seed=receipt["seed"],
+            subject_identity=receipt["subject_identity"],
+            budget=layout_budget(),
+        )
+    except LayoutOverBudget as exc:
+        raise InvalidStructuralData(
+            "generated_world_catalogs_changed: laying it out again tries more placements than "
+            f"the bounds catalog now allows ({exc})"
+        ) from exc
     if generation.receipt.output_digest != receipt["output_digest"]:
         raise InvalidStructuralData(
             "generated_world_output_changed: generating this world's receipt again produced "

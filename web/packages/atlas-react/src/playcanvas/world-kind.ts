@@ -11,13 +11,17 @@ import {
   type OwnedDistrict,
 } from '@exulanica/atlas-core';
 import type { GeneratedTileMount } from './generated-tile/binding-contract.js';
+import type { GeneratedSiteMount } from './generated-site/site-mount.js';
+
+export type { GeneratedSiteMount };
 import type { AuthoredGroundSupport, EndlessAuthoredGroundSupport } from './world-field.js';
 
 /*
  * WHAT KIND OF WORLD THE BINDING IS DRAWING, DECIDED ONCE.
  *
  * The options the app hands `AtlasBinding.create` name at most one ground (an authored starter
- * region, an owned district or a generated tile; none means the regions of a photo-built world).
+ * region, an owned district, a generated tile or a world kind's site; none means the regions of a
+ * photo-built world).
  * Every decision that follows from which one it is (city scale, where fog is mixed, what is drawn
  * at first, where a person can walk) is read from the one description `describeWorldKind` returns, which also carries the
  * ground's own data, so the binding never asks the options what kind of world it is.
@@ -36,7 +40,8 @@ export type WorldGround =
   | { readonly form: 'authored-flat'; readonly region: AuthoredRegion }
   | { readonly form: 'scene-regions' }
   | { readonly form: 'owned-district'; readonly district: OwnedDistrictGround }
-  | { readonly form: 'generated-tile'; readonly tile: GeneratedTileMount };
+  | { readonly form: 'generated-tile'; readonly tile: GeneratedTileMount }
+  | { readonly form: 'generated-site'; readonly site: GeneratedSiteMount };
 
 export interface WorldKind {
   readonly ground: WorldGround;
@@ -44,10 +49,10 @@ export interface WorldKind {
   readonly city: boolean;
   /**
    * Lit materials fog in display space, toward the sky's own colour. Every kind but a generated
-   * tile, whose sky is a skybox the engine tone-maps along with its fog.
+   * tile or site, whose sky is a skybox the engine tone-maps along with its fog.
    */
   readonly displaySpaceFog: boolean;
-  /** The binding's own ground field is drawn. A district or a tile draws its own ground. */
+  /** The binding's own ground field is drawn. A district, a tile or a site draws its own ground. */
   readonly fieldVisible: boolean;
   /** The memory layer (the render root) starts shown. Off wherever another ground is drawn. */
   readonly memoryLayerVisible: boolean;
@@ -58,6 +63,11 @@ export interface WorldKindOptions {
   readonly authoredRegion?: AuthoredRegion;
   readonly ownedDistrict?: OwnedDistrictGround;
   readonly generatedTile?: GeneratedTileMount;
+  /**
+   * A world made from a world kind: the site supplies the ground, the collision and the opening
+   * stance from its served drawing, and draws itself into the environment root as a tile does.
+   */
+  readonly generatedSite?: GeneratedSiteMount;
 }
 
 /** Describe the world these options ask for, or refuse a combination no world can be. */
@@ -65,11 +75,18 @@ export function describeWorldKind(options: WorldKindOptions): WorldKind {
   if (options.ownedDistrict !== undefined && options.generatedTile !== undefined) {
     throw new TypeError('A generated tile replaces the owned district; pass one or the other');
   }
-  if (options.authoredRegion !== undefined &&
+  if (options.generatedSite !== undefined &&
       (options.ownedDistrict !== undefined || options.generatedTile !== undefined)) {
+    throw new TypeError('A world kind\'s site is a world of its own; pass no other ground with it');
+  }
+  if (options.authoredRegion !== undefined &&
+      (options.ownedDistrict !== undefined || options.generatedTile !== undefined
+        || options.generatedSite !== undefined)) {
     throw new TypeError('An authored starter region cannot replace geographic ground');
   }
-  const ground: WorldGround = options.generatedTile !== undefined
+  const ground: WorldGround = options.generatedSite !== undefined
+    ? { form: 'generated-site', site: options.generatedSite }
+    : options.generatedTile !== undefined
     ? { form: 'generated-tile', tile: options.generatedTile }
     : options.ownedDistrict !== undefined
       ? { form: 'owned-district', district: options.ownedDistrict }
@@ -78,14 +95,21 @@ export function describeWorldKind(options: WorldKindOptions): WorldKind {
         : options.authoredRegion.ground.kind === 'endless'
           ? { form: 'authored-endless', region: options.authoredRegion }
           : { form: 'authored-flat', region: options.authoredRegion };
-  const geographic = ground.form === 'owned-district' || ground.form === 'generated-tile';
+  const generated = ground.form === 'generated-tile' || ground.form === 'generated-site';
+  const geographic = ground.form === 'owned-district' || generated;
   return Object.freeze({
     ground: Object.freeze(ground),
     city: geographic,
-    displaySpaceFog: ground.form !== 'generated-tile',
+    displaySpaceFog: !generated,
     fieldVisible: !geographic,
     memoryLayerVisible: !geographic,
   });
+}
+
+/** What draws itself into the environment root: a generated tile or a site, else nothing. */
+export function groundMount(kind: WorldKind): GeneratedTileMount | null {
+  return kind.ground.form === 'generated-tile' ? kind.ground.tile
+    : kind.ground.form === 'generated-site' ? kind.ground.site : null;
 }
 
 /** The authored starter region a world stands on, or null when it stands on anything else. */
@@ -126,7 +150,7 @@ export interface WorldViews {
 export function worldViews(kind: WorldKind): WorldViews {
   return Object.freeze({
     cityViews: kind.ground.form === 'owned-district',
-    thirdPerson: kind.ground.form !== 'generated-tile',
+    thirdPerson: kind.ground.form !== 'generated-tile' && kind.ground.form !== 'generated-site',
   });
 }
 
@@ -253,6 +277,8 @@ export function worldNavigation(kind: WorldKind, scene: AtlasScene): NavigationW
   switch (ground.form) {
     case 'generated-tile':
       return ground.tile.navigationWorld;
+    case 'generated-site':
+      return ground.site.navigationWorld;
     // The district owns the ground and the blockers; the scene owns where the memories are. Both
     // are already drawn in the same coordinate space, so withholding the regions from the
     // navigation world did not keep them apart, it only made them unreachable.

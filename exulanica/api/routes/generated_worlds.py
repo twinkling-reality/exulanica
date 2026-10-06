@@ -35,6 +35,7 @@ from exulanica.api.dependencies import (
     get_services,
 )
 from exulanica.api.routes.world_entries import SavedWorldEntryView, _view
+from exulanica.api.sayable import sayable
 from exulanica.api.services import Services
 from exulanica.api.world_scope import WorldId
 from exulanica.world.baked_tiles import (
@@ -155,7 +156,8 @@ def create_generated_world(
         # The code PUT /world-entries/{entry_id} answers the same title with.
         return _problem(422, "invalid_saved_world_entry", str(exc))
     except SpecificationRefused as exc:
-        return JSONResponse(status_code=422, content=exc.document())
+        # The client's own value is said back, so only as JSON and UTF-8 can carry it.
+        return JSONResponse(status_code=422, content=sayable(exc.document()))
     except (GeneratedWorldRefused, UnknownWorldComposer, WorldLimitReached) as exc:
         return _problem(409, exc.code, str(exc))
     return _view(created)

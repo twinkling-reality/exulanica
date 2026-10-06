@@ -408,6 +408,9 @@ export const COPY: Readonly<Record<string, string>> = Object.freeze({
   'world.about.generated-tile':
     'A world generated from the city grammar\'s catalogs. Its streets, buildings and shops are '
     + 'generated, not recorded from a real place.',
+  'world.about.generated-site':
+    'A world made from the world kind {kind}. Its grounds, buildings and furniture are generated '
+    + 'from the kind\'s parts, not recorded from a real place.',
   // Your worlds: the first screen after signing in, before any world opens.
   'yourWorlds.label': 'Your worlds',
   'yourWorlds.strip': 'Your saved worlds',
@@ -431,6 +434,9 @@ export const COPY: Readonly<Record<string, string>> = Object.freeze({
   'yourWorlds.kind.personal': 'Personal world',
   'yourWorlds.about.generated':
     'Generated from {recipe}. Your changes and appearance are kept, and it opens where you left it.',
+  'yourWorlds.about.site':
+    'Made from the world kind {kind}. Your changes and appearance are kept, and it opens where you '
+    + 'left it.',
   'yourWorlds.about.starter': 'An empty square to build on. It opens where you left it.',
   'yourWorlds.about.authored': 'Your changes and appearance are kept, and it opens where you left it.',
   'yourWorlds.about.personal': 'Laid out from your photographs. It opens where you left it.',
@@ -476,6 +482,10 @@ export const COPY: Readonly<Record<string, string>> = Object.freeze({
     + 'this page looks again every few seconds and opens it when they are.',
   'world.generated.failed':
     'A tile of this world could not be baked, so the world is not drawn.',
+  'world.site.failed':
+    'This world\'s drawing could not be read, so the world is not drawn.',
+  'world.site.making':
+    'This world is still being drawn. It appears here in a moment; this page asks again by itself.',
   'world.opening': 'Opening this world and decoding its available reconstruction…',
   // Why a world did not open, by the server's refusal code. Only making the starter world writes
   // while a world opens, so a database refusal there means the starter was not made.

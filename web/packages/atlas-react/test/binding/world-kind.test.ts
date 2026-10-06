@@ -18,6 +18,8 @@ import {
 import { DISTRICT_DOCUMENT, ENDLESS_REGION, FLAT_REGION, stubTileMount } from './world-kinds.js';
 
 const district = { document: DISTRICT_DOCUMENT as never, residentBytes: 100 };
+/** A world kind's site meets the binding through the tile's seam, with its kind's words. */
+const stubSiteMount = () => ({ ...stubTileMount(), kindLabel: 'Yard', drawing: null as never });
 const flags = (options: WorldKindOptions) => {
   const { ground, ...rest } = describeWorldKind(options);
   return { form: ground.form, ...rest };
@@ -35,6 +37,8 @@ describe('describeWorldKind', () => {
       city: true, displaySpaceFog: true, fieldVisible: false, memoryLayerVisible: false });
     expect(flags({ generatedTile: stubTileMount() })).toEqual({ form: 'generated-tile',
       city: true, displaySpaceFog: false, fieldVisible: false, memoryLayerVisible: false });
+    expect(flags({ generatedSite: stubSiteMount() })).toEqual({ form: 'generated-site',
+      city: true, displaySpaceFog: false, fieldVisible: false, memoryLayerVisible: false });
   });
 
   it('carries the ground it names, so nothing downstream reads the options again', () => {
@@ -43,23 +47,31 @@ describe('describeWorldKind', () => {
     expect(described.ground).toEqual({ form: 'generated-tile', tile });
     expect(authoredRegionOf(describeWorldKind({ authoredRegion: FLAT_REGION }))).toBe(FLAT_REGION);
     expect(authoredRegionOf(described)).toBeNull();
+    const site = stubSiteMount();
+    expect(describeWorldKind({ generatedSite: site }).ground).toEqual({ form: 'generated-site', site });
     expect(authoredFieldSupport(FLAT_REGION, 1200)).toEqual({ halfWidth: 12, halfDepth: 8, elevation: 0 });
     expect(authoredFieldSupport(ENDLESS_REGION, 1200)).toEqual({ kind: 'endless', elevation: 0, reach: 1200 });
     expect(authoredFieldSupport(null, 1200)).toBeUndefined();
   });
 
-  it('refuses the two combinations no world can be, by name', () => {
+  it('refuses the combinations no world can be, by name', () => {
     expect(() => describeWorldKind({ ownedDistrict: district, generatedTile: stubTileMount() }))
       .toThrow('A generated tile replaces the owned district; pass one or the other');
     expect(() => describeWorldKind({ authoredRegion: ENDLESS_REGION, ownedDistrict: district }))
       .toThrow('An authored starter region cannot replace geographic ground');
     expect(() => describeWorldKind({ authoredRegion: FLAT_REGION, generatedTile: stubTileMount() }))
       .toThrow('An authored starter region cannot replace geographic ground');
+    expect(() => describeWorldKind({ generatedSite: stubSiteMount(), generatedTile: stubTileMount() }))
+      .toThrow('A world kind\'s site is a world of its own; pass no other ground with it');
+    expect(() => describeWorldKind({ generatedSite: stubSiteMount(), ownedDistrict: district }))
+      .toThrow('A world kind\'s site is a world of its own; pass no other ground with it');
+    expect(() => describeWorldKind({ authoredRegion: FLAT_REGION, generatedSite: stubSiteMount() }))
+      .toThrow('An authored starter region cannot replace geographic ground');
   });
 });
 
 /** Every way of asking the options, or an authored ground, what kind of world this is. */
-const KIND_READ = /options\.(authoredRegion|ownedDistrict|generatedTile)\b|\.ground\.kind\b/g;
+const KIND_READ = /options\.(authoredRegion|ownedDistrict|generatedTile|generatedSite)\b|\.ground\.kind\b/g;
 
 describe('where the world kind is read', () => {
   const read = (file: string) => readFileSync(new URL(`../../src/playcanvas/${file}`, import.meta.url), 'utf8');

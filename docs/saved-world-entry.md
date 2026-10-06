@@ -31,7 +31,8 @@ Migration `0083_saved_world_entries.sql` defines `saved_world_entry`:
 entry_id             stable workspace entry identity
 workspace_id         row-level security boundary
 world_id             the named world shared by both version references
-title                the person's name for the entry
+title                the person's name for the entry: 1 to 200 characters once trimmed, with no
+                     control, surrogate or format character (refused invalid_saved_world_entry)
 source_kind          personal or authored
 authored_version_id  exact world_alternate_version
 source snapshot      reached through the authored version, immutable structural authority
@@ -81,6 +82,14 @@ named: `generated_world_grammar_changed` or `generated_world_catalogs_changed` w
 descriptor or its catalogs changed under it, `generated_world_output_changed` when its records
 came out otherwise, and `generated_world_unreadable` for any other refusal. The catalog still
 serves every other world, and the browser shows the entry and refuses to open it.
+
+A world made from a world kind by the site grammar (`POST /worlds/kinds/{kind}/worlds`) states
+`generated_site` in place of `generated_ground`: the kind, its version and label, the region its
+people live in and where a person arrives, facing which way. An available generated entry states
+exactly one of the two, and an unavailable one neither. Its receipt carries the kind's whole document, so a later version of the kind never
+moves it, and the kind catalogs' digests are provenance: only its grammar, its routine catalogs or
+its records coming out otherwise make it unavailable, with the reasons above
+([world kinds](world-kinds-contract.md#a-world-made-from-a-kind)).
 
 Every entry states `takes_photographs`, its world kind's own rule
 ([`WORLD_KINDS`](../exulanica/world/worlds.py)): false for a world generated from a recipe, whose

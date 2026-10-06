@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import datetime as dt
+import unicodedata
 import uuid
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from typing import Final, Literal
+from typing import TYPE_CHECKING, Final, Literal
 
 import psycopg
 
@@ -51,6 +52,10 @@ from exulanica.world.worlds import (
     refuse_past_limit,
     world_kind,
 )
+
+if TYPE_CHECKING:
+    from exulanica.world.composers import ComposedWorld
+    from exulanica.world.kinds.document import KindDocument
 
 __all__ = [
     "InvalidSavedWorldTitle",
@@ -110,11 +115,19 @@ class InvalidSavedWorldTitle(ValueError):
 TITLE_MAXIMUM: Final = 200
 
 
+#: The Unicode categories a title may not hold: control characters (a NUL among them, which the
+#: database cannot keep), surrogates and format characters (bidirectional controls, zero-width).
+_TITLE_REFUSED_CATEGORIES: Final = frozenset({"Cc", "Cs", "Cf"})
+
+
 def _clean_title(title: str) -> str:
-    """``title`` trimmed, or :class:`InvalidSavedWorldTitle` when nothing or too much is left."""
+    """``title`` trimmed, or :class:`InvalidSavedWorldTitle` when nothing or too much is left or it
+    holds a control, surrogate or format character."""
     clean = title.strip()
     if not 1 <= len(clean) <= TITLE_MAXIMUM:
         raise InvalidSavedWorldTitle(f"title must contain between 1 and {TITLE_MAXIMUM} characters")
+    if any(unicodedata.category(character) in _TITLE_REFUSED_CATEGORIES for character in clean):
+        raise InvalidSavedWorldTitle("a title holds no control, surrogate or format characters")
     return clean
 
 
@@ -216,6 +229,9 @@ class SavedWorldEntry:
     #: What to draw of a world generated from a recipe (``GeneratedGround``): its region, where a
     #: person arrives and each baked tile; None for every other world.
     generated_ground: object | None = None
+    #: What to draw of a world made from a world kind (``GeneratedSite``): its kind, region and
+    #: where a person arrives; None for every other world.
+    generated_site: object | None = None
 
 
 class SavedWorldEntryRepository:
@@ -465,6 +481,67 @@ class SavedWorldEntryRepository:
                 actor=created_by,
                 title=clean_title,
                 recipe=recipe,
+                composed=composed,
+            )
+            return self.create(
+                world_id=world_id,
+                title=clean_title,
+                authored_version_id=authored_version_id,
+                style_version_id=style.version_id,
+                created_by=created_by,
+                source_kind="generated",
+            )
+
+    def create_from_kind(
+        self,
+        *,
+        title: str,
+        kind: KindDocument,
+        values: Mapping[str, int],
+        created_by: uuid.UUID,
+        compose: Callable[[KindDocument, Mapping[str, int], str], ComposedWorld] | None = None,
+    ) -> SavedWorldEntry:
+        """Make a world from a world kind with ``values`` (already held to the kind's parameters by
+        :meth:`~exulanica.world.kinds.document.KindDocument.values`), and save its entry, in one
+        transaction.
+
+        As :meth:`create_generated` does for a recipe: the world is composed for a fresh identity
+        before the transaction, another identity is drawn when none of one identity's candidates
+        makes a world people can live in, up to :data:`GENERATED_WORLD_DRAWS`, and the workspace's
+        count is asked before composing and again under its lock. A kind none of whose candidates
+        makes a world for any identity drawn is refused by name
+        (:class:`~exulanica.world.kinds.samples.SiteRefused`, every candidate's sentence).
+        ``compose`` makes one identity's world (by default here, in this process); the API hands
+        the kind worker's, so no generation runs on a request's thread.
+        """
+        from exulanica.world.composers.site_plan import compose_kind
+        from exulanica.world.generated_worlds import create_kind_world_authorities
+        from exulanica.world.kinds.samples import SiteRefused
+
+        clean_title = _clean_title(title)
+        refuse_past_limit(self.connection, self.workspace_id, GENERATED)
+        refusals: list[dict[str, object]] = []
+        code = "kind_generation_refused"
+        for _ in range(GENERATED_WORLD_DRAWS):
+            world_id = new_world_id(GENERATED)
+            try:
+                composed = (compose or compose_kind)(kind, values, world_id)
+            except SiteRefused as exc:
+                code = exc.code
+                refusals.extend({"identity": world_id, **refusal} for refusal in exc.refusals)
+                continue
+            break
+        else:
+            raise SiteRefused(code, refusals)
+        with self.connection.transaction():
+            self._lock_workspace()
+            _, style, authored_version_id = create_kind_world_authorities(
+                self.connection,
+                workspace_id=self.workspace_id,
+                actor=created_by,
+                title=clean_title,
+                kind=kind.kind,
+                version=kind.version,
                 composed=composed,
             )
             return self.create(
@@ -1491,7 +1568,12 @@ class SavedWorldEntryRepository:
         )
 
     def _entry(self, row: dict[str, object]) -> SavedWorldEntry:
-        from exulanica.world.generated_worlds import generated_ground, unreadable_reason
+        from exulanica.world.generated_worlds import (
+            generated_ground,
+            generated_site,
+            states_site,
+            unreadable_reason,
+        )
         from exulanica.world.society_authored_ground import declared_floor
         from exulanica.world.starter import authored_starter_scene
 
@@ -1504,15 +1586,20 @@ class SavedWorldEntryRepository:
         # catalogs changed under it) is this one entry's unavailability, named, and never a failure
         # of the listing every other world of the workspace is read in.
         ground: object | None = None
+        site: object | None = None
         unreadable: str | None = None
         if world_kind(str(row["world_kind"])).draws_generated_tiles:
+            scope = (
+                self.connection,
+                self.workspace_id,
+                str(row["world_id"]),
+                row["source_snapshot_id"],
+            )
             try:
-                ground = generated_ground(
-                    self.connection,
-                    self.workspace_id,
-                    str(row["world_id"]),
-                    row["source_snapshot_id"],
-                )
+                if states_site(*scope):
+                    site = generated_site(*scope)
+                else:
+                    ground = generated_ground(*scope)
             except InvalidStructuralData as exc:
                 unreadable = unreadable_reason(exc)
         unavailable = source_invalidated or authored_changed or unreadable is not None
@@ -1539,6 +1626,7 @@ class SavedWorldEntryRepository:
             authored_scene=scene,
             declared_floor=declared_floor(str(row["composer_key"])),
             generated_ground=ground,
+            generated_site=site,
             authored_version_id=row["authored_version_id"],
             authored_state_sha256=row["authored_state_sha256"],
             authored_edit_seq=row["authored_edit_seq"],

@@ -34,6 +34,7 @@ const GROUND_COPY: Readonly<Record<WorldGround['form'], {
     memoryHidden: 'world.about.district-memory-hidden',
   },
   'generated-tile': { about: 'world.about.generated-tile' },
+  'generated-site': { about: 'world.about.generated-site' },
 });
 
 const MILLIMETRES_PER_METRE = 1000;
@@ -44,8 +45,12 @@ function metres(millimetres: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
 
-/** The values a ground's sentence is filled with: a bounded starter states its own size. */
+/**
+ * The values a ground's sentence is filled with: a bounded starter states its own size, and a
+ * world kind's site the kind it was made from.
+ */
 function groundValues(ground: WorldGround): Readonly<Record<string, string>> {
+  if (ground.form === 'generated-site') return { kind: ground.site.kindLabel };
   if (ground.form !== 'authored-flat' || ground.region.ground.kind !== 'flat') return {};
   return {
     width: metres(2 * ground.region.ground.halfWidthMm),

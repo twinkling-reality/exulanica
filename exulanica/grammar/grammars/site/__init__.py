@@ -21,7 +21,7 @@ from typing import Final
 
 from exulanica.grammar.contract import Generation, Grammar, StageContext, StageEmission, generate
 from exulanica.grammar.errors import InvalidRecordError
-from exulanica.grammar.grammars.site.layout import lay_out
+from exulanica.grammar.grammars.site.layout import LayoutBudget, lay_out
 from exulanica.grammar.grammars.site.plan import SitePlan
 from exulanica.grammar.grammars.site.records import (
     RECORD_SHAPES,
@@ -52,9 +52,12 @@ _SHAPES: Final = {shape.record_type: shape for shape in RECORD_SHAPES}
 
 @dataclass(frozen=True, slots=True)
 class _LayoutStage:
-    """The one stage: the whole layout of one plan."""
+    """The one stage: the whole layout of one plan, within its budget when it has one (the budget
+    bounds the work and is no part of what is generated: a layout within it is the same with any
+    budget or none)."""
 
     plan: SitePlan = field(repr=False)
+    budget: LayoutBudget | None = field(default=None, repr=False, compare=False)
     stage_id: str = "layout"
     stage_version: int = LAYOUT_STAGE_VERSION
 
@@ -64,23 +67,27 @@ class _LayoutStage:
             stage_version=self.stage_version,
             status="emitted",
             reason="",
-            records=lay_out(self.plan, context),
+            records=lay_out(self.plan, context, self.budget),
         )
 
     def validate(self, record: object) -> None:
         validate_site_record(record)
 
 
-def site_grammar(plan: SitePlan) -> Grammar:
+def site_grammar(plan: SitePlan, budget: LayoutBudget | None = None) -> Grammar:
     """The site grammar for one plan: the descriptor's identity, semantics and cascade with the
     plan's layout stage."""
-    return Grammar.from_descriptor(SITE_DESCRIPTOR_PATH, (_LayoutStage(plan),))
+    return Grammar.from_descriptor(SITE_DESCRIPTOR_PATH, (_LayoutStage(plan, budget),))
 
 
-def generate_site(plan: SitePlan, *, seed: str, subject_identity: str) -> Generation:
+def generate_site(
+    plan: SitePlan, *, seed: str, subject_identity: str, budget: LayoutBudget | None = None
+) -> Generation:
     """Generate one site: every record of the plan's layout for this seed and subject, each held
-    to its shape, and then all of them to each other (:func:`check_site_records`)."""
-    generation = generate(site_grammar(plan), seed=seed, subject_identity=subject_identity)
+    to its shape, and then all of them to each other (:func:`check_site_records`); with
+    ``budget``, refused by name as soon as laying it out would try more placements than the
+    budget allows (:class:`~exulanica.grammar.grammars.site.layout.LayoutOverBudget`)."""
+    generation = generate(site_grammar(plan, budget), seed=seed, subject_identity=subject_identity)
     check_site_records(site_records(generation), root_identity=subject_identity)
     return generation
 

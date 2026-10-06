@@ -97,6 +97,8 @@ export function groundEntry(
   switch (ground.form) {
     case 'generated-tile':
       return { ...ground.tile.start };
+    case 'generated-site':
+      return { ...ground.site.start };
     case 'owned-district':
       return ownedDistrictCameraState(navigationWorld, ground.district.document);
     case 'authored-endless':

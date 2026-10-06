@@ -17526,6 +17526,248 @@
     }
    }
   },
+  "/worlds/kinds": {
+   "get": {
+    "tags": [
+     "world"
+    ],
+    "summary": "The kinds of world a person can make worlds of.",
+    "description": "The town, the shipped kinds and the workspace's own kinds, each in plain words.",
+    "operationId": "library_worlds_kinds_get",
+    "parameters": [
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/KindLibraryView"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "world"
+    ],
+    "summary": "Keep a creator's world kind in this workspace once its checks pass.",
+    "description": "Read the kind, build its sample worlds and keep it when every one passes.\n\nA body over :data:`UPLOAD_BODY_MAXIMUM` is refused 413 before it is read; a document larger\nthan :data:`UPLOAD_BYTES_MAXIMUM`, one whose origin is not ``uploaded``, and any refusal of\neither stage answer 422 with the refusal's code, where and why (stage B's with its report so\nfar); a version or a document the workspace already holds, and a workspace already keeping as\nmany kind versions as it may, answer 409, before any sample world is built. Stage B runs in the\nkind worker (:mod:`exulanica.world.kinds.worker`), never on the request's thread: checks the\nworker does not finish within its limit, or cannot take, answer 503 ``kind_work_overran``,\n``kind_work_busy`` or ``kind_work_unavailable`` with a ``Retry-After``, and finished checks\nare kept, so sending the same kind again reads them.",
+    "operationId": "upload_kind_worlds_kinds_post",
+    "parameters": [
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/UploadKindBody"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/UploadedKindView"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Refused by name; nothing was written."
+     }
+    }
+   }
+  },
+  "/worlds/kinds/{kind}/worlds": {
+   "post": {
+    "tags": [
+     "world"
+    ],
+    "summary": "Make a world of a kind and save it as yours.",
+    "description": "Make a world of ``kind`` with a preset and values, for a new identity, and save its entry.\n\nThe town is made as ``POST /worlds/generated`` makes it, from its preset through the same gate\nand composer, so it is the same world. Every other kind is made by the site grammar from the\nkind the workspace holds or the product ships (the latest version unless one is named). An\nunknown kind or preset answers 404; a value the kind does not offer 422, naming the key, the\nvalue and the range; a title empty once trimmed 422; a kind none of whose candidates makes a\nworld people can live in, for any identity drawn, 409 with every refusal; a workspace already\nholding as many generated worlds as the count policy allows 409; a deployment whose database\nrole cannot register a world 403 ``worlds_read_only``. Nothing is written when any is refused.",
+    "operationId": "create_kind_world_worlds_kinds__kind__worlds_post",
+    "parameters": [
+     {
+      "name": "kind",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Kind"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/CreateKindWorldBody"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/SavedWorldEntryView"
+        }
+       }
+      }
+     },
+     "409": {
+      "description": "Refused by name; nothing was written."
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/world/versions/{version_id}/site": {
+   "get": {
+    "tags": [
+     "world"
+    ],
+    "summary": "A site world's drawing, for the world whose snapshot names its receipt.",
+    "description": "The drawing a site world's records make, generated again from the receipt the version's own\nsnapshot names, in the kind worker, and served with its digest as its entity tag. A drawing the\nworker does not finish in time, or cannot take, answers 503 ``kind_work_*`` with a\n``Retry-After``; a finished one is kept, so asking again reads it.",
+    "operationId": "read_site_drawing_world_versions__version_id__site_get",
+    "parameters": [
+     {
+      "name": "version_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Version Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/worlds/specification/drafts": {
    "post": {
     "tags": [
@@ -22062,6 +22304,55 @@
     ],
     "title": "CreateGeneratedWorldBody"
    },
+   "CreateKindWorldBody": {
+    "properties": {
+     "version": {
+      "anyOf": [
+       {
+        "type": "integer",
+        "maximum": 9999.0,
+        "minimum": 1.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Version"
+     },
+     "preset": {
+      "type": "string",
+      "maxLength": 100,
+      "minLength": 1,
+      "title": "Preset"
+     },
+     "title": {
+      "type": "string",
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Title"
+     },
+     "values": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object",
+        "maxProperties": 64
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Values"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "preset",
+     "title"
+    ],
+    "title": "CreateKindWorldBody"
+   },
    "CreateSavedWorldEntryBody": {
     "properties": {
      "world_id": {
@@ -23709,6 +24000,69 @@
     "title": "GeneratedSceneBody",
     "description": "One generation, as its producer describes it.\n\nEvery field is required. There is no partial generation: a receipt missing its model, its\nprompt digest, its conditioning or its seam describes an artifact nobody can place, and the\ntier's only value is that a generated surface can always be placed."
    },
+   "GeneratedSiteView": {
+    "properties": {
+     "kind": {
+      "type": "string",
+      "title": "Kind"
+     },
+     "kind_version": {
+      "type": "integer",
+      "title": "Kind Version"
+     },
+     "kind_label": {
+      "type": "string",
+      "title": "Kind Label"
+     },
+     "region_id": {
+      "type": "string",
+      "title": "Region Id"
+     },
+     "arrival_mm": {
+      "prefixItems": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "integer"
+       },
+       {
+        "type": "integer"
+       }
+      ],
+      "type": "array",
+      "maxItems": 3,
+      "minItems": 3,
+      "title": "Arrival Mm"
+     },
+     "arrival_facing_mm": {
+      "prefixItems": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "integer"
+       }
+      ],
+      "type": "array",
+      "maxItems": 2,
+      "minItems": 2,
+      "title": "Arrival Facing Mm"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "kind",
+     "kind_version",
+     "kind_label",
+     "region_id",
+     "arrival_mm",
+     "arrival_facing_mm"
+    ],
+    "title": "GeneratedSiteView",
+    "description": "What the page draws of a world made from a world kind: its kind, the one region its people\nlive in and where a person arrives, in that region's frame (east, height, south). The drawing\nitself is read through the world's version (``GET /world/versions/{version_id}/site``)."
+   },
    "GeneratedTileView": {
     "properties": {
      "tile_x": {
@@ -25261,6 +25615,322 @@
     "title": "ItemStatus"
    },
    "JsonValue": {},
+   "KindLibraryView": {
+    "properties": {
+     "profile": {
+      "type": "string",
+      "const": "exulanica.world-kinds/v1",
+      "title": "Profile"
+     },
+     "kinds": {
+      "items": {
+       "$ref": "#/components/schemas/KindView"
+      },
+      "type": "array",
+      "title": "Kinds"
+     },
+     "refusals": {
+      "items": {
+       "$ref": "#/components/schemas/KindRefusalView"
+      },
+      "type": "array",
+      "title": "Refusals"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "profile",
+     "kinds",
+     "refusals"
+    ],
+    "title": "KindLibraryView"
+   },
+   "KindParameterView": {
+    "properties": {
+     "key": {
+      "type": "string",
+      "title": "Key"
+     },
+     "label": {
+      "type": "string",
+      "title": "Label"
+     },
+     "minimum": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Minimum"
+     },
+     "maximum": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Maximum"
+     },
+     "step": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Step"
+     },
+     "choices": {
+      "anyOf": [
+       {
+        "items": {
+         "type": "string"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Choices"
+     },
+     "reason": {
+      "type": "string",
+      "title": "Reason"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "key",
+     "label",
+     "minimum",
+     "maximum",
+     "step",
+     "choices",
+     "reason"
+    ],
+    "title": "KindParameterView"
+   },
+   "KindPartView": {
+    "properties": {
+     "key": {
+      "type": "string",
+      "title": "Key"
+     },
+     "label": {
+      "type": "string",
+      "title": "Label"
+     },
+     "description": {
+      "type": "string",
+      "title": "Description"
+     },
+     "form": {
+      "type": "string",
+      "title": "Form"
+     },
+     "roles": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Roles"
+     },
+     "look": {
+      "type": "string",
+      "title": "Look"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "key",
+     "label",
+     "description",
+     "form",
+     "roles",
+     "look"
+    ],
+    "title": "KindPartView"
+   },
+   "KindPresetView": {
+    "properties": {
+     "key": {
+      "type": "string",
+      "title": "Key"
+     },
+     "label": {
+      "type": "string",
+      "title": "Label"
+     },
+     "values": {
+      "additionalProperties": {
+       "anyOf": [
+        {
+         "type": "integer"
+        },
+        {
+         "type": "string"
+        }
+       ]
+      },
+      "type": "object",
+      "title": "Values"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "key",
+     "label",
+     "values"
+    ],
+    "title": "KindPresetView"
+   },
+   "KindRefusalView": {
+    "properties": {
+     "code": {
+      "type": "string",
+      "title": "Code"
+     },
+     "meaning": {
+      "type": "string",
+      "title": "Meaning"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "code",
+     "meaning"
+    ],
+    "title": "KindRefusalView"
+   },
+   "KindView": {
+    "properties": {
+     "kind": {
+      "type": "string",
+      "title": "Kind"
+     },
+     "version": {
+      "type": "integer",
+      "title": "Version"
+     },
+     "sha256": {
+      "type": "string",
+      "title": "Sha256"
+     },
+     "source": {
+      "type": "string",
+      "enum": [
+       "shipped",
+       "workspace"
+      ],
+      "title": "Source"
+     },
+     "label": {
+      "type": "string",
+      "title": "Label"
+     },
+     "summary": {
+      "type": "string",
+      "title": "Summary"
+     },
+     "origin": {
+      "type": "string",
+      "title": "Origin"
+     },
+     "generator": {
+      "additionalProperties": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "integer"
+        }
+       ]
+      },
+      "type": "object",
+      "title": "Generator"
+     },
+     "parameters": {
+      "items": {
+       "$ref": "#/components/schemas/KindParameterView"
+      },
+      "type": "array",
+      "title": "Parameters"
+     },
+     "presets": {
+      "items": {
+       "$ref": "#/components/schemas/KindPresetView"
+      },
+      "type": "array",
+      "title": "Presets"
+     },
+     "parts": {
+      "items": {
+       "$ref": "#/components/schemas/KindPartView"
+      },
+      "type": "array",
+      "title": "Parts"
+     },
+     "zones": {
+      "items": {
+       "$ref": "#/components/schemas/KindZoneView"
+      },
+      "type": "array",
+      "title": "Zones"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "kind",
+     "version",
+     "sha256",
+     "source",
+     "label",
+     "summary",
+     "origin",
+     "generator",
+     "parameters",
+     "presets",
+     "parts",
+     "zones"
+    ],
+    "title": "KindView",
+    "description": "One kind of world a person can make, in words: what it holds, what a person may change."
+   },
+   "KindZoneView": {
+    "properties": {
+     "key": {
+      "type": "string",
+      "title": "Key"
+     },
+     "label": {
+      "type": "string",
+      "title": "Label"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "key",
+     "label"
+    ],
+    "title": "KindZoneView"
+   },
    "LastBatchExecution": {
     "properties": {
      "event_seq": {
@@ -31627,6 +32297,16 @@
        }
       ]
      },
+     "generated_site": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/GeneratedSiteView"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
      "authored_version_id": {
       "type": "string",
       "format": "uuid",
@@ -35570,6 +36250,40 @@
      "style_version_id"
     ],
     "title": "UpdateSavedWorldEntryBody"
+   },
+   "UploadKindBody": {
+    "properties": {
+     "document": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Document"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "document"
+    ],
+    "title": "UploadKindBody"
+   },
+   "UploadedKindView": {
+    "properties": {
+     "kind": {
+      "$ref": "#/components/schemas/KindView"
+     },
+     "validation": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Validation"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "kind",
+     "validation"
+    ],
+    "title": "UploadedKindView"
    },
    "ValidationError": {
     "properties": {

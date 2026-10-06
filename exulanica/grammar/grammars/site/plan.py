@@ -187,7 +187,8 @@ class Holding:
     def __post_init__(self) -> None:
         _key("a holding's part", self.part)
         _require(self.pattern in PATTERNS, f"no pattern {self.pattern!r}")
-        _require(self.count.maximum >= 1, "a holding holds at least one, at most")
+        # A holding may hold none: a person may set how many to nothing, and the layout places
+        # nothing for it.
 
 
 @dataclass(frozen=True, slots=True)
