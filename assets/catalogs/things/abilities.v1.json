@@ -1,0 +1,255 @@
+{
+  "schema_version": 1,
+  "catalog_id": "abilities",
+  "catalog_version": 1,
+  "entries": [
+    {
+      "key": "wait",
+      "module": "exulanica-ability/purposeful/v1",
+      "needs": {
+        "socket": false,
+        "moves": false
+      },
+      "target_offer": null,
+      "takes_line": false,
+      "words": "wait where it is",
+      "parameters": [],
+      "reason": "Waiting a minute where it stands, the purposeful routine's idle action: it changes nothing and is offered only beside something else.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica thing contract; see the entry reason"
+      }
+    },
+    {
+      "key": "stand",
+      "module": "exulanica-ability/purposeful/v1",
+      "needs": {
+        "socket": false,
+        "moves": true
+      },
+      "target_offer": null,
+      "takes_line": false,
+      "words": "stand around",
+      "parameters": [],
+      "reason": "Standing a while at an open spot nearby, as the purposeful routine stands: no place, nobody else's spot.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica thing contract; see the entry reason"
+      }
+    },
+    {
+      "key": "talk",
+      "module": "exulanica-ability/purposeful/v1",
+      "needs": {
+        "socket": false,
+        "moves": true
+      },
+      "target_offer": "talk_to",
+      "takes_line": false,
+      "words": "stop and talk with others",
+      "parameters": [],
+      "reason": "Stopping to talk with somebody within the routine's talk reach who offers talk_to: two open spots beside each other, one shared stay. Talking is wordless; words are said.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica thing contract; see the entry reason"
+      }
+    },
+    {
+      "key": "rest",
+      "module": "exulanica-ability/purposeful/v1",
+      "needs": {
+        "socket": false,
+        "moves": true
+      },
+      "target_offer": "rest_at",
+      "takes_line": false,
+      "words": "rest at places to rest",
+      "parameters": [],
+      "reason": "Walking to a place a thing offers to rest at and staying, the purposeful routine's rest, its stay drawn from the routine.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica thing contract; see the entry reason"
+      }
+    },
+    {
+      "key": "visit",
+      "module": "exulanica-ability/purposeful/v1",
+      "needs": {
+        "socket": false,
+        "moves": true
+      },
+      "target_offer": "visit",
+      "takes_line": false,
+      "words": "visit places",
+      "parameters": [],
+      "reason": "Walking to a place a thing offers to visit and staying a short while, the purposeful routine's visit.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica thing contract; see the entry reason"
+      }
+    },
+    {
+      "key": "pick_up",
+      "module": "exulanica-ability/hands/v1",
+      "needs": {
+        "socket": true,
+        "moves": true
+      },
+      "target_offer": "holdable",
+      "takes_line": false,
+      "words": "pick things up",
+      "parameters": [],
+      "reason": "Walking into reach of a thing that offers holdable and taking it into a free socket that fits its length and grip.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica thing contract; see the entry reason"
+      }
+    },
+    {
+      "key": "put_down",
+      "module": "exulanica-ability/hands/v1",
+      "needs": {
+        "socket": true,
+        "moves": false
+      },
+      "target_offer": null,
+      "takes_line": false,
+      "words": "put things down",
+      "parameters": [],
+      "reason": "Putting a held thing down where it stands, or onto a thing in reach that offers a top with room.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica thing contract; see the entry reason"
+      }
+    },
+    {
+      "key": "give",
+      "module": "exulanica-ability/hands/v1",
+      "needs": {
+        "socket": true,
+        "moves": true
+      },
+      "target_offer": "receive",
+      "takes_line": false,
+      "words": "give things to others",
+      "parameters": [],
+      "reason": "Walking into reach of somebody who offers receive and has a free socket that fits, and handing a held thing over.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica thing contract; see the entry reason"
+      }
+    },
+    {
+      "key": "take",
+      "module": "exulanica-ability/hands/v1",
+      "needs": {
+        "socket": true,
+        "moves": true
+      },
+      "target_offer": "let_take",
+      "takes_line": false,
+      "words": "take what others let it take",
+      "parameters": [],
+      "reason": "Walking into reach of a thing that offers let_take, or a top, and taking what it holds into a free socket that fits.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica thing contract; see the entry reason"
+      }
+    },
+    {
+      "key": "follow",
+      "module": "exulanica-ability/follow/v1",
+      "needs": {
+        "socket": false,
+        "moves": true
+      },
+      "target_offer": "be_followed",
+      "takes_line": false,
+      "words": "follow others",
+      "parameters": [],
+      "reason": "Following somebody who offers be_followed, keeping within the module's following distance until it chooses otherwise or loses them.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica thing contract; see the entry reason"
+      }
+    },
+    {
+      "key": "say",
+      "module": "exulanica-ability/say/v1",
+      "needs": {
+        "socket": false,
+        "moves": false
+      },
+      "target_offer": "hear",
+      "takes_line": true,
+      "words": "say things",
+      "parameters": [],
+      "reason": "Saying one line, written by its decider (a model within the role's limits, or a visitor's own player), to somebody in hearing reach who offers hear, or to everyone in reach. Saying does not interrupt what it is doing. The routine never says anything.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica thing contract; see the entry reason"
+      }
+    },
+    {
+      "key": "leave",
+      "module": "exulanica-ability/crossing/v1",
+      "needs": {
+        "socket": false,
+        "moves": true
+      },
+      "target_offer": "leave_through",
+      "takes_line": false,
+      "words": "leave this world",
+      "parameters": [
+        {
+          "name": "quiet_minutes",
+          "unit": "minutes",
+          "minimum": 1,
+          "maximum": 60,
+          "reason": "How many consecutive minutes its decider may leave unanswered (decider_disconnected, no_answer_in_time) before the visitor goes home with decider_lost; each kind states its own within these bounds."
+        }
+      ],
+      "reason": "A visitor going home: through a reachable thing that offers leave_through, the walk included, or from where it stands when none is reachable. What it holds leaves with it.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica thing contract; see the entry reason"
+      }
+    }
+  ]
+}

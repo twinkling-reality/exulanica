@@ -1,0 +1,41 @@
+{
+  "profile": "exulanica.look/v1",
+  "look": "primitive-gate",
+  "version": 1,
+  "label": "gate",
+  "body_plan": "rigid/v1",
+  "look_kind": "static",
+  "container": {
+    "sha256": "6c421c706f416800be403bca743be2d6722d254cc0b56b763cf98cc2c1de9f07",
+    "bytes": 4328,
+    "media_type": "model/gltf-binary"
+  },
+  "rig": null,
+  "height_mm": null,
+  "sampling": "linear",
+  "light": null,
+  "role": null,
+  "origin": {
+    "profile": "exulanica.origin/v1",
+    "class": "authored",
+    "by": {
+      "kind": "project"
+    },
+    "sources": [],
+    "licence": {
+      "spdx": "CC0-1.0",
+      "verdict": "SHIP",
+      "attribution": null,
+      "share_alike": false,
+      "licence_url": null,
+      "licence_text_sha256": null
+    },
+    "authors": [],
+    "lineage": {
+      "ingredients": [],
+      "receipts": [],
+      "translation_manifest_sha256": null
+    },
+    "distribution": "public"
+  }
+}

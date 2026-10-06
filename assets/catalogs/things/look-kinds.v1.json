@@ -1,0 +1,142 @@
+{
+  "schema_version": 1,
+  "catalog_id": "look-kinds",
+  "catalog_version": 1,
+  "entries": [
+    {
+      "key": "catalog_person",
+      "plans": [
+        "humanoid/v1"
+      ],
+      "container": "none",
+      "rig": false,
+      "light": false,
+      "role": false,
+      "words": "drawn as one of the world's people",
+      "reason": "A person drawn from the published people catalog by the street population draw, as every society's people are drawn: the look a routine person wears.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica thing contract; see the entry reason"
+      }
+    },
+    {
+      "key": "skinned",
+      "plans": [
+        "humanoid/v1"
+      ],
+      "container": "required",
+      "rig": true,
+      "light": false,
+      "role": false,
+      "words": "a rigged figure",
+      "reason": "A rigged glTF figure admitted as a reviewed component with its own clips; its rig maps every required humanoid bone to one of its joints, so sockets and motions find the named bones.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica thing contract; see the entry reason"
+      }
+    },
+    {
+      "key": "rigid_on_bones",
+      "plans": [
+        "humanoid/v1"
+      ],
+      "container": "required",
+      "rig": false,
+      "light": false,
+      "role": false,
+      "words": "rigid parts on named bones",
+      "reason": "One static-glb container with one node per dressed bone named bone:<VRM name>, each a direct child of the scene root at that joint's rest position with no rotation or scale, its rigid parts as children; joint nodes for all 15 required bones; posed by procedural motion on the bones. A blocky figure, or a game's blocky character, is this look.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica thing contract; see the entry reason"
+      }
+    },
+    {
+      "key": "light",
+      "plans": [
+        "bodiless/v1"
+      ],
+      "container": "none",
+      "rig": false,
+      "light": true,
+      "role": false,
+      "words": "a drifting light",
+      "reason": "No file: a light, a glow and a slow drift, in a colour and radius the look states.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica thing contract; see the entry reason"
+      }
+    },
+    {
+      "key": "static",
+      "plans": [
+        "rigid/v1"
+      ],
+      "container": "required",
+      "rig": false,
+      "light": false,
+      "role": false,
+      "words": "a solid object",
+      "reason": "One static-glb container: a reviewed object or component, a person's prepared asset, or a generated piece, contained in the thing's box.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica thing contract; see the entry reason"
+      }
+    },
+    {
+      "key": "look_role",
+      "plans": [
+        "rigid/v1"
+      ],
+      "container": "none",
+      "rig": false,
+      "light": false,
+      "role": true,
+      "words": "dressed by this world's style",
+      "reason": "A look role the world's style pack dresses, fitted CONTAIN to the thing's box; with no pack dressing it, the engine's primitive of the box.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica thing contract; see the entry reason"
+      }
+    },
+    {
+      "key": "none",
+      "plans": [
+        "humanoid/v1",
+        "bodiless/v1",
+        "rigid/v1"
+      ],
+      "container": "none",
+      "rig": false,
+      "light": false,
+      "role": false,
+      "words": "not drawn",
+      "reason": "Nothing is drawn; the thing is still there, and its card says it has no look.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica thing contract; see the entry reason"
+      }
+    }
+  ]
+}

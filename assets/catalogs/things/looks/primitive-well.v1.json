@@ -1,0 +1,41 @@
+{
+  "profile": "exulanica.look/v1",
+  "look": "primitive-well",
+  "version": 1,
+  "label": "well",
+  "body_plan": "rigid/v1",
+  "look_kind": "static",
+  "container": {
+    "sha256": "daa6c85105f16dfea0d729cac887836543a94a7d03d3a16d87b276c777397c01",
+    "bytes": 10268,
+    "media_type": "model/gltf-binary"
+  },
+  "rig": null,
+  "height_mm": null,
+  "sampling": "linear",
+  "light": null,
+  "role": null,
+  "origin": {
+    "profile": "exulanica.origin/v1",
+    "class": "authored",
+    "by": {
+      "kind": "project"
+    },
+    "sources": [],
+    "licence": {
+      "spdx": "CC0-1.0",
+      "verdict": "SHIP",
+      "attribution": null,
+      "share_alike": false,
+      "licence_url": null,
+      "licence_text_sha256": null
+    },
+    "authors": [],
+    "lineage": {
+      "ingredients": [],
+      "receipts": [],
+      "translation_manifest_sha256": null
+    },
+    "distribution": "public"
+  }
+}

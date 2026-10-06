@@ -98,10 +98,11 @@ The backend's layering is a rule the tooling keeps. `[tool.importlinter]` in
 [`pyproject.toml`](../pyproject.toml) declares an exhaustive layers contract, so a top-level package
 nobody placed breaks `uv run lint-imports`. The HTTP surface (`exulanica.api`) depends on the domain
 and nothing the product runs depends on it; above it sit only the evaluation harness, package
-projection and orchestration. The world and its societies sit above movement, the model client, the
-database and the store; traffic, reconstruction, the generator grammar and materials sit lower
-still. Forbidden contracts beside the layers keep the model client, reconstruction, capture,
-traffic, movement, materials, lettering and the generator system from importing what they must not.
+projection and orchestration. The world and its societies sit above movement and things, the model
+client, the database and the store; traffic, reconstruction, the generator grammar and materials sit
+lower still. Forbidden contracts beside the layers keep the model client, reconstruction, capture,
+traffic, movement, things, materials, lettering and the generator system from importing what they
+must not.
 The contract in `pyproject.toml` owns the exact order.
 
 ### 1.4 People, models and movement
@@ -116,6 +117,7 @@ The contract in `pyproject.toml` owns the exact order.
 | Asking the chosen models | `exulanica/api/decision_host.py` and `exulanica/api/society_person_decisions.py` for people; `exulanica/api/traffic_signal_controller.py` for signals |
 | Comparisons of models | The loop `exulanica/world/society_comparison.py`, the runner `exulanica/api/society_comparison_runner.py`, the one definition path `exulanica/api/society_comparison_start.py`, each verified run's stored drawing `exulanica/world/society_comparison_drawing.py` (migration 0121), the start's claim and lease `exulanica/world/society_comparison_start_repository.py` played by `exulanica/api/society_comparison_worker.py`, the command `exulanica/orchestration/compare.py` and the Compare view `web/packages/app/src/ui/society-comparison.ts` with its start controls `society-comparison-start.ts` |
 | Movement | The registry `exulanica/movement/registry.py`, reading [`movement-modules.v1.json`](../exulanica/movement/movement-modules.v1.json), with `walking.py` and `flight.py` beside it |
+| Things | `exulanica/things`: thing kinds (`kinds.py`) read against the catalogs in [`assets/catalogs/things`](../assets/catalogs/things), looks, the origin record and translation manifests; the kinds and looks this repository ships are written by `scripts/things/shipped_things.py` |
 | Flight serving | `exulanica/world/flight_worker.py`, binding the episode worker `exulanica/world/episode_worker.py`: one worker process computes flight episodes on a clock every viewer shares |
 | Road traffic | `exulanica/traffic`, a pure deterministic simulation; `exulanica/world/traffic_host.py` serves a saved town's own roads (`saved_world_roads`, `GET /world/versions/{version_id}/traffic`) and a baked city's traffic (`GET /tiles/traffic`) for the development preview, with signal minutes sealed by `exulanica/api/traffic_signal_controller.py` |
 
@@ -125,8 +127,9 @@ host's asking and replay are one path for every role; two roles are registered, 
 junction signal. A
 chosen model proposes, the engine validates, and replay reads stored receipts without a call. The
 [society contract](synthetic-society-contract.md), the [decision roles contract](decision-roles-contract.md),
-the [movement modules contract](movement-modules-contract.md) and
-[society experiments](society-experiments.md) own the rules; the
+the [movement modules contract](movement-modules-contract.md), the
+[things contract](things-contract.md) and [society experiments](society-experiments.md) own the
+rules; the
 [people and models guide](capabilities/simulation.md) explains them for a reader.
 
 ## 2. Platform split and deployment topology

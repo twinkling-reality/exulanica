@@ -1,0 +1,99 @@
+{
+  "profile": "exulanica.thing-kind/v1",
+  "kind": "villager",
+  "version": 1,
+  "label": "villager",
+  "summary": "One of the world's own people, going about the purposeful routine.",
+  "class": "being",
+  "body": {
+    "plan": "humanoid/v1",
+    "height_mm": {
+      "from": 1500,
+      "to": 1950
+    }
+  },
+  "origin": {
+    "profile": "exulanica.origin/v1",
+    "class": "authored",
+    "by": {
+      "kind": "project"
+    },
+    "sources": [],
+    "licence": {
+      "spdx": "Apache-2.0",
+      "verdict": "SHIP",
+      "attribution": null,
+      "share_alike": false,
+      "licence_url": null,
+      "licence_text_sha256": null
+    },
+    "authors": [],
+    "lineage": {
+      "ingredients": [],
+      "receipts": [],
+      "translation_manifest_sha256": null
+    },
+    "distribution": "public"
+  },
+  "moves": [
+    "exulanica-movement/walking/v1"
+  ],
+  "abilities": [
+    {
+      "key": "wait",
+      "parameters": {}
+    },
+    {
+      "key": "stand",
+      "parameters": {}
+    },
+    {
+      "key": "talk",
+      "parameters": {}
+    },
+    {
+      "key": "rest",
+      "parameters": {}
+    },
+    {
+      "key": "visit",
+      "parameters": {}
+    }
+  ],
+  "offers": [
+    {
+      "key": "talk_to",
+      "parameters": {}
+    },
+    {
+      "key": "hear",
+      "parameters": {}
+    }
+  ],
+  "routine": {
+    "weights": {
+      "rest": 700,
+      "visit": 1000,
+      "stand": 300,
+      "talk": 500
+    },
+    "follow_holders_of": [],
+    "reason": "The purposeful routine's own weights, as every saved world's people."
+  },
+  "deciders": {
+    "default": "routine",
+    "allowed": [
+      "routine",
+      "model",
+      "person"
+    ]
+  },
+  "looks": [
+    {
+      "look": "people-catalog",
+      "version": 1,
+      "sha256": "188e6de0561b3617f6c6f0f8495e7ea3f7c6a2dd5fcf43f39feecd2ffea3c24d"
+    }
+  ],
+  "ext": {}
+}

@@ -1,0 +1,73 @@
+{
+  "profile": "exulanica.thing-kind/v1",
+  "kind": "market_stall",
+  "version": 1,
+  "label": "market stall",
+  "summary": "The world object catalog's market stall, as a thing.",
+  "class": "object",
+  "body": {
+    "plan": "rigid/v1",
+    "box_mm": {
+      "width": 2400,
+      "depth": 1200,
+      "height": 2480
+    },
+    "blocks_walking": true
+  },
+  "origin": {
+    "profile": "exulanica.origin/v1",
+    "class": "authored",
+    "by": {
+      "kind": "project"
+    },
+    "sources": [],
+    "licence": {
+      "spdx": "Apache-2.0",
+      "verdict": "SHIP",
+      "attribution": null,
+      "share_alike": false,
+      "licence_url": null,
+      "licence_text_sha256": null
+    },
+    "authors": [],
+    "lineage": {
+      "ingredients": [],
+      "receipts": [],
+      "translation_manifest_sha256": null
+    },
+    "distribution": "public"
+  },
+  "moves": [],
+  "abilities": [],
+  "offers": [
+    {
+      "key": "visit",
+      "parameters": {
+        "places": [
+          {
+            "x_mm": -351,
+            "y_mm": 1140,
+            "faces": "-y",
+            "seat": null
+          },
+          {
+            "x_mm": 351,
+            "y_mm": 1140,
+            "faces": "-y",
+            "seat": null
+          }
+        ]
+      }
+    }
+  ],
+  "routine": null,
+  "deciders": null,
+  "looks": [
+    {
+      "look": "market-stall",
+      "version": 1,
+      "sha256": "45b1a6b52e221219c3a8ea6a01c2cdce021520aa4600e5300f05749f10efa130"
+    }
+  ],
+  "ext": {}
+}

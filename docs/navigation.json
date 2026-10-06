@@ -34,6 +34,7 @@
         {"path": "decision-roles-contract.md", "role": "contract", "owns": "Decision roles, the owner's model choice, the person's decision contract, host asking and spend bounds, dispositions and replay"},
         {"path": "society-experiments.md", "role": "contract", "owns": "Comparisons of the models that decide for a world's people, and intervention experiments over a living society"},
         {"path": "movement-modules-contract.md", "role": "contract", "owns": "Movement modules and their dispatch: walking, flight through a world's air, flying kinds and roads"},
+        {"path": "things-contract.md", "role": "contract", "owns": "Thing kinds, body plans, abilities and offers, looks and look kinds, the origin record and translation manifests"},
         {"path": "character-representation-contract.md", "role": "contract", "owns": "Character appearance, rigging, subject bindings, movement and how a society's people are drawn"},
         {"path": "traffic-contract.md", "role": "contract", "owns": "Traffic simulation inputs, derived road records, state transitions and invariants, and its serving for a baked city"},
         {"path": "world-clock-contract.md", "role": "contract", "owns": "A world version's clock: legacy and coupled timing, the transition, pausing, stepping and catching up, crossing occupancy and the order between walkers and traffic"}

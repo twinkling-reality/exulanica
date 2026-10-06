@@ -1,0 +1,41 @@
+{
+  "profile": "exulanica.look/v1",
+  "look": "blocky-traveller",
+  "version": 1,
+  "label": "blocky traveller",
+  "body_plan": "humanoid/v1",
+  "look_kind": "rigid_on_bones",
+  "container": {
+    "sha256": "86a4a0b2831105897c2ac972d744658347718a8575f1e82354496c5f0060245e",
+    "bytes": 28616,
+    "media_type": "model/gltf-binary"
+  },
+  "rig": null,
+  "height_mm": 1700,
+  "sampling": "linear",
+  "light": null,
+  "role": null,
+  "origin": {
+    "profile": "exulanica.origin/v1",
+    "class": "authored",
+    "by": {
+      "kind": "project"
+    },
+    "sources": [],
+    "licence": {
+      "spdx": "CC0-1.0",
+      "verdict": "SHIP",
+      "attribution": null,
+      "share_alike": false,
+      "licence_url": null,
+      "licence_text_sha256": null
+    },
+    "authors": [],
+    "lineage": {
+      "ingredients": [],
+      "receipts": [],
+      "translation_manifest_sha256": null
+    },
+    "distribution": "public"
+  }
+}

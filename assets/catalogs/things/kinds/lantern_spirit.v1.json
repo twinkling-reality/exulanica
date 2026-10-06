@@ -1,0 +1,115 @@
+{
+  "profile": "exulanica.thing-kind/v1",
+  "kind": "lantern_spirit",
+  "version": 1,
+  "label": "lantern spirit",
+  "summary": "A spirit with no body, a light that drifts and holds a small thing beside it.",
+  "class": "being",
+  "body": {
+    "plan": "bodiless/v1",
+    "radius_mm": 200
+  },
+  "origin": {
+    "profile": "exulanica.origin/v1",
+    "class": "authored",
+    "by": {
+      "kind": "project"
+    },
+    "sources": [],
+    "licence": {
+      "spdx": "Apache-2.0",
+      "verdict": "SHIP",
+      "attribution": null,
+      "share_alike": false,
+      "licence_url": null,
+      "licence_text_sha256": null
+    },
+    "authors": [],
+    "lineage": {
+      "ingredients": [],
+      "receipts": [],
+      "translation_manifest_sha256": null
+    },
+    "distribution": "public"
+  },
+  "moves": [
+    "exulanica-movement/walking/v1"
+  ],
+  "abilities": [
+    {
+      "key": "wait",
+      "parameters": {}
+    },
+    {
+      "key": "follow",
+      "parameters": {}
+    },
+    {
+      "key": "say",
+      "parameters": {}
+    },
+    {
+      "key": "pick_up",
+      "parameters": {}
+    },
+    {
+      "key": "put_down",
+      "parameters": {}
+    },
+    {
+      "key": "give",
+      "parameters": {}
+    },
+    {
+      "key": "take",
+      "parameters": {}
+    }
+  ],
+  "offers": [
+    {
+      "key": "talk_to",
+      "parameters": {}
+    },
+    {
+      "key": "hear",
+      "parameters": {}
+    },
+    {
+      "key": "receive",
+      "parameters": {}
+    },
+    {
+      "key": "be_followed",
+      "parameters": {}
+    }
+  ],
+  "routine": {
+    "weights": {
+      "wait": 200,
+      "follow": 800,
+      "pick_up": 50,
+      "give": 50
+    },
+    "follow_holders_of": [
+      "lantern"
+    ],
+    "reason": "A light that mostly follows, and most of all whoever carries a lantern, now and then taking up or handing on something small."
+  },
+  "deciders": {
+    "default": "routine",
+    "allowed": [
+      "routine",
+      "model",
+      "person",
+      "external"
+    ]
+  },
+  "looks": [
+    {
+      "look": "spirit-light",
+      "version": 1,
+      "sha256": "836b8a8b04a4369db3e3a8f3647101d672c8921b91e9b4289dd81a1df5cfaf9f"
+    }
+  ],
+  "ext": {}
+}

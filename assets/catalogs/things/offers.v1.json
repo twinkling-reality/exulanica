@@ -1,0 +1,225 @@
+{
+  "schema_version": 1,
+  "catalog_id": "offers",
+  "catalog_version": 1,
+  "entries": [
+    {
+      "key": "holdable",
+      "words": "can be held",
+      "parameters": [
+        {
+          "name": "hands",
+          "kind": "integer",
+          "minimum": 1,
+          "maximum": 2,
+          "unit": "hands"
+        },
+        {
+          "name": "grip",
+          "kind": "point"
+        },
+        {
+          "name": "axis",
+          "kind": "axis"
+        }
+      ],
+      "reason": "A thing a hand or a float socket may hold: how many hands it takes, its grip as a point in its own slot frame, and the axis it extends along from the hand. Whether a socket can hold it is the socket's to say by the thing's length and its section through the grip.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica thing contract; see the entry reason"
+      }
+    },
+    {
+      "key": "receive",
+      "words": "others can give it things",
+      "parameters": [],
+      "reason": "Somebody who accepts a thing handed to them into a free socket that fits.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica thing contract; see the entry reason"
+      }
+    },
+    {
+      "key": "let_take",
+      "words": "others can take what it holds",
+      "parameters": [],
+      "reason": "A thing, such as a rack, that lets others take what it holds. No being offers it unless its kind says so.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica thing contract; see the entry reason"
+      }
+    },
+    {
+      "key": "top",
+      "words": "things can be put on it",
+      "parameters": [
+        {
+          "name": "capacity",
+          "kind": "integer",
+          "minimum": 1,
+          "maximum": 8,
+          "unit": "things"
+        }
+      ],
+      "reason": "A surface others may put things on and take things from, holding at most its capacity of things whose footprint fits its box.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica thing contract; see the entry reason"
+      }
+    },
+    {
+      "key": "talk_to",
+      "words": "others can talk with it",
+      "parameters": [],
+      "reason": "Somebody others may stop and talk with, as the routine pairs people.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica thing contract; see the entry reason"
+      }
+    },
+    {
+      "key": "hear",
+      "words": "others can say things to it",
+      "parameters": [],
+      "reason": "Somebody who hears a line said within hearing reach, and keeps the latest lines it heard.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica thing contract; see the entry reason"
+      }
+    },
+    {
+      "key": "be_followed",
+      "words": "others can follow it",
+      "parameters": [],
+      "reason": "Somebody others may follow: the follow module keeps a follower within its following distance of them.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica thing contract; see the entry reason"
+      }
+    },
+    {
+      "key": "rest_at",
+      "words": "others can rest at it",
+      "parameters": [
+        {
+          "name": "places",
+          "kind": "places"
+        }
+      ],
+      "reason": "A thing with places to rest at, each a point in its slot frame with the way the person there faces and the seat they sit on, in the same frame, where it has one, as the world object catalog derives them.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica thing contract; see the entry reason"
+      }
+    },
+    {
+      "key": "visit",
+      "words": "others can visit it",
+      "parameters": [
+        {
+          "name": "places",
+          "kind": "places"
+        }
+      ],
+      "reason": "A thing with places to visit, each a point in its slot frame with the side the person there faces.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica thing contract; see the entry reason"
+      }
+    },
+    {
+      "key": "perch",
+      "words": "birds can perch on it",
+      "parameters": [
+        {
+          "name": "perches",
+          "kind": "perches"
+        }
+      ],
+      "reason": "Points a flyer stands on, read by flight alone, as the world object catalog's perches.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica thing contract; see the entry reason"
+      }
+    },
+    {
+      "key": "host",
+      "words": "birds live on it",
+      "parameters": [
+        {
+          "name": "flyers",
+          "kind": "flyers"
+        }
+      ],
+      "reason": "The flyers that live on it, by flying kind and count, read by flight alone, as the world object catalog's hosts.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica thing contract; see the entry reason"
+      }
+    },
+    {
+      "key": "arrive_through",
+      "words": "visitors arrive through it",
+      "parameters": [
+        {
+          "name": "point",
+          "kind": "place"
+        }
+      ],
+      "reason": "A gate: visitors from outside arrive at its arrival point, a point in its slot frame with the side they face, resolved to the nearest open walking node.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica thing contract; see the entry reason"
+      }
+    },
+    {
+      "key": "leave_through",
+      "words": "visitors leave through it",
+      "parameters": [],
+      "reason": "A gate visitors leave the world through, at its arrival point.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica thing contract; see the entry reason"
+      }
+    }
+  ]
+}

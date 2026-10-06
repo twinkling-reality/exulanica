@@ -421,6 +421,11 @@ layers = [
   # input and passes it down, so it sits directly under `world`; the forbidden contract below keeps
   # it pure, so its integer steps replay the same on any machine with no database or store.
   "movement",
+  # Things: thing kinds, body plans, abilities, offers, looks, the one origin record and
+  # translation manifests, data the world and its engine modules read and nothing below them
+  # knows. Under movement, so an engine module may read a kind's semantics and nothing here can
+  # reach a step; the forbidden contract below keeps it pure data.
+  "things",
   # Reference material for drafting: the reference sources and their adapters, the boundary every
   # outgoing query passes, and the notes a drafter receives. It judges a query with the hosted
   # request policy (epistemics) and sends it through the model transport (models), and sits under
@@ -686,6 +691,37 @@ forbidden_modules = [
   "exulanica.capture",
   "exulanica.world",
   "exulanica.traffic",
+  "exulanica.models",
+  "exulanica.api",
+  "numpy",
+  "torch",
+  "exulanica.env",
+]
+
+[[tool.importlinter.contracts]]
+# A thing kind, a look or an origin record is data read by a pure reader: it cannot open the
+# database or the store, name an evidence address, reach the pipeline, a person, the selector,
+# reconstruction or the capture verdict, import the world that reads it, call a model or load the
+# numeric stack. What a society reads of a kind is its semantics, and nothing here can reach a
+# society to hand it a look. `exulanica.canonical` and `exulanica.grammar`'s documents and catalog
+# rules stay importable: the readers share their refusals.
+name = "Things are pure data: no database, store, evidence, pipeline, world, traffic or model"
+type = "forbidden"
+source_modules = ["exulanica.things"]
+forbidden_modules = [
+  "psycopg",
+  "exulanica.db",
+  "exulanica.store",
+  "exulanica.evidence",
+  "exulanica.ingest",
+  "exulanica.migrations",
+  "exulanica.identity",
+  "exulanica.selection",
+  "exulanica.reconstruction",
+  "exulanica.capture",
+  "exulanica.world",
+  "exulanica.traffic",
+  "exulanica.movement",
   "exulanica.models",
   "exulanica.api",
   "numpy",

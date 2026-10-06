@@ -1,0 +1,137 @@
+{
+  "profile": "exulanica.thing-kind/v1",
+  "kind": "knight",
+  "version": 1,
+  "label": "knight",
+  "summary": "An armoured knight who walks, carries things, hands them over and says things.",
+  "class": "being",
+  "body": {
+    "plan": "humanoid/v1",
+    "height_mm": {
+      "from": 1700,
+      "to": 1900
+    }
+  },
+  "origin": {
+    "profile": "exulanica.origin/v1",
+    "class": "authored",
+    "by": {
+      "kind": "project"
+    },
+    "sources": [],
+    "licence": {
+      "spdx": "Apache-2.0",
+      "verdict": "SHIP",
+      "attribution": null,
+      "share_alike": false,
+      "licence_url": null,
+      "licence_text_sha256": null
+    },
+    "authors": [],
+    "lineage": {
+      "ingredients": [],
+      "receipts": [],
+      "translation_manifest_sha256": null
+    },
+    "distribution": "public"
+  },
+  "moves": [
+    "exulanica-movement/walking/v1"
+  ],
+  "abilities": [
+    {
+      "key": "wait",
+      "parameters": {}
+    },
+    {
+      "key": "stand",
+      "parameters": {}
+    },
+    {
+      "key": "talk",
+      "parameters": {}
+    },
+    {
+      "key": "rest",
+      "parameters": {}
+    },
+    {
+      "key": "visit",
+      "parameters": {}
+    },
+    {
+      "key": "pick_up",
+      "parameters": {}
+    },
+    {
+      "key": "put_down",
+      "parameters": {}
+    },
+    {
+      "key": "give",
+      "parameters": {}
+    },
+    {
+      "key": "take",
+      "parameters": {}
+    },
+    {
+      "key": "follow",
+      "parameters": {}
+    },
+    {
+      "key": "say",
+      "parameters": {}
+    }
+  ],
+  "offers": [
+    {
+      "key": "talk_to",
+      "parameters": {}
+    },
+    {
+      "key": "hear",
+      "parameters": {}
+    },
+    {
+      "key": "receive",
+      "parameters": {}
+    },
+    {
+      "key": "be_followed",
+      "parameters": {}
+    }
+  ],
+  "routine": {
+    "weights": {
+      "rest": 700,
+      "visit": 1000,
+      "stand": 300,
+      "talk": 500,
+      "pick_up": 200,
+      "put_down": 100,
+      "give": 150,
+      "take": 100,
+      "follow": 100
+    },
+    "follow_holders_of": [],
+    "reason": "The purposeful routine's own weights for resting, visiting, standing and talking, with smaller ones for its hands and for following, so left to its routine it goes about as people do and now and then picks something up, hands it over or follows; what it says is its decider's."
+  },
+  "deciders": {
+    "default": "routine",
+    "allowed": [
+      "routine",
+      "model",
+      "person",
+      "external"
+    ]
+  },
+  "looks": [
+    {
+      "look": "blocky-knight",
+      "version": 1,
+      "sha256": "614153fcc807c0126ea93f6d3880aa7a71231e94b0a06caf78c121f2d6b9ed45"
+    }
+  ],
+  "ext": {}
+}

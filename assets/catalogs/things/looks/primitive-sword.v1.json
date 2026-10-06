@@ -1,0 +1,41 @@
+{
+  "profile": "exulanica.look/v1",
+  "look": "primitive-sword",
+  "version": 1,
+  "label": "sword",
+  "body_plan": "rigid/v1",
+  "look_kind": "static",
+  "container": {
+    "sha256": "1a49569fe1b90b01c20d8fbb142694cae3aea7bf8be4e0d22024d1f4eccddcee",
+    "bytes": 5876,
+    "media_type": "model/gltf-binary"
+  },
+  "rig": null,
+  "height_mm": null,
+  "sampling": "linear",
+  "light": null,
+  "role": null,
+  "origin": {
+    "profile": "exulanica.origin/v1",
+    "class": "authored",
+    "by": {
+      "kind": "project"
+    },
+    "sources": [],
+    "licence": {
+      "spdx": "CC0-1.0",
+      "verdict": "SHIP",
+      "attribution": null,
+      "share_alike": false,
+      "licence_url": null,
+      "licence_text_sha256": null
+    },
+    "authors": [],
+    "lineage": {
+      "ingredients": [],
+      "receipts": [],
+      "translation_manifest_sha256": null
+    },
+    "distribution": "public"
+  }
+}

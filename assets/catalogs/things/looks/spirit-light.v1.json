@@ -1,0 +1,41 @@
+{
+  "profile": "exulanica.look/v1",
+  "look": "spirit-light",
+  "version": 1,
+  "label": "drifting light",
+  "body_plan": "bodiless/v1",
+  "look_kind": "light",
+  "container": null,
+  "rig": null,
+  "height_mm": null,
+  "sampling": "linear",
+  "light": {
+    "colour": "#ffd76a",
+    "intensity_milli": 1500,
+    "radius_mm": 4000
+  },
+  "role": null,
+  "origin": {
+    "profile": "exulanica.origin/v1",
+    "class": "authored",
+    "by": {
+      "kind": "project"
+    },
+    "sources": [],
+    "licence": {
+      "spdx": "CC0-1.0",
+      "verdict": "SHIP",
+      "attribution": null,
+      "share_alike": false,
+      "licence_url": null,
+      "licence_text_sha256": null
+    },
+    "authors": [],
+    "lineage": {
+      "ingredients": [],
+      "receipts": [],
+      "translation_manifest_sha256": null
+    },
+    "distribution": "public"
+  }
+}

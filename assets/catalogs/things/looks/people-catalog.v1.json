@@ -1,0 +1,50 @@
+{
+  "profile": "exulanica.look/v1",
+  "look": "people-catalog",
+  "version": 1,
+  "label": "one of the world's people",
+  "body_plan": "humanoid/v1",
+  "look_kind": "catalog_person",
+  "container": null,
+  "rig": null,
+  "height_mm": 1750,
+  "sampling": "linear",
+  "light": null,
+  "role": null,
+  "origin": {
+    "profile": "exulanica.origin/v1",
+    "class": "imported",
+    "by": {
+      "kind": "project"
+    },
+    "sources": [
+      {
+        "reference": "https://github.com/makehumancommunity/mpfb2",
+        "retrieved_on": null,
+        "revision": null,
+        "licence_page_sha256": null
+      },
+      {
+        "reference": "https://quaternius.com/packs/ultimatemodularcharacters.html",
+        "retrieved_on": null,
+        "revision": null,
+        "licence_page_sha256": null
+      }
+    ],
+    "licence": {
+      "spdx": "CC0-1.0",
+      "verdict": "SHIP",
+      "attribution": null,
+      "share_alike": false,
+      "licence_url": null,
+      "licence_text_sha256": "f6089cba01cb570a24712b41ab8a586ccd3cc5ef53dc266ca50b95c288956d2c"
+    },
+    "authors": [],
+    "lineage": {
+      "ingredients": [],
+      "receipts": [],
+      "translation_manifest_sha256": null
+    },
+    "distribution": "public"
+  }
+}

@@ -1,0 +1,66 @@
+{
+  "profile": "exulanica.thing-kind/v1",
+  "kind": "lantern",
+  "version": 1,
+  "label": "lantern",
+  "summary": "A lantern held by the ring on its cap, hanging below the hand.",
+  "class": "object",
+  "body": {
+    "plan": "rigid/v1",
+    "box_mm": {
+      "width": 180,
+      "depth": 180,
+      "height": 300
+    },
+    "blocks_walking": false
+  },
+  "origin": {
+    "profile": "exulanica.origin/v1",
+    "class": "authored",
+    "by": {
+      "kind": "project"
+    },
+    "sources": [],
+    "licence": {
+      "spdx": "Apache-2.0",
+      "verdict": "SHIP",
+      "attribution": null,
+      "share_alike": false,
+      "licence_url": null,
+      "licence_text_sha256": null
+    },
+    "authors": [],
+    "lineage": {
+      "ingredients": [],
+      "receipts": [],
+      "translation_manifest_sha256": null
+    },
+    "distribution": "public"
+  },
+  "moves": [],
+  "abilities": [],
+  "offers": [
+    {
+      "key": "holdable",
+      "parameters": {
+        "hands": 1,
+        "grip": {
+          "x_mm": 0,
+          "y_mm": 0,
+          "z_mm": 290
+        },
+        "axis": "-z"
+      }
+    }
+  ],
+  "routine": null,
+  "deciders": null,
+  "looks": [
+    {
+      "look": "primitive-lantern",
+      "version": 1,
+      "sha256": "acae9f8decbf9a84c74d0bc9c166509d37cb35fb601a1514464c95462019c174"
+    }
+  ],
+  "ext": {}
+}

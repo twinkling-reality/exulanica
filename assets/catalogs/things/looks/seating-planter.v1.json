@@ -1,0 +1,41 @@
+{
+  "profile": "exulanica.look/v1",
+  "look": "seating-planter",
+  "version": 1,
+  "label": "planter seat",
+  "body_plan": "rigid/v1",
+  "look_kind": "static",
+  "container": {
+    "sha256": "385530a43f4b89a0bf2fdede6fae0666400651e8a5f20e11390b49d41fd38f61",
+    "bytes": 1852036,
+    "media_type": "model/gltf-binary"
+  },
+  "rig": null,
+  "height_mm": null,
+  "sampling": "linear",
+  "light": null,
+  "role": null,
+  "origin": {
+    "profile": "exulanica.origin/v1",
+    "class": "authored",
+    "by": {
+      "kind": "project"
+    },
+    "sources": [],
+    "licence": {
+      "spdx": "CC0-1.0",
+      "verdict": "SHIP",
+      "attribution": null,
+      "share_alike": false,
+      "licence_url": null,
+      "licence_text_sha256": "3ada8de3b91df178fae9ca03e7aca4af4cee19ec3dfe454d9811640157d6668b"
+    },
+    "authors": [],
+    "lineage": {
+      "ingredients": [],
+      "receipts": [],
+      "translation_manifest_sha256": null
+    },
+    "distribution": "public"
+  }
+}

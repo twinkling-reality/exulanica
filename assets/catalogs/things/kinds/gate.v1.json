@@ -1,0 +1,69 @@
+{
+  "profile": "exulanica.thing-kind/v1",
+  "kind": "gate",
+  "version": 1,
+  "label": "gate",
+  "summary": "A gate visitors from other programs arrive through and leave by.",
+  "class": "object",
+  "body": {
+    "plan": "rigid/v1",
+    "box_mm": {
+      "width": 3000,
+      "depth": 400,
+      "height": 3000
+    },
+    "blocks_walking": false
+  },
+  "origin": {
+    "profile": "exulanica.origin/v1",
+    "class": "authored",
+    "by": {
+      "kind": "project"
+    },
+    "sources": [],
+    "licence": {
+      "spdx": "Apache-2.0",
+      "verdict": "SHIP",
+      "attribution": null,
+      "share_alike": false,
+      "licence_url": null,
+      "licence_text_sha256": null
+    },
+    "authors": [],
+    "lineage": {
+      "ingredients": [],
+      "receipts": [],
+      "translation_manifest_sha256": null
+    },
+    "distribution": "public"
+  },
+  "moves": [],
+  "abilities": [],
+  "offers": [
+    {
+      "key": "arrive_through",
+      "parameters": {
+        "point": {
+          "x_mm": 0,
+          "y_mm": 1000,
+          "faces": "+y",
+          "seat": null
+        }
+      }
+    },
+    {
+      "key": "leave_through",
+      "parameters": {}
+    }
+  ],
+  "routine": null,
+  "deciders": null,
+  "looks": [
+    {
+      "look": "primitive-gate",
+      "version": 1,
+      "sha256": "69666279a709c8a86b660b44924a7d78c1eb340a16c40acc83181b9ec1a51210"
+    }
+  ],
+  "ext": {}
+}

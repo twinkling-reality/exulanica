@@ -1,0 +1,41 @@
+{
+  "profile": "exulanica.look/v1",
+  "look": "planter-tree",
+  "version": 1,
+  "label": "tree in a planter",
+  "body_plan": "rigid/v1",
+  "look_kind": "static",
+  "container": {
+    "sha256": "5dea98bea3ed30dac4cdfb7704b824779993324f72d27c9767ea0f6b1d548f89",
+    "bytes": 2453464,
+    "media_type": "model/gltf-binary"
+  },
+  "rig": null,
+  "height_mm": null,
+  "sampling": "linear",
+  "light": null,
+  "role": null,
+  "origin": {
+    "profile": "exulanica.origin/v1",
+    "class": "authored",
+    "by": {
+      "kind": "project"
+    },
+    "sources": [],
+    "licence": {
+      "spdx": "CC0-1.0",
+      "verdict": "SHIP",
+      "attribution": null,
+      "share_alike": false,
+      "licence_url": null,
+      "licence_text_sha256": "3ada8de3b91df178fae9ca03e7aca4af4cee19ec3dfe454d9811640157d6668b"
+    },
+    "authors": [],
+    "lineage": {
+      "ingredients": [],
+      "receipts": [],
+      "translation_manifest_sha256": null
+    },
+    "distribution": "public"
+  }
+}

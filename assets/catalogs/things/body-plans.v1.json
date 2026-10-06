@@ -1,0 +1,400 @@
+{
+  "schema_version": 1,
+  "catalog_id": "body-plans",
+  "catalog_version": 1,
+  "entries": [
+    {
+      "key": "humanoid",
+      "version": 1,
+      "title": "a person's body",
+      "bones": [
+        {
+          "name": "hips",
+          "parent": null,
+          "required": true
+        },
+        {
+          "name": "spine",
+          "parent": "hips",
+          "required": true
+        },
+        {
+          "name": "chest",
+          "parent": "spine",
+          "required": false
+        },
+        {
+          "name": "upperChest",
+          "parent": "chest",
+          "required": false
+        },
+        {
+          "name": "neck",
+          "parent": "upperChest",
+          "required": false
+        },
+        {
+          "name": "head",
+          "parent": "neck",
+          "required": true
+        },
+        {
+          "name": "leftEye",
+          "parent": "head",
+          "required": false
+        },
+        {
+          "name": "rightEye",
+          "parent": "head",
+          "required": false
+        },
+        {
+          "name": "jaw",
+          "parent": "head",
+          "required": false
+        },
+        {
+          "name": "leftUpperLeg",
+          "parent": "hips",
+          "required": true
+        },
+        {
+          "name": "leftLowerLeg",
+          "parent": "leftUpperLeg",
+          "required": true
+        },
+        {
+          "name": "leftFoot",
+          "parent": "leftLowerLeg",
+          "required": true
+        },
+        {
+          "name": "leftToes",
+          "parent": "leftFoot",
+          "required": false
+        },
+        {
+          "name": "rightUpperLeg",
+          "parent": "hips",
+          "required": true
+        },
+        {
+          "name": "rightLowerLeg",
+          "parent": "rightUpperLeg",
+          "required": true
+        },
+        {
+          "name": "rightFoot",
+          "parent": "rightLowerLeg",
+          "required": true
+        },
+        {
+          "name": "rightToes",
+          "parent": "rightFoot",
+          "required": false
+        },
+        {
+          "name": "leftShoulder",
+          "parent": "upperChest",
+          "required": false
+        },
+        {
+          "name": "leftUpperArm",
+          "parent": "leftShoulder",
+          "required": true
+        },
+        {
+          "name": "leftLowerArm",
+          "parent": "leftUpperArm",
+          "required": true
+        },
+        {
+          "name": "leftHand",
+          "parent": "leftLowerArm",
+          "required": true
+        },
+        {
+          "name": "rightShoulder",
+          "parent": "upperChest",
+          "required": false
+        },
+        {
+          "name": "rightUpperArm",
+          "parent": "rightShoulder",
+          "required": true
+        },
+        {
+          "name": "rightLowerArm",
+          "parent": "rightUpperArm",
+          "required": true
+        },
+        {
+          "name": "rightHand",
+          "parent": "rightLowerArm",
+          "required": true
+        },
+        {
+          "name": "leftThumbMetacarpal",
+          "parent": "leftHand",
+          "required": false
+        },
+        {
+          "name": "leftThumbProximal",
+          "parent": "leftThumbMetacarpal",
+          "required": false
+        },
+        {
+          "name": "leftThumbDistal",
+          "parent": "leftThumbProximal",
+          "required": false
+        },
+        {
+          "name": "leftIndexProximal",
+          "parent": "leftHand",
+          "required": false
+        },
+        {
+          "name": "leftIndexIntermediate",
+          "parent": "leftIndexProximal",
+          "required": false
+        },
+        {
+          "name": "leftIndexDistal",
+          "parent": "leftIndexIntermediate",
+          "required": false
+        },
+        {
+          "name": "leftMiddleProximal",
+          "parent": "leftHand",
+          "required": false
+        },
+        {
+          "name": "leftMiddleIntermediate",
+          "parent": "leftMiddleProximal",
+          "required": false
+        },
+        {
+          "name": "leftMiddleDistal",
+          "parent": "leftMiddleIntermediate",
+          "required": false
+        },
+        {
+          "name": "leftRingProximal",
+          "parent": "leftHand",
+          "required": false
+        },
+        {
+          "name": "leftRingIntermediate",
+          "parent": "leftRingProximal",
+          "required": false
+        },
+        {
+          "name": "leftRingDistal",
+          "parent": "leftRingIntermediate",
+          "required": false
+        },
+        {
+          "name": "leftLittleProximal",
+          "parent": "leftHand",
+          "required": false
+        },
+        {
+          "name": "leftLittleIntermediate",
+          "parent": "leftLittleProximal",
+          "required": false
+        },
+        {
+          "name": "leftLittleDistal",
+          "parent": "leftLittleIntermediate",
+          "required": false
+        },
+        {
+          "name": "rightThumbMetacarpal",
+          "parent": "rightHand",
+          "required": false
+        },
+        {
+          "name": "rightThumbProximal",
+          "parent": "rightThumbMetacarpal",
+          "required": false
+        },
+        {
+          "name": "rightThumbDistal",
+          "parent": "rightThumbProximal",
+          "required": false
+        },
+        {
+          "name": "rightIndexProximal",
+          "parent": "rightHand",
+          "required": false
+        },
+        {
+          "name": "rightIndexIntermediate",
+          "parent": "rightIndexProximal",
+          "required": false
+        },
+        {
+          "name": "rightIndexDistal",
+          "parent": "rightIndexIntermediate",
+          "required": false
+        },
+        {
+          "name": "rightMiddleProximal",
+          "parent": "rightHand",
+          "required": false
+        },
+        {
+          "name": "rightMiddleIntermediate",
+          "parent": "rightMiddleProximal",
+          "required": false
+        },
+        {
+          "name": "rightMiddleDistal",
+          "parent": "rightMiddleIntermediate",
+          "required": false
+        },
+        {
+          "name": "rightRingProximal",
+          "parent": "rightHand",
+          "required": false
+        },
+        {
+          "name": "rightRingIntermediate",
+          "parent": "rightRingProximal",
+          "required": false
+        },
+        {
+          "name": "rightRingDistal",
+          "parent": "rightRingIntermediate",
+          "required": false
+        },
+        {
+          "name": "rightLittleProximal",
+          "parent": "rightHand",
+          "required": false
+        },
+        {
+          "name": "rightLittleIntermediate",
+          "parent": "rightLittleProximal",
+          "required": false
+        },
+        {
+          "name": "rightLittleDistal",
+          "parent": "rightLittleIntermediate",
+          "required": false
+        }
+      ],
+      "sockets": [
+        {
+          "key": "hand.right",
+          "bone": "rightHand",
+          "holds": 1,
+          "length_mm_maximum": 1500,
+          "grip_section_mm_maximum": 60
+        },
+        {
+          "key": "hand.left",
+          "bone": "leftHand",
+          "holds": 1,
+          "length_mm_maximum": 1500,
+          "grip_section_mm_maximum": 60
+        }
+      ],
+      "size": {
+        "height_mm": {
+          "minimum": 900,
+          "maximum": 2400
+        }
+      },
+      "reach_mm": 1500,
+      "motions": {
+        "required": [
+          "idle",
+          "walk"
+        ],
+        "optional": [
+          "run",
+          "reach",
+          "hold",
+          "talk",
+          "sit"
+        ]
+      },
+      "moves": [
+        "exulanica-movement/walking/v1"
+      ],
+      "reason": "A person's body: the VRM 1.0 humanoid's 55 bone names and parents, 15 of them required, so a look of any origin that maps its joints onto them (a rigged mesh, rigid blocky parts, a game's character) moves and holds things on the same named bones. Rest pose T-pose; in the world's slot frame up is +z and the front +y, which a glTF look (+Y up, +Z front) meets by the style packs' rotation. Two hand sockets each hold one thing at most 1,500 mm long (a sword of 1,000 mm, never a 1,800 mm bench) whose section through its grip is at most 60 mm (a closed adult hand around a hilt or a handle: a declared figure, not a measurement). Heights from 900 to 2,400 mm cover a child-sized figure to a tall armoured one; the walking module's clearance and the society's object reach of 1,500 mm hold for every height, so a body's height changes how it is drawn, never where it may go. Idle and walk are required of every look; run, reach, hold, talk and sit are drawn where a look has them and otherwise stood idle, never replaced by a pose that implies another action.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica thing contract; bone names and parents from the VRM 1.0 humanoid specification (VRMC_vrm-1.0 humanoid.md), read 2026-10-06"
+      }
+    },
+    {
+      "key": "bodiless",
+      "version": 1,
+      "title": "no body",
+      "bones": [],
+      "sockets": [
+        {
+          "key": "float",
+          "bone": null,
+          "holds": 1,
+          "length_mm_maximum": 300,
+          "grip_section_mm_maximum": null
+        }
+      ],
+      "size": {
+        "radius_mm": {
+          "minimum": 100,
+          "maximum": 600
+        }
+      },
+      "reach_mm": 1500,
+      "motions": {
+        "required": [],
+        "optional": []
+      },
+      "moves": [
+        "exulanica-movement/walking/v1"
+      ],
+      "reason": "A thing with no body, such as a spirit or a voice: no bones, a radius for how it is drawn, and one float socket that holds one small thing beside it, at most 300 mm long, so a lantern of 300 mm floats with it and a 1,000 mm sword is refused by name. It goes where walkers go, over the same walking graph and by the same rules, and is drawn floating; how high it floats and how it drifts are presentation, never its position.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica thing contract; bone names and parents from the VRM 1.0 humanoid specification (VRMC_vrm-1.0 humanoid.md), read 2026-10-06"
+      }
+    },
+    {
+      "key": "rigid",
+      "version": 1,
+      "title": "a solid object",
+      "bones": [],
+      "sockets": [],
+      "size": {
+        "box_mm": {
+          "minimum": 10,
+          "maximum": 10000
+        }
+      },
+      "reach_mm": null,
+      "motions": {
+        "required": [],
+        "optional": []
+      },
+      "moves": [],
+      "reason": "A solid object, in the world's slot frame: whole millimetres, width along x, depth along y with the front at +y, height along z, the pivot at the base centre (the frame of style pack slots, world kind parts and the world object catalog's parts). It has no bones and moves only when something carries it; a holdable one states its grip as a point in that frame and the axis it extends along from the hand.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica thing contract; bone names and parents from the VRM 1.0 humanoid specification (VRMC_vrm-1.0 humanoid.md), read 2026-10-06"
+      }
+    }
+  ]
+}
