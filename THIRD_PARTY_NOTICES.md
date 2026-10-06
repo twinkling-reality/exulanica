@@ -151,7 +151,7 @@ time.
 | Model identifier | Role | License recorded here | Source of that reading | Status |
 | --- | --- | --- | --- | --- |
 | `MiniMaxAI/MiniMax-M3` | vision sensor, primary | Custom license named only "MiniMax-M3" | Nebius catalog string. **The license text has never been read** | **UNVERIFIED. Highest priority gap in this section** |
-| `openbmb/MiniCPM-V-4_5` | vision sensor, fallback | "Apache 2.0 License" per the Nebius catalog, whose `license.url` points at the **code** repository LICENSE rather than at the weights card | Nebius catalog | **UNVERIFIED as a weights license** |
+| `openbmb/MiniCPM-V-4_5` | vision sensor, fallback | Apache-2.0 | Hugging Face model card metadata (`cardData.license` and the `license:apache-2.0` tag) at revision `daef484c35ec93210ec93c5e901f8f3e9b78ee34`, read on 2026-10-06 | **VERIFIED against the card** |
 | `Qwen/Qwen3-Embedding-8B` | embedding, primary, no fallback exists | Apache-2.0 | Nebius catalog | **UNVERIFIED against the card frontmatter** |
 | `Qwen/Qwen3-235B-A22B-Instruct-2507` | structured extraction, primary, not in any default route | Apache-2.0 | Nebius catalog | **UNVERIFIED against the card frontmatter** |
 | `deepseek-ai/DeepSeek-V4-Flash-0731` | structured extraction, fallback, not in any default route | MIT | Nebius catalog, corroborated by the repository LICENSE at <https://huggingface.co/deepseek-ai/DeepSeek-V4-Flash-0731/blob/main/LICENSE> | **UNVERIFIED against the card frontmatter** |
@@ -162,18 +162,40 @@ section 9.
 
 ### 3.4 The instrument that actually binds API-only use
 
-**OPEN.** Calling hosted weights over an API is use, not redistribution, so the weights licenses
-above bite far less than they would if anything were vendored. The instrument that does bind an
-API-only consumer is the hosted endpoint's own terms of service and acceptable use policy. The
-Nebius Token Factory terms of service and acceptable use policy have not been retrieved or read.
-Item **T-4** in section 9.
+Calling hosted weights over an API is use, not redistribution, so the weights licenses above bite
+far less than they would if anything were vendored. The instrument that does bind an API-only
+consumer is the hosted endpoint's own terms. Item **T-4** in section 9 holds what stays open.
 
-The same applies to the Tavily Search API, although no product code calls it: no public-entity
-lookup is built, and `scripts/verify_web_lookup.py` made one credential check with it. Tavily's
-privacy page, read on 2026-08-27, states that it may use portions of query data to improve future
-responses, that it shares query data with third-party index providers where its own index cannot
-retrieve content, and that queries should not carry personal information. Its terms of service
-were not read.
+**Nebius Token Factory.** Terms of service at
+<https://docs.tokenfactory.nebius.com/legal/terms-of-service>, effective date 2026-08-20, read on
+2026-10-06. Token Factory publishes no separate acceptable use policy; its restrictions are
+section 5f of the terms. What binds this product:
+
+| Section | What it says | Consequence here |
+| --- | --- | --- |
+| 4a to 4c | The API may be built into the customer's product and offered to its end users; the customer informs end users about the terms | People who use a hosted model through Exulanica are end users of the service |
+| 4d | The customer is the "provider" of the resulting AI system under the EU AI Act | Provider duties rest with Exulanica's operator |
+| 5f | No use for "competitive analysis or benchmarking"; no use of the service or its output for military purposes, surveillance or "biometric processing"; no use in a high-risk AI system | Model comparisons published from hosted calls and any face or body processing of photographs need a reading against this clause before publication or use (T-4) |
+| 7 | Nebius may "access, use, host, cache, store, copy, and modify Inputs and Outputs" to provide the service, and "collects and processes both Input and Output data for the purpose of training smaller Models used exclusively for Speculative Decoding"; the customer may opt out of both through the onboarding form or by email to Nebius support | Text and pictures sent to a hosted model may train Nebius's speculative-decoding models unless the operator's account has opted out (T-4) |
+| 8b | Personal data processed on the customer's behalf falls under the Data Processing Agreement | Hosted requests carrying personal data rely on that agreement |
+| 11c | Hosted models may carry their own licence agreements, which the customer and its end users must follow | The model licence rows in this section and in the license matrix apply in full |
+
+**Tavily Search API.** No product code calls it; `scripts/verify_web_lookup.py` is a one-off
+credential check that keeps the request it sent, the status and the latency, and no part of the
+response. Read on 2026-10-06: the Platform Terms of Service (<https://www.tavily.com/terms>, last
+updated 2026-05-04), the Acceptable Use Policy (<https://www.tavily.com/acceptable-use-policy>, last
+updated 2026-05-05, made part of the terms by their section 3.8) and the Privacy Policy
+(<https://www.tavily.com/privacy>, last updated 2025-11-24).
+
+| Section | What it says | Consequence here |
+| --- | --- | --- |
+| Terms 2, 3.2, 3.5 | A revocable right to use the service for the customer's internal business purposes, including integration into the customer's applications, which may serve outside end users | A product feature may call it |
+| Terms 1.7, 9.3; AUP 2, 5 | Results ("Output") are not part of the services Tavily owns; they are derived from publicly available content and may infringe; the service and its content may not be harvested or indexed by automated means | No licence covers keeping, showing or exporting a result |
+| Terms 6.5, 6.7, 7, 9.2; Privacy 2.1, 4.1 | Tavily holds a perpetual, irrevocable, sublicensable licence to queries; Tavily and its AI providers may train on them; queries may be shared with third-party search indexes; queries should carry no personal information | Every query is treated as published |
+| Terms 8.2; AUP 3 | Queries must carry no government identifiers, health, biometric, financial or credential data, nothing about children, and no special categories of personal data | Queries are built without such data |
+| Terms 3.2 (x) | No disclosure to third parties of performance information or analysis relating to the service | No public document states a measurement of the service's performance |
+| AUP 4 | End users who use the service through the customer's application must be bound by terms at least as restrictive as the AUP, monitored, and violations reported | A lookup feature offered to people needs such product terms first |
+| Terms 17.8 | Tavily may audit use; the customer keeps accurate records of it | Requests sent are recorded |
 
 ---
 
@@ -417,12 +439,11 @@ the ones that would matter to a reviewer.
 | **T-1** | No model in `models.manifest.json` has a pinned HuggingFace revision SHA, and the recorded `catalog_license` values are Nebius catalog strings, which are derived labels known to be wrong in three of three checked cases | The standing decision (license-matrix section 5) is to record the license from raw card frontmatter at a pinned SHA. It has not been carried out for any model | For each identifier, `curl https://huggingface.co/api/models/<id>` and record `cardData.license`, `gated` and `sha`. Add the SHA and the frontmatter license to the manifest | 30 min |
 | **T-2** | `nvidia/Nemotron-3-Ultra-550b-a55b` carries a catalog-only `openmdw-1.1` reading, which is the one known case where the catalog is more permissive than any verified reading, **and it is now the declared primary for the `reasoning_hard` role** | This is the error direction that invalidates a compliance claim. license-matrix section 5 records the exposure as zero, which is out of date | Read the HuggingFace card before the hard role is used, and correct license-matrix section 5 either way | 5 min |
 | **T-3** | `MiniMaxAI/MiniMax-M3` custom license text has never been read | It is the **primary** vision sensor. Every photograph passes through it | Read <https://huggingface.co/MiniMaxAI/MiniMax-M3/blob/main/LICENSE> | 10 min |
-| **T-4** | Nebius Token Factory terms of service and acceptable use policy never retrieved | This is the instrument that actually binds API-only use, which is most of what Exulanica does | Retrieve and read both. Do the same for Tavily's terms of service | 30 min |
+| **T-4** | Two Nebius Token Factory terms (section 3.4) are not yet answered: section 7's training of speculative-decoding models on inputs and outputs, and section 5f's bar on "competitive analysis or benchmarking" and "biometric processing" | Photographs and their descriptions go to the vision role, and model comparisons are published from hosted calls | Record whether the operator's account has opted out under section 7; read section 5f against published model comparisons and photograph screening, and record the reading | 30 min |
 | **T-5** | Pillow's bundled native imaging library licenses not enumerated | The wheels bundle native libraries with their own notices, at least one of which (Alliance for Open Media) appears in the shipped license file | Read the complete license file shipped in the wheel and reproduce the bundled notices here | 15 min |
 | **T-6** | `psycopg` and `psycopg-binary` are **LGPL-3.0-only** and are not analysed anywhere in the documentation set | The existing enforcement plan scans for GPL and AGPL only. LGPL is neither, and the relinking obligation has not been assessed against a deployed container | Decide whether the deployed image redistributes the library, and record the conclusion. Add LGPL to the dependency scan | 30 min |
 | **T-7** | 246 resolved npm package versions, of which only the direct dependencies are license checked | None is shipped to the browser, which bounds the exposure but does not close it | Run a license enumeration over `pnpm-lock.yaml` and append or attach the result | 30 min |
 | **T-8** | Apache-2.0 NOTICE mechanics, inbound and outbound (section 7.2) | Determines whether a separate `NOTICE` file is required and what it must contain | Enumerate `NOTICE` files across the full Apache-2.0 dependency set, then decide | 15 min |
-| **T-9** | `openbmb/MiniCPM-V-4_5` license recorded from a catalog entry whose URL points at the **code** repository rather than the weights card | It is the vision fallback, so it is on a live failover path | `curl` the card frontmatter at a pinned SHA | 5 min |
 | **T-10** | `colorama` and `tzdata` licenses not read | Both resolve only under a Windows platform marker and are not installed on the development or deployment platform | Read from the published package metadata if either platform ever becomes relevant | 5 min |
 | **T-11** | The mechanical enforcement described in license-matrix section 9 (manifest SHA pinning, catalog drift CI job, GPL and AGPL dependency scan, built-image grep for the named blocked packages) is specified and **not implemented** | These checks are what keep this file true after it is written | Implement before the perception pipeline is written | Not yet scheduled |
 | **T-12** | `nvidia/diar_streaming_sortformer_4spk-v2` license is **DISPUTED** between two readings (CC-BY-4.0 versus NVIDIA Open Model License) | Determines whether diarization is commercially clean. No exposure today: the corpus has no audio and the capability is deferred | Recorded in license-matrix section 4a with the `curl` that settles it | 5 min if revived |

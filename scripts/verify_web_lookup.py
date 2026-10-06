@@ -2,12 +2,16 @@
 # requires-python = ">=3.10"
 # dependencies = ["httpx>=0.27"]
 # ///
-"""Verify the Tavily credential with one real runtime call, and archive it.
+"""Verify the Tavily credential with one real runtime call, and record the request.
 
 Doubles as the first exercise of Exulanica's past-to-present boundary: the query
 carries ONLY public-entity context. No private media, no person, no private
 location, no transcript. That constraint is the point of the test, not an
 incidental detail.
+
+Nothing of the response is kept or printed beyond its status, latency, result
+count, credits and request id: Tavily's terms give no right to keep or show a
+result (THIRD_PARTY_NOTICES.md section 3.4).
 """
 import json, pathlib, sys, time
 import httpx
@@ -36,7 +40,8 @@ def main():
         "query": PUBLIC_ENTITY_QUERY,
         "max_results": 3,
         "search_depth": "basic",
-        "include_answer": True,
+        "include_answer": False,
+        "include_usage": True,
     }
     t0 = time.time()
     r = httpx.post("https://api.tavily.com/search", timeout=60,
@@ -45,28 +50,28 @@ def main():
                    json=payload)
     dt = time.time() - t0
     ok = r.status_code == 200
-    body = r.json() if ok else r.text
+    body = r.json() if ok else {}
 
-    # Archive request and response. The request is retained deliberately: it is
-    # the evidence that no private payload was sent.
+    results = body.get("results", []) if ok else []
+    credits = (body.get("usage") or {}).get("credits") if ok else None
+    request_id = body.get("request_id") if ok else None
+
+    # Record the request, never the response: the request is the evidence that
+    # no private payload was sent.
     (OUT / "tavily_runtime_call.json").write_text(json.dumps({
         "request": payload, "status": r.status_code,
-        "latency_s": round(dt, 3), "response": body,
+        "latency_s": round(dt, 3), "result_count": len(results),
+        "credits": credits, "request_id": request_id,
     }, indent=2))
 
     if ok:
-        results = body.get("results", [])
-        print(f"[PASS] Tavily HTTP 200 in {dt:.2f}s, {len(results)} results")
-        for x in results:
-            print(f"       {x.get('title','')[:70]}")
-            print(f"         {x.get('url','')}")
-        ans = (body.get("answer") or "")[:180]
-        if ans:
-            print(f"       answer: {ans}")
-        print(f"\n       Archived to {OUT / 'tavily_runtime_call.json'}")
+        print(f"[PASS] Tavily HTTP 200 in {dt:.2f}s, {len(results)} results, "
+              f"{credits} credits")
+        print(f"       Recorded the request to {OUT / 'tavily_runtime_call.json'}")
         print("       Payload contained public-entity text only. No private data sent.")
     else:
-        print(f"[FAIL] HTTP {r.status_code}: {str(body)[:300]}")
+        # An error body is Tavily's own message about the request, not a result.
+        print(f"[FAIL] HTTP {r.status_code}: {r.text[:300]}")
     return 0 if ok else 1
 
 
