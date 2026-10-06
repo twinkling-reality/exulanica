@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import io
 import json
+import tempfile
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Final
@@ -26,7 +27,26 @@ from PIL import Image
 from exulanica_appearance.assets.job import RawMesh, run_job
 from exulanica_appearance.assets.sheet import draw_sheet
 
-__all__ = ["STUB_PACK", "StubBackend", "dry_run", "stub_mesh"]
+__all__ = [
+    "CASE_PATH",
+    "CASE_PROFILE",
+    "GRIP_SECTION_MM_MAXIMUM",
+    "STUB_PACK",
+    "StubBackend",
+    "case_bytes",
+    "dry_run",
+    "stub_mesh",
+]
+
+#: One held piece's request, job and receipt from the dry run, for readers outside this package
+#: (the origin record's reader) to test against real records. Relative to the repository root.
+CASE_PATH: Final = "tests/fixtures/generated-piece/sword-case.v1.json"
+CASE_PROFILE: Final = "exulanica.generated-piece-case/v1"
+
+#: humanoid/v1's grip_section_mm_maximum, the widest section a closed adult hand goes around. The
+#: body plan catalog states it; this stays the stub's own copy until that catalog lands, then the
+#: dry run reads it there.
+GRIP_SECTION_MM_MAXIMUM: Final = 60
 
 STUB_PACK: Final = {
     "id": "stub.toon-town",
@@ -45,12 +65,29 @@ STUB_PACK: Final = {
     "version": 1,
 }
 
-#: What the stub is asked for: the trial's six pieces, the shopfront dressed per opening. The sword
-#: stands upright, blade along +Y in glTF, its pommel at the base centre.
+#: What the stub is asked for: the trial's six pieces, the shopfront dressed per opening. The lantern
+#: and the sword take the thing kinds' boxes and grips (slot frame: x across, y deep, z up): the
+#: sword extends up from a grip 150 mm above its pommel, the lantern hangs below its ring.
 STUB_REQUESTS: Final = (
     {"look_role": "prop.bench", "slot_mm": {"width": 1800, "height": 900, "depth": 700}},
-    {"look_role": "prop.lantern", "slot_mm": {"width": 300, "height": 450, "depth": 300}},
-    {"look_role": "prop.sword", "slot_mm": {"width": 120, "height": 1000, "depth": 50}},
+    {
+        "look_role": "prop.lantern",
+        "slot_mm": {"width": 180, "height": 300, "depth": 180},
+        "hold": {
+            "axis": "-z",
+            "grip": {"x_mm": 0, "y_mm": 0, "z_mm": 290},
+            "section_mm_maximum": GRIP_SECTION_MM_MAXIMUM,
+        },
+    },
+    {
+        "look_role": "prop.sword",
+        "slot_mm": {"width": 120, "height": 1000, "depth": 40},
+        "hold": {
+            "axis": "+z",
+            "grip": {"x_mm": 0, "y_mm": 0, "z_mm": 150},
+            "section_mm_maximum": GRIP_SECTION_MM_MAXIMUM,
+        },
+    },
     {"look_role": "plant.tree", "slot_mm": {"width": 5000, "height": 8000, "depth": 5000}},
     {"look_role": "vehicle.car", "slot_mm": {"width": 1900, "height": 1600, "depth": 4600}},
     {"look_role": "door.shop_door", "slot_mm": {"width": 1200, "height": 2400, "depth": 300}},
@@ -189,12 +226,15 @@ def stub_mesh(look_role: str) -> Mesh:
             ]
         )
     if look_role == "prop.lantern":
+        # Base, glass, cap, then a ring of two posts and a top bar the hand goes around.
         return _join(
             [
-                (*_box((-0.15, -0.15, 0), (0.15, 0.15, 0.05)), dark),
-                (*_box((-0.11, -0.11, 0.05), (0.11, 0.11, 0.32)), cream),
-                (*_box((-0.14, -0.14, 0.32), (0.14, 0.14, 0.37)), dark),
-                (*_box((-0.02, -0.02, 0.37), (0.02, 0.02, 0.45)), dark),
+                (*_box((-0.09, -0.09, 0), (0.09, 0.09, 0.03)), dark),
+                (*_box((-0.065, -0.065, 0.03), (0.065, 0.065, 0.2)), cream),
+                (*_box((-0.08, -0.08, 0.2), (0.08, 0.08, 0.23)), dark),
+                (*_box((-0.025, -0.004, 0.23), (-0.02, 0.004, 0.3)), dark),
+                (*_box((0.02, -0.004, 0.23), (0.025, 0.004, 0.3)), dark),
+                (*_box((-0.025, -0.004, 0.28), (0.025, 0.004, 0.3)), dark),
             ]
         )
     if look_role == "prop.sword":
@@ -322,3 +362,29 @@ def dry_run(repository: Path, out: Path) -> dict[str, Any]:
     )
     (out / "summary.json").write_text(json.dumps(pieces, indent=1, sort_keys=True) + "\n")
     return {"job": job_sha256, "pieces": pieces}
+
+
+def case_bytes(repository: Path, look_role: str = "prop.sword") -> bytes:
+    """The case file's bytes: a fresh dry run's records for one piece, as canonical JSON.
+
+    Rewrite :data:`CASE_PATH` with these bytes when a record format changes. The receipt's
+    seconds and runtime are this run's; everything else is fixed by the request."""
+    with tempfile.TemporaryDirectory() as directory:
+        out = Path(directory)
+        run = dry_run(repository, out)
+        piece = next(item for item in run["pieces"] if item["look_role"] == look_role)
+        receipt = (out / "receipts" / f"{piece['receipt']}.json").read_bytes()
+        request = (out / f"request-{piece['request_sha256']}.json").read_bytes()
+        job = (out / f"job-{run['job']}.json").read_bytes()
+    document = {
+        "about": (
+            "One generated piece's records from the dry run (route S, a stub in place of the "
+            "models): its request, the job that made it and its receipt. Regenerate with "
+            "exulanica_appearance.assets.dryrun.case_bytes when a record format changes."
+        ),
+        "job": json.loads(job),
+        "profile": CASE_PROFILE,
+        "receipt": json.loads(receipt),
+        "request": json.loads(request),
+    }
+    return canonical_bytes(document) + b"\n"

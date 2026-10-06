@@ -14,6 +14,7 @@ from typing import Any, Final
 
 from exulanica_pieces.canonical import sha256_hex
 from exulanica_pieces.geometry.glb import write_glb
+from exulanica_pieces.geometry.hold import measure_hold
 from exulanica_pieces.geometry.mesh import (
     Mesh,
     Simplifier,
@@ -62,6 +63,7 @@ def make_piece(
         slot["width"] = request["tile_module_mm"]
     mesh, step = fit(mesh, request["fit"], slot)
     steps.append(step)
+    fitted = mesh
     palette = request["pack"]["palette"]
     mesh, swatch, step = flat_palette(mesh, palette)
     steps.append(step)
@@ -76,7 +78,10 @@ def make_piece(
         "triangles": len(mesh.triangles),
         "vertices": _written_vertices(glb),
     }
-    return Piece(glb, steps, measured, verdict(measured, request["budget"]))
+    hold = request.get("hold")
+    if hold is not None:
+        measured["hold"] = measure_hold(fitted, slot, size, hold)
+    return Piece(glb, steps, measured, verdict(measured, request["budget"], hold))
 
 
 def _written_vertices(glb: bytes) -> int:

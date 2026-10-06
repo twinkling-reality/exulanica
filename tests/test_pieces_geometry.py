@@ -204,3 +204,96 @@ def test_every_written_triangle_carries_one_swatch_at_all_three_corners() -> Non
     for a, b, c in triangles:
         assert (corner_colours[a] == corner_colours[b]).all()
         assert (corner_colours[b] == corner_colours[c]).all()
+
+
+# --------------------------------------------------------------------------------------------
+# A held piece: the section through its grip and how full its box is
+# --------------------------------------------------------------------------------------------
+
+
+def _parts(boxes: list[tuple[tuple[float, float, float], tuple[float, float, float]]]) -> Mesh:
+    meshes = []
+    for low, high in boxes:
+        box = _box(tuple(h - lo for lo, h in zip(low, high, strict=True)))
+        meshes.append(Mesh(box.positions + np.array(low), box.triangles, box.colours))
+    positions, triangles, colours, base = [], [], [], 0
+    for mesh in meshes:
+        positions.append(mesh.positions)
+        triangles.append(mesh.triangles + base)
+        colours.append(mesh.colours)
+        base += len(mesh.positions)
+    return Mesh(np.concatenate(positions), np.concatenate(triangles), np.concatenate(colours))
+
+
+def _sword(handle_half: float = 0.015) -> Mesh:
+    """In a model's frame, +Z up: a 30 mm square handle to 200 mm, a guard, a blade to 1,000 mm.
+    The handle's eight corners sit at 0 and 200 mm, so a section at 150 mm has no vertex in it."""
+    h = handle_half
+    return _parts(
+        [
+            ((-h, -h, 0.0), (h, h, 0.2)),
+            ((-0.06, -0.02, 0.2), (0.06, 0.02, 0.25)),
+            ((-0.02, -0.005, 0.25), (0.02, 0.005, 1.0)),
+        ]
+    )
+
+
+def _held_piece(mesh: Mesh, *, slot: dict, grip: dict, maximum: int = 60):  # type: ignore[no-untyped-def]
+    table, _ = colour.read_table(ROOT)
+    budgets = read_budgets(ROOT)
+    hold = {"axis": "+z", "grip": grip, "section_mm_maximum": maximum}
+    request = read_request(
+        build_request(
+            pack=PACK,
+            variants=1,
+            route="S",
+            budgets=budgets,
+            look_role="prop.sword",
+            slot_mm=slot,
+            hold=hold,
+        ),
+        budgets,
+    )
+    return make_piece(
+        mesh, up="+Z", front="-Y", request=request, simplifier=cluster_simplify, table=table
+    )
+
+
+SWORD_SLOT = {"width": 120, "height": 1000, "depth": 40}
+SWORD_GRIP = {"x_mm": 0, "y_mm": 0, "z_mm": 150}
+
+
+def test_an_upright_sword_is_held_at_its_handle() -> None:
+    piece = _held_piece(_sword(), slot=SWORD_SLOT, grip=SWORD_GRIP)
+    # The handle is 30 mm square (the mesh above); the box is filled along its 1,000 mm side.
+    assert piece.measured["hold"] == {
+        "band_mm": 10,
+        "fill_permille": 1000,
+        "grip_in_section": True,
+        "section_mm": {"x_mm": 30, "y_mm": 30},
+    }
+    assert piece.verdict == {"over": [], "within": True}
+
+
+def test_a_sword_laid_down_is_refused_for_its_fill_and_its_grip() -> None:
+    lying = _sword()
+    lying = Mesh(lying.positions[:, [2, 1, 0]], lying.triangles[:, [0, 2, 1]], lying.colours)
+    piece = _held_piece(lying, slot=SWORD_SLOT, grip=SWORD_GRIP)
+    # Contain shrinks a 1,000 mm long sword lying across a 120 mm wide box to a few mm tall.
+    assert piece.measured["hold"]["fill_permille"] < 50
+    assert piece.measured["hold"]["section_mm"] is None
+    assert piece.verdict == {"over": ["grip_section", "hold_fill"], "within": False}
+
+
+def test_a_handle_wider_than_a_hand_closes_around_is_refused() -> None:
+    piece = _held_piece(
+        _sword(handle_half=0.04), slot={"width": 120, "height": 1000, "depth": 80}, grip=SWORD_GRIP
+    )
+    assert piece.measured["hold"]["section_mm"] == {"x_mm": 80, "y_mm": 80}
+    assert piece.verdict == {"over": ["grip_section"], "within": False}
+
+
+def test_a_grip_point_beside_the_handle_is_refused() -> None:
+    piece = _held_piece(_sword(), slot=SWORD_SLOT, grip={"x_mm": 50, "y_mm": 0, "z_mm": 150})
+    assert piece.measured["hold"]["grip_in_section"] is False
+    assert piece.verdict == {"over": ["grip_section"], "within": False}

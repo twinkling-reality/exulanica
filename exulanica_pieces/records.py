@@ -7,14 +7,22 @@ value checked), like every appearance record.
   fit, the optional plain description, the pack (id, version, digest, palette, style words), the
   budget with the digest of the piece budgets file it came from, how many variants, and which
   route. Nothing about who asked. A request with a description may carry a person's words, so it
-  is cached within its workspace only (:func:`cache_scope`). A ``v1`` request, whose budget came
-  from a table this module held before the pack format's file existed, is still read as it was;
-  only ``v2`` requests are built.
-- ``exulanica.generated-asset-job/v1``: one batch, fixed before it runs: the requests, the route's
-  weights listing digest, every prompt and seed, the code and container, and the stop.
+  is cached within its workspace only (:func:`cache_scope`). A piece made for a thing a hand holds
+  carries ``hold``: the thing kind's grip point and axis and the widest section a hand closes
+  around, all in the kind's slot frame, copied from the thing kind and its body plan. A ``v1``
+  request, whose budget came from a table this module held before the pack format's file existed,
+  is still read as it was; only ``v2`` requests are built.
+- ``exulanica.generated-asset-job/v2``: one batch, fixed before it runs: the requests, the route's
+  weights listing digest, the prompt template's version, every prompt and seed, the code and
+  container, and the stop. A ``v1`` job, written before the template had a version, still reads.
 - ``exulanica.generated-asset/v1``: one output: the request, job, variant and seed; every input
   and intermediate by digest; every post-process step; the GLB; what was measured against the
-  budget; origin generated, truth invented, its licence, and the regeneration sentence.
+  budget and, for a held piece, against its grip; origin generated, truth invented, its licence,
+  and the regeneration sentence.
+
+A thing kind's slot frame (whole millimetres, x across the width, y the depth with the front at +y,
+z up, the base centre at the origin) meets a piece's glTF frame by the agreed rotation:
+X_gltf = -x, Y_gltf = z, Z_gltf = y.
 
 Seeds come from the request digest under a prefix, so a seed is reproducible from the request and
 names nothing else.
@@ -47,7 +55,11 @@ from exulanica_pieces.vocabulary import (
 )
 
 __all__ = [
+    "HOLD_AXES",
+    "HOLD_FILL_MINIMUM_PER_MILLE",
     "JOB_PROFILE",
+    "JOB_PROFILE_V1",
+    "PROMPT_VERSION",
     "RECEIPT_PROFILE",
     "REGENERATION",
     "REQUEST_PROFILE",
@@ -67,7 +79,15 @@ __all__ = [
 
 REQUEST_PROFILE: Final = "exulanica.generated-asset-request/v2"
 REQUEST_PROFILE_V1: Final = "exulanica.generated-asset-request/v1"
-JOB_PROFILE: Final = "exulanica.generated-asset-job/v1"
+JOB_PROFILE: Final = "exulanica.generated-asset-job/v2"
+JOB_PROFILE_V1: Final = "exulanica.generated-asset-job/v1"
+#: The concept prompt's template, :func:`prompt_for`. A change to its words is a new version.
+PROMPT_VERSION: Final = "exulanica.generated-asset-prompt/v1"
+#: The direction a held thing extends from the hand, in the thing kind's slot frame.
+HOLD_AXES: Final = ("+x", "-x", "+y", "-y", "+z", "-z")
+#: A held piece fills at least this share of its box's longest side, so a grip point measured
+#: along that side lands on the piece and not in the gap a smaller fit leaves.
+HOLD_FILL_MINIMUM_PER_MILLE: Final = 800
 RECEIPT_PROFILE: Final = "exulanica.generated-asset/v1"
 REGENERATION: Final = (
     "GPU generation is not bit-exact across hardware, drivers or library versions; the stored "
@@ -126,7 +146,9 @@ _REQUEST_KEYS: Final = (
     "slot_mm",
     "variants",
 )
-_REQUEST_OPTIONAL: Final = ("description", "tile_module_mm")
+_REQUEST_OPTIONAL: Final = ("description", "hold", "tile_module_mm")
+_HOLD_KEYS: Final = ("axis", "grip", "section_mm_maximum")
+_GRIP_KEYS: Final = ("x_mm", "y_mm", "z_mm")
 _PACK_KEYS: Final = ("id", "palette", "sha256", "style", "version")
 _BUDGET_KEYS: Final = (
     "budgets_sha256",
@@ -187,6 +209,10 @@ def _check_request(document: object, budgets: PieceBudgets | None) -> dict[str, 
         raise Refused("only a tiled piece states a module length")
     if "description" in document:
         _plain(document["description"], _MAX_DESCRIPTION, "description")
+    if "hold" in document:
+        if document["profile"] == REQUEST_PROFILE_V1:
+            raise Refused("a v1 request holds no grip")
+        _check_hold(document["hold"], document["fit"], slot)
     pack = exact_keys(document["pack"], _PACK_KEYS, "pack")
     if not isinstance(pack["id"], str) or _PACK_ID.fullmatch(pack["id"]) is None:
         raise Refused("pack.id is lower case letters, digits, dots and hyphens")
@@ -223,6 +249,26 @@ def _check_request(document: object, budgets: PieceBudgets | None) -> dict[str, 
     if document["route"] not in ROUTES:
         raise Refused(f"route is one of {', '.join(sorted(ROUTES))}")
     return document
+
+
+def _check_hold(value: object, fit: str, slot: Mapping[str, int]) -> None:
+    hold = exact_keys(value, _HOLD_KEYS, "hold")
+    if fit != "contain":
+        raise Refused("only a piece fitted by contain is made for a hand")
+    if hold["axis"] not in HOLD_AXES:
+        raise Refused(f"hold.axis is one of {', '.join(HOLD_AXES)}")
+    maximum = hold["section_mm_maximum"]
+    if not is_count(maximum, 1) or maximum > 1000:
+        raise Refused("hold.section_mm_maximum is 1 to 1,000 mm, the body plan's figure")
+    grip = exact_keys(hold["grip"], _GRIP_KEYS, "hold.grip")
+    if not all(isinstance(v, int) and not isinstance(v, bool) for v in grip.values()):
+        raise Refused("hold.grip is whole millimetres")
+    if (
+        2 * abs(grip["x_mm"]) > slot["width"]
+        or 2 * abs(grip["y_mm"]) > slot["depth"]
+        or not 0 <= grip["z_mm"] <= slot["height"]
+    ):
+        raise Refused("hold.grip lies inside the slot: x across the width, y the depth, z up")
 
 
 def _expected_budget(role: str, module_mm: object, budgets: PieceBudgets) -> dict[str, Any]:
@@ -271,6 +317,7 @@ def build_request(
     budgets: PieceBudgets,
     description: str | None = None,
     tile_module_mm: int | None = None,
+    hold: Mapping[str, Any] | None = None,
 ) -> bytes:
     """A v2 request's canonical bytes; its budget is filled from the pack format's file."""
     family, _ = split_role(look_role)
@@ -289,6 +336,8 @@ def build_request(
         document["description"] = description
     if tile_module_mm is not None:
         document["tile_module_mm"] = tile_module_mm
+    if hold is not None:
+        document["hold"] = {**hold, "grip": dict(hold["grip"])}
     raw = canonical_bytes(document)
     read_request(raw, budgets)
     return raw
@@ -335,16 +384,32 @@ def seed_for(request_sha256: str, variant: int) -> int:
     return int.from_bytes(digest.digest()[:8], "big") >> 1
 
 
+#: How a held thing stands in its picture, by the direction it extends from the hand.
+_HELD_POSE: Final = MappingProxyType(
+    {
+        "+z": "standing upright, its handle at the bottom",
+        "-z": "hanging from a ring or handle at its top",
+        "+x": "lying on its side, its handle at one end",
+        "-x": "lying on its side, its handle at one end",
+        "+y": "lying on its side, its handle at the back",
+        "-y": "lying on its side, its handle at the front",
+    }
+)
+
+
 def prompt_for(request: Mapping[str, Any]) -> str:
-    """The concept picture's prompt, from the request alone, by a fixed template."""
+    """The concept picture's prompt, from the request alone, by the template :data:`PROMPT_VERSION`
+    names. A held thing's picture shows it posed as its grip says, so the model draws the handle
+    where the hand will be."""
     _, leaf = split_role(request["look_role"])
     subject = request.get("description") or leaf.replace("_", " ")
     slot = request["slot_mm"]
+    pose = f"{_HELD_POSE[request['hold']['axis']]}, " if "hold" in request else ""
     return (
         f"{subject}, a single {request['look_role'].split('.')[0]} for a game world, "
         f"{request['pack']['style']}, about {slot['width']} mm wide, {slot['height']} mm tall and "
-        f"{slot['depth']} mm deep, whole object in frame, three-quarter front view, plain light "
-        "grey background, no text, no lettering, no logo"
+        f"{slot['depth']} mm deep, {pose}whole object in frame, three-quarter front view, plain "
+        "light grey background, no text, no lettering, no logo"
     )
 
 
@@ -358,9 +423,11 @@ _JOB_KEYS: Final = (
     "container",
     "items",
     "profile",
+    "prompt_version",
     "route",
     "stop",
 )
+_JOB_KEYS_V1: Final = tuple(key for key in _JOB_KEYS if key != "prompt_version")
 _ITEM_KEYS: Final = ("prompt", "request_sha256", "seed", "variant")
 #: An item may instead start from a cut-out another job made, named by its sha256, so two routes
 #: are compared on the same pictures.
@@ -404,6 +471,7 @@ def build_job(
         "container": container,
         "items": items,
         "profile": JOB_PROFILE,
+        "prompt_version": PROMPT_VERSION,
         "route": route,
         "stop": {
             "estimate_seconds": estimate_seconds,
@@ -416,9 +484,18 @@ def build_job(
 
 
 def read_job(raw: bytes) -> dict[str, Any]:
-    document = exact_keys(parse_canonical(raw, "job"), _JOB_KEYS, "job")
-    if document["profile"] != JOB_PROFILE or document["route"] not in ROUTES:
-        raise Refused(f"a job's profile is {JOB_PROFILE} and its route one of {sorted(ROUTES)}")
+    document = parse_canonical(raw, "job")
+    v1 = isinstance(document, dict) and document.get("profile") == JOB_PROFILE_V1
+    document = exact_keys(document, _JOB_KEYS_V1 if v1 else _JOB_KEYS, "job")
+    if not v1 and (
+        document["profile"] != JOB_PROFILE or document["prompt_version"] != PROMPT_VERSION
+    ):
+        raise Refused(
+            f"a job's profile is {JOB_PROFILE} or {JOB_PROFILE_V1}, and a {JOB_PROFILE} job's "
+            f"prompt template is {PROMPT_VERSION}"
+        )
+    if document["route"] not in ROUTES:
+        raise Refused(f"a job's route is one of {sorted(ROUTES)}")
     for key in ("code_sha256", "components_sha256"):
         if not is_sha256(document[key]):
             raise Refused(f"job.{key} is a sha256")
@@ -497,18 +574,39 @@ _MEASURED_KEYS: Final = (
     "triangles",
     "vertices",
 )
+_HOLD_MEASURED_KEYS: Final = ("band_mm", "fill_permille", "grip_in_section", "section_mm")
 _SECONDS_KEYS: Final = ("concept", "cutout", "mesh", "postprocess")
 _STEPS: Final = ("orient", "simplify", "fit", "palette", "write")
 
 
-def verdict(measured: Mapping[str, Any], budget: Mapping[str, Any]) -> dict[str, Any]:
-    """Within budget, or each measure over it named. The budget is the request's."""
-    over = sorted(
+def verdict(
+    measured: Mapping[str, Any],
+    budget: Mapping[str, Any],
+    hold: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Within budget, or each measure over it named. The budget is the request's.
+
+    A held piece also names ``hold_fill`` when it fills less than
+    :data:`HOLD_FILL_MINIMUM_PER_MILLE` of its box's longest side, and ``grip_section`` when
+    nothing crosses the grip, the section through it is wider than the hand closes around, or the
+    grip point lies outside that section."""
+    over = [
         key
         for key in ("glb_bytes", "materials", "texture_side_px", "triangles", "vertices")
         if measured[key] > budget[key]
-    )
-    return {"over": over, "within": not over}
+    ]
+    if hold is not None:
+        held = measured["hold"]
+        if held["fill_permille"] < HOLD_FILL_MINIMUM_PER_MILLE:
+            over.append("hold_fill")
+        section = held["section_mm"]
+        if (
+            section is None
+            or max(section.values()) > hold["section_mm_maximum"]
+            or not held["grip_in_section"]
+        ):
+            over.append("grip_section")
+    return {"over": sorted(over), "within": not over}
 
 
 def build_receipt(document: Mapping[str, Any], request: Mapping[str, Any]) -> bytes:
@@ -553,11 +651,18 @@ def read_receipt(raw: bytes, request: Mapping[str, Any]) -> dict[str, Any]:
     output = exact_keys(document["output"], ("bytes", "sha256"), "receipt.output")
     if not is_sha256(output["sha256"]) or not is_count(output["bytes"], 1):
         raise Refused("receipt.output names the GLB by sha256 and size")
-    measured = exact_keys(document["measured"], _MEASURED_KEYS, "receipt.measured")
+    hold = request.get("hold")
+    measured = exact_keys(
+        document["measured"],
+        _MEASURED_KEYS + (("hold",) if hold is not None else ()),
+        "receipt.measured",
+    )
     _mm_box(measured["size_mm"], "receipt.measured.size_mm")
     if measured["glb_bytes"] != output["bytes"]:
         raise Refused("the measured size is the output's size")
-    if document["verdict"] != verdict(measured, request["budget"]):
+    if hold is not None:
+        _check_hold_measured(measured["hold"], hold["axis"])
+    if document["verdict"] != verdict(measured, request["budget"], hold):
         raise Refused("receipt.verdict is not what the measures and the request's budget say")
     exact_keys(document["seconds"], _SECONDS_KEYS, "receipt.seconds")
     if not all(is_count(value) for value in document["seconds"].values()):
@@ -565,3 +670,21 @@ def read_receipt(raw: bytes, request: Mapping[str, Any]) -> dict[str, Any]:
     if not isinstance(document["runtime"], dict):
         raise Refused("receipt.runtime states the machine and libraries")
     return document
+
+
+def _check_hold_measured(value: object, axis: str) -> None:
+    held = exact_keys(value, _HOLD_MEASURED_KEYS, "receipt.measured.hold")
+    if not is_count(held["band_mm"], 1) or not is_count(held["fill_permille"]):
+        raise Refused("receipt.measured.hold states its band and fill in whole numbers")
+    if not isinstance(held["grip_in_section"], bool):
+        raise Refused("receipt.measured.hold.grip_in_section is true or false")
+    section = held["section_mm"]
+    across = tuple(f"{a}_mm" for a in "xyz" if a != axis[1])
+    if section is not None and (
+        not isinstance(section, dict)
+        or set(section) != set(across)
+        or not all(is_count(v) for v in section.values())
+    ):
+        raise Refused(f"receipt.measured.hold.section_mm is null or whole mm along {across}")
+    if section is None and held["grip_in_section"]:
+        raise Refused("a grip cannot lie in a section that is not there")

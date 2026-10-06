@@ -435,11 +435,24 @@ bytes through the committed table [`assets/colour/srgb8-linear16.v1.json`](../as
 description of at most 80 characters, the pack's id, version, digest, palette and style words, the
 budget with the digest of the piece budgets file it came from, variants and route; a request is
 read only against that file, and a `v1` request, whose budget came from an earlier built-in table,
-still reads as it did), `exulanica.generated-asset-job/v1` (one batch fixed before it runs:
-every prompt and seed, the weights listing, code, container and stop at 150 per cent of the
-estimate) and `exulanica.generated-asset/v1` (one piece: every input by digest, every step, the GLB,
+still reads as it did), `exulanica.generated-asset-job/v2` (one batch fixed before it runs: the
+prompt template's version, every prompt and seed, the weights listing, code, container and stop at
+150 per cent of the estimate; a `v1` job, written before the template had a version, still reads) and `exulanica.generated-asset/v1` (one piece: every input by digest, every step, the GLB,
 what was measured against the budget, origin generated, truth invented, CC0-1.0 and the
-regeneration sentence). A seed is drawn from the request digest under a prefix. An output is cached
+regeneration sentence). A seed is drawn from the request digest under a prefix.
+
+**Held pieces.** A piece made for a thing a hand holds (a sword, a lantern) is made to its thing
+kind: the request takes the kind's box as its slot and carries the kind's grip, a point in the
+kind's slot frame (whole millimetres, x across, y deep with the front at +y, z up, from the base
+centre) and the direction the thing extends from the hand, with the widest section a hand closes
+around from the holder's body plan. The concept picture is posed by that direction ("standing
+upright, its handle at the bottom"; "hanging from a ring or handle at its top"). After the contain
+fit the receipt measures how full the box is along its longest side and the section through the
+grip, a slab 10 mm either side of the plane across the direction; the piece is refused (`hold_fill`)
+below 800 per mille, so a model that laid a sword down is not shrunk into a stub, and refused
+(`grip_section`) when nothing crosses the grip, the section is wider than the body plan's figure, or
+the grip point lies outside it. `tests/fixtures/generated-piece/sword-case.v1.json` holds one held
+piece's request, job and receipt from the dry run for readers of these records elsewhere. An output is cached
 under the digest of its request, weights listing and post-process version; a request that carries a
 description may hold a person's words and is cached within its workspace only.
 

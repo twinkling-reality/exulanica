@@ -17,15 +17,18 @@ import pytest
 from exulanica.world import style_packs
 from exulanica_pieces import budgets as piece_budgets
 from exulanica_pieces import colour
-from exulanica_pieces.canonical import Refused, canonical_bytes
+from exulanica_pieces.canonical import Refused, canonical_bytes, parse_canonical, sha256_hex
 from exulanica_pieces.records import (
     REQUEST_PROFILE_V1,
     build_job,
     build_request,
     cache_scope,
+    prompt_for,
     read_job,
+    read_receipt,
     read_request,
     seed_for,
+    verdict,
 )
 
 PACK = {
@@ -313,3 +316,134 @@ def test_a_job_refuses_a_changed_seed_and_a_stub_container_on_a_real_route() -> 
             container="stub",
             estimate_seconds=10,
         )
+
+
+# --------------------------------------------------------------------------------------------
+# Held pieces, the prompt template and the job's version
+# --------------------------------------------------------------------------------------------
+
+SWORD = {"look_role": "prop.sword", "slot_mm": {"width": 120, "height": 1000, "depth": 40}}
+#: The thing kind's grip (THINGS: 150 mm up its length, extending upward) and humanoid/v1's
+#: grip_section_mm_maximum (60 mm), as THINGS states them on 2026-10-06.
+SWORD_HOLD = {"axis": "+z", "grip": {"x_mm": 0, "y_mm": 0, "z_mm": 150}, "section_mm_maximum": 60}
+
+
+def _held(**hold_changes: object) -> dict:
+    hold = {**SWORD_HOLD, **hold_changes}
+    return read_request(
+        build_request(pack=PACK, variants=1, route="S", budgets=BUDGETS, hold=hold, **SWORD),
+        BUDGETS,
+    )
+
+
+def test_a_held_request_carries_its_grip_and_poses_its_picture() -> None:
+    request = _held()
+    assert request["hold"] == SWORD_HOLD
+    pose = "standing upright, its handle at the bottom, whole object in frame"
+    assert pose in prompt_for(request)
+    assert "hanging from a ring or handle at its top" in prompt_for(_held(axis="-z"))
+
+
+def test_a_request_without_a_grip_keeps_the_first_template_s_words() -> None:
+    # The template's words before it had a version, typed here: a version names them, it does
+    # not change them.
+    assert prompt_for(_request()) == (
+        "bench, a single prop for a game world, toon style, flat colours, chunky simple shapes, "
+        "about 1800 mm wide, 900 mm tall and 700 mm deep, whole object in frame, three-quarter "
+        "front view, plain light grey background, no text, no lettering, no logo"
+    )
+
+
+@pytest.mark.parametrize(
+    ("changes", "match"),
+    [
+        ({"axis": "up"}, "hold.axis"),
+        ({"grip": {"x_mm": 0, "y_mm": 0, "z_mm": 1001}}, "inside the slot"),
+        ({"grip": {"x_mm": 61, "y_mm": 0, "z_mm": 150}}, "inside the slot"),
+        ({"grip": {"x_mm": 0, "y_mm": 21, "z_mm": 150}}, "inside the slot"),
+        ({"grip": {"x_mm": 0, "y_mm": 0, "z_mm": -1}}, "inside the slot"),
+        ({"grip": {"x_mm": 0, "y_mm": 0}}, "exactly"),
+        ({"grip": {"x_mm": 0.5, "y_mm": 0, "z_mm": 150}}, "fraction"),
+        ({"grip": {"x_mm": "0", "y_mm": 0, "z_mm": 150}}, "whole millimetres"),
+        ({"section_mm_maximum": 0}, "1 to 1,000"),
+        ({"reach": 3}, "exactly"),
+    ],
+)
+def test_a_held_request_refuses(changes: dict, match: str) -> None:
+    with pytest.raises(Refused, match=match):
+        _held(**changes)
+
+
+def test_only_a_contained_piece_and_a_v2_request_hold_a_grip() -> None:
+    door = {"look_role": "door.shop_door", "slot_mm": {"width": 1200, "height": 2400, "depth": 300}}
+    with pytest.raises(Refused, match="contain"):
+        build_request(pack=PACK, variants=1, route="S", budgets=BUDGETS, hold=SWORD_HOLD, **door)
+    v1 = json.loads(build_request(pack=PACK, variants=1, route="S", budgets=BUDGETS, **SWORD))
+    v1["profile"] = REQUEST_PROFILE_V1
+    v1["hold"] = SWORD_HOLD
+    with pytest.raises(Refused, match="v1 request holds no grip"):
+        read_request(canonical_bytes(v1), BUDGETS)
+
+
+def _measured(**hold: object) -> dict:
+    budget = _held()["budget"]
+    base = {key: 0 for key in ("glb_bytes", "materials", "texture_side_px", "triangles")}
+    base["vertices"] = 0
+    held = {"band_mm": 10, "fill_permille": 800, "grip_in_section": True}
+    held["section_mm"] = {"x_mm": 60, "y_mm": 30}
+    held.update(hold)
+    return verdict({**base, "hold": held}, budget, SWORD_HOLD)
+
+
+def test_a_held_piece_s_verdict_names_its_fill_and_its_grip() -> None:
+    assert _measured() == {"over": [], "within": True}  # 800 per mille and 60 mm are allowed
+    assert _measured(fill_permille=799)["over"] == ["hold_fill"]
+    assert _measured(section_mm={"x_mm": 61, "y_mm": 30})["over"] == ["grip_section"]
+    assert _measured(section_mm=None, grip_in_section=False)["over"] == ["grip_section"]
+    assert _measured(grip_in_section=False)["over"] == ["grip_section"]
+
+
+def test_a_job_names_its_prompt_template_and_a_v1_job_still_reads() -> None:
+    raw = build_request(pack=PACK, variants=1, route="S", budgets=BUDGETS, **BENCH)
+    job = json.loads(
+        build_job(
+            budgets=BUDGETS,
+            route="S",
+            components_sha256="1" * 64,
+            requests=[raw],
+            code_sha256="2" * 64,
+            container="stub",
+            estimate_seconds=10,
+        )
+    )
+    assert job["profile"] == "exulanica.generated-asset-job/v2"
+    assert job["prompt_version"] == "exulanica.generated-asset-prompt/v1"
+    with pytest.raises(Refused, match="prompt template"):
+        read_job(canonical_bytes(dict(job, prompt_version="exulanica.generated-asset-prompt/v0")))
+    v1 = {key: value for key, value in job.items() if key != "prompt_version"}
+    v1["profile"] = "exulanica.generated-asset-job/v1"
+    assert read_job(canonical_bytes(v1))["route"] == "S"
+    with pytest.raises(Refused, match="exactly"):
+        read_job(canonical_bytes(dict(v1, prompt_version=job["prompt_version"])))
+
+
+def test_the_shared_case_is_one_held_piece_s_records_read_strictly() -> None:
+    """The case other readers test against (the origin record's) holds records these readers
+    accept: a request, the job that made it and its receipt, tied together by digest."""
+    path = ROOT / "tests/fixtures/generated-piece/sword-case.v1.json"
+    case = parse_canonical(path.read_bytes().rstrip(b"\n"), "case")
+    assert case["profile"] == "exulanica.generated-piece-case/v1"
+    request = read_request(canonical_bytes(case["request"]), BUDGETS)
+    job_raw = canonical_bytes(case["job"])
+    job = read_job(job_raw)
+    receipt = read_receipt(canonical_bytes(case["receipt"]), request)
+    request_sha256 = sha256_hex(canonical_bytes(case["request"]))
+    assert receipt["job_sha256"] == sha256_hex(job_raw)
+    assert request_sha256 in {item["request_sha256"] for item in job["items"]}
+    assert (request["look_role"], request["hold"]["axis"]) == ("prop.sword", "+z")
+    assert (receipt["origin"], receipt["truth"], receipt["licence"]) == (
+        "generated",
+        "invented",
+        "CC0-1.0",
+    )
+    assert receipt["verdict"] == {"over": [], "within": True}
