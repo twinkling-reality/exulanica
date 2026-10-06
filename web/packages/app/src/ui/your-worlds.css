@@ -227,6 +227,7 @@
 }
 
 #shell .your-worlds .your-worlds-actions[data-primary='open'] .your-worlds-create-action kbd,
+#shell .your-worlds .your-worlds-actions .your-worlds-values kbd,
 #shell .your-worlds .your-worlds-actions[data-primary='create'] .your-worlds-open kbd {
   padding: 0.3rem 0.45rem;
   border-radius: var(--radius-full);

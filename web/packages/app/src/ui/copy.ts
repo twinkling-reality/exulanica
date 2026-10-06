@@ -415,7 +415,9 @@ export const COPY: Readonly<Record<string, string>> = Object.freeze({
   'yourWorlds.open': 'Open',
   'yourWorlds.openNamed': 'Open {title}',
   'yourWorlds.values': 'View values',
-  'yourWorlds.values.unavailable': 'The values a world was made with are not shown here yet.',
+  'yourWorlds.values.none': 'This world was made before its values were kept, so there are none to show.',
+  'yourWorlds.values.from':
+    'These are the values {title} was made with. Creating from them makes a new world; {title} stays as it is.',
   'yourWorlds.create': 'Create a world',
   'yourWorlds.create.caption': 'New world',
   'yourWorlds.create.detail': 'Start from a town, or describe one',

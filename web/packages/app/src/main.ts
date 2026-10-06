@@ -72,6 +72,7 @@ import { el, replace } from './ui/dom.js';
 import { button, errorState } from './ui/system/components.js';
 import { createLayout, MODAL_BACKGROUND_REGIONS, type Layout } from './ui/system/layout.js';
 import { mountActions, type MountedActions } from './composition/actions.js';
+import { fill } from './ui/copy.js';
 import { actionState, perform } from './ui/actions/surfaces.js';
 import { actionSpec, availability } from './ui/actions/registry.js';
 import type { PlannedRequest } from './ui/actions/planned.js';
@@ -325,7 +326,10 @@ interface MakeWorldSurface {
  * holds a stand-in where the panel will be, saying "Opening Create a world."; a load that fails says
  * so with Try again, and a stand-in closed meanwhile is never replaced by the panel.
  */
-function showWorldRecipes(onClose: () => void): MakeWorldSurface | null {
+function showWorldRecipes(
+  onClose: () => void,
+  start: { readonly recipeKey: string; readonly values: Readonly<Record<string, number | string>>; readonly origin: string } | null = null,
+): MakeWorldSurface | null {
   const client = state.worldEntries;
   const credentials = state.credentials;
   if (client === null || credentials === null) return null;
@@ -366,6 +370,12 @@ function showWorldRecipes(onClose: () => void): MakeWorldSurface | null {
       // takes it once attached (composition/world-description.ts).
       panel.focus();
       attachWorldDescription(panel, { credentials, specification: () => specification.specification() });
+      // A saved world's own values, loaded as a person's edit is: what is out of range now is said
+      // by the panel's own check, and the world they came from never changes.
+      if (start !== null) {
+        panel.showOrigin(start.origin);
+        void panel.setValues(start.recipeKey, start.values);
+      }
     }, (error: unknown) => {
       if (!stand.isConnected) return;
       const retry = button({ label: 'Try again', variant: 'primary', onClick: load });
@@ -413,6 +423,15 @@ async function mountWorldEntry(): Promise<void> {
       create: () => {
         if (creating?.isConnected === true) return;
         creating = showWorldRecipes(closeCreate);
+      },
+      viewValues: (entry) => {
+        const ground = entry.generatedGround;
+        if (creating?.isConnected === true || ground?.values == null) return;
+        creating = showWorldRecipes(closeCreate, {
+          recipeKey: ground.recipeKey,
+          values: ground.values,
+          origin: fill('yourWorlds.values.from', { title: entry.title }),
+        });
       },
     }),
     arrivalFailure: worldOpeningReason(state.worldEntryError),

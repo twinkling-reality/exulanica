@@ -208,6 +208,13 @@ export interface GeneratedGround {
   /** The way a person arriving faces, a plan vector: east, then south. */
   readonly arrivalFacingMm: readonly [east: number, south: number];
   readonly tiles: readonly GeneratedTile[];
+  /** The specification schema the world's receipt names (`world-specification.v<N>`), or null. */
+  readonly specification: string | null;
+  /**
+   * Every adjustable value the world was made with, keyed by that schema's value keys, as the
+   * receipt records them; null for a world of a recipe that recorded none.
+   */
+  readonly values: Readonly<Record<string, number | string>> | null;
 }
 
 /** A declared floor, in millimetres, as the server serves it on a saved world's entry. */
@@ -926,6 +933,18 @@ function parseGeneratedGround(value: unknown): GeneratedGround | null {
   if (!Array.isArray(tiles) || tiles.length === 0) {
     throw new TypeError('The server returned a generated ground with no tiles.');
   }
+  const served = row['values'];
+  if (served !== undefined && served !== null && (typeof served !== 'object' || Array.isArray(served))) {
+    throw new TypeError('The server returned a generated ground whose values are not a record.');
+  }
+  const values = served === undefined || served === null ? null : Object.freeze(Object.fromEntries(
+    Object.entries(served as Record<string, unknown>).map(([key, held]) => {
+      if (typeof held === 'string' && held.length > 0) return [key, held];
+      return [key, integer(held, `value ${key}`)];
+    }),
+  ));
+  const specification = row['specification'] === undefined || row['specification'] === null
+    ? null : text(row['specification'], 'specification');
   return Object.freeze({
     recipeKey: text(row['recipe_key'], 'recipe key'),
     recipeLabel: text(row['recipe_label'], 'recipe label'),
@@ -939,6 +958,8 @@ function parseGeneratedGround(value: unknown): GeneratedGround | null {
       integer(facing[0], 'arrival facing east'),
       integer(facing[1], 'arrival facing south'),
     ]) as GeneratedGround['arrivalFacingMm'],
+    specification,
+    values,
     tiles: Object.freeze(tiles.map((tile: unknown) => {
       const one = record(tile, 'generated tile');
       const state = one['state'];

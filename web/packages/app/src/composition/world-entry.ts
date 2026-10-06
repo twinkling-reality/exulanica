@@ -26,6 +26,11 @@ export interface WorldEntrySurface {
   readonly create?: () => void;
   /** A picture of a saved world, or null where there is none to show. */
   readonly picture?: (entry: SavedWorldEntry) => string | null;
+  /**
+   * Opens Create a world holding the values a generated world was made with, so a new world can be
+   * made from them; the world itself never changes. Absent where nothing can be made.
+   */
+  readonly viewValues?: (entry: SavedWorldEntry) => void;
 }
 
 /** What Your worlds offers for making a world, as the action registry reads it from the server. */
@@ -42,6 +47,11 @@ export interface WorldEntrySurfaceHandle {
 
 const DAY = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
 const SHORT_DAY = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+
+/** The values a generated world was made with, as its entry serves them, or null where there are none. */
+function valuesOf(entry: SavedWorldEntry): Readonly<Record<string, number | string>> | null {
+  return entry.generatedGround?.values ?? null;
+}
 
 /** A day as a person reads it, from an ISO time the server served; null when it is not one. */
 function servedDay(iso: string, format: Intl.DateTimeFormat): string | null {
@@ -121,9 +131,9 @@ export function buildYourWorlds(deps: WorldEntrySurface): WorldEntrySurfaceHandl
   ]);
   const values = el('button', {
     type: 'button', class: 'your-worlds-secondary your-worlds-values', 'data-action': 'worlds.values',
-    'aria-disabled': 'true', 'aria-describedby': 'your-worlds-values-why',
-  }, [el('span', { text: say('yourWorlds.values') })]);
-  const valuesWhy = el('span', { id: 'your-worlds-values-why', class: 'your-worlds-hint', text: say('yourWorlds.values.unavailable') });
+    'aria-describedby': 'your-worlds-values-why',
+  }, [el('span', { text: say('yourWorlds.values') }), kbd('V')]);
+  const valuesWhy = el('span', { id: 'your-worlds-values-why', class: 'your-worlds-hint', text: say('yourWorlds.values.none') });
   const createButton = el('button', {
     type: 'button', class: 'your-worlds-secondary your-worlds-create-action', 'data-action': 'worlds.create',
   }, [el('span', { text: say('yourWorlds.create') }), kbd('N')]);
@@ -261,8 +271,10 @@ export function buildYourWorlds(deps: WorldEntrySurface): WorldEntrySurfaceHandl
     // the alternative, so the two swap places and weight.
     actions.dataset['primary'] = first ? 'create' : 'open';
     showBackdrop(first ? null : deps.picture?.(entry) ?? null);
-    values.hidden = entry.generatedGround == null;
-    valuesWhy.hidden = values.hidden;
+    values.hidden = entry.generatedGround == null || deps.viewValues === undefined;
+    const viewable = valuesOf(entry) !== null;
+    values.setAttribute('aria-disabled', String(!viewable));
+    valuesWhy.hidden = values.hidden || viewable;
     showReconcile(entry);
   };
 
@@ -320,10 +332,16 @@ export function buildYourWorlds(deps: WorldEntrySurface): WorldEntrySurfaceHandl
     const card = cards.find((one) => one.dataset['entryId'] === chosen!.entryId);
     if (card !== undefined) openEntry(chosen, card);
   });
-  values.addEventListener('click', () => {
-    status.hidden = false;
-    status.textContent = say('yourWorlds.values.unavailable');
-  });
+  const viewValues = (): void => {
+    if (chosen === null || values.hidden) return;
+    if (valuesOf(chosen) === null) {
+      status.hidden = false;
+      status.textContent = say('yourWorlds.values.none');
+      return;
+    }
+    deps.viewValues?.(chosen);
+  };
+  values.addEventListener('click', viewValues);
 
   root.addEventListener('keydown', (event) => {
     if (event.metaKey || event.ctrlKey || event.altKey || typing(event.target)) return;
@@ -334,6 +352,11 @@ export function buildYourWorlds(deps: WorldEntrySurface): WorldEntrySurfaceHandl
       const step = event.key === 'ArrowRight' ? 1 : -1;
       const from = at >= 0 ? at : Math.max(0, cards.findIndex((card) => card.dataset['entryId'] === chosen?.entryId));
       all[Math.min(all.length - 1, Math.max(0, from + step))]?.focus();
+      return;
+    }
+    if ((event.key === 'v' || event.key === 'V') && !event.shiftKey) {
+      event.preventDefault();
+      viewValues();
       return;
     }
     if ((event.key === 'n' || event.key === 'N') && !event.shiftKey) {

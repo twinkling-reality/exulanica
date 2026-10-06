@@ -35,6 +35,8 @@ const ground = (tiles: readonly GeneratedTile[]): GeneratedGround => ({
   arrivalMm: [128000, 105, -58750],
   arrivalFacingMm: [0, 3000],
   tiles,
+  specification: null,
+  values: null,
 });
 
 const entry = (tiles: readonly GeneratedTile[]) => ({

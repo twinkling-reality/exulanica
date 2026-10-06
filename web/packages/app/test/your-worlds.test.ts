@@ -27,7 +27,7 @@ const entry = (overrides: Partial<SavedWorldEntry> = {}): SavedWorldEntry => ({
   updatedAt: '2026-10-04T17:30:00Z',
   generatedGround: {
     recipeKey: 'market_town', recipeLabel: 'A market town', regionId: 'r',
-    arrivalMm: [0, 0, 0], arrivalFacingMm: [1, 0], tiles: [],
+    arrivalMm: [0, 0, 0], arrivalFacingMm: [1, 0], tiles: [], specification: null, values: null,
   },
   ...overrides,
 });
@@ -37,7 +37,7 @@ const quiet = entry({
   createdAt: '2026-09-30T08:00:00Z', updatedAt: '2026-09-30T09:00:00Z',
   generatedGround: {
     recipeKey: 'small_town', recipeLabel: 'A small town', regionId: 'r',
-    arrivalMm: [0, 0, 0], arrivalFacingMm: [1, 0], tiles: [],
+    arrivalMm: [0, 0, 0], arrivalFacingMm: [1, 0], tiles: [], specification: null, values: null,
   },
 });
 
@@ -167,5 +167,49 @@ describe('the pictures on Your worlds', () => {
     // Anything else under the key is not a picture and is not shown.
     window.localStorage.setItem(`exulanica.world-picture.v1.${quiet.entryId}`, 'javascript:alert(1)');
     expect(worldPicture(quiet)).toBe('/your-worlds/small_town.jpg');
+  });
+});
+
+describe('View values on Your worlds', () => {
+  const made = (values: Readonly<Record<string, number | string>> | null) => entry({
+    generatedGround: {
+      recipeKey: 'market_town', recipeLabel: 'A market town', regionId: 'r',
+      arrivalMm: [0, 0, 0], arrivalFacingMm: [1, 0], tiles: [],
+      specification: values === null ? null : 'world-specification.v2', values,
+    },
+  });
+  const button = (root: HTMLElement) => root.querySelector<HTMLButtonElement>('[data-action="worlds.values"]')!;
+
+  it('hands the chosen world, values and all, to Create a world from the button and from V', () => {
+    const viewValues = vi.fn();
+    const world = made({ city_extent_x_mm: 384000, cross_street_hierarchy: 'local_street' });
+    const { root } = build([world], { viewValues });
+    expect(button(root).hidden).toBe(false);
+    expect(button(root).getAttribute('aria-disabled')).toBe('false');
+    button(root).click();
+    expect(viewValues).toHaveBeenLastCalledWith(world);
+    press(root.querySelector('.your-worlds-card')!, 'v');
+    expect(viewValues).toHaveBeenCalledTimes(2);
+    // Never while a person types.
+    const field = document.createElement('input');
+    root.append(field);
+    press(field, 'v');
+    expect(viewValues).toHaveBeenCalledTimes(2);
+  });
+
+  it('says a world made before values were kept has none to show, and opens nothing', () => {
+    const viewValues = vi.fn();
+    const { root } = build([made(null)], { viewValues });
+    expect(button(root).getAttribute('aria-disabled')).toBe('true');
+    expect(root.querySelector<HTMLElement>('#your-worlds-values-why')!.hidden).toBe(false);
+    button(root).click();
+    expect(viewValues).not.toHaveBeenCalled();
+    expect(root.querySelector('.your-worlds-status')!.textContent)
+      .toBe('This world was made before its values were kept, so there are none to show.');
+  });
+
+  it('offers no View values for a world not made from a recipe, or where nothing can be made', () => {
+    expect(button(build([starter(1)], { viewValues: vi.fn() }).root).hidden).toBe(true);
+    expect(button(build([made({ city_extent_x_mm: 1 })]).root).hidden).toBe(true);
   });
 });

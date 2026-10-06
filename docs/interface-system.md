@@ -142,7 +142,8 @@ the most recently changed first, and a last card for Create a world. Moving to a
 pressing a card or Open opens it. A person whose only world is the untouched starter square sees
 "Create your world", with Create a world as the primary action. A world that cannot open says why
 when chosen and pressed; Create a world refused by the workspace says the action's words. Keys:
-the arrows choose, Enter opens, N creates; none fires while a person types. The World menu's
+the arrows choose, Enter opens, N creates, V views a generated world's values; none fires while a
+person types. The World menu's
 Your worlds entry keeps a picture of the open world and loads the page afresh, which starts here.
 Behind the page the chosen world's picture fills the right side, fading into the page towards the
 words, the top and the strip and drifting slowly (still under reduced motion); a world with no
@@ -152,8 +153,12 @@ A card's picture is the world's own frame, kept in the person's browser only a f
 the world opens and again when they leave it for Your worlds; until there is one, a world made from
 a recipe shows a frame of a town made from that recipe, captured from the running application and
 shipped in `web/packages/app/public/your-worlds/`, and any other world shows the brand blend. View
-values is shown for a generated world and stays unavailable until the saved world entry serves the
-values the world was made with.
+values (or V) is shown for a generated world: it opens Create a world holding the recipe and every
+value the world was made with, as the saved entry serves them from its generation receipt
+(`generated_ground.values`), checked as a person's own edit is, with a line saying whose values
+they are and that creating from them makes a new world while that one stays as it is. Nothing
+changes an existing world's values. A world made before its values were kept says it has none to
+show.
 
 Create a world (`ui/world-recipes.ts`, `ui/world-description.ts`, `ui/create-world.css`) is one full
 sheet in the same language: describing the town in the person's own words comes first, the recipes

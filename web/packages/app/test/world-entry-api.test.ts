@@ -192,7 +192,18 @@ describe('saved world entry client', () => {
         tileX: 0, tileY: 0, tileInputsDigest: 'f'.repeat(64),
         bakedTileId: '14141414-1414-4141-8141-141414141414', state: 'baked',
       }],
+      specification: null,
+      values: null,
     });
+    // What the world was made with, as its receipt records it: integers and choice keys only.
+    const valued = { ...ground, specification: 'world-specification.v2', values: { city_extent_x_mm: 384000, cross_street_hierarchy: 'local_street' } };
+    const [made] = await client([wire({ source_kind: 'generated', generated_ground: valued })]).entries();
+    expect(made!.generatedGround!.specification).toBe('world-specification.v2');
+    expect(made!.generatedGround!.values).toEqual({ city_extent_x_mm: 384000, cross_street_hierarchy: 'local_street' });
+    await expect(client([wire({ source_kind: 'generated', generated_ground: { ...valued, values: { city_extent_x_mm: 1.5 } } })]).entries())
+      .rejects.toThrow();
+    await expect(client([wire({ source_kind: 'generated', generated_ground: { ...valued, values: [1] } })]).entries())
+      .rejects.toThrow('values');
     // Only a generated entry declares a generated ground, and an available one always does.
     await expect(client([wire({ generated_ground: ground })]).entries()).rejects.toThrow('generated ground');
     await expect(client([wire({ source_kind: 'generated' })]).entries()).rejects.toThrow('generated ground');

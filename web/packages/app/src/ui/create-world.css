@@ -56,6 +56,19 @@
   color: var(--color-text);
 }
 
+/* Where the values shown came from, when a saved world's own were loaded: said once, above all else. */
+#shell section.world-recipes .world-recipes-origin {
+  margin: 1rem 0 0;
+  padding: 10px 14px;
+  max-width: 46ch;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--color-text);
+  border: 1px solid var(--color-border-strong);
+  border-left: 3px solid var(--brand-yellow);
+  border-radius: 8px;
+}
+#shell section.world-recipes .world-recipes-origin[hidden] { display: none; }
 #shell section.world-recipes .world-recipes-introduction {
   max-width: 28rem;
   margin: 1rem 0 0;

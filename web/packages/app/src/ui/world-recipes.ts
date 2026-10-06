@@ -53,6 +53,8 @@ export interface WorldRecipesPanel {
    * to the page.
    */
   focus(): void;
+  /** Say where the values shown came from, such as a saved world's own; null says nothing. */
+  showOrigin(words: string | null): void;
 }
 
 /** Whether a person can reach a control: not inside anything hidden, not disabled. */
@@ -108,12 +110,14 @@ export function buildWorldRecipes(options: {
       make.click();
     }
   };
+  const origin = el('p', { class: 'world-recipes-origin', role: 'status', hidden: true });
   const root = el('section', {
     class: 'world-recipes', role: 'dialog', 'aria-label': say('worldRecipes.heading'),
     'data-ui-stage': 'dark', tabindex: '-1',
   }, [
     el('div', { class: 'world-recipes-main' }, [
       el('h2', { text: say('worldRecipes.heading') }),
+      origin,
       el('p', { class: 'world-recipes-introduction', text: say('worldRecipes.introduction') }),
       el('p', { class: 'world-recipes-list-label', text: say('worldRecipes.recipes') }),
       list,
@@ -268,6 +272,10 @@ export function buildWorldRecipes(options: {
       const target = describe !== null && usable(describe) ? describe
         : [...list.querySelectorAll<HTMLElement>('button')].find(usable) ?? root;
       target.focus({ preventScroll: true });
+    },
+    showOrigin(words) {
+      origin.textContent = words ?? '';
+      origin.hidden = words === null;
     },
     async setValues(presetKey, values) {
       await loaded;

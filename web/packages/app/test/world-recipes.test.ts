@@ -88,6 +88,14 @@ describe('the panel that makes a world', () => {
     expect(await built.setValues('a_town_nobody_offers', {})).toMatchObject({ code: 'unknown_world_recipe' });
 
     expect(await built.setValues('market_town', { block_length_mm: 130000 })).toBeNull();
+    // Where the values came from is said above everything else, and only while it is said.
+    const origin = built.root.querySelector<HTMLElement>('.world-recipes-origin')!;
+    expect(origin.hidden).toBe(true);
+    built.showOrigin('These are the values Saturday market was made with.');
+    expect(origin.hidden).toBe(false);
+    expect(origin.textContent).toBe('These are the values Saturday market was made with.');
+    built.showOrigin(null);
+    expect(origin.hidden).toBe(true);
     expect(built.root.getAttribute('data-specification-state')).toBe('admitted');
     const length = built.root.querySelector<HTMLInputElement>('[data-parameter="block_length_mm"]')!;
     expect(length.value).toBe('130000');
