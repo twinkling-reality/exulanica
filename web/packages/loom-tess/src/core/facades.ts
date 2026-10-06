@@ -236,6 +236,34 @@ export function facadeOpenings(
   return openings;
 }
 
+/** How one face is laid out over its frame, as `facadePieces` and every reader of its openings take it. */
+export interface FaceLayout {
+  readonly run: number;
+  /** The face includes storey 0, so its bays and ground band sit at its foot. */
+  readonly banded: boolean;
+  readonly bandTop: number;
+  readonly party: boolean;
+  /** Where the wall gives way to the party wall's scar, or the face's top. */
+  readonly walled: number;
+  /** The rectangle openings are cut from: the wall, between the band and the scar or the top. */
+  readonly region: WallRegion;
+}
+
+/**
+ * The layout of a face over its frame. The ground band belongs to the bays; the face above it is
+ * the wall, up to the neighbour's top on a party wall and in the scar's role above that.
+ */
+export function faceLayout(facade: FacadeFields, frame: FaceFrame, where: string): FaceLayout {
+  const run = exact(facade.run_length_mm, where);
+  const banded = facade.first_storey === 0;
+  const bandTop = banded ? add(frame.base, facade.band_top_mm, where) : frame.base;
+  const party = facade.exposure === PARTY_WALL;
+  const scarBase = party ? add(frame.datum, facade.neighbour_top_mm, where) : frame.top;
+  const walled = scarBase < bandTop ? bandTop : scarBase;
+  const wallTop = walled > frame.top ? frame.top : walled;
+  return { run, banded, bandTop, party, walled, region: { run, base: bandTop, top: wallTop } };
+}
+
 /**
  * A building's face on one tier edge, by the rule above. `frame` is that edge with the heights the
  * face's storeys sit at, `bays` are the ground bay records that name this facade, and
@@ -255,16 +283,8 @@ export function facadePieces(
   const band = new Surface(GROUND_BAND, VERTICAL);
   const scar = new Surface(PARTY_WALL_SCAR, VERTICAL);
   const panels = new Map<string, Surface>();
-  const run = exact(facade.run_length_mm, where);
-  // The ground band belongs to the bays; the face above it is the wall, up to the neighbour's top
-  // on a party wall and in the scar's role above that.
-  const banded = facade.first_storey === 0;
-  const bandTop = banded ? add(frame.base, facade.band_top_mm, where) : frame.base;
-  const party = facade.exposure === PARTY_WALL;
-  const scarBase = party ? add(frame.datum, facade.neighbour_top_mm, where) : frame.top;
-  const walled = scarBase < bandTop ? bandTop : scarBase;
-  const wallTop = walled > frame.top ? frame.top : walled;
-  const region: WallRegion = { run, base: bandTop, top: wallTop };
+  const { run, banded, bandTop, party, walled, region } = faceLayout(facade, frame, where);
+  const wallTop = region.top;
   const openings = facadeOpenings(facade, massing, region, resolutionMm, where);
   if (openings.length === 0) {
     faceOn(wall, edge, 0, run, bandTop, wallTop, 0, frame.datum, where);

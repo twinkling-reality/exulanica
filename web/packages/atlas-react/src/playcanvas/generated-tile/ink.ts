@@ -100,9 +100,17 @@ function displayColour([r, g, b]: Rgb): pc.Color {
 
 /**
  * Ink every opaque mesh a tile drew under `root` (the entities a tile names `generated-tile:<set>`),
- * in `colour`: unlit lines, fogged like everything else, each under the mesh it outlines.
+ * and those of any other entity whose name starts with one of `prefixes` (a style pack's baked
+ * pieces, `style-pack:pieces`), in `colour`: unlit lines, fogged like everything else, each under
+ * the mesh it outlines.
  */
-export function attachTileInk(device: pc.GraphicsDevice, root: pc.Entity, colour: Rgb, options: InkOptions = INK_OPTIONS): TileInk {
+export function attachTileInk(
+  device: pc.GraphicsDevice,
+  root: pc.Entity,
+  colour: Rgb,
+  options: InkOptions = INK_OPTIONS,
+  prefixes: readonly string[] = ['generated-tile:'],
+): TileInk {
   const material = new pc.StandardMaterial();
   material.name = 'generated-tile:ink';
   material.useLighting = false;
@@ -112,7 +120,7 @@ export function attachTileInk(device: pc.GraphicsDevice, root: pc.Entity, colour
   const made: { entity: pc.Entity; mesh: pc.Mesh }[] = [];
   let segments = 0;
   for (const render of root.findComponents('render') as pc.RenderComponent[]) {
-    if (!render.entity.name.startsWith('generated-tile:') || render.entity.name === 'generated-tile:ink') continue;
+    if (!prefixes.some((prefix) => render.entity.name.startsWith(prefix)) || render.entity.name === 'generated-tile:ink') continue;
     for (const instance of render.meshInstances) {
       const drawn = instance.material as pc.StandardMaterial;
       if (drawn.blendType !== pc.BLEND_NONE || drawn.alphaTest > 0) continue;

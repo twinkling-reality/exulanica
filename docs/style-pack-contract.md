@@ -7,10 +7,10 @@ manifest. Which values of a world are protected, and how an appearance is propos
 applied and rolled back, is the [customization contract](atlas-world-customization-contract.md);
 the light and finish a preset becomes is the [render look](generated-tile-runtime.md#61-the-render-look-a-style-chooses).
 
-Status: the manifest, both readers, the resolver, the fit rules, the piece budgets and the browser's
-reading of a palette piece are built. Drawing a world from a pack, the packs themselves, storing,
-listing, uploading and downloading packs, binding a pack to a world's style version and drafting a
-pack with a model are planned and not built.
+Status: the manifest, both readers, the resolver, the fit rules, the piece budgets, the browser's
+reading of a palette piece and drawing a generated town in a pack (section 7) are built. The packs
+themselves, choosing a pack per world, storing, listing, uploading and downloading packs, binding a
+pack to a world's style version and drafting a pack with a model are planned and not built.
 
 ## 1. In plain words
 
@@ -136,3 +136,18 @@ same refusal by reason and path, or the same digest; `tests/test_style_packs.py`
 the variant choice and the fit rules, stretching included.
 `web/packages/atlas-core/test/style-piece.test.ts` holds the piece reader to a piece it writes
 itself, apart from the pieces' writer.
+
+## 7. Drawing a town in a pack
+
+`web/packages/atlas-react/src/playcanvas/style-pack/` draws a generated town in a resolved pack.
+Nothing it does changes a tile, a record, what anyone can walk on or what collides; taking the tiles
+down puts every material back and removes every piece.
+
+| Part | What it does |
+| --- | --- |
+| Light | The pack's default preset, in its whole-number units, becomes the tiles' render look (`renderLookOfPreset`); what a pack does not choose, such as shadow map sizes, is the engine's |
+| Surfaces | Each texture set a town is drawn with takes the look role `assets/style-packs/town-look-roles.v1.json` names: the family of the first grammar surface role the material catalog lists for the set's material, then the material's key. The pack resolves it as a surface only; a swatch replaces the set's material, a texture set keeps the set's own, and either may colour the set's upward faces with an up swatch (`dressTownSurfaces`) |
+| Windows | One slot per opening a facade the tile owns cuts, read with the tessellator's own rules (`openingSlots`): the hole's width and reveal, its height to the head or to an arched head's springing line, its base centre set in half the reveal, its front the face's outward side; its look role `window.<head treatment>` |
+| Pieces | A pack's pieces are fetched, held to the size and digest their manifest states, read as palette pieces and uploaded once (`fetchPackPieces`, `uploadPackPieces`); every slot's piece is placed by its fit and baked with the others into one mesh per swatch (`dressSlots`) |
+| Vehicles | A traffic vehicle's body is the pack's piece for `vehicle.<body family>`, chosen by the vehicle's id, contained in the record's own size; its `vehicle_body` swatch takes the vehicle's colour as the pack states it (`vehicle_red`); a body family the pack does not dress keeps the traffic's boxes (`packVehicleBodies`) |
+| Ink | A shading that draws ink outlines the tiles' opaque surfaces and the pack's baked pieces (`attachTileInk`) |

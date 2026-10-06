@@ -279,7 +279,7 @@ export function applyTileEnvironment(app: pc.AppBase, camera: pc.Entity, look: T
     groundMaterial.metalness = 0;
     groundMaterial.gloss = 0;
     groundMaterial.update();
-    groundMesh = pc.createPlane(device, { halfExtents: new pc.Vec2(look.edge.reachM, look.edge.reachM) });
+    groundMesh = pc.Mesh.fromGeometry(device, new pc.PlaneGeometry({ halfExtents: new pc.Vec2(look.edge.reachM, look.edge.reachM) }));
     ground = new pc.Entity('generated-tile:edge-ground');
     ground.addComponent('render', { meshInstances: [new pc.MeshInstance(groundMesh, groundMaterial)], castShadows: false, receiveShadows: true });
     ground.setPosition(0, -look.edge.dropM, 0);

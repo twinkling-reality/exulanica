@@ -18,7 +18,11 @@ export {
   TESSELLATOR_SOURCE_VERSION,
   TessellationError,
 } from './expand.js';
-export { capsuleOf, obstructionsOf } from './expand.js';
+export { capsuleOf, facadeFrame, obstructionsOf } from './expand.js';
+export { facadeOpenings, faceLayout } from './facades.js';
+export type { FacadeFields, FaceFrame, FaceLayout } from './facades.js';
+export type { MassingFields } from './massing.js';
+export type { Opening, WallRegion } from './openings.js';
 export type { CapsuleClearance, Need, ObstructionRegion, ProjectionDefinition } from './expand.js';
 export { routeObstructionRings } from './route-rings.js';
 export {

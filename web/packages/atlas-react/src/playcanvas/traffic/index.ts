@@ -19,4 +19,5 @@ export type {
 } from './types.js';
 export { SIGNAL_LOOKS_V1, SignalLights, SignalLookError } from './signal-lights.js';
 export type { GroundAt, ToRenderer } from './types.js';
+export type { VehicleBodies } from './traffic-layer.js';
 export { TrafficLayer, VEHICLE_LOOKS, VehicleLookError, pointAlong, poseBetween } from './traffic-layer.js';

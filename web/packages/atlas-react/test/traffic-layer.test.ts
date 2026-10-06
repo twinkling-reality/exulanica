@@ -118,6 +118,25 @@ describe('the traffic layer', () => {
     expect(x).toBeCloseTo(centreAt102 + 0.5, 3);
   });
 
+  it('draws a vehicle in the body a style pack gives it, and in its boxes when it gives none', () => {
+    const { root } = setup();
+    const asked: string[] = [];
+    const bodies = {
+      body: (row: VehicleSamples) => {
+        asked.push(row.vehicleId);
+        return row.vehicleId === 'styled' ? new pc.Entity('style-pack:vehicle.sedan') : null;
+      },
+    };
+    const layer = new TrafficLayer(root, () => 0, toRenderer, bodies);
+    layer.setWindow(trafficWindow([car('styled', 3, true), car('plain', 3, true)]), 0);
+    layer.update(1500);
+    layer.update(1600);
+    expect(root.findByName('vehicle:styled')!.children.map((child) => child.name)).toEqual(['style-pack:vehicle.sedan']);
+    expect(root.findByName('vehicle:plain')!.children.map((child) => child.name)).toContain('body');
+    // A vehicle's body is asked for once, when it is first drawn.
+    expect(asked.sort()).toEqual(['plain', 'styled']);
+  });
+
   it('does not draw a vehicle where the drawn world has no ground', () => {
     const { root } = setup();
     const layer = new TrafficLayer(root, () => null, toRenderer);

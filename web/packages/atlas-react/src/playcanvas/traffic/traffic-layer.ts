@@ -22,8 +22,10 @@ import type { GroundAt, ToRenderer, TrafficWindow, VehicleSamples } from './type
  * rises. A vehicle standing where the drawn world has no ground is not drawn.
  *
  * Every body family and colour is resolved through `vehicle-looks.ts`; a key it does not state is
- * an error, never a stand-in. The window's signals are drawn beside the vehicles, lit as each group
- * shows at the second drawn (`signal-lights.ts`).
+ * an error, never a stand-in. A world drawn in a style pack may hand in `VehicleBodies`, which
+ * draws a vehicle's body from the pack instead of the boxes; a vehicle it has no body for keeps
+ * them. The window's signals are drawn beside the vehicles, lit as each group shows at the second
+ * drawn (`signal-lights.ts`).
  */
 
 const MM_PER_METRE = 1000;
@@ -39,6 +41,15 @@ type Point = readonly [number, number];
 export const VEHICLE_LOOKS = VEHICLE_LOOKS_V1;
 
 export class VehicleLookError extends Error {}
+
+/**
+ * What draws a vehicle's body in place of the boxes `vehicle-looks.ts` states: an entity standing on
+ * its own origin at the middle of the vehicle's plan, its front toward -Z (the way a vehicle at yaw
+ * 0 faces), sized to the record's dimensions; or null, and the vehicle is drawn in boxes.
+ */
+export interface VehicleBodies {
+  body(row: VehicleSamples): pc.Entity | null;
+}
 
 
 interface Drawn {
@@ -133,6 +144,7 @@ export class TrafficLayer {
     parent: pc.Entity,
     private readonly groundAt: GroundAt,
     private readonly toRenderer: ToRenderer,
+    private readonly bodies: VehicleBodies | null = null,
   ) {
     this.root = new pc.Entity('traffic');
     parent.addChild(this.root);
@@ -354,6 +366,14 @@ export class TrafficLayer {
     const existing = this.drawn.get(row.vehicleId);
     if (existing !== undefined) return existing;
     const root = new pc.Entity(`vehicle:${row.vehicleId}`);
+    const body = this.bodies?.body(row) ?? null;
+    if (body !== null) {
+      root.addChild(body);
+      this.root.addChild(root);
+      const drawn = { root };
+      this.drawn.set(row.vehicleId, drawn);
+      return drawn;
+    }
     const { length, width, height } = row.dimensionsMm;
     for (const box of this.bodyBoxes(row.bodyFamily)) {
       const part = new pc.Entity(box.role);

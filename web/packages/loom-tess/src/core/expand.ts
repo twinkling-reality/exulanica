@@ -778,6 +778,11 @@ function faceFrameOf(facade: FacadeFields, context: ExpandContext, where: string
   if (building === undefined) throw new TessellationError(`${where} names a building the tile does not carry`);
   if (building.kind !== 'city.massing') throw new TessellationError(`${where} names ${building.kind} as its building`);
   const massing = building.fields as unknown as MassingFields;
+  return { massing, frame: facadeFrame(facade, massing, where) };
+}
+
+/** The tier edge a facade stands on and the heights its storeys sit at, from its building's massing. */
+export function facadeFrame(facade: FacadeFields, massing: MassingFields, where: string): FaceFrame {
   const tier = massing.tiers[facade.tier_ordinal];
   if (tier === undefined) throw new TessellationError(`${where} is laid out on a tier its building does not have`);
   const ring = tier.ring_mm;
@@ -785,10 +790,7 @@ function faceFrameOf(facade: FacadeFields, context: ExpandContext, where: string
   if (from === undefined) throw new TessellationError(`${where} is laid out on an edge its tier does not have`);
   const to = ring[(facade.edge_ordinal + 1) % ring.length]!;
   const heights = faceHeights(facade, massing, where);
-  return {
-    massing,
-    frame: { from, to, run: runOf(from, to, where), datum: massing.base_elevation_mm, base: heights.base, top: heights.top },
-  };
+  return { from, to, run: runOf(from, to, where), datum: massing.base_elevation_mm, base: heights.base, top: heights.top };
 }
 
 /** The facade a record laid out on a face names, which the tile must carry for it to be drawn. */
