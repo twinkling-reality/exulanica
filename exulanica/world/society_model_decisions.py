@@ -39,6 +39,7 @@ from collections.abc import Mapping, Sequence
 from copy import deepcopy
 from typing import Any, Final
 
+from exulanica.world.deciders import receipt_from_outside
 from exulanica.world.role_decisions import DecisionDisposition
 from exulanica.world.society import SOCIETY_NAMESPACE, SocietyEvent, society_state_sha256
 from exulanica.world.society_decision_contract import (
@@ -206,10 +207,12 @@ def append_decision_events(
         person = people.get(disposition.subject_id)
         who = "Someone no longer here" if person is None else person["display_name"]
         provider = receipt["provider"]
+        outside = receipt_from_outside(receipt)
         order = len(result)
         event_document = {
             "summary": (
-                f"{who} (simulated): the model's decision was "
+                f"{who} (simulated): the {'outside program' if outside else 'model'}'s "
+                f"decision was "
                 f"{disposition.disposition}; {disposition.reason.replace('_', ' ')}."
             ),
             "synthetic": True,
@@ -229,14 +232,14 @@ def append_decision_events(
             "motion_path_mm": None if person is None else deepcopy(person["motion_path_mm"]),
             "previous_state_sha256": previous_digest,
             "seed_sha256": previous_state["seed_sha256"],
-            "origin": "model",
+            "origin": "external" if outside else "model",
             "decision_seq": disposition.decision_seq,
             "request_id": disposition.request_id,
             "decision_sha256": disposition.decision_sha256,
             "disposition": disposition.disposition,
             "model": (
                 None
-                if provider is None
+                if provider is None or outside
                 else {"provider": provider["provider"], "model_id": provider["model_id"]}
             ),
             "chose": None if receipt["proposal"] is None else receipt["proposal"]["label"],

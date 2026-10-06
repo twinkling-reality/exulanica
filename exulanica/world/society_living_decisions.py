@@ -36,6 +36,7 @@ from copy import deepcopy
 from dataclasses import dataclass, field
 from typing import Any, Final
 
+from exulanica.world.deciders import receipt_from_outside
 from exulanica.world.decision_roles import DecisionContract, DecisionRole
 from exulanica.world.role_decisions import DecisionDisposition, written_messages
 from exulanica.world.society import SOCIETY_NAMESPACE, SocietyEvent, society_state_sha256
@@ -379,10 +380,12 @@ def living_decision_events(
         person = people.get(disposition.subject_id)
         role = "person" if person is None or person["role"] is None else person["role"]["label"]
         provider = receipt["provider"]
+        outside = receipt_from_outside(receipt)
         order = len(result)
         event_document = {
             "summary": (
-                f"A {role} (simulated): the model's decision was "
+                f"A {role} (simulated): the {'outside program' if outside else 'model'}'s "
+                f"decision was "
                 f"{disposition.disposition}; {disposition.reason.replace('_', ' ')}."
             ),
             "synthetic": True,
@@ -401,14 +404,14 @@ def living_decision_events(
             "motion_path_mm": None if person is None else deepcopy(person["motion_path_mm"]),
             "previous_state_sha256": previous_digest,
             "seed_sha256": previous_state["seed_sha256"],
-            "origin": "model",
+            "origin": "external" if outside else "model",
             "decision_seq": disposition.decision_seq,
             "request_id": disposition.request_id,
             "decision_sha256": disposition.decision_sha256,
             "disposition": disposition.disposition,
             "model": (
                 None
-                if provider is None
+                if provider is None or outside
                 else {"provider": provider["provider"], "model_id": provider["model_id"]}
             ),
             "chose": None if receipt["proposal"] is None else receipt["proposal"]["label"],

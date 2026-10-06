@@ -1009,6 +1009,34 @@
       "reason": "Why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py)."
     },
     {
+      "key": "decision_reason.decider_disconnected",
+      "kind": "decision_reason",
+      "code": "decider_disconnected",
+      "words": "the program that decides for them was not connected",
+      "reason": "Authored: why a person's decider was or was not followed when an outside program decides for them under its grant, said after 'because' of the reason code a decision receipt records (GENERIC_REASONS in exulanica/world/decision_roles.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.no_answer_in_time",
+      "kind": "decision_reason",
+      "code": "no_answer_in_time",
+      "words": "the program that decides for them did not answer in time",
+      "reason": "Authored: why a person's decider was or was not followed when an outside program decides for them under its grant, said after 'because' of the reason code a decision receipt records (GENERIC_REASONS in exulanica/world/decision_roles.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.grant_revoked",
+      "kind": "decision_reason",
+      "code": "grant_revoked",
+      "words": "the world's owner withdrew that program's permission to decide for them",
+      "reason": "Authored: why a person's decider was or was not followed when an outside program decides for them under its grant, said after 'because' of the reason code a decision receipt records (GENERIC_REASONS in exulanica/world/decision_roles.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.grant_expired",
+      "kind": "decision_reason",
+      "code": "grant_expired",
+      "words": "that program's permission to decide for them had run out",
+      "reason": "Authored: why a person's decider was or was not followed when an outside program decides for them under its grant, said after 'because' of the reason code a decision receipt records (GENERIC_REASONS in exulanica/world/decision_roles.py), in the words the People panel uses."
+    },
+    {
       "key": "doing.living_idle",
       "kind": "doing",
       "code": "living_idle",

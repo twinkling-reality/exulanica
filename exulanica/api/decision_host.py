@@ -24,7 +24,7 @@ import logging
 import threading
 import time
 import uuid
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
 from decimal import Decimal
@@ -33,8 +33,10 @@ from typing import Any, Final, TypeVar
 
 import psycopg
 
+from exulanica.api.external_asking import REFUSALS_BEFORE_ASKING, ExternalAsker
 from exulanica.api.society_runtime import SocietyRuntime
 from exulanica.db.session import Database
+from exulanica.epistemics.saved_names import SavedName, recognised_spans, saved_names
 from exulanica.errors import PrivacyAdmissionError
 from exulanica.models.budget import BudgetGuard
 from exulanica.models.choice import ChoiceRefused
@@ -54,6 +56,7 @@ from exulanica.models.spending import SpendingRefused
 from exulanica.models.usage import CallUsage, usd_string
 from exulanica.selection.calls import CallLog
 from exulanica.selection.validation import Session
+from exulanica.world.deciders import check_external_config
 from exulanica.world.decision_roles import (
     GENERIC_REASONS,
     DecisionContract,
@@ -61,6 +64,7 @@ from exulanica.world.decision_roles import (
     RoleOption,
     decision_roles,
 )
+from exulanica.world.role_decisions import check_role_result
 from exulanica.world.society import asked_again_after_a_race, society_state_sha256
 from exulanica.world.society_controls import LEASE_SECONDS, ControlClaim
 from exulanica.world.society_decision_repository import SocietyDecisionRepository
@@ -71,6 +75,7 @@ __all__ = [
     "HOST_REFUSALS",
     "MODEL_REFUSALS",
     "DecisionHost",
+    "OutsideAsk",
     "RoleAsk",
     "answer_tokens",
     "ask",
@@ -79,6 +84,8 @@ __all__ = [
     "hour_refusal",
     "model_refusal",
     "offered_providers",
+    "outside_context_sendable",
+    "outside_sendable_labels",
     "question_refusal",
     "sendable_labels",
     "share_kept",
@@ -112,6 +119,18 @@ MODEL_REFUSALS: Final = frozenset(
 #: What the log says when an ask ends in an error nothing names: the error's class, and nothing
 #: of its text.
 _ASK_FAILED: Final = "A %s decision ask failed with %s; the world decides that turn"
+#: The most outside programs asked at once in one minute: each ask waits on its door for at most
+#: its deadline, so this bounds the host's threads, not the number of subjects asked.
+_OUTSIDE_ASKS_AT_ONCE: Final = 16
+#: What a door states about the program it serves when a request is reserved: everything a request
+#: records of it but the contract, which the host adds.
+_DOOR_STATES: Final = frozenset(
+    {"kind", "bridge", "grant_id", "grant_seq", "mapping_sha256", "deadline_ms"}
+)
+#: What a door's answer states: what a receipt records of any answer.
+_ANSWER_KEYS: Final = frozenset({"status", "reason", "proposal", "provider"})
+#: The statuses a door may answer with; ``stale`` is the host's to record, never a program's.
+_ANSWER_STATUSES: Final = frozenset({"accepted", "rejected", "unavailable"})
 
 
 def _error_class(exc: BaseException) -> str:
@@ -316,6 +335,64 @@ def sendable_labels(
     return frozenset(label for label, keep in zip(labels, kept[1:], strict=True) if keep)
 
 
+def outside_sendable_labels(
+    names: Sequence[SavedName], role: DecisionRole, labels: Sequence[str]
+) -> frozenset[str] | None:
+    """The labels an outside program may be sent as they are, judged with ``role``'s fixed
+    description: none of them may carry a name the account holder saved, of any kind, since no
+    right releases a name to a program outside the policy boundary; None when the description
+    itself carries one, and then nobody is asked it."""
+    if recognised_spans(role.choice_description, names):
+        return None
+    return frozenset(label for label in labels if not recognised_spans(label, names))
+
+
+def _texts(value: object) -> Iterator[str]:
+    """Every text a JSON value states, its objects' keys included."""
+    if isinstance(value, str):
+        yield value
+    elif isinstance(value, Mapping):
+        for key, held in value.items():
+            yield str(key)
+            yield from _texts(held)
+    elif isinstance(value, list | tuple):
+        for held in value:
+            yield from _texts(held)
+
+
+def outside_context_sendable(names: Sequence[SavedName], context: Mapping[str, Any]) -> bool:
+    """Whether a request's whole context may be sent to an outside program as it is: no text in
+    any of its fields carries a name the account holder saved. A model's request passes the
+    policy boundary, which redacts; an outside program's passes none, so one that would carry a
+    name is not sent at all."""
+    return not any(recognised_spans(text, names) for text in _texts(context))
+
+
+def _door_statement(
+    contract: DecisionContract,
+    described: Mapping[str, Any],
+    told: object,
+    refusal: object,
+) -> tuple[dict[str, Any], str | None]:
+    """A door's statement about the program a choice names, held to its one shape, with the
+    contract the host adds, and the refusal it may give before asking; or ValueError."""
+    if not isinstance(told, Mapping) or set(told) != _DOOR_STATES:
+        raise ValueError(f"a door states exactly {sorted(_DOOR_STATES)}")
+    config = {**told, "contract": contract.binding()}
+    check_external_config(config)
+    if config["deadline_ms"] > contract.value("decision_deadline_ms"):
+        raise ValueError("a door's deadline outlasts the contract's")
+    if (config["bridge"], config["grant_id"]) != (described["bridge"], described["grant_id"]):
+        raise ValueError("a door stated another program than the choice names")
+    if refusal is not None and refusal not in REFUSALS_BEFORE_ASKING:
+        raise ValueError("a door refused an ask for a reason it may not give")
+    return dict(config), None if refusal is None else str(refusal)
+
+
+class _NotSendable(Exception):
+    """A reserved request whose context would carry a saved name: undone, and nobody asked."""
+
+
 def _only(labels: frozenset[str]) -> Callable[[Sequence[RoleOption]], list[RoleOption]]:
     """The options whose labels were judged sendable; one the judgement did not see is left out."""
 
@@ -345,6 +422,21 @@ class RoleAsk:
     request: dict[str, Any]
     spec: ModelSpec
     mechanism: AnsweringMechanism
+
+
+@dataclass(frozen=True, slots=True)
+class OutsideAsk:
+    """One reserved request an outside program is asked, under the role it is asked for: all its
+    door needs, and no connection. It is asked by the sooner of its door's own deadline from the
+    moment it is asked and ``latest``, the end the playback lease leaves its role's asks."""
+
+    role: DecisionRole
+    request: dict[str, Any]
+    deadline_ms: int
+    latest: float
+
+    def ends_at(self, now: float) -> float:
+        return min(now + self.deadline_ms / 1000, self.latest)
 
 
 def ask(
@@ -491,11 +583,14 @@ def world_hour(
     connection: psycopg.Connection, workspace_id: uuid.UUID, world_id: str, role: DecisionRole
 ) -> tuple[int, Decimal]:
     """How many of ``role``'s decisions this world asked of models in the last hour, and their
-    cost."""
+    cost. An outside program's answers are not counted: they spend nothing, and their own grant
+    bounds how often they are asked."""
     row = connection.execute(
-        "select count(*) filter (where d.document->'provider' <> 'null'::jsonb) as asked,"
+        "select count(*) filter (where d.document->'provider' <> 'null'::jsonb "
+        "and d.document->'provider'->>'kind' is null) as asked,"
         "coalesce(sum((d.document->'provider'->>'cost_usd')::numeric) "
-        "filter (where d.document->'provider' <> 'null'::jsonb),0) as spent "
+        "filter (where d.document->'provider' <> 'null'::jsonb "
+        "and d.document->'provider'->>'kind' is null),0) as spent "
         "from world_society_decision d join world_society s using(workspace_id,society_id) "
         "where d.workspace_id=%s and s.world_id=%s "
         "and d.document->>'profile'=%s "
@@ -525,10 +620,13 @@ class DecisionHost:
 
     ``workspaces`` are the ones the host's environment lists (``EXULANICA_SOCIETY_CONTROL_
     WORKSPACES``): no other workspace's subjects are asked for, whatever its owner chose.
-    ``client`` is the process's model client, or ``None`` with no credential, in which case
-    nothing is asked or written. ``policy_for`` attaches the workspace's rules to each ask. The
-    roles are the registry's (:func:`~exulanica.world.decision_roles.decision_roles`), the one
-    every reader of a role's documents asks.
+    ``client`` is the process's model client, or ``None`` with no credential, in which case no
+    model is asked and nothing is written for a subject a model runs. ``policy_for`` attaches the
+    workspace's rules to each ask. ``external`` is the outside programs' door the application
+    registers, or ``None``, in which case no outside program is asked and nothing is written for
+    a subject one decides for; it needs no model client. The roles are the registry's
+    (:func:`~exulanica.world.decision_roles.decision_roles`), the one every reader of a role's
+    documents asks.
     """
 
     database: Database
@@ -538,6 +636,7 @@ class DecisionHost:
     policy_for: Callable[[uuid.UUID], HostedRequestPolicy]
     manifest: Manifest
     manifest_sha256: str
+    external: ExternalAsker | None = None
 
     def before_minute(self, claim: ControlClaim, lease_ends: float) -> bool:
         """Ask every chosen subject at a choice point; True when the coming minute runs alone.
@@ -547,7 +646,8 @@ class DecisionHost:
         True whenever this host may ask for somebody in this world, asked this minute or not, so
         the claim advances one minute and no later choice point of theirs passes unasked. False
         when it asks for nobody here (an unlisted workspace, no chosen subject, or a host
-        refusal): the claim advances as it would with no model.
+        refusal): the claim advances as it would with no model. A subject an outside program
+        decides for is asked through ``external``, beside the models, with no model client.
         """
         if claim.workspace_id not in self.workspaces:
             return False
@@ -562,19 +662,24 @@ class DecisionHost:
             row = society._row(claim.version_id)
             if row is None:
                 return False
-            asking_roles = []
+            chosen_roles = []
             choice_repository = SocietyModelChoiceRepository(
                 connection, claim.workspace_id, world_id=claim.world_id
             )
             for role in decision_roles().hosted_by(row["engine_version"]):
                 choices = choice_repository.current(claim.version_id, role)
                 chosen = {subject: c for subject, c in choices.items() if c["model"]}
-                if chosen:
-                    asking_roles.append((role, role.contract(), chosen))
-            if not asking_roles:
+                outside = {
+                    subject: c
+                    for subject, c in choices.items()
+                    if c["decider"]["kind"] == "external" and self.external is not None
+                }
+                if chosen or outside:
+                    chosen_roles.append((role, role.contract(), chosen, outside))
+            if not chosen_roles:
                 return False
             decisions = SocietyDecisionRepository(society)
-            for role, _contract, _chosen in asking_roles:
+            for role, _contract, _chosen, _outside in chosen_roles:
                 for request_id in decisions.unanswered_requests(role, claim.version_id):
 
                     def close(request_id: uuid.UUID = request_id) -> None:
@@ -583,24 +688,70 @@ class DecisionHost:
 
                     _once_more_after_a_race(close)
             client = self.client
-            if client is None:
-                return False
             asking_roles = [
                 (role, contract, chosen)
-                for role, contract, chosen in asking_roles
-                if host_refusal(role, client, self.manifest, contract) is None
+                for role, contract, chosen, _outside in chosen_roles
+                if chosen
+                and client is not None
+                and host_refusal(role, client, self.manifest, contract) is None
             ]
-            if not asking_roles:
+            outside_roles = [
+                (role, contract, outside)
+                for role, contract, _chosen, outside in chosen_roles
+                if outside
+            ]
+            if not asking_roles and not outside_roles:
                 return False
             planned = []
             for role, contract, chosen in asking_roles:
+                assert client is not None
                 due = self._due(role, contract, chosen, row["state"], client)
                 if due:
                     planned.append((role, contract, lease_ends, due))
-            if not planned:
+            outside_planned = []
+            for role, contract, outside in outside_roles:
+                present = set(role.adapter.subjects(row["state"]))
+                due_outside = [
+                    subject
+                    for subject in sorted(outside)
+                    if subject in present and role.adapter.due(row["state"], subject)
+                ]
+                if due_outside:
+                    outside_planned.append((role, contract, due_outside, outside))
+            if not planned and not outside_planned:
                 return True
             # Asked under the workspace's own rules, which also decide what may be offered.
-            asking = client.with_policy(self.policy_for(claim.workspace_id))
+            asking = (
+                None
+                if client is None or not planned
+                else client.with_policy(self.policy_for(claim.workspace_id))
+            )
+            # Outside programs' requests are reserved first, each door's statement waited for no
+            # later than its role's asks may end, so no door's time is taken from a model's ask
+            # window, which is set after its own reservation below.
+            outside_reserved = []
+            for role, contract, due_outside, outside in outside_planned:
+                if self._ends_at(contract, lease_ends) <= time.monotonic():
+                    continue
+                try:
+                    outside_asks, outside_refused = self._outside_reserved(
+                        connection,
+                        claim,
+                        society,
+                        decisions,
+                        row,
+                        role,
+                        contract,
+                        due_outside,
+                        outside,
+                        lease_ends,
+                    )
+                except Exception as exc:
+                    _LOG.error(
+                        "A %s outside reservation failed with %s", role.key, _error_class(exc)
+                    )
+                    continue
+                outside_reserved.append((outside_asks, outside_refused))
             # Each role's requests are reserved in a transaction of its own, asked again on its
             # own after a race: another role's committed reservations are never read again, where
             # an existing request is not fresh and would go unasked.
@@ -610,6 +761,7 @@ class DecisionHost:
                 # after reservation, so time spent reserving cannot borrow another role's time.
                 if self._ends_at(contract, lease_ends) <= time.monotonic():
                     continue
+                assert asking is not None and client is not None
                 try:
                     sendable = _once_more_after_a_race(
                         lambda role=role, contract=contract, due=due: self._judged(
@@ -626,6 +778,7 @@ class DecisionHost:
                     due: list = due,
                     sendable: dict = sendable,
                 ) -> tuple[list[RoleAsk], list[tuple[uuid.UUID, dict[str, Any]]]]:
+                    assert client is not None
                     return self._reserved(
                         connection, claim, decisions, row, role, contract, due, sendable, client
                     )
@@ -639,8 +792,9 @@ class DecisionHost:
                     continue
                 ends_at = self._ends_at(contract, lease_ends)
                 reserved.append((contract, ends_at, asks, refused))
-        # No connection from the reservations survives here: the models are asked without one.
-        result_groups = self._asked_by_every_role(asking, reserved)
+        # No connection from the reservations survives here: models and outside programs are
+        # asked without one.
+        result_groups = self._asked_by_every_role(asking, reserved, claim, outside_reserved)
         for role_results in result_groups:
             try:
                 with self.database.session(claim.workspace_id) as connection:
@@ -668,13 +822,159 @@ class DecisionHost:
                                 )
 
                         # An answer a model was paid for is recorded: asked again after a race,
-                        # and on the last try recorded as decision_sources_unavailable.
-                        asked_again_after_a_race(finish)
+                        # and on the last try recorded as decision_sources_unavailable. One
+                        # answer that cannot be recorded costs its own subject alone; the next
+                        # minute closes its request as unanswered.
+                        try:
+                            asked_again_after_a_race(finish)
+                        except psycopg.OperationalError:
+                            raise
+                        except Exception as exc:
+                            _LOG.error("A decision recording failed with %s", _error_class(exc))
             except Exception as exc:
-                # A broken connection or a role-specific recording fault cannot drop another
-                # role's answers. Open its own session for the next role.
+                # A broken connection cannot drop another role's answers. Open its own session
+                # for the next role.
                 _LOG.error("A decision recording failed with %s", _error_class(exc))
         return True
+
+    def _outside_reserved(
+        self,
+        connection: psycopg.Connection,
+        claim: ControlClaim,
+        society: SocietyRepository,
+        decisions: SocietyDecisionRepository,
+        row: dict[str, Any],
+        role: DecisionRole,
+        contract: DecisionContract,
+        due: Sequence[str],
+        outside: Mapping[str, Mapping[str, Any]],
+        lease_ends: float,
+    ) -> tuple[list[OutsideAsk], list[tuple[uuid.UUID, dict[str, Any]]]]:
+        """``role``'s requests of outside programs for this minute: each due subject's request,
+        reserved over the options the account holder's saved names leave sendable, with what its
+        door states about the program; a subject its door refuses before asking is answered at
+        once with that refusal, and the rest are asked. Nothing is reserved for a question a saved
+        name would change, and a subject is left unasked this minute, the routine deciding, when
+        its door's statement is malformed or comes after its role's asks must end, or when any
+        text of its request would carry a saved name."""
+        names = saved_names(connection, claim.workspace_id)
+        latest = society._chain(row)
+        document = society._inputs(row, [latest])[latest]
+        labels = sorted(
+            {
+                option.label
+                for subject in due
+                for option in role.adapter.options(
+                    role, row["state"], document, subject, contract, seed=row["seed"]
+                )
+            }
+        )
+        sendable = outside_sendable_labels(names, role, labels)
+        if sendable is None:
+            return [], []
+        stated = self._stated(
+            claim, role, contract, due, outside, self._ends_at(contract, lease_ends)
+        )
+
+        def reserve() -> tuple[list[OutsideAsk], list[tuple[uuid.UUID, dict[str, Any]]]]:
+            asks: list[OutsideAsk] = []
+            refused: list[tuple[uuid.UUID, dict[str, Any]]] = []
+            with connection.transaction():
+                for subject in due:
+                    if subject not in stated:
+                        continue
+                    config, refusal = stated[subject]
+                    try:
+                        # A savepoint: a request that would carry a saved name is undone alone.
+                        with connection.transaction():
+                            reserved, fresh = decisions.prepare_role(
+                                role,
+                                claim.version_id,
+                                request_id=uuid.uuid5(
+                                    claim.society_id,
+                                    f"{role.subject}-decision:{subject}:{row['current_tick']}",
+                                ),
+                                subject_id=uuid.UUID(subject),
+                                base_tick=row["current_tick"],
+                                base_state_sha256=row["state_sha256"],
+                                contract=contract,
+                                provider_config=config,
+                                offer=_only(sendable),
+                            )
+                            request = reserved["request"]
+                            if (
+                                fresh
+                                and request is not None
+                                and refusal is None
+                                and not outside_context_sendable(names, request["context"])
+                            ):
+                                raise _NotSendable
+                    except _NotSendable:
+                        continue
+                    if not fresh or request is None:
+                        continue
+                    request_id = uuid.UUID(request["request_id"])
+                    if refusal is not None:
+                        refused.append((request_id, _refused(refusal)))
+                        continue
+                    asks.append(
+                        OutsideAsk(
+                            role, request, config["deadline_ms"], self._latest(contract, lease_ends)
+                        )
+                    )
+            return asks, refused
+
+        return _once_more_after_a_race(reserve)
+
+    def _stated(
+        self,
+        claim: ControlClaim,
+        role: DecisionRole,
+        contract: DecisionContract,
+        due: Sequence[str],
+        outside: Mapping[str, Mapping[str, Any]],
+        ends_at: float,
+    ) -> dict[str, tuple[dict[str, Any], str | None]]:
+        """What each due subject's door states about its program, asked at once with no lock
+        held and waited for no later than ``ends_at``. A statement that is malformed, names
+        another program, gives a deadline past the contract's, raises or comes late leaves its own
+        subject unasked this minute, and no other."""
+        external = self.external
+        assert external is not None
+        if not due or ends_at <= time.monotonic():
+            return {}
+        pool = ThreadPoolExecutor(max_workers=min(len(due), _OUTSIDE_ASKS_AT_ONCE))
+        try:
+            futures = [
+                (
+                    subject,
+                    pool.submit(
+                        external.configuration,
+                        claim.workspace_id,
+                        claim.world_id,
+                        subject,
+                        outside[subject]["decider"],
+                    ),
+                )
+                for subject in due
+            ]
+            stated: dict[str, tuple[dict[str, Any], str | None]] = {}
+            for subject, future in futures:
+                try:
+                    told, refusal = future.result(timeout=max(0.0, ends_at - time.monotonic()))
+                    stated[subject] = _door_statement(
+                        contract, outside[subject]["decider"], told, refusal
+                    )
+                except TimeoutError:
+                    _LOG.error("A %s door stated nothing before its asks had to end", role.key)
+                except Exception as exc:
+                    _LOG.error(
+                        "A %s door's statement was refused with %s", role.key, _error_class(exc)
+                    )
+            return stated
+        finally:
+            # A door that does not return in time is not waited for: its statement is dropped.
+            pool.shutdown(wait=False, cancel_futures=True)
 
     def _due(
         self,
@@ -796,17 +1096,94 @@ class DecisionHost:
 
     def _asked_by_every_role(
         self,
-        client: ModelClient,
+        client: ModelClient | None,
+        reserved: Sequence[
+            tuple[DecisionContract, float, list[RoleAsk], list[tuple[uuid.UUID, dict[str, Any]]]]
+        ],
+        claim: ControlClaim | None = None,
+        outside: Sequence[tuple[list[OutsideAsk], list[tuple[uuid.UUID, dict[str, Any]]]]] = (),
+    ) -> list[list[tuple[uuid.UUID, dict[str, Any]]]]:
+        """Every role's asks at once, each by its own deadline, so no role waits for another's;
+        then each role's results, refusals first, in the order its requests were reserved: the
+        models' groups first, then the outside programs' groups, which their own threads ask
+        beside the models' with no model client."""
+        outside_asks = [asked for asks, _refused in outside for asked in asks]
+        outside_futures: list[tuple[float, Future[dict[str, Any]]]] = []
+        outside_pool = (
+            ThreadPoolExecutor(max_workers=min(len(outside_asks), _OUTSIDE_ASKS_AT_ONCE))
+            if outside_asks
+            else None
+        )
+        try:
+            if outside_pool is not None:
+                assert claim is not None
+                now = time.monotonic()
+                for asked in outside_asks:
+                    ends_at = asked.ends_at(now)
+                    outside_futures.append(
+                        (ends_at, outside_pool.submit(self._outside_answer, claim, asked, ends_at))
+                    )
+            results = DecisionHost._models_asked(client, reserved)
+            answered = iter(outside_futures)
+            for asks, refused in outside:
+                group = list(refused)
+                for asked in asks:
+                    ends_at, future = next(answered)
+                    try:
+                        result = future.result(timeout=max(0.0, ends_at - time.monotonic()))
+                    except TimeoutError:
+                        result = _refused("no_answer_in_time")
+                    except Exception as exc:
+                        _LOG.error("An outside decision ask failed with %s", _error_class(exc))
+                        result = _refused("decider_disconnected")
+                    group.append((uuid.UUID(asked.request["request_id"]), result))
+                results.append(group)
+            return results
+        finally:
+            if outside_pool is not None:
+                # A door that ignores its deadline is not waited for: its late answer is dropped.
+                outside_pool.shutdown(wait=False, cancel_futures=True)
+
+    def _outside_answer(
+        self, claim: ControlClaim, asked: OutsideAsk, ends_at: float
+    ) -> dict[str, Any]:
+        """An outside program's answer through its door, held to what a receipt records of it:
+        one offered label or none, for a reason the role records, with the program's own record.
+        ``no_answer_in_time`` when no time was left to ask or the answer came after ``ends_at``;
+        ``decider_disconnected`` when the answer is not one a receipt may record, so a malformed
+        answer costs its own subject alone."""
+        external = self.external
+        assert external is not None
+        if ends_at <= time.monotonic():
+            return _refused("no_answer_in_time")
+        answered = external.answer(claim.workspace_id, claim.world_id, asked.request, ends_at)
+        if time.monotonic() > ends_at:
+            return _refused("no_answer_in_time")
+        try:
+            if not isinstance(answered, Mapping) or set(answered) != _ANSWER_KEYS:
+                raise ValueError("an answer states exactly status, reason, proposal and provider")
+            result = dict(answered)
+            if result["status"] not in _ANSWER_STATUSES:
+                raise ValueError("an answer is accepted, rejected or unavailable")
+            check_role_result(asked.role, result, asked.request)
+        except Exception as exc:
+            _LOG.error("A %s outside answer was refused with %s", asked.role.key, _error_class(exc))
+            return _refused("decider_disconnected")
+        return result
+
+    @staticmethod
+    def _models_asked(
+        client: ModelClient | None,
         reserved: Sequence[
             tuple[DecisionContract, float, list[RoleAsk], list[tuple[uuid.UUID, dict[str, Any]]]]
         ],
     ) -> list[list[tuple[uuid.UUID, dict[str, Any]]]]:
-        """Every role's asks at once, each by its own deadline, so no role waits for another's;
-        then each role's results, refusals first, in the order its requests were reserved."""
+        """Every role's model asks at once, each by its own deadline; then each role's results,
+        refusals first, in the order its requests were reserved."""
         # One executor bounds calls across all roles. The first pass gives each role a slot
         # before any role's second ask, so a slow role cannot consume the entire pool first.
         active = [item for item in reserved if item[2]]
-        if not active:
+        if not active or client is None:
             return [list(refused) for _contract, _ends_at, _asks, refused in reserved]
         process_limit = max(
             len(active), max(contract.value("concurrent_calls_maximum") for contract, *_ in active)
@@ -871,11 +1248,15 @@ class DecisionHost:
     def _ends_at(contract: DecisionContract, lease_ends: float) -> float:
         """When every ask of a role this minute ends: the contract's deadline from now, and never
         later than the lease leaves the minute to commit in."""
-        commit_room = LEASE_SECONDS - contract.value("decision_deadline_ms") / 1000
         return min(
             time.monotonic() + contract.value("decision_deadline_ms") / 1000,
-            lease_ends - commit_room,
+            DecisionHost._latest(contract, lease_ends),
         )
+
+    @staticmethod
+    def _latest(contract: DecisionContract, lease_ends: float) -> float:
+        """The latest any ask of a role may end: what the lease leaves the minute to commit in."""
+        return lease_ends - (LEASE_SECONDS - contract.value("decision_deadline_ms") / 1000)
 
     def _ask(
         self,

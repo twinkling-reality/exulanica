@@ -56,6 +56,7 @@ export const CHOICE_REFUSAL_WORDS: Readonly<Record<string, string>> = {
   too_many_model_people: 'That would put more people under models than this world allows.',
   choice_key_reused: 'That choice was already sent with different people. Choose again.',
   subject_chosen_under_another_role: 'That subject is already assigned to a model under another kind of decision.',
+  decided_from_outside: 'Someone you chose came into this world from outside, and the program they came with decides for them.',
 };
 
 const decisionWords = (code: string): string =>

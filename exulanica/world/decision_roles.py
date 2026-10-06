@@ -157,6 +157,13 @@ GENERIC_REASONS: Final = frozenset(
         "provider_configuration_changed",
         # When the minute consumes it: a second receipt for a subject already decided.
         "subject_already_decided",
+        # An outside program asked for a subject under its grant gave no usable answer: its door
+        # had no live connection, it did not answer by the deadline, or the grant was revoked or
+        # had expired (exulanica.world.deciders.EXTERNAL_REASONS).
+        "decider_disconnected",
+        "no_answer_in_time",
+        "grant_revoked",
+        "grant_expired",
     }
 )
 #: The shape of each profile a role's documents carry, the shapes migration 0117 admits by the
@@ -174,6 +181,8 @@ _CATALOG_ID: Final = re.compile(r"[a-z][a-z0-9-]*")
 _PROMPT_VERSION: Final = re.compile(r"[a-z][a-z0-9-]*/v[1-9][0-9]{0,5}")
 #: Prompt text is instruction written for a model: printable ASCII, one line, bounded.
 _PROMPT_TEXT: Final = re.compile(r"[ -~]{1,2000}")
+#: A profile's version as every profile pattern spells it: a whole number with no leading zero.
+_VERSION_TEXT: Final = re.compile(r"[1-9][0-9]{0,5}")
 _PLACEHOLDER: Final = re.compile(r"\{([a-z_]+)\}")
 #: The code an adapter module must hold, each by the name the generic path calls it by.
 _ADAPTER_NAMES: Final = (
@@ -398,6 +407,17 @@ class DecisionRole:
     def hosted_by(self, engine: str) -> bool:
         return engine in self.engines
 
+    def reads_choice(self, profile: str) -> bool:
+        """Whether a choice of ``profile`` is this role's: the profile a new choice records, or an
+        earlier version of it, which a role keeps reading after its new choices move on."""
+        name, _, newest = self.choice_profile.rpartition("/v")
+        stated, _, version = profile.rpartition("/v")
+        return (
+            stated == name
+            and _VERSION_TEXT.fullmatch(version) is not None
+            and int(version) <= int(newest)
+        )
+
     def contract(self, versions: Mapping[str, int] | None = None) -> DecisionContract:
         """The contract of these catalog versions; left out, the one a new request records."""
         chosen = dict(self.contract_versions if versions is None else versions)
@@ -444,7 +464,9 @@ class RoleRegistry:
         return self._by("receipt_profile", profile)
 
     def for_choice(self, profile: str) -> DecisionRole | None:
-        return self._by("choice_profile", profile)
+        """The role whose choices ``profile`` records, at the version a new choice records or an
+        earlier one; None when no registered role writes it."""
+        return next((role for role in self if role.reads_choice(profile)), None)
 
     def for_contract(self, binding: Mapping[str, Any]) -> DecisionRole:
         """The role a record's contract binding names: the one registered role whose contract,

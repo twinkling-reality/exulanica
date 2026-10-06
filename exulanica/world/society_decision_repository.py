@@ -17,6 +17,7 @@ from typing import Any, Final
 
 from psycopg.types.json import Jsonb
 
+from exulanica.world.deciders import EXTERNAL_REASONS, is_external
 from exulanica.world.decision_roles import (
     DecisionContract,
     DecisionRole,
@@ -43,6 +44,9 @@ from exulanica.world.society_repository import SocietyRepository
 
 #: What a role's receipt must say of the call to match its request: the model it asked, how.
 _ROLE_PROVENANCE = ("provider", "model_id", "mechanism", "prompt_version")
+#: What a receipt of an outside program's answer must say to match its request: the door, and the
+#: grant and mapping file it was asked under.
+_OUTSIDE_PROVENANCE = ("kind", "bridge", "grant_id", "grant_seq", "mapping_sha256")
 
 
 #: How many minutes back a claim looks for a role's request its host never answered: the
@@ -181,15 +185,31 @@ class SocietyDecisionRepository:
             validate_decision_receipt(receipt, request)
             asked, provider = request["provider_config"], receipt["provider"]
             call = provider or {}
+            outside = is_external(asked)
             decisions.append(
                 {
                     "decision_seq": receipt["decision_seq"],
                     "subject_id": receipt["subject_id"],
                     "base_tick": receipt["base_tick"],
                     "consumed_tick": value["tick"],
-                    "provider": asked["provider"],
-                    "model_id": asked["model_id"],
-                    "mechanism": asked["mechanism"],
+                    # Who was asked: a model, or an outside program under its grant, which no
+                    # model's name, mechanism or cost describes.
+                    "decider": (
+                        {
+                            "kind": "external",
+                            "bridge": asked["bridge"],
+                            "grant_id": asked["grant_id"],
+                        }
+                        if outside
+                        else {
+                            "kind": "model",
+                            "provider": asked["provider"],
+                            "model_id": asked["model_id"],
+                        }
+                    ),
+                    "provider": None if outside else asked["provider"],
+                    "model_id": None if outside else asked["model_id"],
+                    "mechanism": None if outside else asked["mechanism"],
                     "status": receipt["status"],
                     "reason": receipt["reason"],
                     "disposition": value["disposition"],
@@ -301,8 +321,11 @@ class SocietyDecisionRepository:
         read lock on its ``last_try``
         (``asked_again_after_a_race`` in :mod:`exulanica.world.society`): what the subject could
         see could not be read, and the request is closed rather than left in progress. A try
-        before the last raises the race, to be asked again.
+        before the last raises the race, to be asked again. A request an outside program did not
+        answer keeps an outside reason whatever else changed: its own, or
+        ``decider_disconnected``.
         """
+        answered_for = result["reason"]
         row = self._row(version_id)
         request = self._request(row, request_id)
         if request is None:
@@ -338,9 +361,14 @@ class SocietyDecisionRepository:
             ):
                 result = {**result, "status": "stale", "reason": "decision_context_changed"}
             elif result["status"] == "accepted":
+                provenance = (
+                    _OUTSIDE_PROVENANCE
+                    if is_external(request["provider_config"])
+                    else _ROLE_PROVENANCE
+                )
                 if result["provider"] is None or any(
                     result["provider"].get(key) != request["provider_config"][key]
-                    for key in _ROLE_PROVENANCE
+                    for key in provenance
                 ):
                     result = {
                         **result,
@@ -353,6 +381,16 @@ class SocietyDecisionRepository:
         if result["status"] != "accepted":
             # Only an accepted answer is kept as a proposal; the rest record why none applies.
             result = {**result, "proposal": None}
+        if is_external(request["provider_config"]) and result["provider"] is None:
+            # Nothing the program said is recorded, so its receipt, and the event its minute
+            # writes, say who was asked in the program's own terms.
+            result = {
+                **result,
+                "status": "unavailable",
+                "reason": answered_for
+                if answered_for in EXTERNAL_REASONS
+                else "decider_disconnected",
+            }
         return self._record_receipt(row, request, request_id, result)
 
     def unanswered_requests(self, role: DecisionRole, version_id: uuid.UUID) -> list[uuid.UUID]:
@@ -388,8 +426,9 @@ class SocietyDecisionRepository:
     def close_unanswered(self, version_id: uuid.UUID, request_id: uuid.UUID) -> dict:
         """Record that a role's request was never answered in the minute it was asked for.
 
-        Its receipt says so by name (``unanswered_in_its_minute``), and the next minute consumes
-        it like any other unaccepted receipt, so the history closes what was left open.
+        Its receipt says so by name (``unanswered_in_its_minute``; an outside program's,
+        ``no_answer_in_time``), and the next minute consumes it like any other unaccepted receipt,
+        so the history closes what was left open.
         """
         row = self._row(version_id)
         request = self._request(row, request_id)
@@ -400,7 +439,9 @@ class SocietyDecisionRepository:
             return existing
         result = {
             "status": "unavailable",
-            "reason": "unanswered_in_its_minute",
+            "reason": "no_answer_in_time"
+            if is_external(request["provider_config"])
+            else "unanswered_in_its_minute",
             "proposal": None,
             "provider": None,
         }

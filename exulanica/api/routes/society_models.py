@@ -62,7 +62,9 @@ PROFILE: Final = "exulanica.society-models/v1"
 DECISIONS_READ: Final = 2000
 #: A refusal of a choice answered with 409 rather than 422: the society or the key, not the body.
 #: ``/world/versions/{version_id}/models/{role_key}`` answers a choice of any role by this too.
-CHOICE_CONFLICTS: Final = frozenset({"engine_takes_no_model_choice", "choice_key_reused"})
+CHOICE_CONFLICTS: Final = frozenset(
+    {"engine_takes_no_model_choice", "choice_key_reused", "decided_from_outside"}
+)
 #: What the People panel shows: a society's people, so these routes serve the role that decides
 #: for them, as its registry entry names what it decides for.
 SUBJECT: Final = "person"
@@ -261,8 +263,11 @@ def society_models_view(
         return refusals[key]
 
     models = offered_models(role, services)
+    # What models decided: an outside program's decisions name no model, and are read by its own
+    # door's routes, not summarised here among the models'.
+    asked_models = [decision for decision in decisions if decision["decider"]["kind"] == "model"]
     latest: dict[str, dict[str, Any]] = {}
-    for decision in decisions:
+    for decision in asked_models:
         latest[decision["subject_id"]] = decision
     return {
         "profile": PROFILE,
@@ -313,7 +318,7 @@ def society_models_view(
         ],
         "by_model": [
             {**summary, "name": manifest.model_name(summary["model_id"])}
-            for summary in _by_model(decisions)
+            for summary in _by_model(asked_models)
         ],
         "decisions_read": {"counted": len(decisions), "maximum": DECISIONS_READ},
     }

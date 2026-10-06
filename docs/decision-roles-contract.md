@@ -5,28 +5,32 @@ for a traffic light at a town's junction. Each role has a data contract and an a
 owns the clock, state and persistent decisions for the subject it controls.
 
 A world's owner can hand some choices made in their world to an open model: which model decides
-for a person or a traffic light. This contract owns that path for every kind of thing a
-model may decide for, called a decision role: the role registry and what adding a role takes, the
-owner's choice of a model, the person role's contract, how the playback host asks a chosen model
-before a minute and what it may spend, what each decision does in its minute, and replay. The
+for a person or a traffic light. They can also hand a person to an outside program, such as a
+game's bridge, under a grant they issue. This contract owns that path for every kind of thing a
+decider may decide for, called a decision role: the role registry and what adding a role takes,
+who decides for a subject and the owner's choice of it, the person role's contract, how the
+playback host asks a chosen model or an outside program before a minute and what it may spend,
+what each decision does in its minute, and replay. The
 society's engines, routines, inputs and persistence are the
 [synthetic society contract](synthetic-society-contract.md)'s; running the same hour once per model
 and scoring it is [comparisons of models](society-experiments.md#comparisons-of-models)'s; which
 models exist and what they were measured to do is
 [model and service selection](model-and-service-selection.md)'s.
 
-In short: before each minute of a playing world, the host asks the chosen model what each of its
-people at a choice point does next, offering only what the world's own routine could start for
-them then. The model answers with one offered label. The answer is stored as a receipt, the minute
-checks it again and applies it or records why not, and replay applies the stored receipts without
-calling a model. With no choice recorded, nothing is asked or reserved and the routine decides.
+In short: before each minute of a playing world, the host asks the chosen model, or the outside
+program the owner granted, what each of its people at a choice point does next, offering only what
+the world's own routine could start for them then. The decider answers with one offered label. The
+answer is stored as a receipt, the minute checks it again and applies it or records why not, and
+replay applies the stored receipts without calling a model or the program. With no choice recorded,
+nothing is asked or reserved and the routine decides.
 
 <details>
 <summary>Sections</summary>
 
 - [Roles as data](#roles-as-data)
 - [Adding a role](#adding-a-role)
-- [The owner's choice](#the-owners-choice)
+- [Who decides: deciders and the owner's choice](#who-decides-deciders-and-the-owners-choice)
+- [An outside program deciding](#an-outside-program-deciding)
 - [The person's contract](#the-persons-contract)
 - [The host's decision phase](#the-hosts-decision-phase)
 - [Spend](#spend)
@@ -40,7 +44,7 @@ calling a model. With no choice recorded, nothing is asked or reserved and the r
 
 A decision role is a kind of thing in a world that changes and chooses at choice points of its own,
 whose choices a world's owner may hand to an open model. Each role is one entry of the registry
-catalog `assets/catalogs/roles/decision-roles.v2.json`, read at its newest version by
+catalog `assets/catalogs/roles/decision-roles.v3.json`, read at its newest version by
 `exulanica/world/decision_roles.py`. An entry states, with a licence and a reason like every catalog
 entry:
 
@@ -56,6 +60,10 @@ entry:
 | `subjects_bound` | The policy key bounding how many of its subjects models run at once |
 | `request_profile`, `receipt_profile`, `choice_profile`, `context_profile` | The profiles of its documents |
 | `prompt_version`, `instruction`, `choice_description`, `not_offered` | Its prompt: the one instruction, how the one choice is described, and what a model is told when its answer was not offered |
+
+A role reads its owner's choices at the profile its entry states, which a new choice records, and
+at every earlier version of that profile, so a choice recorded before its role's choices moved on
+is still read (`DecisionRole.reads_choice`).
 
 The adapter defines which of its subjects are at a choice point
 (`subjects`, `due`), their options and what a model reads (`options`, `context`,
@@ -153,38 +161,118 @@ What a role in a world also needs:
   others' requests asked in their minute (`tests/test_decision_host_roles_postgres.py`, with two
   roles made from the person's adapter under other keys).
 
-## The owner's choice
+## Who decides: deciders and the owner's choice
+
+A **decider** is what chooses a subject's next action. Its descriptor, `exulanica.decider/v1`
+(`exulanica/world/deciders.py`), is one of four closed shapes:
+
+| Descriptor | Who decides |
+| --- | --- |
+| `{"kind": "routine"}` | the world's own rules |
+| `{"kind": "model", "provider", "model_id"}` | an open model the manifest declares |
+| `{"kind": "person"}` | the world's owner, through a direct request, which supersedes any bound decider's answer in its minute and is never a binding of its own |
+| `{"kind": "external", "bridge", "grant_id"}` | an outside program, by its bridge's key, under a grant the world's owner issued; which game, adapter version and mapping file it answers with are the grant's and each receipt's |
+
+A subject's decider is the latest choice naming it, and a society with no choice is run by its
+rules alone. Choices are appended in order to `world_society_model_choice` (migration 0110), each
+naming who made it, and are never changed. From the registry's third version a choice records its
+decider under the role's choice profile `exulanica.society-model-choice/v2`; a choice of the first
+profile names `model`, a model or none, and is still read as the model it names or the routine
+(migration 0146 admits exactly one of the two fields). Every read of a choice gives its `decider` and
+the `model` it names, none for the routine and for an outside program, so whatever asks which model
+runs somebody, spending among it, reads the answer it always did.
 
 `POST /world/versions/{version_id}/society/models?world_id=W` records one choice,
 `{idempotency_key, people: [subject_id, ...], model: {provider, model_id} | null}`, for one person or
-a group; a null model is their own routine. It requires `world.write` and `model.invoke`, which in a
-browser only the workspace's owner holds, because a choice commits the world's host to asking the
-model. Choices are appended in order to `world_society_model_choice` (migration 0110) under the
-role's choice profile (`exulanica.society-model-choice/v1`), each naming who made it, and are never
-changed. A person's model is the latest choice naming them, and a society with no choice is run by
-its routine alone.
+a group: a model, or with a null model their own routine. It requires `world.write` and
+`model.invoke`, which in a browser only the workspace's owner holds, because a choice commits the
+world's host to asking the model. An outside program is never chosen through this route: the route
+that records its grant records the external choice in the grant's own transaction
+(`SocietyModelChoiceRepository.record_external_choice`), and ending the grant hands every subject it
+still decides for back to their routine as one choice (`release_external_choice`), read under the
+society's lock, so a choice made meanwhile is never undone and a retry returns the choice it
+recorded.
 
 A choice may name only people of this society and a model the manifest declares, offers the
 person's role and the contract can ask by a verified mechanism; otherwise it is refused by name
 (`CHOICE_REFUSALS`): `422` for `person_not_in_this_world`, `person_named_twice`,
 `model_not_declared`, `model_not_offered`, `model_not_askable` and `too_many_model_people` (more than
-`model_people_maximum` people run by models at once), and `409` for a society whose engine takes no
-choice (`engine_takes_no_model_choice`) or a key reused for another choice (`choice_key_reused`). An
-exact retry of a key is answered with the choice it recorded before anything else is checked, so it
-still returns after its model stops being offered. Whether this process can reach the model's
-provider is the host's to say, never a reason to refuse the choice: a choice outlives a deployment.
+`model_people_maximum` people run by models at once; an outside program's subjects are not counted),
+and `409` for a society whose engine takes no choice (`engine_takes_no_model_choice`), a key reused
+for another choice (`choice_key_reused`) and somebody who came into the world from outside, whose own
+program decides for them (`decided_from_outside`: the owner may end its grant or send them away,
+never choose for them). An exact retry of a key is answered with the choice it recorded before
+anything else is checked, so it still returns after its model stops being offered. Whether this
+process can reach the model's provider, or the program's door, is the host's to say, never a reason
+to refuse the choice: a choice outlives a deployment.
 
 `GET` at the same path, with `world.read`, returns the models the person's role is offered, in plain
 words with whether this process can ask each; whether this host asks models for the world at all,
 and why not (`host_refusal`: `models_not_run_here`, `provider_credential_absent`,
-`process_budget_spent` or `process_share_spent`); each person's choice, with why its model is not
-asked here when it is not (`refusal`, one of `MODEL_REFUSALS`); each person's latest decision; and
-per model the decisions asked, accepted and applied, why the rest were not acted on, latency and
-cost, over the society's latest 2,000 decisions (`DECISIONS_READ`). Neither route asks a model.
+`process_budget_spent` or `process_share_spent`); each person's choice with its decider, and why its
+model is not asked here when it is not (`refusal`, one of `MODEL_REFUSALS`); each person's latest
+model decision; and per model the decisions asked, accepted and applied, why the rest were not acted
+on, latency and cost, over the society's latest 2,000 decisions (`DECISIONS_READ`). An outside
+program's decisions name no model and are neither summarised nor counted among the models'. Neither
+route asks a model.
 
 In a saved world the People panel offers the choice for one person or for everyone and shows this
 read (`web/packages/app/src/composition/society-models-mount.ts`). Where the host cannot ask a
 person's model, the page says the person follows their own routine for now, and why.
+
+## An outside program deciding
+
+An outside program decides for a subject under a grant: its door (an application component the
+host never imports) implements the `ExternalAsker` port of `exulanica/api/external_asking.py`, and
+the application registers it with the decision host. A host with no door registered asks no
+outside program and writes nothing for its subjects, and the routine decides for them, as a host
+with no model client asks no model.
+
+- **Asking.** In the decision phase the host splits each role's due subjects by decider, and
+  reserves outside programs' requests before any model's, so no door's time comes out of a model's
+  ask window. For each external subject it asks the door's `configuration` first, for every due
+  subject at once and with no lock held, waiting no later than the role's asks must end: what the
+  request records of the program as its grant stands now (`kind`, `bridge`, `grant_id`,
+  `grant_seq`, `mapping_sha256` and the door's own `deadline_ms`), to which the host adds the
+  contract, and a refusal decided before asking (`decider_disconnected`, `grant_revoked` or
+  `grant_expired`). A statement that is malformed, names another program, gives a deadline past
+  the contract's, raises or comes late leaves its own subject unasked that minute, and the routine
+  decides for them. The host reserves the request as it reserves a model's, over the options the
+  account holder's saved names leave sendable (no right releases a name to an outside program, so
+  any saved name keeps a label out, and one in the role's description asks nobody). A request any
+  text of which, in any field, would carry a saved name is undone and not sent. A refused subject's
+  request is answered at once as `unavailable` for its reason, so a world counts an outside
+  program's silence from its own records. The rest are asked through `answer`, from the host's
+  pool beside the model asks and with no connection held, each by the sooner of the door's deadline
+  from the moment it is asked and the end the lease leaves the minute. The host stops waiting then
+  and never waits for a door that ignores its deadline: an answer that comes later is recorded as
+  `no_answer_in_time`.
+- **What is recorded.** The request's `provider_config` and the receipt's `provider` hold the
+  program's record instead of a model's (`exulanica.world.deciders.EXTERNAL_CONFIG` and
+  `EXTERNAL_RECORD`), each naming its kind; a model's keep exactly their fields, so every stored one
+  reads as written. The receipt names the adapter's version (whole numbers joined by dots), the
+  digest of the answer frame the program sent and how long it took, and no cost: an outside answer
+  spends nothing. It carries no free text from the program; a correlation token, where one is
+  needed, is a SHA-256 digest or none. The answer is checked as a model's is, when it arrives and
+  again when it is recorded: one offered label exactly, for a reason the role records, naming the
+  bridge, grant, grant revision and mapping file it was asked under, and an accepted one always
+  carries the program's record. An answer that fails is recorded as `decider_disconnected`, for its
+  own subject alone. A request the program did not answer ends for one of the outside reasons
+  `decider_disconnected`, `no_answer_in_time`, `grant_revoked` or `grant_expired`, whatever else
+  changed before it was recorded, and one a stopped host left open closes as `no_answer_in_time`,
+  so its receipt and its minute's event always say an outside program was asked; the routine
+  decides that turn.
+- **Bounds.** External asks are outside the models' spending, the process's budget and a world's
+  hourly bounds, which `world_hour` counts from model calls alone; how often a program is asked is
+  its grant's to bound.
+- **In the minute.** The receipt is consumed exactly as a model's, and its `decision_applied`
+  event says an outside program decided (`origin: external`, `model: null`). The owner's direct
+  request supersedes an outside answer for a native person that minute, as it does a model's.
+- **Replay and comparisons.** Replay applies the stored receipts and never contacts the program,
+  and no comparison asks one. Everybody outside a comparison's group is decided as the owner's
+  latest choice names, so a subject an outside program decides for runs by their routine in every
+  arm; a subject inside the group is decided by each arm's model, whoever decides for them in the
+  world.
 
 ## The signal's contract
 
@@ -328,7 +416,8 @@ recorded.
 
 ## Spend
 
-Two bounds hold whoever plays the world. The hourly bounds above hold each world. The process's
+Two bounds hold whoever plays the world. Both bound model calls: an outside program's asks spend
+nothing and are bounded by its grant ([an outside program deciding](#an-outside-program-deciding)). The hourly bounds above hold each world. The process's
 model budget (`EXULANICA_BUDGET_USD`, `EXULANICA_BUDGET_MAX_CALLS`) is a ceiling for the life of the
 process that every model call it makes shares, the Companion, photograph ingestion, vision and
 caption search among them. People's decisions may use all of it but the contract's
@@ -404,9 +493,11 @@ chooser with the planner's reason `route_invalidated`, and the other person is l
 routine.
 
 Every consumed receipt appends one `decision_applied` event after the minute's other events, naming
-its `request_id`, `decision_seq`, `decision_sha256`, disposition and reason, the model as
-`{provider, model_id}` and the chosen label (`chose`), and the transition binds each consumed
-receipt exactly once with its disposition (`world_society_transition_decision`, migration 0055). A
+its `request_id`, `decision_seq`, `decision_sha256`, disposition and reason, who decided (`origin`:
+`model`, or `external` for an outside program, by its receipt's record or a reason only an outside
+ask gives), the model as `{provider, model_id}` or null for an outside program, and the chosen label
+(`chose`), and the transition binds each consumed receipt exactly once with its disposition
+(`world_society_transition_decision`, migration 0055). A
 receipt for somebody no longer here, one closed after its minute for a person sent away since, is
 consumed by their id alone and moves nobody. `GET /world/versions/{version_id}/society/decisions/{request_id}`
 reads a request and its receipt, which names the calls, tokens and cost.
@@ -438,7 +529,8 @@ stored request the loop does not rebuild stops it by name.
 
 | Part | Source | Tests |
 | --- | --- | --- |
-| Registry and adapters | `assets/catalogs/roles/decision-roles.v1.json`, `exulanica/world/decision_roles.py`, `exulanica/world/role_catalogs.py`, `exulanica/world/roles/` | `tests/test_decision_roles.py`, with the test role in `tests/decision_role_fixtures/` |
+| Registry and adapters | `assets/catalogs/roles/decision-roles.v3.json`, `exulanica/world/decision_roles.py`, `exulanica/world/role_catalogs.py`, `exulanica/world/roles/` | `tests/test_decision_roles.py`, with the test role in `tests/decision_role_fixtures/` |
+| Deciders and outside programs | `exulanica/world/deciders.py`, `exulanica/api/external_asking.py`, the host's outside path in `exulanica/api/decision_host.py`, migration 0146 | `tests/test_outside_deciders.py` (each answer and statement a door may give, late, failing or malformed, costing its own subject alone; a context carrying a saved name in any field), `tests/test_outside_deciders_postgres.py` (a request left open by a stopped host; a request carrying a saved name undone and not sent; a released grant's retry) |
 | Requests, receipts, the minute loop and replay | `exulanica/world/role_decisions.py` | `tests/test_decision_roles.py` |
 | The person's contract and minute | `exulanica/world/society_decision_contract.py`, `exulanica/world/society_model_decisions.py`, `assets/catalogs/society/society-decision-action.v2.json`, `assets/catalogs/society/society-decision-policy.v2.json` | `tests/test_society_person_decisions.py`, `tests/test_society_model_actions.py`, `tests/test_person_role_goldens.py` |
 | One choice among labels | `exulanica/models/choice.py` | `tests/test_model_choice.py` |

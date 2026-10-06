@@ -34,6 +34,13 @@ from typing import Any, Final, Protocol
 
 from exulanica.canonical import canonical_json
 from exulanica.models.manifest import AnsweringMechanism
+from exulanica.world.deciders import (
+    EXTERNAL_REASONS,
+    DeciderRefused,
+    check_external_config,
+    check_external_record,
+    is_external,
+)
 from exulanica.world.decision_roles import (
     FEWEST_OPTIONS,
     DecisionContract,
@@ -110,7 +117,10 @@ RECEIPT_STATUSES: Final = ("accepted", "rejected", "unavailable", "stale")
 #: admitting arbitrary output.
 _REQUEST_BYTES: Final = 70_000
 RESULT_BYTES: Final = 16_000
-#: What a request records about the model it asked: which, how, under which contract.
+#: What a request records about the model it asked: which, how, under which contract. A request
+#: that asked an outside program records :data:`~exulanica.world.deciders.EXTERNAL_CONFIG` in the
+#: same field instead, which names its kind; a model's never does, so every stored one reads as it
+#: was written.
 PROVIDER_CONFIG: Final = frozenset(
     {
         "provider",
@@ -124,7 +134,8 @@ PROVIDER_CONFIG: Final = frozenset(
     }
 )
 #: What a receipt records about the call: the model, how it was asked, every attempt it paid for
-#: in the execution record's words, what it cost and how long it took.
+#: in the execution record's words, what it cost and how long it took. An outside program's answer
+#: records :data:`~exulanica.world.deciders.EXTERNAL_RECORD` in the same field instead.
 PROVIDER_RECORD: Final = frozenset(
     {
         "provider",
@@ -324,7 +335,14 @@ def check_role_request(role: DecisionRole, document: Mapping[str, Any]) -> None:
     labels = [role.adapter.option_from_record(option).label for option in context["options"]]
     if len(set(labels)) != len(labels):
         raise ValueError(f"a {role.key} decision offers each label once")
-    if not isinstance(config, dict) or set(config) != PROVIDER_CONFIG:
+    if is_external(config):
+        try:
+            check_external_config(config)
+        except DeciderRefused as exc:
+            raise ValueError(
+                f"a {role.key} decision request names the program it asked: {exc}"
+            ) from exc
+    elif not isinstance(config, dict) or set(config) != PROVIDER_CONFIG:
         raise ValueError(f"a {role.key} decision request names the model it asked, and how")
 
 
@@ -347,7 +365,29 @@ def check_role_result(
     if (result["status"] == "accepted") != (proposal is not None):
         raise ValueError(f"exactly an accepted {role.key} decision carries a proposal")
     provider = result["provider"]
-    if provider is not None and (
+    if is_external(request["provider_config"]):
+        if provider is None:
+            # A request an outside program never answered ends for a reason only an outside ask
+            # gives, so its receipt, and the event its minute writes, say who was asked; and an
+            # accepted answer always carries the program's record.
+            if result["status"] == "accepted" or result["reason"] not in EXTERNAL_REASONS:
+                raise ValueError(
+                    f"a {role.key} decision an outside program did not answer ends for an outside "
+                    "reason"
+                )
+            return
+        # Whoever a request asked is whoever its receipt names as answering: an outside program's
+        # answer is recorded as one, in its own fields, and never as a model's call.
+        try:
+            check_external_record(provider)
+        except DeciderRefused as exc:
+            raise ValueError(f"a {role.key} decision records the program's answer: {exc}") from exc
+        if any(
+            provider[key] != request["provider_config"][key]
+            for key in ("bridge", "grant_id", "grant_seq", "mapping_sha256")
+        ):
+            raise ValueError(f"a {role.key} decision's answer came from the program it asked")
+    elif provider is not None and (
         not isinstance(provider, dict) or set(provider) != PROVIDER_RECORD
     ):
         raise ValueError(f"a {role.key} decision records its call in the stated fields")

@@ -64,6 +64,7 @@ DRAWING_MODULES: Final = (
     "exulanica.movement.registry",
     "exulanica.movement.steps",
     "exulanica.movement.walking",
+    "exulanica.world.deciders",
     "exulanica.world.decision_roles",
     "exulanica.world.role_decisions",
     "exulanica.world.roles.person",
