@@ -115,7 +115,9 @@ A piece is an `exulanica.static-glb/v1` container first
 that profile's limits: `assets/style-packs/piece-budgets.v1.json` states, per family, the triangles
 at the first level of detail (per metre of the piece's own width for a tiled family), materials, the
 largest texture side and the file's size, and a second level of detail holds at most a quarter of
-the first's triangles. A pack's files total at most 64 MiB.
+the first's triangles. A pack's files total at most 64 MiB. One reader reads that file,
+`exulanica_pieces/budgets.py`, for the pack reader and the generated pieces alike, so a generated
+piece is made against the numbers a pack's piece is held to.
 
 ## 6. Readers
 

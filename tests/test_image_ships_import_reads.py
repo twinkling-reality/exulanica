@@ -26,15 +26,18 @@ REPOSITORY = Path(__file__).resolve().parents[1]
 _READS = """
 import importlib, json, pkgutil, sys
 from pathlib import Path
-import exulanica
+import exulanica, exulanica_pieces
 package = Path(exulanica.__file__).resolve().parent
 root = package.parent
+# Every top-level package of the wheel is code the image installs, not data it must copy.
+packages = [package, Path(exulanica_pieces.__file__).resolve().parent]
 read = set()
 def hook(event, args):
     if event != "open" or not args or not isinstance(args[0], (str, Path)):
         return
     path = Path(args[0]).resolve()
-    if root in path.parents and package not in path.parents and ".venv" not in path.parts:
+    inside = any(installed in path.parents for installed in packages)
+    if root in path.parents and not inside and ".venv" not in path.parts:
         read.add(path.relative_to(root).as_posix())
 sys.addaudithook(hook)
 failed = []
@@ -109,6 +112,25 @@ IMAGES = {
         (REPOSITORY / "deploy/material-bake/Dockerfile.dockerignore").read_text(encoding="utf-8"),
     ),
 }
+
+
+def test_every_image_copies_and_admits_every_package_the_wheel_builds():
+    """A package the wheel lists but an image never COPYs is missing from its wheel, so an
+    import of it fails when the image starts. Each package the wheel names is copied into each
+    image that installs it, and its build context's allowlist admits the package directory."""
+    pyproject = (REPOSITORY / "pyproject.toml").read_text(encoding="utf-8")
+    wheel = re.search(r"\[tool\.hatch\.build\.targets\.wheel\]\npackages = \[([^\]]*)\]", pyproject)
+    assert wheel is not None
+    packages = re.findall(r'"([^"]+)"', wheel.group(1))
+    # A positive control: the shared piece formats are a package of the wheel beside the product.
+    assert packages == ["exulanica", "exulanica_pieces"]
+    for name, image in IMAGES.items():
+        for package in packages:
+            assert re.search(rf"^COPY\s+{package}\s+\./{package}\s*$", image.dockerfile, re.M), (
+                name,
+                package,
+            )
+            assert image.allowlisted(f"{package}/__init__.py"), (name, package)
 
 
 def test_every_image_that_installs_the_package_is_checked():

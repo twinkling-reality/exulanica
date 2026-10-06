@@ -62,7 +62,11 @@ def test_the_training_code_has_its_own_environment_and_the_product_s_does_not_ca
     assert training["project"]["name"] == "exulanica-training"
     assert any(dependency.startswith("torch") for dependency in training["project"]["dependencies"])
     product = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    assert product["tool"]["hatch"]["build"]["targets"]["wheel"]["packages"] == ["exulanica"]
+    # The product and the piece formats it shares (exulanica_pieces); nothing else.
+    assert product["tool"]["hatch"]["build"]["targets"]["wheel"]["packages"] == [
+        "exulanica",
+        "exulanica_pieces",
+    ]
     assert product["tool"]["pytest"]["ini_options"]["testpaths"] == ["tests"]
     for recipe in (
         TRAINING / "container" / "Dockerfile",
@@ -124,4 +128,8 @@ def test_the_generated_appearance_code_keeps_model_libraries_out_of_its_base_env
     assert any(d.startswith("torch") for d in appearance["project"]["optional-dependencies"]["gpu"])
     assert (APPEARANCE / "uv.lock").is_file()
     product = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    assert product["tool"]["hatch"]["build"]["targets"]["wheel"]["packages"] == ["exulanica"]
+    # The product and the piece formats it shares (exulanica_pieces); nothing else.
+    assert product["tool"]["hatch"]["build"]["targets"]["wheel"]["packages"] == [
+        "exulanica",
+        "exulanica_pieces",
+    ]

@@ -233,7 +233,11 @@ def test_no_wheel_or_image_can_carry_the_scripted_model():
     """The wheel packages the product alone, the image build context is an allowlist naming no
     ``scripts`` path, and no Dockerfile copies one."""
     project = tomllib.loads((ROOT / "pyproject.toml").read_text())
-    assert project["tool"]["hatch"]["build"]["targets"]["wheel"]["packages"] == ["exulanica"]
+    # The product and the piece formats it shares (exulanica_pieces); nothing else.
+    assert project["tool"]["hatch"]["build"]["targets"]["wheel"]["packages"] == [
+        "exulanica",
+        "exulanica_pieces",
+    ]
 
     allowlist = (ROOT / ".dockerignore").read_text().splitlines()
     assert allowlist[[line.strip() for line in allowlist].index("*")] == "*"

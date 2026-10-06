@@ -13,6 +13,8 @@
 !LICENSE
 !THIRD_PARTY_NOTICES.md
 !exulanica
+# The piece formats the package imports, a second top-level package of the same wheel.
+!exulanica_pieces
 # The published material catalog, without the texture blobs: what the API needs to check a
 # person's recipe against the published makers. About 200 KiB.
 !assets/textures/manifest.json

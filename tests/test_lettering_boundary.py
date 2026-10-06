@@ -107,5 +107,9 @@ def test_the_tool_reaches_nothing_of_the_product():
 
 def test_the_tool_is_not_on_the_product_s_test_path_or_in_its_wheel():
     config = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    assert config["tool"]["hatch"]["build"]["targets"]["wheel"]["packages"] == ["exulanica"]
+    # The product and the piece formats it shares (exulanica_pieces); nothing else.
+    assert config["tool"]["hatch"]["build"]["targets"]["wheel"]["packages"] == [
+        "exulanica",
+        "exulanica_pieces",
+    ]
     assert config["tool"]["pytest"]["ini_options"]["testpaths"] == ["tests"]

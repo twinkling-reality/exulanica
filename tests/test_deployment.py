@@ -47,9 +47,10 @@ def test_the_image_installs_the_package_it_claims_to_run():
     the working package and installs the empty one over it, and the image's own entry points
     raise ModuleNotFoundError at start. Nothing about the build fails.
     """
-    packages = re.search(r'packages\s*=\s*\["([^"]+)"\]', PYPROJECT)
-    assert packages is not None, "pyproject no longer names the wheel's package directory"
-    directory = packages.group(1)
+    packages = re.search(r"packages\s*=\s*\[([^\]]+)\]", PYPROJECT)
+    assert packages is not None, "pyproject no longer names the wheel's package directories"
+    directories = re.findall(r'"([^"]+)"', packages.group(1))
+    assert directories, "pyproject no longer names the wheel's package directories"
 
     installing = [
         line
@@ -57,11 +58,12 @@ def test_the_image_installs_the_package_it_claims_to_run():
         if "uv sync" in line and "--no-install-project" not in line
     ]
     assert installing, "no stage installs the project, so the image runs nothing"
-    assert re.search(rf"^COPY\s+{re.escape(directory)}\s", DOCKERFILE, re.MULTILINE), (
-        f"the Dockerfile runs `uv sync` without --no-install-project and never COPYs "
-        f"{directory!r}. The wheel it builds is empty and every entry point in the image will "
-        "raise ModuleNotFoundError."
-    )
+    for directory in directories:
+        assert re.search(rf"^COPY\s+{re.escape(directory)}\s", DOCKERFILE, re.MULTILINE), (
+            f"the Dockerfile runs `uv sync` without --no-install-project and never COPYs "
+            f"{directory!r}. The wheel it builds lacks it and every import of it in the image "
+            "will raise ModuleNotFoundError."
+        )
 
 
 def test_the_image_never_installs_a_stale_wheel_of_its_own_package():

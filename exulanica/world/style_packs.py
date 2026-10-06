@@ -31,6 +31,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Final
 
+from exulanica_pieces.budgets import BUDGETS_PROFILE, PieceBudget, read_budgets
+
 __all__ = [
     "BUDGETS_PROFILE",
     "COLOUR_ENCODING",
@@ -737,39 +739,11 @@ def load_context(root: Path) -> StylePackContext:
     return StylePackContext(families=families, texture_sets=sets)
 
 
-BUDGETS_PROFILE: Final = "exulanica.style-pack-piece-budgets/v1"
-
-
-@dataclass(frozen=True, slots=True)
-class PieceBudget:
-    """What one piece of a family may weigh at its first level of detail, as one binary glTF."""
-
-    triangles: int
-    triangles_per_metre: int
-    materials: int
-    texture_side_px: int
-    glb_bytes: int
-
-    def triangle_limit(self, width_mm: int) -> int:
-        """A tiled family's limit scales with the piece's own width; every other's is fixed."""
-        if self.triangles_per_metre:
-            return self.triangles_per_metre * width_mm // 1000
-        return self.triangles
-
-
 def read_piece_budgets(root: Path) -> dict[str, PieceBudget]:
-    """The per-family piece budgets, from ``assets/style-packs/piece-budgets.v1.json``."""
-    document = json.loads(
-        (root / "assets/style-packs/piece-budgets.v1.json").read_text(encoding="utf-8")
-    )
-    if document.get("profile") != BUDGETS_PROFILE:
-        raise ValueError(f"the piece budgets are not {BUDGETS_PROFILE}")
-    budgets: dict[str, PieceBudget] = {}
-    for family, values in document["families"].items():
-        budget = PieceBudget(**values)
-        if (budget.triangles == 0) == (budget.triangles_per_metre == 0):
-            raise ValueError(f"{family}: states triangles or triangles per metre, exactly one")
-        if min(budget.materials, budget.texture_side_px, budget.glb_bytes) <= 0:
-            raise ValueError(f"{family}: every budget is a positive whole number")
-        budgets[family] = budget
-    return budgets
+    """The per-family piece budgets, from ``assets/style-packs/piece-budgets.v1.json``.
+
+    Read by the one reader of that file, :func:`exulanica_pieces.budgets.read_budgets`, which the
+    generated pieces are made against too, so a pack's pieces and a generated piece are held to
+    the same numbers. A file it refuses raises its refusal, a ``ValueError``.
+    """
+    return dict(read_budgets(root).families)

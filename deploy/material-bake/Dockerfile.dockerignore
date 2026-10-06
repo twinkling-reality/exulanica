@@ -6,6 +6,8 @@
 !LICENSE
 !THIRD_PARTY_NOTICES.md
 !exulanica
+# The piece formats the package imports, a second top-level package of the same wheel.
+!exulanica_pieces
 !web/package.json
 !web/pnpm-lock.yaml
 !web/pnpm-workspace.yaml

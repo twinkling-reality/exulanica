@@ -86,7 +86,10 @@ def test_a_budget_with_both_triangle_rules_is_refused(tmp_path: Path) -> None:
     )
     document["families"]["window"]["triangles_per_metre"] = 10
     (tmp_path / "assets/style-packs").mkdir(parents=True)
-    (tmp_path / "assets/style-packs/piece-budgets.v1.json").write_text(json.dumps(document))
+    # Written as the committed file is, canonical JSON and one newline, so only the rule is broken.
+    (tmp_path / "assets/style-packs/piece-budgets.v1.json").write_text(
+        style_packs.canonical_json(document) + "\n"
+    )
     with pytest.raises(ValueError, match="window: states triangles or triangles per metre"):
         style_packs.read_piece_budgets(tmp_path)
 

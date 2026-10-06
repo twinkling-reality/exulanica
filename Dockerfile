@@ -39,6 +39,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # ModuleNotFoundError at start. `tests/test_deployment.py` asserts this COPY exists.
 COPY pyproject.toml uv.lock LICENSE THIRD_PARTY_NOTICES.md ./
 COPY exulanica ./exulanica
+COPY exulanica_pieces ./exulanica_pieces
 # The project wheel is rebuilt unconditionally: a cache mount that outlives the previous build must
 # never let an older wheel of this package shadow the sources COPYed just above.
 RUN --mount=type=cache,target=/root/.cache/uv \

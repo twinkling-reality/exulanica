@@ -52,6 +52,7 @@ ENV UV_COMPILE_BYTECODE=1 \
 WORKDIR /opt/exulanica/src
 COPY pyproject.toml uv.lock LICENSE THIRD_PARTY_NOTICES.md ./
 COPY exulanica ./exulanica
+COPY exulanica_pieces ./exulanica_pieces
 RUN uv sync --locked --no-dev --no-editable \
  && rm /usr/local/bin/uv
 COPY assets/textures/manifest.json assets/textures/catalog.json /opt/exulanica/assets/textures/
