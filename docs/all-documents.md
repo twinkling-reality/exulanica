@@ -7,7 +7,7 @@ Start from the [documentation hub](README.md). Each document has one subject hom
 an explicit responsibility. A role describes how to use a document, not whether a feature
 is implemented. Contracts and scoped evidence establish capability claims.
 
-**99 documents** in the public catalog.
+**101 documents** in the public catalog.
 
 - [Product and architecture](#orientation)
 - [Capability guides](#capabilities)
@@ -61,6 +61,7 @@ How a world's people live, how open models decide for them, how runs are compare
 | [Decision roles and model decisions](decision-roles-contract.md) | contract | Decision roles, the owner's model choice, the person's decision contract, host asking and spend bounds, dispositions and replay |
 | [Society experiments](society-experiments.md) | contract | Comparisons of the models that decide for a world's people, and intervention experiments over a living society |
 | [Movement modules contract](movement-modules-contract.md) | contract | Movement modules and their dispatch: walking, flight through a world's air, flying kinds and roads |
+| [Things contract](things-contract.md) | contract | Thing kinds, body plans, abilities and offers, looks and look kinds, the origin record and translation manifests |
 | [Character representation and movement](character-representation-contract.md) | contract | Character appearance, rigging, subject bindings, movement and how a society's people are drawn |
 | [Traffic simulation](traffic-contract.md) | contract | Traffic simulation inputs, derived road records, state transitions and invariants, and its serving for a baked city |
 | [World clock](world-clock-contract.md) | contract | A world version's clock: legacy and coupled timing, the transition, pausing, stepping and catching up, crossing occupancy and the order between walkers and traffic |
@@ -218,4 +219,5 @@ a record's original status is not proof of the implementation's present capabili
 | [0026-a-restore-carries-every-withdrawal](adr/0026-a-restore-carries-every-withdrawal.md) | ADR-0026: A restore carries every withdrawal a person made, not only their deletions |
 | [0027-a-generated-world-is-drawn-in-its-own-world](adr/0027-a-generated-world-is-drawn-in-its-own-world.md) | ADR-0027: A world generated from a reviewed recipe is drawn in its person's own world |
 | [0028-a-crash-recovery-replays-a-declared-withdrawal-export](adr/0028-a-crash-recovery-replays-a-declared-withdrawal-export.md) | ADR-0028: A crash recovery replays a declared withdrawal export and refuses a stale one |
+| [0030-a-thing-is-a-typed-record-whose-looks-never-reach-the-simulation](adr/0030-a-thing-is-a-typed-record-whose-looks-never-reach-the-simulation.md) | ADR-0030: A thing is a typed record whose looks never reach the simulation |
 | [gsplat-training-and-recorded-rung](adr/gsplat-training-and-recorded-rung.md) | Gaussian optimization and recorded scene rung are separate decisions |
