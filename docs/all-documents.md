@@ -7,7 +7,7 @@ Start from the [documentation hub](README.md). Each document has one subject hom
 an explicit responsibility. A role describes how to use a document, not whether a feature
 is implemented. Contracts and scoped evidence establish capability claims.
 
-**101 documents** in the public catalog.
+**103 documents** in the public catalog.
 
 - [Product and architecture](#orientation)
 - [Capability guides](#capabilities)
@@ -87,11 +87,12 @@ Read the contract for the state or operation being changed.
 
 ## Generated and admitted environments
 
-Generation vocabulary, generated streets and tiles, textures and lettering, and admitted city data. Generated tiles and the owned district appear in the development preview; texture sets also dress shipped world objects.
+Generation vocabulary, world kinds and the site grammar, generated streets and tiles, textures and lettering, and admitted city data. Generated tiles and the owned district appear in the development preview; texture sets also dress shipped world objects.
 
 | Document | Role | Owns |
 | --- | --- | --- |
 | [The generator system: `exulanica.grammar`](grammar-package.md) | contract | Generator contract, seeds, city stages and the catalog envelope every data catalog uses |
+| [World kinds](world-kinds-contract.md) | contract | World kinds as data: the kind document and its checks, the site grammar, a site world's people, receipt and drawing, and the kind routes |
 | [The generated corridor: one street, from a seed](generated-corridor-street.md) | reference | Generated corridor structure and reproduction |
 | [Generated tile runtime](generated-tile-runtime.md) | contract | Generated-tile loading, rendering and navigation in the development preview |
 | [Generated-world representation decisions](representation-decisions.md) | reference | Generated-world representation decisions, supports and limits |
@@ -219,5 +220,6 @@ a record's original status is not proof of the implementation's present capabili
 | [0026-a-restore-carries-every-withdrawal](adr/0026-a-restore-carries-every-withdrawal.md) | ADR-0026: A restore carries every withdrawal a person made, not only their deletions |
 | [0027-a-generated-world-is-drawn-in-its-own-world](adr/0027-a-generated-world-is-drawn-in-its-own-world.md) | ADR-0027: A world generated from a reviewed recipe is drawn in its person's own world |
 | [0028-a-crash-recovery-replays-a-declared-withdrawal-export](adr/0028-a-crash-recovery-replays-a-declared-withdrawal-export.md) | ADR-0028: A crash recovery replays a declared withdrawal export and refuses a stale one |
+| [0029-a-world-kind-is-data-a-site-grammar-realises](adr/0029-a-world-kind-is-data-a-site-grammar-realises.md) | ADR-0029: A world kind is data that one site grammar realises |
 | [0030-a-thing-is-a-typed-record-whose-looks-never-reach-the-simulation](adr/0030-a-thing-is-a-typed-record-whose-looks-never-reach-the-simulation.md) | ADR-0030: A thing is a typed record whose looks never reach the simulation |
 | [gsplat-training-and-recorded-rung](adr/gsplat-training-and-recorded-rung.md) | Gaussian optimization and recorded scene rung are separate decisions |
