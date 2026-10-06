@@ -46,7 +46,7 @@ export interface MountActionsDeps {
    * Sends a Companion plan step's request, built from its registry entry, and shows its write as
    * the panel that owns the action would (`performPlanned`). Absent, no plan step is sent.
    */
-  readonly send?: (request: PlannedRequest) => Promise<unknown>;
+  readonly send?: (request: PlannedRequest) => Promise<{ readonly status: number; readonly body: unknown }>;
   readonly people: PeopleControls;
   /** Where the clock sits in the top bar; it is inserted before this node. */
   readonly clockSlot: HTMLElement | null;

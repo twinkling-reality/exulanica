@@ -16,6 +16,24 @@
 import { Transport, type TransportOptions } from '@exulanica/graph-client';
 import { openWorldPath } from './world-scope.js';
 
+/**
+ * A sent step's own answer, as `POST /selection/actions/outcome` reads it on each step: the status
+ * its request got, the problem code when refused, and the identity fields its step kind takes
+ * (`deliveries/UIB/outcome-answer-shape.txt`, the server's `extra="forbid"` model). Built by
+ * `stepAnswer` in `ui/actions/planned.ts`.
+ */
+export interface StepAnswer {
+  readonly status: number;
+  readonly code: string | null;
+  readonly edit_seq?: number;
+  readonly state_sha256?: string;
+  readonly event_seq?: number;
+  readonly document_sha256?: string;
+  readonly revision?: number;
+  readonly last_event_seq?: number;
+  readonly society_id?: string;
+}
+
 export type PlanOutcome = 'plan' | 'clarify' | 'refused' | 'capabilities' | 'question';
 export type PlanKind = 'question' | 'appearance' | 'world_edit' | 'simulation' | 'capabilities';
 export type StepState = 'prepared' | 'pending' | 'blocked' | 'not_permitted';
@@ -269,19 +287,29 @@ export class CompanionActionsClient {
     return parseActionPlan(await this.#transport.postJson<unknown>(this.#path('/selection/actions/prepare'), { ...base(page), actions }));
   }
 
-  /** What the authorities recorded for the plan's steps; a client's own answer, no proof. */
-  async outcome(plan: ActionPlan): Promise<ActionOutcome> {
+  /**
+   * What the authorities recorded for the plan's steps. Each step sent carries its own request's
+   * answer (`answers`, by step index; see `stepAnswer` in `ui/actions/planned.ts`), so the server
+   * reads the step's own receipt; a step not sent carries none.
+   */
+  async outcome(plan: ActionPlan, answers: Readonly<Record<number, StepAnswer>> = {}): Promise<ActionOutcome> {
     return parseActionOutcome(await this.#transport.postJson<unknown>(this.#path('/selection/actions/outcome'), {
       version_id: plan.versionId,
       plan_sha256: plan.planSha256,
-      steps: plan.steps.map((step) => step.raw),
+      steps: plan.steps.map((step) => {
+        const answer = answers[step.index];
+        return answer === undefined ? step.raw : { ...step.raw, answer };
+      }),
     }));
   }
 
-  /** Send one planned request the registry built (`ui/actions/planned.ts`). */
-  async send(request: { readonly method: string; readonly path: string; readonly body: unknown }): Promise<unknown> {
-    if (request.method === 'PUT') return this.#transport.putJson<unknown>(request.path, request.body);
-    if (request.method === 'POST') return this.#transport.postJson<unknown>(request.path, request.body);
+  /** Send one planned request the registry built (`ui/actions/planned.ts`): its status and body. */
+  async send(request: {
+    readonly method: string; readonly path: string; readonly body: unknown;
+  }): Promise<{ readonly status: number; readonly body: unknown }> {
+    if (request.method === 'PUT' || request.method === 'POST') {
+      return this.#transport.sendJson<unknown>(request.method, request.path, request.body);
+    }
     throw new TypeError(`A planned step may not use ${request.method}`);
   }
 }

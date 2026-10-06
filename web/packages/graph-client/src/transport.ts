@@ -96,6 +96,17 @@ export class Transport {
     return (await response.json()) as T;
   }
 
+  /**
+   * A write whose caller needs the status it got as well as the body, such as a Companion plan's
+   * step, which reports its own answer back (`POST /selection/actions/outcome`).
+   */
+  async sendJson<T>(
+    method: 'POST' | 'PUT', path: string, body: unknown,
+  ): Promise<{ readonly status: number; readonly body: T }> {
+    const response = await this.#request(method, path, { body });
+    return { status: response.status, body: (await response.json()) as T };
+  }
+
   /** Successful DELETE routes may deliberately return no response body. */
   async delete(path: string): Promise<void> {
     await this.#request('DELETE', path, {});

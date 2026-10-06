@@ -65,7 +65,10 @@ function harness(options: {
     capabilities: () => (options.capabilities === undefined ? everything : options.capabilities),
     onChange: () => () => undefined,
     toasts: toastStack(),
-    send: async (request) => { sent.push(request); return options.send?.(request, sent.length - 1) ?? {}; },
+    send: async (request) => {
+      sent.push(request);
+      return { status: 200, body: (await options.send?.(request, sent.length - 1)) ?? {} };
+    },
   };
   const client = {
     plan: vi.fn(async () => parseActionPlan(await (options.plan ?? (async () => fixture('world-edit-plan')))())),
@@ -217,6 +220,29 @@ describe('a confirmed plan', () => {
     expect(h.sent[1]!.body).toMatchObject({ base_revision: first.control.revision, base_state_sha256: first.society.state_sha256 });
     expect(stepStates(h.sheet)).toEqual(['done', 'done', 'done']);
     expect(h.afterTime).toHaveBeenCalledOnce();
+  });
+
+  it('reports each sent step’s own answer with the outcome, and none for a step not reached', async () => {
+    // The server's step answer carries a receipt (society_control_repository.manual_step); the
+    // recorded responses predate it, so each is given one here.
+    const answered = responses('stopped-responses');
+    const receipt = { event_seq: 41, document_sha256: 'd'.repeat(64), kind: 'manual_step' };
+    const h = harness({
+      plan: async () => fixture('simulation-plan'),
+      send: async (_request, index) => {
+        if (index === 0) return { ...(answered[0]!.body as object), receipt };
+        throw new ApiError(409, 'stale_society_state', 'stale_society_state: society changed; reload before advancing');
+      },
+      outcome: { ...(fixture('stopped-outcome') as object), state: 'partial', alternatives: ['play'] },
+    });
+    await h.plans.route('move time on three minutes');
+    await confirmAndWait(h);
+    expect(h.client.outcome).toHaveBeenCalledOnce();
+    const answers = h.client.outcome.mock.calls[0]![1] as Record<number, unknown>;
+    expect(answers).toEqual({
+      0: { status: 200, code: null, event_seq: 41, document_sha256: 'd'.repeat(64) },
+      1: { status: 409, code: 'stale_society_state' },
+    });
   });
 
   it('stops where a step is refused, shows what happened and what was not reached, and offers Play', async () => {

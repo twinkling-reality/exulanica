@@ -1232,22 +1232,25 @@ async function mount(): Promise<void> {
     ? null
     : new CompanionActionsClient({ ...currentCredentials, worldId: state.activeWorldEntry.worldId });
   const PLANNED_EDITS = new Set(['objects.place', 'objects.move', 'objects.remove', 'objects.undo', 'arrangements.place']);
-  const sendPlanned = async (request: PlannedRequest): Promise<unknown> => {
+  const sendPlanned = async (
+    request: PlannedRequest,
+  ): Promise<{ readonly status: number; readonly body: unknown }> => {
     const active = state.activeWorldEntry;
     if (planClient === null || active === null) throw new Error('No world is open to change.');
     const binding = PLANNED_EDITS.has(request.actionId) ? activeEntryWriteBinding() : null;
-    const body = await planClient.send({
+    const sent = await planClient.send({
       method: request.method,
       path: openWorldPath(request.path, active.worldId, 'a planned change'),
       body: request.body,
     });
+    const body = sent.body;
     if (binding !== null) {
       const version = parseVersion(request.actionId === 'arrangements.place' ? (body as { version: unknown }).version : body);
       await recordAuthoredEntryAdvance(version, binding);
       await objects.begin(version.versionId);
       await environmentSelection.afterAuthoredEdit(version.versionId);
     }
-    return body;
+    return sent;
   };
   actions = mountActions({
     layout,

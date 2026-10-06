@@ -10,7 +10,7 @@
  * differs from its entry's operation, is refused here and never sent.
  */
 
-import type { FromEarlier, PlanStep } from '../../companion-actions-api.js';
+import type { FromEarlier, PlanStep, StepAnswer } from '../../companion-actions-api.js';
 import { actionSpec, type ActionSpec } from './registry.js';
 
 /**
@@ -103,4 +103,41 @@ export function plannedRequest(
     body[field] = value;
   }
   return { request: Object.freeze({ actionId: entry.spec.id, stepIndex: step.index, method, path, body: Object.freeze(body) }) };
+}
+
+/** The identity fields each route's answer carries, and where in its body they are. */
+const ANSWER_FIELDS: Readonly<Record<string, { readonly at: string | null; readonly fields: readonly string[] }>> = {
+  'POST /world/versions/{version_id}/compositions/apply': { at: null, fields: ['edit_seq', 'state_sha256'] },
+  'POST /world/versions/{version_id}/objects/{object_id}/move': { at: null, fields: ['edit_seq', 'state_sha256'] },
+  'POST /world/versions/{version_id}/objects/{object_id}/remove': { at: null, fields: ['edit_seq', 'state_sha256'] },
+  'POST /world/versions/{version_id}/objects/undo': { at: null, fields: ['edit_seq', 'state_sha256'] },
+  'POST /world/versions/{version_id}/arrangements/apply': { at: 'version', fields: ['edit_seq', 'state_sha256'] },
+  'POST /world/versions/{version_id}/society/control/steps': { at: 'receipt', fields: ['event_seq', 'document_sha256'] },
+  'PUT /world/versions/{version_id}/society/control': { at: null, fields: ['revision', 'last_event_seq'] },
+  'POST /world/versions/{version_id}/society': { at: null, fields: ['society_id'] },
+};
+
+/**
+ * A sent step's own answer for `POST /selection/actions/outcome`: the status its request got and,
+ * when refused, the problem's code alone; when it ran, the identity fields its route takes, read
+ * from its body (at the top level, or under `version` or `receipt`), so the server can find the
+ * step's one receipt. A field the body lacks is left out rather than guessed. Any other route
+ * (a style preview or apply) answers with its status and code only.
+ */
+export function stepAnswer(
+  operation: string,
+  sent: { readonly status: number; readonly body?: unknown; readonly code?: string | null },
+): StepAnswer {
+  if (sent.status >= 400) return { status: sent.status, code: sent.code ?? null };
+  const shape = ANSWER_FIELDS[operation];
+  const answer: Record<string, unknown> = { status: sent.status, code: null };
+  if (shape === undefined) return answer as unknown as StepAnswer;
+  const body = sent.body !== null && typeof sent.body === 'object' ? sent.body as Record<string, unknown> : {};
+  const source = shape.at === null ? body : body[shape.at];
+  if (source === null || typeof source !== 'object') return answer as unknown as StepAnswer;
+  for (const field of shape.fields) {
+    const value = (source as Record<string, unknown>)[field];
+    if (typeof value === 'number' || typeof value === 'string') answer[field] = value;
+  }
+  return answer as unknown as StepAnswer;
 }

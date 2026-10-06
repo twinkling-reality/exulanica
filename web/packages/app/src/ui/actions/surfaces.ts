@@ -54,7 +54,8 @@ export interface ActionHost {
   onChange(listener: () => void): () => void;
   readonly toasts: ToastStack;
   /** Sends a request a Companion plan step was built into (`planned.ts`); absent, none is sent. */
-  readonly send?: (request: PlannedRequest) => Promise<unknown>;
+  /** Sends a planned step's request; resolves to the status it got and its body. */
+  readonly send?: (request: PlannedRequest) => Promise<{ readonly status: number; readonly body: unknown }>;
 }
 
 /** What a control for this action should show now. */
@@ -103,10 +104,13 @@ export async function perform(host: ActionHost, id: string, control?: HTMLButton
 
 /** What sending one planned step came to. */
 export type PlannedResult =
-  /** Sent, and the route answered with this body. */
-  | { readonly kind: 'ran'; readonly response: unknown }
-  /** Sent, and the route refused: its code, and the action's words for it. */
-  | { readonly kind: 'refused'; readonly code: string | null; readonly detail: string; readonly words: RefusalWords }
+  /** Sent, and the route answered with this status and body. */
+  | { readonly kind: 'ran'; readonly status: number; readonly response: unknown }
+  /** Sent, and the route refused: its status where it answered, its code, and the action's words. */
+  | {
+    readonly kind: 'refused'; readonly status: number | null; readonly code: string | null;
+    readonly detail: string; readonly words: RefusalWords;
+  }
   /** Not sent: the action is not available now, in the action's words for why. */
   | { readonly kind: 'not-run'; readonly state: string; readonly code: string | null; readonly words: RefusalWords };
 
@@ -132,13 +136,15 @@ export async function performPlanned(
   }
   if (control !== undefined) setButtonBusy(control, true);
   try {
-    return { kind: 'ran', response: await host.send(request) };
+    const sent = await host.send(request);
+    return { kind: 'ran', status: sent.status, response: sent.body };
   } catch (error) {
     const code = error instanceof ApiError ? error.code : null;
     const detail = error instanceof ApiError
       ? error.message.replace(`${error.code}: `, '')
       : error instanceof Error ? error.message : String(error);
-    return { kind: 'refused', code, detail, words: refusalWords(spec, code) };
+    const status = error instanceof ApiError ? error.status : null;
+    return { kind: 'refused', status, code, detail, words: refusalWords(spec, code) };
   } finally {
     if (control !== undefined) setButtonBusy(control, false);
   }

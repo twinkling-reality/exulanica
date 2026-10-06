@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { parseActionPlan, type ActionPlan, type PlanStep } from '../src/companion-actions-api.js';
 import { parseWorldCapabilities, type OperationDescriptors } from '../src/capabilities-api.js';
-import { PLAN_ACTIONS, plannedEntry, plannedRequest } from '../src/ui/actions/planned.js';
+import { PLAN_ACTIONS, plannedEntry, plannedRequest, stepAnswer } from '../src/ui/actions/planned.js';
 import { actionSpec } from '../src/ui/actions/registry.js';
 import { performPlanned, type ActionHost } from '../src/ui/actions/surfaces.js';
 import { toastStack } from '../src/ui/system/components.js';
@@ -128,12 +128,54 @@ describe('sending a planned step', () => {
 
   it('returns the route’s answer, or its refusal in the same words the rail would use', async () => {
     const available = version('available', null, actionSpec('clock.advance').operation!);
-    const ran = await performPlanned(host(available, async () => ({ ok: true })), advance());
-    expect(ran).toEqual({ kind: 'ran', response: { ok: true } });
+    const ran = await performPlanned(host(available, async () => ({ status: 200, body: { ok: true } })), advance());
+    expect(ran).toEqual({ kind: 'ran', status: 200, response: { ok: true } });
     const refused = await performPlanned(host(available, async () => {
       throw new ApiError(409, 'stale_society_state', 'stale_society_state: society changed; reload before advancing');
     }), advance());
-    expect(refused).toMatchObject({ kind: 'refused', code: 'stale_society_state',
+    expect(refused).toMatchObject({ kind: 'refused', status: 409, code: 'stale_society_state',
       words: { happened: 'The world moved on while you were deciding, so its clock did not change.' } });
+  });
+});
+
+describe('a sent step’s own answer, as the outcome read takes it', () => {
+  // Expected shapes from deliveries/UIB/outcome-answer-shape.txt: which fields each route answers
+  // with, and where in its body they are.
+  const sha = (c: string) => c.repeat(64);
+  it('takes an edit’s sequence and digest from the top of its body, or from its version', () => {
+    expect(stepAnswer('POST /world/versions/{version_id}/compositions/apply',
+      { status: 201, body: { edit_seq: 3, state_sha256: sha('a'), objects: [] } }))
+      .toEqual({ status: 201, code: null, edit_seq: 3, state_sha256: sha('a') });
+    expect(stepAnswer('POST /world/versions/{version_id}/objects/undo',
+      { status: 200, body: { edit_seq: 4, state_sha256: sha('b') } }))
+      .toEqual({ status: 200, code: null, edit_seq: 4, state_sha256: sha('b') });
+    expect(stepAnswer('POST /world/versions/{version_id}/arrangements/apply',
+      { status: 201, body: { version: { edit_seq: 5, state_sha256: sha('c') }, edit_seq: 99 } }))
+      .toEqual({ status: 201, code: null, edit_seq: 5, state_sha256: sha('c') });
+  });
+
+  it('takes a clock step’s receipt, a clock setting’s revision and a society’s id', () => {
+    expect(stepAnswer('POST /world/versions/{version_id}/society/control/steps',
+      { status: 200, body: { receipt: { event_seq: 7, document_sha256: sha('d') }, control: { revision: 2 } } }))
+      .toEqual({ status: 200, code: null, event_seq: 7, document_sha256: sha('d') });
+    expect(stepAnswer('PUT /world/versions/{version_id}/society/control',
+      { status: 200, body: { revision: 6, last_event_seq: 12, mode: 'playing' } }))
+      .toEqual({ status: 200, code: null, revision: 6, last_event_seq: 12 });
+    expect(stepAnswer('POST /world/versions/{version_id}/society',
+      { status: 201, body: { society_id: '11111111-1111-4111-8111-111111111111' } }))
+      .toEqual({ status: 201, code: null, society_id: '11111111-1111-4111-8111-111111111111' });
+  });
+
+  it('answers a refusal, and any other route, with its status and code only', () => {
+    expect(stepAnswer('POST /world/versions/{version_id}/compositions/apply', { status: 409, code: 'stale_version' }))
+      .toEqual({ status: 409, code: 'stale_version' });
+    expect(stepAnswer('POST /world/styles/previews', { status: 201, body: { preview_id: 'p', edit_seq: 1 } }))
+      .toEqual({ status: 201, code: null });
+  });
+
+  it('leaves out a field the body lacks rather than guessing it', () => {
+    expect(stepAnswer('POST /world/versions/{version_id}/society/control/steps',
+      { status: 200, body: { control: { revision: 1 } } }))
+      .toEqual({ status: 200, code: null });
   });
 });

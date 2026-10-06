@@ -802,9 +802,15 @@ before it (`body_from`); the world scope is the page's. A step whose typed actio
 or whose route key differs from its entry's operation, is refused in the browser and never sent.
 Each later world-edit step is prepared again against the state the step before it left. The first
 refusal stops the chain; each step then reads as done, not done (with the action's own words) or not
-reached, and Play is offered when the outcome read says a chain left the world paused. The outcome
-read is sent each step's own answer, so a step refused because another writer moved the world first
-reads as superseded, never as that writer's record.
+reached, and Play is offered when the outcome read says a chain left the world paused. With the
+outcome read the browser sends each sent step's own `answer`: the status its request got, the
+problem code when it was refused, and the identity its route returned (an edit's `edit_seq` and
+`state_sha256`, at the top of the body or under `version`; a clock step's receipt `event_seq` and
+`document_sha256`; a clock setting's `revision` and `last_event_seq`; a society's `society_id`).
+A step not sent carries none (`stepAnswer` in `web/packages/app/src/ui/actions/planned.ts`). Each
+step's own answer is also what the sheet shows. The outcome read credits a step only with the
+record its own answer names, so a step refused because another writer moved the world first reads
+as superseded, never as that writer's record.
 
 ## Evidence and limits
 

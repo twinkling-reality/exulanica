@@ -29,9 +29,10 @@ import type {
   CompanionActionsClient,
   PlanClarification,
   PlanStep,
+  StepAnswer,
 } from '../companion-actions-api.js';
 import { availability, actionSpec, refusalWords, type RefusalWords } from '../ui/actions/registry.js';
-import { PLAN_ACTIONS, plannedRequest } from '../ui/actions/planned.js';
+import { PLAN_ACTIONS, plannedRequest, stepAnswer } from '../ui/actions/planned.js';
 import { performPlanned, type ActionHost } from '../ui/actions/surfaces.js';
 import { plannedStepView, type PlanSheet, type PlanStepView } from '../ui/companion-plan.js';
 import { OBJECT_ROLE_LABELS, isObjectRole } from '../world-objects-api.js';
@@ -203,6 +204,8 @@ export function mountCompanionPlans(deps: CompanionPlansDeps): CompanionPlans {
     if (host === null || client === null) return;
     running = true;
     const earlier: unknown[] = [];
+    // Each sent step's own answer, by step index, for the outcome read (`stepAnswer`).
+    const answers: Record<number, StepAnswer> = {};
     let done = 0;
     let stopped = false;
     for (const step of plan.steps) deps.sheet.setStep(step.index, { kind: 'waiting' });
@@ -243,6 +246,12 @@ export function mountCompanionPlans(deps: CompanionPlansDeps): CompanionPlans {
         continue;
       }
       const result = await performPlanned(host, { ...built.request, stepIndex: step.index });
+      const operation = actionSpec(built.request.actionId).operation ?? '';
+      if (result.kind === 'ran') {
+        answers[step.index] = stepAnswer(operation, { status: result.status, body: result.response });
+      } else if (result.kind === 'refused' && result.status !== null) {
+        answers[step.index] = stepAnswer(operation, { status: result.status, code: result.code });
+      }
       if (result.kind === 'ran') {
         earlier[step.index] = result.response;
         done += 1;
@@ -256,7 +265,7 @@ export function mountCompanionPlans(deps: CompanionPlansDeps): CompanionPlans {
     let offerPlay = false;
     if (done > 0) {
       try {
-        offerPlay = (await client.outcome(plan)).alternatives.includes('play');
+        offerPlay = (await client.outcome(plan, answers)).alternatives.includes('play');
       } catch {
         // What was recorded could not be read back; each step's own answer is already shown.
       }
