@@ -8,9 +8,10 @@ applied and rolled back, is the [customization contract](atlas-world-customizati
 the light and finish a preset becomes is the [render look](generated-tile-runtime.md#61-the-render-look-a-style-chooses).
 
 Status: the manifest, both readers, the resolver, the fit rules, the piece budgets, the browser's
-reading of a palette piece and drawing a generated town in a pack (section 7) are built. The packs
-themselves, choosing a pack per world, storing, listing, uploading and downloading packs, binding a
-pack to a world's style version and drafting a pack with a model are planned and not built.
+reading of a palette piece, drawing a generated town in a pack (section 7), three authored packs
+(section 8) and the committed library the host serves (section 9) are built. Choosing a pack per
+world, binding a pack to a world's style version, a person's own packs (storing, uploading and
+downloading them) and drafting a pack with a model are planned and not built.
 
 ## 1. In plain words
 
@@ -151,3 +152,49 @@ down puts every material back and removes every piece.
 | Pieces | A pack's pieces are fetched, held to the size and digest their manifest states, read as palette pieces and uploaded once (`fetchPackPieces`, `uploadPackPieces`); every slot's piece is placed by its fit and baked with the others into one mesh per swatch (`dressSlots`) |
 | Vehicles | A traffic vehicle's body is the pack's piece for `vehicle.<body family>`, chosen by the vehicle's id, contained in the record's own size; its `vehicle_body` swatch takes the vehicle's colour as the pack states it (`vehicle_red`); a body family the pack does not dress keeps the traffic's boxes (`packVehicleBodies`) |
 | Ink | A shading that draws ink outlines the tiles' opaque surfaces and the pack's baked pieces (`attachTileInk`) |
+
+The app draws a saved generated world in the pack its address names (`?look=toon`, `cozy`,
+`finished`, or `today` for the tile look) and otherwise in `DEFAULT_WORLD_LOOK`
+(`web/packages/app/src/world-look.ts`), the cozy town, reading the pack from the host (section 9).
+A pack the page cannot read is not stood in for: the world opens in the tile look, and the shell's
+`data-world-look` attribute states the pack asked for and why it was not drawn.
+
+## 8. The authored packs
+
+Three packs are committed under `assets/style-packs/packs/`, each CC0-1.0 and authored by Exulanica:
+`exulanica.toon-town` (flat colour in two light bands with ink), `exulanica.cozy-town` (faceted,
+warm light, some windows lit) and `exulanica.finished-town` (the town's own materials, physically
+lit, slate roofs). Each states a day and an evening preset, surfaces for the town's materials and
+for every surface family's default, window and door frames that stretch, a hatchback, a sedan, one
+van for minivans and panel vans and a bus for the traffic (bicycles keep the traffic's boxes), a
+tree and a fence. `scripts/style_packs/authored_packs.py` writes every byte of them from boxes,
+prisms, cones and faceted spheres through the shared piece writer, and refuses a frame whose fixed
+parts would not fit the smallest opening the city grammar cuts or the smallest door a site cuts,
+each read from the grammars. `tests/test_authored_style_packs.py` holds the committed files to the
+script, the product's reader, the piece budgets and those openings;
+`web/packages/atlas-react/test/style-pack-authored.test.ts` reads them as the page does.
+
+## 9. The library the host serves
+
+The host serves its committed library, and nothing of a pack is bundled with the page, as no 3D
+content is. When the host starts it reads `assets/style-packs/packs/` once
+(`exulanica/world/style_pack_library.py`) and does not start if a pack breaks a rule, naming the
+pack and the rule: a manifest not written as its canonical JSON and one newline, a manifest the
+authoritative reader refuses, a folder not named by its pack id, a listed file that is absent, a
+symbolic link or other bytes than its manifest states, a file its manifest does not list, or a base
+that is not another pack of the library at the version and digest it names. A name starting with a
+dot is passed over; no pack id or listed path can start with one.
+
+| Route | Answer |
+| --- | --- |
+| `GET /world/style-packs` | `exulanica.style-pack-list/v1`: each pack's id, version and manifest digest, title, description and tags, origin, licence with the attribution it requires, authors, file count and bytes |
+| `GET /world/style-packs/{content_sha256}` | A manifest as its canonical bytes (`application/json`) or a file a manifest lists (its stated media type), named by the SHA-256 of exactly those bytes and cached as immutable; any other digest is 404 `unknown_reference` |
+
+Both need a session holding `world.read`. A request names a digest and nothing else, so no request
+reaches a path. The page reads the list, fetches a pack's manifest by the digest the list names and
+each piece by the digest its manifest states, and holds every answer to its digest before reading
+it (`web/packages/app/src/world-look.ts`). The bytes are held by
+`exulanica/world/committed_content.py`, an index of committed content by digest that any later
+library of committed looks can share. `tests/test_style_pack_library.py` and
+`tests/test_style_pack_routes.py` hold the host's half, and `web/packages/app/test/world-look.test.ts`
+the page's.

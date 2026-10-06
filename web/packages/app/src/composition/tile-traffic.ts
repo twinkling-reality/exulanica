@@ -58,6 +58,8 @@ export interface TrafficReader {
 
 export interface TileTrafficDeps {
   readonly reader: TrafficReader;
+  /** The bodies a style pack draws vehicles in, asked for when the layer is made; none draws boxes. */
+  readonly bodies?: () => import('@exulanica/atlas-react/traffic').VehicleBodies | null;
   readonly now?: () => number;
   readonly setTimer?: (callback: () => void, ms: number) => unknown;
   readonly clearTimer?: (handle: unknown) => void;
@@ -88,17 +90,21 @@ export function withTileTraffic(
   );
 }
 
-/** The tile, with the traffic `reader` reads drawn while it is attached, each state reported. */
+/**
+ * The tile, with the traffic `reader` reads drawn while it is attached, each state reported, its
+ * vehicles in the `bodies` a style pack draws them in when there are any.
+ */
 export function withTraffic(
   tile: LoadedGeneratedTile,
   reader: TrafficReader,
   report: (state: TileTrafficState) => void,
+  bodies: () => import('@exulanica/atlas-react/traffic').VehicleBodies | null = () => null,
 ): LoadedGeneratedTile {
   return {
     ...tile,
     attach(host: GeneratedTileHost): GeneratedTileAttachment {
       const attachment = tile.attach(host);
-      const traffic = startTileTraffic(host, tile, { reader, report });
+      const traffic = startTileTraffic(host, tile, { reader, report, bodies });
       return {
         metrics: attachment.metrics,
         get animating() {
@@ -167,6 +173,7 @@ export function startTileTraffic(
         return surface.sample(x, z)?.height ?? null;
       },
       tileToRenderer,
+      deps.bodies?.() ?? null,
     );
   })();
 

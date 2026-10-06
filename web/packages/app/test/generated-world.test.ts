@@ -88,7 +88,8 @@ describe('a saved generated world of several tiles', () => {
     const bytes = { [west!]: new Uint8Array([1, 2, 3]), [east!]: new Uint8Array([4, 5, 6]) };
     const { fetch, read } = tileRoute(bytes);
     vi.stubGlobal('fetch', fetch);
-    const loaded = await loadGeneratedWorld(access, entry(tiles));
+    // In the tile look, so what it reads is the tiles alone; a pack's reads are world-look.test.ts's.
+    const loaded = await loadGeneratedWorld(access, entry(tiles), '?look=today');
     expect(isGeneratedWorld(loaded)).toBe(true);
     expect(read).toEqual([west, east].map((id) =>
       `/world/versions/version/tiles/${id}/bytes?world_id=world%3Agenerated%3Awide`));

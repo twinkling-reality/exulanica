@@ -22,6 +22,8 @@
 # The versioned catalogs the package reads, some of them when it is imported: the society's
 # routine, words and identities, and the detector's vocabulary. About 800 KiB.
 !assets/catalogs
+# The committed style pack library the API serves, read and checked when it starts. About 520 KiB.
+!assets/style-packs
 # The character catalogs the image publishes, with their containers and licences. About 22 MB.
 !assets/characters/catalog.json
 !assets/characters/looks.json

@@ -999,6 +999,13 @@ def character_catalog(owner) -> str:
     return publication.catalog_sha256
 
 
+def style_pack_content(owner) -> str:
+    """A committed style pack's manifest, which the host serves every workspace by its digest."""
+    from exulanica.world.style_pack_library import style_pack_library
+
+    return style_pack_library().packs[0].manifest_sha256
+
+
 def invented_digest() -> str:
     return uuid.uuid4().hex * 2
 

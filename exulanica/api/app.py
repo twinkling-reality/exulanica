@@ -117,6 +117,7 @@ from exulanica.api.routes import (
     society_experiments,
     society_models,
     spending,
+    style_packs,
     tiles,
     workspace_assets,
     world,
@@ -200,6 +201,7 @@ from exulanica.world import (
 from exulanica.world.flight_input import close_flight_worker
 from exulanica.world.society import SocietyBytesNotRead
 from exulanica.world.specification_samples import close_sample_worker
+from exulanica.world.style_pack_library import style_pack_library
 from exulanica.world.traffic_host import close_traffic_worker
 
 __all__ = ["create_app"]
@@ -280,6 +282,10 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     # evidence path cannot write either, so it is a broken deployment rather than a degraded
     # feature, and it should say so at boot instead of at the first asset read.
     seed_reviewed_assets(services.store)
+    # The committed style pack library, read and held to its digests once, here, so a library that
+    # breaks its own rules stops the start with the pack and the rule named rather than refusing
+    # the first page that asks for a look (exulanica.world.style_pack_library).
+    style_pack_library()
     traffic_signals = TrafficSignalController(
         services.database,
         services.model_client,
@@ -426,10 +432,11 @@ def create_app(services: Services | None = None, *, verify: bool = True) -> Fast
     app.include_router(place_name_rights.router)
     app.include_router(reconstruction_admission.router)
     app.include_router(world.router)
-    # The authored world under /world, in matching order: reviewed assets and behaviours, versions,
-    # environment instances, objects, compositions, arrangements. tests/snapshots/api-routes.json
-    # records it.
+    # The authored world under /world, in matching order: reviewed assets, the committed style pack
+    # library and behaviours, versions, environment instances, objects, compositions, arrangements.
+    # tests/snapshots/api-routes.json records it.
     app.include_router(world_assets.router)
+    app.include_router(style_packs.router)
     app.include_router(world_behaviours.router)
     app.include_router(world_versions.router)
     app.include_router(world_environments.router)

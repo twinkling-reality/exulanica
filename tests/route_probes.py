@@ -809,6 +809,12 @@ EXISTENCE_BUILDERS: Final[Mapping[str, Owned | Shared]] = {
     "/world/projects/{project_id}/items/{item_id}": Owned(build.world_project_item),
     "/world/projects/{project_id}/shares/{share_id}": Owned(build.world_project_share),
     "/world/source-media/{source_id}": Owned(build.source_media),
+    "/world/style-packs/{content_sha256}": Shared(
+        build.style_pack_content,
+        "the committed style pack library is read from the host's tree when it starts, the same "
+        "bytes for every workspace, each addressed by its own digest",
+        build.invented_digest,
+    ),
     "/world/styles/previews/{preview_id}": Owned(build.style_preview),
     "/world/styles/proposals/{proposal_id}": Owned(build.style_proposal),
     "/world/versions/{version_id}": Owned(build.world_version),

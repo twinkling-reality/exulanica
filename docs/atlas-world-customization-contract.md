@@ -6,9 +6,10 @@ controls, failure rules, source-media loading, the frontend integration boundary
 Companion's own appearance. The server half, with its transactions, registry and HTTP routes, is
 the [appearance authority](world-version-authorities.md#appearance-authority). Global appearance
 customization is implemented, including Companion proposals drafted from a person's sentence; a
-regional renderer preview, a library of several complete styles and a structural topology editor
-are not built. The data object a complete style will be, a style pack, is the
-[style pack contract](style-pack-contract.md).
+regional renderer preview, choosing one of several complete styles for a world and a structural
+topology editor are not built. A complete style is a style pack: three are committed and served by
+the host, and the page draws a generated town in the cozy one unless its address names another
+([style pack contract](style-pack-contract.md)).
 
 ## 1. Protected topology
 

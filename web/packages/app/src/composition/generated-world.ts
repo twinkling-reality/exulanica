@@ -25,9 +25,16 @@
  * (`GET /world/versions/{version}/traffic`). A world whose roads hold no traffic is refused by name,
  * and the page then says why in words chosen by the refusal's code (`trafficRefusalWords`), never
  * a blank; the shell's `data-tile-traffic` attribute states what was served and drawn.
+ *
+ * A world is drawn in the look the page chooses (`../world-look.ts`): the tile look, or a style pack
+ * the host serves, whose light the tiles are loaded in and whose surfaces, windows and vehicles dress
+ * them once attached. A pack the page cannot read is not stood in for: the world opens in the tile
+ * look, and the shell's `data-world-look` attribute states the pack asked for and why it was not
+ * drawn.
  */
 
 import type { GeneratedTileAttachment, GeneratedTileHost, LoadedGeneratedTile } from '@exulanica/atlas-react/generated-tile';
+import type { VehicleBodies } from '@exulanica/atlas-react/traffic';
 import type { Credentials } from '../config.js';
 import { fill, say } from '../ui/copy.js';
 import { el } from '../ui/dom.js';
@@ -64,6 +71,8 @@ const GROUND_SEARCH_REACH_MM = 5_000;
 export { GENERATED_WORLD_WAITING_ATTRIBUTE };
 /** Marks the note saying why a world shows no vehicles; it names the refusal's code. */
 export const WORLD_TRAFFIC_NOTE_ATTRIBUTE = 'data-world-traffic-note';
+/** States the look a generated world is drawn in: the pack asked for, and whether it was drawn. */
+export const WORLD_LOOK_ATTRIBUTE = 'data-world-look';
 /** The prefix every refusal to read a generated world's records carries. */
 const UNREADABLE_PREFIX = 'generated_world_';
 /** What the note names when the page could not load its own traffic code. */
@@ -74,6 +83,10 @@ const TRAFFIC_NOT_LOADED = 'traffic_not_loaded';
 export interface GeneratedWorld {
   readonly tile: LoadedGeneratedTile;
   readonly ground: GeneratedGround;
+  /** The look it is drawn in: the pack asked for (null for the tile look), and why one was not drawn. */
+  readonly look: { readonly pack: string | null; readonly drawn: boolean; readonly reason: string | null };
+  /** The bodies its traffic takes from its pack while its tiles are attached, if any. */
+  readonly bodies: () => VehicleBodies | null;
 }
 
 /** Why a saved generated world is not drawn yet: tiles still baking, or a bake that failed. */
@@ -148,6 +161,7 @@ export function groundNear(
 export async function loadGeneratedWorld(
   access: Credentials,
   entry: SavedWorldEntry,
+  search: string = typeof window === 'undefined' ? '' : window.location.search,
 ): Promise<GeneratedWorld | GeneratedWorldWaiting | null> {
   const ground = entry.generatedGround ?? null;
   if (ground === null) return null;
@@ -164,13 +178,27 @@ export async function loadGeneratedWorld(
   })));
   const [first, ...rest] = containers;
   const neighbours: readonly { readonly name: string; readonly bytes: Uint8Array }[] = rest;
-  const loaded = await route.loadGeneratedTile({
+  const worldLook = await import('../world-look.js');
+  const pack = worldLook.chosenWorldLook(search);
+  let prepared: import('../world-look.js').PreparedWorldLook | null = null;
+  let reason: string | null = null;
+  if (pack !== null) {
+    try {
+      prepared = await worldLook.prepareWorldLook(access, pack, library.textureManifest, containers.map((one) => one.bytes));
+    } catch (error) {
+      reason = error instanceof Error ? error.message : String(error);
+    }
+  }
+  const plain = await route.loadGeneratedTile({
     name: first!.name,
     bytes: first!.bytes,
     manifest: parseTextureSetManifest(library.textureManifest),
     fetchSet: (set) => library.textureSet(set.contentSha256),
     ...(neighbours.length === 0 ? {} : { neighbours }),
+    ...(prepared === null ? {} : { look: prepared.look }),
   });
+  const dressed = prepared === null ? null : worldLook.inWorldLook(plain, prepared);
+  const loaded = dressed?.tile ?? plain;
   // Where a person arrives is the world's own spawn, served in the region's frame: east, height,
   // south. The renderer's frame is east, up and south in metres, so it is read across unchanged.
   // Its yaw 0 looks north with forward (-sin yaw, 0, -cos yaw), so a facing of (east, south) is
@@ -185,7 +213,12 @@ export async function loadGeneratedWorld(
     yaw: Math.atan2(-facingEast, -facingSouth),
     pitch: 0,
   };
-  return { tile: { ...loaded, start }, ground };
+  return {
+    tile: { ...loaded, start },
+    ground,
+    look: { pack, drawn: prepared !== null, reason },
+    bodies: dressed?.bodies ?? (() => null),
+  };
 }
 
 /** Whether a load finished with a world to mount, rather than one still being built. */
@@ -270,6 +303,7 @@ async function withWorldTraffic(
   access: Credentials,
   entry: SavedWorldEntry,
   tile: LoadedGeneratedTile,
+  bodies: () => VehicleBodies | null = () => null,
 ): Promise<LoadedGeneratedTile> {
   const note = (): Element | null => env.shell.querySelector(`[${WORLD_TRAFFIC_NOTE_ATTRIBUTE}]`);
   const explain = (code: string): void => {
@@ -321,6 +355,7 @@ async function withWorldTraffic(
       }
       explain(state.reason);
     },
+    bodies,
   ), TILE_TRAFFIC_ATTRIBUTE);
 }
 
@@ -337,7 +372,10 @@ export async function openGeneratedWorld(
   env.shell.querySelector(`[${GENERATED_WORLD_WAITING_ATTRIBUTE}]`)?.remove();
   const loaded = await loadGeneratedWorld(access, entry);
   if (loaded === null) return null;
-  if (isGeneratedWorld(loaded)) return withWorldTraffic(env, access, entry, loaded.tile);
+  if (isGeneratedWorld(loaded)) {
+    env.shell.setAttribute(WORLD_LOOK_ATTRIBUTE, JSON.stringify(loaded.look));
+    return withWorldTraffic(env, access, entry, loaded.tile, loaded.bodies);
+  }
   const words = loaded.waiting === 'baking'
     ? fill('world.generated.baking', { recipe: loaded.ground.recipeLabel })
     : say('world.generated.failed');

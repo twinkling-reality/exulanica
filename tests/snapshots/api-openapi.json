@@ -10567,6 +10567,115 @@
     }
    }
   },
+  "/world/style-packs": {
+   "get": {
+    "tags": [
+     "world"
+    ],
+    "summary": "The committed style packs this host serves: each pack's identity, licence and origin.",
+    "operationId": "style_packs_world_style_packs_get",
+    "parameters": [
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Style Packs World Style Packs Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/world/style-packs/{content_sha256}": {
+   "get": {
+    "tags": [
+     "world"
+    ],
+    "summary": "One style pack manifest or listed file, as the bytes its SHA-256 names.",
+    "operationId": "style_pack_content_world_style_packs__content_sha256__get",
+    "parameters": [
+     {
+      "name": "content_sha256",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "pattern": "^[0-9a-f]{64}$",
+       "title": "Content Sha256"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Style Pack Content World Style Packs  Content Sha256  Get"
+        }
+       },
+       "model/gltf-binary": {}
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/world/behaviours": {
    "get": {
     "tags": [
