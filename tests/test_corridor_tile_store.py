@@ -8,6 +8,7 @@ a workspace was served a tile, and may not publish one.
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import uuid
 from collections.abc import Iterator
@@ -27,6 +28,7 @@ from exulanica.world.baked_tiles import (
 )
 from psycopg.rows import dict_row
 
+from baked_tile_stages import CURRENT_STAGE_PARAMS, CURRENT_STAGE_VERSION, stated_stage
 from pg_harness import migrated_schema
 from test_route_permissions import APP_ROLE, app_role_dsn
 
@@ -64,8 +66,8 @@ def _record(repository: BakedTileRepository, key: uuid.UUID, container: bytes, *
     tile = {**_tile(), **changes.pop("tile", {})}
     return repository.record(
         baked_tile_id=key,
-        stage_version=3,
-        stage_params_sha256=hashlib.sha256(b"params").digest(),
+        stage_version=CURRENT_STAGE_VERSION,
+        stage_params_sha256=CURRENT_STAGE_PARAMS,
         tile=tile,
         document=b"a tile document",
         container=container,
@@ -120,8 +122,8 @@ def test_the_identity_a_row_carries_is_the_world_the_tile_record_stated(stored):
     record = _tile()
     repository.record(
         baked_tile_id=key,
-        stage_version=3,
-        stage_params_sha256=hashlib.sha256(b"params").digest(),
+        stage_version=CURRENT_STAGE_VERSION,
+        stage_params_sha256=CURRENT_STAGE_PARAMS,
         tile=record,
         document=b"a tile document",
         container=b"a container",
@@ -196,15 +198,22 @@ def test_one_tile_document_baked_by_two_tessellators_makes_two_rows(stored):
     than a fault under the old key. 0072 made `tile_inputs_digest` unique on its own, so the first
     bake after a tessellator bump failed on a key that had correctly moved.
     """
-    _admin, repository, _scratch = stored
+    admin, repository, _scratch = stored
     older, newer = uuid.uuid4(), uuid.uuid4()
     assert _record(repository, older, b"as the old tessellator wrote it") == "stored"
+    # The same tile, the same inputs; a tessellator whose stated version has moved, which ships
+    # with the migration that states its stage (0144).
+    newer_params = hashlib.sha256(b"params with tessellator 5").digest()
+    with stated_stage(admin, CURRENT_STAGE_VERSION, newer_params):
+        _two_tessellators(repository, older, newer, newer_params)
+
+
+def _two_tessellators(repository, older, newer, newer_params) -> None:
     assert (
         repository.record(
             baked_tile_id=newer,
-            stage_version=3,
-            # The same tile, the same inputs; a tessellator whose stated version has moved.
-            stage_params_sha256=hashlib.sha256(b"params with tessellator 5").digest(),
+            stage_version=CURRENT_STAGE_VERSION,
+            stage_params_sha256=newer_params,
             tile=_tile(),
             document=b"a tile document",
             container=b"as the new tessellator writes it",
@@ -248,28 +257,49 @@ def test_a_city_listing_names_the_current_bake_of_each_tile(stored):
     returned every bake ever made, ordered by `lod, tile_y, tile_x`, which does not order among
     rows sharing all three. A caller reading by coordinate took whichever row the plan yielded.
     """
-    _admin, repository, _scratch = stored
+    admin, repository, _scratch = stored
     seed = str(_tile()["city_seed"])
     # Three bakes of tile (2, 0), oldest first, and one of tile (3, 0) for company. Each later bake
-    # is a new key because a new tessellator moves the stage params digest, which is migration 0077.
+    # is a new key because a new tessellator moves the stage params digest, which is migration 0077,
+    # and each is published under the stage its migration states as current (0144).
     keys = [uuid.uuid4() for _ in range(3)]
-    for index, key in enumerate(keys):
+    neighbour = uuid.uuid4()
+    with contextlib.ExitStack() as stages:
+        for index, key in enumerate(keys):
+            params = hashlib.sha256(f"params {index}".encode()).digest()
+            stages.enter_context(stated_stage(admin, CURRENT_STAGE_VERSION, params))
+            assert (
+                repository.record(
+                    baked_tile_id=key,
+                    stage_version=CURRENT_STAGE_VERSION,
+                    stage_params_sha256=params,
+                    tile=_tile(),
+                    document=b"a tile document",
+                    container=f"container {index}".encode(),
+                    render_batch_sha256=hashlib.sha256(b"render").digest(),
+                    nav_envelope_sha256=hashlib.sha256(b"nav").digest(),
+                    receipt={"tessellator": index, "container": "owd/3"},
+                )
+                == "stored"
+            )
         assert (
             repository.record(
-                baked_tile_id=key,
-                stage_version=3,
-                stage_params_sha256=hashlib.sha256(f"params {index}".encode()).digest(),
-                tile=_tile(),
+                baked_tile_id=neighbour,
+                stage_version=CURRENT_STAGE_VERSION,
+                stage_params_sha256=params,
+                tile=_tile(3),
                 document=b"a tile document",
-                container=f"container {index}".encode(),
+                container=b"the tile next door",
                 render_batch_sha256=hashlib.sha256(b"render").digest(),
                 nav_envelope_sha256=hashlib.sha256(b"nav").digest(),
-                receipt={"tessellator": index, "container": "owd/3"},
+                receipt={"tessellator": 2, "container": "owd/3"},
             )
             == "stored"
         )
-    neighbour = uuid.uuid4()
-    assert _record(repository, neighbour, b"the tile next door", tile={"tile_x": 3}) == "stored"
+        _listing_names_the_current_bake(repository, seed, keys, neighbour)
+
+
+def _listing_names_the_current_bake(repository, seed, keys, neighbour) -> None:
 
     listed = repository.tiles_of_world(seed)
     # One row per tile, and for the tile with three bakes it is the last one published.
@@ -289,15 +319,21 @@ def test_a_faulted_current_bake_stays_current_and_is_refused_at_the_bytes(stored
     """No silent substitution. A faulted newest row is listed, carries its state, and `servable`
     refuses it. Falling back to the previous good bake would draw older geometry than the store
     says it holds, without anybody asking for it."""
-    _admin, repository, _scratch = stored
+    admin, repository, _scratch = stored
     seed = str(_tile()["city_seed"])
     older, newer = uuid.uuid4(), uuid.uuid4()
     assert _record(repository, older, b"the bake before") == "stored"
+    newer_params = hashlib.sha256(b"params of the newer tessellator").digest()
+    with stated_stage(admin, CURRENT_STAGE_VERSION, newer_params):
+        _a_faulted_current_bake(repository, seed, older, newer, newer_params)
+
+
+def _a_faulted_current_bake(repository, seed, older, newer, newer_params) -> None:
     assert (
         repository.record(
             baked_tile_id=newer,
-            stage_version=3,
-            stage_params_sha256=hashlib.sha256(b"params of the newer tessellator").digest(),
+            stage_version=CURRENT_STAGE_VERSION,
+            stage_params_sha256=newer_params,
             tile=_tile(),
             document=b"a tile document",
             container=b"the current bake",
@@ -311,8 +347,8 @@ def test_a_faulted_current_bake_stays_current_and_is_refused_at_the_bytes(stored
     assert (
         repository.record(
             baked_tile_id=newer,
-            stage_version=3,
-            stage_params_sha256=hashlib.sha256(b"params of the newer tessellator").digest(),
+            stage_version=CURRENT_STAGE_VERSION,
+            stage_params_sha256=newer_params,
             tile=_tile(),
             document=b"a tile document",
             container=b"the current bake, differently",

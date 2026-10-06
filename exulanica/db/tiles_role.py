@@ -35,6 +35,7 @@ __all__ = [
     "TilesRoleUnsafe",
     "assert_tiles_role",
     "provision_tiles_role",
+    "publish_function_installed",
     "tile_publishers",
 ]
 
@@ -99,17 +100,23 @@ def provision_tiles_role(
             )
         connection.execute(sql.SQL("grant usage on schema {} to {}").format(schema, role_name))
         connection.execute(sql.SQL("revoke create on schema {} from {}").format(schema, role_name))
-        present = connection.execute(
-            "select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace "
-            "where n.nspname = current_schema() and p.proname = %s and p.prosecdef",
-            (PUBLISH_FUNCTION[0],),
-        ).fetchone()
-        if present is not None:
+        if publish_function_installed(connection):
             connection.execute(
                 sql.SQL("grant execute on function {} to {}").format(
                     _signature(connection), role_name
                 )
             )
+
+
+def publish_function_installed(connection: psycopg.Connection) -> bool:
+    """Whether the schema holds the publish function as its owner's to lend (migration 0138 or
+    later): a database provisioned below 0138 has nothing to grant and nothing to check."""
+    row = connection.execute(
+        "select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace "
+        "where n.nspname = current_schema() and p.proname = %s and p.prosecdef",
+        (PUBLISH_FUNCTION[0],),
+    ).fetchone()
+    return row is not None
 
 
 def tile_publishers(connection: psycopg.Connection) -> list[str]:
@@ -126,15 +133,17 @@ def tile_publishers(connection: psycopg.Connection) -> list[str]:
     return sorted({row["name"] for row in rows})
 
 
-def assert_tiles_role(connection: psycopg.Connection) -> None:
-    """Refuse a connection that is not a narrow tile publisher.
+def assert_tiles_role(connection: psycopg.Connection, role: str | None = None) -> None:
+    """Refuse a tile publisher wider than the narrow role: the connection's own user, or ``role``
+    by name (as ``exulanica-db`` checks the role it just provisioned).
 
     The owner, a superuser or a BYPASSRLS role, a member of any role, a role that can create in
     the schema, reach any table or sequence, or execute any other SECURITY DEFINER function, is
     refused by name. So is a role that cannot execute the publish function.
     """
     with connection.cursor(row_factory=dict_row) as cursor:
-        role = cursor.execute("select current_user name").fetchone()["name"]
+        if role is None:
+            role = cursor.execute("select current_user name").fetchone()["name"]
         row = cursor.execute(
             "select oid, rolsuper, rolbypassrls, rolcreaterole, rolcreatedb, rolreplication, "
             "rolinherit from pg_roles where rolname = %s",
@@ -157,25 +166,26 @@ def assert_tiles_role(connection: psycopg.Connection) -> None:
         ):
             raise TilesRoleUnsafe(f"{role} owns schema objects; the owner never publishes here")
         if cursor.execute(
-            "select has_schema_privilege(current_user, current_schema(), 'CREATE') allowed"
+            "select has_schema_privilege(%s, current_schema(), 'CREATE') allowed", (role,)
         ).fetchone()["allowed"]:
             raise TilesRoleUnsafe(f"{role} can create schema objects")
         if cursor.execute(
             "select 1 from pg_class c join pg_namespace n on n.oid = c.relnamespace "
             "where n.nspname = current_schema() and ("
-            "(c.relkind in ('r','p','v','m','f') and (has_table_privilege(current_user, c.oid, "
+            "(c.relkind in ('r','p','v','m','f') and (has_table_privilege(%(role)s, c.oid, "
             "'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER') "
-            "or has_any_column_privilege(current_user, c.oid, 'SELECT,INSERT,UPDATE,REFERENCES'))) "
-            "or (c.relkind = 'S' and has_sequence_privilege(current_user, c.oid, "
-            "'SELECT,USAGE,UPDATE'))) limit 1"
+            "or has_any_column_privilege(%(role)s, c.oid, 'SELECT,INSERT,UPDATE,REFERENCES'))) "
+            "or (c.relkind = 'S' and has_sequence_privilege(%(role)s, c.oid, "
+            "'SELECT,USAGE,UPDATE'))) limit 1",
+            {"role": role},
         ).fetchone():
             raise TilesRoleUnsafe(f"{role} can reach a table or sequence")
         others = cursor.execute(
             "select p.oid::regprocedure::text signature from pg_proc p "
             "join pg_namespace n on n.oid = p.pronamespace "
             "where n.nspname = current_schema() and p.prosecdef and p.proname <> %s "
-            "and has_function_privilege(current_user, p.oid, 'EXECUTE') order by 1",
-            (PUBLISH_FUNCTION[0],),
+            "and has_function_privilege(%s, p.oid, 'EXECUTE') order by 1",
+            (PUBLISH_FUNCTION[0], role),
         ).fetchall()
         if others:
             raise TilesRoleUnsafe(
@@ -183,11 +193,11 @@ def assert_tiles_role(connection: psycopg.Connection) -> None:
                 + ", ".join(r["signature"] for r in others)
             )
         allowed = cursor.execute(
-            "select coalesce(bool_or(has_function_privilege(current_user, p.oid, 'EXECUTE') "
+            "select coalesce(bool_or(has_function_privilege(%s, p.oid, 'EXECUTE') "
             "and p.prosecdef), false) ok from pg_proc p "
             "join pg_namespace n on n.oid = p.pronamespace "
             "where n.nspname = current_schema() and p.proname = %s",
-            (PUBLISH_FUNCTION[0],),
+            (role, PUBLISH_FUNCTION[0]),
         ).fetchone()["ok"]
         if not allowed:
             raise TilesRoleUnsafe(f"{role} cannot execute {PUBLISH_FUNCTION[0]}")

@@ -311,7 +311,9 @@ def workspace_id() -> uuid.UUID:
 #: would empty the vocabulary and every later insert would be refused by a guard doing its job.
 #: The registries are named once, in ``exulanica.db.registries``; beside them the harness keeps
 #: ``schema_migrations`` and the pipeline's stage catalogue, ``stage_registry``.
-_PRESERVED_TABLES = frozenset({*REGISTRY_TABLES, "schema_migrations", "stage_registry"})
+_PRESERVED_TABLES = frozenset(
+    {*REGISTRY_TABLES, "schema_migrations", "stage_registry", "baked_tile_stage"}
+)
 
 #: Emptied with DELETE rather than TRUNCATE, because migration 0013 puts a BEFORE TRUNCATE
 #: trigger on both. That trigger is not decoration and this is not a workaround for it: measured

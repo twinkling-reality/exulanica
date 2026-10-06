@@ -38,6 +38,7 @@ from fastapi.testclient import TestClient
 from psycopg.rows import dict_row
 
 import traffic_corridor_support as corridor
+from baked_tile_stages import CURRENT_STAGE_PARAMS, CURRENT_STAGE_VERSION
 from pg_harness import migrated_schema
 from test_route_permissions import ALL_PERMISSIONS, APP_ROLE, app_role_dsn
 
@@ -79,8 +80,8 @@ def _record(repository: BakedTileRepository, tile, container: bytes, seed: str) 
     fields = record_payload(tile)["fields"]
     repository.record(
         baked_tile_id=uuid.uuid4(),
-        stage_version=3,
-        stage_params_sha256=hashlib.sha256(b"params").digest(),
+        stage_version=CURRENT_STAGE_VERSION,
+        stage_params_sha256=CURRENT_STAGE_PARAMS,
         tile={**fields, "city_seed": seed, "tile_inputs_digest": tile_inputs_digest(tile)},
         document=b"a tile document",
         container=container,

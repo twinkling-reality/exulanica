@@ -279,32 +279,40 @@ def _project_components(
     captures = cursor.execute(
         "select c.capture_id,c.blob_sha256,c.started_at,c.created_at,b.byte_size,b.media_type,"
         "b.ni_uri,b.purged_at from capture c join blob b using(blob_sha256) "
-        "where c.deleted_at is null order by c.capture_id"
+        "where c.workspace_id=current_workspace() and c.deleted_at is null order by c.capture_id"
     ).fetchall()
     spans = cursor.execute(
         "select s.span_id,s.blob_sha256,s.track_key,s.t_start_ns,s.t_end_ns,s.modality,"
-        "s.region,s.span_digest from evidence_span s where exists "
-        "(select 1 from capture c where c.blob_sha256=s.blob_sha256 and c.deleted_at is null) "
+        "s.region,s.span_digest from evidence_span s "
+        "where s.workspace_id=current_workspace() and exists "
+        "(select 1 from capture c where c.workspace_id=s.workspace_id "
+        "and c.blob_sha256=s.blob_sha256 and c.deleted_at is null) "
         "order by s.span_id"
     ).fetchall()
     occurrences = cursor.execute(
         "select o.occurrence_id,o.capture_id,o.class,o.primary_span_id,o.span_ids,o.presence,"
         "o.detector_version,o.quality,o.identity_key from occurrence o "
-        "join capture c using(capture_id) "
-        "where c.deleted_at is null and not exists ("
-        "select 1 from entity_link withdrawn join entity e using(entity_id) "
-        "where withdrawn.occurrence_id=o.occurrence_id and withdrawn.state='confirmed' "
+        "join capture c on c.workspace_id=o.workspace_id and c.capture_id=o.capture_id "
+        "where o.workspace_id=current_workspace() and c.deleted_at is null and not exists ("
+        "select 1 from entity_link withdrawn join entity e "
+        "on e.workspace_id=withdrawn.workspace_id and e.entity_id=withdrawn.entity_id "
+        "where withdrawn.workspace_id=o.workspace_id "
+        "and withdrawn.occurrence_id=o.occurrence_id and withdrawn.state='confirmed' "
         "and e.deleted_at is not null) order by o.occurrence_id"
     ).fetchall()
     entities = cursor.execute(
         "select entity_id,class,display_name,merged_into,created_at from entity "
-        "where deleted_at is null order by entity_id"
+        "where workspace_id=current_workspace() and deleted_at is null order by entity_id"
     ).fetchall()
     links = cursor.execute(
         "select l.link_id,l.occurrence_id,l.entity_id,l.state,l.method,l.basis_digest,l.decided_at "
-        "from entity_link l join entity e using(entity_id) join occurrence o using(occurrence_id) "
-        "join capture c on c.capture_id=o.capture_id "
-        "where e.deleted_at is null and c.deleted_at is null order by l.link_id"
+        "from entity_link l join entity e on e.workspace_id=l.workspace_id "
+        "and e.entity_id=l.entity_id join occurrence o on o.workspace_id=l.workspace_id "
+        "and o.occurrence_id=l.occurrence_id "
+        "join capture c on c.workspace_id=o.workspace_id and c.capture_id=o.capture_id "
+        "where l.workspace_id=current_workspace() and e.deleted_at is null "
+        "and c.deleted_at is null "
+        "order by l.link_id"
     ).fetchall()
     # **The scene predicate is asked ONCE, here, and every other query is filtered by its
     # answer.** ADR-0009 D9 gives a fact about N photographs a subject, and the reduction over
@@ -322,10 +330,10 @@ def _project_components(
     # already dropped. Nothing in this repository writes a future `effective_at`, so it is
     # unreachable today and it is designed out rather than commented around.
     #
-    # The workspace filter is explicit rather than left to row-level security, which is what the
-    # older queries in this function rely on. Both are correct in production; only this one is
-    # falsifiable by a test, because the harness connects as the schema owner and a superuser
-    # bypasses row-level security entirely, so no test here can see a missing predicate.
+    # The workspace filter is explicit, as in every read of this function, rather than left to
+    # row-level security: an owner or superuser connection bypasses row-level security entirely,
+    # so only an explicit predicate holds there, and only it is falsifiable by a test, since the
+    # harness connects as the schema owner.
     # A production worker prepares scene and artifact rows before flushing object bytes, then
     # publishes its assertion and succeeded job in a second transaction. A package must not
     # expose that retryable middle state. Scenes created before the job system have no job row
@@ -348,8 +356,8 @@ def _project_components(
         "a.valid_time,a.asserted_at,a.support_span_ids,a.external_source,a.status,a.supersedes "
         "from assertion a join predicate p using(predicate_id) "
         "where a.workspace_id=%s and a.status='active' "
-        "and not exists (select 1 from tombstone t where t.scope='assertion' "
-        "and t.assertion_id=a.assertion_id and t.effective_at<=now()) "
+        "and not exists (select 1 from tombstone t where t.workspace_id=a.workspace_id "
+        "and t.scope='assertion' and t.assertion_id=a.assertion_id and t.effective_at<=now()) "
         "and not tombstone_blocks_any_span(a.workspace_id,a.support_span_ids) "
         "and (a.subject_ref->>'type' <> 'capture' or exists ("
         "select 1 from capture c where c.workspace_id=a.workspace_id "
@@ -397,7 +405,8 @@ def _project_components(
         "a.content_sha256,a.byte_size,a.superseded_by,a.purged_at,a.needs_repair,a.scene_id "
         "from artifact a where a.workspace_id=%s and ("
         "(a.scene_id is null and exists (select 1 from capture c "
-        " where c.blob_sha256=a.source_blob_sha256 and c.deleted_at is null) "
+        " where c.workspace_id=a.workspace_id "
+        " and c.blob_sha256=a.source_blob_sha256 and c.deleted_at is null) "
         " and not person_withdrawal_blocks_artifact(a.workspace_id,a.artifact_id)) "
         "or exists (select 1 from reconstruction_scene s "
         "left join reconstruction_scene_job j on j.workspace_id=s.workspace_id "
@@ -972,7 +981,7 @@ def _provenance(
         "e.attempt,e.max_attempts,e.error_class,e.started_at,e.ended_at,e.duration_ms,e.cost,"
         "e.occurred_at,r.capture_id,r.trigger,r.status as run_status "
         "from pipeline_event e join pipeline_run r using(run_id) "
-        "where r.capture_id=any(%s) order by e.run_id,e.seq",
+        "where r.workspace_id=current_workspace() and r.capture_id=any(%s) order by e.run_id,e.seq",
         (list(capture_ids),),
     ).fetchall()
     return {
@@ -1044,7 +1053,7 @@ def _deletion(cursor: psycopg.Cursor) -> dict[str, Any]:
     rows = cursor.execute(
         "select tombstone_id,scope,capture_id,track_key,interval_ns,entity_id,assertion_id,"
         "blocklist_hash,requested_at,effective_at,purge_completed_at from tombstone "
-        "order by effective_at,tombstone_id"
+        "where workspace_id=current_workspace() order by effective_at,tombstone_id"
     ).fetchall()
     return {
         "items": [

@@ -18,7 +18,9 @@ import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from exulanica.store.namespaces import tile_store
 from exulanica.world.arrival_worlds import (
+    ArrivalWorldNotBaked,
     ArrivalWorldsInvalid,
+    arrival_tiles_baked,
     load_arrival_worlds,
     make_arrival_world,
 )
@@ -36,12 +38,14 @@ def _made_alias(request):
     return request.getfixturevalue("imported_made")
 
 
-def _copy(api, workspace: uuid.UUID, world):
+def _copy(api, workspace: uuid.UUID, world, *, require_baked: bool = True):
     """``world`` made in ``workspace`` as the runtime role, with the tiles it reads and the bake
-    jobs it queued."""
+    jobs it queued. The installation's own copy, which bakes them, is made unbaked."""
     with api.database.session(workspace) as connection:
         repository = SavedWorldEntryRepository(connection, workspace, api.store)
-        entry = make_arrival_world(repository, world, created_by=uuid.uuid4())
+        entry = make_arrival_world(
+            repository, world, created_by=uuid.uuid4(), require_baked=require_baked
+        )
         tiles = generated_tiles(connection, workspace, entry.world_id, entry.source_snapshot_id)
         jobs = connection.execute(
             "select count(*) n from job where workspace_id=%s and kind=%s "
@@ -59,11 +63,22 @@ def test_a_second_workspace_s_arrival_world_opens_baked_with_no_job(made, tmp_pa
     (world, *_) = load_arrival_worlds()
     installation = api.repository.workspace_id
 
-    first, waiting, queued = _copy(api, installation, world)
-    assert queued == len(waiting) > 0
-    assert {tile.state for tile in waiting} == {"baking"}
+    # Before the installation's copy is baked, a visitor's copy waits rather than being made.
+    early = uuid.uuid4()
+    with api.database.session(early) as connection:
+        repository = SavedWorldEntryRepository(connection, early, api.store)
+        baked_already = arrival_tiles_baked(connection, world)
+        if not baked_already:
+            with pytest.raises(ArrivalWorldNotBaked):
+                make_arrival_world(repository, world, created_by=uuid.uuid4())
+            assert repository.entries() == ()
+
+    first, waiting, queued = _copy(api, installation, world, require_baked=False)
+    if not baked_already:
+        assert queued == len(waiting) > 0
+        assert {tile.state for tile in waiting} == {"baking"}
     outcomes = _baker(api, store, tmp_path, monkeypatch).drain([installation])
-    assert {outcome.status for outcome in outcomes} == {"baked"}
+    assert {outcome.status for outcome in outcomes} <= {"baked"}, [o.detail for o in outcomes]
 
     visitor = uuid.uuid4()
     copy, tiles, jobs = _copy(api, visitor, world)
@@ -104,7 +119,7 @@ def test_one_arrival_identity_in_two_workspaces_is_two_worlds_neither_can_see(
     owner = api.repository.workspace_id
     stranger = api.client.app.state.services.tokens.session_for(STRANGER_TOKEN).workspace_id
     # The stranger's copy first, so a lookup by identity alone would meet it before the owner's.
-    theirs, _, _ = _copy(api, stranger, world)
+    theirs, _, _ = _copy(api, stranger, world, require_baked=False)
     _baker(api, store, tmp_path, monkeypatch).drain([stranger])
     mine, tiles, jobs = _copy(api, owner, world)
     # (a) both are made, as two worlds of one identity.
@@ -144,6 +159,25 @@ def test_one_arrival_identity_in_two_workspaces_is_two_worlds_neither_can_see(
         world_id=world.world_id,
     )
     assert projected.structure_snapshot_id == mine.source_snapshot_id
+
+
+@pytest.mark.postgres
+def test_a_visitor_s_copy_waits_until_the_arrival_tiles_are_baked(made):
+    """An arrival identity nobody has baked: a visitor's copy is refused by name and nothing is
+    made; the installation's own copy, which bakes it, is made."""
+    api = made
+    (shipped, *_) = load_arrival_worlds()
+    fresh = dataclasses.replace(shipped, key="fresh", world_id=f"world:generated:{uuid.uuid4()}")
+    visitor = uuid.uuid4()
+    with api.database.session(visitor) as connection:
+        repository = SavedWorldEntryRepository(connection, visitor, api.store)
+        assert not arrival_tiles_baked(connection, fresh)
+        with pytest.raises(ArrivalWorldNotBaked):
+            make_arrival_world(repository, fresh, created_by=uuid.uuid4())
+        assert repository.entries() == ()
+    made_unbaked, tiles, jobs = _copy(api, api.repository.workspace_id, fresh, require_baked=False)
+    assert made_unbaked.world_id == fresh.world_id
+    assert jobs == len(tiles) > 0
 
 
 def _catalog(tmp_path, worlds) -> dict[str, str]:

@@ -35,7 +35,9 @@ __all__ = [
     "ARRIVAL_WORLDS_PATH",
     "PROFILE",
     "ArrivalWorld",
+    "ArrivalWorldNotBaked",
     "ArrivalWorldsInvalid",
+    "arrival_tiles_baked",
     "load_arrival_worlds",
     "main",
     "make_arrival_world",
@@ -104,16 +106,46 @@ def load_arrival_worlds(environ: Mapping[str, str] | None = None) -> tuple[Arriv
     return tuple(worlds)
 
 
-def make_arrival_world(repository: Any, world: ArrivalWorld, *, created_by: uuid.UUID) -> Any:
+class ArrivalWorldNotBaked(RuntimeError):
+    """An arrival world's tiles are not all baked yet, so a visitor's copy would wait."""
+
+
+def arrival_tiles_baked(connection: Any, world: ArrivalWorld) -> bool:
+    """Whether every tile of ``world`` is stored and servable under the stage this installation
+    runs. Composing the world writes nothing; its tiles are read by the digest of their inputs."""
+    from exulanica.world.baked_tiles import current_bake
+    from exulanica.world.composers import composer_module
+    from exulanica.world.generated_worlds import compose_generated_world
+    from exulanica.world.world_recipes import town_recipe
+
+    composed = compose_generated_world(town_recipe(world.recipe, world.values), world.world_id)
+    composer = composed.receipt["composer"]
+    for _tile, inputs in composer_module(composer["key"], composer["version"]).tile_inputs(
+        composed.receipt
+    ):
+        bake = current_bake(connection, inputs)
+        if bake is None or not bake.servable:
+            return False
+    return True
+
+
+def make_arrival_world(
+    repository: Any, world: ArrivalWorld, *, created_by: uuid.UUID, require_baked: bool = True
+) -> Any:
     """Make ``world`` in the repository's workspace under its fixed identity, and answer the
     saved entry; the workspace's existing copy when it already holds that identity.
 
+    A visitor's copy is made only once the arrival world's tiles are baked
+    (:class:`ArrivalWorldNotBaked` otherwise), so it opens at once rather than waiting; the
+    installation's own copy, which is what bakes them, passes ``require_baked=False``.
     ``repository`` is the workspace's
     :class:`~exulanica.world.saved_entries.SavedWorldEntryRepository`.
     """
     for entry in repository.entries():
         if entry.world_id == world.world_id:
             return entry
+    if require_baked and not arrival_tiles_baked(repository.connection, world):
+        raise ArrivalWorldNotBaked(f"{world.key}'s tiles are not all baked yet")
     return repository.create_generated(
         title=world.title,
         recipe_key=world.recipe,
@@ -160,7 +192,7 @@ def main(argv: Sequence[str] | None = None, *, stream: Any = None) -> int:
     with database.session(args.workspace) as connection:
         repository = SavedWorldEntryRepository(connection, args.workspace, content_stores().blobs)
         for world in worlds:
-            entry = make_arrival_world(repository, world, created_by=actor)
+            entry = make_arrival_world(repository, world, created_by=actor, require_baked=False)
             tiles = generated_tiles(
                 connection, args.workspace, world.world_id, entry.source_snapshot_id
             )

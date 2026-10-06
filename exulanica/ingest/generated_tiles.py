@@ -11,9 +11,11 @@ drains them one workspace at a time:
    a child process each, under a wall-clock timeout, as the offline bake does. The child is given
    only the environment :func:`child_environment` allows, so no database URL, credential or key
    this worker holds reaches Node or a web dependency.
-3. It **publishes** each bake through the owner connection, the only role migration 0072 lets
-   write a baked tile, and nothing else: the first answer is ``stored`` (or ``identical`` when the
-   same tile was baked for another world), and the second must be ``identical``. A publish the
+3. It **publishes** each bake through the publisher connection, as ``exulanica_tiles``, which may
+   execute ``record_baked_tile_bake`` and nothing else (migration 0138); that function runs with
+   its owner's rights and accepts only a bake of the stage the installation runs (0144). The first
+   answer is ``stored`` (or ``identical`` when the same tile was baked for another world), and the
+   second must be ``identical``. A publish the
    database refuses for the moment (SQLSTATE 40001 from migration 0041's guard while a reader holds
    the asset read lock, or a dropped connection) is tried again after a short jittered wait, and a
    publish still refused goes back to the queue with a later ``run_after``, bounded by
@@ -333,7 +335,8 @@ class GeneratedTileBaker:
         return statement
 
     def _publish(self, fields: Mapping[str, Any]) -> str:
-        """Record one bake through the owner connection, tried again while the database refuses it
+        """Record one bake through the publisher connection (the tile role, migration 0138), tried
+        again while the database refuses it
         for the moment. Each try opens a publisher of its own, so a refused try leaves nothing
         behind, and the write is one function call, so the next try is the same write; a publish
         refused through every wait of :data:`PUBLISH_RETRY_DELAYS` is :class:`PublishRefused`."""

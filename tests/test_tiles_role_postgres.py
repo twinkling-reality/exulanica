@@ -32,6 +32,7 @@ from exulanica.db.tiles_role import (
 )
 from exulanica.env import env_get
 from exulanica.ingest.generated_tiles_command import check_publisher
+from exulanica.ingest.stages import STAGES
 from psycopg import sql
 from psycopg.conninfo import make_conninfo
 from psycopg.rows import dict_row
@@ -97,8 +98,9 @@ def _arguments(container: bytes) -> tuple:
     digest = uuid.uuid4().bytes * 2
     return (
         uuid.uuid4(),
-        1,
-        hashlib.sha256(b"params").digest(),
+        # The stage the installation runs (migration 0144 refuses any other).
+        STAGES["baked_tile"].version,
+        STAGES["baked_tile"].params_digest,
         hashlib.sha256(digest).digest(),
         hashlib.sha256(b"seed").digest(),
         json.dumps([]),
@@ -204,7 +206,7 @@ def test_the_function_runs_as_its_owner_with_every_name_qualified(spine_schema):
     for name in relations:
         assert name.startswith((f'"{scratch}".', f"{scratch}.")), name
     calls = re.findall(r"([A-Za-z_][\w.]*)\s*\(", body)
-    keywords = {"if", "values", "and", "or", "not", "in", "insert", "returns"}
+    keywords = {"if", "values", "and", "or", "not", "in", "insert", "returns", "exists"}
     unqualified = [name for name in calls if "." not in name and name.lower() not in keywords]
     # Every function call is pg_catalog's, written as such; the column list after an insert's
     # table name is the only parenthesis that follows a bare word.
@@ -259,7 +261,33 @@ def test_the_worker_refuses_a_wider_publisher_on_the_public_profile_and_warns_el
         ).fetchone()[0]
     assert check_publisher(tiles, public) is None
     assert check_publisher(tiles, elsewhere) is None
-    with pytest.raises(TilesRoleUnsafe, match="public profile publishes only as the tile role"):
+    with pytest.raises(TilesRoleUnsafe, match="published only as the tile role"):
         check_publisher(owner, public)
     assert check_publisher(owner, elsewhere)
     assert check_publisher(owner, {})
+    # The rule is the component, not the profile's name: any profile installing generated tiles.
+    renamed = json.loads((profiles / "public.json").read_text(encoding="utf-8"))
+    renamed["id"] = "a-public-server-by-another-name"
+    (tmp_path / "renamed.json").write_text(json.dumps(renamed), encoding="utf-8")
+    with pytest.raises(TilesRoleUnsafe, match="published only as the tile role"):
+        check_publisher(owner, {"EXULANICA_INSTALLATION_PROFILE": str(tmp_path / "renamed.json")})
+
+
+def test_provisioning_checks_the_tile_role_it_made_by_name(roles, spine_schema):
+    """exulanica-db checks the role as the owner, before any worker connects as it."""
+    psycopg_module, scratch = spine_schema
+    admin = open_scratch_connection(psycopg_module, scratch)
+    admin.row_factory = dict_row
+    try:
+        assert_tiles_role(admin, role=roles["tiles"])
+        admin.execute(
+            sql.SQL("grant select on capture to {}").format(sql.Identifier(roles["tiles"]))
+        )
+        with pytest.raises(TilesRoleUnsafe, match="table"):
+            assert_tiles_role(admin, role=roles["tiles"])
+        with pytest.raises(TilesRoleUnsafe):
+            assert_tiles_role(admin, role=roles["app"])
+        provision_tiles_role(admin, role=roles["tiles"])
+        assert_tiles_role(admin, role=roles["tiles"])
+    finally:
+        admin.close()

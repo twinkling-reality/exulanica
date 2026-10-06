@@ -195,9 +195,11 @@ def create_generated_authorities(
         style_version_id=style.version_id,
         created_by=actor,
     )
-    # A tile whose bake is already stored, by the digest over its inputs, is the same bytes this
+    # A tile whose bake is already stored under the stage this installation runs, by the digest
+    # over its inputs (the columns its key is derived from, migration 0144), is the same bytes this
     # world's tile would bake to: it queues no job, and the tile reads baked at once, as a world
-    # with no job for a tile is read (generated_tiles). A tile stored with a fault still queues one,
+    # with no job for a tile is read (generated_tiles). A bake of another stage is not read, so a
+    # stage change rebakes. A tile stored with a fault the owner has not cleared still queues one,
     # whose job then fails as every bake of it does.
     composer = composed.receipt["composer"]
     inputs = {
@@ -208,7 +210,7 @@ def create_generated_authorities(
     }
     for tile_x, tile_y in composed.receipt["tiles"]:
         stored = current_bake(connection, inputs[(int(tile_x), int(tile_y))])
-        if stored is not None and stored.state == "baked":
+        if stored is not None and stored.servable:
             continue
         connection.execute(
             "insert into job (workspace_id,kind,payload) values (%s,%s,%s)",
@@ -334,7 +336,11 @@ def generated_tiles(
             ).fetchone()
         ended = None if job is None else str(job["state"])
         state: Literal["baked", "baking", "failed"]
-        if (bake is not None and bake.state != "baked") or ended in ("failed", "cancelled"):
+        if bake is not None and bake.cleared:
+            # The owner's recorded decision to serve the stored first bake (migration 0144): the
+            # job that failed on the fault no longer fails the world.
+            state = "baked"
+        elif (bake is not None and bake.state != "baked") or ended in ("failed", "cancelled"):
             state = "failed"
         elif bake is not None and ended in (None, "done"):
             # A world with no job for the tile (one restored without its queue) is drawn from its

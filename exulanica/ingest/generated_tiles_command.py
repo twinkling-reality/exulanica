@@ -8,9 +8,9 @@ publishes each baked tile through ``EXULANICA_TILE_PUBLISHER_DATABASE_URL``.
 
 The publisher is ``exulanica_tiles`` (migration 0138), which may execute the publish function and
 nothing else, and :func:`~exulanica.db.tiles_role.assert_tiles_role` checks it at startup. A wider
-role, the owner included, is refused where the installation's profile is ``public``, a server
-anybody can reach, and accepted with a ``publisher_not_narrow`` warning elsewhere, so an
-installation that has not yet provisioned the role keeps baking. Baked tiles go to the tile store
+role, the owner included, is refused wherever the installation's profile installs generated tiles,
+and accepted with a ``publisher_not_narrow`` warning elsewhere, so a development checkout that has
+not provisioned the role keeps baking. Baked tiles go to the tile store
 under ``EXULANICA_DATA_DIR``.
 
 Nothing here downloads anything. The tessellator runs either compiled (``EXULANICA_TESS_CLI``, a
@@ -47,12 +47,9 @@ from exulanica.env import env_get, env_name
 from exulanica.ingest.generated_tiles import GeneratedTileBaker
 from exulanica.store.configured import content_stores
 
-__all__ = ["PUBLIC_PROFILE", "PUBLISHER_ENV", "check_publisher", "main"]
+__all__ = ["PUBLISHER_ENV", "check_publisher", "main"]
 
 PUBLISHER_ENV: Final = env_name("TILE_PUBLISHER_DATABASE_URL")
-#: The installation profile of a server anybody can reach, where only the narrow publisher role
-#: is accepted.
-PUBLIC_PROFILE: Final = "public"
 _CHECKOUT_WEB: Final = Path(__file__).resolve().parents[2] / "web"
 
 
@@ -77,31 +74,36 @@ def _workspaces(values: list[str], environ: Mapping[str, str]) -> frozenset[uuid
 def check_publisher(url: str, environ: Mapping[str, str]) -> str | None:
     """Why the publisher is wider than the tile role, as a warning, or None when it is that role.
 
-    Refused, by raising :class:`~exulanica.db.tiles_role.TilesRoleUnsafe`, where the installation's
-    profile is ``public``: a server anybody can reach publishes only as the tile role.
+    Refused, by raising :class:`~exulanica.db.tiles_role.TilesRoleUnsafe`, wherever the
+    installation's profile installs generated tiles (``public`` among the shipped ones): an
+    installation that bakes towns publishes only as the tile role. Elsewhere, where the profile
+    installs none or no profile is named, the warning lets a development checkout keep baking.
     """
     with psycopg.connect(url, autocommit=True, row_factory=dict_row) as connection:
         try:
             assert_tiles_role(connection)
         except TilesRoleUnsafe as refusal:
-            if _profile_id(environ) == PUBLIC_PROFILE:
+            if _installs_generated_tiles(environ):
                 raise TilesRoleUnsafe(
-                    f"the {PUBLIC_PROFILE} profile publishes only as the tile role: {refusal}"
+                    "this installation's profile installs generated tiles, which are published "
+                    f"only as the tile role: {refusal}"
                 ) from refusal
             return str(refusal)
     return None
 
 
-def _profile_id(environ: Mapping[str, str]) -> str | None:
-    """The ``id`` of the installation profile ``EXULANICA_INSTALLATION_PROFILE`` names, or None.
+def _installs_generated_tiles(environ: Mapping[str, str]) -> bool:
+    """Whether the installation profile ``EXULANICA_INSTALLATION_PROFILE`` names installs
+    ``generated_tiles``.
 
     Read here rather than through the API's loader, which this layer does not import; the API
     validates the whole profile at its own startup, and an unreadable one stops it there."""
     named = env_get("INSTALLATION_PROFILE", environ)
     if not named:
-        return None
+        return False
     document = json.loads(Path(named).read_text(encoding="utf-8"))
-    return str(document["id"]) if isinstance(document, dict) and "id" in document else None
+    component = (document.get("components") or {}).get("generated_tiles") or {}
+    return component.get("installed") is True
 
 
 def _compiled(environ: Mapping[str, str]) -> tuple[Path, Path] | None:

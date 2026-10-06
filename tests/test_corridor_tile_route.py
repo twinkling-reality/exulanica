@@ -28,6 +28,7 @@ from exulanica.world.baked_tiles import TILE_MEDIA_TYPE, BakedTileRepository
 from fastapi.testclient import TestClient
 from psycopg.rows import dict_row
 
+from baked_tile_stages import CURRENT_STAGE_PARAMS, CURRENT_STAGE_VERSION
 from pg_harness import migrated_schema
 from test_route_permissions import ALL_PERMISSIONS, APP_ROLE, app_role_dsn
 
@@ -73,8 +74,8 @@ class Tiles:
 def _record(repository: BakedTileRepository, key: uuid.UUID, tile_x: int, container: bytes) -> str:
     return repository.record(
         baked_tile_id=key,
-        stage_version=3,
-        stage_params_sha256=hashlib.sha256(b"params").digest(),
+        stage_version=CURRENT_STAGE_VERSION,
+        stage_params_sha256=CURRENT_STAGE_PARAMS,
         # `city_seed` is the TILE RECORD's spelling and it is not the column's. Migration 0081
         # renamed the column to `world_seed`; the record's field moves at city grammar version 4.
         tile={

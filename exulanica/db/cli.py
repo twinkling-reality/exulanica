@@ -32,7 +32,12 @@ from exulanica.db.roles import (
     provision_runtime_role,
 )
 from exulanica.db.session import Database
-from exulanica.db.tiles_role import TILES_ROLE, provision_tiles_role
+from exulanica.db.tiles_role import (
+    TILES_ROLE,
+    assert_tiles_role,
+    provision_tiles_role,
+    publish_function_installed,
+)
 from exulanica.env import env_get, env_name
 
 __all__ = [
@@ -79,6 +84,11 @@ def provision_database(database: Database, stream: Any) -> int:
         provision_account_role(connection, role=ACCOUNT_ROLE, password=account_password)
         provision_backup_role(connection, role=BACKUP_ROLE, password=backup_password)
         provision_tiles_role(connection, role=TILES_ROLE, password=tiles_password)
+        # The role just provisioned is checked here as well as by the worker that connects as it,
+        # so a database whose tile role is wider than it should be stops the deployment, not only
+        # the worker (migration 0138). Below 0138 there is no publish function to lend or check.
+        if publish_function_installed(connection):
+            assert_tiles_role(connection, role=TILES_ROLE)
     print(
         f"roles: {RUNTIME_ROLE} may select, insert and update and may not delete; "
         f"{EXECUTOR_ROLE} may select and nothing else; {PURGE_ROLE} may mark bytes purged "

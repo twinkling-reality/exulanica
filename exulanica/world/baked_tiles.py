@@ -19,7 +19,10 @@ Migration 0072 holds the shape and every rule; this is the path that reaches it.
 * :meth:`BakedTileRepository.servable` answers what a tile's bytes would be without fetching or
   charging, which is what a conditional request needs.
 
-Nothing here bakes, and nothing here reads ``assets/``. A faulted tile is never served.
+A tile's bake is found, listed and reused only under the bake stage this installation runs
+(migration 0144); a stored bake of any stage stays reachable by its key. Nothing here bakes, and
+nothing here reads ``assets/``. A faulted tile is never served unless the owner recorded the
+decision to serve its stored first bake; the stored row itself is never changed.
 """
 
 from __future__ import annotations
@@ -99,6 +102,14 @@ class BakedTile:
     render_batch_sha256: str
     nav_envelope_sha256: str
     state: str
+    #: Whether the owner recorded the decision to serve this faulted tile's stored first bake
+    #: (``exulanica-tile-fault clear``, migration 0144). A clearance never changes the row.
+    cleared: bool = False
+
+    @property
+    def servable(self) -> bool:
+        """Baked and agreed with itself, or faulted and cleared by the owner's recorded decision."""
+        return self.state == "baked" or self.cleared
 
     def document(self) -> dict[str, object]:
         return {
@@ -114,6 +125,7 @@ class BakedTile:
             "render_batch_sha256": self.render_batch_sha256,
             "nav_envelope_sha256": self.nav_envelope_sha256,
             "state": self.state,
+            "cleared": self.cleared,
         }
 
 
@@ -135,14 +147,14 @@ _CURRENT_FIRST: Final = "baked_at desc, baked_tile_id desc"
 
 
 def current_bake(connection: psycopg.Connection, tile_inputs_digest: str) -> BakedTile | None:
-    """The current bake of the tile whose bake inputs have this digest, by the rule every listing
-    of baked tiles uses, or None when it was never baked. A tile document baked by two tessellators
-    has two rows (migration 0077), so the digest alone names no single row; this names the current
-    one."""
+    """The bake of the tile whose bake inputs have this digest under the stage this installation
+    runs, or None when it was never baked under it. Its key is derived from exactly those columns
+    (``baked_tile_id(spec, tile)``), so this is the row the code expects; a row of another stage,
+    published by anyone, is never read here (migration 0144)."""
     with connection.cursor(row_factory=dict_row) as cursor:
         row = cursor.execute(
             f"select {_COLUMNS} from baked_tile where tile_inputs_digest = %s "
-            f"order by {_CURRENT_FIRST} limit 1",
+            f"and {_CURRENT_STAGE} order by {_CURRENT_FIRST} limit 1",
             (bytes.fromhex(tile_inputs_digest),),
         ).fetchone()
     return None if row is None else _row(row)
@@ -162,12 +174,23 @@ def _row(row: Mapping[str, Any]) -> BakedTile:
         render_batch_sha256=_hex(row["render_batch_sha256"]),
         nav_envelope_sha256=_hex(row["nav_envelope_sha256"]),
         state=row["state"],
+        cleared=bool(row["cleared"]),
     )
 
 
 _COLUMNS: Final = (
     "baked_tile_id, tile_x, tile_y, lod, stage_version, stage_params_sha256, tile_inputs_digest, "
-    "container_sha256, container_bytes, render_batch_sha256, nav_envelope_sha256, state"
+    "container_sha256, container_bytes, render_batch_sha256, nav_envelope_sha256, state, "
+    "exists (select 1 from baked_tile_fault_clearance c "
+    "where c.baked_tile_id = baked_tile.baked_tile_id) as cleared"
+)
+
+#: The rows of the bake stage this installation runs (migration 0144): a tile's bake is found by
+#: its inputs, listed and reused only under it, by the columns its key is derived from. A row of
+#: another stage stays reachable by its key (:meth:`BakedTileRepository.read` and the bytes route).
+_CURRENT_STAGE: Final = (
+    "(stage_version, stage_params_sha256) in (select s.stage_version, s.stage_params_sha256 "
+    "from baked_tile_stage s where s.retired_at is null)"
 )
 
 
@@ -252,10 +275,11 @@ class BakedTileRepository:
         neighbouring tiles cannot ask a row for its identity if each grammar spells that field
         after itself.
 
-        CURRENT IS THE MOST RECENTLY PUBLISHED, greatest ``baked_at``, ties broken by
-        ``baked_tile_id`` so the answer is total rather than whichever row the plan happened to
-        yield. A store serves what was last published into it, so republishing an earlier bake
-        makes that bake current, which is the behaviour an operator republishing one would expect.
+        CURRENT IS THE MOST RECENTLY PUBLISHED UNDER THE STAGE THIS INSTALLATION RUNS (migration
+        0144), greatest ``baked_at``, ties broken by ``baked_tile_id`` so the answer is total rather
+        than whichever row the plan happened to yield. A bake of another stage is never listed,
+        and the function refuses to publish one, so a stage change rebakes rather than reaching
+        back to an earlier stage's bytes.
 
         WHY THIS IS ONE ROW PER TILE. A tile document says nothing about the tessellator, so a new
         tessellator's bake is a NEW ROW under a new key rather than a replacement (migration 0077).
@@ -278,7 +302,7 @@ class BakedTileRepository:
         """
         rows = self.connection.execute(
             f"select distinct on (lod, tile_y, tile_x) {_COLUMNS} from baked_tile "
-            "where world_seed = %s and (%s::int is null or lod = %s) "
+            f"where world_seed = %s and (%s::int is null or lod = %s) and {_CURRENT_STAGE} "
             f"order by lod, tile_y, tile_x, {_CURRENT_FIRST}",
             (bytes.fromhex(world_seed), lod, lod),
         ).fetchall()
@@ -289,10 +313,11 @@ class BakedTileRepository:
         nothing: a caller that only needs to know what the bytes would be, to answer a conditional
         request or to skip a fetch, must not spend a workspace's ceiling to find out."""
         tile = self.read(baked_tile_id)
-        if tile.state != "baked":
+        if not tile.servable:
             raise BakedTileFaulted(
                 f"baked tile {baked_tile_id} baked twice into different containers and is not "
-                "served; rebake it after the bake is made deterministic again"
+                "served; make the bake deterministic again, or record the decision to serve its "
+                "stored first bake (exulanica-tile-fault clear)"
             )
         return tile
 
@@ -373,7 +398,7 @@ class BakedTileRepository:
         if current is None:
             raise UnknownBakedTile(f"baked tile {seen.baked_tile_id} stopped being stored")
         now = _row(current)
-        if now.state != "baked" or now.container_sha256 != seen.container_sha256:
+        if not now.servable or now.container_sha256 != seen.container_sha256:
             raise BakedTileFaulted(
                 f"baked tile {seen.baked_tile_id} stopped being servable while it was read"
             )

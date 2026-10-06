@@ -185,6 +185,10 @@ INSTANCE_TABLES: Final[Mapping[str, str]] = {
     # it cannot resolve there reads as unavailable rather than borrowing the source's catalog.
     "character_catalog_publication": "host-admin character catalog publication, per deployment",
     "character_catalog_withdrawal": "host-admin character catalog withdrawal, per deployment",
+    # The bake stage a deployment runs is stated by its own migrations, as its schema is; an
+    # owner's decision to serve a faulted tile is about that deployment's bakes (migration 0144).
+    "baked_tile_stage": "the bake stage the destination's own migrations state",
+    "baked_tile_fault_clearance": "host-owner decision on this deployment's faulted bakes",
 }
 
 #: Tables with no ``workspace_id`` that nevertheless hold this workspace's rows, with the exact

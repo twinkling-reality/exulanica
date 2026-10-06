@@ -182,6 +182,10 @@ exulanica-generated-tile-worker = "exulanica.ingest.generated_tiles_command:main
 # arrival worlds (exulanica/world/arrival-worlds.v1.json) once in its own workspace, so their tiles
 # are baked before any visitor's copy is made. Downloads nothing.
 exulanica-arrival-worlds = "exulanica.world.arrival_worlds:main"
+# `uv run exulanica-tile-fault list|clear --baked-tile <uuid> --operator <label> --reason "..."`.
+# The owner's recorded decision to serve a faulted tile's stored first bake (migration 0144); it
+# never changes or deletes the stored tile.
+exulanica-tile-fault = "exulanica.world.tile_faults:main"
 # `uv run exulanica-installation check|facts|backup|verify|maintenance|restore`. A complete
 # installation's profile facts, backup sets, unattended maintenance and declared crash recovery;
 # docs/deployment.md section 9 owns its settings and procedures.

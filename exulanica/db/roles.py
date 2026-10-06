@@ -139,6 +139,10 @@ READ_ONLY_TABLES: Final = (
     "restore_replay_receipt",
     "schema_migrations",
     "baked_tile",
+    # Migration 0144: the bake stage the installation runs, and the owner's recorded decisions to
+    # serve a faulted tile's first bake. Readers ask both; the owner alone writes either.
+    "baked_tile_stage",
+    "baked_tile_fault_clearance",
     "saved_world_source_current_membership",
     # Migration 0124's durable spending: the runtime reads its own workspace's rows and changes
     # them only through the functions in SPENDING_RUNTIME_FUNCTIONS. With INSERT or UPDATE it could

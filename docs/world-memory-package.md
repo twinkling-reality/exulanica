@@ -118,7 +118,10 @@ their fixed-point integers or reviewed choices.
 `project` requires an idle workspace-scoped connection and starts a `REPEATABLE READ` transaction.
 The first reads capture the current structure, appearance, and interaction pointers. Every graph,
 evidence, artifact, provenance, evaluation, deletion, and policy component is then read from that
-same database snapshot. The projector writes a sibling staging directory, scans every JSON payload,
+same database snapshot. Every read names the projected workspace itself rather than relying on
+row-level security, so a projection on an owner or BYPASSRLS connection, as person withdrawal and
+the package command make, carries no other workspace's rows
+(`tests/test_world_package_scoped_postgres.py`). The projector writes a sibling staging directory, scans every JSON payload,
 builds and signs the manifest, inserts the append-only `world_package_export` receipt, and renames
 the staging directory into place before commit. A failed transaction removes the newly published
 directory.

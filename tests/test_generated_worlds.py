@@ -64,6 +64,7 @@ from exulanica.world.world_recipes import (
 from exulanica.world.worlds import GENERATED, WORLD_COUNT_POLICY, workspace_worlds
 from psycopg.types.json import Jsonb
 
+from baked_tile_stages import stated_stage
 from personal_world_support import STRANGER_TOKEN
 from pg_harness import open_scratch_connection
 from test_society_made_world import made as imported_made  # noqa: F401
@@ -1101,10 +1102,14 @@ def test_a_tile_names_its_current_bake_when_two_tessellators_baked_it(
     monkeypatch.setitem(
         bake_worker.STAGES, "baked_tile", dataclasses.replace(spec, version=spec.version + 1)
     )
-    [second] = baker.drain([workspace])
-    assert first.baked_tile_id != second.baked_tile_id
-    [tile] = api.entry(entry["entry_id"])["generated_ground"]["tiles"]
-    assert (tile["state"], tile["baked_tile_id"]) == ("baked", str(second.baked_tile_id))
+    # A new stage is a schema fact (migration 0144): the migration that comes with it retires the
+    # stage the schema states and states the next. Done here as that migration would, and undone
+    # after, because the stage table is kept across tests.
+    with stated_stage(owner, spec.version + 1, spec.params_digest):
+        [second] = baker.drain([workspace])
+        assert first.baked_tile_id != second.baked_tile_id
+        [tile] = api.entry(entry["entry_id"])["generated_ground"]["tiles"]
+        assert (tile["state"], tile["baked_tile_id"]) == ("baked", str(second.baked_tile_id))
 
 
 def test_a_town_whose_homes_hold_more_than_the_schema_allows_is_refused_by_name(made, monkeypatch):

@@ -117,6 +117,7 @@ boundary ([security floor](security-floor.md)).
 | Material bake worker | `exulanica-material-bake` | Bakes requested material recipes in a Node process | 5.2.5 |
 | Generated-tile worker | `exulanica-generated-tile-worker` | Bakes the tiles generated towns wait for, in a Node process, and publishes each as the tile role | 9.1 |
 | Arrival worlds | `exulanica-arrival-worlds` | Makes the installation's arrival worlds in its own workspace, so their tiles are baked before a visitor's copy | 8.2 |
+| Tile faults | `exulanica-tile-fault` | Lists faulted baked tiles, and records the owner's decision to serve one's stored first bake | 9.1 |
 | Ingest | `exulanica-ingest` | Ingests a directory of photographs from the command line | 5.2.6 |
 | Catalog preflight | `exulanica-preflight` | Checks every model identifier against its provider's catalog | 5.2.7, 7 |
 | Restore | `python -m exulanica.orchestration.restore` | Replays every withdrawal into a restored database | 5.2.8 |
@@ -1292,7 +1293,9 @@ A rehearsal's plain-HTTP redirect names the standard port, not the one the rehea
 
 **Limits.** A tile's bake is shared by every world whose tiles it is: if the second bake of a tile
 ever differs from the first, the stored tile is marked and reads failed for every copy of that
-arrival world, not only the one being baked (migration 0072's rule). No off-host copy of the backups
+arrival world, not only the one being baked (migration 0072's rule), until the owner records the
+decision to serve its stored first bake (`exulanica-tile-fault clear`, 9.1). A visitor's copy of
+an arrival world is made only once its tiles are baked. No off-host copy of the backups
 is made, so the loss of the host loses both disks. A
 restore has not been timed on the host (D-3). The process fuse starts again at every restart; the
 authority does not. Per-address limits do not bound how many addresses write at once.
@@ -1349,11 +1352,23 @@ and the tessellator compiled to JavaScript (`tsc --build` of `web/packages/loom-
 package manager or dependency. It claims each bake job as `exulanica_app`, in the job's workspace,
 for the workspaces it is configured with and those active accounts own. It publishes each bake as
 `exulanica_tiles`, which may execute `record_baked_tile_bake` and nothing else (migration 0138,
-[security floor](security-floor.md#5-database-roles)). Under the `public` profile the worker refuses
-any wider publisher, the owner included. Elsewhere it accepts one with a `publisher_not_narrow`
-warning, so an installation that has not provisioned the role keeps baking. A tile whose bake is
-already stored queues no job when a world is made, so a world whose tiles another world shares is
-drawn at once. `single-host-server-only` is
+[security floor](security-floor.md#5-database-roles)); `exulanica-db` checks that role as it
+provisions it. Wherever the profile installs generated tiles the worker refuses any wider
+publisher, the owner included. Elsewhere it accepts one with a `publisher_not_narrow` warning, so
+a development checkout that has not provisioned the role keeps baking.
+
+The function stores a bake only for the bake stage the installation runs: its version and
+parameter digest are a schema fact, stated by a migration (`baked_tile_stage`, 0144), and a code
+change to the stage comes with a migration stating the next one. A key whose stored row is a bake
+of another stage or another tile is refused rather than marked. A tile's bake is listed and reused
+only under the current stage; a stored bake of any stage stays reachable by its key. A tile whose
+bake is already stored under the current stage queues no job when a world is made, so a world
+whose tiles another world shares is drawn at once. A tile whose second bake differed from its first
+is never served; the owner may record the decision to serve its stored first bake with
+`exulanica-tile-fault clear`, which never changes or deletes the stored tile. `list` names every
+fault with what a clearance would serve and what disagreed with it: the stored container's
+digest, when that bake ran and its receipt, and the differing bake's digest.
+`single-host-server-only` is
 the same built without the reconstruction and pose extras, whose workers then report unavailable,
 and is what `compose.yaml` and `.env.example` select by default (`EXULANICA_PROFILE`);
 `shared-store` keeps its bytes in an S3-compatible bucket, composed by adding
