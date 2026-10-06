@@ -1828,3 +1828,42 @@ describe('the words a refusal is said in', () => {
     expect(say('proposal.refused.out_of_range')).toContain('rather than moved');
   });
 });
+
+describe('a look chosen in the Look sheet', () => {
+  const TOON = { packId: 'exulanica.toon-town', version: 1, manifestSha256: 'a'.repeat(64) };
+
+  it('is saved as a new appearance version naming the pack, through one preview and Apply', async () => {
+    const h = await harness();
+    const result = await h.mounted.useStylePack(TOON);
+    expect(result).toEqual({ saved: true, words: 'Saved as revision 1 of this world\'s appearance.' });
+    expect(h.bodies).toHaveLength(1);
+    expect(h.bodies[0]!['stylePack']).toEqual(TOON);
+    expect(h.bodies[0]!['origin']).toBe('settings');
+    expect(h.applied).toHaveLength(1);
+    expect(h.client.activePreview()).toBeNull();
+  });
+
+  it('is never saved over a design another writer changed: the remade preview is thrown away', async () => {
+    const h = await harness({ applyStale: true });
+    const result = await h.mounted.useStylePack(TOON);
+    expect(result.saved).toBe(false);
+    expect(result.words).toBe('This world\'s design changed elsewhere, so nothing was changed. Choose the look again.');
+    // The client made the preview again on the newer version; it was discarded, never applied.
+    expect(h.applied).toHaveLength(1);
+    expect(h.client.activePreview()).toBeNull();
+    expect(h.open).toHaveLength(0);
+  });
+
+  it('waits for a change already open in Design, and sends nothing', async () => {
+    const h = await harness();
+    await h.client.previewSettings(PROFILE);
+    const sent = h.bodies.length;
+    const result = await h.mounted.useStylePack(TOON);
+    expect(result).toEqual({
+      saved: false,
+      words: 'A change to this world\'s design is waiting in Design. Apply it or undo it there, then choose the look.',
+    });
+    expect(h.bodies).toHaveLength(sent);
+    expect(h.applied).toHaveLength(0);
+  });
+});

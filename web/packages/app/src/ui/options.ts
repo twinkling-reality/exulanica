@@ -101,6 +101,8 @@ export interface OptionsView {
   showSettings(capabilities: readonly InteractionCapability[]): void;
   /** Say the served settings could not be read, in place of controls drawn from a guess. */
   settingsUnavailable(detail: string): void;
+  /** Name the look this world is drawn in, or hide Look where this world is drawn in none. */
+  setLook(title: string | null): void;
 }
 
 export interface WorldStyleAuthorityPresentation {
@@ -150,6 +152,8 @@ interface OptionsCallbacks {
   readonly onWorldRollback?: (versionId: string) => Promise<AtlasPreferences | null>;
   readonly onClose: () => void;
   readonly onShowControls: () => void;
+  /** Open the Look sheet; absent where nothing here can be drawn in a look. */
+  readonly onChangeLook?: () => void;
 }
 
 function option(value: string, label: string): HTMLOptionElement {
@@ -176,6 +180,15 @@ export const sameWorldStyle = (left: AtlasPreferences, right: AtlasPreferences):
 };
 
 export function buildOptions(callbacks: OptionsCallbacks): OptionsView {
+  // Look: the style pack this world is drawn in, and the way to the Look sheet.
+  const lookName = el('p', { class: 'look-options-current' });
+  const changeLook = el('button', { type: 'button', class: 'look-options-change', 'data-action': 'look.open', text: 'Change look' });
+  if (callbacks.onChangeLook !== undefined) changeLook.addEventListener('click', callbacks.onChangeLook);
+  const lookGroup = el('div', { class: 'option-group look-options', hidden: true }, [
+    el('h2', { text: 'Look' }),
+    el('div', { class: 'look-options-row' }, [lookName, changeLook]),
+    el('p', { class: 'option-note', text: 'How this town is drawn. Its places, people and history stay as they are.' }),
+  ]);
   const root = el('section', {
     class: 'system-overlay options-view atlas-instrument held-plate',
     role: 'dialog',
@@ -562,6 +575,7 @@ export function buildOptions(callbacks: OptionsCallbacks): OptionsView {
       ]),
       close,
     ]),
+    lookGroup,
     el('div', { class: 'option-group appearance-options' }, [
       el('h2', { text: 'Display' }),
       field(DEVICE_SETTING_WORDS.contrast.label, contrast, DEVICE_SETTING_WORDS.contrast.note),
@@ -626,6 +640,10 @@ export function buildOptions(callbacks: OptionsCallbacks): OptionsView {
         .filter((control): control is HTMLElement => control !== null);
       viewSettings.replaceChildren(...drawn);
       render();
+    },
+    setLook(title) {
+      lookGroup.hidden = title === null || callbacks.onChangeLook === undefined;
+      lookName.textContent = title ?? '';
     },
     settingsUnavailable(detail) {
       settingControls.length = 0;

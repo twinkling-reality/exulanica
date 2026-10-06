@@ -72,6 +72,8 @@ import { el, replace } from './ui/dom.js';
 import { button, errorState } from './ui/system/components.js';
 import { createLayout, MODAL_BACKGROUND_REGIONS, type Layout } from './ui/system/layout.js';
 import { mountActions, type MountedActions } from './composition/actions.js';
+import { buildLookSheet, type LookOption } from './ui/look-sheet.js';
+import type { ListedStylePack } from './world-look.js';
 import { fill } from './ui/copy.js';
 import { actionState, perform } from './ui/actions/surfaces.js';
 import { actionSpec, availability } from './ui/actions/registry.js';
@@ -1175,6 +1177,11 @@ async function mount(): Promise<void> {
     }),
   ]);
   let status: MountedStatusAndInspector;
+  // Look: the style pack a generated town is drawn in, chosen in the Look sheet (ui/look-sheet.ts)
+  // and saved as an appearance version (`useStylePack`). Only generated towns are drawn in packs.
+  const lookAccess = state.credentials;
+  const lookOffered = state.activeWorldEntry?.generatedGround != null && lookAccess !== null && state.worldStyles !== null;
+  let openLook: () => Promise<void> = async () => undefined;
   const appearance = mountAppearance({
     env,
     state,
@@ -1184,7 +1191,59 @@ async function mount(): Promise<void> {
     onShowControls: () => dispatchShell({ type: 'toggle-controls' }),
     onCloseControls: () => dispatchShell({ type: 'toggle-controls' }),
     onShowCustomize: () => dispatchShell({ type: 'toggle-options' }),
+    ...(lookOffered ? { onChangeLook: () => void openLook() } : {}),
   });
+  // world-look.js loads with a generated world's tiles, never with the page, so it is read here too.
+  let lookPacks: Promise<readonly ListedStylePack[]> | null = null;
+  let defaultLook: string | null = null;
+  const packsForLook = (): Promise<readonly ListedStylePack[]> => (lookPacks ??= import('./world-look.js')
+    .then((look) => { defaultLook = look.DEFAULT_WORLD_LOOK; return look.listedStylePacks(lookAccess!); }));
+  /** The pack this world is drawn in: the one its appearance names, else the default look. */
+  const currentLook = (): string | null => state.worldStyleConnection?.state.current.stylePack?.packId ?? defaultLook;
+  const reflectLook = (): void => {
+    if (!lookOffered) { appearance.options.setLook(null); return; }
+    void packsForLook().then(
+      (packs) => appearance.options.setLook(packs.find((pack) => pack.pack_id === currentLook())?.title ?? null),
+      () => appearance.options.setLook(null),
+    );
+  };
+  reflectLook();
+  openLook = async () => {
+    let packs: readonly ListedStylePack[];
+    try {
+      packs = await packsForLook();
+    } catch {
+      lookPacks = null;
+      appearance.options.reportWorldLifecycle('failed', 'The looks this server offers could not be read. Try again in a moment.');
+      return;
+    }
+    dispatchShell({ type: 'show-world' });
+    shell.querySelector('section.look-sheet')?.remove();
+    const offered: readonly LookOption[] = packs.map((pack) => ({
+      packId: pack.pack_id, title: pack.title, description: pack.description, authors: pack.authors,
+      licence: pack.licence, picture: null,
+    }));
+    const sheet = buildLookSheet({
+      worldTitle: state.activeWorldEntry?.title ?? 'This world',
+      onUse: async (option) => {
+        const listed = packs.find((pack) => pack.pack_id === option.packId)!;
+        const result = await appearance.useStylePack({
+          packId: listed.pack_id, version: listed.version, manifestSha256: listed.manifest_sha256,
+        });
+        if (!result.saved) return result.words;
+        sheet.show(offered, currentLook());
+        reflectLook();
+        return `${result.words} The world is drawn in ${option.title} the next time it opens.`;
+      },
+      onClose: () => {
+        sheet.root.remove();
+        canvas.focus({ preventScroll: true });
+      },
+    });
+    shell.append(sheet.root);
+    sheet.show(offered, currentLook());
+    sheet.focus();
+  };
 
   status = mountStatusAndInspector({
     env,

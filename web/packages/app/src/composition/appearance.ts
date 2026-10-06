@@ -33,6 +33,7 @@ import {
   type ActiveWorldStylePreview,
   type WorldStyleClient,
   type WorldStyleConnection,
+  type WorldStylePackBinding,
   type WorldStyleVersionRecord,
 } from '../world-style-api.js';
 import {
@@ -60,6 +61,8 @@ export interface AppearanceDependencies {
   readonly onShowControls: () => void;
   readonly onCloseControls: () => void;
   readonly onShowCustomize: () => void;
+  /** Open the Look sheet from Design; absent where no look can be chosen. */
+  readonly onChangeLook?: () => void;
   /** Advance the active saved entry only after the style authority accepted a version. */
   readonly onStyleSaved?: (version: WorldStyleVersionRecord) => Promise<void>;
 }
@@ -68,6 +71,12 @@ export interface MountedAppearance {
   readonly options: ReturnType<typeof buildOptions>;
   readonly settings: ReturnType<typeof buildControlsGuide>;
   applyPreferences(next: AtlasPreferences): void;
+  /**
+   * Draw this world in a style pack (null for the default look), saved as a new version of its
+   * appearance by the same preview and Apply as any change made in Design. Resolves to whether it
+   * was saved, with what happened in words.
+   */
+  useStylePack(pack: WorldStylePackBinding | null): Promise<{ readonly saved: boolean; readonly words: string }>;
   dispose(): void;
 }
 
@@ -618,6 +627,7 @@ export function mountAppearance(deps: AppearanceDependencies): MountedAppearance
     },
     onClose: deps.onCloseOptions,
     onShowControls: deps.onShowControls,
+    ...(deps.onChangeLook === undefined ? {} : { onChangeLook: deps.onChangeLook }),
   });
 
   presentWorldStyleAuthority(optionsView, state.worldStyleConnection, state.worldStyleFailure, null);
@@ -848,7 +858,47 @@ export function mountAppearance(deps: AppearanceDependencies): MountedAppearance
     }
   }
 
+  /**
+   * A look chosen in the Look sheet. A change already waiting in Design is the person's to decide
+   * there, so a look is not previewed over it; a design another writer changed meanwhile is never
+   * saved over (the client would make the pack's preview again from the profile this page read,
+   * which would undo that change), so the person is asked to choose again.
+   */
+  async function useStylePack(
+    pack: WorldStylePackBinding | null,
+  ): Promise<{ readonly saved: boolean; readonly words: string }> {
+    const client = state.worldStyles;
+    if (client === null) {
+      return { saved: false, words: state.worldStyleFailure ?? 'This world\'s appearance cannot be changed here.' };
+    }
+    if (client.requiresReconciliation()) return { saved: false, words: `Nothing was changed. ${RESTORE_BEFORE_CHANGING}` };
+    if (client.activePreview() !== null) {
+      return { saved: false, words: 'A change to this world\'s design is waiting in Design. Apply it or undo it there, then choose the look.' };
+    }
+    try {
+      await client.previewStylePack(pack);
+      const result = await client.applyActive();
+      if (result.kind === 'stale-recovered') await client.discardActive();
+      syncWorldStyleConnection(state, client);
+      presentWorldStyleAuthority(optionsView, state.worldStyleConnection, state.worldStyleFailure, null);
+      if (result.kind === 'applied') {
+        await deps.onStyleSaved?.(result.version);
+        return { saved: true, words: `Saved as revision ${result.version.revision} of this world's appearance.` };
+      }
+      if (result.kind === 'expired') return { saved: false, words: 'The choice waited too long to be confirmed, so nothing was changed. Choose the look again.' };
+      if (result.kind === 'stale' && result.reconciliationRequired) {
+        return { saved: false, words: `This world's design changed elsewhere, so nothing was changed. ${RESTORE_BEFORE_CHANGING}` };
+      }
+      return { saved: false, words: 'This world\'s design changed elsewhere, so nothing was changed. Choose the look again.' };
+    } catch (error) {
+      if (client.activePreview() !== null) await client.discardActive().catch(() => undefined);
+      syncWorldStyleConnection(state, client);
+      return { saved: false, words: describeWorldStyleFailure(error) };
+    }
+  }
+
   return {
+    useStylePack,
     options: optionsView,
     settings: settingsView,
     applyPreferences,

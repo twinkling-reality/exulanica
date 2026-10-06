@@ -76,6 +76,9 @@ export interface ListedStylePack {
   readonly version: number;
   readonly manifest_sha256: string;
   readonly title: string;
+  /** What the pack looks like, in the pack's own words. */
+  readonly description: string;
+  readonly authors: readonly string[];
   readonly licence: { readonly id: string; readonly attribution: string | null };
 }
 

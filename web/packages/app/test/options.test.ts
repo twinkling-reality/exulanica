@@ -371,3 +371,34 @@ describe('Options', () => {
     expect(onChange).toHaveBeenLastCalledWith(DEFAULT_PREFERENCES);
   });
 });
+
+describe('Look in Design', () => {
+  const build = (onChangeLook?: () => void) => buildOptions({
+    preferences: DEFAULT_PREFERENCES,
+    onChange: vi.fn(),
+    onPreview: vi.fn(),
+    onClose: vi.fn(),
+    onShowControls: vi.fn(),
+    ...(onChangeLook === undefined ? {} : { onChangeLook }),
+  });
+
+  it('names the look this town is drawn in and opens the Look sheet', () => {
+    const onChangeLook = vi.fn();
+    const view = build(onChangeLook);
+    const group = view.root.querySelector<HTMLElement>('.look-options')!;
+    expect(group.hidden).toBe(true);
+    view.setLook('Toon town');
+    expect(group.hidden).toBe(false);
+    expect(group.querySelector('.look-options-current')!.textContent).toBe('Toon town');
+    group.querySelector<HTMLButtonElement>('[data-action="look.open"]')!.click();
+    expect(onChangeLook).toHaveBeenCalledTimes(1);
+    view.setLook(null);
+    expect(group.hidden).toBe(true);
+  });
+
+  it('offers no Look where nothing here can be drawn in one', () => {
+    const view = build();
+    view.setLook('Cozy town');
+    expect(view.root.querySelector<HTMLElement>('.look-options')!.hidden).toBe(true);
+  });
+});

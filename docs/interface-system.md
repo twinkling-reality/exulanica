@@ -182,6 +182,22 @@ that says what it will do ("Let Qwen3 235B Instruct decide for 4 people", "Give 
 routine"); once the server records a choice the people are unticked and the action says what the
 choice came to. What each model decided, and how the panel's models decide, follow below it.
 
+### Look
+
+Look (`web/packages/app/src/ui/look-sheet.ts`, `ui/look-sheet.css`) is where the owner of a generated
+town chooses which of the host's style packs it is drawn in ([style packs](style-pack-contract.md)).
+Design names the look the town is drawn in now, with Change look; the sheet opens over the world on
+the dark stage in Your worlds' language. It names the chosen pack large with its own title and
+description, its licence ("CC0, free to use") and who made it, and one primary action, Use this
+look, which the pack the world is drawn in now does not offer; under it a strip holds every pack
+`GET /world/style-packs` lists, the one drawn now marked Now. Keys: the arrows choose, Enter uses,
+Escape goes back, and the world under the sheet takes no key while it is open. Using a look saves
+a new version of the world's appearance through the same preview and Apply as any change in Design
+(`useStylePack` in `composition/appearance.ts`): a change already open in Design is decided there
+first, and a design another writer changed meanwhile is never saved over, so the person is asked to
+choose again. The world is drawn in the new look the next time it opens. A pack the host serves no
+picture for shows none.
+
 ## 4. Actions
 
 Each action is declared once in `ACTIONS`: label, hint, icon, group, placements (`rail`, `top-bar`,
