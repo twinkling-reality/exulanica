@@ -512,7 +512,7 @@
           {"id": "group-chosen-in-words", "says": "After the choice it says that many people are decided by the model chosen, and each chosen person's row names the model, which you chose."}
         ],
         "api": [
-          {"id": "choice-recorded", "says": "POST /world/versions/{version_id}/society/models answered the stored choice naming exactly the ticked people and the model; the models read holds that model for each of them and none for the others."}
+          {"id": "choice-recorded", "says": "POST /world/versions/{version_id}/models/{role_key}, for the role whose subject is a person, answered the stored choice naming exactly the ticked people and the model; the models read holds that model for each of them and none for the others."}
         ]
       }
     },
@@ -1264,7 +1264,7 @@
           {"id": "group-chosen-in-words", "says": "After the choice it says that many people are decided by the model chosen, and each chosen person's row names the model, which you chose."}
         ],
         "api": [
-          {"id": "choice-recorded", "says": "POST /world/versions/{version_id}/society/models answered the stored choice naming exactly the ticked people and the model; the models read holds that model for each of them and none for the others."}
+          {"id": "choice-recorded", "says": "POST /world/versions/{version_id}/models/{role_key}, for the role whose subject is a person, answered the stored choice naming exactly the ticked people and the model; the models read holds that model for each of them and none for the others."}
         ]
       }
     },

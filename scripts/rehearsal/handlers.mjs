@@ -1058,6 +1058,11 @@ async function chooseModelForAGroup(ctx) {
   const { entry } = await savedWorld(ctx);
   const read = async () => (await ctx.api('GET', societyPath(entry, '/models'))).body;
   const before = await read();
+  // The page records the choice through the version's route for the role whose subject is a
+  // person, by that role's key in GET .../models, as society-models-mount.ts chooses with a world
+  // client; the society read above still shows what was recorded.
+  const roles = (await ctx.api('GET', `/world/versions/${entry.authored_version_id}/models?world_id=${encodeURIComponent(entry.world_id)}`)).body;
+  const roleKey = roles?.roles?.find((role) => role.subject === 'person')?.key ?? null;
   await page.waitFor(MODELS_SHOWN, SETTLE_MS, 'Who decides');
   const offered = await modelsSeen(page);
   const served = (before?.models ?? []).find((m) => m.provider === model.provider && m.model_id === model.model_id) ?? null;
@@ -1081,7 +1086,8 @@ async function chooseModelForAGroup(ctx) {
     && rows.length === size && rows.every((r) => r.text.endsWith(`${served?.name}, which you chose.`)),
   { result, rows, others: (seen?.people ?? []).filter((p) => !group.includes(p.id)) });
   await ctx.screenshot('chosen', `Who decides after choosing ${served?.name ?? 'a model'} for ${size} people`);
-  const posted = (await responses(ctx, 'POST', `/api/world/versions/${entry.authored_version_id}/society/models`)).at(-1) ?? null;
+  const posted = roleKey === null ? null
+    : (await responses(ctx, 'POST', `/api/world/versions/${entry.authored_version_id}/models/${roleKey}`)).at(-1) ?? null;
   const after = await read();
   const choices = new Map((after?.choices ?? []).map((c) => [c.subject_id, c]));
   const document = posted?.response_body ?? {};
@@ -1089,7 +1095,7 @@ async function chooseModelForAGroup(ctx) {
     && document.model?.model_id === model.model_id && document.model?.provider === model.provider
     && group.every((id) => choices.get(id)?.model?.model_id === model.model_id && choices.get(id)?.refusal == null)
     && [...choices.values()].filter((c) => !group.includes(c.subject_id)).every((c) => c.model === null),
-  { posted: posted === null ? null : { status: posted.status, body: pick(document, ['choice_seq', 'people', 'model', 'chosen_by', 'document_sha256', 'recorded_at']) },
+  { role_key: roleKey, posted: posted === null ? null : { status: posted.status, body: pick(document, ['choice_seq', 'people', 'model', 'chosen_by', 'document_sha256', 'recorded_at']) },
     choices: [...choices.values()].map((c) => pick(c, ['subject_id', 'model', 'choice_seq', 'refusal'])) });
   ctx.facts[ctx.parameters.fact ?? 'model_group'] = { people: group, choice_seq: document.choice_seq ?? null, model, name: served?.name ?? null };
   await decisionSpend(ctx, after);
