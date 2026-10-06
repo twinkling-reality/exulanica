@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "catalog_id": "reference-aspect",
+  "catalog_version": 1,
+  "entries": [
+    {
+      "key": "buildings",
+      "label": "Buildings",
+      "description": "Building shapes, roofs, storeys, doors, windows and how buildings stand together.",
+      "reason": "Kinds and looks are drafted from building shapes more than anything else, so notes about them are asked for first.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica reference notes"
+      }
+    },
+    {
+      "key": "materials_and_colour",
+      "label": "Materials and colour",
+      "description": "What surfaces are made of and their colours, finishes and patterns.",
+      "reason": "A look's palette, materials and surfaces are drafted from what things are made of and their colours.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica reference notes"
+      }
+    },
+    {
+      "key": "landscape_and_plants",
+      "label": "Landscape and plants",
+      "description": "Ground, water, slopes, paths, trees, crops and other plants.",
+      "reason": "A world kind's ground, water and planted areas are drafted from what the land and its plants look like.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica reference notes"
+      }
+    },
+    {
+      "key": "clothing",
+      "label": "Clothing",
+      "description": "What people wear and carry, described as garments, never as any person.",
+      "reason": "Inhabitants' outfits are drafted from garments, described as garments so that no note describes a person.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica reference notes"
+      }
+    },
+    {
+      "key": "food_and_goods",
+      "label": "Food and goods",
+      "description": "What is made, sold, eaten or stored there.",
+      "reason": "Shops, workplaces and their fixtures are drafted from what is made, sold and kept in a place.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica reference notes"
+      }
+    },
+    {
+      "key": "vehicles_and_boats",
+      "label": "Vehicles and boats",
+      "description": "What moves people and goods, and where it stops.",
+      "reason": "Roads, berths and what moves on them are drafted from the vehicles and boats a place has.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica reference notes"
+      }
+    },
+    {
+      "key": "scale",
+      "label": "Scale",
+      "description": "How big, how many and how far, as rough figures for drafting, never as facts.",
+      "reason": "A kind's extent and counts are drafted from rough figures, which stay drafted figures and are never shown as facts.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica reference notes"
+      }
+    }
+  ]
+}

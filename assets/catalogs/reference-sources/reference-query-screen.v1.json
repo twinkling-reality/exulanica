@@ -1,0 +1,134 @@
+{
+  "schema_version": 1,
+  "catalog_id": "reference-query-screen",
+  "catalog_version": 1,
+  "entries": [
+    {
+      "key": "first_person",
+      "words": [
+        "i",
+        "me",
+        "my",
+        "mine",
+        "myself",
+        "we",
+        "us",
+        "our",
+        "ours",
+        "ourselves"
+      ],
+      "reason": "A search about the person's own life is personal: a query is planned from what a world should look like, never from whose it is.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica's outgoing query screen; see the entry reason"
+      }
+    },
+    {
+      "key": "credentials",
+      "words": [
+        "password",
+        "passcode",
+        "passphrase",
+        "login",
+        "username",
+        "api_key",
+        "apikey",
+        "access_token",
+        "secret_key"
+      ],
+      "reason": "Tavily's terms (8.2) and acceptable use policy (3) forbid credentials in any query.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica's outgoing query screen; see the entry reason"
+      }
+    },
+    {
+      "key": "identifiers",
+      "words": [
+        "passport",
+        "ssn",
+        "social_security",
+        "driving_licence",
+        "drivers_license",
+        "national_insurance",
+        "tax_id"
+      ],
+      "reason": "Government identifiers are forbidden in any query by Tavily's terms (8.2) and acceptable use policy (3).",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica's outgoing query screen; see the entry reason"
+      }
+    },
+    {
+      "key": "finance",
+      "words": [
+        "iban",
+        "credit_card",
+        "creditcard",
+        "debit_card",
+        "bank_account",
+        "account_number",
+        "routing_number",
+        "cvv"
+      ],
+      "reason": "Financial account data is forbidden in any query by Tavily's terms (8.2) and acceptable use policy (3).",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica's outgoing query screen; see the entry reason"
+      }
+    },
+    {
+      "key": "health",
+      "words": [
+        "diagnosis",
+        "diagnosed",
+        "patient",
+        "prescription",
+        "medication",
+        "medical_record",
+        "therapy",
+        "pregnant",
+        "pregnancy"
+      ],
+      "reason": "Health information is forbidden in any query by Tavily's terms (8.2) and acceptable use policy (3).",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica's outgoing query screen; see the entry reason"
+      }
+    },
+    {
+      "key": "contact",
+      "words": [
+        "phone",
+        "telephone",
+        "email",
+        "e_mail",
+        "postcode",
+        "zip_code"
+      ],
+      "reason": "Contact details identify a person; with the address, email, link and long-number patterns, they never leave in a query.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica's outgoing query screen; see the entry reason"
+      }
+    }
+  ]
+}

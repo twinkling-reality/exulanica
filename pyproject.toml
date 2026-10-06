@@ -417,6 +417,12 @@ layers = [
   # input and passes it down, so it sits directly under `world`; the forbidden contract below keeps
   # it pure, so its integer steps replay the same on any machine with no database or store.
   "movement",
+  # Reference material for drafting: the reference sources and their adapters, the boundary every
+  # outgoing query passes, and the notes a drafter receives. It judges a query with the hosted
+  # request policy (epistemics) and sends it through the model transport (models), and sits under
+  # `world` and `selection`, whose drafters take its notes. A picture's model right is injected by
+  # the caller that holds it, so nothing here reaches `ingest`.
+  "references",
   "epistemics",
   # Erasure sits under everything that writes, because everything that writes may have to ask
   # for it: `exulanica.ingest` writes the tombstone that fills the queue, and there is one

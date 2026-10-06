@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "catalog_id": "reference-source",
+  "catalog_version": 1,
+  "entries": [
+    {
+      "key": "tavily_search",
+      "label": "Tavily web search",
+      "kind": "leads",
+      "egress_origin": "https://api.tavily.com",
+      "endpoint_path": "/search",
+      "credential_env": "TAVILY_API_KEY",
+      "terms_url": "https://www.tavily.com/terms",
+      "terms_updated": "2026-05-04",
+      "terms_read": "2026-10-06",
+      "terms_sha256": "d1a28daca2b0bd15549e8987044a7adc1c1cc7da18d33b656e31e37102b425b8",
+      "kept": [
+        "query",
+        "request_record"
+      ],
+      "shown": [
+        "request_record"
+      ],
+      "exported": [],
+      "availability": "operator_only",
+      "cost_unit": "credit",
+      "cost_per_call": 1,
+      "search_depth": "basic",
+      "max_results": 5,
+      "calls_per_minute": 30,
+      "reason": "Discovery only. Tavily's terms (read 2026-10-06) give no right to keep, show or export a result, and license every query to Tavily perpetually, including for training, so a query is ours and treated as published, and nothing of a result outlives the job that asked. Its acceptable use policy binds people who use it through the product, so it is offered to the operator's workspaces only until product terms carry it. The basic depth costs one credit a call.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica reference sources from the provider's terms as read; see the entry reason"
+      }
+    }
+  ]
+}
