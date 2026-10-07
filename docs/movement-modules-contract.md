@@ -1,19 +1,24 @@
 # Movement modules contract
 
-Status: **WALKING, FLIGHT AND ROADS BUILT; ROADS SERVED FOR A BAKED CITY ON THE DEVELOPMENT PREVIEW**.
+Status: **WALKING, FLIGHT, FLIGHT FOR BEINGS AND ROADS BUILT; ROADS SERVED FOR A BAKED CITY ON THE DEVELOPMENT PREVIEW**.
+No engine calls flight for beings; its air is composed from a saved world's own ground, not yet
+from a town's.
 
 Movement in a world is one engine module per kind of movement, chosen by data. A module states the
 space it moves in, the catalog its agents come from, its clock, the bounded parameters every agent's
 figures are checked against, and what it hands a renderer. Walking moves the people of a society
-over a route graph; flight moves flying kinds through a saved world's air; roads drive vehicles over
-a generated city's streets, served for a baked city on the development preview. A bird, a dragon and
-a plane are kinds of the flight kind catalog, never code of their own.
+over a route graph; flight moves flying kinds through a saved world's air; flight for beings flies a
+world's flying things, one society minute at a time, through its air columns; roads drive vehicles
+over a generated city's streets, served for a baked city on the development preview. A bird, a
+dragon and a plane are kinds of the flight kind catalog, or thing kinds whose moves name flight for
+beings, never code of their own.
 
 This contract owns the module registry and its dispatch, the walking and flight steps, the air a
-flight happens in, the flight kind catalog, the flight route and the flight renderer. The society's
-goals, stays and replay are the [society contract](synthetic-society-contract.md)'s; where objects
-declare perches and host flyers is the [world objects contract](world-objects-contract.md)'s; the
-traffic simulation is the [traffic contract](traffic-contract.md)'s.
+flight happens in, the flight kind catalog, the flight route and the flight renderer, and the flight
+for beings step and the air columns it reads. The society's goals, stays and replay are the
+[society contract](synthetic-society-contract.md)'s; where objects declare perches and host flyers
+is the [world objects contract](world-objects-contract.md)'s; the traffic simulation is the
+[traffic contract](traffic-contract.md)'s.
 
 <details>
 <summary>Sections</summary>
@@ -21,6 +26,7 @@ traffic simulation is the [traffic contract](traffic-contract.md)'s.
 - [The registry and its dispatch](#the-registry-and-its-dispatch)
 - [Walking](#walking)
 - [Flight](#flight)
+- [Flight for beings (v2)](#flight-for-beings-v2)
 - [Roads](#roads)
 - [A model choosing for a flyer](#a-model-choosing-for-a-flyer)
 - [What movement modules do not do](#what-movement-modules-do-not-do)
@@ -37,7 +43,7 @@ order. A row states:
 | Field | Meaning |
 | --- | --- |
 | `module` | The identity, `exulanica-movement/<kind>/v<N>` |
-| `space` | What it moves in: `ground-lattice`, `road-graph` or `air-volume`, with the input profiles it reads |
+| `space` | What it moves in: `ground-lattice`, `road-graph`, `air-volume` or `air-columns`, with the input profiles it reads |
 | `agents` | The catalog its agents come from, and which of its kinds, or all |
 | `clock` | Its step length and whose clock it is: the society's persisted tick, a host's, or shared real time (`wall`) |
 | `parameters` | Integer bounds, a unit and a reason for each figure; with a `value` where the module uses one figure for every agent, without one where each kind states its own |
@@ -314,6 +320,179 @@ latest window arrived, as the crowd shows each person where a minute left them. 
 page for frames only while some flyer is off its perch at the clock's step. A kind whose parts are
 not in storage is named in `data-flight-undrawn` and not drawn.
 
+## Flight for beings (v2)
+
+`exulanica-movement/flight/v2` ([`flight_v2.py`](../exulanica/movement/flight_v2.py)) flies one
+flying thing of a world, a being of the things catalog, through one society minute at a time. Its
+agents are the thing kinds whose `moves` name it; its clock is the society's persisted minute, inside
+which it takes `steps_per_minute` (120) steps of `step_ms` (500 ms); its output is
+`exulanica.flight-minute/v1`, the payload of the minute's `flew` event. It is pure and exact as
+flight is: integer millimetres, millimetres a second and fixed-point turns, and no floating point, so
+the same input flies the same minute on any machine.
+
+### Air columns
+
+The air (`exulanica.air-columns/v1`, read by `air_columns`) is a world's ground divided into square
+columns, `{profile, origin_mm: [x0, y0], column_mm, columns_x, columns_y, ceiling_mm, tops_mm}`:
+each column the height above the ground of the tallest solid in it, 0 where it is open, row by row
+from the least corner, and each half-open so every point of the ground lies in exactly one. The
+ceiling is at most the module's `ceiling_mm` (200,000 mm), and a column's side lies between
+`column_minimum_mm` (2,000) and `column_maximum_mm` (8,000); `column_mm_for` gives the side for an
+air from its widest flyer's span, half the span rounded up to 500 mm and held between the two. An
+air of more than `max_columns` (262,144) columns is refused as
+`flight_world_too_large` before any top is read, and any other document the profile does not state
+as `invalid_air_columns`. Its digest is the SHA-256 of its canonical document, and every minute's
+outcome names the air it was flown in by it.
+
+A column is flyable for a kind when its top and the kind's clearance are at most the ceiling. A
+flyer's body is the square of half its span, rounded up, around its position; the columns that square
+meets are the columns under it.
+
+### A flying thing's figures and state
+
+Each kind states its own value, inside the row's bounds, for `cruise_mm_per_s`, `climb_mm_per_s`,
+`descent_mm_per_s`, `turn_rate_mrad_per_s`, `acceleration_mm_per_s2`, `clearance_mm` (above the tops
+of the columns under it), `band_minimum_mm` (the lowest it cruises above the ground), `span_mm` and
+`hovers`: 1 for a kind that can hold still in the air, 0 for a winged kind. `flyer_figures` refuses a
+value outside the bounds with `ParameterOutOfBounds` naming the module, the parameter and the value,
+and figures that do not state exactly these as `invalid_flight_figures`. A kind's smallest turn is its
+cruise speed over its turn rate.
+
+A flying being's state is the things engine's, with optional fields only: `position_mm` `[x, y]`
+along the ground, `mode` (`flight` while airborne, `walking` on the ground), and while in flight
+`height_mm` above the ground and `velocity_mm_s` `[vx, vy, vz]`, `z` up, absent at rest. Its
+`thing_id` names its draw. A minute replaces the movement fields and keeps every other field of the
+state as it was. A state that does not have this
+shape is refused as `invalid_flyer`, and one standing outside the air as `flyer_outside_air`.
+
+### A minute's steps
+
+`fly_minute(air, flyer, goal, figures, seed, tick, ordinal)` answers the flyer's state after the
+minute, a waypoint `[x, y, height]` at the end of each simulated second (60 of them, every second
+step) and the minute's outcome. Each step steers by Reynolds steering, as flight does: the goal gives
+a desired velocity, and the step changes the velocity toward it. The part of the change along the
+heading changes the speed by at most the kind's acceleration over the step; the part across turns the
+heading toward the desired one by at most its turn rate over the step, never past it, so the turning
+acceleration is at most speed times turn rate; the speed is at most the cruise speed. From rest the
+velocity sets off toward the desired one within the acceleration.
+
+The height a flyer aims at is what its goal asks, its band for cruising, or its clearance above the
+tallest flyable column under its body now and in the next three seconds along its heading and along
+the way it wants to go, where that is higher, and never above the ceiling. Columns it cannot fly over
+are left to its route and the guard. Where a column ahead on the way it wants to go needs it higher
+than it is, it slows so that it climbs that far before it gets there. Its vertical speed moves
+toward the height within its climb and descent rates, by at most its acceleration a step and never
+faster than it can stop at the height.
+
+**The guard has the last word.** A step is taken whole only when the box its body sweeps, from where
+it starts to where it ends, lies inside the air, under the ceiling and, at the lower of its two
+heights, at least its clearance above every top the box meets; while a flyer lands or takes off, open
+ground asks for no clearance. Otherwise the flyer slides, keeping only the parts of its move that
+stay legal, level first, then vertical, then along each axis of the ground; failing those it holds
+where it is, at rest. Each such step is counted in the outcome's `held_steps`. A flyer that starts a
+step where it may not be, as when a column was placed under it since its last minute, takes its
+steered move only where it ends where the flyer may be, and otherwise climbs straight up toward its
+clearance where the ceiling leaves room, comes straight down under the ceiling, or moves out from
+under the columns it cannot fly over and in from the air's sides; each of those steps is held.
+
+### Routes over columns
+
+Where the straight way from the flyer to where it first meets its goal, the point where its way
+touches a circle or a landing point, crosses a column it cannot fly over or leaves the air, it
+follows a route: an A* search over the columns a body centred on lies over flyable columns only, from
+its own column to the goal's, four neighbours, the Manhattan distance to the goal's column its
+estimate, ties broken toward the way travelled and then by column. A route to a circle ends at
+any such column whose centre lies within a column of the circle; a route to a landing ends at the
+landing point's own column. A search that settles `route_cells` (16,384) columns without arriving
+ends with none, and the goal is refused as `no_route`. The flyer passes each waypoint, a column's
+centre, whose column it reaches, and aims at the furthest of its next eight it can fly straight to,
+slowing to as little as a quarter of its cruise speed where it must turn a right angle or more. A
+route is found again at each minute's start from the state, and never stored.
+
+### Goals
+
+The goals are the things engine's primitives, each a document naming its `kind`:
+
+| Goal | Fields | Flight |
+| --- | --- | --- |
+| `go_near` | `point_mm`, `within_mm` | Flies at its band to the point and circles it at the larger of `within_mm` and its smallest turn |
+| `keep_near` | `target_id`, `point_mm`, `within_mm` | The same around the target's position this minute; `point_mm` null when the target is gone |
+| `circle` | `point_mm`, `radius_mm` | An orbit at its band at the larger of `radius_mm` and its smallest turn, entered toward the point where its way touches the circle |
+| `land` | `point_mm` | Comes down onto the point and becomes `walking` at height 0 |
+| `take_off` | none | Climbs from the ground to its band, then stays there |
+| `stay` | none | Circles where it is, or, for a kind that hovers, slows to rest where it is |
+
+A flyer goes round a circle the way it is already going round its centre, at nine tenths of the
+fastest speed its turn holds on the circle, so its turning keeps a tenth in hand to hold the radius.
+A circle that, as wide as the flyer's body, leaves the air or crosses a column the kind cannot fly
+over is refused as `circle_blocked`, for `go_near` and `keep_near` as for `circle`. A goal near a
+point is reached when the flyer ends the minute within its circle's radius and a slack, a quarter of
+the radius and at least a column, and a circle when it ends the minute within that slack of it.
+
+A landing is refused as `no_room_to_land` unless every column within half the flyer's span of the
+point lies in the air and is open. It follows a glide path toward the point, its height its descent
+over its cruise speed for each millimetre beyond 250 mm from the point and never above its band,
+slowing as it nears the point so that its turn can follow it. A winged flyer within two of its
+smallest turns of the point and above the glide path there circles the point at its smallest turn,
+descending, where every column under that circle is open; elsewhere, and for a kind that hovers, it
+comes to the point and down. Within 250 mm of the point and one step's descent of the ground it
+touches down on the point: its mode becomes `walking`, its height and velocity go, and a `landed`
+event carries the millisecond of the minute at which the step it touched down in began, 0 to
+59,500, as every event of a minute falls from 0 to 59,999.
+
+A flyer on the ground given any goal but `stay` takes off first. A take-off is refused as
+`no_room_to_rise` unless every column within half its span of where it stands lies in the air and is
+open and its clearance is under the ceiling; it leaves the ground at the minute's start, with a
+`took_off` event at 0 ms. It climbs to its band, a winged kind around the circle of its smallest turn
+through where it stood where every column under that circle is open and straight up otherwise, a
+kind that hovers straight up; a flyer that starts a minute below its clearance over open ground is
+still taking off. While landing or taking off it may be lower than its clearance over open ground,
+and nowhere else.
+
+A winged flyer told to stay circles where it is: around the circle of its smallest turn through its
+position, to its left where it can fly over every column under that circle, else to its right, else
+at three quarters, a half and a quarter of that radius, flown as much slower; where no circle fits it
+slows to rest. A kind that hovers slows to rest at its height, and a flyer on the ground stays there.
+A goal of any other kind is refused as `not_served_by_module`; `keep_near` with no point as
+`target_gone`, and with a point outside the air as `lost_target`; `go_near` to a point outside the air
+as `no_route`. A refused goal's minute is flown as `stay`. A goal document its primitive does not
+state is refused, raised as `invalid_flight_goal`.
+
+### The outcome
+
+| Field | Meaning |
+| --- | --- |
+| `profile`, `module` | `exulanica.flight-minute/v1` and `exulanica-movement/flight/v2` |
+| `goal` | The goal's kind, as given |
+| `status` | `reached` where the goal holds at the minute's end, `under_way` where it does not yet, or `refused` |
+| `refusal` | The refusal's name, or null |
+| `waypoints_mm` | The 60 waypoints, as the minute also answers them |
+| `events` | `took_off` and `landed`, each with `at_ms`, the millisecond of the minute it happened at |
+| `held_steps` | Steps the guard took less of than steering proposed |
+| `air_sha256` | The digest of the air the minute was flown in |
+
+The minute's one draw is `sha256(seed:flight:<thing_id>:tick:ordinal)`: the heading a flyer at rest
+sets off along, and the way it turns where its goal lies straight behind it or it cannot tell which
+way it goes round a circle's centre. Steering needs no other. `check_flyers` refuses a world's minute
+of more than `max_flyers` (24) flyers as `too_many_flyers`, for the engine that moves them to call.
+
+### What flight for beings does not do
+
+- No engine calls the step, and no shipped thing kind names the module: the engine that moves a
+  world's things is to call it once a minute for each flying being, and a body plan that flies is to
+  name it.
+- No composer builds a town's air from its massing footprints and heights, and a saved world's air
+  holds its placed objects but not its placed things' boxes. A saved world's air is composed by
+  [`flight_air.py`](../exulanica/world/flight_air.py) `compose_air_columns`: the society's walking
+  area in columns of the side the widest flyer's span gives, each the highest any part of a placed
+  object reaching into it stands above the ground, the parts read as flight's input reads them
+  (`placed_solids`), and an object whose geometry it cannot state refused by name as
+  `flight_unavailable`.
+- Flyers do not avoid each other, and they do not see people; a flyer keeps its clearance above the
+  tallest solid in each column under it, however small the solid.
+- A column's top stands for its whole area: a flyer keeps above the tallest thing anywhere in a
+  column, and a landing or take-off needs every column within half its span open.
+
 ## Roads
 
 `exulanica-movement/roads/v1` is built. Its space is the road network the traffic simulation
@@ -387,6 +566,8 @@ viewers could share them.
 | Episodes and their worker | `exulanica/movement/flight_episodes.py`, `exulanica/world/episode_worker.py`, `exulanica/world/flight_worker.py` | `tests/test_flight_worker.py` (a real worker process, killed), `tests/test_world_flight_api.py` |
 | Independent check | `exulanica/world/flight_checks.py` | `tests/test_flight_checks.py` (positive controls, the moves that join one window to the next, a placement error planted in the flight's composer, the rule that it imports nothing of the flight, and the two placements' parity) |
 | Flight kinds, assets | `exulanica/world/flight_kinds.py`, migration 0114 | `tests/test_flight_kinds.py`, `tests/test_reviewed_asset_placeability.py` |
+| Flight for beings: a saved world's air | `exulanica/world/flight_air.py`, `placed_solids` in `exulanica/world/flight_input.py` | `tests/test_flight_air.py` (each column's top against the independent checker's own parts over flight's four bounds worlds, the same version giving the same air, an unplaceable object and a ground too wide refused by name) |
+| Flight for beings: air columns, figures, steps, guard, routes, goals | `exulanica/movement/flight_v2.py`, its row in `movement-modules.v1.json` and its step in `steps.py` | `tests/test_flight_v2.py` (every flight judged by a checker in the file that derives the columns under a body and the height it needs from the air's document alone, positive controls beside every refusal, the guard taken away and caught flying through a tower, a minute replayed in another interpreter, and a minute of 24 flyers timed and not asserted) |
 | Perches and hosts | `exulanica/world/object_catalog.py`, `world-object.v3.json` | `tests/test_world_object_perches.py` |
 | Composition, route | `exulanica/world/flight_input.py`, `exulanica/api/routes/world_flight.py` | `tests/test_world_flight_api.py` |
 | Page and renderer | `web/packages/app/src/flight-api.ts`, `composition/saved-world-flight.ts`, `web/packages/atlas-react/src/playcanvas/flight/` | `flight-api.test.ts`, `saved-world-flight.test.ts`, `environment-selection-flight.test.ts`, `flight-flock.test.ts`, `authored-society-flight-assets.test.ts`, `tests/test_flight_page_words.py` (the page's words against the server's codes) |

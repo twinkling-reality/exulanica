@@ -81,11 +81,13 @@ from exulanica.world.workspace_assets import WorkspaceAssetError
 
 __all__ = [
     "FLIGHT_NAMESPACE",
+    "PlacedSolids",
     "SavedFlight",
     "close_flight_worker",
     "compose_flight_input",
     "flight_clock",
     "flight_episodes",
+    "placed_solids",
     "saved_world_flight",
     "served_window",
 ]
@@ -180,36 +182,25 @@ def _unavailable(code: str, object_id: str) -> FlightRefused:
     return FlightRefused("flight_unavailable", f"{code}:{object_id}")
 
 
-def compose_flight_input(
+class PlacedSolids(NamedTuple):
+    """A version's objects as a flight reads them: every part a solid, and each object read
+    through the catalog with its kind, where it stands and whether it moves."""
+
+    solids: list[Solid]
+    placed: list[tuple[str, WorldObjectKind, Placement, bool]]
+
+
+def placed_solids(
     *,
-    world_id: str,
     version: AlternateVersion,
     ground: SocietyGround,
     asset_keys: Mapping[str, str],
-    objects: WorldObjectCatalog | None = None,
-    flying: FlightKindCatalog | None = None,
+    objects: WorldObjectCatalog,
     workspace_bounds: Mapping[str, tuple[int, int, int]] | None = None,
-) -> FlightInput:
-    """The flight over one saved world version, or a refusal naming the object it could not read.
-
-    ``asset_keys`` maps each reviewed asset's content digest to its registry key, as the reviewed
-    registry holds them. ``workspace_bounds`` maps each placed workspace asset's preparation id to
-    the width, height and depth it measured, in millimetres; such an object is solid and hosts no
-    flyer and no perch.
-    """
-    if version.world_id != world_id or ground.world_id != world_id:
-        raise FlightRefused("flight_unavailable", "the version or its ground is another world's")
-    catalog = world_object_catalog() if objects is None else objects
-    flyers_catalog = flight_kind_catalog() if flying is None else flying
-    kinds_by_asset = catalog.by_asset_key()
-    flying_kinds = flyers_catalog.by_key()
-    volume = _volume(ground)
-    nx, ny, nz = volume.shape
-    if nx * ny * nz > _MAX_CELLS:
-        raise FlightRefused(
-            "flight_world_too_large",
-            f"the air over this ground is {nx * ny * nz} cells; at most {_MAX_CELLS}",
-        )
+) -> PlacedSolids:
+    """Every part of every placed object of a version as a solid, or a refusal naming the object
+    whose geometry cannot be stated, as :func:`compose_flight_input` describes."""
+    kinds_by_asset = objects.by_asset_key()
     solids: list[Solid] = []
     placed: list[tuple[str, WorldObjectKind, Placement, bool]] = []
     for obj in sorted(version.objects, key=lambda value: value.object_id):
@@ -260,6 +251,45 @@ def compose_flight_input(
                 "flight_world_too_large",
                 f"this world's objects have more than {_MAX_PARTS} parts to build its air from",
             )
+    return PlacedSolids(solids, placed)
+
+
+def compose_flight_input(
+    *,
+    world_id: str,
+    version: AlternateVersion,
+    ground: SocietyGround,
+    asset_keys: Mapping[str, str],
+    objects: WorldObjectCatalog | None = None,
+    flying: FlightKindCatalog | None = None,
+    workspace_bounds: Mapping[str, tuple[int, int, int]] | None = None,
+) -> FlightInput:
+    """The flight over one saved world version, or a refusal naming the object it could not read.
+
+    ``asset_keys`` maps each reviewed asset's content digest to its registry key, as the reviewed
+    registry holds them. ``workspace_bounds`` maps each placed workspace asset's preparation id to
+    the width, height and depth it measured, in millimetres; such an object is solid and hosts no
+    flyer and no perch.
+    """
+    if version.world_id != world_id or ground.world_id != world_id:
+        raise FlightRefused("flight_unavailable", "the version or its ground is another world's")
+    catalog = world_object_catalog() if objects is None else objects
+    flyers_catalog = flight_kind_catalog() if flying is None else flying
+    flying_kinds = flyers_catalog.by_key()
+    volume = _volume(ground)
+    nx, ny, nz = volume.shape
+    if nx * ny * nz > _MAX_CELLS:
+        raise FlightRefused(
+            "flight_world_too_large",
+            f"the air over this ground is {nx * ny * nz} cells; at most {_MAX_CELLS}",
+        )
+    solids, placed = placed_solids(
+        version=version,
+        ground=ground,
+        asset_keys=asset_keys,
+        objects=catalog,
+        workspace_bounds=workspace_bounds,
+    )
     clearance = max(
         (ceil_div(flyer_kind.figures.body_span_mm, 2) for flyer_kind in flyers_catalog.kinds),
         default=0,

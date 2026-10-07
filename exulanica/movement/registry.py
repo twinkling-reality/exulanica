@@ -27,6 +27,7 @@ from typing import Any, Final, Literal
 
 __all__ = [
     "FLIGHT",
+    "FLIGHT_V2",
     "MODULES",
     "MODULES_PATH",
     "ROADS",
@@ -49,11 +50,12 @@ TABLE_PROFILE: Final = "exulanica.movement-modules/v1"
 #: holds the code's step table to the rows that are built.
 WALKING: Final = "exulanica-movement/walking/v1"
 FLIGHT: Final = "exulanica-movement/flight/v1"
+FLIGHT_V2: Final = "exulanica-movement/flight/v2"
 ROADS: Final = "exulanica-movement/roads/v1"
 
 Status = Literal["built", "not_connected"]
 _STATUSES: Final = ("built", "not_connected")
-_SPACES: Final = ("air-volume", "ground-lattice", "road-graph")
+_SPACES: Final = ("air-columns", "air-volume", "ground-lattice", "road-graph")
 _CLOCKS: Final = ("host", "society", "wall")
 _ROW_KEYS: Final = frozenset(
     {"agents", "clock", "module", "output", "parameters", "reason", "refusal", "space", "status"}

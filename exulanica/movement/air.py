@@ -53,6 +53,7 @@ __all__ = [
     "occupancy_from_cells",
     "placed_point",
     "segment_meets_cell",
+    "solid_bounds",
     "swept_cells",
 ]
 
@@ -194,7 +195,7 @@ def placed_point(point: Sequence[int], placement: Placement) -> Vector:
     )
 
 
-def _solid_bounds(solid: Solid) -> tuple[Vector, Vector]:
+def solid_bounds(solid: Solid) -> tuple[Vector, Vector]:
     """A solid's closed region bounds, every corner rounded outward to the millimetre, over the
     whole of its travel: a box moved along a straight line sweeps the box spanning both ends."""
     low, high = _placed_bounds(solid.box, solid.placement)
@@ -366,7 +367,7 @@ def build_occupancy(
     cell = volume.cell_mm
     grow = clearance_mm
     for solid in solids:
-        low, high = _solid_bounds(solid)
+        low, high = solid_bounds(solid)
         for ix in _closed_range(low[0] - grow, high[0] + grow, volume.min_x_mm, cell, nx):
             for iy in _closed_range(low[1] - grow, high[1] + grow, volume.ground_mm, cell, ny):
                 for iz in _closed_range(low[2] - grow, high[2] + grow, volume.min_z_mm, cell, nz):

@@ -17,15 +17,23 @@ from collections.abc import Callable, Mapping
 from types import MappingProxyType
 from typing import Any, Final
 
-from exulanica.movement import flight, walking
-from exulanica.movement.registry import FLIGHT, ROADS, WALKING, MovementError, built_module
+from exulanica.movement import flight, flight_v2, walking
+from exulanica.movement.registry import (
+    FLIGHT,
+    FLIGHT_V2,
+    ROADS,
+    WALKING,
+    MovementError,
+    built_module,
+)
 
 __all__ = ["HOSTED", "STEPS", "MovementStepHosted", "step_of"]
 
 #: One entry per built module this package runs. Each module's step has its own signature, stated
-#: where it is defined: walking's traverses a route, flight's computes a window of steps.
+#: where it is defined: walking's traverses a route, flight's computes a window of steps, flight
+#: for beings flies one flyer through one society minute.
 STEPS: Final[Mapping[str, Callable[..., Any]]] = MappingProxyType(
-    {WALKING: walking.traverse, FLIGHT: flight.flight_window}
+    {WALKING: walking.traverse, FLIGHT: flight.flight_window, FLIGHT_V2: flight_v2.fly_minute}
 )
 #: Built modules whose step runs in a host above this package, by the module that runs it.
 HOSTED: Final[Mapping[str, str]] = MappingProxyType({ROADS: "exulanica.world.traffic_episodes"})

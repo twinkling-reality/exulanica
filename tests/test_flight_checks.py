@@ -301,6 +301,6 @@ def test_both_placements_put_every_perch_within_a_millimetre_and_the_flight_cove
             drawn = checker_module._part_boxes(kind, transform, (0, 0, 0))
             assert len(boxes) == len(drawn)
             for box, (low, high) in zip(boxes, drawn, strict=True):
-                flight_low, flight_high = air._solid_bounds(air.Solid("x", box, placement))
+                flight_low, flight_high = air.solid_bounds(air.Solid("x", box, placement))
                 assert all(a <= b for a, b in zip(flight_low, low, strict=True)), kind.key
                 assert all(a >= b for a, b in zip(flight_high, high, strict=True)), kind.key

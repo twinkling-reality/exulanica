@@ -66,6 +66,51 @@
     },
     {
       "agents": {
+        "catalog": "things",
+        "kinds": null,
+        "reason": "Every thing kind whose moves name this module (assets/catalogs/things/kinds) flies by it, and states a value for every parameter below that a kind supplies. A kind's figures are declared for the screen, not measured from an animal: a society minute plays in 8 s at 1x, so a large flyer's world speeds of 1 to 3 m/s show as 7.5 to 22.5 m/s."
+      },
+      "clock": {
+        "kind": "society",
+        "reason": "One call is one simulated minute of the society's persisted history, as a walking tick is, and inside it the module takes steps_per_minute steps of step_ms each. Nothing of a flight is kept between minutes but the flyer's own state: its route is found again each minute from where it is.",
+        "step_ms": 60000
+      },
+      "module": "exulanica-movement/flight/v2",
+      "output": {
+        "profile": "exulanica.flight-minute/v1",
+        "reason": "The flew event's payload: a waypoint [x, y, height] in millimetres at the end of each simulated second, the took_off and landed events with the millisecond of the minute each happened at, the goal's status or its refusal by name, how many steps the guard held, and the digest of the air it was flown in. A renderer draws the flyer along the waypoints and runs no steering of its own."
+      },
+      "parameters": [
+        {"maximum": 5000, "minimum": 100, "name": "acceleration_mm_per_s2", "reason": "The most a kind's speed along its heading changes in a second; steering asks for a change and is held to this.", "unit": "mm/s2", "value": null},
+        {"maximum": 100000, "minimum": 2000, "name": "band_minimum_mm", "reason": "The lowest a kind cruises above the ground; where the columns ahead stand taller it flies higher, its clearance above their tops, up to the air's ceiling.", "unit": "mm", "value": null},
+        {"maximum": 200000, "minimum": 200000, "name": "ceiling_mm", "reason": "The highest ceiling an air may state above its ground; an air states its own ceiling at or below it. Twice the highest band a kind may state, so every band fits under it with room to clear what stands below.", "unit": "mm", "value": 200000},
+        {"maximum": 20000, "minimum": 1000, "name": "clearance_mm", "reason": "How far above the tops of the columns under its body a kind keeps, except over open ground while it lands or takes off: 1 m for a small bird to 20 m for a creature whose wings reach far beyond its body. A column whose top and this clearance reach above the air's ceiling is not flyable for the kind.", "unit": "mm", "value": null},
+        {"maximum": 3000, "minimum": 100, "name": "climb_mm_per_s", "reason": "The fastest a kind climbs.", "unit": "mm/s", "value": null},
+        {"maximum": 8000, "minimum": 8000, "name": "column_maximum_mm", "reason": "The widest column an air may have. An air's column is half its widest flyer's span rounded up to 500 mm and held between the narrowest and the widest, so a column is about the reach of a wing and a street never becomes a single column.", "unit": "mm", "value": 8000},
+        {"maximum": 2000, "minimum": 2000, "name": "column_minimum_mm", "reason": "The narrowest column an air may have: at 2 m, the most columns an air may have cover a 1,024 m square, and a route search over them stays bounded.", "unit": "mm", "value": 2000},
+        {"maximum": 5000, "minimum": 500, "name": "cruise_mm_per_s", "reason": "The speed a kind flies at when nothing slows it, declared for the screen: a society minute plays in 8 s at 1x, so 1 to 3 m/s in the world shows as 7.5 to 22.5 m/s for a large flyer.", "unit": "mm/s", "value": null},
+        {"maximum": 3000, "minimum": 100, "name": "descent_mm_per_s", "reason": "The fastest a kind descends, and the slope it glides down to land: its descent over its cruise speed.", "unit": "mm/s", "value": null},
+        {"maximum": 1, "minimum": 0, "name": "hovers", "reason": "1 for a kind that can hold still in the air, a floating spirit or a hovering bird: told to stay, it slows to rest where it is, and it rises and lands straight up and down. 0 for a winged kind, which stays by circling at its smallest turn and lands down a spiral where the ground around the point is open.", "unit": "flag", "value": null},
+        {"maximum": 262144, "minimum": 262144, "name": "max_columns", "reason": "The most columns an air may have: reading an air and searching a route grow with it. 262,144 columns cover a 1,024 m square at the narrowest column and a 4,096 m square at the widest; a larger air is refused by name (flight_world_too_large) rather than flown slowly.", "unit": "column", "value": 262144},
+        {"maximum": 24, "minimum": 24, "name": "max_flyers", "reason": "The most flyers one world's minute moves, as flight v1 bounds its flyers: a world whose things would fly more is refused by name (too_many_flyers), never trimmed.", "unit": "flyer", "value": 24},
+        {"maximum": 16384, "minimum": 16384, "name": "route_cells", "reason": "The most columns one route search may settle before it ends with no route, which refuses the goal as no_route: a sixteenth of the largest air, so a search that finds no way ends in bounded time.", "unit": "column", "value": 16384},
+        {"maximum": 60000, "minimum": 0, "name": "span_mm", "reason": "A kind's wingspan, from its extent. Its body is the square of half its span around its position: the columns that square meets are the ones it must clear, and the ones a landing or a take-off needs open.", "unit": "mm", "value": null},
+        {"maximum": 500, "minimum": 500, "name": "step_ms", "reason": "The length of one step, each steered, moved and held to the guard: a step at the fastest cruise moves 2.5 m, and the guard asks every column the box the move sweeps meets.", "unit": "ms", "value": 500},
+        {"maximum": 120, "minimum": 120, "name": "steps_per_minute", "reason": "Steps in one society minute: this many steps of step_ms make the minute the society persists.", "unit": "step", "value": 120},
+        {"maximum": 2000, "minimum": 100, "name": "turn_rate_mrad_per_s", "reason": "The fastest a kind turns: its heading turns at most this far in a second, so its smallest turn is its cruise speed over this rate, the radius it circles at when it stays.", "unit": "mrad/s", "value": null},
+        {"maximum": 60, "minimum": 60, "name": "waypoints_per_minute", "reason": "One waypoint at the end of each simulated second, every second step: a renderer moves the flyer between them.", "unit": "waypoint", "value": 60}
+      ],
+      "reason": "Flight for beings: a flying thing moved one society minute at a time through a world's air columns by Reynolds steering with bounded acceleration and turning, at a height that clears the column tops ahead by its kind's clearance under the air's ceiling, every step held to a guard, by a route over flyable columns where the straight way is blocked, toward the goals a things engine gives it: go near, keep near, circle, land, take off and stay.",
+      "refusal": null,
+      "space": {
+        "kind": "air-columns",
+        "profiles": ["exulanica.air-columns/v1"],
+        "reason": "A world's ground divided into square columns, row by row from its least corner, each holding the height of the tallest solid in it, 0 where it is open, under a ceiling. The module reads an air as it is given; composing one from a world's geometry is a host's work above this package."
+      },
+      "status": "built"
+    },
+    {
+      "agents": {
         "catalog": "vehicle-class",
         "kinds": null,
         "reason": "The traffic simulation's vehicle classes (assets/catalogs/traffic/vehicle-class.v1.json), each bounded by that catalog's own integer fields and their cited sources."
