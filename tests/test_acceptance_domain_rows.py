@@ -205,8 +205,29 @@ def test_h4_reads_the_day_line_and_never_the_hours():
     assert DRIVE.window_entry({"entries": [hour, mislabelled]}, "living", 1440) == {}
 
 
+#: The catalogs module's shape at the heads A-56 compares, where the module stated the seeds
+#: catalog's versions itself (they now live in exulanica/world/society_comparison_seeds.py, which
+#: the drawing digest does not cover): a table mapping each catalog to its version, the seeds
+#: schemas built for a tuple of versions, and other values beside them.
+A56_CATALOGS_SOURCE = """
+#: The versions a comparison over a day is defined under.
+DAY_COMPARISON_VERSIONS: Final = {
+    PERSON_SCORE_CATALOG: 5,
+    COMPARISON_PROTOCOL_CATALOG: 4,
+    COMPARISON_SEEDS_CATALOG: 6,
+}
+COMPARISON_WINDOWS: Final = ("hour", "day")
+SCHEMAS: Final = {
+    **{
+        (COMPARISON_SEEDS_CATALOG, version): CatalogSchema(COMPARISON_SEEDS_CATALOG, version)
+        for version in (3, 4, 5, 6)
+    },
+}
+"""
+
+
 def test_a56_lets_only_the_seeds_versions_of_the_catalogs_module_change():
-    source = (ROOT / "exulanica" / "world" / "society_catalogs.py").read_text()
+    source = A56_CATALOGS_SOURCE
     table = "    COMPARISON_SEEDS_CATALOG: 6,\n}"
     schemas = "for version in (3, 4, 5, 6)"
     assert table in source and schemas in source

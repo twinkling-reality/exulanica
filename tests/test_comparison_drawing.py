@@ -120,7 +120,85 @@ def test_the_digest_covers_the_data_a_replay_reads_as_well_as_its_code():
     data = set(drawing_data())
     assert {MODULES_PATH, ENGINES_PATH} <= data
     assert set(REGISTRY_DIRECTORY.glob("*.json")) <= data
-    assert set(ROUTINE_DIRECTORY.glob("*.json")) <= data
+    seeds = set(ROUTINE_DIRECTORY.glob("society-comparison-seeds.v*.json"))
+    assert len(seeds) >= 6
+    assert set(ROUTINE_DIRECTORY.glob("*.json")) - seeds <= data
+    # A drawing names no seed and its replay reads no comparison catalog (below), so a new set of
+    # held-out seeds is no drawing input.
+    assert not seeds & data
+
+
+def _living_played():
+    from test_society_living_comparison import _Choosing, _plan
+
+    plan = _plan("model")
+    played = play(plan, _Choosing())
+    stored = list(zip(played.requests, played.receipts, strict=True))
+    outcome = {
+        "status": "completed",
+        "minutes": {"state_sha256": played.minute_digests},
+        "events_sha256": played.events_sha256,
+        "receipts": {"count": len(played.receipts), "sha256": played.receipts_sha256},
+    }
+    return plan, stored, outcome
+
+
+@pytest.mark.parametrize("arm", ["model", "group", "routine", "living"])
+def test_a_replay_and_its_drawing_read_no_comparison_catalog(monkeypatch, arm):
+    from exulanica.world import society_catalogs
+
+    plan, stored, outcome = _living_played() if arm == "living" else _played(arm)
+    read: list[str] = []
+
+    def refused(*_args, **_kwargs):
+        read.append("load_comparison_catalogs")
+        raise AssertionError("a replay read a comparison catalog")
+
+    real_load = society_catalogs.load_catalog
+
+    def load(path, *args, **kwargs):
+        if Path(path).name.startswith("society-comparison-"):
+            read.append(Path(path).name)
+        return real_load(path, *args, **kwargs)
+
+    # Every module that holds the loader by name, so no import path reaches the real one.
+    for module in list(sys.modules.values()):
+        if (
+            getattr(module, "load_comparison_catalogs", None)
+            is society_catalogs.load_comparison_catalogs
+        ):
+            monkeypatch.setattr(module, "load_comparison_catalogs", refused)
+    monkeypatch.setattr(society_catalogs, "load_catalog", load)
+    replayed = verified_replay(plan, stored, outcome)
+    drawn = replay_document(
+        plan, {}, "model" if arm == "living" else arm, "0" * 64, replayed, model_name=str
+    )
+    assert drawn["profile"]
+    assert read == []
+
+
+def test_a_new_set_of_seeds_leaves_the_digest_and_every_stored_drawing_current(
+    monkeypatch, tmp_path
+):
+    from exulanica.world import society_comparison_seeds
+
+    assert society_comparison_seeds.__name__ not in DRAWING_MODULES
+    copy = tmp_path / "society"
+    copy.mkdir()
+    for file in ROUTINE_DIRECTORY.glob("*.json"):
+        (copy / file.name).write_bytes(file.read_bytes())
+    monkeypatch.setattr(drawing_module, "ROUTINE_DIRECTORY", copy)
+    # The digest is taken over the files in path order, so the copy's is its own baseline; the
+    # last assertion shows the copy is what it reads.
+    before = drawing_module._code_sha256()
+    newest = sorted(copy.glob("society-comparison-seeds.v*.json"))[-1]
+    (copy / "society-comparison-seeds.v99.json").write_bytes(newest.read_bytes())
+    newest.write_bytes(newest.read_bytes() + b" ")
+    assert drawing_module._code_sha256() == before
+    # Any other society catalog is still covered: the same change to it is a new digest.
+    other = copy / "society-need.v1.json"
+    other.write_bytes(other.read_bytes() + b" ")
+    assert drawing_module._code_sha256() != before
 
 
 @pytest.mark.parametrize("changed", ["module", "movement", "engines", "roles"])

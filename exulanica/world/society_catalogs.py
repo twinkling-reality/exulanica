@@ -64,6 +64,11 @@ from exulanica.grammar.catalogs import (
 from exulanica.grammar.errors import CatalogError
 from exulanica.grammar.records import KEY_PATTERN
 from exulanica.world.role_catalogs import role_action_schema, role_policy_schema
+from exulanica.world.society_comparison_seeds import (
+    COMPARISON_SEEDS_CATALOG,
+    DAY_SEEDS_VERSION,
+    HOUR_SEEDS_VERSION,
+)
 from exulanica.world.society_engines import society_engine
 
 if TYPE_CHECKING:
@@ -197,7 +202,6 @@ _DECISION_CATALOG_VERSIONS: Final = {
 #: How a person's hour is scored, and the protocol and seeds a comparison of models is made under.
 PERSON_SCORE_CATALOG: Final = "society-person-score"
 COMPARISON_PROTOCOL_CATALOG: Final = "society-comparison-protocol"
-COMPARISON_SEEDS_CATALOG: Final = "society-comparison-seeds"
 #: The versions a new comparison is defined under: the score of how people fared, half the need
 #: they were spared and half the variety of their hour, with what each model answered reported
 #: apart; the protocol whose population bound is derived from a measured replay; and seeds whose
@@ -205,7 +209,7 @@ COMPARISON_SEEDS_CATALOG: Final = "society-comparison-seeds"
 COMPARISON_VERSIONS: Final = {
     PERSON_SCORE_CATALOG: 3,
     COMPARISON_PROTOCOL_CATALOG: 3,
-    COMPARISON_SEEDS_CATALOG: 5,
+    COMPARISON_SEEDS_CATALOG: HOUR_SEEDS_VERSION,
 }
 #: A run keeps the score semantics for the state family its stored engine writes. The
 #: comparison protocol and seed catalog remain the same for both families.
@@ -214,12 +218,12 @@ COMPARISON_SCORE_BY_FAMILY: Final = {"purposeful": 3, "living": 4}
 COMPARISON_WINDOWS: Final = ("hour", "day")
 #: The versions a comparison over a day is defined under: the fifth score, the fourth's terms over
 #: the day assembled exactly from its hours, the fourth protocol, whose window is a day, and the
-#: sixth seeds, whose held-out seeds no comparison has run: the fifth's, which an hour's comparison
-#: is still defined under, were spent by a judged comparison of a town's hour.
+#: seeds :mod:`exulanica.world.society_comparison_seeds` names for a day, which a new set of
+#: held-out seeds changes without touching this module.
 DAY_COMPARISON_VERSIONS: Final = {
     PERSON_SCORE_CATALOG: 5,
     COMPARISON_PROTOCOL_CATALOG: 4,
-    COMPARISON_SEEDS_CATALOG: 6,
+    COMPARISON_SEEDS_CATALOG: DAY_SEEDS_VERSION,
 }
 #: The state families a comparison may run over a day, by the score its day is scored under: a
 #: living town's, whose people keep the day of its clock. A purposeful society keeps no time of
@@ -681,7 +685,10 @@ SCHEMAS: Final[dict[tuple[str, int], CatalogSchema]] = {
             ),
             entry_check=_seed_v3_bounds,
         )
-        for version in (3, 4, 5, 6)
+        # Every version from the third the directory holds a file for: a new set of held-out seeds
+        # is a new file, read by this schema, and no edit here.
+        for version in _versions_present(COMPARISON_SEEDS_CATALOG)
+        if version >= 3
     },
 }
 

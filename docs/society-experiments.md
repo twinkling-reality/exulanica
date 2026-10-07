@@ -586,8 +586,13 @@ cancelled day's run keeps the hours it sealed, which stay readable.
 the digest of the drawing code and the data that code reads (migration 0121). A server whose drawing
 code or data differ finds no drawing under its own digest and replays the run on each read instead,
 held to the run's record. Nothing draws stored runs again, so every run drawn before such a change
-is served by replay; the rows drawn under the earlier digest are kept. A day's run is not drawn:
-each of its hours is replayed on its read from the state the hour before it sealed.
+is served by replay; the rows drawn under the earlier digest are kept. The seeds catalog is not
+among the data the digest covers: a drawing names no seed and its replay reads no comparison
+catalog, so a new set of held-out seeds, a new seeds file and the version
+[`exulanica/world/society_comparison_seeds.py`](../exulanica/world/society_comparison_seeds.py)
+names for it, leaves every stored drawing current
+([`tests/test_comparison_drawing.py`](../tests/test_comparison_drawing.py)). A day's run is not
+drawn: each of its hours is replayed on its read from the state the hour before it sealed.
 
 **An earlier input.** A start may name `input_seq`, an earlier stored input of the society, to
 freeze instead of its newest; the plan takes the same parameter and states the input a start of

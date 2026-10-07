@@ -15,6 +15,9 @@ of the run's stored records, which never change. So it stays the document a repl
 as long as that code and the catalogs it reads stay the same: :data:`DRAWING_MODULES` names every
 module of this package a verified replay and its drawing execute, and the plan's builder, and
 :func:`drawing_sha256` covers their bytes, the society catalogs' bytes and the drawing's profile.
+The seeds catalog is not among them: a drawing names no seed and its replay reads no comparison
+catalog, so which seeds a new comparison draws from
+(:mod:`~exulanica.world.society_comparison_seeds`) changes no stored drawing.
 Any change to them is a new digest, under which nothing is stored until a host draws the run
 again; ``tests/test_comparison_drawing.py`` traces a verified replay and fails on a module it runs
 that the list leaves out.
@@ -42,6 +45,7 @@ from exulanica.canonical import canonical_json
 from exulanica.movement.registry import MODULES_PATH
 from exulanica.world.decision_roles import REGISTRY_DIRECTORY
 from exulanica.world.society_catalogs import ROUTINE_DIRECTORY
+from exulanica.world.society_comparison_seeds import COMPARISON_SEEDS_CATALOG
 from exulanica.world.society_engines import ENGINES_PATH
 
 __all__ = [
@@ -106,11 +110,18 @@ def _module_path(name: str) -> Path:
 
 def drawing_data() -> tuple[Path, ...]:
     """Every data file a verified replay and its drawing read: the society catalogs, the movement
-    modules walking reads, the society engines and the decision role registry and catalogs."""
+    modules walking reads, the society engines and the decision role registry and catalogs. The
+    seeds catalog's files are left out: a drawing names no seed and its replay reads no comparison
+    catalog, so a new set of held-out seeds leaves stored drawings current
+    (:mod:`exulanica.world.society_comparison_seeds`)."""
     return tuple(
         sorted(
             {
-                *ROUTINE_DIRECTORY.glob("*.json"),
+                *(
+                    file
+                    for file in ROUTINE_DIRECTORY.glob("*.json")
+                    if not file.name.startswith(f"{COMPARISON_SEEDS_CATALOG}.v")
+                ),
                 MODULES_PATH,
                 ENGINES_PATH,
                 *REGISTRY_DIRECTORY.glob("*.json"),
