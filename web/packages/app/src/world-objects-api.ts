@@ -134,6 +134,20 @@ export interface AuthoredObject {
   readonly removed: boolean;
 }
 
+/**
+ * A thing placed by its kind (version schema 5): the kind it is, by key, version and digest, and
+ * where it stands. Nothing here says how it is drawn: that is a look's, read from the thing library.
+ */
+export interface PlacedThing {
+  readonly thingId: string;
+  readonly kind: { readonly kind: string; readonly version: number; readonly sha256: string };
+  readonly regionId: string;
+  readonly transform: ObjectTransform;
+  readonly origin: { readonly kind: string; readonly role: string };
+  /** True while a removal is in force. */
+  readonly removed: boolean;
+}
+
 /** A placed object's own admitted asset, a person's upload, as the version read states it. */
 export interface WorkspaceAssetView {
   readonly assetId: string;
@@ -206,6 +220,8 @@ export interface AlternateVersion {
   readonly elementOverrides: readonly ElementOverride[];
   readonly environmentInstances?: readonly EnvironmentInstance[];
   readonly pointMapInstances?: readonly PointMapInstance[];
+  /** Things placed by their kind; empty for a version that places none. */
+  readonly things?: readonly PlacedThing[];
   readonly edits: readonly VersionEdit[];
 }
 
@@ -1092,7 +1108,29 @@ export function parseVersion(value: unknown): AlternateVersion {
       array(row['point_map_instances'] ?? [], 'point map instance list')
         .map(parsePointMapInstance),
     ),
+    things: Object.freeze(array(row['things'] ?? [], 'placed thing list').map(parsePlacedThing)),
     edits: Object.freeze(array(row['edits'], 'version edit list').map(parseEdit)),
+  });
+}
+
+export function parsePlacedThing(value: unknown): PlacedThing {
+  const row = record(value, 'placed thing');
+  const kind = record(row['kind'], 'placed thing kind');
+  const origin = record(row['origin'], 'placed thing origin');
+  return Object.freeze({
+    thingId: text(row['thing_id'], 'placed thing id'),
+    kind: Object.freeze({
+      kind: text(kind['kind'], 'placed thing kind key'),
+      version: integer(kind['version'], 'placed thing kind version'),
+      sha256: digest(kind['sha256'], 'placed thing kind digest'),
+    }),
+    regionId: text(row['region_id'], 'placed thing region'),
+    transform: parseTransform(row['transform']),
+    origin: Object.freeze({
+      kind: text(origin['kind'], 'placed thing origin kind'),
+      role: text(origin['role'], 'placed thing origin role'),
+    }),
+    removed: flag(row['removed'], 'placed thing removal'),
   });
 }
 

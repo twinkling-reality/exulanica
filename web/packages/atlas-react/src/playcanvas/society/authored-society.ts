@@ -270,10 +270,14 @@ export class AuthoredRegionSociety {
     return this.crowd.residentBytes;
   }
 
-  /** The nearest drawn inhabitant along a world-space ray, or null. */
+  /**
+   * The nearest drawn inhabitant along a world-space ray, or null; with `limit`, only one nearer
+   * than that many world metres along it (something else the ray meets first stands in front).
+   */
   pickInhabitant(
     origin: readonly [number, number, number],
     direction: readonly [number, number, number],
+    limit = Number.POSITIVE_INFINITY,
   ): string | null {
     // The crowd reports boxes in this root's frame, so the ray is carried into it: its origin as a
     // point of the visitor's world, its direction by the root's inverse turn.
@@ -282,7 +286,9 @@ export class AuthoredRegionSociety {
     const length = this.ray.direction.length();
     if (!(length > 0)) return null;
     this.ray.direction.mulScalar(1 / length);
-    return this.crowd.pick(Number.POSITIVE_INFINITY, (minimum, maximum) => {
+    // A world distance in this root's frame: the frame's scale along the ray.
+    const toLocal = length / Math.hypot(direction[0], direction[1], direction[2]);
+    return this.crowd.pick(limit * toLocal, (minimum, maximum) => {
       this.box.setMinMax(
         new pc.Vec3(minimum[0], minimum[1], minimum[2]),
         new pc.Vec3(maximum[0], maximum[1], maximum[2]),

@@ -89,6 +89,7 @@ import type { SeatingLayout } from '@exulanica/atlas-react/playcanvas';
 import type { SocietyPlaces } from '../society-api.js';
 import { engineCreatedOver, societyEngine } from '../society-engines.js';
 import type { SavedWorldFlight, SavedWorldFlightStatus } from './saved-world-flight.js';
+import { mountThings, type MountedThings, type ThingsDependencies } from './things.js';
 
 /** Where the development preview's real-engine society recording is served. */
 const SOCIETY_RECORDING_URL = '/preview-api/society/recording';
@@ -456,6 +457,8 @@ export function mountEnvironmentSelection(
   let districtFailure = 'Authorized district placement is not connected.';
   let catalog: EnvironmentCatalog | null = null;
   let current: AlternateVersion | null = null;
+  /** The open saved world's placed things, drawn by their looks; null until it is attached. */
+  let things: MountedThings | null = null;
   let authoredWorldFailure: string | null = null;
   let chosen: NYCLocalFeature | null = null;
   let admittedFeaturesByProvider = new Map<string, NYCLocalFeature>();
@@ -1697,6 +1700,8 @@ export function mountEnvironmentSelection(
       await readSavedVersion();
       refreshSeatingLayout();
       noticeChangedObject(before);
+      const atlas = deps.state.atlas?.binding;
+      if (atlas && savedWorld !== null && (phase as string) !== 'disposed') await drawPlacedThings(atlas, savedWorld.regionId);
       void savedFlight?.restart();
       await liveSociety.afterAuthoredEdit();
       renderInhabitantsPanel();
@@ -1944,6 +1949,36 @@ export function mountEnvironmentSelection(
     if (heading) heading.after(inhabitantsPanel.root); else workspace.nearby.prepend(inhabitantsPanel.root);
   }
 
+  /**
+   * Draw the version's placed things in the frames their regions are drawn in: the society's region
+   * is the frame its people walk in (`hostRegionSociety`, `hostGeneratedSociety`), and any other is
+   * the authored objects' region root. A library that cannot be read leaves the world as it was and
+   * says why on the canvas, never stood in for.
+   */
+  async function drawPlacedThings(atlas: NonNullable<SessionState['atlas']>['binding'], regionId: string): Promise<void> {
+    const placed = current?.things ?? [];
+    if (placed.length === 0 && things === null) return;
+    try {
+      things ??= await mountThings({
+        app: atlas.app,
+        camera: atlas.camera,
+        shell: deps.env.shell,
+        credentials: deps.credentials,
+        regionRoot: (id) => (id === regionId
+          ? (atlas.authoredSociety?.root.parent as ReturnType<ThingsDependencies['regionRoot']> | undefined) ?? null
+          : atlas.regionRoots.get(id as IslandId) ?? null),
+        invalidate: () => atlas.invalidate(),
+        reducedMotion: () => deps.env.systemReducedMotion.matches,
+      });
+      if ((phase as string) === 'disposed') { things.destroy(); things = null; return; }
+      await things.setPlaced(placed);
+      if (deps.env.canvas) deps.env.canvas.dataset['thingsDrawn'] = String(things.layer.drawn.length);
+      if (deps.env.canvas) deps.env.canvas.dataset['thingsMissed'] = String(things.misses.length);
+    } catch (error) {
+      if (deps.env.canvas) deps.env.canvas.dataset['thingsFailure'] = error instanceof Error ? error.message : String(error);
+    }
+  }
+
   async function attachSavedWorld(entry: NonNullable<SessionState['activeWorldEntry']>, regionId: string): Promise<void> {
     savedWorld = { worldId: entry.worldId, versionId: entry.authoredVersionId, regionId };
     offerInhabitantsPanel();
@@ -1956,15 +1991,20 @@ export function mountEnvironmentSelection(
     }
     await readSavedVersion();
     if ((phase as string) === 'disposed') return;
+    await drawPlacedThings(atlas, regionId);
+    if ((phase as string) === 'disposed') return;
     attachedControls = atlas.controls;
     priorInteract = atlas.controls.onInteract;
     installedInteract = () => {
       const ray = atlas.interactionRay?.();
       const position = ray ? { x: ray.origin[0], y: ray.origin[1], z: ray.origin[2] } : atlas.controls.state;
       const forward = ray ? { x: ray.direction[0], y: ray.direction[1], z: ray.direction[2] } : atlas.controls.forward?.() ?? atlas.camera.forward;
+      // The nearest along the ray wins: a placed thing, or one of the world's people in front of it.
+      const thing = things?.pick([position.x, position.y, position.z], [forward.x, forward.y, forward.z]) ?? null;
       const inhabitantId = atlas.authoredSociety?.pickInhabitant(
-        [position.x, position.y, position.z], [forward.x, forward.y, forward.z]);
+        [position.x, position.y, position.z], [forward.x, forward.y, forward.z], thing?.distance ?? Number.POSITIVE_INFINITY);
       if (inhabitantId) { inspectInhabitant(inhabitantId); return; }
+      if (thing !== null) { things?.raise(thing.pick, 'aim'); return; }
       priorInteract?.();
     };
     atlas.controls.onInteract = installedInteract;
@@ -2277,6 +2317,9 @@ export function mountEnvironmentSelection(
         if (deps.env.canvas) delete deps.env.canvas.dataset[key];
       }
       if (liveSociety || recording) crowd()?.clearSociety();
+      things?.destroy();
+      things = null;
+      if (deps.env.canvas) for (const key of ['thingsDrawn', 'thingsMissed', 'thingsFailure']) delete deps.env.canvas.dataset[key];
       savedWorldActions.clear();
       recording = null;
       recordingPlaying = false;

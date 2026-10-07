@@ -1,9 +1,9 @@
 # Things contract
 
 Status: **THING KINDS, BODY PLANS, ABILITIES, OFFERS, LOOKS, THE ORIGIN RECORD AND TRANSLATION
-MANIFESTS ARE DATA HELD TO THEIR CHECKS, AND A WORLD'S AUTHOR PLACES THINGS BY THEIR KIND; A
-CREATURE'S BODY PLAN, SKETCH AND KIND ARE BUILT FROM A DRAFTED BODY RECIPE; NO SOCIETY ENGINE OR
-RENDERER READS A THING KIND**.
+MANIFESTS ARE DATA HELD TO THEIR CHECKS, A WORLD'S AUTHOR PLACES THINGS BY THEIR KIND, A CREATURE'S
+BODY PLAN, SKETCH AND KIND ARE BUILT FROM A DRAFTED BODY RECIPE, AND THE BROWSER DRAWS A VERSION'S
+PLACED THINGS BY THEIR LOOKS; NO SOCIETY ENGINE READS A THING KIND**.
 
 A thing is anything addressable in a world: a knight, a lantern spirit, a sword, a well, a gate, a
 visitor that came in from another program. What a kind of thing is and can do is one typed,
@@ -38,6 +38,7 @@ records the choice and the alternatives it rejected.
 - [Lines](#lines)
 - [The kinds and looks this repository ships](#the-kinds-and-looks-this-repository-ships)
 - [Creatures: bodies drafted from words](#creatures-bodies-drafted-from-words)
+- [Drawing](#drawing)
 - [What is not built](#what-is-not-built)
 - [Implementation and evidence](#implementation-and-evidence)
 
@@ -508,6 +509,41 @@ creature and assembles its answer:
   that answered, the prompt's version and the digests of the instructions and the words, never the
   words.
 
+## Drawing
+
+The browser draws a thing from its look, never from what it is
+([`things/`](../web/packages/atlas-react/src/playcanvas/things)). It reads the host's thing library
+by digest: the list names every kind, look, container and the body plans catalog by the SHA-256 of
+its bytes, and every answer is hashed again and refused by name when it is other bytes, so nothing
+substituted or truncated is read. One figure draws each look kind:
+
+| Look kind | Drawn as |
+| --- | --- |
+| `catalog_person` | One of the world's people, drawn from the thing's id by the people catalog's draw |
+| `skinned` | The rigged container with its own clips; standing, walking and running blend by ground speed (`rig.ground_speed_mm_per_s`), a clip plays at most twice its pace, and a motion with no clip is drawn idle |
+| `rigid_on_bones` | The container's `bone:<name>` nodes, each hung from its nearest dressed ancestor in the body plan's parent table, posed procedurally |
+| `light` | An omni light of the look's colour, intensity and radius, a core and a glow, floating 1,250 mm over the thing's point and drifting within its radius (presentation only) |
+| `static` | The container at the thing's place, turned by its placed yaw as an authored object is |
+| `look_role` | The engine's box primitive in the kind's box: no style pack dresses a thing yet |
+| `none` | Nothing; the thing keeps its place |
+
+A body is drawn at its look's natural height kept inside its kind's height range, so a look never
+makes a kind taller or shorter than the kind allows. No bone is named in the drawing: a skeleton's
+limbs are read from its shape and its plan's sockets (a chain ending near the ground is a leg, one
+carrying a socket an arm, the one ending highest the head), so any body plan's skeleton is read the
+same way. Standing figures breathe and turn their heads; under reduced motion they stand still.
+
+A version's placed things stand where it places them, in the frame their region is drawn in: the
+region a saved world's people live in, or an authored object's region root. A thing in a region
+the world does not draw, a document the library does not hold at its digest, a look kind the page
+does not draw or a container that does not read is drawn as nothing, its reason kept by name
+(`ThingLayer.misses`), never stood in for.
+
+Aiming and pressing E picks the nearest drawn thing or person along the ray. A picked thing raises
+one event on the shell, `exulanica:thing-pick`, whose detail names it by the version's id, the
+society's thing id and its person id where each exists, and how it was picked; the same event with
+no detail clears the pick. The picked thing wears a ring in the design tokens' signal colour.
+
 ## What is not built
 
 These are material limits of the boundary above, not partial behaviour:
@@ -516,7 +552,8 @@ These are material limits of the boundary above, not partial behaviour:
   modules no registry states. A world's people are the society's own, drawn as today.
 - No store holds a workspace's own kinds or looks, or the look chosen for a thing: the library
   serves the shipped ones only. A placed thing names a shipped kind.
-- The browser draws no thing by its look kind.
+- The browser draws no thing a society moves, no held thing, no line and no mark of who decides,
+  and no look chosen for a thing: placed things stand in their kind's first look.
 - No importer or crossing writes a translation manifest; the reader and its accounting check exist.
 - No route drafts a creature or keeps its documents, and no model has been measured as its drafter:
   the drafter runs on scripted replies only, and no role of the model manifest names it.
@@ -541,3 +578,4 @@ These are material limits of the boundary above, not partial behaviour:
 | The skinned container | [`skinned.py`](../exulanica_pieces/skinned.py) | `tests/test_skinned_glb.py` (containers built in the test from struct packing: a positive control, then each rule broken alone and refused by name) |
 | No creature in code | | `tests/test_no_creature_code.py` (with a planted name the scan finds) |
 | Purity | The import contract "Things are pure data" in `pyproject.toml`: no database, store, evidence, pipeline, world, traffic, movement step, model or numeric stack | `lint-imports` |
+| Drawing | [`things/`](../web/packages/atlas-react/src/playcanvas/things), [`composition/things.ts`](../web/packages/app/src/composition/things.ts), [`things-library.ts`](../web/packages/app/src/things-library.ts) | `web/packages/atlas-react/test/things-*.test.ts` (the shipped documents read, digests refused, skeletons read by shape with a ten-legged plan, planted feet, placement, misses, picking), `web/packages/app/test/things-composition.test.ts`, `web/packages/app/test/environment-selection-things.test.ts` |

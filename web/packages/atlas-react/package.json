@@ -8,6 +8,7 @@
     "./playcanvas": "./src/playcanvas/index.ts",
     "./generated-tile": "./src/playcanvas/generated-tile/index.ts",
     "./generated-site": "./src/playcanvas/generated-site/index.ts",
+    "./things": "./src/playcanvas/things/index.ts",
     "./style-pack": "./src/playcanvas/style-pack/index.ts",
     "./traffic": "./src/playcanvas/traffic/index.ts"
   },
