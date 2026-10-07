@@ -9,7 +9,9 @@ What is shown here, with no database and no server:
     starter (the spawn faces north) and for an arrival facing east, checked against arithmetic done
     here rather than the builder's;
 *   against a server played here, the builder places every thing bound to the saved world, a
-    second run places nothing, and a thing already placed as something else is refused by name.
+    second run places nothing, and a thing already placed as something else is refused by name;
+*   it then starts the scene's society and chooses each being's mind under keys a second run asks
+    with again, and refuses a society on another engine or a mind that reads back as another.
 """
 
 from __future__ import annotations
@@ -136,6 +138,15 @@ class _Server:
         self.things: list[dict[str, Any]] = []
         self.edits = 0
         self.bound: list[dict[str, Any]] = []
+        self.beings = {
+            key
+            for (key, _), kind in shipped_thing_kinds().items()
+            if kind.document["class"] == "being"
+        }
+        self.engine: str | None = None
+        self.asked: dict[str, dict[str, Any]] = {}
+        self.chosen: dict[str, dict[str, str] | None] = {}
+        self.read_back: dict[str, dict[str, str] | None] = {}
 
     def _version(self) -> dict[str, Any]:
         return {
@@ -172,6 +183,37 @@ class _Server:
                 revision=self.entry["revision"] + 1,
             )
             return self._version()
+        if (method, path) == ("POST", "/world/versions/version-1/society"):
+            assert body["region_id"] == "region:starter"
+            self.engine = self.engine or body["profile"]
+            people = [
+                {
+                    "id": f"person:{thing['thing_id']}",
+                    "placed_id": thing["thing_id"],
+                    "came_by": "placed",
+                }
+                for thing in self.things
+                if thing["kind"]["kind"] in self.beings
+            ]
+            villager = {"id": "person:villager", "placed_id": None, "came_by": "populated"}
+            return {
+                "profile": self.engine,
+                "society_id": "society-1",
+                "state_sha256": "a" * 64,
+                "state": {"inhabitants": [villager, *people]},
+            }
+        if (method, path) == ("POST", "/world/versions/version-1/society/models"):
+            # A key asked again must ask for the same choice, and is answered with the one recorded.
+            assert self.asked.setdefault(body["idempotency_key"], body) == body
+            for person in body["people"]:
+                self.chosen[person] = body["model"]
+            return {"recorded": True}
+        if (method, path) == ("GET", "/world/versions/version-1/society/models"):
+            stored = {**self.chosen, **self.read_back}
+            return {
+                "choices": [{"subject_id": s, "model": m} for s, m in stored.items()],
+                "host_refusal": None,
+            }
         raise AssertionError(f"the builder called {method} {path}")
 
 
@@ -196,3 +238,38 @@ def test_the_builder_refuses_a_thing_already_placed_as_something_else():
     server.things[0]["transform"] = dict(server.things[0]["transform"], x_mm=999_999)
     with pytest.raises(builder.SceneRefused, match="as something else"):
         builder.build(server, scene)
+
+
+def test_the_builder_chooses_each_being_s_mind_and_a_second_run_asks_for_the_same():
+    builder = _builder()
+    scene = builder.read_scene(_scenes()[0])
+    server = _Server()
+    record = builder.build(server, scene)
+    society = builder.bring_to_life(server, scene, record)
+    assert society["engine"] == scene["engine"] and society["society_id"] == "society-1"
+    wanted = {
+        mind["thing_id"]: {k: mind["decider"][k] for k in ("provider", "model_id")}
+        for mind in scene["minds"]
+    }
+    assert {f"person:{thing}": model for thing, model in wanted.items()} == server.chosen
+    assert {m["thing_id"]: m["model"] for m in society["minds"]} == wanted
+    keys = set(server.asked)
+    assert len(keys) == len(scene["minds"])
+    assert builder.bring_to_life(server, scene, record) == society
+    assert set(server.asked) == keys  # the same choices, under the same keys
+
+
+def test_the_builder_refuses_another_engine_and_a_mind_that_reads_back_as_another():
+    builder = _builder()
+    scene = builder.read_scene(_scenes()[0])
+    server = _Server()
+    record = builder.build(server, scene)
+    builder.bring_to_life(server, scene, record)  # the positive control
+    knight = next(m for m in scene["minds"] if m["thing_id"] == "knight")
+    server.read_back[f"person:{knight['thing_id']}"] = None
+    with pytest.raises(builder.SceneRefused, match="knight's mind reads back as another"):
+        builder.bring_to_life(server, scene, record)
+    elsewhere = _Server()
+    elsewhere.engine = "exulanica-society/v2"
+    with pytest.raises(builder.SceneRefused, match="runs exulanica-society/v2"):
+        builder.bring_to_life(elsewhere, scene, builder.build(elsewhere, scene))

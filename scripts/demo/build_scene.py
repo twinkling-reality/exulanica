@@ -21,13 +21,21 @@ bound to the saved world so the world reopens with them:
 4.  the version is read back and every placed thing is checked against the document: kind, version,
     region and pose.
 
-The record it writes is the scene's fixture for a rehearsal: the scene document's digest, the world,
-saved entry and version it built, the version's state digest and edit count, and every placed
-thing's kind digest as the server stored it. It never holds the token or anything the token grants.
+With ``--minds`` it then brings the scene to life as the world's owner would:
 
-Standard library only, like the developer client, so it shares no code with what it drives. Minds
-and the engine are read from the document but chosen in a later step, once the routes that take
-them exist for things; this step builds the ground and the things.
+5.  ``POST /world/versions/{version}/society`` starts the society the document's engine names on the
+    version built, in the arrival's region (asked again, the version's society is read back);
+6.  ``POST /world/versions/{version}/society/models`` chooses, for each being the document gives a
+    mind, the open model it names (or the routine), keyed by the scene's digest, the society and the
+    thing, so a second run asks for the same choices and is answered with the ones recorded; the
+    choices are read back from ``GET /world/versions/{version}/society/models``.
+
+The record it writes is the scene's fixture for a rehearsal: the scene document's digest, the world,
+saved entry and version it built, the version's state digest and edit count, every placed thing's
+kind digest as the server stored it, and with ``--minds`` the society, its engine and each being's
+chosen mind. It never holds the token or anything the token grants.
+
+Standard library only, like the developer client, so it shares no code with what it drives.
 """
 
 from __future__ import annotations
@@ -42,6 +50,7 @@ import sys
 import urllib.error
 import urllib.parse
 import urllib.request
+import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -52,6 +61,9 @@ RECORD_PROFILE = "exulanica.demo-scene-build/v1"
 TIMEOUT_SECONDS = 30
 #: A full turn in microradians, the most a placed thing's yaw states.
 FULL_TURN = 6_283_185
+#: The namespace of the keys this script chooses minds under: the same scene, society and thing
+#: always give the same key, so asking again is answered with the choice already recorded.
+MINDS_NAMESPACE = uuid.uuid5(uuid.NAMESPACE_URL, "exulanica.demo-scene-build/v1/minds")
 
 
 class SceneRefused(RuntimeError):
@@ -254,6 +266,71 @@ def build(api: Api, scene: Mapping[str, Any], entry_id: str | None = None) -> di
     }
 
 
+def _model(decider: Mapping[str, Any]) -> dict[str, str] | None:
+    """The model a scene's decider names, or None for the routine."""
+    if decider["kind"] == "routine":
+        return None
+    if decider["kind"] != "model":
+        raise SceneRefused(f"a scene chooses a model or the routine, not {decider['kind']!r}")
+    return {"provider": decider["provider"], "model_id": decider["model_id"]}
+
+
+def bring_to_life(api: Api, scene: Mapping[str, Any], record: Mapping[str, Any]) -> dict[str, Any]:
+    """Start the scene's society on the version ``record`` built and choose each being's mind, as
+    the world's owner would; the choices are read back. Returns what the record keeps of it."""
+    world_id, version_id = record["world_id"], record["version_id"]
+    society_path = f"/world/versions/{version_id}/society"
+    society = api.call(
+        "POST",
+        society_path,
+        {"region_id": record["arrival"]["region_id"], "profile": scene["engine"]},
+        world_id=world_id,
+    )
+    if society["profile"] != scene["engine"]:
+        raise SceneRefused(
+            f"the version's society runs {society['profile']}, not {scene['engine']}"
+        )
+    people = {
+        person["placed_id"]: person["id"]
+        for person in society["state"]["inhabitants"]
+        if person.get("came_by") == "placed"
+    }
+    chosen = []
+    for mind in scene.get("minds", []):
+        person = people.get(mind["thing_id"])
+        if person is None:
+            raise SceneRefused(f"{mind['thing_id']} is not among the society's people")
+        model = _model(mind["decider"])
+        key = uuid.uuid5(
+            MINDS_NAMESPACE,
+            f"{record['scene']['sha256']}:{society['society_id']}:{mind['thing_id']}",
+        )
+        api.call(
+            "POST",
+            f"{society_path}/models",
+            {"idempotency_key": str(key), "people": [person], "model": model},
+            world_id=world_id,
+        )
+        chosen.append({"thing_id": mind["thing_id"], "person_id": person, "model": model})
+    view = api.call("GET", f"{society_path}/models", world_id=world_id)
+    held = {choice["subject_id"]: choice["model"] for choice in view["choices"]}
+    for choice in chosen:
+        stored = held.get(choice["person_id"])
+        if stored is not None:
+            stored = {"provider": stored["provider"], "model_id": stored["model_id"]}
+        if stored != choice["model"]:
+            raise SceneRefused(f"{choice['thing_id']}'s mind reads back as another")
+    return {
+        "society_id": society["society_id"],
+        "engine": society["profile"],
+        "state_sha256": society["state_sha256"],
+        # Why no model would be asked here (no key, no allowance), as the server says; None when
+        # the chosen models are asked.
+        "host_refusal": view.get("host_refusal"),
+        "minds": chosen,
+    }
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
@@ -262,13 +339,22 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--base-url", required=True, help="the API's address")
     parser.add_argument("--record", type=Path, required=True, help="where to write the record")
     parser.add_argument("--entry", help="the saved world to dress; a starter is made without it")
+    parser.add_argument(
+        "--minds",
+        action="store_true",
+        help="then start the scene's society and choose each being's mind",
+    )
     args = parser.parse_args(argv)
     token = os.environ.get("EXULANICA_TOKEN")
     if not token:
         print("set EXULANICA_TOKEN to a token with world.read and world.write", file=sys.stderr)
         return 2
     try:
-        record = build(Api(args.base_url, token), read_scene(args.scene), args.entry)
+        api = Api(args.base_url, token)
+        scene = read_scene(args.scene)
+        record = build(api, scene, args.entry)
+        if args.minds:
+            record["society"] = bring_to_life(api, scene, record)
     except SceneRefused as refused:
         print(f"not built: {refused}", file=sys.stderr)
         return 1
@@ -278,6 +364,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         f"{len(record['things'])} things ({record['things_added']} added), "
         f"version {record['version_id']} at edit {record['edit_seq']}"
     )
+    if "society" in record:
+        society = record["society"]
+        print(f"society {society['society_id']} on {society['engine']}: ", end="")
+        print(
+            ", ".join(
+                f"{m['thing_id']} {(m['model'] or {}).get('model_id', 'routine')}"
+                for m in society["minds"]
+            )
+        )
+        if society["host_refusal"]:
+            print(f"no model is asked here yet: {society['host_refusal']}", file=sys.stderr)
     return 0
 
 
