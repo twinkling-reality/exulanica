@@ -173,11 +173,32 @@ def test_a_guest_entry_is_counted_by_the_address_the_edge_set(which):
     real_ip_recursive, which would let an address a client wrote earlier in the header be counted.
     The edge replaces the header it receives (its Caddyfile trusts no proxy before it)."""
     conf = _installation_configuration() if which == "installation" else _reviewer_configuration()
-    assert re.findall(r"^\s*set_real_ip_from (\S+);$", conf, re.M) == [
+    # The trusted addresses are an included file, so the public composition can name its edge's
+    # one address in their place; each image's own file names the container ranges.
+    assert re.findall(r"^\s*include (\S+);$", conf, re.M) == [
+        "/etc/nginx/exulanica-trusted-proxies.conf"
+    ]
+    assert not re.findall(r"^\s*set_real_ip_from", conf, re.M)
+    trusted = (
+        (ROOT / "deploy" / "installation" / "client-trusted-proxies.conf").read_text(
+            encoding="utf-8"
+        )
+        if which == "installation"
+        else (ROOT / "deploy" / "judge" / "web.Dockerfile")
+        .read_text(encoding="utf-8")
+        .split("COPY <<'TRUSTED' /etc/nginx/exulanica-trusted-proxies.conf\n", 1)[1]
+        .split("\nTRUSTED\n", 1)[0]
+    )
+    assert re.findall(r"^set_real_ip_from (\S+);$", trusted, re.M) == [
         "10.0.0.0/8",
         "172.16.0.0/12",
         "192.168.0.0/16",
     ]
+    if which == "installation":
+        assert (
+            "COPY deploy/installation/client-trusted-proxies.conf "
+            "/etc/nginx/exulanica-trusted-proxies.conf"
+        ) in _instructions(CLIENT)
     assert re.search(r"^\s*real_ip_header X-Forwarded-For;$", conf, re.M)
     directives = "\n".join(line for line in conf.splitlines() if not line.lstrip().startswith("#"))
     assert "real_ip_recursive" not in directives
@@ -230,6 +251,7 @@ def test_the_client_context_is_an_allowlist_without_credentials():
     assert set(ignored[1:]) == {
         "!web/packages/app/dist",
         "!deploy/installation/client-nginx.conf",
+        "!deploy/installation/client-trusted-proxies.conf",
         "**/.env",
         "**/.env.*",
     }

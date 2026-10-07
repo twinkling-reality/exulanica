@@ -130,6 +130,8 @@ SPENDING_ADMIN_TABLES: Final = (
     "spending_event",
     # Migration 0139: the authority's guest policy, the operator's terms for a visitor's grant.
     "spending_guest_policy",
+    # Migration 0155: how many workspaces a guest policy granted in a day.
+    "spending_guest_policy_day",
 )
 #: The role unattended maintenance reads a complete backup and withdrawal export as. It reads
 #: every row of every workspace and writes nothing: see :func:`provision_backup_role`.

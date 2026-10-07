@@ -61,12 +61,16 @@ and its state row lock, with its witness advance written before the commit and c
 reads the policy only after taking the state row lock, so a grant racing a replacement takes the
 policy that stands after it. It accepts no figure from its caller, refuses a workspace holding
 another grant under the authority, refuses once the policy's grants of the day are spent
-(`guest_grants_exhausted`, counted under that lock, so the database bounds a day's guest grants
-whatever process asks), and is executable by the runtime role alone. A policy ends when another
-replaces it or the operator withdraws it (`guest-policy-withdraw`); one set before the authority's
-latest restore reconciliation or reauthorization grants nothing until set again
-(`guest_policy_needs_restating`), because a restore may bring back a policy that had ended.
-`status --authorities` and `reconcile-restore` show each live policy and whether it waits for that.
+(`guest_grants_exhausted`, counted in a row of the policy's own under that lock, so the database
+bounds a day's guest grants whatever process asks and whoever owns the function), and is
+executable by the runtime role alone. Setting and withdrawing a policy are ledger steps too
+(`guest_policy_set`, `guest_policy_ended`, migration 0155), taken under the witness lock and
+refused while the authority is suspended, so a restore that loses one leaves the ledger behind its
+witness and is reconciled. A policy ends when another replaces it, when the operator withdraws it
+(`guest-policy-withdraw`, recording who and why), or when the ledger ends it: reconciling a
+restore or reauthorizing the authority ends every live policy, because a restored database may
+hold one that had ended, and the operator sets one again. `status --authorities` and
+`reconcile-restore` show each live policy and the last that ended, with how, by whom and why.
 A day's guest grants are thus bounded by the policy's figure, and the authority's ceiling bounds
 everyone together. A grant is never larger than what it is granted under, in ceiling, calls
 or validity, and a trigger refuses one that would be, for every role. Because every admission is

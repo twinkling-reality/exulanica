@@ -347,9 +347,36 @@ def test_the_api_reaches_accounts_as_its_own_role_and_trusts_only_the_proxy_s_sc
     api = OVERLAY_SERVICES["api"]
     assert "EXULANICA_ACCOUNT_DATABASE_URL: postgresql://exulanica_accounts:" in api
     assert '"${EXULANICA_PUBLIC_ORIGIN:?' in api
-    assert 'FORWARDED_ALLOW_IPS: "*"' in api
-    # Trusting any forwarder is safe only while nothing but the client proxy reaches the API.
     assert re.search(r"^    ports: !reset \[\]$", api, re.M)
+
+
+def test_each_proxy_trusts_forwarded_headers_from_the_one_address_before_it():
+    """A process on a Linux host reaches every container at its bridge address, from the network's
+    gateway. So the API trusts forwarded headers from the client proxy's fixed address alone, and
+    the client proxy trusts X-Forwarded-For from the edge's fixed address alone, both inside the
+    network's fixed range and neither its gateway."""
+    import ipaddress
+
+    subnet = re.search(r"^        - subnet: (\S+)$", OVERLAY, re.M)
+    assert subnet is not None
+    network = ipaddress.ip_network(subnet.group(1))
+
+    def address(service: str) -> ipaddress.IPv4Address:
+        found = re.search(r"^\s+ipv4_address: (\S+)$", OVERLAY_SERVICES[service], re.M)
+        assert found is not None, service
+        return ipaddress.ip_address(found.group(1))
+
+    edge, client = address("edge"), address("client")
+    for pinned in (edge, client):
+        assert pinned in network and pinned != next(network.hosts())
+    forwarded = re.search(r'^      FORWARDED_ALLOW_IPS: "(\S+)"$', OVERLAY_SERVICES["api"], re.M)
+    assert forwarded is not None and ipaddress.ip_address(forwarded.group(1)) == client
+    mount = (
+        "./deploy/public/client-trusted-proxies.conf:/etc/nginx/exulanica-trusted-proxies.conf:ro"
+    )
+    assert mount in OVERLAY_SERVICES["client"]
+    trusted = (PUBLIC / "client-trusted-proxies.conf").read_text(encoding="utf-8")
+    assert re.findall(r"^set_real_ip_from (\S+);$", trusted, re.M) == [str(edge)]
 
 
 @needs_shell

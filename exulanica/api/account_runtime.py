@@ -148,8 +148,10 @@ class GuestEntryOff(AccountUnavailable):
 
 
 #: The guest entry's modes: ``open`` admits anyone who asks, ``code`` anyone who also sends the code
-#: whose SHA-256 the server is configured with. ``off`` (or no setting) mounts no entry at all.
-GUEST_ENTRY_MODES = ("open", "code")
+#: whose SHA-256 the server is configured with. ``closed`` admits nobody new while the guests who
+#: entered keep their sessions and towns: an explicit ``off`` on a server with an account database
+#: and no Google sign-in (:func:`load_account_runtime`). No setting mounts no entry at all.
+GUEST_ENTRY_MODES = ("open", "code", "closed")
 
 
 @dataclass(frozen=True)
@@ -164,7 +166,7 @@ class GuestEntryConfig:
 
     def __post_init__(self) -> None:
         if self.mode not in GUEST_ENTRY_MODES:
-            raise ValueError("guest entry is open or code")
+            raise ValueError("guest entry is open, code or closed")
         if not self.browser_origins:
             raise ValueError("a guest entry needs the exact browser origins it is made from")
         for value in self.browser_origins:
@@ -176,7 +178,10 @@ class GuestEntryConfig:
             len(self.code_sha256) != 64 or set(self.code_sha256) - set("0123456789abcdef")
         ):
             raise ValueError("the entry code is configured as its lowercase SHA-256")
-        if type(self.entries_per_day) is not int or not 1 <= self.entries_per_day <= 1_000_000:
+        if (
+            type(self.entries_per_day) is not int
+            or not (0 if self.mode == "closed" else 1) <= self.entries_per_day <= 1_000_000
+        ):
             raise ValueError("a day admits between one and a million guests")
         if (
             type(self.session_seconds) is not int
@@ -189,7 +194,7 @@ class GuestEntryConfig:
         in constant time."""
         if self.mode == "open":
             return True
-        if not isinstance(code, str) or not 1 <= len(code) <= 256:
+        if self.mode == "closed" or not isinstance(code, str) or not 1 <= len(code) <= 256:
             return False
         digest = hashlib.sha256(code.encode("utf-8")).hexdigest()
         assert self.code_sha256 is not None
@@ -507,8 +512,8 @@ class AccountRuntime:
         :class:`AccountRejected` for an ``Origin`` outside the browser origins or a code that does
         not open the entry; :class:`GuestEntriesExhausted` when today's entries are all taken.
         """
-        if self.guest is None:
-            raise GuestEntryOff("guest entry is not configured")
+        if self.guest is None or self.guest.mode == "closed":
+            raise GuestEntryOff("guest entry is not configured or is closed")
         if request.headers.get("origin") not in self.browser_origins:
             raise AccountRejected("untrusted request origin")
         if not self.guest.admits(code):
@@ -566,6 +571,28 @@ def load_guest_entry(environ: Mapping[str, str]) -> GuestEntryConfig | None:
         raise AccountUnavailable(f"guest entry configuration is invalid: {exc}") from exc
 
 
+def _closed_entry(environ: Mapping[str, str], shared: tuple[str, ...]) -> bool:
+    return (environ.get("EXULANICA_GUEST_ENTRY") or "").strip() == "off" and all(
+        environ.get(name) for name in shared
+    )
+
+
+def _closed(environ: Mapping[str, str]) -> GuestEntryConfig:
+    """A closed guest entry: the browser origins and session length the open one had, no entry."""
+    try:
+        seconds = environ.get("EXULANICA_GUEST_SESSION_SECONDS")
+        return GuestEntryConfig(
+            mode="closed",
+            browser_origins=_json_strings(
+                environ["EXULANICA_ACCOUNT_BROWSER_ORIGINS"], "EXULANICA_ACCOUNT_BROWSER_ORIGINS"
+            ),
+            entries_per_day=0,
+            session_seconds=int(seconds) if seconds else 7 * 24 * 60 * 60,
+        )
+    except (ValueError, TypeError) as exc:
+        raise AccountUnavailable(f"guest entry configuration is invalid: {exc}") from exc
+
+
 def load_account_runtime(environ: Mapping[str, str]) -> AccountRuntime | None:
     """Google sign-in, the guest entry, both or neither; a partial configuration is a boot error.
 
@@ -581,6 +608,10 @@ def load_account_runtime(environ: Mapping[str, str]) -> AccountRuntime | None:
     shared = ("EXULANICA_ACCOUNT_BROWSER_ORIGINS", "EXULANICA_ACCOUNT_DATABASE_URL")
     guest = load_guest_entry(environ)
     google = any(environ.get(name) for name in google_names)
+    if not google and guest is None and _closed_entry(environ, shared):
+        # An operator who turns the entry off on a server that admitted guests closes it: the API
+        # keeps starting, the guests who entered keep their sessions, nobody new enters.
+        guest = _closed(environ)
     if not google and guest is None:
         if any(environ.get(name) for name in shared):
             raise AccountUnavailable("Google account configuration is incomplete")

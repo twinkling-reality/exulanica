@@ -3,5 +3,6 @@
 *
 !web/packages/app/dist
 !deploy/installation/client-nginx.conf
+!deploy/installation/client-trusted-proxies.conf
 **/.env
 **/.env.*

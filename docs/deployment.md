@@ -446,7 +446,7 @@ with or without Google sign-in beside it:
 
 | Variable | Purpose |
 | --- | --- |
-| `EXULANICA_GUEST_ENTRY` | `off` (the default), `open`, or `code` |
+| `EXULANICA_GUEST_ENTRY` | `off` (the default), `open`, or `code`. An explicit `off` on a host with the account database and the browser origins and no Google sign-in closes the entry: the API starts, the guests who entered keep their sessions and towns, and nobody new enters |
 | `EXULANICA_GUEST_ENTRY_CODE_SHA256` | With `code`: the lowercase SHA-256 of the code visitors are given. The code itself is never configured |
 | `EXULANICA_GUEST_ENTRIES_PER_DAY` | Required with a guest entry, no default: how many guests a day (UTC) enters |
 | `EXULANICA_GUEST_SESSION_SECONDS` | How long a guest's session lasts: 604800 (seven days) by default, at most thirty days |
@@ -471,12 +471,14 @@ world from the arrival list (8.2). Either may fail without undoing the entry.
 Once the account exists it answers 201 with the session cookie, `role`, `allowance`, `arrival` and
 `incomplete`, which names each step that failed: `allowance` with the refusal's code (for instance
 `guest_grants_exhausted`) or `allowance_failed`, and `arrival` with `arrival_not_made`. A guest who
-holds no allowance on a provider is granted it on their next `GET /auth/session`. The refusals,
+holds no allowance on a provider is granted it on a later `GET /auth/session`, on those providers
+alone and at most once a minute per workspace, because each ask takes the authority's witness and
+state locks that every admission takes. The refusals,
 before anything is made, are:
 - 403 `guest_entry_code_wrong`;
 - 403 `origin_not_permitted`;
 - 429 `guest_entries_exhausted` when the day is full, with `Retry-After` the seconds to 00:00 UTC;
-- 503 `guest_entry_off` on a host with accounts and no guest entry;
+- 503 `guest_entry_off` on a host with accounts and no guest entry, or a closed one;
 - 503 `guest_entry_unavailable`, with `Retry-After` 30, when the account database does not answer;
 - 503 `account_unavailable`, as every account route answers, on a host with no accounts.
 
@@ -1293,7 +1295,7 @@ secrets directory `EXULANICA_DEPLOY_DIR`:
 | `images`, `save <file>` | Print the image IDs; write the four images to one gzip archive and print its sha256 |
 | `init` | Writes `public.env` (mode 0600, in a directory created 0700). It holds seven generated role passwords, the `public` profile, the host, issuer, edge address and ports, the backup and custody directories, and the model endpoint's allowlist. It also writes the operator's token, whose grant holds `operations.read` alone. Custody inside the backup directory is refused. The fuse is left empty |
 | `mint <label>`, `revoke <label>` | Add or remove a token for a workspace of its own, minted by the image's `exulanica-seed token` with the reviewer's permissions. The next `up` serves the change and plays those workspaces |
-| `up` | Starts the server from loaded images, never building. It refuses until the fuse is filled in, and refuses when the merged Compose configuration publishes a port for `api` or `client`: only the edge may, because the API trusts forwarded headers from anything that reaches it and the client proxy trusts `X-Forwarded-For` from private ranges. `restore-marker`, `migrate` and `catalogs` run to completion on every start |
+| `up` | Starts the server from loaded images, never building. It refuses until the fuse is filled in, and refuses when the merged Compose configuration publishes a port for `api` or `client`: only the edge may. The overlay gives the network a fixed range and the edge and the client proxy fixed addresses: the client proxy trusts `X-Forwarded-For` from the edge's address alone and the API trusts forwarded headers from the client proxy's alone, so a process on the host, which reaches every container at its bridge address from the network's gateway, names neither its counted address nor its scheme. A host that already uses that range changes the four places `deploy/public/public.yaml` names. `restore-marker`, `migrate` and `catalogs` run to completion on every start |
 | `prepare-towns` | Makes the arrival worlds in the operator's workspace, inside the API's container (`exulanica-arrival-worlds prepare`), and prints each tile's state; run it again to read them once baked |
 | `issue-authority`, `guest-policy`, `guest-policy-withdraw`, `grant <label>`, `spending` | Issue the server's spending authority from `EXULANICA_AUTHORITY_USD`, `EXULANICA_AUTHORITY_CALLS` and `EXULANICA_AUTHORITY_VALID_UNTIL`; grant a minted workspace `EXULANICA_GRANT_USD` and `EXULANICA_GRANT_CALLS` under it; set what each guest is granted under it (`EXULANICA_GUEST_USD`, `EXULANICA_GUEST_CALLS`, `EXULANICA_GUEST_DAYS`) and how many guests it grants in a UTC day (`EXULANICA_GUEST_GRANTS_PER_DAY`, the day's entries unless stated); end that policy so no guest is granted anything until another is set; print the authorities' state and each live guest policy, with whether it must be set again. Each runs `python -m exulanica.spending` as the owner in a one-shot container on the server's network, with the witness volume |
 | `backup-now` | One maintenance pass now (9.3) |
@@ -1359,9 +1361,9 @@ decision to serve its stored first bake (`exulanica-tile-fault clear`, 9.1). A v
 an arrival world is made only once its tiles are baked. No off-host copy of the backups
 is made, so the loss of the host loses both disks. A
 restore has not been timed on the host (D-3). After a restore, reconcile the authority, then set
-the guest policy again (`guest-policy`): a policy set before a restore's reconciliation or a
-reauthorization grants nothing, because the restored database may hold one the operator had
-replaced or withdrawn. The process fuse starts again at every restart; the authority does not.
+the guest policy again (`guest-policy`): reconciling a restore, or reauthorizing, ends every live
+policy, because the restored database may hold one the operator had replaced or withdrawn, and a
+policy change is itself a ledger step, so a restore that lost only that is reconciled too. The process fuse starts again at every restart; the authority does not.
 Per-address limits do not bound how many addresses write at once. The edge's access log drops
 cookies, the authorization header and a session's CSRF token, and keeps a visitor's address only
 to its network (/24, /48); it is kept by size (each container's log, ten files of 10 MB), not

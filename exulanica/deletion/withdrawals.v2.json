@@ -309,7 +309,7 @@
     },
     {
       "table": "spending_guest_policy",
-      "reason": "An operator's guest policy, ended when another replaces it or the operator withdraws it (migration 0139). A restore may bring back a policy that had ended, so spending_grant_guest grants nothing under a policy set before the authority's latest restore reconciliation or reauthorization: the operator states it again, and spending status shows which policies wait for that."
+      "reason": "An operator's guest policy, ended when another replaces it, when the operator withdraws it, or by the ledger (migrations 0139 and 0155). Setting and withdrawing one are ledger steps under the witness, so a restore that loses either is reconciled, and reconciling a restore, or reauthorizing, ends every live policy: nothing a restore brings back grants until the operator sets a policy again."
     }
   ]
 }

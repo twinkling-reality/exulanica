@@ -192,10 +192,10 @@ def test_a_withdrawn_policy_grants_nothing_until_another_is_set(bench):
     assert bench.durable().grant_guest(workspace, provider=PROVIDER) is not None
 
 
-def test_a_policy_set_before_a_reauthorization_is_set_again_before_it_grants(bench):
-    """A restore can bring back a policy the operator had replaced or withdrawn; its
-    reconciliation, and any reauthorization, leave every earlier policy granting nothing until the
-    operator states it again, which status shows."""
+def test_a_reauthorization_ends_the_live_policy_until_the_operator_sets_one(bench):
+    """The ledger ends a policy: reauthorizing the authority (as reconciling a restore does) ends
+    every live guest policy of it, so nothing a restore brought back grants. Status says how it
+    ended, and a guest is granted again once the operator sets a policy."""
     authority = bench.issue(ceiling="1.00", calls=10_000)
     _policy(bench, authority)
     bench.operator.reauthorize(
@@ -207,27 +207,29 @@ def test_a_policy_set_before_a_reauthorization_is_set_again_before_it_grants(ben
         reason="a restore was reconciled",
     )
     (shown,) = [p for p in bench.operator.guest_policies() if p["authority_id"] == str(authority)]
-    assert shown["needs_restating"] is True
-    with pytest.raises(SpendingRefused) as refused:
-        bench.durable().grant_guest(uuid.uuid4(), provider=PROVIDER)
-    assert refused.value.detail == "guest_policy_needs_restating"
+    assert shown["live"] is False
+    assert (shown["ended"]["as"], shown["ended"]["by"]) == ("reauthorized", "ledger")
+    workspace = uuid.uuid4()
+    assert bench.durable().grant_guest(workspace, provider=PROVIDER) is None
+    assert _grants(bench, workspace) == []
     _policy(bench, authority)
-    (shown,) = [p for p in bench.operator.guest_policies() if p["authority_id"] == str(authority)]
-    assert shown["needs_restating"] is False
-    assert bench.durable().grant_guest(uuid.uuid4(), provider=PROVIDER) is not None
+    assert bench.durable().grant_guest(workspace, provider=PROVIDER) is not None
 
 
 def test_a_grant_racing_a_replacement_takes_the_policy_that_stands_after_it(bench):
     """The grant locks the authority's state before it reads the policy. Here the operator's
     replacement holds that lock while a grant waits on it; the grant then takes the replacement's
     figures, not the replaced one's."""
-    authority = bench.issue(ceiling="1.00", calls=10_000)
+    # A witnessed authority's set and grant both take the witness lock first, which serializes
+    # them before the database does; an unwitnessed one leaves the state row lock as the only
+    # order, which is what this holds.
+    authority = bench.issue(ceiling="1.00", calls=10_000, witnessed=False)
     _policy(bench, authority, usd=Decimal("0.05"))
     workspace, granted, failed = uuid.uuid4(), [], []
 
     def grant() -> None:
         try:
-            granted.append(bench.durable().grant_guest(workspace, provider=PROVIDER))
+            granted.append(bench.durable(witnessed=False).grant_guest(workspace, provider=PROVIDER))
         except Exception as exc:  # reported below
             failed.append(exc)
 
@@ -251,7 +253,8 @@ def test_a_grant_racing_a_replacement_takes_the_policy_that_stands_after_it(benc
         else:
             pytest.fail("the grant never waited on the authority's state")
         connection.execute(
-            "select spending_set_guest_policy(%s, %s, %s, make_interval(days => %s), %s, %s, %s)",
+            "select spending_set_guest_policy(%s, %s, %s, make_interval(days => %s), %s, %s, %s, "
+            "null)",
             (
                 authority,
                 Decimal("0.02"),
@@ -315,14 +318,128 @@ def test_every_name_a_guest_spending_body_uses_is_qualified(function, spine_sche
     body = re.sub(r"--[^\n]*", "", row["prosrc"])
     body = re.sub(r"'[^']*'", "''", body)  # string literals name nothing
     relations = re.findall(
-        r"\b(?<!distinct )(?:from|insert\s+into|update|join)\s+([A-Za-z_\"][\w.\"]*)",
+        r"\b(?<!distinct )(?<!do )(?:from|insert\s+into|update|join)\s+([A-Za-z_\"][\w.\"]*)",
         body,
         re.I,
     )
     assert relations, "the body names no relation"
     for name in relations:
         assert name.startswith((f'"{scratch}".', f"{scratch}.")), name
+    # An insert's alias before its column list (`as d (...)`) and `on conflict (...)` are syntax.
+    body = re.sub(r"\bas\s+\w+\s*\(", "as (", body, flags=re.I)
     calls = re.findall(r"([A-Za-z_][\w.\"]*)\s*\(", body)
     words = {"if", "values", "and", "or", "not", "in", "insert", "returns", "exists", "least"}
+    words |= {"conflict", "as"}
     unqualified = [name for name in calls if "." not in name and name.lower() not in words]
     assert unqualified == [], unqualified
+
+
+def test_a_restore_that_loses_only_a_policy_change_does_not_bring_the_old_policy_back(bench):
+    """Setting a policy is a step of the ledger under the witness. A backup taken before the
+    operator replaced 0.05 with 0.02, restored: the ledger is behind its witness, so nothing is
+    granted until the restore is reconciled, and the reconciliation ends the policy the backup
+    brought back, so a guest is granted again only once the operator sets one."""
+    from test_spending_witness import _restore, _snapshot
+
+    authority = bench.issue(ceiling="1.00", calls=10_000)
+    _policy(bench, authority, usd=Decimal("0.05"))
+    backup = _snapshot(bench)
+    _policy(bench, authority, usd=Decimal("0.02"))
+    _restore(bench, backup)
+    workspace = uuid.uuid4()
+    with pytest.raises(SpendingRefused) as refused:
+        bench.durable().grant_guest(workspace, provider=PROVIDER)
+    assert refused.value.reason == "spending_suspended"
+    bench.operator.reconcile_restore(authority, operator="test-operator", reason="restored")
+    (shown,) = [p for p in bench.operator.guest_policies() if p["authority_id"] == str(authority)]
+    assert shown["live"] is False and shown["ended"]["as"] == "restored"
+    assert bench.durable().grant_guest(workspace, provider=PROVIDER) is None
+    assert _grants(bench, workspace) == []
+
+
+def test_a_withdrawal_records_who_withdrew_it_and_why(bench):
+    authority = bench.issue(ceiling="1.00", calls=10_000)
+    _policy(bench, authority)
+    bench.operator.withdraw_guest_policy(authority, operator="night-shift", reason="abuse seen")
+    (shown,) = [p for p in bench.operator.guest_policies() if p["authority_id"] == str(authority)]
+    assert shown["ended"]["as"] == "withdrawn"
+    assert (shown["ended"]["by"], shown["ended"]["reason"]) == ("night-shift", "abuse seen")
+    assert bench.events(authority)[-1]["kind"] == "guest_policy_ended"
+
+
+def test_the_day_limit_and_the_ledger_s_end_hold_under_an_owner_that_does_not_bypass(
+    bench, spine_schema
+):
+    """0155 reads nothing past row-level security: the grant and the event trigger, owned by a
+    login-less role that is neither superuser nor BYPASSRLS, still refuse the day's third guest
+    and still end the live policy on a reauthorization."""
+    from psycopg import sql
+
+    from pg_harness import open_scratch_connection
+
+    psycopg_module, scratch = spine_schema
+    owner = "guest_definer_" + uuid.uuid4().hex[:12]
+    admin = open_scratch_connection(psycopg_module, scratch)
+    try:
+        admin.execute(
+            sql.SQL("create role {} nologin nosuperuser nobypassrls").format(sql.Identifier(owner))
+        )
+        for statement in (
+            "grant usage on schema {s} to {r}",
+            "grant all on all tables in schema {s} to {r}",
+            "grant execute on all functions in schema {s} to {r}",
+        ):
+            admin.execute(
+                sql.SQL(statement).format(s=sql.Identifier(scratch), r=sql.Identifier(owner))
+            )
+        for function in (
+            "spending_grant_guest(uuid,text,uuid,text,jsonb)",
+            "tg_spending_event_ends_guest_policies()",
+        ):
+            admin.execute(
+                sql.SQL("alter function {}." + function + " owner to {}").format(
+                    sql.Identifier(scratch), sql.Identifier(owner)
+                )
+            )
+        flags = admin.execute(
+            "select rolsuper, rolbypassrls from pg_roles where rolname = %s", (owner,)
+        ).fetchone()
+        assert tuple(flags) == (False, False)
+        admin.commit()
+
+        authority = bench.issue(ceiling="1.00", calls=10_000)
+        _policy(bench, authority, per_day=2)
+        durable = bench.durable()
+        durable.grant_guest(uuid.uuid4(), provider=PROVIDER)
+        durable.grant_guest(uuid.uuid4(), provider=PROVIDER)
+        with pytest.raises(SpendingRefused) as refused:
+            durable.grant_guest(uuid.uuid4(), provider=PROVIDER)
+        assert refused.value.detail == "guest_grants_exhausted"
+        bench.operator.reauthorize(
+            authority,
+            ceiling_usd=Decimal("1.00"),
+            max_calls=10_000,
+            valid_until=dt.datetime.now(dt.UTC) + dt.timedelta(days=30),
+            operator="test-operator",
+            reason="as after a restore",
+        )
+        (shown,) = [
+            p for p in bench.operator.guest_policies() if p["authority_id"] == str(authority)
+        ]
+        assert shown["live"] is False and shown["ended"]["as"] == "reauthorized"
+    finally:
+        admin.rollback()
+        admin.execute("reset role")
+        for function in (
+            "spending_grant_guest(uuid,text,uuid,text,jsonb)",
+            "tg_spending_event_ends_guest_policies()",
+        ):
+            admin.execute(
+                sql.SQL("alter function {}." + function + " owner to current_user").format(
+                    sql.Identifier(scratch)
+                )
+            )
+        admin.execute(sql.SQL("drop owned by {}").format(sql.Identifier(owner)))
+        admin.execute(sql.SQL("drop role {}").format(sql.Identifier(owner)))
+        admin.commit()
+        admin.close()

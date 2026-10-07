@@ -34,5 +34,6 @@ LABEL org.opencontainers.image.source="https://github.com/twinkling-reality/exul
 
 COPY web/packages/app/dist /usr/share/nginx/html
 COPY deploy/installation/client-nginx.conf /etc/nginx/conf.d/default.conf
+COPY deploy/installation/client-trusted-proxies.conf /etc/nginx/exulanica-trusted-proxies.conf
 
 EXPOSE 8080

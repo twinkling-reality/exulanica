@@ -4,7 +4,11 @@ from __future__ import annotations
 
 import datetime as dt
 import logging
+import threading
+import time
 import uuid
+from collections import OrderedDict
+from collections.abc import Callable
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Body, Query, Request
@@ -30,6 +34,37 @@ from exulanica.api.authorisation import TokenNotAccepted
 from exulanica.models.spending import SpendingRefused
 
 _LOG = logging.getLogger(__name__)
+
+#: How often a guest's session read may ask again for an allowance it does not hold, per workspace:
+#: each ask takes the authority's witness and state locks, which every admission takes too.
+GRANT_RETRY_SECONDS = 60.0
+#: How many workspaces' last asks are remembered; the oldest is forgotten past it.
+GRANT_RETRY_REMEMBERED = 10_000
+
+
+class _GrantRetries:
+    """When each workspace last asked again for its allowance, in this process."""
+
+    def __init__(self, clock: Callable[[], float] = time.monotonic) -> None:
+        self._clock = clock
+        self._lock = threading.Lock()
+        self._asked: OrderedDict[uuid.UUID, float] = OrderedDict()
+
+    def may_ask(self, workspace_id: uuid.UUID) -> bool:
+        """True, and remembered, when the workspace has not asked within GRANT_RETRY_SECONDS."""
+        with self._lock:
+            now = self._clock()
+            last = self._asked.get(workspace_id)
+            if last is not None and now - last < GRANT_RETRY_SECONDS:
+                return False
+            self._asked[workspace_id] = now
+            self._asked.move_to_end(workspace_id)
+            while len(self._asked) > GRANT_RETRY_REMEMBERED:
+                self._asked.popitem(last=False)
+            return True
+
+
+_GRANT_RETRIES = _GrantRetries()
 
 router = APIRouter(prefix="/auth", tags=["accounts"])
 _HEADERS = {
@@ -148,8 +183,9 @@ def _session_view(
     request: Request, account: AccountSession, *, grant_missing: bool = False
 ) -> dict[str, Any]:
     """The session as the browser reads it. For a guest, the allowance; with ``grant_missing``, a
-    guest who holds no allowance on a provider is granted it first (an entry whose grant failed,
-    the authority suspended or the database slow, is granted on a later read). An allowance that
+    guest who holds no allowance on a provider is granted it first, on those providers alone and at
+    most once a minute per workspace (an entry whose grant failed, the authority suspended or the
+    database slow, is granted on a later read). An allowance that
     cannot be read is null, and the session is still answered."""
     view: dict[str, Any] = {
         "user_id": account.user_id,
@@ -163,8 +199,9 @@ def _session_view(
         workspace = account.session.workspace_id
         try:
             allowance = _allowance(request, workspace)
-            if grant_missing and any(entry["state"] == "none" for entry in allowance):
-                _grant_guest(request, workspace)
+            missing = [entry["provider"] for entry in allowance if entry["state"] == "none"]
+            if grant_missing and missing and _GRANT_RETRIES.may_ask(workspace):
+                _grant_guest(request, workspace, providers=missing)
                 allowance = _allowance(request, workspace)
         except Exception as exc:  # the session stands; the allowance is unread, not invented
             _LOG.warning("a guest's allowance could not be read: %s", type(exc).__qualname__)
@@ -279,7 +316,9 @@ def guest_entry(
     return response
 
 
-def _grant_guest(request: Request, workspace_id: uuid.UUID) -> list[dict[str, str]]:
+def _grant_guest(
+    request: Request, workspace_id: uuid.UUID, *, providers: list[str] | None = None
+) -> list[dict[str, str]]:
     """The workspace's allowance from every provider with a guest policy. A refusal, or a failure
     of any kind, leaves the workspace without one on that provider and is answered by provider and
     code (a failure by its class alone, never its text); the entry stands."""
@@ -289,7 +328,13 @@ def _grant_guest(request: Request, workspace_id: uuid.UUID) -> list[dict[str, st
     if spending is None:
         return []
     problems: list[dict[str, str]] = []
-    for provider in load_manifest().providers:
+    if providers is None:
+        try:
+            providers = list(load_manifest().providers)
+        except Exception as exc:
+            _LOG.warning("the model manifest could not be read: %s", type(exc).__qualname__)
+            return [{"provider": "*", "code": "allowance_failed"}]
+    for provider in providers:
         try:
             spending.grant_guest(workspace_id, provider=provider)
         except SpendingRefused as refused:

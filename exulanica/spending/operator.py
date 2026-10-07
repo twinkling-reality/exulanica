@@ -49,16 +49,17 @@ __all__ = ["SpendingOperationRefused", "SpendingOperator"]
 _LOG = logging.getLogger(__name__)
 
 
-#: Each authority's live guest policy, read as the owner (no runtime role reads the table).
-_LIVE_GUEST_POLICIES = """
+#: Each authority's guest policies that are live, and the last that ended, read as the owner (no
+#: runtime role reads the table).
+_GUEST_POLICIES = """
 select p.authority_id, p.policy_id, p.ceiling_usd, p.max_calls,
        extract(day from p.valid_for)::int as valid_for_days, p.grants_per_day, p.created_at,
-       exists (select 1 from spending_event e
-                where e.authority_id = p.authority_id
-                  and e.kind in ('restore_reconciled', 'reauthorized')
-                  and e.created_at > p.created_at) as needs_restating
+       p.ended_at, p.ended_as, p.ended_by, p.ended_reason
   from spending_guest_policy p
  where p.ended_at is null
+    or p.policy_id = (select q.policy_id from spending_guest_policy q
+                       where q.authority_id = p.authority_id and q.ended_at is not null
+                       order by q.ended_at desc, q.policy_id desc limit 1)
  order by p.created_at
 """
 
@@ -252,16 +253,17 @@ class SpendingOperator:
         """The authority's guest policy (migration 0139): the figures every guest workspace is
         granted under it, at most once each and at most ``grants_per_day`` workspaces in a UTC
         day, by the runtime's ``spending_grant_guest``. Replaces the policy it had. Not a ledger
-        step: each grant made under it is. Set again after a restore's reconciliation or a
-        reauthorization, which leave the earlier policy granting nothing."""
+        step: each grant made under it is. A step of the ledger itself (migration 0155), taken
+        under the witness lock, so a restore that loses it is reconciled; set again after a
+        restore's reconciliation or a reauthorization, which end every live policy."""
         if type(valid_for_days) is not int or not 1 <= valid_for_days <= 31:
             raise SpendingOperationRefused("a guest's allowance is valid for 1 to 31 days")
         if type(grants_per_day) is not int or not 1 <= grants_per_day <= 1_000_000:
             raise SpendingOperationRefused("a guest policy grants 1 to 1,000,000 workspaces a day")
         document = self._step(
             authority_id,
-            "select spending_set_guest_policy(%s, %s, %s, make_interval(days => %s), %s, %s, %s) "
-            "as document",
+            "select spending_set_guest_policy(%s, %s, %s, make_interval(days => %s), %s, %s, %s, "
+            "%s) as document",
             (
                 authority_id,
                 ceiling_usd,
@@ -271,29 +273,29 @@ class SpendingOperator:
                 operator,
                 reason,
             ),
-            witnessed=False,
-            pass_witness=False,
+            witnessed=self._witnessed(authority_id),
         )
         return uuid.UUID(str(document["policy_id"]))
 
     def withdraw_guest_policy(self, authority_id: uuid.UUID, *, operator: str, reason: str) -> str:
         """End the authority's live guest policy without another: no guest is granted anything
-        under it until a policy is set. ``withdrawn``, or ``none_live`` when none was live."""
+        under it until a policy is set. ``withdrawn``, or ``none_live`` when none was live. A step
+        of the ledger, recording who withdrew it and why."""
         document = self._step(
             authority_id,
-            "select spending_withdraw_guest_policy(%s, %s, %s) as document",
+            "select spending_withdraw_guest_policy(%s, %s, %s, %s) as document",
             (authority_id, operator, reason),
-            witnessed=False,
-            pass_witness=False,
+            witnessed=self._witnessed(authority_id),
         )
         return str(document["outcome"])
 
     def guest_policies(self) -> list[dict[str, Any]]:
-        """Every authority's live guest policy, with its figures, and whether it must be set again
-        before it grants (a restore's reconciliation or a reauthorization came after it)."""
+        """Every authority's live guest policy with its figures, and the last that ended, with
+        when, how (replaced, withdrawn, or by the ledger: restored or reauthorized), by whom and
+        why. An authority with no live policy grants no guest anything."""
         try:
             with self.database.unscoped() as connection:
-                rows = connection.execute(_LIVE_GUEST_POLICIES).fetchall()
+                rows = connection.execute(_GUEST_POLICIES).fetchall()
         except psycopg.errors.InsufficientPrivilege as exc:
             raise SpendingOperationRefused("the guest policies are read as the owner") from exc
         return [
@@ -305,7 +307,15 @@ class SpendingOperator:
                 "valid_for_days": row["valid_for_days"],
                 "grants_per_day": row["grants_per_day"],
                 "set_at": row["created_at"].isoformat(),
-                "needs_restating": row["needs_restating"],
+                "live": row["ended_at"] is None,
+                "ended": None
+                if row["ended_at"] is None
+                else {
+                    "at": row["ended_at"].isoformat(),
+                    "as": row["ended_as"],
+                    "by": row["ended_by"],
+                    "reason": row["ended_reason"],
+                },
             }
             for row in rows
         ]

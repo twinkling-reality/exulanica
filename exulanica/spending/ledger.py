@@ -121,10 +121,6 @@ class _Remembered:
 #: Why a guest's allowance is not granted, by the reason ``spending_grant_guest`` answers.
 _GUEST_REFUSALS: Final = {
     "workspace_holds_a_grant": "this workspace's allowance is not a guest's to grant",
-    "guest_policy_needs_restating": (
-        "the guest policy was set before the authority's latest restore or reauthorization, so "
-        "the operator sets it again before it grants anything"
-    ),
     "guest_grants_exhausted": "the guest policy has granted as many visitors as it does today",
 }
 
@@ -216,9 +212,8 @@ class DurableSpending:
         with the ledger. Answers the grant, the same one when asked again, or None where no guest
         policy is set for ``provider``. Refused, raising :class:`SpendingRefused`, under
         ``spending_not_granted`` for a workspace that holds another grant from the authority
-        (``workspace_holds_a_grant``), a policy set before the authority's latest restore
-        reconciliation or reauthorization (``guest_policy_needs_restating``) and a policy whose
-        grants of the day are spent (``guest_grants_exhausted``); as an admission is refused by a
+        (``workspace_holds_a_grant``) and a policy whose grants of the day are spent
+        (``guest_grants_exhausted``); as an admission is refused by a
         suspended, revoked or expired authority; and ``spending_unavailable`` when the database
         does not answer.
         """

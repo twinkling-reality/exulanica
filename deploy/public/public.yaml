@@ -44,6 +44,11 @@ services:
       # the certificate authority again and meet its rate limit.
       - edge_data:/data
       - edge_config:/config
+    # A fixed address, the one the client proxy trusts X-Forwarded-For from
+    # (client-trusted-proxies.conf).
+    networks:
+      default:
+        ipv4_address: 10.231.89.10
     logging: &bounded-logs
       driver: json-file
       options:
@@ -84,10 +89,11 @@ services:
       # Browser accounts on the account role, for the guest entry: the one origin visitors open.
       EXULANICA_ACCOUNT_DATABASE_URL: postgresql://exulanica_accounts:${EXULANICA_ACCOUNT_ROLE_PASSWORD}@postgres:5432/${POSTGRES_DB:-exulanica}
       EXULANICA_ACCOUNT_BROWSER_ORIGINS: '["${EXULANICA_PUBLIC_ORIGIN:?set EXULANICA_PUBLIC_ORIGIN to the https origin visitors open}"]'
-      # uvicorn takes the scheme from X-Forwarded-Proto only from the addresses named here. The API
-      # publishes no port (above): only the client proxy reaches it, over the compose network, and
-      # that proxy passes on the edge's https, so the sign-in routes see the origin the browser did.
-      FORWARDED_ALLOW_IPS: "*"
+      # uvicorn takes the scheme from X-Forwarded-Proto, and the client's address from
+      # X-Forwarded-For, only from the address named here: the client proxy's fixed one. A process
+      # on the host that reaches the API at its bridge address comes from the network's gateway and
+      # is taken as it is, plain http from that address.
+      FORWARDED_ALLOW_IPS: "10.231.89.20"
     logging: *bounded-logs
 
   preparation:
@@ -114,6 +120,15 @@ services:
     # X-Forwarded-Proto, which this proxy trusts from private ranges. `up` checks the merged
     # configuration publishes neither this port nor the API's.
     ports: !reset []
+    # Trusts X-Forwarded-For from the edge's address alone, not from the private ranges the image
+    # trusts: on a Linux host a local process reaches this proxy at its bridge address, from the
+    # network's gateway, and would otherwise choose the address a guest entry is counted by.
+    volumes:
+      - ./deploy/public/client-trusted-proxies.conf:/etc/nginx/exulanica-trusted-proxies.conf:ro
+    # A fixed address, the one the API trusts forwarded headers from.
+    networks:
+      default:
+        ipv4_address: 10.231.89.20
     logging: *bounded-logs
 
   # Bakes the tiles of the towns visitors make, and of the arrival worlds once, as the tile role.
@@ -129,3 +144,12 @@ services:
 volumes:
   edge_data:
   edge_config:
+
+# One network with a fixed range, so the edge and the client proxy keep the addresses the trust
+# settings name. A host that already uses this range for something else changes all four places
+# together (here, the edge, the client and client-trusted-proxies.conf).
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 10.231.89.0/24

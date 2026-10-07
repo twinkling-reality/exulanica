@@ -60,12 +60,12 @@ COPY --from=build /src/web/packages/app/dist /usr/share/nginx/html
 COPY <<'CONF' /etc/nginx/conf.d/default.conf
 # The client address a write is counted against. Behind the public edge every connection comes
 # from the edge's container, so the address is taken from X-Forwarded-For, trusted only from the
-# private ranges a container network is drawn from. The edge replaces that header with the address
-# it accepted the connection from, so a visitor cannot choose it; with no edge in front, the
-# address is whatever reached the loopback port.
-set_real_ip_from 10.0.0.0/8;
-set_real_ip_from 172.16.0.0/12;
-set_real_ip_from 192.168.0.0/16;
+# addresses the included file names: the private ranges a container network is drawn from in this
+# image, and the edge's one fixed address in the public composition (deploy/public), where a
+# process on the host could otherwise reach this proxy at its bridge address and name its own. The
+# edge replaces that header with the address it accepted the connection from, so a visitor cannot
+# choose it; with no edge in front, the address is whatever reached the loopback port.
+include /etc/nginx/exulanica-trusted-proxies.conf;
 real_ip_header X-Forwarded-For;
 
 # Writes are counted; reads are not. An empty key is not limited, so GET, HEAD and OPTIONS pass
@@ -219,5 +219,13 @@ server {
     }
 }
 CONF
+
+# The addresses whose X-Forwarded-For the configuration above trusts: the private ranges a
+# container network is drawn from, as deploy/installation/client-trusted-proxies.conf names them.
+COPY <<'TRUSTED' /etc/nginx/exulanica-trusted-proxies.conf
+set_real_ip_from 10.0.0.0/8;
+set_real_ip_from 172.16.0.0/12;
+set_real_ip_from 192.168.0.0/16;
+TRUSTED
 
 EXPOSE 8080

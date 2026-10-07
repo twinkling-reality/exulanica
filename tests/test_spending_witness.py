@@ -53,6 +53,7 @@ TABLES = (
     "spending_authority_state",
     "spending_authority_revocation",
     "spending_guest_policy",
+    "spending_guest_policy_day",
     "spending_grant",
     "spending_grant_state",
     "spending_grant_revocation",

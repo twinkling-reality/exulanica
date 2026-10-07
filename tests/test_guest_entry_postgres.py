@@ -391,3 +391,74 @@ def _app_without_check(account_url, spine_schema, tmp_path, guest) -> TestClient
     )
     app.include_router(accounts.router)
     return TestClient(app, base_url=ORIGIN, follow_redirects=False)
+
+
+def test_a_session_read_asks_again_at_most_once_a_minute(guest_app, monkeypatch):
+    """Each ask for a missing allowance takes the authority's witness and state locks, which every
+    admission takes, so a guest reading their session in a loop asks once a minute, not each time,
+    and only for the providers they hold nothing from."""
+    import dataclasses
+
+    from exulanica.api.routes import accounts as routes
+
+    class _Clock:
+        now = 1_000.0
+
+        def __call__(self) -> float:
+            return self.now
+
+    clock = _Clock()
+    monkeypatch.setattr(routes, "_GRANT_RETRIES", routes._GrantRetries(clock=clock))
+    client = guest_app(per_day=1_000_000)
+    spending = _FailingSpending()
+    client.app.state.services = dataclasses.replace(client.app.state.services, spending=spending)
+    assert _enter(client).status_code == 201
+    entered = len(spending.asked)
+    for _ in range(5):
+        assert client.get("/auth/session").status_code == 200
+    assert len(spending.asked) == entered + 1
+    clock.now += routes.GRANT_RETRY_SECONDS
+    client.get("/auth/session")
+    assert len(spending.asked) == entered + 2
+
+
+@pytest.mark.parametrize("mode", ["off", "open", "code"])
+def test_the_public_api_starts_in_every_entry_mode(mode, account_role, spine_schema, tmp_path):
+    """The public overlay always gives the API the account database and the origin. With the entry
+    off the server must still start, closed to new guests, so turning it off never takes the
+    server down."""
+    from exulanica.api.services import build_services
+
+    _, scratch = spine_schema
+    environ = {
+        "EXULANICA_DATABASE_URL": scratch_database(scratch).url,
+        "EXULANICA_DATA_DIR": str(tmp_path),
+        "EXULANICA_DERIVATIVE_WORKER": "off",
+        "EXULANICA_ACCOUNT_DATABASE_URL": account_role,
+        "EXULANICA_ACCOUNT_BROWSER_ORIGINS": f'["{ORIGIN}"]',
+        "EXULANICA_GUEST_ENTRY": mode,
+    }
+    if mode != "off":
+        environ["EXULANICA_GUEST_ENTRIES_PER_DAY"] = "10"
+    if mode == "code":
+        environ["EXULANICA_GUEST_ENTRY_CODE_SHA256"] = hashlib.sha256(CODE.encode()).hexdigest()
+    services = build_services(environ)
+    assert services.accounts is not None and services.accounts.guest is not None
+    assert services.accounts.guest.mode == {"off": "closed"}.get(mode, mode)
+
+
+def test_a_closed_entry_admits_nobody_new_and_keeps_the_guests_who_entered(
+    guest_app, account_role, spine_schema, tmp_path
+):
+    import dataclasses
+
+    client = guest_app(per_day=1_000_000)
+    entered = _enter(client)
+    assert entered.status_code == 201
+    runtime = client.app.state.services.accounts
+    closed = dataclasses.replace(runtime.guest, mode="closed", entries_per_day=0)
+    object.__setattr__(runtime, "guest", closed)
+    refused = _enter(client)
+    assert refused.status_code == 503 and refused.json()["code"] == "guest_entry_off"
+    session = client.get("/auth/session")
+    assert session.status_code == 200 and session.json()["role"] == "guest"

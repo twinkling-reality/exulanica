@@ -184,6 +184,7 @@ INSTANCE_TABLES: Final[Mapping[str, str]] = {
     "spending_reservation": "per-deployment spending reservation and settlement",
     "spending_event": "per-deployment spending ledger",
     "spending_guest_policy": "per-deployment figures a guest workspace is granted",
+    "spending_guest_policy_day": "per-deployment count of a guest policy's grants in a day",
     # The host publishes its character catalogs; a destination publishes its own, and a saved look
     # it cannot resolve there reads as unavailable rather than borrowing the source's catalog.
     "character_catalog_publication": "host-admin character catalog publication, per deployment",
