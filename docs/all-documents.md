@@ -7,7 +7,7 @@ Start from the [documentation hub](README.md). Each document has one subject hom
 an explicit responsibility. A role describes how to use a document, not whether a feature
 is implemented. Contracts and scoped evidence establish capability claims.
 
-**104 documents** in the public catalog.
+**106 documents** in the public catalog.
 
 - [Product and architecture](#orientation)
 - [Capability guides](#capabilities)
@@ -59,6 +59,7 @@ How a world's people live, how open models decide for them, how runs are compare
 | --- | --- | --- |
 | [Synthetic society contract](synthetic-society-contract.md) | contract | Society engines, inputs, identity, persistence, playback, directed actions and replay |
 | [Decision roles and model decisions](decision-roles-contract.md) | contract | Decision roles, the owner's model choice, the person's decision contract, host asking and spend bounds, dispositions and replay |
+| [The door for outside programs](door-contract.md) | contract | The door for outside programs: admitted bridges, owners' grants and their secrets, the channel a bridge reads and answers on, the external asker and mapping files |
 | [Society experiments](society-experiments.md) | contract | Comparisons of the models that decide for a world's people, and intervention experiments over a living society |
 | [Movement modules contract](movement-modules-contract.md) | contract | Movement modules and their dispatch: walking, flight through a world's air, flying kinds and roads |
 | [Things contract](things-contract.md) | contract | Thing kinds, body plans, abilities and offers, looks and look kinds, the origin record and translation manifests |
@@ -223,4 +224,5 @@ a record's original status is not proof of the implementation's present capabili
 | [0028-a-crash-recovery-replays-a-declared-withdrawal-export](adr/0028-a-crash-recovery-replays-a-declared-withdrawal-export.md) | ADR-0028: A crash recovery replays a declared withdrawal export and refuses a stale one |
 | [0029-a-world-kind-is-data-a-site-grammar-realises](adr/0029-a-world-kind-is-data-a-site-grammar-realises.md) | ADR-0029: A world kind is data that one site grammar realises |
 | [0030-a-thing-is-a-typed-record-whose-looks-never-reach-the-simulation](adr/0030-a-thing-is-a-typed-record-whose-looks-never-reach-the-simulation.md) | ADR-0030: A thing is a typed record whose looks never reach the simulation |
+| [0031-an-outside-program-decides-only-through-the-door](adr/0031-an-outside-program-decides-only-through-the-door.md) | ADR-0031: An outside program decides for a world's things only through the door |
 | [gsplat-training-and-recorded-rung](adr/gsplat-training-and-recorded-rung.md) | Gaussian optimization and recorded scene rung are separate decisions |
