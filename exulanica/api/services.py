@@ -1059,14 +1059,15 @@ def build_services(
 
 def _door_open_to(accounts: AccountRuntime | None) -> Callable[[uuid.UUID], bool] | None:
     """Whether a workspace is open to the door, where the deployment has accounts: its owner's
-    account and owner membership stand and it is not disabled, read through the account role on
-    every call, so a disabled workspace's doors close at their next request. An account database
-    that cannot be read refuses the request (``account_unavailable``) rather than opening it."""
+    account and owner membership stand and it is not disabled, read for that workspace alone
+    through the account role on every call, so a disabled workspace's doors close at their next
+    request. An account database that cannot be read refuses the request
+    (``account_unavailable``) rather than opening it."""
     if accounts is None:
         return None
 
     def open_to(workspace_id: uuid.UUID) -> bool:
-        return workspace_id in accounts.active_owned_workspaces()
+        return accounts.owned_workspace_active(workspace_id)
 
     return open_to
 

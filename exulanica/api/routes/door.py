@@ -586,9 +586,12 @@ async def frames(
                 next_head = now + _HEAD_EVERY_SECONDS
                 if await request.is_disconnected():
                     return {"profile": FRAME_PROFILE, "frames": [], "cursor": cursor.encode()}
-                found = await _in_thread(
-                    lambda: _on_channel(request, channel, lambda r: r.read(cursor))
-                )
+                try:
+                    found = await _in_thread(
+                        lambda: _on_channel(request, channel, lambda r: r.read(cursor))
+                    )
+                except ChannelRefused as exc:
+                    return _channel_problem(exc)
                 if found is not None and (found[0] or found[1] != cursor):
                     return _frames(found)
             if now >= ends or not door.polls.holds(channel.grant_id, token):

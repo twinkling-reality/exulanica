@@ -239,7 +239,8 @@ def test_a_planned_restore_loses_nothing_and_the_source_can_serve_again(purged, 
 
 def _a_door_credential_ended_long_ago(purged) -> str:
     """A world, a door grant and its channel credential, which the owner ended and which ended
-    more than thirty days ago, so the door's retention may prune it: its digest."""
+    more than thirty days ago: its digest. The credential is written with triggers off, as only a
+    superuser may, since the door stamps a secret's time at insert."""
     workspace = purged.workspace_id
     world = f"door-world-{uuid.uuid4().hex[:8]}"
     grant = uuid.uuid4()
@@ -255,26 +256,23 @@ def _a_door_credential_ended_long_ago(purged) -> str:
             "values (%s, %s, %s, 'test-bridge', %s)",
             (workspace, grant, world, uuid.uuid4()),
         )
+        connection.execute("set local session_replication_role = replica")
         connection.execute(
             "insert into door_secret (secret_sha256, kind, bridge, workspace_id, grant_id, "
-            "created_at, expires_at) values (%s, 'channel', 'test-bridge', %s, %s, "
-            "now() - interval '40 days', now() - interval '31 days')",
+            "created_at, expires_at, revoked_at) values (%s, 'channel', 'test-bridge', %s, %s, "
+            "now() - interval '40 days', now() - interval '31 days', now() - interval '39 days')",
             (secret, workspace, grant),
-        )
-        connection.execute(
-            "update door_secret set revoked_at = created_at + interval '1 day' "
-            "where secret_sha256 = %s",
-            (secret,),
         )
     return secret
 
 
-def test_a_pruned_door_credential_never_makes_an_older_backup_unrestorable(
+def test_an_ended_door_credential_never_makes_an_older_backup_unrestorable(
     purged, source, tmp_path
 ):
-    """An owner ends a door credential, a backup is taken, the door prunes the credential past its
-    retention, and that backup is restored: backup sets carry no door secret, so the backup holds
-    no withdrawal the checkpoint lacks, and the restored installation holds no credential."""
+    """An owner ends a door credential long past its retention, a backup is taken, the door's
+    retention runs, and that backup is restored: the revoked credential is kept, as a withdrawal
+    is, backup sets carry no door secret, so the backup holds no withdrawal the checkpoint lacks,
+    and the restored installation holds no credential."""
     _require_server_binaries()
     from exulanica.orchestration.installation.recovery import restore_planned
 
@@ -292,10 +290,10 @@ def test_a_pruned_door_credential_never_makes_an_older_backup_unrestorable(
     )
     with purged.database().unscoped() as connection:
         connection.execute("select door_prune(1000)")
-        pruned = connection.execute(
+        kept = connection.execute(
             "select 1 from door_secret where secret_sha256 = %s", (secret,)
         ).fetchone()
-    assert pruned is None
+    assert kept is not None
     sealed = tmp_path / "custody" / "checkpoint.json"
     loaded = read_backup_set(taken.directory)
     owner, database = loaded.database.owner_role, loaded.database.database

@@ -30,6 +30,7 @@ answer. What is shown:
 
 from __future__ import annotations
 
+import datetime
 import itertools
 import json
 import threading
@@ -48,7 +49,12 @@ from exulanica.db.roles import provision_runtime_role
 from exulanica.door.asker import DoorAsker
 from exulanica.door.bridges import load_bridge_directory
 from exulanica.door.credentials import credential_sha256
-from exulanica.door.grants import SECRETS_WAITING_MAXIMUM, GrantRepository, Scope
+from exulanica.door.grants import (
+    SECRETS_ISSUED_MAXIMUM,
+    SECRETS_WAITING_MAXIMUM,
+    GrantRepository,
+    Scope,
+)
 from exulanica.door.notices import Notices
 from exulanica.door.protocol import DEADLINE_MS_DEFAULT, Cursor
 from exulanica.door.runtime import DoorRuntime
@@ -61,7 +67,7 @@ import door_support
 import test_society_authored_world_postgres as helpers
 import test_society_stay_requests_api as stays
 from conftest import scratch_role_database
-from test_society_saved_world_api import OWNER, TOKEN
+from test_society_saved_world_api import OWNER, TOKEN, routes
 from tests_support_api import EVERY_PERMISSION
 
 saved_world = helpers.saved_world
@@ -614,9 +620,14 @@ def test_no_answer_by_the_deadline_and_a_revoked_grant_each_say_so(door):
                     sha256_of_canonical(document).hex(),
                 ),
             )
-    # The channel may still read that its grant ended, and is told once.
+    # The channel may still read that its grant ended, and is told once, last: while the ask it
+    # was sent waits for its outcome the end waits too, so the outcome is never left unread.
     read = _frames(door, channel).json()
-    assert [frame["kind"] for frame in read["frames"]][-1] == "grant_ended"
+    assert [frame["kind"] for frame in read["frames"]] == ["grant", "asked"]
+    assert Cursor.decode(read["cursor"]).ended is False
+    _record_turn(door, external)
+    read = _frames(door, channel, read["cursor"]).json()
+    assert [frame["kind"] for frame in read["frames"]] == ["outcome", "grant_ended"]
     assert read["frames"][-1]["reason"] == "revoked"
     assert Cursor.decode(read["cursor"]).ended is True
 
@@ -652,16 +663,35 @@ def test_configuration_names_a_quiet_bridge_a_thing_the_grant_no_longer_names_an
         asker.configuration(
             world["workspace"], _world_id(door), person, {**decider, "bridge": "other-bridge"}
         )
-    # Once its end passes, a grant that was never revoked still binds the person, and is not asked.
+    # Once its end passes, the first time the host meets the person the grant hands them back to
+    # their routine, as a revocation does: that turn is grant_expired, and no later one is asked.
     with door["runtime"].database.session(world["workspace"]) as connection:
         grant = GrantRepository(connection, world["workspace"], world["session"].actor).current(
             grant_id
         )
     assert grant is not None
+    assert _choice_of(door, person)["decider"]["kind"] == "external"
     monkeypatch.setattr(GrantRepository, "now", lambda _self: grant.expires_at)
     assert asker.configuration(world["workspace"], _world_id(door), person, decider)[1] == (
         "grant_expired"
     )
+    assert _choice_of(door, person)["decider"] == {"kind": "routine"}
+    # Meeting it again, or revoking it later, hands back nothing more.
+    assert asker.configuration(world["workspace"], _world_id(door), person, decider)[1] == (
+        "grant_expired"
+    )
+    revoked = door["client"].post(f"/door/grants/{grant_id}/revoke", headers=OWNER)
+    assert revoked.status_code == 200, revoked.text
+    assert _choice_of(door, person)["decider"] == {"kind": "routine"}
+
+
+def _choice_of(door, person: str) -> dict[str, Any]:
+    """The person's choice as the world's owner reads it from the choices route."""
+    scope, _, society = routes(door["world"])
+    read = door["client"].get(society + "/models", headers=OWNER, params=scope)
+    assert read.status_code == 200, read.text
+    [choice] = [entry for entry in read.json()["choices"] if entry["subject_id"] == person]
+    return choice
 
 
 def test_one_poll_stops_adding_asked_frames_past_its_byte_bound(door, monkeypatch):
@@ -697,6 +727,27 @@ def test_an_answer_after_the_turn_is_decided_is_too_late_and_outcomes_follow_in_
     asked, cursor = _asked(door, channel, cursor)
     waiting["_thread"].join(timeout=5)
     # The host records the turn's receipt (the world's routine decided it); then the answer is late.
+    _record_turn(door, external)
+    late = door["client"].post(
+        "/door/channel/answers",
+        headers=channel,
+        json={
+            "request_id": asked["request_id"],
+            "request_sha256": asked["request_sha256"],
+            "label": asked["context"]["options"][0]["label"],
+        },
+    )
+    assert (late.status_code, late.json()["code"]) == (409, "answer_too_late")
+    read = _frames(door, channel, cursor).json()
+    assert [frame["kind"] for frame in read["frames"]] == ["outcome"]
+    assert (read["frames"][0]["status"], read["frames"][0]["reason"]) == (
+        "unavailable",
+        "no_answer_in_time",
+    )
+
+
+def _record_turn(door, external: dict[str, Any]) -> None:
+    """The host's receipt of an asked turn: the world's routine decided it."""
     world = door["world"]
     society_id = (
         world["connection"]
@@ -719,22 +770,6 @@ def test_an_answer_after_the_turn_is_decided_is_too_late_and_outcomes_follow_in_
         ),
     )
     world["connection"].commit()
-    late = door["client"].post(
-        "/door/channel/answers",
-        headers=channel,
-        json={
-            "request_id": asked["request_id"],
-            "request_sha256": asked["request_sha256"],
-            "label": asked["context"]["options"][0]["label"],
-        },
-    )
-    assert (late.status_code, late.json()["code"]) == (409, "answer_too_late")
-    read = _frames(door, channel, cursor).json()
-    assert [frame["kind"] for frame in read["frames"]] == ["outcome"]
-    assert (read["frames"][0]["status"], read["frames"][0]["reason"]) == (
-        "unavailable",
-        "no_answer_in_time",
-    )
 
 
 def _closed(request: dict[str, Any], profile: str) -> dict[str, Any]:
@@ -1131,6 +1166,69 @@ def test_a_closed_workspace_s_credentials_and_invites_open_nothing(door):
     assert _redeem(door, BRIDGE, code).status_code == 201
 
 
+def test_a_held_poll_ends_once_its_credential_is_ended(door):
+    grant_id = _issue(door).json()["grant"]["grant_id"]
+    first = _credential(door, grant_id)
+    cursor = _frames(door, first, _hello(door, first).json()["cursor"]).json()["cursor"]
+    client, _runtime = door["application"](_bridges(door["world"]["workspace"], hold_seconds=5))
+    with client:
+        result: dict[str, Any] = {}
+
+        def poll() -> None:
+            started = time.monotonic()
+            result["read"] = client.get(
+                "/door/channel/frames", headers=first, params={"after": cursor}
+            )
+            result["seconds"] = time.monotonic() - started
+
+        thread = threading.Thread(target=poll)
+        thread.start()
+        time.sleep(0.5)
+        _credential(door, grant_id)  # the owner's new credential ends the first
+        thread.join(timeout=10)
+    assert (result["read"].status_code, result["read"].json()["code"]) == (401, "unauthenticated")
+    assert result["seconds"] < 4.0  # refused at its next read, not after its hold
+
+
+def test_a_bridge_reads_its_grant_s_end_even_after_its_mapping_is_unpinned(door):
+    grant_id = _issue(door).json()["grant"]["grant_id"]
+    channel = _credential(door, grant_id)
+    cursor = _hello(door, channel).json()["cursor"]
+    door["client"].post(f"/door/grants/{grant_id}/revoke", headers=OWNER)
+    entries = json.loads(
+        door_support.bridges_setting(
+            listed=False, workspaces=[str(door["world"]["workspace"])], hold_seconds=1
+        )
+    )
+    entries[0]["mapping_sha256"] = [door_support.mapping_sha256(door_support.mapping(2))]
+    client, _runtime = door["application"](
+        load_bridge_directory({"EXULANICA_DOOR_BRIDGES": json.dumps(entries)})
+    )
+    with client:
+        read = client.get("/door/channel/frames", headers=channel, params={"after": cursor})
+    assert read.status_code == 200, read.text
+    assert [frame["kind"] for frame in read.json()["frames"]][-1] == "grant_ended"
+
+
+def test_a_grant_is_given_a_bounded_number_of_secrets(door):
+    grant_id = _issue(door).json()["grant"]["grant_id"]
+    for _ in range(SECRETS_ISSUED_MAXIMUM):
+        _credential(door, grant_id)
+    more = door["client"].post(f"/door/grants/{grant_id}/channel-credentials", headers=OWNER)
+    assert (more.status_code, more.json()["code"]) == (409, "too_many_secrets")
+    live = (
+        door["world"]["connection"]
+        .execute(
+            "select count(*) filter (where revoked_at is null) as live, count(*) as given "
+            "from door_secret where grant_id = %s",
+            (grant_id,),
+        )
+        .fetchone()
+    )
+    door["world"]["connection"].commit()
+    assert live == {"live": 1, "given": SECRETS_ISSUED_MAXIMUM}
+
+
 def test_at_most_six_hellos_a_grant_a_minute(door):
     channel = _credential(door, _issue(door).json()["grant"]["grant_id"])
     assert [_hello(door, channel).status_code for _ in range(6)] == [200] * 6
@@ -1245,22 +1343,35 @@ def test_no_answer_counts_after_its_grant_is_revoked_whoever_writes_it(door, mon
 # -- retention and bounds --------------------------------------------------------------------
 
 
-def test_only_door_prune_removes_global_rows_and_only_past_their_retention(door):
+def _backdated_secret(admin, world, grant_id, digest: str, *, revoked: bool) -> None:
+    """A channel secret of the grant that ended thirty-one days ago, revoked or not: written with
+    triggers off, as only a superuser may, since the door stamps a secret's time at insert."""
+    with admin.transaction():
+        admin.execute("set local session_replication_role = replica")
+        admin.execute(
+            "insert into door_secret (secret_sha256, kind, bridge, workspace_id, grant_id, "
+            "created_at, expires_at, revoked_at) values (%s, 'channel', 'test-bridge', %s, %s, "
+            "statement_timestamp() - interval '40 days', "
+            "statement_timestamp() - interval '31 days', %s)",
+            (
+                digest,
+                world["workspace"],
+                grant_id,
+                datetime.datetime.now(datetime.UTC) - datetime.timedelta(days=35)
+                if revoked
+                else None,
+            ),
+        )
+
+
+def test_only_door_prune_removes_global_rows_and_never_a_revoked_secret(door):
     grant_id = _issue(door).json()["grant"]["grant_id"]
     channel = _credential(door, grant_id)
     world = door["world"]
     admin = world["connection"]
+    _backdated_secret(admin, world, grant_id, "1" * 64, revoked=False)
+    _backdated_secret(admin, world, grant_id, "2" * 64, revoked=True)
     with admin.transaction():
-        admin.execute(
-            "select set_config('exulanica.workspace_id', %s, true)", (str(world["workspace"]),)
-        )
-        admin.execute(
-            "insert into door_secret (secret_sha256, kind, bridge, workspace_id, grant_id, "
-            "created_at, expires_at) values (%s, 'channel', 'test-bridge', %s, %s, "
-            "statement_timestamp() - interval '40 days', "
-            "statement_timestamp() - interval '31 days')",
-            ("1" * 64, world["workspace"], grant_id),
-        )
         admin.execute(
             "insert into door_redemption_refusal (bridge, requester_sha256, refused_at) "
             "values ('test-bridge', %s, statement_timestamp() - interval '2 days'), "
@@ -1274,12 +1385,76 @@ def test_only_door_prune_removes_global_rows_and_only_past_their_retention(door)
     assert pruned == 2
     left = admin.execute(
         "select (select count(*) from door_secret where secret_sha256 = %s) as old_secret, "
+        "(select count(*) from door_secret where secret_sha256 = %s) as revoked_secret, "
         "(select count(*) from door_redemption_refusal) as refusals",
-        ("1" * 64,),
+        ("1" * 64, "2" * 64),
     ).fetchone()
-    assert left == {"old_secret": 0, "refusals": 1}
+    # A revocation is a withdrawal written once: the revoked secret is kept for good.
+    assert left == {"old_secret": 0, "revoked_secret": 1, "refusals": 1}
+    with (
+        pytest.raises(psycopg.errors.CheckViolation, match="revoked door secret is kept"),
+        admin.transaction(),
+    ):
+        admin.execute("delete from door_secret where secret_sha256 = %s", ("2" * 64,))
     # The live credential was kept, and still opens its channel.
     assert _hello(door, channel).status_code == 200
+
+
+def test_a_secret_s_time_is_the_door_s_and_door_prune_keeps_its_owner_and_grants(door):
+    """A secret's created_at is stamped at insert whatever the writer says, and 0157 replaced
+    door_prune in place: still a SECURITY DEFINER on a pinned search path, owned by the role every
+    definer is handed to where that role exists, executable by the runtime alone, its owner
+    holding exactly select and delete on the two global tables."""
+    grant_id = _issue(door).json()["grant"]["grant_id"]
+    world = door["world"]
+    admin = world["connection"]
+    with admin.transaction():
+        admin.execute(
+            "select set_config('exulanica.workspace_id', %s, true)", (str(world["workspace"]),)
+        )
+        admin.execute(
+            "insert into door_secret (secret_sha256, kind, bridge, workspace_id, grant_id, "
+            "created_at, expires_at) values (%s, 'channel', 'test-bridge', %s, %s, "
+            "statement_timestamp() - interval '9 days', statement_timestamp() + interval '1 day')",
+            ("3" * 64, world["workspace"], grant_id),
+        )
+    stamped = admin.execute(
+        "select created_at > statement_timestamp() - interval '1 minute' as now "
+        "from door_secret where secret_sha256 = %s",
+        ("3" * 64,),
+    ).fetchone()
+    assert stamped == {"now": True}
+    function = admin.execute(
+        "select pg_get_userbyid(p.proowner) as owner, p.prosecdef as definer, "
+        "p.proconfig as config, "
+        "has_function_privilege(%s, p.oid, 'EXECUTE') as runtime_executes, "
+        "has_function_privilege('public', p.oid, 'EXECUTE') as public_executes "
+        "from pg_proc p where p.proname = 'door_prune' "
+        "and p.pronamespace = current_schema()::regnamespace",
+        (ROLE,),
+    ).fetchone()
+    admin.commit()
+    assert function["definer"] is True
+    assert function["config"] == ["search_path=pg_catalog, pg_temp"]
+    assert (function["runtime_executes"], function["public_executes"]) == (True, False)
+    definer = admin.execute("select 1 from pg_roles where rolname = 'exulanica_definer'").fetchone()
+    admin.commit()
+    if definer is not None:
+        # Once every definer is handed to that role: its owner, with the privileges its grant line
+        # states, and no more.
+        assert function["owner"] == "exulanica_definer"
+        privileges = admin.execute(
+            "select t, p, has_table_privilege('exulanica_definer', t, p) as held "
+            "from unnest(array['door_secret', 'door_redemption_refusal']) t, "
+            "unnest(array['SELECT', 'INSERT', 'UPDATE', 'DELETE']) p order by t, p"
+        ).fetchall()
+        admin.commit()
+        assert {(row["t"], row["p"]) for row in privileges if row["held"]} == {
+            ("door_redemption_refusal", "DELETE"),
+            ("door_redemption_refusal", "SELECT"),
+            ("door_secret", "DELETE"),
+            ("door_secret", "SELECT"),
+        }
 
 
 def test_a_body_past_its_route_s_bound_is_refused_before_it_is_read(door):

@@ -111,8 +111,9 @@ no society; 409 for `engine_takes_no_model_choice`, `choice_key_reused` and `dec
 422 for the rest, such as `person_not_in_this_world`), and nothing is issued. Revoking hands every
 thing the grant still decides for back to its routine in the revocation's transaction
 (`release_external_choice`); a thing its owner gave another decider meanwhile keeps that decider. A
-grant that expires keeps its binding until its owner revokes it: its things are not asked, and each
-of their turns is recorded unavailable with `grant_expired` and decided by the routine.
+grant that runs out hands its things back the same way the first time the decision host meets one
+of them, under the grant's lock and chosen by the grant's own actor: that turn is recorded
+unavailable with `grant_expired`, and every later turn is the routine's, with no request.
 
 Refusals: `bridge_not_offered` and `invalid_scope` (422), `unknown_world` (404), `grant_ended` (409)
 for an invite or credential on a grant that has ended, and `unknown_reference` (404) for a grant id
@@ -149,17 +150,20 @@ deployment has accounts, a secret opens its grant only while the workspace is op
 account and owner membership stand and the workspace is not disabled, read through the account role
 on every request as a browser session is (an account database that cannot be read answers 503
 `account_unavailable`), and a disabled workspace's societies stop playing, so its programs are not
-asked either. A secret may only gain the time an invite was used and the time it was revoked, each
-once: migration 0149 refuses every other change. Backup sets carry no door secret and no refused
-redemption (`EPHEMERAL_TABLES` in `exulanica/orchestration/installation/backup_set.py`), so a
-restore voids every invite and channel credential and each owner opens their grants again; a secret
-the door has pruned therefore never leaves an older backup holding a revocation a later checkpoint
-lacks. A secret's revocation is catalogued (kind `door_secret`) so that a sealed restore checkpoint
-refuses it, as it refuses a sign-out. The runtime role may update those two columns and deletes
-nothing: `door_prune`, a function with its owner's rights the runtime alone may execute, removes
-refused redemptions a day old and secrets thirty days past their end, a bounded batch at a time, as
-the door issues and redeems (`exulanica/door/retention.py`); the tables' triggers refuse every other
-delete, whoever asks.
+asked either. A secret's time is stamped when it is stored, whatever the writer says (migration
+0157), and a secret may only gain the time an invite was used and the time it was revoked, each
+once: migration 0149 refuses every other change. A grant is given at most 48 secrets over its life,
+invites and channel credentials together (409 `too_many_secrets`). A revoked secret is a withdrawal
+written once and kept for good: no prune removes it and its trigger refuses its delete, whoever
+asks, so a database that keeps door rows never holds a revocation a later checkpoint lacks. Backup
+sets carry no door secret and no refused redemption (`EPHEMERAL_TABLES` in
+`exulanica/orchestration/installation/backup_set.py`), so a restore voids every invite and channel
+credential and each owner opens their grants again. A secret's revocation is catalogued (kind
+`door_secret`) so that a sealed restore checkpoint refuses it, as it refuses a sign-out. The runtime
+role may update those two columns and deletes nothing: `door_prune`, a function with its owner's
+rights the runtime alone may execute, removes refused redemptions a day old and secrets nobody
+revoked thirty days past their end, a bounded batch at a time, as the door issues and redeems
+(`exulanica/door/retention.py`); the tables' triggers refuse every other delete, whoever asks.
 
 ## The channel
 
@@ -215,9 +219,12 @@ first with nothing to send; a process holds at most 64, a workspace at most four
 bridge at most half. When the process or a bridge is full, a poll from a workspace holding fewer
 takes the place of the oldest poll of the workspace holding the most there, if that one holds at
 least two more; the poll whose place is taken is answered at once with nothing to send. So the
-places are shared evenly among the workspaces that want them, however many owners use one listed
-bridge, and only a poll that would not be fairer is refused (503 `door_busy`, `retry_after_ms`
-1,000). The frames route belongs to the streams admission class.
+places are shared evenly among the workspaces that want them, and only a poll that would not be
+fairer is refused (503 `door_busy`, `retry_after_ms` 1,000). One process therefore serves the
+programs of at most 32 workspaces at a time through one bridge: a listed bridge that more owners use
+at once needs more API processes, or some programs wait, and one left out past its hold and ten
+quiet seconds is reported not connected and its things fall to the routine
+([deployment guide](deployment.md), 5.4). The frames route belongs to the streams admission class.
 
 **Answers.** `POST /door/channel/answers` names one open ask of the grant (else 404
 `unknown_reference`), its request digest and one of the labels the request offered (else 422
@@ -305,8 +312,11 @@ kind library by the crossings that use it.
 - Nothing from a program is executed: a mapping is closed data, every answer is one of the labels its
   request offered, checked again by the engine in its minute, and a line meets the line rule before
   it is stored and the workspace's rules when the host records it.
-- What leaves through the door is the request as the host reserved it: its context, the role's
-  instruction and the description of the one choice, which is what a model is shown.
+- What leaves through the door is the request as the host reserved it, which is what a model is
+  shown: its context, the role's instruction and the description of the one choice, the same
+  request rendered as a model is sent it (`messages` and the forced `act`) and the minute it was
+  asked at; and the grant as its owner issued it, its named things and the version they live in
+  included.
 - `door_secret` and `door_redemption_refusal` belong to the deployment and never travel in a seed
   (`exulanica/orchestration/judge_seed.py`). Grants, asks, answers, mappings and declarations are
   kept with the world; the transport tables are kept as appended.
@@ -324,6 +334,7 @@ own licence notes. Until they land, a grant's visitor scope is recorded and offe
 | --- | --- | --- |
 | Bridges, secrets, the cursor, mappings, words and the process's own notices | `exulanica/door/bridges.py`, `credentials.py`, `protocol.py`, `mapping.py`, `notices.py` | `tests/test_door.py` |
 | Grants, redemption, retention, the channel and the asker | `exulanica/door/grants.py`, `secrets.py`, `retention.py`, `channel.py`, `asker.py`, `exulanica/api/routes/door.py`, migration 0149 | `tests/test_door_postgres.py` |
+| Kept revocations, a secret's stamped time, `door_prune` keeping its owner, a run-out grant's things handed back | migration 0157, `exulanica/door/grants.py`, `asker.py` | `tests/test_door_postgres.py`, `tests/test_installation_recovery.py` |
 | A bridge deciding a person's turn end to end, what it is sent, replay with no bridge, a quiet bridge and revocation | `exulanica/api/services.py`, `exulanica/door/grants.py`, `exulanica/door/asker.py`, `exulanica/door/channel.py` | `tests/test_door_outside_decider_postgres.py` |
 | The `Channel` declaration and `door.grant` | `exulanica/api/permissions.py`, `exulanica/api/dependencies.py` | `tests/test_route_permissions.py`, `tests/test_route_rule_layout.py`, `tests/test_api.py`, `tests/test_existence_oracle.py` |
 | The product names no game and imports no adapter | `pyproject.toml` import contracts | `tests/test_door_names_no_game.py` |

@@ -803,6 +803,12 @@ is opened:
   after the permission check and before the tile charge, so a request that is not permitted is
   refused as it would be on an idle server and a refused request is never charged.
 - A slot is released where it was taken, around the whole response, a streamed one included.
+- The door's held polls (`GET /door/channel/frames`, [door contract](door-contract.md)) are
+  streams with bounds of their own: one process holds at most 64, at most four for one workspace
+  and at most 32 for one bridge. So one process serves the programs of at most 32 workspaces at a
+  time through one bridge; a listed bridge many owners use at once needs more API processes, or
+  some of its programs are answered 503 `door_busy` and, once quiet past their hold and ten
+  seconds, are reported not connected and their things fall to the routine.
 - A body that stops arriving is answered **408 `body_timeout`** and the connection closed: 15
   seconds between pieces, or 60 seconds in total for a request (600 for an upload, which is 512 MB
   at about 0.9 MB/s). A client can hold a slot for at most its class's total; a limit per address

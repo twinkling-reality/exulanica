@@ -275,6 +275,9 @@ def test_worker_workspace_discovery_tracks_owner_authority_not_browser_sessions(
     second = api.login("worker-owner-two")
     second_workspace = uuid.UUID(second["workspace_id"])
     assert api.runtime.active_owned_workspaces() == frozenset({first_workspace, second_workspace})
+    # The door reads one workspace by its key, under the same rule.
+    assert api.runtime.owned_workspace_active(first_workspace) is True
+    assert api.runtime.owned_workspace_active(uuid.uuid4()) is False
 
     with api.runtime.repository() as repo:
         repo.connection.execute(
@@ -286,6 +289,8 @@ def test_worker_workspace_discovery_tracks_owner_authority_not_browser_sessions(
             (second_workspace,),
         )
     assert api.runtime.active_owned_workspaces() == frozenset()
+    assert api.runtime.owned_workspace_active(first_workspace) is False
+    assert api.runtime.owned_workspace_active(second_workspace) is False
 
 
 def test_session_expiry_is_database_authority(account_api):

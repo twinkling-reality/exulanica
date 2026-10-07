@@ -38,7 +38,9 @@ content and may hold a name.
 A grant that names some of the world's own things binds them to the bridge in the version it names,
 through the choice record (``SocietyModelChoiceRepository.record_external_choice``), in the grant's
 own transaction, so a thing is never decided for by a program whose grant does not exist; revoking
-hands them back to their routine the same way (``release_external_choice``). A new world version
+hands them back to their routine the same way (``release_external_choice``), and so does a grant
+that runs out, the first time the decision host meets one of its things (:meth:`GrantRepository.
+lapse`). A new world version
 starts its society again, so a binding is a version's, as a model choice is.
 
 The repository runs on a connection scoped to the owner's workspace and is the one writer of the
@@ -82,6 +84,7 @@ __all__ = [
     "MINUTES_DEFAULT",
     "MINUTES_MAXIMUM",
     "READING_GRACE",
+    "SECRETS_ISSUED_MAXIMUM",
     "SECRETS_WAITING_MAXIMUM",
     "THINGS_MAXIMUM",
     "VISITORS_MAXIMUM",
@@ -102,10 +105,13 @@ MINUTES_MAXIMUM: Final = 1440
 INVITE_LIFETIME: Final = dt.timedelta(minutes=15)
 #: How long a channel credential may still read its grant's frames after the grant ends.
 READING_GRACE: Final = dt.timedelta(hours=24)
-#: Per grant, the most invites waiting unused and unexpired: enough for a server and a spare, few
-#: enough that no grant grows the global secret table without bound. A grant has one live channel
-#: credential at most.
+#: Per grant, the most invites waiting unused and unexpired: enough for a server and a spare. A
+#: grant has one live channel credential at most.
 SECRETS_WAITING_MAXIMUM: Final = 8
+#: The most secrets one grant is ever given, invites and channel credentials together. A revoked
+#: secret is kept for good (migration 0157), so this bounds what one grant adds to the global
+#: secret table, whatever its owner asks.
+SECRETS_ISSUED_MAXIMUM: Final = 48
 #: The most characters in the words an owner gives a grant's bridge to show for the world.
 WORLD_WORDS_MAXIMUM: Final = 80
 #: Grants' ids, derived from the workspace and the issue's idempotency key.
@@ -367,13 +373,16 @@ class GrantRepository:
         except ModelChoiceRefused as exc:
             raise GrantRefused(exc.code, exc.detail) from exc
 
-    def _release(self, grant: Grant) -> None:
-        """Hand the grant's named things back to their routine in the version they were bound in."""
+    def _release(self, grant: Grant, why: str = "release") -> dict[str, Any] | None:
+        """Hand the grant's named things back to their routine in the version they were bound in,
+        as one choice keyed by the grant and ``why`` (a revocation's ``release``, a run-out
+        grant's ``lapse``, each by its own chooser): the choice recorded, which a repeat answers
+        again, or None when the grant decides for nobody now, as after the other one."""
         assert grant.scope.version_id is not None
-        self._choices(grant.world_id).release_external_choice(
+        return self._choices(grant.world_id).release_external_choice(
             uuid.UUID(grant.scope.version_id),
             person_role(),
-            request_id=uuid.uuid5(grant.grant_id, "release"),
+            request_id=uuid.uuid5(grant.grant_id, why),
             grant_id=grant.grant_id,
             chosen_by=self._actor,
             contract=decision_contract(),
@@ -472,6 +481,19 @@ class GrantRepository:
         assert revoked is not None
         return revoked
 
+    def lapse(self, grant_id: uuid.UUID) -> bool:
+        """Hand a grant's named things back to their routine once the grant has run out, as
+        revoking does, under the grant's lock and chosen by the grant's own actor: the decision
+        host then asks the routine for them and nobody else. True when they are released (a
+        repeat answers with the same release); a grant that stands, was revoked or names no thing
+        changes nothing."""
+        with self._connection.transaction():
+            self.lock(grant_id)
+            grant = self.current(grant_id)
+            if grant is None or not grant.scope.things or grant.ended(self.now()) != "expired":
+                return False
+            return self._release(grant, "lapse") is not None
+
     def _standing(self, grant_id: uuid.UUID) -> Grant:
         grant = self.current(grant_id)
         if grant is None:
@@ -483,6 +505,18 @@ class GrantRepository:
     def _secret(
         self, grant: Grant, *, kind: str, text: str, expires_at: dt.datetime
     ) -> IssuedSecret:
+        """Store one new secret of ``grant``, under the grant's lock the caller holds, while the
+        grant has been given fewer than :data:`SECRETS_ISSUED_MAXIMUM`."""
+        issued = self._connection.execute(
+            "select count(*) as issued from door_secret where workspace_id = %s and grant_id = %s",
+            (self._workspace_id, grant.grant_id),
+        ).fetchone()
+        assert issued is not None
+        if issued["issued"] >= SECRETS_ISSUED_MAXIMUM:
+            raise GrantRefused(
+                "too_many_secrets",
+                f"a grant is given at most {SECRETS_ISSUED_MAXIMUM} invites and credentials",
+            )
         self._connection.execute(
             "insert into door_secret (secret_sha256, kind, bridge, workspace_id, grant_id, "
             "expires_at) values (%s, %s, %s, %s, %s, %s)",

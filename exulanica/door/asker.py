@@ -93,6 +93,12 @@ class DoorAsker:
             "deadline_ms": DEADLINE_MS_DEFAULT if bridge is None else bridge.deadline_ms,
         }
         ended = grant.ended(now)
+        if ended == "expired" and subject_id in grant.scope.things:
+            # A grant that ran out hands its things back to their routine the first time the host
+            # meets one of them, as a revocation does: this turn is recorded grant_expired, and the
+            # host asks the routine for every later one, with no request.
+            with self.database.session(workspace_id) as connection:
+                GrantRepository(connection, workspace_id, grant_actor(grant_id)).lapse(grant_id)
         if ended is not None:
             return config, _ENDED[ended]
         if subject_id not in grant.scope.things:

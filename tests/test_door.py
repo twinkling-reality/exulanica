@@ -270,7 +270,11 @@ def test_a_mapping_that_breaks_its_profile_is_refused_by_name(change, says):
 def test_a_program_that_brings_no_visitor_needs_none_in_its_mapping():
     document = door_support.mapping()
     document["visitors"] = []
-    reads = [field for field in door_support.READS if field != "player"]
+    # Nor a player's name to leave behind: it brings nobody with one.
+    document["never_crosses"] = [
+        entry for entry in document["never_crosses"] if entry["field"] != "player name"
+    ]
+    reads = [field for field in door_support.READS if field not in ("player", "player name")]
     assert check_reads(check_mapping(document), reads) == frozenset(reads)
 
 
@@ -321,6 +325,7 @@ def test_text_a_person_reads_meets_the_line_rule(text, fault):
         ("at 10.0.0.1", False, False),
         ("meta-llama/Llama-3.1-8B", True, True),
         ("Mr. Smith", False, True),
+        ("see x\u0301.com", False, False),
         ("mail me@there", False, False),
         ("https x", False, True),
         ("https://x", False, False),

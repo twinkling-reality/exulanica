@@ -221,11 +221,15 @@ def redeem_invite(
                 or row["revoked_at"] is not None
                 or now >= row["expires_at"]
                 or not bridge.offered_to(row["workspace_id"])
-                or (open_to is not None and not open_to(row["workspace_id"]))
             ):
                 _refuse(connection, bridge, requester)
                 refusal = InviteNotRedeemable("this invite opens nothing for this bridge")
             prune(connection)
+    # The account database is read with no connection of this one held open.
+    if refusal is None and open_to is not None and not open_to(row["workspace_id"]):
+        with database.unscoped() as connection:
+            _refuse(connection, bridge, requester)
+        refusal = InviteNotRedeemable("this invite opens nothing for this bridge")
     # Raised only once the connection has committed the refusal it recorded.
     if refusal is not None:
         raise refusal

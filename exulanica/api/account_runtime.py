@@ -442,6 +442,11 @@ class AccountRuntime:
         with self.repository() as repository:
             return repository.active_owned_workspaces()
 
+    def owned_workspace_active(self, workspace_id: uuid.UUID) -> bool:
+        """Whether one workspace is open, read for it alone through the account role."""
+        with self.repository() as repository:
+            return repository.owned_workspace_active(workspace_id)
+
     def start(self, return_uri: str | None = None) -> tuple[str, str]:
         config, provider = self._google()
         target = return_uri or config.return_uris[0]

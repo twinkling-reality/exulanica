@@ -288,7 +288,11 @@ def check_mapping(document: Any) -> dict[str, Any]:
         _words(entry["reason_words"], f"{where} reason_words")
     fields = [entry["field"] for entry in behind]
     _unique(fields, "never_crosses")
-    _require(_ALWAYS_BEHIND in fields, f"never_crosses lists {_ALWAYS_BEHIND!r}")
+    # A person's name never crosses with a visitor; a program that brings none names no person.
+    _require(
+        not document["visitors"] or _ALWAYS_BEHIND in fields,
+        f"never_crosses lists {_ALWAYS_BEHIND!r} for a mapping with visitors",
+    )
     return document
 
 

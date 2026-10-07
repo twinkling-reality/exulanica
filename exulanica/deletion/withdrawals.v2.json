@@ -244,7 +244,7 @@
       "table": "door_secret",
       "shape": "column",
       "note": "An owner ending a door grant's invites and channel credentials without ending the grant (migration 0149), as after one leaked, or a new channel credential ending the grant's last: the secret opens nothing again. Backup sets carry no door secret (EPHEMERAL_TABLES in exulanica/orchestration/installation/backup_set.py), so a restore voids every credential, as it does every browser session, and a sealed checkpoint refuses a revocation like any withdrawal.",
-      "identity": ["secret_sha256"],
+      "identity": ["workspace_id", "secret_sha256"],
       "columns": ["revoked_at"],
       "withdrawn": {"column": "revoked_at", "is": "not null"},
       "workspace": "workspace_id"

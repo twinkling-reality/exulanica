@@ -85,6 +85,21 @@ class AccountRepository:
         """
         return active_owned_workspaces(self.connection)
 
+    def owned_workspace_active(self, workspace_id: uuid.UUID) -> bool:
+        """Whether one workspace's owner still has that authority: the same rule as
+        :meth:`active_owned_workspaces`, read for one workspace by its key, as a browser session is
+        read by its own."""
+        row = self.connection.execute(
+            "select 1 from account_workspace w "
+            "join account_user u on u.user_id=w.owner_user_id "
+            "join account_membership m on m.workspace_id=w.workspace_id "
+            "and m.user_id=w.owner_user_id "
+            "where w.workspace_id=%s and u.disabled_at is null and w.disabled_at is null "
+            "and m.revoked_at is null and m.membership_role='owner'",
+            (workspace_id,),
+        ).fetchone()
+        return row is not None
+
     def begin_login(
         self,
         *,

@@ -302,8 +302,10 @@ class ChannelRepository:
         ended = grant.ended(self._grants.now())
         if ended is not None and cursor.ended:
             raise ChannelRefused("grant_ended", 410, "this grant was revoked or has ended")
-        self._presence(bridge, "polling")
         if ended is None:
+            # Once the grant has ended a bridge only reads what was sent, its end included, so a
+            # hello the deployment no longer admits does not keep it from reading the end.
+            self._presence(bridge, "polling")
             self._connection.execute(
                 "update door_presence set polled_at = greatest(polled_at, statement_timestamp()) "
                 "where workspace_id = %(w)s and grant_id = %(g)s",
@@ -313,7 +315,15 @@ class ChannelRepository:
 
     def read(self, cursor: Cursor) -> tuple[list[dict[str, Any]], Cursor] | None:
         """What is new after ``cursor`` and the cursor after it, or None when the head says nothing
-        is: the one read a held poll repeats."""
+        is: the one read a held poll repeats, which refuses a credential ended since the poll
+        began, by a newer one of the grant or by its owner."""
+        live = self._connection.execute(
+            "select 1 from door_secret where secret_sha256 = %s and kind = 'channel' "
+            "and revoked_at is null and expires_at > statement_timestamp()",
+            (self._session.credential_sha256,),
+        ).fetchone()
+        if live is None:
+            raise ChannelRefused("unauthenticated", 401, "no door credential opens anything here")
         if not self.head(cursor).news(cursor):
             return None
         return self.frames(cursor)
@@ -354,7 +364,9 @@ class ChannelRepository:
 
     def frames(self, cursor: Cursor) -> tuple[list[dict[str, Any]], Cursor]:
         """Everything after ``cursor``, at most :data:`FRAMES_PER_POLL` frames, and the cursor
-        after them: the grant if it changed, outcomes in ask order, open asks, then its end."""
+        after them: the grant if it changed, outcomes in ask order, open asks, then its end, once
+        every ask was read and every outcome reported, so the end is the last thing a bridge
+        reads."""
         grant = self.grant()
         now = self._grants.now()
         frames: list[dict[str, Any]] = []
@@ -402,6 +414,8 @@ class ChannelRepository:
             )
             position["outcome"] = row["ask_seq"]
         room = FRAMES_PER_POLL - len(frames)
+        # Whether this poll read every ask after the cursor: only then may it carry the end.
+        every_ask = room > 0
         if room > 0:
             asks = self._connection.execute(
                 "select a.ask_seq, r.document as request, d.request_id as recorded "
@@ -438,12 +452,21 @@ class ChannelRepository:
                 )
                 size = len(canonical_json(frame))
                 if asked_bytes and asked_bytes + size > ASKED_BYTES_MAXIMUM:
+                    every_ask = False
                     break  # the next poll reads on from this ask
                 asked_bytes += size
                 frames.append(frame)
                 position["ask"] = row["ask_seq"]
+            if len(asks) == room:
+                every_ask = False  # there may be more: the next poll reads on
         ended = grant.ended(now)
-        if ended is not None and not cursor.ended and len(frames) < FRAMES_PER_POLL:
+        if (
+            ended is not None
+            and not cursor.ended
+            and len(frames) < FRAMES_PER_POLL
+            and every_ask
+            and position["outcome"] >= position["ask"]
+        ):
             frames.append(
                 grant_ended_frame(
                     grant_id=str(grant.grant_id), grant_seq=grant.grant_seq, reason=ended

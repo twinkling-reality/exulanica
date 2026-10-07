@@ -92,6 +92,15 @@ def _withdrawal_shaped(connection, schema) -> dict[str, set[str]]:
     return found
 
 
+def test_a_kind_that_names_a_workspace_carries_it_in_what_a_checkpoint_holds():
+    """A restore replays each carried withdrawal in its own workspace's session, reading that
+    workspace from the carried row: a column kind holds only its identity and columns, so one that
+    names a workspace names it among its identity, or the replay meets a row without it."""
+    for kind in CATALOG:
+        if kind.workspace is not None and kind.shape == "column":
+            assert kind.workspace in kind.identity, kind.kind
+
+
 def test_every_withdrawal_shaped_table_is_carried_or_excluded_by_name(repository, spine_schema):
     _, schema = spine_schema
     found = _withdrawal_shaped(repository.connection, schema)

@@ -12,8 +12,9 @@ ceiling on all of them, a share for each workspace and a share for each bridge, 
 one bridge cannot take every place. When the process or a bridge is full, a new poll from a
 workspace holding fewer takes the place of the oldest poll of the workspace holding the most, whose
 bridge is answered at once with nothing to send and polls again; so the places are shared evenly
-among the workspaces that want them, however many owners use one listed bridge, and only a
-workspace that would hold as many as everyone else is answered ``door_busy``. A bridge that polls
+among the workspaces that want them, and only a workspace that would hold as many as everyone else
+is answered ``door_busy``. One process serves at most half its places' worth of workspaces through
+one bridge; more need more processes (the deployment guide, 5.4). A bridge that polls
 again while its last poll is still held ends that one with nothing to send, so a dropped connection
 never leaves two polls reading for one grant.
 """
