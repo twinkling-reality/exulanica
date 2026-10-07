@@ -6,10 +6,14 @@ and nothing spends credits.
 
 from __future__ import annotations
 
+import io
 import json
+import os
 import uuid
+from decimal import Decimal
 
 import pytest
+from exulanica.models.budget import BudgetGuard
 from exulanica.models.client import ModelClient
 from exulanica.models.errors import (
     AmbiguousStructuredOutputError,
@@ -22,9 +26,10 @@ from exulanica.models.errors import (
     TruncatedResponseError,
 )
 from exulanica.models.manifest import Role
-from exulanica.models.messages import image_part
+from exulanica.models.messages import image_part, text_part
 from exulanica.models.reasoning import split_reasoning
 from exulanica.models.transport import HttpResponse
+from PIL import Image
 from pydantic import BaseModel, model_validator
 
 from model_fakes import RecordingPolicy, chat_body, model_not_found
@@ -281,9 +286,7 @@ class Sighting(BaseModel):
 
 
 def test_structured_output_returns_a_validated_instance(client, transport):
-    transport.default = ok(
-        chat_body('{"subject": "waterfall", "count": 2, "caption": null}')
-    )
+    transport.default = ok(chat_body('{"subject": "waterfall", "count": 2, "caption": null}'))
     result = client.structured(
         Role.REASONING_CHEAP, MESSAGES, Sighting, prompt_version="extract-v3"
     )
@@ -369,8 +372,7 @@ def test_structured_output_survives_inline_reasoning(client, transport):
     """Scratch work wrapped around the JSON must not defeat validation."""
     transport.default = ok(
         chat_body(
-            '<think>Counting the shapes now.</think>'
-            '{"subject":"bar","count":1,"caption":null}'
+            '<think>Counting the shapes now.</think>{"subject":"bar","count":1,"caption":null}'
         )
     )
     result = client.structured(Role.REASONING_CHEAP, MESSAGES, Sighting, prompt_version="v1")
@@ -400,8 +402,7 @@ def test_a_brace_in_a_transcribed_string_does_not_defeat_the_scan(client, transp
     """Transcribed signage will eventually contain a brace. A naive counter mis-parses it."""
     transport.default = ok(
         chat_body(
-            "Thinking about the sign.\n"
-            '{"subject":"sign","count":1,"caption":"reads {OPEN} today"}'
+            'Thinking about the sign.\n{"subject":"sign","count":1,"caption":"reads {OPEN} today"}'
         )
     )
     result = client.structured(Role.REASONING_CHEAP, MESSAGES, Sighting, prompt_version="v1")
@@ -469,15 +470,67 @@ def test_single_photograph_needs_no_wrapping(client, transport):
 
 def test_vision_can_return_structured_output(client, transport):
     transport.default = ok(chat_body('{"subject":"waterfall","count":1,"caption":"winter"}'))
-    result = client.vision(
-        [b"bytes"], "extract", prompt_version="v1", schema=Sighting
-    )
+    result = client.vision([b"bytes"], "extract", prompt_version="v1", schema=Sighting)
     assert result.value.subject == "waterfall"
 
 
 def test_image_part_accepts_a_url_unchanged():
     part = image_part("https://example.invalid/photo.jpg")
     assert part["image_url"]["url"] == "https://example.invalid/photo.jpg"
+
+
+class _Reservations(BudgetGuard):
+    """A budget that keeps what each call reserved."""
+
+    def __init__(self) -> None:
+        super().__init__(ceiling_usd=Decimal("1"))
+        self.made: list[Decimal] = []
+
+    def reserve(self, spec, **kwargs) -> Decimal:
+        projected = super().reserve(spec, **kwargs)
+        self.made.append(projected)
+        return projected
+
+
+def _noise_jpeg(side: int) -> bytes:
+    """An image whose bytes do not compress, so its data URL is as long as a photograph's."""
+    buffer = io.BytesIO()
+    Image.frombytes("RGB", (side, side), os.urandom(side * side * 3)).save(buffer, "JPEG")
+    return buffer.getvalue()
+
+
+def test_an_image_reserves_its_declared_tokens_and_never_its_bytes(manifest, transport):
+    vision = manifest[Role.VISION].primary
+    transport.default = ok(
+        chat_body("a harbour", model=vision.model_id, prompt_tokens=1100, completion_tokens=150)
+    )
+    guard = _Reservations()
+    client = ModelClient(
+        api_key="test-key-not-real",
+        manifest=manifest,
+        transport=transport,
+        budget=guard,
+        policy=RecordingPolicy(),
+    )
+    words = [text_part("describe the place")]
+    calls = (
+        (words, 0),
+        ([*words, image_part(_noise_jpeg(64))], 800),
+        ([*words, image_part(_noise_jpeg(768))], 800),
+    )
+    for content, image_tokens in calls:
+        client.chat(
+            Role.VISION,
+            [{"role": "user", "content": content}],
+            prompt_version="v1",
+            image_prompt_tokens=image_tokens,
+        )
+    text_only, small, large = guard.made
+    assert small == large  # the image's size moves nothing
+    image_tokens = vision.cost_usd(prompt_tokens=800, completion_tokens=0)
+    assert abs(large - text_only - image_tokens) <= Decimal("0.00000002")
+    billed = guard.spent_usd / 3
+    assert large <= 10 * billed, (large, billed)
 
 
 # -- credential hygiene -----------------------------------------------------------------------
@@ -549,7 +602,7 @@ def test_the_placeholder_never_becomes_a_value(client, transport):
 
 
 def test_a_decoy_written_after_the_answer_is_refused_too(client, transport):
-    """"Take the last object" fixes the archived probe and breaks this one. Both are guesses."""
+    """ "Take the last object" fixes the archived probe and breaks this one. Both are guesses."""
     transport.default = ok(
         chat_body(
             '{"subject": "waterfall", "count": 2, "caption": null}\n'
@@ -656,9 +709,12 @@ def test_structured_output_refuses_a_key_the_schema_forbade(client, transport):
     transport.default = ok(
         chat_body('{"subject": "a", "count": 1, "caption": null, "smuggled": "in"}')
     )
-    assert Sighting.model_validate(
-        {"subject": "a", "count": 1, "caption": None, "smuggled": "in"}
-    ).subject == "a"
+    assert (
+        Sighting.model_validate(
+            {"subject": "a", "count": 1, "caption": None, "smuggled": "in"}
+        ).subject
+        == "a"
+    )
     with pytest.raises(SchemaViolationError):
         client.structured(Role.REASONING_CHEAP, MESSAGES, Sighting, prompt_version="v1")
 

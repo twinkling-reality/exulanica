@@ -177,6 +177,31 @@ def _refusal_reasons(exc: ValidationError) -> str:
     )
 
 
+def _prompt_characters(messages: Iterable[Mapping[str, Any]]) -> int:
+    """The characters a call's budget reservation reads as prompt text: each message as it would
+    print, with its image parts left out.
+
+    An image part is a ``data:`` URL of the image's base64 bytes, tens of thousands of characters
+    that are no prompt text at all; the image's tokens are reserved separately, as
+    ``image_prompt_tokens``. Counting the URL as text reserved over thirty times what a call on a
+    768 px rendition cost, so a ceiling admitted a fraction of the calls it could pay for.
+    """
+    total = 0
+    for message in messages:
+        content = message.get("content")
+        if isinstance(content, list):
+            message = {
+                **message,
+                "content": [
+                    part
+                    for part in content
+                    if not (isinstance(part, Mapping) and part.get("type") == "image_url")
+                ],
+            }
+        total += len(str(message))
+    return total
+
+
 class ModelClient:
     """Role-routed access to the OpenAI-compatible endpoint."""
 
@@ -705,7 +730,7 @@ class ModelClient:
                     response_format=response_format,
                 )
 
-        prompt_chars = sum(len(str(m)) for m in payload["messages"])
+        prompt_chars = _prompt_characters(payload["messages"])
         served = self._chain.walk(
             role,
             "/chat/completions",
@@ -891,7 +916,7 @@ class ModelClient:
             "/chat/completions",
             admitted,
             timeout=timeout,
-            prompt_chars=sum(len(str(m)) for m in admitted["messages"]),
+            prompt_chars=_prompt_characters(admitted["messages"]),
             extra_prompt_tokens=0,
             max_tokens=resolved,
             keep_usd=keep_usd,
