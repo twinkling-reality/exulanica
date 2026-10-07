@@ -1,0 +1,196 @@
+{
+  "profile": "exulanica.demo-scene/v1",
+  "scene": "three-strangers",
+  "version": 1,
+  "title": "Three strangers",
+  "summary": "A clearing with a stone well and a gate for travellers, where an armoured knight, a blocky traveller and a lantern spirit meet, each with an open model for a mind; placed from where a person arrives, so it dresses a starter or any saved world.",
+  "ground": {
+    "kind": "starter",
+    "frame": "each thing is placed from where a person arrives: right_mm to their right, forward_mm ahead, turn_microradians counterclockwise from facing the way they face (a turn of pi faces them)"
+  },
+  "words": "A crossroads clearing at dusk: a stone well, a gate for travellers, a knight on guard by the well, a blocky traveller, a lantern spirit, and a sword and a lantern left by the well.",
+  "things": [
+    {
+      "thing_id": "well",
+      "kind": {
+        "kind": "well",
+        "version": 1
+      },
+      "place": {
+        "right_mm": 0,
+        "forward_mm": 5500,
+        "turn_microradians": 0
+      }
+    },
+    {
+      "thing_id": "gate",
+      "kind": {
+        "kind": "gate",
+        "version": 1
+      },
+      "place": {
+        "right_mm": 0,
+        "forward_mm": 11500,
+        "turn_microradians": 3141593
+      }
+    },
+    {
+      "thing_id": "sword",
+      "kind": {
+        "kind": "sword",
+        "version": 3
+      },
+      "place": {
+        "right_mm": 1300,
+        "forward_mm": 4600,
+        "turn_microradians": 0
+      }
+    },
+    {
+      "thing_id": "lantern",
+      "kind": {
+        "kind": "lantern",
+        "version": 1
+      },
+      "place": {
+        "right_mm": -1400,
+        "forward_mm": 4700,
+        "turn_microradians": 0
+      }
+    },
+    {
+      "thing_id": "bench-west",
+      "kind": {
+        "kind": "bench",
+        "version": 1
+      },
+      "place": {
+        "right_mm": -3600,
+        "forward_mm": 5800,
+        "turn_microradians": 1570796
+      }
+    },
+    {
+      "thing_id": "tree-east",
+      "kind": {
+        "kind": "planter_tree",
+        "version": 1
+      },
+      "place": {
+        "right_mm": 4200,
+        "forward_mm": 8200,
+        "turn_microradians": 0
+      }
+    },
+    {
+      "thing_id": "tree-west",
+      "kind": {
+        "kind": "planter_tree",
+        "version": 1
+      },
+      "place": {
+        "right_mm": -4600,
+        "forward_mm": 9200,
+        "turn_microradians": 0
+      }
+    },
+    {
+      "thing_id": "lamp",
+      "kind": {
+        "kind": "lamp_post",
+        "version": 1
+      },
+      "place": {
+        "right_mm": 2600,
+        "forward_mm": 10200,
+        "turn_microradians": 4712389
+      }
+    },
+    {
+      "thing_id": "knight",
+      "kind": {
+        "kind": "knight",
+        "version": 2
+      },
+      "place": {
+        "right_mm": 2000,
+        "forward_mm": 5300,
+        "turn_microradians": 0
+      }
+    },
+    {
+      "thing_id": "traveller",
+      "kind": {
+        "kind": "traveller",
+        "version": 1
+      },
+      "place": {
+        "right_mm": -2300,
+        "forward_mm": 4300,
+        "turn_microradians": 0
+      }
+    },
+    {
+      "thing_id": "lantern-spirit",
+      "kind": {
+        "kind": "lantern_spirit",
+        "version": 1
+      },
+      "place": {
+        "right_mm": -900,
+        "forward_mm": 6800,
+        "turn_microradians": 0
+      }
+    }
+  ],
+  "minds": [
+    {
+      "thing_id": "knight",
+      "decider": {
+        "kind": "model",
+        "provider": "nebius_token_factory",
+        "model_id": "nvidia/nemotron-3-super-120b-a12b"
+      }
+    },
+    {
+      "thing_id": "lantern-spirit",
+      "decider": {
+        "kind": "model",
+        "provider": "nebius_token_factory",
+        "model_id": "Qwen/Qwen3-235B-A22B-Instruct-2507"
+      }
+    },
+    {
+      "thing_id": "traveller",
+      "decider": {
+        "kind": "model",
+        "provider": "nebius_token_factory",
+        "model_id": "deepseek-ai/DeepSeek-V4-Flash-0731"
+      }
+    }
+  ],
+  "engine": "exulanica-society/v7",
+  "origin": {
+    "profile": "exulanica.origin/v1",
+    "class": "authored",
+    "by": {
+      "kind": "project"
+    },
+    "sources": [],
+    "licence": {
+      "spdx": "Apache-2.0",
+      "verdict": "SHIP",
+      "attribution": null,
+      "share_alike": false,
+      "licence_url": null,
+      "licence_text_sha256": null
+    },
+    "authors": [],
+    "lineage": {
+      "ingredients": [],
+      "receipts": [],
+      "translation_manifest_sha256": null
+    },
+    "distribution": "public"
+  }
+}
