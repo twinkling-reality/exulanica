@@ -8,10 +8,12 @@ adjustable parameters, and nothing else; every request passes one gate
 (:func:`~exulanica.world.world_recipes.town_recipe`), which refuses a value the schema does not
 offer by name with its key, the value and the range. The server generates the world through the one
 generation path ``POST /world-generation/worlds`` also takes, saves it as a ``generated`` world with
-its receipt and its saved entry, and queues one bake per tile off the request. The two doors
-differ in authority and metering only: this one asks for ``world.write`` and is bounded by the
-world-count policy's ``generated`` limit and the schema's ranges, which bound the tiles a world
-covers; the other states any specification and charges the workspace tile quota.
+its receipt and its saved entry, and queues one bake per tile off the request, then names the
+look it is made in: the pack of the host's library the request names, or the library's default
+(:mod:`exulanica.world.creation_look`). The two doors differ in authority and metering only: this
+one asks for ``world.write`` and is bounded by the world-count policy's ``generated`` limit and the
+schema's ranges, which bound the tiles a world covers; the other states any specification and
+charges the workspace tile quota.
 
 A generated world's page reads each baked tile through the world it belongs to: the tile's bytes
 are served only when the version's own snapshot names it, held to their digest under the final read
@@ -20,6 +22,7 @@ check, and never charged (``exulanica/api/permissions.py`` says why).
 
 from __future__ import annotations
 
+import contextlib
 import uuid
 from typing import Annotated, Any
 
@@ -34,6 +37,7 @@ from exulanica.api.dependencies import (
     ScopedConnection,
     get_services,
 )
+from exulanica.api.routes.world import StylePackBody
 from exulanica.api.routes.world_entries import SavedWorldEntryView, _view
 from exulanica.api.sayable import sayable
 from exulanica.api.services import Services
@@ -47,9 +51,12 @@ from exulanica.world.baked_tiles import (
     UnknownBakedTile,
 )
 from exulanica.world.composers import GeneratedWorldRefused, UnknownWorldComposer
-from exulanica.world.errors import InvalidStructuralData
+from exulanica.world.creation_look import name_creation_look
+from exulanica.world.errors import InvalidStructuralData, StyleWriteBusy
 from exulanica.world.generated_worlds import generated_tiles
+from exulanica.world.models import StylePackBinding
 from exulanica.world.saved_entries import InvalidSavedWorldTitle, SavedWorldEntryRepository
+from exulanica.world.style_pack_library import style_pack_library
 from exulanica.world.world_recipes import (
     SpecificationRefused,
     UnknownWorldRecipe,
@@ -90,6 +97,9 @@ class CreateGeneratedWorldBody(BaseModel):
     #: Values for any of the preset's adjustable parameters, by the schema's keys; each is held to
     #: its range by the gate, which refuses by name, so they are taken as the JSON sent.
     values: Annotated[dict[str, Any] | None, Field(max_length=64)] = None
+    #: The look the world is made in, a pack of the host's library named exactly; absent or null,
+    #: the library's default, so every world made here is made wearing a look.
+    style_pack: StylePackBody | None = None
 
 
 def _problem(status: int, code: str, detail: str) -> JSONResponse:
@@ -132,19 +142,43 @@ def create_generated_world(
 
     An unknown preset, a value its schema does not offer (422, naming the key, the value and the
     range), a title that is empty once trimmed (422), a preset its composer does not generate, a
-    specification that generates no world from any of its seed candidates, and a workspace that
-    already holds as many generated worlds as the count policy allows are each refused by name, and
-    nothing is written. A deployment whose database role cannot register a world is refused 403
-    `worlds_read_only` before anything is generated.
+    specification that generates no world from any of its seed candidates, a style pack that is
+    not a pack of the host's library at exactly that version and manifest digest (422
+    `invalid_style_data`), and a workspace that already holds as many generated worlds as the
+    count policy allows are each refused by name, and nothing is written. A deployment whose
+    database role cannot register a world is refused 403 `worlds_read_only` before anything is
+    generated.
+
+    The world is made, then its look named in its appearance's next version, the entry's resume
+    pointer moved with it. When that write is refused as busy, the world stays as made, naming no
+    pack, which a page draws in the default look.
     """
     try:
         require_world_registration(connection)
     except WorldsReadOnly as exc:
         return _problem(403, exc.code, str(exc))
+    library = style_pack_library()
+    named = body.style_pack
+    pack = (
+        StylePackBinding(
+            library.default_pack.pack_id,
+            library.default_pack.version,
+            library.default_pack.manifest_sha256,
+        )
+        if named is None
+        else StylePackBinding(named.pack_id, named.version, named.manifest_sha256)
+    )
+    held = library.pack(pack.pack_id)
+    if held is None or (held.version, held.manifest_sha256) != (pack.version, pack.manifest_sha256):
+        return _problem(
+            422,
+            "invalid_style_data",
+            f"style pack {pack.pack_id} version {pack.version} is not a pack of this host's "
+            "library",
+        )
+    entries = SavedWorldEntryRepository(connection, session.workspace_id, services.store)
     try:
-        created = SavedWorldEntryRepository(
-            connection, session.workspace_id, services.store
-        ).create_generated(
+        created = entries.create_generated(
             title=body.title,
             recipe_key=body.recipe,
             created_by=session.actor,
@@ -160,6 +194,9 @@ def create_generated_world(
         return JSONResponse(status_code=422, content=sayable(exc.document()))
     except (GeneratedWorldRefused, UnknownWorldComposer, WorldLimitReached) as exc:
         return _problem(409, exc.code, str(exc))
+    # Refused as busy, the world stays as made, naming no pack: a page draws it in the default.
+    with contextlib.suppress(StyleWriteBusy):
+        created = name_creation_look(entries, created, pack, session.actor)
     return _view(created)
 
 

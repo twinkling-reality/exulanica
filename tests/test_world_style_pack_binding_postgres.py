@@ -31,8 +31,8 @@ from test_world_style_postgres import fixture_styles, proposal, topology
 pytestmark = pytest.mark.postgres
 
 PACKS = Path(__file__).resolve().parents[1] / "assets" / "style-packs" / "packs"
-#: A host whose library holds no pack at all.
-EMPTY = StylePackLibrary(packs=(), content=CommittedContent(()))
+#: A host whose library holds no pack at all, and so names none its default.
+EMPTY = StylePackLibrary(packs=(), content=CommittedContent(()), default="")
 
 
 def committed(pack_id: str) -> StylePackBinding:

@@ -210,8 +210,16 @@ export async function loadGeneratedWorld(
   const neighbours: readonly { readonly name: string; readonly bytes: Uint8Array }[] = rest;
   const worldLook = await import('../world-look.js');
   type Prepared = import('../world-look.js').PreparedWorldLook;
-  /** The pack a choice names, read and its pieces fetched; null for the tile look. Throws when it cannot be read. */
-  const prepare = (choice: import('../world-look.js').WorldLookChoice): Promise<Prepared | null> => (
+  type Choice = import('../world-look.js').WorldLookChoice;
+  /** The pack a choice draws: its own, or for the default the pack the host's list marks so, by its digest. */
+  const resolved = async (choice: Choice): Promise<Choice> => {
+    if (choice.source !== 'default') return choice;
+    const listed = worldLook.listedDefault(await worldLook.listedStylePacks(access));
+    if (listed === undefined) throw new Error('The host lists no default style pack');
+    return { ...choice, packId: listed.pack_id, manifestSha256: listed.manifest_sha256 };
+  };
+  /** The pack a resolved choice names, read and its pieces fetched; null for the tile look. Throws when it cannot be read. */
+  const prepare = (choice: Choice): Promise<Prepared | null> => (
     choice.packId === null
       ? Promise.resolve(null)
       : worldLook.prepareWorldLook(
@@ -223,11 +231,11 @@ export async function loadGeneratedWorld(
     const dressed = prepared === null ? null : worldLook.inWorldLook(plain, prepared);
     return { tile: dressed?.tile ?? plain, bodies: dressed?.bodies ?? (() => null) };
   };
-  const choice = worldLook.worldLookChoice(search, bound);
-  const pack = choice.packId;
+  let choice = worldLook.worldLookChoice(search, bound);
   let prepared: Prepared | null = null;
   let reason: string | null = null;
   try {
+    choice = await resolved(choice);
     prepared = await prepare(choice);
   } catch (error) {
     reason = error instanceof Error ? error.message : String(error);
@@ -259,9 +267,10 @@ export async function loadGeneratedWorld(
   return {
     tile: { ...loaded, start },
     ground,
-    look: { pack, source: choice.source, drawn: prepared !== null, reason },
+    look: { pack: choice.packId, source: choice.source, drawn: prepared !== null, reason },
     bodies: drawn.bodies,
-    async relook(next) {
+    async relook(asked) {
+      const next = await resolved(asked);
       const nextPrepared = await prepare(next);
       // A look is read only when tiles are attached, so the tiles as loaded are drawn again in the
       // new pack's light: nothing is fetched, verified or decoded a second time.
@@ -294,16 +303,20 @@ export function switchableWorld(
       const run = queue.then(async (): Promise<WorldLookRedraw> => {
         const started = performance.now();
         const { DEFAULT_WORLD_LOOK } = await import('../world-look.js');
-        const packId = pack?.packId ?? DEFAULT_WORLD_LOOK;
+        let packId = pack?.packId ?? DEFAULT_WORLD_LOOK;
         const result = (drawn: boolean, reason: string | null): WorldLookRedraw => ({
           pack: packId, source: 'redraw', drawn, reason, elapsedMs: Math.round(performance.now() - started),
         });
         let next: Awaited<ReturnType<GeneratedWorld['relook']>>;
         try {
-          next = await world.relook({ packId, manifestSha256: pack?.manifestSha256 ?? null, source: 'redraw' });
+          // No pack: the default, the one the host's list marks.
+          next = await world.relook(pack === null
+            ? { packId, manifestSha256: null, source: 'default' }
+            : { packId: pack.packId, manifestSha256: pack.manifestSha256, source: 'redraw' });
         } catch (error) {
           return result(false, error instanceof Error ? error.message : String(error));
         }
+        packId = next.look.pack;
         if (host === null) return result(false, 'The world was taken down before its new look was ready');
         // The old look comes down before the new one goes up: each sets the scene's light, and
         // taking one down after the other went up would undo the new one.
@@ -311,7 +324,7 @@ export function switchableWorld(
         current = next;
         attachment = current.tile.attach(host);
         for (const listener of listeners) listener();
-        stated(next.look);
+        stated({ ...next.look, source: 'redraw' });
         return result(next.look.drawn, null);
       }).then((done) => {
         // Every redraw states what it drew, however it was asked: through `redrawWorldLook`

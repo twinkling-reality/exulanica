@@ -20,6 +20,7 @@ function fakeWorld(log: string[], held: Readonly<Record<string, Promise<void>>> 
     },
   }) as unknown as LoadedGeneratedTile;
   const asked: (string | null)[] = [];
+  const sources: string[] = [];
   const world = {
     tile: tile('first'),
     ground: {},
@@ -27,6 +28,7 @@ function fakeWorld(log: string[], held: Readonly<Record<string, Promise<void>>> 
     bodies: () => null,
     async relook(choice: WorldLookChoice) {
       asked.push(choice.manifestSha256);
+      sources.push(choice.source);
       await held[choice.packId ?? ''];
       if (choice.packId === 'exulanica.unreadable') throw new Error('The host serves no style pack exulanica.unreadable');
       return {
@@ -36,7 +38,7 @@ function fakeWorld(log: string[], held: Readonly<Record<string, Promise<void>>> 
       };
     },
   } as unknown as GeneratedWorld;
-  return { world, asked };
+  return { world, asked, sources };
 }
 
 describe('redrawing the open world in another pack', () => {
@@ -79,7 +81,7 @@ describe('redrawing the open world in another pack', () => {
     const log: string[] = [];
     let release = (): void => undefined;
     const slow = new Promise<void>((resolve) => { release = resolve; });
-    const { world, asked } = fakeWorld(log, { [TOON.packId]: slow });
+    const { world, asked, sources } = fakeWorld(log, { [TOON.packId]: slow });
     const mounted = switchableWorld(world, () => undefined, document.createElement('div'));
     const attachment = mounted.tile.attach(HOST);
     const asking = Promise.all([redrawWorldLook(TOON), redrawWorldLook(null)]);
@@ -91,6 +93,8 @@ describe('redrawing the open world in another pack', () => {
     expect(first.pack).toBe(TOON.packId);
     expect(second.pack).toBe('exulanica.cozy-town');
     expect(asked).toEqual([TOON.manifestSha256, null]);
+    // No pack asks for the default, the one the host lists so.
+    expect(sources).toEqual(['redraw', 'default']);
     expect(log).toEqual(['attach first', 'take down first', `attach ${TOON.packId}`, `take down ${TOON.packId}`, 'attach exulanica.cozy-town']);
     attachment.dispose();
   });

@@ -165,6 +165,34 @@ describe('saved world entry client', () => {
       .rejects.toThrow('declared floor with no extent');
   });
 
+  it('makes a generated world in the look it names, and names none to wear the host\'s default', async () => {
+    const sent: unknown[] = [];
+    const ground = {
+      recipe_key: 'small_town', recipe_label: 'A small town', region_id: 'region:generated',
+      arrival_mm: [64000, 99, -58700], arrival_facing_mm: [0, 3400],
+      tiles: [{ tile_x: 0, tile_y: 0, tile_inputs_digest: 'f'.repeat(64), baked_tile_id: null, state: 'baking' }],
+    };
+    const client = new WorldEntryClient({
+      baseUrl: 'https://exulanica.test', token: 'private',
+      fetch: vi.fn(async (_input: string | URL | Request, init: RequestInit = {}) => {
+        sent.push(JSON.parse(String(init.body)));
+        return Response.json(wire({ source_kind: 'generated', generated_ground: ground }), { status: 201 });
+      }),
+    });
+    const toon = { packId: 'exulanica.toon-town', version: 2, manifestSha256: 'b'.repeat(64) };
+    await client.makeGenerated('small_town', 'A small town', { storey_band_high: 4 }, toon);
+    await client.makeGenerated('small_town', 'A small town', undefined, null);
+    await client.makeGenerated('small_town', 'A small town');
+    expect(sent).toEqual([
+      {
+        recipe: 'small_town', title: 'A small town', values: { storey_band_high: 4 },
+        style_pack: { pack_id: 'exulanica.toon-town', version: 2, manifest_sha256: 'b'.repeat(64) },
+      },
+      { recipe: 'small_town', title: 'A small town' },
+      { recipe: 'small_town', title: 'A small town' },
+    ]);
+  });
+
   it('reads what a generated world declares to draw, and refuses a declaration that does not add up', async () => {
     const ground = {
       recipe_key: 'small_town',

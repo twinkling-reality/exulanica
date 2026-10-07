@@ -12,9 +12,12 @@ that fails its own checks is a defect to fix rather than a pack to leave out. A 
 a dot (an operating system's folder notes) is passed over: no pack id or listed path can start with
 one, so nothing it holds is ever served.
 
-The library lists each pack with what a person choosing one needs: its id, version and manifest
-digest; its title, description and tags; its origin; its licence with the attribution it requires,
-and its authors; and its preview picture's digest and media type, when it has one. It serves each
+``assets/style-packs/library.v1.json`` names the library's default pack, the look a town is made
+in when the person making it names none; a default that is not a pack of the library refuses the
+library. The library lists each pack with what a person choosing one needs: its id, version and
+manifest digest; its title, description and tags; its origin; its licence with the attribution it
+requires, and its authors; its preview picture's digest and media type, when it has one; and
+whether it is the default. It serves each
 manifest as its canonical bytes, so the digest that identifies a pack names exactly the bytes
 served, and each listed file as the media type its manifest states, all as committed content by
 digest (:mod:`exulanica.world.committed_content`). The host reads it once, when it starts
@@ -41,6 +44,8 @@ from exulanica.world.style_packs import (
 
 __all__ = [
     "LIBRARY_DIRECTORY",
+    "LIBRARY_FILE",
+    "LIBRARY_PROFILE",
     "LIST_PROFILE",
     "MANIFEST_MEDIA_TYPE",
     "LibraryPack",
@@ -53,6 +58,10 @@ __all__ = [
 _ROOT: Final = Path(__file__).resolve().parents[2]
 #: Where the committed packs are, one folder each, named by pack id.
 LIBRARY_DIRECTORY: Final = _ROOT / "assets" / "style-packs" / "packs"
+#: Which pack of the library is its default.
+LIBRARY_FILE: Final = _ROOT / "assets" / "style-packs" / "library.v1.json"
+#: The profile of that file: its default pack's id and nothing else.
+LIBRARY_PROFILE: Final = "exulanica.style-pack-library/v1"
 #: The profile of the list ``GET /world/style-packs`` answers.
 LIST_PROFILE: Final = "exulanica.style-pack-list/v1"
 #: The media type a manifest is served as: its canonical JSON.
@@ -110,14 +119,28 @@ class StylePackLibrary:
 
     packs: tuple[LibraryPack, ...]
     content: CommittedContent
+    #: The id of the pack a town is made in when the person making it names none.
+    default: str
 
     def pack(self, pack_id: str) -> LibraryPack | None:
         """The committed pack ``pack_id`` names, or None."""
         return next((pack for pack in self.packs if pack.pack_id == pack_id), None)
 
+    @property
+    def default_pack(self) -> LibraryPack:
+        """The library's default pack, which loading held to be one of its packs."""
+        found = self.pack(self.default)
+        assert found is not None
+        return found
+
     def listing(self) -> dict[str, Any]:
         """The document ``GET /world/style-packs`` answers, packs in id order."""
-        return {"profile": LIST_PROFILE, "packs": [pack.listing() for pack in self.packs]}
+        return {
+            "profile": LIST_PROFILE,
+            "packs": [
+                {**pack.listing(), "default": pack.pack_id == self.default} for pack in self.packs
+            ],
+        }
 
 
 @dataclass(frozen=True, slots=True)
@@ -185,10 +208,35 @@ def _preview(manifest: dict[str, Any]) -> dict[str, str | None]:
     return {"preview_sha256": file["sha256"], "preview_media_type": file["media_type"]}
 
 
+def _default(library_file: Path, packs: dict[str, _Read]) -> str:
+    """The pack ``library_file`` names as the default, which must be one of ``packs``."""
+    try:
+        document = json.loads(library_file.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as unread:
+        raise StylePackLibraryRefused(f"{library_file.name} cannot be read: {unread}") from unread
+    if (
+        not isinstance(document, dict)
+        or set(document) != {"profile", "default"}
+        or document["profile"] != LIBRARY_PROFILE
+    ):
+        raise StylePackLibraryRefused(
+            f"{library_file.name} is not {LIBRARY_PROFILE}: a profile and a default, nothing else"
+        )
+    if document["default"] not in packs:
+        raise StylePackLibraryRefused(
+            f"{library_file.name} names {document['default']!r} the default, "
+            "which is not a pack of the library"
+        )
+    return str(document["default"])
+
+
 def load_style_pack_library(
-    directory: Path = LIBRARY_DIRECTORY, context: StylePackContext | None = None
+    directory: Path = LIBRARY_DIRECTORY,
+    context: StylePackContext | None = None,
+    library_file: Path = LIBRARY_FILE,
 ) -> StylePackLibrary:
-    """Read and check every pack in ``directory``; refuse the library at the first broken rule."""
+    """Read and check every pack in ``directory`` and the default ``library_file`` names; refuse
+    the library at the first broken rule."""
     context = load_context(_ROOT) if context is None else context
     packs: dict[str, _Read] = {}
     for folder in sorted(directory.iterdir()):
@@ -209,6 +257,7 @@ def load_style_pack_library(
             or found.digest != base["manifest_sha256"]
         ):
             raise _refuse(pack_id, f"its base {base['pack_id']} is not a pack of the library")
+    default = _default(library_file, packs)
     return StylePackLibrary(
         packs=tuple(
             LibraryPack(
@@ -229,6 +278,7 @@ def load_style_pack_library(
             for pack_id, read in sorted(packs.items())
         ),
         content=CommittedContent(item for read in packs.values() for item in read.items),
+        default=default,
     )
 
 

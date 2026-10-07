@@ -3,6 +3,7 @@
 import { Transport, type GraphPayload, type TransportOptions } from '@exulanica/graph-client';
 import { societyEngine, type SocietyEngineProfile } from './society-engines.js';
 import { worldPath } from './world-scope.js';
+import type { WorldStylePackBinding } from './world-style-api.js';
 
 /**
  * The kind the server gives a world composed from the workspace's own photographs and other
@@ -469,17 +470,24 @@ export class WorldEntryClient {
   }
 
   /**
-   * Generate a world from a preset, with `values` for any of its adjustable parameters, and save
-   * it; its tiles are baked after this returns.
+   * Generate a world from a preset, with `values` for any of its adjustable parameters, in the look
+   * `stylePack` names (a pack of the host's library; none, the host's default), and save it; its
+   * tiles are baked after this returns.
    */
   async makeGenerated(
     recipe: string,
     title: string,
     values?: Readonly<Record<string, number | string>>,
+    stylePack?: WorldStylePackBinding | null,
   ): Promise<SavedWorldEntry> {
-    return parseEntry(await this.#transport.postJson<unknown>(
-      '/worlds/generated', values === undefined ? { recipe, title } : { recipe, title, values },
-    ));
+    return parseEntry(await this.#transport.postJson<unknown>('/worlds/generated', {
+      recipe,
+      title,
+      ...(values === undefined ? {} : { values }),
+      ...(stylePack === undefined || stylePack === null ? {} : {
+        style_pack: { pack_id: stylePack.packId, version: stylePack.version, manifest_sha256: stylePack.manifestSha256 },
+      }),
+    }));
   }
 
   /** Create or exact-idempotently reopen this workspace's source-independent starter. */

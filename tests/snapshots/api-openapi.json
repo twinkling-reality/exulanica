@@ -17954,7 +17954,7 @@
      "world"
     ],
     "summary": "Generate a world from a recipe and save it as yours.",
-    "description": "Generate the preset's world with the values asked for, for a new identity, save it and its\nentry, and queue its bakes.\n\nAn unknown preset, a value its schema does not offer (422, naming the key, the value and the\nrange), a title that is empty once trimmed (422), a preset its composer does not generate, a\nspecification that generates no world from any of its seed candidates, and a workspace that\nalready holds as many generated worlds as the count policy allows are each refused by name, and\nnothing is written. A deployment whose database role cannot register a world is refused 403\n`worlds_read_only` before anything is generated.",
+    "description": "Generate the preset's world with the values asked for, for a new identity, save it and its\nentry, and queue its bakes.\n\nAn unknown preset, a value its schema does not offer (422, naming the key, the value and the\nrange), a title that is empty once trimmed (422), a preset its composer does not generate, a\nspecification that generates no world from any of its seed candidates, a style pack that is\nnot a pack of the host's library at exactly that version and manifest digest (422\n`invalid_style_data`), and a workspace that already holds as many generated worlds as the\ncount policy allows are each refused by name, and nothing is written. A deployment whose\ndatabase role cannot register a world is refused 403 `worlds_read_only` before anything is\ngenerated.\n\nThe world is made, then its look named in its appearance's next version, the entry's resume\npointer moved with it. When that write is refused as busy, the world stays as made, naming no\npack, which a page draws in the default look.",
     "operationId": "create_generated_world_worlds_generated_post",
     "parameters": [
      {
@@ -23852,6 +23852,16 @@
        }
       ],
       "title": "Values"
+     },
+     "style_pack": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/StylePackBody"
+       },
+       {
+        "type": "null"
+       }
+      ]
      }
     },
     "additionalProperties": false,

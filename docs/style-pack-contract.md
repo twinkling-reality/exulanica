@@ -204,17 +204,22 @@ pack and the rule: a manifest not written as its canonical JSON and one newline,
 authoritative reader refuses, a folder not named by its pack id, a listed file that is absent, a
 symbolic link or other bytes than its manifest states, a file its manifest does not list, or a base
 that is not another pack of the library at the version and digest it names. A name starting with a
-dot is passed over; no pack id or listed path can start with one.
+dot is passed over; no pack id or listed path can start with one. `assets/style-packs/library.v1.json`
+(`exulanica.style-pack-library/v1`) names the library's default pack, the look a world is made in
+when the person making it names none; a default that is not a pack of the library, or a file stating
+anything else, refuses the library the same way.
 
 | Route | Answer |
 | --- | --- |
-| `GET /world/style-packs` | `exulanica.style-pack-list/v1`: each pack's id, version and manifest digest, title, description and tags, origin, licence with the attribution it requires, authors, file count and bytes, and its preview picture's digest and media type (`preview_sha256`, `preview_media_type`, or null) |
+| `GET /world/style-packs` | `exulanica.style-pack-list/v1`: each pack's id, version and manifest digest, title, description and tags, origin, licence with the attribution it requires, authors, file count and bytes, its preview picture's digest and media type (`preview_sha256`, `preview_media_type`, or null), and whether it is the default (`default`) |
 | `GET /world/style-packs/{content_sha256}` | A manifest as its canonical bytes (`application/json`) or a file a manifest lists (its stated media type), named by the SHA-256 of exactly those bytes and cached as immutable; any other digest is 404 `unknown_reference` |
 
 Both need a session holding `world.read`. A request names a digest and nothing else, so no request
 reaches a path. The page reads the list, fetches a pack's manifest by the digest the list names and
 each piece by the digest its manifest states, and holds every answer to its digest before reading
-it (`web/packages/app/src/world-look.ts`). The bytes are held by
+it (`web/packages/app/src/world-look.ts`). A world naming no pack is drawn in the pack the list
+marks default (`listedDefault`); the page's own `DEFAULT_WORLD_LOOK` is read only from a host that
+marks none. The bytes are held by
 `exulanica/world/committed_content.py`, an index of committed content by digest that any later
 library of committed looks can share. `tests/test_style_pack_library.py` and
 `tests/test_style_pack_routes.py` hold the host's half, and `web/packages/app/test/world-look.test.ts`
@@ -232,3 +237,15 @@ history whose pack the host no longer holds says so in the version's warnings. T
 world's pack by the manifest digest its appearance names, so it draws exactly the bytes the world
 was given. A pack states no structure, so naming one never moves the world's topology. A world
 package exported from a world does not yet carry the pack its appearance names.
+
+A world made by `POST /worlds/generated` is made wearing a look: the pack its `style_pack` names
+(`{pack_id, version, manifest_sha256}`, a pack of the library at exactly that version and digest,
+else 422 `invalid_style_data` and nothing made), or the library's default when it names none
+(`exulanica/world/creation_look.py`). The world is made first, its first appearance naming no pack;
+the pack is then named by the appearance's next version through the same preview and Apply a
+person's change takes, its provenance `user` with the reference `world-creation`, and the saved
+entry's resume pointer moves with it in that write. A write to a world's look is its own
+transaction, so it follows the making's: when it is refused as busy, the world stays as made, naming
+no pack, and is drawn in the default. Binding the default at creation means a later change of the
+library's default never restyles a world already made; a rollback to the first version returns a
+world to naming no pack.

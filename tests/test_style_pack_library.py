@@ -182,6 +182,38 @@ def test_a_base_must_be_a_pack_of_the_library_at_its_version_and_digest(tmp_path
             _load(library)
 
 
+def test_the_default_is_the_pack_the_library_file_names_and_only_it_is_listed_so() -> None:
+    named = json.loads((ROOT / "assets" / "style-packs" / "library.v1.json").read_text("utf-8"))
+    assert named["profile"] == "exulanica.style-pack-library/v1"
+    library = load_style_pack_library()
+    assert library.default == named["default"] == library.default_pack.pack_id
+    listed = {pack["pack_id"]: pack["default"] for pack in library.listing()["packs"]}
+    assert listed == {pack_id: pack_id == named["default"] for pack_id in _committed()}
+
+
+COMMITTED_DEFAULT = {"profile": "exulanica.style-pack-library/v1", "default": "exulanica.cozy-town"}
+
+
+@pytest.mark.parametrize(
+    ("change", "named"),
+    [
+        ({"default": "exulanica.nowhere-town"}, "not a pack of the library"),
+        ({"profile": "exulanica.style-pack-library/v2"}, "a profile and a default, nothing else"),
+        ({"fallback": "exulanica.toon-town"}, "a profile and a default, nothing else"),
+    ],
+)
+def test_a_default_that_is_not_a_pack_or_a_file_of_another_shape_refuses_the_library(
+    tmp_path: Path, change: dict, named: str
+) -> None:
+    library_file = tmp_path / "library.v1.json"
+    # The positive control: the committed default, written here, loads.
+    library_file.write_text(json.dumps(COMMITTED_DEFAULT))
+    assert load_style_pack_library(PACKS, CONTEXT, library_file).default == "exulanica.cozy-town"
+    library_file.write_text(json.dumps({**COMMITTED_DEFAULT, **change}))
+    with pytest.raises(StylePackLibraryRefused, match=named):
+        load_style_pack_library(PACKS, CONTEXT, library_file)
+
+
 def test_committed_content_holds_bytes_to_their_digest_and_one_media_type() -> None:
     data = b"piece"
     digest = hashlib.sha256(data).hexdigest()

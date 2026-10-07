@@ -16,7 +16,8 @@
  * Which pack (`worldLookChoice`): the one the page's address names (`?look=toon`, `cozy`,
  * `finished`, or `today` for the tile look), which is presentation only and read from a closed list
  * of words for the team's packs; else the pack the world's appearance names (its style version's
- * binding), fetched by the very manifest digest it names; else `DEFAULT_WORLD_LOOK`.
+ * binding), fetched by the very manifest digest it names; else the pack the host's list marks its
+ * default (`listedDefault`), which is `DEFAULT_WORLD_LOOK` only from a host that marks none.
  */
 
 import type { LookFamily, ResolvedStylePack } from '@exulanica/atlas-core';
@@ -39,7 +40,10 @@ export const WORLD_LOOKS = Object.freeze({
   finished: 'exulanica.finished-town',
 } as const);
 
-/** The pack a generated world opens in when the address names none: the cozy town. */
+/**
+ * The default look from a host whose list marks none: the cozy town. A host's list states its own
+ * default (`listedDefault`), which is the one a page draws.
+ */
 export const DEFAULT_WORLD_LOOK: string | null = WORLD_LOOKS.cozy;
 
 /**
@@ -83,6 +87,13 @@ export interface ListedStylePack {
   /** The pack's preview picture by digest, fetched like any piece; null for a pack with none. */
   readonly preview_sha256?: string | null;
   readonly preview_media_type?: string | null;
+  /** Whether the host makes a world in this pack when its maker names none; absent from an older host. */
+  readonly default?: boolean;
+}
+
+/** The pack the host's list marks its default, or `DEFAULT_WORLD_LOOK` from a list marking none. */
+export function listedDefault(packs: readonly ListedStylePack[]): ListedStylePack | undefined {
+  return packs.find((pack) => pack.default === true) ?? packs.find((pack) => pack.pack_id === DEFAULT_WORLD_LOOK);
 }
 
 /** A pack read, resolved and its pieces fetched and checked, ready to draw a world in. */

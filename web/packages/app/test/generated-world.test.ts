@@ -14,6 +14,17 @@ vi.mock('../src/texture-library.js', () => ({
     textureSet: async () => new Uint8Array(),
   }),
 }));
+// The host's list and the pack reader are replaced, so a test sees which pack, by which digest, a
+// world is asked to be drawn in; the reader refuses, and the world opens in the tile look saying so.
+const looks = vi.hoisted(() => ({ listed: [] as unknown[], asked: [] as unknown[][] }));
+vi.mock('../src/world-look.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../src/world-look.js')>()),
+  listedStylePacks: async () => looks.listed,
+  prepareWorldLook: async (...asked: unknown[]) => {
+    looks.asked.push(asked);
+    throw new Error('this test reads no pack');
+  },
+}));
 vi.mock('@exulanica/atlas-core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@exulanica/atlas-core')>()),
   parseTextureSetManifest: () => ({ sets: [] }),
@@ -131,6 +142,20 @@ describe('a saved generated world of several tiles', () => {
     expect(looks).toEqual([TILE_LOOK_V1]);
     expect(again.tile).toMatchObject({ look: TILE_LOOK_V1, start: loaded.tile.start });
     expect(again.look).toEqual({ pack: null, source: 'redraw', drawn: false, reason: null });
+  });
+
+  it('draws a world naming no pack in the pack the host lists as its default, by the digest the list names', async () => {
+    const tiles = [tile(0, 'baked')];
+    vi.stubGlobal('fetch', tileRoute({ [tiles[0]!.bakedTileId!]: new Uint8Array([1]) }).fetch);
+    looks.listed = [
+      { pack_id: 'exulanica.cozy-town', manifest_sha256: 'c'.repeat(64), default: false },
+      { pack_id: 'exulanica.toon-town', manifest_sha256: 'b'.repeat(64), default: true },
+    ];
+    looks.asked = [];
+    const loaded = await loadGeneratedWorld(access, entry(tiles), '');
+    if (!isGeneratedWorld(loaded)) throw new Error('not loaded');
+    expect(looks.asked.map((asked) => [asked[1], asked[4]])).toEqual([['exulanica.toon-town', 'b'.repeat(64)]]);
+    expect(loaded.look).toEqual({ pack: 'exulanica.toon-town', source: 'default', drawn: false, reason: 'this test reads no pack' });
   });
 
   it('opens beside the served arrival when the drawn ground carves the point itself', async () => {

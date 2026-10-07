@@ -83,6 +83,11 @@ def test_the_list_names_every_committed_pack_with_its_licence_and_attribution(cl
     assert cozy["licence"] == {"id": "CC0-1.0", "attribution": None}
     assert cozy["licence"] == manifest["licence"]
     assert cozy["authors"] == manifest["authors"]
+    # The pack the library file names is the one marked default, and no other is.
+    library = json.loads((PACKS.parent / "library.v1.json").read_text(encoding="utf-8"))
+    assert {pack_id: pack["default"] for pack_id, pack in listed.items()} == {
+        pack_id: pack_id == library["default"] for pack_id in listed
+    }
 
 
 def test_a_manifest_and_a_piece_are_served_as_the_bytes_their_digest_names(client) -> None:

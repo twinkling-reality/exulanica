@@ -89,7 +89,7 @@ COPY assets/textures/blobs /app/assets/textures/blobs
 # cannot start any process. `tests/test_image_ships_import_reads.py` holds both lines.
 COPY assets/catalogs /app/assets/catalogs
 # The committed style pack library, which the API reads and holds to its digests when it starts and
-# serves at /world/style-packs (exulanica/world/style_pack_library.py). About 520 KiB.
+# serves at /world/style-packs (exulanica/world/style_pack_library.py). About 1.1 MiB.
 # `tests/test_image_ships_startup_reads.py` holds this line to what loading the library reads.
 COPY assets/style-packs /app/assets/style-packs
 # The character catalogs the image publishes (`exulanica-character-catalog publish --apply`, which

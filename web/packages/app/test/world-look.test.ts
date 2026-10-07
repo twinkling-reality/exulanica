@@ -8,6 +8,7 @@ import {
   STYLE_PACK_LIST_PROFILE,
   WORLD_LOOKS,
   addressedWorldLook,
+  listedDefault,
   prepareWorldLook,
   worldLookChoice,
 } from '../src/world-look.js';
@@ -89,6 +90,24 @@ describe('the look a generated world opens in', () => {
   it('names only packs the committed library holds, the default among them', () => {
     expect(Object.values(WORLD_LOOKS).sort()).toEqual(readdirSync(PACKS).sort());
     expect(readdirSync(PACKS)).toContain(DEFAULT_WORLD_LOOK);
+  });
+});
+
+describe('the default look', () => {
+  const listed = (packId: string, marked?: boolean) => ({
+    pack_id: packId, version: 2, manifest_sha256: 'a'.repeat(64), title: packId, description: '', authors: [],
+    licence: { id: 'CC0-1.0', attribution: null }, ...(marked === undefined ? {} : { default: marked }),
+  });
+
+  it('is the pack the host lists as its default, else the page\'s fallback from a host marking none', () => {
+    expect(listedDefault([listed('exulanica.cozy-town', false), listed('exulanica.toon-town', true)])?.pack_id).toBe('exulanica.toon-town');
+    expect(listedDefault([listed('exulanica.cozy-town'), listed('exulanica.toon-town')])?.pack_id).toBe(DEFAULT_WORLD_LOOK);
+    expect(listedDefault([listed('exulanica.toon-town')])).toBeUndefined();
+  });
+
+  it('falls back to the pack the committed library names its default', () => {
+    const library = JSON.parse(readFileSync('../assets/style-packs/library.v1.json', 'utf8')) as { default: string };
+    expect(library.default).toBe(DEFAULT_WORLD_LOOK);
   });
 });
 
