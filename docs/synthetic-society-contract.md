@@ -1504,7 +1504,8 @@ first, unchanged, and every event they record names v7; then the things phase:
   crossing ever stops a society's minutes;
 * what the minute's decisions do beside the planner's goals, in decision order: a line a decider
   chose to say is said (`said`, `chose_to_say`), with the line, whom it was said to, or none for
-  everyone near, the decider kind (a model or an outside program) and who heard it: every being
+  everyone near, the speaker and that one each by kind and number as the minute began (so the event
+  alone names both), the decider kind (a model or an outside program) and who heard it: every being
   within the hearing reach of the society of things' contract (8 m) of where the speaker stood as
   the minute began, whose kind offers hearing and who is still here; each hearer keeps it among the
   last lines it heard (at most the contract's `lines_heard_maximum`, the oldest dropped first), with

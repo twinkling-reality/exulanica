@@ -608,6 +608,25 @@ def test_a_line_is_heard_within_reach_and_makes_the_one_it_was_said_to_due():
     assert near["id"] in said.document["thing"]["heard_by"]
     assert far["id"] not in said.document["thing"]["heard_by"]
     assert said.document["thing"]["decider"] == "model"
+    # The event names the speaker and the one it was said to by kind and number, as the minute
+    # began, so it is worded without the state.
+    assert (said.document["thing"]["from_kind"], said.document["thing"]["from_number"]) == (
+        knight["kind"],
+        knight["ordinal"] + 1,
+    )
+    assert (said.document["thing"]["to_kind"], said.document["thing"]["to_number"]) == (
+        near["kind"],
+        near["ordinal"] + 1,
+    )
+    # Said to everyone near, it names no one it was said to.
+    (to_all,) = [o for o in options if o.kind == "say_all"]
+    [aloud] = [
+        e
+        for e in _decided_minute(state, document, [_receipt(knight, to_all, line="hello all")])[1]
+        if e.kind == "said"
+    ]
+    assert [aloud.document["thing"][key] for key in ("to", "to_kind", "to_number")] == [None] * 3
+    assert aloud.document["thing"]["from_number"] == knight["ordinal"] + 1
     heard = _person(after, id=near["id"])["heard"]
     assert heard[-1] == {
         "tick": after["tick"],

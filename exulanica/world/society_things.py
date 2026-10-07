@@ -853,6 +853,10 @@ def _decided(
                     {"inhabitants": [p for i, p in began.items() if i in here]}, origin, reach
                 )
             ]
+            # The speaker and the one it was said to, by kind and number as the minute began, so
+            # the event alone names both, whoever has left since. The option was offered over the
+            # state the minute began from, so the one it names was there.
+            addressee = None if to is None else began.get(to)
             minute.emit(
                 "said",
                 person["id"],
@@ -863,6 +867,10 @@ def _decided(
                 details={
                     "line": line,
                     "to": to,
+                    "to_kind": None if addressee is None else dict(addressee["kind"]),
+                    "to_number": None if addressee is None else addressee["ordinal"] + 1,
+                    "from_kind": dict(person["kind"]),
+                    "from_number": person["ordinal"] + 1,
                     "heard_by": heard_by,
                     "decider": "external" if receipt_from_outside(receipt) else "model",
                 },
