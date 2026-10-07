@@ -7,10 +7,13 @@
  * (`stylePackContent`), kept for the page's life as page-local addresses; a pack with none, or one
  * that could not be read, has none. The default is the pack the host's list marks default
  * (`listedDefault`), which is the page's own `DEFAULT_WORLD_LOOK` only from a host that marks none.
+ *
+ * What a world is drawn in now is matched by the exact digest its appearance names (`listedVersion`):
+ * a pack's current version, an earlier one the host still serves, or none the host lists.
  */
 
 import type { Credentials } from '../config.js';
-import type { LookOption } from '../ui/look-sheet.js';
+import type { LookNow, LookOption } from '../ui/look-sheet.js';
 import type { ListedStylePack } from '../world-look.js';
 import type { WorldStylePackBinding } from '../world-style-api.js';
 
@@ -22,18 +25,28 @@ export interface LookLibrary {
   readonly defaultId: string | null;
   /** The exact pack to ask for, by the list's version and digest; null for one not listed. */
   binding(packId: string): WorldStylePackBinding | null;
+  /**
+   * What a world bound to `bound` (null for none, which is the default) is drawn in, for the Look
+   * sheet: the pack, and an earlier version or a pack the host does not serve, said with it.
+   */
+  now(bound: WorldStylePackBinding | null): Promise<{ readonly packId: string | null; readonly how: LookNow }>;
 }
+
+/** Said in the Look sheet when a world names a look this host does not list, so it is drawn plainly. */
+export const UNSERVED_LOOK_WORDS = 'This world names a look this server does not offer, so it is drawn in its plain tiles. Choose a look to draw it in.';
 
 const pictures = new Map<string, Promise<string | null>>();
 
-function picture(access: Credentials, pack: ListedStylePack): Promise<string | null> {
-  const sha = pack.preview_sha256 ?? null;
+function picture(
+  access: Credentials, pack: ListedStylePack, shown: { readonly preview_sha256?: string | null; readonly preview_media_type?: string | null } = pack,
+): Promise<string | null> {
+  const sha = shown.preview_sha256 ?? null;
   if (sha === null) return Promise.resolve(null);
   let held = pictures.get(sha);
   if (held === undefined) {
     held = import('../world-look.js')
       .then((look) => look.stylePackContent(access, sha, `${pack.title}'s picture`))
-      .then((bytes) => URL.createObjectURL(new Blob([bytes], { type: pack.preview_media_type ?? 'image/jpeg' })))
+      .then((bytes) => URL.createObjectURL(new Blob([bytes], { type: shown.preview_media_type ?? 'image/jpeg' })))
       .catch(() => { pictures.delete(sha); return null; });
     pictures.set(sha, held);
   }
@@ -47,15 +60,27 @@ export async function readLookLibrary(access: Credentials): Promise<LookLibrary>
   const shown = await Promise.all(packs.map((pack) => picture(access, pack)));
   const options: readonly LookOption[] = packs.map((pack, index) => ({
     packId: pack.pack_id, title: pack.title, description: pack.description, authors: pack.authors,
-    licence: pack.licence, picture: shown[index] ?? null,
+    licence: pack.licence, picture: shown[index] ?? null, version: pack.version, changes: pack.changes ?? null,
   }));
+  const defaultId = look.listedDefault(packs)?.pack_id ?? look.DEFAULT_WORLD_LOOK;
   return {
     packs,
     options,
-    defaultId: look.listedDefault(packs)?.pack_id ?? look.DEFAULT_WORLD_LOOK,
+    defaultId,
     binding(packId) {
       const listed = packs.find((pack) => pack.pack_id === packId);
       return listed === undefined ? null : { packId: listed.pack_id, version: listed.version, manifestSha256: listed.manifest_sha256 };
+    },
+    async now(bound) {
+      if (bound === null) return { packId: defaultId, how: {} };
+      const found = look.listedVersion(packs, bound.manifestSha256);
+      if (found === undefined) return { packId: null, how: { notice: UNSERVED_LOOK_WORDS } };
+      if (found.current) return { packId: found.pack.pack_id, how: {} };
+      const version = found.pack.earlier_versions?.find((one) => one.manifest_sha256 === bound.manifestSha256);
+      return {
+        packId: found.pack.pack_id,
+        how: { earlier: { packId: found.pack.pack_id, version: found.version, picture: await picture(access, found.pack, version) } },
+      };
     },
   };
 }

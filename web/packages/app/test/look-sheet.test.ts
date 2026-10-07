@@ -175,3 +175,70 @@ describe('the look of a town not made yet', () => {
     expect(choosing.root.dataset['live']).toBe('false');
   });
 });
+
+describe('a world drawn in an earlier version of its look', () => {
+  const VERSIONED = [
+    { ...pack('cozy', 'Cozy town'), version: 3, changes: 'Shaded roads are grey again.' },
+    { ...pack('finished', 'Finished town'), version: 1, changes: null },
+  ];
+  const EARLIER = { packId: 'cozy', version: 2, picture: '/cozy-2.jpg' };
+  const captions = (root: HTMLElement) => [...root.querySelectorAll('.look-sheet-caption')].map((node) => node.textContent);
+
+  it('shows that version as Now, its own card, before the current version, which says what changed', async () => {
+    const onUse = vi.fn(async (_option: LookOption) => '');
+    const versioned = buildLookSheet({ worldTitle: 'Saturday market', onUse, onClose: vi.fn() });
+    document.body.replaceChildren(versioned.root);
+    versioned.show(VERSIONED, 'cozy', { earlier: EARLIER });
+    const { root } = versioned;
+    expect(captions(root)).toEqual(['Now · version 2', 'Version 3', 'Look 2']);
+    expect(text(root, '.look-sheet-overline')).toBe('Look 1 of 2');
+    expect(text(root, '.look-sheet-version')).toBe('This world is drawn in version 2. Version 3 is here. Shaded roads are grey again.');
+    expect(use(root).hidden).toBe(true);
+    expect(text(root, '[data-action="look.keep"] span')).toBe('Keep version 2');
+    // Its own picture, not the current version's.
+    expect(root.querySelector('.look-sheet-backdrop img')!.getAttribute('src')).toBe('/cozy-2.jpg');
+
+    press(root, 'ArrowRight');
+    expect(text(root, '.look-sheet-overline')).toBe('Look 1 of 2');
+    expect(text(root, '.look-sheet-version')).toBe('Version 3 is here. Shaded roads are grey again.');
+    expect(use(root).hidden).toBe(false);
+    expect(text(root, '[data-action="look.use"] span')).toBe('Use version 3');
+    expect(text(root, '[data-action="look.keep"] span')).toBe('Keep version 2');
+    expect(root.querySelector('.look-sheet-backdrop img')!.getAttribute('src')).toBe('/cozy.jpg');
+    press(root, 'Enter');
+    expect(onUse).toHaveBeenCalledTimes(1);
+    expect(onUse.mock.calls[0]![0]).toMatchObject({ packId: 'cozy', version: 3 });
+    await vi.waitFor(() => expect(use(root).disabled).toBe(false));
+
+    // Another pack names no version.
+    press(root, 'ArrowRight');
+    expect(root.querySelector('.look-sheet-version')).toBeNull();
+    expect(text(root, '[data-action="look.use"] span')).toBe('Use this look');
+  });
+
+  it('draws the world exactly as it is now on its Now card, and the current version on the next', () => {
+    vi.useFakeTimers();
+    try {
+      const onBrowse = vi.fn();
+      const live = buildLookSheet({ worldTitle: 'Saturday market', onUse: vi.fn(async () => ''), onClose: vi.fn(), onBrowse });
+      document.body.replaceChildren(live.root);
+      live.show(VERSIONED, 'cozy', { earlier: EARLIER });
+      press(live.root, 'ArrowRight');
+      vi.advanceTimersByTime(BROWSE_PAUSE_MS + 1);
+      press(live.root, 'ArrowLeft');
+      vi.advanceTimersByTime(BROWSE_PAUSE_MS + 1);
+      expect(onBrowse.mock.calls.map(([option, now]) => [option.packId, now])).toEqual([['cozy', false], ['cozy', true]]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('marks nothing as Now, and says so, for a look the host does not serve', () => {
+    const { root, show } = sheet();
+    show(VERSIONED, null, { notice: 'This world names a look this server does not offer.' });
+    expect(captions(root)).toEqual(['Look 1', 'Look 2']);
+    expect(text(root, '.look-sheet-status')).toBe('This world names a look this server does not offer.');
+    expect(text(root, '[data-action="look.keep"] span')).toBe('Back to the world');
+    expect(use(root).hidden).toBe(false);
+  });
+});

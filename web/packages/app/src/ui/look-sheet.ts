@@ -11,6 +11,10 @@
  * routes Use through a handler, which answers with what happened in words or a refusal's words.
  * Choosing a look changes how the world is drawn and nothing else: its places, people and history
  * stay as they are, which the sheet says once.
+ *
+ * A world drawn in an earlier version of a pack keeps it: the host still serves every version it
+ * published, and a newer one is only ever a choice. The sheet then shows that version as Now, its
+ * own card, beside the pack's current version, which says what changed and offers itself by number.
  */
 
 import { el, replace, setText } from './dom.js';
@@ -25,14 +29,37 @@ export interface LookOption {
   readonly licence: { readonly id: string; readonly attribution: string | null };
   /** A picture of a town drawn in the pack, or null where the host serves none. */
   readonly picture: string | null;
+  /** The version the host offers, its current one; absent where the sheet need not name it. */
+  readonly version?: number;
+  /** The host's note on what this version changed, for a person; null or absent for none. */
+  readonly changes?: string | null;
+}
+
+/** The earlier version of an offered pack a world is drawn in now. */
+export interface EarlierLook {
+  readonly packId: string;
+  readonly version: number;
+  /** That version's own picture, or null where it has none. */
+  readonly picture: string | null;
+}
+
+/** How the world is drawn now, where the packs alone cannot say it. */
+export interface LookNow {
+  /** The world is drawn in an earlier version of one of the packs. */
+  readonly earlier?: EarlierLook | null;
+  /** One plain sentence said in the sheet's status line on opening, such as a look the host does not serve. */
+  readonly notice?: string | null;
 }
 
 export interface LookSheet {
   readonly root: HTMLElement;
   /** Show the world itself behind the sheet (true) or the packs' pictures (false). */
   setLive(live: boolean): void;
-  /** The packs, with the one the world is drawn in now (null where none of them). */
-  show(options: readonly LookOption[], current: string | null): void;
+  /**
+   * The packs, with the one the world is drawn in now (null where none of them), and, where it is
+   * an earlier version of one, which.
+   */
+  show(options: readonly LookOption[], current: string | null, now?: LookNow): void;
   focus(): void;
 }
 
@@ -67,9 +94,11 @@ export function buildLookSheet(options: {
   readonly onClose: () => void;
   /**
    * Draw the world behind the sheet in the look being looked at, while a person moves through
-   * them. Given, the sheet opens see-through on the world rather than over a picture of it.
+   * them: `now` true for the look the world is drawn in now, exactly as it is drawn (an earlier
+   * version included), else the option's current version. Given, the sheet opens see-through on
+   * the world rather than over a picture of it.
    */
-  readonly onBrowse?: (option: LookOption) => void;
+  readonly onBrowse?: (option: LookOption, now: boolean) => void;
   /**
    * Words for a sheet that only chooses (a town not made yet): the primary action's words and the
    * caption of the look chosen so far, in place of "Use this look" and "Now".
@@ -110,33 +139,67 @@ export function buildLookSheet(options: {
     strip,
   ]);
 
+  /**
+   * One card in the strip: a pack at its current version, or the earlier version the world is
+   * drawn in now (`earlier`), which can be kept but not used again.
+   */
+  interface Card {
+    readonly option: LookOption;
+    readonly earlier: EarlierLook | null;
+    /** The pack's place among the packs, counted from 1, shared by both versions of one. */
+    readonly place: number;
+  }
   let shown: readonly LookOption[] = [];
+  let entries: readonly Card[] = [];
   let live = options.onBrowse !== undefined;
   root.dataset['live'] = String(live);
   let current: string | null = null;
+  let earlier: EarlierLook | null = null;
   let chosen = 0;
   let busy = false;
   const cards: HTMLButtonElement[] = [];
 
+  /** Whether a card is the look the world is drawn in now. */
+  const isNowCard = (card: Card): boolean => card.option.packId === current && (earlier === null || card.earlier !== null);
+  /** The version words a card's look is named by, where the world is in an earlier version of its pack. */
+  const versioned = (card: Card): boolean => earlier !== null && card.option.packId === earlier.packId;
+  const nowWords = (): string => {
+    const now = entries.find(isNowCard);
+    if (now === undefined) return 'Back to the world';
+    return now.earlier !== null ? `Keep version ${now.earlier.version}` : `Keep ${now.option.title}`;
+  };
+
   const render = (): void => {
-    const option = shown[chosen];
-    if (option === undefined) return;
-    const now = shown.find((held) => held.packId === current) ?? null;
-    setText(overline, `Look ${chosen + 1} of ${shown.length}`);
+    const card = entries[chosen];
+    if (card === undefined) return;
+    const option = card.option;
+    setText(overline, `Look ${card.place} of ${shown.length}`);
     setText(title, option.title);
-    setText(about, option.description);
-    const isNow = option.packId === current;
+    const isNow = isNowCard(card);
+    // A pack whose earlier version the world keeps says which version each card is, and what the
+    // newer one changed, under its own words.
+    const versionLine = !versioned(card) || earlier === null ? null : [
+      ...(card.earlier === null ? [] : [`This world is drawn in version ${card.earlier.version}.`]),
+      option.version === undefined ? 'A newer version is here.' : `Version ${option.version} is here.`,
+      ...(option.changes == null ? [] : [option.changes]),
+    ].join(' ');
+    replace(about, versionLine === null ? [option.description] : [
+      option.description, el('span', { class: 'look-sheet-version', text: versionLine }),
+    ]);
     use.hidden = isNow;
     use.disabled = busy;
-    use.querySelector('span')!.textContent = busy ? 'Working…' : options.choosing?.use ?? 'Use this look';
-    keep.querySelector('span')!.textContent = isNow ? `Keep ${option.title}` : now === null ? 'Back to the world' : `Keep ${now.title}`;
+    use.querySelector('span')!.textContent = busy ? 'Working…'
+      : versioned(card) && option.version !== undefined ? `Use version ${option.version}`
+        : options.choosing?.use ?? 'Use this look';
+    keep.querySelector('span')!.textContent = nowWords();
     replace(meta, [
       el('span', { text: licenceWords(option.licence) }),
       ...(option.authors.length === 0 ? [] : [el('span', { text: authorWords(option.authors) })]),
       el('span', { text: 'Your streets, people and history stay as they are' }),
     ]);
-    replace(backdrop, live || option.picture === null ? [] : [el('img', { src: option.picture, alt: '', decoding: 'async' })]);
-    backdrop.hidden = live || option.picture === null;
+    const picture = card.earlier !== null ? card.earlier.picture : option.picture;
+    replace(backdrop, live || picture === null ? [] : [el('img', { src: picture, alt: '', decoding: 'async' })]);
+    backdrop.hidden = live || picture === null;
     cards.forEach((card, index) => card.setAttribute('aria-selected', String(index === chosen)));
   };
 
@@ -145,12 +208,12 @@ export function buildLookSheet(options: {
   let browseTimer: number | null = null;
   const browse = (): void => {
     if (browseTimer !== null) window.clearTimeout(browseTimer);
-    const option = shown[chosen];
-    if (!live || options.onBrowse === undefined || option === undefined) return;
-    browseTimer = window.setTimeout(() => { browseTimer = null; options.onBrowse?.(option); }, BROWSE_PAUSE_MS);
+    const card = entries[chosen];
+    if (!live || options.onBrowse === undefined || card === undefined) return;
+    browseTimer = window.setTimeout(() => { browseTimer = null; options.onBrowse?.(card.option, isNowCard(card)); }, BROWSE_PAUSE_MS);
   };
   const choose = (index: number): void => {
-    const next = Math.min(shown.length - 1, Math.max(0, index));
+    const next = Math.min(entries.length - 1, Math.max(0, index));
     const moved = next !== chosen;
     chosen = next;
     render();
@@ -158,13 +221,13 @@ export function buildLookSheet(options: {
   };
 
   const run = async (): Promise<void> => {
-    const option = shown[chosen];
-    if (option === undefined || busy || option.packId === current) return;
+    const card = entries[chosen];
+    if (card === undefined || busy || isNowCard(card)) return;
     busy = true;
     status.textContent = '';
     render();
     try {
-      status.textContent = await options.onUse(option, (words) => { status.textContent = words; });
+      status.textContent = await options.onUse(card.option, (words) => { status.textContent = words; });
     } finally {
       busy = false;
       render();
@@ -195,29 +258,41 @@ export function buildLookSheet(options: {
 
   return {
     root,
-    show(next, now) {
+    show(next, now, how) {
       shown = next;
       current = now;
+      earlier = how?.earlier != null && how.earlier.packId === now && next.some((option) => option.packId === now) ? how.earlier : null;
+      // The earlier version the world keeps comes just before its pack's current version.
+      entries = next.flatMap((option, index): Card[] => {
+        const pack: Card = { option, earlier: null, place: index + 1 };
+        return earlier !== null && option.packId === earlier.packId ? [{ option, earlier, place: index + 1 }, pack] : [pack];
+      });
       cards.length = 0;
-      replace(strip, next.map((option, index) => {
-        const card = el('button', {
-          type: 'button', role: 'option', class: 'look-sheet-card', 'data-pack-id': option.packId,
+      replace(strip, entries.map((card, index) => {
+        const picture = card.earlier !== null ? card.earlier.picture : card.option.picture;
+        const caption = isNowCard(card)
+          ? card.earlier !== null ? `Now · version ${card.earlier.version}` : options.choosing?.now ?? 'Now'
+          : versioned(card) && card.option.version !== undefined ? `Version ${card.option.version}` : `Look ${card.place}`;
+        const button = el('button', {
+          type: 'button', role: 'option', class: 'look-sheet-card', 'data-pack-id': card.option.packId,
+          ...(card.earlier === null ? {} : { 'data-version': String(card.earlier.version) }),
         }, [
           // A pack with no picture has no picture box: never a stand-in.
-          ...(option.picture === null ? [] : [el('span', { class: 'look-sheet-picture', 'aria-hidden': 'true' }, [
-            el('img', { src: option.picture, alt: '', loading: 'lazy', decoding: 'async' }),
+          ...(picture === null ? [] : [el('span', { class: 'look-sheet-picture', 'aria-hidden': 'true' }, [
+            el('img', { src: picture, alt: '', loading: 'lazy', decoding: 'async' }),
           ])]),
-          el('span', { class: 'look-sheet-caption', text: option.packId === now ? options.choosing?.now ?? 'Now' : `Look ${index + 1}` }),
-          el('span', { class: 'look-sheet-card-title', text: option.title }),
+          el('span', { class: 'look-sheet-caption', text: caption }),
+          el('span', { class: 'look-sheet-card-title', text: card.option.title }),
         ]) as HTMLButtonElement;
-        card.addEventListener('focus', () => choose(index));
-        card.addEventListener('click', () => choose(index));
-        cards.push(card);
-        return card;
+        button.addEventListener('focus', () => choose(index));
+        button.addEventListener('click', () => choose(index));
+        cards.push(button);
+        return button;
       }));
       // Opening on the look drawn now draws nothing new.
-      const at = next.findIndex((option) => option.packId === now);
+      const at = entries.findIndex(isNowCard);
       chosen = at < 0 ? 0 : at;
+      if (how?.notice != null) status.textContent = how.notice;
       render();
     },
     focus() {

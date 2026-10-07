@@ -75,6 +75,8 @@
 #shell section.look-sheet .look-sheet-lede { align-self: center; max-width: 36rem; display: grid; gap: 1rem; }
 #shell section.look-sheet .look-sheet-title { margin: 0; font: 200 clamp(2.4rem, 5vw, 3.5rem)/1.05 var(--font-display); letter-spacing: -0.02em; }
 #shell section.look-sheet .look-sheet-about { margin: 0; max-width: 30rem; font-size: 1rem; line-height: 1.6; color: var(--color-text-muted); }
+/* Which version of the pack, where the world keeps an earlier one: said once, in the text colour. */
+#shell section.look-sheet .look-sheet-version { display: block; margin-top: 0.6rem; color: var(--color-text); }
 #shell section.look-sheet .look-sheet-actions { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 0.4rem; }
 #shell section.look-sheet .look-sheet-actions > button[type='button'] {
   display: inline-flex;

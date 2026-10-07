@@ -1242,15 +1242,16 @@ async function mount(): Promise<void> {
   });
   let library: Promise<LookLibrary> | null = null;
   const lookLibrary = (): Promise<LookLibrary> => (library ??= readLookLibrary(lookAccess!));
-  let defaultLook: string | null = null;
-  /** The pack this world is drawn in: the one its appearance names, else the host's default. */
-  const currentLook = (): string | null => state.worldStyleConnection?.state.current.stylePack?.packId ?? defaultLook;
+  /** The exact pack this world's appearance names, by digest; null for none, which is the host's default. */
+  const boundLook = (): WorldStylePackBinding | null => state.worldStyleConnection?.state.current.stylePack ?? null;
   const reflectLook = (): void => {
     if (!lookOffered) { appearance.options.setLook(null); return; }
     void lookLibrary().then(
-      (looks) => {
-        defaultLook = looks.defaultId;
-        appearance.options.setLook(looks.options.find((option) => option.packId === currentLook())?.title ?? null);
+      async (looks) => {
+        const now = await looks.now(boundLook());
+        const title = looks.options.find((option) => option.packId === now.packId)?.title ?? null;
+        const earlier = now.how.earlier ?? null;
+        appearance.options.setLook(title === null || earlier === null ? title : `${title}, version ${earlier.version}`);
       },
       () => { library = null; appearance.options.setLook(null); },
     );
@@ -1258,9 +1259,10 @@ async function mount(): Promise<void> {
   reflectLook();
   openLook = async () => {
     let looks: LookLibrary;
+    let now: Awaited<ReturnType<LookLibrary['now']>>;
     try {
       looks = await lookLibrary();
-      defaultLook = looks.defaultId;
+      now = await looks.now(boundLook());
     } catch {
       library = null;
       appearance.options.reportWorldLifecycle('failed', 'The looks this server offers could not be read. Try again in a moment.');
@@ -1270,43 +1272,46 @@ async function mount(): Promise<void> {
     shell.querySelector('section.look-sheet')?.remove();
     const offered = looks.options;
     const bindingOf = (packId: string): WorldStylePackBinding | null => looks.binding(packId);
-    // The look drawn behind the sheet while a person browses, when it is not the world's own.
-    let browsed: string | null = null;
+    // Whether the world behind the sheet is drawn in a look other than its own, from browsing.
+    let browsedAway = false;
     const sheet = buildLookSheet({
       worldTitle: state.activeWorldEntry?.title ?? 'This world',
-      onBrowse: (option) => {
-        browsed = option.packId;
-        void redrawWorldLook(bindingOf(option.packId)).then((done) => {
+      onBrowse: (option, isNow) => {
+        browsedAway = !isNow;
+        // The look drawn now is drawn exactly as the world names it, an earlier version included;
+        // any other at the version the host offers now.
+        void redrawWorldLook(isNow ? boundLook() : bindingOf(option.packId)).then((done) => {
           // A world that cannot be drawn in another look while open is shown by its pictures.
           if (!done.drawn) sheet.setLive(false);
         });
       },
       onUse: async (option, say) => {
         const binding = bindingOf(option.packId)!;
+        // Moving from an earlier version of the same pack is said by its number.
+        const named = now.how.earlier?.packId === option.packId ? `version ${binding.version} of ${option.title}` : option.title;
         const result = await appearance.useStylePack(binding);
         if (!result.saved) return result.words;
-        browsed = null;
-        sheet.show(offered, currentLook());
+        browsedAway = false;
+        now = await looks.now(boundLook());
+        sheet.show(offered, now.packId, now.how);
         reflectLook();
         // Saving names the pack; drawing the open world in it is the redraw's (LOOK's
         // composition/world-look-redraw.ts), which keeps the old look up until the new one is ready.
-        say(`${result.words} Drawing the world in ${option.title}…`);
+        say(`${result.words} Drawing the world in ${named}…`);
         const drawn = await redrawWorldLook(binding);
         return drawn.drawn
-          ? `${result.words} The world is now drawn in ${option.title}.`
-          : `${result.words} It could not be drawn now${drawn.reason === null ? '' : ` (${drawn.reason})`}, so it is drawn in ${option.title} the next time the world opens.`;
+          ? `${result.words} The world is now drawn in ${named}.`
+          : `${result.words} It could not be drawn now${drawn.reason === null ? '' : ` (${drawn.reason})`}, so it is drawn in ${named} the next time the world opens.`;
       },
       onClose: () => {
-        // Leaving without Use puts the world back in its own look.
-        if (browsed !== null && browsed !== currentLook()) {
-          void redrawWorldLook(state.worldStyleConnection?.state.current.stylePack ?? null);
-        }
+        // Leaving without Use puts the world back in its own look, exactly the version it names.
+        if (browsedAway) void redrawWorldLook(boundLook());
         sheet.root.remove();
         canvas.focus({ preventScroll: true });
       },
     });
     shell.append(sheet.root);
-    sheet.show(offered, currentLook());
+    sheet.show(offered, now.packId, now.how);
     sheet.focus();
   };
 

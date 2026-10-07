@@ -245,7 +245,13 @@ Escape goes back, and the world under the sheet takes no key while it is open. T
 see-through on the world itself: resting on a look draws the open world in it behind the sheet
 (`redrawWorldLook`, a re-attach of the tiles already loaded), and leaving without Use puts the world
 back in its own look; a world that cannot be redrawn while open is shown by the packs' pictures
-instead. Using a look saves
+instead. A world drawn in an earlier version of a pack the host still serves (matched by the digest
+its appearance names, `listedVersion`) keeps it: the sheet shows that version as Now, its own card
+with its own picture, just before the pack's current version, which says the version it is and the
+host's note on what changed (`changes` on the list entry) and is offered as Use version N. Resting
+on the Now card draws the world exactly as it is drawn now, and resting on the current version draws
+the world in it. A world naming a pack the host does not list marks nothing Now and says that it is
+drawn in its plain tiles. Using a look saves
 a new version of the world's appearance through the same preview and Apply as any change in Design
 (`useStylePack` in `composition/appearance.ts`): a change already open in Design is decided there
 first, and a design another writer changed meanwhile is never saved over, so the person is asked to
