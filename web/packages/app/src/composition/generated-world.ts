@@ -313,6 +313,11 @@ export function switchableWorld(
         for (const listener of listeners) listener();
         stated(next.look);
         return result(next.look.drawn, null);
+      }).then((done) => {
+        // Every redraw states what it drew, however it was asked: through `redrawWorldLook`
+        // (the Look sheet's Use) or through the shell's event.
+        shell.setAttribute(WORLD_LOOK_REDRAW_ATTRIBUTE, JSON.stringify(done));
+        return done;
       });
       queue = run;
       return run;
@@ -320,9 +325,7 @@ export function switchableWorld(
   };
   const onRedraw = (event: Event): void => {
     const detail = (event as CustomEvent<WorldStylePackBinding | null>).detail ?? null;
-    void redrawable.redraw(detail).then((done) => {
-      shell.setAttribute(WORLD_LOOK_REDRAW_ATTRIBUTE, JSON.stringify(done));
-    });
+    void redrawable.redraw(detail);
   };
   return {
     bodies: () => current.bodies(),

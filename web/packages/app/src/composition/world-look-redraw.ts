@@ -12,8 +12,9 @@
  * another, in the order they were asked for.
  *
  * Any part of the page may also ask by dispatching `WORLD_LOOK_REDRAW_EVENT` on the shell with the
- * pack as the event's detail; the shell's `data-world-look` attribute then states the look drawn,
- * and `WORLD_LOOK_REDRAW_ATTRIBUTE` the redraw's own result, its time included.
+ * pack as the event's detail. However a redraw is asked, the shell's `data-world-look` attribute
+ * then states the look drawn, and `WORLD_LOOK_REDRAW_ATTRIBUTE` the redraw's own result, its time
+ * included.
  * Nothing here changes what the world's appearance names: that is the appearance's own Apply.
  */
 
@@ -21,7 +22,7 @@ import type { WorldStylePackBinding } from '../world-style-api.js';
 
 /** The event a part of the page dispatches on the shell to redraw the open world in a pack. */
 export const WORLD_LOOK_REDRAW_EVENT = 'exulanica:world-look-redraw';
-/** States, on the shell, what the last redraw an event asked for drew and how long it took. */
+/** States, on the shell, what the last redraw drew and how long it took, however it was asked. */
 export const WORLD_LOOK_REDRAW_ATTRIBUTE = 'data-world-look-redraw';
 
 /** What a redraw drew. */

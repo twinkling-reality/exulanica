@@ -56,6 +56,8 @@ describe('redrawing the open world in another pack', () => {
     expect(done).toMatchObject({ pack: TOON.packId, source: 'redraw', drawn: true, reason: null });
     expect(done.elapsedMs).toBeGreaterThanOrEqual(0);
     expect(stated).toEqual([{ pack: TOON.packId, source: 'redraw', drawn: true, reason: null }]);
+    // Asked directly, as the Look sheet asks, the redraw states its result on the shell too.
+    expect(JSON.parse(shell.getAttribute('data-world-look-redraw') ?? 'null')).toEqual(done);
     expect(mounted.bodies()).not.toBeNull();
     expect(attachment.metrics).toEqual({ lookId: TOON.packId });
     attachment.dispose();
