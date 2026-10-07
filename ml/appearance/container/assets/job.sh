@@ -2,10 +2,14 @@
 # The entry of a generated asset job on Nebius Serverless AI, run from the bucket mount by the image
 # python:3.12-slim-bookworm pinned by digest (the submit command names it).
 #
-#   sh /mnt/data/runs/<job sha256>/job.sh
+#   sh /mnt/data/runs/<job or session sha256>/job.sh
 #
-# Environment, set by the submit command: ROUTE (A or B), JOB (the job record's sha256), CODE_SHA256
-# (the staged code archive's) and STOP_SECONDS (the job record's stop). Nothing here reads a credential: the bucket arrives as a mount.
+# Environment, set by the submit command: ROUTE (A or B), JOB (the job record's sha256, or in a
+# session the session record's), CODE_SHA256 (the staged code archive's), STOP_SECONDS (the job
+# record's stop, or the session's hard stop) and MODE: "job" runs one staged job; "session" loads
+# the route once and serves the bucket's queue until its idle stop, a stop marker or its hard stop
+# (exulanica_appearance/assets/session.py). Nothing here reads a credential: the bucket arrives as
+# a mount.
 set -eu
 # The job record's stop (150 per cent of its estimate) bounds the whole job, setup included; the
 # service's own timeout is at least an hour and is only the backstop.
@@ -20,6 +24,8 @@ run="$data/runs/$JOB"
 work=/opt/work
 mkdir -p "$work/out"
 case "$ROUTE" in A|B) ;; *) echo "ROUTE is A or B" >&2; exit 2 ;; esac
+mode=${MODE:-job}
+case "$mode" in job|session) ;; *) echo "MODE is job or session" >&2; exit 2 ;; esac
 # File names are lower case, and the job's file system tells the cases apart.
 route=$(printf '%s' "$ROUTE" | tr AB ab)
 
@@ -44,9 +50,14 @@ publish() {
   PYTHONPATH="$code:$code/ml/appearance" python -m exulanica_appearance assets remote publish \
     --source "$work/out" --target "$data/out" --ledger "$work/published.txt"
 }
-( while sleep 60; do publish > /dev/null || echo "publish failed" >&2; done ) &
-publisher=$!
-trap 'kill "$publisher" 2>/dev/null; echo "phase publish $(date -u +%Y-%m-%dT%H:%M:%SZ)"; publish || true' EXIT
+# A session publishes each batch itself before marking it done, so only a single job needs the
+# minute loop.
+publisher=""
+if [ "$mode" = job ]; then
+  ( while sleep 60; do publish > /dev/null || echo "publish failed" >&2; done ) &
+  publisher=$!
+fi
+trap '[ -n "$publisher" ] && kill "$publisher" 2>/dev/null; echo "phase publish $(date -u +%Y-%m-%dT%H:%M:%SZ)"; publish || true' EXIT
 trap 'exit 143' TERM
 
 echo "phase prepare $(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -63,7 +74,13 @@ case "$ROUTE" in
   A) upstream="/opt/upstream/trellis:/opt/upstream/utils3d" ;;
   B) upstream="/opt/upstream/step1x" ;;
 esac
-PYTHONPATH="$standins:$upstream:$code:$code/ml/appearance" python -m exulanica_appearance assets remote run \
-  --code "$code" --route "$ROUTE" --job "$run/job.json" --requests "$run/requests" \
-  --weights "$work/weights" --cutouts "$data/out/inputs" --out "$work/out"
+if [ "$mode" = session ]; then
+  PYTHONPATH="$standins:$upstream:$code:$code/ml/appearance" python -m exulanica_appearance assets session serve \
+    --code "$code" --route "$ROUTE" --session "$run/session.json" --code-sha256 "$CODE_SHA256" \
+    --root "$data" --weights "$work/weights" --work "$work/out" --ledger "$work/published.txt"
+else
+  PYTHONPATH="$standins:$upstream:$code:$code/ml/appearance" python -m exulanica_appearance assets remote run \
+    --code "$code" --route "$ROUTE" --job "$run/job.json" --requests "$run/requests" \
+    --weights "$work/weights" --cutouts "$data/out/inputs" --out "$work/out"
+fi
 echo "phase done $(date -u +%Y-%m-%dT%H:%M:%SZ)"

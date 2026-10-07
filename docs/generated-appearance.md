@@ -521,10 +521,32 @@ job without creating it; the bucket key is read from its file in one process and
 command in that command's environment only, never on a command line. Route A's colour comes from TRELLIS's Gaussians; route
 B's is a prototype projection of the cut-out seen from the front, approximate by construction.
 
+**The warm session** (built, not yet run on a rented machine). A cold job spends about 11 minutes
+starting, installing and fetching weights before its first piece, while a piece itself takes 8 to 10
+seconds. A session is one Serverless AI job (`MODE=session` in `job.sh`) that loads its route once
+and serves batches from the bucket until it has had no ready batch for its idle stop (10 minutes by
+default), finds a stop marker, or reaches its hard stop (at most one hour). The bucket carries data
+only: a batch is a job record and its request documents in `queue/<job sha256>/`, with `ready.json`
+copied last naming every other file by digest. The session reads an entry with the same strict
+readers a single job uses and refuses, without running anything, an entry holding any other file, a
+symbolic link, a file whose digest differs, a request its job does not name, an item that starts
+from a cut-out, or a job naming another code archive than the one the session was started with and
+`job.sh` checked. It takes the oldest ready entry nobody has claimed, but never one whose own stop
+would carry it past its hard stop; writes `claimed/<job>.json`; runs the batch; publishes the
+outputs; then writes `done/<job>.json` with each request's milliseconds. A heartbeat file is written
+every 30 seconds. On this Mac, `python -m exulanica_appearance assets session record | stage |
+start | submit | status | stop | fetch | charges` makes the session record, stages it, starts it
+inside the allocated bound, queues a batch (refused when any of its requests already has a receipt
+for every variant under the same cache key), reads the latest heartbeat, writes the stop marker,
+fetches what the session wrote, and turns the done markers into charge lines. A run record of
+profile `exulanica.appearance-gpu-run/v2` carries those lines: each request's milliseconds at the
+listed rate, rounded up, and the account it is charged to; the rest of the session's cost is start-up,
+loading and idle time. The session serves route A; the creature route joins it when that route lands.
 
 **Planned, not built:** the operator's choice of route from the blind side-by-side pictures, route
 B's zero-area refusals, pieces that fill a thin box (gates, benches, lamp posts), a shopfront
 request shaped for a shallow fill slot, the admission's `generated` rights
-basis, the generation queue under the spending authority, and the Companion's offer of new pieces
-for a pack.
+basis, a measured session run (how soon a file written from this Mac appears in the mount's listing,
+and memory with two routes loaded), the product's own writer to the queue under the spending
+authority, and the Companion's offer of new pieces for a pack.
 

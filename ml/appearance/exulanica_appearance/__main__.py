@@ -393,6 +393,121 @@ def _assets_nebius(args: argparse.Namespace) -> int:
     return 0
 
 
+def session_queue_idle() -> int:
+    from exulanica_appearance.assets.queue import IDLE_SECONDS_DEFAULT
+
+    return IDLE_SECONDS_DEFAULT
+
+
+def _assets_session(args: argparse.Namespace) -> int:
+    from exulanica_appearance.assets import queue as session_queue
+
+    if args.step == "serve":
+        from exulanica_appearance.assets.remote import backend_for, publish
+        from exulanica_appearance.assets.session import serve
+
+        root, work, ledger = Path(args.root), Path(args.work), Path(args.ledger)
+        result: object = serve(
+            root=root,
+            session_raw=Path(args.session).read_bytes(),
+            code_sha256=args.code_sha256,
+            backend=backend_for(args.route, Path(args.weights)),
+            repository=Path(args.code),
+            work=work,
+            publish=lambda: publish(work, root / "out", ledger),
+        )
+        print(json.dumps(result, indent=1, sort_keys=True))
+        return 0
+    from exulanica_appearance.assets import nebius
+
+    if args.step == "record":
+        from exulanica_appearance.canonical import sha256_hex
+
+        raw = session_queue.build_session(
+            route=args.route,
+            code_sha256=sha256_hex(nebius.code_archive(Path(args.repository))),
+            idle_seconds=args.idle,
+            stop_seconds=args.stop,
+        )
+        Path(args.out).write_bytes(raw)
+        result = {"session_sha256": sha256_hex(raw), **session_queue.read_session(raw)}
+    elif args.step == "stage":
+        result = nebius.session_stage(
+            repository=Path(args.repository),
+            session_raw=Path(args.session).read_bytes(),
+            bucket=args.bucket,
+            region=args.region,
+        )
+    elif args.step == "start":
+        from exulanica_appearance.canonical import sha256_hex
+
+        raw = Path(args.session).read_bytes()
+        session = session_queue.read_session(raw)
+        result = nebius.submit(
+            route=session["route"],
+            job_sha256=sha256_hex(raw),
+            code_sha256=session["code_sha256"],
+            bucket_id=args.bucket_id,
+            subnet_id=args.subnet_id,
+            platform=args.platform,
+            preset=args.preset,
+            timeout_seconds=session["stop_seconds"],
+            rate_cents_per_hour=args.rate_cents,
+            bound_cents=args.bound_cents,
+            preemptible=False,
+            profile=args.profile,
+            dry_run=args.dry_run,
+            mode="session",
+        )
+    elif args.step == "submit":
+        from datetime import UTC, datetime
+
+        from exulanica_pieces.geometry.postprocess import POSTPROCESS_VERSION
+        from exulanica_pieces.records import read_job
+
+        job_raw = Path(args.job).read_bytes()
+        job = read_job(job_raw)
+        requests = [path.read_bytes() for path in sorted(Path(args.requests).glob("*.json"))]
+        receipts = {
+            path.name: path.read_bytes() for path in sorted(Path(args.receipts).glob("*.json"))
+        }
+        kept = session_queue.uncached_requests(
+            requests,
+            components_sha256=job["components_sha256"],
+            postprocess_version=POSTPROCESS_VERSION,
+            receipts=receipts,
+        )
+        if len(kept) != len(requests):
+            raise Refused(
+                f"{len(requests) - len(kept)} of the job's requests are already made under the "
+                "same cache key; build the job without them"
+            )
+        result = nebius.queue(
+            job_raw=job_raw,
+            requests=requests,
+            bucket=args.bucket,
+            region=args.region,
+            queued_at=datetime.now(UTC),
+        )
+    elif args.step == "status":
+        result = nebius.session_status(
+            session_sha256=args.session_sha256, bucket=args.bucket, region=args.region
+        )
+    elif args.step == "stop":
+        result = nebius.session_stop(
+            session_sha256=args.session_sha256, bucket=args.bucket, region=args.region
+        )
+    elif args.step == "charges":
+        done = [path.read_bytes() for path in sorted(Path(args.done).glob("*.json"))]
+        result = session_queue.charges_from_done(
+            done, session_sha256=args.session_sha256, account=args.account
+        )
+    else:
+        result = nebius.session_fetch(bucket=args.bucket, region=args.region, out=Path(args.out))
+    print(json.dumps(result, indent=1, sort_keys=True) if not isinstance(result, str) else result)
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m exulanica_appearance")
     groups = parser.add_subparsers(dest="group", required=True)
@@ -541,6 +656,43 @@ def main(argv: list[str] | None = None) -> int:
     on_nebius.required = True
     for command in on_nebius.choices.values():
         command.set_defaults(run=_assets_nebius)
+
+    on_session = assets.add_parser("session").add_subparsers(dest="step", required=True)
+    session_serve = on_session.add_parser("serve")
+    for name in (
+        "--code", "--route", "--session", "--code-sha256", "--root", "--weights", "--work",
+        "--ledger",
+    ):  # fmt: skip
+        session_serve.add_argument(name, required=True)
+    session_record = on_session.add_parser("record")
+    for name in ("--repository", "--route", "--out"):
+        session_record.add_argument(name, required=True)
+    session_record.add_argument("--idle", type=int, default=session_queue_idle())
+    session_record.add_argument("--stop", type=int, required=True)
+    session_stage = on_session.add_parser("stage")
+    for name in ("--repository", "--session", "--bucket", "--region"):
+        session_stage.add_argument(name, required=True)
+    session_start = on_session.add_parser("start")
+    for name in ("--session", "--bucket-id", "--subnet-id", "--platform", "--preset", "--profile"):
+        session_start.add_argument(name, required=True)
+    session_start.add_argument("--rate-cents", type=int, required=True)
+    session_start.add_argument("--bound-cents", type=int, required=True)
+    session_start.add_argument("--dry-run", action="store_true")
+    session_submit = on_session.add_parser("submit")
+    for name in ("--job", "--requests", "--receipts", "--bucket", "--region"):
+        session_submit.add_argument(name, required=True)
+    for step in ("status", "stop"):
+        command = on_session.add_parser(step)
+        for name in ("--session-sha256", "--bucket", "--region"):
+            command.add_argument(name, required=True)
+    session_fetch = on_session.add_parser("fetch")
+    for name in ("--bucket", "--region", "--out"):
+        session_fetch.add_argument(name, required=True)
+    session_charges = on_session.add_parser("charges")
+    for name in ("--done", "--session-sha256", "--account"):
+        session_charges.add_argument(name, required=True)
+    for command in on_session.choices.values():
+        command.set_defaults(run=_assets_session)
 
     args = parser.parse_args(argv)
     try:

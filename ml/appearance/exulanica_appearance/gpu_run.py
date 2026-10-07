@@ -7,6 +7,11 @@ purpose, and the generation records it produced. The reader holds the arithmetic
 the interval, cost is rate times seconds rounded up to a micro-dollar, and a run that passed its stop
 must say why.
 
+A ``v2`` record is a ``v1`` record with ``charges``: one line per request a warm session served,
+its job, its milliseconds (the sum of its items' own times) and their cost at the same rate, rounded
+up, and the account it is charged to. What the charges leave of the run's cost (start-up, loading,
+idle polling) belongs to whoever started the session.
+
 The listed rate times the billed seconds is an estimate of the bill. The provider's billing page,
 read by the operator, is the only authoritative total, and the record says so.
 """
@@ -30,8 +35,10 @@ from exulanica_appearance.canonical import (
 __all__ = [
     "AUTHORITATIVE",
     "GPU_RUN_PROFILE",
+    "GPU_RUN_PROFILE_V2",
     "build_gpu_run",
     "ceiling_seconds",
+    "charge_microdollars",
     "cost_microdollars",
     "document_section",
     "ledger_line",
@@ -39,6 +46,14 @@ __all__ = [
 ]
 
 GPU_RUN_PROFILE: Final = "exulanica.appearance-gpu-run/v1"
+GPU_RUN_PROFILE_V2: Final = "exulanica.appearance-gpu-run/v2"
+_CHARGE_KEYS: Final = (
+    "account",
+    "cost_microdollars",
+    "job_sha256",
+    "milliseconds",
+    "request_sha256",
+)
 AUTHORITATIVE: Final = "the provider's billing page, read by the operator"
 _INSTANT: Final = "%Y-%m-%dT%H:%M:%SZ"
 _KEYS: Final = (
@@ -70,6 +85,11 @@ def cost_microdollars(rate_cents_per_hour: int, seconds: int) -> int:
     return -(-numerator // 3600)
 
 
+def charge_microdollars(rate_cents_per_hour: int, milliseconds: int) -> int:
+    """Rate times milliseconds, in millionths of a dollar, rounded up."""
+    return -(-rate_cents_per_hour * 10_000 * milliseconds // 3_600_000)
+
+
 def ceiling_seconds(ceiling_cents: int, rate_cents_per_hour: int) -> int:
     """The most seconds a ceiling buys at a rate, rounded down, so a run cannot pass it by a second."""
     if ceiling_cents < 0 or rate_cents_per_hour < 1:
@@ -88,6 +108,20 @@ def build_gpu_run(document: dict[str, Any]) -> bytes:
     full["stop_at_seconds"] = full["estimate_seconds"] * 3 // 2
     full["generations"] = sorted(full["generations"])
     full["authoritative_total"] = AUTHORITATIVE
+    if "charges" in full:
+        full["profile"] = GPU_RUN_PROFILE_V2
+        full["charges"] = sorted(
+            (
+                dict(
+                    charge,
+                    cost_microdollars=charge_microdollars(
+                        full["rate_cents_per_hour"], charge["milliseconds"]
+                    ),
+                )
+                for charge in full["charges"]
+            ),
+            key=lambda charge: (charge["job_sha256"], charge["request_sha256"]),
+        )
     raw = canonical_bytes(full)
     read_gpu_run(raw)
     return raw
@@ -95,9 +129,11 @@ def build_gpu_run(document: dict[str, Any]) -> bytes:
 
 def read_gpu_run(raw: bytes) -> dict[str, Any]:
     where = "the GPU run record"
-    document = exact_keys(parse_canonical(raw, where), _KEYS, where)
-    if document["profile"] != GPU_RUN_PROFILE:
-        raise Refused(f"{where}: profile is {GPU_RUN_PROFILE}")
+    parsed = parse_canonical(raw, where)
+    v2 = isinstance(parsed, dict) and parsed.get("profile") == GPU_RUN_PROFILE_V2
+    document = exact_keys(parsed, (*_KEYS, "charges") if v2 else _KEYS, where)
+    if document["profile"] not in (GPU_RUN_PROFILE, GPU_RUN_PROFILE_V2):
+        raise Refused(f"{where}: profile is {GPU_RUN_PROFILE} or {GPU_RUN_PROFILE_V2}")
     for key in ("provider", "instance_type", "instance_name", "gpu", "rate_source", "purpose"):
         if not is_text(document[key]):
             raise Refused(f"{where}: {key} is printable ASCII")
@@ -149,7 +185,31 @@ def read_gpu_run(raw: bytes) -> dict[str, Any]:
         raise Refused(f"{where}: generations are sorted sha256 digests, each once")
     if document["authoritative_total"] != AUTHORITATIVE:
         raise Refused(f"{where}: authoritative_total names {AUTHORITATIVE}")
+    if v2:
+        _check_charges(document, seconds, where)
     return document
+
+
+def _check_charges(document: dict[str, Any], seconds: int, where: str) -> None:
+    charges = document["charges"]
+    if not isinstance(charges, list):
+        raise Refused(f"{where}: charges is a list")
+    keys = []
+    for index, value in enumerate(charges):
+        at = f"{where}: charges[{index}]"
+        charge = exact_keys(value, _CHARGE_KEYS, at)
+        if not is_sha256(charge["job_sha256"]) or not is_sha256(charge["request_sha256"]):
+            raise Refused(f"{at} names a job and a request by sha256")
+        if not is_text(charge["account"]) or not is_count(charge["milliseconds"]):
+            raise Refused(f"{at} states its account and its whole milliseconds")
+        expected = charge_microdollars(document["rate_cents_per_hour"], charge["milliseconds"])
+        if charge["cost_microdollars"] != expected:
+            raise Refused(f"{at}: cost_microdollars is the rate times its milliseconds, rounded up")
+        keys.append((charge["job_sha256"], charge["request_sha256"]))
+    if keys != sorted(set(keys)):
+        raise Refused(f"{where}: charges are sorted by job and request, each once")
+    if sum(charge["milliseconds"] for charge in charges) > seconds * 1000:
+        raise Refused(f"{where}: the charges' milliseconds fit inside the billed seconds")
 
 
 def ledger_line(raw: bytes) -> str:
@@ -231,7 +291,7 @@ def document_section(
     lines += [
         "",
         (
-            "The machine-readable record of this run is `exulanica.appearance-gpu-run/v1` with "
+            f"The machine-readable record of this run is `{run['profile']}` with "
             f"{len(run['generations'])} generation records; the cost above is the listed rate times "
             "the billed seconds, and the provider's billing page, read by the operator, is the only "
             "authoritative total."

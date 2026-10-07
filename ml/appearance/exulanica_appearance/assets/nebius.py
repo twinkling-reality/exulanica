@@ -9,6 +9,11 @@
   ``nebius ai job cancel``.
 - ``clear`` and ``usage``: remove everything the bucket holds, and list what it still holds, so
   weights and outputs are not kept (and billed) once fetched.
+- ``session_stage``, ``queue``, ``session_status``, ``session_stop`` and ``session_fetch``: a warm
+  session's record, code and entry script; a batch put in its queue with ``ready.json`` copied
+  last; the session's latest heartbeat; its stop marker; and its outputs and markers
+  (:mod:`exulanica_appearance.assets.queue` holds the layout). A session is submitted like a job,
+  with ``mode="session"``.
 
 The bucket key is the JSON file ``EXULANICA_GEN_S3_KEY_FILE`` names (fields aws_access_key_id,
 aws_secret_access_key, endpoint_url, region, bucket, as the account setup writes it, mode 600).
@@ -25,16 +30,30 @@ import json
 import os
 import subprocess
 import tarfile
+import tempfile
 from collections.abc import Sequence
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Final
 
-from exulanica_pieces.canonical import Refused, sha256_hex
+from exulanica_pieces.canonical import Refused, parse_canonical, sha256_hex
+
+from exulanica_appearance.assets.queue import (
+    BEAT_PROFILE,
+    build_ready,
+    entry_files,
+    read_session,
+)
 
 __all__ = [
     "IMAGE",
     "clear",
     "code_archive",
+    "queue",
+    "session_fetch",
+    "session_stage",
+    "session_status",
+    "session_stop",
     "submit_arguments",
     "usage",
     "worst_case_cents",
@@ -201,10 +220,16 @@ def submit_arguments(
     preemptible: bool,
     profile: str,
     dry_run: bool = False,
+    mode: str = "job",
 ) -> list[str]:
-    """The ``nebius ai job create`` command, or a refusal when the worst case passes the bound."""
+    """The ``nebius ai job create`` command, or a refusal when the worst case passes the bound.
+
+    In ``session`` mode ``job_sha256`` is the session record's digest and ``timeout_seconds`` its
+    hard stop."""
     if route not in ("A", "B"):
         raise Refused("a job on the rented machine takes route A or B")
+    if mode not in ("job", "session"):
+        raise Refused("a submission runs one job or a session")
     # The service's shortest timeout is one hour, so a shorter stop still risks an hour; the
     # job's own stop is enforced inside the job (STOP_SECONDS in job.sh).
     service_timeout = max(timeout_seconds, 3600)
@@ -216,7 +241,7 @@ def submit_arguments(
         )
     command = [
         "nebius", "--profile", profile, "ai", "job", "create",
-        "--name", f"exulanica-gen-{route.lower()}-{job_sha256[:12]}",
+        "--name", f"exulanica-gen-{'session-' if mode == 'session' else ''}{route.lower()}-{job_sha256[:12]}",
         "--image", IMAGE,
         "--platform", platform,
         "--preset", preset,
@@ -229,6 +254,7 @@ def submit_arguments(
         "--env", f"JOB={job_sha256}",
         "--env", f"CODE_SHA256={code_sha256}",
         "--env", f"STOP_SECONDS={timeout_seconds}",
+        "--env", f"MODE={mode}",
         "--container-command", "sh",
         "--args", f"{_MOUNT}/runs/{job_sha256}/job.sh",
         "--async",
@@ -277,3 +303,110 @@ def clear(*, bucket: str, region: str) -> str:
 def usage(*, bucket: str, region: str) -> str:
     """What the bucket still holds, with the totals line the aws CLI prints."""
     return _aws(region, ["s3", "ls", "--recursive", "--summarize", f"s3://{bucket}/"], bucket)
+
+
+def _copy(region: str, bucket: str, files: dict[str, bytes], prefix: str) -> None:
+    """Copy ``files`` (names relative to ``prefix``) to the bucket in one call."""
+    with tempfile.TemporaryDirectory(prefix="exulanica-gen-") as staging:
+        for name, data in files.items():
+            path = Path(staging) / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(data)
+        _aws(
+            region,
+            [
+                "s3",
+                "cp",
+                "--recursive",
+                "--only-show-errors",
+                staging,
+                f"s3://{bucket}/{prefix}",
+            ],
+            bucket,
+        )
+
+
+def session_stage(
+    *, repository: Path, session_raw: bytes, bucket: str, region: str
+) -> dict[str, Any]:
+    """Copy a session's record, the code archive it names and the entry script to
+    ``runs/<session sha256>/``; refused when the archive is not the one the record names."""
+    session = read_session(session_raw)
+    code = code_archive(repository)
+    if sha256_hex(code) != session["code_sha256"]:
+        raise Refused("the session record names another code archive than this tree makes")
+    session_sha256 = sha256_hex(session_raw)
+    _copy(
+        region,
+        bucket,
+        {
+            "code.tar": code,
+            "job.sh": (repository / "ml/appearance/container/assets/job.sh").read_bytes(),
+            "session.json": session_raw,
+        },
+        f"runs/{session_sha256}/",
+    )
+    return {"code_sha256": session["code_sha256"], "session_sha256": session_sha256}
+
+
+def queue(
+    *,
+    job_raw: bytes,
+    requests: Sequence[bytes],
+    bucket: str,
+    region: str,
+    queued_at: datetime,
+) -> dict[str, Any]:
+    """Put a batch in the queue: its job and requests first, then ``ready.json`` in a second copy,
+    so the session never sees a ready entry whose files are not all there."""
+    job_sha256 = sha256_hex(job_raw)
+    prefix = f"queue/{job_sha256}/"
+    _copy(region, bucket, entry_files(job_raw, requests), prefix)
+    _copy(region, bucket, {"ready.json": build_ready(job_raw, requests, queued_at)}, prefix)
+    return {"job_sha256": job_sha256, "requests": len(requests)}
+
+
+def session_stop(*, session_sha256: str, bucket: str, region: str) -> dict[str, Any]:
+    """The stop marker: the session ends at its next poll, after the batch in hand."""
+    _copy(region, bucket, {"stop": b""}, f"session/{session_sha256}/")
+    return {"session_sha256": session_sha256, "stop": "written"}
+
+
+def session_status(*, session_sha256: str, bucket: str, region: str) -> dict[str, Any]:
+    """The session's latest heartbeat, read strictly enough to show, and how many it has written."""
+    listing = _aws(region, ["s3", "ls", f"s3://{bucket}/session/{session_sha256}/"], bucket)
+    beats = sorted(
+        line.split()[-1]
+        for line in listing.splitlines()
+        if line.split() and line.split()[-1].startswith("beat-")
+    )
+    if not beats:
+        return {"beats": 0, "session_sha256": session_sha256}
+    raw = _aws(
+        region, ["s3", "cp", f"s3://{bucket}/session/{session_sha256}/{beats[-1]}", "-"], bucket
+    )
+    beat = parse_canonical(raw.encode("ascii"), "heartbeat")
+    if beat.get("profile") != BEAT_PROFILE or beat.get("session_sha256") != session_sha256:
+        raise Refused("the latest heartbeat is not this session's")
+    return {"beats": len(beats), "latest": beat}
+
+
+def session_fetch(*, bucket: str, region: str, out: Path) -> str:
+    """Everything the session wrote (outputs, claimed and done markers, heartbeats), not the staged
+    code or the queue."""
+    out.mkdir(parents=True, exist_ok=True)
+    return _aws(
+        region,
+        [
+            "s3",
+            "sync",
+            "--only-show-errors",
+            "--exclude",
+            "runs/*",
+            "--exclude",
+            "queue/*",
+            f"s3://{bucket}/",
+            str(out),
+        ],
+        bucket,
+    )

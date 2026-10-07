@@ -20,7 +20,7 @@ from __future__ import annotations
 import io
 import platform
 import time
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Final, Protocol
@@ -100,8 +100,12 @@ def run_job(
     repository: Path,
     out: Path,
     cutouts: Mapping[str, bytes] | None = None,
+    clock: Callable[[], float] = time.monotonic,
 ) -> dict[str, Any]:
-    """Run every item; ``cutouts`` holds cut-outs by sha256 for items that name one."""
+    """Run every item; ``cutouts`` holds cut-outs by sha256 for items that name one.
+
+    Each outcome states the item's own milliseconds from start to end by ``clock``, so a session
+    serving many batches can charge each request what its items took."""
     job = read_job(job_raw)
     if job["route"] != backend.route:
         raise Refused(f"the job takes route {job['route']}, the backend is route {backend.route}")
@@ -120,6 +124,7 @@ def run_job(
             "request_sha256": item["request_sha256"],
             "variant": item["variant"],
         }
+        item_started = clock()
         try:
             seconds = {"concept": 0, "cutout": 0, "mesh": 0, "postprocess": 0}
             inputs = {"colour_table": table_sha256}
@@ -193,6 +198,7 @@ def run_job(
             outcome["refused"] = str(refusal)
         except Exception as error:  # noqa: BLE001 - one item's failure must not lose a paid batch
             outcome["failed"] = f"{type(error).__name__}: {error}"
+        outcome["milliseconds"] = max(0, round((clock() - item_started) * 1000))
         outcomes.append(outcome)
     results = {
         "ended_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
