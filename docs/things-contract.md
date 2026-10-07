@@ -579,7 +579,7 @@ substituted or truncated is read. One figure draws each look kind:
 | Look kind | Drawn as |
 | --- | --- |
 | `catalog_person` | One of the world's people, drawn from the thing's id by the people catalog's draw |
-| `skinned` | The rigged container with its own clips; standing, walking and running blend by ground speed (`rig.ground_speed_mm_per_s`), a clip plays at most twice its pace, and a motion with no clip is drawn idle |
+| `skinned` | The rigged container with its own clips; standing, walking and running blend by ground speed (`rig.ground_speed_mm_per_s`), a clip plays at most twice its pace, and a motion with no clip is drawn idle. A rig with no clips at all, as a creature sculpted for its own plan has, is posed by the same solved gait as `rigid_on_bones`, its skin following its joints; it must rest translation-only with each joint hung from its plan parent's, and is refused by name otherwise |
 | `rigid_on_bones` | The container's `bone:<name>` nodes, each hung from its nearest dressed ancestor in the body plan's parent table, posed procedurally |
 | `light` | An omni light of the look's colour, intensity and radius, a core and a glow, floating 1,250 mm over the thing's point and drifting within its radius (presentation only) |
 | `static` | The container at the thing's place, turned by its placed yaw as an authored object is |

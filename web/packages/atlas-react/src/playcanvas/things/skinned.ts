@@ -10,12 +10,17 @@
  * feet slide (named, never hidden by moving the figure). A motion with no clip falls back to idle,
  * as the body plan says. Over a clip, the arm of a socket that reaches is posed procedurally on the
  * mapped arm bones, and the head nods while the thing speaks.
+ *
+ * A rig with no clips at all (a creature sculpted for its own body plan) is posed as a rigid look is:
+ * each frame the same solved gait (`./motion.ts`) turns its joints, and the skin follows them. Such a
+ * rig must rest translation-only and hang each joint from its plan parent's joint, so a joint's turn
+ * is the solved turn; one that does not is refused by name.
  */
 
 import * as pc from 'playcanvas';
 import type { Grip, SkinnedRig } from './documents.js';
 import { HALF_TURN, bodyCarry, nodeCarry, placeHeld, quat, quatOf, type PickVolume, type ThingFigure, type ThingPose } from './figures.js';
-import { axisAngle, mul, rotate } from './motion.js';
+import { axisAngle, mul, rotate, solvePose } from './motion.js';
 import { dressSkeleton, type BodyPlanEntry, type DressedSkeleton, type Vec3 } from './skeleton.js';
 
 const LOCOMOTION = 'locomotion';
@@ -47,6 +52,10 @@ export class SkinnedFigure implements ThingFigure {
   private readonly holdClip: boolean;
   private previous: readonly [number, number, number] | null = null;
   private speed = 0;
+  /** A rig with no clips, posed by the solved gait; its root joint's rest, local and in the look's frame. */
+  private readonly procedural: { readonly rootLocal: pc.Vec3; readonly rootLook: Vec3 } | null;
+  /** Metres walked, in the look's own units, for the solved gait. */
+  private travelled = 0;
   private time = 0;
   private pending: ThingPose | null = null;
   private readonly scale: number;
@@ -100,6 +109,22 @@ export class SkinnedFigure implements ThingFigure {
     const run = rig.groundSpeedMmPerS['run'];
     this.walkSpeed = walk === undefined ? null : walk / 1000;
     this.runSpeed = run === undefined ? null : run / 1000;
+    this.holdClip = rig.clips['hold'] !== undefined && tracks.has(rig.clips['hold']!);
+    if (Object.keys(rig.clips).length === 0) {
+      for (const bone of this.skeleton.order) {
+        const up = this.skeleton.parentOf.get(bone) ?? null;
+        if (up !== null && this.joints.get(bone)!.parent !== this.joints.get(up)) {
+          throw new TypeError(`A rig with no clips hangs each joint from its plan parent's, and "${rig.bones[bone]}" does not hang from "${rig.bones[up]}".`);
+        }
+        if (Math.abs(this.restLocal.get(bone)!.w) < 1 - 1e-6) {
+          throw new TypeError(`A rig with no clips rests translation-only, and "${rig.bones[bone]}" is turned at rest.`);
+        }
+      }
+      this.procedural = { rootLocal: this.joints.get(this.skeleton.root)!.getLocalPosition().clone(), rootLook: rest.get(this.skeleton.root)! };
+      this.solve({ position: [0, 0, 0], facing: 0, deltaSeconds: 0 });
+      return;
+    }
+    this.procedural = null;
     const clip = (motion: string): pc.AnimTrack => {
       const named = rig.clips[motion] ?? rig.clips['idle'];
       const track = named === undefined ? undefined : tracks.get(named);
@@ -113,7 +138,6 @@ export class SkinnedFigure implements ThingFigure {
     if (this.runSpeed !== null && rig.clips['run'] !== undefined && (this.walkSpeed === null || this.runSpeed > this.walkSpeed)) {
       points.push({ name: 'run', point: this.runSpeed });
     }
-    this.holdClip = rig.clips['hold'] !== undefined && tracks.has(rig.clips['hold']!);
     const carrying = points.map((point) => (point.name === 'idle' ? { name: 'hold', point: 0 } : point));
     const held = (value: boolean) => [{ parameterName: HOLDING, predicate: pc.ANIM_EQUAL_TO, value }];
     anim.loadStateGraph({
@@ -155,10 +179,19 @@ export class SkinnedFigure implements ThingFigure {
     } else if (pose.discontinuity) {
       this.speed = 0;
     }
+    if (this.procedural !== null && this.previous !== null && !pose.discontinuity && dt > 0) {
+      this.travelled += Math.hypot(x - this.previous[0], z - this.previous[2]) / this.scale;
+    }
     this.previous = pose.position;
     this.time += pose.reducedMotion ? 0 : dt;
     this.root.setLocalPosition(x, y, z);
     this.root.setLocalEulerAngles(0, (pose.facing * 180) / Math.PI, 0);
+    if (this.procedural !== null) {
+      this.misses.clear();
+      this.solve(pose);
+      this.pending = pose;
+      return;
+    }
     const anim = this.figure.anim!;
     const ground = pose.reducedMotion ? 0 : this.speed / this.scale;
     this.misses.clear();
@@ -177,13 +210,31 @@ export class SkinnedFigure implements ThingFigure {
     this.pending = pose;
   }
 
+  /** A clip-less rig's joints turned by the solved gait, its root joint carried by its bob and crouch. */
+  private solve(pose: ThingPose): void {
+    const procedural = this.procedural!;
+    const solved = solvePose(this.skeleton, {
+      travelled: this.travelled,
+      speed: pose.reducedMotion ? 0 : this.speed / this.scale,
+      time: this.time,
+      holding: pose.holding ?? new Set(),
+      reach: pose.reach ?? null,
+      talking: pose.talking === true,
+      ...(pose.reducedMotion ? { reducedMotion: true } : {}),
+    });
+    for (const bone of this.skeleton.order) this.joints.get(bone)!.setLocalRotation(quat(solved.local.get(bone)!));
+    const at = solved.rootPosition, rest = procedural.rootLook, local = procedural.rootLocal;
+    this.joints.get(this.skeleton.root)!.setLocalPosition(local.x + at[0] - rest[0], local.y + at[1] - rest[1], local.z + at[2] - rest[2]);
+  }
+
   /** After the engine's animation step: the procedural arm over the clip, the nod, held things. */
   afterAnimation(): void {
     const pose = this.pending;
     if (pose === null) return;
     const body = mul(quatOf(this.root.getRotation()), HALF_TURN);
     const reach = pose.reach ?? null;
-    for (const socket of pose.holding ?? []) {
+    // A clip-less rig's arms, head and hands were all posed by the solved gait.
+    for (const socket of this.procedural === null ? pose.holding ?? [] : []) {
       const arm = this.armOf(socket);
       const reaching = reach !== null && reach.socket === socket ? Math.max(0, Math.min(1, reach.amount)) : 0;
       // A rig with a socket joint carries the thing on the clip's own arm (its hold clip where it
@@ -195,7 +246,7 @@ export class SkinnedFigure implements ThingFigure {
       this.aim(arm.bones[0]!, arm.bones[1]!, rotate(body, upper));
       this.aim(arm.bones[1]!, arm.bones[2]!, rotate(body, lower));
     }
-    if (pose.talking && !pose.reducedMotion) {
+    if (pose.talking && !pose.reducedMotion && this.procedural === null) {
       const head = this.joints.get(this.headBone());
       if (head !== undefined) head.setLocalRotation(head.getLocalRotation().clone().mul(quat(axisAngle([1, 0, 0], 0.08 * Math.sin(2 * Math.PI * 2.1 * this.time)))));
     }
