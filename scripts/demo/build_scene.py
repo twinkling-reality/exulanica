@@ -116,8 +116,21 @@ class Api:
                 problem = json.loads(error.read() or b"{}")
             except json.JSONDecodeError:
                 problem = {}
-            code = problem.get("code", "") if isinstance(problem, dict) else ""
-            raise SceneRefused(f"{method} {path}: {error.code} {code}".strip()) from None
+            raise SceneRefused(refusal(method, path, error.code, problem)) from None
+
+
+def refusal(method: str, path: str, status: int, problem: Any) -> str:
+    """A server's refusal in words: its code, or the first thing a request's check refused (where
+    in the request, and why), or the status alone when the answer names neither."""
+    said = ""
+    if isinstance(problem, dict):
+        detail = problem.get("detail")
+        if problem.get("code"):
+            said = str(problem["code"])
+        elif isinstance(detail, list) and detail and isinstance(detail[0], dict):
+            where = ".".join(str(part) for part in detail[0].get("loc", []))
+            said = f"{where}: {detail[0].get('msg', '')}".strip(": ")
+    return f"{method} {path}: {status} {said}".strip()
 
 
 @dataclass(frozen=True)

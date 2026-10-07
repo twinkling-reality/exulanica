@@ -886,3 +886,30 @@ def test_a_door_bridges_file_that_is_not_an_array_of_objects_is_refused(tmp_path
     path = tmp_path / "bridges.json"
     path.write_text(written)
     assert _refusal(LAUNCH.door_bridges_setting, path, []) == "door-bridges-file"
+
+
+def test_the_society_of_things_is_offered_only_when_asked_and_to_the_api_alone(tmp_path):
+    exports = {
+        "EXULANICA_DATABASE_URL": "u",
+        "EXULANICA_READONLY_DATABASE_URL": "r",
+        "EXULANICA_PURGE_DATABASE_URL": "p",
+    }
+
+    def environment(offered: bool) -> dict[str, str]:
+        return LAUNCH.api_environment(
+            exports=exports,
+            grant={},
+            data_dir=tmp_path,
+            model=False,
+            derivative_worker=True,
+            society_playback={},
+            society_of_things=offered,
+            # The shell's own setting never reaches the API: the scrub drops it either way.
+            environ={"EXULANICA_SOCIETY_OF_THINGS": "yes", "HOME": "/home/someone"},
+        )
+
+    assert environment(True)["EXULANICA_SOCIETY_OF_THINGS"] == "on"
+    assert "EXULANICA_SOCIETY_OF_THINGS" not in environment(False)
+    parser = LAUNCH.build_parser()
+    assert parser.parse_args(["up", "--worktree", "w"]).society_of_things is False
+    assert parser.parse_args(["up", "--worktree", "w", "--society-of-things"]).society_of_things

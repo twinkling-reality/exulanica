@@ -273,3 +273,13 @@ def test_the_builder_refuses_another_engine_and_a_mind_that_reads_back_as_anothe
     elsewhere.engine = "exulanica-society/v2"
     with pytest.raises(builder.SceneRefused, match="runs exulanica-society/v2"):
         builder.bring_to_life(elsewhere, scene, builder.build(elsewhere, scene))
+
+
+def test_a_refusal_names_its_code_or_what_the_request_check_refused():
+    refusal = _builder().refusal
+    assert refusal("POST", "/x", 409, {"code": "thing_kind_unshipped"}) == (
+        "POST /x: 409 thing_kind_unshipped"
+    )
+    detail = {"detail": [{"loc": ["body", "profile"], "msg": "Input should be 'v1'", "type": "e"}]}
+    assert refusal("POST", "/x", 422, detail) == "POST /x: 422 body.profile: Input should be 'v1'"
+    assert refusal("GET", "/x", 500, "not json") == "GET /x: 500"

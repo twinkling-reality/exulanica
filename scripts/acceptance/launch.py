@@ -77,6 +77,11 @@ starts exactly what it always did:
   (``EXULANICA_DOOR_BRIDGES``, digests only, never a credential), so an adapter can be run against
   the slot's API. An entry's ``"workspaces": "synthetic"`` becomes the run's synthetic workspace
   ids, which the file cannot know before the run makes them; the API's own loader checks the rest.
+- ``--society-of-things`` offers the society of things on the slot's API
+  (``EXULANICA_SOCIETY_OF_THINGS=on``), so a rehearsal can start a society over placed things. It
+  is set for the API process alone, after the scrub of the shell's ``EXULANICA_`` variables, and
+  recorded in the run state, so a restarted API offers it too. For rehearsal stacks on fresh
+  acceptance databases only.
 - ``--peer-token`` adds ``token-peer``: a second actor in the first workspace with the same
   permissions, so a client can be shown what one actor's private work looks like to another.
 - ``--depth-worker``, with ``--no-derivative-worker``, runs the production derivative worker
@@ -511,6 +516,7 @@ def api_environment(
     derivative_worker: bool,
     society_playback: Mapping[str, str],
     door_bridges: str | None = None,
+    society_of_things: bool = False,
     environ: Mapping[str, str] | None = None,
 ) -> dict[str, str]:
     environment = clean_environment(environ)
@@ -531,6 +537,8 @@ def api_environment(
     environment.update(society_playback)
     if door_bridges is not None:
         environment["EXULANICA_DOOR_BRIDGES"] = door_bridges
+    if society_of_things:
+        environment["EXULANICA_SOCIETY_OF_THINGS"] = "on"
     return environment
 
 
@@ -1254,6 +1262,8 @@ def up(arguments: argparse.Namespace) -> None:
             arguments.door_bridges, [workspace_id, *(other["workspace_id"] for other in others)]
         )
         state["door_bridges"] = door_bridges
+    if arguments.society_of_things:
+        state["society_of_things"] = True
 
     # People are drawn only from published catalogs (migration 0131), so a run publishes before
     # its API starts, exactly as a deployment must.
@@ -1283,6 +1293,7 @@ def up(arguments: argparse.Namespace) -> None:
             arguments.society_tick_interval_ms,
         ),
         door_bridges=door_bridges,
+        society_of_things=arguments.society_of_things,
     )
     environment.update(model_witness_environment(environment, run_dir))
     plan = None
@@ -1593,6 +1604,7 @@ def restart_api(arguments: argparse.Namespace) -> None:
             playback.get("base_tick_interval_ms") if isinstance(playback, Mapping) else None,
         ),
         door_bridges=state.get("door_bridges"),
+        society_of_things=bool(state.get("society_of_things")),
     )
     environment.update(model_witness_environment(environment, run_dir))
     scripted = state.get("scripted_model")
@@ -1792,6 +1804,12 @@ def build_parser() -> argparse.ArgumentParser:
                 help="admit the outside programs a JSON array of bridge declarations names "
                 '(EXULANICA_DOOR_BRIDGES; an entry\'s "workspaces": "synthetic" becomes the '
                 "run's synthetic workspaces) (default: no bridge)",
+            )
+            command.add_argument(
+                "--society-of-things",
+                action="store_true",
+                help="offer the society of things on the API (EXULANICA_SOCIETY_OF_THINGS=on), "
+                "for rehearsal stacks on fresh acceptance databases only (default: not offered)",
             )
             command.add_argument(
                 "--society-tick-interval-ms",
