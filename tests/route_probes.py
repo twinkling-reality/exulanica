@@ -45,6 +45,7 @@ from exulanica.world.decision_roles import decision_roles
 from exulanica.world.society_experiments import DEVELOPMENT_SEEDS
 
 import existence_builders as build
+from thing_fixtures import kind_body, placeable_kind
 from world_support import FIXTURE_WORLD_ID
 
 __all__ = [
@@ -82,6 +83,7 @@ ACCOUNT_ROUTES: Final[frozenset[tuple[str, str]]] = frozenset(
 _ZERO_DIGEST: Final = "0" * 64
 _REGION_KEY: Final = "aa" * 32
 _TRANSFORM: Final = {"x_mm": 0, "y_mm": 0, "z_mm": 0, "yaw_microradians": 0, "scale_milli": 1000}
+_POSE: Final = {"x_mm": 0, "y_mm": 0, "z_mm": 0, "yaw_microradians": 0}
 
 
 def _place_name_notice(role: str) -> str:
@@ -587,6 +589,29 @@ PROBE_OVERRIDES: Final[dict[str, dict[str, Any]]] = {
         **_IN_WORLD,
         "json": {"base_tick": 0, "base_state_sha256": _ZERO_DIGEST},
     },
+    "POST /world/versions/{version_id}/things": {
+        **_IN_WORLD,
+        "json": {
+            "base_state_sha256": _ZERO_DIGEST,
+            "thing_id": "thing:probe",
+            "kind": kind_body(placeable_kind()),
+            "region_id": "region-a",
+            "pose": _POSE,
+            "origin_role": "fictional",
+        },
+    },
+    "POST /world/versions/{version_id}/things/undo": {
+        **_IN_WORLD,
+        "json": {"base_state_sha256": _ZERO_DIGEST},
+    },
+    "POST /world/versions/{version_id}/things/{thing_id}/move": {
+        **_IN_WORLD,
+        "json": {"base_state_sha256": _ZERO_DIGEST, "pose": _POSE},
+    },
+    "POST /world/versions/{version_id}/things/{thing_id}/remove": {
+        **_IN_WORLD,
+        "json": {"base_state_sha256": _ZERO_DIGEST},
+    },
     "POST /world/versions/{version_id}/traffic/comparisons": {
         **_IN_WORLD,
         "json": {
@@ -845,6 +870,9 @@ EXISTENCE_BUILDERS: Final[Mapping[str, Owned | Shared]] = {
     ),
     "/world/versions/{version_id}/society/inputs/{input_seq}": Owned(
         build.society_input_seq, build.invented_input_seq
+    ),
+    "/world/versions/{version_id}/things/{thing_id}": Owned(
+        build.placed_thing, build.invented_thing
     ),
     "/world/versions/{version_id}/tiles/{baked_tile_id}": Owned(build.generated_tile),
     "/world/versions/{version_id}/traffic/comparisons/{comparison_id}": Owned(

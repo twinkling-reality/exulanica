@@ -4,7 +4,8 @@ The digest is every stored version's compare-and-swap token, so a change to how 
 composed that moved one byte would refuse the next edit on every world that holds that shape.
 These digests were computed on the tree before the composition moved out of
 ``exulanica.world.objects`` and must be identical after: one per schema version and one per
-source selection, including a version 3 that holds point maps and no environment instances.
+source selection, including a version 3 that holds point maps and no environment instances, and a
+version 4 that holds placed things, alone and beside every other section.
 """
 
 from __future__ import annotations
@@ -26,7 +27,7 @@ from exulanica.world.edit_kinds import EditSubject
 from authored_delta_fixtures import DELTAS
 
 #: The order the fixtures list their sections in.
-KEYS = ("objects", "element_overrides", "environment_instances", "point_map_instances")
+KEYS = ("objects", "element_overrides", "environment_instances", "point_map_instances", "things")
 
 GOLDEN = {
     "empty": ("b42557ee1fc8f83170fd24e88748dcbbcf5879fbc45f02df62b6c298b420f8fa", 1),
@@ -37,6 +38,13 @@ GOLDEN = {
     "v3-with-environments": (
         "9bd86fdf1f1da5ec369912bc1653b5182b96ef7c3f96e70871bf6ae338b70049",
         3,
+    ),
+    # Placed things, schema version 4: computed when the section was added, with every golden
+    # above unchanged by it.
+    "v4-things-only": ("8111d9e22549dc3ec38cedb4d041a4f9b217813f5a02968993be8e5a913521c6", 4),
+    "v4-with-everything": (
+        "601623cb191e812e54603086f48e3d4a149a840da23f1e29766fe600e95ac0e4",
+        4,
     ),
 }
 

@@ -258,7 +258,11 @@ def test_one_object_s_perches_are_one_pool_for_every_kind_it_hosts(tmp_path):
         title="one tree, two kinds",
         style_version_id=None,
         state_sha256=delta_sha256(
-            objects=placed, element_overrides=(), environment_instances=(), point_map_instances=()
+            objects=placed,
+            element_overrides=(),
+            environment_instances=(),
+            point_map_instances=(),
+            things=(),
         ),
         edit_seq=1,
         source_invalidated=False,

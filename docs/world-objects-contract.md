@@ -38,6 +38,7 @@ The implementation is migration `0042_authored_world_objects.sql`,
 - [11. Durable environment instances](#11-durable-environment-instances)
 - [12. Arrangements of several objects](#12-arrangements-of-several-objects)
 - [13. What a world's society reads from its objects](#13-what-a-worlds-society-reads-from-its-objects)
+- [14. Placed things](#14-placed-things)
 - [Bounded scene-extraction preparation](#bounded-scene-extraction-preparation)
 - [Authored district object coordinates](#authored-district-object-coordinates)
 
@@ -551,6 +552,10 @@ client recipe; this surface has no such prior client, so it does not invent a se
 | `POST` | `/world/versions/{version_id}/objects/undo/preview` | Which edit an undo would reverse and what it would restore; writes nothing |
 | `POST` | `/world/versions/{version_id}/arrangements/preview` | Where an arrangement's objects would stand, or its refusal; writes nothing |
 | `POST` | `/world/versions/{version_id}/arrangements/apply` | Add an arrangement's objects as ordinary edits |
+| `POST` | `/world/versions/{version_id}/things` | Place one thing by its shipped kind (section 14) |
+| `POST` | `/world/versions/{version_id}/things/{thing_id}/move` | Replace one placed thing's pose |
+| `POST` | `/world/versions/{version_id}/things/{thing_id}/remove` | Store a placed thing's removal |
+| `POST` | `/world/versions/{version_id}/things/undo` | Reverse the newest edit not already reversed |
 | `GET` | `/world/assets` | The reviewed assets a person may place, with availability, each kind's use and what inhabitants do there |
 | `GET` | `/world/assets/{asset_key}` | One reviewed asset of any kind, and whether it may be placed |
 | `GET` | `/world/assets/{asset_key}/bytes` | The reviewed GLB bytes |
@@ -931,6 +936,40 @@ What people do at each kind, its places, seats and stays, is the `use` and `acti
 routes serve (section 4). An object carrying a behaviour makes the society's input unavailable
 until the behaviour is taken away (section 3), and an object in another region of a made world is
 no part of this region's society's input.
+
+## 14. Placed things
+
+A thing an author places, a knight by the well, a sword on the ground, the gate visitors arrive
+through, is a row of `world_alternate_thing` (migration 0152): an id the author chooses, unique in
+the version; a shipped thing kind by key, version and the SHA-256 of its document
+([things contract](things-contract.md#a-thing-kind)); a region of the source snapshot and a
+region-local pose of `x_mm`, `y_mm`, `z_mm` and `yaw_microradians`; and `origin.role`, `fictional`
+or `personal`, chosen by the person. It names no look and no asset: how it is drawn is a look chosen
+for it, and what it does is its kind's and the simulation's. It has no scale, since a kind's
+figures are its own, and a placement stating one is refused. Every key includes the workspace, and
+the relation enables and forces row-level security.
+
+A placement names a kind that is shipped at the stated version, with that version's digest when it
+states one; with none, the shipped digest is stored. Anything else is refused as
+`422 invalid_thing_placement`, as are an id of the wrong shape, a region the snapshot lacks and a
+pose out of bounds; an id already placed in the version is `409 invalid_object_state`. A version
+holds at most 256 placed things, removed ones included, since its delta keeps them; one more is
+refused as `409 thing_limit_reached`, and undoing a placement makes room again. What a placed
+thing is never changes after it is placed: the table's trigger refuses a change to its kind or
+origin, and a move keeps its region, so a move changes its pose alone. `add_thing`, `move_thing`
+and `remove_thing` append to the version's edit log under the same compare-and-swap as every edit,
+naming the thing in the log's `thing_id`, and undo restores the stored document; an undone addition
+is a retained, removed row, and the same id may be placed again. A branched or carried version keeps
+its placed things as they are, since a shipped kind's version never changes.
+
+The version's delta gains a `things` section, sorted by `thing_id`, written only when the version
+holds a placed thing, which selects schema version 4; the version document then reads with
+`schema_version` 5 and lists `things`. A version holding none keeps its bytes and its digest. No
+package format admits the thing edits yet. An export reads the edit kinds of a version's whole
+lineage, so a version is withheld from a package export by name (`edit_kind_not_admitted`, naming the
+edit) once it or any version it descends from holds a thing edit, even after the thing is removed:
+every later version of such a saved world is withheld too, each one carried when photographs are
+added included. Nothing in the browser draws a placed thing.
 
 ## Bounded scene-extraction preparation
 

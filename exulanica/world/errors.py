@@ -26,6 +26,7 @@ __all__ = [
     "InvalidStructuralData",
     "InvalidStructuralPreviewState",
     "InvalidStyleData",
+    "InvalidThingPlacement",
     "InvalidatedSourceVersion",
     "PointMapNotPermitted",
     "PointMapNotProduced",
@@ -140,6 +141,14 @@ class InvalidatedSourceVersion(WorldStyleError):
 
 class InvalidEnvironmentData(WorldStyleError):
     """An environment source, selection, anchor, destination, or role is malformed."""
+
+
+class InvalidThingPlacement(WorldStyleError):
+    """A placed thing's id, kind, region, pose or origin is not acceptable."""
+
+
+class ThingLimitReached(WorldStyleError):
+    """A version already holds as many placed things as one version may."""
 
 
 class InvalidEnvironmentState(WorldStyleError):

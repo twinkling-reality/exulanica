@@ -64,6 +64,7 @@ _SECTION_TABLES: Final = {
     "element_overrides": "world_alternate_element_override",
     "environment_instances": "world_alternate_environment_instance",
     "point_map_instances": "world_alternate_point_map_instance",
+    "things": "world_alternate_thing",
 }
 
 #: The section builder of each extension family. A family without one stops the import, since a

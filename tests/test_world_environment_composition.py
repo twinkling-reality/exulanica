@@ -53,6 +53,7 @@ def _sections(*environment_instances: EnvironmentInstance) -> dict[str, object]:
         "element_overrides": (),
         "environment_instances": environment_instances,
         "point_map_instances": (),
+        "things": (),
     }
 
 

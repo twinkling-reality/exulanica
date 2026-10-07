@@ -1,0 +1,86 @@
+{
+  "profile": "exulanica.thing-kind-lock/v1",
+  "reason": "Every thing kind version this repository ships, with the digest it shipped with: a shipped version never changes, so the kind loader refuses a file this does not name at its digest, and a changed kind is a new version and a new line.",
+  "kinds": [
+    {
+      "kind": "bench",
+      "version": 1,
+      "sha256": "ab8651c56415b812a5d5670fd98c8e12de97703b119b85aa3e92f69df6df3d8c"
+    },
+    {
+      "kind": "cafe_table",
+      "version": 1,
+      "sha256": "bffd7159cd2c8a518c31ba2e32798373b427c629496c7b724a3744432ea1c393"
+    },
+    {
+      "kind": "gate",
+      "version": 1,
+      "sha256": "2490ce4197acd2ba7e2e3494764187f6040e3fd972bb8118fadf52eacd6dcddc"
+    },
+    {
+      "kind": "knight",
+      "version": 1,
+      "sha256": "d506980f69c79dc1e9c9f91390a4fb4fc45efab44c099fdb614e57a94642f7e7"
+    },
+    {
+      "kind": "lamp_post",
+      "version": 1,
+      "sha256": "0404e448839bfdea242691cdb81d5c528a3259e945bc9a6348eeec9eea023bde"
+    },
+    {
+      "kind": "lantern",
+      "version": 1,
+      "sha256": "5cb77297b677cdf10b67eb20fd4e7845c3f1f9f0dbd1f26fd57066c4bcf973a9"
+    },
+    {
+      "kind": "lantern_spirit",
+      "version": 1,
+      "sha256": "f2584e526d178ab2627d420a97cebec98736e89a2cd539aaac927a1535f92180"
+    },
+    {
+      "kind": "market_stall",
+      "version": 1,
+      "sha256": "9e9d4273f63105cd019a7db2bc1f724ddc963dd45741d3d48ce5115ff3e98f63"
+    },
+    {
+      "kind": "planter_tree",
+      "version": 1,
+      "sha256": "945ba33280f6d67550c8497a6294a2ba228955c32f9032af31083b23ff20152a"
+    },
+    {
+      "kind": "seating_planter",
+      "version": 1,
+      "sha256": "2b6c788a82ef5210050705e8f210f346655463cee60729a114d9a91ac0c321e6"
+    },
+    {
+      "kind": "sword",
+      "version": 1,
+      "sha256": "7d389c3397310e7811d067302ae734cd26f6b36e12c67e397fccaa8f6557d952"
+    },
+    {
+      "kind": "sword",
+      "version": 2,
+      "sha256": "785a27d7c181ad01891b2d28dee0fc21b6f1aaa78b664d41f749c416cc5f9b07"
+    },
+    {
+      "kind": "traveller",
+      "version": 1,
+      "sha256": "b6d706c190d3fe873595c92797c59598f69237dbea75debb96769559582e7a3b"
+    },
+    {
+      "kind": "villager",
+      "version": 1,
+      "sha256": "c2d6681e1727bb24886c1a20b3b1ee5ad9fb8bd15608f8bef3e71e73213ddeca"
+    },
+    {
+      "kind": "visitor",
+      "version": 1,
+      "sha256": "97be94be55a6290a75b8865e2cf589970ea465c8ff7ee9eb5910e2070f935df8"
+    },
+    {
+      "kind": "well",
+      "version": 1,
+      "sha256": "9f3ebe562bd058f8c2ad402b85b8260c99f2bb0cd00e74e83d25ae2b9ad5877e"
+    }
+  ]
+}

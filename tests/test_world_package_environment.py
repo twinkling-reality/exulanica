@@ -84,7 +84,11 @@ def _instance(
 def _environment_sections(*, availability: str = "available") -> dict[str, object]:
     instance = _instance()
     added = product_delta_sha256(
-        objects=[], element_overrides=[], environment_instances=[instance], point_map_instances=[]
+        objects=[],
+        element_overrides=[],
+        environment_instances=[instance],
+        point_map_instances=[],
+        things=[],
     )
     structure = json.loads((GOLDEN / "world/structure.json").read_bytes())
     topology = json.loads((GOLDEN / "world/topology.json").read_bytes())
@@ -95,6 +99,7 @@ def _environment_sections(*, availability: str = "available") -> dict[str, objec
             element_overrides=[],
             environment_instances=[instance],
             point_map_instances=[],
+            things=(),
         ),
         "edit_seq": 1,
         "edits": [
@@ -170,6 +175,7 @@ def test_the_environment_inclusive_digest_rederives_without_the_product_code():
         element_overrides=[],
         environment_instances=[_instance()],
         point_map_instances=[],
+        things=[],
     )
     assert version["delta"]["schema_version"] == 2
     assert "environment_instances" in version["delta"]

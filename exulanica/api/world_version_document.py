@@ -28,6 +28,7 @@ from exulanica.world import (
     truth_statement,
 )
 from exulanica.world.object_catalog import NO_ACTIVITY, world_object_catalog
+from exulanica.world.placed_things import placed_thing_document
 from exulanica.world.society_catalogs import purposeful_routine
 
 
@@ -212,6 +213,7 @@ class VersionEditView(BaseModel):
     element_id: str | None
     environment_instance_id: str | None
     point_map_instance_id: str | None
+    thing_id: str | None
     undone_edit_id: uuid.UUID | None
     base_state_sha256: str
     result_state_sha256: str
@@ -242,6 +244,9 @@ class AlternateVersionView(BaseModel):
     #: Availability is computed on read and is deliberately not part of ``state_sha256``: a right
     #: ending is not an edit, and a token that moved with one would refuse unrelated changes.
     point_map_instances: list[dict[str, JsonValue]]
+    #: Things placed by their kind (``exulanica.world.placed_things``): each names a shipped thing
+    #: kind by key, version and digest. Nothing here says how one is drawn.
+    things: list[dict[str, JsonValue]]
     edits: list[VersionEditView]
 
 
@@ -354,7 +359,9 @@ def alternate_version_view(
     pinned = workspace_assets or {}
     return AlternateVersionView(
         schema_version=(
-            4
+            5
+            if version.things
+            else 4
             if pinned
             else 3
             if version.point_map_instances
@@ -437,6 +444,7 @@ def alternate_version_view(
             }
             for instance in version.point_map_instances
         ],
+        things=[placed_thing_document(thing) for thing in version.things],
         edits=[
             VersionEditView(
                 edit_id=edit.edit_id,
@@ -446,6 +454,7 @@ def alternate_version_view(
                 element_id=edit.element_id,
                 environment_instance_id=edit.environment_instance_id,
                 point_map_instance_id=edit.point_map_instance_id,
+                thing_id=edit.thing_id,
                 undone_edit_id=edit.undone_edit_id,
                 base_state_sha256=edit.base_state_sha256,
                 result_state_sha256=edit.result_state_sha256,

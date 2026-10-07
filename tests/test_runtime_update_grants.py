@@ -89,6 +89,10 @@ RUNTIME_UPDATES: dict[str, str] = {
         "migration 0093's trigger refuses every change to what it names"
     ),
     "world_alternate_object": "an object moves, changes and is removed",
+    "world_alternate_thing": (
+        "a placed thing moves and is removed, and an undo sets addition_undone; migration 0152's "
+        "trigger refuses every change to the kind and origin it names"
+    ),
     "world_alternate_version": "a version records its state digest and edit sequence, under a lock",
     "saved_world_entry": (
         "saved-world creation and explicit reconciliation move its authored/style pointers; "

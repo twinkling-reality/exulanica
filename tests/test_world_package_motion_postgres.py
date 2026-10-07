@@ -132,6 +132,7 @@ def test_a_world_with_motion_exports_verifies_and_round_trips(repository, tmp_pa
             element_overrides=stored.element_overrides,
             environment_instances=(),
             point_map_instances=(),
+            things=(),
         )
         assert packaged["state_sha256"] == stored.state_sha256
         assert [(e["kind"], e["result_state_sha256"]) for e in packaged["edits"]] == [

@@ -60,6 +60,7 @@ from exulanica.world import (
     Transform,
     WorldObjectRepository,
 )
+from exulanica.world.errors import InvalidThingPlacement, ThingLimitReached
 from exulanica.world.society import UnavailableSocietyInput
 from exulanica.world.workspace_assets import WorkspaceAssetWithdrawn
 from exulanica.world.worlds import require_world
@@ -199,6 +200,8 @@ WriteObjects = Annotated[WorldObjectRepository, Depends(object_write_repository)
 #: application-wide handlers and must keep answering identically here.
 OBJECT_PROBLEMS: Final[tuple[tuple[type[Exception], int, str], ...]] = (
     (InvalidEnvironmentData, 422, "invalid_environment_data"),
+    (InvalidThingPlacement, 422, "invalid_thing_placement"),
+    (ThingLimitReached, 409, "thing_limit_reached"),
     (InvalidEnvironmentState, 409, "invalid_environment_state"),
     (EnvironmentBindingDrift, 409, "environment_binding_drift"),
     (EnvironmentSourceWithdrawn, 410, "withdrawn"),

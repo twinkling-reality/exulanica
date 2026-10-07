@@ -113,6 +113,7 @@ def _version(*objects: AuthoredObject, overrides=()) -> AlternateVersion:
             element_overrides=overrides,
             environment_instances=(),
             point_map_instances=(),
+            things=(),
         ),
         edit_seq=len(objects) + len(overrides),
         source_invalidated=False,

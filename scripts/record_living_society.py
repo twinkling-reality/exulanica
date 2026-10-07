@@ -64,7 +64,11 @@ def flatiron_input(interpretation_path: Path = FLATIRON_INTERPRETATION) -> dict[
         title="Fictional living society preview",
         style_version_id=None,
         state_sha256=delta_sha256(
-            objects=(), element_overrides=(), environment_instances=(), point_map_instances=()
+            objects=(),
+            element_overrides=(),
+            environment_instances=(),
+            point_map_instances=(),
+            things=(),
         ),
         edit_seq=0,
         source_invalidated=False,

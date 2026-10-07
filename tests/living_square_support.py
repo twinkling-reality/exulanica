@@ -87,7 +87,11 @@ def version(objects: tuple[AuthoredObject, ...], edit_seq: int | None = None) ->
         title="A small square",
         style_version_id=None,
         state_sha256=delta_sha256(
-            objects=objects, element_overrides=(), environment_instances=(), point_map_instances=()
+            objects=objects,
+            element_overrides=(),
+            environment_instances=(),
+            point_map_instances=(),
+            things=(),
         ),
         edit_seq=len(objects) if edit_seq is None else edit_seq,
         source_invalidated=False,

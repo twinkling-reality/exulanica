@@ -16,9 +16,12 @@ no way to move), an offer its geometry makes implausible (a grip outside the box
 longer than any hand holds), a look of another body plan, a routine weight for saying something
 (the routine never says anything), and an origin or licence the record refuses.
 
-The digest is the SHA-256 of the document's canonical bytes, and every version is immutable. What
-a society reads of a kind is :meth:`ThingKind.semantics`: everything but its looks, its origin and
-its ``ext``, so a society never reads a look and a replay never reads the kind library.
+The digest is the SHA-256 of the document's canonical bytes, and every version is immutable: the
+lock beside the kinds (``kinds.lock.json``, :func:`read_kind_lock`) names every shipped version with
+the digest it shipped with, and :func:`shipped_thing_kinds` refuses a file the lock does not name
+at that digest, so a changed kind is a new version and a new line, never an edit. What a society
+reads of a kind is :meth:`ThingKind.semantics`: everything but its looks, its origin and its
+``ext``, so a society never reads a look and a replay never reads the kind library.
 
 Pure: no connection, no store.
 """
@@ -43,10 +46,13 @@ __all__ = [
     "CLASSES",
     "DECIDER_KINDS",
     "KINDS_DIRECTORY",
+    "KINDS_LOCK",
+    "LOCK_PROFILE",
     "THING_KIND_CODES",
     "THING_KIND_PROFILE",
     "ThingKind",
     "ThingKindRefused",
+    "read_kind_lock",
     "read_thing_kind",
     "shipped_thing_kinds",
 ]
@@ -56,6 +62,9 @@ CLASSES: Final = ("being", "object")
 #: The deciders a kind may allow, as the decider descriptor names them.
 DECIDER_KINDS: Final = ("routine", "model", "person", "external")
 KINDS_DIRECTORY: Final = Path(__file__).resolve().parents[2] / "assets/catalogs/things/kinds"
+#: Every shipped kind version and the digest it shipped with, beside the kinds.
+KINDS_LOCK: Final = KINDS_DIRECTORY.parent / "kinds.lock.json"
+LOCK_PROFILE: Final = "exulanica.thing-kind-lock/v1"
 #: The most canonical bytes a kind's ``ext`` may hold: source data kept, never read.
 EXT_BYTES_MAXIMUM: Final = 8 * 1024
 #: The abilities a routine draws among, each by weight; saying and leaving are never drawn.
@@ -91,6 +100,11 @@ THING_KIND_CODES: Final = (
     ),
     ("thing_kind_look_unfit", "A look of another body plan than the kind's."),
     ("thing_kind_origin_invalid", "An origin record the origin reader refuses."),
+    (
+        "thing_kind_not_locked",
+        "A shipped kind file the lock does not name at its digest, or a locked version with no "
+        "file: a shipped version never changes.",
+    ),
 )
 _TOP: Final = frozenset(
     {
@@ -485,15 +499,55 @@ def _deciders(raw: object) -> None:
         raise _invalid("deciders.default", "is the routine or an outside program it allows")
 
 
+def read_kind_lock(path: Path = KINDS_LOCK) -> dict[tuple[str, int], str]:
+    """The lock: every shipped kind version, in key and version order, with its digest."""
+    where = path.name
+    document = _closed(where, read_json(path), frozenset({"profile", "reason", "kinds"}))
+    if document["profile"] != LOCK_PROFILE:
+        raise _invalid(f"{where}.profile", f"is {LOCK_PROFILE}")
+    _text(f"{where}.reason", document["reason"], 1000)
+    if not isinstance(document["kinds"], list):
+        raise _invalid(f"{where}.kinds", "is a list")
+    locked: dict[tuple[str, int], str] = {}
+    for index, raw in enumerate(document["kinds"]):
+        at = f"{where}.kinds[{index}]"
+        entry = _closed(at, raw, frozenset({"kind", "version", "sha256"}))
+        if not isinstance(entry["kind"], str) or _KEY.fullmatch(entry["kind"]) is None:
+            raise _invalid(f"{at}.kind", "is a kind key")
+        version = _whole(f"{at}.version", entry["version"], 1, 10_000)
+        if not isinstance(entry["sha256"], str) or _HEX64.fullmatch(entry["sha256"]) is None:
+            raise _invalid(f"{at}.sha256", "is a digest")
+        locked[(entry["kind"], version)] = entry["sha256"]
+    if list(locked) != sorted(locked) or len(locked) != len(document["kinds"]):
+        raise _invalid(f"{where}.kinds", "names each version once, in key and version order")
+    return locked
+
+
 def shipped_thing_kinds(
-    directory: Path = KINDS_DIRECTORY, *, catalogs: ThingCatalogs | None = None
+    directory: Path = KINDS_DIRECTORY,
+    *,
+    catalogs: ThingCatalogs | None = None,
+    lock: Path = KINDS_LOCK,
 ) -> dict[tuple[str, int], ThingKind]:
     """Every thing kind this repository ships, by key and version, each read and checked; a file
-    named for another kind or version than it states is refused."""
+    named for another kind or version than it states is refused, and so is one the lock does not
+    name at its digest, or a version the lock names with no file."""
     found = {}
     for path in sorted(directory.glob("*.v*.json")):
         kind = read_thing_kind(read_json(path), catalogs=catalogs)
         if path.name != f"{kind.kind}.v{kind.version}.json":
             raise _invalid(path.name, "names the kind and version it states")
         found[(kind.kind, kind.version)] = kind
+    locked = read_kind_lock(lock)
+    for (key, version), kind in found.items():
+        if locked.get((key, version)) != kind.sha256:
+            raise _refuse(
+                "thing_kind_not_locked",
+                f"{key}.v{version}.json",
+                f"is not the document the lock ({lock.name}) says version {version} shipped as",
+            )
+    for key, version in sorted(set(locked) - set(found)):
+        raise _refuse(
+            "thing_kind_not_locked", lock.name, f"names {key} version {version}, which has no file"
+        )
     return found

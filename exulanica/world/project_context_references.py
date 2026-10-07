@@ -116,6 +116,10 @@ EDIT_OPERATIONS: Final = frozenset(
         "POST /world/versions/{version_id}/objects/{object_id}/behaviour",
         "POST /world/versions/{version_id}/objects/{object_id}/move",
         "POST /world/versions/{version_id}/objects/{object_id}/remove",
+        "POST /world/versions/{version_id}/things",
+        "POST /world/versions/{version_id}/things/undo",
+        "POST /world/versions/{version_id}/things/{thing_id}/move",
+        "POST /world/versions/{version_id}/things/{thing_id}/remove",
     }
 )
 #: The routes whose success records an appearance version.

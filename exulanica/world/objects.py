@@ -156,6 +156,7 @@ class VersionEdit:
     element_id: str | None
     environment_instance_id: str | None
     point_map_instance_id: str | None
+    thing_id: str | None
     undone_edit_id: uuid.UUID | None
     base_state_sha256: str
     result_state_sha256: str

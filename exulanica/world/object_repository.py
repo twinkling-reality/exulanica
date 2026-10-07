@@ -76,6 +76,7 @@ from exulanica.world.errors import (
     InvalidObjectState,
     InvalidPointMapPlacement,
     StaleObjectBase,
+    ThingLimitReached,
     UnavailableAsset,
     UnknownWorldResource,
 )
@@ -99,6 +100,15 @@ from exulanica.world.photo_point_maps import (
     PointMapSourceBinding,
     point_map_instance_document,
     validate_point_map_instance,
+)
+from exulanica.world.placed_things import (
+    PLACED_THINGS_MAXIMUM,
+    UNSCALED_MILLI,
+    PlacedThing,
+    ThingKindReference,
+    ThingPlacement,
+    placed_thing_document,
+    validate_placed_thing,
 )
 from exulanica.world.point_map_source_authority import PointMapSourceAuthority
 from exulanica.world.reviewed_catalog import ReviewedAssetRow, ReviewedCatalog
@@ -250,6 +260,7 @@ class WorldObjectRepository:
             EditSubject.ELEMENT: "_undo_override",
             EditSubject.ENVIRONMENT_INSTANCE: "_undo_environment",
             EditSubject.POINT_MAP_INSTANCE: "_undo_point_map",
+            EditSubject.THING: "_undo_thing",
         }
     )
 
@@ -263,6 +274,7 @@ class WorldObjectRepository:
             EditSubject.ELEMENT: ("_override_carries", "_carry_override"),
             EditSubject.ENVIRONMENT_INSTANCE: ("_environment_carries", "_carry_environment"),
             EditSubject.POINT_MAP_INSTANCE: ("_point_map_carries", "_carry_point_map"),
+            EditSubject.THING: ("_thing_carries", "_carry_thing"),
         }
     )
 
@@ -469,6 +481,7 @@ class WorldObjectRepository:
                 version_id, with_availability=False
             ),
             "point_map_instances": self._point_map_instances(version_id, with_availability=False),
+            "things": self._things(version_id),
         }
 
     def carry_version(
@@ -534,6 +547,7 @@ class WorldObjectRepository:
                 *sections["objects"],
                 *sections["environment_instances"],
                 *sections["point_map_instances"],
+                *sections["things"],
             ):
                 if row.region_id not in regions:
                     raise InvalidObjectData(f"{row.region_id} is not a region of the new snapshot")
@@ -648,6 +662,11 @@ class WorldObjectRepository:
             return CarryOutcome.STAYS, StayReason.NOT_READABLE
         return CarryOutcome.CARRIED, None
 
+    def _thing_carries(self, thing: PlacedThing) -> tuple[CarryOutcome, StayReason | None]:
+        # A placed thing names a shipped kind by its digest, and a shipped version never changes:
+        # it carries as it is.
+        return CarryOutcome.CARRIED, None
+
     def _carry_edits(
         self, from_version_id: uuid.UUID, to_version_id: uuid.UUID
     ) -> dict[uuid.UUID, uuid.UUID]:
@@ -756,6 +775,16 @@ class WorldObjectRepository:
             lambda: self._point_map_carries(instance),
         )
 
+    def _carry_thing(
+        self,
+        from_version_id: uuid.UUID,
+        to_version_id: uuid.UUID,
+        thing: PlacedThing,
+        edit_ids: Mapping[uuid.UUID, uuid.UUID],
+    ) -> None:
+        created, last = self._thing_edit_ids(from_version_id, thing.thing_id)
+        self._insert_thing(to_version_id, thing, self._carried_edit_ids(edit_ids, created, last))
+
     def _write_carried(
         self,
         write: Callable[[], None],
@@ -809,6 +838,7 @@ class WorldObjectRepository:
         overrides = self._overrides(version_id)
         environments = self._environment_instances(version_id, with_availability=with_availability)
         point_maps = self._point_map_instances(version_id, with_availability=with_availability)
+        things = self._things(version_id)
         row = self._version_row(version_id)
         return AlternateVersion(
             version_id=row["version_id"],
@@ -822,6 +852,7 @@ class WorldObjectRepository:
                 element_overrides=overrides,
                 environment_instances=environments,
                 point_map_instances=point_maps,
+                things=things,
             ),
             edit_seq=row["edit_seq"],
             source_invalidated=self._source_invalidated(row["source_snapshot_id"]),
@@ -831,6 +862,7 @@ class WorldObjectRepository:
             element_overrides=overrides,
             environment_instances=environments,
             point_map_instances=point_maps,
+            things=things,
             edits=self._edits(version_id),
         )
 
@@ -1101,6 +1133,8 @@ class WorldObjectRepository:
             self._check_environment_restore(version_id, restores)
         if restores is not None and subject is EditSubject.POINT_MAP_INSTANCE:
             self._check_point_map_restore(version_id, restores)
+        if restores is not None and subject is EditSubject.THING:
+            self._check_thing_restore(version_id, restores)
         current = self.connection.execute(
             "select after_document from world_alternate_version_edit "
             f"where workspace_id=%s and world_id=%s and version_id=%s and {subject.column}=%s "
@@ -1572,21 +1606,17 @@ class WorldObjectRepository:
         element_id: str | None = None,
         environment_instance_id: str | None = None,
         point_map_instance_id: str | None = None,
+        thing_id: str | None = None,
         undone_edit_id: uuid.UUID | None = None,
     ) -> None:
         version_id = row["version_id"]
-        result = delta_sha256(
-            objects=self._objects(version_id),
-            element_overrides=self._overrides(version_id),
-            environment_instances=self._environment_instances(version_id, with_availability=False),
-            point_map_instances=self._point_map_instances(version_id, with_availability=False),
-        )
+        result = delta_sha256(**self._delta(version_id))
         self.connection.execute(
             "insert into world_alternate_version_edit (edit_id,workspace_id,world_id,version_id,"
             "edit_seq,kind,object_id,element_id,environment_instance_id,point_map_instance_id,"
-            "undone_edit_id,base_state_sha256,"
+            "thing_id,undone_edit_id,base_state_sha256,"
             "result_state_sha256,before_document,after_document,actor) "
-            "values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+            "values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
             (
                 edit_id,
                 self.workspace_id,
@@ -1598,6 +1628,7 @@ class WorldObjectRepository:
                 element_id,
                 environment_instance_id,
                 point_map_instance_id,
+                thing_id,
                 undone_edit_id,
                 row["state_sha256"],
                 result,
@@ -2330,6 +2361,266 @@ class WorldObjectRepository:
             ),
         )
 
+    # -- placed things ----------------------------------------------------------------------
+    #
+    # A placed thing names a shipped thing kind by key, version and digest and stands in a region
+    # at its kind's own size (exulanica.world.placed_things). Its kind never changes after it is
+    # placed: migration 0152's trigger refuses it, and a move or a removal changes only its pose
+    # and whether it is removed.
+
+    def add_thing(
+        self,
+        version_id: uuid.UUID,
+        placement: ThingPlacement,
+        *,
+        base_state_sha256: str,
+        actor: uuid.UUID,
+    ) -> AlternateVersion:
+        with self.connection.transaction():
+            row = self._begin_edit(version_id, base_state_sha256)
+            thing = self._validated_thing_placement(row, placement)
+            edit_id = uuid.uuid4()
+            self._insert_thing(version_id, thing, (edit_id, edit_id))
+            self._append_edit(
+                row,
+                edit_id=edit_id,
+                kind="add_thing",
+                thing_id=thing.thing_id,
+                before=None,
+                after=placed_thing_document(thing),
+                actor=actor,
+            )
+        return self._written(version_id)
+
+    def move_thing(
+        self,
+        version_id: uuid.UUID,
+        thing_id: str,
+        transform: Transform,
+        *,
+        base_state_sha256: str,
+        actor: uuid.UUID,
+    ) -> AlternateVersion:
+        with self.connection.transaction():
+            row = self._begin_edit(version_id, base_state_sha256)
+            current = self._require_thing(version_id, thing_id)
+            if current.removed:
+                raise InvalidObjectState(f"{thing_id} is removed in this version")
+            moved = replace(current, transform=transform)
+            validate_placed_thing(moved, region_ids=frozenset({current.region_id}), kinds=None)
+            edit_id = uuid.uuid4()
+            self.connection.execute(
+                "update world_alternate_thing "
+                "set x_mm=%s,y_mm=%s,z_mm=%s,yaw_microradians=%s,last_edit_id=%s "
+                "where workspace_id=%s and world_id=%s and version_id=%s and thing_id=%s",
+                (
+                    transform.x_mm,
+                    transform.y_mm,
+                    transform.z_mm,
+                    transform.yaw_microradians,
+                    edit_id,
+                    self.workspace_id,
+                    self.world_id,
+                    version_id,
+                    thing_id,
+                ),
+            )
+            self._append_edit(
+                row,
+                edit_id=edit_id,
+                kind="move_thing",
+                thing_id=thing_id,
+                before=placed_thing_document(current),
+                after=placed_thing_document(self._require_thing(version_id, thing_id)),
+                actor=actor,
+            )
+        return self._written(version_id)
+
+    def remove_thing(
+        self,
+        version_id: uuid.UUID,
+        thing_id: str,
+        *,
+        base_state_sha256: str,
+        actor: uuid.UUID,
+    ) -> AlternateVersion:
+        with self.connection.transaction():
+            row = self._begin_edit(version_id, base_state_sha256)
+            current = self._require_thing(version_id, thing_id)
+            if current.removed:
+                raise InvalidObjectState(f"{thing_id} is already removed in this version")
+            edit_id = uuid.uuid4()
+            self.connection.execute(
+                "update world_alternate_thing set removed=true,last_edit_id=%s "
+                "where workspace_id=%s and world_id=%s and version_id=%s and thing_id=%s",
+                (edit_id, self.workspace_id, self.world_id, version_id, thing_id),
+            )
+            self._append_edit(
+                row,
+                edit_id=edit_id,
+                kind="remove_thing",
+                thing_id=thing_id,
+                before=placed_thing_document(current),
+                after=placed_thing_document(self._require_thing(version_id, thing_id)),
+                actor=actor,
+            )
+        return self._written(version_id)
+
+    def _validated_thing_placement(
+        self, row: Mapping[str, Any], placement: ThingPlacement
+    ) -> PlacedThing:
+        present = self.connection.execute(
+            "select 1 from world_alternate_thing where workspace_id=%s and world_id=%s "
+            "and version_id=%s and thing_id=%s and not addition_undone",
+            (self.workspace_id, self.world_id, row["version_id"], placement.thing_id),
+        ).fetchone()
+        if present is not None:
+            raise InvalidObjectState(f"{placement.thing_id} already exists in this version")
+        held = self.connection.execute(
+            "select count(*) as n from world_alternate_thing where workspace_id=%s "
+            "and world_id=%s and version_id=%s and not addition_undone",
+            (self.workspace_id, self.world_id, row["version_id"]),
+        ).fetchone()["n"]
+        if held >= PLACED_THINGS_MAXIMUM:
+            raise ThingLimitReached(
+                f"a version holds at most {PLACED_THINGS_MAXIMUM} placed things, removed ones "
+                "included; undo a placement to make room, or place it in another version"
+            )
+        return validate_placed_thing(
+            PlacedThing(
+                thing_id=placement.thing_id,
+                kind=placement.kind,
+                region_id=placement.region_id,
+                transform=placement.transform,
+                origin=placement.origin,
+            ),
+            region_ids=self._source_region_ids(row["source_snapshot_id"]),
+        )
+
+    def _insert_thing(
+        self,
+        version_id: uuid.UUID,
+        thing: PlacedThing,
+        edit_ids: tuple[uuid.UUID, uuid.UUID],
+    ) -> None:
+        created_edit_id, last_edit_id = edit_ids
+        written = self.connection.execute(
+            """
+            insert into world_alternate_thing(
+              workspace_id,world_id,version_id,thing_id,kind,kind_version,kind_sha256,region_id,
+              x_mm,y_mm,z_mm,yaw_microradians,origin_kind,origin_role,removed,created_edit_id,
+              last_edit_id,addition_undone)
+            values(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,false)
+            on conflict (workspace_id,world_id,version_id,thing_id) do update set
+              kind=excluded.kind,kind_version=excluded.kind_version,
+              kind_sha256=excluded.kind_sha256,region_id=excluded.region_id,
+              x_mm=excluded.x_mm,y_mm=excluded.y_mm,z_mm=excluded.z_mm,
+              yaw_microradians=excluded.yaw_microradians,origin_kind=excluded.origin_kind,
+              origin_role=excluded.origin_role,removed=excluded.removed,
+              created_edit_id=excluded.created_edit_id,last_edit_id=excluded.last_edit_id,
+              addition_undone=false
+            where world_alternate_thing.addition_undone
+            returning thing_id
+            """,
+            (
+                self.workspace_id,
+                self.world_id,
+                version_id,
+                thing.thing_id,
+                thing.kind.kind,
+                thing.kind.version,
+                bytes.fromhex(thing.kind.sha256),
+                thing.region_id,
+                thing.transform.x_mm,
+                thing.transform.y_mm,
+                thing.transform.z_mm,
+                thing.transform.yaw_microradians,
+                thing.origin.kind,
+                thing.origin.role,
+                thing.removed,
+                created_edit_id,
+                last_edit_id,
+            ),
+        ).fetchone()
+        if written is None:
+            raise InvalidObjectState(f"{thing.thing_id} already exists in this version")
+
+    def _things(self, version_id: uuid.UUID) -> tuple[PlacedThing, ...]:
+        rows = self.connection.execute(
+            "select thing_id,kind,kind_version,kind_sha256,region_id,x_mm,y_mm,z_mm,"
+            "yaw_microradians,origin_kind,origin_role,removed from world_alternate_thing "
+            "where workspace_id=%s and world_id=%s and version_id=%s and not addition_undone "
+            "order by thing_id",
+            (self.workspace_id, self.world_id, version_id),
+        ).fetchall()
+        return tuple(_thing_from_row(row) for row in rows)
+
+    def _require_thing(self, version_id: uuid.UUID, thing_id: str) -> PlacedThing:
+        for thing in self._things(version_id):
+            if thing.thing_id == thing_id:
+                return thing
+        raise UnknownWorldResource(f"no placed thing {thing_id} in this version")
+
+    def _thing_edit_ids(self, version_id: uuid.UUID, thing_id: str) -> tuple[uuid.UUID, uuid.UUID]:
+        row = self.connection.execute(
+            "select created_edit_id,last_edit_id from world_alternate_thing "
+            "where workspace_id=%s and world_id=%s and version_id=%s and thing_id=%s",
+            (self.workspace_id, self.world_id, version_id, thing_id),
+        ).fetchone()
+        return (row["created_edit_id"], row["last_edit_id"])
+
+    def _undo_thing(
+        self,
+        version_id: uuid.UUID,
+        thing_id: str,
+        before: Mapping[str, Any] | None,
+        edit_id: uuid.UUID,
+    ) -> tuple[Mapping[str, Any] | None, Mapping[str, Any] | None]:
+        current = self._require_thing(version_id, thing_id)
+        if before is None:
+            self.connection.execute(
+                "update world_alternate_thing set removed=true,addition_undone=true,"
+                "last_edit_id=%s "
+                "where workspace_id=%s and world_id=%s and version_id=%s and thing_id=%s",
+                (edit_id, self.workspace_id, self.world_id, version_id, thing_id),
+            )
+            return placed_thing_document(current), None
+        self._restore_thing(version_id, before, edit_id)
+        return placed_thing_document(current), placed_thing_document(
+            self._require_thing(version_id, thing_id)
+        )
+
+    def _check_thing_restore(self, version_id: uuid.UUID, document: Mapping[str, Any]) -> None:
+        """Refuse restoring a stored document that names another kind or origin than the thing
+        has: the writer's check and the undo preview's one rule."""
+        current = placed_thing_document(self._require_thing(version_id, document["thing_id"]))
+        if current["kind"] != document["kind"] or current["origin"] != document["origin"]:
+            raise InvalidObjectState("stored undo kind disagrees with the thing as it stands")
+
+    def _restore_thing(
+        self, version_id: uuid.UUID, document: Mapping[str, Any], edit_id: uuid.UUID
+    ) -> None:
+        self._check_thing_restore(version_id, document)
+        transform = document["transform"]
+        self.connection.execute(
+            "update world_alternate_thing set region_id=%s,x_mm=%s,y_mm=%s,z_mm=%s,"
+            "yaw_microradians=%s,removed=%s,last_edit_id=%s "
+            "where workspace_id=%s and world_id=%s and version_id=%s and thing_id=%s",
+            (
+                document["region_id"],
+                transform["x_mm"],
+                transform["y_mm"],
+                transform["z_mm"],
+                transform["yaw_microradians"],
+                document["removed"],
+                edit_id,
+                self.workspace_id,
+                self.world_id,
+                version_id,
+                document["thing_id"],
+            ),
+        )
+
     def _version_row(self, version_id: uuid.UUID, *, for_update: bool = False) -> Mapping[str, Any]:
         row = self.connection.execute(
             "select version_id,world_id,source_snapshot_id,parent_version_id,title,"
@@ -2776,6 +3067,21 @@ def _binding_refusal() -> Iterator[None]:
                 "the workspace asset stopped being placeable before the object was written"
             ) from error
         raise
+
+
+def _thing_from_row(row: Mapping[str, Any]) -> PlacedThing:
+    return PlacedThing(
+        thing_id=row["thing_id"],
+        kind=ThingKindReference(
+            row["kind"], int(row["kind_version"]), bytes(row["kind_sha256"]).hex()
+        ),
+        region_id=row["region_id"],
+        transform=Transform(
+            row["x_mm"], row["y_mm"], row["z_mm"], row["yaw_microradians"], UNSCALED_MILLI
+        ),
+        origin=ObjectOrigin(row["origin_kind"], row["origin_role"]),
+        removed=row["removed"],
+    )
 
 
 def _object_from_document(document: Mapping[str, Any]) -> AuthoredObject:

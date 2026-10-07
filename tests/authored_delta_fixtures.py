@@ -22,6 +22,7 @@ from exulanica.world import (
     SourceAnchor,
     Transform,
 )
+from exulanica.world.placed_things import PlacedThing, ThingKindReference
 
 CUBE = "b41289ac10548cf698d46a15206caa8e744b0b800f4ac29260c99f18d8b831d9"
 
@@ -135,12 +136,37 @@ POINT_MAP = PointMapInstance(
     origin=ObjectOrigin("authored", "personal"),
 )
 
-#: Name -> (objects, element overrides, environment instances, point map instances).
+#: Two placed things, out of order: a knight by the well and the gate visitors arrive through.
+KNIGHT = PlacedThing(
+    thing_id="knight:by-the-well",
+    kind=ThingKindReference("knight", 1, "d" * 64),
+    region_id="region-a",
+    transform=Transform(2_000, 500, 0, 1_570_796, 1_000),
+    origin=ObjectOrigin("authored", "fictional"),
+)
+GATE = PlacedThing(
+    thing_id="gate:east",
+    kind=ThingKindReference("gate", 1, "e" * 64),
+    region_id="region-a",
+    transform=Transform(-3_000, 0, 0, 0, 1_000),
+    origin=ObjectOrigin("authored", "fictional"),
+    removed=True,
+)
+
+#: Name -> (objects, element overrides, environment instances, point map instances, things).
 DELTAS = {
-    "empty": ((), (), (), ()),
-    "v1": (OBJECTS, OVERRIDES, (), ()),
-    "v2-whole-asset": (OBJECTS, OVERRIDES, (WHOLE_ASSET,), ()),
-    "v2-feature": ((), (), (FEATURE,), ()),
-    "v3-point-maps-only": ((), (), (), (POINT_MAP,)),
-    "v3-with-environments": (OBJECTS, OVERRIDES, (FEATURE, WHOLE_ASSET), (POINT_MAP,)),
+    "empty": ((), (), (), (), ()),
+    "v1": (OBJECTS, OVERRIDES, (), (), ()),
+    "v2-whole-asset": (OBJECTS, OVERRIDES, (WHOLE_ASSET,), (), ()),
+    "v2-feature": ((), (), (FEATURE,), (), ()),
+    "v3-point-maps-only": ((), (), (), (POINT_MAP,), ()),
+    "v3-with-environments": (OBJECTS, OVERRIDES, (FEATURE, WHOLE_ASSET), (POINT_MAP,), ()),
+    "v4-things-only": ((), (), (), (), (KNIGHT,)),
+    "v4-with-everything": (
+        OBJECTS,
+        OVERRIDES,
+        (FEATURE, WHOLE_ASSET),
+        (POINT_MAP,),
+        (KNIGHT, GATE),
+    ),
 }

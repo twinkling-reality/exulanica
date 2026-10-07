@@ -862,7 +862,7 @@ layers = [
   "object_repository",
   "environment_source_authority | point_map_source_authority",
   "authored_delta",
-  "environment_instances | photo_point_maps",
+  "environment_instances | photo_point_maps | placed_things",
   "objects",
   "edit_kinds",
 ]

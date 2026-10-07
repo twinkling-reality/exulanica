@@ -62,6 +62,7 @@ from society_fixtures import SEED, society_input
 from society_living_fixtures import grid_input
 from static_glb_builder import cube
 from test_material_recipes import _small
+from thing_fixtures import kind_body, placeable_kind
 from workspace_asset_support import declaration as workspace_asset_declaration
 from world_support import FIXTURE_WORLD_ID, registered_world
 
@@ -306,6 +307,37 @@ def world_object(owner) -> dict[str, Any]:
 
 def invented_object() -> str:
     return f"object:{uuid.uuid4().hex}"
+
+
+def placed_thing(owner) -> dict[str, Any]:
+    """A thing placed by a shipped kind in a version of its own, with no society (API)."""
+    version_id = _plain_version(owner)
+    current = _ok(in_world(owner, "GET", f"/world/versions/{version_id}"), 200)
+    thing_id = "thing:existence"
+    _ok(
+        in_world(
+            owner,
+            "POST",
+            f"/world/versions/{version_id}/things",
+            json={
+                "base_state_sha256": current["state_sha256"],
+                "thing_id": thing_id,
+                "kind": kind_body(placeable_kind()),
+                "region_id": REGION,
+                "pose": {"x_mm": 0, "y_mm": 0, "z_mm": 0, "yaw_microradians": 0},
+                "origin_role": "fictional",
+            },
+        ),
+        201,
+    )
+    return {
+        "/world/versions/{version_id}": version_id,
+        "/world/versions/{version_id}/things/{thing_id}": thing_id,
+    }
+
+
+def invented_thing() -> str:
+    return f"thing:{uuid.uuid4().hex}"
 
 
 # -- admitted environment sources --------------------------------------------------------------

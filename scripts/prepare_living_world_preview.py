@@ -200,7 +200,11 @@ def generate_preview(
         title="Fictional living-world preview",
         style_version_id=None,
         state_sha256=delta_sha256(
-            objects=(), element_overrides=(), environment_instances=(), point_map_instances=()
+            objects=(),
+            element_overrides=(),
+            environment_instances=(),
+            point_map_instances=(),
+            things=(),
         ),
         edit_seq=0,
         source_invalidated=False,
@@ -294,6 +298,7 @@ def generate_preview(
                     element_overrides=(),
                     environment_instances=(),
                     point_map_instances=(),
+                    things=(),
                 ),
             )
             inputs.append(composed(len(inputs) + 1))

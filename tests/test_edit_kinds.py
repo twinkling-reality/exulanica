@@ -132,6 +132,27 @@ def test_the_newest_subject_check_gives_every_kind_its_registered_subject():
         assert set(disjuncts[subject.column]) == kinds_of(subject), (stem, subject)
 
 
+#: The migrations that name the edit log's checks or the placed-thing table, as of the last of them.
+#: A migration added later is numbered above every one of these: one numbered below them runs
+#: before them on a fresh database and after them on a database already past them, so the two
+#: would hold different checks (a restated check dropping the thing kinds, a column a trigger
+#: then refuses to change).
+TOUCHING_THE_EDIT_LOG: tuple[str, ...] = ("0042", "0050", "0093", "0096", "0152")
+
+
+def test_a_migration_touching_the_edit_log_or_placed_things_is_numbered_above_the_rest():
+    names = (KIND_CHECK, SUBJECT_CHECK, "world_alternate_thing")
+    touching = [stem[:4] for stem, sql in _migrations() if any(name in sql for name in names)]
+    # The positive control: the scan finds every migration known to touch them.
+    assert set(TOUCHING_THE_EDIT_LOG) <= set(touching)
+    late = [
+        number
+        for number in touching
+        if number not in TOUCHING_THE_EDIT_LOG and number < max(TOUCHING_THE_EDIT_LOG)
+    ]
+    assert not late, f"migrations {late} touch the edit log below {max(TOUCHING_THE_EDIT_LOG)}"
+
+
 def test_each_kind_names_the_first_migration_that_admitted_it():
     firsts: dict[str, str] = {}
     for stem, sql in _migrations():

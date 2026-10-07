@@ -366,7 +366,11 @@ def test_a_perch_whose_column_another_object_crosses_is_refused():
         title="lamp over a tree",
         style_version_id=None,
         state_sha256=delta_sha256(
-            objects=objects, element_overrides=(), environment_instances=(), point_map_instances=()
+            objects=objects,
+            element_overrides=(),
+            environment_instances=(),
+            point_map_instances=(),
+            things=(),
         ),
         edit_seq=2,
         source_invalidated=False,

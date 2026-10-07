@@ -40,7 +40,11 @@ def flight(*objects, bounds=None):
         title="a bench beside a tree",
         style_version_id=None,
         state_sha256=delta_sha256(
-            objects=objects, element_overrides=(), environment_instances=(), point_map_instances=()
+            objects=objects,
+            element_overrides=(),
+            environment_instances=(),
+            point_map_instances=(),
+            things=(),
         ),
         edit_seq=len(objects),
         source_invalidated=False,

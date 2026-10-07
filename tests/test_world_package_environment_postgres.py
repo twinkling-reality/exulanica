@@ -79,6 +79,7 @@ def test_environment_instance_round_trips_through_a_signed_package(repository, t
         element_overrides=stored.element_overrides,
         environment_instances=stored.environment_instances,
         point_map_instances=(),
+        things=(),
     )
     assert packaged["delta"]["schema_version"] == 2
     assert packaged["state_sha256"] == stored.state_sha256 == environments.delta_sha256(

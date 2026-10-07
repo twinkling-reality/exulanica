@@ -159,6 +159,7 @@ def v1_digest(objects=(), overrides=()):
         element_overrides=overrides,
         environment_instances=(),
         point_map_instances=(),
+        things=(),
     )
 
 
@@ -168,6 +169,7 @@ def v1_document(objects=(), overrides=()):
         element_overrides=overrides,
         environment_instances=(),
         point_map_instances=(),
+        things=(),
     )
 
 

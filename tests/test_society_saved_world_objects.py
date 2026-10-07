@@ -129,6 +129,7 @@ def world(*objects, overrides=(), placements=()) -> AlternateVersion:
             element_overrides=overrides,
             environment_instances=placements,
             point_map_instances=(),
+            things=(),
         ),
         edit_seq=len(held) + len(placements) + len(overrides),
         source_invalidated=False,

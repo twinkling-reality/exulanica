@@ -1,8 +1,9 @@
 """An alternate version's authored delta: every kind's section, composed into one digest.
 
 This module sits above every instance kind. :mod:`exulanica.world.objects` holds the object and
-element-override documents, :mod:`exulanica.world.environment_instances` and
-:mod:`exulanica.world.photo_point_maps` hold their own, and only this module knows all of them.
+element-override documents, :mod:`exulanica.world.environment_instances`,
+:mod:`exulanica.world.photo_point_maps` and :mod:`exulanica.world.placed_things` hold their own, and
+only this module knows all of them.
 The composition used to live in ``objects`` and reach up into the two instance modules from inside
 a function, so a new kind could be added below without the composer being told: the digest took
 each later section as an optional argument defaulting to empty, and a caller that passed fewer
@@ -16,11 +17,11 @@ required argument every caller has to answer. A caller holding the whole version
 :func:`version_delta_sha256`, which reads every section from it.
 
 **The document is unchanged.** Sections are sorted by their subject id; the two version 1 sections
-are always written; each later section is written only when it holds something and then selects
-its schema version (2 for environment instances, 3 for point maps). That last rule is load-bearing:
-the digest is every stored version's compare-and-swap token, so a section that appeared empty
-would move the token of every world that has none and refuse the next edit on all of them.
-``tests/test_authored_delta.py`` holds golden digests for every schema version.
+are always written; each later section is written only when it holds something and then selects its
+schema version (2 for environment instances, 3 for point maps, 4 for placed things). That last rule
+is load-bearing: the digest is every stored version's compare-and-swap token, so a section that
+appeared empty would move the token of every world that has none and refuse the next edit on all of
+them. ``tests/test_authored_delta.py`` holds golden digests for every schema version.
 
 Pure: no connection and no SQL, so an independent verifier can rebuild the digest.
 """
@@ -47,6 +48,7 @@ from exulanica.world.objects import (
     override_document,
 )
 from exulanica.world.photo_point_maps import PointMapInstance, point_map_instance_document
+from exulanica.world.placed_things import PlacedThing, placed_thing_document
 
 __all__ = [
     "DELTA_SECTIONS",
@@ -77,6 +79,7 @@ class AlternateVersion:
     element_overrides: tuple[ElementOverride, ...] = ()
     environment_instances: tuple[EnvironmentInstance, ...] = ()
     point_map_instances: tuple[PointMapInstance, ...] = ()
+    things: tuple[PlacedThing, ...] = ()
     edits: tuple[VersionEdit, ...] = ()
 
 
@@ -119,6 +122,7 @@ DELTA_SECTIONS: Final[tuple[DeltaSection, ...]] = (
         attrgetter("instance_id"),
         3,
     ),
+    DeltaSection("things", EditSubject.THING, placed_thing_document, attrgetter("thing_id"), 4),
 )
 
 
@@ -128,6 +132,7 @@ def canonical_delta_document(
     element_overrides: Sequence[ElementOverride],
     environment_instances: Sequence[EnvironmentInstance],
     point_map_instances: Sequence[PointMapInstance],
+    things: Sequence[PlacedThing],
 ) -> dict[str, Any]:
     """The whole delta, in the one order its digest is defined over.
 
@@ -141,6 +146,7 @@ def canonical_delta_document(
             "element_overrides": element_overrides,
             "environment_instances": environment_instances,
             "point_map_instances": point_map_instances,
+            "things": things,
         }
     )
 
@@ -151,6 +157,7 @@ def delta_sha256(
     element_overrides: Sequence[ElementOverride],
     environment_instances: Sequence[EnvironmentInstance],
     point_map_instances: Sequence[PointMapInstance],
+    things: Sequence[PlacedThing],
 ) -> str:
     """The state token: SHA-256 over the canonical delta, hex."""
     document = canonical_delta_document(
@@ -158,6 +165,7 @@ def delta_sha256(
         element_overrides=element_overrides,
         environment_instances=environment_instances,
         point_map_instances=point_map_instances,
+        things=things,
     )
     # Round-trips through canonical_json first so a value the digest could not represent raises
     # here, where the message names this plane, rather than inside the hashing helper.

@@ -61,7 +61,11 @@ def version(objects=(), **changes):
         "Synthetic authored composition",
         None,
         delta_sha256(
-            objects=objects, element_overrides=(), environment_instances=(), point_map_instances=()
+            objects=objects,
+            element_overrides=(),
+            environment_instances=(),
+            point_map_instances=(),
+            things=(),
         ),
         0,
         False,

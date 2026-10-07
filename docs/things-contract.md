@@ -1,8 +1,8 @@
 # Things contract
 
 Status: **THING KINDS, BODY PLANS, ABILITIES, OFFERS, LOOKS, THE ORIGIN RECORD AND TRANSLATION
-MANIFESTS ARE DATA HELD TO THEIR CHECKS; NO SOCIETY ENGINE, STORE, ROUTE OR RENDERER READS A THING
-KIND**.
+MANIFESTS ARE DATA HELD TO THEIR CHECKS, AND A WORLD'S AUTHOR PLACES THINGS BY THEIR KIND; NO
+SOCIETY ENGINE OR RENDERER READS A THING KIND**.
 
 A thing is anything addressable in a world: a knight, a lantern spirit, a sword, a well, a gate, a
 visitor that came in from another program. What a kind of thing is and can do is one typed,
@@ -73,9 +73,14 @@ canonical JSON with no floats, and every object in it states exactly its keys:
 | `ext` | source data kept verbatim, at most 8 KiB of canonical bytes, which no engine reads |
 
 A kind's identity is its key and version, and its digest is the SHA-256 of its canonical bytes; a
-version never changes. A thing names its kind by all three. What a society is given of a kind is
-`ThingKind.semantics()`: every field but `looks`, `origin`, `ext` and `summary`, with the kind's
-reference, so no look reaches a society through its kind.
+version never changes, and a kind that must change gets its next version beside the first. The lock
+beside the kinds, `assets/catalogs/things/kinds.lock.json`, names every shipped version with the
+digest it shipped with, and the kind loader refuses a file it does not name at that digest, or a
+locked version with no file. A thing names its kind by all
+three: a world's author places one by its kind in a version's authored plane
+([world objects contract, section 14](world-objects-contract.md#14-placed-things)). What a society
+is given of a kind is `ThingKind.semantics()`: every field but `looks`, `origin`, `ext` and
+`summary`, with the kind's reference, so no look reaches a society through its kind.
 
 ### Refusals
 
@@ -90,6 +95,7 @@ A kind is refused with `ThingKindRefused`: a code, the field at fault and a sent
 | `thing_kind_offer_implausible` | A grip outside the box; a holdable thing longer than any socket of any plan holds; a place beyond reach (1,500 mm) of the box; places on a thing with no box |
 | `thing_kind_look_unfit` | A look of another body plan than the kind's, when the reader is given looks to resolve |
 | `thing_kind_origin_invalid` | An origin record the origin reader refuses |
+| `thing_kind_not_locked` | A shipped kind file the lock does not name at its digest, or a locked version with no file |
 
 `shipped_thing_kinds()` reads every kind under
 [`assets/catalogs/things/kinds`](../assets/catalogs/things/kinds) and refuses a file named for
@@ -270,11 +276,14 @@ act on is dropped or opaque.
 
 ## The kinds and looks this repository ships
 
-[`scripts/things/shipped_things.py`](../scripts/things/shipped_things.py) writes every shipped kind
-and look, and `--check` exits non-zero when a committed one differs. The six pieces of furniture
-are derived from the world object catalog, their places, seats, perches and hosted flyers as that
-catalog derives them, so no figure is stated twice. The kinds are this project's own, under the
-repository's licence.
+[`scripts/things/shipped_things.py`](../scripts/things/shipped_things.py) writes every shipped look
+and the first version of every shipped kind, and `--check` exits non-zero when a committed one
+differs. A later version of a kind is data: its committed document is the source, which the script
+reads, checks against the things catalogs and formats, and never writes from figures of its own.
+The script keeps the lock, adding a line for each new version and refusing to change one already
+there. The six pieces of furniture are derived from the world object catalog, their places, seats,
+perches and hosted flyers as that catalog derives them, so no figure is stated twice. The kinds are
+this project's own, under the repository's licence.
 
 | Kind | Class | Body | Abilities | Offers | Deciders | Look |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -283,7 +292,7 @@ repository's licence.
 | `lantern_spirit` | being | bodiless, radius 200 mm | wait, follow, say, pick_up, put_down, give, take | talk_to, hear, receive, be_followed | as the knight; its routine follows whoever carries a lantern | `spirit-light` |
 | `visitor` | being | humanoid, 1,500 to 2,000 mm | wait, stand, talk, say, pick_up, put_down, give, take, follow, leave after 5 quiet minutes | talk_to, hear, receive, be_followed | an outside program only | none: its crossing brings one |
 | `villager` | being | humanoid, 1,500 to 1,950 mm | wait, stand, talk, rest, visit | talk_to, hear | the routine; a model or the owner | `people-catalog` |
-| `sword` | object | 120 x 40 x 1,000 mm | | holdable, one hand | | `primitive-sword` |
+| `sword` | object | version 2: 240 x 80 x 1,000 mm, as wide and deep as a sword's guard and pommel; version 1: 120 x 40 x 1,000 mm | | holdable, one hand, 150 mm up its length | | `primitive-sword` |
 | `lantern` | object | 180 x 180 x 300 mm | | holdable, one hand | | `primitive-lantern` |
 | `well` | object | 1,600 x 1,600 x 2,200 mm, blocks walking | | visit, from two sides | | `primitive-well` |
 | `gate` | object | 3,000 x 400 x 3,000 mm, walked through | | arrive_through, leave_through | | `primitive-gate` |
@@ -307,7 +316,7 @@ These are material limits of the boundary above, not partial behaviour:
 - No society engine reads a thing kind, and no ability module runs: the abilities catalog names
   modules no registry states. A world's people are the society's own, drawn as today.
 - No store holds a workspace's own kinds or looks, or the look chosen for a thing, and no route
-  serves a kind, a look or a look's container.
+  serves a kind, a look or a look's container. A placed thing names a shipped kind.
 - The browser draws no thing by its look kind.
 - No importer or crossing writes a translation manifest; the reader and its accounting check exist.
 
@@ -320,5 +329,6 @@ These are material limits of the boundary above, not partial behaviour:
 | Looks | [`looks.py`](../exulanica/things/looks.py), [`authored.py`](../exulanica/things/authored.py), [`pieces.py`](../exulanica/things/pieces.py) | `tests/test_thing_kinds.py`, `tests/test_thing_looks_and_origins.py` (each authored container written again and admitted, a blocky figure's joints, a static look inside its box) |
 | Origin record and vocabularies | [`origin.py`](../exulanica/things/origin.py), [`vocabularies.py`](../exulanica/things/vocabularies.py) | `tests/test_thing_looks_and_origins.py` |
 | Translation manifests | [`manifests.py`](../exulanica/things/manifests.py) | `tests/test_thing_looks_and_origins.py` |
-| Shipped kinds and looks | [`shipped_things.py`](../scripts/things/shipped_things.py) | `tests/test_thing_kinds.py` (`--check`) |
+| Shipped kinds and looks | [`shipped_things.py`](../scripts/things/shipped_things.py), the lock `kinds.lock.json` | `tests/test_thing_kinds.py` (`--check`), `tests/test_placed_things.py` (every shipped version at its locked digest; a changed, unlocked or missing file refused) |
+| Placed things | [`placed_things.py`](../exulanica/world/placed_things.py), the object repository, [`world_things.py`](../exulanica/api/routes/world_things.py), migration 0152 | `tests/test_placed_things.py`, `tests/test_placed_things_postgres.py` (as the deployed writer: place, move, remove, undo and place again; the kind fixed by the table; another workspace sees nothing; a branch keeps them; the routes' refusals by name), `tests/test_edit_kind_undo_postgres.py` |
 | Purity | The import contract "Things are pure data" in `pyproject.toml`: no database, store, evidence, pipeline, world, traffic, movement step, model or numeric stack | `lint-imports` |

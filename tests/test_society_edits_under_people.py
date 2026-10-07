@@ -49,6 +49,7 @@ def edited(*objects, seq):
             element_overrides=(),
             environment_instances=(),
             point_map_instances=(),
+            things=(),
         ),
         edit_seq=seq,
     )

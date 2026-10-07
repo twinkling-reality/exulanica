@@ -3,11 +3,17 @@
     uv run python scripts/things/shipped_things.py          # write
     uv run python scripts/things/shipped_things.py --check  # exit 1 on any difference
 
-The slice's kinds (a knight, a traveller, a lantern spirit, a visitor, a villager, a sword, a
-lantern, a well and a gate) are stated here; the world object catalog's six pieces of furniture
-are derived from it, their places, seats and perches as that catalog derives them, so neither
-states a figure twice. Each look this repository authors pins the digest of the container its
+The first version of the slice's kinds (a knight, a traveller, a lantern spirit, a visitor, a
+villager, a sword, a lantern, a well and a gate) is stated here; the world object catalog's six
+pieces of furniture are derived from it, their places, seats and perches as that catalog derives
+them, so neither states a figure twice. A later version of a kind is data: its committed document
+(``kinds/<kind>.v<N>.json``) is the source, which this reads, checks and formats, and never writes
+from figures of its own. Each look this repository authors pins the digest of the container its
 recipe writes (exulanica/things/authored.py); each furniture look pins its reviewed asset's.
+
+``kinds.lock.json`` beside the kinds names every shipped version with the digest it shipped with,
+and the kind loader refuses a file it does not name at that digest. Writing adds a line for each
+new version and refuses to change one already there: a shipped version never changes.
 """
 
 from __future__ import annotations
@@ -22,6 +28,9 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 from exulanica.canonical import sha256_of_canonical  # noqa: E402
+from exulanica.grammar.documents import read_json  # noqa: E402
+from exulanica.things.kinds import KINDS_LOCK, LOCK_PROFILE, read_kind_lock  # noqa: E402
+from exulanica.things.kinds import read_thing_kind  # noqa: E402
 from exulanica.things.authored import AUTHORED_LOOKS, container_of  # noqa: E402
 from exulanica.things.vocabularies import origin_of_character_family  # noqa: E402
 from exulanica.world.assets import reviewed_asset_of  # noqa: E402
@@ -232,6 +241,7 @@ def _object(
 
 
 def kinds(made_looks: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    """The first version of every kind this states, by its file's stem (``sword.v1``)."""
     ref = {key: _ref(look) for key, look in made_looks.items()}
     anyone = {"default": "routine", "allowed": ["routine", "model", "person", "external"]}
     found = {
@@ -458,11 +468,45 @@ def kinds(made_looks: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
             offers,
             [ref[key.replace("_", "-")]],
         )
-    return found
+    return {f"{doc['kind']}.v1": doc for doc in found.values()}
+
+
+def later_versions() -> dict[str, dict[str, Any]]:
+    """Every later version of a kind, by its file's stem: its committed document, read and checked
+    against the things catalogs. A shipped version never changes; a changed kind is its next
+    version, a new document beside the first."""
+    later = {}
+    for path in sorted(KINDS.glob("*.v*.json")):
+        document = read_json(path)
+        if document.get("version") == 1:
+            continue
+        kind = read_thing_kind(document)
+        stem = f"{kind.kind}.v{kind.version}"
+        if path.name != f"{stem}.json":
+            raise SystemExit(f"{path.name} names another kind or version than it states")
+        later[stem] = dict(document)
+    return later
 
 
 def _text(document: dict[str, Any]) -> str:
     return json.dumps(document, indent=2, ensure_ascii=False) + "\n"
+
+
+def _lock_text(locked: dict[tuple[str, int], str]) -> str:
+    return _text(
+        {
+            "profile": LOCK_PROFILE,
+            "reason": (
+                "Every thing kind version this repository ships, with the digest it shipped "
+                "with: a shipped version never changes, so the kind loader refuses a file this "
+                "does not name at its digest, and a changed kind is a new version and a new line."
+            ),
+            "kinds": [
+                {"kind": kind, "version": version, "sha256": digest}
+                for (kind, version), digest in sorted(locked.items())
+            ],
+        }
+    )
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -470,10 +514,22 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--check", action="store_true")
     arguments = parser.parse_args(argv)
     made_looks = looks()
-    made_kinds = kinds(made_looks)
+    made_kinds = {**kinds(made_looks), **later_versions()}
     wanted = {LOOKS / f"{key}.v1.json": _text(doc) for key, doc in made_looks.items()}
-    wanted |= {KINDS / f"{key}.v1.json": _text(doc) for key, doc in made_kinds.items()}
+    wanted |= {KINDS / f"{stem}.json": _text(doc) for stem, doc in made_kinds.items()}
     present = {path for directory in (LOOKS, KINDS) for path in directory.glob("*.json")}
+    digests = {
+        (doc["kind"], doc["version"]): sha256_of_canonical(doc).hex() for doc in made_kinds.values()
+    }
+    locked = read_kind_lock(KINDS_LOCK) if KINDS_LOCK.exists() else {}
+    # A version already shipped keeps its digest and its file; anything else is a refusal.
+    changed = sorted(key for key in locked if key in digests and digests[key] != locked[key])
+    missing = sorted(key for key in locked if key not in digests)
+    for kind, version in changed:
+        print(f"refused: {kind} version {version} shipped with another digest; make a new version")
+    for kind, version in missing:
+        print(f"refused: {kind} version {version} shipped and has no document")
+    lock_text = _lock_text({**locked, **digests} if not (changed or missing) else locked)
     if arguments.check:
         differing = sorted(
             str(path.relative_to(ROOT))
@@ -485,14 +541,20 @@ def main(argv: list[str] | None = None) -> int:
             print(f"differs: {path}")
         for path in stray:
             print(f"not written by this script: {path}")
-        return 1 if differing or stray else 0
+        unlocked = not KINDS_LOCK.exists() or KINDS_LOCK.read_text(encoding="utf-8") != lock_text
+        if unlocked:
+            print(f"differs: {KINDS_LOCK.relative_to(ROOT)}")
+        return 1 if differing or stray or changed or missing or unlocked else 0
+    if changed or missing:
+        return 1
     for directory in (LOOKS, KINDS):
         directory.mkdir(parents=True, exist_ok=True)
     for path, text in wanted.items():
         path.write_text(text, encoding="utf-8")
     for path in present - set(wanted):
         path.unlink()
-    print(f"wrote {len(made_looks)} looks and {len(made_kinds)} kinds")
+    KINDS_LOCK.write_text(lock_text, encoding="utf-8")
+    print(f"wrote {len(made_looks)} looks, {len(made_kinds)} kinds and the lock")
     return 0
 
 

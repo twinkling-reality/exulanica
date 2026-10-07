@@ -196,6 +196,7 @@ def _objects_only(objects):
         "element_overrides": [],
         "environment_instances": [],
         "point_map_instances": [],
+        "things": [],
     }
 
 

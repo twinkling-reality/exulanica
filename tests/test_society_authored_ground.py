@@ -111,6 +111,7 @@ def version(
             element_overrides=overrides,
             environment_instances=(),
             point_map_instances=point_maps,
+            things=(),
         ),
         edit_seq=len(objects) + len(point_maps),
         source_invalidated=invalidated,

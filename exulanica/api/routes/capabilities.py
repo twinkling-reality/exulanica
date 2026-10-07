@@ -100,6 +100,12 @@ from exulanica.api.routes.world_objects import (
     undo_authored_edit,
     undo_authored_edit_preview,
 )
+from exulanica.api.routes.world_things import (
+    add_thing,
+    move_thing,
+    remove_thing,
+    undo_thing_edit,
+)
 from exulanica.api.routes.world_traffic import world_traffic
 from exulanica.api.routes.world_versions import alternate_version
 from exulanica.api.routes.worlds import compose_personal_source_world, personal_source_world
@@ -409,6 +415,18 @@ def _environment_operations(context: VersionContext) -> list[Operation]:
     ]
 
 
+def _thing_operations(context: VersionContext) -> list[Operation]:
+    state = unavailable(_INVALIDATED) if context.source.invalidated else AVAILABLE
+    things = Subjects(alternate_version, "things")
+    base = _version_base()
+    return [
+        Operation(add_thing, state, "version", context.bind, base=base),
+        Operation(move_thing, state, "thing", context.bind, things, base=base),
+        Operation(remove_thing, state, "thing", context.bind, things, base=base),
+        Operation(undo_thing_edit, state, "version", context.bind, base=base),
+    ]
+
+
 def _composition_operations(context: VersionContext) -> list[Operation]:
     state = unavailable(SOURCE_INVALIDATED) if context.source.invalidated else AVAILABLE
     base = _version_base()
@@ -603,6 +621,7 @@ def _traffic_operations(context: VersionContext) -> list[Operation]:
 VERSION_ADAPTERS: Final[tuple[Callable[[VersionContext], list[Operation]], ...]] = (
     _object_operations,
     _environment_operations,
+    _thing_operations,
     _composition_operations,
     _arrangement_operations,
     _society_operations,

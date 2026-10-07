@@ -155,6 +155,9 @@ export const EDIT_WORDS: Readonly<Record<string, string>> = {
   add_point_map: 'a photograph’s points you placed',
   move_point_map: 'a photograph’s points you moved',
   remove_point_map: 'a photograph’s points you removed',
+  add_thing: 'a thing you placed',
+  move_thing: 'a thing you moved',
+  remove_thing: 'a thing you removed',
 };
 
 /** How far one arrow key moves an object, in millimetres. A quarter of a step. */

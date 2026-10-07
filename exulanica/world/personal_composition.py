@@ -144,6 +144,7 @@ VERSION_TABLES: Final[Mapping[str, str]] = {
     "world_alternate_element_override": "carried",
     "world_alternate_environment_instance": "carried while its source can still be placed",
     "world_alternate_point_map_instance": "carried while its depth right and bytes allow it",
+    "world_alternate_thing": "carried: it names a shipped kind by a digest that never changes",
     "world_alternate_version_edit": "carried whole when every row carries, otherwise not at all",
     "world_character_appearance_revision": "the avatar's carried; an inhabitant's stay",
     "world_society": "stays in the previous version; inhabitants who are here refuse",
@@ -674,6 +675,7 @@ _KIND_WORDS: Final[Mapping[EditSubject, tuple[str, str]]] = {
     EditSubject.ELEMENT: ("change to a place's structure", "changes to its places' structure"),
     EditSubject.ENVIRONMENT_INSTANCE: ("environment piece", "environment pieces"),
     EditSubject.POINT_MAP_INSTANCE: ("photograph depth estimate", "photograph depth estimates"),
+    EditSubject.THING: ("thing you placed", "things you placed"),
 }
 
 #: Why a carried row stays in the previous version, as the object repository names it, in words

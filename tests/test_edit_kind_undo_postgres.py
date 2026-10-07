@@ -37,6 +37,7 @@ from exulanica.world import (
 )
 from exulanica.world.edit_kinds import UnregisteredEditKind
 from exulanica.world.photo_point_maps import PointMapPlacement
+from exulanica.world.placed_things import ThingPlacement, placed_thing_document
 from psycopg.types.json import Jsonb
 
 from test_photo_point_map_composition import placed as imported_placed  # noqa: F401
@@ -44,11 +45,18 @@ from test_world_environment_composition_postgres import composed as imported_com
 from test_world_objects_api import objects_api as imported_objects_api  # noqa: F401
 from test_world_objects_postgres import authored, transform
 from test_world_objects_postgres import world as imported_world  # noqa: F401
+from thing_fixtures import kind_reference, placeable_kind
 
 pytestmark = pytest.mark.postgres
 
 #: Every id column of the log, in the order the table declares them.
-SUBJECT_COLUMNS = ("object_id", "element_id", "environment_instance_id", "point_map_instance_id")
+SUBJECT_COLUMNS = (
+    "object_id",
+    "element_id",
+    "environment_instance_id",
+    "point_map_instance_id",
+    "thing_id",
+)
 
 MOTION = ObjectBehaviour(
     "motion.bounded-path",
@@ -80,7 +88,7 @@ def _placed_alias(request):
 def _log(worlds: WorldObjectRepository, version_id: uuid.UUID) -> list[dict[str, Any]]:
     return worlds.connection.execute(
         "select edit_id,edit_seq,kind,object_id,element_id,environment_instance_id,"
-        "point_map_instance_id,undone_edit_id,base_state_sha256,result_state_sha256,"
+        "point_map_instance_id,thing_id,undone_edit_id,base_state_sha256,result_state_sha256,"
         "before_document,after_document from world_alternate_version_edit "
         "where workspace_id=%s and world_id=%s and version_id=%s order by edit_seq",
         (worlds.workspace_id, worlds.world_id, version_id),
@@ -395,6 +403,73 @@ def test_undo_reverses_each_point_map_kind(placed, kind):
         after_edit=after_edit,
         after_undo=after_undo,
         document_of=_point_map_document,
+    )
+
+
+# -- placed things -------------------------------------------------------------------------------
+
+
+def _thing_document(version, thing_id: str) -> dict[str, Any] | None:
+    found = [thing for thing in version.things if thing.thing_id == thing_id]
+    return placed_thing_document(found[0]) if found else None
+
+
+@pytest.mark.parametrize("kind", ["add_thing", "move_thing", "remove_thing"])
+def test_undo_reverses_each_thing_kind(world, kind):
+    worlds, snapshot, _ = world
+    version = worlds.create_version(
+        source_snapshot_id=snapshot.snapshot_id, title="Pinned", created_by=uuid.uuid4()
+    )
+    placement = ThingPlacement(
+        thing_id="thing:pinned",
+        kind=kind_reference(placeable_kind()),
+        region_id="region-a",
+        transform=Transform(1_200, 0, 0, 785_398, 1_000),
+        origin=ObjectOrigin("authored", "fictional"),
+    )
+    if kind != "add_thing":
+        version = worlds.add_thing(
+            version.version_id,
+            placement,
+            base_state_sha256=version.state_sha256,
+            actor=uuid.uuid4(),
+        )
+    before_edit = version
+    if kind == "add_thing":
+        after_edit = worlds.add_thing(
+            version.version_id,
+            placement,
+            base_state_sha256=version.state_sha256,
+            actor=uuid.uuid4(),
+        )
+    elif kind == "move_thing":
+        after_edit = worlds.move_thing(
+            version.version_id,
+            "thing:pinned",
+            Transform(-2_000, 500, 0, 0, 1_000),
+            base_state_sha256=version.state_sha256,
+            actor=uuid.uuid4(),
+        )
+    else:
+        after_edit = worlds.remove_thing(
+            version.version_id,
+            "thing:pinned",
+            base_state_sha256=version.state_sha256,
+            actor=uuid.uuid4(),
+        )
+    after_undo = worlds.undo(
+        after_edit.version_id, base_state_sha256=after_edit.state_sha256, actor=uuid.uuid4()
+    )
+    _assert_undo_reversed(
+        worlds,
+        after_edit.version_id,
+        kind=kind,
+        subject_column="thing_id",
+        subject_id="thing:pinned",
+        before_edit=before_edit,
+        after_edit=after_edit,
+        after_undo=after_undo,
+        document_of=_thing_document,
     )
 
 

@@ -150,6 +150,7 @@ def test_one_version_one_object_round_trips_through_a_signed_package(repository,
         element_overrides=stored.element_overrides,
         environment_instances=(),
         point_map_instances=(),
+        things=(),
     )
     assert (
         packaged["state_sha256"] == stored.state_sha256 == authored.delta_sha256(packaged["delta"])

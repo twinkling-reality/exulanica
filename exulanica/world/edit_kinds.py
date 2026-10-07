@@ -1,14 +1,14 @@
 """The edit kinds an alternate version's log can hold, stated once, as data.
 
 An edit kind is a name ``world_alternate_version_edit.kind`` stores and the subject that edit
-changes: an authored object, an element of the source snapshot, a placed environment instance or
-a placed photo point map. Each subject has one id column in the log, and the schema requires an
-edit to name exactly that column (``world_alternate_edit_names_its_subject``). ``undo`` is the one
-kind with no subject of its own: it names the edit it reverses in ``undone_edit_id`` and repeats
-that edit's subject columns.
+changes: an authored object, an element of the source snapshot, a placed environment instance, a
+placed photo point map or a placed thing. Each subject has one id column in the log, and the schema
+requires an edit to name exactly that column (``world_alternate_edit_names_its_subject``). ``undo``
+is the one kind with no subject of its own: it names the edit it reverses in ``undone_edit_id`` and
+repeats that edit's subject columns.
 
-**Why a registry rather than a list in each place.** Every migration that admits a kind (0042,
-0050, 0093, 0096) restates the whole list, and the projector's SQL and both package verifiers name
+**Why a registry rather than a list in each place.** Every migration that admits a kind (0042, 0050,
+0093, 0096, 0152) restates the whole list, and the projector's SQL and both package verifiers name
 kinds by hand. A kind added in one place and not another is lost without a sound: a migration that
 restates the CHECK from an older list drops a kind a parallel change has just added, and undo, when
 it held its own list, sent every kind it did not recognise to the element-override branch. Here the
@@ -53,6 +53,7 @@ class EditSubject(StrEnum):
     ELEMENT = "element"
     ENVIRONMENT_INSTANCE = "environment_instance"
     POINT_MAP_INSTANCE = "point_map_instance"
+    THING = "thing"
 
     @property
     def column(self) -> str:
@@ -111,6 +112,9 @@ EDIT_KINDS: Final[tuple[EditKind, ...]] = (
         EditSubject.POINT_MAP_INSTANCE,
         "0093_a_photograph_s_point_map_placed_in_a_world",
     ),
+    EditKind("add_thing", EditSubject.THING, "0152_a_thing_is_placed_by_its_kind"),
+    EditKind("move_thing", EditSubject.THING, "0152_a_thing_is_placed_by_its_kind"),
+    EditKind("remove_thing", EditSubject.THING, "0152_a_thing_is_placed_by_its_kind"),
 )
 
 #: The kind that reverses another edit. It has no subject of its own and is never itself undone.
