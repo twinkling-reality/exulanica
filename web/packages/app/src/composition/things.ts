@@ -130,11 +130,18 @@ export async function mountThings(deps: ThingsDependencies): Promise<MountedThin
   let chosen: ReadonlyMap<string, ThingLookChoice> = new Map();
   /** The placed things a choice was last given to, so a choice withdrawn returns them to their first look. */
   let chosenPlaced = new Set<string>();
-  const crowdFigures = new ThingCrowdFigures({ maker: layer.maker, lookOf: (person) => chosen.get(person.id)?.look ?? null });
+  /** Each placed thing's authored yaw, by its placed id, so a placed being stands as it was placed. */
+  let placedYaw: ReadonlyMap<string, number> = new Map();
+  const crowdFigures = new ThingCrowdFigures({
+    maker: layer.maker,
+    lookOf: (person) => chosen.get(person.id)?.look ?? null,
+    placedYawOf: (placedId) => placedYaw.get(placedId) ?? null,
+  });
   let destroyed = false;
   return {
     async setPlaced(things) {
       if (destroyed) return;
+      placedYaw = new Map(things.map((thing) => [thing.thingId, thing.transform.yawMicroradians]));
       await layer.setPlaced(things.map(placedThingRecord));
     },
     setSociety(state) {

@@ -21,7 +21,7 @@ import type { CrowdFigures } from '../society/crowd.js';
 import type { CrowdPose, CrowdRenderable, CrowdRenderableFactory, InhabitantIdentity, SocietyInhabitantSnapshot } from '../society/types.js';
 import type { ThingFigureMaker } from './figure-maker.js';
 import { refusalOf } from './figure-maker.js';
-import { PresenceFigure, type ThingFigure } from './figures.js';
+import { PresenceFigure, facingOfYaw, type ThingFigure } from './figures.js';
 import type { Named } from './library.js';
 
 /** A person's figure while its look is read: how tall to treat it before it stands. */
@@ -106,6 +106,8 @@ export interface ThingCrowdFiguresOptions {
   readonly maker: ThingFigureMaker;
   /** The look chosen for a person, or null for its kind's first look. */
   readonly lookOf?: (person: SocietyInhabitantSnapshot) => Named | null;
+  /** A placed thing's authored yaw by its placed id, or null for one not placed (`facingOfYaw`). */
+  readonly placedYawOf?: (placedId: string) => number | null;
 }
 
 /**
@@ -148,6 +150,17 @@ export class ThingCrowdFigures implements CrowdFigures {
       return renderable;
     };
     return { key, factory };
+  }
+
+  /**
+   * A placed being stands at its placed yaw until it first walks, as the layer draws it before a
+   * society holds it: one rule for both (`facingOfYaw`). Anyone else, or a placement not read, null.
+   */
+  standingFacingOf(person: SocietyInhabitantSnapshot): number | null {
+    const placedId = person.placed_id ?? null;
+    if (placedId === null) return null;
+    const yaw = this.options.placedYawOf?.(placedId) ?? null;
+    return yaw === null ? null : facingOfYaw(yaw);
   }
 
   /** The figure drawing a person now, or null while it is not drawn in full or not yet made. */

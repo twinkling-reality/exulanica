@@ -105,6 +105,11 @@ export type PoseInterval = (rank: number) => number;
  */
 export interface CrowdFigures {
   figureFor(person: SocietyInhabitantSnapshot): { readonly key: string; readonly factory: CrowdRenderableFactory } | null;
+  /**
+   * The facing a person stands at until they first walk, as an author placed them, or null for
+   * none: everyone else starts facing as the crowd does.
+   */
+  standingFacingOf?(person: SocietyInhabitantSnapshot): number | null;
 }
 
 export interface CrowdCounts {
@@ -140,6 +145,8 @@ interface Walker {
   readonly activity: string | null;
   position: readonly [number, number];
   facing: number;
+  /** Not yet turned by a walk, a seat or a partner: they face as they were placed. */
+  asPlaced: boolean;
   /** Whether the path recorded for this tick has been walked to its end. */
   arrived: boolean;
   /** How the object this person's action uses is drawn at their place, or null for none. */
@@ -484,7 +491,8 @@ export class SocietyCrowd {
         indoors: person.indoors === true,
         activity,
         position,
-        facing: previous?.facing ?? 0,
+        facing: previous?.facing ?? this.figures?.standingFacingOf?.(person) ?? 0,
+        asPlaced: previous?.asPlaced ?? true,
         arrived: walked >= total,
         place: found?.kind === 'place' ? found.drawing : null,
         facingRule: rule,
@@ -686,6 +694,7 @@ export class SocietyCrowd {
     for (const walker of this.walkers.values()) {
       const person = people.get(walker.id);
       walker.figure = person === undefined || figures === null ? null : figures.figureFor(person);
+      this.faceAsPlaced(walker, person);
     }
     this.releaseNear();
     this.discontinuity = true;
@@ -704,6 +713,7 @@ export class SocietyCrowd {
     for (const walker of this.walkers.values()) {
       const person = people.get(walker.id);
       walker.figure = person === undefined ? null : figures.figureFor(person);
+      this.faceAsPlaced(walker, person);
     }
     if (this.state !== null) this.assignDetail();
   }
@@ -826,7 +836,7 @@ export class SocietyCrowd {
       walker.drawn = [walker.position[0], 0, walker.position[1]];
       walker.seatBlend = 0;
       walker.onSeat = false;
-      if (walker.arrived) walker.facing = this.facingOf(walker);
+      if (walker.arrived) this.turn(walker, this.facingOf(walker));
       return false;
     }
     // A seat that is no longer theirs, or no longer there, is got up from before another is sat on.
@@ -861,19 +871,33 @@ export class SocietyCrowd {
     walker.seatBlend = onto;
     walker.onSeat = staying && settle.progress >= settle.toFront;
     if (settle.progress > settle.toFront || walker.onSeat) {
-      walker.facing = settle.facing;
+      this.turn(walker, settle.facing);
     } else if (settle.progress !== before) {
       // Walking to where they stand before the seat, or back to their place, they face the way they go.
-      walker.facing = goal > before
+      this.turn(walker, goal > before
         ? heading(settle.path[0], settle.path[1], walker.facing)
-        : heading(settle.path[1], settle.path[0], walker.facing);
+        : heading(settle.path[1], settle.path[0], walker.facing));
     }
     if (settle.progress <= 0 && !staying) {
       walker.settle = null;
-      if (walker.arrived) walker.facing = this.facingOf(walker);
+      if (walker.arrived) this.turn(walker, this.facingOf(walker));
       return false;
     }
     return settle.progress !== goal;
+  }
+
+  /** Turn a walker to `facing`; once turned, they no longer face as they were placed. */
+  private turn(walker: Walker, facing: number): void {
+    if (facing === walker.facing) return;
+    walker.facing = facing;
+    walker.asPlaced = false;
+  }
+
+  /** Face a person who has not yet turned as they were placed, when the figures now say how. */
+  private faceAsPlaced(walker: Walker, person: SocietyInhabitantSnapshot | undefined): void {
+    if (!walker.asPlaced || person === undefined) return;
+    const facing = this.figures?.standingFacingOf?.(person) ?? null;
+    if (facing !== null) walker.facing = facing;
   }
 
   /** The way a walker standing at the end of their path faces, by their activity's rule. */
@@ -992,7 +1016,7 @@ export class SocietyCrowd {
         }
       }
       const position = walker.total > 0 ? sampleMotionPath(walker.route, walker.walked / walker.total) : walker.route[0]!;
-      walker.facing = heading(walker.position, position, walker.facing);
+      this.turn(walker, heading(walker.position, position, walker.facing));
       walker.position = position;
       walker.arrived = walker.walked >= walker.total;
       const settling = this.settle(walker, dt, reduced);
