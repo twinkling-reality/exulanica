@@ -16,11 +16,19 @@
  */
 
 import * as pc from 'playcanvas';
-import { createObjectContainerAsset } from '../scene-objects.js';
-import type { LookDrawing } from './documents.js';
-import { FigureRefused, makeFigure, type InstancedContainer } from './dispatch.js';
+import type { OwnedSocietyState, SocietyThingSnapshot } from '../society/types.js';
+
+/**
+ * A society's thing as the drawing reads it: from THINGS 3b a held thing also names its holder's
+ * socket (`socket`, set exactly while `held_by` is), and its `position_mm` is null while it is held.
+ */
+type HeldThing = SocietyThingSnapshot & { readonly socket?: string | null };
+import type { ThingCrowdFigures } from './crowd-figures.js';
+import type { Grip, LookDrawing } from './documents.js';
+import type { InstancedContainer } from './dispatch.js';
+import { ThingFigureMaker, refusalOf } from './figure-maker.js';
 import { PresenceFigure, facingOfYaw, type ThingFigure } from './figures.js';
-import { LibraryRefused, type Named, type ThingLibrary } from './library.js';
+import type { Named, ThingLibrary } from './library.js';
 import { PickRing, rayMeets, ringRadius } from './ring.js';
 
 /** A placed thing as the version document lists it, in this page's words. */
@@ -87,6 +95,12 @@ interface Entry {
   look: string | null;
   /** Raised each time the entry is rebuilt, so a stale load is dropped. */
   generation: number;
+  /** How it is held, for a holdable object, once made. */
+  grip: Grip | null;
+  /** The entity it stands in when nobody holds it. */
+  parent: pc.Entity | null;
+  /** Who holds it now and in which socket, while a society's state says one does. */
+  heldBy: { readonly subjectId: string; readonly socket: string } | null;
 }
 
 const ANIMATED_LOOK_KINDS: ReadonlySet<string> = new Set(['rigid_on_bones', 'skinned', 'light', 'catalog_person']);
@@ -94,23 +108,21 @@ const ANIMATED_LOOK_KINDS: ReadonlySet<string> = new Set(['rigid_on_bones', 'ski
 export class ThingLayer {
   private readonly entries = new Map<string, Entry>();
   private readonly missed = new Map<string, ThingMiss>();
-  private readonly assets = new Map<string, Promise<pc.Asset>>();
   private readonly lookChoices = new Map<string, Named>();
   private readonly ring: PickRing;
-  private readonly primitive: pc.StandardMaterial;
+  /** Makes every figure of this page from the library, a container once a digest. */
+  readonly maker: ThingFigureMaker;
   private picked: string | null = null;
   private destroyed = false;
   private readonly onUpdate = (dt: number) => this.step(dt);
 
   constructor(private readonly options: ThingLayerOptions) {
     this.ring = new PickRing(options.app.graphicsDevice, options.ringColour);
-    this.primitive = new pc.StandardMaterial();
-    this.primitive.name = 'thing:look-role-primitive';
-    this.primitive.diffuse = new pc.Color(0.62, 0.6, 0.56);
-    this.primitive.useMetalness = true;
-    this.primitive.metalness = 0;
-    this.primitive.gloss = 0.2;
-    this.primitive.update();
+    this.maker = new ThingFigureMaker({
+      app: options.app,
+      library: options.library,
+      ...(options.instantiate ? { instantiate: options.instantiate } : {}),
+    });
     // After the engine's animation step, so a rigged look's arm is posed over its clip.
     options.app.on('update', this.onUpdate);
   }
@@ -133,7 +145,10 @@ export class ThingLayer {
         continue;
       }
       if (entry !== undefined) this.drop(id, entry);
-      const fresh: Entry = { record, key, figure: null, look: null, generation: (entry?.generation ?? 0) + 1 };
+      const fresh: Entry = {
+        record, key, figure: null, look: null, generation: (entry?.generation ?? 0) + 1,
+        grip: null, parent: null, heldBy: null,
+      };
       this.entries.set(id, fresh);
       loads.push(this.build(id, fresh));
     }
@@ -169,6 +184,7 @@ export class ThingLayer {
   /** Whether anything drawn moves on its own (breathes, drifts, plays a clip). */
   get animating(): boolean {
     if (this.options.reducedMotion?.() === true) return false;
+    if (this.society !== null) return true;
     for (const entry of this.entries.values()) if (entry.figure !== null && ANIMATED_LOOK_KINDS.has(entry.figure.lookKind)) return true;
     return this.picked !== null;
   }
@@ -206,14 +222,7 @@ export class ThingLayer {
     this.ring.place(null, 0);
     for (const [id, entry] of this.entries) this.drop(id, entry);
     this.ring.destroy();
-    this.primitive.destroy();
-    for (const held of this.assets.values()) {
-      void held.then((asset) => {
-        asset.unload();
-        this.options.app.assets.remove(asset);
-      }, () => undefined);
-    }
-    this.assets.clear();
+    this.maker.destroy();
   }
 
   private keyOf(record: PlacedThingRecord): string {
@@ -244,101 +253,133 @@ export class ThingLayer {
       return;
     }
     try {
-      const library = this.options.library;
-      const kind = await library.kind({ key: record.kind.kind, version: record.kind.version, sha256: record.kind.sha256 });
-      const chosen = this.lookChoices.get(id) ?? kind.looks[0] ?? null;
-      let look: LookDrawing | null = null;
-      if (chosen !== null) look = await library.look(chosen);
-      const plan = look === null ? null : (await library.bodyPlans()).get(look.bodyPlan) ?? null;
-      const container = look?.container == null ? null : await (this.options.instantiate ?? ((one: LookDrawing) => this.instance(one)))(look);
-      if (stale()) {
-        container?.model.destroy();
-        return;
-      }
-      const figure = makeFigure({
+      const made = await this.maker.make(
         parent,
-        device: this.options.app.graphicsDevice,
-        name: `thing:${id}`,
-        thingId: id,
-        kind,
-        look: look ?? { look: 'none', version: 1, label: 'no look', bodyPlan: kind.bodyPlan, lookKind: 'none', container: null, rig: null, heightMm: null, sampling: 'linear', light: null, role: null },
-        plan,
-        container,
-        primitive: this.primitive,
-      });
-      entry.figure = figure;
-      entry.look = look === null ? 'none' : `${look.look}/v${look.version}`;
+        { name: `thing:${id}`, thingId: id, kind: { key: record.kind.kind, version: record.kind.version, sha256: record.kind.sha256 }, look: this.lookChoices.get(id) ?? null },
+        stale,
+      );
+      if (made === null) return;
+      entry.figure = made.figure;
+      entry.look = made.look;
+      entry.grip = made.kind.grip;
+      entry.parent = parent;
       this.missed.delete(id);
       this.poseOne(entry, 0);
-      if (this.picked === id) this.ring.place(figure.root, ringRadius(figure.pickVolume));
+      if (this.picked === id) this.ring.place(made.figure.root, ringRadius(made.figure.pickVolume));
     } catch (error) {
       if (stale()) return;
-      const reason = error instanceof FigureRefused || error instanceof LibraryRefused
-        ? error.reason
-        : error instanceof Error && 'reason' in error && typeof (error as { reason: unknown }).reason === 'string'
-          ? (error as { reason: string }).reason
-          : 'look_unreadable';
-      this.miss(id, reason, error instanceof Error ? error.message : String(error));
+      this.miss(id, refusalOf(error), error instanceof Error ? error.message : String(error));
     }
   }
 
-  /** The look's container, loaded once a digest, instantiated for one figure. */
-  private async instance(look: LookDrawing): Promise<InstancedContainer> {
-    const reference = look.container!;
-    let held = this.assets.get(reference.sha256);
-    if (held === undefined) {
-      held = this.options.library.container(reference).then(async (bytes) => {
-        const asset = await createObjectContainerAsset(this.options.app, `thing-look:${reference.sha256.slice(0, 16)}`, bytes);
-        if (look.sampling === 'nearest') nearestSampling(asset);
-        return asset;
-      });
-      held.catch(() => this.assets.delete(reference.sha256));
-      this.assets.set(reference.sha256, held);
+  /**
+   * Draw what a society of things says about the version's things, or the version alone with null.
+   * Its beings are its people, drawn by the crowd (`figures`), so their standing figures here are
+   * not drawn; each object stands where the state puts it, or is held in its holder's socket, and
+   * one the state does not list (carried away) is not drawn. A state from before v7 lists no things
+   * and changes nothing here.
+   */
+  setSociety(state: OwnedSocietyState | null, figures: ThingCrowdFigures | null): void {
+    this.society = state?.things === undefined ? null : {
+      things: new Map(state.things.map((thing) => [thing.placed_id ?? `carried:${thing.id}`, thing])),
+      figures,
+    };
+    this.applySociety();
+    this.options.invalidate?.();
+  }
+
+  private society: { readonly things: ReadonlyMap<string, HeldThing>; readonly figures: ThingCrowdFigures | null } | null = null;
+  /** The people who held something at the last look, so a hand emptied is told so. */
+  private holdersSeen = new Set<string>();
+
+  /** Stand, hold or hide each placed thing as the society's state says; every frame, as holders appear. */
+  private applySociety(): void {
+    // Each person's figure learns which of its sockets hold something, so it carries them.
+    const society = this.society;
+    if (society?.figures != null) {
+      const holding = new Map<string, Set<string>>();
+      for (const thing of society.things.values()) {
+        if (thing.held_by == null || thing.socket == null) continue;
+        let sockets = holding.get(thing.held_by);
+        if (sockets === undefined) holding.set(thing.held_by, sockets = new Set());
+        sockets.add(thing.socket);
+      }
+      for (const subjectId of new Set([...holding.keys(), ...this.holdersSeen])) {
+        society.figures.renderableOf(subjectId)?.setHolding(holding.get(subjectId) ?? new Set());
+      }
+      this.holdersSeen = new Set(holding.keys());
     }
-    const asset = await held;
-    const resource = asset.resource as pc.ContainerResource & { animations?: pc.Asset[] };
-    const model = resource.instantiateRenderEntity({});
-    const tracks = new Map<string, pc.AnimTrack>();
-    for (const clip of resource.animations ?? []) {
-      const track = clip.resource as pc.AnimTrack;
-      tracks.set(track.name, track);
+    for (const entry of this.entries.values()) {
+      const figure = entry.figure;
+      if (figure === null) continue;
+      const society = this.society;
+      const thing = society === null ? undefined : society.things.get(entry.record.thingId);
+      const holder = thing?.held_by == null || thing.socket == null ? null : { subjectId: thing.held_by, socket: thing.socket };
+      const holderFigure = holder === null ? null : society?.figures?.figureOf(holder.subjectId) ?? null;
+      const holding = holder !== null && holderFigure?.hold !== undefined && entry.grip !== null;
+      // Out of a hand it no longer is in: back where it stands.
+      if (entry.heldBy !== null && (!holding || entry.heldBy.subjectId !== holder!.subjectId || entry.heldBy.socket !== holder!.socket)) {
+        const was = society?.figures?.figureOf(entry.heldBy.subjectId);
+        was?.release?.(entry.heldBy.socket);
+        if (figure.root.parent !== entry.parent && entry.parent !== null) {
+          figure.root.parent?.removeChild(figure.root);
+          entry.parent.addChild(figure.root);
+        }
+        entry.heldBy = null;
+      }
+      if (society === null) {
+        figure.setVisible(true);
+        continue;
+      }
+      // Not among the state's things: a being (the crowd draws it as one of the society's people)
+      // or an object carried away.
+      if (thing === undefined) {
+        figure.setVisible(false);
+        continue;
+      }
+      if (holder !== null) {
+        if (holding && entry.heldBy === null) {
+          holderFigure!.hold!(holder.socket, figure.root, entry.grip!);
+          entry.heldBy = holder;
+        }
+        // Held by someone not drawn now, or whose look holds nothing: not drawn either.
+        figure.setVisible(holding);
+        continue;
+      }
+      figure.setVisible(true);
     }
-    return { model, tracks };
   }
 
   private step(dt: number): void {
     if (this.destroyed) return;
     const reduced = this.options.reducedMotion?.() === true;
+    if (this.society !== null) this.applySociety();
     for (const entry of this.entries.values()) this.poseOne(entry, dt, reduced);
     const camera = this.options.camera.getPosition();
     for (const entry of this.entries.values()) {
       if (entry.figure instanceof PresenceFigure) entry.figure.face(camera);
       entry.figure?.afterAnimation?.();
     }
+    // The society's things the crowd draws: rigged arms over their clips, glows to the camera.
+    this.society?.figures?.afterAnimation(camera);
     this.ring.step(dt, reduced);
     if (this.animating) this.options.invalidate?.();
   }
 
   private poseOne(entry: Entry, dt: number, reducedMotion = false): void {
     const figure = entry.figure;
-    if (figure === null) return;
+    // A held thing is placed by its holder's pose.
+    if (figure === null || entry.heldBy !== null) return;
     const t = entry.record.transform;
+    // Where a society runs, an object stands at the state's plan point, turned by the state's yaw.
+    const thing = this.society?.things.get(entry.record.thingId);
     figure.pose({
-      position: [t.xMm / 1000, t.yMm / 1000, t.zMm / 1000],
-      facing: facingOfYaw(t.yawMicroradians),
+      position: thing?.position_mm == null
+        ? [t.xMm / 1000, t.yMm / 1000, t.zMm / 1000]
+        : [thing.position_mm[0] / 1000, (thing.height_mm ?? 0) / 1000, thing.position_mm[1] / 1000],
+      facing: facingOfYaw(thing?.yaw_microradians ?? t.yawMicroradians),
       deltaSeconds: dt,
       ...(reducedMotion ? { reducedMotion: true } : {}),
     });
-  }
-}
-
-/** Draw a pixel-art look's textures as their pixels: nearest filtering, no blur between texels. */
-function nearestSampling(asset: pc.Asset): void {
-  const resource = asset.resource as pc.ContainerResource & { textures?: pc.Asset[] };
-  for (const texture of resource.textures ?? []) {
-    const t = texture.resource as pc.Texture | undefined;
-    if (t === undefined) continue;
-    t.minFilter = pc.FILTER_NEAREST;
-    t.magFilter = pc.FILTER_NEAREST;
   }
 }

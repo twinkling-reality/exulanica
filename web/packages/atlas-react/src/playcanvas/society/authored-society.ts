@@ -3,7 +3,7 @@ import { FlightFlock } from '../flight/flock.js';
 import type { FlightKindLook, FlightWindow } from '../flight/types.js';
 import type { NativeCharacterFrame } from '../native-character-runtime.js';
 import { createObjectContainerAsset } from '../scene-objects.js';
-import { SocietyCrowd, type CrowdCounts, type CrowdSeatingMiss } from './crowd.js';
+import { SocietyCrowd, type CrowdCounts, type CrowdFigures, type CrowdSeatingMiss } from './crowd.js';
 import type { SeatingLayout } from './seating.js';
 import type { CrowdJump, CrowdTiming, OwnedSocietyState } from './types.js';
 
@@ -116,6 +116,14 @@ export class AuthoredRegionSociety {
   private localGround(observer: readonly [number, number]): [number, number] {
     const at = this.localPoint(observer[0], this.root.getPosition().y + this.renderOrigin.y, observer[1]);
     return [at.x, at.z];
+  }
+
+  /**
+   * Draw the things among the inhabitants by their own looks, or everyone as one of the world's
+   * people with null (`SocietyCrowd.setFigures`).
+   */
+  setFigures(figures: CrowdFigures | null): void {
+    this.crowd.setFigures(figures);
   }
 
   /** Everyone drawn as everyone else is although their state says what they do, and why. */

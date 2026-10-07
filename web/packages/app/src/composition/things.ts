@@ -9,7 +9,16 @@
  * it was picked; the thing's card opens from that event. Dispatching the same event with a null
  * detail takes the ring away, as a card does when it closes.
  */
-import { ThingLayer, type PlacedThingRecord, type ThingLayerOptions, type ThingLibrary, type ThingMiss, type ThingPick } from '@exulanica/atlas-react/things';
+import {
+  ThingCrowdFigures,
+  ThingLayer,
+  type PlacedThingRecord,
+  type ThingLayerOptions,
+  type ThingLibrary,
+  type ThingMiss,
+  type ThingPick,
+} from '@exulanica/atlas-react/things';
+import type { OwnedSocietyState } from '@exulanica/atlas-react/playcanvas';
 import type { Credentials } from '../config.js';
 import { openThingLibrary } from '../things-library.js';
 import { tokenBlock } from '../ui/system/token-values.js';
@@ -42,6 +51,13 @@ export interface MountedThings {
   pick(origin: readonly [number, number, number], direction: readonly [number, number, number]): { readonly pick: ThingPick; readonly distance: number } | null;
   /** Raise the pick event for `pick`, or for nothing with null. */
   raise(pick: ThingPick | null, via: ThingPickVia): void;
+  /**
+   * What the world's society says about its things, or null when no society is shown: its beings
+   * are drawn by the crowd through `crowdFigures`, its objects stand or are held as it says.
+   */
+  setSociety(state: OwnedSocietyState | null): void;
+  /** How the society's crowd draws its things by their looks (`AuthoredRegionSociety.setFigures`). */
+  readonly crowdFigures: ThingCrowdFigures;
   /** Placed things drawn as nothing, and why. */
   readonly misses: readonly ThingMiss[];
   readonly layer: ThingLayer;
@@ -91,12 +107,17 @@ export async function mountThings(deps: ThingsDependencies): Promise<MountedThin
     layer.setPicked(detail === null ? null : { placedId: detail.placedId, thingId: detail.thingId, subjectId: detail.subjectId });
   };
   deps.shell.addEventListener(THING_PICK_EVENT, onPick);
+  const crowdFigures = new ThingCrowdFigures({ maker: layer.maker });
   let destroyed = false;
   return {
     async setPlaced(things) {
       if (destroyed) return;
       await layer.setPlaced(things.map(placedThingRecord));
     },
+    setSociety(state) {
+      if (!destroyed) layer.setSociety(state, state === null ? null : crowdFigures);
+    },
+    crowdFigures,
     pick: (origin, direction) => layer.pick(origin, direction),
     raise(pick, via) {
       const detail: ThingPickDetail = pick === null ? null : Object.freeze({ ...pick, via });

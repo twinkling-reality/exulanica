@@ -96,6 +96,17 @@ export interface CrowdOptions {
 
 export type PoseInterval = (rank: number) => number;
 
+/**
+ * Inhabitants drawn by their own look rather than by the people catalog: the things of a society
+ * of things (`../things`). `figureFor` names the factory that draws one and a key that changes
+ * when its look does, or null for one of the world's people, drawn as everyone is. Things are few
+ * and have no far form: one is drawn in full wherever it is within the far radius, ranked after a
+ * selected person and before everyone else in the budget's full places.
+ */
+export interface CrowdFigures {
+  figureFor(person: SocietyInhabitantSnapshot): { readonly key: string; readonly factory: CrowdRenderableFactory } | null;
+}
+
 export interface CrowdCounts {
   readonly population: number;
   readonly outdoors: number;
@@ -152,6 +163,8 @@ interface Walker {
   onSeat: boolean;
   /** Where they are drawn this frame: east, height of the root, south. */
   drawn: readonly [number, number, number];
+  /** What draws them when they are a thing drawn by its own look, or null for one of the people. */
+  figure: { readonly key: string; readonly factory: CrowdRenderableFactory } | null;
 }
 
 /**
@@ -274,6 +287,9 @@ export class SocietyCrowd {
   private readonly farRadius: number;
   private readonly far: FarFigures;
   private readonly near = new Map<string, CrowdRenderable>();
+  /** The figure key each full character was made with, so a changed look makes it again. */
+  private readonly nearKeys = new Map<string, string>();
+  private figures: CrowdFigures | null = null;
   private walkers = new Map<string, Walker>();
   private state: OwnedSocietyState | null = null;
   private scope = '';
@@ -478,6 +494,7 @@ export class SocietyCrowd {
         seatBlend: jumped ? 0 : previous?.seatBlend ?? 0,
         onSeat: jumped ? false : previous?.onSeat ?? false,
         drawn: jumped || previous === undefined ? [position[0], 0, position[1]] : previous.drawn,
+        figure: this.figures?.figureFor(person) ?? null,
       };
       walkers.set(person.id, walker);
     }
@@ -638,6 +655,22 @@ export class SocietyCrowd {
     return [...this.walkers.values()]
       .filter((w) => !w.indoors && Math.hypot(w.position[0] - held.position[0], w.position[1] - held.position[1]) < 0.001)
       .map((w) => w.id);
+  }
+
+  /**
+   * Draw the things among the inhabitants by their own looks (`CrowdFigures`), or everyone as one
+   * of the world's people with null. Everyone drawn in full is made again; nobody moves.
+   */
+  setFigures(figures: CrowdFigures | null): void {
+    this.figures = figures;
+    const people = new Map((this.state?.inhabitants ?? []).map((person) => [person.id, person]));
+    for (const walker of this.walkers.values()) {
+      const person = people.get(walker.id);
+      walker.figure = person === undefined || figures === null ? null : figures.figureFor(person);
+    }
+    this.releaseNear();
+    this.discontinuity = true;
+    if (this.state !== null) this.assignDetail();
   }
 
   /** Keep a selected inhabitant as a full character while it is outdoors. */
@@ -843,6 +876,7 @@ export class SocietyCrowd {
   private releaseNear(): void {
     for (const renderable of this.near.values()) renderable.destroy();
     this.near.clear();
+    this.nearKeys.clear();
     this.slots.clear();
     this.fresh.clear();
   }
@@ -858,14 +892,21 @@ export class SocietyCrowd {
     const nearIds = new Set<string>();
     const selected = this.selectedId ? this.walkers.get(this.selectedId) : undefined;
     if (selected && !selected.indoors && this.nearLimit > 0) nearIds.add(selected.id);
+    // Things have no far form: each within the far radius is drawn in full, nearest first.
     for (const { w, d } of ranked) {
       if (nearIds.size >= this.nearLimit) break;
-      if (d <= this.nearRadius) nearIds.add(w.id);
+      if (w.figure !== null && d <= this.farRadius) nearIds.add(w.id);
+    }
+    for (const { w, d } of ranked) {
+      if (nearIds.size >= this.nearLimit) break;
+      if (w.figure === null && d <= this.nearRadius) nearIds.add(w.id);
     }
     for (const [id, renderable] of this.near) {
-      if (!nearIds.has(id)) {
+      const key = this.walkers.get(id)?.figure?.key ?? '';
+      if (!nearIds.has(id) || this.nearKeys.get(id) !== key) {
         renderable.destroy();
         this.near.delete(id);
+        this.nearKeys.delete(id);
         this.slots.delete(id);
         this.fresh.delete(id);
       }
@@ -878,15 +919,16 @@ export class SocietyCrowd {
       else this.slots.set(id, { rank, pendingSeconds: 0 });
       rank += 1;
       if (this.near.has(id)) continue;
-      const renderable = this.factory(this.device, this.root, { ...identity, inhabitantId: id }, 'near');
       const walker = this.walkers.get(id)!;
+      const renderable = (walker.figure?.factory ?? this.factory)(this.device, this.root, { ...identity, inhabitantId: id }, 'near');
+      this.nearKeys.set(id, walker.figure?.key ?? '');
       // Posed at once, so a new full character is drawn and pickable before the next frame.
       renderable.setVisible(!walker.indoors);
       renderable.pose({ ...this.poseOf(walker), deltaSeconds: 1 / 60, discontinuity: true });
       this.near.set(id, renderable);
       this.discontinuity = true;
     }
-    this.farIds = ranked.filter(({ w, d }) => !nearIds.has(w.id) && d <= this.farRadius).map(({ w }) => w.id);
+    this.farIds = ranked.filter(({ w, d }) => !nearIds.has(w.id) && w.figure === null && d <= this.farRadius).map(({ w }) => w.id);
   }
 
   private place(nowMs: number, dt: number, reduced: boolean, draw = true): void {

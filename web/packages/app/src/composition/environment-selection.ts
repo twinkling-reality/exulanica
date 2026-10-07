@@ -482,6 +482,9 @@ export function mountEnvironmentSelection(
   let current: AlternateVersion | null = null;
   /** The open saved world's placed things, drawn by their looks; null until it is attached. */
   let things: MountedThings | null = null;
+  /** Whether the society's crowd draws its things through `things`, and whether that is being set up. */
+  let figuresSet = false;
+  let thingsMounting = false;
   let authoredWorldFailure: string | null = null;
   let chosen: NYCLocalFeature | null = null;
   let admittedFeaturesByProvider = new Map<string, NYCLocalFeature>();
@@ -1782,6 +1785,7 @@ export function mountEnvironmentSelection(
     const canvas = deps.env.canvas;
     if (society === null || runtime === null) {
       runtime?.clearSociety();
+      things?.setSociety(null);
       renderedSnapshot = null;
       if (selectedInhabitant) { selectedInhabitant = null; clearInspector(); selected.textContent = 'Selected inhabitant is unavailable.'; }
       delete canvas.dataset.societyPopulation;
@@ -1887,10 +1891,30 @@ export function mountEnvironmentSelection(
     // One line per person, however many of the minutes moved them: the latest reason stands.
     const named = new Map<string, MovedWithoutWalking>();
     const layout = seatingNow(next.places);
+    // A society of things draws its things by their looks: the crowd through the things' figures.
+    if (next.state.things !== undefined) {
+      if (things === null && savedWorld !== null && !thingsMounting) {
+        thingsMounting = true;
+        const atlas = deps.state.atlas!.binding;
+        void drawPlacedThings(atlas, savedWorld.regionId, true).then(() => {
+          thingsMounting = false;
+          if (things !== null && (phase as string) !== 'disposed') {
+            runtime.setFigures(things.crowdFigures);
+            figuresSet = true;
+            things.setSociety(renderedSnapshot?.state ?? next.state);
+            atlas.invalidate();
+          }
+        });
+      } else if (things !== null && !figuresSet) {
+        runtime.setFigures(things.crowdFigures);
+        figuresSet = true;
+      }
+    }
     for (const minute of [...unread, next.state]) {
       runtime.setSociety(minute, observer, timing, layout);
       for (const jump of runtime.societyJumps ?? []) named.set(jump.inhabitantId, jump);
     }
+    things?.setSociety(next.state.things === undefined ? null : next.state);
     reflectSeatingMisses(runtime);
     moved = [...named.values()];
   }
@@ -1975,9 +1999,9 @@ export function mountEnvironmentSelection(
    * the authored objects' region root. A library that cannot be read leaves the world as it was and
    * says why on the canvas, never stood in for.
    */
-  async function drawPlacedThings(atlas: NonNullable<SessionState['atlas']>['binding'], regionId: string): Promise<void> {
+  async function drawPlacedThings(atlas: NonNullable<SessionState['atlas']>['binding'], regionId: string, forSociety = false): Promise<void> {
     const placed = current?.things ?? [];
-    if (placed.length === 0 && things === null) return;
+    if (placed.length === 0 && things === null && !forSociety) return;
     try {
       things ??= await mountThings({
         app: atlas.app,
@@ -2340,6 +2364,7 @@ export function mountEnvironmentSelection(
       if (liveSociety || recording) crowd()?.clearSociety();
       things?.destroy();
       things = null;
+      figuresSet = false;
       if (deps.env.canvas) for (const key of ['thingsDrawn', 'thingsMissed', 'thingsFailure']) delete deps.env.canvas.dataset[key];
       savedWorldActions.clear();
       recording = null;

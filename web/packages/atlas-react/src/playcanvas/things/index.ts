@@ -47,3 +47,7 @@ export { DUTY, gaitOf, solvePose } from './motion.js';
 export { PickRing, rayMeets, ringRadius } from './ring.js';
 export type { DrawnThing, PlacedThingRecord, ThingLayerOptions, ThingMiss, ThingPick } from './thing-layer.js';
 export { ThingLayer } from './thing-layer.js';
+export type { FigureMade, FigureMakerOptions } from './figure-maker.js';
+export { ThingFigureMaker } from './figure-maker.js';
+export type { ThingCrowdFiguresOptions, ThingFigureMiss } from './crowd-figures.js';
+export { ThingCrowdFigures, ThingCrowdRenderable } from './crowd-figures.js';

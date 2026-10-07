@@ -15,7 +15,11 @@ const { FakeLayer, layers } = vi.hoisted(() => {
     placed: readonly PlacedThingRecord[] = [];
     picked: ThingPick | null = null;
     destroyed = false;
+    /** The maker the crowd's figures read the library's looks from. */
+    readonly maker = { library: { list: { kinds: [], looks: [] } } };
+    society: unknown = null;
     constructor(readonly options: ThingLayerOptions) { made.push(this); }
+    setSociety(state: unknown) { this.society = state; }
     async setPlaced(things: readonly PlacedThingRecord[]) { this.placed = things; }
     pick() { return { pick: { placedId: this.placed[0]!.thingId, thingId: null, subjectId: null }, distance: 3 }; }
     setPicked(pick: ThingPick | null) { this.picked = pick; }

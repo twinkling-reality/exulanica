@@ -19,7 +19,12 @@ import { axisAngle, mul, rotate } from './motion.js';
 import { dressSkeleton, type BodyPlanEntry, type DressedSkeleton, type Vec3 } from './skeleton.js';
 
 const LOCOMOTION = 'locomotion';
+/** Standing and moving while holding something: the look's hold clip where it has one. */
+const CARRYING = 'carrying';
 const SPEED = 'speed';
+const HOLDING = 'holding';
+/** Seconds a figure takes to take up, or put down, its holding stance. */
+const HOLD_BLEND_SECONDS = 0.25;
 /** The fastest a locomotion clip plays, as a multiple of its own pace. */
 export const CLIP_SPEED_LIMIT = 2;
 const PICK_HALF_WIDTH = 0.2;
@@ -38,6 +43,8 @@ export class SkinnedFigure implements ThingFigure {
   private readonly held = new Map<string, { entity: pc.Entity; grip: Grip }>();
   private readonly walkSpeed: number | null;
   private readonly runSpeed: number | null;
+  /** Whether the look has a clip for holding, which it then stands in while it holds something. */
+  private readonly holdClip: boolean;
   private previous: readonly [number, number, number] | null = null;
   private speed = 0;
   private time = 0;
@@ -106,18 +113,36 @@ export class SkinnedFigure implements ThingFigure {
     if (this.runSpeed !== null && rig.clips['run'] !== undefined && (this.walkSpeed === null || this.runSpeed > this.walkSpeed)) {
       points.push({ name: 'run', point: this.runSpeed });
     }
+    this.holdClip = rig.clips['hold'] !== undefined && tracks.has(rig.clips['hold']!);
+    const carrying = points.map((point) => (point.name === 'idle' ? { name: 'hold', point: 0 } : point));
+    const held = (value: boolean) => [{ parameterName: HOLDING, predicate: pc.ANIM_EQUAL_TO, value }];
     anim.loadStateGraph({
       layers: [{
         name: 'Base',
         states: [
           { name: 'START' },
           { name: LOCOMOTION, loop: true, speed: 1, blendTree: { type: pc.ANIM_BLEND_1D, parameter: SPEED, syncAnimations: true, children: points } },
+          ...(this.holdClip
+            ? [{ name: CARRYING, loop: true, speed: 1, blendTree: { type: pc.ANIM_BLEND_1D, parameter: SPEED, syncAnimations: true, children: carrying } }]
+            : []),
         ],
-        transitions: [{ from: 'START', to: LOCOMOTION }],
+        transitions: [
+          { from: 'START', to: LOCOMOTION },
+          ...(this.holdClip
+            ? [
+              { from: LOCOMOTION, to: CARRYING, time: HOLD_BLEND_SECONDS, conditions: held(true) },
+              { from: CARRYING, to: LOCOMOTION, time: HOLD_BLEND_SECONDS, conditions: held(false) },
+            ]
+            : []),
+        ],
       }],
-      parameters: { [SPEED]: { name: SPEED, type: pc.ANIM_PARAMETER_FLOAT, value: 0 } },
+      parameters: {
+        [SPEED]: { name: SPEED, type: pc.ANIM_PARAMETER_FLOAT, value: 0 },
+        [HOLDING]: { name: HOLDING, type: pc.ANIM_PARAMETER_BOOLEAN, value: false },
+      },
     });
     for (const { name: motion } of points) anim.assignAnimation(`${LOCOMOTION}.${motion}`, clip(motion));
+    if (this.holdClip) for (const { name: motion } of carrying) anim.assignAnimation(`${CARRYING}.${motion}`, clip(motion));
   }
 
   /** Before the engine's animation step: where it stands, which way it faces, how fast it goes. */
@@ -137,6 +162,7 @@ export class SkinnedFigure implements ThingFigure {
     const anim = this.figure.anim!;
     const ground = pose.reducedMotion ? 0 : this.speed / this.scale;
     this.misses.clear();
+    if (this.holdClip) anim.setBoolean(HOLDING, (pose.holding?.size ?? 0) > 0);
     const fastest = this.runSpeed ?? this.walkSpeed;
     if (fastest === null) {
       if (ground > 0.15) this.misses.add('no_ground_speed');
@@ -160,8 +186,8 @@ export class SkinnedFigure implements ThingFigure {
     for (const socket of pose.holding ?? []) {
       const arm = this.armOf(socket);
       const reaching = reach !== null && reach.socket === socket ? Math.max(0, Math.min(1, reach.amount)) : 0;
-      // A rig with a socket joint carries the thing on the clip's own arm; the arm is posed here
-      // only to reach, or to carry where the rig names no socket joint.
+      // A rig with a socket joint carries the thing on the clip's own arm (its hold clip where it
+      // has one); the arm is posed here only to reach, or to carry where the rig names no socket joint.
       if (arm === null || (reaching === 0 && this.sockets.has(socket))) continue;
       const s = arm.side;
       const upper: Vec3 = [s * (0.16 - 0.1 * reaching), -1 + 0.95 * reaching, 0.3 + 0.9 * reaching];
