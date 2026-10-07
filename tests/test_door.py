@@ -267,6 +267,13 @@ def test_a_mapping_that_breaks_its_profile_is_refused_by_name(change, says):
         check_mapping(document)
 
 
+def test_a_program_that_brings_no_visitor_needs_none_in_its_mapping():
+    document = door_support.mapping()
+    document["visitors"] = []
+    reads = [field for field in door_support.READS if field != "player"]
+    assert check_reads(check_mapping(document), reads) == frozenset(reads)
+
+
 def test_a_game_names_its_actions_with_its_own_identifiers_and_items_travel_in_alone():
     document = door_support.mapping()
     # A namespaced action id, as games write them, is one grammar for every game.
@@ -309,6 +316,11 @@ def test_text_a_person_reads_meets_the_line_rule(text, fault):
         ("Qwen/Qwen3-235B-A22B-Instruct-2507", True, True),
         ("Qwen/Qwen3", False, False),
         ("see acme.ai", False, False),
+        ("see \uff45\uff58\uff41\uff4d\uff50\uff4c\uff45.\uff43\uff4f\uff4d", False, False),
+        ("\u043f\u0440\u0438\u043c\u0435\u0440.\u0440\u0444", False, False),
+        ("at 10.0.0.1", False, False),
+        ("meta-llama/Llama-3.1-8B", True, True),
+        ("Mr. Smith", False, True),
         ("mail me@there", False, False),
         ("https x", False, True),
         ("https://x", False, False),
@@ -326,15 +338,44 @@ def test_held_polls_are_shared_by_workspace_and_by_bridge():
     polls = HeldPolls(maximum=8, per_workspace=2)
     one, two = uuid.uuid4(), uuid.uuid4()
     assert polls.per_bridge == 4
-    first = polls.hold(uuid.uuid4(), one, "a")
+    oldest = uuid.uuid4()
+    first = polls.hold(oldest, one, "a")
     assert first is not None and polls.hold(uuid.uuid4(), one, "a") is not None
     # A third poll of the same workspace waits for one of its own to end, whatever the bridge.
     assert polls.hold(uuid.uuid4(), one, "b") is None
     assert polls.hold(uuid.uuid4(), two, "a") is not None
     assert polls.hold(uuid.uuid4(), uuid.uuid4(), "a") is not None
-    # Four polls of bridge "a" are half the ceiling: a fifth waits, another bridge does not.
+    # Four polls of bridge "a" are half the ceiling. A fifth, from a workspace holding none there,
+    # takes the place of the oldest poll of the workspace holding two; then every workspace there
+    # holds one, and a sixth waits. Another bridge does not.
+    assert polls.hold(uuid.uuid4(), uuid.uuid4(), "a") is not None
+    assert not polls.holds(oldest, first)
     assert polls.hold(uuid.uuid4(), uuid.uuid4(), "a") is None
     assert polls.hold(uuid.uuid4(), uuid.uuid4(), "b") is not None
+
+
+def test_a_full_process_gives_a_workspace_holding_fewer_the_place_of_one_holding_the_most():
+    polls = HeldPolls(maximum=4, per_workspace=4)
+    many, few = uuid.uuid4(), uuid.uuid4()
+    held = [
+        (grant, polls.hold(grant, many, bridge))
+        for grant, bridge in (
+            (uuid.uuid4(), "a"),
+            (uuid.uuid4(), "a"),
+            (uuid.uuid4(), "b"),
+            (uuid.uuid4(), "b"),
+        )
+    ]
+    assert all(token is not None for _grant, token in held)
+    # The process is full. A workspace holding none takes the oldest place of the one holding four,
+    # and then another, while that one still holds two more than it would.
+    assert polls.hold(uuid.uuid4(), few, "c") is not None
+    assert [polls.holds(grant, token) for grant, token in held] == [False, True, True, True]
+    assert polls.hold(uuid.uuid4(), few, "c") is not None
+    assert [polls.holds(grant, token) for grant, token in held] == [False, False, True, True]
+    # Two and two: neither takes a place from the other, and the poll that lost its place waits.
+    assert polls.hold(uuid.uuid4(), few, "d") is None
+    assert polls.hold(held[0][0], many, "a") is None
 
 
 def test_a_grant_polling_again_ends_its_last_poll_without_needing_room():

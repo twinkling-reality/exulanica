@@ -22,8 +22,12 @@ registered one would be a surface for registering anything.
     names the owner's workspace, since a listed server serves strangers. ``owner``: a program the
     world's owner runs on their own machine, such as an agent or a single-player game; it has no
     bridge credential and takes no invites, and any owner it is offered to may give it a channel
-    credential for their own grant. Views say which, so a card can say a program is run by the
-    world's owner rather than by a shared server.
+    credential for their own grant. Listing an owner bridge is how a deployment offers one program
+    to every owner, as an agents' client is offered: each owner's copy holds only that owner's
+    credentials, which open only that owner's grants, and the bridge's held polls are shared evenly
+    among the workspaces using it (:class:`exulanica.door.notices.HeldPolls`); a deployment that
+    offers it to some owners only declares it unlisted, naming their workspaces. Views say which,
+    so a card can say a program is run by the world's owner rather than by a shared server.
 ``ai``
     Whether the program's choices are an artificial intelligence's, true or false and always
     stated, so a deployment cannot forget it: a card marks the things and lines of every grant of an

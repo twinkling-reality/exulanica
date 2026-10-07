@@ -61,10 +61,18 @@ __all__ = [
 ]
 
 BACKUP_SET_PROFILE: Final = "exulanica.installation-backup/v1"
-#: Sign-in state a backup set carries the definition of and never the rows: pending logins hold a
-#: plaintext nonce and verifier, and browser sessions a plaintext CSRF token (migration 0058).
-#: Restoring either is useless, so a restored installation asks everyone to sign in again.
-EPHEMERAL_TABLES: Final = ("account_login_attempt", "account_browser_session")
+#: Tables a backup set carries the definition of and never the rows. Sign-in state: pending logins
+#: hold a plaintext nonce and verifier, and browser sessions a plaintext CSRF token (migration
+#: 0058); restoring either is useless, so a restored installation asks everyone to sign in again.
+#: The door's secrets and refused redemptions (migration 0149): a restore voids every invite and
+#: channel credential, so owners open their grants again, and a secret the door prunes after its
+#: retention never leaves an older backup holding a revocation a later checkpoint cannot carry.
+EPHEMERAL_TABLES: Final = (
+    "account_login_attempt",
+    "account_browser_session",
+    "door_secret",
+    "door_redemption_refusal",
+)
 _MANIFEST: Final = "backup-set.json"
 _KEYS: Final = "keys.txt"
 

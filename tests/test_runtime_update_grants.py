@@ -48,9 +48,10 @@ RUNTIME_UPDATES: dict[str, str] = {
         "(door/channel.py); migration 0149 refuses a move backwards and every delete"
     ),
     "door_secret": (
-        "redeeming an invite sets used_at, and an owner ending a grant's credentials sets "
-        "revoked_at, the two columns the runtime may update (door/secrets.py, door/grants.py); "
-        "migration 0149 refuses every other change and every delete before retention"
+        "redeeming an invite sets used_at, and an owner ending a grant's credentials or a new "
+        "channel credential ending the grant's last sets revoked_at, the two columns the runtime "
+        "may update (door/secrets.py, door/grants.py); migration 0149 refuses every other change "
+        "and every delete before retention"
     ),
     "entity": "naming and merging, name and withdrawal triggers, and a bridge decision's lock",
     "entity_link": "a link's state changes (identity/links.py)",

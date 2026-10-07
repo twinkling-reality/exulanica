@@ -1008,7 +1008,7 @@ def build_services(
         executor_shares_the_write_role=readonly_url is None,
         model_client=client,
         accounts=accounts,
-        door=door_runtime(database, environ),
+        door=door_runtime(database, environ, open_to=_door_open_to(accounts)),
         environment_admission_root=data_dir / "environment-inbox",
         materials=_material_runtime(stores, environ),
         workspace_assets=WorkspaceAssetRuntime(
@@ -1041,6 +1041,20 @@ def build_services(
         spending_mode=mode,
         spending=spending,
     )
+
+
+def _door_open_to(accounts: AccountRuntime | None) -> Callable[[uuid.UUID], bool] | None:
+    """Whether a workspace is open to the door, where the deployment has accounts: its owner's
+    account and owner membership stand and it is not disabled, read through the account role on
+    every call, so a disabled workspace's doors close at their next request. An account database
+    that cannot be read refuses the request (``account_unavailable``) rather than opening it."""
+    if accounts is None:
+        return None
+
+    def open_to(workspace_id: uuid.UUID) -> bool:
+        return workspace_id in accounts.active_owned_workspaces()
+
+    return open_to
 
 
 def _role_credentials_set(environ: Mapping[str, str]) -> bool:

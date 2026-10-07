@@ -6,7 +6,8 @@ adapter outside the product and pinned by digest in the deployment's bridge dire
 ``visitors``
     Each kind of game character that may cross, the thing kind it arrives as here, the words it is
     known by, and the looks it may arrive in, each with its licence. A look is chosen by a key the
-    adapter reports; no picture crosses at run time.
+    adapter reports; no picture crosses at run time. None for a program that brings no visitor and
+    only decides for a world's own things, such as an agent.
 ``items``
     Each game item that may be carried across, the thing kind it becomes, which ways it travels,
     and whether the correspondence is exact or approximated. At most one item of each kind travels
@@ -187,7 +188,7 @@ def check_mapping(document: Any) -> dict[str, Any]:
         _words(game["content"], "its game's content")
 
     visitors = document["visitors"]
-    _require(isinstance(visitors, list) and 1 <= len(visitors) <= 16, "1 to 16 visitors")
+    _require(isinstance(visitors, list) and len(visitors) <= 16, "at most 16 visitors")
     for index, visitor in enumerate(visitors):
         where = f"visitor {index + 1}"
         _object(

@@ -12,14 +12,22 @@ one can be read back with it, and the grant's presence records the version, the 
 declaration, which every later answer names. Declared words are for a person reading a card: they
 never enter a society record or any model's context.
 
+**Presence.** A grant answers to one program at a time: it has one live channel credential, and a
+hello counts only if it was said since that credential was issued (:func:`presence_of`), so a hello
+an earlier program said never names who answers now. A hello whose adapter version or mapping the
+deployment no longer admits counts for nothing either: unpinning one closes every channel that said
+hello with it, which must say hello again before it polls or answers, and is not asked meanwhile.
+A hello and an answer take the grant's lock and check that their credential is still the live one,
+so neither lands beside the issue of the next.
+
 **Reading.** Frames are projected from what the grant's tables and the decision tables hold
 (:mod:`exulanica.door.protocol`): the grant as it stands, each ask's request with the role's words,
 each answered ask's recorded outcome, and the grant's end. A cheap head read says whether anything
 is new before any frame is built, which is what a held poll repeats.
 
 **Answering.** An answer names one ask of this grant and one of the labels its request offered. It
-is stored as the bridge sent it, with the adapter version, mapping and declaration the grant's
-presence names at that moment, and nothing else happens: the decision host makes the receipt, and
+is stored as the bridge sent it, with the adapter version, mapping and declaration its own hello
+named, and nothing else happens: the decision host makes the receipt, and
 applies the workspace's rules to any line, when it records it. Migration 0149 ties the stored answer
 to its ask by all four of the ask's names and refuses it under a grant that has ended, under the
 lock revoking takes. An answer to an ask the host already recorded is too late, and a second answer
@@ -112,16 +120,30 @@ class Presence:
     def connected(self, now: dt.datetime, window: dt.timedelta) -> bool:
         return now - self.polled_at <= window
 
+    def admitted_by(self, bridge: Bridge) -> bool:
+        """Whether the deployment still admits the adapter version and the mapping this hello
+        named: one it unpinned closes the channel until the bridge says hello again."""
+        return (
+            self.adapter_version in bridge.adapter_versions
+            and self.mapping_sha256 in bridge.mapping_sha256
+        )
+
 
 def presence_of(
     connection: psycopg.Connection, workspace_id: uuid.UUID, grant_id: uuid.UUID
 ) -> Presence | None:
+    """What the program holding the grant's live channel credential said hello with, and when it
+    last polled; None when it has said no hello since that credential was issued, or the grant has
+    no live channel credential."""
     row = connection.execute(
         "select p.adapter_version, p.mapping_sha256, p.declared_sha256, d.document as declared, "
         "p.hello_at, p.polled_at from door_presence p left join door_declaration d "
         "  on d.workspace_id = p.workspace_id and d.declared_sha256 = p.declared_sha256 "
-        "where p.workspace_id = %s and p.grant_id = %s",
-        (workspace_id, grant_id),
+        "where p.workspace_id = %(w)s and p.grant_id = %(g)s and p.hello_at >= ("
+        "  select max(s.created_at) from door_secret s "
+        "   where s.workspace_id = %(w)s and s.grant_id = %(g)s and s.kind = 'channel' "
+        "     and s.revoked_at is null and s.expires_at > statement_timestamp())",
+        {"w": workspace_id, "g": grant_id},
     ).fetchone()
     return None if row is None else Presence(**row)
 
@@ -183,6 +205,27 @@ class ChannelRepository:
             raise ChannelRefused("grant_ended", 410, "this grant was revoked or has ended")
         return grant
 
+    def _live(self) -> None:
+        """Take the grant's lock and refuse a credential ended since it was presented, by a newer
+        one of the grant or by its owner, so a hello or an answer never lands beside the issue of
+        the next credential."""
+        self._grants.lock(self._session.grant_id)
+        row = self._connection.execute(
+            "select 1 from door_secret where secret_sha256 = %s and kind = 'channel' "
+            "and revoked_at is null and expires_at > statement_timestamp()",
+            (self._session.credential_sha256,),
+        ).fetchone()
+        if row is None:
+            raise ChannelRefused("unauthenticated", 401, "no door credential opens anything here")
+
+    def _presence(self, bridge: Bridge, doing: str) -> Presence:
+        """This channel's own hello, while the deployment admits what it named, or a refusal that
+        asks the bridge to say hello first."""
+        presence = presence_of(self._connection, self._session.workspace_id, self._session.grant_id)
+        if presence is None or not presence.admitted_by(bridge):
+            raise ChannelRefused("hello_first", 409, f"say hello on this channel before {doing}")
+        return presence
+
     def hello(
         self,
         *,
@@ -218,6 +261,7 @@ class ChannelRepository:
         declaration = None if declared is None else _declaration(declared)
         declared_digest = None if declaration is None else declared_sha256(declaration)
         with self._connection.transaction():
+            self._live()
             self._connection.execute(
                 "insert into door_mapping (workspace_id, mapping_sha256, document) "
                 "values (%(w)s, %(m)s, %(d)s) on conflict do nothing",
@@ -253,25 +297,18 @@ class ChannelRepository:
         records the poll; once the grant has ended it records nothing, and once the bridge has read
         that end (``cursor.ended``) it is refused. Then whatever is new after ``cursor``, or None.
         """
-        self.bridge()
+        bridge = self.bridge()
         grant = self.grant()
         ended = grant.ended(self._grants.now())
         if ended is not None and cursor.ended:
             raise ChannelRefused("grant_ended", 410, "this grant was revoked or has ended")
+        self._presence(bridge, "polling")
         if ended is None:
-            polled = self._connection.execute(
+            self._connection.execute(
                 "update door_presence set polled_at = greatest(polled_at, statement_timestamp()) "
-                "where workspace_id = %(w)s and grant_id = %(g)s returning grant_id",
-                self._ids,
-            ).fetchone()
-        else:
-            polled = self._connection.execute(
-                "select grant_id from door_presence "
                 "where workspace_id = %(w)s and grant_id = %(g)s",
                 self._ids,
-            ).fetchone()
-        if polled is None:
-            raise ChannelRefused("hello_first", 409, "say hello on this channel before polling")
+            )
         return self.read(cursor)
 
     def read(self, cursor: Cursor) -> tuple[list[dict[str, Any]], Cursor] | None:
@@ -417,12 +454,24 @@ class ChannelRepository:
 
     def answer(self, body: Mapping[str, Any]) -> str:
         """Store a bridge's answer to one open ask of this standing grant, with who answered as its
-        presence names them now, and return its digest."""
+        own hello named them, and return its digest."""
+        try:
+            with self._connection.transaction():
+                return self._answer(body)
+        except psycopg.errors.UniqueViolation as exc:
+            raise ChannelRefused(
+                "answer_already_given", 409, "this ask was answered already"
+            ) from exc
+        except psycopg.errors.CheckViolation as exc:
+            # The grant reached its end between the read below and the insert, which 0149 checks
+            # again under the lock revoking takes.
+            raise ChannelRefused("grant_ended", 410, "this grant was revoked or has ended") from exc
+
+    def _answer(self, body: Mapping[str, Any]) -> str:
         request_id = body["request_id"]
+        self._live()
         self._standing()
-        presence = presence_of(self._connection, self._session.workspace_id, self._session.grant_id)
-        if presence is None:
-            raise ChannelRefused("hello_first", 409, "say hello on this channel before answering")
+        presence = self._presence(self.bridge(), "answering")
         row = self._connection.execute(
             "select a.ask_seq, r.document as request, d.request_id as recorded, "
             "w.request_id as answered "
@@ -473,31 +522,21 @@ class ChannelRepository:
         if line is not None:
             document["line"] = line
         digest = answer_sha256(document)
-        try:
-            with self._connection.transaction():
-                self._connection.execute(
-                    "insert into door_answer (workspace_id, request_id, grant_id, ask_seq, "
-                    "adapter_version, mapping_sha256, declared_sha256, document, answer_sha256) "
-                    "values (%(w)s, %(r)s, %(g)s, %(s)s, %(v)s, %(m)s, %(c)s, %(d)s, %(h)s)",
-                    {
-                        **self._ids,
-                        "r": request_id,
-                        "s": row["ask_seq"],
-                        "v": presence.adapter_version,
-                        "m": presence.mapping_sha256,
-                        "c": presence.declared_sha256,
-                        "d": Jsonb(document),
-                        "h": digest,
-                    },
-                )
-        except psycopg.errors.UniqueViolation as exc:
-            raise ChannelRefused(
-                "answer_already_given", 409, "this ask was answered already"
-            ) from exc
-        except psycopg.errors.CheckViolation as exc:
-            # The grant ended between the read above and the insert, which 0149 checks under the
-            # lock revoking takes.
-            raise ChannelRefused("grant_ended", 410, "this grant was revoked or has ended") from exc
+        self._connection.execute(
+            "insert into door_answer (workspace_id, request_id, grant_id, ask_seq, "
+            "adapter_version, mapping_sha256, declared_sha256, document, answer_sha256) "
+            "values (%(w)s, %(r)s, %(g)s, %(s)s, %(v)s, %(m)s, %(c)s, %(d)s, %(h)s)",
+            {
+                **self._ids,
+                "r": request_id,
+                "s": row["ask_seq"],
+                "v": presence.adapter_version,
+                "m": presence.mapping_sha256,
+                "c": presence.declared_sha256,
+                "d": Jsonb(document),
+                "h": digest,
+            },
+        )
         return digest
 
 

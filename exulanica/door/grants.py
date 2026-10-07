@@ -15,13 +15,21 @@ digest in ``door_secret``: an invite, which a server bridge redeems once, within
 with the deployment's bridge credential, for a channel credential; or a channel credential issued
 directly to the owner, for a bridge the owner runs or a server bridge declared for the owner's
 workspace alone (:meth:`exulanica.door.bridges.Bridge.direct_credentials_for`). At most eight
-unexpired invites wait unused, and eight direct credentials are live, per grant. A channel
-credential reads its grant's frames until a day after the grant ends, so a bridge learns what
-happened while it was away; it answers nothing once the grant has ended. What a secret opens ends
-with its grant: every use of one checks that its grant still stands. An owner may also end every
-credential and invite of a grant at once without ending the grant
+unexpired invites wait unused per grant, and one channel credential is live: a grant answers to one
+program at a time, so a channel credential issued or redeemed ends the grant's earlier one, and the
+channel counts only a hello said since the live credential was issued
+(:func:`exulanica.door.channel.presence_of`). A receipt therefore names the adapter of the program
+that holds the grant, which is the only one that can answer. Every use of a secret checks its
+grant: once the grant has ended an invite opens nothing and a channel credential answers nothing,
+reading only, until a day after the end, what happened while its bridge was away. An owner may also
+end every credential and invite of a grant at once without ending the grant
 (:meth:`GrantRepository.revoke_credentials`), as after a credential leaked; each records the time
 it was revoked.
+
+Issuing, revoking, every write of a grant's secrets, and a hello and an answer on its channel all
+take the grant's lock (:meth:`GrantRepository.lock`), so a credential being ended is never issued
+again by a request running beside it, a cap is never passed by two requests at once, and an answer
+is never stored under a hello its credential did not say.
 
 A grant may carry ``world_words``, the words its owner chose for its bridge to show players about
 the world (a title for a panel). The door never reads the world's own title, which is the owner's
@@ -94,9 +102,9 @@ MINUTES_MAXIMUM: Final = 1440
 INVITE_LIFETIME: Final = dt.timedelta(minutes=15)
 #: How long a channel credential may still read its grant's frames after the grant ends.
 READING_GRACE: Final = dt.timedelta(hours=24)
-#: Per grant, the most invites waiting unused and unexpired, and the most live channel credentials
-#: an owner is given directly: enough for a server and a spare, few enough that no grant grows the
-#: global secret table without bound.
+#: Per grant, the most invites waiting unused and unexpired: enough for a server and a spare, few
+#: enough that no grant grows the global secret table without bound. A grant has one live channel
+#: credential at most.
 SECRETS_WAITING_MAXIMUM: Final = 8
 #: The most characters in the words an owner gives a grant's bridge to show for the world.
 WORLD_WORDS_MAXIMUM: Final = 80
@@ -331,6 +339,14 @@ class GrantRepository:
             issued_at=row["issued_at"],
         )
 
+    def lock(self, grant_id: uuid.UUID) -> None:
+        """Take the grant's lock until the transaction ends. Issuing, revoking, every write of its
+        secrets, and a hello and an answer on its channel take it, so none sees another half
+        done."""
+        self._connection.execute(
+            "select pg_advisory_xact_lock(hashtextextended(%s, 149001))", (str(grant_id),)
+        )
+
     def _choices(self, world_id: str) -> SocietyModelChoiceRepository:
         return SocietyModelChoiceRepository(self._connection, self._workspace_id, world_id=world_id)
 
@@ -385,9 +401,7 @@ class GrantRepository:
             raise GrantRefused("bridge_not_offered", "this deployment offers no such bridge here")
         grant_id = uuid.uuid5(_GRANT_NAMESPACE, f"{self._workspace_id}:{idempotency_key}")
         with self._connection.transaction():
-            self._connection.execute(
-                "select pg_advisory_xact_lock(hashtextextended(%s, 149001))", (str(grant_id),)
-            )
+            self.lock(grant_id)
             existing = self.current(grant_id)
             if existing is not None:
                 if (existing.world_id, existing.bridge, existing.scope) != (
@@ -441,9 +455,7 @@ class GrantRepository:
         """End a grant now: nothing more is asked or answered under it, and its invites and
         channel open nothing more but reading what was sent. Revoking twice changes nothing."""
         with self._connection.transaction():
-            self._connection.execute(
-                "select pg_advisory_xact_lock(hashtextextended(%s, 149001))", (str(grant_id),)
-            )
+            self.lock(grant_id)
             grant = self.current(grant_id)
             if grant is None:
                 raise GrantRefused("unknown_grant", "no grant with this id is issued here")
@@ -509,6 +521,7 @@ class GrantRepository:
         """A fresh invite to a standing grant of a server bridge: single use, for fifteen minutes
         or until the grant ends, whichever is sooner, shown once as four groups of four."""
         with self._connection.transaction():
+            self.lock(grant_id)
             grant = self._standing(grant_id)
             bridge = self._offered(grant, bridges)
             if not bridge.takes_invites():
@@ -527,8 +540,10 @@ class GrantRepository:
 
     def direct_channel(self, grant_id: uuid.UUID, bridges: BridgeDirectory) -> IssuedSecret:
         """A channel credential for a standing grant, shown once, given to its owner: for a program
-        the owner runs, or a server bridge declared for this workspace alone."""
+        the owner runs, or a server bridge declared for this workspace alone. It ends the grant's
+        earlier channel credential."""
         with self._connection.transaction():
+            self.lock(grant_id)
             grant = self._standing(grant_id)
             bridge = self._offered(grant, bridges)
             if not bridge.direct_credentials_for(self._workspace_id):
@@ -536,18 +551,22 @@ class GrantRepository:
                     "direct_credential_not_offered",
                     "this bridge's grants open only with invites its own server redeems",
                 )
-            if self._waiting(grant, "channel") >= SECRETS_WAITING_MAXIMUM:
-                raise GrantRefused(
-                    "too_many_secrets",
-                    f"a grant has at most {SECRETS_WAITING_MAXIMUM} live channel credentials",
-                )
             return self._channel(grant)
 
     def redeemed_channel(self, grant_id: uuid.UUID) -> IssuedSecret:
-        """The channel credential a redeemed invite opens, in the redemption's transaction."""
+        """The channel credential a redeemed invite opens, in the redemption's transaction, which
+        holds the grant's lock; it ends the grant's earlier channel credential."""
         return self._channel(self._standing(grant_id))
 
     def _channel(self, grant: Grant) -> IssuedSecret:
+        """A new channel credential for ``grant``, ending the live one it had: a grant answers to
+        one program at a time. The caller holds the grant's lock."""
+        self._connection.execute(
+            "update door_secret set revoked_at = statement_timestamp() "
+            "where workspace_id = %s and grant_id = %s and kind = 'channel' "
+            "and revoked_at is null and expires_at > statement_timestamp()",
+            (self._workspace_id, grant.grant_id),
+        )
         return self._secret(
             grant,
             kind="channel",
@@ -559,6 +578,7 @@ class GrantRepository:
         """End every live invite and channel credential of a grant now, without ending the grant,
         and say how many: each records the time it was revoked, and opens nothing after."""
         with self._connection.transaction():
+            self.lock(grant_id)
             grant = self.current(grant_id)
             if grant is None:
                 raise GrantRefused("unknown_grant", "no grant with this id is issued here")

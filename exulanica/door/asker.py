@@ -7,8 +7,11 @@ application gives it (``exulanica/api/external_asking.py``), and this is the one
 *   :meth:`DoorAsker.configuration`, before anything is reserved, states the external request's
     ``provider_config`` as the grant stands now (its bridge, revision, the mapping its bridge last
     said hello with, and the bridge's declared deadline) and whether to ask at all: a revoked or
-    expired grant, a bridge the deployment no longer declares or offers here, or one that is not
-    connected, is a refusal the host records at once.
+    expired grant, a bridge the deployment no longer declares or offers here, a workspace that is
+    closed (where the deployment has accounts), or a program that is not connected, is a refusal the
+    host records at once. A program is connected when the holder of the grant's live credential
+    said hello since it was issued, with a version and mapping the deployment still admits, and
+    polled within the presence window (:func:`exulanica.door.channel.presence_of`).
 *   :meth:`DoorAsker.answer` writes the ask to the grant's outbox, where the bridge's held poll
     reads it, and waits until ``ends_at`` for the bridge's answer in the inbox. The answer it finds
     becomes the result the host records as the receipt: the offered option the bridge named, and
@@ -59,6 +62,8 @@ class DoorAsker:
     notices: Notices
     bridges: BridgeDirectory
     monotonic: Callable[[], float] = time.monotonic
+    #: Whether a workspace is open, where the deployment has accounts.
+    open_to: Callable[[uuid.UUID], bool] | None = None
 
     def configuration(
         self,
@@ -96,7 +101,14 @@ class DoorAsker:
         if bridge is None or not bridge.offered_to(workspace_id):
             # The deployment removed the bridge, or stopped offering it here: nobody may answer.
             return config, "decider_disconnected"
-        if presence is None or not presence.connected(now, presence_window(bridge)):
+        if self.open_to is not None and not self.open_to(workspace_id):
+            # The workspace was disabled, or its owner's account or membership ended.
+            return config, "decider_disconnected"
+        if (
+            presence is None
+            or not presence.admitted_by(bridge)
+            or not presence.connected(now, presence_window(bridge))
+        ):
             return config, "decider_disconnected"
         return config, None
 

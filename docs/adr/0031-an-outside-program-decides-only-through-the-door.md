@@ -30,13 +30,15 @@ second game should need nothing new in the product.
   appended revisions. A revocation is a withdrawal of permission, carried by a restore from an older
   backup like any other. A grant opens through a single-use invite of 80 bits that a bridge redeems
   with its own deployment credential, or through a channel credential of 256 bits; both are stored as
-  digests in the one door table outside every workspace, read before any workspace is known.
+  digests in the one door table outside every workspace, read before any workspace is known, and
+  no backup carries them, so a restore voids every credential and owners open their grants again.
 - **A bridge dials out and reads by long-poll over HTTPS.** It receives the same request a model is
   shown and answers with one of the labels offered; the decision host writes the receipt, so replay
   needs no bridge. The world keeps its clock: a late or missing answer falls to the routine.
 - **An answer is tied, in the database, to its ask, a standing grant and whoever gave it**: the
-  adapter version, mapping and declaration its grant's presence named when it answered, so a
-  receipt never names an adapter that did not answer and no answer outlives a revocation.
+  adapter version, mapping and declaration its own hello named. A grant answers to one program at a
+  time: it has one live channel credential, and only a hello said under that credential counts, so
+  a receipt never names an adapter that did not answer and no answer outlives a revocation.
 - **Door credentials and account credentials never overlap**, by a route declaration kind of their
   own (`Channel`), and the owner permission that issues grants (`door.grant`) is isolated by name.
 

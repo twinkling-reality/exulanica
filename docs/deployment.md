@@ -1548,7 +1548,10 @@ matches any host and port.
 
 The dump carries the definitions of `account_login_attempt` and `account_browser_session` and not
 their rows, which hold plaintext sign-in nonces, verifiers and CSRF tokens: a restored installation
-asks everyone to sign in again.
+asks everyone to sign in again. Nor does it carry the rows of `door_secret` and
+`door_redemption_refusal` (migration 0149): a restore voids every door invite and channel credential,
+so each world's owner opens their grants again ([door contract](door-contract.md)), and a credential
+the door prunes after its retention never leaves an older backup unrestorable.
 
 `exulanica_backup` is provisioned by `exulanica-db` with `EXULANICA_BACKUP_ROLE_PASSWORD`: BYPASSRLS,
 SELECT on every table and sequence (and, by default privilege, on those the owner creates later)

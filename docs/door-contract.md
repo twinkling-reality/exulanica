@@ -47,7 +47,16 @@ A missing or empty setting admits no bridge. A malformed one is refused at start
 with the secret in the message, and two bridges may share neither a key nor a credential. A bridge
 credential is matched in constant time against every declared digest. Removing a bridge from the
 setting, or no longer offering it to a workspace, closes its channels there: every credential of it
-then opens nothing, and the decision host no longer asks it.
+then opens nothing, and the decision host no longer asks it. Unpinning a mapping or an adapter
+version closes every channel that said hello with it: until the bridge says hello again with one the
+deployment admits, its polls and answers are 409 `hello_first` and the host does not ask it
+(`decider_disconnected`).
+
+Listing an owner bridge is how a deployment offers one program to every owner, as an agents' client
+is offered: any owner may give it a channel credential for their own grant, each owner's copy holds
+only that owner's credentials, which open only that owner's grants, and the bridge's held polls are
+shared evenly among the workspaces using it (see Frames). A deployment that offers it to some owners
+only declares it unlisted, naming their workspaces.
 
 ## Grants
 
@@ -76,8 +85,13 @@ bridge is unlisted and names the owner's workspace, because a listed server serv
 not that owner. A program its owner runs has no bridge credential and takes no invites: any owner it
 is offered to is given its channel credential directly. A request for a credential the bridge cannot
 be given is refused before anything is issued (422 `direct_credential_not_offered`, or
-`invites_not_offered`). Per grant, at most eight unexpired invites wait unused and eight channel
-credentials given directly are live (409 `too_many_secrets`).
+`invites_not_offered`). Per grant, at most eight unexpired invites wait unused (409
+`too_many_secrets`), and one channel credential is live: a grant answers to one program at a time,
+so a channel credential issued or redeemed ends the grant's earlier one, whose program is refused at
+its next request (401 `unauthenticated`). Issuing and revoking a grant, every write of its secrets,
+and a hello and an answer on its channel take the grant's lock, so a credential being ended is never
+issued again beside it, a cap is never passed by two requests at once, and an answer is never stored
+under a hello its own credential did not say.
 
 A grant is the newest of its revisions, each appended and never changed. Revoking records the
 owner's revocation (`door_grant_revocation`), after which nothing is asked or answered under the
@@ -129,15 +143,23 @@ Every failed redemption is recorded against its bridge and requester in `door_re
 and a requester with ten failures in the last minute is refused before its code is read (429
 `too_many_redemptions`, `retry_after_s` 60). Those refusals are not recorded, so the lockout ends a
 minute after the requester's last real failure, and another requester of the same bridge is never
-held up. What a secret opens ends with its grant: every use of one checks that its grant still
-stands. A secret may only gain the time an invite was used and the time it was revoked, each once:
-migration 0149 refuses every other change. A secret's revocation, like a grant's, is a withdrawal a
-restore from an older backup writes again (kind `door_secret`), so a credential ended after a backup
-does not open again. The runtime role may update those two columns and deletes nothing:
-`door_prune`, a function with its owner's rights the runtime alone may execute, removes refused
-redemptions a day old and secrets thirty days past their end, a bounded batch at a time, as the door
-issues and redeems (`exulanica/door/retention.py`); the tables' triggers refuse every other delete,
-whoever asks.
+held up. Every use of a secret checks its grant: once the grant has ended an invite opens nothing
+and a channel credential answers nothing, reading only, for the day after, what was sent. Where the
+deployment has accounts, a secret opens its grant only while the workspace is open: its owner's
+account and owner membership stand and the workspace is not disabled, read through the account role
+on every request as a browser session is (an account database that cannot be read answers 503
+`account_unavailable`), and a disabled workspace's societies stop playing, so its programs are not
+asked either. A secret may only gain the time an invite was used and the time it was revoked, each
+once: migration 0149 refuses every other change. Backup sets carry no door secret and no refused
+redemption (`EPHEMERAL_TABLES` in `exulanica/orchestration/installation/backup_set.py`), so a
+restore voids every invite and channel credential and each owner opens their grants again; a secret
+the door has pruned therefore never leaves an older backup holding a revocation a later checkpoint
+lacks. A secret's revocation is catalogued (kind `door_secret`) so that a sealed restore checkpoint
+refuses it, as it refuses a sign-out. The runtime role may update those two columns and deletes
+nothing: `door_prune`, a function with its owner's rights the runtime alone may execute, removes
+refused redemptions a day old and secrets thirty days past their end, a bounded batch at a time, as
+the door issues and redeems (`exulanica/door/retention.py`); the tables' triggers refuse every other
+delete, whoever asks.
 
 ## The channel
 
@@ -158,10 +180,13 @@ allowed, never listed against: letters, marks and digits of any script and `. , 
 (and `/` in a mind), on the line rule ([things contract](things-contract.md)), with no dotted host
 name (else 422 `declared_refused`). The mapping and the declaration are kept in the workspace by
 their digests (`door_mapping`, `door_declaration`), and the grant's presence records the version,
-mapping and declaration that every later answer names. Declared words are a program's own words for
-a person reading a card: they never enter a society record or any model's context. A grant takes at
-most six hellos a minute in one process (429 `too_many_hellos`, `retry_after_s` 60). The answer
-states the bridge's hold. A bridge polls only after its hello (409 `hello_first`).
+mapping and declaration that every later answer names. A presence counts only if its hello was said
+since the grant's live channel credential was issued, so a hello an earlier program said never names
+who answers now, and only while the deployment still admits its version and mapping. Declared words
+are a program's own words for a person reading a card: they never enter a society record or any
+model's context. A grant takes at most six hellos a minute in one process (429 `too_many_hellos`,
+`retry_after_s` 60). The answer states the bridge's hold. A bridge polls only after its hello (409
+`hello_first`).
 
 **Frames.** `GET /door/channel/frames?after=` answers with frames of `exulanica.door-frame/v1` after
 an opaque cursor, and the cursor after them; a bridge reads only response bodies. One ask is written
@@ -187,19 +212,23 @@ poller threads per process, and frames are built only when the head says somethi
 the process that wrote an ask the poll wakes at once; otherwise the head is read once a second, and
 a poll whose client went away ends at its next read. One poll is held per grant, a second ending the
 first with nothing to send; a process holds at most 64, a workspace at most four of them and a
-bridge at most half (503 `door_busy` beyond). The frames route belongs to the streams admission
-class.
+bridge at most half. When the process or a bridge is full, a poll from a workspace holding fewer
+takes the place of the oldest poll of the workspace holding the most there, if that one holds at
+least two more; the poll whose place is taken is answered at once with nothing to send. So the
+places are shared evenly among the workspaces that want them, however many owners use one listed
+bridge, and only a poll that would not be fairer is refused (503 `door_busy`, `retry_after_ms`
+1,000). The frames route belongs to the streams admission class.
 
 **Answers.** `POST /door/channel/answers` names one open ask of the grant (else 404
 `unknown_reference`), its request digest and one of the labels the request offered (else 422
 `answer_not_offered`). A line is accepted only with an option that says one, at most 200 code points
 on the line rule (else 422 `line_not_offered`, `line_missing` or `line_refused`). The answer is
-stored as sent, with the adapter version, mapping and declaration the grant's presence names at that
-moment, and nothing else happens: the host makes the receipt. A second answer is 409
-`answer_already_given`, an answer after the turn was decided 409 `answer_too_late`, and an answer
-once the grant has ended 410 `grant_ended`; none changes anything. Migration 0149 ties a stored
-answer to its ask by all four of the ask's names, and refuses one under a grant that has ended under
-the lock revoking takes, so a revocation and an answer never both commit as if the other had not.
+stored as sent, with the adapter version, mapping and declaration its own hello named, and nothing
+else happens: the host makes the receipt. A second answer is 409 `answer_already_given`, an answer
+after the turn was decided 409 `answer_too_late`, and an answer once the grant has ended 410
+`grant_ended`; none changes anything. Migration 0149 ties a stored answer to its ask by all four of
+the ask's names, and refuses one under a grant that has ended under the lock revoking takes, so a
+revocation and an answer never both commit as if the other had not.
 
 ## Deciding through the door
 
@@ -213,9 +242,11 @@ given in `exulanica/api/services.py`):
    contract. `mapping_sha256` is the mapping of the bridge's last hello, or the grant's first pinned
    digest before any; `deadline_ms` is the bridge's. It also states whether to ask at all: a revoked
    or expired grant (`grant_revoked`, `grant_expired`), a thing the grant no longer names
-   (`grant_revoked`), a bridge the deployment no longer declares or offers here, or one that has not
-   polled within its hold and ten quiet seconds (`decider_disconnected`). With a refusal the host
-   records an unavailable receipt at once and the world's routine decides that turn.
+   (`grant_revoked`), a bridge the deployment no longer declares or offers here, a workspace that is
+   closed, or a program that has said no hello under the grant's live credential with a version and
+   mapping the deployment admits, or has not polled within its hold and ten quiet seconds
+   (`decider_disconnected`). With a refusal the host records an unavailable receipt at once and the
+   world's routine decides that turn.
 2. **Asking** writes the ask to the grant's outbox (`door_ask`), which wakes the bridge's held poll,
    and waits until the minute's deadline for the bridge's answer in the inbox (`door_answer`),
    holding no connection between reads. The default deadline is 3,000 ms: a frame reaches a held
@@ -244,7 +275,7 @@ product and pinned by digest in the deployment's bridge directory:
 
 | Part | States |
 | --- | --- |
-| `visitors` | Each kind of game character that may cross, the thing kind it arrives as, the words it is known by, and the looks it may arrive in, each with its licence |
+| `visitors` | Each kind of game character that may cross, the thing kind it arrives as, the words it is known by, and the looks it may arrive in, each with its licence; none for a program that brings no visitor and only decides for a world's own things, such as an agent |
 | `items` | Each game item that may be carried, the thing kind it becomes, which ways it travels, and whether the correspondence is exact or approximated; at most one item of each kind travels out, so a thing leaving always becomes one known game item |
 | `actions` | Which of the game's actions become which abilities |
 | `never_crosses` | Every game field the adapter reads with no counterpart here; a player's name always among them |

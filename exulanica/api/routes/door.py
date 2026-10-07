@@ -24,7 +24,9 @@ something is new; between reads it is an awaited sleep. Within this process an a
 host writes wakes its grant's poll at once (:mod:`exulanica.door.notices`); otherwise the head is
 read once a second. One poll is held per grant, a second poll for the same grant ending the first
 with nothing to send; a workspace and a bridge each hold at most their share of the process's
-polls; a poll whose client went away ends at its next read. Every poll checks its grant: once the
+polls, and a full bridge or process gives a workspace holding fewer the place of the oldest poll of
+the workspace holding the most (:class:`exulanica.door.notices.HeldPolls`); a poll whose client went
+away ends at its next read. Every poll checks its grant: once the
 bridge has read that the grant ended, its polls and hellos are refused.
 
 The route validates and delegates: grants, secrets, the channel and the protocol are
@@ -209,6 +211,7 @@ def _grant_view(
         "ai": None if bridge is None else bridge.ai,
         "connected": presence is not None
         and bridge is not None
+        and presence.admitted_by(bridge)
         and presence.connected(now, presence_window(bridge)),
         "adapter_version": None if presence is None else presence.adapter_version,
         # The program's own words about itself, as it last said hello: for a person reading a card.
@@ -463,8 +466,10 @@ def _on_channel(
 @router.post("/invites/redeem")
 def redeem(request: Request, body: RedeemBody, bridge: CurrentBridge) -> Any:
     """Redeem one invite, as the bridge whose credential is presented, for a channel credential."""
+    services = get_services(request)
+    open_to = None if services.door is None else services.door.open_to
     try:
-        redeemed = redeem_invite(get_services(request).database, bridge, body.code, body.requester)
+        redeemed = redeem_invite(services.database, bridge, body.code, body.requester, open_to)
     except TooManyRedemptions:
         return _problem(
             429,

@@ -83,6 +83,7 @@ __all__ = [
     "PURGE_CROSS_WORKSPACE_TABLES",
     "PURGE_ROLE",
     "READ_ONLY_TABLES",
+    "READ_ONLY_WITHHELD_TABLES",
     "RUNTIME_ROLE",
     "SPENDING_ADMIN_TABLES",
     "SPENDING_READ_FUNCTIONS",
@@ -295,6 +296,10 @@ INSERT_ONLY_TABLES: Final = (
 COLUMN_UPDATE_TABLES: Final[tuple[tuple[str, tuple[str, ...]], ...]] = (
     ("door_secret", ("used_at", "revoked_at")),
 )
+
+#: Tables the read-only role is never granted: migration 0149's door secrets and refused
+#: redemptions hold digests no selection reads, and 0149 grants them to the runtime alone.
+READ_ONLY_WITHHELD_TABLES: Final = ("door_secret", "door_redemption_refusal")
 
 #: Functions with their owner's rights the runtime executes for the door. The runtime holds no
 #: DELETE: migration 0149's ``door_prune`` removes the door's global rows past their retention, a
@@ -566,6 +571,11 @@ def provision_runtime_role(
                 sql.SQL("revoke all on {} from {}").format(sql.Identifier(table), role_name)
             )
         _grant_functions(connection, schema, role_name, SPENDING_READ_FUNCTIONS)
+        if read_only:
+            for table in sorted(_present_tables(connection, READ_ONLY_WITHHELD_TABLES)):
+                connection.execute(
+                    sql.SQL("revoke all on {} from {}").format(sql.Identifier(table), role_name)
+                )
         if not read_only:
             _grant_functions(connection, schema, role_name, SPENDING_RUNTIME_FUNCTIONS)
             _grant_functions(connection, schema, role_name, DOOR_RUNTIME_FUNCTIONS)

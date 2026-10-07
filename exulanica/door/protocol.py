@@ -126,8 +126,9 @@ READS_MAXIMUM: Final = 64
 #: these few marks. No colon or at sign, so no scheme or address reads as one.
 _DECLARED_MARKS: Final = frozenset(" .,'&()_+-")
 #: A dotted host name, such as a web address without its scheme, which the allowed marks could
-#: still spell.
-_HOST: Final = re.compile(r"[A-Za-z0-9-]\.[A-Za-z]{2,}")
+#: still spell: in any script (a letter or digit, a dot, then two letters), or an IPv4 address.
+#: Read after compatibility folding, so fullwidth letters spell what they look like.
+_HOST: Final = re.compile(r"[^\W_]\.[^\W\d_]{2,}|\d{1,3}(?:\.\d{1,3}){3}")
 
 _CURSOR_VERSION: Final = 1
 _CURSOR_FIELDS: Final = frozenset({"v", "ask", "outcome", "grant", "ended"})
@@ -227,7 +228,7 @@ def declared_fault(text: object, *, maximum: int, slash: bool = False) -> str | 
         unicodedata.category(character)[0] in "LMN" or character in marks for character in text
     ):
         return "holds only letters, digits, spaces and . , ' & ( ) _ + -" + (" /" if slash else "")
-    if _HOST.search(text):
+    if _HOST.search(unicodedata.normalize("NFKC", text)):
         return "holds no host name"
     return None
 

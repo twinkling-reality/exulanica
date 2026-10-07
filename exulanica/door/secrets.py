@@ -12,7 +12,8 @@ A bridge presents one of two secrets, and neither request names a workspace:
     channel credential. Only a bridge run by a server has one. The bridge credential is matched
     against the deployment's declared bridges (:mod:`exulanica.door.bridges`); the invite is looked
     up by its digest, used in the same statement that checks it is unused, unrevoked and unexpired,
-    and only then is a channel credential issued.
+    under its grant's lock, and only then is a channel credential issued, ending the grant's earlier
+    one (a grant answers to one program at a time).
 
 ``door_secret`` carries no row-level security because it must be read before any workspace is
 known, which is why it holds nothing but digests and identifiers. Both lookups read it on a
@@ -24,6 +25,12 @@ or past its end is refused as :class:`ChannelNotAccepted`, and an invite that is
 already used, revoked, expired, another bridge's, for a workspace the bridge is no longer offered to
 or for a grant that has ended as :class:`InviteNotRedeemable`, each with one code and one sentence,
 so a caller learns nothing about which guess came closer.
+
+**A workspace that is closed opens nothing.** Where the deployment has accounts, a credential or an
+invite opens a grant only while its workspace is open: its owner's account and membership stand and
+the workspace is not disabled (``open_to``, which the application reads through its account role on
+every request, as a browser session is checked). A disabled workspace's doors close at the next
+request, and its societies stop playing, so nothing is asked there either.
 
 **A lockout that locks out only the guesser.** A server bridge forwards codes that many people type,
 so it names who typed each one with ``requester``, a digest it derives and never a name. Every
@@ -38,6 +45,7 @@ from __future__ import annotations
 import datetime as dt
 import re
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, Final
 
@@ -98,11 +106,13 @@ class TooManyRedemptions(ExulanicaError):
 
 @dataclass(frozen=True, slots=True)
 class ChannelSession:
-    """Who is asking on a channel: one bridge, under one grant, in one workspace."""
+    """Who is asking on a channel: one bridge, under one grant, in one workspace, with the channel
+    credential it presented (as its digest)."""
 
     workspace_id: uuid.UUID
     grant_id: uuid.UUID
     bridge: str
+    credential_sha256: str
 
     @property
     def actor(self) -> uuid.UUID:
@@ -130,13 +140,18 @@ def _row(connection: psycopg.Connection, digest: str) -> tuple[dict[str, Any] | 
 
 
 def open_channel(
-    database: Database, bridges: BridgeDirectory, presented: str | None
+    database: Database,
+    bridges: BridgeDirectory,
+    presented: str | None,
+    open_to: Callable[[uuid.UUID], bool] | None = None,
 ) -> ChannelSession:
-    """The channel a credential opens, or :class:`ChannelNotAccepted`."""
+    """The channel a credential opens, or :class:`ChannelNotAccepted`. ``open_to`` says whether a
+    workspace is open, where the deployment has accounts."""
     if not presented or CHANNEL_CREDENTIAL_FORM.fullmatch(presented) is None:
         raise ChannelNotAccepted("no channel credential opens a grant here")
+    digest = credential_sha256(presented)
     with database.unscoped() as connection:
-        row, now = _row(connection, credential_sha256(presented))
+        row, now = _row(connection, digest)
     if (
         row is None
         or row["kind"] != "channel"
@@ -147,8 +162,13 @@ def open_channel(
     bridge = bridges.get(row["bridge"])
     if bridge is None or not bridge.offered_to(row["workspace_id"]):
         raise ChannelNotAccepted("no channel credential opens a grant here")
+    if open_to is not None and not open_to(row["workspace_id"]):
+        raise ChannelNotAccepted("no channel credential opens a grant here")
     return ChannelSession(
-        workspace_id=row["workspace_id"], grant_id=row["grant_id"], bridge=row["bridge"]
+        workspace_id=row["workspace_id"],
+        grant_id=row["grant_id"],
+        bridge=row["bridge"],
+        credential_sha256=digest,
     )
 
 
@@ -159,10 +179,17 @@ def _refuse(connection: psycopg.Connection, bridge: Bridge, requester: str) -> N
     )
 
 
-def redeem_invite(database: Database, bridge: Bridge, typed: str, requester: str) -> Redeemed:
+def redeem_invite(
+    database: Database,
+    bridge: Bridge,
+    typed: str,
+    requester: str,
+    open_to: Callable[[uuid.UUID], bool] | None = None,
+) -> Redeemed:
     """Redeem one invite for a channel credential, as ``bridge``, whose own credential the caller
     already matched (:meth:`~exulanica.door.bridges.BridgeDirectory.for_credential`), for the
-    requester the bridge names.
+    requester the bridge names, while the invite's workspace is open (``open_to``, where the
+    deployment has accounts).
 
     Raises :class:`TooManyRedemptions` for a requester past its failures, and
     :class:`InviteNotRedeemable` for every other failure.
@@ -194,6 +221,7 @@ def redeem_invite(database: Database, bridge: Bridge, typed: str, requester: str
                 or row["revoked_at"] is not None
                 or now >= row["expires_at"]
                 or not bridge.offered_to(row["workspace_id"])
+                or (open_to is not None and not open_to(row["workspace_id"]))
             ):
                 _refuse(connection, bridge, requester)
                 refusal = InviteNotRedeemable("this invite opens nothing for this bridge")
@@ -206,6 +234,8 @@ def redeem_invite(database: Database, bridge: Bridge, typed: str, requester: str
     grant_id = row["grant_id"]
     try:
         with database.session(workspace_id) as connection, connection.transaction():
+            grants = GrantRepository(connection, workspace_id, grant_actor(grant_id))
+            grants.lock(grant_id)
             used = connection.execute(
                 "update door_secret set used_at = statement_timestamp() "
                 "where secret_sha256 = %s and kind = 'invite' and used_at is null "
@@ -215,7 +245,6 @@ def redeem_invite(database: Database, bridge: Bridge, typed: str, requester: str
             ).fetchone()
             if used is None:
                 raise InviteNotRedeemable("this invite opens nothing for this bridge")
-            grants = GrantRepository(connection, workspace_id, grant_actor(grant_id))
             channel = grants.redeemed_channel(grant_id)
             grant = grants.current(grant_id)
             assert grant is not None

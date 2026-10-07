@@ -237,6 +237,91 @@ def test_a_planned_restore_loses_nothing_and_the_source_can_serve_again(purged, 
     verify_restore(purged.database())
 
 
+def _a_door_credential_ended_long_ago(purged) -> str:
+    """A world, a door grant and its channel credential, which the owner ended and which ended
+    more than thirty days ago, so the door's retention may prune it: its digest."""
+    workspace = purged.workspace_id
+    world = f"door-world-{uuid.uuid4().hex[:8]}"
+    grant = uuid.uuid4()
+    secret = uuid.uuid4().hex * 2
+    with purged.database().session(workspace) as connection, connection.transaction():
+        connection.execute(
+            "insert into world_identity (workspace_id, world_id, kind, provenance, created_by) "
+            "values (%s, %s, 'authored-starter', '{\"origin\": \"test\"}', %s)",
+            (workspace, world, uuid.uuid4()),
+        )
+        connection.execute(
+            "insert into door_grant (workspace_id, grant_id, world_id, bridge, issued_by) "
+            "values (%s, %s, %s, 'test-bridge', %s)",
+            (workspace, grant, world, uuid.uuid4()),
+        )
+        connection.execute(
+            "insert into door_secret (secret_sha256, kind, bridge, workspace_id, grant_id, "
+            "created_at, expires_at) values (%s, 'channel', 'test-bridge', %s, %s, "
+            "now() - interval '40 days', now() - interval '31 days')",
+            (secret, workspace, grant),
+        )
+        connection.execute(
+            "update door_secret set revoked_at = created_at + interval '1 day' "
+            "where secret_sha256 = %s",
+            (secret,),
+        )
+    return secret
+
+
+def test_a_pruned_door_credential_never_makes_an_older_backup_unrestorable(
+    purged, source, tmp_path
+):
+    """An owner ends a door credential, a backup is taken, the door prunes the credential past its
+    retention, and that backup is restored: backup sets carry no door secret, so the backup holds
+    no withdrawal the checkpoint lacks, and the restored installation holds no credential."""
+    _require_server_binaries()
+    from exulanica.orchestration.installation.recovery import restore_planned
+
+    _first, backup_store = source
+    secret = _a_door_credential_ended_long_ago(purged)
+    taken = take_backup_set(
+        backup_url=purged.database(role=_ROLE, password=_PASSWORD).url,
+        directory=tmp_path / "backup-sets",
+        namespaces=[Namespace("blobs", purged.store, backup_store)],
+        custody=tmp_path / "custody",
+        restore_state_path=None,
+        backup_domains=[purged.store.root, tmp_path / "backup-store"],
+        identity={"profile": "single-host"},
+        role=_ROLE,
+    )
+    with purged.database().unscoped() as connection:
+        connection.execute("select door_prune(1000)")
+        pruned = connection.execute(
+            "select 1 from door_secret where secret_sha256 = %s", (secret,)
+        ).fetchone()
+    assert pruned is None
+    sealed = tmp_path / "custody" / "checkpoint.json"
+    loaded = read_backup_set(taken.directory)
+    owner, database = loaded.database.owner_role, loaded.database.database
+    try:
+        with scratch_cluster(owner=owner) as (cluster, port):
+            target = _target(cluster, port, owner, database, purged.scratch, tmp_path)
+            result = restore_planned(
+                source=purged.database(),
+                checkpoint_path=sealed,
+                backup_set=taken.directory,
+                backup_stores={"blobs": backup_store},
+                marker=tmp_path / "control" / "restore.json",
+                target=target,
+                provision=_provision(purged.scratch),
+            )
+            with Database(target.database_url).unscoped() as connection:
+                secrets_held = connection.execute(
+                    "select count(*) as n from door_secret"
+                ).fetchone()
+            assert result["mode"] == "planned"
+            assert secrets_held["n"] == 0
+    finally:
+        _unseal(purged, sealed, tmp_path)
+    verify_restore(purged.database())
+
+
 def _erase_from_backup(purged, backup_store, deleted):
     """What maintenance does after a completed purge: the backup copy loses those bytes too."""
     from exulanica.store.base import PurgeAuthorization, privileged_purger

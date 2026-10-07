@@ -106,8 +106,8 @@ def door(saved_world, spine_schema, monkeypatch):
         ),
     )
 
-    def application(bridges) -> tuple[TestClient, DoorRuntime]:
-        runtime = DoorRuntime(database=database, bridges=bridges)
+    def application(bridges, open_to=None) -> tuple[TestClient, DoorRuntime]:
+        runtime = DoorRuntime(database=database, bridges=bridges, open_to=open_to)
         services = Services(
             database=database,
             readonly_database=database,
@@ -826,6 +826,26 @@ def test_another_workspace_sees_no_grant_and_the_runtime_may_change_a_secret_onl
     }
 
 
+def test_a_read_only_role_reads_the_door_s_workspace_tables_and_no_secret(door):
+    """Provisioning a read-only role gives it what migration 0149 gives ``exulanica_ro``: the
+    grants, presences, asks and answers of its workspace, and neither global table of digests."""
+    connection = door["world"]["connection"]
+    provision_runtime_role(connection, role="exulanica_door_reader", read_only=True)
+    connection.commit()
+    reads = connection.execute(
+        "select t, has_table_privilege('exulanica_door_reader', t, 'SELECT') as reads "
+        "from unnest(array['door_grant', 'door_presence', 'door_answer', 'door_secret', "
+        "'door_redemption_refusal']) t"
+    ).fetchall()
+    assert {row["t"]: row["reads"] for row in reads} == {
+        "door_grant": True,
+        "door_presence": True,
+        "door_answer": True,
+        "door_secret": False,
+        "door_redemption_refusal": False,
+    }
+
+
 def test_an_idle_held_poll_opens_about_one_short_connection_a_second(door, monkeypatch):
     """A held poll keeps no connection while it waits: it opens one for its presence, one per
     head read, about once a second, and none between them (the credential lookup opens one more).
@@ -975,6 +995,140 @@ def test_a_bridge_the_deployment_removed_opens_nothing_and_is_not_asked(door):
         assert refusal == "decider_disconnected"
         view = client.get(f"/door/grants/{grant_id}", headers=OWNER).json()["grant"]
         assert (view["bridge_label"], view["connected"]) == (None, False)
+
+
+def _configuration(asker, door, person: str, grant_id: uuid.UUID) -> str | None:
+    """Why the asker would not ask the grant's program for ``person`` this minute, or None."""
+    decider = {"kind": "external", "bridge": "test-bridge", "grant_id": str(grant_id)}
+    _config, refusal = asker.configuration(
+        door["world"]["workspace"], _world_id(door), person, decider
+    )
+    return refusal
+
+
+def test_a_grant_answers_to_one_program_at_a_time(door):
+    """A channel credential issued or redeemed ends the grant's last, and a hello said under the
+    last never counts for the next: it says hello before it polls or answers, and is not asked
+    until it has."""
+    _request, person = _person_request(door)
+    grant_id = _grant_for(door, person)
+    asker = door["runtime"].asker()
+    first = _credential(door, grant_id)
+    assert _hello(door, first).status_code == 200
+    assert _configuration(asker, door, person, grant_id) is None
+    second = _credential(door, grant_id)
+    assert _frames(door, first).json()["code"] == "unauthenticated"
+    assert _hello(door, first).json()["code"] == "unauthenticated"
+    polled = _frames(door, second)
+    assert (polled.status_code, polled.json()["code"]) == (409, "hello_first")
+    answered = door["client"].post(
+        "/door/channel/answers",
+        headers=second,
+        json={"request_id": str(uuid.uuid4()), "request_sha256": "0" * 64, "label": "wait"},
+    )
+    assert (answered.status_code, answered.json()["code"]) == (409, "hello_first")
+    assert _configuration(asker, door, person, grant_id) == "decider_disconnected"
+    view = door["client"].get(f"/door/grants/{grant_id}", headers=OWNER).json()["grant"]
+    assert view["connected"] is False
+    hello = _hello(door, second)
+    assert hello.status_code == 200, hello.text
+    assert _frames(door, second, hello.json()["cursor"]).status_code == 200
+    assert _configuration(asker, door, person, grant_id) is None
+    # An invite a server redeems ends the owner's credential the same way.
+    code = door["client"].post(f"/door/grants/{grant_id}/invites", headers=OWNER).json()["code"]
+    redeemed = _redeem(door, BRIDGE, code)
+    assert redeemed.status_code == 201, redeemed.text
+    assert _frames(door, second).json()["code"] == "unauthenticated"
+    assert _configuration(asker, door, person, grant_id) == "decider_disconnected"
+    with door["world"]["connection"].cursor() as cursor:
+        live = cursor.execute(
+            "select count(*) as n from door_secret where grant_id = %s and kind = 'channel' "
+            "and revoked_at is null",
+            (grant_id,),
+        ).fetchone()
+    assert live["n"] == 1
+
+
+def _narrowed(door, **pins: list[str]):
+    """The test bridges with the test bridge's pinned mappings or adapter versions narrowed."""
+    entries = json.loads(
+        door_support.bridges_setting(
+            listed=False,
+            workspaces=[str(door["world"]["workspace"])],
+            owner_workspaces=[str(door["world"]["workspace"])],
+            hold_seconds=1,
+        )
+    )
+    entries[0].update(pins)
+    return load_bridge_directory({"EXULANICA_DOOR_BRIDGES": json.dumps(entries)})
+
+
+@pytest.mark.parametrize(
+    ("pins", "admitted"),
+    [
+        (
+            {"mapping_sha256": [door_support.mapping_sha256(door_support.mapping(2))]},
+            {"mapping": door_support.mapping(2)},
+        ),
+        (
+            {"adapter_versions": [door_support.NEWER_ADAPTER_VERSION]},
+            {"adapter_version": door_support.NEWER_ADAPTER_VERSION},
+        ),
+    ],
+)
+def test_unpinning_what_a_hello_named_closes_the_channel_until_it_says_hello_again(
+    door, pins, admitted
+):
+    _request, person = _person_request(door)
+    grant_id = _grant_for(door, person)
+    channel = _credential(door, grant_id)
+    assert _hello(door, channel).status_code == 200
+    client, runtime = door["application"](_narrowed(door, **pins))
+    with client:
+        polled = client.get("/door/channel/frames", headers=channel)
+        assert (polled.status_code, polled.json()["code"]) == (409, "hello_first")
+        answered = client.post(
+            "/door/channel/answers",
+            headers=channel,
+            json={"request_id": str(uuid.uuid4()), "request_sha256": "0" * 64, "label": "wait"},
+        )
+        assert (answered.status_code, answered.json()["code"]) == (409, "hello_first")
+        assert _configuration(runtime.asker(), door, person, grant_id) == "decider_disconnected"
+        view = client.get(f"/door/grants/{grant_id}", headers=OWNER).json()["grant"]
+        assert view["connected"] is False
+        body = {
+            "adapter_version": door_support.ADAPTER_VERSION,
+            "mapping": door_support.mapping(),
+            "reads": door_support.READS,
+            **admitted,
+        }
+        assert client.post("/door/channel/hello", headers=channel, json=body).status_code == 200
+        assert client.get("/door/channel/frames", headers=channel).status_code == 200
+        assert _configuration(runtime.asker(), door, person, grant_id) is None
+
+
+def test_a_closed_workspace_s_credentials_and_invites_open_nothing(door):
+    _request, person = _person_request(door)
+    grant_id = _grant_for(door, person)
+    channel = _credential(door, grant_id)
+    assert _hello(door, channel).status_code == 200
+    code = door["client"].post(f"/door/grants/{grant_id}/invites", headers=OWNER).json()["code"]
+    workspace = door["world"]["workspace"]
+    client, runtime = door["application"](
+        _bridges(workspace), open_to=lambda workspace_id: workspace_id != workspace
+    )
+    with client:
+        assert client.get("/door/channel/frames", headers=channel).json()["code"] == (
+            "unauthenticated"
+        )
+        redeemed = client.post(
+            "/door/invites/redeem", headers=BRIDGE, json={"code": code, "requester": SOMEONE}
+        )
+        assert (redeemed.status_code, redeemed.json()["code"]) == (404, "invite_not_redeemable")
+        assert _configuration(runtime.asker(), door, person, grant_id) == "decider_disconnected"
+    # Open again, the same credential reads and the same invite redeems.
+    assert _frames(door, channel).status_code == 200
+    assert _redeem(door, BRIDGE, code).status_code == 201
 
 
 def test_at_most_six_hellos_a_grant_a_minute(door):

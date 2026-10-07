@@ -8,10 +8,14 @@ stores an answer, say so here, and whoever waits on it wakes at once. A notice i
 sooner and never a fact: every decision is taken from what the database holds.
 
 :class:`HeldPolls` keeps one held poll per grant and shares this process's held polls fairly: a
-ceiling on all of them, a share for each workspace and a share for each bridge, so a few workspaces
-or one bridge cannot take every place and leave everyone else's bridges answered ``door_busy``. A
-bridge that polls again while its last poll is still held ends that one with nothing to send, so a
-dropped connection never leaves two polls reading for one grant.
+ceiling on all of them, a share for each workspace and a share for each bridge, so one workspace or
+one bridge cannot take every place. When the process or a bridge is full, a new poll from a
+workspace holding fewer takes the place of the oldest poll of the workspace holding the most, whose
+bridge is answered at once with nothing to send and polls again; so the places are shared evenly
+among the workspaces that want them, however many owners use one listed bridge, and only a
+workspace that would hold as many as everyone else is answered ``door_busy``. A bridge that polls
+again while its last poll is still held ends that one with nothing to send, so a dropped connection
+never leaves two polls reading for one grant.
 """
 
 from __future__ import annotations
@@ -26,6 +30,7 @@ from typing import Final
 
 __all__ = [
     "ANSWERS_REMEMBERED",
+    "GRANTS_REMEMBERED",
     "HELD_POLLS_MAXIMUM",
     "HELD_POLLS_PER_WORKSPACE",
     "HELLOS_PER_MINUTE",
@@ -49,6 +54,9 @@ HELLOS_PER_MINUTE: Final = 6
 #: that another process is waiting on wakes nobody here; the oldest is forgotten first, so the set
 #: never grows with the number of answers.
 ANSWERS_REMEMBERED: Final = 4096
+#: How many grants' ask counts a process remembers. The least recently asked is forgotten first;
+#: a poll that finds its grant's count changed only reads the database once more than it needed.
+GRANTS_REMEMBERED: Final = 4096
 
 
 @dataclass
@@ -56,12 +64,15 @@ class Notices:
     """Counts of asks written and the requests answered, as this process has seen them."""
 
     _condition: threading.Condition = field(default_factory=threading.Condition)
-    _asks: dict[uuid.UUID, int] = field(default_factory=dict)
+    _asks: OrderedDict[uuid.UUID, int] = field(default_factory=OrderedDict)
     _answered: OrderedDict[uuid.UUID, None] = field(default_factory=OrderedDict)
 
     def asked(self, grant_id: uuid.UUID) -> None:
         with self._condition:
             self._asks[grant_id] = self._asks.get(grant_id, 0) + 1
+            self._asks.move_to_end(grant_id)
+            while len(self._asks) > GRANTS_REMEMBERED:
+                self._asks.popitem(last=False)
             self._condition.notify_all()
 
     def asks(self, grant_id: uuid.UUID) -> int:
@@ -94,7 +105,8 @@ class Notices:
 class HeldPolls:
     """One held poll per grant; at most :data:`HELD_POLLS_MAXIMUM` in this process, at most
     ``per_workspace`` for one workspace, and at most half of the ceiling for one bridge, so a second
-    bridge always finds room."""
+    bridge always finds room; places shared evenly among workspaces when either ceiling is
+    reached."""
 
     maximum: int = HELD_POLLS_MAXIMUM
     per_workspace: int = HELD_POLLS_PER_WORKSPACE
@@ -108,19 +120,44 @@ class HeldPolls:
 
     def hold(self, grant_id: uuid.UUID, workspace_id: uuid.UUID, bridge: str) -> uuid.UUID | None:
         """A token for a new poll of ``grant_id``, which ends any poll it already held; None when
-        the process, the workspace or the bridge already holds its share of other grants' polls."""
+        its workspace already holds its share, or when the bridge or the process is full and no
+        workspace there holds two more polls than this one would."""
         with self._lock:
             if grant_id not in self._held:
-                held = self._held.values()
-                if (
-                    len(self._held) >= self.maximum
-                    or sum(1 for _t, w, _b in held if w == workspace_id) >= self.per_workspace
-                    or sum(1 for _t, _w, b in held if b == bridge) >= self.per_bridge
+                if sum(1 for _t, w, _b in self._held.values() if w == workspace_id) >= (
+                    self.per_workspace
                 ):
                     return None
+                bridge_full = (
+                    sum(1 for _t, _w, b in self._held.values() if b == bridge) >= self.per_bridge
+                )
+                if bridge_full or len(self._held) >= self.maximum:
+                    taken = self._fair_place(workspace_id, bridge if bridge_full else None)
+                    if taken is None:
+                        return None
+                    # The poll whose place is taken no longer holds it, and answers at once.
+                    del self._held[taken]
             token = uuid.uuid4()
             self._held[grant_id] = (token, workspace_id, bridge)
             return token
+
+    def _fair_place(self, workspace_id: uuid.UUID, bridge: str | None) -> uuid.UUID | None:
+        """The grant whose place a new poll of ``workspace_id`` takes, among the polls of ``bridge``
+        or of the whole process: the oldest poll of the workspace holding the most there, if it
+        holds at least two more than ``workspace_id`` does; else None."""
+        counts: dict[uuid.UUID, int] = {}
+        oldest: dict[uuid.UUID, uuid.UUID] = {}
+        for held_grant, (_token, held_workspace, held_bridge) in self._held.items():
+            if bridge is not None and held_bridge != bridge:
+                continue
+            counts[held_workspace] = counts.get(held_workspace, 0) + 1
+            oldest.setdefault(held_workspace, held_grant)
+        if not counts:
+            return None
+        most = max(counts, key=lambda workspace: counts[workspace])
+        if counts[most] < counts.get(workspace_id, 0) + 2:
+            return None
+        return oldest[most]
 
     def holds(self, grant_id: uuid.UUID, token: uuid.UUID) -> bool:
         """Whether the poll with ``token`` is still the one held for ``grant_id``."""

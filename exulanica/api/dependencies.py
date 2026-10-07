@@ -198,7 +198,9 @@ def _door_channel(request: Request) -> ChannelSession:
     if services.door is None:
         raise TokenNotAccepted("no door credential opens anything here")
     try:
-        return open_channel(services.database, services.door.bridges, presented)
+        return open_channel(
+            services.database, services.door.bridges, presented, services.door.open_to
+        )
     except ChannelNotAccepted as exc:
         raise TokenNotAccepted("no door credential opens anything here") from exc
 
