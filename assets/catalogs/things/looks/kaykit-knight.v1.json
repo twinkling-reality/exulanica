@@ -1,0 +1,99 @@
+{
+  "profile": "exulanica.look/v1",
+  "look": "kaykit-knight",
+  "version": 1,
+  "label": "armoured knight",
+  "body_plan": "humanoid/v1",
+  "look_kind": "skinned",
+  "container": {
+    "sha256": "4edf18316ef8f04b77b1e254aeafa6440cc07736d88595053f17b71a5dec2b10",
+    "bytes": 504240,
+    "media_type": "model/gltf-binary"
+  },
+  "rig": {
+    "bones": {
+      "chest": "chest",
+      "head": "head",
+      "hips": "hips",
+      "leftFoot": "foot.l",
+      "leftHand": "wrist.l",
+      "leftLowerArm": "lowerarm.l",
+      "leftLowerLeg": "lowerleg.l",
+      "leftToes": "toes.l",
+      "leftUpperArm": "upperarm.l",
+      "leftUpperLeg": "upperleg.l",
+      "rightFoot": "foot.r",
+      "rightHand": "wrist.r",
+      "rightLowerArm": "lowerarm.r",
+      "rightLowerLeg": "lowerleg.r",
+      "rightToes": "toes.r",
+      "rightUpperArm": "upperarm.r",
+      "rightUpperLeg": "upperleg.r",
+      "spine": "spine"
+    },
+    "clips": {
+      "idle": "idle",
+      "walk": "walk",
+      "run": "run",
+      "reach": "reach",
+      "hold": "hold",
+      "sit": "sit"
+    },
+    "sockets": {
+      "hand.left": "handslot.l",
+      "hand.right": "handslot.r"
+    },
+    "ground_speed_mm_per_s": {
+      "walk": 504,
+      "run": 2377
+    }
+  },
+  "height_mm": 1800,
+  "sampling": "linear",
+  "light": null,
+  "role": null,
+  "origin": {
+    "profile": "exulanica.origin/v1",
+    "class": "imported",
+    "by": {
+      "kind": "project"
+    },
+    "sources": [
+      {
+        "reference": "https://kaylousberg.itch.io/kaykit-adventurers",
+        "retrieved_on": "2026-10-07",
+        "revision": "Free 2.0, KayKit_Adventurers_2.0_FREE.zip sha256 abe48f4763fba0896bab486ee9e6d08ca6b5b3884b9601f235c8847ae94dc479",
+        "licence_page_sha256": "e5080afaa4502709a27a4628649f03d4beb7e0e6f06146130eed29060e942dc2"
+      },
+      {
+        "reference": "https://kaylousberg.itch.io/kaykit-character-animations",
+        "retrieved_on": "2026-10-07",
+        "revision": "Free 1.1, KayKit_Character_Animations_1.1.zip sha256 65882f31f905ad2e953819648a59287cdeab8f623908d5ef701971d3758be20f",
+        "licence_page_sha256": "7ab41a1b2d83835c975b51f4623412ea486084264bbaaddccd6fd96c140d6ab4"
+      }
+    ],
+    "licence": {
+      "spdx": "CC0-1.0",
+      "verdict": "SHIP",
+      "attribution": null,
+      "share_alike": false,
+      "licence_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "licence_text_sha256": "d4adc31660d1db22eb60eba648e01db41577548f6fa1a3576cb4a6283dae0a58"
+    },
+    "authors": [
+      "Kay Lousberg"
+    ],
+    "lineage": {
+      "ingredients": [
+        "11422afd50abf7e8c92ea107e2e0bc94abd38023d6d15f55ad580347efbfa29e",
+        "5f725c0f745f36078c7238968cd5c04843cbc6260689eb6e7f5e2bbd7ffdd7ad",
+        "ab6ffeed40c8281dd0ce0506534eadf7385151f1c266643a10fa2a0f0a7ba3b1",
+        "e3b62dc122c5073373376a846e354137add2088ddcce8731c389fc5c20734aad",
+        "e484370733824a0740683e7f6040aae0d20e5efd4107dde1175d6a2ad7e2f199"
+      ],
+      "receipts": [],
+      "translation_manifest_sha256": "14994ec74f34c2efdb9e012a00062c641e83f5744c03e253457252086e6a0b7f"
+    },
+    "distribution": "public"
+  }
+}

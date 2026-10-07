@@ -1,0 +1,57 @@
+{
+  "profile": "exulanica.translation-manifest/v2",
+  "translator": {
+    "key": "gltf-look-import",
+    "version": 1,
+    "sha256": "ff4ca2a34eb4144fa1a91c7632942716451ff8a4be00c78d5097e533158d4ffa"
+  },
+  "source": {
+    "format": "gltf",
+    "type": "accessory",
+    "sha256": "39d13170ed01b73283b1bc61f76fa84cc3e06bdf0b5e09e2ba788f27b5c952f7"
+  },
+  "target": {
+    "kind": null,
+    "look": {
+      "look": "kaykit-sword",
+      "version": 1
+    }
+  },
+  "fields": [
+    {
+      "path": "/files",
+      "disposition": "exact",
+      "to": "/origin/lineage/ingredients",
+      "reason": null,
+      "words": "the 3 files it was read from, each named by digest in its origin"
+    },
+    {
+      "path": "/meshes",
+      "disposition": "exact",
+      "to": "/container",
+      "reason": null,
+      "words": "its mesh came across as it is"
+    },
+    {
+      "path": "/materials",
+      "disposition": "exact",
+      "to": "/container",
+      "reason": null,
+      "words": "its material came across as it is"
+    },
+    {
+      "path": "/pictures",
+      "disposition": "exact",
+      "to": "/container",
+      "reason": null,
+      "words": "its picture came across as it is"
+    },
+    {
+      "path": "/size_mm",
+      "disposition": "approximated",
+      "to": "/container",
+      "reason": "scaled uniformly by 0.472743 to 238 x 62 x 839 mm, inside its 240 x 80 x 1000 mm box",
+      "words": "it measured 503 x 131 x 1,775 mm and measures 238 x 62 x 839 mm"
+    }
+  ]
+}

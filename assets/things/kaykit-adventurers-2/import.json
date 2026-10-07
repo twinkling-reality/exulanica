@@ -1,0 +1,202 @@
+{
+  "profile": "exulanica.look-import/v1",
+  "pack": "kaykit-adventurers-2",
+  "title": "KayKit Adventurers 2.0 and Character Animations 1.1, free tiers",
+  "sources": {
+    "adventurers": {
+      "title": "KayKit : Adventurers Character Pack 2.0, free tier",
+      "creator": "Kay Lousberg",
+      "reference": "https://kaylousberg.itch.io/kaykit-adventurers",
+      "upload": "Free 2.0",
+      "archive": "KayKit_Adventurers_2.0_FREE.zip",
+      "bytes": 13024345,
+      "sha256": "abe48f4763fba0896bab486ee9e6d08ca6b5b3884b9601f235c8847ae94dc479",
+      "last_modified": "2025-10-27",
+      "retrieved_at": "2026-10-07T00:02:02Z",
+      "page_retrieved_at": "2026-10-07T00:00:01Z",
+      "page_sha256": "e5080afaa4502709a27a4628649f03d4beb7e0e6f06146130eed29060e942dc2",
+      "page_licence_line": "Asset license: Creative Commons Zero v1.0 Universal",
+      "licence_member": "KayKit_Adventurers_2.0_FREE/License.txt",
+      "licence_file": "License.txt"
+    },
+    "animations": {
+      "title": "KayKit : Character Animations 1.1, free tier",
+      "creator": "Kay Lousberg",
+      "reference": "https://kaylousberg.itch.io/kaykit-character-animations",
+      "upload": "Free 1.1",
+      "archive": "KayKit_Character_Animations_1.1.zip",
+      "bytes": 14858957,
+      "sha256": "65882f31f905ad2e953819648a59287cdeab8f623908d5ef701971d3758be20f",
+      "last_modified": "2025-12-10",
+      "retrieved_at": "2026-10-07T00:37:40Z",
+      "page_retrieved_at": "2026-10-07T00:36:20Z",
+      "page_sha256": "7ab41a1b2d83835c975b51f4623412ea486084264bbaaddccd6fd96c140d6ab4",
+      "page_licence_line": "Asset license: Creative Commons Zero v1.0 Universal",
+      "licence_member": "KayKit_Character_Animations_1.1/License.txt",
+      "licence_file": "License-character-animations.txt"
+    }
+  },
+  "licence": {
+    "spdx": "CC0-1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "credit_offered": "Kay Lousberg, www.kaylousberg.com"
+  },
+  "looks": [
+    {
+      "look": "kaykit-knight",
+      "version": 1,
+      "label": "armoured knight",
+      "summary": "An armoured knight with a cape and a visored helmet, rigged, with clips to stand, walk, run, reach to the ground, hold a thing up and sit.",
+      "look_kind": "skinned",
+      "body_plan": "humanoid/v1",
+      "source_type": "character",
+      "figure": {
+        "source": "adventurers",
+        "path": "KayKit_Adventurers_2.0_FREE/Characters/gltf/Knight.glb"
+      },
+      "height_mm": 1800,
+      "bones": {
+        "hips": "hips",
+        "spine": "spine",
+        "chest": "chest",
+        "head": "head",
+        "leftUpperLeg": "upperleg.l",
+        "leftLowerLeg": "lowerleg.l",
+        "leftFoot": "foot.l",
+        "leftToes": "toes.l",
+        "rightUpperLeg": "upperleg.r",
+        "rightLowerLeg": "lowerleg.r",
+        "rightFoot": "foot.r",
+        "rightToes": "toes.r",
+        "leftUpperArm": "upperarm.l",
+        "leftLowerArm": "lowerarm.l",
+        "leftHand": "wrist.l",
+        "rightUpperArm": "upperarm.r",
+        "rightLowerArm": "lowerarm.r",
+        "rightHand": "wrist.r"
+      },
+      "sockets": {
+        "hand.left": "handslot.l",
+        "hand.right": "handslot.r"
+      },
+      "clips": [
+        {
+          "motion": "idle",
+          "source": "adventurers",
+          "path": "KayKit_Adventurers_2.0_FREE/Animations/gltf/Rig_Medium/Rig_Medium_General.glb",
+          "clip": "Idle_A"
+        },
+        {
+          "motion": "walk",
+          "source": "adventurers",
+          "path": "KayKit_Adventurers_2.0_FREE/Animations/gltf/Rig_Medium/Rig_Medium_MovementBasic.glb",
+          "clip": "Walking_A"
+        },
+        {
+          "motion": "run",
+          "source": "adventurers",
+          "path": "KayKit_Adventurers_2.0_FREE/Animations/gltf/Rig_Medium/Rig_Medium_MovementBasic.glb",
+          "clip": "Running_A"
+        },
+        {
+          "motion": "reach",
+          "source": "adventurers",
+          "path": "KayKit_Adventurers_2.0_FREE/Animations/gltf/Rig_Medium/Rig_Medium_General.glb",
+          "clip": "PickUp"
+        },
+        {
+          "motion": "hold",
+          "source": "animations",
+          "path": "KayKit_Character_Animations_1.1/Animations/gltf/Rig_Medium/Rig_Medium_Tools.glb",
+          "clip": "Holding_A"
+        },
+        {
+          "motion": "sit",
+          "source": "animations",
+          "path": "KayKit_Character_Animations_1.1/Animations/gltf/Rig_Medium/Rig_Medium_Simulation.glb",
+          "clip": "Sit_Chair_Idle"
+        }
+      ],
+      "in_place": [
+        "root",
+        "hips"
+      ],
+      "ground_speed": {
+        "motions": [
+          "walk",
+          "run"
+        ],
+        "feet": [
+          "foot.l",
+          "foot.r",
+          "toes.l",
+          "toes.r"
+        ],
+        "stance_mm": 10,
+        "samples": 240
+      },
+      "reasons": {
+        "joints": {
+          "root": "the rig's own root below the hips; the body plan starts at the hips, so it stays in the figure and moves with its clips",
+          "hand.l": "a palm joint past the wrist; the body plan's left hand is the wrist joint, so this stays in the figure and moves with its clips",
+          "hand.r": "a palm joint past the wrist; the body plan's right hand is the wrist joint, so this stays in the figure and moves with its clips"
+        },
+        "clips": {
+          "Death_A": "this world has no dying",
+          "Death_A_Pose": "this world has no dying",
+          "Death_B": "this world has no dying",
+          "Death_B_Pose": "this world has no dying",
+          "Hit_A": "this world has no harm",
+          "Hit_B": "this world has no harm",
+          "Idle_B": "one idle clip is kept; this is a second idle",
+          "Interact": "a push with one hand at chest height; no motion of a person's body is drawn with it",
+          "Spawn_Air": "things arrive by the world's rules, never by a clip",
+          "Spawn_Ground": "things arrive by the world's rules, never by a clip",
+          "T-Pose": "the figure's own rest pose is kept; a clip of it adds nothing",
+          "Throw": "this world has no throwing",
+          "Use_Item": "no motion of a person's body is drawn with it",
+          "Jump_Full_Long": "walking has no jumping",
+          "Jump_Full_Short": "walking has no jumping",
+          "Jump_Idle": "walking has no jumping",
+          "Jump_Land": "walking has no jumping",
+          "Jump_Start": "walking has no jumping",
+          "Running_B": "one run clip is kept; this is a second run",
+          "Walking_B": "one walk clip is kept; this is another walk",
+          "Walking_C": "one walk clip is kept; this is another walk",
+          "Holding_B": "one holding clip is kept; this one holds a thing across the body",
+          "Holding_C": "one holding clip is kept; this one holds a thing across the body",
+          "Sit_Chair_Down": "the movement into a seat; the world blends from standing to sitting",
+          "Sit_Chair_StandUp": "the movement out of a seat; the world blends from sitting to standing",
+          "Sit_Floor_Down": "this world seats people on seats, not on the ground",
+          "Sit_Floor_Idle": "this world seats people on seats, not on the ground",
+          "Sit_Floor_StandUp": "this world seats people on seats, not on the ground",
+          "Waving": "a greeting is a line said, not a wave",
+          "Cheering": "a motion no ability here draws"
+        },
+        "files": {
+          "Rig_Medium_Tools.glb": "a tool or work motion; no ability here uses a tool",
+          "Rig_Medium_Simulation.glb": "a motion no ability here draws"
+        }
+      }
+    },
+    {
+      "look": "kaykit-sword",
+      "version": 1,
+      "label": "sword",
+      "summary": "A one-handed steel sword with a brass guard and pommel.",
+      "look_kind": "static",
+      "body_plan": "rigid/v1",
+      "source_type": "accessory",
+      "gltf": {
+        "source": "adventurers",
+        "path": "KayKit_Adventurers_2.0_FREE/Assets/gltf/sword_1handed.gltf"
+      },
+      "fit_box_mm": {
+        "width": 240,
+        "depth": 80,
+        "height": 1000
+      },
+      "fit_margin_mm": 1
+    }
+  ]
+}

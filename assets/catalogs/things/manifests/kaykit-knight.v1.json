@@ -1,0 +1,701 @@
+{
+  "profile": "exulanica.translation-manifest/v2",
+  "translator": {
+    "key": "gltf-look-import",
+    "version": 1,
+    "sha256": "ff4ca2a34eb4144fa1a91c7632942716451ff8a4be00c78d5097e533158d4ffa"
+  },
+  "source": {
+    "format": "gltf-binary",
+    "type": "character",
+    "sha256": "8e37f94d54c086fb422b52f9697064f2c854a904d5b28e85e0f37ee582b02581"
+  },
+  "target": {
+    "kind": null,
+    "look": {
+      "look": "kaykit-knight",
+      "version": 1
+    }
+  },
+  "fields": [
+    {
+      "path": "/files",
+      "disposition": "exact",
+      "to": "/origin/lineage/ingredients",
+      "reason": null,
+      "words": "the 5 files it was read from, each named by digest in its origin"
+    },
+    {
+      "path": "/joints/chest",
+      "disposition": "exact",
+      "to": "/rig/bones/chest",
+      "reason": null,
+      "words": "its joint chest moves the body's chest bone"
+    },
+    {
+      "path": "/joints/foot.l",
+      "disposition": "exact",
+      "to": "/rig/bones/leftFoot",
+      "reason": null,
+      "words": "its joint foot.l moves the body's leftFoot bone"
+    },
+    {
+      "path": "/joints/foot.r",
+      "disposition": "exact",
+      "to": "/rig/bones/rightFoot",
+      "reason": null,
+      "words": "its joint foot.r moves the body's rightFoot bone"
+    },
+    {
+      "path": "/joints/hand.l",
+      "disposition": "approximated",
+      "to": "/container",
+      "reason": "a palm joint past the wrist; the body plan's left hand is the wrist joint, so this stays in the figure and moves with its clips",
+      "words": "its joint hand.l stays in the figure and moves with its clips"
+    },
+    {
+      "path": "/joints/hand.r",
+      "disposition": "approximated",
+      "to": "/container",
+      "reason": "a palm joint past the wrist; the body plan's right hand is the wrist joint, so this stays in the figure and moves with its clips",
+      "words": "its joint hand.r stays in the figure and moves with its clips"
+    },
+    {
+      "path": "/joints/handslot.l",
+      "disposition": "exact",
+      "to": "/rig/sockets/hand.left",
+      "reason": null,
+      "words": "its joint handslot.l is where its hand.left holds things"
+    },
+    {
+      "path": "/joints/handslot.r",
+      "disposition": "exact",
+      "to": "/rig/sockets/hand.right",
+      "reason": null,
+      "words": "its joint handslot.r is where its hand.right holds things"
+    },
+    {
+      "path": "/joints/head",
+      "disposition": "exact",
+      "to": "/rig/bones/head",
+      "reason": null,
+      "words": "its joint head moves the body's head bone"
+    },
+    {
+      "path": "/joints/hips",
+      "disposition": "exact",
+      "to": "/rig/bones/hips",
+      "reason": null,
+      "words": "its joint hips moves the body's hips bone"
+    },
+    {
+      "path": "/joints/lowerarm.l",
+      "disposition": "exact",
+      "to": "/rig/bones/leftLowerArm",
+      "reason": null,
+      "words": "its joint lowerarm.l moves the body's leftLowerArm bone"
+    },
+    {
+      "path": "/joints/lowerarm.r",
+      "disposition": "exact",
+      "to": "/rig/bones/rightLowerArm",
+      "reason": null,
+      "words": "its joint lowerarm.r moves the body's rightLowerArm bone"
+    },
+    {
+      "path": "/joints/lowerleg.l",
+      "disposition": "exact",
+      "to": "/rig/bones/leftLowerLeg",
+      "reason": null,
+      "words": "its joint lowerleg.l moves the body's leftLowerLeg bone"
+    },
+    {
+      "path": "/joints/lowerleg.r",
+      "disposition": "exact",
+      "to": "/rig/bones/rightLowerLeg",
+      "reason": null,
+      "words": "its joint lowerleg.r moves the body's rightLowerLeg bone"
+    },
+    {
+      "path": "/joints/root",
+      "disposition": "approximated",
+      "to": "/container",
+      "reason": "the rig's own root below the hips; the body plan starts at the hips, so it stays in the figure and moves with its clips",
+      "words": "its joint root stays in the figure and moves with its clips"
+    },
+    {
+      "path": "/joints/spine",
+      "disposition": "exact",
+      "to": "/rig/bones/spine",
+      "reason": null,
+      "words": "its joint spine moves the body's spine bone"
+    },
+    {
+      "path": "/joints/toes.l",
+      "disposition": "exact",
+      "to": "/rig/bones/leftToes",
+      "reason": null,
+      "words": "its joint toes.l moves the body's leftToes bone"
+    },
+    {
+      "path": "/joints/toes.r",
+      "disposition": "exact",
+      "to": "/rig/bones/rightToes",
+      "reason": null,
+      "words": "its joint toes.r moves the body's rightToes bone"
+    },
+    {
+      "path": "/joints/upperarm.l",
+      "disposition": "exact",
+      "to": "/rig/bones/leftUpperArm",
+      "reason": null,
+      "words": "its joint upperarm.l moves the body's leftUpperArm bone"
+    },
+    {
+      "path": "/joints/upperarm.r",
+      "disposition": "exact",
+      "to": "/rig/bones/rightUpperArm",
+      "reason": null,
+      "words": "its joint upperarm.r moves the body's rightUpperArm bone"
+    },
+    {
+      "path": "/joints/upperleg.l",
+      "disposition": "exact",
+      "to": "/rig/bones/leftUpperLeg",
+      "reason": null,
+      "words": "its joint upperleg.l moves the body's leftUpperLeg bone"
+    },
+    {
+      "path": "/joints/upperleg.r",
+      "disposition": "exact",
+      "to": "/rig/bones/rightUpperLeg",
+      "reason": null,
+      "words": "its joint upperleg.r moves the body's rightUpperLeg bone"
+    },
+    {
+      "path": "/joints/wrist.l",
+      "disposition": "exact",
+      "to": "/rig/bones/leftHand",
+      "reason": null,
+      "words": "its joint wrist.l moves the body's leftHand bone"
+    },
+    {
+      "path": "/joints/wrist.r",
+      "disposition": "exact",
+      "to": "/rig/bones/rightHand",
+      "reason": null,
+      "words": "its joint wrist.r moves the body's rightHand bone"
+    },
+    {
+      "path": "/meshes",
+      "disposition": "approximated",
+      "to": "/container",
+      "reason": "joined into one skinned mesh of 9 parts, so the figure is one mesh on one skin; no vertex changed but by its height",
+      "words": "its 9 meshes came across as one mesh of 9 parts"
+    },
+    {
+      "path": "/materials",
+      "disposition": "exact",
+      "to": "/container",
+      "reason": null,
+      "words": "its material came across as it is"
+    },
+    {
+      "path": "/pictures",
+      "disposition": "exact",
+      "to": "/container",
+      "reason": null,
+      "words": "its picture came across as it is"
+    },
+    {
+      "path": "/height_mm",
+      "disposition": "approximated",
+      "to": "/height_mm",
+      "reason": "scaled uniformly by 0.707796 into its vertices, bind matrices, joints and clips to 1800 mm, inside a person's height",
+      "words": "it stood 2,543 mm tall and stands 1,800 mm"
+    },
+    {
+      "path": "/clips/Rig_Medium_General.glb/Death_A",
+      "disposition": "dropped",
+      "to": null,
+      "reason": "this world has no dying",
+      "words": "its clip Death_A did not come across"
+    },
+    {
+      "path": "/clips/Rig_Medium_General.glb/Death_A_Pose",
+      "disposition": "dropped",
+      "to": null,
+      "reason": "this world has no dying",
+      "words": "its clip Death_A_Pose did not come across"
+    },
+    {
+      "path": "/clips/Rig_Medium_General.glb/Death_B",
+      "disposition": "dropped",
+      "to": null,
+      "reason": "this world has no dying",
+      "words": "its clip Death_B did not come across"
+    },
+    {
+      "path": "/clips/Rig_Medium_General.glb/Death_B_Pose",
+      "disposition": "dropped",
+      "to": null,
+      "reason": "this world has no dying",
+      "words": "its clip Death_B_Pose did not come across"
+    },
+    {
+      "path": "/clips/Rig_Medium_General.glb/Hit_A",
+      "disposition": "dropped",
+      "to": null,
+      "reason": "this world has no harm",
+      "words": "its clip Hit_A did not come across"
+    },
+    {
+      "path": "/clips/Rig_Medium_General.glb/Hit_B",
+      "disposition": "dropped",
+      "to": null,
+      "reason": "this world has no harm",
+      "words": "its clip Hit_B did not come across"
+    },
+    {
+      "path": "/clips/Rig_Medium_General.glb/Idle_A",
+      "disposition": "exact",
+      "to": "/rig/clips/idle",
+      "reason": null,
+      "words": "its clip Idle_A came across as its idle clip"
+    },
+    {
+      "path": "/clips/Rig_Medium_General.glb/Idle_B",
+      "disposition": "dropped",
+      "to": null,
+      "reason": "one idle clip is kept; this is a second idle",
+      "words": "its clip Idle_B did not come across"
+    },
+    {
+      "path": "/clips/Rig_Medium_General.glb/Interact",
+      "disposition": "dropped",
+      "to": null,
+      "reason": "a push with one hand at chest height; no motion of a person's body is drawn with it",
+      "words": "its clip Interact did not come across"
+    },
+    {
+      "path": "/clips/Rig_Medium_General.glb/PickUp",
+      "disposition": "approximated",
+      "to": "/rig/clips/reach",
+      "reason": "kept in place: its root and hips hold their place across the ground, 15 mm of drift removed",
+      "words": "its clip PickUp came across as its reach clip, kept in place"
+    },
+    {
+      "path": "/clips/Rig_Medium_General.glb/Spawn_Air",
+      "disposition": "dropped",
+      "to": null,
+      "reason": "things arrive by the world's rules, never by a clip",
+      "words": "its clip Spawn_Air did not come across"
+    },
+    {
+      "path": "/clips/Rig_Medium_General.glb/Spawn_Ground",
+      "disposition": "dropped",
+      "to": null,
+      "reason": "things arrive by the world's rules, never by a clip",
+      "words": "its clip Spawn_Ground did not come across"
+    },
+    {
+      "path": "/clips/Rig_Medium_General.glb/T-Pose",
+      "disposition": "dropped",
+      "to": null,
+      "reason": "the figure's own rest pose is kept; a clip of it adds nothing",
+      "words": "its clip T-Pose did not come across"
+    },
+    {
+      "path": "/clips/Rig_Medium_General.glb/Throw",
+      "disposition": "dropped",
+      "to": null,
+      "reason": "this world has no throwing",
+      "words": "its clip Throw did not come across"
+    },
+    {
+      "path": "/clips/Rig_Medium_General.glb/Use_Item",
+      "disposition": "dropped",
+      "to": null,
+      "reason": "no motion of a person's body is drawn with it",
+      "words": "its clip Use_Item did not come across"
+    },
+    {
+      "path": "/clips/Rig_Medium_MovementBasic.glb/Jump_Full_Long",
+      "disposition": "dropped",
+      "to": null,
+      "reason": "walking has no jumping",
+      "words": "its clip Jump_Full_Long did not come across"
+    },
+    {
+      "path": "/clips/Rig_Medium_MovementBasic.glb/Jump_Full_Short",
+      "disposition": "dropped",
+      "to": null,
+      "reason": "walking has no jumping",
+      "words": "its clip Jump_Full_Short did not come across"
+    },
+    {
+      "path": "/clips/Rig_Medium_MovementBasic.glb/Jump_Idle",
+      "disposition": "dropped",
+      "to": null,
+      "reason": "walking has no jumping",
+      "words": "its clip Jump_Idle did not come across"
+    },
+    {
+      "path": "/clips/Rig_Medium_MovementBasic.glb/Jump_Land",
+      "disposition": "dropped",
+      "to": null,
+      "reason": "walking has no jumping",
+      "words": "its clip Jump_Land did not come across"
+    },
+    {
+      "path": "/clips/Rig_Medium_MovementBasic.glb/Jump_Start",
+      "disposition": "dropped",
+      "to": null,
+      "reason": "walking has no jumping",
+      "words": "its clip Jump_Start did not come across"
+    },
+    {
+      "path": "/clips/Rig_Medium_MovementBasic.glb/Running_A",
+      "disposition": "exact",
+      "to": "/rig/clips/run",
+      "reason": null,
+      "words": "its clip Running_A came across as its run clip"
+    },
+    {
+      "path": "/clips/Rig_Medium_MovementBasic.glb/Running_B",
+      "disposition": "dropped",
+      "to": null,
+      "reason": "one run clip is kept; this is a second run",
+      "words": "its clip Running_B did not come across"
+    },
+    {
+      "path": "/clips/Rig_Medium_MovementBasic.glb/T-Pose",
+      "disposition": "dropped",
+      "to": null,
+      "reason": "the figure's own rest pose is kept; a clip of it adds nothing",
+      "words": "its clip T-Pose did not come across"
+    },
+    {
+      "path": "/clips/Rig_Medium_MovementBasic.glb/Walking_A",
+      "disposition": "exact",
+      "to": "/rig/clips/walk",
+      "reason": null,
+      "words": "its clip Walking_A came across as its walk clip"
+    },
+    {
+      "path": "/clips/Rig_Medium_MovementBasic.glb/Walking_B",
+      "disposition": "dropped",
+      "to": null,
+      "reason": "one walk clip is kept; this is another walk",
+      "words": "its clip Walking_B did not come across"
+    },
+    {
+      "path": "/clips/Rig_Medium_MovementBasic.glb/Walking_C",
+      "disposition": "dropped",
+      "to": null,
+      "reason": "one walk clip is kept; this is another walk",
+      "words": "its clip Walking_C did not come across"
+    },
+    {
+      "path": "/clips/Rig_Medium_Simulation.glb/Cheering",
+      "disposition": "dropped",
+      "to": null,
+      "reason": "a motion no ability here draws",
+      "words": "its clip Cheering did not come across"
+    },
+    {
+      "path": "/clips/Rig_Medium_Simulation.glb/Lie_Down",
+      "disposition": "dropped",
+      "to": null,
+      "reason": "a motion no ability here draws",
+      "words": "its clip Lie_Down did not come across"
+    },
+    {
+      "path": "/clips/Rig_Medium_Simulation.glb/Lie_Idle",
+      "disposition": "dropped",
+      "to": null,
+      "reason": "a motion no ability here draws",
+      "words": "its clip Lie_Idle did not come across"
+    },
+    {
+      "path": "/clips/Rig_Medium_Simulation.glb/Lie_StandUp",
+      "disposition": "dropped",
+      "to": null,
+      "reason": "a motion no ability here draws",
+      "words": "its clip Lie_StandUp did not come across"
+    },
+    {
+      "path": "/clips/Rig_Medium_Simulation.glb/Push_Ups",
+      "disposition": "dropped",
+      "to": null,
+      "reason": "a motion no ability here draws",
+      "words": "its clip Push_Ups did not come across"
+    },
+    {
+      "path": "/clips/Rig_Medium_Simulation.glb/Sit_Chair_Down",
+      "disposition": "dropped",
+      "to": null,
+      "reason": "the movement into a seat; the world blends from standing to sitting",
+      "words": "its clip Sit_Chair_Down did not come across"
+    },
+    {
+      "path": "/clips/Rig_Medium_Simulation.glb/Sit_Chair_Idle",
+      "disposition": "exact",
+      "to": "/rig/clips/sit",
+      "reason": null,
+      "words": "its clip Sit_Chair_Idle came across as its sit clip"
+    },
+    {
+      "path": "/clips/Rig_Medium_Simulation.glb/Sit_Chair_StandUp",
+      "disposition": "dropped",
+      "to": null,
+      "reason": "the movement out of a seat; the world blends from sitting to standing",
+      "words": "its clip Sit_Chair_StandUp did not come across"
+    },
+    {
+      "path": "/clips/Rig_Medium_Simulation.glb/Sit_Floor_Down",
+      "disposition": "dropped",
+      "to": null,
+      "reason": "this world seats people on seats, not on the ground",
+      "words": "its clip Sit_Floor_Down did not come across"
+    },
+    {
+      "path": "/clips/Rig_Medium_Simulation.glb/Sit_Floor_Idle",
+      "disposition": "dropped",
+      "to": null,
+      "reason": "this world seats people on seats, not on the ground",
+      "words": "its clip Sit_Floor_Idle did not come across"
+    },
+    {
+      "path": "/clips/Rig_Medium_Simulation.glb/Sit_Floor_StandUp",
+      "disposition": "dropped",
+      "to": null,
+      "reason": "this world seats people on seats, not on the ground",
+      "words": "its clip Sit_Floor_StandUp did not come across"
+    },
+    {
+      "path": "/clips/Rig_Medium_Simulation.glb/Sit_Ups",
+      "disposition": "dropped",
+      "to": null,
+      "reason": "a motion no ability here draws",
+      "words": "its clip Sit_Ups did not come across"
+    },
+    {
+      "path": "/clips/Rig_Medium_Simulation.glb/T-Pose",
+      "disposition": "dropped",
+      "to": null,
+      "reason": "the figure's own rest pose is kept; a clip of it adds nothing",
+      "words": "its clip T-Pose did not come across"
+    },
+    {
+      "path": "/clips/Rig_Medium_Simulation.glb/Waving",
+      "disposition": "dropped",
+      "to": null,
+      "reason": "a greeting is a line said, not a wave",
+      "words": "its clip Waving did not come across"
+    },
+    {
+      "path": "/clips/Rig_Medium_Tools.glb/Chop",
+      "disposition": "dropped",
+      "to": null,
+      "reason": "a tool or work motion; no ability here uses a tool",
+      "words": "its clip Chop did not come across"
+    },
+    {
+      "path": "/clips/Rig_Medium_Tools.glb/Chopping",
+      "disposition": "dropped",
+      "to": null,
+      "reason": "a tool or work motion; no ability here uses a tool",
+      "words": "its clip Chopping did not come across"
+    },
+    {
+      "path": "/clips/Rig_Medium_Tools.glb/Dig",
+      "disposition": "dropped",
+      "to": null,
+      "reason": "a tool or work motion; no ability here uses a tool",
+      "words": "its clip Dig did not come across"
+    },
+    {
+      "path": "/clips/Rig_Medium_Tools.glb/Digging",
+      "disposition": "dropped",
+      "to": null,
+      "reason": "a tool or work motion; no ability here uses a tool",
+      "words": "its clip Digging did not come across"
+    },
+    {
+      "path": "/clips/Rig_Medium_Tools.glb/Fishing_Bite",
+      "disposition": "dropped",
+      "to": null,
+      "reason": "a tool or work motion; no ability here uses a tool",
+      "words": "its clip Fishing_Bite did not come across"
+    },
+    {
+      "path": "/clips/Rig_Medium_Tools.glb/Fishing_Cast",
+      "disposition": "dropped",
+      "to": null,
+      "reason": "a tool or work motion; no ability here uses a tool",
+      "words": "its clip Fishing_Cast did not come across"
+    },
+    {
+      "path": "/clips/Rig_Medium_Tools.glb/Fishing_Catch",
+      "disposition": "dropped",
+      "to": null,
+      "reason": "a tool or work motion; no ability here uses a tool",
+      "words": "its clip Fishing_Catch did not come across"
+    },
+    {
+      "path": "/clips/Rig_Medium_Tools.glb/Fishing_Idle",
+      "disposition": "dropped",
+      "to": null,
+      "reason": "a tool or work motion; no ability here uses a tool",
+      "words": "its clip Fishing_Idle did not come across"
+    },
+    {
+      "path": "/clips/Rig_Medium_Tools.glb/Fishing_Reeling",
+      "disposition": "dropped",
+      "to": null,
+      "reason": "a tool or work motion; no ability here uses a tool",
+      "words": "its clip Fishing_Reeling did not come across"
+    },
+    {
+      "path": "/clips/Rig_Medium_Tools.glb/Fishing_Struggling",
+      "disposition": "dropped",
+      "to": null,
+      "reason": "a tool or work motion; no ability here uses a tool",
+      "words": "its clip Fishing_Struggling did not come across"
+    },
+    {
+      "path": "/clips/Rig_Medium_Tools.glb/Fishing_Tug",
+      "disposition": "dropped",
+      "to": null,
+      "reason": "a tool or work motion; no ability here uses a tool",
+      "words": "its clip Fishing_Tug did not come across"
+    },
+    {
+      "path": "/clips/Rig_Medium_Tools.glb/Hammer",
+      "disposition": "dropped",
+      "to": null,
+      "reason": "a tool or work motion; no ability here uses a tool",
+      "words": "its clip Hammer did not come across"
+    },
+    {
+      "path": "/clips/Rig_Medium_Tools.glb/Hammering",
+      "disposition": "dropped",
+      "to": null,
+      "reason": "a tool or work motion; no ability here uses a tool",
+      "words": "its clip Hammering did not come across"
+    },
+    {
+      "path": "/clips/Rig_Medium_Tools.glb/Holding_A",
+      "disposition": "exact",
+      "to": "/rig/clips/hold",
+      "reason": null,
+      "words": "its clip Holding_A came across as its hold clip"
+    },
+    {
+      "path": "/clips/Rig_Medium_Tools.glb/Holding_B",
+      "disposition": "dropped",
+      "to": null,
+      "reason": "one holding clip is kept; this one holds a thing across the body",
+      "words": "its clip Holding_B did not come across"
+    },
+    {
+      "path": "/clips/Rig_Medium_Tools.glb/Holding_C",
+      "disposition": "dropped",
+      "to": null,
+      "reason": "one holding clip is kept; this one holds a thing across the body",
+      "words": "its clip Holding_C did not come across"
+    },
+    {
+      "path": "/clips/Rig_Medium_Tools.glb/Lockpick",
+      "disposition": "dropped",
+      "to": null,
+      "reason": "a tool or work motion; no ability here uses a tool",
+      "words": "its clip Lockpick did not come across"
+    },
+    {
+      "path": "/clips/Rig_Medium_Tools.glb/Lockpicking",
+      "disposition": "dropped",
+      "to": null,
+      "reason": "a tool or work motion; no ability here uses a tool",
+      "words": "its clip Lockpicking did not come across"
+    },
+    {
+      "path": "/clips/Rig_Medium_Tools.glb/Pickaxe",
+      "disposition": "dropped",
+      "to": null,
+      "reason": "a tool or work motion; no ability here uses a tool",
+      "words": "its clip Pickaxe did not come across"
+    },
+    {
+      "path": "/clips/Rig_Medium_Tools.glb/Pickaxing",
+      "disposition": "dropped",
+      "to": null,
+      "reason": "a tool or work motion; no ability here uses a tool",
+      "words": "its clip Pickaxing did not come across"
+    },
+    {
+      "path": "/clips/Rig_Medium_Tools.glb/Saw",
+      "disposition": "dropped",
+      "to": null,
+      "reason": "a tool or work motion; no ability here uses a tool",
+      "words": "its clip Saw did not come across"
+    },
+    {
+      "path": "/clips/Rig_Medium_Tools.glb/Sawing",
+      "disposition": "dropped",
+      "to": null,
+      "reason": "a tool or work motion; no ability here uses a tool",
+      "words": "its clip Sawing did not come across"
+    },
+    {
+      "path": "/clips/Rig_Medium_Tools.glb/T-Pose",
+      "disposition": "dropped",
+      "to": null,
+      "reason": "the figure's own rest pose is kept; a clip of it adds nothing",
+      "words": "its clip T-Pose did not come across"
+    },
+    {
+      "path": "/clips/Rig_Medium_Tools.glb/Work_A",
+      "disposition": "dropped",
+      "to": null,
+      "reason": "a tool or work motion; no ability here uses a tool",
+      "words": "its clip Work_A did not come across"
+    },
+    {
+      "path": "/clips/Rig_Medium_Tools.glb/Work_B",
+      "disposition": "dropped",
+      "to": null,
+      "reason": "a tool or work motion; no ability here uses a tool",
+      "words": "its clip Work_B did not come across"
+    },
+    {
+      "path": "/clips/Rig_Medium_Tools.glb/Work_C",
+      "disposition": "dropped",
+      "to": null,
+      "reason": "a tool or work motion; no ability here uses a tool",
+      "words": "its clip Work_C did not come across"
+    },
+    {
+      "path": "/clips/Rig_Medium_Tools.glb/Working_A",
+      "disposition": "dropped",
+      "to": null,
+      "reason": "a tool or work motion; no ability here uses a tool",
+      "words": "its clip Working_A did not come across"
+    },
+    {
+      "path": "/clips/Rig_Medium_Tools.glb/Working_B",
+      "disposition": "dropped",
+      "to": null,
+      "reason": "a tool or work motion; no ability here uses a tool",
+      "words": "its clip Working_B did not come across"
+    },
+    {
+      "path": "/clips/Rig_Medium_Tools.glb/Working_C",
+      "disposition": "dropped",
+      "to": null,
+      "reason": "a tool or work motion; no ability here uses a tool",
+      "words": "its clip Working_C did not come across"
+    }
+  ]
+}

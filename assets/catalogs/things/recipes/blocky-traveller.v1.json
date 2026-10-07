@@ -1,0 +1,42 @@
+{
+  "profile": "exulanica.look-recipe/v1",
+  "recipe": "blocky-traveller",
+  "version": 1,
+  "summary": "The blocky figure as a traveller: tanned skin, brown hair, a teal shirt, blue trousers and dark shoes.",
+  "base": {
+    "recipe": "blocky-figure",
+    "version": 1
+  },
+  "palette": {
+    "skin": "#e0b58a",
+    "hair": "#5b3a29",
+    "shirt": "#3e8e7e",
+    "trousers": "#3b4a8a",
+    "shoes": "#3a2a20",
+    "eyes": "#2b2b2b"
+  },
+  "nodes": null,
+  "origin": {
+    "profile": "exulanica.origin/v1",
+    "class": "authored",
+    "by": {
+      "kind": "project"
+    },
+    "sources": [],
+    "licence": {
+      "spdx": "CC0-1.0",
+      "verdict": "SHIP",
+      "attribution": null,
+      "share_alike": false,
+      "licence_url": null,
+      "licence_text_sha256": null
+    },
+    "authors": [],
+    "lineage": {
+      "ingredients": [],
+      "receipts": [],
+      "translation_manifest_sha256": null
+    },
+    "distribution": "public"
+  }
+}

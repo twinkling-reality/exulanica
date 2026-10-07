@@ -8,8 +8,16 @@ villager, a sword, a lantern, a well and a gate) is stated here; the world objec
 pieces of furniture are derived from it, their places, seats and perches as that catalog derives
 them, so neither states a figure twice. A later version of a kind is data: its committed document
 (``kinds/<kind>.v<N>.json``) is the source, which this reads, checks and formats, and never writes
-from figures of its own. Each look this repository authors pins the digest of the container its
-recipe writes (exulanica/things/authored.py); each furniture look pins its reviewed asset's.
+from figures of its own.
+
+Every look is data: its committed document (``looks/<look>.v<N>.json``) is read and held to its
+source by what it is, and a look changes only as a new version. An authored look with a recipe
+(exulanica/things/authored.py) pins the container its recipe writes, and writing refreshes that
+container block alone; an authored look without one pins a reviewed asset of the world object
+catalog and that asset's dedication; the people catalog's look states the origin of the family the
+street population draws; an imported look's container, import receipt, translation manifest
+(``manifests/<look>.v<N>.json``) and the source reading the manifest accounts for are committed
+beside it (``assets/things/<folder>/``). A file the script cannot hold to a source is reported.
 
 ``kinds.lock.json`` beside the kinds names every shipped version with the digest it shipped with,
 and the kind loader refuses a file it does not name at that digest. Writing adds a line for each
@@ -32,12 +40,21 @@ from exulanica.grammar.documents import read_json  # noqa: E402
 from exulanica.things.kinds import KINDS_LOCK, LOCK_PROFILE, read_kind_lock  # noqa: E402
 from exulanica.things.kinds import read_thing_kind  # noqa: E402
 from exulanica.things.authored import AUTHORED_LOOKS, container_of  # noqa: E402
+from exulanica.things.looks import LookRefused, read_look  # noqa: E402
+from exulanica.things.manifests import (  # noqa: E402
+    ManifestRefused,
+    check_accounting,
+    read_manifest,
+)
 from exulanica.things.vocabularies import origin_of_character_family  # noqa: E402
 from exulanica.world.assets import reviewed_asset_of  # noqa: E402
 from exulanica.world.object_catalog import world_object_catalog  # noqa: E402
 
 KINDS = ROOT / "assets/catalogs/things/kinds"
 LOOKS = ROOT / "assets/catalogs/things/looks"
+MANIFESTS = ROOT / "assets/catalogs/things/manifests"
+#: Where imported looks keep their containers, import receipts and source readings, by folder.
+IMPORTED = ROOT / "assets/things"
 WALKING = "exulanica-movement/walking/v1"
 #: The furniture the world object catalog states, as thing kinds; its markers are test pieces.
 FURNITURE = ("bench", "cafe_table", "planter_tree", "lamp_post", "market_stall", "seating_planter")
@@ -61,25 +78,6 @@ def _origin(spdx: str) -> dict[str, Any]:
         "lineage": {"ingredients": [], "receipts": [], "translation_manifest_sha256": None},
         "distribution": "public",
     }
-
-
-def _look(key: str, label: str, plan: str, look_kind: str, **parts: Any) -> dict[str, Any]:
-    document = {
-        "profile": "exulanica.look/v1",
-        "look": key,
-        "version": 1,
-        "label": label,
-        "body_plan": plan,
-        "look_kind": look_kind,
-        "container": parts.get("container"),
-        "rig": None,
-        "height_mm": parts.get("height_mm"),
-        "sampling": "linear",
-        "light": parts.get("light"),
-        "role": None,
-        "origin": _origin("CC0-1.0"),
-    }
-    return document
 
 
 def _people_origin() -> dict[str, Any]:
@@ -108,53 +106,114 @@ def _container(data: bytes) -> dict[str, Any]:
     }
 
 
-def looks() -> dict[str, dict[str, Any]]:
-    authored = {
-        "blocky-traveller": ("blocky traveller", "humanoid/v1"),
-        "blocky-knight": ("blocky knight", "humanoid/v1"),
-        "primitive-sword": ("sword", "rigid/v1"),
-        "primitive-lantern": ("lantern", "rigid/v1"),
-        "primitive-well": ("well", "rigid/v1"),
-        "primitive-gate": ("gate", "rigid/v1"),
-    }
-    assert set(authored) == set(AUTHORED_LOOKS)
-    found = {}
-    for key, (label, plan) in authored.items():
-        kind = "rigid_on_bones" if plan == "humanoid/v1" else "static"
-        found[key] = _look(
-            key,
-            label,
-            plan,
-            kind,
-            container=_container(container_of(key)),
-            height_mm=1700 if plan == "humanoid/v1" else None,
-        )
-    found["spirit-light"] = _look(
-        "spirit-light",
-        "drifting light",
-        "bodiless/v1",
-        "light",
-        light={"colour": "#ffd76a", "intensity_milli": 1500, "radius_mm": 4000},
-    )
-    found["people-catalog"] = _look(
-        "people-catalog", "one of the world's people", "humanoid/v1", "catalog_person", height_mm=1750
-    )
-    found["people-catalog"]["origin"] = _people_origin()
-    catalog = world_object_catalog().by_key()
-    for key in FURNITURE:
-        kind = catalog[key]
-        asset = reviewed_asset_of(kind)
-        look = _look(
-            key.replace("_", "-"),
-            kind.title.lower(),
-            "rigid/v1",
-            "static",
-            container=_container(asset.payload),
-        )
-        # The reviewed asset's own dedication, pinned by the digest its registry row carries.
-        look["origin"]["licence"]["licence_text_sha256"] = asset.licence_sha256
-        found[look["look"]] = look
+class LookUnheld(ValueError):
+    """A committed look this script cannot hold to its source, by what is wrong."""
+
+
+def _imported_files() -> dict[str, tuple[Path, dict[str, Any]]]:
+    """Every imported container, by its digest: its file and its import receipt."""
+    found: dict[str, tuple[Path, dict[str, Any]]] = {}
+    for receipt_path in sorted(IMPORTED.glob("*/*.import.json")):
+        receipt = read_json(receipt_path)
+        container = receipt_path.with_name(receipt_path.name.removesuffix(".import.json") + ".glb")
+        found[receipt["content_sha256"]] = (container, dict(receipt))
     return found
+
+
+def _reviewed_assets() -> dict[str, str]:
+    """Every reviewed asset the world object catalog draws, by its payload's digest, with the
+    digest of its dedication."""
+    found = {}
+    for kind in world_object_catalog().kinds:
+        asset = reviewed_asset_of(kind)
+        found[_container(asset.payload)["sha256"]] = asset.licence_sha256
+    return found
+
+
+def _hold_imported(
+    document: dict[str, Any], imported: dict[str, tuple[Path, dict[str, Any]]]
+) -> str:
+    """An imported look's committed sources, or :class:`LookUnheld`: its container and receipt,
+    its manifest by the digest its origin names, and the source reading the manifest accounts for.
+    Returns the manifest's file name."""
+    held = imported.get(document["container"]["sha256"])
+    if held is None:
+        raise LookUnheld("no import receipt names its container")
+    container, receipt = held
+    if not container.exists() or _container(container.read_bytes()) != document["container"]:
+        raise LookUnheld(f"{container.relative_to(ROOT)} is not the container it pins")
+    if receipt["byte_size"] != document["container"]["bytes"]:
+        raise LookUnheld("its import receipt states another length")
+    stem = f"{document['look']}.v{document['version']}"
+    manifest_path = MANIFESTS / f"{stem}.json"
+    lineage = document["origin"]["lineage"]
+    if not manifest_path.exists():
+        raise LookUnheld(f"no manifest {manifest_path.relative_to(ROOT)}")
+    manifest = read_json(manifest_path)
+    if sha256_of_canonical(manifest).hex() != lineage["translation_manifest_sha256"]:
+        raise LookUnheld("its origin names another manifest")
+    if manifest["target"] != {
+        "kind": None,
+        "look": {"look": document["look"], "version": document["version"]},
+    }:
+        raise LookUnheld("its manifest names another look")
+    reading_path = container.with_name(f"{document['look']}.source.json")
+    if not reading_path.exists():
+        raise LookUnheld(f"no source reading {reading_path.relative_to(ROOT)}")
+    reading = read_json(reading_path)
+    if sha256_of_canonical(reading).hex() != manifest["source"]["sha256"]:
+        raise LookUnheld("its manifest accounts for another source reading")
+    try:
+        check_accounting(read_manifest(manifest), reading)
+    except ManifestRefused as refused:
+        raise LookUnheld(str(refused)) from refused
+    return manifest_path.name
+
+
+def looks() -> tuple[dict[str, dict[str, Any]], dict[str, str], list[str]]:
+    """Every committed look, by its file's stem, held to its source; the manifests imported looks
+    name, by file name; and what could not be held, in words. A recipe look's container block is
+    refreshed from its recipe, so writing keeps it current and checking reports the difference."""
+    imported = _imported_files()
+    reviewed = _reviewed_assets()
+    people = _people_origin()
+    found: dict[str, dict[str, Any]] = {}
+    manifests: dict[str, str] = {}
+    unheld: list[str] = []
+    for path in sorted(LOOKS.glob("*.json")):
+        name = str(path.relative_to(ROOT))
+        document = dict(read_json(path))
+        try:
+            look = read_look(document)
+        except LookRefused as refused:
+            unheld.append(f"{name}: {refused}")
+            continue
+        stem = f"{look.look}.v{look.version}"
+        if path.name != f"{stem}.json":
+            unheld.append(f"{name}: names another look or version than it states")
+            continue
+        origin, kind = document["origin"], look.look_kind
+        try:
+            if kind == "catalog_person":
+                if origin != people:
+                    raise LookUnheld("its origin is not the people family's")
+            elif kind == "light":
+                pass
+            elif origin["class"] == "imported":
+                manifests[_hold_imported(document, imported)] = stem
+            elif kind in ("static", "rigid_on_bones") and look.look in AUTHORED_LOOKS:
+                document["container"] = _container(container_of(look.look))
+            elif kind == "static":
+                licence = reviewed.get(document["container"]["sha256"])
+                if licence is None or origin["licence"]["licence_text_sha256"] != licence:
+                    raise LookUnheld("no reviewed asset and dedication are the ones it pins")
+            else:
+                raise LookUnheld(f"no source holds a {kind} look here")
+        except LookUnheld as unheld_look:
+            unheld.append(f"{name}: {unheld_look}")
+            continue
+        found[stem] = document
+    return found, manifests, unheld
 
 
 def _ref(look: dict[str, Any]) -> dict[str, Any]:
@@ -406,9 +465,7 @@ def kinds(made_looks: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
             _offers(
                 "arrive_through",
                 "leave_through",
-                arrive_through={
-                    "point": {"x_mm": 0, "y_mm": 1000, "faces": "+y", "seat": None}
-                },
+                arrive_through={"point": {"x_mm": 0, "y_mm": 1000, "faces": "+y", "seat": None}},
             ),
             [ref["primitive-gate"]],
         ),
@@ -513,11 +570,15 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--check", action="store_true")
     arguments = parser.parse_args(argv)
-    made_looks = looks()
-    made_kinds = {**kinds(made_looks), **later_versions()}
-    wanted = {LOOKS / f"{key}.v1.json": _text(doc) for key, doc in made_looks.items()}
+    made_looks, manifests, unheld = looks()
+    first_looks = {doc["look"]: doc for doc in made_looks.values() if doc["version"] == 1}
+    made_kinds = {**kinds(first_looks), **later_versions()}
+    wanted = {LOOKS / f"{stem}.json": _text(doc) for stem, doc in made_looks.items()}
     wanted |= {KINDS / f"{stem}.json": _text(doc) for stem, doc in made_kinds.items()}
-    present = {path for directory in (LOOKS, KINDS) for path in directory.glob("*.json")}
+    wanted |= {MANIFESTS / name: _text(read_json(MANIFESTS / name)) for name in manifests}
+    present = {path for directory in (LOOKS, KINDS, MANIFESTS) for path in directory.glob("*.json")}
+    for line in unheld:
+        print(f"not held to a source: {line}")
     digests = {
         (doc["kind"], doc["version"]): sha256_of_canonical(doc).hex() for doc in made_kinds.values()
     }
@@ -544,10 +605,10 @@ def main(argv: list[str] | None = None) -> int:
         unlocked = not KINDS_LOCK.exists() or KINDS_LOCK.read_text(encoding="utf-8") != lock_text
         if unlocked:
             print(f"differs: {KINDS_LOCK.relative_to(ROOT)}")
-        return 1 if differing or stray or changed or missing or unlocked else 0
-    if changed or missing:
+        return 1 if differing or stray or changed or missing or unlocked or unheld else 0
+    if changed or missing or unheld:
         return 1
-    for directory in (LOOKS, KINDS):
+    for directory in (LOOKS, KINDS, MANIFESTS):
         directory.mkdir(parents=True, exist_ok=True)
     for path, text in wanted.items():
         path.write_text(text, encoding="utf-8")

@@ -1,0 +1,133 @@
+{
+  "profile": "exulanica.look-recipe/v1",
+  "recipe": "primitive-well",
+  "version": 1,
+  "summary": "A stone well with water, two posts, a crossbar and a roof.",
+  "base": null,
+  "palette": null,
+  "nodes": [
+    {
+      "name": "well",
+      "at_mm": [
+        0,
+        0,
+        0
+      ],
+      "parts": [
+        {
+          "name": "wall",
+          "shape": "cylinder",
+          "size_mm": [
+            1400,
+            1400,
+            700
+          ],
+          "centre_mm": [
+            0,
+            0,
+            350
+          ],
+          "colour": "#9a8f84"
+        },
+        {
+          "name": "water",
+          "shape": "cylinder",
+          "size_mm": [
+            1200,
+            1200,
+            20
+          ],
+          "centre_mm": [
+            0,
+            0,
+            600
+          ],
+          "colour": "#2f5d7c"
+        },
+        {
+          "name": "left-post",
+          "shape": "box",
+          "size_mm": [
+            100,
+            100,
+            1500
+          ],
+          "centre_mm": [
+            -650,
+            0,
+            1050
+          ],
+          "colour": "#7a5a3c"
+        },
+        {
+          "name": "right-post",
+          "shape": "box",
+          "size_mm": [
+            100,
+            100,
+            1500
+          ],
+          "centre_mm": [
+            650,
+            0,
+            1050
+          ],
+          "colour": "#7a5a3c"
+        },
+        {
+          "name": "crossbar",
+          "shape": "box",
+          "size_mm": [
+            1400,
+            80,
+            80
+          ],
+          "centre_mm": [
+            0,
+            0,
+            1650
+          ],
+          "colour": "#7a5a3c"
+        },
+        {
+          "name": "roof",
+          "shape": "box",
+          "size_mm": [
+            1600,
+            1000,
+            100
+          ],
+          "centre_mm": [
+            0,
+            0,
+            2150
+          ],
+          "colour": "#a0522d"
+        }
+      ]
+    }
+  ],
+  "origin": {
+    "profile": "exulanica.origin/v1",
+    "class": "authored",
+    "by": {
+      "kind": "project"
+    },
+    "sources": [],
+    "licence": {
+      "spdx": "CC0-1.0",
+      "verdict": "SHIP",
+      "attribution": null,
+      "share_alike": false,
+      "licence_url": null,
+      "licence_text_sha256": null
+    },
+    "authors": [],
+    "lineage": {
+      "ingredients": [],
+      "receipts": [],
+      "translation_manifest_sha256": null
+    },
+    "distribution": "public"
+  }
+}

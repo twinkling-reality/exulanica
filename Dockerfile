@@ -101,6 +101,10 @@ COPY assets/characters/catalog.json assets/characters/looks.json /app/assets/cha
 COPY assets/characters/parametric-catalog.json /app/assets/characters/
 COPY assets/characters/makehuman-people-v1 /app/assets/characters/makehuman-people-v1
 COPY assets/characters/makehuman-parametric-v1 /app/assets/characters/makehuman-parametric-v1
+# The looks imported from packs other makers published, each with its container, import receipt,
+# licence and source reading (assets/catalogs/things/looks names each container by digest). About
+# 0.6 MB. `tests/test_thing_imports.py` holds this line to the files the imported looks name.
+COPY assets/things /app/assets/things
 # The installation profiles an installation names by EXULANICA_INSTALLATION_PROFILE
 # (docs/deployment.md 9.1).
 COPY deploy/profiles /app/deploy/profiles

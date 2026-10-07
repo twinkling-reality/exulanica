@@ -1,0 +1,33 @@
+{
+  "files": [
+    {
+      "source": "adventurers",
+      "path": "KayKit_Adventurers_2.0_FREE/Assets/gltf/sword_1handed.gltf",
+      "sha256": "2a6074d46c3e337f84f0295d0ea862b116fec7d816db8d027d75a464311228b6"
+    },
+    {
+      "source": "adventurers",
+      "path": "KayKit_Adventurers_2.0_FREE/Assets/gltf/sword_1handed.bin",
+      "sha256": "c8acdc21adf19257e66b78e86d37855474a0a9fda796c39b39d6d08a5ca34bd5"
+    },
+    {
+      "source": "adventurers",
+      "path": "KayKit_Adventurers_2.0_FREE/Assets/gltf/knight_texture.png",
+      "sha256": "028db4d1cd8b3471e6ba21686515abd4e36ae582f8b314b71ad2ab1fb5453b12"
+    }
+  ],
+  "meshes": [
+    "sword_1handed"
+  ],
+  "materials": [
+    "knight"
+  ],
+  "pictures": [
+    "knight_texture"
+  ],
+  "size_mm": {
+    "width": 503,
+    "depth": 131,
+    "height": 1775
+  }
+}

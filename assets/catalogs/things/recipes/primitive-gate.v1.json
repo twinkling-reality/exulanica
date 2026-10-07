@@ -1,0 +1,88 @@
+{
+  "profile": "exulanica.look-recipe/v1",
+  "recipe": "primitive-gate",
+  "version": 1,
+  "summary": "A wooden gate of two posts and a lintel, wide enough to walk through.",
+  "base": null,
+  "palette": null,
+  "nodes": [
+    {
+      "name": "gate",
+      "at_mm": [
+        0,
+        0,
+        0
+      ],
+      "parts": [
+        {
+          "name": "left-post",
+          "shape": "box",
+          "size_mm": [
+            300,
+            400,
+            3000
+          ],
+          "centre_mm": [
+            -1350,
+            0,
+            1500
+          ],
+          "colour": "#7a5a3c"
+        },
+        {
+          "name": "right-post",
+          "shape": "box",
+          "size_mm": [
+            300,
+            400,
+            3000
+          ],
+          "centre_mm": [
+            1350,
+            0,
+            1500
+          ],
+          "colour": "#7a5a3c"
+        },
+        {
+          "name": "lintel",
+          "shape": "box",
+          "size_mm": [
+            3000,
+            400,
+            300
+          ],
+          "centre_mm": [
+            0,
+            0,
+            2850
+          ],
+          "colour": "#5c4129"
+        }
+      ]
+    }
+  ],
+  "origin": {
+    "profile": "exulanica.origin/v1",
+    "class": "authored",
+    "by": {
+      "kind": "project"
+    },
+    "sources": [],
+    "licence": {
+      "spdx": "CC0-1.0",
+      "verdict": "SHIP",
+      "attribution": null,
+      "share_alike": false,
+      "licence_url": null,
+      "licence_text_sha256": null
+    },
+    "authors": [],
+    "lineage": {
+      "ingredients": [],
+      "receipts": [],
+      "translation_manifest_sha256": null
+    },
+    "distribution": "public"
+  }
+}

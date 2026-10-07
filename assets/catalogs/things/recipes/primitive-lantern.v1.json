@@ -1,0 +1,104 @@
+{
+  "profile": "exulanica.look-recipe/v1",
+  "recipe": "primitive-lantern",
+  "version": 1,
+  "summary": "A lantern of boxes: a base, a glowing glass, a cap and a ring to hold it by.",
+  "base": null,
+  "palette": null,
+  "nodes": [
+    {
+      "name": "lantern",
+      "at_mm": [
+        0,
+        0,
+        0
+      ],
+      "parts": [
+        {
+          "name": "base",
+          "shape": "box",
+          "size_mm": [
+            180,
+            180,
+            30
+          ],
+          "centre_mm": [
+            0,
+            0,
+            15
+          ],
+          "colour": "#3a2a20"
+        },
+        {
+          "name": "glass",
+          "shape": "box",
+          "size_mm": [
+            150,
+            150,
+            200
+          ],
+          "centre_mm": [
+            0,
+            0,
+            130
+          ],
+          "colour": "#fff2b0",
+          "glow": "#ffd76a"
+        },
+        {
+          "name": "cap",
+          "shape": "box",
+          "size_mm": [
+            180,
+            180,
+            30
+          ],
+          "centre_mm": [
+            0,
+            0,
+            245
+          ],
+          "colour": "#3a2a20"
+        },
+        {
+          "name": "ring",
+          "shape": "box",
+          "size_mm": [
+            50,
+            8,
+            40
+          ],
+          "centre_mm": [
+            0,
+            0,
+            280
+          ],
+          "colour": "#3a2a20"
+        }
+      ]
+    }
+  ],
+  "origin": {
+    "profile": "exulanica.origin/v1",
+    "class": "authored",
+    "by": {
+      "kind": "project"
+    },
+    "sources": [],
+    "licence": {
+      "spdx": "CC0-1.0",
+      "verdict": "SHIP",
+      "attribution": null,
+      "share_alike": false,
+      "licence_url": null,
+      "licence_text_sha256": null
+    },
+    "authors": [],
+    "lineage": {
+      "ingredients": [],
+      "receipts": [],
+      "translation_manifest_sha256": null
+    },
+    "distribution": "public"
+  }
+}

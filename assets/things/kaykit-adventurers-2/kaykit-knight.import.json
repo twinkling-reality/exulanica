@@ -1,0 +1,13 @@
+{
+  "profile": "exulanica.reviewed-asset-import/v1",
+  "asset_key": "things.kaykit-knight.v1",
+  "title": "KayKit : Adventurers Character Pack 2.0, free tier: armoured knight",
+  "summary": "An armoured knight with a cape and a visored helmet, rigged, with clips to stand, walk, run, reach to the ground, hold a thing up and sit.",
+  "content_sha256": "4edf18316ef8f04b77b1e254aeafa6440cc07736d88595053f17b71a5dec2b10",
+  "byte_size": 504240,
+  "licence_id": "CC0-1.0",
+  "licence_sha256": "d4adc31660d1db22eb60eba648e01db41577548f6fa1a3576cb4a6283dae0a58",
+  "source_url": "https://kaylousberg.itch.io/kaykit-adventurers",
+  "source_revision": "Free 2.0, KayKit_Adventurers_2.0_FREE.zip sha256 abe48f4763fba0896bab486ee9e6d08ca6b5b3884b9601f235c8847ae94dc479",
+  "producer": "exulanica-look-import/1"
+}

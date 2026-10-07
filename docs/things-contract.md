@@ -231,14 +231,21 @@ records apart from what a thing is, a kind is given to a society only through it
 a crossing's look rides beside its arrival, never in it. Swapping a thing's look therefore changes
 no state and no decision.
 
-The looks this repository authors are recipes in [`authored.py`](../exulanica/things/authored.py),
-written by [`pieces.py`](../exulanica/things/pieces.py) into a binary glTF the same on any machine:
-every vertex a whole number of millimetres turned into metres by one float32 division, a cylinder's
-corners from a table of square roots. Their containers are not committed. Each look document pins
-its container's digest and length, and a test writes each container again, compares it and passes
-it through the product's static glTF admission (`inspect_static_glb`). A blocky figure stands its
-joints where a 1,700 mm figure's stand in the T-pose, with an upper arm, a lower arm and a hand as
-three boxes, so its elbow bends.
+The looks this repository authors are recipe documents, profile `exulanica.look-recipe/v1`, under
+[`assets/catalogs/things/recipes`](../assets/catalogs/things/recipes), one file per recipe version,
+each with its origin record. A recipe states named nodes, each at a point in the slot frame and
+holding boxes and upright cylinders in whole millimetres, each in one colour and some glowing; or it
+builds on another recipe (`base`) and colours it with its `palette`, a colour being `#rrggbb` or a
+palette role's name. The two blocky figures are one recipe in two palettes, so their joints are
+stated once. One reader, [`authored.py`](../exulanica/things/authored.py), names no look: a recipe
+is a look's when every colour it reaches resolves, and a test holds that no module of the things
+package states a shipped kind's, look's or recipe's key. [`pieces.py`](../exulanica/things/pieces.py)
+writes each into a binary glTF the same on any machine: every vertex a whole number of millimetres
+turned into metres by one float32 division, a cylinder's corners from a table of square roots.
+Their containers are not committed. Each look document pins its container's digest and length, and
+a test writes each container again, compares it and passes it through the product's static glTF
+admission (`inspect_static_glb`). A blocky figure stands its joints where a 1,700 mm figure's stand
+in the T-pose, with an upper arm, a lower arm and a hand as three boxes, so its elbow bends.
 
 ## The origin record
 
@@ -329,10 +336,15 @@ text from outside normalises it first. A translation manifest's words are lines.
 
 ## The kinds and looks this repository ships
 
-[`scripts/things/shipped_things.py`](../scripts/things/shipped_things.py) writes every shipped look
-and the first version of every shipped kind, and `--check` exits non-zero when a committed one
-differs. A later version of a kind is data: its committed document is the source, which the script
-reads, checks against the things catalogs and formats, and never writes from figures of its own.
+[`scripts/things/shipped_things.py`](../scripts/things/shipped_things.py) writes the first version
+of every shipped kind, and `--check` exits non-zero when a committed one differs. A later version
+of a kind is data: its committed document is the source, which the script reads, checks against the
+things catalogs and formats, and never writes from figures of its own. Every look is data in the
+same way, and a look changes only as a new version: the script reads each committed look and holds
+it to its source by what it is (an authored look's recipe, a reviewed asset and its dedication, the
+people family's origin, or an imported look's committed files, below), reports one that differs or
+that it cannot hold to a source, and when writing only formats documents and refreshes a recipe
+look's container block.
 The script keeps the lock, adding a line for each new version and refusing to change one already
 there. The six pieces of furniture are derived from the world object catalog, their places, seats,
 perches and hosted flyers as that catalog derives them, so no figure is stated twice. The kinds are
@@ -352,12 +364,12 @@ kind suggesting a look the library does not hold at the kind's digest each stop 
 
 | Kind | Class | Body | Abilities | Offers | Deciders | Look |
 | --- | --- | --- | --- | --- | --- | --- |
-| `knight` | being | humanoid, 1,700 to 1,900 mm | wait, stand, talk, rest, visit, pick_up, put_down, give, take, follow, say | talk_to, hear, receive, be_followed | the routine by default; a model, the owner or an outside program | `blocky-knight` |
+| `knight` | being | humanoid, 1,700 to 1,900 mm | wait, stand, talk, rest, visit, pick_up, put_down, give, take, follow, say | talk_to, hear, receive, be_followed | the routine by default; a model, the owner or an outside program | version 2: `kaykit-knight`, then `blocky-knight`; version 1: `blocky-knight` |
 | `traveller` | being | humanoid, 1,550 to 1,800 mm | as the knight | as the knight | as the knight | `blocky-traveller` |
 | `lantern_spirit` | being | bodiless, radius 200 mm | wait, follow, say, pick_up, put_down, give, take | talk_to, hear, receive, be_followed | as the knight; its routine follows whoever carries a lantern | `spirit-light` |
 | `visitor` | being | humanoid, 1,500 to 2,000 mm | wait, stand, talk, say, pick_up, put_down, give, take, follow, leave after 5 quiet minutes | talk_to, hear, receive, be_followed | an outside program only | none: its crossing brings one |
 | `villager` | being | humanoid, 1,500 to 1,950 mm | wait, stand, talk, rest, visit | talk_to, hear | the routine; a model or the owner | `people-catalog` |
-| `sword` | object | version 2: 240 x 80 x 1,000 mm, as wide and deep as a sword's guard and pommel; version 1: 120 x 40 x 1,000 mm | | holdable, one hand, 150 mm up its length | | `primitive-sword` |
+| `sword` | object | versions 2 and 3: 240 x 80 x 1,000 mm, as wide and deep as a sword's guard and pommel; version 1: 120 x 40 x 1,000 mm | | holdable, one hand, 150 mm up its length | | version 3: `kaykit-sword`, then `primitive-sword`; versions 1 and 2: `primitive-sword` |
 | `lantern` | object | 180 x 180 x 300 mm | | holdable, one hand | | `primitive-lantern` |
 | `well` | object | 1,600 x 1,600 x 2,200 mm, blocks walking | | visit, from two sides | | `primitive-well` |
 | `gate` | object | 3,000 x 400 x 3,000 mm, walked through | | arrive_through, leave_through | | `primitive-gate` |
@@ -373,6 +385,29 @@ kind suggesting a look the library does not hold at the kind's digest each stop 
 | `spirit-light` | `light` | authored here, CC0 |
 | `people-catalog` | `catalog_person` | imported, CC0: the people catalog's MakeHuman family through MPFB 2, with Quaternius locomotion |
 | `bench`, `cafe-table`, `seating-planter`, `market-stall`, `planter-tree`, `lamp-post` | `static` | authored here, CC0, pinned to the reviewed asset's dedication |
+| `kaykit-knight` | `skinned` | imported, CC0: the knight of Kay Lousberg's KayKit Adventurers 2.0, with idle, walk, run and pick-up clips from that pack and holding and sitting clips from KayKit Character Animations 1.1, standing 1,800 mm, holding at its own hand slots |
+| `kaykit-sword` | `static` | imported, CC0: the one-handed sword of KayKit Adventurers 2.0, scaled to stand inside the sword's box |
+
+### Imported looks
+
+A look made from a pack another maker published is imported by one translator,
+[`scripts/things/import_looks.py`](../scripts/things/import_looks.py), from an import document
+(`exulanica.look-import/v1`, `assets/things/<folder>/import.json`) that states, as data, each source
+pack (its page and the date it was read, its archive by digest, its licence file), and for each
+look the files it reads, how a figure's joints map onto the body plan's bones and sockets, the clip
+each motion uses, the box an object stands inside, and why each joint or clip that does not come
+across stays behind. The translator names no pack or thing. It merges a rigged figure into the
+shared skinned shape (`exulanica.skinned-glb/v1`): one skinned mesh of the figure's parts with only
+the clips its motions use, each named by its motion, holding the joints the document names at their
+first key's ground position so a clip never carries the figure, with the uniform scale that stands
+it at the look's height baked into its vertices, bind matrices, joints and clips, so no node is
+scaled. It fits an object inside its box and prepares it as any person's static container is. It measures each
+moving clip's ground speed from the clip itself. Beside the import document it commits each
+container with a reviewed import receipt, each source's licence file byte for byte and a source
+reading per look; under `assets/catalogs/things` it writes the look and its translation manifest
+(version 2), which accounts for every field of the reading. The archives are never committed; with
+them present, `--check` makes everything again and compares every byte. The API image carries
+`assets/things` beside the catalogs.
 
 ## Creatures: bodies drafted from words
 
@@ -554,7 +589,8 @@ These are material limits of the boundary above, not partial behaviour:
   serves the shipped ones only. A placed thing names a shipped kind.
 - The browser draws no thing a society moves, no held thing, no line and no mark of who decides,
   and no look chosen for a thing: placed things stand in their kind's first look.
-- No importer or crossing writes a translation manifest; the reader and its accounting check exist.
+- No crossing writes a translation manifest yet; the look importer writes one for each look it
+  makes.
 - No route drafts a creature or keeps its documents, and no model has been measured as its drafter:
   the drafter runs on scripted replies only, and no role of the model manifest names it.
 - No creature flies, swims, climbs or burrows: the grammar states those movements and refuses them
@@ -567,7 +603,8 @@ These are material limits of the boundary above, not partial behaviour:
 | --- | --- | --- |
 | Catalogs | [`catalogs.py`](../exulanica/things/catalogs.py), [`assets/catalogs/things`](../assets/catalogs/things) | `tests/test_thing_kinds.py`, `tests/test_catalog_provenance.py` (every entry says why it exists) |
 | Thing kinds | [`kinds.py`](../exulanica/things/kinds.py) | `tests/test_thing_kinds.py` (each refusal by name, against a positive control) |
-| Looks | [`looks.py`](../exulanica/things/looks.py), [`authored.py`](../exulanica/things/authored.py), [`pieces.py`](../exulanica/things/pieces.py) | `tests/test_thing_kinds.py`, `tests/test_thing_looks_and_origins.py` (each authored container written again and admitted, a blocky figure's joints, a static look inside its box) |
+| Looks | [`looks.py`](../exulanica/things/looks.py), [`authored.py`](../exulanica/things/authored.py), [`pieces.py`](../exulanica/things/pieces.py), [`recipes`](../assets/catalogs/things/recipes) | `tests/test_thing_kinds.py`, `tests/test_thing_looks_and_origins.py` (each authored container written again and admitted, a blocky figure's joints, a static look inside its box), `tests/test_thing_recipes.py` (each recipe read or refused by name, the blocky figures one stated body, no things module naming a shipped key) |
+| Imported looks | [`import_looks.py`](../scripts/things/import_looks.py), [`assets/things`](../assets/things) | `tests/test_thing_imports.py` (each imported look held to its committed container, receipt, licence, manifest and source reading; a figure's rig naming only what its container holds, its clips in place, its height; an imported static look inside its kind's box; the merge on a small figure made in the test; every file shipped in the API image) |
 | Origin record and vocabularies | [`origin.py`](../exulanica/things/origin.py), [`vocabularies.py`](../exulanica/things/vocabularies.py) | `tests/test_thing_looks_and_origins.py` |
 | Translation manifests and lines | [`manifests.py`](../exulanica/things/manifests.py), [`lines.py`](../exulanica/things/lines.py) | `tests/test_thing_looks_and_origins.py` (words held to the line rule, a look's import, each refusal against a positive control) |
 | Shipped kinds and looks | [`shipped_things.py`](../scripts/things/shipped_things.py), the lock `kinds.lock.json` | `tests/test_thing_kinds.py` (`--check`), `tests/test_placed_things.py` (every shipped version at its locked digest; a changed, unlocked or missing file refused) |

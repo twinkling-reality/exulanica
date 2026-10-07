@@ -108,8 +108,9 @@ def test_a_kind_named_without_its_digest_is_the_shipped_one_and_a_stated_one_mus
     assert named_kind("sword", 2, shipped[("sword", 2)].sha256) == sword
     with pytest.raises(InvalidThingPlacement):
         named_kind("sword", 2, shipped[("sword", 1)].sha256)
+    unshipped = 1 + max(version for kind, version in shipped if kind == "sword")
     with pytest.raises(InvalidThingPlacement):
-        named_kind("sword", 3)
+        named_kind("sword", unshipped)
 
 
 def test_a_shipped_kind_version_never_changes(tmp_path):

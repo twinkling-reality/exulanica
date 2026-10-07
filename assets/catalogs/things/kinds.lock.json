@@ -23,6 +23,11 @@
       "sha256": "d506980f69c79dc1e9c9f91390a4fb4fc45efab44c099fdb614e57a94642f7e7"
     },
     {
+      "kind": "knight",
+      "version": 2,
+      "sha256": "6a15023d6c9dcc809a181cb7f77ec6bd2ca48747c3155e5fa83d66bd5d0b682c"
+    },
+    {
       "kind": "lamp_post",
       "version": 1,
       "sha256": "0404e448839bfdea242691cdb81d5c528a3259e945bc9a6348eeec9eea023bde"
@@ -61,6 +66,11 @@
       "kind": "sword",
       "version": 2,
       "sha256": "785a27d7c181ad01891b2d28dee0fc21b6f1aaa78b664d41f749c416cc5f9b07"
+    },
+    {
+      "kind": "sword",
+      "version": 3,
+      "sha256": "d871f4042cc88e598f0dcd2c03f47407b32536e08e71045a4b27433ba11d4df3"
     },
     {
       "kind": "traveller",

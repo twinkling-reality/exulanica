@@ -1,0 +1,103 @@
+{
+  "profile": "exulanica.look-recipe/v1",
+  "recipe": "primitive-sword",
+  "version": 1,
+  "summary": "A one-handed sword of four boxes: pommel, grip, guard and blade, the blade up.",
+  "base": null,
+  "palette": null,
+  "nodes": [
+    {
+      "name": "sword",
+      "at_mm": [
+        0,
+        0,
+        0
+      ],
+      "parts": [
+        {
+          "name": "pommel",
+          "shape": "box",
+          "size_mm": [
+            50,
+            40,
+            40
+          ],
+          "centre_mm": [
+            0,
+            0,
+            20
+          ],
+          "colour": "#b08d57"
+        },
+        {
+          "name": "grip",
+          "shape": "box",
+          "size_mm": [
+            30,
+            30,
+            140
+          ],
+          "centre_mm": [
+            0,
+            0,
+            110
+          ],
+          "colour": "#6b4a2b"
+        },
+        {
+          "name": "guard",
+          "shape": "box",
+          "size_mm": [
+            120,
+            40,
+            30
+          ],
+          "centre_mm": [
+            0,
+            0,
+            195
+          ],
+          "colour": "#b08d57"
+        },
+        {
+          "name": "blade",
+          "shape": "box",
+          "size_mm": [
+            50,
+            10,
+            790
+          ],
+          "centre_mm": [
+            0,
+            0,
+            605
+          ],
+          "colour": "#d9dee3"
+        }
+      ]
+    }
+  ],
+  "origin": {
+    "profile": "exulanica.origin/v1",
+    "class": "authored",
+    "by": {
+      "kind": "project"
+    },
+    "sources": [],
+    "licence": {
+      "spdx": "CC0-1.0",
+      "verdict": "SHIP",
+      "attribution": null,
+      "share_alike": false,
+      "licence_url": null,
+      "licence_text_sha256": null
+    },
+    "authors": [],
+    "lineage": {
+      "ingredients": [],
+      "receipts": [],
+      "translation_manifest_sha256": null
+    },
+    "distribution": "public"
+  }
+}

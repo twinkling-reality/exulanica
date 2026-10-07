@@ -1,0 +1,71 @@
+{
+  "profile": "exulanica.thing-kind/v1",
+  "kind": "sword",
+  "version": 3,
+  "label": "sword",
+  "summary": "A sword one hand holds by its grip, the blade up.",
+  "class": "object",
+  "body": {
+    "plan": "rigid/v1",
+    "box_mm": {
+      "width": 240,
+      "depth": 80,
+      "height": 1000
+    },
+    "blocks_walking": false
+  },
+  "origin": {
+    "profile": "exulanica.origin/v1",
+    "class": "authored",
+    "by": {
+      "kind": "project"
+    },
+    "sources": [],
+    "licence": {
+      "spdx": "Apache-2.0",
+      "verdict": "SHIP",
+      "attribution": null,
+      "share_alike": false,
+      "licence_url": null,
+      "licence_text_sha256": null
+    },
+    "authors": [],
+    "lineage": {
+      "ingredients": [],
+      "receipts": [],
+      "translation_manifest_sha256": null
+    },
+    "distribution": "public"
+  },
+  "moves": [],
+  "abilities": [],
+  "offers": [
+    {
+      "key": "holdable",
+      "parameters": {
+        "hands": 1,
+        "grip": {
+          "x_mm": 0,
+          "y_mm": 0,
+          "z_mm": 150
+        },
+        "axis": "+z"
+      }
+    }
+  ],
+  "routine": null,
+  "deciders": null,
+  "looks": [
+    {
+      "look": "kaykit-sword",
+      "version": 1,
+      "sha256": "4ee0a5dacbe953e7867f14e0ef8bd531006b44e4fc805c50614c7c8ed8e179ff"
+    },
+    {
+      "look": "primitive-sword",
+      "version": 1,
+      "sha256": "c4cc254fcfe748f7066b27d21759906487eadf77d63a5152b53e33e1ca4fcd32"
+    }
+  ],
+  "ext": {}
+}

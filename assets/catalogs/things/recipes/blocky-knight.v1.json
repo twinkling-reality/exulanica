@@ -1,0 +1,42 @@
+{
+  "profile": "exulanica.look-recipe/v1",
+  "recipe": "blocky-knight",
+  "version": 1,
+  "summary": "The blocky figure in plate: every part in steel greys, the visor dark.",
+  "base": {
+    "recipe": "blocky-figure",
+    "version": 1
+  },
+  "palette": {
+    "skin": "#a9b4bf",
+    "hair": "#8d99a6",
+    "shirt": "#8d99a6",
+    "trousers": "#6f7b88",
+    "shoes": "#4a525c",
+    "eyes": "#1f2428"
+  },
+  "nodes": null,
+  "origin": {
+    "profile": "exulanica.origin/v1",
+    "class": "authored",
+    "by": {
+      "kind": "project"
+    },
+    "sources": [],
+    "licence": {
+      "spdx": "CC0-1.0",
+      "verdict": "SHIP",
+      "attribution": null,
+      "share_alike": false,
+      "licence_url": null,
+      "licence_text_sha256": null
+    },
+    "authors": [],
+    "lineage": {
+      "ingredients": [],
+      "receipts": [],
+      "translation_manifest_sha256": null
+    },
+    "distribution": "public"
+  }
+}
