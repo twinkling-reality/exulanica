@@ -92,10 +92,11 @@ import { pointerRay, type SeatingLayout } from '@exulanica/atlas-react/playcanva
 import type { SocietyPlaces } from '../society-api.js';
 import { engineCreatedOver, societyEngine } from '../society-engines.js';
 import type { SavedWorldFlight, SavedWorldFlightStatus } from './saved-world-flight.js';
-import { mountThings, THING_PICK_EVENT, type MountedThings, type ThingPickDetail, type ThingPickVia, type ThingsDependencies } from './things.js';
+import { looksReadDue, mountThings, THING_PICK_EVENT, type MountedThings, type ThingPickDetail, type ThingPickVia, type ThingsDependencies } from './things.js';
 import { AttachedMarks, type MarkedSubject } from '@exulanica/atlas-react/things';
 import { markLabel, markOf } from './thing-marks.js';
 import { DoorBridgesClient, type DoorBridge } from '../door-bridges-api.js';
+import { ThingLooksClient, type ThingLookChoice } from '../thing-looks-api.js';
 import '../ui/thing-marks.css';
 
 /** Where the development preview's real-engine society recording is served. */
@@ -141,6 +142,8 @@ export interface EnvironmentSelectionDependencies {
   readonly societyClient?: SocietyClient;
   readonly societyControlClient?: SocietyControlClient;
   readonly societyModelsClient?: SocietyModelsClient;
+  /** The looks chosen for a society of things' things; read with the credentials when left out. */
+  readonly thingLooksClient?: { read(versionId: string): Promise<ReadonlyMap<string, ThingLookChoice>> };
   readonly societyDistrictClient?: SocietyDistrictClient;
   /** The open saved world's flight, read ahead of the page's clock; none when omitted. */
   readonly flight?: (world: {
@@ -511,6 +514,10 @@ export function mountEnvironmentSelection(
   let bridges: ReadonlyMap<string, DoorBridge> | null = null;
   /** When the bridges were last asked for, so a bridge the door does not list is asked at most once a minute. */
   let bridgesAskedAt = Number.NEGATIVE_INFINITY;
+  /** Whether the looks chosen for the society's things have been read, the things a read covered, and when one was asked. */
+  let looksRead = false;
+  const looksSeen = new Set<string>();
+  let looksAskedAt = Number.NEGATIVE_INFINITY;
   let authoredWorldFailure: string | null = null;
   let chosen: NYCLocalFeature | null = null;
   let admittedFeaturesByProvider = new Map<string, NYCLocalFeature>();
@@ -1929,6 +1936,34 @@ export function mountEnvironmentSelection(
     if (unknownBridge) readBridges();
   }
 
+  /**
+   * Read the looks chosen for a society of things' things when one is first drawn, and again when a
+   * state lists a thing no read has covered (a visitor's look is recorded in the minute that brings
+   * it in), at most once a minute; then draw them (`MountedThings.setLooks`) and ask the crowd again.
+   */
+  function readLooksFor(state: OwnedSocietyState): void {
+    const world = savedWorld;
+    if (things === null || world === null) return;
+    const ids = [...state.inhabitants.map((person) => person.id), ...(state.things ?? []).map((thing) => thing.id)];
+    const now = performance.now();
+    if (!looksReadDue(ids, looksSeen, looksRead, looksAskedAt, now)) return;
+    looksAskedAt = now;
+    // Only a read issued covers a thing: one skipped by the minute's limit is asked for after it.
+    for (const id of ids) looksSeen.add(id);
+    const client = deps.thingLooksClient ?? new ThingLooksClient({ ...deps.credentials, worldId: world.worldId });
+    void client.read(world.versionId).then((read) => {
+      if ((phase as string) === 'disposed' || things === null) return;
+      looksRead = true;
+      things.setLooks(read);
+      deps.state.atlas?.binding.authoredSociety?.refreshFigures();
+      if (deps.env.canvas) deps.env.canvas.dataset['thingLooksChosen'] = String(read.size);
+    }, (error: unknown) => {
+      // A read that failed covered nothing: its things are asked for again after the minute.
+      for (const id of ids) looksSeen.delete(id);
+      if (deps.env.canvas) deps.env.canvas.dataset['thingLooksFailure'] = error instanceof Error ? error.message : String(error);
+    });
+  }
+
   function readBridges(): void {
     const now = performance.now();
     if (now - bridgesAskedAt < 60_000) return;
@@ -2024,6 +2059,7 @@ export function mountEnvironmentSelection(
     reflectSeatingMisses(runtime);
     // The state just drawn: `renderedSnapshot` names it only once this returns.
     refreshMarks(next.state);
+    if (next.state.things !== undefined) readLooksFor(next.state);
     moved = [...named.values()];
   }
 
@@ -2500,6 +2536,9 @@ export function mountEnvironmentSelection(
       marks?.destroy();
       marks = null;
       bridges = null;
+      looksRead = false;
+      looksSeen.clear();
+      looksAskedAt = Number.NEGATIVE_INFINITY;
       if (deps.env.canvas) delete deps.env.canvas.dataset['thingMarks'];
       if (deps.env.canvas) for (const key of ['thingsDrawn', 'thingsMissed', 'thingsFailure']) delete deps.env.canvas.dataset[key];
       savedWorldActions.clear();

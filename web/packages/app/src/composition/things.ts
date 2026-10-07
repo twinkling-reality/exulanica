@@ -22,6 +22,7 @@ import type { OwnedSocietyState } from '@exulanica/atlas-react/playcanvas';
 import type { Credentials } from '../config.js';
 import { openThingLibrary } from '../things-library.js';
 import { tokenBlock } from '../ui/system/token-values.js';
+import type { ThingLookChoice } from '../thing-looks-api.js';
 import type { PlacedThing } from '../world-objects-api.js';
 
 export const THING_PICK_EVENT = 'exulanica:thing-pick';
@@ -58,6 +59,12 @@ export interface MountedThings {
   setSociety(state: OwnedSocietyState | null): void;
   /** How the society's crowd draws its things by their looks (`AuthoredRegionSociety.setFigures`). */
   readonly crowdFigures: ThingCrowdFigures;
+  /**
+   * The looks chosen for the society's things, by thing id (`GET .../thing-looks`): a person of a
+   * kind wears its chosen look in the crowd, a placed thing in the layer; a thing with none wears its
+   * kind's first look. The crowd is asked again by its caller (`refreshFigures`).
+   */
+  setLooks(choices: ReadonlyMap<string, ThingLookChoice>): void;
   /** Placed things drawn as nothing, and why. */
   readonly misses: readonly ThingMiss[];
   readonly layer: ThingLayer;
@@ -72,6 +79,19 @@ export function signalColour(): string {
   const value = tokenBlock(':root').get('--color-signal');
   if (value === undefined || !/^#[0-9a-f]{6}$/iu.test(value)) throw new Error('tokens.css :root --color-signal is not a colour');
   return value.toLowerCase();
+}
+
+/** The least time between two reads of the looks chosen for a society's things. */
+export const LOOKS_READ_INTERVAL_MS = 60_000;
+
+/**
+ * Whether the looks chosen for a society's things are to be read now: when none has been read, or
+ * a state lists a thing no read has covered (a visitor's look is recorded in the minute that brings
+ * it in), and never within `LOOKS_READ_INTERVAL_MS` of the last ask.
+ */
+export function looksReadDue(ids: readonly string[], covered: ReadonlySet<string>, read: boolean, askedAt: number, now: number): boolean {
+  if (read && ids.every((id) => covered.has(id))) return false;
+  return now - askedAt >= LOOKS_READ_INTERVAL_MS;
 }
 
 export function placedThingRecord(thing: PlacedThing): PlacedThingRecord {
@@ -107,7 +127,10 @@ export async function mountThings(deps: ThingsDependencies): Promise<MountedThin
     layer.setPicked(detail === null ? null : { placedId: detail.placedId, thingId: detail.thingId, subjectId: detail.subjectId });
   };
   deps.shell.addEventListener(THING_PICK_EVENT, onPick);
-  const crowdFigures = new ThingCrowdFigures({ maker: layer.maker });
+  let chosen: ReadonlyMap<string, ThingLookChoice> = new Map();
+  /** The placed things a choice was last given to, so a choice withdrawn returns them to their first look. */
+  let chosenPlaced = new Set<string>();
+  const crowdFigures = new ThingCrowdFigures({ maker: layer.maker, lookOf: (person) => chosen.get(person.id)?.look ?? null });
   let destroyed = false;
   return {
     async setPlaced(things) {
@@ -118,6 +141,18 @@ export async function mountThings(deps: ThingsDependencies): Promise<MountedThin
       if (!destroyed) layer.setSociety(state, state === null ? null : crowdFigures);
     },
     crowdFigures,
+    setLooks(choices) {
+      if (destroyed) return;
+      chosen = choices;
+      const placed = new Set<string>();
+      for (const choice of choices.values()) {
+        if (choice.placedId === null) continue;
+        placed.add(choice.placedId);
+        void layer.setLook(choice.placedId, choice.look);
+      }
+      for (const placedId of chosenPlaced) if (!placed.has(placedId)) void layer.setLook(placedId, null);
+      chosenPlaced = placed;
+    },
     pick: (origin, direction) => layer.pick(origin, direction),
     raise(pick, via) {
       const detail: ThingPickDetail = pick === null ? null : Object.freeze({ ...pick, via });

@@ -126,6 +126,11 @@ export class AuthoredRegionSociety {
     this.crowd.setFigures(figures);
   }
 
+  /** Ask the things' figures again, as after the looks chosen for them change (`SocietyCrowd.refreshFigures`). */
+  refreshFigures(): void {
+    this.crowd.refreshFigures();
+  }
+
   /**
    * Where a mark over an inhabitant hangs, in world space (`SocietyCrowd.anchorOf`), or false when
    * they are not drawn outdoors now. Those in flight are drawn by the flock and hang no mark yet.

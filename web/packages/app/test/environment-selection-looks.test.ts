@@ -4,16 +4,17 @@ import { describe, expect, it, vi } from 'vitest';
 import { ApiError } from '@exulanica/graph-client';
 import type { AtlasScene } from '@exulanica/atlas-core';
 import type { PlacedThingRecord, ThingLayerOptions, ThingPick } from '@exulanica/atlas-react/things';
-import { mountEnvironmentSelection, type SelectedThing } from '../src/composition/environment-selection.js';
+import { mountEnvironmentSelection } from '../src/composition/environment-selection.js';
 import { parseSociety, type SocietySnapshot } from '../src/society-api.js';
 import { parseSocietyControl } from '../src/society-control-api.js';
-import { THING_PICK_EVENT, type ThingPickDetail } from '../src/composition/things.js';
 import type { AlternateVersion } from '../src/world-objects-api.js';
+import type { ThingLookChoice } from '../src/thing-looks-api.js';
 import type { AppEnvironment, SessionState } from '../src/composition/session-state.js';
 
 /*
- * A saved world whose version places things: they are handed to the things layer in the frame its
- * society's region is drawn in, and aiming and pressing E picks the nearer of a thing and a person.
+ * The looks chosen for a society of things' things are read when the society is first drawn: a
+ * person wears theirs in the crowd, which is asked again, and a placed thing in the layer. A read
+ * that fails says so on the canvas and dresses nothing.
  */
 
 const { FakeLayer, layers } = vi.hoisted(() => {
@@ -27,6 +28,8 @@ const { FakeLayer, layers } = vi.hoisted(() => {
     society: unknown = null;
     constructor(readonly options: ThingLayerOptions) { made.push(this); }
     setSociety(state: unknown) { this.society = state; }
+    readonly looks: [string, unknown][] = [];
+    async setLook(placedId: string, look: unknown) { this.looks.push([placedId, look]); }
     async setPlaced(things: readonly PlacedThingRecord[]) { this.placed = things; }
     pick() { return this.placed.length === 0 ? null : { pick: { placedId: this.placed[0]!.thingId, thingId: null, subjectId: null }, distance: this.distance }; }
     setPicked(_pick: ThingPick | null) {}
@@ -41,14 +44,6 @@ vi.mock('@exulanica/atlas-react/things', async (original) => ({
   ThingLayer: FakeLayer,
 }));
 vi.mock('../src/things-library.js', () => ({ openThingLibrary: vi.fn(async () => ({ library: true })) }));
-// A click on the world casts the same ray the reticle does, here from the page point.
-const { pointerRay } = vi.hoisted(() => ({
-  pointerRay: vi.fn((_source: unknown, _x: number, _y: number) => ({ origin: [0, 1.68, 4] as const, direction: [0, 0, -1] as const })),
-}));
-vi.mock('@exulanica/atlas-react/playcanvas', async (original) => ({
-  ...(await original<typeof import('@exulanica/atlas-react/playcanvas')>()),
-  pointerRay,
-}));
 
 const WORLD = 'world:authored:saved';
 const KIND = { kind: 'well', version: 1, sha256: 'a'.repeat(64) };
@@ -85,7 +80,7 @@ const thingsSociety = (): SocietySnapshot => parseSociety({
   },
 });
 
-function mount(withSociety = false) {
+function mount(withSociety: boolean, looksClient: { read: (versionId: string) => Promise<ReadonlyMap<string, ThingLookChoice>> }) {
   const missing = () => new ApiError(404, 'unknown_reference', 'no such society');
   const regionEntity = { name: 'authored-region:region:starter' };
   const crowd = {
@@ -97,16 +92,11 @@ function mount(withSociety = false) {
     drawnInhabitantCount: 1, inhabitantSeatAtPlace: vi.fn(() => false), setSeatingLayout: vi.fn(), seatingMisses: [],
     // A person stands 5 m along the ray: picked only when nothing nearer stands in front.
     pickInhabitant: vi.fn((_o: unknown, _d: unknown, limit = Number.POSITIVE_INFINITY) => (limit > 5 ? 'person-0' : null)),
-    // A looks read asks the crowd again for its things' figures.
     refreshFigures: vi.fn(),
   };
-  const controls = {
-    state: { x: 0, y: 1.68, z: 4 }, onInteract: vi.fn() as (() => void) | null, forward: () => ({ x: 0, y: 0, z: -1 }),
-    onPointerPick: null as ((clientX: number, clientY: number) => boolean) | null,
-  };
+  const controls = { state: { x: 0, y: 1.68, z: 4 }, onInteract: vi.fn() as (() => void) | null, forward: () => ({ x: 0, y: 0, z: -1 }) };
   const binding = {
     app: { app: true }, camera: { forward: { x: 0, y: 0, z: -1 } }, controls, invalidate: vi.fn(),
-    interactionRay: () => ({ origin: [0, 1.68, 4] as const, direction: [0, 0, -1] as const }),
     regionRoots: new Map(), ownedDistrict: null, generatedTile: null, authoredSociety: crowd,
     memoryLayerVisible: false, onMemoryLayerChange: null,
   };
@@ -127,8 +117,6 @@ function mount(withSociety = false) {
   const modelsClient = { read: vi.fn(async () => { throw missing(); }), choose: vi.fn() };
   const canvas = document.createElement('canvas');
   const shell = document.createElement('div');
-  // The shell is in the page, as the application's is, so a pick raised on it reaches the document.
-  document.body.replaceChildren(shell);
   const mounted = mountEnvironmentSelection({
     env: { canvas, shell, preview: false, systemReducedMotion: { matches: false } } as unknown as AppEnvironment,
     state: {
@@ -141,101 +129,46 @@ function mount(withSociety = false) {
     showStatus: vi.fn(), admissionId: null,
     worldClient: worldClient as never, societyClient: societyClient as never, societyControlClient: controlClient as never,
     societyModelsClient: modelsClient as never,
-    // No look is chosen for any thing here.
-    thingLooksClient: { read: vi.fn(async () => new Map()) },
+    thingLooksClient: looksClient,
   });
   document.body.append(mounted.root);
-  return { mounted, crowd, controls, canvas, shell, regionEntity, binding };
+  return { mounted, crowd, controls, canvas, shell, regionEntity };
 }
 
-describe('a saved world\'s placed things', () => {
-  it('are handed to the layer in the society\'s region frame, and E picks the nearer of a thing and a person', async () => {
-    const { mounted, crowd, controls, canvas, shell, regionEntity } = mount();
-    await mounted.begin();
-    const layer = layers.at(-1)!;
-    expect(layer.placed.map((one) => [one.thingId, one.regionId, one.transform.zMm])).toEqual([['well-1', 'region:starter', -3000]]);
-    expect(layer.options.regionRoot('region:starter')).toBe(regionEntity);
-    expect(layer.options.regionRoot('region:elsewhere')).toBeNull();
-    expect(canvas.dataset['thingsDrawn']).toBe('1');
-    const heard: ThingPickDetail[] = [];
-    shell.addEventListener(THING_PICK_EVENT, (event) => heard.push((event as CustomEvent<ThingPickDetail>).detail));
-    // The well stands 3 m along the ray, in front of the person at 5 m: the well is picked.
-    controls.onInteract!();
-    expect(crowd.pickInhabitant.mock.calls.at(-1)![2]).toBe(3);
-    expect(heard).toEqual([{ placedId: 'well-1', thingId: null, subjectId: null, via: 'aim' }]);
-    // With the well behind the person, the person is picked and no thing event is raised.
-    layer.distance = 9;
-    controls.onInteract!();
-    expect(heard).toHaveLength(1);
-    expect(crowd.pickInhabitant.mock.results.at(-1)!.value).toBe('person-0');
-    mounted.dispose();
-    expect(canvas.dataset['thingsDrawn']).toBeUndefined();
-  });
+const LOOK = { key: 'stone-well', version: 1, sha256: 'd'.repeat(64) };
+const MANNEQUIN = { key: 'kaykit-mannequin', version: 1, sha256: 'e'.repeat(64) };
+const settle = async () => { for (let i = 0; i < 12; i += 1) await new Promise((resolve) => setTimeout(resolve, 0)); };
 
-  it('draws a society of things\' things through the crowd by their looks, and its objects as the state says', async () => {
-    const { mounted, crowd } = mount(true);
+describe('the looks chosen for a society of things\' things', () => {
+  it('reads them once the society is drawn, dresses the crowd and the layer, and asks the crowd again', async () => {
+    const choices = new Map<string, ThingLookChoice>([
+      ['person-0', { thingId: 'person-0', placedId: 'knight-1', look: MANNEQUIN, chosenBy: 'owner', chosenAt: '2026-10-09T14:00:00.000000Z' }],
+      ['t-well', { thingId: 't-well', placedId: 'well-1', look: LOOK, chosenBy: 'owner', chosenAt: '2026-10-09T14:01:00.000000Z' }],
+    ]);
+    const looksClient = { read: vi.fn(async (_versionId: string) => choices as ReadonlyMap<string, ThingLookChoice>) };
+    const { mounted, crowd, canvas } = mount(true, looksClient);
     await mounted.begin();
-    for (let i = 0; i < 6; i += 1) await new Promise((resolve) => setTimeout(resolve, 0));
+    await settle();
+    expect(looksClient.read.mock.calls.map((call) => call[0])).toEqual(['version']);
     const layer = layers.at(-1)!;
-    expect(crowd.setSociety).toHaveBeenCalled();
-    // The crowd draws the society's things by the figures the things layer makes for them, once.
-    expect(crowd.setFigures).toHaveBeenCalledTimes(1);
-    const figures = crowd.setFigures.mock.calls[0]![0] as { figureFor(person: unknown): unknown };
-    expect(typeof figures.figureFor).toBe('function');
-    // The layer is told what the state says of the things.
-    expect((layer.society as { things: { placed_id: string }[] }).things.map((thing) => thing.placed_id)).toEqual(['well-1']);
+    expect(layer.looks).toEqual([['knight-1', MANNEQUIN], ['well-1', LOOK]]);
+    expect(crowd.refreshFigures).toHaveBeenCalledTimes(1);
+    expect(canvas.dataset['thingLooksChosen']).toBe('2');
+    // The crowd's figures dress the society's person in its chosen look.
+    const figures = crowd.setFigures.mock.calls[0]![0] as { figureFor(person: unknown): { key: string } | null };
+    const knight = thingsSociety().state.inhabitants[0]!;
+    expect(figures.figureFor(knight)!.key).toContain(`|kaykit-mannequin/1/${'e'.repeat(64)}`);
     mounted.dispose();
   });
 
-  it('picks by a click on the world as E does, never while a surface holds the world, and lets go on dispose', async () => {
-    const { mounted, crowd, controls, shell, binding } = mount();
-    pointerRay.mockClear();
+  it('says on the canvas when the read fails, and dresses nothing', async () => {
+    const looksClient = { read: vi.fn(async (_versionId: string): Promise<ReadonlyMap<string, ThingLookChoice>> => { throw new Error('thing looks unavailable: HTTP 503'); }) };
+    const { mounted, crowd, canvas } = mount(true, looksClient);
     await mounted.begin();
-    const layer = layers.at(-1)!;
-    const heard: ThingPickDetail[] = [];
-    shell.addEventListener(THING_PICK_EVENT, (event) => heard.push((event as CustomEvent<ThingPickDetail>).detail));
-    expect(controls.onPointerPick).not.toBeNull();
-    // A click over the well takes the click (no camera look) and raises the pick as a pointer's.
-    expect(controls.onPointerPick!(640, 400)).toBe(true);
-    expect(pointerRay).toHaveBeenLastCalledWith(binding, 640, 400);
-    expect(heard).toEqual([{ placedId: 'well-1', thingId: null, subjectId: null, via: 'pointer' }]);
-    // The person nearer than the well is picked instead, by the same nearest-wins rule.
-    layer.distance = 9;
-    expect(controls.onPointerPick!(640, 400)).toBe(true);
-    expect(crowd.pickInhabitant.mock.results.at(-1)!.value).toBe('person-0');
-    // While a sheet is modal on the world, a click picks nothing and is left to camera look.
-    const sheet = document.createElement('section');
-    sheet.setAttribute('aria-modal', 'true');
-    document.body.append(sheet);
-    expect(controls.onPointerPick!(640, 400)).toBe(false);
-    sheet.remove();
+    await settle();
+    expect(canvas.dataset['thingLooksFailure']).toBe('thing looks unavailable: HTTP 503');
+    expect(crowd.refreshFigures).not.toHaveBeenCalled();
+    expect(layers.at(-1)!.looks).toEqual([]);
     mounted.dispose();
-    expect(controls.onPointerPick).toBeNull();
-  });
-
-  it('opens a picked thing that is nobody in Selected through the card\'s view, and stops listening on dispose', async () => {
-    const { mounted, shell } = mount();
-    await mounted.begin();
-    const root = document.createElement('section');
-    const view = { root, show: vi.fn(() => true), showThing: vi.fn((_thing: SelectedThing) => true), hide: vi.fn() };
-    mounted.useInhabitantView(view);
-    shell.dispatchEvent(new CustomEvent<ThingPickDetail>(THING_PICK_EVENT, {
-      bubbles: true, detail: { placedId: 'well-1', thingId: null, subjectId: null, via: 'aim' },
-    }));
-    expect(view.showThing).toHaveBeenCalledOnce();
-    expect(view.showThing.mock.calls[0]![0]).toMatchObject({ worldId: WORLD, versionId: 'version', placed: { thingId: 'well-1', kind: KIND } });
-    expect(root.hidden).toBe(false);
-    expect(mounted.root.querySelector<HTMLElement>('.living-world-inspector')!.hidden).toBe(true);
-    // A thing the version no longer places, and the ring's own clearing, open nothing.
-    shell.dispatchEvent(new CustomEvent<ThingPickDetail>(THING_PICK_EVENT, {
-      bubbles: true, detail: { placedId: 'gone', thingId: null, subjectId: null, via: 'aim' },
-    }));
-    shell.dispatchEvent(new CustomEvent<ThingPickDetail>(THING_PICK_EVENT, { bubbles: true, detail: null }));
-    expect(view.showThing).toHaveBeenCalledOnce();
-    mounted.dispose();
-    shell.dispatchEvent(new CustomEvent<ThingPickDetail>(THING_PICK_EVENT, {
-      bubbles: true, detail: { placedId: 'well-1', thingId: null, subjectId: null, via: 'aim' },
-    }));
-    expect(view.showThing).toHaveBeenCalledOnce();
   });
 });

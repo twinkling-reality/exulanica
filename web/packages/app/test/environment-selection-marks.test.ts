@@ -115,6 +115,8 @@ function mount() {
     societyCounts: { population: 4, outdoors: 4, indoors: 0, near: 4, far: 0, drawn: 4 },
     drawnInhabitantCount: 4, inhabitantSeatAtPlace: vi.fn(() => false), setSeatingLayout: vi.fn(), seatingMisses: [],
     pickInhabitant: vi.fn(() => null), anchorOf: vi.fn(() => false),
+    // A looks read asks the crowd again for its things' figures.
+    refreshFigures: vi.fn(),
   };
   const stage = document.createElement('div');
   const overlayRoot = document.createElement('div');
@@ -152,6 +154,8 @@ function mount() {
     showStatus: vi.fn(), admissionId: null,
     worldClient: worldClient as never, societyClient: societyClient as never, societyControlClient: controlClient as never,
     societyModelsClient: modelsClient as never,
+    // No look is chosen for any thing here.
+    thingLooksClient: { read: vi.fn(async () => new Map()) },
   });
   document.body.append(mounted.root);
   return { mounted, crowd, canvas, stage };

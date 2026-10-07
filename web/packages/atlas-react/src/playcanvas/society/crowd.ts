@@ -692,6 +692,22 @@ export class SocietyCrowd {
     if (this.state !== null) this.assignDetail();
   }
 
+  /**
+   * Ask the figures again for everyone, as after the looks chosen for them change: a person whose
+   * figure is now another kind's or look's is made again where they stand; nobody else is touched,
+   * and nobody moves.
+   */
+  refreshFigures(): void {
+    const figures = this.figures;
+    if (figures === null) return;
+    const people = new Map((this.state?.inhabitants ?? []).map((person) => [person.id, person]));
+    for (const walker of this.walkers.values()) {
+      const person = people.get(walker.id);
+      walker.figure = person === undefined ? null : figures.figureFor(person);
+    }
+    if (this.state !== null) this.assignDetail();
+  }
+
   /** Keep a selected inhabitant as a full character while it is outdoors. */
   select(id: string): void {
     if (!this.walkers.has(id)) return;
