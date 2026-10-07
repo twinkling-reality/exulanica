@@ -551,12 +551,11 @@ def run_specification(world: World) -> Witness:
 def run_creature_drafting(world: World) -> Witness:
     """The creature drafter, handed a person's words as the creature route will hand them."""
     form = form_of("horse", label="striped hill beast")
-    # The role the drafter is asked under until its own is measured and joins the manifest.
-    client, transport = world.hosted([_json_reply(form, Role.SPECIFICATION_DRAFTER)])
+    client, transport = world.hosted([_json_reply(form, Role.CREATURE_DRAFTER)])
     outcome = draft_creature(
         client,
         f"a striped beast that circles {PLACE}, where {PERSON} feeds it",
-        role=Role.SPECIFICATION_DRAFTER,
+        role=Role.CREATURE_DRAFTER,
     )
     assert outcome.creature is not None, outcome.refusal
     return transport

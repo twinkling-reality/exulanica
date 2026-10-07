@@ -614,8 +614,9 @@ These are material limits of the boundary above, not partial behaviour:
   and no look chosen for a thing: placed things stand in their kind's first look.
 - No crossing writes a translation manifest yet; the look importer writes one for each look it
   makes.
-- No route drafts a creature or keeps its documents, and no model has been measured as its drafter:
-  the drafter runs on scripted replies only, and no role of the model manifest names it.
+- No route drafts a creature or keeps its documents. The drafter is measured and bound to its own
+  manifest role, `creature_drafter` (see [model and service selection](model-and-service-selection.md)),
+  and is reached by tests and the measurement only.
 - No creature flies, swims, climbs or burrows: the grammar states those movements and refuses them
   in words. A floating body therefore cannot move at all yet.
 - No creature has a sculpted look: its sketch is its only look.

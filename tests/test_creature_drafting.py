@@ -39,8 +39,7 @@ from form_shapes import arrays_followed_by_a_property
 from model_fakes import FakeTransport, RecordingPolicy, chat_body
 
 MODEL = "test/model"
-#: The role the drafter is asked under until its own is measured and joins the manifest.
-ROLE = Role.SPECIFICATION_DRAFTER
+ROLE = Role.CREATURE_DRAFTER
 DESCRIPTION = "a creature with six legs, a long neck and a striped tail"
 
 

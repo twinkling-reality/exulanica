@@ -355,6 +355,23 @@
       "required_use_cases": ["text"],
       "rationale": "Drafts a world's specification from a person's description (exulanica/selection/world_drafting.py): a preset and the values the served specification allows, and the parts of the description it cannot say copied word for word; the server's gate judges the draft and nothing is made until the person makes the world. Chosen by the rule pre-registered in docs/evaluation/2026-09-29-world-drafting-models-v2-preregistration.json over the five text models whose licence entry is resolved: a model was eligible at 10 of 12 drafts the gate would make on the first try and 10 of 12 matching the words by rule; Super, Qwen3 235B, Nano and Lightning were eligible (DeepSeek V4 Flash drafted 9 and timed out 3 times), Super was the NVIDIA model with the lowest slowest-of-12 draft time within 15 s, and the next in that order, Qwen3 235B, is the fallback. Model-unavailability errors select the fallback; a refused form is repaired once and then refused, never escalated to a larger model."
     },
+    "creature_drafter": {
+      "primary": "nvidia/nemotron-3-super-120b-a12b",
+      "fallback": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+      "timeout_seconds": 55,
+      "timeout_basis": {
+        "record": "docs/evaluation/2026-10-07-creature-drafter-timings.json",
+        "model": "nvidia/nemotron-3-super-120b-a12b",
+        "rows": 9,
+        "p50_ms": 17229,
+        "p99_ms": 25659,
+        "longest_ms": 25659,
+        "note": "The primary's own calls in the pre-registered measurement of the creature drafter: eight held-out descriptions, one form each and one repair where a check refused the first. No retained public record measures the Qwen3 235B fallback, which serves under this timeout when the primary is withdrawn."
+      },
+      "max_tokens": {"value": 16384, "basis": "The ceiling every candidate was asked with in the measurement the timeout names, one for all so none was truncated by a choice made for another. A ceiling is not a spend; a low one costs a failed draft."},
+      "required_use_cases": ["text"],
+      "rationale": "Drafts a creature from a person's description (exulanica/selection/creature_drafting.py): a flat form of its body, colours, abilities and offers, assembled into a recipe, a body plan, a sketch and a thing kind that every reader a thing passes holds, with one repair naming the check's code, field and sentence and no fallback to another model on a refused form. Chosen by the rule pre-registered for the measurement over three licence-resolved text models with a JSON schema in this manifest: eligible at 6 of 8 valid and 5 of 8 matching the words by rule; the NVIDIA model with the shortest slowest draft within 60 s is the primary, and the next in that order the fallback. Model-unavailability errors select the fallback."
+    },
     "reference_drafting": {
       "primary": "Qwen/Qwen3-235B-A22B-Instruct-2507",
       "fallback": "deepseek-ai/DeepSeek-V4-Flash-0731",

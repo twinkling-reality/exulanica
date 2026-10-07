@@ -2,6 +2,7 @@
 
     uv run python scripts/measure_creature_drafting_models.py preregister --out DIR
     uv run python scripts/measure_creature_drafting_models.py dry-run --out DIR
+    uv run python scripts/measure_creature_drafting_models.py timings --out DIR
     EXULANICA_BUDGET_USD=<bound> uv run python scripts/measure_creature_drafting_models.py run \
         --out DIR --env-file PATH
 
@@ -529,14 +530,14 @@ def dry_run(out: Path) -> None:
     """The whole run over a transport that answers every call with a development creature's form,
     spending nothing, so the record path is exercised before money is."""
     from model_fakes import FakeTransport, RecordingPolicy, chat_body
-    from test_creature_drafting import _form_of
+    from creature_support import form_of
 
     from exulanica.models.budget import BudgetGuard
     from exulanica.models.client import ModelClient
     from exulanica.models.manifest import load_manifest
     from exulanica.models.transport import HttpResponse
 
-    form = _form_of("horse", label="dry run beast")
+    form = form_of("horse", label="dry run beast")
 
     class Answers(FakeTransport):
         def post_json(self, url, *, headers, payload, timeout):  # type: ignore[no-untyped-def]
@@ -620,9 +621,60 @@ def run(out: Path, as_run: bytes, env_file: Path | None) -> None:
     )
 
 
+#: The record the manifest's timeout basis quotes: the primary's own timings and nothing else. The
+#: fallback's timings and the candidates' comparison stay out of the repository until the
+#: provider's terms are confirmed.
+TIMINGS: Final = ROOT / "docs/evaluation/2026-10-07-creature-drafter-timings.json"
+
+
+def timings(out: Path) -> None:
+    """Write the primary's own call timings from a complete run's record."""
+    record = _read_record(out / "record.json")
+    if record["run_sha256"] != _sha256((out / "run.json").read_bytes()):
+        raise SystemExit("record.json names a run.json other than the one in --out")
+    if record["ended_as"] != "complete" or record["decision"] is None:
+        raise SystemExit("only a complete run's decision has timings to write")
+    primary = record["decision"]["primary"]
+    [summary] = [s for s in record["summaries"] if s["model_id"] == primary]
+    calls = summary["calls"]
+    timing = {
+        "kind": "exulanica.creature-drafter-timings/v1",
+        # The shape every timeout basis's record has (tests/test_models_call_bounds.py): the
+        # role's primary and its own measured calls. The primary's alone, nothing else.
+        "measured": {
+            "roles": {
+                "creature_drafter": {
+                    "primary": primary,
+                    "primary_measured": {
+                        key: calls[key] for key in ("rows", "p50_ms", "p99_ms", "longest_ms")
+                    },
+                }
+            }
+        },
+        "run_sha256": record["run_sha256"],
+        "provider": record["provider"],
+        "script_sha256": record["script_sha256"],
+        "tree": record["tree"],
+        "window": record["window"],
+        "note": (
+            "The creature drafter's primary's own calls when its measurement asked the eight "
+            "held-out descriptions of tests/fixtures/creatures/creatures.v1.json: rows are its "
+            "calls, a form and a repair where one was asked. Nothing of any other model is "
+            "published here."
+        ),
+    }
+    document = {
+        "profile": PROFILE,
+        "record": timing,
+        "record_sha256": _sha256(canonical_json(timing)),
+    }
+    TIMINGS.write_text(json.dumps(document, indent=1, sort_keys=True) + "\n", encoding="utf-8")
+    print(f"wrote {TIMINGS.relative_to(ROOT)}", file=sys.stderr)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("step", choices=("preregister", "dry-run", "run"))
+    parser.add_argument("step", choices=("preregister", "dry-run", "run", "timings"))
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--env-file", type=Path, help="run: the .env file the key is read from")
     arguments = parser.parse_args()
@@ -634,6 +686,8 @@ def main() -> None:
         preregister(out)
     elif arguments.step == "dry-run":
         dry_run(out)
+    elif arguments.step == "timings":
+        timings(out)
     else:
         run(out, as_run, arguments.env_file)
 

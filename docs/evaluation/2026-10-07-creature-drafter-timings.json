@@ -1,0 +1,33 @@
+{
+ "profile": "exulanica.digest-bound-record/v1",
+ "record": {
+  "kind": "exulanica.creature-drafter-timings/v1",
+  "measured": {
+   "roles": {
+    "creature_drafter": {
+     "primary": "nvidia/nemotron-3-super-120b-a12b",
+     "primary_measured": {
+      "longest_ms": 25659,
+      "p50_ms": 17229,
+      "p99_ms": 25659,
+      "rows": 9
+     }
+    }
+   }
+  },
+  "note": "The creature drafter's primary's own calls when its measurement asked the eight held-out descriptions of tests/fixtures/creatures/creatures.v1.json: rows are its calls, a form and a repair where one was asked. Nothing of any other model is published here.",
+  "provider": "Nebius Token Factory",
+  "run_sha256": "e02d45d671798d2500c94c930850484be5b88a0c8ceceab06c93ad37fb6bde7e",
+  "script_sha256": "ae3e748fba967b1656db336b78de74820269f56e43114cbb861d48d6ff5ea4a8",
+  "tree": {
+   "diff_head_sha256": "efc78e2e5301b7838100eddbb2e383406259668ad34646c15d00f5bf72eace26",
+   "head": "e1377d1a72cdeadb9f8fd49767194f7a0042852c",
+   "untracked_sha256": {}
+  },
+  "window": {
+   "ended": "2026-10-07T09:07:04-0400",
+   "started": "2026-10-07T09:00:43-0400"
+  }
+ },
+ "record_sha256": "ca97685056ace221272b810fbb53e3f5b73fb0d5e62357c3e2e490f52cd4d993"
+}

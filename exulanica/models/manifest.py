@@ -119,6 +119,7 @@ class Role(StrEnum):
     VISION = "vision"
     STRUCTURED_EXTRACTION = "structured_extraction"
     SPECIFICATION_DRAFTER = "specification_drafter"
+    CREATURE_DRAFTER = "creature_drafter"
     REFERENCE_DRAFTING = "reference_drafting"
     EMBEDDING = "embedding"
 

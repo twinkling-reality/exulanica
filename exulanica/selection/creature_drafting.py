@@ -61,6 +61,7 @@ from exulanica.things.kinds import THING_KIND_CODES
 
 __all__ = [
     "CHECK_SENTENCES",
+    "DRAFTER_ROLE",
     "DRAFT_ATTEMPTS",
     "PROMPT_PATH",
     "CreatureDraftOutcome",
@@ -76,6 +77,9 @@ __all__ = [
 ]
 
 PROMPT_PATH: Final = Path(__file__).with_name("creature-drafting.v1.json")
+#: The manifest role a creature is drafted under, bound to the models the drafter's pre-registered
+#: measurement chose (docs/evaluation/2026-10-07-creature-drafter-timings.json).
+DRAFTER_ROLE: Final = Role.CREATURE_DRAFTER
 _PROMPT_PROFILE: Final = "exulanica.creature-drafting-prompt/v1"
 #: One form and one repair, as the kind drafter: a creature the checks refuse twice is refused by
 #: name, never escalated to a larger model.
