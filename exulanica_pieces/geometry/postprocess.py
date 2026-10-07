@@ -12,6 +12,8 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Final
 
+import numpy as np
+
 from exulanica_pieces.canonical import sha256_hex
 from exulanica_pieces.geometry.glb import write_glb
 from exulanica_pieces.geometry.hold import measure_hold
@@ -23,11 +25,13 @@ from exulanica_pieces.geometry.mesh import (
     orient,
     simplify_to,
 )
-from exulanica_pieces.records import verdict
+from exulanica_pieces.records import box_fill_permille, measures_box_fill, verdict
 
 __all__ = ["POSTPROCESS_VERSION", "Piece", "make_piece"]
 
-POSTPROCESS_VERSION: Final = "exulanica.generated-asset-postprocess/v1"
+#: v2 adds the yaw choice of a contained piece; an output is cached under its version, so a piece
+#: made by v1 is never served as v2.
+POSTPROCESS_VERSION: Final = "exulanica.generated-asset-postprocess/v2"
 
 
 @dataclass(frozen=True)
@@ -61,6 +65,9 @@ def make_piece(
     if request["fit"] == "tile":
         # One module of the run: its own length along the width, the slot's height and depth.
         slot["width"] = request["tile_module_mm"]
+    if request["fit"] == "contain":
+        mesh, yaw = _better_yaw(mesh, slot)
+        steps[0]["yaw_degrees"] = yaw
     mesh, step = fit(mesh, request["fit"], slot)
     steps.append(step)
     fitted = mesh
@@ -81,7 +88,29 @@ def make_piece(
     hold = request.get("hold")
     if hold is not None:
         measured["hold"] = measure_hold(fitted, slot, size, hold)
+    if measures_box_fill(request):
+        measured["box_fill_permille"] = box_fill_permille(size, slot)
     return Piece(glb, steps, measured, verdict(measured, request["budget"], hold))
+
+
+def _better_yaw(mesh: Mesh, slot: Mapping[str, int]) -> tuple[Mesh, int]:
+    """The mesh as it stands or turned 90 degrees about glTF +Y, whichever the contain fit leaves
+    filling more of the slot's longest side; a tie keeps it as it stands.
+
+    A model may draw a thing's long side across the picture or into it, and the contain fit of a
+    thin box then shrinks it by its depth (measured on Nebius, 2026-10-07: market stalls 600 to
+    905 per mille turned, benches drawn end-on 96 to 660). Turning is a proper rotation, so the
+    winding and the normals stay right."""
+    turned = Mesh(
+        np.stack([mesh.positions[:, 2], mesh.positions[:, 1], -mesh.positions[:, 0]], axis=1),
+        mesh.triangles,
+        mesh.colours,
+    )
+    fills = []
+    for candidate in (mesh, turned):
+        _, step = fit(candidate, "contain", slot)
+        fills.append(box_fill_permille(step["size_mm"], slot))
+    return (turned, 90) if fills[1] > fills[0] else (mesh, 0)
 
 
 def _written_vertices(glb: bytes) -> int:

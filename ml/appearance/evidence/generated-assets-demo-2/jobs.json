@@ -1,0 +1,16 @@
+{
+ "jobs": [
+  {
+   "attempt": 2,
+   "code_sha256": "72c0cf6dbd6ffe1e117b507ca3a6f2b0180ffcb3b68cc3d53be65f15062145fc",
+   "container_finished_at": "2026-10-07T01:57:35.576Z",
+   "container_started_at": "2026-10-07T01:43:36.844Z",
+   "job_id": "aijob-e05kjbbr0hmw3yq266",
+   "job_sha256": "183069141135a1343fca3a8106960a69fb7ad23982c1bb717f4c911d06684953",
+   "outcome": "ran: the demo's 32 items again with the prompt's proportion words (template v2, since withdrawn), a box fill check and the well described; 32 pieces with receipts, 8 within every check (wells 4, lanterns 3, a market stall); the fill check refused the undersized gates, benches, cafe tables, lamp posts and 3 stalls; the proportion words turned the benches end-on",
+   "route": "A"
+  }
+ ],
+ "profile": "exulanica.generated-assets-trial-jobs/v1",
+ "source": "the job's final status (nebius ai job get) and its staged digests, saved by the lane's watcher and stage commands"
+}

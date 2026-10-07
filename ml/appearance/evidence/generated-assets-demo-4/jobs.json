@@ -1,0 +1,16 @@
+{
+ "jobs": [
+  {
+   "attempt": 4,
+   "code_sha256": "94b77f2cb27739f745b314dc77fcdbf76fb0c071816e5f8532fe14548dc854c2",
+   "container_finished_at": "2026-10-07T02:36:27.512Z",
+   "container_started_at": "2026-10-07T02:26:40.782Z",
+   "job_id": "aijob-e05n8eb783svys0qan",
+   "job_sha256": "3a341a98f3d086dfff58f6f4ae30b99ef3b9a3fccc8a0425fa559e16e328a619",
+   "outcome": "ran: lamp posts and cafe tables at 4 variants with lane THINGS's descriptions; 7 pieces with receipts, none within every check (cafe tables 1,374 and 1,332 mm wide at box fill 798 and 774, one at 409; lamp posts with one arm, 1.75 to 1.87 m tall, box fill 292 to 310); one cafe table refused, the simplifier left 1,986 triangles over 1,500",
+   "route": "A"
+  }
+ ],
+ "profile": "exulanica.generated-assets-trial-jobs/v1",
+ "source": "the job's final status (nebius ai job get) and its staged digests, saved by the lane's watcher and stage commands"
+}

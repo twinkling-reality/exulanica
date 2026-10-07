@@ -297,3 +297,50 @@ def test_a_grip_point_beside_the_handle_is_refused() -> None:
     piece = _held_piece(_sword(), slot=SWORD_SLOT, grip={"x_mm": 50, "y_mm": 0, "z_mm": 150})
     assert piece.measured["hold"]["grip_in_section"] is False
     assert piece.verdict == {"over": ["grip_section"], "within": False}
+
+
+def test_a_piece_made_to_a_kind_records_how_much_of_its_box_it_fills() -> None:
+    table, _ = colour.read_table(ROOT)
+    budgets = read_budgets(ROOT)
+    kind = {"key": "gate", "sha256": "24" * 32, "version": 1}
+    slot = {"width": 3000, "height": 3000, "depth": 400}
+    request = read_request(
+        build_request(
+            pack=PACK, variants=1, route="S", budgets=budgets, look_role="fixture.gate",
+            slot_mm=slot, thing_kind=kind,
+        ),
+        budgets,
+    )  # fmt: skip
+    # A cube in the model's frame: contain fits it to the 400 mm depth, 400 of 3,000 wide.
+    piece = make_piece(
+        _box((1.0, 1.0, 1.0)), up="+Z", front="-Y", request=request,
+        simplifier=cluster_simplify, table=table,
+    )  # fmt: skip
+    assert piece.measured["box_fill_permille"] == 400 * 1000 // 3000
+    assert piece.verdict == {"over": ["box_fill"], "within": False}
+
+
+def test_a_contained_piece_drawn_deep_is_turned_to_fill_its_box() -> None:
+    table, _ = colour.read_table(ROOT)
+    budgets = read_budgets(ROOT)
+    stall = {"width": 2400, "height": 2480, "depth": 1200}
+    request = read_request(
+        build_request(
+            pack=PACK, variants=1, route="S", budgets=budgets, look_role="fixture.market_stall",
+            slot_mm=stall,
+        ),
+        budgets,
+    )  # fmt: skip
+    # In the model's frame (+Z up, front -Y): 1 wide, 2 deep, 2 tall. As drawn, contain fits it to
+    # the 1,200 mm depth (600 wide, 1,200 tall); turned, its 2 units lie across the 2,400 width.
+    deep = make_piece(
+        _box((1.0, 2.0, 2.0)), up="+Z", front="-Y", request=request,
+        simplifier=cluster_simplify, table=table,
+    )  # fmt: skip
+    assert deep.steps[0]["yaw_degrees"] == 90
+    assert deep.measured["size_mm"] == {"width": 2400, "height": 2400, "depth": 1200}
+    cube = make_piece(
+        _box((1.0, 1.0, 1.0)), up="+Z", front="-Y", request=request,
+        simplifier=cluster_simplify, table=table,
+    )  # fmt: skip
+    assert cube.steps[0]["yaw_degrees"] == 0  # a tie keeps the piece as drawn

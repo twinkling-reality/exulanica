@@ -418,6 +418,9 @@ def test_a_job_names_its_prompt_template_and_a_v1_job_still_reads() -> None:
     )
     assert job["profile"] == "exulanica.generated-asset-job/v2"
     assert job["prompt_version"] == "exulanica.generated-asset-prompt/v1"
+    # The withdrawn v2 template still reads: the job that measured it names it.
+    withdrawn = dict(job, prompt_version="exulanica.generated-asset-prompt/v2")
+    assert read_job(canonical_bytes(withdrawn))["prompt_version"].endswith("/v2")
     with pytest.raises(Refused, match="prompt template"):
         read_job(canonical_bytes(dict(job, prompt_version="exulanica.generated-asset-prompt/v0")))
     v1 = {key: value for key, value in job.items() if key != "prompt_version"}
@@ -465,3 +468,17 @@ def test_a_request_may_name_the_thing_kind_it_is_made_for() -> None:
             build_request(
                 pack=PACK, variants=1, route="S", budgets=BUDGETS, thing_kind=bad, **BENCH
             )
+
+
+def test_a_piece_made_to_a_kind_is_held_to_its_box_s_fill() -> None:
+    kind = {"key": "gate", "sha256": "24" * 32, "version": 1}
+    gate = {"look_role": "fixture.gate", "slot_mm": {"width": 3000, "height": 3000, "depth": 400}}
+    request = read_request(
+        build_request(pack=PACK, variants=1, route="S", budgets=BUDGETS, thing_kind=kind, **gate),
+        BUDGETS,
+    )
+    base = {key: 0 for key in ("glb_bytes", "materials", "texture_side_px", "triangles")}
+    base["vertices"] = 0
+    # 800 per mille of the box's longest side passes; 799 does not (a third-size gate did).
+    assert verdict({**base, "box_fill_permille": 800}, request["budget"])["within"]
+    assert verdict({**base, "box_fill_permille": 799}, request["budget"])["over"] == ["box_fill"]

@@ -395,10 +395,18 @@ every piece by receipt. On the same 16 trial items, route A made 13 pieces (11 w
 at 8 to 10 seconds a piece; on route A's 13 cut-outs, route B made 7 (5 within every check) at about
 40 seconds a mesh and was refused 6 times for a zero-area triangle. A demo job of eight thing kinds
 at four variants in the cozy look made 32 pieces on route A, 27 within every check; several of them
-fill only part of their kind's box, because the model draws them deeper than the box allows, and a
-fill check and prompt wording from the box's proportions are still to come. The requests, jobs,
-results and receipts are in `ml/appearance/evidence/generated-assets-trial-1/` and
-`generated-assets-demo-1/`, and each rented job's record in `ml/appearance/evidence/gpu-run-aijob-*.json`. The budgets are the style
+fill only part of their kind's box, because the model draws them deeper than the box allows. A piece
+made to a thing kind is now refused (`box_fill`) below 800 per mille of its box's longest side: rerun
+with that check, the same 32 items gave 8 within it, and a described well filled its box where the bare
+word had drawn a pillar. Words from the box's proportions in the prompt helped no kind and turned the
+benches end-on, so the prompt keeps its first wording. The contain fit now also tries the piece turned
+90 degrees about its up axis and keeps whichever fills the box more (post-process v2, the choice
+recorded in the receipt): rerun, 10 of the 32 were within every check, three market stalls among them,
+and benches drawn end-on came back to their length. Described as the thing kinds state them, cafe
+tables with their chairs reached 1,332 to 1,374 mm of a 1,720 mm box and lamp posts gained their single
+arm, still short of their 6 m box. The requests, jobs, results and receipts are in
+`ml/appearance/evidence/generated-assets-trial-1/` and `generated-assets-demo-1/` to
+`generated-assets-demo-4/`, and each rented job's record in `ml/appearance/evidence/gpu-run-aijob-*.json`. The budgets are the style
 pack format's, read from [`assets/style-packs/piece-budgets.v1.json`](../assets/style-packs/piece-budgets.v1.json)
 by `exulanica_pieces.budgets`, the same file the [style pack contract](style-pack-contract.md) holds
 pieces to.
@@ -494,8 +502,8 @@ command in that command's environment only, never on a command line. Route A's c
 B's is a prototype projection of the cut-out seen from the front, approximate by construction.
 
 **Planned, not built:** the operator's choice of route from the blind side-by-side pictures, route
-B's zero-area refusals, a fill check for every piece made to a kind, a shopfront request shaped for a
-shallow fill slot, the admission's `generated` rights
+B's zero-area refusals, pieces that fill a thin box (gates, benches, lamp posts, stalls), a shopfront
+request shaped for a shallow fill slot, the admission's `generated` rights
 basis, the generation queue under the spending authority, and the Companion's offer of new pieces
 for a pack.
 

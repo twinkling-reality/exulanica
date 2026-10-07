@@ -1,0 +1,16 @@
+{
+ "jobs": [
+  {
+   "attempt": 3,
+   "code_sha256": "94b77f2cb27739f745b314dc77fcdbf76fb0c071816e5f8532fe14548dc854c2",
+   "container_finished_at": "2026-10-07T02:20:24.739Z",
+   "container_started_at": "2026-10-07T02:06:50.925Z",
+   "job_id": "aijob-e05qbz8x2c7h4hb64e",
+   "job_sha256": "19419fae567a29f8b4b94bbb19567f6dbce172b6840d09c70aaedde40332e086",
+   "outcome": "ran: the demo's 32 items with the yaw choice in the fit (prompt v1, the well described); 32 pieces, 10 within every check (wells 4, lanterns 3, market stalls 3 after turning); benches turned back to about 1.0 to 1.2 m and gates grew to 0.9 to 2.1 m, both still under the box fill bar; lamp posts and cafe tables unchanged (not yet described)",
+   "route": "A"
+  }
+ ],
+ "profile": "exulanica.generated-assets-trial-jobs/v1",
+ "source": "the job's final status (nebius ai job get) and its staged digests, saved by the lane's watcher and stage commands"
+}

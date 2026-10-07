@@ -57,16 +57,19 @@ from exulanica_pieces.vocabulary import (
 )
 
 __all__ = [
+    "BOX_FILL_MINIMUM_PER_MILLE",
     "HOLD_AXES",
     "HOLD_FILL_MINIMUM_PER_MILLE",
     "JOB_PROFILE",
     "JOB_PROFILE_V1",
     "PROMPT_VERSION",
+    "PROMPT_VERSIONS",
     "RECEIPT_PROFILE",
     "REGENERATION",
     "REQUEST_PROFILE",
     "REQUEST_PROFILE_V1",
     "ROUTES",
+    "box_fill_permille",
     "build_job",
     "build_receipt",
     "build_request",
@@ -83,13 +86,20 @@ REQUEST_PROFILE: Final = "exulanica.generated-asset-request/v2"
 REQUEST_PROFILE_V1: Final = "exulanica.generated-asset-request/v1"
 JOB_PROFILE: Final = "exulanica.generated-asset-job/v2"
 JOB_PROFILE_V1: Final = "exulanica.generated-asset-job/v1"
-#: The concept prompt's template, :func:`prompt_for`. A change to its words is a new version.
+#: The concept prompt's template, :func:`prompt_for`. A change to its words is a new version. A v2
+#: template added words from the slot's proportions; measured on Nebius (2026-10-07) it helped no
+#: kind and turned the benches end-on, so it was withdrawn, and only the job that measured it names
+#: it.
 PROMPT_VERSION: Final = "exulanica.generated-asset-prompt/v1"
+PROMPT_VERSIONS: Final = frozenset({PROMPT_VERSION, "exulanica.generated-asset-prompt/v2"})
 #: The direction a held thing extends from the hand, in the thing kind's slot frame.
 HOLD_AXES: Final = ("+x", "-x", "+y", "-y", "+z", "-z")
 #: A held piece fills at least this share of its box's longest side, so a grip point measured
 #: along that side lands on the piece and not in the gap a smaller fit leaves.
 HOLD_FILL_MINIMUM_PER_MILLE: Final = 800
+#: A piece made to a thing kind fills at least this share of the kind's box along its longest side,
+#: so a gate is not drawn a third of its gateway's size.
+BOX_FILL_MINIMUM_PER_MILLE: Final = 800
 RECEIPT_PROFILE: Final = "exulanica.generated-asset/v1"
 REGENERATION: Final = (
     "GPU generation is not bit-exact across hardware, drivers or library versions; the stored "
@@ -426,8 +436,8 @@ def prompt_for(request: Mapping[str, Any]) -> str:
     return (
         f"{subject}, a single {request['look_role'].split('.')[0]} for a game world, "
         f"{request['pack']['style']}, about {slot['width']} mm wide, {slot['height']} mm tall and "
-        f"{slot['depth']} mm deep, {pose}whole object in frame, three-quarter front view, plain "
-        "light grey background, no text, no lettering, no logo"
+        f"{slot['depth']} mm deep, {pose}whole object in frame, three-quarter front view, "
+        "plain light grey background, no text, no lettering, no logo"
     )
 
 
@@ -506,11 +516,11 @@ def read_job(raw: bytes) -> dict[str, Any]:
     v1 = isinstance(document, dict) and document.get("profile") == JOB_PROFILE_V1
     document = exact_keys(document, _JOB_KEYS_V1 if v1 else _JOB_KEYS, "job")
     if not v1 and (
-        document["profile"] != JOB_PROFILE or document["prompt_version"] != PROMPT_VERSION
+        document["profile"] != JOB_PROFILE or document["prompt_version"] not in PROMPT_VERSIONS
     ):
         raise Refused(
             f"a job's profile is {JOB_PROFILE} or {JOB_PROFILE_V1}, and a {JOB_PROFILE} job's "
-            f"prompt template is {PROMPT_VERSION}"
+            f"prompt template is one of {sorted(PROMPT_VERSIONS)}"
         )
     if document["route"] not in ROUTES:
         raise Refused(f"a job's route is one of {sorted(ROUTES)}")
@@ -597,6 +607,19 @@ _SECONDS_KEYS: Final = ("concept", "cutout", "mesh", "postprocess")
 _STEPS: Final = ("orient", "simplify", "fit", "palette", "write")
 
 
+def box_fill_permille(size_mm: Mapping[str, int], slot_mm: Mapping[str, int]) -> int:
+    """The fitted size along the slot's longest side, per mille of that side."""
+    longest = max(("width", "height", "depth"), key=lambda key: (slot_mm[key], key))
+    return size_mm[longest] * 1000 // slot_mm[longest]
+
+
+def measures_box_fill(request: Mapping[str, Any]) -> bool:
+    """A piece made to a thing kind and not held is held to its box's fill.
+
+    A held piece already is, by its hold fill."""
+    return "thing_kind" in request and "hold" not in request
+
+
 def verdict(
     measured: Mapping[str, Any],
     budget: Mapping[str, Any],
@@ -613,6 +636,10 @@ def verdict(
         for key in ("glb_bytes", "materials", "texture_side_px", "triangles", "vertices")
         if measured[key] > budget[key]
     ]
+    if "box_fill_permille" in measured and (
+        measured["box_fill_permille"] < BOX_FILL_MINIMUM_PER_MILLE
+    ):
+        over.append("box_fill")
     if hold is not None:
         held = measured["hold"]
         if held["fill_permille"] < HOLD_FILL_MINIMUM_PER_MILLE:
@@ -672,9 +699,17 @@ def read_receipt(raw: bytes, request: Mapping[str, Any]) -> dict[str, Any]:
     hold = request.get("hold")
     measured = exact_keys(
         document["measured"],
-        _MEASURED_KEYS + (("hold",) if hold is not None else ()),
+        _MEASURED_KEYS
+        + (("hold",) if hold is not None else ())
+        + (("box_fill_permille",) if measures_box_fill(request) else ()),
         "receipt.measured",
     )
+    if measures_box_fill(request) and (
+        measured["box_fill_permille"] != box_fill_permille(measured["size_mm"], request["slot_mm"])
+    ):
+        raise Refused(
+            "receipt.measured.box_fill_permille is the size along the slot's longest side"
+        )
     _mm_box(measured["size_mm"], "receipt.measured.size_mm")
     if measured["glb_bytes"] != output["bytes"]:
         raise Refused("the measured size is the output's size")
