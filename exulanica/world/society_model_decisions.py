@@ -43,6 +43,7 @@ from exulanica.world.deciders import receipt_from_outside
 from exulanica.world.role_decisions import DecisionDisposition
 from exulanica.world.society import SOCIETY_NAMESPACE, SocietyEvent, society_state_sha256
 from exulanica.world.society_decision_contract import (
+    THINGS_KINDS,
     DecisionOption,
     TalkPromise,
     option_goal_policy,
@@ -127,6 +128,13 @@ def model_goal_policies(
         else:
             option = DecisionOption.from_record(receipt["proposal"]["option"])
             own[subject] = option
+            if option.kind in THINGS_KINDS:
+                # Going on, saying something or leaving changes no goal: the planner goes on as
+                # it would, and the things phase says the line or lets the visitor go.
+                disposition = "applied"
+                applied.add(subject)
+                settled[index] = (disposition, reason)
+                continue
             if option.kind == "talk":
                 # Checked once every other choice of the minute is known.
                 talks.append((index, subject, option))

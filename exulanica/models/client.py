@@ -948,7 +948,8 @@ class ModelClient:
             raise
         if result.payload is None:  # pragma: no cover - both mechanisms return a checked payload
             raise ChoiceRefused(f"{model_id} returned no answer to the choice")
-        return ChoiceResult(label=request.answer(result.payload), mechanism=mechanism, call=result)
+        label, line = request.answer_with_line(result.payload)
+        return ChoiceResult(label=label, mechanism=mechanism, call=result, line=line)
 
     # -- vision ------------------------------------------------------------------------------
 

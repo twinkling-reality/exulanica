@@ -81,6 +81,8 @@ class ChoiceResult:
     label: str
     mechanism: AnsweringMechanism
     call: ChatResult
+    #: The line the chosen option says, for a choice that takes one and an answer that states it.
+    line: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

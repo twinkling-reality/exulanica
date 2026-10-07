@@ -43,7 +43,11 @@ from exulanica.api.decision_host import DecisionHost, world_hour
 from exulanica.canonical import canonical_json
 from exulanica.world.crossings import register_crossing_stream
 from exulanica.world.society_controls import LEASE_SECONDS
-from exulanica.world.society_decision_contract import decision_contract, person_role
+from exulanica.world.society_decision_contract import (
+    LINE_KINDS,
+    decision_contract,
+    person_role,
+)
 from exulanica.world.society_model_choice_repository import (
     ModelChoiceRefused,
     SocietyModelChoiceRepository,
@@ -73,7 +77,8 @@ MAPPING = "b" * 64
 
 class _Door:
     """An outside program's door: it states the grant as it stands, and answers each request with
-    the first place its person could go, or refuses every ask before asking."""
+    the first place its person could go, else the first offered option that says nothing, or
+    refuses every ask before asking."""
 
     def __init__(self, refusal: str | None = None) -> None:
         self.refusal = refusal
@@ -95,7 +100,9 @@ class _Door:
     def answer(self, workspace_id, world_id, request, ends_at):
         self.asked.append(copy.deepcopy(request))
         options = request["context"]["options"]
-        option = next((o for o in options if o["kind"] == "target"), options[0])
+        # The options come in a drawn order, and a say option needs a line this door never writes.
+        quiet = [o for o in options if o["kind"] not in LINE_KINDS]
+        option = next((o for o in quiet if o["kind"] == "target"), quiet[0])
         frame = canonical_json({"request_id": request["request_id"], "label": option["label"]})
         config = request["provider_config"]
         return {

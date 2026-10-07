@@ -30,7 +30,15 @@ import pytest
 from exulanica.world import society_things
 from exulanica.world.crossings import CrossingRefused, check_crossing
 from exulanica.world.deciders import arrival_deciders
+from exulanica.world.role_decisions import DecisionDisposition
+from exulanica.world.roles import person as person_adapter
 from exulanica.world.society import society_state_sha256
+from exulanica.world.society_decision_contract import (
+    choice_options,
+    hearers,
+    observed_context,
+    person_role,
+)
 from exulanica.world.society_planner import (
     advance_purposeful_society,
     initial_purposeful_society,
@@ -462,3 +470,205 @@ def test_only_the_deciders_a_kind_allows_may_decide_for_its_beings():
     # A society whose people state no kind leaves the choice to its own rules.
     purposeful = initial_purposeful_society(SOCIETY, SEED, compose(()), population=POPULATION)
     assert kind_allows(purposeful, purposeful["inhabitants"][0]["id"], "external")
+
+
+# -- lines, going on and leaving (3a3) -----------------------------------------------------------
+
+
+def _things_contract():
+    role = person_role()
+    return role.contract(role.terms(THINGS_PROFILE).versions)
+
+
+def _beside(state, mover, anchor, dx_mm=2_000):
+    """``state`` with ``mover`` standing ``dx_mm`` east of ``anchor``."""
+    moved = copy.deepcopy(state)
+    target = next(p for p in moved["inhabitants"] if p["id"] == mover["id"])
+    target["position_mm"] = [anchor["position_mm"][0] + dx_mm, anchor["position_mm"][1]]
+    return moved
+
+
+def _under_way(state, person_id):
+    """``state`` with something under way for ``person_id``: a goal and an active action."""
+    busy = copy.deepcopy(state)
+    person = next(p for p in busy["inhabitants"] if p["id"] == person_id)
+    person["goal"] = person["goal"] or {"kind": "stand"}
+    person["action"] = {**person["action"], "status": "active"}
+    return busy
+
+
+def _receipt(person, option, *, line=None, status="accepted", reason="validated_choice"):
+    proposal = None
+    if status == "accepted":
+        proposal = {"label": option.label, "option": option.as_record()}
+        if line is not None:
+            proposal["line"] = line
+    receipt = {
+        "subject_id": person["id"],
+        "request_id": str(uuid.uuid4()),
+        "status": status,
+        "reason": reason,
+        "proposal": proposal,
+        "provider": None if status != "accepted" else {"provider": "test", "model_id": "m"},
+    }
+    disposition = DecisionDisposition(
+        decision_seq=1,
+        request_id=receipt["request_id"],
+        subject_id=person["id"],
+        disposition="applied" if status == "accepted" else status,
+        reason=reason,
+        decision_sha256="0" * 64,
+    )
+    return receipt, disposition
+
+
+def _decided_minute(state, document, decisions):
+    planned, events = advance_purposeful_society(state, SEED, [document])
+    return advance_things(state, planned, SEED, document, events, (), decisions=decisions)
+
+
+def near_of(state, speaker, contract):
+    return hearers(state, speaker, contract.value("hearing_reach_mm"))
+
+
+def test_a_being_that_can_say_something_is_offered_to_say_it_to_whoever_hears_it():
+    document = compose((GATE, KNIGHT))
+    state = _genesis(GATE, KNIGHT)
+    knight = _person(state, came_by="placed")
+    villager = _person(state, came_by="populated")
+    state = _beside(state, villager, knight)
+    contract = _things_contract()
+    options = choice_options(state, document, knight["id"], contract, seed=SEED)
+    said = sorted(
+        (o for o in options if o.kind == "say_to"),
+        key=lambda o: [p["id"] for _d, p in near_of(state, knight, contract)].index(o.addressee_id),
+    )
+    near = near_of(state, knight, contract)
+    assert villager["id"] in {p["id"] for _d, p in near}
+    # The nearest who hear, at most the policy's ways of saying something less one, nearest first.
+    assert [o.addressee_id for o in said] == [
+        p["id"] for _d, p in near[: contract.value("say_options_maximum") - 1]
+    ]
+    for option, (distance, other) in zip(said, near, strict=False):
+        assert option.label == (
+            f"say something to the villager (person {other['ordinal'] + 1}), "
+            f"{round(distance / 1000)} m away"
+        )
+    assert "say_all" in {o.kind for o in options}
+    assert "leave" not in {o.kind for o in options}
+    # Under the role's own contract, as every other engine's people are asked, nothing is said.
+    plain = choice_options(state, document, knight["id"], person_role().contract(), seed=SEED)
+    assert not {o.kind for o in plain} & {"say_to", "say_all", "carry_on", "leave"}
+    # A villager's kind cannot say anything, so it is offered no line.
+    theirs = choice_options(state, document, villager["id"], contract, seed=SEED)
+    assert not {o.kind for o in theirs} & {"say_to", "say_all"}
+
+
+def test_a_being_with_something_under_way_may_go_on_say_something_or_leave():
+    document = compose((GATE, KNIGHT))
+    state = _genesis(GATE, KNIGHT)
+    state, _, _ = _minute(state, document, [arrival(1)])
+    knight = _person(state, came_by="placed")
+    visitor = _person(state, came_by="crossed")
+    state = _beside(state, visitor, knight)
+    contract = _things_contract()
+    busy = _under_way(state, knight["id"])
+    kinds = {o.kind for o in choice_options(busy, document, knight["id"], contract, seed=SEED)}
+    assert "carry_on" in kinds and "say_to" in kinds and "wait" not in kinds
+    assert not kinds & {"target", "stand", "talk"}
+    away = _under_way(state, visitor["id"])
+    kinds = {o.kind for o in choice_options(away, document, visitor["id"], contract, seed=SEED)}
+    assert {"carry_on", "leave"} <= kinds
+    # A program deciding from outside is asked every minute; a model, only at a choice point.
+    assert person_adapter.due_from_outside(away, visitor["id"])
+    assert not person_adapter.due(away, visitor["id"])
+    # Somebody with nothing to say and no way to leave is not asked while something is under way.
+    villager = _person(state, came_by="populated")
+    idle = _under_way(state, villager["id"])
+    assert choice_options(idle, document, villager["id"], contract, seed=SEED) == ()
+
+
+def test_a_line_is_heard_within_reach_and_makes_the_one_it_was_said_to_due():
+    document = compose((GATE, KNIGHT))
+    state = _genesis(GATE, KNIGHT)
+    knight = _person(state, came_by="placed")
+    villagers = [p for p in state["inhabitants"] if p["came_by"] == "populated"]
+    near, far = villagers[0], villagers[1]
+    state = _beside(state, near, knight)
+    state = _beside(state, far, knight, dx_mm=20_000)
+    contract = _things_contract()
+    options = choice_options(state, document, knight["id"], contract, seed=SEED)
+    (to_near,) = [o for o in options if o.kind == "say_to" and o.addressee_id == near["id"]]
+    after, events, _ = _decided_minute(
+        state, document, [_receipt(knight, to_near, line="good morning")]
+    )
+    [said] = [e for e in events if e.kind == "said"]
+    assert said.document["thing"]["line"] == "good morning"
+    assert said.document["thing"]["to"] == near["id"]
+    assert near["id"] in said.document["thing"]["heard_by"]
+    assert far["id"] not in said.document["thing"]["heard_by"]
+    assert said.document["thing"]["decider"] == "model"
+    heard = _person(after, id=near["id"])["heard"]
+    assert heard[-1] == {
+        "tick": after["tick"],
+        "from": knight["id"],
+        "from_kind": knight["kind"],
+        "from_number": knight["ordinal"] + 1,
+        "to": near["id"],
+        "line": "good morning",
+    }
+    assert "heard" not in _person(after, id=far["id"])
+    validate_things_state(after)
+    # The one it was said to is asked the next minute, whatever is under way for them.
+    busy = _under_way(after, near["id"])
+    assert person_adapter.due(busy, near["id"])
+    # Every line kept is among the last the contract keeps, the oldest dropped first.
+    current = state
+    kept = _things_contract().value("lines_heard_maximum")
+    for index in range(kept + 1):
+        receipt = _receipt(knight, to_near, line=f"line {index}")
+        current = _decided_minute(current, document, [receipt])[0]
+        # Beside the knight where it now stands, so the next line carries to them too.
+        knight = _person(current, id=knight["id"])
+        current = _beside(current, near, knight)
+    lines = [entry["line"] for entry in _person(current, id=near["id"])["heard"]]
+    assert lines == [f"line {index}" for index in range(1, kept + 1)]
+    # The positive control: somebody busy that nobody spoke to is not.
+    other = next(p for p in villagers if p["id"] not in (near["id"], far["id"]))
+    assert not person_adapter.due(_under_way(after, other["id"]), other["id"])
+    # What they heard is in their next request's context, quoted, and named by kind and number.
+    seen = observed_context(busy, document, near["id"], (), profile="p")["heard"]
+    assert seen[-1]["from"] == f"the knight (person {knight['ordinal'] + 1})"
+    assert seen[-1]["to_you"] is True
+
+
+def test_a_visitor_leaves_when_it_chooses_and_when_its_program_stays_quiet():
+    document = compose((GATE, KNIGHT))
+    state = _genesis(GATE, KNIGHT)
+    state, _, _ = _minute(state, document, [arrival(1)])
+    visitor = _person(state, came_by="crossed")
+    contract = _things_contract()
+    leave = next(
+        o
+        for o in choice_options(state, document, visitor["id"], contract, seed=SEED)
+        if o.kind == "leave"
+    )
+    after, events, _ = _decided_minute(state, document, [_receipt(visitor, leave)])
+    [left] = [e for e in events if e.kind == "thing_departed"]
+    assert left.document["reason"] == "chose_to_leave"
+    assert not [p for p in after["inhabitants"] if p["came_by"] == "crossed"]
+    # Quiet minutes: a program that does not answer, five minutes in a row, sends it home; a pass
+    # is an answer and starts the count again.
+    quiet = _receipt(visitor, None, status="unavailable", reason="no_answer_in_time")
+    passed = _receipt(visitor, None, status="unavailable", reason="decider_passed")
+    current = state
+    for minute in range(4):
+        current, events, _ = _decided_minute(current, document, [quiet])
+        assert _person(current, came_by="crossed")["quiet_minutes"] == minute + 1
+    current, events, _ = _decided_minute(current, document, [passed])
+    assert "quiet_minutes" not in _person(current, came_by="crossed")
+    for _ in range(4):
+        current, events, _ = _decided_minute(current, document, [quiet])
+    current, events, _ = _decided_minute(current, document, [quiet])
+    assert [e.document["reason"] for e in events if e.kind == "thing_departed"] == ["decider_lost"]
+    assert not [p for p in current["inhabitants"] if p["came_by"] == "crossed"]

@@ -26,7 +26,9 @@ from exulanica.world.decision_roles import (
 from exulanica.world.role_decisions import written_messages
 from exulanica.world.society_decision_contract import (
     ACTION_FIELDS,
+    LINE_KINDS,
     PERSON_REASONS,
+    POLICY_KEYS_FROM,
     DecisionOption,
     at_choice_point,
     choice_options,
@@ -47,12 +49,16 @@ from exulanica.world.society_model_decisions import append_decision_events, mode
 __all__ = [
     "FAMILIES",
     "IDLE_KIND",
+    "IDLE_KINDS",
     "KINDS",
+    "LINE_KINDS",
+    "POLICY_KEYS_FROM",
     "REASONS",
     "ROLE",
     "apply",
     "context",
     "due",
+    "due_from_outside",
     "events",
     "messages",
     "option_from_record",
@@ -66,6 +72,9 @@ ROLE: Final = "society_decision"
 KINDS: Final = ACTION_FIELDS
 #: Waiting a minute changes nothing: it is offered only beside something else.
 IDLE_KIND: Final = "wait"
+#: What changes nothing, first preferred first: going on with what is under way, where it is
+#: offered (to a society of things' people asked while something is under way), else waiting.
+IDLE_KINDS: Final = ("carry_on", IDLE_KIND)
 REASONS: Final = PERSON_REASONS
 
 
@@ -96,11 +105,33 @@ def subjects(state: Mapping[str, Any]) -> list[str]:
     return [person["id"] for person in state["inhabitants"]]
 
 
+def _addressed(state: Mapping[str, Any], person: Mapping[str, Any]) -> bool:
+    """Whether a line was said to ``person`` in the minute that made ``state``."""
+    return any(
+        heard["to"] == person["id"] and heard["tick"] == state["tick"]
+        for heard in person.get("heard", ())
+    )
+
+
 def due(state: Mapping[str, Any], subject_id: str) -> bool:
+    """Whether a model chosen for this person is asked before the coming minute: at the routine's
+    own choice point, and in a society of things also the minute after a line was said to them,
+    whatever is under way."""
     if _living(state["profile"]):
         return living_due(state, subject_id)
     person = next(p for p in state["inhabitants"] if p["id"] == subject_id)
-    return at_choice_point(person)
+    if at_choice_point(person):
+        return True
+    return society_engine(state["profile"]).state_family == "things" and _addressed(state, person)
+
+
+def due_from_outside(state: Mapping[str, Any], subject_id: str) -> bool:
+    """Whether an outside program deciding for this person is asked before the coming minute:
+    whenever a model would be, and in a society of things every minute, so a program whose
+    player acts at any moment is asked at the next one, with going on offered."""
+    if society_engine(state["profile"]).state_family == "things":
+        return True
+    return due(state, subject_id)
 
 
 def options(

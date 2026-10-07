@@ -183,6 +183,74 @@ def test_a_choice_by_a_forced_function_returns_the_option_and_sends_exactly_that
     assert sent["url"].startswith(manifest.provider(manifest.spec(model_id).provider).base_url)
 
 
+LINE_REQUEST = ChoiceRequest(
+    description="Choose what the being does next.",
+    options=("say something to everyone near you", "wait here a minute"),
+    line_characters_maximum=20,
+)
+
+
+def test_a_choice_that_takes_a_line_asks_for_the_option_and_the_line_or_none():
+    schema = LINE_REQUEST.schema()
+    assert schema["required"] == ["action", "line"]
+    assert schema["properties"]["line"] == {"type": ["string", "null"], "maxLength": 20}
+    said = {"action": "say something to everyone near you", "line": "good morning"}
+    assert LINE_REQUEST.answer_with_line(said) == (
+        "say something to everyone near you",
+        "good morning",
+    )
+    assert LINE_REQUEST.answer_with_line({"action": "wait here a minute", "line": None}) == (
+        "wait here a minute",
+        None,
+    )
+    # The line is required as strict mode requires every property, and bounded by the schema.
+    for refused in (
+        {"action": "wait here a minute"},
+        {"action": "wait here a minute", "line": "x" * 21},
+        {"action": "wait here a minute", "line": 3},
+    ):
+        with pytest.raises(ChoiceRefused):
+            LINE_REQUEST.answer_with_line(refused)
+    # A choice that takes no line keeps its one argument, and refuses a line as any extra one.
+    assert REQUEST.schema()["required"] == ["action"]
+    with pytest.raises(ChoiceRefused):
+        REQUEST.answer({"action": "wait here a minute", "line": None})
+    with pytest.raises(ValueError, match="line holds"):
+        ChoiceRequest(description="d", options=("a b", "c d"), line_characters_maximum=0)
+
+
+def test_a_line_rides_back_from_the_forced_function_beside_the_option():
+    document = _document()
+    model_id = _chosen_model(document)
+    manifest = parse_manifest(document)
+    said = {"action": "say something to everyone near you", "line": "good morning"}
+    transport = FakeTransport([_tool_reply(said, model=model_id)])
+    result = _client(manifest, transport).choose(
+        CHOSEN,
+        model_id,
+        MESSAGES,
+        LINE_REQUEST,
+        mechanism=AnsweringMechanism.TOOL_CALL,
+        prompt_version="v1",
+        timeout=5.0,
+    )
+    assert (result.label, result.line) == ("say something to everyone near you", "good morning")
+    (sent,) = transport.requests
+    assert sent["payload"]["tools"] == [LINE_REQUEST.tool()]
+    # The positive control for the line: a choice that takes none answers with no line.
+    transport = FakeTransport([_tool_reply({"action": "by a tree, 5 m away"}, model=model_id)])
+    plain = _client(manifest, transport).choose(
+        CHOSEN,
+        model_id,
+        MESSAGES,
+        REQUEST,
+        mechanism=AnsweringMechanism.TOOL_CALL,
+        prompt_version="v1",
+        timeout=5.0,
+    )
+    assert (plain.label, plain.line) == ("by a tree, 5 m away", None)
+
+
 def test_a_choice_by_a_strict_schema_returns_the_option():
     document = _document()
     model_id = _chosen_model(document)

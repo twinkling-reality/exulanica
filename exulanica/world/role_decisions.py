@@ -34,6 +34,7 @@ from typing import Any, Final, Protocol
 
 from exulanica.canonical import canonical_json
 from exulanica.models.manifest import AnsweringMechanism
+from exulanica.things.lines import LineRefused, check_line
 from exulanica.world.deciders import (
     EXTERNAL_REASONS,
     DeciderRefused,
@@ -52,6 +53,7 @@ from exulanica.world.society_planner import input_sha256
 
 __all__ = [
     "ANSWER_BY",
+    "ANSWER_WITH_LINE_BY",
     "PROVIDER_CONFIG",
     "PROVIDER_RECORD",
     "RECEIPT_STATUSES",
@@ -159,6 +161,17 @@ ANSWER_BY: Final = {
     AnsweringMechanism.TOOL_CALL: "Choose one by calling act.",
     AnsweringMechanism.JSON_SCHEMA: 'Answer with a JSON object whose "action" is one of them.',
 }
+#: How a model is told to answer a choice that takes a line, naming its second fixed argument.
+ANSWER_WITH_LINE_BY: Final = {
+    AnsweringMechanism.TOOL_CALL: (
+        "Choose one by calling act, with the line it says as line when it says something, "
+        "and null as line otherwise."
+    ),
+    AnsweringMechanism.JSON_SCHEMA: (
+        'Answer with a JSON object whose "action" is one of them and whose "line" is the line '
+        "it says when it says something, and null otherwise."
+    ),
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -256,15 +269,16 @@ def written_messages(
     context: Mapping[str, Any],
     mechanism: AnsweringMechanism,
 ) -> list[dict[str, str]]:
-    """The role's instruction, then the subject's situation, their options and how to answer."""
+    """The instruction of the terms the request is asked under, then the subject's situation,
+    their options and how to answer: with a line, where an option says something."""
     lines = [
         *situation,
         "What you can do now:",
         *(f"- {option['label']}" for option in context["options"]),
-        ANSWER_BY[mechanism],
+        (ANSWER_WITH_LINE_BY if role.takes_line(context) else ANSWER_BY)[mechanism],
     ]
     return [
-        {"role": "system", "content": role.instruction},
+        {"role": "system", "content": role.terms_of(context).instruction},
         {"role": "user", "content": "\n".join(lines)},
     ]
 
@@ -356,12 +370,26 @@ def check_role_result(
     proposal = result["proposal"]
     if proposal is not None:
         offered = request["context"]["options"]
+        option = proposal.get("option")
+        takes_line = isinstance(option, Mapping) and option.get("kind") in getattr(
+            role.adapter, "LINE_KINDS", frozenset()
+        )
         if (
-            set(proposal) != {"label", "option"}
-            or proposal["option"] not in offered
-            or proposal["label"] != proposal["option"]["label"]
+            set(proposal) != ({"label", "option", "line"} if takes_line else {"label", "option"})
+            or option not in offered
+            or proposal["label"] != option["label"]
         ):
             raise ValueError(f"a {role.key} decision proposes one of the options it offered")
+        if takes_line:
+            # The line an option says, held to the line rule at the bound its request states.
+            try:
+                checked = check_line(
+                    proposal["line"], maximum=request["context"]["line_characters_maximum"]
+                )
+            except LineRefused as exc:
+                raise ValueError(f"a {role.key} decision's line breaks the line rule") from exc
+            if checked != proposal["line"]:
+                raise ValueError(f"a {role.key} decision states its line as the line rule reads it")
     if (result["status"] == "accepted") != (proposal is not None):
         raise ValueError(f"exactly an accepted {role.key} decision carries a proposal")
     provider = result["provider"]

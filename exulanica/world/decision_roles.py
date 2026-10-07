@@ -13,9 +13,13 @@ in a world also takes the engine, route, panel and comparison work that
     action vocabulary with its words, and the bounds on asking) and the versions a new request
     records, from which policy version a model is asked in its own measured answering order, the
     profiles of its request, receipt, choice and context documents, its prompt version and prompt
-    texts, and the name of its adapter module. A new role is a new registry version beside the
-    last, and the loader reads the newest: nothing stored records the registry's version, since a
-    request records its role's own profile and contract.
+    texts, and the name of its adapter module. From registry version 5 an entry may also state, for
+    an engine that hosts it, that engine's own terms: the catalog versions its new requests record
+    and the prompt they are asked with, so one engine's people can be asked new questions while
+    every other engine's are asked exactly as before. A new role is a new registry version beside
+    the last, and the loader reads the newest: nothing stored records the registry's version, since
+    a request records its role's own profile and contract, and its context the engine it was asked
+    under.
 *   **Its adapter module**, ``exulanica.world.roles.<name>`` and nowhere else, is the code only
     the role can have: which subjects it may decide for and which are at a choice point, the options
     the engine's state offers each and the fields its words fill, the observation a model reads and
@@ -76,6 +80,7 @@ __all__ = [
     "RoleOption",
     "RoleRefused",
     "RoleRegistry",
+    "RoleTerms",
     "decision_roles",
     "load_decision_roles",
 ]
@@ -121,6 +126,10 @@ GENERIC_REASONS: Final = frozenset(
         "validated_choice",
         # The model answered, but never with an offered option, as often as the policy allows.
         "answer_not_offered",
+        # The line a chosen option says breaks the line rule, or the workspace's rules would
+        # change it: it is not said, and the routine decides that turn.
+        "line_out_of_bounds",
+        "line_refused_by_rules",
         # The call itself.
         "model_timed_out",
         "model_call_failed",
@@ -362,6 +371,22 @@ class DecisionContract:
         }
 
 
+@dataclass(frozen=True, slots=True)
+class RoleTerms:
+    """What a role's request is asked under: the catalog versions a new request records and the
+    prompt it is asked with, its version and its three texts. A role's own terms are its entry's;
+    an engine hosting it may state its own."""
+
+    versions: Mapping[str, int]
+    prompt_version: str
+    #: The one instruction a model is given, sent as written.
+    instruction: str
+    #: How the one function a model answers by is described, in every request.
+    choice_description: str
+    #: What a model is told when its answer was not one of the options, before it is asked again.
+    not_offered: str
+
+
 @dataclass(frozen=True)
 class DecisionRole:
     """One registered role: its declaration, its adapter and its model requirements."""
@@ -397,9 +422,39 @@ class DecisionRole:
     #: What a model is told when its answer was not one of the options, before it is asked again.
     not_offered: str
     adapter: RoleAdapter
+    #: The terms an engine hosting the role states for its own requests, by engine; an engine
+    #: stating none is asked under the role's own terms.
+    engine_terms: Mapping[str, RoleTerms] = field(default_factory=dict)
     _contracts: dict[tuple[tuple[str, int], ...], DecisionContract] = field(
         default_factory=dict, compare=False, hash=False, repr=False
     )
+
+    @property
+    def own_terms(self) -> RoleTerms:
+        """The terms the role's entry states for every engine that states none of its own."""
+        return RoleTerms(
+            versions=dict(self.contract_versions),
+            prompt_version=self.prompt_version,
+            instruction=self.instruction,
+            choice_description=self.choice_description,
+            not_offered=self.not_offered,
+        )
+
+    def terms(self, engine: str | None = None) -> RoleTerms:
+        """The terms a request of ``engine`` is asked under: the engine's own where the entry
+        states them, the role's otherwise."""
+        found = None if engine is None else self.engine_terms.get(engine)
+        return self.own_terms if found is None else found
+
+    def terms_of(self, context: Mapping[str, Any]) -> RoleTerms:
+        """The terms a request was asked under, by the engine its context names; a context that
+        names no engine was asked under the role's own."""
+        engine = context.get("engine")
+        return self.terms(engine if isinstance(engine, str) else None)
+
+    def every_terms(self) -> tuple[RoleTerms, ...]:
+        """The role's own terms, then each engine's, in engine order."""
+        return (self.own_terms, *(self.engine_terms[e] for e in sorted(self.engine_terms)))
 
     @property
     def reasons(self) -> frozenset[str]:
@@ -429,23 +484,38 @@ class DecisionRole:
         return self._contracts[key]
 
     def idle_label(self, context: Mapping[str, Any]) -> str | None:
-        """The label of the option a request offers that changes nothing, of its adapter's idle
-        kind, or None where it offers none: what an outside program answers for a subject when
+        """The label of the option a request offers that changes nothing, of the first of its
+        adapter's idle kinds it offers (going on with what is under way, then waiting, for a
+        person), or None where it offers none: what an outside program answers for a subject when
         nobody there acts for it, read from the request's own context."""
-        return next(
-            (
-                option["label"]
-                for option in context["options"]
-                if option.get("kind") == self.adapter.IDLE_KIND
-            ),
-            None,
+        kinds = getattr(self.adapter, "IDLE_KINDS", (self.adapter.IDLE_KIND,))
+        offered = {option.get("kind"): option["label"] for option in context["options"]}
+        return next((offered[kind] for kind in kinds if kind in offered), None)
+
+    def line_labels(self, context: Mapping[str, Any]) -> tuple[str, ...]:
+        """The labels of a request's options that say something, in its order, by the kinds the
+        adapter states take a line: an answer naming one gives the line it says, and an answer
+        naming any other gives none. Read from the request's own context, so a door needs no
+        option kind of its own."""
+        kinds = getattr(self.adapter, "LINE_KINDS", frozenset())
+        return tuple(
+            option["label"] for option in context["options"] if option.get("kind") in kinds
         )
 
+    def takes_line(self, context: Mapping[str, Any]) -> bool:
+        """Whether a request's options include one that says something: then its choice takes a
+        line too, bounded as its context says."""
+        return bool(self.line_labels(context))
+
     def choice(self, context: Mapping[str, Any]) -> ChoiceRequest:
-        """The one choice a model answers, built from a request's options and nowhere else."""
+        """The one choice a model answers, built from a request's options and its terms and
+        nowhere else: with a line, bounded as its context states, when an option says something."""
         return ChoiceRequest(
-            description=self.choice_description,
+            description=self.terms_of(context).choice_description,
             options=tuple(option["label"] for option in context["options"]),
+            line_characters_maximum=(
+                int(context["line_characters_maximum"]) if self.takes_line(context) else None
+            ),
         )
 
 
@@ -589,6 +659,58 @@ def _description(where: str, value: object) -> FieldValue:
 
 
 _VERSION: Final = integer_field(1, 10_000)
+#: The registry version from which an entry states each engine's own terms (``engine_terms``).
+ENGINE_TERMS_FROM: Final = 5
+_TERM_FIELDS: Final = frozenset(
+    {
+        "engine",
+        "action_version",
+        "policy_version",
+        "prompt_version",
+        "instruction",
+        "choice_description",
+        "not_offered",
+    }
+)
+
+
+def _engine_terms(where: str, value: object) -> FieldValue:
+    """The terms each engine states for its own requests: a list of objects, one an engine, each
+    naming an engine the engine table states, the two catalog versions its new requests record,
+    and its prompt's version and three texts."""
+    if not isinstance(value, list):
+        raise CatalogError(f"{where} is a list of an engine's terms")
+    known = {engine.engine for engine in ENGINES}
+    found: list[dict[str, object]] = []
+    for index, item in enumerate(value):
+        at = f"{where}[{index}]"
+        if not isinstance(item, dict) or set(item) != _TERM_FIELDS:
+            raise CatalogError(f"{at} states exactly {sorted(_TERM_FIELDS)}")
+        if item["engine"] not in known:
+            raise CatalogError(f"{at}.engine is not an engine the engine table states")
+        found.append(
+            {
+                "engine": item["engine"],
+                "action_version": _VERSION(f"{at}.action_version", item["action_version"]),
+                "policy_version": _VERSION(f"{at}.policy_version", item["policy_version"]),
+                "prompt_version": _matching(_PROMPT_VERSION, "a prompt version")(
+                    f"{at}.prompt_version", item["prompt_version"]
+                ),
+                "instruction": _matching(_PROMPT_TEXT, "one line of printable instruction text")(
+                    f"{at}.instruction", item["instruction"]
+                ),
+                "choice_description": _description(
+                    f"{at}.choice_description", item["choice_description"]
+                ),
+                "not_offered": _matching(_PROMPT_TEXT, "one line of printable instruction text")(
+                    f"{at}.not_offered", item["not_offered"]
+                ),
+            }
+        )
+    engines = [item["engine"] for item in found]
+    if len(set(engines)) != len(engines):
+        raise CatalogError(f"{where} states one engine's terms twice")
+    return tuple(found)  # type: ignore[arg-type]
 
 
 def _registry_schema(version: int) -> CatalogSchema:
@@ -616,6 +738,7 @@ def _registry_schema(version: int) -> CatalogSchema:
             ("instruction", _matching(_PROMPT_TEXT, "one line of printable instruction text")),
             ("choice_description", _description),
             ("not_offered", _matching(_PROMPT_TEXT, "one line of printable instruction text")),
+            *((("engine_terms", _engine_terms),) if version >= ENGINE_TERMS_FROM else ()),
             ("reason", text_field),
         ),
     )
@@ -695,6 +818,28 @@ def load_decision_roles(
     for entry in catalog.entries:
         values = dict(entry.values)
         adapter = _adapter(entry.key, str(values["adapter"]), adapters)
+        action_catalog, policy_catalog = (
+            str(values["action_catalog"]),
+            str(values["policy_catalog"]),
+        )
+        engine_terms: dict[str, RoleTerms] = {}
+        for stated in values.get("engine_terms", ()):  # type: ignore[union-attr]
+            terms = dict(stated)  # type: ignore[call-overload]
+            if terms["engine"] not in values["engines"]:  # type: ignore[operator]
+                raise RoleRefused(
+                    "role_terms_unhosted",
+                    f"role {entry.key} states terms for {terms['engine']}, which does not host it",
+                )
+            engine_terms[str(terms["engine"])] = RoleTerms(
+                versions={
+                    action_catalog: int(terms["action_version"]),
+                    policy_catalog: int(terms["policy_version"]),
+                },
+                prompt_version=str(terms["prompt_version"]),
+                instruction=str(terms["instruction"]),
+                choice_description=str(terms["choice_description"]),
+                not_offered=str(terms["not_offered"]),
+            )
         roles[entry.key] = DecisionRole(
             key=entry.key,
             subject=str(values["subject"]),
@@ -723,13 +868,18 @@ def load_decision_roles(
             choice_description=str(values["choice_description"]),
             not_offered=str(values["not_offered"]),
             adapter=adapter,  # type: ignore[arg-type]
+            engine_terms=engine_terms,
         )
-    for name in (*PROFILE_PATTERNS, "prompt_version"):
+    for name in PROFILE_PATTERNS:
         stated = [getattr(role, name) for role in roles.values()]
         if len(set(stated)) != len(stated):
             raise RoleRefused(
                 "role_profile_shared", f"two roles state one {name.replace('_', ' ')}"
             )
+    # A prompt version names one prompt: no two roles, and no two terms of one role, share one.
+    prompts = [terms.prompt_version for role in roles.values() for terms in role.every_terms()]
+    if len(set(prompts)) != len(prompts):
+        raise RoleRefused("role_profile_shared", "two roles or two terms state one prompt version")
     # A request's id is derived from its role's subject word, the subject and the minute, so two
     # roles deciding for one kind of subject would reserve one id and the second would be skipped.
     subjects = sorted(role.subject for role in roles.values())
@@ -755,6 +905,15 @@ def _catalog(role: DecisionRole, catalog_id: str, version: int, schema: Any) -> 
     )
 
 
+def _adapter_policy_keys(role: DecisionRole, versions: Mapping[str, int]) -> frozenset[str]:
+    """The keys only this role's policy holds at the policy version ``versions`` names, as its
+    adapter states them (``POLICY_KEYS_FROM``: from a version on, those keys); none for an adapter
+    that states none."""
+    version = versions[role.policy_catalog]
+    stated = getattr(role.adapter, "POLICY_KEYS_FROM", {})
+    return frozenset(key for since, held in stated.items() if version >= since for key in held)
+
+
 def _contract(role: DecisionRole, versions: Mapping[str, int]) -> DecisionContract:
     """One version of ``role``'s contract, read from its catalogs and held to its adapter."""
     if set(versions) != {role.action_catalog, role.policy_catalog}:
@@ -767,7 +926,7 @@ def _contract(role: DecisionRole, versions: Mapping[str, int]) -> DecisionContra
         role, role.policy_catalog, versions[role.policy_catalog], role_policy_schema
     )
     digest = catalog_digest([actions, policy_catalog])
-    keys = POLICY_KEYS | {role.subjects_bound}
+    keys = POLICY_KEYS | {role.subjects_bound} | _adapter_policy_keys(role, versions)
     stated = {entry.key for entry in policy_catalog.entries}
     if stated != keys:
         raise ContractError(

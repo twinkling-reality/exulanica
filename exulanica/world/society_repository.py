@@ -159,6 +159,16 @@ def _ground_key(navigation_profile: str) -> str:
     return society_ground_for_navigation(navigation_profile).key
 
 
+def _consumed(receipts: list[Any], decided: Any) -> list[tuple[Any, Any]]:
+    """Each receipt a minute consumed with what the minute did with it, in decision order."""
+    by_request = {str(disposition.request_id): disposition for disposition in decided}
+    return [
+        (receipt, by_request[str(receipt["request_id"])])
+        for receipt in receipts
+        if str(receipt["request_id"]) in by_request
+    ]
+
+
 class SocietyRepository:
     def __init__(
         self,
@@ -755,7 +765,13 @@ class SocietyRepository:
                         )[:CROSSINGS_PER_MINUTE]
                     )
                     state, events, crossed = advance_things(
-                        row["state"], state, row["seed"], inputs[-1], events, pending
+                        row["state"],
+                        state,
+                        row["seed"],
+                        inputs[-1],
+                        events,
+                        pending,
+                        decisions=_consumed(receipts, decided),
                     )
             else:
                 raise UnknownSocietyEngine(f"unsupported society engine {row['engine_version']!r}")
@@ -1250,6 +1266,7 @@ class SocietyRepository:
                             inputs[-1],
                             events,
                             [each.crossing for each in taken],
+                            decisions=_consumed(receipts, decided),
                         )
                         if list(crossed) != [each.bound for each in taken]:
                             raise ValueError("society crossing replay mismatch")

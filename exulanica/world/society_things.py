@@ -103,6 +103,7 @@ THING_EVENT_KINDS: Final = (
     "thing_departed",
     "arrival_refused",
     "departure_refused",
+    "said",
 )
 #: Every reason the things phase records, stated once: the browser has words for exactly these.
 THING_REASONS: Final = frozenset(
@@ -124,6 +125,11 @@ THING_REASONS: Final = frozenset(
         "already_here",
         "not_here",
         MALFORMED,
+        # A being's decider: it said a line, or a visitor chose to leave, or the program deciding
+        # for a visitor stayed quiet for as many minutes as its kind waits.
+        "chose_to_say",
+        "chose_to_leave",
+        "decider_lost",
     }
 )
 #: Every outcome the things phase records, stated once: the browser has words for exactly these.
@@ -134,7 +140,13 @@ THING_OUTCOMES: Final = (
     "put_elsewhere",
     "departed",
     "not_departed",
+    "said",
 )
+#: The reasons an outside program's request ends with for a visitor, counted as a quiet minute: it
+#: had no live connection, or it did not answer in time. A program that passed answered.
+QUIET_REASONS: Final = frozenset({"decider_disconnected", "no_answer_in_time"})
+#: The kinds of a decision whose minute the things phase carries out: a line said, or leaving.
+_SPOKEN_KINDS: Final = frozenset({"say_to", "say_all"})
 #: Why a visitor left, by the reason its departure states: the program that sent it called it
 #: back, or the grant it came under ended. Named apart from the world's owner sending everyone
 #: away, which is another engine's.
@@ -748,11 +760,15 @@ def advance_things(
     document: Mapping[str, Any],
     events: Sequence[SocietyEvent],
     crossings: Sequence[Crossing] = (),
+    decisions: Sequence[tuple[Mapping[str, Any], Any]] = (),
 ) -> tuple[dict[str, Any], tuple[SocietyEvent, ...], tuple[BoundCrossing, ...]]:
     """The things phase of a minute: ``state`` and ``events`` are the minute so far (the planner's,
     its directed requests' and its decisions'), ``previous`` the state it began from and
-    ``document`` the input it consumed last. Answers the state, every event of the minute, and
-    what became of each crossing, in the order they were handed over."""
+    ``document`` the input it consumed last. ``decisions`` are the receipts the minute consumed,
+    each with what the minute did with it: an applied line is said, an applied leaving is carried
+    out, and a visitor whose program stays quiet for as many minutes as its kind waits is sent home.
+    Answers the state, every event of the minute, and what became of each crossing, in the order
+    they were handed over."""
     _require(state["profile"] == THINGS_PROFILE, "the things phase is a society of things'")
     _require(len(crossings) <= CROSSINGS_PER_MINUTE, "a minute takes a bounded number of crossings")
     result = deepcopy(state)
@@ -769,8 +785,103 @@ def advance_things(
             bound.append(_arrive(minute, crossing, checked))
         else:
             bound.append(_depart(minute, crossing, checked))
+    _decided(minute, previous, decisions)
     validate_things_state(result)
     return result, tuple(minute.events), tuple(bound)
+
+
+def _say_bounds(profile: str) -> tuple[int, int]:
+    """How far a line carries and how many lines a being keeps, as the contract the people of a
+    society of ``profile`` are asked under states them."""
+    from exulanica.world.society_decision_contract import person_role
+
+    role = person_role()
+    contract = role.contract(role.terms(profile).versions)
+    return contract.value("hearing_reach_mm"), contract.value("lines_heard_maximum")
+
+
+def _quiet_limit(person: Mapping[str, Any]) -> int | None:
+    """How many quiet minutes a being's kind waits before it goes home, by its leave ability's
+    ``quiet_minutes``; None for a kind that does not leave."""
+    kind = shipped_kind(ThingKindReference(**person["kind"]))
+    leave = next((a for a in kind.document["abilities"] if a["key"] == "leave"), None)
+    return None if leave is None else int(leave["parameters"]["quiet_minutes"])
+
+
+def _decided(
+    minute: _Minute,
+    previous: Mapping[str, Any],
+    decisions: Sequence[tuple[Mapping[str, Any], Any]],
+) -> None:
+    """What the minute's consumed decisions do beside the planner's goals, in decision order: a
+    visitor's quiet minutes are counted, an applied line is said where the speaker stood as the
+    minute began and heard by every being then within reach that hears, and an applied leaving
+    sends the visitor home; then every visitor whose program stayed quiet long enough leaves."""
+    from exulanica.world.deciders import receipt_from_outside
+    from exulanica.world.society_decision_contract import hearers
+
+    if not decisions:
+        return
+    reach, kept = _say_bounds(minute.state["profile"])
+    began = {person["id"]: person for person in previous["inhabitants"]}
+    for receipt, disposition in decisions:
+        person = next(
+            (p for p in minute.state["inhabitants"] if p["id"] == receipt["subject_id"]), None
+        )
+        if person is None:
+            continue
+        if person["came_by"] == "crossed":
+            quiet = disposition.disposition == "unavailable" and receipt["reason"] in QUIET_REASONS
+            if quiet:
+                person["quiet_minutes"] = person.get("quiet_minutes", 0) + 1
+            else:
+                person.pop("quiet_minutes", None)
+        if disposition.disposition != "applied" or receipt["proposal"] is None:
+            continue
+        option = receipt["proposal"]["option"]
+        if option["kind"] == "leave" and person["came_by"] == "crossed":
+            minute.leave(person, "chose_to_leave")
+        elif option["kind"] in _SPOKEN_KINDS:
+            line = receipt["proposal"]["line"]
+            to = option.get("addressee_id")
+            here = {p["id"] for p in minute.state["inhabitants"]}
+            # Who heard: within reach where everybody stood as the minute began, and still here.
+            origin = began.get(person["id"], person)
+            heard_by = [
+                other["id"]
+                for _distance, other in hearers(
+                    {"inhabitants": [p for i, p in began.items() if i in here]}, origin, reach
+                )
+            ]
+            minute.emit(
+                "said",
+                person["id"],
+                "chose_to_say",
+                "said",
+                person=person,
+                name=person["display_name"],
+                details={
+                    "line": line,
+                    "to": to,
+                    "heard_by": heard_by,
+                    "decider": "external" if receipt_from_outside(receipt) else "model",
+                },
+            )
+            heard = {
+                "tick": minute.state["tick"],
+                "from": person["id"],
+                "from_kind": dict(person["kind"]),
+                "from_number": person["ordinal"] + 1,
+                "to": to,
+                "line": line,
+            }
+            for hearer in minute.state["inhabitants"]:
+                if hearer["id"] in heard_by:
+                    hearer["heard"] = [*hearer.get("heard", ()), dict(heard)][-kept:]
+    for person in list(minute.state["inhabitants"]):
+        limit = _quiet_limit(person) if person["came_by"] == "crossed" else None
+        if limit is not None and person.get("quiet_minutes", 0) >= limit:
+            minute.leave(person, "decider_lost")
 
 
 #: Why a placed being is not in the society: it is full, no node is open where it was put, or the
@@ -791,6 +902,49 @@ def _reference_shape(value: Any) -> bool:
         and isinstance(value["sha256"], str)
         and _HEX64.fullmatch(value["sha256"]) is not None
     )
+
+
+#: The most lines a state lets one being keep, whatever its contract keeps: a bound on the field.
+_HEARD_BOUND: Final = 64
+_HEARD_FIELDS: Final = frozenset({"tick", "from", "from_kind", "from_number", "to", "line"})
+
+
+def _optional_lines(person: Mapping[str, Any]) -> None:
+    """The lines a being heard, stated only once it heard one (oldest first, each with when, who
+    said it, by kind and number, to whom and the line itself), and a visitor's quiet minutes,
+    stated only while its program has been quiet."""
+    from exulanica.things.lines import LineRefused, check_line
+
+    heard = person.get("heard")
+    if heard is not None:
+        _require(
+            isinstance(heard, list) and 1 <= len(heard) <= _HEARD_BOUND,
+            "a being states the lines it heard only once it heard one",
+        )
+        ticks = [entry.get("tick") if isinstance(entry, dict) else None for entry in heard]
+        for entry in heard:
+            _require(
+                isinstance(entry, dict)
+                and set(entry) == _HEARD_FIELDS
+                and type(entry["tick"]) is int
+                and isinstance(entry["from"], str)
+                and _reference_shape(entry["from_kind"])
+                and type(entry["from_number"]) is int
+                and entry["from_number"] >= 1
+                and (entry["to"] is None or isinstance(entry["to"], str)),
+                "invalid heard line",
+            )
+            try:
+                check_line(entry["line"])
+            except LineRefused as exc:
+                raise ValueError("a heard line is held to the line rule") from exc
+        _require(ticks == sorted(ticks), "a being's heard lines are oldest first")
+    quiet = person.get("quiet_minutes")
+    if quiet is not None:
+        _require(
+            person["came_by"] == "crossed" and type(quiet) is int and quiet >= 1,
+            "only a visitor counts its program's quiet minutes, and only while it is quiet",
+        )
 
 
 def _optional_movement(person: Mapping[str, Any]) -> None:
@@ -846,6 +1000,7 @@ def validate_things_state(state: Mapping[str, Any]) -> None:
         _require(set(person) >= _PERSON_FIELDS, "a person of a society of things states its kind")
         _require(_reference_shape(person["kind"]), "a person names its kind")
         _optional_movement(person)
+        _optional_lines(person)
         came_by = person["came_by"]
         _require(came_by in CAME_BY, "a person came by a stated way")
         _require(

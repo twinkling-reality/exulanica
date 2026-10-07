@@ -276,6 +276,13 @@ def test_each_ground_names_the_shipped_being_its_population_is_made_of():
     villager = dict(shipped_thing_kinds()[("villager", 1)].reference())
     grounds = load_society_grounds()
     assert [ground.population_kind for ground in grounds] == [villager] * len(grounds)
+    # Every reader shares the loaded grounds, so none may change the kind for the others: it is
+    # read-only, and a reader's copy is its own.
+    with pytest.raises(TypeError):
+        grounds[0].population_kind["version"] = 2  # type: ignore[index]
+    copied = dict(grounds[0].population_kind)
+    copied["version"] = 2
+    assert grounds[0].population_kind == villager
 
 
 def _reference(key: str, version: int) -> dict:

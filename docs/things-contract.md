@@ -2,8 +2,9 @@
 
 Status: **THING KINDS, BODY PLANS, ABILITIES, OFFERS, LOOKS, THE ORIGIN RECORD AND TRANSLATION
 MANIFESTS ARE DATA HELD TO THEIR CHECKS, A WORLD'S AUTHOR PLACES THINGS BY THEIR KIND, THE SOCIETY OF
-THINGS LIVES WITH THEM, A CREATURE'S BODY PLAN, SKETCH AND KIND ARE BUILT FROM A DRAFTED BODY RECIPE,
-AND THE BROWSER DRAWS A VERSION'S PLACED THINGS BY THEIR LOOKS**.
+THINGS LIVES WITH THEM AND ITS BEINGS SAY LINES AND LEAVE BY THEIR DECIDERS' CHOICE, A CREATURE'S BODY
+PLAN, SKETCH AND KIND ARE BUILT FROM A DRAFTED BODY RECIPE, AND THE BROWSER DRAWS A VERSION'S PLACED
+THINGS BY THEIR LOOKS**.
 
 A thing is anything addressable in a world: a knight, a lantern spirit, a sword, a well, a gate, a
 visitor that came in from another program. What a kind of thing is and can do is one typed,
@@ -630,9 +631,10 @@ no detail clears the pick. The picked thing wears a ring in the design tokens' s
 These are material limits of the boundary above, not partial behaviour:
 
 - The society of things ([society contract](synthetic-society-contract.md#the-society-of-things-v7))
-  reads a placed thing's kind, places its beings and lets visitors cross in, but no ability module
-  runs: its people walk, choose, stay and talk by the purposeful planner's rules, and the hands,
-  following, saying and leaving the abilities catalog names are not built.
+  reads a placed thing's kind, places its beings, lets visitors cross in and leave, and says the lines
+  its beings' deciders choose, but no ability module runs: its people walk, choose, stay and talk by
+  the purposeful planner's rules, and the hands and following the abilities catalog names are not
+  built. The routine says nothing; only a model chosen for a being, or a visitor's own program, does.
 - No store holds a workspace's own kinds or looks: the library serves the shipped ones only, a
   placed thing names a shipped kind and a thing wears a shipped look. The world's owner has no
   route to choose a look, and a look is recorded only where a door records its crossing's.

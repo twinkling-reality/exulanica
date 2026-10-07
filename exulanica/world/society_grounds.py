@@ -365,8 +365,11 @@ def load_society_grounds(
             population_rule=str(values.get("population_rule", "stated")),
             place_dependency=str(values.get("place_dependency", "none")),
             record_subjects=tuple(values.get("record_subjects", ())),
+            # Read-only, since every reader of the loaded grounds shares it: a reader copies it.
             population_kind=(
-                dict(values["population_kind"]) if "population_kind" in values else None
+                MappingProxyType(dict(values["population_kind"]))
+                if "population_kind" in values
+                else None
             ),
         )
         for entry in catalog.entries

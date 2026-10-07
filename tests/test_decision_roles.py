@@ -49,6 +49,7 @@ from exulanica.world.decision_roles import (
     ADAPTER_PACKAGE,
     CHOICE_SUBJECT_FIELDS,
     PROFILE_PATTERNS,
+    REGISTRY_DIRECTORY,
     RoleRefused,
     decision_roles,
     load_decision_roles,
@@ -665,3 +666,87 @@ def test_a_role_names_the_offered_option_that_changes_nothing():
     # A pass is an outside program's own reason, recorded at once, which every role records.
     assert "decider_passed" in EXTERNAL_REASONS
     assert "decider_passed" in person.reasons and "decider_passed" in signal.reasons
+
+
+THINGS = "exulanica-society/v7"
+
+
+def test_a_society_of_things_people_are_asked_under_their_engine_s_own_terms():
+    person = decision_roles().role("society_decision")
+    own, things = person.terms(), person.terms(THINGS)
+    assert own == person.terms("exulanica-society/v2") == person.terms("exulanica-society/v5")
+    assert own.versions == {"society-decision-action": 2, "society-decision-policy": 2}
+    assert things.versions == {"society-decision-action": 3, "society-decision-policy": 3}
+    assert (own.prompt_version, things.prompt_version) == (
+        "society-person-choice/v1",
+        "society-person-choice/v2",
+    )
+    contract = person.contract(things.versions)
+    assert {"carry_on", "say_to", "say_all", "leave"} <= set(contract.words)
+    assert contract.value("line_characters_maximum") == 200
+    # The role's own contract keeps exactly its keys: the line bounds are the third policy's.
+    assert "line_characters_maximum" not in person.contract().policy
+    # A request names the engine it was asked under in its context and is asked by its terms.
+    assert person.terms_of({"engine": THINGS, "options": []}) == things
+    assert person.terms_of({"options": []}) == own
+    said = {
+        "engine": THINGS,
+        "line_characters_maximum": 200,
+        "options": [
+            {"label": "say something to everyone near you", "kind": "say_all"},
+            {"label": "wait here a minute", "kind": "wait"},
+        ],
+    }
+    assert person.choice(said).line_characters_maximum == 200
+    assert person.choice(said).description == things.choice_description
+    assert person.line_labels(said) == ("say something to everyone near you",)
+    quiet = {**said, "options": said["options"][1:]}
+    assert person.choice(quiet).line_characters_maximum is None
+    # What an outside program answers when nobody acts: going on with what is under way first.
+    carry = {"label": "carry on with what you are doing", "kind": "carry_on"}
+    assert person.idle_label({"options": [*said["options"], carry]}) == carry["label"]
+    assert person.idle_label(said) == "wait here a minute"
+
+
+def _things_registry(root: Path, monkeypatch, change) -> Any:
+    """The production registry's version 5 with ``change`` made to its person entry, loaded with
+    a copy of the person's adapter."""
+    from decision_role_support import write_registry
+
+    document = json.loads(
+        (REGISTRY_DIRECTORY / "decision-roles.v5.json").read_text(encoding="utf-8")
+    )
+    (entry,) = [e for e in document["entries"] if e["key"] == "society_decision"]
+    entry = json.loads(json.dumps(entry))
+    change(entry)
+    directory, package = write_registry(root, [entry])
+    first = directory / "decision-roles.v1.json"
+    written = json.loads(first.read_text(encoding="utf-8"))
+    first.unlink()
+    (directory / "decision-roles.v5.json").write_text(
+        json.dumps({**written, "catalog_version": 5}), encoding="utf-8"
+    )
+    monkeypatch.syspath_prepend(str(root))
+    return load_decision_roles(directory, adapters=package)
+
+
+def test_an_engine_states_terms_only_for_a_role_it_hosts_and_with_a_prompt_of_its_own(
+    tmp_path, monkeypatch
+):
+    # The positive control: the production entry loads, with its one engine's terms.
+    held = _things_registry(tmp_path / "held", monkeypatch, lambda entry: None)
+    assert sorted(held.role("society_decision").engine_terms) == [THINGS]
+
+    def unhosted(entry):
+        entry["engine_terms"][0]["engine"] = "exulanica-society/v4"
+
+    with pytest.raises(RoleRefused) as refused:
+        _things_registry(tmp_path / "unhosted", monkeypatch, unhosted)
+    assert refused.value.code == "role_terms_unhosted"
+
+    def shared(entry):
+        entry["engine_terms"][0]["prompt_version"] = entry["prompt_version"]
+
+    with pytest.raises(RoleRefused) as refused:
+        _things_registry(tmp_path / "shared", monkeypatch, shared)
+    assert refused.value.code == "role_profile_shared"

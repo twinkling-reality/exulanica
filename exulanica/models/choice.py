@@ -20,6 +20,14 @@ model about the situation goes in its messages, where every policy judges it.
 **A reply is one of the labels, exactly.** :meth:`ChoiceRequest.answer` refuses anything else:
 another string, a second argument, a missing one. A tool call is read from the one tool call the
 reply carries and refused when it names another function or carries no call at all.
+
+**A line rides beside the label only where a request asks for one.** A choice some of whose
+options say something states the most characters a line may hold, and only then does the function
+take a second fixed argument, :data:`LINE_ARGUMENT`: a string of at most that many characters, or
+null. Both arguments are required, as strict mode requires every property, so a reply states its
+line, or that it has none, rather than leaving it out. :meth:`ChoiceRequest.answer_with_line`
+returns the label and the line; which options take a line, and the line's own rule, are the
+caller's to check, since only the caller knows what an option does.
 """
 
 from __future__ import annotations
@@ -37,6 +45,8 @@ from exulanica.models.schema import response_format_for_schema, validate_against
 __all__ = [
     "CHOICE_ARGUMENT",
     "CHOICE_FUNCTION",
+    "LINE_ARGUMENT",
+    "LINE_CHARACTERS_BOUND",
     "OPTIONS_MAXIMUM",
     "ChoiceRefused",
     "ChoiceRequest",
@@ -48,6 +58,11 @@ OPTIONS_MAXIMUM: Final = 64
 #: caller writes rides in a name, where no policy could replace it.
 CHOICE_FUNCTION: Final = "act"
 CHOICE_ARGUMENT: Final = "action"
+#: The second argument of a choice whose options say something: the line a chosen option says.
+LINE_ARGUMENT: Final = "line"
+#: The most characters any request may let a line hold: a bound on the schema, which rides in
+#: every request that takes a line.
+LINE_CHARACTERS_BOUND: Final = 1_000
 #: An option label: lowercase product vocabulary, no capitals, brackets, quotes or newlines.
 _LABEL: Final = re.compile(r"^[a-z0-9][a-z0-9 ,.'()-]{0,118}[a-z0-9)]$")
 #: The description is instruction text: printable ASCII, one line, bounded.
@@ -64,6 +79,9 @@ class ChoiceRequest:
 
     description: str
     options: tuple[str, ...]
+    #: The most characters a line may hold, for a choice some of whose options say something;
+    #: None for a choice that takes no line, whose function has one argument.
+    line_characters_maximum: int | None = None
 
     @property
     def name(self) -> str:
@@ -88,13 +106,25 @@ class ChoiceRequest:
                     "a little punctuation, as product vocabulary reads"
                 )
         object.__setattr__(self, "options", options)
+        bound = self.line_characters_maximum
+        if bound is not None and (
+            type(bound) is not int or not 1 <= bound <= LINE_CHARACTERS_BOUND
+        ):
+            raise ValueError(f"a line holds 1 to {LINE_CHARACTERS_BOUND} characters, not {bound!r}")
 
     def schema(self) -> dict[str, Any]:
-        """The arguments' schema: one required property, an enum of the options, nothing else."""
+        """The arguments' schema: one required property, an enum of the options, and for a choice
+        that takes a line a second, the line or null; nothing else."""
+        properties: dict[str, Any] = {self.argument: {"type": "string", "enum": list(self.options)}}
+        if self.line_characters_maximum is not None:
+            properties[LINE_ARGUMENT] = {
+                "type": ["string", "null"],
+                "maxLength": self.line_characters_maximum,
+            }
         return {
             "type": "object",
-            "properties": {self.argument: {"type": "string", "enum": list(self.options)}},
-            "required": [self.argument],
+            "properties": properties,
+            "required": list(properties),
             "additionalProperties": False,
         }
 
@@ -131,14 +161,25 @@ class ChoiceRequest:
 
     def answer(self, arguments: object) -> str:
         """The option a reply's arguments chose, or :class:`ChoiceRefused` saying why not."""
+        return self.answer_with_line(arguments)[0]
+
+    def answer_with_line(self, arguments: object) -> tuple[str, str | None]:
+        """The option a reply's arguments chose and the line they state, None for a choice that
+        takes no line or a reply stating none; or :class:`ChoiceRefused` saying why not."""
         try:
             checked = validate_against_schema(arguments, self.schema(), name=self.name)
         except StructuredOutputError as exc:
             raise ChoiceRefused(f"the reply is not one of the offered options: {exc}") from exc
-        return str(checked[self.argument])
+        line = checked.get(LINE_ARGUMENT)
+        return str(checked[self.argument]), None if line is None else str(line)
 
     def answer_from_tool_call(self, message: Mapping[str, Any]) -> str:
         """The option a reply's one tool call chose, or :class:`ChoiceRefused` saying why not."""
+        return self.answer(self.arguments_from_tool_call(message))
+
+    def arguments_from_tool_call(self, message: Mapping[str, Any]) -> dict[str, Any]:
+        """The arguments of a reply's one tool call, the option and, for a choice that takes
+        one, the line, checked against the schema; or :class:`ChoiceRefused` saying why not."""
         calls = message.get("tool_calls")
         if not isinstance(calls, list) or len(calls) != 1:
             count = len(calls) if isinstance(calls, list) else 0
@@ -151,4 +192,7 @@ class ChoiceRequest:
             arguments = json.loads(raw) if isinstance(raw, str) else raw
         except json.JSONDecodeError as exc:
             raise ChoiceRefused("the reply's tool call arguments are not JSON") from exc
-        return self.answer(arguments)
+        label, line = self.answer_with_line(arguments)
+        if self.line_characters_maximum is None:
+            return {self.argument: label}
+        return {self.argument: label, LINE_ARGUMENT: line}

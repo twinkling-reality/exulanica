@@ -1501,7 +1501,18 @@ first, unchanged, and every event they record names v7; then the things phase:
   something's here (`already_here`); a departure naming nobody who crossed in is
   `departure_refused`, `not_here`. A crossing whose document fails its check is refused
   (`malformed_crossing`), with an event naming the crossing and nothing from the document, so no
-  crossing ever stops a society's minutes.
+  crossing ever stops a society's minutes;
+* what the minute's decisions do beside the planner's goals, in decision order: a line a decider
+  chose to say is said (`said`, `chose_to_say`), with the line, whom it was said to, or none for
+  everyone near, the decider kind (a model or an outside program) and who heard it: every being
+  within the hearing reach of the society of things' contract (8 m) of where the speaker stood as
+  the minute began, whose kind offers hearing and who is still here; each hearer keeps it among the
+  last lines it heard (at most the contract's `lines_heard_maximum`, the oldest dropped first), with
+  when, who said it by kind and number, and to whom. A visitor that chose to leave departs
+  (`thing_departed`, `chose_to_leave`), taking what it holds. A visitor whose program had no live
+  connection or gave no answer in time counts that minute as quiet, and any other answer or a pass
+  ends the count; one quiet for as many minutes in a row as its kind's leave ability waits (a
+  visitor of `visitor` version 1: five) departs (`thing_departed`, `decider_lost`).
 
 Each event of the things phase carries `at_ms` 0: it takes effect as the minute begins (`at_ms`
 is the moment within the minute, 0 to 59,999). A minute with nothing to reconcile and no crossing
@@ -1523,6 +1534,14 @@ stream registered, nothing crosses, and a society that took crossings is refused
 Replay reads the bound crossings back and refuses by name a minute whose recomputed crossings
 differ, or a crossing bound to a minute the society never ran.
 
+**Lines.** A line is said only by a decider: the model the world's owner chose for a being, or the
+outside program that sent a visitor; the routine never says anything. It is one plain line held to
+the line rule (`exulanica/things/lines.py`), checked before it is said and refused by name when it
+breaks the rule or the workspace's rules would change it
+([decision roles](decision-roles-contract.md#a-society-of-things-people)). A being a line was said
+to is asked the minute after, whatever is under way for it, and every being reads the lines it
+heard, quoted, in its next request.
+
 **Who decides.** The world's owner may choose a model for a person as in a purposeful society, but
 only a decider the person's kind allows (`decider_not_allowed`, the kind's `deciders.allowed`), and
 an author places no being only an outside program may decide for
@@ -1540,7 +1559,9 @@ object states `height_mm` only off the ground. A velocity is three whole millime
 within 100,000 either way: x and y along the ground (`position_mm`'s two axes) and z up (the rate of
 `height_mm`). The next minute's flight starts from it. The state check admits them from the first
 state, so a stored society of walkers needs nothing rewritten when another movement module lands.
-The things composition states one walking lattice, the people's.
+The things composition states one walking lattice, the people's. A being states `heard` only once it
+heard a line (oldest first, each `{tick, from, from_kind, from_number, to, line}`, the line held to
+the line rule), and a visitor states `quiet_minutes` only while its program has been quiet.
 
 It runs no comparison of models and no experiment, and its people are not sent away. A placed
 thing's footprint is its kind's whole box, so a kind whose box overhangs its base (a tree's

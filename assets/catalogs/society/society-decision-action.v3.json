@@ -1,0 +1,111 @@
+{
+  "schema_version": 1,
+  "catalog_id": "society-decision-action",
+  "catalog_version": 3,
+  "entries": [
+    {
+      "key": "go",
+      "kind": "target",
+      "words": "{activity}, {metres} m away",
+      "reason": "Going somewhere to do what is done there: one option for each place the person can reach that has room for them this minute, named by what the world's routine says people do at it and how far the walk is, so options are told apart by what they are and never by where they sit in a list. The engine applies it only if the place is still enabled, unchanged, reachable and free when the minute runs.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica society decision contract; see the entry reason"
+      }
+    },
+    {
+      "key": "wait",
+      "kind": "wait",
+      "words": "wait here a minute",
+      "reason": "Staying where they are for one simulated minute, after which they choose again. It is offered only beside at least one other action, a place to go, somebody to talk with or a spot to stand at: a person with nothing else to do is left to the routine, and no model is asked.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica society decision contract; see the entry reason"
+      }
+    },
+    {
+      "key": "stand",
+      "kind": "stand",
+      "words": "stand a while nearby",
+      "reason": "Stopping to stand a while, as the world's routine has people do: offered when an open spot lies within the routine's standing reach of the person, and applied by the routine's own rules, the spot drawn among the open ones as the minute begins, as the routine draws it, and the stay as long as the routine draws for standing. Standing relieves nothing, as the routine says. The engine promises the spot before the minute, so nobody else takes it in that minute.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica society decision contract; see the entry reason"
+      }
+    },
+    {
+      "key": "talk",
+      "kind": "talk",
+      "words": "talk with person {number}, {metres} m away",
+      "reason": "Stopping to talk with one other person, as the world's routine has two people do: one option for each person the routine itself could pair them with now, somebody within its talking reach who is free to choose or standing, with two open spots beside each other that both can walk to. The other person is named by a number, the one their simulated name ends with, which stays theirs for the society's life, and never by a name, so no rule about saved names can change or hide the option; options are told apart by that number and by how far the walk to them is. The engine applies it only if the other person is still free to talk when the minute runs and nobody, their own model included, decided for them in that minute, and it promises both spots before the minute; the talk lasts as long as the routine draws. Nothing is said in the simulation.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica society decision contract; see the entry reason"
+      }
+    },
+    {
+      "key": "carry_on",
+      "kind": "carry_on",
+      "words": "carry on with what you are doing",
+      "reason": "Going on with whatever is under way for them: offered to a person of a society of things who is asked while something is under way, as somebody a line was said to is the minute after, or one an outside program decides for every minute. It changes nothing: the goal and the action stay as they were, and a person with nothing under way is never offered it.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica society decision contract; see the entry reason"
+      }
+    },
+    {
+      "key": "say_to",
+      "kind": "say_to",
+      "words": "say something to the {who} (person {number}), {metres} m away",
+      "reason": "Saying one line to one being who hears it, within the policy's hearing reach: an option for each of the nearest such beings, at most the policy's number of ways to say something less one, named by the label of its kind and the number its simulated name ends with, never by a name. Only a being whose kind has the say ability is offered it. The line is its decider's: a model writes it in the choice's line argument and an outside program sends it with its answer; the routine never says anything. Saying does not interrupt what the speaker is doing, and the one it is said to is asked the next minute.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica society decision contract; see the entry reason"
+      }
+    },
+    {
+      "key": "say_all",
+      "kind": "say_all",
+      "words": "say something to everyone near you",
+      "reason": "Saying one line to everybody who hears within the policy's hearing reach, offered beside the ways of saying something to one being when anybody hears. The line is the decider's, as for saying something to one being, and nobody is made to answer it.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica society decision contract; see the entry reason"
+      }
+    },
+    {
+      "key": "leave",
+      "kind": "leave",
+      "words": "leave this world",
+      "reason": "Going back where it came from, taking what it holds: offered to a being whose kind has the leave ability, a visitor from another program, and recorded as its departure by its own choice.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica society decision contract; see the entry reason"
+      }
+    }
+  ]
+}

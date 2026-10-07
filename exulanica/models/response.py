@@ -212,9 +212,7 @@ def result_from_body(
         )
 
     if choice_request is not None:
-        payload: dict[str, Any] | None = {
-            choice_request.argument: choice_request.answer_from_tool_call(message)
-        }
+        payload: dict[str, Any] | None = choice_request.arguments_from_tool_call(message)
     else:
         payload = (
             None

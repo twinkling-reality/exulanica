@@ -44,7 +44,7 @@ nothing is asked or reserved and the routine decides.
 
 A decision role is a kind of thing in a world that changes and chooses at choice points of its own,
 whose choices a world's owner may hand to an open model. Each role is one entry of the registry
-catalog `assets/catalogs/roles/decision-roles.v4.json`, read at its newest version by
+catalog `assets/catalogs/roles/decision-roles.v5.json`, read at its newest version by
 `exulanica/world/decision_roles.py`. An entry states, with a licence and a reason like every catalog
 entry:
 
@@ -60,6 +60,14 @@ entry:
 | `subjects_bound` | The policy key bounding how many of its subjects models run at once |
 | `request_profile`, `receipt_profile`, `choice_profile`, `context_profile` | The profiles of its documents |
 | `prompt_version`, `instruction`, `choice_description`, `not_offered` | Its prompt: the one instruction, how the one choice is described, and what a model is told when its answer was not offered |
+| `engine_terms` | From registry version 5: for an engine that hosts the role and asks its own questions, that engine's terms, the two catalog versions its new requests record and its own prompt (version and three texts); empty where every engine is asked under the role's own |
+
+A request is asked under the terms of the engine whose state it was asked over: the engine's own
+where the entry states them, the role's otherwise (`DecisionRole.terms`). A request names its engine
+in its context where the engine's terms are its own, so its prompt, its choice and its record are
+read back by the same terms (`terms_of`); a request that names none was asked under the role's own.
+No two roles, and no two terms of one role, share a prompt version, and an entry stating terms for
+an engine that does not host it is refused by name (`role_terms_unhosted`).
 
 A role reads its owner's choices at the profile its entry states, which a new choice records, and
 at every earlier version of that profile, so a choice recorded before its role's choices moved on
@@ -79,7 +87,9 @@ names no role: a role's requirements reach it as a `ChosenRoleBinding`, and
 `tests/test_decision_roles.py` scans `exulanica/models` for role names.
 
 The person role has key `society_decision`, subject `person`, and is hosted by the
-purposeful society (`exulanica-society/v2`) and the living town (`exulanica-society/v5`). Its
+purposeful society (`exulanica-society/v2`), the living town (`exulanica-society/v5`) and the
+society of things (`exulanica-society/v7`), whose people are asked under the society of things'
+own terms ([below](#a-society-of-things-people)). Its
 adapter is `exulanica/world/roles/person.py`, over its contract in
 `exulanica/world/society_decision_contract.py` and its minute in
 `exulanica/world/society_model_decisions.py`; a person in a living town is offered the living
@@ -377,6 +387,57 @@ The bounds both policy versions state:
 | `process_reserve_percent` | 50 | The share of the process's model budget decisions leave for other work |
 | `answer_rank_tool_call`, `answer_rank_json_schema` | 1, 2 | The contract's order of answering mechanisms |
 
+### A society of things' people
+
+A society of things' people are asked under their engine's own terms: version 3 of both catalogs and
+the prompt `society-person-choice/v2`. Version 3 keeps version 2's actions and bounds and adds:
+
+| Action | Kind | Words a model reads |
+| --- | --- | --- |
+| `carry_on` | `carry_on` | "carry on with what you are doing" |
+| `say_to` | `say_to` | `say something to the {who} (person {number}), {metres} m away` |
+| `say_all` | `say_all` | "say something to everyone near you" |
+| `leave` | `leave` | "leave this world" |
+
+| Bound | Value | What it bounds |
+| --- | --- | --- |
+| `line_characters_maximum` | 200 | Characters of one line, as the line rule counts them (`exulanica/things/lines.py`) |
+| `hearing_reach_mm` | 8,000 | How far a line carries: the routine's own reach for two people stopping to talk |
+| `lines_heard_maximum` | 8 | Lines each being keeps, the oldest dropped first |
+| `say_options_maximum` | 4 | Ways of saying something offered: to each of the three nearest who hear, and to everyone near |
+
+**When they are asked.** At the routine's own choice point, as every person; and also the minute
+after a line was said to them, whatever is under way. A being an outside program decides for is
+asked every minute.
+
+**What they are offered.** At a choice point, the routine's options as above; and, where the being's
+kind has the say ability, saying something to each of the nearest beings within hearing reach whose
+kind offers hearing (named by their kind's label and the number their simulated name ends with), and
+to everyone near when anybody hears; and, for a visitor whose kind has the leave ability, leaving.
+While something is under way, going on with it (`carry_on`), with the ways of saying something and
+leaving; a being with none of those is not asked. Going on and waiting change nothing: an outside
+program's idle answer is going on where it is offered, waiting otherwise
+(`DecisionRole.idle_label`).
+
+**What the model reads.** The second prompt's instruction, then the situation, which also says when
+something is still under way, and the lines the being heard, oldest first, each quoted and named as
+what others said, never as instructions, by who said it (kind and number), to whom and when.
+
+**How it answers a line.** Where an option says something, the one function takes a second fixed
+argument, `line`: a string of at most `line_characters_maximum` characters, or null, both arguments
+required (`exulanica/models/choice.py`); `DecisionRole.line_labels` names the labels whose answer
+carries a line, for a door to state. An answer naming a say option with no line, or another option
+with one, is asked once more with the second prompt's note. A line that breaks the line rule is
+refused `line_out_of_bounds`, and one the workspace's rules would change, as they change a saved
+name, `line_refused_by_rules`; either way the receipt is rejected, nothing is said and the routine
+decides that turn. An accepted receipt's proposal is the label, the option and the line. An outside
+program's answer carries the line in its proposal too, held to the same rule, and a line naming a
+name the account holder saved is refused `line_refused_by_rules`.
+
+**What it does in its minute.** Going on, saying and leaving set no goal: the routine goes on as it
+would, and the society of things carries out the line and the leaving
+([society contract](synthetic-society-contract.md#the-society-of-things-v7)).
+
 ## The host's decision phase
 
 Before each minute of a playing purposeful society in a workspace the host's environment lists
@@ -538,7 +599,7 @@ stored request the loop does not rebuild stops it by name.
 
 | Part | Source | Tests |
 | --- | --- | --- |
-| Registry and adapters | `assets/catalogs/roles/decision-roles.v4.json`, `exulanica/world/decision_roles.py`, `exulanica/world/role_catalogs.py`, `exulanica/world/roles/` | `tests/test_decision_roles.py`, with the test role in `tests/decision_role_fixtures/` |
+| Registry and adapters | `assets/catalogs/roles/decision-roles.v5.json`, `exulanica/world/decision_roles.py`, `exulanica/world/role_catalogs.py`, `exulanica/world/roles/` | `tests/test_decision_roles.py`, with the test role in `tests/decision_role_fixtures/` |
 | Deciders and outside programs | `exulanica/world/deciders.py`, `exulanica/api/external_asking.py`, the host's outside path in `exulanica/api/decision_host.py`, migration 0146 | `tests/test_outside_deciders.py` (each answer and statement a door may give, late, failing or malformed, costing its own subject alone; a context carrying a saved name in any field), `tests/test_outside_deciders_postgres.py` (a request left open by a stopped host; a request carrying a saved name undone and not sent; a released grant's retry) |
 | Requests, receipts, the minute loop and replay | `exulanica/world/role_decisions.py` | `tests/test_decision_roles.py` |
 | The person's contract and minute | `exulanica/world/society_decision_contract.py`, `exulanica/world/society_model_decisions.py`, `assets/catalogs/society/society-decision-action.v2.json`, `assets/catalogs/society/society-decision-policy.v2.json` | `tests/test_society_person_decisions.py`, `tests/test_society_model_actions.py`, `tests/test_person_role_goldens.py` |

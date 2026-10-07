@@ -737,6 +737,13 @@
       "reason": "Authored: what a society of things recorded happening to a thing that came, moved or went, in the words the inspector and the Companion both use."
     },
     {
+      "key": "outcome.said",
+      "kind": "outcome",
+      "code": "said",
+      "words": "said something",
+      "reason": "Authored: what one recorded simulation event says happened to a simulated person, by the outcome the event records; it names no words anybody said, because talking has no content."
+    },
+    {
       "key": "event_reason.sent_away",
       "kind": "event_reason",
       "code": "sent_away",
@@ -854,6 +861,27 @@
       "code": "not_here",
       "words": "nobody of that name was here",
       "reason": "Authored: why a society of things recorded that a thing came, moved or went, or could not, when the event records a reason that is not a choice the planner makes."
+    },
+    {
+      "key": "event_reason.chose_to_say",
+      "kind": "event_reason",
+      "code": "chose_to_say",
+      "words": "it chose to say something",
+      "reason": "Authored: why a society of things recorded a line said, a visitor leaving by its own choice, or a visitor sent home because the program deciding for it went quiet: the decider's own act, said after 'because'."
+    },
+    {
+      "key": "event_reason.chose_to_leave",
+      "kind": "event_reason",
+      "code": "chose_to_leave",
+      "words": "it chose to go back where it came from",
+      "reason": "Authored: why a society of things recorded a line said, a visitor leaving by its own choice, or a visitor sent home because the program deciding for it went quiet: the decider's own act, said after 'because'."
+    },
+    {
+      "key": "event_reason.decider_lost",
+      "kind": "event_reason",
+      "code": "decider_lost",
+      "words": "the program deciding for it stopped answering",
+      "reason": "Authored: why a society of things recorded a line said, a visitor leaving by its own choice, or a visitor sent home because the program deciding for it went quiet: the decider's own act, said after 'because'."
     },
     {
       "key": "line.event",
@@ -1176,6 +1204,20 @@
       "code": "decider_passed",
       "words": "nobody in the program that decides for them was acting for them",
       "reason": "Authored: why a person's decider was or was not followed when an outside program decides for them under its grant, said after 'because' of the reason code a decision receipt records (GENERIC_REASONS in exulanica/world/decision_roles.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.line_out_of_bounds",
+      "kind": "decision_reason",
+      "code": "line_out_of_bounds",
+      "words": "the line it chose to say was not one plain line of words within the limit",
+      "reason": "Authored: why a person's model or outside program was not followed when the line its chosen option says breaks the line rule, said after 'because' of the reason code a decision receipt records (GENERIC_REASONS in exulanica/world/decision_roles.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.line_refused_by_rules",
+      "kind": "decision_reason",
+      "code": "line_refused_by_rules",
+      "words": "the line it chose to say carried a name this world's rules keep out",
+      "reason": "Authored: why a person's model or outside program was not followed when the workspace's rules would change the line its chosen option says, as they change a saved name, said after 'because' of the reason code a decision receipt records (GENERIC_REASONS in exulanica/world/decision_roles.py), in the words the People panel uses."
     },
     {
       "key": "doing.living_idle",

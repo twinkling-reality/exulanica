@@ -53,6 +53,17 @@ export interface RoutineGoal {
   readonly reason?: string;
 }
 
+/** A line a being of a society of things heard: when, who said it (by kind and number), to whom. */
+export interface SocietyHeardLine {
+  readonly tick: number;
+  readonly from: string;
+  readonly from_kind: ThingKindReference;
+  readonly from_number: number;
+  /** The one it was said to, or null for everyone near. */
+  readonly to: string | null;
+  readonly line: string;
+}
+
 export interface SocietyInhabitantSnapshot {
   readonly id: string;
   readonly synthetic: true;
@@ -106,6 +117,10 @@ export interface SocietyInhabitantSnapshot {
   /** mm/s: x and y along the ground (position_mm's two axes), z up (the rate of height_mm). */
   readonly velocity_mm_s?: readonly [number, number, number];
   readonly size_class_mm?: number;
+  /** v7: the lines the being heard, oldest first; stated only once it heard one. */
+  readonly heard?: readonly SocietyHeardLine[];
+  /** v7: the minutes in a row a visitor's program has been quiet; stated only while it is. */
+  readonly quiet_minutes?: number;
 }
 
 /** The exact versioned routine catalogs and digest recorded by a v4 society state. */
