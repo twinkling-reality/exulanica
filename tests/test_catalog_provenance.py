@@ -111,8 +111,9 @@ def test_the_discovery_finds_every_family_and_no_unknown_shape():
     # the grounds a society stands on, the words both the inspector and the
     # Companion say of a simulated person and of each kind of activity, the world object
     # catalog's three versions and its arrangements, the flight kind catalog, the local
-    # detector's vocabulary, the decision role registry in its three versions (the third names a
-    # choice's decider), the society ground catalog's second, third and fourth versions (the
+    # detector's vocabulary, the decision role registry in its four versions (the third names a
+    # choice's decider, the fourth hosts a society of things' people), the society ground
+    # catalog's second, third and fourth versions (the
     # grounds' navigation forms and population rules, then a site's ground, then the place each
     # input names and the records its people use), the world recipes in four
     # versions and the two versions of the specification schema their presets are points in,
@@ -124,7 +125,7 @@ def test_the_discovery_finds_every_family_and_no_unknown_shape():
     # query may carry, the four vocabularies a thing kind is read against (body plans, abilities,
     # offers, and look kinds in two versions, the second fitting every plan with bones), and the
     # body grammar a creature's body recipe is read against.
-    assert len(found[ENTRY_SHAPE]) == 96
+    assert len(found[ENTRY_SHAPE]) == 97
     # The traffic catalogs: vehicle classes, right-of-way policies, signal plans, the two access
     # mappings, the road derivation and the signal placement.
     assert len(found[CITED_SHAPE]) == 7

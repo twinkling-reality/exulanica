@@ -14,7 +14,7 @@ import { SOCIETY_ENGINES_V2_JSON, type SocietyEngineProfile } from './society-en
 export type { SocietyEngineProfile };
 
 /** Which state shape an engine writes, and so which reader parses it. */
-export type SocietyStateFamily = 'legacy' | 'purposeful' | 'living';
+export type SocietyStateFamily = 'legacy' | 'purposeful' | 'living' | 'things';
 
 export interface SocietyEngine {
   readonly engine: SocietyEngineProfile;
@@ -36,7 +36,7 @@ export interface SocietyEngine {
   readonly populationMaximum: number;
 }
 
-const FAMILIES: readonly SocietyStateFamily[] = ['legacy', 'purposeful', 'living'];
+const FAMILIES: readonly SocietyStateFamily[] = ['legacy', 'purposeful', 'living', 'things'];
 
 /**
  * The kinds of ground a new society is created over, each with the engine the table names: an owned

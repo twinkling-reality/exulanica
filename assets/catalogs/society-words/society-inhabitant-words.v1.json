@@ -4,7 +4,8 @@
   "catalog_version": 1,
   "profiles": [
     "exulanica-society/v2",
-    "exulanica-society/v5"
+    "exulanica-society/v5",
+    "exulanica-society/v7"
   ],
   "entries": [
     {
@@ -708,6 +709,34 @@
       "reason": "Authored: what one recorded simulation event says happened to a simulated person, by the outcome the event records; it names no words anybody said, because talking has no content."
     },
     {
+      "key": "outcome.put_elsewhere",
+      "kind": "outcome",
+      "code": "put_elsewhere",
+      "words": "was put somewhere else",
+      "reason": "Authored: what a society of things recorded happening to a thing that came, moved or went, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "outcome.not_arrived",
+      "kind": "outcome",
+      "code": "not_arrived",
+      "words": "did not arrive",
+      "reason": "Authored: what a society of things recorded happening to a thing that came, moved or went, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "outcome.not_placed",
+      "kind": "outcome",
+      "code": "not_placed",
+      "words": "was not placed",
+      "reason": "Authored: what a society of things recorded happening to a thing that came, moved or went, in the words the inspector and the Companion both use."
+    },
+    {
+      "key": "outcome.not_departed",
+      "kind": "outcome",
+      "code": "not_departed",
+      "words": "was not here to leave",
+      "reason": "Authored: what a society of things recorded happening to a thing that came, moved or went, in the words the inspector and the Companion both use."
+    },
+    {
       "key": "event_reason.sent_away",
       "kind": "event_reason",
       "code": "sent_away",
@@ -720,6 +749,97 @@
       "code": "brought_back",
       "words": "the world's owner brought everyone back",
       "reason": "Authored: why a recorded event happened when the event records a reason that is not a choice the planner makes, such as the world's owner sending everyone away."
+    },
+    {
+      "key": "event_reason.placed_by_author",
+      "kind": "event_reason",
+      "code": "placed_by_author",
+      "words": "the world's author placed it here",
+      "reason": "Authored: why a society of things recorded that a thing came, moved or went, or could not, when the event records a reason that is not a choice the planner makes."
+    },
+    {
+      "key": "event_reason.moved_by_author",
+      "kind": "event_reason",
+      "code": "moved_by_author",
+      "words": "the world's author moved it",
+      "reason": "Authored: why a society of things recorded that a thing came, moved or went, or could not, when the event records a reason that is not a choice the planner makes."
+    },
+    {
+      "key": "event_reason.removed_by_author",
+      "kind": "event_reason",
+      "code": "removed_by_author",
+      "words": "the world's author took it out of the world",
+      "reason": "Authored: why a society of things recorded that a thing came, moved or went, or could not, when the event records a reason that is not a choice the planner makes."
+    },
+    {
+      "key": "event_reason.society_full",
+      "kind": "event_reason",
+      "code": "society_full",
+      "words": "the world already holds as many people as it can",
+      "reason": "Authored: why a society of things recorded that a thing came, moved or went, or could not, when the event records a reason that is not a choice the planner makes."
+    },
+    {
+      "key": "event_reason.no_place_to_stand",
+      "kind": "event_reason",
+      "code": "no_place_to_stand",
+      "words": "there was nowhere open to stand near where it was placed",
+      "reason": "Authored: why a society of things recorded that a thing came, moved or went, or could not, when the event records a reason that is not a choice the planner makes."
+    },
+    {
+      "key": "event_reason.crossed_in",
+      "kind": "event_reason",
+      "code": "crossed_in",
+      "words": "it came in from another program through a gate",
+      "reason": "Authored: why a society of things recorded that a thing came, moved or went, or could not, when the event records a reason that is not a choice the planner makes."
+    },
+    {
+      "key": "event_reason.sent_home",
+      "kind": "event_reason",
+      "code": "sent_home",
+      "words": "the program it came from called it back",
+      "reason": "Authored: why a society of things recorded that a thing came, moved or went, or could not, when the event records a reason that is not a choice the planner makes."
+    },
+    {
+      "key": "event_reason.grant_ended",
+      "kind": "event_reason",
+      "code": "grant_ended",
+      "words": "the permission it came in under ended",
+      "reason": "Authored: why a society of things recorded that a thing came, moved or went, or could not, when the event records a reason that is not a choice the planner makes."
+    },
+    {
+      "key": "event_reason.no_arrival_place",
+      "kind": "event_reason",
+      "code": "no_arrival_place",
+      "words": "the world has no gate to arrive through",
+      "reason": "Authored: why a society of things recorded that a thing came, moved or went, or could not, when the event records a reason that is not a choice the planner makes."
+    },
+    {
+      "key": "event_reason.visitor_limit",
+      "kind": "event_reason",
+      "code": "visitor_limit",
+      "words": "the world already holds as many visitors as it takes",
+      "reason": "Authored: why a society of things recorded that a thing came, moved or went, or could not, when the event records a reason that is not a choice the planner makes."
+    },
+    {
+      "key": "event_reason.unknown_kind",
+      "kind": "event_reason",
+      "code": "unknown_kind",
+      "words": "it is no kind of thing this world knows",
+      "reason": "Authored: why a society of things recorded that a thing came, moved or went, or could not, when the event records a reason that is not a choice the planner makes."
+    },
+    {
+      "key": "event_reason.already_here",
+      "kind": "event_reason",
+      "code": "already_here",
+      "words": "something of the same name is already here",
+      "reason": "Authored: why a society of things recorded that a thing came, moved or went, or could not, when the event records a reason that is not a choice the planner makes."
+    },
+    {
+      "key": "event_reason.not_here",
+      "kind": "event_reason",
+      "code": "not_here",
+      "words": "nobody of that name was here",
+      "reason": "Authored: why a society of things recorded that a thing came, moved or went, or could not, when the event records a reason that is not a choice the planner makes."
     },
     {
       "key": "line.event",
@@ -1034,6 +1154,13 @@
       "kind": "decision_reason",
       "code": "grant_expired",
       "words": "that program's permission to decide for them had run out",
+      "reason": "Authored: why a person's decider was or was not followed when an outside program decides for them under its grant, said after 'because' of the reason code a decision receipt records (GENERIC_REASONS in exulanica/world/decision_roles.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.decider_passed",
+      "kind": "decision_reason",
+      "code": "decider_passed",
+      "words": "nobody in the program that decides for them was acting for them",
       "reason": "Authored: why a person's decider was or was not followed when an outside program decides for them under its grant, said after 'because' of the reason code a decision receipt records (GENERIC_REASONS in exulanica/world/decision_roles.py), in the words the People panel uses."
     },
     {

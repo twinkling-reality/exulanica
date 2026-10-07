@@ -1,0 +1,73 @@
+{
+  "profile": "exulanica.thing-kind/v1",
+  "kind": "well",
+  "version": 2,
+  "label": "well",
+  "summary": "A stone well with a little roof, which people walk up to and look into.",
+  "class": "object",
+  "body": {
+    "plan": "rigid/v1",
+    "box_mm": {
+      "width": 1600,
+      "depth": 1600,
+      "height": 2200
+    },
+    "blocks_walking": true
+  },
+  "origin": {
+    "profile": "exulanica.origin/v1",
+    "class": "authored",
+    "by": {
+      "kind": "project"
+    },
+    "sources": [],
+    "licence": {
+      "spdx": "Apache-2.0",
+      "verdict": "SHIP",
+      "attribution": null,
+      "share_alike": false,
+      "licence_url": null,
+      "licence_text_sha256": null
+    },
+    "authors": [],
+    "lineage": {
+      "ingredients": [],
+      "receipts": [],
+      "translation_manifest_sha256": null
+    },
+    "distribution": "public"
+  },
+  "moves": [],
+  "abilities": [],
+  "offers": [
+    {
+      "key": "visit",
+      "parameters": {
+        "places": [
+          {
+            "x_mm": 0,
+            "y_mm": 1590,
+            "faces": "-y",
+            "seat": null
+          },
+          {
+            "x_mm": 0,
+            "y_mm": -1590,
+            "faces": "+y",
+            "seat": null
+          }
+        ]
+      }
+    }
+  ],
+  "routine": null,
+  "deciders": null,
+  "looks": [
+    {
+      "look": "primitive-well",
+      "version": 1,
+      "sha256": "40441b985e489ebc22090ad080bd36f93554398d9440011d50ab9ec041093ace"
+    }
+  ],
+  "ext": {}
+}

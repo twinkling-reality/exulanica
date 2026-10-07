@@ -69,8 +69,9 @@ IDLE_KIND: Final = "wait"
 REASONS: Final = PERSON_REASONS
 
 
-#: The state families whose people this role decides for.
-FAMILIES: Final = ("purposeful", "living")
+#: The state families whose people this role decides for: a society of things' people are
+#: purposeful people beside its things, asked the purposeful contract's questions.
+FAMILIES: Final = ("purposeful", "living", "things")
 
 
 def person_role() -> DecisionRole:

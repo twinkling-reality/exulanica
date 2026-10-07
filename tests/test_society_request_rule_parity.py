@@ -5,7 +5,9 @@
 before it records one. Were they to disagree, a request the society would take could not be
 recorded, or one it refuses could be. Both are asked of the same people, under an input that records
 the newest routine and one that records none: somebody free, each kind of stay the routine has,
-under way, a talker waiting for the other, a stay just over, somebody blocked, and somebody walking.
+under way, a talker waiting for the other, a stay just over, somebody blocked, and somebody walking;
+and, in a society of things, a visitor from outside, whom no request may direct however free it is
+(its own program decides for it), beside a being the world's author placed, who may be.
 """
 
 from __future__ import annotations
@@ -66,6 +68,15 @@ def _people(stays: list[str]) -> dict[str, dict[str, Any]]:
         # Never recorded, since a stay happens at a node; held here so the rule's node clause is
         # asked of both sides too.
         "a stay kind on an edge": _person(stays[0], "active", where=ON_AN_EDGE),
+        "a free visitor from outside": {
+            **_person("idle", "active", goal=False),
+            "came_by": "crossed",
+        },
+        "a blocked visitor from outside": {**_person("idle", "blocked"), "came_by": "crossed"},
+        "a free being its author placed": {
+            **_person("idle", "active", goal=False),
+            "came_by": "placed",
+        },
     }
 
 
@@ -111,5 +122,8 @@ def test_the_database_admits_exactly_whom_the_society_may_direct(spine_schema, i
         assert answers[read_under, "walking, at a node on the way"] is False
         assert answers[read_under, "walking, part way along an edge"] is False
         assert answers[read_under, "a stay kind on an edge"] is False
+        assert answers[read_under, "a free visitor from outside"] is False
+        assert answers[read_under, "a blocked visitor from outside"] is False
+        assert answers[read_under, "a free being its author placed"] is True
     assert answers["the newest routine", "a talker waiting for the other"] is True
     assert answers["no routine", "a talker waiting for the other"] is False

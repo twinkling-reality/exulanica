@@ -91,3 +91,20 @@ describe('the society engine table', () => {
       .toThrow('Invalid society goal');
   });
 });
+
+describe('a society of things', () => {
+  const things = (inhabitants: number, population: number) => {
+    const row = purposeful('exulanica-society/v7', inhabitants);
+    return { ...row, population_size: population };
+  };
+
+  it('is read with the purposeful reader, its people as many as come and go within its bound', () => {
+    expect(societyEngine('exulanica-society/v7').stateFamily).toBe('things');
+    // Begun with six of its ground's people, it holds eight once a placed being and a visitor came.
+    expect(parseSociety(things(8, 6)).state.inhabitants).toHaveLength(8);
+    expect(parseSociety(things(4, 6)).state.inhabitants).toHaveLength(4);
+    expect(() => parseSociety(things(513, 6))).toThrow('Invalid society response');
+    // Any other engine still holds exactly its population.
+    expect(() => parseSociety({ ...purposeful('exulanica-society/v2', 8), population_size: 6 })).toThrow('Invalid society response');
+  });
+});

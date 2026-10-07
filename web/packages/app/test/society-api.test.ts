@@ -131,6 +131,16 @@ describe('persisted event identity and window', () => {
       expect(() => parseSocietyEvents({events:[{...persistedEvent(),document:{...document,...changed}}]},snapshot)).toThrow(/binding/);
     }
   });
+  it('reads a society of things\' history, which names people who have left', () => {
+    const held = parseSociety(responseRow());
+    const document = {...persistedEvent().document,branch_id:'branch',subject_id:'gone',tick:4,order:0,input_seq:1,input_sha256:'c'.repeat(64),reason:'sent_home',outcome:'departed'};
+    const left = {...persistedEvent(),subject_id:'gone'};
+    const things = {...held,state:{...held.state,profile:'exulanica-society/v7' as const}};
+    expect(parseSocietyEvents({events:[{...left,document:{...document,profile:'exulanica-society/v7'}}]},things)).toHaveLength(1);
+    // Anywhere else, an event names only somebody the state holds.
+    const purposeful = {...held,state:{...held.state,profile:'exulanica-society/v2' as const}};
+    expect(() => parseSocietyEvents({events:[{...left,document:{...document,profile:'exulanica-society/v2'}}]},purposeful)).toThrow();
+  });
 });
 
 describe('living society snapshots', () => {

@@ -44,6 +44,7 @@ from exulanica.models.manifest import (
     parse_manifest,
 )
 from exulanica.models.transport import HttpResponse
+from exulanica.world.deciders import EXTERNAL_REASONS
 from exulanica.world.decision_roles import (
     ADAPTER_PACKAGE,
     CHOICE_SUBJECT_FIELDS,
@@ -214,7 +215,11 @@ def test_the_person_is_a_registered_role_read_from_its_catalogs():
     registry = decision_roles()
     person = registry.role("society_decision")
     assert person.adapter.__name__ == f"{ADAPTER_PACKAGE}.person"
-    assert person.engines == ("exulanica-society/v2", "exulanica-society/v5")
+    assert person.engines == (
+        "exulanica-society/v2",
+        "exulanica-society/v5",
+        "exulanica-society/v7",
+    )
     assert person.chosen.required_use_cases == ("text",)
     second = person.contract()
     first = person.contract({"society-decision-action": 1, "society-decision-policy": 1})
@@ -641,3 +646,22 @@ def test_the_fixture_role_is_its_data_and_one_module():
         "junction-signal-policy.v1.json",
         "junction_signal.py",
     ]
+
+
+def test_a_role_names_the_offered_option_that_changes_nothing():
+    """What an outside program answers for a subject when nobody there acts for it: the option of
+    the role's idle kind, read from the request's own context, or none where none is offered."""
+    person = decision_roles().role("society_decision")
+    signal = decision_roles().role("junction_signal")
+    offered = {
+        "options": [
+            {"label": "A", "kind": "target"},
+            {"label": "B", "kind": person.adapter.IDLE_KIND},
+        ]
+    }
+    assert person.idle_label(offered) == "B"
+    assert person.idle_label({"options": offered["options"][:1]}) is None
+    assert signal.idle_label({"options": [{"label": "C", "kind": signal.adapter.IDLE_KIND}]}) == "C"
+    # A pass is an outside program's own reason, recorded at once, which every role records.
+    assert "decider_passed" in EXTERNAL_REASONS
+    assert "decider_passed" in person.reasons and "decider_passed" in signal.reasons

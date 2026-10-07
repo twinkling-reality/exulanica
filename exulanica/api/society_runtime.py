@@ -78,6 +78,7 @@ from exulanica.world.society_authored_ground import (
     authored_input_region,
     build_authored_ground_society_input_v3,
     build_authored_ground_society_input_v4,
+    build_authored_ground_society_input_v5,
     objects_in_region,
     read_authored_ground,
 )
@@ -91,9 +92,12 @@ from exulanica.world.society_composition import (
 )
 from exulanica.world.society_engines import society_engine
 from exulanica.world.society_input_policy import (
+    ARRIVAL_INPUTS,
+    AUTHORED_GROUND_COMPOSITION_V5,
     LEGACY_COMPOSITION,
     LIVING_INPUTS,
     LOCAL_INPUT,
+    THING_INPUTS,
     WALKING_SURFACES_BY_FAMILY,
     WALKING_SURFACES_COMPOSITION,
     WALKING_SURFACES_COMPOSITION_V2,
@@ -300,6 +304,12 @@ def _reviewed_view(row: Mapping[str, Any] | None) -> ReviewedRow:
     if row is None:
         return None
     return (row["content_sha256"], row["byte_size"], row["licence_sha256"])
+
+
+def _pins_arrival(document: dict[str, Any]) -> bool:
+    """Whether an input pins the opening source a person arrives at: every fourth-composition
+    input, and a things-composition input whose ground states no arrival of its own."""
+    return document.get("profile") in ARRIVAL_INPUTS and document.get("arrival") is not None
 
 
 class RuntimeSourceBinding(BaseModel):
@@ -1133,7 +1143,7 @@ class SocietyRuntime:
         read: _ReadFirst,
         document: dict,
     ) -> None:
-        if document.get("profile") != "exulanica.society-input/authored-ground-v4":
+        if not _pins_arrival(document):
             return
         try:
             descriptor = ArrivalDescriptor.model_validate(document["arrival"])
@@ -1589,6 +1599,31 @@ class SocietyRuntime:
         # the area the ground states or declares, or the walking surfaces the world's own records
         # state. A form with no composition is refused by name.
         if ground.navigation_form == "lattice":
+            if composition == AUTHORED_GROUND_COMPOSITION_V5:
+                # A society of things: the fourth composition's ground at its pinned arrival,
+                # or the ground's own where it states one, and the things placed in it.
+                at = (
+                    ground
+                    if arrival is None
+                    else replace(
+                        ground,
+                        arrival_x_mm=arrival.position_local_mm[0],
+                        arrival_z_mm=arrival.position_local_mm[2],
+                    )
+                )
+                return build_authored_ground_society_input_v5(
+                    ground=ground,
+                    version=version,
+                    arrival=arrival,
+                    input_seq=seq,
+                    dependency_refs=self._authored_refs(binding, at),
+                    availability="available" if reason is None else "unavailable",
+                    unavailable_reason=reason,
+                    reviewed_affordances=registry,
+                    segment_blocked=segment_blocked,
+                    standing=self._standing,
+                    workspace_obstacles=workspace,
+                )
             if arrival is not None:
                 arrived_ground = replace(
                     ground,
@@ -1744,14 +1779,17 @@ class SocietyRuntime:
                 raise UnavailableSocietyInput("arrival_source_unavailable")
             version = self._authored_version(connection, session, binding)
             composition = None
-            if engine is not None and ground.navigation_form == "walking_surfaces":
+            family = None if engine is None else society_engine(engine).state_family
+            if family is not None and ground.navigation_form == "walking_surfaces":
                 # A world's own walking surfaces are composed as the engine asked for reads them.
-                family = society_engine(engine).state_family
                 composition = WALKING_SURFACES_BY_FAMILY.get(family)
                 if composition is None:
                     raise UnavailableSocietyInput(
                         f"no composition of a world's own surfaces is read by a {family} engine"
                     )
+            elif family == "things":
+                # A society of things reads the things the author placed with the ground.
+                composition = AUTHORED_GROUND_COMPOSITION_V5
             return self._authored_compose(
                 connection,
                 binding,
@@ -1811,7 +1849,7 @@ class SocietyRuntime:
             )
             arrival_authority: ArrivalAuthority | None = None
             arrival = None
-            if document["profile"] == "exulanica.society-input/authored-ground-v4":
+            if _pins_arrival(document):
                 try:
                     arrival = ArrivalDescriptor.model_validate(document["arrival"])
                 except (KeyError, ValueError) as exc:
@@ -1885,6 +1923,7 @@ class SocietyRuntime:
                     # and under the routine it records.
                     policy_for_input(document["profile"])
                     if ground.navigation_form == "walking_surfaces"
+                    or document["profile"] in THING_INPUTS
                     else None,
                     input_routine(document) if document["profile"] in LIVING_INPUTS else None,
                     arrival=arrival,
@@ -1986,7 +2025,7 @@ class SocietyRuntime:
             self._read_town_ahead(connection, binding, ground, read, last_document)
             self._read_ahead(connection, session, read, composing=binding)
             arrival_authority: ArrivalAuthority | None = None
-            if last_document["profile"] == "exulanica.society-input/authored-ground-v4":
+            if _pins_arrival(last_document):
                 arrival = ArrivalDescriptor.model_validate(last_document["arrival"])
                 key = society_state_sha256(arrival.model_dump(mode="json"))
                 arrival_authority = read.arrivals.get(key)
@@ -2014,7 +2053,11 @@ class SocietyRuntime:
                 last + 1,
                 read,
                 policy_for_input(last_document["profile"])
-                if last_document is not None and ground.navigation_form == "walking_surfaces"
+                if last_document is not None
+                and (
+                    ground.navigation_form == "walking_surfaces"
+                    or last_document["profile"] in THING_INPUTS
+                )
                 else None,
                 input_routine(last_document)
                 if last_document is not None and last_document["profile"] in LIVING_INPUTS

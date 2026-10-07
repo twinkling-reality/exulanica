@@ -1,1 +1,0 @@
-lane THINGS (2026-10-03 wave), package 3a2: the v7 engine checks, event kinds and input authored-ground-v5. It names neither world_alternate_thing nor the edit log checks (tests/test_edit_kinds.py)

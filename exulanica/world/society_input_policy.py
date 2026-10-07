@@ -23,12 +23,19 @@ AUTHORED_GROUND_COMPOSITION_V3 = "exulanica.society-composition/authored-ground-
 #: A new made-world society stands at the world-owned opening source its saved version pins.
 #: Existing v3 societies keep the region-origin rule recorded in their inputs.
 AUTHORED_GROUND_COMPOSITION_V4 = "exulanica.society-composition/authored-ground-v4"
+#: The society of things (``exulanica-society/v7``) reads the fourth composition's ground, at the
+#: opening source its saved version pins where the ground states none, and the things the world's
+#: author placed in the version, each with what its kind says it is and does
+#: (:mod:`exulanica.things.kinds`): a placed object blocks walking or offers a rest or a visit as
+#: its kind says, a placed being lives there, and a gate is where visitors from outside arrive.
+AUTHORED_GROUND_COMPOSITION_V5 = "exulanica.society-composition/authored-ground-v5"
 LEGACY_INPUT = "exulanica.society-input/v1"
 LOCAL_INPUT = "exulanica.society-input/v2"
 AUTHORED_GROUND_INPUT = "exulanica.society-input/authored-ground-v1"
 AUTHORED_GROUND_INPUT_V2 = "exulanica.society-input/authored-ground-v2"
 AUTHORED_GROUND_INPUT_V3 = "exulanica.society-input/authored-ground-v3"
 AUTHORED_GROUND_INPUT_V4 = "exulanica.society-input/authored-ground-v4"
+AUTHORED_GROUND_INPUT_V5 = "exulanica.society-input/authored-ground-v5"
 #: A saved world whose own records state its walking surfaces (a world generated from the city
 #: grammar): the society walks those surfaces, the world's premises and benches are its activities,
 #: and the input records the population its ground's rule derived (migration 0118).
@@ -62,6 +69,7 @@ _PAIRS = (
     (AUTHORED_GROUND_COMPOSITION_V4, AUTHORED_GROUND_INPUT_V4),
     (WALKING_SURFACES_COMPOSITION, WALKING_SURFACES_INPUT),
     (WALKING_SURFACES_COMPOSITION_V2, WALKING_SURFACES_INPUT_V2),
+    (AUTHORED_GROUND_COMPOSITION_V5, AUTHORED_GROUND_INPUT_V5),
 )
 #: Compositions that record a known unreachable authored activity against that activity alone,
 #: type-check authored transforms strictly, and publish an ``unavailable_affordances`` list.
@@ -73,6 +81,7 @@ LOCAL_FAILURE_COMPOSITIONS = (
     AUTHORED_GROUND_COMPOSITION_V4,
     WALKING_SURFACES_COMPOSITION,
     WALKING_SURFACES_COMPOSITION_V2,
+    AUTHORED_GROUND_COMPOSITION_V5,
 )
 LOCAL_FAILURE_INPUTS = (
     LOCAL_INPUT,
@@ -82,9 +91,11 @@ LOCAL_FAILURE_INPUTS = (
     AUTHORED_GROUND_INPUT_V4,
     WALKING_SURFACES_INPUT,
     WALKING_SURFACES_INPUT_V2,
+    AUTHORED_GROUND_INPUT_V5,
 )
 #: Every input profile a saved world's own ground produces, oldest first. A society's inputs may
-#: move forward along this order and never back.
+#: move forward along this order and never back; a society whose first input pins where people
+#: arrive (``ARRIVAL_INPUTS``) keeps its first input's profile for its whole life.
 AUTHORED_GROUND_INPUTS: Final = (
     AUTHORED_GROUND_INPUT,
     AUTHORED_GROUND_INPUT_V2,
@@ -92,6 +103,7 @@ AUTHORED_GROUND_INPUTS: Final = (
     AUTHORED_GROUND_INPUT_V4,
     WALKING_SURFACES_INPUT,
     WALKING_SURFACES_INPUT_V2,
+    AUTHORED_GROUND_INPUT_V5,
 )
 #: Input profiles that record the purposeful routine they were composed under. Every other profile
 #: records none and is read under the routine the society was first released with.
@@ -100,7 +112,15 @@ ROUTINE_INPUTS: Final = (
     AUTHORED_GROUND_INPUT_V4,
     WALKING_SURFACES_INPUT,
     WALKING_SURFACES_INPUT_V2,
+    AUTHORED_GROUND_INPUT_V5,
 )
+#: Input profiles that state where a person arrives by the opening source the version pins: the
+#: fourth composition's always, and the things composition's wherever the ground states no arrival
+#: of its own (``arrival`` is null where it does).
+ARRIVAL_INPUTS: Final = (AUTHORED_GROUND_INPUT_V4, AUTHORED_GROUND_INPUT_V5)
+#: Input profiles that carry the things the world's author placed in the version, which only a
+#: society of things reads.
+THING_INPUTS: Final = (AUTHORED_GROUND_INPUT_V5,)
 #: Input profiles that record the population their ground's rule derived from the world.
 POPULATION_INPUTS: Final = (WALKING_SURFACES_INPUT, WALKING_SURFACES_INPUT_V2)
 #: Input profiles that carry the living place a living society over them walks, with the living
@@ -119,8 +139,11 @@ WALKING_SURFACES_BY_FAMILY: Final[Mapping[str, str]] = {
 #: ``record_subjects``): a record's subject is its kind and its identity.
 WORLD_RECORD_INPUTS: Final = (WALKING_SURFACES_INPUT, WALKING_SURFACES_INPUT_V2)
 #: Record kinds an input profile's activities may name as their subjects whatever ground it is
-#: composed over, by profile: none yet.
-PROFILE_RECORD_SUBJECTS: Final[Mapping[str, tuple[str, ...]]] = {}
+#: composed over, by profile.
+PROFILE_RECORD_SUBJECTS: Final[Mapping[str, tuple[str, ...]]] = {
+    # A thing the world's author placed, by its id in the version.
+    AUTHORED_GROUND_INPUT_V5: ("thing",),
+}
 
 
 def _record_subjects(document: Mapping[str, Any]) -> tuple[str, ...]:
@@ -143,6 +166,7 @@ LOCAL_RECORD_REASONS: Final[Mapping[str, frozenset[str]]] = {
     AUTHORED_GROUND_INPUT_V2: frozenset({UNREACHABLE, MOVES, OFF_GROUND, UNSUPPORTED_BEHAVIOUR}),
     AUTHORED_GROUND_INPUT_V3: frozenset({UNREACHABLE, MOVES, OFF_GROUND, UNSUPPORTED_BEHAVIOUR}),
     AUTHORED_GROUND_INPUT_V4: frozenset({UNREACHABLE, MOVES, OFF_GROUND, UNSUPPORTED_BEHAVIOUR}),
+    AUTHORED_GROUND_INPUT_V5: frozenset({UNREACHABLE, MOVES, OFF_GROUND, UNSUPPORTED_BEHAVIOUR}),
     # A world that states its walking surfaces joins no object its person placed to them, and a
     # place of its own too close to another's is not stood at: either activity is unreachable.
     WALKING_SURFACES_INPUT: frozenset({UNREACHABLE}),
@@ -153,6 +177,7 @@ UNREAD_PLACEMENT_REASONS: Final[Mapping[str, frozenset[str]]] = {
     AUTHORED_GROUND_INPUT_V2: frozenset({NO_AUTHORED_FRAME}),
     AUTHORED_GROUND_INPUT_V3: frozenset({NO_AUTHORED_FRAME}),
     AUTHORED_GROUND_INPUT_V4: frozenset({NO_AUTHORED_FRAME}),
+    AUTHORED_GROUND_INPUT_V5: frozenset({NO_AUTHORED_FRAME}),
     WALKING_SURFACES_INPUT: frozenset({NO_AUTHORED_FRAME}),
     WALKING_SURFACES_INPUT_V2: frozenset({NO_AUTHORED_FRAME}),
 }

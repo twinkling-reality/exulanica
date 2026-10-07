@@ -36,7 +36,6 @@ IDENTITY_COMPARISONS: dict[str, tuple[int, str]] = {
         "definition and the state it reads are that engine's",
     ),
     "exulanica/world/society_legacy.py": (1, "the first engine checks its own state"),
-    "exulanica/world/society_planner.py": (1, "the purposeful engine checks its own state"),
     "exulanica/world/society_presence.py": (
         1,
         "the purposeful engine's own presence transition checks its state and seed",
@@ -48,6 +47,11 @@ IDENTITY_COMPARISONS: dict[str, tuple[int, str]] = {
         "functions (four)",
     ),
     "exulanica/world/society_social.py": (1, "the social engine checks its own state"),
+    "exulanica/world/society_things.py": (
+        2,
+        "the society of things checks that the state its things phase and its state check are "
+        "given is its own",
+    ),
 }
 
 

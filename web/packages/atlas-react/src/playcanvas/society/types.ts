@@ -6,7 +6,30 @@ export type SocietyProfile =
   | 'exulanica-society/v2'
   | 'exulanica-society/v3'
   | 'exulanica-society/v4'
-  | 'exulanica-society/v5';
+  | 'exulanica-society/v5'
+  | 'exulanica-society/v7';
+
+/** A thing kind by key, version and digest, as a society of things names it: never a look. */
+export interface ThingKindReference {
+  readonly kind: string;
+  readonly version: number;
+  readonly sha256: string;
+}
+
+/**
+ * One of a society of things' things (v7): an object its author placed, standing where the version
+ * puts it, or one a visitor carried in, held by it. How it is drawn is a look chosen for it.
+ */
+export interface SocietyThingSnapshot {
+  readonly id: string;
+  readonly placed_id: string | null;
+  readonly kind: ThingKindReference;
+  readonly position_mm: readonly [number, number] | null;
+  readonly yaw_microradians: number | null;
+  readonly held_by: string | null;
+  /** Only for a thing that does not rest on the ground: millimetres above its elevation. */
+  readonly height_mm?: number;
+}
 
 /**
  * The v2 goal: one reviewed affordance at one target, a walk that makes room at a busy
@@ -72,6 +95,17 @@ export interface SocietyInhabitantSnapshot {
   readonly support_z_mm?: number | null;
   readonly needs?: Readonly<Record<string, number>>;
   readonly explanation?: { readonly summary: string; readonly event_ids: readonly string[] };
+  /** v7: the person is a thing of this kind, and came by population, placement or crossing. */
+  readonly kind?: ThingKindReference;
+  readonly came_by?: 'populated' | 'placed' | 'crossed';
+  readonly placed_id?: string | null;
+  readonly crossing?: { readonly arrival_id: string; readonly bridge: string; readonly grant_id: string } | null;
+  /** v7, only where they apply: a mode other than walking, height and velocity in flight, a size class. */
+  readonly mode?: 'walking' | 'flight';
+  readonly height_mm?: number;
+  /** mm/s: x and y along the ground (position_mm's two axes), z up (the rate of height_mm). */
+  readonly velocity_mm_s?: readonly [number, number, number];
+  readonly size_class_mm?: number;
 }
 
 /** The exact versioned routine catalogs and digest recorded by a v4 society state. */
@@ -99,6 +133,8 @@ export interface OwnedSocietyState {
   readonly minute_of_day?: number;
   readonly day?: number;
   readonly inhabitants: readonly SocietyInhabitantSnapshot[];
+  /** v7: the society's things. */
+  readonly things?: readonly SocietyThingSnapshot[];
 }
 
 export type CrowdDetail = 'near' | 'far';

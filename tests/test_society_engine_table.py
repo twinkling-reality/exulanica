@@ -42,6 +42,7 @@ from exulanica.world.society_engines import (
 from exulanica.world.society_living import LIVING_PROFILE, LIVING_TOWN_PROFILE
 from exulanica.world.society_planner import PURPOSEFUL_PROFILE
 from exulanica.world.society_social import SOCIAL_PROFILE
+from exulanica.world.society_things import THINGS_PROFILE
 
 ROOT = Path(__file__).resolve().parents[1]
 QUOTED_ENGINE = re.compile(r"'(exulanica-society/v[0-9]+)'")
@@ -57,6 +58,7 @@ def test_every_engine_in_the_table_is_implemented_and_every_implementation_is_li
         SOCIAL_PROFILE: "purposeful",
         LIVING_PROFILE: "living",
         LIVING_TOWN_PROFILE: "living",
+        THINGS_PROFILE: "things",
     }
     assert {engine.engine: engine.state_family for engine in ENGINES} == implemented
     assert DEFAULT_ENGINE == SOCIETY_ENGINE_VERSION
@@ -64,19 +66,26 @@ def test_every_engine_in_the_table_is_implemented_and_every_implementation_is_li
 
 def test_each_capability_is_claimed_only_by_engines_that_implement_it():
     # A capability in the table is a promise the code keeps: directed actions are v2 and v3's
-    # goal-policy seam, model decisions are v2's person decisions over that same seam and v3's
-    # stored social proposals, experiments run the living engine.
-    assert ACTION_ENGINES == (PURPOSEFUL_PROFILE, SOCIAL_PROFILE)
-    assert DECISION_ENGINES == (PURPOSEFUL_PROFILE, SOCIAL_PROFILE, LIVING_TOWN_PROFILE)
-    # v2's people take a model their world's owner chose at the planner's choice points, and the
-    # living town's at its engine's own, through its choice seam.
-    assert OWNER_MODEL_CHOICE_ENGINES == (PURPOSEFUL_PROFILE, LIVING_TOWN_PROFILE)
+    # goal-policy seam, which the society of things' planner minute is, model decisions are v2's
+    # person decisions over that same seam and v3's stored social proposals, experiments run the
+    # living engine.
+    assert ACTION_ENGINES == (PURPOSEFUL_PROFILE, SOCIAL_PROFILE, THINGS_PROFILE)
+    assert DECISION_ENGINES == (
+        PURPOSEFUL_PROFILE,
+        SOCIAL_PROFILE,
+        LIVING_TOWN_PROFILE,
+        THINGS_PROFILE,
+    )
+    # v2's people take a model their world's owner chose at the planner's choice points, and so do
+    # a society of things' people, and the living town's at its engine's own, through its seam.
+    assert OWNER_MODEL_CHOICE_ENGINES == (PURPOSEFUL_PROFILE, LIVING_TOWN_PROFILE, THINGS_PROFILE)
     # v3 is retired: its stored societies read and replay, and nothing new is made with it.
     assert CREATABLE_ENGINES == (
         SOCIETY_ENGINE_VERSION,
         PURPOSEFUL_PROFILE,
         LIVING_PROFILE,
         LIVING_TOWN_PROFILE,
+        THINGS_PROFILE,
     )
     assert CREATES == {
         "district": LIVING_PROFILE,
@@ -86,7 +95,12 @@ def test_each_capability_is_claimed_only_by_engines_that_implement_it():
     assert EXPERIMENT_ENGINES == (LIVING_PROFILE,)
     # Comparisons play the purposeful society or living town through each engine's choice seam.
     assert COMPARISON_ENGINES == (PURPOSEFUL_PROFILE, LIVING_TOWN_PROFILE)
-    assert SAVED_WORLD_ENGINES == (PURPOSEFUL_PROFILE, SOCIAL_PROFILE, LIVING_TOWN_PROFILE)
+    assert SAVED_WORLD_ENGINES == (
+        PURPOSEFUL_PROFILE,
+        SOCIAL_PROFILE,
+        LIVING_TOWN_PROFILE,
+        THINGS_PROFILE,
+    )
     # Sending people away and bringing them back is the purposeful engine's own transition.
     assert PRESENCE_ENGINES == (PURPOSEFUL_PROFILE,)
     assert LEGACY_ENGINES == (SOCIETY_ENGINE_VERSION,)

@@ -44,7 +44,7 @@ nothing is asked or reserved and the routine decides.
 
 A decision role is a kind of thing in a world that changes and chooses at choice points of its own,
 whose choices a world's owner may hand to an open model. Each role is one entry of the registry
-catalog `assets/catalogs/roles/decision-roles.v3.json`, read at its newest version by
+catalog `assets/catalogs/roles/decision-roles.v4.json`, read at its newest version by
 `exulanica/world/decision_roles.py`. An entry states, with a licence and a reason like every catalog
 entry:
 
@@ -258,10 +258,19 @@ with no model client asks no model.
   bridge, grant, grant revision and mapping file it was asked under, and an accepted one always
   carries the program's record. An answer that fails is recorded as `decider_disconnected`, for its
   own subject alone. A request the program did not answer ends for one of the outside reasons
-  `decider_disconnected`, `no_answer_in_time`, `grant_revoked` or `grant_expired`, whatever else
-  changed before it was recorded, and one a stopped host left open closes as `no_answer_in_time`,
-  so its receipt and its minute's event always say an outside program was asked; the routine
-  decides that turn.
+  `decider_disconnected`, `no_answer_in_time`, `grant_revoked`, `grant_expired` or
+  `decider_passed`, whatever else changed before it was recorded, and one a stopped host left open
+  closes as `no_answer_in_time`, so its receipt and its minute's event always say an outside
+  program was asked; the routine decides that turn. A program passes (`decider_passed`) when
+  nobody there acts for its subject: the answer is recorded at once, with or without the program's
+  record of the pass, and counts as the program's presence, never as a quiet minute. What a program
+  answers when it has nothing to say is the role's idle option, `DecisionRole.idle_label(context)`:
+  the label of the offered option of the adapter's idle kind (waiting a minute, for a person), read
+  from the request's own context.
+- **A visitor.** In a society of things, a visitor from outside is decided for by the program that
+  sent it, as its arrival records: the host asks that program's door with the decider read from
+  the state, no choice is recorded for it, and neither an owner's choice nor a person's direct
+  request may name it (`decided_from_outside`).
 - **Bounds.** External asks are outside the models' spending, the process's budget and a world's
   hourly bounds, which `world_hour` counts from model calls alone; how often a program is asked is
   its grant's to bound.
@@ -529,7 +538,7 @@ stored request the loop does not rebuild stops it by name.
 
 | Part | Source | Tests |
 | --- | --- | --- |
-| Registry and adapters | `assets/catalogs/roles/decision-roles.v3.json`, `exulanica/world/decision_roles.py`, `exulanica/world/role_catalogs.py`, `exulanica/world/roles/` | `tests/test_decision_roles.py`, with the test role in `tests/decision_role_fixtures/` |
+| Registry and adapters | `assets/catalogs/roles/decision-roles.v4.json`, `exulanica/world/decision_roles.py`, `exulanica/world/role_catalogs.py`, `exulanica/world/roles/` | `tests/test_decision_roles.py`, with the test role in `tests/decision_role_fixtures/` |
 | Deciders and outside programs | `exulanica/world/deciders.py`, `exulanica/api/external_asking.py`, the host's outside path in `exulanica/api/decision_host.py`, migration 0146 | `tests/test_outside_deciders.py` (each answer and statement a door may give, late, failing or malformed, costing its own subject alone; a context carrying a saved name in any field), `tests/test_outside_deciders_postgres.py` (a request left open by a stopped host; a request carrying a saved name undone and not sent; a released grant's retry) |
 | Requests, receipts, the minute loop and replay | `exulanica/world/role_decisions.py` | `tests/test_decision_roles.py` |
 | The person's contract and minute | `exulanica/world/society_decision_contract.py`, `exulanica/world/society_model_decisions.py`, `assets/catalogs/society/society-decision-action.v2.json`, `assets/catalogs/society/society-decision-policy.v2.json` | `tests/test_society_person_decisions.py`, `tests/test_society_model_actions.py`, `tests/test_person_role_goldens.py` |

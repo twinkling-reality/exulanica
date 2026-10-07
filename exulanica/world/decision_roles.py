@@ -158,12 +158,14 @@ GENERIC_REASONS: Final = frozenset(
         # When the minute consumes it: a second receipt for a subject already decided.
         "subject_already_decided",
         # An outside program asked for a subject under its grant gave no usable answer: its door
-        # had no live connection, it did not answer by the deadline, or the grant was revoked or
-        # had expired (exulanica.world.deciders.EXTERNAL_REASONS).
+        # had no live connection, it did not answer by the deadline, the grant was revoked or had
+        # expired, or nobody was there to act for the subject, so it passed and the routine
+        # decides at once (exulanica.world.deciders.EXTERNAL_REASONS).
         "decider_disconnected",
         "no_answer_in_time",
         "grant_revoked",
         "grant_expired",
+        "decider_passed",
     }
 )
 #: The shape of each profile a role's documents carry, the shapes migration 0117 admits by the
@@ -425,6 +427,19 @@ class DecisionRole:
         if key not in self._contracts:
             self._contracts[key] = _contract(self, chosen)
         return self._contracts[key]
+
+    def idle_label(self, context: Mapping[str, Any]) -> str | None:
+        """The label of the option a request offers that changes nothing, of its adapter's idle
+        kind, or None where it offers none: what an outside program answers for a subject when
+        nobody there acts for it, read from the request's own context."""
+        return next(
+            (
+                option["label"]
+                for option in context["options"]
+                if option.get("kind") == self.adapter.IDLE_KIND
+            ),
+            None,
+        )
 
     def choice(self, context: Mapping[str, Any]) -> ChoiceRequest:
         """The one choice a model answers, built from a request's options and nowhere else."""

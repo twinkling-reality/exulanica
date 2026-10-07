@@ -51,6 +51,7 @@ ACTION_REFUSALS: Final = frozenset(
         "action_context_changed",
         "canonical_target_changed",
         "destination_full",
+        "decided_from_outside",
         "inhabitant_action_in_progress",
         "inhabitant_already_there",
         "target_unreachable",
@@ -197,12 +198,14 @@ def _reachable(person: dict[str, Any], document: dict[str, Any], target: dict[st
 def may_be_directed(person: dict[str, Any], document: dict[str, Any]) -> bool:
     """Whether a direct request may send ``person`` somewhere, under the input it is made against.
 
-    Nobody is doing anything, what they did is over or blocked, or it is a stay the request ends
-    (``ends_on_request``: a stay under a routine that draws its stays). A walk is left to arrive.
-    The database holds a recorded request to this same rule (``society_person_may_be_directed``,
-    migration 0108), and tests/test_society_request_rule_parity.py holds the two equal.
+    Somebody who came in from outside never is: the program that sent them decides for them.
+    Anybody else may be when nobody is doing anything, what they did is over or blocked, or it is a
+    stay the request ends (``ends_on_request``: a stay under a routine that draws its stays). A
+    walk is left to arrive. The database holds a recorded request to this same rule
+    (``society_person_may_be_directed``, migrations 0108 and 0151), and
+    tests/test_society_request_rule_parity.py holds the two equal.
     """
-    return (
+    return person.get("came_by") != "crossed" and (
         person["goal"] is None
         or person["action"]["status"] in ("completed", "blocked")
         or ends_on_request(routine_of(document), person)
@@ -226,6 +229,9 @@ def _request_reason(
     person = _people(state).get(request["subject_id"])
     if person is None:
         return "rejected", "unknown_inhabitant"
+    if person.get("came_by") == "crossed":
+        # Their own program decides for a visitor from outside, never a person's request.
+        return "rejected", "decided_from_outside"
     if not may_be_directed(person, document):
         return "rejected", "inhabitant_action_in_progress"
     if (

@@ -57,8 +57,8 @@ __all__ = [
 
 ENGINES_PATH: Final = Path(__file__).with_name("society-engines.v2.json")
 TABLE_PROFILE: Final = "exulanica.society-engines/v2"
-StateFamily = Literal["legacy", "purposeful", "living"]
-_STATE_FAMILIES: Final = ("legacy", "purposeful", "living")
+StateFamily = Literal["legacy", "purposeful", "living", "things"]
+_STATE_FAMILIES: Final = ("legacy", "purposeful", "living", "things")
 #: The kinds of ground a new society is created over, each with the engine the table names for it:
 #: an owned district, a saved world's own ground, and a saved world whose own records state its
 #: walking surfaces and homes (a town generated from a recipe).

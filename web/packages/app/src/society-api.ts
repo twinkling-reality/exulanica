@@ -359,13 +359,20 @@ export function parseSociety(value: unknown): SocietySnapshot {
     });
   }
   const inhabitants = state['inhabitants'];
-  const v2 = engine.stateFamily === 'purposeful';
+  // A society of things' people walk and choose as the purposeful society's do, beside its things.
+  const things = engine.stateFamily === 'things';
+  const v2 = engine.stateFamily === 'purposeful' || things;
   // Sent away, a society holds nobody until the same people are brought back.
   const presence = presenceOf(state);
   const holding = presence.status === 'away' ? 0 : row['population_size'];
+  // People come and go in a society of things (placed by its author, crossing in and out), so it
+  // holds any number within its engine's bound rather than the population it began with.
+  const counted = Array.isArray(inhabitants) && (things
+    ? inhabitants.length <= engine.populationMaximum
+    : inhabitants.length === holding);
   if (!textValue(row['society_id']) || !textValue(row['version_id']) || !textValue(row['place_id']) ||
       !integer(row['current_tick']) || state['tick'] !== row['current_tick'] ||
-      !digest(row['state_sha256']) || !Array.isArray(inhabitants) || inhabitants.length !== holding) {
+      !digest(row['state_sha256']) || !Array.isArray(inhabitants) || !counted) {
     throw new Error('Invalid society response');
   }
   const ids = new Set<string>();
@@ -446,7 +453,9 @@ export function parseSocietyEvents(value: unknown, snapshot: SocietySnapshot): r
   // While everyone is away the state names nobody, yet the history still holds their events:
   // those belong to the society's own people, whom the state will name again when they return.
   const subjects = new Set(snapshot.state.inhabitants.map(person => person.id));
-  const anyoneOfTheSociety = snapshot.presence.status === 'away';
+  // A society of things' history also names people who have left, and arrivals it refused.
+  const anyoneOfTheSociety = snapshot.presence.status === 'away' ||
+    societyEngine(snapshot.state.profile ?? DEFAULT_SOCIETY_ENGINE).stateFamily === 'things';
   const events = rows.map(raw => {
     const row = record(raw), doc = record(row['document']);
     if (!textValue(row['event_id']) || ids.has(row['event_id']) ||

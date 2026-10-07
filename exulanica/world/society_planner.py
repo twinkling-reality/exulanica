@@ -32,16 +32,19 @@ from exulanica.world.society_catalogs import (
 )
 from exulanica.world.society_engines import society_engine
 from exulanica.world.society_input_policy import (
+    ARRIVAL_INPUTS,
     AUTHORED_GROUND_INPUT,
     AUTHORED_GROUND_INPUT_V2,
     AUTHORED_GROUND_INPUT_V3,
     AUTHORED_GROUND_INPUT_V4,
+    AUTHORED_GROUND_INPUT_V5,
     AUTHORED_GROUND_INPUTS,
     LIVING_INPUTS,
     LOCAL_FAILURE_INPUTS,
     LOCAL_INPUT,
     POPULATION_INPUTS,
     ROUTINE_INPUTS,
+    THING_INPUTS,
     UNREAD_PLACEMENT_REASONS,
     WALKING_SURFACES_INPUT,
     WALKING_SURFACES_INPUT_V2,
@@ -50,6 +53,7 @@ from exulanica.world.society_input_policy import (
     validate_unread_placements,
 )
 from exulanica.world.society_legacy import initial_society
+from exulanica.world.society_thing_inputs import validate_input_things
 
 PURPOSEFUL_PROFILE = "exulanica-society/v2"
 INPUT_PROFILE = "exulanica.society-input/v1"
@@ -82,6 +86,7 @@ NAVIGATION_PROFILES = {
     AUTHORED_GROUND_INPUT_V2: "authored-ground-lattice/v1",
     AUTHORED_GROUND_INPUT_V3: "authored-ground-lattice/v1",
     AUTHORED_GROUND_INPUT_V4: "authored-ground-lattice/v1",
+    AUTHORED_GROUND_INPUT_V5: "authored-ground-lattice/v1",
     WALKING_SURFACES_INPUT: "city-walking-surfaces/v1",
     WALKING_SURFACES_INPUT_V2: "city-walking-surfaces/v1",
 }
@@ -96,6 +101,7 @@ FRAME_NAMES = {
     AUTHORED_GROUND_INPUT_V2: "authored-ground-local-mm",
     AUTHORED_GROUND_INPUT_V3: "authored-ground-local-mm",
     AUTHORED_GROUND_INPUT_V4: "authored-ground-local-mm",
+    AUTHORED_GROUND_INPUT_V5: "authored-ground-local-mm",
     WALKING_SURFACES_INPUT: WALKING_SURFACES_FRAME,
     WALKING_SURFACES_INPUT_V2: WALKING_SURFACES_FRAME,
 }
@@ -108,6 +114,8 @@ FRAME_ALTITUDES: Final = {
 WORLD_TARGET_ORIGINS: Final = {
     WALKING_SURFACES_INPUT: ("premises", "furniture"),
     WALKING_SURFACES_INPUT_V2: ("premises", "furniture"),
+    # A rest or a visit a thing the world's author placed offers, by the thing's id.
+    AUTHORED_GROUND_INPUT_V5: ("thing",),
 }
 #: Input profiles whose activities state the places their occupants stand at. A society advancing
 #: over one keeps each place to one person and keeps people waiting clear of every place.
@@ -117,7 +125,12 @@ PLACE_INPUTS = (
     AUTHORED_GROUND_INPUT_V4,
     WALKING_SURFACES_INPUT,
     WALKING_SURFACES_INPUT_V2,
+    AUTHORED_GROUND_INPUT_V5,
 )
+#: The state families whose minute this planner takes: the purposeful society's own, and the
+#: society of things, whose people walk, choose and stay by the same rules beside its things
+#: (:mod:`exulanica.world.society_things`).
+PLANNED_FAMILIES: Final = ("purposeful", "things")
 #: Every reason code the planner records on a goal, an action or an event, stated once: the browser
 #: has words for exactly these (``REASON_WORDS`` in web/packages/app/src/ui/world-inhabitants.ts,
 #: held to this set by society-words-parity.test.ts), and tests/test_society_reason_codes.py fails
@@ -248,12 +261,17 @@ def _validate_society_input(document: dict[str, Any]) -> None:
         fields.add("population")
     if document.get("profile") in LIVING_INPUTS:
         fields.add("living")
-    if document.get("profile") == AUTHORED_GROUND_INPUT_V4:
+    if document.get("profile") in ARRIVAL_INPUTS:
         fields.add("arrival")
+    if document.get("profile") in THING_INPUTS:
+        fields.add("things")
     _require(set(document) == fields, "invalid society input fields")
     profile = document["profile"]
     _require(profile in NAVIGATION_PROFILES, "unsupported society input profile")
-    if profile == AUTHORED_GROUND_INPUT_V4:
+    # The things composition pins an arrival only where the ground states none of its own.
+    if profile in ARRIVAL_INPUTS and (
+        profile not in THING_INPUTS or document["arrival"] is not None
+    ):
         arrival = ArrivalDescriptor.model_validate(document["arrival"])
         _require(arrival.source.world_id == document["world_id"], "arrival world mismatch")
         _require(
@@ -487,6 +505,8 @@ def _validate_society_input(document: dict[str, Any]) -> None:
     _require(target_ids == sorted(set(target_ids)), "targets must be unique and sorted")
     if profile in PLACE_INPUTS:
         _validate_places(document, nodes)
+    if profile in THING_INPUTS:
+        validate_input_things(document)
     if profile in LOCAL_FAILURE_INPUTS:
         validate_local_affordances(document, routine.affordances)
     if profile in UNREAD_PLACEMENT_REASONS:
@@ -691,10 +711,13 @@ def validate_input_successor(previous: dict[str, Any], current: dict[str, Any]) 
             >= AUTHORED_GROUND_INPUTS.index(previous["profile"]),
             "input profile moved backwards",
         )
-        if AUTHORED_GROUND_INPUT_V4 in (previous["profile"], current["profile"]):
+        if previous["profile"] in ARRIVAL_INPUTS or current["profile"] in ARRIVAL_INPUTS:
+            # A pinned arrival belongs to a new society and keeps its profile; a society of
+            # things' input may move on to a later things composition, its arrival kept.
             _require(
-                previous["profile"] == current["profile"],
-                "v4 arrival belongs to a new society and keeps its profile",
+                previous["profile"] == current["profile"]
+                or (previous["profile"] in THING_INPUTS and current["profile"] in THING_INPUTS),
+                "a pinned arrival belongs to a new society and keeps its profile",
             )
             _require(previous["arrival"] == current["arrival"], "arrival pin changed")
         # A society's area is part of what the society is, like its seed. An edit changes what is
@@ -962,6 +985,29 @@ def _step_aside(
         if pool:
             return min(pool)[1]
     return None
+
+
+def open_node_near(
+    document: dict[str, Any], people: list[dict], point: list[int] | tuple[int, int]
+) -> str | None:
+    """Where somebody new stands who comes to ``point``: the node a person steps aside to there.
+
+    The nearest node of the input's graph to ``point``, by squared distance and then node id, that
+    is no activity's place, has an edge and that nobody in ``people`` stands at or is headed to,
+    first among the nodes nobody waiting would be in the way at; None where there is none, or the
+    input is unavailable.
+    """
+    if document["availability"] != "available" or document["navigation"]["unavailable_reason"]:
+        return None
+    graph = _graph(document)
+    places_here = document["profile"] in PLACE_INPUTS
+    places = (
+        frozenset(n for t in document["targets"] for n in t["place_node_ids"])
+        if places_here
+        else frozenset()
+    )
+    crowded = standing_exclusions(document) if places_here else frozenset()
+    return _step_aside({"position_mm": list(point)}, people, graph, places, crowded)
 
 
 #: How a target states the stay a person makes there: a fixed duration, or the routine activity
@@ -1467,8 +1513,15 @@ def advance_purposeful_society(
     *,
     goal_policy: dict[str, dict[str, Any]] | None = None,
 ) -> tuple[dict[str, Any], tuple[SocietyEvent, ...]]:
-    """Consume current input and every queued successor, then take exactly one explicit tick."""
-    _require(state["profile"] == PURPOSEFUL_PROFILE, "unsupported purposeful profile")
+    """Consume current input and every queued successor, then take exactly one explicit tick.
+
+    The state is a purposeful society's or a society of things' (``PLANNED_FAMILIES``), and every
+    event it records names the state's own engine.
+    """
+    _require(
+        society_engine(state["profile"]).state_family in PLANNED_FAMILIES,
+        "unsupported purposeful profile",
+    )
     _require(state["seed_sha256"] == seed, "society seed lineage mismatch")
     _require(bool(inputs), "historical current input is required")
     validate_society_input(inputs[0])
@@ -1503,7 +1556,7 @@ def advance_purposeful_society(
         document = {
             "summary": summary,
             "synthetic": True,
-            "profile": PURPOSEFUL_PROFILE,
+            "profile": result["profile"],
             "branch_id": result["branch_id"],
             "subject_id": person["id"],
             "tick": tick,

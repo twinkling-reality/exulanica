@@ -102,10 +102,27 @@ export const SOCIETY_ENGINES_V2_JSON = String.raw`{
       "saved_world": true,
       "state_family": "living",
       "takes_inputs": true
+    },
+    {
+      "comparisons": false,
+      "creatable": true,
+      "directed_actions": true,
+      "engine": "exulanica-society/v7",
+      "experiments": false,
+      "model_decisions": true,
+      "owner_model_choice": true,
+      "playback": true,
+      "playback_refusal": null,
+      "population": {"maximum": 512, "minimum": 1},
+      "presence": false,
+      "reason": "The purposeful society with things, over a saved world's own ground, where everybody is a thing of a stated kind. Its people are the villagers its ground's population brings, the beings the world's author placed in its version, and visitors that cross in from an outside program: each visitor arrives at the arrival point of a gate the author placed, and leaves when its program sends it away or its grant ends. An author's placed objects stand where the version puts them, block walking where their kind says and offer the rests and visits their kind offers. The world's owner may choose a model for a person, and the program that sent a visitor decides for it: each takes, at the planner's own choice points, a validated choice from a stored receipt, replayed without a call. It takes directed actions for anybody but a visitor; its people are not sent away; and no comparison runs it, because no person score has been measured over things. Its population is its ground's, with the beings placed and the visitors arrived beside it, so its floor is one.",
+      "saved_world": true,
+      "state_family": "things",
+      "takes_inputs": true
     }
   ],
   "profile": "exulanica.society-engines/v2"
 }
 `;
 
-export type SocietyEngineProfile = 'exulanica-society/v1' | 'exulanica-society/v2' | 'exulanica-society/v3' | 'exulanica-society/v4' | 'exulanica-society/v5';
+export type SocietyEngineProfile = 'exulanica-society/v1' | 'exulanica-society/v2' | 'exulanica-society/v3' | 'exulanica-society/v4' | 'exulanica-society/v5' | 'exulanica-society/v7';

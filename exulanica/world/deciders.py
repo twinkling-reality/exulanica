@@ -41,6 +41,7 @@ __all__ = [
     "KINDS",
     "OWNER_CHOOSES",
     "DeciderRefused",
+    "arrival_deciders",
     "arrived_from_outside",
     "check_external_config",
     "check_external_record",
@@ -86,10 +87,17 @@ EXTERNAL_RECORD: Final = frozenset(
     }
 )
 #: Why an outside program gave no usable answer, beside the reasons every role records: its door
-#: had no live connection for the grant, it did not answer in time, or its grant was revoked or
-#: had expired when the minute asked.
+#: had no live connection for the grant, it did not answer in time, its grant was revoked or had
+#: expired when the minute asked, or nobody there acted for the subject, so it passed at once and
+#: the routine decides that turn (a pass is the program's presence, never a quiet minute).
 EXTERNAL_REASONS: Final = frozenset(
-    {"decider_disconnected", "no_answer_in_time", "grant_revoked", "grant_expired"}
+    {
+        "decider_disconnected",
+        "no_answer_in_time",
+        "grant_revoked",
+        "grant_expired",
+        "decider_passed",
+    }
 )
 #: The longest an outside program may be given to answer, in milliseconds: the playback lease's 30
 #: seconds, which no role's contract deadline may outlast either.
@@ -235,3 +243,17 @@ def arrived_from_outside(state: Mapping[str, Any], subject_id: str) -> bool:
         if person.get("id") == subject_id:
             return person.get("came_by") == "crossed"
     return False
+
+
+def arrival_deciders(state: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
+    """Who decides for each visitor in this society, by its id: its arrival, the outside program
+    that sent it under its grant, as the state records it. Nobody records a choice for a visitor
+    (``decided_from_outside``), so this is how a host knows whom a door decides for."""
+    found: dict[str, dict[str, Any]] = {}
+    for person in state.get("inhabitants", ()):
+        crossing = person.get("crossing")
+        if person.get("came_by") == "crossed" and isinstance(crossing, Mapping):
+            found[str(person["id"])] = decider(
+                {"kind": "external", "bridge": crossing["bridge"], "grant_id": crossing["grant_id"]}
+            )
+    return found

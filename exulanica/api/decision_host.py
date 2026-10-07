@@ -56,7 +56,7 @@ from exulanica.models.spending import SpendingRefused
 from exulanica.models.usage import CallUsage, usd_string
 from exulanica.selection.calls import CallLog
 from exulanica.selection.validation import Session
-from exulanica.world.deciders import check_external_config
+from exulanica.world.deciders import arrival_deciders, check_external_config
 from exulanica.world.decision_roles import (
     GENERIC_REASONS,
     DecisionContract,
@@ -674,6 +674,14 @@ class DecisionHost:
                     for subject, c in choices.items()
                     if c["decider"]["kind"] == "external" and self.external is not None
                 }
+                if self.external is not None:
+                    # A visitor from outside is decided for by the program that sent it, as its
+                    # arrival recorded: nobody records a choice for it. Only a role whose subjects
+                    # it is asks for it.
+                    subjects = set(role.adapter.subjects(row["state"]))
+                    for subject, described in arrival_deciders(row["state"]).items():
+                        if subject in subjects:
+                            outside.setdefault(subject, {"decider": described, "model": None})
                 if chosen or outside:
                     chosen_roles.append((role, role.contract(), chosen, outside))
             if not chosen_roles:

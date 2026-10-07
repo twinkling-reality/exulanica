@@ -1,9 +1,9 @@
 # Things contract
 
 Status: **THING KINDS, BODY PLANS, ABILITIES, OFFERS, LOOKS, THE ORIGIN RECORD AND TRANSLATION
-MANIFESTS ARE DATA HELD TO THEIR CHECKS, A WORLD'S AUTHOR PLACES THINGS BY THEIR KIND, A CREATURE'S
-BODY PLAN, SKETCH AND KIND ARE BUILT FROM A DRAFTED BODY RECIPE, AND THE BROWSER DRAWS A VERSION'S
-PLACED THINGS BY THEIR LOOKS; NO SOCIETY ENGINE READS A THING KIND**.
+MANIFESTS ARE DATA HELD TO THEIR CHECKS, A WORLD'S AUTHOR PLACES THINGS BY THEIR KIND, THE SOCIETY OF
+THINGS LIVES WITH THEM, A CREATURE'S BODY PLAN, SKETCH AND KIND ARE BUILT FROM A DRAFTED BODY RECIPE,
+AND THE BROWSER DRAWS A VERSION'S PLACED THINGS BY THEIR LOOKS**.
 
 A thing is anything addressable in a world: a knight, a lantern spirit, a sword, a well, a gate, a
 visitor that came in from another program. What a kind of thing is and can do is one typed,
@@ -605,8 +605,10 @@ no detail clears the pick. The picked thing wears a ring in the design tokens' s
 
 These are material limits of the boundary above, not partial behaviour:
 
-- No society engine reads a thing kind, and no ability module runs: the abilities catalog names
-  modules no registry states. A world's people are the society's own, drawn as today.
+- The society of things ([society contract](synthetic-society-contract.md#the-society-of-things-v7))
+  reads a placed thing's kind, places its beings and lets visitors cross in, but no ability module
+  runs: its people walk, choose, stay and talk by the purposeful planner's rules, and the hands,
+  following, saying and leaving the abilities catalog names are not built.
 - No store holds a workspace's own kinds or looks: the library serves the shipped ones only, a
   placed thing names a shipped kind and a thing wears a shipped look. The world's owner has no
   route to choose a look, and a look is recorded only where a door records its crossing's.
@@ -635,6 +637,7 @@ These are material limits of the boundary above, not partial behaviour:
 | The thing library | [`thing_library.py`](../exulanica/world/thing_library.py), [`things.py`](../exulanica/api/routes/things.py) | `tests/test_thing_library.py` (every shipped document and container by digest, an imported container by the digest its look pins, each refusal against a positive control), `tests/test_thing_library_routes.py` (a session required, the bytes a digest names, 404 otherwise), `tests/test_image_ships_startup_reads.py` (every file it reads ships in the API image) |
 | Look choices | [`thing_looks.py`](../exulanica/world/thing_looks.py), [`world_things.py`](../exulanica/api/routes/world_things.py) (the read), migration 0156 | `tests/test_thing_looks.py` (a shipped look fit for the kind, each refusal by name), `tests/test_thing_looks_postgres.py` (as the deployed writer: one look per crossing, the newest per thing, no change or removal; the table's shape and its append-only trigger; another workspace sees nothing; the route) |
 | Placed things | [`placed_things.py`](../exulanica/world/placed_things.py), the object repository, [`world_things.py`](../exulanica/api/routes/world_things.py), migration 0152 | `tests/test_placed_things.py`, `tests/test_placed_things_postgres.py` (as the deployed writer: place, move, remove, undo and place again; the kind fixed by the table; another workspace sees nothing; a branch keeps them; the routes' refusals by name), `tests/test_edit_kind_undo_postgres.py` |
+| The society of things | [`society_things.py`](../exulanica/world/society_things.py), [`society_thing_inputs.py`](../exulanica/world/society_thing_inputs.py), [`crossings.py`](../exulanica/world/crossings.py), the things composition in [`society_authored_ground.py`](../exulanica/world/society_authored_ground.py), migration 0151 | `tests/test_society_things.py` (genesis, a minute equal to the planner's, placed beings, crossings, the state check), `tests/test_society_thing_inputs.py` (the composition and its shape), `tests/test_society_things_postgres.py` (through the routes: made by name, an edit reaching it, a visitor crossing in and out, replay), `tests/test_outside_deciders_postgres.py` (a visitor decided for by its own program), `tests/test_society_request_rule_parity.py` |
 | Creatures: recipes, plans, sketches, assembly | [`bodies.py`](../exulanica/things/bodies.py), [`sketch.py`](../exulanica/things/sketch.py), [`creatures.py`](../exulanica/things/creatures.py), [`body-grammar.v1.json`](../assets/catalogs/things/body-grammar.v1.json) | `tests/test_creature_bodies.py` (thirteen hand-written creatures: each body where its recipe says, a left limb the mirror of its right, each limb of a lying body hung from the stretch of spine beside it, the bone count the recipe's own sum, each refusal by name, the sketch read back from its bytes) |
 | The creature drafter | [`creature_drafting.py`](../exulanica/selection/creature_drafting.py), [`creature-drafting.v1.json`](../exulanica/selection/creature-drafting.v1.json) | `tests/test_creature_drafting.py` (scripted replies: a pass with its provenance, a refusal repaired with its check's sentence, two refusals, a form outside the schema, a reply cut off in blank space), `tests/test_hosted_boundary.py` (its request carries no saved name) |
 | The skinned container | [`skinned.py`](../exulanica_pieces/skinned.py) | `tests/test_skinned_glb.py` (containers built in the test from struct packing: a positive control, then each rule broken alone and refused by name) |

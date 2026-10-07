@@ -38,6 +38,7 @@ import pytest
 from exulanica.api import decision_host as host_module
 from exulanica.api.decision_host import DecisionHost, world_hour
 from exulanica.canonical import canonical_json
+from exulanica.world.crossings import register_crossing_stream
 from exulanica.world.society_controls import LEASE_SECONDS
 from exulanica.world.society_decision_contract import decision_contract, person_role
 from exulanica.world.society_model_choice_repository import (
@@ -47,6 +48,8 @@ from exulanica.world.society_model_choice_repository import (
 from psycopg.types.json import Jsonb
 
 import test_society_stay_requests_api as stays
+import test_society_things_postgres as things_api
+import things_society_support as things_support
 from test_society_person_decisions_postgres import (
     _choose,
     _claim,
@@ -500,3 +503,43 @@ def test_the_test_door_answers_in_the_receipt_s_one_shape():
     }
     check_external_record(door.answer(None, "w", request, 0.0)["provider"])
     assert json.loads(json.dumps(door.asked[0])) == request
+
+
+@pytest.mark.parametrize("saved_world", [2], indirect=True)
+def test_a_visitor_s_own_program_decides_for_it_from_its_arrival_with_no_choice_recorded(app):
+    world, client = app
+    services = _services(client)
+    stream = things_support.MemoryCrossings()
+    register_crossing_stream(stream)
+    try:
+        things_api._place(client, world, "well", "well", 2, -4_000, 2_000)
+        things_api._place(client, world, "gate", "gate", 1, 0, 6_000)
+        snapshot = things_api._make_society(client, world)
+        stream.hand(uuid.UUID(snapshot["society_id"]), things_support.arrival(1, grant_id=GRANT))
+        snapshot = stays._step(world, client, snapshot)
+        [visitor] = [p for p in snapshot["state"]["inhabitants"] if p["came_by"] == "crossed"]
+        door = _Door()
+        host = _doorkeeping_host(world, services, door)
+        snapshot = _asked_until_decided(world, client, services, host, snapshot)
+        receipts = _decisions(services, world, snapshot)
+        assert {receipt["subject_id"] for receipt in receipts} == {visitor["id"]}
+        assert receipts[0]["provider"]["kind"] == "external"
+        # The door was told the visitor's decider as its arrival records it, and nobody chose it.
+        arrived_by = {
+            "kind": "external",
+            "bridge": things_support.BRIDGE,
+            "grant_id": str(GRANT),
+        }
+        assert [entry[2:] for entry in door.configured] == [(visitor["id"], arrived_by)]
+        with services.database.session(world["workspace"]) as connection:
+            assert (
+                _repository(connection, world).current(world["binding"].version_id, person_role())
+                == {}
+            )
+        stays._step(world, client, snapshot)
+        scope, _, society = routes(world)
+        replayed = client.get(society + "/replay", headers=OWNER, params=scope)
+        assert replayed.status_code == 200, replayed.text
+        assert replayed.json()["replay_verified"] is True
+    finally:
+        register_crossing_stream(None)

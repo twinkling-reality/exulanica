@@ -29,11 +29,13 @@ from typing import Any, Final, Literal
 import psycopg
 from psycopg.rows import dict_row
 
+from exulanica.things.kinds import ThingKind
 from exulanica.world.arrival_selection import ArrivalDescriptor
 from exulanica.world.authored_delta import AlternateVersion, version_delta_sha256
-from exulanica.world.errors import InvalidStructuralData
+from exulanica.world.errors import InvalidStructuralData, InvalidThingPlacement
 from exulanica.world.object_catalog import world_object_catalog
 from exulanica.world.objects import AuthoredObject, ElementOverride, Transform
+from exulanica.world.placed_things import PlacedThing, placed_thing_document, shipped_kind
 from exulanica.world.society import society_state_sha256
 from exulanica.world.society_catalogs import (
     PurposefulRoutine,
@@ -42,6 +44,7 @@ from exulanica.world.society_catalogs import (
 )
 from exulanica.world.society_composition import (
     PLACES_FIELD,
+    REVIEWED_REACH_MM,
     ComposedObject,
     Obstacle,
     Point,
@@ -70,6 +73,7 @@ from exulanica.world.society_input_policy import (
     AUTHORED_GROUND_COMPOSITION_V2,
     AUTHORED_GROUND_COMPOSITION_V3,
     AUTHORED_GROUND_COMPOSITION_V4,
+    AUTHORED_GROUND_COMPOSITION_V5,
     MOVES,
     NO_AUTHORED_FRAME,
     OFF_GROUND,
@@ -80,6 +84,7 @@ from exulanica.world.society_input_policy import (
 from exulanica.world.society_place import ceil_distance
 from exulanica.world.society_planner import (
     CLEARANCE_MM,
+    DURATIONS,
     WALKING_SURFACES_ALTITUDE,
     WALKING_SURFACES_FRAME,
     input_sha256,
@@ -547,11 +552,21 @@ SWEPT_BEHAVIOURS: Final[
 
 
 @dataclass(frozen=True, slots=True)
+class _PlacedUse:
+    """A placed thing as the places it offers are composed: its id and its pose."""
+
+    object_id: str
+    transform: Transform
+
+
+@dataclass(frozen=True, slots=True)
 class _UsableObject:
-    obj: AuthoredObject
+    obj: AuthoredObject | _PlacedUse
     reviewed: Mapping[str, Any]
     centre: Point
     half_extents: tuple[int, int]
+    #: ``authored`` for an object the person placed, ``thing`` for a thing placed by its kind.
+    origin: str = "authored"
 
 
 def _scaled(half_extents: Sequence[int], scale_milli: int) -> tuple[int, int]:
@@ -560,10 +575,20 @@ def _scaled(half_extents: Sequence[int], scale_milli: int) -> tuple[int, int]:
     return (-(-hx * scale_milli // 1000), -(-hz * scale_milli // 1000))
 
 
+def _subject(version_id: uuid.UUID, object_id: str, origin: str) -> str:
+    """How an input names what offers an activity: an authored object by its version and id, a
+    placed thing by its id (``PROFILE_RECORD_SUBJECTS``)."""
+    return f"authored:{version_id}:{object_id}" if origin == "authored" else f"thing:{object_id}"
+
+
 def _refused_activity(
-    version_id: uuid.UUID, obj: AuthoredObject, reviewed: Mapping[str, Any], reason: str
+    version_id: uuid.UUID,
+    obj: AuthoredObject | _PlacedUse,
+    reviewed: Mapping[str, Any],
+    reason: str,
+    origin: str = "authored",
 ) -> dict[str, Any]:
-    subject_id = f"authored:{version_id}:{obj.object_id}"
+    subject_id = _subject(version_id, obj.object_id, origin)
     return {
         "target_id": f"{subject_id}:{reviewed['affordance']}",
         "subject_id": subject_id,
@@ -779,9 +804,9 @@ def _place_targets(
     kept: list[Point] = []
     targets: list[dict[str, Any]] = []
     records: list[dict[str, Any]] = []
-    for item in sorted(usable, key=lambda value: value.obj.object_id):
+    for item in sorted(usable, key=lambda value: (value.origin, value.obj.object_id)):
         obj, reviewed = item.obj, item.reviewed
-        subject_id = f"authored:{version_id}:{obj.object_id}"
+        subject_id = _subject(version_id, obj.object_id, item.origin)
         reach = reviewed["reach_mm"]
         chosen: list[tuple[str, Point, dict[str, Any]]] = []
         for index, point in enumerate(destination_places(item, standing, clearance)):
@@ -798,9 +823,11 @@ def _place_targets(
             if not joins:
                 continue
             kept.append(point)
-            chosen.append((f"{PLACE_NODE_PREFIX}{obj.object_id}:{index}", point, joins[0][2]))
+            # A placed thing's places are named apart from an authored object's of the same id.
+            name = obj.object_id if item.origin == "authored" else f"thing:{obj.object_id}"
+            chosen.append((f"{PLACE_NODE_PREFIX}{name}:{index}", point, joins[0][2]))
         if not chosen:
-            records.append(_refused_activity(version_id, obj, reviewed, UNREACHABLE))
+            records.append(_refused_activity(version_id, obj, reviewed, UNREACHABLE, item.origin))
             continue
         for node_id, point, join in chosen:
             nav["nodes"].append(
@@ -822,7 +849,7 @@ def _place_targets(
                 "node_id": chosen[0][2]["node_id"],
                 "affordance": reviewed["affordance"],
                 **terms(item),
-                "origin": "authored",
+                "origin": item.origin,
                 "object_id": obj.object_id,
                 "version_id": str(version_id),
                 "enabled": True,
@@ -914,6 +941,214 @@ def build_authored_ground_society_input_v4(
     )
 
 
+def build_authored_ground_society_input_v5(
+    *,
+    ground: SocietyGround,
+    version: AlternateVersion,
+    arrival: ArrivalDescriptor | None,
+    input_seq: int,
+    dependency_refs: Sequence[dict[str, str]],
+    availability: str,
+    unavailable_reason: str | None,
+    reviewed_affordances: Mapping[str, dict[str, Any]],
+    segment_blocked: SegmentBlocked,
+    standing: StandingPolicy,
+    routine: PurposefulRoutine | None = None,
+    workspace_obstacles: Mapping[str, dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """Compose a society of things' input, ``exulanica.society-composition/authored-ground-v5``.
+
+    The fourth composition's projection, at the opening pose the version pins where the ground
+    states no arrival of its own (``arrival``; None where it does, and the ground's own arrival
+    stands), and the things the world's author placed in the region (``_things_one_by_one``): a
+    placed object whose kind blocks walking is an obstacle, its box turned with it; one whose kind
+    offers a rest or a visit offers it at the places its kind states, turned with it, unless it is
+    off the ground; and every placed thing not removed is listed with its kind's semantics, where
+    it stands and, for a gate, where visitors arrive. A thing whose kind is not shipped at the
+    digest it names makes the input unavailable by name.
+    """
+    if arrival is not None:
+        if (
+            arrival.source.world_id != version.world_id
+            or arrival.source.version_id != version.version_id
+            or arrival.source.source_snapshot_id != ground.snapshot_id
+            or arrival.region_id != ground.region_id
+        ):
+            raise ValueError("arrival source does not belong to this authored ground and version")
+        x, _, z = arrival.position_local_mm
+        ground = replace(ground, arrival_x_mm=x, arrival_z_mm=z)
+    return _authored_ground_with_routine(
+        AUTHORED_GROUND_COMPOSITION_V5,
+        ground=ground,
+        version=version,
+        input_seq=input_seq,
+        dependency_refs=dependency_refs,
+        availability=availability,
+        unavailable_reason=unavailable_reason,
+        reviewed_affordances=reviewed_affordances,
+        segment_blocked=segment_blocked,
+        standing=standing,
+        routine=routine,
+        arrival=arrival,
+        workspace_obstacles=workspace_obstacles,
+        things=True,
+    )
+
+
+#: The activity a placed thing offers people, by the offer of its kind that states it, in this
+#: order: one at most, the first its kind offers, since a place belongs to one activity.
+_THING_ACTIVITIES: Final = (("rest_at", "rest"), ("visit", "visit"))
+
+
+def things_in_region(version: AlternateVersion, ground: SocietyGround) -> list[PlacedThing]:
+    """The version's placed things this society reads, in id order: each placed in its region,
+    removed ones included, as its input's references bind them."""
+    return sorted(
+        (thing for thing in version.things if thing.region_id == ground.region_id),
+        key=lambda value: value.thing_id,
+    )
+
+
+def _thing_kinds(things: Sequence[PlacedThing]) -> tuple[dict[str, ThingKind], str | None]:
+    """The shipped kind of each placed thing not removed, by its id, or the reason the input is
+    unavailable: a thing whose kind is not shipped at the digest it names."""
+    kinds: dict[str, ThingKind] = {}
+    for thing in things:
+        if thing.removed:
+            continue
+        try:
+            kinds[thing.thing_id] = shipped_kind(thing.kind)
+        except InvalidThingPlacement:
+            return {}, f"unknown_thing_kind:{thing.thing_id}"
+    return kinds, None
+
+
+def _things_one_by_one(
+    things: Sequence[PlacedThing],
+    kinds: Mapping[str, ThingKind],
+    ground: SocietyGround,
+    version_id: uuid.UUID,
+) -> tuple[list[_UsableObject], list[Obstacle], list[dict[str, Any]]]:
+    """Every placed object's obstacle and activity, decided for that thing alone.
+
+    A placed being is no obstacle and offers no activity here: it lives in the society. A placed
+    object stands at its kind's own size: its box is its footprint, in its slot frame, whose front
+    (``+y``) is the region's ``-z``, as an authored object's catalog places are, turned by its yaw.
+    It blocks walking where its kind says. Its places to rest or visit at are its kind's, turned
+    with it, joined to the lattice within the reviewed reach; one that does not rest on the ground
+    plane offers none (``OFF_GROUND``) and still blocks.
+    """
+    usable: list[_UsableObject] = []
+    obstacles: list[Obstacle] = []
+    records: list[dict[str, Any]] = []
+    for thing in things:
+        if thing.removed:
+            continue
+        semantics = kinds[thing.thing_id].semantics()
+        if semantics["class"] != "object":
+            continue
+        body = semantics["body"]
+        box = body["box_mm"]
+        transform = thing.transform
+        centre = (transform.x_mm, transform.z_mm)
+        half = (-(-box["width"] // 2), -(-box["depth"] // 2))
+        if body["blocks_walking"]:
+            obstacles.append(
+                (
+                    f"thing:{thing.thing_id}",
+                    footprint_ring(centre, half, transform.yaw_microradians),
+                )
+            )
+        offers = {offer["key"]: offer["parameters"] for offer in semantics["offers"]}
+        found = next(
+            ((offer, affordance) for offer, affordance in _THING_ACTIVITIES if offer in offers),
+            None,
+        )
+        if found is None:
+            continue
+        offer, affordance = found
+        reviewed = {
+            "affordance": affordance,
+            "duration_ticks": DURATIONS[affordance],
+            "footprint_half_extents_mm": list(half),
+            "blocks_navigation": body["blocks_walking"],
+            "reach_mm": REVIEWED_REACH_MM,
+            PLACES_FIELD: [[place["x_mm"], -place["y_mm"]] for place in offers[offer]["places"]],
+            "thing_kind": semantics["kind"],
+        }
+        item = _UsableObject(
+            _PlacedUse(thing.thing_id, transform), reviewed, centre, half, origin="thing"
+        )
+        if transform.y_mm != ground.elevation_mm:
+            records.append(_refused_activity(version_id, item.obj, reviewed, OFF_GROUND, "thing"))
+        else:
+            usable.append(item)
+    return usable, obstacles, records
+
+
+def _arrival_point(semantics: Mapping[str, Any], thing: PlacedThing) -> list[int] | None:
+    """Where visitors step out of a gate, in the region's frame: its kind's arrival point turned
+    with it, or None for a thing that is no gate."""
+    for offer in semantics["offers"]:
+        if offer["key"] == "arrive_through":
+            point = offer["parameters"]["point"]
+            centre = (thing.transform.x_mm, thing.transform.z_mm)
+            turned = turned_point(
+                centre, (point["x_mm"], -point["y_mm"]), thing.transform.yaw_microradians
+            )
+            return [turned[0], turned[1]]
+    return None
+
+
+def _input_things(
+    things: Sequence[PlacedThing], kinds: Mapping[str, ThingKind], ground: SocietyGround
+) -> list[dict[str, Any]]:
+    """The things list a v5 input states (:mod:`exulanica.world.society_thing_inputs`): a thing
+    off the ground states its height above the ground's elevation."""
+    entries = []
+    for thing in things:
+        if thing.removed:
+            continue
+        semantics = kinds[thing.thing_id].semantics()
+        entry = {
+            "placed_id": thing.thing_id,
+            "kind": semantics,
+            "position_mm": [thing.transform.x_mm, thing.transform.z_mm],
+            "yaw_microradians": thing.transform.yaw_microradians,
+            "arrival_mm": _arrival_point(semantics, thing),
+        }
+        if thing.transform.y_mm != ground.elevation_mm:
+            entry["height_mm"] = thing.transform.y_mm - ground.elevation_mm
+        entries.append(entry)
+    return entries
+
+
+def thing_dependency_refs(
+    version_id: uuid.UUID, things: Sequence[PlacedThing], kinds: Mapping[str, ThingKind]
+) -> list[dict[str, str]]:
+    """Bind every placed thing in the region, removed ones included, and the kind of each one that
+    is not removed, by its digest."""
+    refs: list[dict[str, str]] = []
+    for thing in things:
+        kind = kinds.get(thing.thing_id)
+        if kind is not None:
+            refs.append(
+                {
+                    "kind": "thing_kind",
+                    "identity": f"{kind.kind}.v{kind.version}",
+                    "sha256": kind.sha256,
+                }
+            )
+        refs.append(
+            {
+                "kind": "placed_thing",
+                "identity": f"{version_id}:{thing.thing_id}",
+                "sha256": society_state_sha256(placed_thing_document(thing)),
+            }
+        )
+    return refs
+
+
 def _authored_ground_with_routine(
     composition: str,
     *,
@@ -929,6 +1164,7 @@ def _authored_ground_with_routine(
     routine: PurposefulRoutine | None,
     arrival: ArrivalDescriptor | None = None,
     workspace_obstacles: Mapping[str, dict[str, Any]] | None = None,
+    things: bool = False,
 ) -> dict[str, Any]:
     chosen = purposeful_routine() if routine is None else routine
     catalog = world_object_catalog()
@@ -936,7 +1172,12 @@ def _authored_ground_with_routine(
     kinds = catalog.by_asset_key()
 
     def activity(item: _UsableObject) -> dict[str, Any]:
-        kind = kinds[item.reviewed["asset_key"]].key
+        # A placed thing's activity is the routine's entry for its own kind, where it has one.
+        kind = (
+            item.reviewed["thing_kind"]
+            if item.origin == "thing"
+            else kinds[item.reviewed["asset_key"]].key
+        )
         return {"activity": chosen.at_object(item.reviewed["affordance"], kind).key}
 
     document = _authored_ground_input(
@@ -952,11 +1193,13 @@ def _authored_ground_with_routine(
         segment_blocked=segment_blocked,
         standing=standing,
         workspace_obstacles=workspace_obstacles,
+        things=things,
     )
     del document["document_sha256"]
     document["routine"] = chosen.binding()
-    if arrival is not None:
-        document["arrival"] = arrival.model_dump(mode="json")
+    # The things composition states its arrival either way: the pinned one, or none.
+    if arrival is not None or things:
+        document["arrival"] = None if arrival is None else arrival.model_dump(mode="json")
     document["document_sha256"] = input_sha256(document)
     validate_society_input(document)
     return document
@@ -1016,8 +1259,10 @@ def _authored_ground_input(
     segment_blocked: SegmentBlocked,
     standing: StandingPolicy,
     workspace_obstacles: Mapping[str, dict[str, Any]] | None = None,
+    things: bool = False,
 ) -> dict[str, Any]:
-    """The projection the second and third compositions share, with its digest, unvalidated."""
+    """The projection the second and later compositions share, with its digest, unvalidated:
+    with ``things``, the things composition's placed things too."""
     if version_delta_sha256(version) != version.state_sha256:
         raise ValueError("authored delta digest mismatch")
     validate_reviewed_affordances(reviewed_affordances)
@@ -1060,6 +1305,9 @@ def _authored_ground_input(
             workspace_obstacles=workspace_obstacles,
         )
     )
+    placed = things_in_region(version, ground) if things else []
+    thing_kinds, thing_refusal = _thing_kinds(placed)
+    refs.extend(thing_dependency_refs(version.version_id, placed, thing_kinds))
 
     targets: list[dict[str, Any]] = []
     records: list[dict[str, Any]] = []
@@ -1068,6 +1316,15 @@ def _authored_ground_input(
         usable, obstacles, records, reason = _objects_one_by_one(
             version, reviewed_affordances, ground, workspace_obstacles
         )
+    if reason is None and things:
+        reason = thing_refusal
+    if reason is None and things:
+        thing_usable, thing_obstacles, thing_records = _things_one_by_one(
+            placed, thing_kinds, ground, version.version_id
+        )
+        usable = [*usable, *thing_usable]
+        obstacles = [*obstacles, *thing_obstacles]
+        records = [*records, *thing_records]
     if reason is None:
         clear = clearance_test(
             obstacles,
@@ -1115,6 +1372,10 @@ def _authored_ground_input(
         "unavailable_affordances": sorted(records, key=lambda row: row["target_id"]),
         "unread_placements": unread,
     }
+    if things:
+        document["things"] = (
+            [] if reason is not None else _input_things(placed, thing_kinds, ground)
+        )
     document["document_sha256"] = input_sha256(document)
     return document
 

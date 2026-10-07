@@ -969,7 +969,10 @@ package format admits the thing edits yet. An export reads the edit kinds of a v
 lineage, so a version is withheld from a package export by name (`edit_kind_not_admitted`, naming the
 edit) once it or any version it descends from holds a thing edit, even after the thing is removed:
 every later version of such a saved world is withheld too, each one carried when photographs are
-added included. Nothing in the browser draws a placed thing.
+added included. Nothing in the browser draws a placed thing. A society of things reads the
+version's placed things ([society contract](synthetic-society-contract.md#the-society-of-things-v7)):
+its placed beings live there, and its placed objects block walking and offer rests and visits as
+their kinds say.
 
 ## Bounded scene-extraction preparation
 

@@ -10,6 +10,7 @@ from typing import Any
 import psycopg
 from psycopg.types.json import Jsonb
 
+from exulanica.world.crossings import BoundCrossing, crossing_stream
 from exulanica.world.decision_roles import decision_roles
 from exulanica.world.role_decisions import append_role_events, apply_receipts
 from exulanica.world.society import (
@@ -39,7 +40,7 @@ from exulanica.world.society_engines import (
     society_engine,
 )
 from exulanica.world.society_grounds import society_population
-from exulanica.world.society_input_policy import LIVING_INPUTS, is_authored_ground
+from exulanica.world.society_input_policy import LIVING_INPUTS, THING_INPUTS, is_authored_ground
 from exulanica.world.society_legacy import advance_society, initial_society
 from exulanica.world.society_living import (
     initial_living_society,
@@ -68,6 +69,7 @@ from exulanica.world.society_social import (
     advance_social_society,
     initial_social_society,
 )
+from exulanica.world.society_things import advance_things, initial_things_society
 from exulanica.world.world_clock_repository import WorldClockRepository
 
 #: Profiles that consume authorized inputs and record transition receipts, from the engine table.
@@ -319,6 +321,13 @@ class SocietyRepository:
                         ),
                         profile=profile,
                     )
+                elif engine.state_family == "things":
+                    # A society of things reads the things composition and no other.
+                    if initial_input["profile"] not in THING_INPUTS:
+                        raise SocietyStartRefused("engine_not_for_this_ground")
+                    state = initial_things_society(
+                        society_id, seed, initial_input, population=population
+                    )
                 elif profile == SOCIAL_PROFILE:
                     state = initial_social_society(
                         society_id, seed, initial_input, population=population
@@ -329,11 +338,16 @@ class SocietyRepository:
                     )
                 else:
                     raise UnknownSocietyEngine(f"no genesis is implemented for {profile}")
-            population = (
-                state["population"]["size"]
-                if engine.state_family == "living"
-                else len(state["inhabitants"])
-            )
+            if engine.state_family == "living":
+                population = state["population"]["size"]
+            elif engine.state_family == "things":
+                # The people its ground's population brings: the beings its author placed are its
+                # things, which every replay places again from the first input.
+                population = sum(
+                    1 for person in state["inhabitants"] if person["came_by"] == "populated"
+                )
+            else:
+                population = len(state["inhabitants"])
             if not engine.holds(population):
                 raise ValueError(
                     f"{profile} holds {engine.population_minimum} to "
@@ -631,6 +645,7 @@ class SocietyRepository:
             ahead.enter_context(inputs_ahead(self.connection, self.named_inputs(row)))
             engine = society_engine(row["engine_version"])
             places = None
+            crossed: tuple[BoundCrossing, ...] = ()
             if engine.state_family == "legacy":
                 state, events = advance_society(row["state"], row["seed"])
             elif engine.state_family == "living":
@@ -658,7 +673,7 @@ class SocietyRepository:
                     roles, row["state"], state, inputs[-1], receipts, decided, events
                 )
                 processed = [(d.decision_seq, d.disposition) for d in decided]
-            elif engine.state_family == "purposeful":
+            elif engine.state_family in ("purposeful", "things"):
                 inputs = self._pending_inputs(row)
                 # The latest authorized unavailable input must be able to pause the engine
                 # even when earlier dependencies are now withdrawn. Historical replay/reads
@@ -721,6 +736,20 @@ class SocietyRepository:
                     events = append_role_events(
                         roles, row["state"], state, inputs[-1], receipts, decided, events
                     )
+                if engine.state_family == "things":
+                    # Placed beings as the latest input places them, then the crossings the door
+                    # handed over and no minute has consumed, in the order it wrote them.
+                    stream = crossing_stream()
+                    pending = (
+                        ()
+                        if stream is None
+                        else stream.pending(
+                            self.connection, self.workspace_id, row["society_id"], state["tick"]
+                        )
+                    )
+                    state, events, crossed = advance_things(
+                        row["state"], state, row["seed"], inputs[-1], events, pending
+                    )
             else:
                 raise UnknownSocietyEngine(f"unsupported society engine {row['engine_version']!r}")
             digest = self._record(row, state, events)
@@ -756,6 +785,13 @@ class SocietyRepository:
                         dispositions=action_dispositions,
                         events=events,
                     )
+            if crossed:
+                # Each crossing bound once, to the event this minute recorded for it.
+                stream = crossing_stream()
+                assert stream is not None
+                stream.bind(
+                    self.connection, self.workspace_id, row["society_id"], state["tick"], crossed
+                )
             return self.snapshot(version_id)
 
     def _record(self, row: dict, state: dict[str, Any], events: tuple[SocietyEvent, ...]) -> str:
@@ -1060,7 +1096,7 @@ class SocietyRepository:
                     expected_events.extend(events)
             elif engine.state_family == "living":
                 state, expected_events = self._replay_living(row)
-            elif engine.state_family == "purposeful":
+            elif engine.state_family in ("purposeful", "things"):
                 documents = self._validated_inputs(row)
                 with inputs_ahead(self.connection, documents):
                     for document in documents:
@@ -1069,6 +1105,8 @@ class SocietyRepository:
                 initializer = (
                     initial_social_society
                     if row["engine_version"] == SOCIAL_PROFILE
+                    else initial_things_society
+                    if engine.state_family == "things"
                     else initial_purposeful_society
                 )
                 state = initializer(
@@ -1082,6 +1120,14 @@ class SocietyRepository:
                 if len(transitions) != row["current_tick"]:
                     raise ValueError("missing or extra society transition")
                 presences = self._presences(row)
+                # The crossings each minute consumed, as the door bound them, by minute.
+                consumed: dict[int, list[Any]] = {}
+                stream = crossing_stream()
+                if engine.state_family == "things" and stream is not None:
+                    for taken in stream.consumed(
+                        self.connection, self.workspace_id, row["society_id"]
+                    ):
+                        consumed.setdefault(taken.tick, []).append(taken)
                 # Replayed from what was stored and bound, never asked again.
                 roles = decision_roles().hosted_by(row["engine_version"])
                 role_decisions, role_bindings = (
@@ -1177,6 +1223,18 @@ class SocietyRepository:
                         events = append_role_events(
                             roles, previous_state, state, inputs[-1], receipts, decided, events
                         )
+                    if engine.state_family == "things":
+                        taken = consumed.pop(transition["tick"], [])
+                        state, events, crossed = advance_things(
+                            previous_state,
+                            state,
+                            row["seed"],
+                            inputs[-1],
+                            events,
+                            [each.crossing for each in taken],
+                        )
+                        if list(crossed) != [each.bound for each in taken]:
+                            raise ValueError("society crossing replay mismatch")
                     action_events = [
                         event for event in events if event.kind == "user_action_requested"
                     ]
@@ -1197,6 +1255,8 @@ class SocietyRepository:
                     ):
                         raise ValueError("society transition replay mismatch")
                     expected_events.extend(events)
+                if consumed:
+                    raise ValueError("a crossing is bound to a minute the society never ran")
                 for action in actions:
                     if action["tick"] is None and (
                         action["document"]["base_tick"] != state["tick"]

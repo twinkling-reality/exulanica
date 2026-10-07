@@ -91,6 +91,11 @@
       "kind": "well",
       "version": 1,
       "sha256": "9f3ebe562bd058f8c2ad402b85b8260c99f2bb0cd00e74e83d25ae2b9ad5877e"
+    },
+    {
+      "kind": "well",
+      "version": 2,
+      "sha256": "498acbe7f30319219238468e561951e59676d581d4714f9ee11e8a5079337ca9"
     }
   ]
 }
