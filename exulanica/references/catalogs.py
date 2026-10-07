@@ -48,6 +48,7 @@ __all__ = [
     "ReferenceCatalogs",
     "ReferenceSource",
     "load_reference_catalogs",
+    "web_source",
 ]
 
 CATALOG_DIRECTORY: Final = (
@@ -287,3 +288,13 @@ def load_reference_catalogs(directory: Path = CATALOG_DIRECTORY) -> ReferenceCat
         aspects=MappingProxyType(read_aspects),
         screened=MappingProxyType(screened),
     )
+
+
+def web_source(catalogs: ReferenceCatalogs | None = None) -> ReferenceSource | None:
+    """The web source this product searches: the catalog's first leads source, in file order, or
+    None when the catalog holds none. Replacing the source is a catalog entry and an adapter."""
+    catalogs = catalogs if catalogs is not None else load_reference_catalogs()
+    for source in catalogs.sources.values():
+        if source.kind == "leads":
+            return source
+    return None

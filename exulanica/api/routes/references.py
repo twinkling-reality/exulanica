@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import unicodedata
 import uuid
 from typing import Annotated, Any, Final, Literal
 
@@ -48,10 +49,10 @@ from exulanica.api.services import Services
 from exulanica.references import store
 from exulanica.references.adapters import ReferenceSourceUnavailable
 from exulanica.references.bundle import read_bundle
-from exulanica.references.catalogs import load_reference_catalogs
+from exulanica.references.catalogs import web_source
 from exulanica.references.drafting import reference_prompts
-from exulanica.references.worker import WEB_SOURCE
 from exulanica.selection.world_drafting import sendable
+from exulanica.spending.status import workspace_status
 
 __all__ = ["REFERENCE_UNAVAILABLE", "router"]
 
@@ -65,6 +66,10 @@ REFERENCE_UNAVAILABLE: Final = (
     "reference_budget_unavailable",
 )
 _LISTED: Final = 20
+#: Another requester's request answers exactly as one that does not exist, and as an id-addressed
+#: route answers a credential that may not reach it (exulanica/api/permissions.py).
+_UNKNOWN: Final = "unknown_reference"
+_UNKNOWN_DETAIL: Final = "nothing at this address is available to this credential"
 
 
 class ReferenceBody(BaseModel):
@@ -83,16 +88,25 @@ def _refusal(status: int, code: str, detail: str) -> JSONResponse:
     return JSONResponse({"code": code, "detail": detail}, status_code=status)
 
 
-def unavailable_because(services: Services, workspace_id: uuid.UUID) -> str | None:
-    """Why this workspace may not ask for web notes here, or None when it may."""
-    source = load_reference_catalogs().sources[WEB_SOURCE]
+def unavailable_because(
+    services: Services, workspace_id: uuid.UUID, *, running: bool
+) -> str | None:
+    """Why this workspace may not ask for web notes here, or None when it may.
+
+    ``running`` is whether the worker's thread is alive in this process. Everything a search could
+    be refused by is asked here, before anything is queued: the source and its offer, the worker,
+    durable spending and the workspace's own grant for the source.
+    """
+    source = web_source()
+    if source is None:
+        return "references_not_configured"
     if not services.references_offered_here() or (
         source.availability == "operator_only" and workspace_id not in services.reference_workspaces
     ):
         return "references_operator_only"
-    if not services.runs_reference_worker or services.model_client is None:
+    if not services.runs_reference_worker or services.model_client is None or not running:
         return "references_not_run_here"
-    if services.spending is None:
+    if services.spending is None or not _granted(services, workspace_id, source.key):
         return "reference_budget_unavailable"
     if services.reference_adapter_for is None:
         return "references_not_configured"
@@ -104,6 +118,43 @@ def unavailable_because(services: Services, workspace_id: uuid.UUID) -> str | No
     return None
 
 
+def _granted(services: Services, workspace_id: uuid.UUID, provider: str) -> bool:
+    """Whether the workspace holds a live grant for ``provider`` with a call left."""
+    document = workspace_status(services.database, workspace_id, providers=[provider])
+    for entry in document["providers"]:
+        if entry["provider"] == provider:
+            return (
+                entry["grant"]["state"] == "active"
+                and entry["authority_state"] == "active"
+                and entry["available_calls"] > 0
+            )
+    return False
+
+
+def _running(request: Request) -> bool:
+    thread = getattr(request.app.state, "reference_thread", None)
+    return thread is not None and thread.is_alive()
+
+
+def _sweep(services: Services, workspace_id: uuid.UUID) -> None:
+    """This workspace's reference jobs no worker here will take, ended now, words blanked."""
+    with services.database.session(workspace_id) as connection:
+        if services.serves_references_to(workspace_id):
+            store.expire_unclaimed(connection, workspace_id)
+        else:
+            store.end_unserved(connection, workspace_id)
+
+
+def _invalid_description(description: str) -> str | None:
+    """A control character (U+0000 included) is refused by name; line breaks and tabs are words."""
+    if any(
+        unicodedata.category(character) == "Cc" and character not in "\n\t"
+        for character in description
+    ):
+        return "description_control_character"
+    return None
+
+
 def reference_operation(code: str | None) -> Operation:
     """Asking for a reference: available, or unavailable with its code."""
     return Operation(
@@ -111,7 +162,7 @@ def reference_operation(code: str | None) -> Operation:
         availability=AVAILABLE if code is None else unavailable(code),
         subject="workspace",
         idempotency="idempotency_key",
-        options=(read_reference, cancel_reference),
+        options=(read_reference,),
     )
 
 
@@ -193,7 +244,10 @@ def list_references(
             views.append(
                 _view(found, _lookups(connection, session.workspace_id, found.reference_id))
             )
-    operation = reference_operation(unavailable_because(services, session.workspace_id))
+    _sweep(services, session.workspace_id)
+    operation = reference_operation(
+        unavailable_because(services, session.workspace_id, running=_running(request))
+    )
     return JSONResponse(
         {
             "references": views,
@@ -206,6 +260,7 @@ def list_references(
 
 @router.post("/references", status_code=202)
 def request_reference(
+    request: Request,
     body: ReferenceBody,
     connection: ScopedConnection,
     session: CurrentSession,
@@ -213,10 +268,21 @@ def request_reference(
 ) -> JSONResponse:
     """Ask for notes on what the things in a description look like, for one draft. Answers 202
     with the request at once; an idempotency key answers 200 with the request it first made."""
-    code = unavailable_because(services, session.workspace_id)
+    invalid = _invalid_description(body.description)
+    if invalid is not None:
+        return _refusal(422, invalid, "a description holds no control character")
+    _sweep(services, session.workspace_id)
+    code = unavailable_because(services, session.workspace_id, running=_running(request))
     if code is not None:
         return _refusal(409, code, "web notes are not offered to this workspace here")
     sent = sendable(connection, session.workspace_id, body.description)
+    if len(sent.text) > store.MAX_DESCRIPTION_CHARACTERS:
+        return _refusal(
+            422,
+            "description_too_long",
+            f"with its saved names replaced, a description is at most "
+            f"{store.MAX_DESCRIPTION_CHARACTERS} characters",
+        )
     key = body.idempotency_key
     try:
         made, new = store.create_request(
@@ -234,6 +300,13 @@ def request_reference(
         )
     except store.RequestNotOffered:
         return _refusal(409, "references_operator_only", "web notes are not offered here")
+    except store.RequestLimitReached:
+        return _refusal(
+            429,
+            "reference_limit_reached",
+            f"at most {store.MAX_OPEN_PER_ACTOR} requests open and "
+            f"{store.MAX_PER_ACTOR_HOUR} an hour for one requester",
+        )
     except store.RequestKeyReused:
         return _refusal(
             409, "idempotency_key_reused", "the key names an earlier request with another body"
@@ -246,9 +319,11 @@ def read_reference(
     reference_id: uuid.UUID, connection: ReadOnlyConnection, session: CurrentSession
 ) -> JSONResponse:
     """One reference request: its steps as they happen, then its notes, or why it stopped."""
-    found = store.read_request(connection, session.workspace_id, reference_id)
+    found = store.read_request(
+        connection, session.workspace_id, reference_id, owner_actor_id=session.actor
+    )
     if found is None:
-        return _refusal(404, "reference_not_found", "no such reference request")
+        return _refusal(404, _UNKNOWN, _UNKNOWN_DETAIL)
     return JSONResponse(_view(found, _lookups(connection, session.workspace_id, reference_id)))
 
 
@@ -258,7 +333,9 @@ def cancel_reference(
 ) -> JSONResponse:
     """Stop a request: a queued one at once, a running one at its next step. A finished one is
     answered as it stands."""
-    found = store.request_cancel(connection, session.workspace_id, reference_id)
+    found = store.request_cancel(
+        connection, session.workspace_id, reference_id, owner_actor_id=session.actor
+    )
     if found is None:
-        return _refusal(404, "reference_not_found", "no such reference request")
+        return _refusal(404, _UNKNOWN, _UNKNOWN_DETAIL)
     return JSONResponse(_view(found, _lookups(connection, session.workspace_id, reference_id)))

@@ -151,6 +151,10 @@ class Permission(StrEnum):
     OPERATIONS_WRITE = "operations.write"
     #: Materialising a tile on demand. Metered against the workspace tile quota.
     TILES_MATERIALISE = "tiles.materialise"
+    #: Asking a web source for reference notes, which spends the operator's source credits and binds
+    #: the person asking to the source's acceptable use policy. Held by an account owner and by a
+    #: token whose grant names it; never by a guest.
+    REFERENCES_REQUEST = "references.request"
 
 
 #: Routes that require ``tiles.materialise`` and charge the tile quota themselves, once per tile
@@ -256,6 +260,7 @@ ACCOUNT_OWNER_PERMISSIONS: Final[frozenset[Permission]] = frozenset(
         _P.WORLD_WRITE,
         _P.OPERATIONS_READ,
         _P.OPERATIONS_WRITE,
+        _P.REFERENCES_REQUEST,
     }
 )
 
@@ -427,6 +432,13 @@ _WORLD_WRITES_WITH_A_MODEL: Final = _every(
     "POST /world/versions/{version_id}/society/models",
     "POST /world/versions/{version_id}/traffic/comparisons",
     "POST /world/versions/{version_id}/traffic/comparisons/{comparison_id}/cancel",
+)
+
+#: Asking for reference notes, and stopping a request. A request spends the operator's web source
+#: credits and a planning and a reading call, so it needs a permission of its own as well as the
+#: model grant; reading a request needs only world.read, and only its requester reads or stops it.
+_REFERENCE_REQUESTS: Final = _every(
+    _requires(_P.WORLD_WRITE, _P.MODEL_INVOKE, _P.REFERENCES_REQUEST),
     "POST /worlds/references",
     "POST /worlds/references/{reference_id}/cancel",
 )
@@ -725,6 +737,7 @@ ROUTE_RULE_SECTIONS: Final[tuple[Mapping[str, Public | Authentication | Requires
     _LIBRARY_READS_WITH_A_MODEL,
     _WORLD_READS_WITH_A_MODEL,
     _WORLD_WRITES_WITH_A_MODEL,
+    _REFERENCE_REQUESTS,
     _INTAKE,
     _DELETIONS,
     _CONSENT_READS,

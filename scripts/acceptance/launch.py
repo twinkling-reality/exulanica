@@ -178,6 +178,7 @@ PERMISSIONS = (
     "world.write",
     "operations.read",
     "operations.write",
+    "references.request",
 )
 #: What ``--tiles`` adds to the synthetic grant, which the account owner's does not carry.
 TILES_PERMISSION = "tiles.materialise"

@@ -329,6 +329,7 @@ def test_readiness_reports_each_check_separately(deployment):
         "derivative_worker",
         "accounts",
         "society_playback",
+        "references",
         "character_catalogs",
     }
     # Not asked for, so not running, and READY: draining the queue in another process is a real

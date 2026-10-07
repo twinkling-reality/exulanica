@@ -154,3 +154,26 @@ def test_no_worker_runs_on_a_public_installation_for_a_source_offered_to_the_ope
     assert isinstance(
         _services(tmp_path, installation=private).build_reference_worker(), ReferenceWorker
     )
+
+
+def test_readiness_reports_the_reference_worker_only_where_one_was_built(tmp_path) -> None:
+    from types import SimpleNamespace
+
+    from exulanica.api.routes.health import _references_check
+
+    services = _services(tmp_path)
+
+    def request(worker, alive):
+        thread = SimpleNamespace(is_alive=lambda: alive)
+        return SimpleNamespace(
+            app=SimpleNamespace(
+                state=SimpleNamespace(reference_worker=worker, reference_thread=thread)
+            )
+        )
+
+    unbuilt = _references_check(request(None, False), services)
+    assert unbuilt == {"ok": True, "configured": False, "running": False}
+    dead = _references_check(request(object(), False), services)
+    assert (dead["ok"], dead["configured"], dead["running"]) == (False, True, False)
+    alive = _references_check(request(object(), True), services)
+    assert (alive["ok"], alive["running"], alive["listed_workspaces"]) == (True, True, 1)

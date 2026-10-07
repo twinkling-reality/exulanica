@@ -32,7 +32,7 @@ from exulanica.references import store
 from exulanica.references.adapters.base import ReferenceSourceUnavailable
 from exulanica.references.adapters.tavily import TavilySearch
 from exulanica.references.bundle import read_bundle
-from exulanica.references.worker import ReferenceWorker
+from exulanica.references.worker import PROCESS_RESERVE_PERCENT, ReferenceWorker
 from psycopg.rows import tuple_row
 
 from model_fakes import FakeTransport, RecordingPolicy, chat_body
@@ -411,13 +411,66 @@ def test_the_catalog_s_calls_per_minute_holds_in_this_process(scene, monkeypatch
 
     connection, workspace_id, models, tavily, _gate, worker, request = scene
     made = request()
-    catalogs = load_reference_catalogs()
-    slow = dataclasses.replace(catalogs.sources["tavily_search"], calls_per_minute=1)
-    narrowed = dataclasses.replace(catalogs, sources={"tavily_search": slow})
-    monkeypatch.setattr(worker_module, "load_reference_catalogs", lambda: narrowed)
+    slow = dataclasses.replace(
+        load_reference_catalogs().sources["tavily_search"], calls_per_minute=1
+    )
+    monkeypatch.setattr(worker_module, "web_source", lambda: slow)
     models.responses = [_structured(PLAN), _structured(READING)]
     tavily.responses = [_tavily_answer(), _tavily_answer()]
     assert worker().run_once(workspace_id) == "complete"
     assert len(tavily.requests) == 1
     finished = store.read_request(connection, workspace_id, made.reference_id)
     assert len(read_bundle(finished.bundle).lookups) == 1
+
+
+def test_spent_credits_are_known_before_the_planner_is_paid(scene) -> None:
+    connection, workspace_id, models, tavily, _gate, worker, request = scene
+    made = request()
+    spent = _Gate(refuse="spending_not_granted")
+    assert worker(spending=_Spending(spent)).run_once(workspace_id) == "partial"
+    finished = store.read_request(connection, workspace_id, made.reference_id)
+    assert finished.steps[0]["reason"] == "source_unavailable"
+    assert finished.steps[1]["reason"] == "spending_not_granted"
+    assert models.requests == [] and tavily.requests == []
+
+
+def test_reference_jobs_leave_half_the_process_budget_for_other_work(scene) -> None:
+    connection, workspace_id, models, _tavily, gate, worker, request = scene
+    made = request()
+    # Two calls in all: half is kept for other work, so the planner and reader cannot both fit.
+    small = ModelClient(
+        api_key="test-key-not-real",
+        manifest=load_manifest(),
+        transport=models,
+        budget=BudgetGuard(ceiling_usd=Decimal("1.00"), max_calls=2),
+        policy=RecordingPolicy(),
+    )
+    assert PROCESS_RESERVE_PERCENT == 50
+    assert worker(client=small).run_once(workspace_id) == "partial"
+    finished = store.read_request(connection, workspace_id, made.reference_id)
+    assert finished.steps[0]["reason"] == "process_budget_spent"
+    assert models.requests == [] and gate.admitted == []
+
+
+def test_a_spent_rate_is_known_before_the_planner_is_paid(scene, monkeypatch) -> None:
+    import dataclasses
+
+    from exulanica.references import worker as worker_module
+    from exulanica.references.catalogs import load_reference_catalogs
+
+    connection, workspace_id, models, tavily, _gate, worker, request = scene
+    request()
+    second = request()
+    slow = dataclasses.replace(
+        load_reference_catalogs().sources["tavily_search"], calls_per_minute=1
+    )
+    monkeypatch.setattr(worker_module, "web_source", lambda: slow)
+    models.responses = [_structured(PLAN), _structured(READING)]
+    tavily.responses = [_tavily_answer()]
+    playing = worker()
+    playing.run_once(workspace_id)
+    asked = len(models.requests)
+    assert playing.run_once(workspace_id) == "partial"
+    later = store.read_request(connection, workspace_id, second.reference_id)
+    assert later.steps[1]["reason"] == "reference_source_rate_limited_here"
+    assert len(models.requests) == asked

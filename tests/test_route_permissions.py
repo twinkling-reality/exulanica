@@ -326,11 +326,26 @@ def test_a_route_reaching_a_model_through_the_client_factory_alone_is_counted():
     assert _reaches_a_model(reaches_a_model_through_the_factory)
 
 
+#: Names the refusal ledger's check admits before the enum holds them, each with the lane whose
+#: pending migration adds it to the vocabulary; one leaves here when the enum gains it.
+PENDING_PERMISSIONS = {"door.grant": "lane BRIDGE's door adds it (pending migration 0149)"}
+
+
 def test_the_refusal_ledger_check_names_exactly_the_vocabulary():
-    """Migration 0061 closes its permission column over the same set as the enum."""
-    sql = (migration_directory() / "0061_route_permissions.sql").read_text(encoding="utf-8")
+    """The last migration to state the ledger's permission column (0061, restated since) closes it
+    over the same set as the enum, and the names a pending lane's migration adds."""
+    stating = [
+        path
+        for path in sorted(migration_directory().glob("*.sql"))
+        if "missing_permissions <@ array[" in path.read_text(encoding="utf-8")
+    ]
+    assert stating[0].name == "0061_route_permissions.sql"
+    sql = stating[-1].read_text(encoding="utf-8")
     block = sql.split("missing_permissions <@ array[", 1)[1].split("]::text[]", 1)[0]
-    assert sorted(re.findall(r"'([a-z.]+)'", block)) == ALL_PERMISSIONS
+    assert sorted(re.findall(r"'([a-z.]+)'", block)) == sorted(
+        {*ALL_PERMISSIONS, *PENDING_PERMISSIONS}
+    )
+    assert not set(PENDING_PERMISSIONS) & set(ALL_PERMISSIONS)
 
 
 def test_every_membership_role_the_schema_allows_has_a_declared_grant():

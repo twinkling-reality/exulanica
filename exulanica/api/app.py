@@ -338,6 +338,17 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
         if reference_worker is not None
         else None
     )
+    app.state.reference_worker = reference_worker
+    app.state.reference_thread = reference_thread
+    if services.reference_adapter_for is not None:
+        # Reference jobs no worker here will take are ended, and their words blanked, at every
+        # start, whether or not the worker runs.
+        try:
+            services.sweep_references()
+        except Exception as failure:
+            _LOG.warning(
+                "the reference sweep at startup failed", extra={"failure": type(failure).__name__}
+            )
     worker = services.build_derivative_worker()
     app.state.derivative_worker = worker
     if worker is not None:

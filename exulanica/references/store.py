@@ -9,13 +9,15 @@ that was sent is written whoever holds the job. Every path that locks both rows 
 first, then the request's.
 
 The job's payload holds what the work needs and nothing more: the request's id, the person's
-description as it is sent (saved names already replaced) and the words the account's own name and
-email are made of. Every end of a request (finished, cancelled, stranded, or expired after
+description as it is sent (saved names already replaced) and any words of the account's own the
+caller asks to be screened (the route passes none: it does not know them). Every end of a request
+(finished, cancelled, stranded, or expired after
 :data:`QUEUED_EXPIRY_SECONDS` unclaimed) blanks the description and the words and clears the
 digest of the request an idempotency key named, so after a request ends nothing of the person's
 words is kept; only our planned queries are, in ``reference_lookup``. A request is accepted only
 for a workspace the caller says is offered references, so no job waits for a worker that will
-never take it.
+never take it, and at most :data:`MAX_OPEN_PER_ACTOR` unfinished and :data:`MAX_PER_ACTOR_HOUR`
+in an hour for any one requester. Only the requester reads or stops a request through the routes.
 """
 
 from __future__ import annotations
@@ -43,11 +45,13 @@ __all__ = [
     "ClaimedRequest",
     "ReferenceRequest",
     "RequestKeyReused",
+    "RequestLimitReached",
     "RequestNotOffered",
     "abandon_stranded",
     "cancel_requested",
     "claim",
     "create_request",
+    "end_unserved",
     "expire_unclaimed",
     "finish",
     "read_request",
@@ -68,6 +72,10 @@ QUEUED_EXPIRY_SECONDS: Final = 600
 #: The same ceiling the world drafter's description carries (reference-prompts.v1.json).
 MAX_DESCRIPTION_CHARACTERS: Final = 1000
 MAX_WITHHELD_WORDS: Final = 16
+#: One requester's unfinished requests, and requests in the last hour: a request spends up to three
+#: of the operator's source credits and two model calls, so one requester cannot queue without end.
+MAX_OPEN_PER_ACTOR: Final = 2
+MAX_PER_ACTOR_HOUR: Final = 20
 _MAX_WITHHELD_CHARACTERS: Final = 64
 FINISHED: Final = ("complete", "partial", "failed", "cancelled")
 _JOB_STATE: Final = {
@@ -94,6 +102,10 @@ class RequestKeyReused(ExulanicaError):
 
 class RequestNotOffered(ExulanicaError):
     """References are not offered to this workspace here, so no request is queued for it."""
+
+
+class RequestLimitReached(ExulanicaError):
+    """This requester already has as many requests open, or made this hour, as one may."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -138,12 +150,19 @@ def _request(row: Mapping[str, Any]) -> ReferenceRequest:
 
 
 def read_request(
-    connection: psycopg.Connection, workspace_id: uuid.UUID, reference_id: uuid.UUID
+    connection: psycopg.Connection,
+    workspace_id: uuid.UUID,
+    reference_id: uuid.UUID,
+    *,
+    owner_actor_id: uuid.UUID | None = None,
 ) -> ReferenceRequest | None:
+    """The request, or None. With ``owner_actor_id``, only that requester's: anyone else's reads as
+    one that does not exist."""
     with connection.cursor(row_factory=dict_row) as cursor:
         row = cursor.execute(
-            f"select {_COLUMNS} from reference_request where workspace_id=%s and reference_id=%s",
-            (workspace_id, reference_id),
+            f"select {_COLUMNS} from reference_request where workspace_id=%s and reference_id=%s "
+            "and (%s::uuid is null or owner_actor_id=%s::uuid)",
+            (workspace_id, reference_id, owner_actor_id, owner_actor_id),
         ).fetchone()
     return None if row is None else _request(row)
 
@@ -216,6 +235,20 @@ def create_request(
     }
     try:
         with connection.transaction(), connection.cursor(row_factory=dict_row) as cursor:
+            # One requester at a time is counted, so two requests racing see each other.
+            cursor.execute(
+                "select pg_advisory_xact_lock(hashtextextended(%s, 880148))",
+                (f"{workspace_id}:{owner_actor_id}",),
+            )
+            counts = cursor.execute(
+                "select count(*) filter (where finished_at is null) as open, "
+                "count(*) filter (where created_at > now() - interval '1 hour') as hour "
+                "from reference_request where workspace_id=%s and owner_actor_id=%s",
+                (workspace_id, owner_actor_id),
+            ).fetchone()
+            assert counts is not None
+            if counts["open"] >= MAX_OPEN_PER_ACTOR or counts["hour"] >= MAX_PER_ACTOR_HOUR:
+                raise RequestLimitReached("this requester has as many requests as one may")
             job = cursor.execute(
                 "insert into job (workspace_id, kind, payload) values (%s, %s, %s) "
                 "returning job_id",
@@ -448,16 +481,23 @@ def finish(
 
 
 def request_cancel(
-    connection: psycopg.Connection, workspace_id: uuid.UUID, reference_id: uuid.UUID
+    connection: psycopg.Connection,
+    workspace_id: uuid.UUID,
+    reference_id: uuid.UUID,
+    *,
+    owner_actor_id: uuid.UUID | None = None,
 ) -> ReferenceRequest | None:
     """Ask a request to stop. A queued one is cancelled at once; a running one at its next step.
+    With ``owner_actor_id``, only that requester's request: anyone else's is None, as an unknown
+    one is.
 
     The job's row is locked before the request's, as every other path that takes both does.
     """
     with connection.transaction(), connection.cursor(row_factory=dict_row) as cursor:
         named = cursor.execute(
-            "select job_id from reference_request where workspace_id=%s and reference_id=%s",
-            (workspace_id, reference_id),
+            "select job_id from reference_request where workspace_id=%s and reference_id=%s "
+            "and (%s::uuid is null or owner_actor_id=%s::uuid)",
+            (workspace_id, reference_id, owner_actor_id, owner_actor_id),
         ).fetchone()
         if named is None:
             return None
@@ -491,7 +531,7 @@ def request_cancel(
                 "now()) where workspace_id=%s and reference_id=%s",
                 (workspace_id, reference_id),
             )
-    return read_request(connection, workspace_id, reference_id)
+    return read_request(connection, workspace_id, reference_id, owner_actor_id=owner_actor_id)
 
 
 def _end_jobs(
@@ -541,4 +581,18 @@ def expire_unclaimed(connection: psycopg.Connection, workspace_id: uuid.UUID) ->
             f"state='queued' and created_at < now() - interval '{QUEUED_EXPIRY_SECONDS} seconds'",
             "expired",
             "queued and never taken",
+        )
+
+
+def end_unserved(connection: psycopg.Connection, workspace_id: uuid.UUID) -> int:
+    """End every unfinished reference job of a workspace this installation does not serve, and its
+    request as failed (``not_served``), blanking the words. Run where no worker will take them: at
+    startup for every workspace the installation knows that it does not serve."""
+    with connection.transaction(), connection.cursor(row_factory=dict_row) as cursor:
+        return _end_jobs(
+            cursor,
+            workspace_id,
+            "state in ('queued', 'running')",
+            "not_served",
+            "the installation does not serve references to this workspace",
         )

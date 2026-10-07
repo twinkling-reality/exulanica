@@ -34,6 +34,7 @@ bundle with its provider, tokens and USD.
 from __future__ import annotations
 
 import collections
+import dataclasses
 import logging
 import threading
 import time
@@ -71,18 +72,20 @@ from exulanica.references.bundle import (
     BundleNote,
     ReferenceBundle,
 )
-from exulanica.references.catalogs import ReferenceSource, load_reference_catalogs
+from exulanica.references.catalogs import ReferenceSource, web_source
 from exulanica.references.notes import keep_notes
 
-__all__ = ["DEADLINE_SECONDS", "STEPS", "WEB_SOURCE", "ReferenceWorker"]
+__all__ = ["DEADLINE_SECONDS", "PROCESS_RESERVE_PERCENT", "STEPS", "ReferenceWorker"]
 
 _LOG = logging.getLogger(__name__)
 
 #: The longest a request runs before it ends partial with what it has.
 DEADLINE_SECONDS: Final = 30.0
 STEPS: Final = ("plan", "search", "read", "bundle")
-#: The one web source the worker uses: the catalog's first leads source.
-WEB_SOURCE: Final = "tavily_search"
+#: The share of the process's model budget (its USD fuse and its call count) reference jobs leave
+#: for every other feature: a job starts its planner only while more than this share remains, so a
+#: loop of reference requests can never spend the process's fuse down for the Companion or a world.
+PROCESS_RESERVE_PERCENT: Final = 50
 #: Outcomes of a search that never left: refused before sending, so nothing is recorded of it and
 #: no further search is tried. The duplicate refusals are a job taken again after a crash meeting
 #: the searches it already made.
@@ -168,6 +171,14 @@ def _reason(failure: BaseException) -> str:
     if isinstance(failure, ModelError):
         return "model_unavailable"
     return "failed"
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class _Reserved:
+    """A search's admitted spending, held until the search is dispatched or released."""
+
+    gate: Any
+    ticket: SpendingTicket
 
 
 class _Rate:
@@ -328,7 +339,12 @@ class ReferenceWorker:
         lookups: list[uuid.UUID],
         started: float,
     ) -> None:
-        source = load_reference_catalogs().sources[WEB_SOURCE]
+        source = web_source()
+        if source is None:
+            steps.set("plan", "missed", reason="source_unavailable")
+            steps.set("search", "missed", reason="references_not_configured")
+            steps.set("read", "missed", reason="nothing_found")
+            return
         adapter, unavailable = self._source(source)
         if adapter is None:
             steps.set("plan", "missed", reason="source_unavailable")
@@ -350,6 +366,51 @@ class ReferenceWorker:
         started: float,
         source: ReferenceSource,
         adapter: ReferenceAdapter,
+    ) -> None:
+        # Everything that could refuse a search is asked before the planner is paid: the process's
+        # share of its model budget, the source's rate here, and the workspace's grant for it, by
+        # admitting the first search now.
+        if not self._process_has_room():
+            steps.set("plan", "missed", reason="process_budget_spent")
+            steps.set("search", "missed", reason="nothing_planned")
+            steps.set("read", "missed", reason="nothing_planned")
+            return
+        first, refusal = self._reserve(claimed, source, 0)
+        if first is None:
+            steps.set("plan", "missed", reason="source_unavailable")
+            steps.set("search", "missed", reason=refusal)
+            steps.set("read", "missed", reason="nothing_found")
+            return
+        pending: list[_Reserved] = [first]
+        try:
+            self._plan_search_read(
+                claimed, steps, calls, notes, lookups, started, source, adapter, pending
+            )
+        finally:
+            for reserved in pending:
+                self._release(reserved.gate, reserved.ticket)
+
+    def _process_has_room(self) -> bool:
+        budget = self._client.budget
+        keep_usd = budget.ceiling_usd * PROCESS_RESERVE_PERCENT / 100
+        keep_calls = budget.max_calls * PROCESS_RESERVE_PERCENT // 100
+        # Two calls: the planner and the reader.
+        return (
+            budget.ceiling_usd - budget.spent_usd - keep_usd > 0
+            and budget.max_calls - budget.billed_calls - keep_calls >= 2
+        )
+
+    def _plan_search_read(
+        self,
+        claimed: store.ClaimedRequest,
+        steps: _Steps,
+        calls: list[BundleCall],
+        notes: list[BundleNote],
+        lookups: list[uuid.UUID],
+        started: float,
+        source: ReferenceSource,
+        adapter: ReferenceAdapter,
+        pending: list[_Reserved],
     ) -> None:
         policy = self._policy_for(claimed.workspace_id)
         client = self._client.with_policy(policy)
@@ -393,8 +454,9 @@ class ReferenceWorker:
         unavailable: str | None = None
         for index, query in enumerate(queries):
             self._check(claimed, steps, started)
+            reserved = pending.pop() if index == 0 and pending else None
             outcome, credits, count, provider_id, lead = self._search(
-                claimed, source, adapter, query, index
+                claimed, source, adapter, query, index, reserved
             )
             if outcome in _NOT_SENT:
                 unavailable = outcome
@@ -439,8 +501,11 @@ class ReferenceWorker:
             return
         screened = keep_notes(
             read.notes,
+            # The queries too: a note that repeats one carries what was asked, not what was found.
             sources=[
-                text for lead in leads for text in (*lead.passages, *lead.picture_descriptions)
+                text
+                for lead in leads
+                for text in (lead.query.text, *lead.passages, *lead.picture_descriptions)
             ],
             withheld_words=claimed.withheld_words,
         )
@@ -448,6 +513,29 @@ class ReferenceWorker:
         notes.extend(
             BundleNote(note.aspect, note.text, "web_description", None) for note in screened.kept
         )
+
+    def _reserve(
+        self, claimed: store.ClaimedRequest, source: ReferenceSource, index: int
+    ) -> tuple[_Reserved | None, str | None]:
+        """A search's rate slot taken and its spending admitted (not yet dispatched), or why not."""
+        if self._spending is None:
+            return None, "reference_budget_unavailable"
+        if not self._rate.take(source):
+            return None, "reference_source_rate_limited_here"
+        gate = self._spending.for_workspace(claimed.workspace_id)
+        try:
+            ticket = gate.admit(
+                SpendingRequest(
+                    provider=source.key,
+                    model_id=source.key,
+                    role=SEARCH_ROLE,
+                    usd=Decimal(0),
+                    key=f"reference:{claimed.job_id}:search:{index}",
+                )
+            )
+        except SpendingRefused as refusal:
+            return None, refusal.reason
+        return _Reserved(gate, ticket), None
 
     def _settle(self, gate: Any, ticket: SpendingTicket, usage: CallUsage) -> None:
         """Settle as the model chain does: a settlement the authority could not take leaves the
@@ -476,25 +564,14 @@ class ReferenceWorker:
         adapter: ReferenceAdapter,
         query: AdmittedQuery,
         index: int,
+        reserved: _Reserved | None = None,
     ) -> tuple[str, int, int, str | None, Leads | None]:
         """One search, admitted against the source's spending: outcome, credits, results, id."""
-        if self._spending is None:
-            return "reference_budget_unavailable", 0, 0, None, None
-        if not self._rate.take(source):
-            return "reference_source_rate_limited_here", 0, 0, None, None
-        gate = self._spending.for_workspace(claimed.workspace_id)
-        try:
-            ticket = gate.admit(
-                SpendingRequest(
-                    provider=source.key,
-                    model_id=source.key,
-                    role=SEARCH_ROLE,
-                    usd=Decimal(0),
-                    key=f"reference:{claimed.job_id}:search:{index}",
-                )
-            )
-        except SpendingRefused as refusal:
-            return refusal.reason, 0, 0, None, None
+        if reserved is None:
+            reserved, refusal = self._reserve(claimed, source, index)
+            if reserved is None:
+                return refusal or "reference_budget_unavailable", 0, 0, None, None
+        gate, ticket = reserved.gate, reserved.ticket
         try:
             gate.dispatch(ticket)
         except SpendingRefused as refusal:

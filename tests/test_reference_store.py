@@ -373,3 +373,14 @@ def test_a_cancel_and_a_claim_together_lock_the_job_first_and_never_deadlock(ing
         )
     thread.join(10)
     assert not thread.is_alive() and failures == []
+
+
+def test_an_unserved_workspace_s_jobs_end_with_their_words_blanked(repository) -> None:
+    connection, workspace_id = repository.connection, repository.workspace_id
+    queued, _ = _create(connection, workspace_id)
+    _create(connection, workspace_id)
+    store.claim(connection, workspace_id, worker="test")
+    assert store.end_unserved(connection, workspace_id) == 2
+    ended = store.read_request(connection, workspace_id, queued.reference_id)
+    assert (ended.status, ended.failure) == ("failed", "not_served")
+    assert _payload(connection, queued.job_id) == {"reference_id": str(queued.reference_id)}

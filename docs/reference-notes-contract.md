@@ -46,7 +46,7 @@ result and never the query text.
 
 Each source has exactly one adapter in `exulanica/references/adapters/`, and a test holds the
 catalog and the adapters to the same set. Adding or replacing a source is a catalog entry plus an
-adapter. The only source is `tavily_search`: a leads source, offered to the operator only, one
+adapter; the web source is the catalog's first leads source. The only source is `tavily_search`: a leads source, offered to the operator only, one
 credit per call at the basic depth, at most five results. Its terms are recorded in
 [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md) section 3.4.
 
@@ -54,7 +54,8 @@ credit per call at the basic depth, at most five results. Its terms are recorded
 
 `exulanica/references/boundary.py::admit_query` is the only constructor of the query an adapter
 sends. A source holds every query it receives (Tavily's terms give it a perpetual licence to them
-and allow training on them), so a query carries nothing of a person. In order:
+and allow training on them), so a query is kept free, by rule, of everything this product knows to
+be a person's: saved names, account words it is given, contact details and screened words. In order:
 
 1. **Shape.** One line of at most 8 words and 80 characters, about a catalogued aspect.
 2. **The workspace's hosted request policy**, the same object model calls pass, judging a hand-over
@@ -140,15 +141,27 @@ the workspace's grant like every model call. Without durable spending, web notes
 | Route | Permission | Does |
 | --- | --- | --- |
 | `GET /worlds/references` | `world.read` | The caller's recent requests and the capability to make one |
-| `POST /worlds/references` | `world.write` and `model.invoke` | `{purpose, description, web: true, idempotency_key?}`; 202 with the request, 200 with the request a repeated key first made |
-| `GET /worlds/references/{reference_id}` | `world.read` | One request: steps, notes, missed steps, our search records |
-| `POST /worlds/references/{reference_id}/cancel` | `world.write` and `model.invoke` | Stop a request |
+| `POST /worlds/references` | `world.write`, `model.invoke` and `references.request` | `{purpose, description, web: true, idempotency_key?}`; 202 with the request, 200 with the request a repeated key first made |
+| `GET /worlds/references/{reference_id}` | `world.read` | One of the caller's own requests: steps, notes, missed steps, our search records |
+| `POST /worlds/references/{reference_id}/cancel` | `world.write`, `model.invoke` and `references.request` | Stop one of the caller's own requests |
 
-A request web notes are not offered for is refused with 409 and one code, and the capability names
-the same code: `references_operator_only` (the workspace is not listed, or the installation's
-profile is `public`), `references_not_run_here`, `reference_budget_unavailable` or
-`references_not_configured`. A key naming an earlier request with another body is
-`idempotency_key_reused`. `web` must be `true`.
+`references.request` is a permission of its own: an account owner holds it, a token holds it when
+its grant names it, and a guest never does, because the source's acceptable use policy binds the
+person asking. Only the requester reads or stops a request: anyone else's answers 404
+`unknown_reference`, exactly as an id that does not exist. One requester has at most two requests
+unfinished and twenty in an hour; another is 429 `reference_limit_reached`.
+
+A request web notes are not offered for is refused with 409 and one code before anything is
+queued, and the capability names the same code: `references_operator_only` (the workspace is not
+listed, or the installation's profile is `public`), `references_not_run_here` (no worker, or its
+thread is not alive here), `reference_budget_unavailable` (no durable spending, or the workspace
+holds no live grant for the source with a call left) or `references_not_configured`. In the job,
+the process's model budget share (half is always left for other work), the source's rate and the
+workspace's grant are asked before the planner is paid. A description holding a control character
+(U+0000 included) is 422 `description_control_character`; one longer than 1,000 characters once
+saved names are replaced is 422 `description_too_long`. A key naming an earlier request with another
+body is `idempotency_key_reused`. `web` must be `true`. Whether the worker runs is in `/readyz`
+(`references`).
 
 ## 9. Limits
 
@@ -157,16 +170,21 @@ profile is `public`), `references_not_run_here`, `reference_budget_unavailable` 
   processes each count their own minute. A stopped source's catalog entry is reviewed before restart.
 - **An answer is read before it is bounded.** The shared model transport reads a whole response
   within its deadline; the adapter then refuses an answer over one million characters unread.
-- **The account's own name is screened only where it is saved.** Saved names are replaced before
-  anything leaves; the account's display name and email are not available to the route, so a typed
-  account name reaches the planner as typed (as it reaches the world drafter), while links and email
-  addresses never leave in a query.
-- **Our query text is kept with the workspace** until the workspace is erased; no shorter retention
-  is decided.
+- **A name nobody saved is kept out of a query only by the planner's instruction.** Saved names are
+  replaced before anything leaves and links, email addresses, long numbers and screened words are
+  refused by rule; a person's name typed into a description and never saved, the account holder's
+  own included (the route is not given the account's display name or email), reaches the planner as
+  typed, as it reaches the world drafter, and the planner is told never to write one into a query.
+  A query that carried one would be kept by the source for good.
+- **Our query text is kept with the workspace.** No erasure path removes reference rows yet, and no
+  retention is decided.
 - **Physical copies outlive the rows.** A blanked payload and a cleared digest are gone from the
   live rows, but PostgreSQL keeps dead row versions until vacuum, the write-ahead log keeps them until
-  it is recycled, and a backup or a judge seed taken while a job was queued keeps its payload as it
-  was then, for as long as that copy is kept.
+  it is recycled, and a backup or a judge seed taken while a job was queued or running keeps its
+  payload as it was then, for as long as that copy is kept.
+- **Unserved jobs end at startup.** A job of a workspace this installation no longer serves (dropped
+  from the list, the worker set off, a public profile) is ended and blanked at the next start, or
+  when that workspace next uses the routes; until then its words wait in the job.
 - **No live search has run through the product.**
 
 ## 10. Verification
@@ -175,7 +193,8 @@ profile is `public`), `references_not_run_here`, `reference_budget_unavailable` 
 `tests/test_reference_notes.py` and `tests/test_reference_settings.py` run without a database;
 `tests/test_reference_store.py`, `tests/test_reference_worker.py` and
 `tests/test_reference_routes.py` run on PostgreSQL. With every outside party scripted they show that
-a saved person, a saved place, the account's own words and a planted search result reach no
-outgoing query, no stored row and no response, and that each guard can fail. Row-level security on
+a saved person, a saved place, account words given to the job and a planted search result reach no
+outgoing query, no stored row and no response, and that each guard can fail; the route tests run as
+the runtime and read-only roles. Row-level security on
 both tables is shown as the runtime role in `tests/test_row_level_security.py`. The two model calls
 are registered paths of `tests/test_hosted_boundary.py`.

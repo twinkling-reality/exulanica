@@ -208,6 +208,7 @@ def _evaluate(request: Request) -> dict[str, Any]:
     checks["derivative_worker"] = _worker_check(request, services)
     checks["accounts"] = _account_check(services)
     checks["society_playback"] = _society_check(request, services)
+    checks["references"] = _references_check(request, services)
     checks["character_catalogs"] = _character_catalog_check(services)
 
     return {
@@ -291,6 +292,30 @@ def _society_check(request: Request, services: Services) -> dict[str, Any]:
 #: What an operator runs when no people catalog is served: the host's own publication command,
 #: with the owner connection and the data directory this API serves its store from.
 PUBLISH_COMMAND: Final = "exulanica-character-catalog publish --apply"
+
+
+def _references_check(request: Request, services: Services) -> dict[str, Any]:
+    """Whether the reference worker runs here, and for how many listed workspaces.
+
+    A count and never the ids, as playback's check says. Not configured is ready: nothing here asks
+    for references to be played.
+    """
+    # Built only with a model client, durable spending, a listed workspace and the source offered
+    # here: an installation that offers no references is ready without a worker.
+    if (
+        not services.runs_reference_worker
+        or getattr(request.app.state, "reference_worker", None) is None
+    ):
+        return {"ok": True, "configured": False, "running": False}
+    thread = getattr(request.app.state, "reference_thread", None)
+    running = thread is not None and thread.is_alive()
+    return {
+        "ok": running,
+        "configured": True,
+        "running": running,
+        "listed_workspaces": len(services.reference_workspaces),
+        "proves": "whether the reference worker's thread is alive; not that a source answers",
+    }
 
 
 def _character_catalog_check(services: Services) -> dict[str, Any]:

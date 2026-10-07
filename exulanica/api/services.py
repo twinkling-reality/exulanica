@@ -86,14 +86,15 @@ from exulanica.models.client import PROVIDER_CREDENTIAL_ABSENT, ModelClient
 from exulanica.models.egress import EGRESS_ALLOWLIST_ENV
 from exulanica.models.manifest import MANIFEST_PATH, Role, load_manifest
 from exulanica.models.spending import SpendingRefused
+from exulanica.references import store as reference_store
 from exulanica.references.adapters import ReferenceAdapter
-from exulanica.references.catalogs import ReferenceSource, load_reference_catalogs
+from exulanica.references.catalogs import ReferenceSource, web_source
 from exulanica.references.settings import (
     configured_adapter,
     plays_references_here,
     reference_workspaces,
 )
-from exulanica.references.worker import WEB_SOURCE, ReferenceWorker
+from exulanica.references.worker import ReferenceWorker
 from exulanica.spending import (
     DURABLE,
     PROCESS,
@@ -529,9 +530,39 @@ class Services:
     def references_offered_here(self) -> bool:
         """Whether this installation may offer the web source at all: a source offered to the
         operator only is offered on no installation whose profile is ``public``."""
-        source = load_reference_catalogs().sources[WEB_SOURCE]
+        source = web_source()
+        if source is None:
+            return False
         profile = self.installation.profile if self.installation is not None else None
         return source.availability == "everyone" or profile is None or profile.id != "public"
+
+    def serves_references_to(self, workspace_id: uuid.UUID) -> bool:
+        """Whether a worker here takes this workspace's reference jobs: references are played here,
+        this installation may offer the source, and the workspace is listed."""
+        return (
+            self.runs_reference_worker
+            and self.references_offered_here()
+            and workspace_id in self.reference_workspaces
+        )
+
+    def sweep_references(self) -> int:
+        """End the reference jobs no worker here will take, for every workspace this process knows
+        (its tokens', its accounts' and its listed ones), blanking their words; expire the stale
+        queued ones of those it serves. Run at startup, so a workspace dropped from the list, a
+        worker set off or a move to a public profile leaves nothing waiting. Returns how many."""
+        known = set(self.reference_workspaces)
+        if self.tokens is not None:
+            known |= set(self.tokens.workspaces)
+        if self.accounts is not None:
+            known |= set(self.accounts.active_owned_workspaces())
+        ended = 0
+        for workspace_id in sorted(known):
+            with self.database.session(workspace_id) as connection:
+                if self.serves_references_to(workspace_id):
+                    ended += reference_store.expire_unclaimed(connection, workspace_id)
+                else:
+                    ended += reference_store.end_unserved(connection, workspace_id)
+        return ended
 
     def build_reference_worker(self) -> ReferenceWorker | None:
         """What plays the reference jobs of the workspaces that may ask for web notes, or None
