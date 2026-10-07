@@ -71,6 +71,7 @@ from exulanica.references.drafting import plan_subjects, read_notes
 from exulanica.selection import action_plan
 from exulanica.selection.answer import Answer, AnswerClause, ClauseType
 from exulanica.selection.calls import CallLog
+from exulanica.selection.creature_drafting import draft_creature
 from exulanica.selection.environment_proposal import (
     EnvironmentOperation,
     propose_environment_operation,
@@ -90,6 +91,7 @@ from exulanica.selection.world_drafting import propose_world_specification, spec
 from exulanica.world.society_decision_contract import decision_contract, person_role
 
 from conftest import ingest_observed, write_photo
+from creature_support import form_of
 from model_fakes import FakeTransport, RecordingPolicy, chat_body
 from test_companion_saved_names import (
     PERSON,
@@ -140,6 +142,7 @@ HOSTED_CALL_PATHS: Mapping[str, tuple[str, str]] = {
     "simulation drafter": ("exulanica.selection.action_plan", "_draft_simulation"),
     "reference planner": ("exulanica.references.drafting", "plan_subjects"),
     "reference reader": ("exulanica.references.drafting", "read_notes"),
+    "creature drafter": ("exulanica.selection.creature_drafting", "draft_creature"),
 }
 
 _PATH_AT = {site: path for path, site in HOSTED_CALL_PATHS.items()}
@@ -545,6 +548,20 @@ def run_specification(world: World) -> Witness:
     return transport
 
 
+def run_creature_drafting(world: World) -> Witness:
+    """The creature drafter, handed a person's words as the creature route will hand them."""
+    form = form_of("horse", label="striped hill beast")
+    # The role the drafter is asked under until its own is measured and joins the manifest.
+    client, transport = world.hosted([_json_reply(form, Role.SPECIFICATION_DRAFTER)])
+    outcome = draft_creature(
+        client,
+        f"a striped beast that circles {PLACE}, where {PERSON} feeds it",
+        role=Role.SPECIFICATION_DRAFTER,
+    )
+    assert outcome.creature is not None, outcome.refusal
+    return transport
+
+
 def run_reference_planning(world: World) -> Witness:
     """The reference planner, handed a description as a reference job hands it."""
     plan = {"subjects": [{"aspect": "buildings", "text": "whitewashed island houses"}]}
@@ -728,6 +745,7 @@ SCENARIOS: Mapping[str, tuple[Callable[[World], Witness], str]] = {
     "simulation drafter": (run_actions, "LISTED SPEEDS"),
     "reference planner": (run_reference_planning, "a harbour town"),
     "reference reader": (run_reference_reading, "Whitewashed houses"),
+    "creature drafter": (run_creature_drafting, "a striped beast that circles"),
 }
 
 #: The paths whose call site replaces saved names itself, and the modules it replaces them with.

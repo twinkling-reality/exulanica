@@ -1,0 +1,1001 @@
+{
+  "schema_version": 1,
+  "catalog_id": "body-grammar",
+  "catalog_version": 1,
+  "entries": [
+    {
+      "key": "horizontal",
+      "group": "posture",
+      "words": "its body runs along the ground on its legs, as most animals with four or more legs do",
+      "spec": {
+        "spine": {
+          "minimum": 1,
+          "maximum": 8
+        },
+        "leg_pairs": {
+          "minimum": 0,
+          "maximum": 6
+        },
+        "parts": [
+          "neck",
+          "head",
+          "jaw",
+          "tail",
+          "upper_body",
+          "leg",
+          "arm",
+          "wing",
+          "fin",
+          "tentacle"
+        ],
+        "extent_mm": {
+          "length": {
+            "minimum": 200,
+            "maximum": 40000
+          },
+          "width": {
+            "minimum": 100,
+            "maximum": 20000
+          },
+          "height": {
+            "minimum": 100,
+            "maximum": 20000
+          },
+          "span": {
+            "minimum": 0,
+            "maximum": 60000
+          }
+        }
+      },
+      "reason": "A body whose torso lies along the ground's plane, front to back: four legs, ten legs, or none (a slug), with necks forward, a tail behind and wings on its back. Most animals and most imagined beasts stand this way. A torso of one to eight segments bends enough to read as a back, a waist and a chest without a bone per vertebra.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica creature body grammar; see the entry reason"
+      }
+    },
+    {
+      "key": "upright",
+      "group": "posture",
+      "words": "stands upright on two legs, as a person does",
+      "spec": {
+        "spine": {
+          "minimum": 2,
+          "maximum": 8
+        },
+        "leg_pairs": {
+          "minimum": 1,
+          "maximum": 2
+        },
+        "parts": [
+          "neck",
+          "head",
+          "jaw",
+          "tail",
+          "leg",
+          "arm",
+          "wing",
+          "fin",
+          "tentacle"
+        ],
+        "extent_mm": {
+          "length": {
+            "minimum": 100,
+            "maximum": 20000
+          },
+          "width": {
+            "minimum": 200,
+            "maximum": 20000
+          },
+          "height": {
+            "minimum": 400,
+            "maximum": 20000
+          },
+          "span": {
+            "minimum": 0,
+            "maximum": 60000
+          }
+        }
+      },
+      "reason": "A body whose torso stands on its legs, head on top and arms out to its sides in the rest pose, as a person's does; one or two pairs of legs. A creature that is a person's shape and fits a person's body (2,400 mm or less) is drafted onto the humanoid plan instead, so it wears people's looks and holds things in their hands.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica creature body grammar; see the entry reason"
+      }
+    },
+    {
+      "key": "serpentine",
+      "group": "posture",
+      "words": "a long body that lies along the ground",
+      "spec": {
+        "spine": {
+          "minimum": 6,
+          "maximum": 24
+        },
+        "leg_pairs": {
+          "minimum": 0,
+          "maximum": 3
+        },
+        "parts": [
+          "neck",
+          "head",
+          "jaw",
+          "tail",
+          "upper_body",
+          "leg",
+          "arm",
+          "wing",
+          "fin",
+          "tentacle"
+        ],
+        "extent_mm": {
+          "length": {
+            "minimum": 400,
+            "maximum": 40000
+          },
+          "width": {
+            "minimum": 50,
+            "maximum": 4000
+          },
+          "height": {
+            "minimum": 50,
+            "maximum": 8000
+          },
+          "span": {
+            "minimum": 0,
+            "maximum": 60000
+          }
+        }
+      },
+      "reason": "A body that is mostly its spine, lying straight along the ground in its rest pose and moved by a travelling wave when it goes: six to twenty-four segments make the wave read as a body rather than a few rods. It may rise into an upright torso at the front (a naga) and may have a few short legs (a lindworm).",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica creature body grammar; see the entry reason"
+      }
+    },
+    {
+      "key": "floating",
+      "group": "posture",
+      "words": "hangs in the air with nothing touching the ground",
+      "spec": {
+        "spine": {
+          "minimum": 1,
+          "maximum": 4
+        },
+        "leg_pairs": {
+          "minimum": 0,
+          "maximum": 0
+        },
+        "parts": [
+          "neck",
+          "head",
+          "jaw",
+          "tail",
+          "arm",
+          "wing",
+          "fin",
+          "tentacle"
+        ],
+        "extent_mm": {
+          "length": {
+            "minimum": 100,
+            "maximum": 20000
+          },
+          "width": {
+            "minimum": 100,
+            "maximum": 20000
+          },
+          "height": {
+            "minimum": 200,
+            "maximum": 20000
+          },
+          "span": {
+            "minimum": 0,
+            "maximum": 60000
+          }
+        }
+      },
+      "reason": "A body that floats: a short vertical torso with its tentacles hanging below and nothing on the ground. It has no legs; it moves only through the air.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica creature body grammar; see the entry reason"
+      }
+    },
+    {
+      "key": "neck",
+      "group": "part",
+      "words": "a neck between its body and each head",
+      "spec": {
+        "bones_per_head": {
+          "minimum": 0,
+          "maximum": 8
+        }
+      },
+      "reason": "Zero to eight neck bones per head: none for a beetle's head, two for a dog's, five or more for a dragon's or a swan's, which bend in a curve the drawing can follow.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica creature body grammar; see the entry reason"
+      }
+    },
+    {
+      "key": "head",
+      "group": "part",
+      "words": "one head or several",
+      "spec": {
+        "count": {
+          "minimum": 1,
+          "maximum": 5
+        }
+      },
+      "reason": "One to five heads, side by side at the front of the body, each on its own neck: a three-headed dog, a five-headed serpent. Every body has a head, which is where the drawing turns it to look.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica creature body grammar; see the entry reason"
+      }
+    },
+    {
+      "key": "jaw",
+      "group": "part",
+      "words": "a jaw that opens, which can carry things",
+      "spec": {
+        "per_head": {
+          "minimum": 0,
+          "maximum": 1
+        },
+        "socket": "mouth"
+      },
+      "reason": "A head may have a jaw, a bone that opens when it talks or bites and that carries one thing in its mouth when the body holds things with its jaws.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica creature body grammar; see the entry reason"
+      }
+    },
+    {
+      "key": "tail",
+      "group": "part",
+      "words": "a tail",
+      "spec": {
+        "bones": {
+          "minimum": 0,
+          "maximum": 16
+        }
+      },
+      "reason": "Zero to sixteen tail bones from the hips back: a stub of one or two, a dog's four, a dragon's or a lizard's eight to sixteen, enough for the sway to curve.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica creature body grammar; see the entry reason"
+      }
+    },
+    {
+      "key": "upper_body",
+      "group": "part",
+      "words": "an upright torso rising from the front of a long or four-legged body",
+      "spec": {
+        "bones": {
+          "minimum": 2,
+          "maximum": 2
+        }
+      },
+      "reason": "Two bones rising from the front of a horizontal or serpentine body, carrying its arms and heads above it: a centaur's torso on a horse's body, a naga's on a serpent's.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica creature body grammar; see the entry reason"
+      }
+    },
+    {
+      "key": "leg",
+      "group": "part",
+      "words": "legs it stands and walks on",
+      "spec": {
+        "pairs": {
+          "minimum": 0,
+          "maximum": 6
+        },
+        "segments": {
+          "minimum": 2,
+          "maximum": 4
+        },
+        "paired": true,
+        "socket": "claw"
+      },
+      "reason": "Legs come in left and right pairs, zero to six pairs (a biped's one, a horse's two, an insect's three, a ten-legged monster's five), each of two to four segments from the hip to the foot. The front pair's feet carry things when the body holds things with its front claws.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica creature body grammar; see the entry reason"
+      }
+    },
+    {
+      "key": "arm",
+      "group": "part",
+      "words": "arms with hands",
+      "spec": {
+        "pairs": {
+          "minimum": 0,
+          "maximum": 3
+        },
+        "segments": {
+          "minimum": 2,
+          "maximum": 4
+        },
+        "paired": true,
+        "socket": "hand"
+      },
+      "reason": "Arms come in left and right pairs, zero to three pairs, each of two to four segments from the shoulder to the hand; the first pair's hands carry things when the body holds things with its hands.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica creature body grammar; see the entry reason"
+      }
+    },
+    {
+      "key": "wing",
+      "group": "part",
+      "words": "wings",
+      "spec": {
+        "pairs": {
+          "minimum": 0,
+          "maximum": 2
+        },
+        "segments": {
+          "minimum": 2,
+          "maximum": 4
+        },
+        "paired": true
+      },
+      "reason": "Wings come in left and right pairs, zero to two pairs, each of two to four bones from the shoulder to the tip, with a membrane or feathers between them that the look draws; the span is the extent's.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica creature body grammar; see the entry reason"
+      }
+    },
+    {
+      "key": "fin",
+      "group": "part",
+      "words": "fins",
+      "spec": {
+        "pairs": {
+          "minimum": 0,
+          "maximum": 4
+        },
+        "segments": {
+          "minimum": 1,
+          "maximum": 2
+        },
+        "paired": true
+      },
+      "reason": "Fins come in left and right pairs along the body, zero to four pairs of one or two bones each.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica creature body grammar; see the entry reason"
+      }
+    },
+    {
+      "key": "tentacle",
+      "group": "part",
+      "words": "tentacles",
+      "spec": {
+        "count": {
+          "minimum": 0,
+          "maximum": 12
+        },
+        "segments": {
+          "minimum": 2,
+          "maximum": 8
+        },
+        "paired": false
+      },
+      "reason": "Zero to twelve tentacles in a ring under the body, each of two to eight segments so it can curl; they need not pair.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica creature body grammar; see the entry reason"
+      }
+    },
+    {
+      "key": "walking",
+      "group": "movement",
+      "words": "walks",
+      "spec": {
+        "module": "exulanica-movement/walking/v1",
+        "enabled_by": {
+          "parts": {
+            "leg": 1,
+            "tentacle": 4
+          },
+          "postures": [
+            "serpentine"
+          ]
+        },
+        "never": [
+          "floating"
+        ],
+        "needs": "legs, four or more tentacles, or a long body, and its feet on the ground",
+        "refusal": null
+      },
+      "reason": "Walking is built: a body with at least one pair of legs, at least four tentacles or a serpentine body walks the world's walking surfaces by the walking module. A floating body never walks.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica creature body grammar; see the entry reason"
+      }
+    },
+    {
+      "key": "flight",
+      "group": "movement",
+      "words": "flies",
+      "spec": {
+        "module": null,
+        "enabled_by": {
+          "parts": {
+            "wing": 1
+          },
+          "postures": [
+            "floating"
+          ]
+        },
+        "never": [],
+        "needs": "a pair of wings, or a floating body",
+        "refusal": "This world has no flying creatures yet."
+      },
+      "reason": "Flight for beings is a movement module not yet built here (flight version 2, for things a mind decides for, at any scale); until it is, a creature asked to fly is refused in these words. A body with a pair of wings or a floating body will fly by it.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica creature body grammar; see the entry reason"
+      }
+    },
+    {
+      "key": "swimming",
+      "group": "movement",
+      "words": "swims",
+      "spec": {
+        "module": null,
+        "enabled_by": {
+          "parts": {
+            "fin": 1,
+            "tentacle": 4
+          },
+          "postures": [
+            "serpentine"
+          ]
+        },
+        "never": [],
+        "needs": "fins, four or more tentacles, or a long body",
+        "refusal": "This world has no swimming yet."
+      },
+      "reason": "No world here has water a body moves through, and no swimming module is built; a creature asked to swim is refused in these words.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica creature body grammar; see the entry reason"
+      }
+    },
+    {
+      "key": "climbing",
+      "group": "movement",
+      "words": "climbs",
+      "spec": {
+        "module": null,
+        "enabled_by": {
+          "parts": {
+            "leg": 1,
+            "arm": 1,
+            "tentacle": 4
+          },
+          "postures": []
+        },
+        "never": [
+          "floating"
+        ],
+        "needs": "legs, arms or four or more tentacles",
+        "refusal": "This world has no climbing yet."
+      },
+      "reason": "No climbing module is built: walls and trees are not surfaces any body moves on here; a creature asked to climb is refused in these words.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica creature body grammar; see the entry reason"
+      }
+    },
+    {
+      "key": "burrowing",
+      "group": "movement",
+      "words": "burrows",
+      "spec": {
+        "module": null,
+        "enabled_by": {
+          "parts": {
+            "leg": 1
+          },
+          "postures": [
+            "serpentine"
+          ]
+        },
+        "never": [
+          "floating"
+        ],
+        "needs": "legs or a long body",
+        "refusal": "This world has no burrowing yet."
+      },
+      "reason": "No world here has ground a body moves through, and no burrowing module is built; a creature asked to burrow is refused in these words.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica creature body grammar; see the entry reason"
+      }
+    },
+    {
+      "key": "crimson",
+      "group": "colour",
+      "words": "crimson",
+      "spec": {
+        "srgb": "#b8322a"
+      },
+      "reason": "A named colour a drafted body's sketch is drawn in, #b8322a in sRGB: a model names a colour from this list instead of writing a number, so the sketch's colours are always ones this catalog states.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica creature body grammar; see the entry reason"
+      }
+    },
+    {
+      "key": "scarlet",
+      "group": "colour",
+      "words": "scarlet",
+      "spec": {
+        "srgb": "#d7372f"
+      },
+      "reason": "A named colour a drafted body's sketch is drawn in, #d7372f in sRGB: a model names a colour from this list instead of writing a number, so the sketch's colours are always ones this catalog states.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica creature body grammar; see the entry reason"
+      }
+    },
+    {
+      "key": "rust",
+      "group": "colour",
+      "words": "rust",
+      "spec": {
+        "srgb": "#a4512b"
+      },
+      "reason": "A named colour a drafted body's sketch is drawn in, #a4512b in sRGB: a model names a colour from this list instead of writing a number, so the sketch's colours are always ones this catalog states.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica creature body grammar; see the entry reason"
+      }
+    },
+    {
+      "key": "copper",
+      "group": "colour",
+      "words": "copper",
+      "spec": {
+        "srgb": "#b26a3c"
+      },
+      "reason": "A named colour a drafted body's sketch is drawn in, #b26a3c in sRGB: a model names a colour from this list instead of writing a number, so the sketch's colours are always ones this catalog states.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica creature body grammar; see the entry reason"
+      }
+    },
+    {
+      "key": "amber",
+      "group": "colour",
+      "words": "amber",
+      "spec": {
+        "srgb": "#e0a33a"
+      },
+      "reason": "A named colour a drafted body's sketch is drawn in, #e0a33a in sRGB: a model names a colour from this list instead of writing a number, so the sketch's colours are always ones this catalog states.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica creature body grammar; see the entry reason"
+      }
+    },
+    {
+      "key": "gold",
+      "group": "colour",
+      "words": "gold",
+      "spec": {
+        "srgb": "#d4af37"
+      },
+      "reason": "A named colour a drafted body's sketch is drawn in, #d4af37 in sRGB: a model names a colour from this list instead of writing a number, so the sketch's colours are always ones this catalog states.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica creature body grammar; see the entry reason"
+      }
+    },
+    {
+      "key": "ochre",
+      "group": "colour",
+      "words": "ochre",
+      "spec": {
+        "srgb": "#c48a2c"
+      },
+      "reason": "A named colour a drafted body's sketch is drawn in, #c48a2c in sRGB: a model names a colour from this list instead of writing a number, so the sketch's colours are always ones this catalog states.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica creature body grammar; see the entry reason"
+      }
+    },
+    {
+      "key": "sand",
+      "group": "colour",
+      "words": "sand",
+      "spec": {
+        "srgb": "#d9c38f"
+      },
+      "reason": "A named colour a drafted body's sketch is drawn in, #d9c38f in sRGB: a model names a colour from this list instead of writing a number, so the sketch's colours are always ones this catalog states.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica creature body grammar; see the entry reason"
+      }
+    },
+    {
+      "key": "cream",
+      "group": "colour",
+      "words": "cream",
+      "spec": {
+        "srgb": "#f2e6c9"
+      },
+      "reason": "A named colour a drafted body's sketch is drawn in, #f2e6c9 in sRGB: a model names a colour from this list instead of writing a number, so the sketch's colours are always ones this catalog states.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica creature body grammar; see the entry reason"
+      }
+    },
+    {
+      "key": "ivory",
+      "group": "colour",
+      "words": "ivory",
+      "spec": {
+        "srgb": "#efe8d6"
+      },
+      "reason": "A named colour a drafted body's sketch is drawn in, #efe8d6 in sRGB: a model names a colour from this list instead of writing a number, so the sketch's colours are always ones this catalog states.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica creature body grammar; see the entry reason"
+      }
+    },
+    {
+      "key": "bone",
+      "group": "colour",
+      "words": "bone",
+      "spec": {
+        "srgb": "#ddd3bd"
+      },
+      "reason": "A named colour a drafted body's sketch is drawn in, #ddd3bd in sRGB: a model names a colour from this list instead of writing a number, so the sketch's colours are always ones this catalog states.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica creature body grammar; see the entry reason"
+      }
+    },
+    {
+      "key": "snow",
+      "group": "colour",
+      "words": "snow",
+      "spec": {
+        "srgb": "#f4f6f8"
+      },
+      "reason": "A named colour a drafted body's sketch is drawn in, #f4f6f8 in sRGB: a model names a colour from this list instead of writing a number, so the sketch's colours are always ones this catalog states.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica creature body grammar; see the entry reason"
+      }
+    },
+    {
+      "key": "moss",
+      "group": "colour",
+      "words": "moss",
+      "spec": {
+        "srgb": "#5f7d3a"
+      },
+      "reason": "A named colour a drafted body's sketch is drawn in, #5f7d3a in sRGB: a model names a colour from this list instead of writing a number, so the sketch's colours are always ones this catalog states.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica creature body grammar; see the entry reason"
+      }
+    },
+    {
+      "key": "jade",
+      "group": "colour",
+      "words": "jade",
+      "spec": {
+        "srgb": "#2f8f6b"
+      },
+      "reason": "A named colour a drafted body's sketch is drawn in, #2f8f6b in sRGB: a model names a colour from this list instead of writing a number, so the sketch's colours are always ones this catalog states.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica creature body grammar; see the entry reason"
+      }
+    },
+    {
+      "key": "emerald",
+      "group": "colour",
+      "words": "emerald",
+      "spec": {
+        "srgb": "#1f7a4d"
+      },
+      "reason": "A named colour a drafted body's sketch is drawn in, #1f7a4d in sRGB: a model names a colour from this list instead of writing a number, so the sketch's colours are always ones this catalog states.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica creature body grammar; see the entry reason"
+      }
+    },
+    {
+      "key": "teal",
+      "group": "colour",
+      "words": "teal",
+      "spec": {
+        "srgb": "#2f8c8c"
+      },
+      "reason": "A named colour a drafted body's sketch is drawn in, #2f8c8c in sRGB: a model names a colour from this list instead of writing a number, so the sketch's colours are always ones this catalog states.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica creature body grammar; see the entry reason"
+      }
+    },
+    {
+      "key": "azure",
+      "group": "colour",
+      "words": "azure",
+      "spec": {
+        "srgb": "#3478c8"
+      },
+      "reason": "A named colour a drafted body's sketch is drawn in, #3478c8 in sRGB: a model names a colour from this list instead of writing a number, so the sketch's colours are always ones this catalog states.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica creature body grammar; see the entry reason"
+      }
+    },
+    {
+      "key": "navy",
+      "group": "colour",
+      "words": "navy",
+      "spec": {
+        "srgb": "#24365f"
+      },
+      "reason": "A named colour a drafted body's sketch is drawn in, #24365f in sRGB: a model names a colour from this list instead of writing a number, so the sketch's colours are always ones this catalog states.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica creature body grammar; see the entry reason"
+      }
+    },
+    {
+      "key": "violet",
+      "group": "colour",
+      "words": "violet",
+      "spec": {
+        "srgb": "#6a4c9c"
+      },
+      "reason": "A named colour a drafted body's sketch is drawn in, #6a4c9c in sRGB: a model names a colour from this list instead of writing a number, so the sketch's colours are always ones this catalog states.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica creature body grammar; see the entry reason"
+      }
+    },
+    {
+      "key": "plum",
+      "group": "colour",
+      "words": "plum",
+      "spec": {
+        "srgb": "#6b3557"
+      },
+      "reason": "A named colour a drafted body's sketch is drawn in, #6b3557 in sRGB: a model names a colour from this list instead of writing a number, so the sketch's colours are always ones this catalog states.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica creature body grammar; see the entry reason"
+      }
+    },
+    {
+      "key": "rose",
+      "group": "colour",
+      "words": "rose",
+      "spec": {
+        "srgb": "#c86b84"
+      },
+      "reason": "A named colour a drafted body's sketch is drawn in, #c86b84 in sRGB: a model names a colour from this list instead of writing a number, so the sketch's colours are always ones this catalog states.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica creature body grammar; see the entry reason"
+      }
+    },
+    {
+      "key": "silver",
+      "group": "colour",
+      "words": "silver",
+      "spec": {
+        "srgb": "#a9b0b7"
+      },
+      "reason": "A named colour a drafted body's sketch is drawn in, #a9b0b7 in sRGB: a model names a colour from this list instead of writing a number, so the sketch's colours are always ones this catalog states.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica creature body grammar; see the entry reason"
+      }
+    },
+    {
+      "key": "slate",
+      "group": "colour",
+      "words": "slate",
+      "spec": {
+        "srgb": "#5d6670"
+      },
+      "reason": "A named colour a drafted body's sketch is drawn in, #5d6670 in sRGB: a model names a colour from this list instead of writing a number, so the sketch's colours are always ones this catalog states.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica creature body grammar; see the entry reason"
+      }
+    },
+    {
+      "key": "charcoal",
+      "group": "colour",
+      "words": "charcoal",
+      "spec": {
+        "srgb": "#3b3a40"
+      },
+      "reason": "A named colour a drafted body's sketch is drawn in, #3b3a40 in sRGB: a model names a colour from this list instead of writing a number, so the sketch's colours are always ones this catalog states.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica creature body grammar; see the entry reason"
+      }
+    },
+    {
+      "key": "ebony",
+      "group": "colour",
+      "words": "ebony",
+      "spec": {
+        "srgb": "#1f1b1d"
+      },
+      "reason": "A named colour a drafted body's sketch is drawn in, #1f1b1d in sRGB: a model names a colour from this list instead of writing a number, so the sketch's colours are always ones this catalog states.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica creature body grammar; see the entry reason"
+      }
+    },
+    {
+      "key": "limits",
+      "group": "limit",
+      "words": "what every body here is held to",
+      "spec": {
+        "bones_maximum": 128,
+        "appearance_characters": {
+          "minimum": 12,
+          "maximum": 200
+        },
+        "colours": {
+          "minimum": 2,
+          "maximum": 4
+        }
+      },
+      "reason": "At most 128 bones (the most joints the browser skins in one look), an appearance of 12 to 200 characters for the sculptor (enough for a sentence, short enough to carry no story), and two to four colours for the sketch: a body, a belly, an accent and its eyes.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica creature body grammar; see the entry reason"
+      }
+    }
+  ]
+}

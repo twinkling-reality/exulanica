@@ -28,7 +28,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Final
 
-__all__ = ["GENERATOR", "Node", "Part", "write_container"]
+__all__ = ["GENERATOR", "MeshPart", "Node", "Part", "write_container"]
 
 GENERATOR: Final = "exulanica-things-pieces/1"
 _COLOUR: Final = re.compile(r"#[0-9a-f]{6}")
@@ -83,12 +83,41 @@ class Part:
 
 
 @dataclass(frozen=True, slots=True)
+class MeshPart:
+    """Triangles in one flat colour, their corners in whole millimetres from their node, each
+    triangle drawn flat with its own normal: an oriented shape no box or upright cylinder makes (a
+    limb's tapered prism, a wing's membrane, which ``double_sided`` draws from both sides)."""
+
+    name: str
+    vertices_mm: tuple[tuple[int, int, int], ...]
+    triangles: tuple[tuple[int, int, int], ...]
+    colour: str
+    double_sided: bool = False
+    glow: str | None = None
+
+    def __post_init__(self) -> None:
+        if any(len(v) != 3 or any(type(c) is not int for c in v) for v in self.vertices_mm):
+            raise ValueError(f"part {self.name}: corners in whole millimetres")
+        count = len(self.vertices_mm)
+        if not self.triangles or any(
+            len(t) != 3
+            or len(set(t)) != 3
+            or any(type(i) is not int or not 0 <= i < count for i in t)
+            for t in self.triangles
+        ):
+            raise ValueError(f"part {self.name}: triangles of three distinct corners")
+        for colour in (self.colour, self.glow):
+            if colour is not None and _COLOUR.fullmatch(colour) is None:
+                raise ValueError(f"part {self.name}: colours are #rrggbb in lowercase")
+
+
+@dataclass(frozen=True, slots=True)
 class Node:
     """A named node at ``at_mm`` in the slot frame, holding its parts."""
 
     name: str
     at_mm: tuple[int, int, int]
-    parts: tuple[Part, ...] = ()
+    parts: tuple[Part | MeshPart, ...] = ()
 
 
 def _gltf(x: float, y: float, z: float) -> tuple[float, float, float]:
@@ -160,6 +189,28 @@ def _cylinder(part: Part) -> tuple[list[tuple[float, ...]], list[tuple[float, ..
     return positions, normals, indices
 
 
+def _mesh(part: MeshPart) -> tuple[list[tuple[float, ...]], list[tuple[float, ...]], list[int]]:
+    """Each triangle on its own three corners with its own normal: the cross product of two of its
+    integer edges, divided by its length, so a flat face is lit as one face on any machine."""
+    positions: list[tuple[float, ...]] = []
+    normals: list[tuple[float, ...]] = []
+    indices: list[int] = []
+    for a, b, c in part.triangles:
+        pa, pb, pc = part.vertices_mm[a], part.vertices_mm[b], part.vertices_mm[c]
+        u = (pb[0] - pa[0], pb[1] - pa[1], pb[2] - pa[2])
+        v = (pc[0] - pa[0], pc[1] - pa[1], pc[2] - pa[2])
+        n = (u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0])
+        length = math.sqrt(n[0] * n[0] + n[1] * n[1] + n[2] * n[2])
+        if length == 0:
+            raise ValueError(f"part {part.name}: a triangle with no area")
+        normal = _gltf(n[0] / length, n[1] / length, n[2] / length)
+        for corner in (pa, pb, pc):
+            indices.append(len(positions))
+            positions.append(_gltf(*(_metres(value) for value in corner)))
+            normals.append(normal)
+    return positions, normals, indices
+
+
 def _colour(hex_colour: str) -> list[float]:
     """An sRGB colour as glTF's linear factors, by the sRGB transfer function."""
     out = []
@@ -179,7 +230,7 @@ def write_container(nodes: Sequence[Node]) -> bytes:
     views: list[dict] = []
     meshes: list[dict] = []
     materials: list[dict] = []
-    material_of: dict[tuple[str, str | None], int] = {}
+    material_of: dict[tuple[str, str | None, bool], int] = {}
     gltf_nodes: list[dict] = []
     roots: list[int] = []
 
@@ -195,13 +246,19 @@ def write_container(nodes: Sequence[Node]) -> bytes:
     for node in nodes:
         children = []
         for part in node.parts:
-            positions, normals, indices = (_box if part.shape == "box" else _cylinder)(part)
+            if isinstance(part, MeshPart):
+                positions, normals, indices = _mesh(part)
+                double_sided = part.double_sided
+            else:
+                positions, normals, indices = (_box if part.shape == "box" else _cylinder)(part)
+                double_sided = False
             if len(positions) > 0xFFFF:
                 raise ValueError(f"part {part.name} has too many corners")
-            key = (part.colour, part.glow)
+            key = (part.colour, part.glow, double_sided)
             if key not in material_of:
+                name = f"{part.colour}{'' if part.glow is None else '+' + part.glow}"
                 material = {
-                    "name": f"{part.colour}{'' if part.glow is None else '+' + part.glow}",
+                    "name": f"{name} both sides" if double_sided else name,
                     "pbrMetallicRoughness": {
                         "baseColorFactor": [*_colour(part.colour), 1.0],
                         "metallicFactor": 0.0,
@@ -210,6 +267,8 @@ def write_container(nodes: Sequence[Node]) -> bytes:
                 }
                 if part.glow is not None:
                     material["emissiveFactor"] = _colour(part.glow)
+                if double_sided:
+                    material["doubleSided"] = True
                 materials.append(material)
                 material_of[key] = len(materials) - 1
             flat = [value for vertex in positions for value in vertex]

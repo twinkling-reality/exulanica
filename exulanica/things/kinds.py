@@ -38,7 +38,7 @@ from typing import Any, Final
 from exulanica.canonical import canonical_json, sha256_of_canonical
 from exulanica.errors import CanonicalisationError
 from exulanica.grammar.documents import read_json
-from exulanica.things.catalogs import AXES, ThingCatalogs, thing_catalogs
+from exulanica.things.catalogs import AXES, EXTENT_SIDES, BodyPlan, ThingCatalogs, thing_catalogs
 from exulanica.things.looks import Look
 from exulanica.things.origin import OriginRefused, read_origin
 
@@ -279,10 +279,13 @@ def read_thing_kind(
     *,
     catalogs: ThingCatalogs | None = None,
     look_of: Callable[[Mapping[str, Any]], Look | None] | None = None,
+    plan_of: Callable[[str], BodyPlan | None] | None = None,
 ) -> ThingKind:
     """``raw`` as a thing kind, every field checked against ``catalogs`` (the process's, left
     out), and each look it suggests resolved by ``look_of`` and held to the kind's body plan; with
-    no resolver, a look's reference is checked for shape alone. Or :class:`ThingKindRefused`."""
+    no resolver, a look's reference is checked for shape alone. A kind of a body plan the catalogs
+    do not state (a workspace's drafted plan) names the plan's digest beside its name and is read
+    with ``plan_of``, which resolves the name to the plan. Or :class:`ThingKindRefused`."""
     catalogs = catalogs or thing_catalogs()
     document = _closed("kind", raw, _TOP)
     try:
@@ -307,12 +310,25 @@ def read_thing_kind(
     if not isinstance(body, Mapping) or "plan" not in body:
         raise _invalid("body", "names its body plan")
     plan = catalogs.plan(str(body["plan"]))
+    if plan is None and plan_of is not None:
+        plan = plan_of(str(body["plan"]))
     if plan is None:
         raise _refuse(
             "thing_kind_reference_unknown", "body.plan", "names a plan the catalog states"
         )
     box: Mapping[str, int] | None = None
-    if "height_mm" in plan.size:
+    if plan.sha256 is not None:
+        # A drafted plan is its own document: the kind pins the version it was checked with.
+        figures = _closed("body", body, frozenset({"plan", "plan_sha256", "extent_mm"}))
+        if figures["plan_sha256"] != plan.sha256:
+            raise _refuse(
+                "thing_kind_reference_unknown", "body.plan_sha256", "is the named plan's digest"
+            )
+        extent = _closed("body.extent_mm", figures["extent_mm"], frozenset(EXTENT_SIDES))
+        for side in EXTENT_SIDES:
+            low, high = plan.size[f"extent_{side}_mm"]
+            _whole(f"body.extent_mm.{side}", extent[side], low, high)
+    elif "height_mm" in plan.size:
         figures = _closed("body", body, frozenset({"plan", "height_mm"}))
         low, high = plan.size["height_mm"]
         span = _closed("body.height_mm", figures["height_mm"], frozenset({"from", "to"}))
@@ -329,11 +345,16 @@ def read_thing_kind(
         box = {side: _whole(f"body.box_mm.{side}", sides[side], low, high) for side in sides}
         if type(figures["blocks_walking"]) is not bool:
             raise _invalid("body.blocks_walking", "is true or false")
-    # Moving, and what a being can do.
+    # Moving, and what a being can do. An entry is a movement module's name, or the module with
+    # the figures it leaves to each kind (``{module, parameters}``), which the module's bounds
+    # check where the kind is used: this package does not read the movement registry.
     moves = document["moves"]
-    if not isinstance(moves, list) or len(set(moves)) != len(moves):
+    if not isinstance(moves, list):
         raise _invalid("moves", "is a list of movement modules, each once")
-    for index, module in enumerate(moves):
+    modules = [_move_module(f"moves[{index}]", entry) for index, entry in enumerate(moves)]
+    if len(set(modules)) != len(modules):
+        raise _invalid("moves", "is a list of movement modules, each once")
+    for index, module in enumerate(modules):
         if module not in plan.moves:
             raise _refuse(
                 "thing_kind_reference_unknown",
@@ -441,6 +462,27 @@ def read_thing_kind(
         sha256=sha256_of_canonical(dict(document)).hex(),
         catalogs_sha256=catalogs.sha256,
     )
+
+
+_PARAMETER: Final = re.compile(r"[a-z][a-z0-9_]{0,47}")
+
+
+def _move_module(where: str, entry: object) -> str:
+    """A ``moves`` entry's module: the entry itself, or an object's ``module`` beside its
+    ``parameters``, each a whole number under a lowercase name."""
+    if type(entry) is str:
+        return entry
+    move = _closed(where, entry, frozenset({"module", "parameters"}))
+    if type(move["module"]) is not str:
+        raise _invalid(f"{where}.module", "names a movement module")
+    parameters = move["parameters"]
+    if not isinstance(parameters, Mapping) or not parameters or len(parameters) > 32:
+        raise _invalid(f"{where}.parameters", "names at most 32 of the module's figures")
+    for name, value in parameters.items():
+        if type(name) is not str or _PARAMETER.fullmatch(name) is None:
+            raise _invalid(f"{where}.parameters", "names figures by lowercase keys")
+        _whole(f"{where}.parameters.{name}", value, 0, 1_000_000_000)
+    return move["module"]
 
 
 def _holdable(

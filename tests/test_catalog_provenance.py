@@ -121,9 +121,10 @@ def test_the_discovery_finds_every_family_and_no_unknown_shape():
     # replay lines a comparison of a living town's people is read by, in four versions, the
     # world kinds' look families, engine roles, bounds and society defaults, the reference
     # sources, the aspects a reference note may be about and the words no outgoing reference
-    # query may carry, and the four
-    # vocabularies a thing kind is read against: body plans, abilities, offers and look kinds.
-    assert len(found[ENTRY_SHAPE]) == 94
+    # query may carry, the four vocabularies a thing kind is read against (body plans, abilities,
+    # offers, and look kinds in two versions, the second fitting every plan with bones), and the
+    # body grammar a creature's body recipe is read against.
+    assert len(found[ENTRY_SHAPE]) == 96
     # The traffic catalogs: vehicle classes, right-of-way policies, signal plans, the two access
     # mappings, the road derivation and the signal placement.
     assert len(found[CITED_SHAPE]) == 7

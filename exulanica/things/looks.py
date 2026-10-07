@@ -15,13 +15,13 @@ Pure: no connection, no store.
 from __future__ import annotations
 
 import re
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Any, Final
 
 from exulanica.canonical import sha256_of_canonical
-from exulanica.things.catalogs import ThingCatalogs, thing_catalogs
+from exulanica.things.catalogs import MOTIONS, BodyPlan, ThingCatalogs, thing_catalogs
 from exulanica.things.origin import OriginRefused, read_origin
 
 __all__ = [
@@ -58,7 +58,7 @@ _TOP: Final = frozenset(
     }
 )
 #: The motions a rig may name clips for: the body plans' motions.
-_MOTIONS: Final = ("idle", "walk", "run", "reach", "hold", "talk", "sit")
+_MOTIONS: Final = MOTIONS
 #: The motions that carry a body over the ground: a rig may state how fast each of its clips does,
 #: so whoever draws it can match the clip to the pace it is drawn moving at.
 _MOVING: Final = ("walk", "run")
@@ -169,9 +169,15 @@ def _rig(
             _whole(f"{where}.ground_speed_mm_per_s.{motion}", speed, 1, 10_000)
 
 
-def read_look(raw: object, *, catalogs: ThingCatalogs | None = None) -> Look:
+def read_look(
+    raw: object,
+    *,
+    catalogs: ThingCatalogs | None = None,
+    plan_of: Callable[[str], BodyPlan | None] | None = None,
+) -> Look:
     """``raw`` as a look, every field checked against the look kinds and body plans, or
-    :class:`LookRefused`."""
+    :class:`LookRefused`. A look of a plan the catalogs do not state (a workspace's drafted plan)
+    is read with ``plan_of``, which resolves a plan's name to the plan."""
     catalogs = catalogs or thing_catalogs()
     document = _closed("look", raw, _TOP)
     if document["profile"] != LOOK_PROFILE:
@@ -182,13 +188,14 @@ def read_look(raw: object, *, catalogs: ThingCatalogs | None = None) -> Look:
     label = document["label"]
     if type(label) is not str or not 1 <= len(label) <= 80 or label != label.strip().lower():
         raise _refuse("label", "is lowercase words, at most 80 characters")
-    plan = catalogs.plan(str(document["body_plan"]))
+    name = str(document["body_plan"])
+    plan = catalogs.plan(name) or (plan_of(name) if plan_of is not None else None)
     if plan is None:
         raise _refuse("body_plan", "names a body plan the catalog states", "look_reference_unknown")
     look_kind = catalogs.look_kinds.get(str(document["look_kind"]))
     if look_kind is None:
         raise _refuse("look_kind", "names a look kind the catalog states", "look_reference_unknown")
-    if plan.name not in look_kind.plans:
+    if not look_kind.fits(plan):
         raise _refuse(
             "look_kind", f"a {look_kind.key} look fits {list(look_kind.plans)}", "look_unfit"
         )
@@ -214,8 +221,11 @@ def read_look(raw: object, *, catalogs: ThingCatalogs | None = None) -> Look:
     elif rig is not None:
         raise _refuse("rig", f"a {look_kind.key} look names no rig")
     height = document["height_mm"]
-    if "height_mm" in plan.size:
-        low, high = plan.size["height_mm"]
+    # A look's natural height, to which it is scaled: a person's height, or the height an extent
+    # states for a drafted body.
+    figure = "height_mm" if "height_mm" in plan.size else "extent_height_mm"
+    if figure in plan.size:
+        low, high = plan.size[figure]
         _whole("height_mm", height, low, high)
     elif height is not None:
         raise _refuse("height_mm", "only a look of a body with a height states one")

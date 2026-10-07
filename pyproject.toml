@@ -827,6 +827,7 @@ source_modules = [
   "exulanica_pieces.canonical",
   "exulanica_pieces.colour",
   "exulanica_pieces.records",
+  "exulanica_pieces.skinned",
   "exulanica_pieces.vocabulary",
 ]
 forbidden_modules = ["numpy", "exulanica_pieces.geometry"]

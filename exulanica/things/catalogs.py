@@ -18,6 +18,13 @@ here and carried as canonical JSON text, as the world object catalog carries its
 so a kind checked against them names exactly what it was checked against. Reading a catalog is not
 registering one.
 
+A body plan a model drafted for a workspace is not a catalog entry but its own document, profile
+``exulanica.body-plan/v1`` (:func:`read_body_plan`), read by the same field readers with its origin
+record in place of a catalog licence. It may state what no shipped plan does: ``limbs``, the chains
+of bones a drawing moves together (a leg, a wing, a tail, a neck), and the size figure
+``extent_mm`` (a length, a width, a height and a wingspan). A look kind may fit every plan with
+bones rather than a list of plans (``plans`` holding ``any_with_bones``).
+
 Pure: no connection, no store.
 """
 
@@ -32,7 +39,8 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Final
 
-from exulanica.canonical import canonical_json
+from exulanica.canonical import canonical_json, sha256_of_canonical
+from exulanica.errors import CanonicalisationError
 from exulanica.grammar.catalogs import (
     Catalog,
     CatalogEntry,
@@ -46,14 +54,24 @@ from exulanica.grammar.catalogs import (
 from exulanica.grammar.documents import split_versioned_name
 from exulanica.grammar.errors import CatalogError
 from exulanica.grammar.records import KEY_PATTERN
+from exulanica.things.origin import OriginRefused, read_origin
 
 __all__ = [
+    "ANY_PLAN_WITH_BONES",
     "AXES",
+    "BODY_PLAN_BONES_MAXIMUM",
+    "BODY_PLAN_PROFILE",
     "CATALOG_DIRECTORY",
+    "EXTENT_SIDES",
+    "LIMB_ROLES",
+    "LIMB_SIDES",
+    "MOTIONS",
     "Ability",
     "AbilityParameter",
     "BodyPlan",
+    "BodyPlanRefused",
     "Bone",
+    "Limb",
     "LookKind",
     "Offer",
     "OfferParameter",
@@ -61,6 +79,7 @@ __all__ = [
     "ThingCatalogError",
     "ThingCatalogs",
     "load_thing_catalogs",
+    "read_body_plan",
     "thing_catalogs",
 ]
 
@@ -68,17 +87,59 @@ _ROOT: Final = Path(__file__).resolve().parents[2]
 CATALOG_DIRECTORY: Final = _ROOT / "assets" / "catalogs" / "things"
 #: The six directions a held thing may extend along from the hand, in the slot frame.
 AXES: Final = ("+x", "-x", "+y", "-y", "+z", "-z")
-_BONE: Final = re.compile(r"[a-z][A-Za-z]{0,47}")
+#: A bone's name: a lowercase letter, then letters and digits (the VRM humanoid names, and a drafted
+#: plan's ``leg3Left2``).
+_BONE: Final = re.compile(r"[a-z][A-Za-z0-9]{0,47}")
 _SOCKET: Final = re.compile(r"[a-z][a-z0-9_]{0,23}(\.[a-z][a-z0-9_]{0,23})?")
 _MODULE: Final = re.compile(r"exulanica-[a-z]+/[a-z][a-z0-9-]{0,31}/v[1-9][0-9]{0,3}")
 _PLAN: Final = re.compile(r"([a-z][a-z0-9_]{0,31})/v([1-9][0-9]{0,3})")
 #: The kinds of value an offer's parameter takes.
 OFFER_PARAMETER_KINDS: Final = ("integer", "point", "axis", "places", "perches", "flyers", "place")
 _CEILING: Final = 1_000_000_000
+#: The profile of a body plan that is its own document rather than a catalog entry.
+BODY_PLAN_PROFILE: Final = "exulanica.body-plan/v1"
+#: The most bones a body plan may have: the most joints one skinned look may move in the browser.
+BODY_PLAN_BONES_MAXIMUM: Final = 128
+#: What a chain of bones is, for whatever moves it: a serpentine body's travelling wave, a neck's
+#: reach, a tail's sway, a jaw's opening, a leg's step, an arm's reach, a wing's beat, a fin's
+#: stroke, a tentacle's drift.
+LIMB_ROLES: Final = ("spine", "neck", "tail", "jaw", "leg", "arm", "wing", "fin", "tentacle")
+#: Which side of the body a chain is on, the body facing +y with its left at -x.
+LIMB_SIDES: Final = ("left", "right", "centre")
+#: In a look kind's ``plans``: the kind fits every body plan that has bones, whatever its name.
+ANY_PLAN_WITH_BONES: Final = "any_with_bones"
+#: The motions a body plan may ask of a look, and a rig may name clips for.
+MOTIONS: Final = (
+    "idle",
+    "walk",
+    "run",
+    "reach",
+    "hold",
+    "talk",
+    "sit",
+    "fly",
+    "glide",
+    "take_off",
+    "land",
+)
+_LIMB_KEY: Final = re.compile(r"[a-z][A-Za-z0-9]{0,47}")
+_PLAN_KEY: Final = re.compile(r"[a-z][a-z0-9_]{0,31}")
+_HEX64: Final = re.compile(r"[0-9a-f]{64}")
 
 
 class ThingCatalogError(CatalogError):
     """A things catalog this code will not read, by the place at fault."""
+
+
+class BodyPlanRefused(ValueError):
+    """A body plan document this code will not read, by a code, the field at fault and a
+    sentence."""
+
+    def __init__(self, code: str, where: str, detail: str) -> None:
+        super().__init__(f"{code} at {where}: {detail}")
+        self.code = code
+        self.where = where
+        self.detail = detail
 
 
 def _fail(where: str, message: str) -> ThingCatalogError:
@@ -141,6 +202,18 @@ class Bone:
 
 
 @dataclass(frozen=True, slots=True)
+class Limb:
+    """A chain of bones a drawing moves together, from the one nearest the body to the tip."""
+
+    key: str
+    role: str
+    side: str
+    #: Where along the body it is, counting from the front: 0 is the foremost of its role.
+    order: int
+    bones: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
 class Socket:
     """Where a body holds a thing: on a bone, or beside a body with none."""
 
@@ -167,7 +240,14 @@ class BodyPlan:
     motions_optional: tuple[str, ...]
     moves: tuple[str, ...]
     reason: str
-    licence: Licence
+    #: A catalog entry's licence; none for a plan that is its own document, which has an origin.
+    licence: Licence | None
+    #: The chains of bones a drawing moves together, where the plan states them.
+    limbs: tuple[Limb, ...] = ()
+    #: A plan document's origin record, and the SHA-256 of its canonical bytes; none for a catalog
+    #: entry, which the catalogs' digest covers.
+    origin: Mapping[str, Any] | None = None
+    sha256: str | None = None
 
     @property
     def name(self) -> str:
@@ -246,6 +326,11 @@ class LookKind:
     reason: str
     licence: Licence
 
+    def fits(self, plan: BodyPlan) -> bool:
+        """Whether a look of this kind may be a look of ``plan``: named, or any plan with bones
+        where the kind says so."""
+        return plan.name in self.plans or (ANY_PLAN_WITH_BONES in self.plans and bool(plan.bones))
+
 
 # -- the nested fields, each read where it is checked and again where it is built ---------------
 
@@ -304,18 +389,69 @@ def _sockets(where: str, value: object) -> tuple[Socket, ...]:
     return tuple(sockets)
 
 
+#: The four ranges an ``extent_mm`` figure states, each read as ``extent_<side>_mm``: nose to tail
+#: tip, side to side with wings folded, ground to top, and wingtip to wingtip (0 with no wings).
+EXTENT_SIDES: Final = ("length", "width", "height", "span")
+
+
+def _range(at: str, span: object, lowest: int) -> tuple[int, int]:
+    bounds = _closed(at, span, frozenset({"minimum", "maximum"}))
+    low = _whole(f"{at}.minimum", bounds["minimum"], lowest, 100_000)
+    return low, _whole(f"{at}.maximum", bounds["maximum"], low, 100_000)
+
+
 def _size(where: str, value: object) -> Mapping[str, tuple[int, int]]:
     if not isinstance(value, Mapping) or len(value) != 1:
         raise _fail(where, "states one figure's range")
     size = {}
     for figure, span in value.items():
         at = f"{where}.{figure}"
+        if figure == "extent_mm":
+            sides = _closed(at, span, frozenset(EXTENT_SIDES))
+            for side in EXTENT_SIDES:
+                # Only a span may be nothing: a body with no wings spans nothing.
+                lowest = 0 if side == "span" else 1
+                size[f"extent_{side}_mm"] = _range(f"{at}.{side}", sides[side], lowest)
+            continue
         if figure not in ("height_mm", "radius_mm", "box_mm"):
-            raise _fail(at, "is a height, a radius or a box side")
-        bounds = _closed(at, span, frozenset({"minimum", "maximum"}))
-        low = _whole(f"{at}.minimum", bounds["minimum"], 1, 100_000)
-        size[figure] = (low, _whole(f"{at}.maximum", bounds["maximum"], low, 100_000))
+            raise _fail(at, "is a height, a radius, a box side or an extent")
+        size[figure] = _range(at, span, 1)
     return MappingProxyType(size)
+
+
+def _limbs(where: str, value: object, bones: tuple[Bone, ...]) -> tuple[Limb, ...]:
+    """Chains of the plan's own bones, each parent-linked from the body outward, no bone in two
+    chains, each role from :data:`LIMB_ROLES`."""
+    if not isinstance(value, list) or len(value) > BODY_PLAN_BONES_MAXIMUM:
+        raise _fail(where, f"is a list of at most {BODY_PLAN_BONES_MAXIMUM} chains")
+    parents = {bone.name: bone.parent for bone in bones}
+    limbs: list[Limb] = []
+    claimed: set[str] = set()
+    for index, raw in enumerate(value):
+        at = f"{where}[{index}]"
+        limb = _closed(at, raw, frozenset({"key", "role", "side", "order", "bones"}))
+        key = _matching(f"{at}.key", limb["key"], _LIMB_KEY, "a chain's key")
+        if limb["role"] not in LIMB_ROLES:
+            raise _fail(f"{at}.role", f"is one of {list(LIMB_ROLES)}")
+        if limb["side"] not in LIMB_SIDES:
+            raise _fail(f"{at}.side", f"is one of {list(LIMB_SIDES)}")
+        order = _whole(f"{at}.order", limb["order"], 0, BODY_PLAN_BONES_MAXIMUM)
+        chain = limb["bones"]
+        if not isinstance(chain, list) or not chain:
+            raise _fail(f"{at}.bones", "names the chain's bones from the body outward")
+        for position, bone in enumerate(chain):
+            place = f"{at}.bones[{position}]"
+            if bone not in parents:
+                raise _fail(place, "names one of the plan's bones")
+            if bone in claimed:
+                raise _fail(place, "names a bone no other chain names")
+            if position and parents[bone] != chain[position - 1]:
+                raise _fail(place, "is a child of the bone before it in the chain")
+            claimed.add(bone)
+        limbs.append(Limb(key, str(limb["role"]), str(limb["side"]), order, tuple(chain)))
+    if len({limb.key for limb in limbs}) != len(limbs):
+        raise _fail(where, "name each chain once")
+    return tuple(limbs)
 
 
 def _reach(where: str, value: object) -> int | None:
@@ -414,9 +550,15 @@ def _offer_parameters(where: str, value: object) -> tuple[OfferParameter, ...]:
 def _plans(where: str, value: object) -> tuple[str, ...]:
     if not isinstance(value, list) or not value:
         raise _fail(where, "names the body plans it fits")
-    return tuple(
-        _matching(f"{where}[{i}]", plan, _PLAN, "a body plan name") for i, plan in enumerate(value)
+    plans = tuple(
+        plan
+        if plan == ANY_PLAN_WITH_BONES
+        else _matching(f"{where}[{i}]", plan, _PLAN, "a body plan name")
+        for i, plan in enumerate(value)
     )
+    if len(set(plans)) != len(plans):
+        raise _fail(where, "names each plan once")
+    return plans
 
 
 def _container(where: str, value: object) -> str:
@@ -493,6 +635,113 @@ def _body_plan(where: str, entry: CatalogEntry) -> BodyPlan:
         moves=_modules(f"{where}.moves", values["moves"]),
         reason=str(values["reason"]),
         licence=entry.licence,
+    )
+
+
+#: The fields of a body plan document, which a catalog entry states as ``key`` and fields.
+_PLAN_DOCUMENT: Final = frozenset(
+    {
+        "profile",
+        "key",
+        "version",
+        "title",
+        "bones",
+        "limbs",
+        "sockets",
+        "size",
+        "reach_mm",
+        "motions",
+        "moves",
+        "reason",
+        "origin",
+    }
+)
+#: The refusals a body plan document meets, each with what it means.
+BODY_PLAN_CODES: Final = (
+    (
+        "body_plan_invalid",
+        "The document is not a body plan: a field it does not state, a value out of shape, a "
+        "chain that is not the plan's own bones.",
+    ),
+    ("body_plan_name_taken", "A key a shipped body plan already has."),
+    ("body_plan_too_many_bones", f"More than {BODY_PLAN_BONES_MAXIMUM} bones."),
+    ("body_plan_origin_invalid", "An origin record the origin reader refuses."),
+)
+
+
+def read_body_plan(raw: object, *, catalogs: ThingCatalogs | None = None) -> BodyPlan:
+    """``raw`` as a body plan document (:data:`BODY_PLAN_PROFILE`): a plan a model drafted for a
+    workspace, read by the same field readers as a catalog entry, with its limbs, its origin
+    record and its digest, or :class:`BodyPlanRefused`. Its key may not be a shipped plan's."""
+    catalogs = catalogs or thing_catalogs()
+    if not isinstance(raw, Mapping) or set(raw) != _PLAN_DOCUMENT:
+        raise BodyPlanRefused(
+            "body_plan_invalid", "plan", f"states exactly {sorted(_PLAN_DOCUMENT)}"
+        )
+    document = dict(raw)
+    try:
+        canonical_json(document)
+    except CanonicalisationError as exc:
+        raise BodyPlanRefused("body_plan_invalid", "plan", f"is canonical JSON: {exc}") from exc
+    if document["profile"] != BODY_PLAN_PROFILE:
+        raise BodyPlanRefused("body_plan_invalid", "profile", f"is {BODY_PLAN_PROFILE}")
+    key = document["key"]
+    if type(key) is not str or _PLAN_KEY.fullmatch(key) is None:
+        raise BodyPlanRefused("body_plan_invalid", "key", "is a lowercase key")
+    if any(plan.key == key for plan in catalogs.plans.values()):
+        raise BodyPlanRefused("body_plan_name_taken", "key", f"{key} is a shipped body plan's key")
+    try:
+        version = _whole("version", document["version"], 1, 1_000)
+        title = _text("title", document["title"], maximum=80)
+        if not isinstance(document["bones"], list) or not document["bones"]:
+            raise _fail("bones", "is a list of at least one bone")
+        if len(document["bones"]) > BODY_PLAN_BONES_MAXIMUM:
+            raise BodyPlanRefused(
+                "body_plan_too_many_bones",
+                "bones",
+                f"a body here has at most {BODY_PLAN_BONES_MAXIMUM} bones",
+            )
+        bones = _bones("bones", document["bones"])
+        limbs = _limbs("limbs", document["limbs"], bones)
+        sockets = _sockets("sockets", document["sockets"])
+        names = {bone.name for bone in bones}
+        for index, socket in enumerate(sockets):
+            if socket.bone is not None and socket.bone not in names:
+                raise _fail(f"sockets[{index}].bone", "names one of the plan's bones")
+        required, optional = _motions("motions", document["motions"])
+        for at, motion in [
+            *(("motions.required", m) for m in required),
+            *(("motions.optional", m) for m in optional),
+        ]:
+            if motion not in MOTIONS:
+                raise _fail(at, f"names motions among {list(MOTIONS)}")
+        size = _size("size", document["size"])
+        reach = _reach("reach_mm", document["reach_mm"])
+        moves = _modules("moves", document["moves"])
+        reason = _text("reason", document["reason"])
+    except ThingCatalogError as exc:
+        where, _, detail = str(exc).partition(": ")
+        raise BodyPlanRefused("body_plan_invalid", where, detail) from exc
+    try:
+        read_origin(document["origin"], where="origin")
+    except OriginRefused as exc:
+        raise BodyPlanRefused("body_plan_origin_invalid", "origin", str(exc)) from exc
+    return BodyPlan(
+        key=key,
+        version=version,
+        title=title,
+        bones=bones,
+        sockets=sockets,
+        size=size,
+        reach_mm=reach,
+        motions_required=required,
+        motions_optional=optional,
+        moves=moves,
+        reason=reason,
+        licence=None,
+        limbs=limbs,
+        origin=MappingProxyType(dict(document["origin"])),
+        sha256=sha256_of_canonical(document).hex(),
     )
 
 
@@ -594,7 +843,7 @@ def load_thing_catalogs(directory: Path = CATALOG_DIRECTORY) -> ThingCatalogs:
         if ability.target_offer is not None and ability.target_offer not in offers:
             raise ThingCatalogError(f"ability {ability.key} targets an offer no catalog states")
     for look_kind in look_kinds.values():
-        if set(look_kind.plans) - set(plans):
+        if set(look_kind.plans) - set(plans) - {ANY_PLAN_WITH_BONES}:
             raise ThingCatalogError(f"look kind {look_kind.key} fits plans no catalog states")
     return ThingCatalogs(
         plans=MappingProxyType(plans),

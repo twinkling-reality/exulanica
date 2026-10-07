@@ -1,0 +1,529 @@
+{
+  "profile": "exulanica.test-creatures/v1",
+  "note": "Hand-written test data for lane CREATURE: what a person might type, and a body recipe a careful author would write for it. The held-out creatures are the rig trial's and the drafter measurement's held-out set; the development creatures are the only ones prompts and parameters may be tuned on. creature_words lists the creature names no source file under exulanica/, exulanica_pieces/, ml/ or web/packages/*/src may use. Snake is left out of creature_words: code names snake case, a way of writing names.",
+  "held_out": {
+    "ten_legs": {
+      "description": "a mythological monster with ten legs",
+      "recipe": {
+        "profile": "exulanica.body-recipe/v1",
+        "posture": "horizontal",
+        "spine": 5,
+        "upper_body": "none",
+        "heads": [
+          {
+            "neck": 1,
+            "jaw": true
+          }
+        ],
+        "limbs": [
+          {
+            "role": "leg",
+            "count": 10,
+            "segments": 3
+          }
+        ],
+        "tail": 2,
+        "extent_mm": {
+          "length": 5200,
+          "width": 1800,
+          "height": 1500,
+          "span": 0
+        },
+        "holds_with": "jaws",
+        "colours": [
+          "violet",
+          "teal",
+          "ebony"
+        ],
+        "appearance": "a creature of the deep woods with a heavy body and bright eyes"
+      }
+    },
+    "dragon": {
+      "description": "a dragon that circles the city",
+      "recipe": {
+        "profile": "exulanica.body-recipe/v1",
+        "posture": "horizontal",
+        "spine": 3,
+        "upper_body": "none",
+        "heads": [
+          {
+            "neck": 5,
+            "jaw": true
+          }
+        ],
+        "limbs": [
+          {
+            "role": "leg",
+            "count": 4,
+            "segments": 3
+          },
+          {
+            "role": "wing",
+            "count": 2,
+            "segments": 3
+          }
+        ],
+        "tail": 8,
+        "extent_mm": {
+          "length": 12000,
+          "width": 2200,
+          "height": 2600,
+          "span": 11000
+        },
+        "holds_with": "jaws",
+        "colours": [
+          "crimson",
+          "gold",
+          "ebony"
+        ],
+        "appearance": "a creature of the deep woods with a heavy body and bright eyes"
+      }
+    },
+    "three_heads": {
+      "description": "a three-headed dog that guards the gate",
+      "recipe": {
+        "profile": "exulanica.body-recipe/v1",
+        "posture": "horizontal",
+        "spine": 3,
+        "upper_body": "none",
+        "heads": [
+          {
+            "neck": 2,
+            "jaw": true
+          },
+          {
+            "neck": 2,
+            "jaw": true
+          },
+          {
+            "neck": 2,
+            "jaw": true
+          }
+        ],
+        "limbs": [
+          {
+            "role": "leg",
+            "count": 4,
+            "segments": 3
+          }
+        ],
+        "tail": 4,
+        "extent_mm": {
+          "length": 2600,
+          "width": 900,
+          "height": 1300,
+          "span": 0
+        },
+        "holds_with": "jaws",
+        "colours": [
+          "charcoal",
+          "sand",
+          "scarlet"
+        ],
+        "appearance": "a creature of the deep woods with a heavy body and bright eyes"
+      }
+    },
+    "serpent": {
+      "description": "a snake-like being as long as a bus",
+      "recipe": {
+        "profile": "exulanica.body-recipe/v1",
+        "posture": "serpentine",
+        "spine": 16,
+        "upper_body": "none",
+        "heads": [
+          {
+            "neck": 1,
+            "jaw": true
+          }
+        ],
+        "limbs": [],
+        "tail": 0,
+        "extent_mm": {
+          "length": 9000,
+          "width": 600,
+          "height": 900,
+          "span": 0
+        },
+        "holds_with": "jaws",
+        "colours": [
+          "emerald",
+          "amber",
+          "ebony"
+        ],
+        "appearance": "a creature of the deep woods with a heavy body and bright eyes"
+      }
+    },
+    "winged_horse": {
+      "description": "a white horse with great feathered wings",
+      "recipe": {
+        "profile": "exulanica.body-recipe/v1",
+        "posture": "horizontal",
+        "spine": 3,
+        "upper_body": "none",
+        "heads": [
+          {
+            "neck": 3,
+            "jaw": false
+          }
+        ],
+        "limbs": [
+          {
+            "role": "leg",
+            "count": 4,
+            "segments": 3
+          },
+          {
+            "role": "wing",
+            "count": 2,
+            "segments": 3
+          }
+        ],
+        "tail": 4,
+        "extent_mm": {
+          "length": 2600,
+          "width": 800,
+          "height": 2400,
+          "span": 6000
+        },
+        "holds_with": "none",
+        "colours": [
+          "snow",
+          "silver",
+          "azure"
+        ],
+        "appearance": "a creature of the deep woods with a heavy body and bright eyes"
+      }
+    },
+    "floating_eight": {
+      "description": "a floating creature with eight long tentacles",
+      "recipe": {
+        "profile": "exulanica.body-recipe/v1",
+        "posture": "floating",
+        "spine": 2,
+        "upper_body": "none",
+        "heads": [
+          {
+            "neck": 0,
+            "jaw": false
+          }
+        ],
+        "limbs": [
+          {
+            "role": "tentacle",
+            "count": 8,
+            "segments": 6
+          }
+        ],
+        "tail": 0,
+        "extent_mm": {
+          "length": 1600,
+          "width": 1600,
+          "height": 3000,
+          "span": 0
+        },
+        "holds_with": "none",
+        "colours": [
+          "plum",
+          "rose",
+          "ebony"
+        ],
+        "appearance": "a creature of the deep woods with a heavy body and bright eyes"
+      }
+    },
+    "raptor": {
+      "description": "a small two-legged raptor covered in feathers",
+      "recipe": {
+        "profile": "exulanica.body-recipe/v1",
+        "posture": "horizontal",
+        "spine": 3,
+        "upper_body": "none",
+        "heads": [
+          {
+            "neck": 3,
+            "jaw": true
+          }
+        ],
+        "limbs": [
+          {
+            "role": "leg",
+            "count": 2,
+            "segments": 4
+          },
+          {
+            "role": "arm",
+            "count": 2,
+            "segments": 3
+          }
+        ],
+        "tail": 8,
+        "extent_mm": {
+          "length": 4000,
+          "width": 900,
+          "height": 1800,
+          "span": 0
+        },
+        "holds_with": "jaws",
+        "colours": [
+          "moss",
+          "ochre",
+          "ebony"
+        ],
+        "appearance": "a creature of the deep woods with a heavy body and bright eyes"
+      }
+    },
+    "four_arms": {
+      "description": "a stone giant with four arms",
+      "recipe": {
+        "profile": "exulanica.body-recipe/v1",
+        "posture": "upright",
+        "spine": 3,
+        "upper_body": "none",
+        "heads": [
+          {
+            "neck": 1,
+            "jaw": true
+          }
+        ],
+        "limbs": [
+          {
+            "role": "leg",
+            "count": 2,
+            "segments": 3
+          },
+          {
+            "role": "arm",
+            "count": 4,
+            "segments": 3
+          }
+        ],
+        "tail": 0,
+        "extent_mm": {
+          "length": 1200,
+          "width": 3200,
+          "height": 3600,
+          "span": 0
+        },
+        "holds_with": "hands",
+        "colours": [
+          "slate",
+          "bone",
+          "rust"
+        ],
+        "appearance": "a creature of the deep woods with a heavy body and bright eyes"
+      }
+    }
+  },
+  "development": {
+    "horse": {
+      "description": "a brown horse",
+      "recipe": {
+        "profile": "exulanica.body-recipe/v1",
+        "posture": "horizontal",
+        "spine": 3,
+        "upper_body": "none",
+        "heads": [
+          {
+            "neck": 3,
+            "jaw": false
+          }
+        ],
+        "limbs": [
+          {
+            "role": "leg",
+            "count": 4,
+            "segments": 3
+          }
+        ],
+        "tail": 3,
+        "extent_mm": {
+          "length": 2400,
+          "width": 700,
+          "height": 1800,
+          "span": 0
+        },
+        "holds_with": "none",
+        "colours": [
+          "crimson",
+          "gold",
+          "ebony"
+        ],
+        "appearance": "a creature of the deep woods with a heavy body and bright eyes"
+      }
+    },
+    "spider": {
+      "description": "a big hairy spider",
+      "recipe": {
+        "profile": "exulanica.body-recipe/v1",
+        "posture": "horizontal",
+        "spine": 2,
+        "upper_body": "none",
+        "heads": [
+          {
+            "neck": 0,
+            "jaw": true
+          }
+        ],
+        "limbs": [
+          {
+            "role": "leg",
+            "count": 8,
+            "segments": 3
+          }
+        ],
+        "tail": 0,
+        "extent_mm": {
+          "length": 1200,
+          "width": 1400,
+          "height": 600,
+          "span": 0
+        },
+        "holds_with": "jaws",
+        "colours": [
+          "ebony",
+          "rust",
+          "amber"
+        ],
+        "appearance": "a creature of the deep woods with a heavy body and bright eyes"
+      }
+    },
+    "crocodile": {
+      "description": "a crocodile sunning itself on a rock",
+      "recipe": {
+        "profile": "exulanica.body-recipe/v1",
+        "posture": "horizontal",
+        "spine": 4,
+        "upper_body": "none",
+        "heads": [
+          {
+            "neck": 1,
+            "jaw": true
+          }
+        ],
+        "limbs": [
+          {
+            "role": "leg",
+            "count": 4,
+            "segments": 2
+          }
+        ],
+        "tail": 10,
+        "extent_mm": {
+          "length": 4500,
+          "width": 900,
+          "height": 500,
+          "span": 0
+        },
+        "holds_with": "jaws",
+        "colours": [
+          "moss",
+          "sand",
+          "ebony"
+        ],
+        "appearance": "a creature of the deep woods with a heavy body and bright eyes"
+      }
+    },
+    "bat": {
+      "description": "a bat that hangs in the trees",
+      "recipe": {
+        "profile": "exulanica.body-recipe/v1",
+        "posture": "horizontal",
+        "spine": 2,
+        "upper_body": "none",
+        "heads": [
+          {
+            "neck": 1,
+            "jaw": true
+          }
+        ],
+        "limbs": [
+          {
+            "role": "leg",
+            "count": 2,
+            "segments": 2
+          },
+          {
+            "role": "wing",
+            "count": 2,
+            "segments": 3
+          }
+        ],
+        "tail": 1,
+        "extent_mm": {
+          "length": 300,
+          "width": 150,
+          "height": 120,
+          "span": 900
+        },
+        "holds_with": "jaws",
+        "colours": [
+          "charcoal",
+          "rose",
+          "ebony"
+        ],
+        "appearance": "a creature of the deep woods with a heavy body and bright eyes"
+      }
+    },
+    "centaur": {
+      "description": "a centaur who carries a bow",
+      "recipe": {
+        "profile": "exulanica.body-recipe/v1",
+        "posture": "horizontal",
+        "spine": 3,
+        "upper_body": "upright",
+        "heads": [
+          {
+            "neck": 1,
+            "jaw": true
+          }
+        ],
+        "limbs": [
+          {
+            "role": "leg",
+            "count": 4,
+            "segments": 3
+          },
+          {
+            "role": "arm",
+            "count": 2,
+            "segments": 3
+          }
+        ],
+        "tail": 3,
+        "extent_mm": {
+          "length": 2500,
+          "width": 800,
+          "height": 2300,
+          "span": 0
+        },
+        "holds_with": "hands",
+        "colours": [
+          "copper",
+          "cream",
+          "navy"
+        ],
+        "appearance": "a creature of the deep woods with a heavy body and bright eyes"
+      }
+    }
+  },
+  "creature_words": [
+    "bat",
+    "centaur",
+    "crocodile",
+    "dog",
+    "dragon",
+    "giant",
+    "griffin",
+    "horse",
+    "jellyfish",
+    "kraken",
+    "lindworm",
+    "monster",
+    "naga",
+    "octopus",
+    "pegasus",
+    "raptor",
+    "serpent",
+    "spider",
+    "unicorn"
+  ]
+}

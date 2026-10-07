@@ -1,8 +1,9 @@
 # Things contract
 
 Status: **THING KINDS, BODY PLANS, ABILITIES, OFFERS, LOOKS, THE ORIGIN RECORD AND TRANSLATION
-MANIFESTS ARE DATA HELD TO THEIR CHECKS, AND A WORLD'S AUTHOR PLACES THINGS BY THEIR KIND; NO
-SOCIETY ENGINE OR RENDERER READS A THING KIND**.
+MANIFESTS ARE DATA HELD TO THEIR CHECKS, AND A WORLD'S AUTHOR PLACES THINGS BY THEIR KIND; A
+CREATURE'S BODY PLAN, SKETCH AND KIND ARE BUILT FROM A DRAFTED BODY RECIPE; NO SOCIETY ENGINE OR
+RENDERER READS A THING KIND**.
 
 A thing is anything addressable in a world: a knight, a lantern spirit, a sword, a well, a gate, a
 visitor that came in from another program. What a kind of thing is and can do is one typed,
@@ -13,9 +14,10 @@ deterministic checks, never code of its own.
 
 This contract owns the thing kind and its checks, the four catalogs a kind is read against (body
 plans, abilities, offers and look kinds), the look, the origin record and the readers that turn
-each existing origin vocabulary into it, translation manifests, and the kinds and looks this
-repository ships. Who decides for a thing, including an outside program, is the
-[decision roles contract](decision-roles-contract.md)'s; walking is the
+each existing origin vocabulary into it, translation manifests, the kinds and looks this
+repository ships, and creatures: body plans built from a drafted body recipe, their sketches and
+the drafter that asks a model for them. Who decides for a thing, including an outside program, is
+the [decision roles contract](decision-roles-contract.md)'s; walking is the
 [movement modules contract](movement-modules-contract.md)'s; the people a society simulates are the
 [society contract](synthetic-society-contract.md)'s; objects placed in a world's authored plane are
 the [world objects contract](world-objects-contract.md)'s; the look roles a style pack dresses are
@@ -35,6 +37,7 @@ records the choice and the alternatives it rejected.
 - [Translation manifests](#translation-manifests)
 - [Lines](#lines)
 - [The kinds and looks this repository ships](#the-kinds-and-looks-this-repository-ships)
+- [Creatures: bodies drafted from words](#creatures-bodies-drafted-from-words)
 - [What is not built](#what-is-not-built)
 - [Implementation and evidence](#implementation-and-evidence)
 
@@ -46,7 +49,8 @@ records the choice and the alternatives it rejected.
 | --- | --- | --- |
 | thing | Anything addressable in a world | the evidence graph's `entity` |
 | thing kind | What a kind of thing is and can do, `exulanica.thing-kind/v1` | a world kind, which is a kind of world |
-| body plan | The semantic shape of a body: bones, sockets, size and motions, named `<key>/v<version>` | a vehicle's body family in traffic |
+| body plan | The semantic shape of a body: bones, sockets, size and motions, named `<key>/v<version>`; a catalog entry, or a document drafted for one workspace | a vehicle's body family in traffic |
+| body recipe | The few figures a drafted body is built from, `exulanica.body-recipe/v1` | a world object's recipe of parts |
 | ability | Something a thing can do, served by one ability module (`exulanica-ability/<name>/v<N>`) | a model's answering mechanism |
 | offer | Something a thing lets others do to it | the society's affordances (rest, visit, stand, talk), which offers map onto |
 | look | One way a thing of a body plan is drawn, `exulanica.look/v1` | a character look, which is a recipe over one catalog body |
@@ -121,8 +125,9 @@ rotation, so nothing is mirrored. A humanoid's rest pose is the T-pose, facing +
 
 "Blocky" is a look, not a body: a blocky figure and a knight share `humanoid/v1`, so either may be
 drawn in the other's look. A sword, 1,000 mm long, fits a hand and not a float socket, so a lantern
-spirit is refused it by name. No four-legged, winged or wheeled plan is stated: a wolf has no body
-here.
+spirit is refused it by name. No four-legged, winged or many-headed plan is shipped: such a body is
+drafted for the creature that has it ([Creatures](#creatures-bodies-drafted-from-words)). No wheeled
+plan exists.
 
 ## Abilities and offers
 
@@ -174,23 +179,42 @@ The world object catalog's uses map onto offers: `rest` to `rest_at` with its pl
 | `body_plan`, `look_kind` | the plan it fits and the look kind that draws it, which must fit that plan |
 | `container` | `{sha256, bytes, media_type}` of one binary glTF, where its look kind draws one, and none otherwise |
 | `rig` | where its look kind is rigged: every bone of the plan it maps to one of the rig's joints, each joint once, all the plan's required bones mapped, and the rig's clip for each motion it has; it may also state `sockets`, the rig's joint for each of the plan's sockets (each joint once), and `ground_speed_mm_per_s`, how fast each of its moving clips (`walk`, `run`) carries the body at the look's own height, whole millimetres a second from 1 to 10,000 |
-| `height_mm` | its natural height, within the plan's bounds, for a body with a height; none otherwise |
+| `height_mm` | its natural height, within the plan's bounds, for a body with a height or an extent; none otherwise |
 | `sampling` | `linear`, or `nearest` for pixel art |
 | `light` | where its look kind is a light: an sRGB colour, an intensity and a radius |
 | `role` | where its look kind is dressed by a style pack: the look role, `family.leaf` |
 | `origin` | its [origin record](#the-origin-record) |
 
-[`look-kinds.v1.json`](../assets/catalogs/things/look-kinds.v1.json) states how looks are drawn:
+[`look-kinds.v2.json`](../assets/catalogs/things/look-kinds.v2.json) states how looks are drawn (its
+first version, which fitted the rigged and rigid kinds to the humanoid alone, stays beside it). A
+look kind's plans may name `any_with_bones`: it fits every plan that has bones, whatever its name.
 
 | Look kind | Plans | What it is |
 | --- | --- | --- |
 | `catalog_person` | humanoid | A person drawn from the published people catalog by the street population draw, as every society's people are drawn |
-| `skinned` | humanoid | A rigged glTF figure admitted as a reviewed component, with its own clips; its rig maps every required bone |
-| `rigid_on_bones` | humanoid | One `exulanica.static-glb/v1` container with one node per dressed bone, named `bone:<VRM name>`, each a direct child of the scene root at that joint's rest position with no rotation or scale, its rigid parts as children; joint nodes for all 15 required bones; posed by procedural motion on the bones |
+| `skinned` | humanoid; any plan with bones | A rigged glTF: a person's figure admitted as a reviewed component with its own clips, or a creature's sculpted look; its rig maps every required bone of its plan |
+| `rigid_on_bones` | humanoid; any plan with bones | One `exulanica.static-glb/v1` container with one node per dressed bone, named `bone:<bone name>`, each a direct child of the scene root at that joint's rest position with no rotation or scale, its rigid parts as children; a joint node for every required bone of its plan; posed by procedural motion on the bones. A blocky figure and a creature's sketch are this look |
 | `light` | bodiless | No file: a light, a glow and a slow drift, in the colour and radius the look states |
 | `static` | rigid | One `exulanica.static-glb/v1` container inside the thing's box: a reviewed object, a person's prepared asset or a generated piece |
 | `look_role` | rigid | A look role the world's style pack dresses, fitted to the thing's box |
-| `none` | all | Nothing is drawn; the thing is still there |
+| `none` | all, and any plan with bones | Nothing is drawn; the thing is still there |
+
+A `skinned` look's container is one binary glTF of the profile `exulanica.skinned-glb/v1`, read by
+`read_skinned_glb` in [`skinned.py`](../exulanica_pieces/skinned.py), plain Python with no numpy so
+the product reads it at admission. One node draws a mesh: it has a skin and no transform, is a root
+of the one scene, and its mesh holds up to 16 triangle primitives on that skin, each with
+`POSITION`, `JOINTS_0` and `WEIGHTS_0` and a colour (`COLOR_0`, or `TEXCOORD_0` with the material's
+one base colour texture, a PNG or JPEG of at most 1,024 by 1,024 pixels in the binary chunk), never
+a morph target or a second set of joints. Joints are placed by translation, rotation and scale,
+never a matrix; nothing that is not a joint lies between a joint and the scene's root; each inverse
+bind matrix is the inverse of its joint's world matrix at rest within one part in ten thousand, so
+the bind pose is the rest pose procedural motion starts from. Every vertex's four weights name
+joints of the skin, are not negative and sum to one within one part in a thousand. A clip is named
+by a motion of the vocabulary, moves joints only and stays in place: every key of the root joint's
+translation keeps its first key's ground position. At most 128 joints, 20,000 triangles, 2
+materials, 16 clips and 8 MiB; no extension and no external file. Given a look's `rig.bones` and its
+plan's parents, the reader also holds the joint tree to the plan's: each mapped bone's nearest
+mapped ancestor joint is the joint of its plan parent.
 
 Where a held thing goes is a socket of the body plan, which names the bone it is on
 (`hand.right` on `rightHand`). In a `rigid_on_bones` container a socket's place is a node named
@@ -337,6 +361,141 @@ this project's own, under the repository's licence.
 | `people-catalog` | `catalog_person` | imported, CC0: the people catalog's MakeHuman family through MPFB 2, with Quaternius locomotion |
 | `bench`, `cafe-table`, `seating-planter`, `market-stall`, `planter-tree`, `lamp-post` | `static` | authored here, CC0, pinned to the reviewed asset's dedication |
 
+## Creatures: bodies drafted from words
+
+A creature a person imagines, with any number of heads, legs, wings or tentacles, is a thing kind
+of class `being` whose body plan was drafted for it rather than shipped. The model that drafts it
+never writes bones: it fills a few figures, and code written once for every creature builds the
+rest. Nothing names any particular creature in code, which `tests/test_no_creature_code.py` holds
+by scanning every source of the product, the shared piece formats, the GPU tooling and the web
+packages for creature names.
+
+### The body recipe
+
+[`bodies.py`](../exulanica/things/bodies.py) reads a body recipe, `exulanica.body-recipe/v1`, with
+`read_body_recipe`, against the body grammar
+([`body-grammar.v1.json`](../assets/catalogs/things/body-grammar.v1.json)), whose entries state
+every choice and bound with its reason:
+
+| Field | Holds |
+| --- | --- |
+| `posture` | `upright` (a torso standing on one or two pairs of legs), `horizontal` (a torso along the ground on none to six pairs), `serpentine` (mostly spine, lying along the ground) or `floating` (no ground contact, no legs), each with its spine segments, leg pairs and extent bounds |
+| `spine` | torso segments, 1 to 8 (serpentine 6 to 24) |
+| `upper_body` | `none`, or `upright`: the front of a horizontal or serpentine body rises into an upright torso carrying its arms and heads |
+| `heads` | 1 to 5, each with 0 to 8 neck bones and a jaw or none |
+| `limbs` | groups `{role, count, segments}`: legs, arms, wings and fins in left and right pairs (up to 6, 3, 2 and 4 pairs), tentacles up to 12; 2 to 4 segments (fins 1 to 2, tentacles 2 to 8) |
+| `tail` | 0 to 16 bones |
+| `extent_mm` | `length` (nose to tail tip), `width` (wings folded), `height` (ground to the top of its head), `span` (wingtip to wingtip, 0 with no wings) |
+| `holds_with` | `none`, `jaws`, `hands` or `front_claws` |
+| `colours` | 2 to 4 of the grammar's named colours: its body, belly, accent and eyes |
+| `appearance` | 12 to 200 characters for a sculptor, one line, no numerals |
+
+| Code | Refused |
+| --- | --- |
+| `body_recipe_invalid` | A field it does not state, a value out of shape, a name the grammar does not hold, numerals in the appearance |
+| `body_recipe_out_of_bounds` | A count, segment number or size outside the grammar's bounds; an odd number of a paired limb |
+| `body_part_unfit` | A part its posture does not take: an upright torso on an upright or floating body, legs on a floating one |
+| `body_too_many_bones` | More than 128 bones, counting every segment of every neck, limb and tail |
+| `body_holds_nothing` | Carrying with jaws, hands or front claws it does not have |
+| `body_span_unfit` | Wings spanning less than its width, or a span with no wings |
+
+The grammar's movement entries say what each body can do and which module it does it by: walking
+(at least one pair of legs, four or more tentacles, or a serpentine body, never a floating one) is
+`exulanica-movement/walking/v1`. Flight, swimming, climbing and burrowing are stated with no module
+and with the sentence a creature asked for one is refused with ("This world has no flying creatures
+yet.").
+
+### The builder and a drafted plan
+
+`build_body` (`exulanica-body-builder/v1`) turns a recipe into a body plan document,
+`exulanica.body-plan/v1`:
+
+- **Bones** with parents, every one required, named by one grammar: `hips`, `spine2`, `upper1`,
+  `head1Neck3`, `head1`, `head1Jaw`, `leg3Left2`, `wing1Right3`, `tentacle4Segment2`, `tail4`.
+  Bone names are a lowercase letter then letters and digits, which every VRM name still is.
+- **Chains** (`limbs`): `{key, role, side, order, bones}`, each bone list from the body outward,
+  role `spine`, `neck`, `tail`, `jaw`, `leg`, `arm`, `wing`, `fin` or `tentacle`, side `left`,
+  `right` or `centre`, order counting from the front, so whatever moves a body reads its chains
+  and never its names. On a body lying along the ground (horizontal or serpentine) each pair of
+  legs, wings, fins or arms hangs from the stretch of spine beside its root, so a spine that bends
+  carries every pair with its own part of the body.
+- **Sockets** from `holds_with`: `mouth` on each jaw (`mouth.head2` and on for further heads),
+  `hand.left` and `hand.right` on the first arms' tips, `claw.left` and `claw.right` on the front
+  feet, each holding one thing up to a quarter of the body's length with a grip section up to a
+  sixth of its width.
+- **Size**, the figure `extent_mm`: ranges from four fifths to five quarters of the recipe's own.
+- **Motions**: idle; walk where it walks; talk with a jaw; hold with a socket. The motion
+  vocabulary is idle, walk, run, reach, hold, talk, sit, fly, glide, take_off and land.
+- **Moves**: the built modules its body can move by.
+- **Joints at rest** in the slot frame, by one rule per posture: a horizontal body's nose at the
+  front of its stated length and its tail tip at the back, feet on the ground, wings level at rest
+  reaching half the span, a neck rising at its angle without lifting a head above the stated
+  height; an upright body in the T-pose; a serpentine body straight along the ground; a floating
+  body's tentacles hanging short of the ground. Integer arithmetic only, with cosines and sines
+  from a table of square roots, so a recipe builds the same bytes on any machine and a left limb is
+  the exact mirror of its right.
+
+`read_body_plan` reads a plan document with the catalog entries' own field readers, and also:
+every chain is the plan's own bones, parent-linked from the body outward, no bone in two chains,
+each role from the list; at most 128 bones; motions from the vocabulary; an origin record in place
+of a catalog licence; its digest. Its key may not be a shipped plan's (`body_plan_name_taken`).
+
+A kind of a drafted plan names it by name and digest and states its four figures inside the plan's
+ranges: `body: {plan, plan_sha256, extent_mm}`. `read_thing_kind` and `read_look` take `plan_of`,
+which resolves a plan the catalogs do not state. A kind's `moves` entry may be the module's name
+or `{module, parameters}`, the figures a module leaves to each kind, whose bounds the module checks
+where the kind is used.
+
+### The sketch
+
+[`sketch.py`](../exulanica/things/sketch.py) draws a drafted plan's **sketch**: look kind
+`rigid_on_bones`, labelled "a sketch of its body", one node per bone named `bone:<name>` at its
+joint at rest, each carrying a tapered six-sided limb from the joint to where the bone ends,
+pointed at both ends; a wing bone also carries its stretch of membrane, drawn from both sides; each
+head carries two eyes. Its colours are the recipe's: the body, the belly (jaws, membranes), an
+accent (the last segment of every limb and the tail's tip) and the eyes. It is authored by this
+project from the plan (class `authored`, CC0-1.0, the plan's and the recipe's digests among its
+ingredients), its container written by [`pieces.py`](../exulanica/things/pieces.py), whose
+oriented parts are triangles in whole millimetres, each lit by its own normal, and admitted by the
+product's static glTF reader. It is the creature's own body plan made visible, never a picture
+standing in for it.
+
+### Assembling a creature
+
+[`creatures.py`](../exulanica/things/creatures.py) `assemble_creature` turns a drafted form into the
+recipe, the plan, the sketch and the kind, each read by its own reader, so a creature passes the
+checks every thing passes. The kind is of class `being`, its default decider the routine with
+`routine`, `model` and `person` allowed, its sketch its first look, its label lowercase words and
+spaces (its key the label with underscores). The kind's and the plan's origins are `drafted`, by
+the model that filled the form, with the recipe's digest (and the kind's also the plan's) among
+their ingredients. A refusal keeps its reader's code, or is one of these:
+
+| Code | Refused |
+| --- | --- |
+| `creature_cannot_move_so` | A movement its body does not allow, in the movement's words ("a creature that flies needs a pair of wings, or a floating body") |
+| `creature_movement_unbuilt` | A movement this world has not built, in the grammar's sentence |
+| `creature_name_taken` | The name of a kind of thing that already exists |
+| `creature_form_invalid` | A field the form does not state, an ability, offer or movement outside its list |
+
+### The drafter
+
+[`creature_drafting.py`](../exulanica/selection/creature_drafting.py), with its words in
+[`creature-drafting.v1.json`](../exulanica/selection/creature-drafting.v1.json), asks a model for a
+creature and assembles its answer:
+
+- The form is flat: every field holds one value (its heads are alike; each kind of limb is a count
+  and its segments; four colour fields; a yes or no for each movement, ability and offer; a weight
+  for each ability its routine does), so no reply can stop between a list and the field after it.
+  Every choice comes from the grammar and the catalogs at call time.
+- The instructions render the grammar's postures, parts, movements and colours, the abilities and
+  offers, the kinds the world already has, and the sentence of every check that may refuse a
+  creature, from the checks' own tables.
+- A creature the checks refuse is told the check's code, the form's field and the check's sentence,
+  never the reply's text, and drafted once more; a second refusal is `creature_not_drafted`.
+- Saved names are replaced before the words are sent, by the caller; the origin names the model
+  that answered, the prompt's version and the digests of the instructions and the words, never the
+  words.
+
 ## What is not built
 
 These are material limits of the boundary above, not partial behaviour:
@@ -347,6 +506,11 @@ These are material limits of the boundary above, not partial behaviour:
   serves a kind, a look or a look's container. A placed thing names a shipped kind.
 - The browser draws no thing by its look kind.
 - No importer or crossing writes a translation manifest; the reader and its accounting check exist.
+- No route drafts a creature or keeps its documents, and no model has been measured as its drafter:
+  the drafter runs on scripted replies only, and no role of the model manifest names it.
+- No creature flies, swims, climbs or burrows: the grammar states those movements and refuses them
+  in words. A floating body therefore cannot move at all yet.
+- No creature has a sculpted look: its sketch is its only look.
 
 ## Implementation and evidence
 
@@ -359,4 +523,8 @@ These are material limits of the boundary above, not partial behaviour:
 | Translation manifests and lines | [`manifests.py`](../exulanica/things/manifests.py), [`lines.py`](../exulanica/things/lines.py) | `tests/test_thing_looks_and_origins.py` (words held to the line rule, a look's import, each refusal against a positive control) |
 | Shipped kinds and looks | [`shipped_things.py`](../scripts/things/shipped_things.py), the lock `kinds.lock.json` | `tests/test_thing_kinds.py` (`--check`), `tests/test_placed_things.py` (every shipped version at its locked digest; a changed, unlocked or missing file refused) |
 | Placed things | [`placed_things.py`](../exulanica/world/placed_things.py), the object repository, [`world_things.py`](../exulanica/api/routes/world_things.py), migration 0152 | `tests/test_placed_things.py`, `tests/test_placed_things_postgres.py` (as the deployed writer: place, move, remove, undo and place again; the kind fixed by the table; another workspace sees nothing; a branch keeps them; the routes' refusals by name), `tests/test_edit_kind_undo_postgres.py` |
+| Creatures: recipes, plans, sketches, assembly | [`bodies.py`](../exulanica/things/bodies.py), [`sketch.py`](../exulanica/things/sketch.py), [`creatures.py`](../exulanica/things/creatures.py), [`body-grammar.v1.json`](../assets/catalogs/things/body-grammar.v1.json) | `tests/test_creature_bodies.py` (thirteen hand-written creatures: each body where its recipe says, a left limb the mirror of its right, each limb of a lying body hung from the stretch of spine beside it, the bone count the recipe's own sum, each refusal by name, the sketch read back from its bytes) |
+| The creature drafter | [`creature_drafting.py`](../exulanica/selection/creature_drafting.py), [`creature-drafting.v1.json`](../exulanica/selection/creature-drafting.v1.json) | `tests/test_creature_drafting.py` (scripted replies: a pass with its provenance, a refusal repaired with its check's sentence, two refusals, a form outside the schema, a reply cut off in blank space), `tests/test_hosted_boundary.py` (its request carries no saved name) |
+| The skinned container | [`skinned.py`](../exulanica_pieces/skinned.py) | `tests/test_skinned_glb.py` (containers built in the test from struct packing: a positive control, then each rule broken alone and refused by name) |
+| No creature in code | | `tests/test_no_creature_code.py` (with a planted name the scan finds) |
 | Purity | The import contract "Things are pure data" in `pyproject.toml`: no database, store, evidence, pipeline, world, traffic, movement step, model or numeric stack | `lint-imports` |
