@@ -247,7 +247,10 @@ written by the measurement that registered it. Each record below replayed every 
 receipts with no billed call. A comparison over a day is registered, played and recorded by
 [`scripts/measure_day_comparison.py`](../scripts/measure_day_comparison.py), which first plays the
 same design on one development seed, so the bound it registers is at least that day's spend for
-every held-out seed with a quarter more, and whose record reads every hour of every run back
+every held-out seed with a quarter more. A seed is admitted only while what is left of the bound
+holds what one seed needs left (the plan's suggested figure for one seed), so the bound is also at
+least that spend for every seed before the last plus that figure. The run's process spends within
+that bound alone (`EXULANICA_SPENDING=process`), and its record reads every hour of every run back
 through the run route and every run's day through the day route.
 
 - [2026-09-26-society-model-comparison.json](evaluation/2026-09-26-society-model-comparison.json)
