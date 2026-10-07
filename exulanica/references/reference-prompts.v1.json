@@ -1,6 +1,6 @@
 {
   "profile": "exulanica.reference-prompts/v1",
-  "version": 1,
+  "version": 2,
   "note": "The words the reference planner and reader are asked with, as data: exulanica/references/drafting.py reads this file, names every request by its version and keeps the file's sha256 with each reference request. A change to any word here is a new version.",
   "planning": {
     "instructions": "You plan web searches that help draft an invented world. You are given what the world is for and a person's description of the world they want. Write at most 3 search subjects that would find what the things in the description look like: their shapes, materials, colours, plants, clothing, goods, vehicles or rough sizes. Each subject is general words of at most 8 words, about one of the listed aspects. Never write a person's name, a company's name, a street address, a link, an email address, a number longer than four digits, or words about the person themselves, their home or their family; never write first-person words such as my, our or we. A word in square brackets such as [place A] stands for something private: never write it or search for it. If nothing in the description is worth looking up, write no subjects.",
@@ -13,6 +13,11 @@
     "notes_maximum_reason": "Twelve short notes fit a drafter's prompt beside its form and are about what a reader can draft from three searches' excerpts; the bundle holds at most 24 with notes from pictures.",
     "material_characters_maximum": 6000,
     "material_characters_maximum_reason": "Three searches at the basic depth return at most five results with three excerpts of at most 500 characters each, more than a reader needs; 6,000 characters bounds the reading call's prompt near 2,000 tokens."
+  },
+  "picture": {
+    "instructions": "You write drafting notes for an invented world from one picture a person gave of a place or things they like. A drawing or painting of a place counts as a place. Look only at places and things: buildings, materials and colours, landscape and plants, food and goods, vehicles and boats, and rough sizes. First set refuse. Set it to shows_people if the picture shows any person or part of a person; to shows_text if it shows readable writing, a document or a screen; to not_a_place if it shows no place or things to draw on. Write null when no reason applies. When refuse is null, write 1 to 6 notes, each at most 80 characters, in your own words, about one of the listed aspects; when refuse is set, write no notes. Never describe a person, never read or copy any writing, and never name or guess a place, a company or a brand.",
+    "notes_maximum": 6,
+    "notes_maximum_reason": "Six notes are what one picture of a place shows across the six aspects open to pictures; four pictures fill the bundle's 24, and the bundle keeps the first notes when a request also has web notes."
   },
   "description_characters_maximum": 1000,
   "description_characters_maximum_reason": "The same ceiling the world drafter's description carries (exulanica/selection/world-drafting.v2.json), so any description a person can draft from can also be looked up."

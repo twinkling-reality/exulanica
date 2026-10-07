@@ -388,6 +388,23 @@
       "required_use_cases": ["text"],
       "rationale": "Plans a reference's web searches from a person's description and drafts notes from what they found, each a structured answer validated before it is kept. A role of its own so that no place-name right or personal model right granted for another role reaches a web lookup: it is offered in neither place-name-uses.v1.json nor model-right-uses.v1.json. The declared DeepSeek fallback handles model-unavailability errors."
     },
+    "reference_vision": {
+      "primary": "openbmb/MiniCPM-V-4_5",
+      "fallback": null,
+      "timeout_seconds": 5,
+      "timeout_basis": {
+        "record": "docs/evaluation/2026-10-07-reference-vision-latency.json",
+        "model": "openbmb/MiniCPM-V-4_5",
+        "rows": 12,
+        "p50_ms": 480,
+        "p99_ms": 1729,
+        "longest_ms": 1729,
+        "note": "One call per code-made drawing of a place (houses, roofs, boats, water, trees and hills; no person, no lettering), sent as the rendition stage's bytes under the reference picture prompt and its strict schema; the longest is a full answer of six notes. Drawings, not photographs: re-measured on a person's own pictures once they may be sent."
+      },
+      "image_prompt_tokens_reserved": {"value": 800, "basis": "One picture's prompt tokens, reserved before a call: the record's calls reported 571 prompt tokens for the picture prompt and one 768 px rendition together, rounded up to the vision role's reservation. Accounting reads the usage the provider reports, never this."},
+      "required_use_cases": ["image"],
+      "rationale": "Reads one of a person's own pictures, given with their consent for a world's reference notes, into at most six notes about places and things, or refuses the whole picture with one reason (shows_people, shows_text, not_a_place); nothing is located, cropped or compared in a picture. A role of its own so that a right granted for it reaches only this chain, and no right granted for another role reaches it. MiniCPM-V-4_5 is Apache-2.0 at the revision the licence matrix pins; no NVIDIA model in the catalog takes images. No fallback: the only other image model offered is conditional on its licence terms (L-2). Off unless an installation turns pictures on."
+    },
     "embedding": {
       "primary": "Qwen/Qwen3-Embedding-8B",
       "fallback": null,

@@ -12,7 +12,7 @@ import uuid
 
 import pytest
 from exulanica.references import store
-from exulanica.references.bundle import BundleNote
+from exulanica.references.bundle import BundleNote, BundlePicture
 from exulanica.references.for_drafting import (
     NOTES_REFUSALS,
     REFERENCE_BASES,
@@ -107,3 +107,38 @@ def test_the_provenance_counts_only_the_notes_the_block_holds(repository) -> Non
     notes = notes_for_draft(connection, workspace_id, REFERENCE_ACTOR, reference_id, purpose="kind")
     assert notes.rendered.cut > 0
     assert notes.provenance["notes"] == notes.rendered.used == 24 - notes.rendered.cut
+
+
+def test_a_drafter_takes_web_notes_only_unless_it_names_picture_notes(repository) -> None:
+    connection, workspace_id = repository.connection, repository.workspace_id
+    picture = uuid.UUID("5e1f0c2a-7b3d-4e8f-9a01-b2c3d4e5f6a1")
+    seen = BundleNote("buildings", "blue painted doors", "own_picture", picture)
+    bundle = scripted_bundle(
+        workspace_id,
+        notes=(*WEB_NOTES, seen),
+        pictures=(
+            BundlePicture(
+                picture,
+                (uuid.UUID("5e1f0c2a-7b3d-4e8f-9a01-b2c3d4e5f6a2"),),
+                ("nebius_token_factory", "reference_vision", "openbmb/MiniCPM-V-4_5"),
+            ),
+        ),
+    )
+    reference_id = finished_reference(connection, workspace_id, bundle=bundle)
+    web = notes_for_draft(connection, workspace_id, REFERENCE_ACTOR, reference_id, purpose="kind")
+    assert web.rendered.text == WEB_NOTES_BLOCK
+    assert web.rendered.photographs == frozenset()
+    assert (web.provenance["notes"], web.provenance["basis"]) == (3, ["web_description"])
+    both = notes_for_draft(
+        connection,
+        workspace_id,
+        REFERENCE_ACTOR,
+        reference_id,
+        purpose="kind",
+        bases=REFERENCE_BASES,
+    )
+    assert both.rendered.photographs == frozenset({picture})
+    assert (both.provenance["notes"], both.provenance["basis"]) == (
+        4,
+        ["web_description", "own_picture"],
+    )

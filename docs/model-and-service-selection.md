@@ -59,6 +59,10 @@ stores its decision receipt and keeps fixed timing when the model cannot answer 
 Nemotron Ultra is a configured role with no production caller in the reviewed Python code;
 Nemotron Super's production callers are the answer composer and the specification drafter.
 Fallback in the hosted client is provider-error handling, not a quality escalation policy.
+`reference_vision` (MiniCPM-V-4_5, no fallback) is a configured role with no production caller
+yet: it is to read a person's own pictures into reference notes, off by default, and its timeout
+rests on code-made drawings ([record](evaluation/2026-10-07-reference-vision-latency.json)),
+not photographs ([reference notes](reference-notes-contract.md)).
 DINOv2 appearance embeddings, YuNet/SFace biometric recognition, speech models, a learned
 reranker and MapAnything appear in earlier plans or candidate discussions, not in implemented
 model paths found by this review. Do not count them as delivered capabilities.

@@ -14,6 +14,8 @@ envelope (:mod:`exulanica.grammar.catalogs`):
   and the vision read write against.
 * ``reference-query-screen.v1.json``: words no outgoing query may carry, by category, each with
   the term or reason that rules them out.
+* ``reference-picture-screen.v1.json``: words no note from a person's own picture may carry, by
+  category, and the aspects closed to pictures, each with its reason.
 """
 
 from __future__ import annotations
@@ -207,6 +209,17 @@ _SCREEN_SCHEMA: Final = CatalogSchema(
 )
 
 
+_PICTURE_SCREEN_SCHEMA: Final = CatalogSchema(
+    catalog_id="reference-picture-screen",
+    catalog_version=1,
+    fields=(
+        ("words", _screen_words),
+        ("closes_aspects", key_list_field),
+        ("reason", text_field),
+    ),
+)
+
+
 @dataclass(frozen=True, slots=True)
 class ReferenceSource:
     """One source, as its catalog entry states it."""
@@ -245,13 +258,17 @@ class Aspect:
 
 @dataclass(frozen=True, slots=True)
 class ReferenceCatalogs:
-    """The three catalogs, read and checked together."""
+    """The four catalogs, read and checked together."""
 
     sources: Mapping[str, ReferenceSource]
     aspects: Mapping[str, Aspect]
     #: Each screened phrase as its words (a key ``social_security`` is the two words in order),
     #: mapped to the category that rules it out.
     screened: Mapping[tuple[str, ...], str]
+    #: Each word no note from a picture may hold, mapped to the category that rules it out.
+    picture_screened: Mapping[str, str]
+    #: The aspects a note from a picture may be about, in catalog order.
+    picture_aspects: tuple[str, ...]
 
 
 @functools.cache
@@ -260,6 +277,9 @@ def load_reference_catalogs(directory: Path = CATALOG_DIRECTORY) -> ReferenceCat
     sources = load_catalog(directory / "reference-source.v1.json", _SOURCE_SCHEMA)
     aspects = load_catalog(directory / "reference-aspect.v1.json", _ASPECT_SCHEMA)
     screen = load_catalog(directory / "reference-query-screen.v1.json", _SCREEN_SCHEMA)
+    picture_screen = load_catalog(
+        directory / "reference-picture-screen.v1.json", _PICTURE_SCREEN_SCHEMA
+    )
     read_sources: dict[str, ReferenceSource] = {}
     for entry in sources.entries:
         values = dict(entry.values)
@@ -283,10 +303,29 @@ def load_reference_catalogs(directory: Path = CATALOG_DIRECTORY) -> ReferenceCat
                     f"{entry.key!r}"
                 )
             screened[phrase] = entry.key
+    picture_screened: dict[str, str] = {}
+    closed: set[str] = set()
+    for entry in picture_screen.entries:
+        values = dict(entry.values)
+        for word in cast(tuple[str, ...], values["words"]):
+            if word in picture_screened:
+                raise CatalogError(
+                    f"reference-picture-screen: {word!r} is in both {picture_screened[word]!r} "
+                    f"and {entry.key!r}"
+                )
+            picture_screened[word] = entry.key
+        for aspect in cast(tuple[str, ...], values["closes_aspects"]):
+            if aspect not in read_aspects:
+                raise CatalogError(
+                    f"reference-picture-screen: {entry.key!r} closes {aspect!r}, which is no aspect"
+                )
+            closed.add(aspect)
     return ReferenceCatalogs(
         sources=MappingProxyType(read_sources),
         aspects=MappingProxyType(read_aspects),
         screened=MappingProxyType(screened),
+        picture_screened=MappingProxyType(picture_screened),
+        picture_aspects=tuple(key for key in read_aspects if key not in closed),
     )
 
 

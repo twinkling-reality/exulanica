@@ -13,7 +13,7 @@ import uuid
 
 import psycopg
 from exulanica.references import store
-from exulanica.references.bundle import BundleCall, BundleNote, ReferenceBundle
+from exulanica.references.bundle import BundleCall, BundleNote, BundlePicture, ReferenceBundle
 
 __all__ = [
     "REFERENCE_ACTOR",
@@ -56,6 +56,7 @@ def scripted_bundle(
     notes: tuple[BundleNote, ...] = WEB_NOTES,
     purpose: str = "kind",
     missed: tuple[str, ...] = (),
+    pictures: tuple[BundlePicture, ...] = (),
 ) -> ReferenceBundle:
     """A bundle of web notes as the worker would keep it; ``missed`` makes it a partial one."""
     return ReferenceBundle(
@@ -64,7 +65,7 @@ def scripted_bundle(
         world_id=None,
         notes=notes,
         lookups=(_LOOKUP,),
-        pictures=(),
+        pictures=pictures,
         model_calls=(
             BundleCall(
                 "nebius_token_factory",

@@ -73,6 +73,8 @@ class ReferencePrompts:
     notes_maximum: int
     material_characters_maximum: int
     description_characters_maximum: int
+    picture: str
+    picture_notes_maximum: int
 
     @property
     def planning_version(self) -> str:
@@ -82,15 +84,20 @@ class ReferencePrompts:
     def reading_version(self) -> str:
         return f"reference-reading-{self.version}"
 
+    @property
+    def picture_version(self) -> str:
+        return f"reference-picture-{self.version}"
+
 
 @functools.cache
 def reference_prompts(path: Path = PROMPT_PATH) -> ReferencePrompts:
-    """The planner's and reader's words, read once and named by the file's SHA-256."""
+    """The planner's, reader's and picture reader's words, read once and named by the file's
+    SHA-256."""
     raw = path.read_bytes()
     document = json.loads(raw)
     if document.get("profile") != _PROFILE:
         raise ValueError(f"{path.name} is not a {_PROFILE} document")
-    planning, reading = document["planning"], document["reading"]
+    planning, reading, picture = document["planning"], document["reading"], document["picture"]
     return ReferencePrompts(
         version=int(document["version"]),
         sha256=hashlib.sha256(raw).hexdigest(),
@@ -100,6 +107,8 @@ def reference_prompts(path: Path = PROMPT_PATH) -> ReferencePrompts:
         notes_maximum=int(reading["notes_maximum"]),
         material_characters_maximum=int(reading["material_characters_maximum"]),
         description_characters_maximum=int(document["description_characters_maximum"]),
+        picture=str(picture["instructions"]),
+        picture_notes_maximum=int(picture["notes_maximum"]),
     )
 
 

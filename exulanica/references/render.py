@@ -21,6 +21,7 @@ check is a consequence of rendering, not a step a caller has to remember.
 from __future__ import annotations
 
 import uuid
+from collections.abc import Collection
 from dataclasses import dataclass
 from typing import Final
 
@@ -66,14 +67,22 @@ def _size(lines: list[str]) -> int:
 
 
 def render_reference_notes(
-    bundle: ReferenceBundle, *, catalogs: ReferenceCatalogs | None = None
+    bundle: ReferenceBundle,
+    *,
+    bases: Collection[str] = BASES,
+    catalogs: ReferenceCatalogs | None = None,
 ) -> RenderedNotes:
-    """``bundle``'s notes as a quoted prompt block, grouped by aspect, within its byte bound, and
-    the pictures behind the notes it holds."""
+    """``bundle``'s notes of ``bases`` as a quoted prompt block, grouped by aspect, within its byte
+    bound, and the pictures behind the notes it holds. A note of another basis is not this block's
+    to hold, and is not counted as cut."""
     catalogs = catalogs if catalogs is not None else load_reference_catalogs()
-    if not bundle.notes:
+    unknown = set(bases) - set(BASES)
+    if unknown:
+        raise ValueError(f"no note has the basis {sorted(unknown)!r}")
+    offered = [note for note in bundle.notes if note.basis in bases]
+    if not offered:
         return RenderedNotes(text="", photographs=frozenset(), used=0, cut=0, bases=())
-    ordered = [note for key in catalogs.aspects for note in bundle.notes if note.aspect == key]
+    ordered = [note for key in catalogs.aspects for note in offered if note.aspect == key]
     lines = [NOTES_HEADING, NOTES_QUOTE]
     held = []
     for note in ordered:

@@ -1,11 +1,16 @@
 """A finished reference request's notes, as a drafter takes them.
 
-A drafter that is handed a reference id (KINDS's kind drafter first) calls :func:`notes_for_draft`
+A drafter that is handed a reference id (the world kind drafter first) calls :func:`notes_for_draft`
 and gets the rendered block for its prompt, the pictures that block's notes were read from, and the
 provenance to keep with what it drafts. It answers only with the caller's own finished request
 (``complete`` or ``partial``) made for the drafter's purpose, so nobody can borrow another person's
 notes; otherwise it raises :class:`NotesRefused` with one of :data:`NOTES_REFUSALS`, and the drafter
 drafts without notes.
+
+A drafter takes web notes only unless it names more ``bases``: a note read from a person's own
+picture is declared as that picture, and the request policy refuses the whole call unless the
+person's right names the drafter's role, so a drafter asks for picture notes only once its role is
+offered for them.
 
 The provenance names the notes and never holds their text: the request id, the bundle's digest,
 how many notes the block holds, and their bases. The text stays in the request, with its workspace.
@@ -20,7 +25,7 @@ workspace's request policy apply to the block as to the person's words.
 from __future__ import annotations
 
 import uuid
-from collections.abc import Mapping
+from collections.abc import Collection, Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Any, Final
@@ -76,6 +81,7 @@ def notes_for_draft(
     reference_id: uuid.UUID,
     *,
     purpose: str,
+    bases: Collection[str] = ("web_description",),
 ) -> NotesForDraft:
     """The caller's own finished request ``reference_id`` as a drafter's notes, or a refusal."""
     found = store.read_request(connection, workspace_id, reference_id, owner_actor_id=actor)
@@ -87,7 +93,7 @@ def notes_for_draft(
     if found.purpose != purpose:
         raise NotesRefused("reference_purpose_differs")
     bundle = read_bundle(found.bundle)
-    rendered = render_reference_notes(bundle)
+    rendered = render_reference_notes(bundle, bases=bases)
     if rendered.used == 0:
         raise NotesRefused("reference_has_no_notes")
     return NotesForDraft(

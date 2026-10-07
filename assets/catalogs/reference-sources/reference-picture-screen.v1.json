@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "catalog_id": "reference-picture-screen",
+  "catalog_version": 1,
+  "entries": [
+    {
+      "key": "people",
+      "words": [
+        "person",
+        "people",
+        "persons",
+        "man",
+        "men",
+        "woman",
+        "women",
+        "boy",
+        "boys",
+        "girl",
+        "girls",
+        "child",
+        "children",
+        "kid",
+        "kids",
+        "baby",
+        "babies",
+        "face",
+        "faces",
+        "crowd",
+        "crowds",
+        "figure",
+        "figures",
+        "someone",
+        "somebody",
+        "he",
+        "she",
+        "him",
+        "her",
+        "his",
+        "hers",
+        "body",
+        "bodies",
+        "hand",
+        "hands",
+        "hair",
+        "skin",
+        "wearing",
+        "worn"
+      ],
+      "closes_aspects": [
+        "clothing"
+      ],
+      "reason": "A note from a person's own picture describes places and things, never anyone in it: a note holding one of these words is dropped, and clothing is closed to pictures because in a picture it is worn by somebody. A word list catches only the words it lists; the reading model is also told to refuse a picture showing a person.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica's picture note screen; see the entry reason"
+      }
+    }
+  ]
+}

@@ -68,6 +68,7 @@ from exulanica.references.adapters.base import Leads
 from exulanica.references.boundary import SearchSubject, admit_query
 from exulanica.references.catalogs import load_reference_catalogs
 from exulanica.references.drafting import plan_subjects, read_notes
+from exulanica.references.pictures import read_picture
 from exulanica.selection import action_plan
 from exulanica.selection.answer import Answer, AnswerClause, ClauseType
 from exulanica.selection.calls import CallLog
@@ -142,6 +143,7 @@ HOSTED_CALL_PATHS: Mapping[str, tuple[str, str]] = {
     "simulation drafter": ("exulanica.selection.action_plan", "_draft_simulation"),
     "reference planner": ("exulanica.references.drafting", "plan_subjects"),
     "reference reader": ("exulanica.references.drafting", "read_notes"),
+    "reference picture reader": ("exulanica.references.pictures", "read_picture"),
     "creature drafter": ("exulanica.selection.creature_drafting", "draft_creature"),
 }
 
@@ -591,6 +593,15 @@ def run_reference_reading(world: World) -> Witness:
     return transport
 
 
+def run_reference_picture(world: World) -> Witness:
+    """The reference picture reader, handed the world's photograph as a reference job hands one."""
+    reading = {"refuse": None, "notes": [{"aspect": "buildings", "text": "white cube houses"}]}
+    client, transport = world.hosted([_json_reply(reading, Role.REFERENCE_VISION)])
+    read = read_picture(client, b"\xff\xd8 a rendition's bytes", capture_id=world.capture)
+    assert read.refused is None, read.refused
+    return transport
+
+
 def run_caption(world: World) -> Witness:
     """The derivative worker's caption pass over the process's client."""
     transport = Witness([_vector_reply()])
@@ -744,6 +755,7 @@ SCENARIOS: Mapping[str, tuple[Callable[[World], Witness], str]] = {
     "simulation drafter": (run_actions, "LISTED SPEEDS"),
     "reference planner": (run_reference_planning, "a harbour town"),
     "reference reader": (run_reference_reading, "Whitewashed houses"),
+    "reference picture reader": (run_reference_picture, "The picture:"),
     "creature drafter": (run_creature_drafting, "a striped beast that circles"),
 }
 

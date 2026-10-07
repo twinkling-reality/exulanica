@@ -1,0 +1,189 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "answers": "kept outside this record: what each answer said is a quality measure of the model",
+    "bound_usd": "0.02",
+    "calls": [
+      {
+        "attempts": 1,
+        "completion_tokens": 157,
+        "drawing_sha256": "e30d34668d6b15234fe0b679a14bca5cb7506d61c58524d996d5f97d1967ebf1",
+        "latency_ms": 1729,
+        "prompt_tokens": 571,
+        "role": "reference_vision",
+        "served_model": "openbmb/MiniCPM-V-4_5",
+        "usd": "0.00054999"
+      },
+      {
+        "attempts": 1,
+        "completion_tokens": 76,
+        "drawing_sha256": "e356f820925699487fd8c38118235427cea444cf1aa2325a187504c29ef2c370",
+        "latency_ms": 806,
+        "prompt_tokens": 571,
+        "role": "reference_vision",
+        "served_model": "openbmb/MiniCPM-V-4_5",
+        "usd": "0.00046008"
+      },
+      {
+        "attempts": 1,
+        "completion_tokens": 15,
+        "drawing_sha256": "97a92d5eede30468357e1ecf24c6b0319fae54e026e27654d09807c60e2654fe",
+        "latency_ms": 457,
+        "prompt_tokens": 571,
+        "role": "reference_vision",
+        "served_model": "openbmb/MiniCPM-V-4_5",
+        "usd": "0.00039237"
+      },
+      {
+        "attempts": 1,
+        "completion_tokens": 40,
+        "drawing_sha256": "0902d87de71855e903c71a9578b61c909b29a1a4c9e5ac85de6f57d6bb97ace0",
+        "latency_ms": 553,
+        "prompt_tokens": 571,
+        "role": "reference_vision",
+        "served_model": "openbmb/MiniCPM-V-4_5",
+        "usd": "0.00042012"
+      },
+      {
+        "attempts": 1,
+        "completion_tokens": 15,
+        "drawing_sha256": "a087c26bab698511536da0ac1e77c28f6eaf45a04f5fef84bf3012c4945c6667",
+        "latency_ms": 473,
+        "prompt_tokens": 571,
+        "role": "reference_vision",
+        "served_model": "openbmb/MiniCPM-V-4_5",
+        "usd": "0.00039237"
+      },
+      {
+        "attempts": 1,
+        "completion_tokens": 161,
+        "drawing_sha256": "d6be63fe95426522aa0f27d8afa5cb023082b3cfc6a6c278300b812bd1c708aa",
+        "latency_ms": 1389,
+        "prompt_tokens": 571,
+        "role": "reference_vision",
+        "served_model": "openbmb/MiniCPM-V-4_5",
+        "usd": "0.00055443"
+      },
+      {
+        "attempts": 1,
+        "completion_tokens": 15,
+        "drawing_sha256": "226fff79cea5a10f02a48bc925a2fbc1f9d0e3b75f8869b8cd89565108d8e7d7",
+        "latency_ms": 480,
+        "prompt_tokens": 571,
+        "role": "reference_vision",
+        "served_model": "openbmb/MiniCPM-V-4_5",
+        "usd": "0.00039237"
+      },
+      {
+        "attempts": 1,
+        "completion_tokens": 15,
+        "drawing_sha256": "3ee7eb98c42a05326c58171948e87e4c8f2a923ec39290661baa6c03602355fc",
+        "latency_ms": 525,
+        "prompt_tokens": 571,
+        "role": "reference_vision",
+        "served_model": "openbmb/MiniCPM-V-4_5",
+        "usd": "0.00039237"
+      },
+      {
+        "attempts": 1,
+        "completion_tokens": 15,
+        "drawing_sha256": "be65a401de1bb529b9a67b863dc8edc9e7779103a5e2c3470093c1681593d116",
+        "latency_ms": 378,
+        "prompt_tokens": 571,
+        "role": "reference_vision",
+        "served_model": "openbmb/MiniCPM-V-4_5",
+        "usd": "0.00039237"
+      },
+      {
+        "attempts": 1,
+        "completion_tokens": 15,
+        "drawing_sha256": "1ed5811a00c518f6c13ed8b6eeba8736d50b7be8af29d65fd6bb48cbf253f72d",
+        "latency_ms": 393,
+        "prompt_tokens": 571,
+        "role": "reference_vision",
+        "served_model": "openbmb/MiniCPM-V-4_5",
+        "usd": "0.00039237"
+      },
+      {
+        "attempts": 1,
+        "completion_tokens": 15,
+        "drawing_sha256": "99796154d36e236b7cea0560f6390f440bef350a9b07e72ed6784ff53d30f90e",
+        "latency_ms": 1575,
+        "prompt_tokens": 571,
+        "role": "reference_vision",
+        "served_model": "openbmb/MiniCPM-V-4_5",
+        "usd": "0.00039237"
+      },
+      {
+        "attempts": 1,
+        "completion_tokens": 15,
+        "drawing_sha256": "201e6be4db6a659c972033a09cb05af7b06eb738dcdef9f1dfb340cf8f6c7c2c",
+        "latency_ms": 398,
+        "prompt_tokens": 571,
+        "role": "reference_vision",
+        "served_model": "openbmb/MiniCPM-V-4_5",
+        "usd": "0.00039237"
+      }
+    ],
+    "corpus": {
+      "class": "synthetic",
+      "drawings_sha256": [
+        "e30d34668d6b15234fe0b679a14bca5cb7506d61c58524d996d5f97d1967ebf1",
+        "e356f820925699487fd8c38118235427cea444cf1aa2325a187504c29ef2c370",
+        "97a92d5eede30468357e1ecf24c6b0319fae54e026e27654d09807c60e2654fe",
+        "0902d87de71855e903c71a9578b61c909b29a1a4c9e5ac85de6f57d6bb97ace0",
+        "a087c26bab698511536da0ac1e77c28f6eaf45a04f5fef84bf3012c4945c6667",
+        "d6be63fe95426522aa0f27d8afa5cb023082b3cfc6a6c278300b812bd1c708aa",
+        "226fff79cea5a10f02a48bc925a2fbc1f9d0e3b75f8869b8cd89565108d8e7d7",
+        "3ee7eb98c42a05326c58171948e87e4c8f2a923ec39290661baa6c03602355fc",
+        "be65a401de1bb529b9a67b863dc8edc9e7779103a5e2c3470093c1681593d116",
+        "1ed5811a00c518f6c13ed8b6eeba8736d50b7be8af29d65fd6bb48cbf253f72d",
+        "99796154d36e236b7cea0560f6390f440bef350a9b07e72ed6784ff53d30f90e",
+        "201e6be4db6a659c972033a09cb05af7b06eb738dcdef9f1dfb340cf8f6c7c2c"
+      ],
+      "made_by": "code in the script as run: houses, roofs, boats, water, trees and hills; no person, no lettering, no photograph",
+      "sent_as": "the rendition stage's bytes"
+    },
+    "fallback": null,
+    "head": "194c35bde915cb0355140466c97513493adc23b4",
+    "kind": "exulanica.reference-vision-latency/v1",
+    "manifest_sha256": "d7be0310d0ac5a1991fc48e060f38b7b27966fd27c375e58a2e3215d01b8ba08",
+    "measured": {
+      "roles": {
+        "reference_vision": {
+          "primary": "openbmb/MiniCPM-V-4_5",
+          "primary_measured": {
+            "longest_ms": 1729,
+            "p50_ms": 480,
+            "p99_ms": 1729,
+            "rows": 12
+          }
+        }
+      }
+    },
+    "model": "openbmb/MiniCPM-V-4_5",
+    "prompt_sha256": "e0a6c7c9beebcc8ddbd7a6da4a639ea4c5cef2f060b63aa4a1b37bcf6960e0ac",
+    "provider": "nebius_token_factory",
+    "purpose": "the reference_vision role's timeout basis: one call per code-made drawing, timed around the client call",
+    "requests_sent": 12,
+    "script_as_run": "docs/evaluation/artifacts/2026-10-07-reference-vision-latency/measure_reference_vision_latency-as-run.py.txt",
+    "script_sha256": "e7db78ef19cbd879030dda12c8bf0daba0f14187e57da6e394952a53ff37f31f",
+    "spent_usd": "0.00512358",
+    "stopped": null,
+    "tree": {
+      "diff_head_sha256": "cc119452722f530a15a1a89c3a9421f0017affc7366e1e0f1dcc76d23939febd",
+      "differs": [
+        "docs/reference-notes-contract.md",
+        "exulanica/references/render.py",
+        "tests/test_reference_notes.py"
+      ],
+      "head": "194c35bde915cb0355140466c97513493adc23b4"
+    },
+    "window": {
+      "ended": "2026-10-07T10:17:20-04:00",
+      "started": "2026-10-07T10:17:11-04:00"
+    },
+    "within_bound": true
+  },
+  "record_sha256": "5de87a6734d770f719f6b8b5ca64202053ac64b45fb731a0ace83695bd933d23"
+}

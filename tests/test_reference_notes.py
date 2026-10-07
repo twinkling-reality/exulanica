@@ -263,3 +263,19 @@ def test_notes_past_the_bound_are_cut_and_counted_and_the_rest_fill_it() -> None
     assert rendered.cut == 24 - rendered.used > 1
     # the picture note was cut, so the block declares neither its picture nor its basis
     assert (rendered.photographs, rendered.bases) == (frozenset(), ("web_description",))
+
+
+def test_a_block_holds_only_the_notes_of_the_bases_it_is_given() -> None:
+    bundle = _bundle()  # one web note and one read from a picture
+    web = render_reference_notes(bundle, bases=("web_description",))
+    assert (web.used, web.cut, web.photographs, web.bases) == (
+        1,
+        0,
+        frozenset(),
+        ("web_description",),
+    )
+    assert "from a picture" not in web.text
+    both = render_reference_notes(bundle)
+    assert (both.used, both.photographs) == (2, frozenset({PICTURE}))
+    with pytest.raises(ValueError, match="no note has the basis"):
+        render_reference_notes(bundle, bases=("rumour",))

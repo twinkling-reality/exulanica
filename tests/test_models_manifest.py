@@ -208,9 +208,16 @@ def test_embedding_role_declares_no_fallback(manifest):
     assert manifest[Role.EMBEDDING].chain == (manifest[Role.EMBEDDING].primary,)
 
 
+def test_reference_vision_declares_no_fallback(manifest):
+    """The only other image model offered is conditional on its licence terms (L-2), so the role
+    reads a person's picture with one model or not at all."""
+    assert manifest[Role.REFERENCE_VISION].fallback is None
+    assert manifest[Role.REFERENCE_VISION].chain == (manifest[Role.REFERENCE_VISION].primary,)
+
+
 def test_every_other_role_has_a_distinct_fallback(manifest):
     for role, binding in manifest.roles.items():
-        if role is Role.EMBEDDING:
+        if role in (Role.EMBEDDING, Role.REFERENCE_VISION):
             continue
         assert binding.fallback is not None, f"{role} has no fallback"
         assert binding.fallback.model_id != binding.primary.model_id

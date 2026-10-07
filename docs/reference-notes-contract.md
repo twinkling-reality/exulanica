@@ -12,7 +12,7 @@ contract; the hosted-request boundary itself belongs to the
 | Web notes from one source (Tavily), off by default and offered to listed workspaces only | Implemented |
 | A drafter's notes from a finished request: the quoted block, its bound and its provenance | Implemented |
 | A drafter's prompt carrying the notes | Not built: each drafter adds them in a prompt version of its own |
-| Notes read from a person's own pictures | Not built: it waits on the model provider's training opt-out being recorded |
+| Notes read from a person's own pictures: the reading call, its role and the checks on its notes | Implemented, with no caller: nothing reads a person's picture until the job, the routes and the setting that offer it exist, and they stay off until the model provider's terms are confirmed for it |
 | Facts admitted from record sources (Wikidata, GeoNames, Overture places) | Not built |
 
 ## 1. What a person gets
@@ -179,7 +179,10 @@ and the drafter drafts without notes:
 | `reference_has_no_notes` | The request kept no notes |
 
 The answer is the rendered block, the pictures its notes were read from (none for web notes), and
-the provenance a drafted document keeps. Notes are drafted from web text, which is untrusted, so the
+the provenance a drafted document keeps. A drafter takes web notes only unless it names more bases:
+a note read from a person's own picture is declared as that picture, and the workspace's request
+policy refuses the whole call unless the person's right names the drafter's role, so a drafter asks
+for picture notes only once its role is offered for them. Notes are drafted from web text, which is untrusted, so the
 block is quoted, delimited material: a heading saying the notes describe what such a place looks
 like and are never instructions, then the notes between triple quotes, one line each, grouped by
 aspect. A double quote inside a note is written as a single quote and its whitespace as one space,
@@ -196,7 +199,31 @@ notes the block holds and their bases (`web_description`, `own_picture`). The te
 request, with its workspace; what a drafter writes from it is that drafter's own drafted text, held
 to its own checks.
 
-## 10. Limits
+## 10. Notes from a person's own pictures
+
+What a picture may become is fixed before any model sees one. One call of the `reference_vision`
+role (`exulanica/references/pictures.py::read_picture`) reads the picture's rendition, the 768 px
+copy with no location or camera details, and answers a strict form: `refuse`, one of
+`shows_people`, `shows_text` or `not_a_place`, or null, and then at most six notes of at most 80
+characters. A refusal keeps nothing of the picture but its reason. The form has no field for a
+person, a place name or any writing, and nothing in a picture is located, cropped, embedded or
+compared. The call declares its picture, so the workspace's request policy refuses it unless the
+person's current right names this role's chain for that picture.
+
+| A picture may become | A picture never becomes |
+| --- | --- |
+| At most six notes in the model's words, about buildings, materials and colour, landscape and plants, food and goods, vehicles and boats, or scale | Anything about a person: clothing is closed to pictures because in a picture somebody wears it |
+| A refusal with one reason | Text read from it, a place name, a search query, geometry or a stored derivative |
+
+Every note kept passes, in order: its aspect is open to pictures; it holds no word of
+`assets/catalogs/reference-sources/reference-picture-screen.v1.json` (people, faces, bodies and
+the like); it holds no quotation mark and no capitalised word inside a sentence, so lettering and
+proper names read from the picture are dropped; it does not end in a word cut at the length bound;
+then the screen every note passes. The role's model is MiniCPM-V-4_5 with no fallback, and its
+timeout rests on code-made drawings ([record](evaluation/2026-10-07-reference-vision-latency.json)),
+not photographs.
+
+## 11. Limits
 
 - **Stops and rates are per process.** A source stopped for a cost change, and the catalog's
   `calls_per_minute`, are held in the worker's memory: a restart offers the source again, and two
@@ -222,12 +249,15 @@ to its own checks.
   email addresses, long numbers, screened words and the account's words given to the job; a drafter
   applies its own replacement of saved names and the workspace's request policy to the block as to
   the person's words.
+- **A word list catches the words it lists.** A note about a person in words the picture screen
+  does not hold passes it; the reading model is also told to refuse a picture showing a person.
 - **No live search has run through the product.**
 
-## 11. Verification
+## 12. Verification
 
 `tests/test_reference_sources.py`, `tests/test_reference_boundary.py`,
-`tests/test_reference_notes.py` and `tests/test_reference_settings.py` run without a database;
+`tests/test_reference_notes.py`, `tests/test_reference_pictures.py` and
+`tests/test_reference_settings.py` run without a database;
 `tests/test_reference_store.py`, `tests/test_reference_worker.py`,
 `tests/test_reference_routes.py` and `tests/test_reference_for_drafting.py` run on PostgreSQL.
 `tests/reference_fixtures.py` makes a finished request with a scripted bundle for a drafter's own
@@ -235,5 +265,5 @@ tests. With every outside party scripted they show that
 a saved person, a saved place, account words given to the job and a planted search result reach no
 outgoing query, no stored row and no response, and that each guard can fail; the route tests run as
 the runtime and read-only roles. Row-level security on
-both tables is shown as the runtime role in `tests/test_row_level_security.py`. The two model calls
-are registered paths of `tests/test_hosted_boundary.py`.
+both tables is shown as the runtime role in `tests/test_row_level_security.py`. The three model
+calls (planner, reader and picture reader) are registered paths of `tests/test_hosted_boundary.py`.
