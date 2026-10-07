@@ -84,14 +84,15 @@ import {
   objectWriteFailure,
   type AlternateVersion,
   type ObjectRole,
+  type PlacedThing,
 } from '../world-objects-api.js';
 import type { AppEnvironment, SessionState } from './session-state.js';
 import { seatingLayout } from './seating-layout.js';
-import type { SeatingLayout } from '@exulanica/atlas-react/playcanvas';
+import { pointerRay, type SeatingLayout } from '@exulanica/atlas-react/playcanvas';
 import type { SocietyPlaces } from '../society-api.js';
 import { engineCreatedOver, societyEngine } from '../society-engines.js';
 import type { SavedWorldFlight, SavedWorldFlightStatus } from './saved-world-flight.js';
-import { mountThings, type MountedThings, type ThingsDependencies } from './things.js';
+import { mountThings, THING_PICK_EVENT, type MountedThings, type ThingPickDetail, type ThingPickVia, type ThingsDependencies } from './things.js';
 import { AttachedMarks, type MarkedSubject } from '@exulanica/atlas-react/things';
 import { markLabel, markOf } from './thing-marks.js';
 import { DoorBridgesClient, type DoorBridge } from '../door-bridges-api.js';
@@ -170,6 +171,19 @@ export interface SelectedPerson {
   readonly mind: PersonMind | null;
 }
 
+/** Whether a person is typing in a field, where no click on the world may pick anything. */
+const typingInField = (): boolean => {
+  const active = document.activeElement;
+  return active instanceof HTMLElement && (active.isContentEditable || active.closest('input, textarea, select') !== null);
+};
+
+/** A placed thing picked in a saved world, for another surface's view of it. */
+export interface SelectedThing {
+  readonly placed: PlacedThing;
+  readonly worldId: string;
+  readonly versionId: string;
+}
+
 /**
  * A view another surface shows at the top of Selected for a person (the thing card). The
  * inspector stays under it with only the person's controls and its record.
@@ -178,6 +192,8 @@ export interface InhabitantView {
   readonly root: HTMLElement;
   /** Show this person; false leaves them to the inspector. Called again on every refresh. */
   show(subjectId: string, about: SelectedPerson): boolean;
+  /** Show a placed thing that is nobody (an object, or a being nothing runs yet) in Selected alone. */
+  showThing?(thing: SelectedThing): boolean;
   hide(): void;
 }
 
@@ -564,7 +580,12 @@ export function mountEnvironmentSelection(
   const recordingRestart = el('button', { type: 'button', text: 'Restart recording' });
   const recordingSpeedSelect = el('select', { 'aria-label': 'Recorded society speed' });
   for (const [value, label] of RECORDING_SPEEDS) recordingSpeedSelect.append(el('option', { value: String(value), text: label }));
-  let attachedControls: { onInteract: (() => void) | null } | null = null;
+  let attachedControls: {
+    onInteract: (() => void) | null;
+    onPointerPick: ((clientX: number, clientY: number) => boolean) | null;
+  } | null = null;
+  let installedPointerPick: ((clientX: number, clientY: number) => boolean) | null = null;
+  let priorPointerPick: ((clientX: number, clientY: number) => boolean) | null = null;
 
   overview.addEventListener('click', () => deps.state.atlas?.binding.setCityView('overview'));
   street.addEventListener('click', () => deps.state.atlas?.binding.setCityView('street'));
@@ -821,6 +842,35 @@ export function mountEnvironmentSelection(
     offerInhabitantView(id);
     return true;
   }
+
+  /**
+   * A placed thing picked in the world that is nobody opens its card in Selected alone (the view's
+   * showThing); a pick that names a person opens theirs as aiming at them does.
+   */
+  function inspectPlacedThing(placedId: string): boolean {
+    const placed = current?.things?.find((thing) => thing.thingId === placedId && !thing.removed);
+    const view = inhabitantView;
+    if (placed === undefined || savedWorld === null || view?.showThing === undefined) return false;
+    workspace.inspect();
+    clearInspector();
+    selectedInhabitant = null;
+    setRepresentationHighlight(null);
+    selected.textContent = 'Selected placed thing';
+    inspector.setUnderView(false);
+    inspector.root.hidden = true;
+    const shown = view.showThing({ placed, worldId: savedWorld.worldId, versionId: savedWorld.versionId });
+    view.root.hidden = !shown;
+    if (!shown) showInspector();
+    return true;
+  }
+  function onThingPick(event: Event): void {
+    const detail = (event as CustomEvent<ThingPickDetail>).detail;
+    if (detail === null) return;
+    if (detail.subjectId !== null) { inspectInhabitant(detail.subjectId); return; }
+    if (detail.placedId !== null) inspectPlacedThing(detail.placedId);
+  }
+  // The pick event is raised on the shell and bubbles; listening at the document hears it from any surface.
+  document.addEventListener(THING_PICK_EVENT, onThingPick);
 
   /** On a selected inhabitant of a saved world: ask the Companion who they are, what and why. */
   function addAskActions(): void {
@@ -2097,19 +2147,32 @@ export function mountEnvironmentSelection(
     if ((phase as string) === 'disposed') return;
     attachedControls = atlas.controls;
     priorInteract = atlas.controls.onInteract;
+    // The nearest along a ray wins: a placed thing, or one of the world's people in front of it.
+    // Aiming and pressing E and a click on the world before looking around pick the same way.
+    const pickAlong = (
+      origin: readonly [number, number, number], direction: readonly [number, number, number], via: ThingPickVia,
+    ): boolean => {
+      const thing = things?.pick(origin, direction) ?? null;
+      const inhabitantId = atlas.authoredSociety?.pickInhabitant(origin, direction, thing?.distance ?? Number.POSITIVE_INFINITY);
+      if (inhabitantId) { inspectInhabitant(inhabitantId); return true; }
+      if (thing !== null) { things?.raise(thing.pick, via); return true; }
+      return false;
+    };
     installedInteract = () => {
       const ray = atlas.interactionRay?.();
       const position = ray ? { x: ray.origin[0], y: ray.origin[1], z: ray.origin[2] } : atlas.controls.state;
       const forward = ray ? { x: ray.direction[0], y: ray.direction[1], z: ray.direction[2] } : atlas.controls.forward?.() ?? atlas.camera.forward;
-      // The nearest along the ray wins: a placed thing, or one of the world's people in front of it.
-      const thing = things?.pick([position.x, position.y, position.z], [forward.x, forward.y, forward.z]) ?? null;
-      const inhabitantId = atlas.authoredSociety?.pickInhabitant(
-        [position.x, position.y, position.z], [forward.x, forward.y, forward.z], thing?.distance ?? Number.POSITIVE_INFINITY);
-      if (inhabitantId) { inspectInhabitant(inhabitantId); return; }
-      if (thing !== null) { things?.raise(thing.pick, 'aim'); return; }
-      priorInteract?.();
+      if (!pickAlong([position.x, position.y, position.z], [forward.x, forward.y, forward.z], 'aim')) priorInteract?.();
     };
     atlas.controls.onInteract = installedInteract;
+    priorPointerPick = atlas.controls.onPointerPick;
+    installedPointerPick = (clientX, clientY) => {
+      // No click opens a card while a person types in a field or a surface holds the world modal.
+      if (typingInField() || document.querySelector('[aria-modal="true"]:not([hidden])') !== null) return false;
+      const ray = atlas.interactionRay === undefined ? null : pointerRay(atlas, clientX, clientY);
+      return ray !== null && pickAlong(ray.origin, ray.direction, 'pointer');
+    };
+    atlas.controls.onPointerPick = installedPointerPick;
     phase = 'attached';
     // The marks write into the element the world shows through, beside the anchor overlay's nodes.
     const stage = atlas.overlay?.root.parentElement ?? null;
@@ -2448,8 +2511,14 @@ export function mountEnvironmentSelection(
       if (attachedControls !== null && attachedControls.onInteract === installedInteract) {
         attachedControls.onInteract = priorInteract;
       }
+      if (attachedControls !== null && attachedControls.onPointerPick === installedPointerPick) {
+        attachedControls.onPointerPick = priorPointerPick;
+      }
+      document.removeEventListener(THING_PICK_EVENT, onThingPick);
       installedInteract = null;
       priorInteract = null;
+      installedPointerPick = null;
+      priorPointerPick = null;
       attachedControls = null;
       if (societyTimer !== null) window.clearTimeout(societyTimer);
       societyTimer = null;

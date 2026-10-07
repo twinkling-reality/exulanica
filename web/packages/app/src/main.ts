@@ -1171,11 +1171,13 @@ async function mount(): Promise<void> {
   state.disposeSocietyComparison = societyComparison === null
     ? null
     : () => societyComparison.dispose();
-  // The thing card is what Selected shows first for a person: who they are, what mind runs them,
-  // changed in place, and where they came from.
+  // The thing card is what Selected shows first for whatever is picked: what it is, what mind runs
+  // it (changed in place for a person), how it looks and where it came from.
   environmentSelection.useInhabitantView(mountThingCard({
     selection: environmentSelection,
     compare: societyComparison === null ? null : () => { if (actions !== null) void perform(actions.host, 'compare.open'); },
+    shell: env.shell,
+    credentials: currentCredentials,
   }).view);
   const character = mountCharacter({ env, state, onClose: () => dispatchShell({ type: 'toggle-character' }) });
   state.disposeCharacter = () => character.dispose();

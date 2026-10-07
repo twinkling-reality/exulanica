@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { ApiError } from '@exulanica/graph-client';
 import type { AtlasScene } from '@exulanica/atlas-core';
 import type { PlacedThingRecord, ThingLayerOptions, ThingPick } from '@exulanica/atlas-react/things';
-import { mountEnvironmentSelection } from '../src/composition/environment-selection.js';
+import { mountEnvironmentSelection, type SelectedThing } from '../src/composition/environment-selection.js';
 import { parseSociety, type SocietySnapshot } from '../src/society-api.js';
 import { parseSocietyControl } from '../src/society-control-api.js';
 import { THING_PICK_EVENT, type ThingPickDetail } from '../src/composition/things.js';
@@ -41,6 +41,14 @@ vi.mock('@exulanica/atlas-react/things', async (original) => ({
   ThingLayer: FakeLayer,
 }));
 vi.mock('../src/things-library.js', () => ({ openThingLibrary: vi.fn(async () => ({ library: true })) }));
+// A click on the world casts the same ray the reticle does, here from the page point.
+const { pointerRay } = vi.hoisted(() => ({
+  pointerRay: vi.fn((_source: unknown, _x: number, _y: number) => ({ origin: [0, 1.68, 4] as const, direction: [0, 0, -1] as const })),
+}));
+vi.mock('@exulanica/atlas-react/playcanvas', async (original) => ({
+  ...(await original<typeof import('@exulanica/atlas-react/playcanvas')>()),
+  pointerRay,
+}));
 
 const WORLD = 'world:authored:saved';
 const KIND = { kind: 'well', version: 1, sha256: 'a'.repeat(64) };
@@ -90,9 +98,13 @@ function mount(withSociety = false) {
     // A person stands 5 m along the ray: picked only when nothing nearer stands in front.
     pickInhabitant: vi.fn((_o: unknown, _d: unknown, limit = Number.POSITIVE_INFINITY) => (limit > 5 ? 'person-0' : null)),
   };
-  const controls = { state: { x: 0, y: 1.68, z: 4 }, onInteract: vi.fn() as (() => void) | null, forward: () => ({ x: 0, y: 0, z: -1 }) };
+  const controls = {
+    state: { x: 0, y: 1.68, z: 4 }, onInteract: vi.fn() as (() => void) | null, forward: () => ({ x: 0, y: 0, z: -1 }),
+    onPointerPick: null as ((clientX: number, clientY: number) => boolean) | null,
+  };
   const binding = {
     app: { app: true }, camera: { forward: { x: 0, y: 0, z: -1 } }, controls, invalidate: vi.fn(),
+    interactionRay: () => ({ origin: [0, 1.68, 4] as const, direction: [0, 0, -1] as const }),
     regionRoots: new Map(), ownedDistrict: null, generatedTile: null, authoredSociety: crowd,
     memoryLayerVisible: false, onMemoryLayerChange: null,
   };
@@ -113,6 +125,8 @@ function mount(withSociety = false) {
   const modelsClient = { read: vi.fn(async () => { throw missing(); }), choose: vi.fn() };
   const canvas = document.createElement('canvas');
   const shell = document.createElement('div');
+  // The shell is in the page, as the application's is, so a pick raised on it reaches the document.
+  document.body.replaceChildren(shell);
   const mounted = mountEnvironmentSelection({
     env: { canvas, shell, preview: false, systemReducedMotion: { matches: false } } as unknown as AppEnvironment,
     state: {
@@ -127,7 +141,7 @@ function mount(withSociety = false) {
     societyModelsClient: modelsClient as never,
   });
   document.body.append(mounted.root);
-  return { mounted, crowd, controls, canvas, shell, regionEntity };
+  return { mounted, crowd, controls, canvas, shell, regionEntity, binding };
 }
 
 describe('a saved world\'s placed things', () => {
@@ -167,5 +181,57 @@ describe('a saved world\'s placed things', () => {
     // The layer is told what the state says of the things.
     expect((layer.society as { things: { placed_id: string }[] }).things.map((thing) => thing.placed_id)).toEqual(['well-1']);
     mounted.dispose();
+  });
+
+  it('picks by a click on the world as E does, never while a surface holds the world, and lets go on dispose', async () => {
+    const { mounted, crowd, controls, shell, binding } = mount();
+    pointerRay.mockClear();
+    await mounted.begin();
+    const layer = layers.at(-1)!;
+    const heard: ThingPickDetail[] = [];
+    shell.addEventListener(THING_PICK_EVENT, (event) => heard.push((event as CustomEvent<ThingPickDetail>).detail));
+    expect(controls.onPointerPick).not.toBeNull();
+    // A click over the well takes the click (no camera look) and raises the pick as a pointer's.
+    expect(controls.onPointerPick!(640, 400)).toBe(true);
+    expect(pointerRay).toHaveBeenLastCalledWith(binding, 640, 400);
+    expect(heard).toEqual([{ placedId: 'well-1', thingId: null, subjectId: null, via: 'pointer' }]);
+    // The person nearer than the well is picked instead, by the same nearest-wins rule.
+    layer.distance = 9;
+    expect(controls.onPointerPick!(640, 400)).toBe(true);
+    expect(crowd.pickInhabitant.mock.results.at(-1)!.value).toBe('person-0');
+    // While a sheet is modal on the world, a click picks nothing and is left to camera look.
+    const sheet = document.createElement('section');
+    sheet.setAttribute('aria-modal', 'true');
+    document.body.append(sheet);
+    expect(controls.onPointerPick!(640, 400)).toBe(false);
+    sheet.remove();
+    mounted.dispose();
+    expect(controls.onPointerPick).toBeNull();
+  });
+
+  it('opens a picked thing that is nobody in Selected through the card\'s view, and stops listening on dispose', async () => {
+    const { mounted, shell } = mount();
+    await mounted.begin();
+    const root = document.createElement('section');
+    const view = { root, show: vi.fn(() => true), showThing: vi.fn((_thing: SelectedThing) => true), hide: vi.fn() };
+    mounted.useInhabitantView(view);
+    shell.dispatchEvent(new CustomEvent<ThingPickDetail>(THING_PICK_EVENT, {
+      bubbles: true, detail: { placedId: 'well-1', thingId: null, subjectId: null, via: 'aim' },
+    }));
+    expect(view.showThing).toHaveBeenCalledOnce();
+    expect(view.showThing.mock.calls[0]![0]).toMatchObject({ worldId: WORLD, versionId: 'version', placed: { thingId: 'well-1', kind: KIND } });
+    expect(root.hidden).toBe(false);
+    expect(mounted.root.querySelector<HTMLElement>('.living-world-inspector')!.hidden).toBe(true);
+    // A thing the version no longer places, and the ring's own clearing, open nothing.
+    shell.dispatchEvent(new CustomEvent<ThingPickDetail>(THING_PICK_EVENT, {
+      bubbles: true, detail: { placedId: 'gone', thingId: null, subjectId: null, via: 'aim' },
+    }));
+    shell.dispatchEvent(new CustomEvent<ThingPickDetail>(THING_PICK_EVENT, { bubbles: true, detail: null }));
+    expect(view.showThing).toHaveBeenCalledOnce();
+    mounted.dispose();
+    shell.dispatchEvent(new CustomEvent<ThingPickDetail>(THING_PICK_EVENT, {
+      bubbles: true, detail: { placedId: 'well-1', thingId: null, subjectId: null, via: 'aim' },
+    }));
+    expect(view.showThing).toHaveBeenCalledOnce();
   });
 });

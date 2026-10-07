@@ -88,6 +88,21 @@ export class ThingLibrary {
     return readLookDrawing(await this.json(named.sha256));
   }
 
+  /**
+   * A kind's whole document as its canonical JSON, held to its digest, for a reader that needs more
+   * than drawing does (the thing card: its summary, abilities and origin).
+   */
+  async kindDocument(named: Named): Promise<unknown> {
+    this.kindEntry(named);
+    return this.json(named.sha256);
+  }
+
+  /** A look's whole document as its canonical JSON, held to its digest (the card reads its origin). */
+  async lookDocument(named: Named): Promise<unknown> {
+    this.lookEntry(named);
+    return this.json(named.sha256);
+  }
+
   async bodyPlans(): Promise<ReadonlyMap<string, BodyPlanEntry>> {
     this.plans ??= this.json(this.list.bodyPlansSha256).then(readBodyPlans);
     return this.plans;

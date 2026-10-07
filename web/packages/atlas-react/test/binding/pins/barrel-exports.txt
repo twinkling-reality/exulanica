@@ -90,6 +90,7 @@ placedCatalogObjectSubject
 placementLandingPose
 placementPoseAtAtlasPoint
 placementPoseBeforeVisitor
+pointerRay
 presenceMarkerSegmentIds
 printDepthOnFlatGround
 probeAll

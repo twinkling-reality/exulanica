@@ -164,6 +164,74 @@ describe('first-person keyboard ownership', () => {
     controls.destroy();
   });
 
+  describe('a click on the world before looking around', () => {
+    const press = (canvas: HTMLCanvasElement, x: number, y: number) =>
+      canvas.dispatchEvent(new MouseEvent('mousedown', { button: 0, bubbles: true, clientX: x, clientY: y }));
+    const move = (x: number, y: number) => document.dispatchEvent(new MouseEvent('mousemove', { clientX: x, clientY: y }));
+    const release = (x: number, y: number) => document.dispatchEvent(new MouseEvent('mouseup', { button: 0, clientX: x, clientY: y }));
+    function setup(picks: boolean) {
+      const canvas = document.createElement('canvas');
+      document.body.append(canvas);
+      const requestPointerLock = vi.fn();
+      canvas.requestPointerLock = requestPointerLock;
+      const controls = new FirstPersonControls(canvas, { x: 0, y: 1.62, z: 0, yaw: 0, pitch: 0 });
+      const pick = vi.fn((_x: number, _y: number) => picks);
+      controls.onPointerPick = pick;
+      return { canvas, controls, pick, requestPointerLock };
+    }
+
+    it('opens what it hits and leaves the pointer free', () => {
+      const { canvas, controls, pick, requestPointerLock } = setup(true);
+      press(canvas, 100, 100);
+      release(102, 101);
+      expect(pick).toHaveBeenCalledWith(102, 101);
+      expect(requestPointerLock).not.toHaveBeenCalled();
+      controls.destroy();
+    });
+
+    it('looks around as before when it misses, drags or is held', () => {
+      vi.useFakeTimers();
+      try {
+        const missed = setup(false);
+        press(missed.canvas, 100, 100);
+        release(100, 100);
+        expect(missed.pick).toHaveBeenCalledOnce();
+        expect(missed.requestPointerLock).toHaveBeenCalledOnce();
+        missed.controls.destroy();
+        // A press that drags is looking around from the moment it moves past the slop, never a pick.
+        const dragged = setup(true);
+        press(dragged.canvas, 100, 100);
+        move(110, 100);
+        expect(dragged.requestPointerLock).toHaveBeenCalledOnce();
+        release(110, 100);
+        expect(dragged.pick).not.toHaveBeenCalled();
+        dragged.controls.destroy();
+        // A press held longer than a click is looking around too.
+        const held = setup(true);
+        press(held.canvas, 100, 100);
+        vi.advanceTimersByTime(301);
+        release(100, 100);
+        expect(held.pick).not.toHaveBeenCalled();
+        expect(held.requestPointerLock).toHaveBeenCalledOnce();
+        held.controls.destroy();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('never picks from a press made while a person types in a field', () => {
+      const { canvas, controls, pick, requestPointerLock } = setup(true);
+      const field = document.createElement('input');
+      document.body.append(field);
+      field.focus();
+      press(canvas, 100, 100);
+      release(100, 100);
+      expect(pick).not.toHaveBeenCalled();
+      expect(requestPointerLock).toHaveBeenCalledOnce();
+      controls.destroy();
+    });
+  });
+
   it('uses X as the one keyboard summon contract', () => {
     const canvas = document.createElement('canvas');
     document.body.append(canvas);

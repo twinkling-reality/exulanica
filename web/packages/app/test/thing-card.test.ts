@@ -30,7 +30,10 @@ function mount(models: readonly SocietyModel[] | null = MODELS) {
   }));
   const openDecides = vi.fn(() => 1);
   const compare = vi.fn();
-  const card = mountThingCard({ selection: { decide, models: () => models, openDecides }, compare });
+  const card = mountThingCard({
+    selection: { decide, models: () => models, openDecides }, compare,
+    shell: document.body, credentials: { baseUrl: 'https://example.test', token: 't' },
+  });
   document.body.replaceChildren(card.view.root);
   return { card, decide, openDecides, compare, root: card.view.root };
 }

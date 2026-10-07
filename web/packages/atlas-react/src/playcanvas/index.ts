@@ -89,6 +89,7 @@ export {
 
 export type { CameraState, ControlsConfig, InputMode } from './controls.js';
 export { DEFAULT_CONTROLS, FirstPersonControls } from './controls.js';
+export { pointerRay, type PointerRaySource, type WorldRay } from './pointer-ray.js';
 
 export {
   NYCSemanticOverlay,

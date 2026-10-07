@@ -30,8 +30,20 @@ import { atlasVec3, forwardFromYawPitch, resolveGroundMovement } from '@exulanic
  * The two input modes in the interaction model, `traverse` and `converse`, are therefore a READ of
  * the browser's lock state rather than a state this module owns.
  *
+ * BEFORE LOOKING AROUND. While the lock is absent the pointer is an ordinary cursor, and a plain
+ * click on the world (pressed and released within CLICK_SLOP_PX and CLICK_MS) is handed to the
+ * application as that screen point (`onPointerPick`), which picks what is under it and says whether
+ * it took the click. A click it does not take, and any press that drags or is held, enters camera
+ * look exactly as a press always has. Nothing hovers, and once the lock is held, targeting is the
+ * reticle's alone.
+ *
  * NO JUMP VERB. The space bar is Interact. That is a product decision, not an omission.
  */
+
+/** How far a press may move, in CSS pixels, and still be a click rather than a drag to look. */
+export const CLICK_SLOP_PX = 4;
+/** How long a press may last, in milliseconds, and still be a click. */
+export const CLICK_MS = 300;
 
 export type InputMode = 'traverse' | 'converse';
 
@@ -135,6 +147,14 @@ export class FirstPersonControls {
   onInteract: (() => void) | null = null;
   /** Summon or dismiss Companion. Bound to X and right click. */
   onSummon: (() => void) | null = null;
+  /**
+   * A plain click on the world while not looking around, at its screen point: true when the
+   * application picked something there and took the click, so no camera look starts. Null keeps
+   * every press for camera look.
+   */
+  onPointerPick: ((clientX: number, clientY: number) => boolean) | null = null;
+  /** A left press that may still be a click, while the lock is absent. */
+  private press: { readonly x: number; readonly y: number; readonly at: number } | null = null;
   private walkAssist:'off'|'walk'|'run'='off';
   setWalkAssist(mode:'off'|'walk'|'run'):void {this.walkAssist=mode;}
 
@@ -203,18 +223,43 @@ export class FirstPersonControls {
       this.state.pitch = Math.max(-PITCH_LIMIT, Math.min(PITCH_LIMIT, this.state.pitch));
     });
 
+    // A real user gesture, which is the only thing that may request the lock. Some embedded
+    // browsers refuse pointer lock; focused keyboard navigation still works.
+    const lock = (): void => { void this.canvas.requestPointerLock()?.catch(() => undefined); };
     on(canvas, 'mousedown', (e: MouseEvent) => {
       if (!this.locked) {
         if (!this.enabled || this.conversationActive) return;
-        // A real user gesture, which is the only thing that may request the lock.
+        // A press made while a person types in a field is never a pick: it only leaves the field.
+        const active = document.activeElement;
+        const typing = active instanceof HTMLElement
+          && (active.isContentEditable || active.closest('input, textarea, select') !== null);
         this.canvas.focus();
-        // Some embedded browsers refuse pointer lock. Focused keyboard navigation still works.
-        void this.canvas.requestPointerLock()?.catch(() => undefined);
+        // A left press may be a click on something; it looks around once it drags, lasts or misses.
+        if (e.button === 0 && this.onPointerPick !== null && !typing) {
+          this.press = { x: e.clientX, y: e.clientY, at: Date.now() };
+          return;
+        }
+        lock();
         return;
       }
       // A left click belongs exclusively to entering/maintaining camera look. Treating the same
       // gesture as Interact opened a memory surface when the person was only trying to look.
       if (e.button === 2) this.onSummon?.();
+    });
+    on(document, 'mousemove', (e: MouseEvent) => {
+      const press = this.press;
+      if (press === null || Math.hypot(e.clientX - press.x, e.clientY - press.y) <= CLICK_SLOP_PX) return;
+      this.press = null;
+      lock();
+    });
+    on(document, 'mouseup', (e: MouseEvent) => {
+      const press = this.press;
+      if (press === null) return;
+      this.press = null;
+      const click = Date.now() - press.at <= CLICK_MS
+        && Math.hypot(e.clientX - press.x, e.clientY - press.y) <= CLICK_SLOP_PX;
+      if (click && this.onPointerPick?.(e.clientX, e.clientY) === true) return;
+      lock();
     });
     on(canvas, 'contextmenu', (e: Event) => e.preventDefault());
 

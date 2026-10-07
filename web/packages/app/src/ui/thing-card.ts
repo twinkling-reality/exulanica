@@ -42,6 +42,21 @@ export interface CardMind {
   readonly when: string;
 }
 
+/** A link the card shows: its words and where it goes (an https address). */
+export interface CardLink {
+  readonly text: string;
+  readonly href: string;
+}
+
+/** How it looks: the look's name, who made it and its licence, where it came from, and any credit owed. */
+export interface CardLooks {
+  readonly name: string;
+  readonly line: string;
+  readonly source: CardLink | null;
+  /** The credit its licence asks for (attribution or share-alike), with a link where there is one. */
+  readonly credit: { readonly text: string; readonly href: string | null } | null;
+}
+
 export interface ThingCardModel {
   /** Which thing this is: a new subject closes an open choice and forgets the last outcome. */
   readonly subject: string;
@@ -51,6 +66,8 @@ export interface ThingCardModel {
   /** What it is doing, or where it is, now; null leaves the row out. */
   readonly now: string | null;
   readonly mind: CardMind | null;
+  /** Null leaves the row out (a person drawn from the world's people catalog). */
+  readonly looks?: CardLooks | null;
   readonly cameFrom: string;
 }
 
@@ -146,6 +163,21 @@ export function buildThingCard(handlers: ThingCardHandlers): ThingCard {
     return box;
   }
 
+  const link = (target: CardLink): HTMLElement => el('a', {
+    class: 'thing-card-link', href: target.href, target: '_blank', rel: 'noopener noreferrer', text: target.text,
+  });
+
+  function looksRow(looks: CardLooks): HTMLElement {
+    const box = row('Looks like');
+    box.append(el('p', { class: 'thing-card-mind-name', text: looks.name }), el('p', { class: 'thing-card-muted', text: looks.line }));
+    if (looks.source !== null) box.append(el('p', {}, [link(looks.source)]));
+    if (looks.credit !== null) {
+      const credit = looks.credit;
+      box.append(el('p', { class: 'thing-card-credit' }, [credit.href === null ? credit.text : link({ text: credit.text, href: credit.href })]));
+    }
+    return box;
+  }
+
   async function choose(key: string): Promise<void> {
     if (busy) return;
     busy = true;
@@ -173,6 +205,7 @@ export function buildThingCard(handlers: ThingCardHandlers): ThingCard {
       parts.push(el('p', { class: 'thing-card-now' }, [el('b', { text: 'Now' }), el('span', { text: model.now })]));
     }
     if (model.mind !== null) parts.push(mindRow(model.mind));
+    if (model.looks != null) parts.push(looksRow(model.looks));
     const came = row('Came from');
     came.append(el('p', { text: model.cameFrom }));
     parts.push(came);

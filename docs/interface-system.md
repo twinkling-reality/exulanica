@@ -214,8 +214,23 @@ plays from a game wears "from" and its game instead; a being its own routine run
 object, wears nothing. One function decides it (`composition/thing-marks.ts`) for the card and for
 the marks drawn in the world, and a model that is chosen but not asked here is no AI mark.
 
-In this version the card serves the people of a world; placed things, visitors and their looks
-join it as the server serves their cards.
+A placed thing that is nobody (an object, or a being nothing runs yet) has the same card, read
+from its kind's and its worn look's documents in the host's thing library and the version's look
+choices: its kind's summary; Mind "None. It decides nothing." for an object, and "Nothing yet" for
+a being that only stands where it was placed; Looks like, with who made the look, its licence and
+a link to its source; and Came from ("You placed it here. A well is one of Exulanica's own
+kinds."). Wherever a look's licence asks for attribution or share-alike terms, the card shows the
+credit it owes with a link to the licence, for any look. Closing the card takes the ring off the
+thing in the world.
+
+A thing is picked by aiming and pressing E, or by clicking it before looking around: a plain click
+(pressed and released within 4 pixels and 300 milliseconds) on a person or a placed thing opens
+its card and leaves the pointer free; a click on nothing, and any press that drags or is held,
+looks around as it always has. No click picks anything while a field had focus at the press or a
+sheet is modal on the world. Both ways pick the nearest along the ray, a person or a thing.
+
+Visitors, a thing's abilities, what it holds and what it said join the card as the server serves
+them.
 
 ### Look
 
