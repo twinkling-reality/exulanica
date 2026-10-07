@@ -1,0 +1,19 @@
+{
+  "mcpServers": {
+    "exulanica": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "exulanica-agent[mcp] @ git+https://github.com/twinkling-reality/exulanica#subdirectory=bridges/agents",
+        "exulanica-agent",
+        "mcp"
+      ],
+      "env": {
+        "EXULANICA_URL": "https://<the world's server>",
+        "EXULANICA_AGENT_KEY": "<the key the world's owner gave you>",
+        "EXULANICA_AGENT_NAME": "Scout",
+        "EXULANICA_AGENT_MAKER": "<your name or team>"
+      }
+    }
+  }
+}

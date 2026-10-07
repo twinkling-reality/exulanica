@@ -1,0 +1,12 @@
+{
+  "bridge": "agents",
+  "label": "Outside AI agents",
+  "game": "AI agents, through MCP or the agent library",
+  "run_by": "owner",
+  "ai": true,
+  "mapping_sha256": ["405483447574d9b095699783bbbc03e2befde93ea021e943be71588d8adb2b48"],
+  "adapter_versions": ["0.1.0"],
+  "listed": true,
+  "hold_seconds": 15,
+  "deadline_ms": 15000
+}
