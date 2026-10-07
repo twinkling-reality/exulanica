@@ -155,9 +155,10 @@ def arrival(
     carried: Sequence[Mapping[str, Any]] = (),
     gate: str | None = None,
     grant_id: uuid.UUID = GRANT,
+    decided_by: str | None = None,
 ) -> Crossing:
     """The ``index``th arrival a door hands over: a visitor, by default of the shipped visitor
-    kind, under the test grant."""
+    kind, under the test grant, stating who decides for it only when ``decided_by`` is given."""
     arrival_id = uuid.uuid5(grant_id, f"arrival:{index}")
     document = {
         "profile": ARRIVAL_PROFILE,
@@ -170,6 +171,8 @@ def arrival(
         "grant_id": str(grant_id),
         "gate": gate,
     }
+    if decided_by is not None:
+        document["decided_by"] = decided_by
     return Crossing(arrival_id, document)
 
 

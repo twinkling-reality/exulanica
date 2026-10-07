@@ -708,7 +708,11 @@ class DecisionHost:
                 connection, claim.workspace_id, world_id=claim.world_id
             )
             for role in decision_roles().hosted_by(row["engine_version"]):
-                choices = choice_repository.current(claim.version_id, role)
+                # Asked under the terms the society's engine states, or the role's own; a gate's
+                # travellers are decided for by its group choice within the contract's bound.
+                terms = role.terms(row["engine_version"])
+                contract = role.contract(terms.versions)
+                choices = choice_repository.deciding(claim.version_id, role, contract)
                 chosen = {subject: c for subject, c in choices.items() if c["model"]}
                 outside = {
                     subject: c
@@ -724,9 +728,7 @@ class DecisionHost:
                         if subject in subjects:
                             outside.setdefault(subject, {"decider": described, "model": None})
                 if chosen or outside:
-                    # Asked under the terms the society's engine states, or the role's own.
-                    terms = role.terms(row["engine_version"])
-                    chosen_roles.append((role, role.contract(terms.versions), chosen, outside))
+                    chosen_roles.append((role, contract, chosen, outside))
             if not chosen_roles:
                 return False
             decisions = SocietyDecisionRepository(society)

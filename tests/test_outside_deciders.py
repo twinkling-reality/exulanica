@@ -35,9 +35,9 @@ from exulanica.epistemics.saved_names import SavedName
 from exulanica.world.deciders import (
     EXTERNAL_REASONS,
     DeciderRefused,
-    arrived_from_outside,
     check_external_config,
     check_external_record,
+    decided_from_outside,
     decider,
     model_of,
     of_model,
@@ -305,17 +305,23 @@ def test_the_one_shapes_refuse_what_they_do_not_state():
 
 
 def test_somebody_who_came_from_outside_is_named_by_the_state_alone():
+    crossing = {"arrival_id": "x", "bridge": "luanti", "grant_id": "g"}
     state = {
         "inhabitants": [
-            {"id": "a", "came_by": "crossed"},
+            {"id": "a", "came_by": "crossed", "crossing": crossing},
             {"id": "b", "came_by": "placed"},
             {"id": "c"},
+            {"id": "d", "came_by": "crossed", "crossing": {**crossing, "decided_by": "program"}},
+            # A visitor whose arrival said the world decides for it is decided for here.
+            {"id": "e", "came_by": "crossed", "crossing": {**crossing, "decided_by": "world"}},
         ]
     }
-    assert arrived_from_outside(state, "a")
-    assert not arrived_from_outside(state, "b")
-    assert not arrived_from_outside(state, "c")
-    assert not arrived_from_outside(state, "nobody")
+    assert decided_from_outside(state, "a")
+    assert not decided_from_outside(state, "b")
+    assert not decided_from_outside(state, "c")
+    assert decided_from_outside(state, "d")
+    assert not decided_from_outside(state, "e")
+    assert not decided_from_outside(state, "nobody")
 
 
 def test_a_role_reads_its_choices_at_its_profile_and_every_earlier_version_of_it():

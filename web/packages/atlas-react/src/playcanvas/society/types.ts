@@ -110,7 +110,13 @@ export interface SocietyInhabitantSnapshot {
   readonly kind?: ThingKindReference;
   readonly came_by?: 'populated' | 'placed' | 'crossed';
   readonly placed_id?: string | null;
-  readonly crossing?: { readonly arrival_id: string; readonly bridge: string; readonly grant_id: string } | null;
+  readonly crossing?: {
+    readonly arrival_id: string;
+    readonly bridge: string;
+    readonly grant_id: string;
+    /** Who decides for the visitor here, as its arrival said; absent means its program does. */
+    readonly decided_by?: 'program' | 'world';
+  } | null;
   /** v7, only where they apply: a mode other than walking, height and velocity in flight, a size class. */
   readonly mode?: 'walking' | 'flight';
   readonly height_mm?: number;

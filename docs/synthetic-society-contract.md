@@ -1452,15 +1452,18 @@ process.
 
 The society of things (`exulanica/world/society_things.py`) is the purposeful society where
 everybody is a thing of a stated kind ([things contract](things-contract.md)). A society is made
-with it by name over a saved world's own lattice ground, a starter or a world made from
-photographs (`creates` does not name it, so a new world's society stays v2 unless asked for). The
-route makes one only on a host that sets `EXULANICA_SOCIETY_OF_THINGS` on, and refuses it by name
-elsewhere (`society_engine_not_offered`): its people do not yet pick things up, hand them over or
-follow anybody. Its people walk, choose, stay and talk by the purposeful planner's rules, and each
-of them names its kind by key, version and digest, and how it came: `populated` (the people its
-ground's population brings, the purposeful genesis's own people with the same names and draws, of
-the kind the ground's catalog entry names, `population_kind`), `placed` (a being the world's author
-placed in the version) or `crossed` (a visitor from an outside program).
+with it by name over a saved world's own lattice ground, a starter or a world made from photographs
+(`creates` does not name it, so a new world's society stays v2 unless asked for). The route makes
+one only on a host that sets `EXULANICA_SOCIETY_OF_THINGS` on, and refuses it by name elsewhere
+(`society_engine_not_offered`): its people do not yet pick things up, hand them over or follow
+anybody. Its people walk, choose, stay and talk by the purposeful planner's rules, and each of them
+names its kind by key, version and digest, and how it came: `populated` (the people its ground's
+population brings, the purposeful genesis's own people with the same names and draws, of the kind
+the ground's catalog entry names, `population_kind`), `placed` (a being the world's author placed in
+the version) or `crossed` (a visitor from an outside program). At genesis the author's beings are
+seated first, each at the open node nearest where it was placed, and only then does anybody of the
+population whose starting node one took step to the open node nearest it, so a composed scene holds
+from its first minute.
 
 **Its input carries the things its author placed.** It reads
 `exulanica.society-input/authored-ground-v5` (migration 0151): the fourth profile's projection, at
@@ -1522,18 +1525,19 @@ engine they name.
 
 **Crossings.** A door fills the port `CrossingStream` (`exulanica/world/crossings.py`): the
 crossings no minute has consumed, at most 32 a minute in the order the door wrote them (the rest
-wait for later minutes), read on the minute's connection under the society's lock; each bound
-once to the event its minute recorded, after the minute's events are written; and every bound
-crossing with its minute, for replay. Its documents are an arrival, `exulanica.thing-arrival/v1`
-(the thing's id, its kind, its origin record of class `crossed`, the translation manifest's
-digest, what it carries, its grant and the gate, or none), and a departure,
-`exulanica.thing-departure/v1`. Neither carries a look. An arrival's origin record may carry
-bounded text the program states (authors, an attribution, source references); the society copies
-none of it into its state or events, which hold the visitor's id, its kind's reference, the bridge
-and the grant. `society_of_version` names the society a version holds and its engine. With no
-stream registered, nothing crosses, and a society that took crossings is refused replay by name.
-Replay reads the bound crossings back and refuses by name a minute whose recomputed crossings
-differ, or a crossing bound to a minute the society never ran.
+wait for later minutes), read on the minute's connection under the society's lock; each bound once
+to the event its minute recorded, after the minute's events are written; and every bound crossing
+with its minute, for replay. Its documents are an arrival, `exulanica.thing-arrival/v1` (the thing's
+id, its kind, its origin record of class `crossed`, the translation manifest's digest, what it
+carries, its grant and the gate, or none, and optionally `decided_by`: `program`, what an arrival
+stating nothing means, or `world`), and a departure, `exulanica.thing-departure/v1`. Neither carries
+a look. An arrival's origin record may carry bounded text the program states (authors, an
+attribution, source references); the society copies none of it into its state or events, which hold
+the visitor's id, its kind's reference, the bridge and the grant. `society_of_version` names the
+society a version holds and its engine. With no stream registered, nothing crosses, and a society
+that took crossings is refused replay by name. Replay reads the bound crossings back and refuses by
+name a minute whose recomputed crossings differ, or a crossing bound to a minute the society never
+ran.
 
 **Lines.** A line is said only by a decider: the model the world's owner chose for a being, or the
 outside program that sent a visitor; the routine never says anything. It is one plain line held to
@@ -1545,11 +1549,16 @@ heard, quoted, in its next request.
 
 **Who decides.** The world's owner may choose a model for a person as in a purposeful society, but
 only a decider the person's kind allows (`decider_not_allowed`, the kind's `deciders.allowed`), and
-an author places no being only an outside program may decide for
-([world objects contract](world-objects-contract.md#14-placed-things)). A visitor is decided for by
-the program that sent it, as its arrival records: the decision host asks its door with the decider
-`{external, bridge, grant_id}` read from the state, no choice is recorded for it, an owner's choice
-naming it is refused (`decided_from_outside`), and so is a person's direct request
+an author places no being only an outside program may decide for ([world objects
+contract](world-objects-contract.md#14-placed-things)). A visitor is decided for by the program that
+sent it, as its arrival records, unless its arrival said the world decides for it (`decided_by`
+`world`, kept in its crossing record): the decision host asks its door with the decider `{external,
+bridge, grant_id}` read from the state, no choice is recorded for it, and an owner's choice naming
+it is refused (`decided_from_outside`). A visitor the world decides for is decided for as any being
+here, where its kind allows that decider: by a choice naming it, else by the choice naming the group
+of arrivals under its grant (the mind the owner named for the gate's travellers, [decision
+roles](decision-roles-contract.md#who-decides-deciders-and-the-owners-choice)), else by the routine; its program is
+never asked, and it never goes quiet. Every visitor, either way, takes no person's direct request
 (`decided_from_outside`), in the society and in the database (`society_person_may_be_directed`,
 migration 0151).
 
@@ -1562,7 +1571,8 @@ within 100,000 either way: x and y along the ground (`position_mm`'s two axes) a
 state, so a stored society of walkers needs nothing rewritten when another movement module lands.
 The things composition states one walking lattice, the people's. A being states `heard` only once it
 heard a line (oldest first, each `{tick, from, from_kind, from_number, to, line}`, the line held to
-the line rule), and a visitor states `quiet_minutes` only while its program has been quiet.
+the line rule), and a visitor its program decides for states `quiet_minutes` only while that program
+has been quiet.
 
 It runs no comparison of models and no experiment, and its people are not sent away. A placed
 thing's footprint is its kind's whole box, so a kind whose box overhangs its base (a tree's

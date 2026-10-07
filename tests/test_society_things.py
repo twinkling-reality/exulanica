@@ -29,7 +29,7 @@ from pathlib import Path
 import pytest
 from exulanica.world import society_things
 from exulanica.world.crossings import CrossingRefused, check_crossing
-from exulanica.world.deciders import arrival_deciders
+from exulanica.world.deciders import arrival_deciders, decided_from_outside
 from exulanica.world.role_decisions import DecisionDisposition
 from exulanica.world.roles import person as person_adapter
 from exulanica.world.society import society_state_sha256
@@ -691,3 +691,83 @@ def test_a_visitor_leaves_when_it_chooses_and_when_its_program_stays_quiet():
     current, events, _ = _decided_minute(current, document, [quiet])
     assert [e.document["reason"] for e in events if e.kind == "thing_departed"] == ["decider_lost"]
     assert not [p for p in current["inhabitants"] if p["came_by"] == "crossed"]
+
+
+def test_an_arrival_may_say_the_world_decides_for_its_visitor():
+    document = compose((GATE, WELL))
+    state = _genesis(GATE, WELL)
+    # Stated or not, "program" means what an arrival always meant; "world" is the one other value.
+    for decided_by in ("program", "world"):
+        check_crossing(arrival(1, decided_by=decided_by))
+    with pytest.raises(CrossingRefused, match="decided_by"):
+        check_crossing(arrival(1, decided_by="both"))
+    crossings = [
+        arrival(1, decided_by="world"),
+        arrival(2),
+        arrival(3, decided_by="program"),
+    ]
+    state, _, bound = _minute(state, document, crossings)
+    assert [b.disposition for b in bound] == ["arrived"] * 3
+    first, second, third = (
+        _person(state, id=crossing.document["thing_id"]) for crossing in crossings
+    )
+    assert first["crossing"]["decided_by"] == "world"
+    assert "decided_by" not in second["crossing"]
+    assert third["crossing"]["decided_by"] == "program"
+    # The world decides for the first: no door is asked for it, and nothing keeps an owner's
+    # choice or a direct request from it.
+    assert set(arrival_deciders(state)) == {second["id"], third["id"]}
+    assert not decided_from_outside(state, first["id"])
+    assert decided_from_outside(state, second["id"]) and decided_from_outside(state, third["id"])
+    validate_things_state(state)
+    broken = copy.deepcopy(state)
+    _person(broken, id=first["id"])["crossing"]["decided_by"] = "nobody"
+    with pytest.raises(ValueError, match="who decides for it"):
+        validate_things_state(broken)
+
+
+def test_a_visitor_the_world_decides_for_never_goes_quiet():
+    document = compose((GATE, KNIGHT))
+    state = _genesis(GATE, KNIGHT)
+    state, _, _ = _minute(state, document, [arrival(1, decided_by="world")])
+    visitor = _person(state, came_by="crossed")
+    # No answer in time from a model the world asked is the world's own miss, never its program
+    # going quiet: the visitor stays however many minutes it lasts.
+    quiet = _receipt(visitor, None, status="unavailable", reason="no_answer_in_time")
+    current = state
+    for _ in range(8):
+        current, events, _ = _decided_minute(current, document, [quiet])
+        assert "quiet_minutes" not in _person(current, came_by="crossed")
+        assert not [e for e in events if e.kind == "thing_departed"]
+    # It may still choose to leave.
+    leave = next(
+        o
+        for o in choice_options(state, document, visitor["id"], _things_contract(), seed=SEED)
+        if o.kind == "leave"
+    )
+    _, events, _ = _decided_minute(state, document, [_receipt(visitor, leave)])
+    assert [e.document["reason"] for e in events if e.kind == "thing_departed"] == [
+        "chose_to_leave"
+    ]
+
+
+def test_an_author_s_beings_are_seated_before_the_population_steps_aside():
+    # A knight put exactly where the ground's population would start somebody: it takes that node,
+    # and the villager who would have stood there steps to the open node nearest it.
+    plain = _genesis(GATE)
+    spot = plain["inhabitants"][0]
+    knight = thing("knight", "knight", 1, *spot["position_mm"])
+    document = compose((GATE, knight))
+    state = initial_things_society(SOCIETY, SEED, document, population=POPULATION)
+    placed = _person(state, came_by="placed")
+    assert placed["location"]["node_id"] == spot["location"]["node_id"]
+    assert placed["position_mm"] == spot["position_mm"]
+    moved = _person(state, id=spot["id"])
+    assert moved["location"]["node_id"] != spot["location"]["node_id"]
+    assert moved["position_mm"] == moved["motion_path_mm"][0]
+    # Everybody else starts where the population was spread, and no two stand at one node.
+    others = {p["id"]: p["location"] for p in plain["inhabitants"] if p["id"] != spot["id"]}
+    assert {p["id"]: p["location"] for p in state["inhabitants"] if p["id"] in others} == others
+    nodes = [p["location"]["node_id"] for p in state["inhabitants"]]
+    assert len(nodes) == len(set(nodes))
+    validate_things_state(state)

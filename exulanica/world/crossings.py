@@ -16,7 +16,8 @@ A crossing is one of two documents:
 *   an arrival, ``exulanica.thing-arrival/v1``: the arriving thing's id, its kind by key, version
     and digest, its origin record (class ``crossed``: the program that sent it, under its grant),
     the digest of the translation manifest that states what came across, the things it carries
-    by id and kind, its grant, and the gate it arrives through, or none;
+    by id and kind, its grant, the gate it arrives through, or none, and, optionally, who decides
+    for it there (``decided_by``: ``program``, what stating nothing means, or ``world``);
 *   a departure, ``exulanica.thing-departure/v1``: who leaves, and why: ``sent_away`` by its
     program, or ``grant_ended``.
 
@@ -42,7 +43,7 @@ from typing import Any, Final, NamedTuple, Protocol
 import psycopg
 
 from exulanica.things.origin import OriginRefused, read_origin
-from exulanica.world.deciders import BRIDGE
+from exulanica.world.deciders import BRIDGE, DECIDED_BY
 
 __all__ = [
     "ARRIVAL_PROFILE",
@@ -99,6 +100,8 @@ _ARRIVAL_FIELDS: Final = frozenset(
         "gate",
     }
 )
+#: What an arrival may state beside its fields; absent, its program decides for its visitor.
+_ARRIVAL_MAY: Final = frozenset({"decided_by"})
 _DEPARTURE_FIELDS: Final = frozenset({"profile", "departure_id", "thing_id", "reason"})
 #: The most things one visitor carries in.
 CARRIED_MAXIMUM: Final = 16
@@ -218,8 +221,10 @@ def _kind(where: str, value: object) -> None:
 def check_arrival(document: object) -> Mapping[str, Any]:
     """``document`` held to the arrival's shape, or :class:`CrossingRefused`. Whether its kind is
     shipped, and where it arrives, are the society's to say."""
-    if not isinstance(document, dict) or set(document) != _ARRIVAL_FIELDS:
+    if not isinstance(document, dict) or set(document) - _ARRIVAL_MAY != _ARRIVAL_FIELDS:
         raise CrossingRefused("an arrival states exactly its fields")
+    if document.get("decided_by", "program") not in DECIDED_BY:
+        raise CrossingRefused(f"an arrival's decided_by is one of {list(DECIDED_BY)}, or none")
     if document["profile"] != ARRIVAL_PROFILE:
         raise CrossingRefused(f"an arrival is an {ARRIVAL_PROFILE} document")
     _uuid("arrival_id", document["arrival_id"])

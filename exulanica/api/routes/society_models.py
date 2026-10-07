@@ -240,9 +240,13 @@ def society_models_view(
     role = _people_role()
     snapshot = society.snapshot(version_id)
     engine = society_engine(snapshot["profile"])
-    choices = SocietyModelChoiceRepository(
-        connection, session.workspace_id, world_id=world_id
-    ).current(version_id, role)
+    manifest = load_manifest()
+    contract = role.contract()
+    repository = SocietyModelChoiceRepository(connection, session.workspace_id, world_id=world_id)
+    # Each person a choice decides for, with where it comes from: their own choice, or the group
+    # choice of the gate a visitor came through (within the contract's bound).
+    choices = repository.deciding(version_id, role, contract)
+    travellers = repository.traveller_choices(version_id, role)
     decisions = (
         SocietyDecisionRepository(society).role_decisions(
             role, version_id, latest=DECISIONS_READ, authorized=snapshot
@@ -250,8 +254,6 @@ def society_models_view(
         if engine.owner_model_choice
         else []
     )
-    manifest = load_manifest()
-    contract = role.contract()
     services = get_services(request)
     refusals: dict[tuple[str, str], str | None] = {}
 
@@ -295,6 +297,18 @@ def society_models_view(
                 "refusal": None if choice["model"] is None else refusal(choice["model"]),
             }
             for subject, choice in sorted(choices.items())
+        ],
+        # The mind each gate's travellers get when their arrival says the world decides for them.
+        "travellers": [
+            {
+                "grant_id": grant_id,
+                "choice_seq": choice["choice_seq"],
+                "decider": choice["decider"],
+                "model": None
+                if choice["model"] is None
+                else {**choice["model"], "name": manifest.model_name(choice["model"]["model_id"])},
+            }
+            for grant_id, choice in sorted(travellers.items())
         ],
         "latest": [
             {

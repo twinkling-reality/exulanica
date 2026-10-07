@@ -14,8 +14,15 @@ read of a choice gives its ``decider`` and the ``model`` it names, which is none
 for an outside program, so every reader that asks which model runs somebody reads the answer it
 always did, and an outside program spends nothing.
 
+A choice of the second profile may name a group instead of subjects (``group``, with no subjects;
+the migration "a choice may name a gate's visitors"): ``arrivals_under_grant``, every visitor that
+arrives under one grant and whose arrival said the world decides for it, which is how the world's
+owner names the mind a gate's travellers get. A choice naming a subject comes before a group's, and
+a group's comes before the routine; the bound on the subjects models run is applied to a group's
+when a minute asks (:meth:`SocietyModelChoiceRepository.deciding`).
+
 What a choice may name is checked here, by name: the society's engine must host the role; every
-subject must be one the role may decide for in its state, and never one that came in from outside,
+subject must be one the role may decide for in its state, and never one that came in from outside
 whose own program decides for it; the model must be declared, offered to the role (a chat model a
 probe verified to answer a choice, with the use cases the role needs) and askable under the role's
 contract by a mechanism it was verified for; and the subjects models run stay within the bound the
@@ -36,7 +43,13 @@ from psycopg.types.json import Jsonb
 
 from exulanica.models.errors import ManifestError
 from exulanica.models.manifest import Manifest
-from exulanica.world.deciders import arrived_from_outside, decider, model_of, of_model
+from exulanica.world.deciders import (
+    decided_by_world,
+    decided_from_outside,
+    decider,
+    model_of,
+    of_model,
+)
 from exulanica.world.decision_roles import DecisionContract, DecisionRole, decision_roles
 from exulanica.world.society import UnknownSociety
 from exulanica.world.society_planner import input_sha256
@@ -44,10 +57,15 @@ from exulanica.world.society_things import kind_allows
 
 __all__ = [
     "CHOICE_REFUSALS",
+    "GROUPS",
     "ModelChoiceRefused",
     "SocietyModelChoiceRepository",
     "decider_of",
 ]
+
+#: The groups a choice may name instead of subjects: every visitor that arrives under one grant and
+#: whose arrival said the world decides for it.
+GROUPS: Final = ("arrivals_under_grant",)
 
 #: Why a choice is refused, by the code the route answers with, and the detail.
 CHOICE_REFUSALS: Final = {
@@ -202,6 +220,85 @@ class SocietyModelChoiceRepository:
                 }
         return current
 
+    @staticmethod
+    def _groups(role: DecisionRole, rows: Sequence[Mapping[str, Any]]) -> dict[str, dict[str, Any]]:
+        """Each grant's latest group choice of ``role``, by grant id."""
+        found: dict[str, dict[str, Any]] = {}
+        for row in SocietyModelChoiceRepository._of(role, rows):
+            document = row["document"]
+            group = document.get("group")
+            if group is None:
+                continue
+            described = decider_of(document)
+            found[group["grant_id"]] = {
+                "decider": described,
+                "model": model_of(described),
+                "choice_seq": document["choice_seq"],
+                "chosen_by": document["chosen_by"],
+                "recorded_at": row["recorded_at"],
+            }
+        return found
+
+    def traveller_choices(
+        self, version_id: uuid.UUID, role: DecisionRole
+    ) -> dict[str, dict[str, Any]]:
+        """Each grant's latest group choice of ``role``: the mind its arriving visitors get when
+        their arrival says the world decides for them, by grant id."""
+        return self._groups(role, self._rows(self._society(version_id, lock=False)["society_id"]))
+
+    def deciding(
+        self, version_id: uuid.UUID, role: DecisionRole, contract: DecisionContract
+    ) -> dict[str, dict[str, Any]]:
+        """Who decides for each of ``role``'s subjects a choice decides for, by subject id: its own
+        latest choice, else, for a visitor the world decides for, the latest choice naming the
+        group of arrivals under its grant (``from``: ``choice`` or ``travellers``), where its kind
+        allows that kind of decider. A group's model runs a visitor only while the subjects models
+        run stay within the contract's bound, in the order the visitors came; past it the routine
+        decides for the rest (``travellers_over_bound``). A subject no choice names is absent, as
+        from :meth:`current`."""
+        society = self._society(version_id, lock=False)
+        rows = self._rows(society["society_id"])
+        found = {
+            subject: {**choice, "from": "choice"}
+            for subject, choice in self._current(role, rows).items()
+        }
+        groups = self._groups(role, rows)
+        if not groups:
+            return found
+        state = society["state"]
+        room = contract.value(role.subjects_bound) - sum(
+            1 for choice in found.values() if choice["decider"]["kind"] == "model"
+        )
+        present = set(role.adapter.subjects(state))
+        visitors = sorted(
+            (
+                person
+                for person in state.get("inhabitants", ())
+                if person.get("id") in present
+                and person["id"] not in found
+                and decided_by_world(person)
+                and person["crossing"]["grant_id"] in groups
+            ),
+            key=lambda person: person["ordinal"],
+        )
+        for person in visitors:
+            choice = groups[person["crossing"]["grant_id"]]
+            if not kind_allows(state, person["id"], choice["decider"]["kind"]):
+                # A kind that takes no such decider is decided for as its kind says.
+                continue
+            if choice["decider"]["kind"] == "model":
+                if room <= 0:
+                    found[person["id"]] = {
+                        **choice,
+                        "decider": {"kind": "routine"},
+                        "model": None,
+                        "from": "travellers_over_bound",
+                    }
+                    continue
+                room -= 1
+            found[person["id"]] = {**choice, "from": "travellers"}
+        return found
+
     def current(self, version_id: uuid.UUID, role: DecisionRole) -> dict[str, dict[str, Any]]:
         """Each subject's latest choice of ``role``, by subject id, with who decides for them and
         the model that is, if any; one never chosen for is absent."""
@@ -280,6 +377,141 @@ class SocietyModelChoiceRepository:
         )
         assert recorded is not None
         return recorded
+
+    def record_traveller_choice(
+        self,
+        version_id: uuid.UUID,
+        role: DecisionRole,
+        *,
+        request_id: uuid.UUID,
+        grant_id: uuid.UUID,
+        model: Mapping[str, str] | None,
+        chosen_by: uuid.UUID,
+        manifest: Manifest,
+        contract: DecisionContract,
+    ) -> dict[str, Any]:
+        """Record the mind every visitor arriving under ``grant_id`` gets when its arrival says the
+        world decides for it: a model the manifest offers the role, or the routine for none.
+        Called by the route that records the grant, in its transaction, which holds the grant to
+        this world; refused as any owner's choice of a model is. Returns the choice, or the one
+        this key already recorded."""
+
+        def described() -> dict[str, Any]:
+            return of_model(_model_record(role, manifest, contract, model))
+
+        return self._record_group(
+            version_id,
+            role,
+            request_id=request_id,
+            group={"kind": "arrivals_under_grant", "grant_id": str(grant_id)},
+            asked=_asked_model(model),
+            described=described,
+            chosen_by=chosen_by,
+            contract=contract,
+        )
+
+    def release_traveller_choice(
+        self,
+        version_id: uuid.UUID,
+        role: DecisionRole,
+        *,
+        request_id: uuid.UUID,
+        grant_id: uuid.UUID,
+        chosen_by: uuid.UUID,
+        contract: DecisionContract,
+    ) -> dict[str, Any] | None:
+        """Hand the visitors arriving under ``grant_id`` back to the routine, as one group choice:
+        called by the route that revokes the grant, in its transaction, so no later grant of the
+        same id inherits a mind. None, recording nothing, when no group choice names the grant."""
+        group = {"kind": "arrivals_under_grant", "grant_id": str(grant_id)}
+        with self.connection.transaction():
+            society = self._society(version_id, lock=True)
+            rows = self._rows(society["society_id"])
+            existing = next((row for row in rows if row["request_id"] == request_id), None)
+            if existing is None and str(grant_id) not in self._groups(role, rows):
+                return None
+            return self._record_group(
+                version_id,
+                role,
+                request_id=request_id,
+                group=group,
+                asked={"kind": "routine"},
+                described=lambda: {"kind": "routine"},
+                chosen_by=chosen_by,
+                contract=contract,
+            )
+
+    def _record_group(
+        self,
+        version_id: uuid.UUID,
+        role: DecisionRole,
+        *,
+        request_id: uuid.UUID,
+        group: Mapping[str, str],
+        asked: Mapping[str, Any] | None,
+        described: Any,
+        chosen_by: uuid.UUID,
+        contract: DecisionContract,
+    ) -> dict[str, Any]:
+        """Record one choice of ``role`` naming ``group`` rather than subjects, checked as
+        ``described()`` checks it, or return the one this idempotency key already recorded."""
+        with self.connection.transaction():
+            society = self._society(version_id, lock=True)
+            rows = self._rows(society["society_id"])
+            existing = next((row for row in rows if row["request_id"] == request_id), None)
+            if existing is not None:
+                document = existing["document"]
+                if (
+                    not role.reads_choice(document["profile"])
+                    or document.get("group") != dict(group)
+                    or asked is None
+                    or decider_of(document) != dict(asked)
+                    or document["chosen_by"] != str(chosen_by)
+                ):
+                    raise ModelChoiceRefused("choice_key_reused")
+                return _view(document, existing["recorded_at"])
+            if not role.hosted_by(society["engine_version"]):
+                raise ModelChoiceRefused("engine_takes_no_model_choice")
+            record = described()
+            sequence = (rows[-1]["choice_seq"] if rows else 0) + 1
+            document: dict[str, Any] = {
+                "profile": role.choice_profile,
+                "choice_seq": sequence,
+                "request_id": str(request_id),
+                "society_id": str(society["society_id"]),
+                role.choice_subjects: [],
+                "group": dict(group),
+                "decider": record,
+                "contract": contract.binding(),
+                "chosen_by": str(chosen_by),
+            }
+            document["document_sha256"] = input_sha256(document)
+            return self._insert(society["society_id"], sequence, request_id, document, chosen_by)
+
+    def _insert(
+        self,
+        society_id: uuid.UUID,
+        sequence: int,
+        request_id: uuid.UUID,
+        document: dict[str, Any],
+        chosen_by: uuid.UUID,
+    ) -> dict[str, Any]:
+        row = self.connection.execute(
+            "insert into world_society_model_choice(workspace_id,world_id,society_id,"
+            "choice_seq,request_id,document,document_sha256,chosen_by) "
+            "values(%s,%s,%s,%s,%s,%s,%s,%s) returning recorded_at",
+            (
+                self.workspace_id,
+                self.world_id,
+                society_id,
+                sequence,
+                request_id,
+                Jsonb(document),
+                document["document_sha256"],
+                chosen_by,
+            ),
+        ).fetchone()
+        return _view(document, row["recorded_at"])
 
     def release_external_choice(
         self,
@@ -366,7 +598,7 @@ class SocietyModelChoiceRepository:
             present = set(role.adapter.subjects(society["state"]))
             if not chosen or not set(chosen) <= present:
                 raise ModelChoiceRefused("person_not_in_this_world")
-            if any(arrived_from_outside(society["state"], subject) for subject in chosen):
+            if any(decided_from_outside(society["state"], subject) for subject in chosen):
                 raise ModelChoiceRefused("decided_from_outside")
             state = society["state"]
             if not all(kind_allows(state, subject, record["kind"]) for subject in chosen):
@@ -405,19 +637,4 @@ class SocietyModelChoiceRepository:
                 "chosen_by": str(chosen_by),
             }
             document["document_sha256"] = input_sha256(document)
-            row = self.connection.execute(
-                "insert into world_society_model_choice(workspace_id,world_id,society_id,"
-                "choice_seq,request_id,document,document_sha256,chosen_by) "
-                "values(%s,%s,%s,%s,%s,%s,%s,%s) returning recorded_at",
-                (
-                    self.workspace_id,
-                    self.world_id,
-                    society["society_id"],
-                    sequence,
-                    request_id,
-                    Jsonb(document),
-                    document["document_sha256"],
-                    chosen_by,
-                ),
-            ).fetchone()
-            return _view(document, row["recorded_at"])
+            return self._insert(society["society_id"], sequence, request_id, document, chosen_by)

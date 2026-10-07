@@ -52,6 +52,7 @@ from exulanica.world.crossings import (
     CrossingRefused,
     check_crossing,
 )
+from exulanica.world.deciders import DECIDED_BY, decided_by_world
 from exulanica.world.errors import InvalidThingPlacement
 from exulanica.world.placed_things import ThingKindReference, shipped_kind
 from exulanica.world.society import (
@@ -152,6 +153,8 @@ _SPOKEN_KINDS: Final = frozenset({"say_to", "say_all"})
 #: away, which is another engine's.
 _DEPARTURE_REASONS: Final = {"sent_away": "sent_home", "grant_ended": "grant_ended"}
 _PERSON_FIELDS: Final = frozenset({"kind", "came_by", "placed_id", "placed_at_mm", "crossing"})
+#: What a visitor's crossing record states; ``decided_by`` beside them only where its arrival said.
+_CROSSING_FIELDS: Final = frozenset({"arrival_id", "bridge", "grant_id"})
 _THING_FIELDS: Final = frozenset(
     {"id", "placed_id", "kind", "position_mm", "yaw_microradians", "held_by"}
 )
@@ -387,12 +390,14 @@ def _refusal_key(entry: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
-def _place_beings(minute: _Minute, *, record: bool) -> None:
+def _place_beings(minute: _Minute, *, record: bool, before_population: bool = False) -> None:
     """Every placed being of the input that is not here yet comes, in id order, to the open node
     nearest where it was placed: recorded as arriving after genesis, silently at it. One that
     cannot is refused once, until its placement changes: no node is open there, or its id is
     already somebody's or something's here. One refused because the society is full is tried
-    again every minute, silently, and comes when there is room."""
+    again every minute, silently, and comes when there is room. ``before_population``: at genesis
+    the ground's population does not yet hold the nodes it was spread over, so an author's
+    placement is kept as nearly as the ground allows, and the population steps aside after."""
     state, document = minute.state, minute.document
     present = {
         person["placed_id"] for person in state["inhabitants"] if person["came_by"] == "placed"
@@ -418,10 +423,15 @@ def _place_beings(minute: _Minute, *, record: bool) -> None:
         here = {person["id"] for person in state["inhabitants"]} | {
             thing["id"] for thing in state["things"]
         }
+        standing = [
+            person
+            for person in state["inhabitants"]
+            if not (before_population and person["came_by"] == "populated")
+        ]
         node = (
             None
             if minute.full() or identity in here
-            else open_node_near(dict(document), state["inhabitants"], entry["position_mm"])
+            else open_node_near(dict(document), standing, entry["position_mm"])
         )
         if node is None:
             reason = (
@@ -624,6 +634,8 @@ def _arrive(minute: _Minute, crossing: Crossing, document: Mapping[str, Any]) ->
             "arrival_id": document["arrival_id"],
             "bridge": by["bridge"],
             "grant_id": document["grant_id"],
+            # Who decides for it here, as its arrival said; stated only where it said so.
+            **({"decided_by": document["decided_by"]} if "decided_by" in document else {}),
         },
     )
     state["inhabitants"].append(person)
@@ -748,9 +760,36 @@ def initial_things_society(
     state["things"] = _things_of(document)
     state["refused_placements"] = []
     minute = _Minute(state, state, seed, document, ())
-    _place_beings(minute, record=False)
+    # The author's beings first, where they were put; then the population steps aside from them.
+    _place_beings(minute, record=False, before_population=True)
+    _population_steps_aside(state, document)
     validate_things_state(state)
     return state
+
+
+def _population_steps_aside(state: dict[str, Any], document: Mapping[str, Any]) -> None:
+    """At genesis, each person of the ground's population whose starting node a placed being took
+    steps to the open node nearest it, in ordinal order, as a person makes room; one with nowhere
+    to go stays where it was spread."""
+    nodes = {n["node_id"]: n["position_mm"] for n in document["navigation"]["nodes"]}
+    taken = {
+        person["location"]["node_id"]
+        for person in state["inhabitants"]
+        if person["came_by"] == "placed"
+    }
+    for person in state["inhabitants"]:
+        if person["came_by"] != "populated" or person["location"]["node_id"] not in taken:
+            continue
+        others = [other for other in state["inhabitants"] if other is not person]
+        node = open_node_near(dict(document), others, person["position_mm"])
+        if node is None:
+            continue
+        point = list(nodes[node])
+        person.update(
+            position_mm=point,
+            location={"node_id": node, "edge": None},
+            motion_path_mm=[list(point)],
+        )
 
 
 def advance_things(
@@ -800,6 +839,12 @@ def _say_bounds(profile: str) -> tuple[int, int]:
     return contract.value("hearing_reach_mm"), contract.value("lines_heard_maximum")
 
 
+def _program_decides(person: Mapping[str, Any]) -> bool:
+    """Whether a visitor's own program decides for it: one the world decides for never goes
+    quiet, since nobody outside is asked for it."""
+    return person["came_by"] == "crossed" and not decided_by_world(person)
+
+
 def _quiet_limit(person: Mapping[str, Any]) -> int | None:
     """How many quiet minutes a being's kind waits before it goes home, by its leave ability's
     ``quiet_minutes``; None for a kind that does not leave."""
@@ -830,7 +875,7 @@ def _decided(
         )
         if person is None:
             continue
-        if person["came_by"] == "crossed":
+        if _program_decides(person):
             quiet = disposition.disposition == "unavailable" and receipt["reason"] in QUIET_REASONS
             if quiet:
                 person["quiet_minutes"] = person.get("quiet_minutes", 0) + 1
@@ -887,7 +932,7 @@ def _decided(
                 if hearer["id"] in heard_by:
                     hearer["heard"] = [*hearer.get("heard", ()), dict(heard)][-kept:]
     for person in list(minute.state["inhabitants"]):
-        limit = _quiet_limit(person) if person["came_by"] == "crossed" else None
+        limit = _quiet_limit(person) if _program_decides(person) else None
         if limit is not None and person.get("quiet_minutes", 0) >= limit:
             minute.leave(person, "decider_lost")
 
@@ -950,8 +995,9 @@ def _optional_lines(person: Mapping[str, Any]) -> None:
     quiet = person.get("quiet_minutes")
     if quiet is not None:
         _require(
-            person["came_by"] == "crossed" and type(quiet) is int and quiet >= 1,
-            "only a visitor counts its program's quiet minutes, and only while it is quiet",
+            _program_decides(person) and type(quiet) is int and quiet >= 1,
+            "only a visitor its program decides for counts the program's quiet minutes, and only "
+            "while it is quiet",
         )
 
 
@@ -1016,6 +1062,16 @@ def validate_things_state(state: Mapping[str, Any]) -> None:
             and (person["placed_at_mm"] is not None) == (came_by == "placed")
             and (person["crossing"] is not None) == (came_by == "crossed"),
             "a person's placement and crossing are how it came",
+        )
+        crossing = person["crossing"]
+        _require(
+            crossing is None
+            or (
+                isinstance(crossing, dict)
+                and set(crossing) - {"decided_by"} == _CROSSING_FIELDS
+                and crossing.get("decided_by", "program") in DECIDED_BY
+            ),
+            "a visitor's crossing names its arrival, bridge and grant, and who decides for it",
         )
     things = state["things"]
     _require(isinstance(things, list), "a society of things holds a list of things")

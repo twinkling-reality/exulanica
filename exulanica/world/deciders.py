@@ -34,6 +34,7 @@ from typing import Any, Final
 __all__ = [
     "ADAPTER_VERSION",
     "BRIDGE",
+    "DECIDED_BY",
     "DECIDER_PROFILE",
     "EXTERNAL_CONFIG",
     "EXTERNAL_REASONS",
@@ -42,9 +43,10 @@ __all__ = [
     "OWNER_CHOOSES",
     "DeciderRefused",
     "arrival_deciders",
-    "arrived_from_outside",
     "check_external_config",
     "check_external_record",
+    "decided_by_world",
+    "decided_from_outside",
     "decider",
     "is_external",
     "model_of",
@@ -59,6 +61,9 @@ KINDS: Final = ("routine", "model", "person", "external")
 #: The deciders an owner's choice binds a subject to through the choices route: a person decides
 #: through direct requests, and an outside program only under a grant its route records.
 OWNER_CHOOSES: Final = ("routine", "model")
+#: Who an arrival says decides for its visitor: the program that sent it (``program``, what an
+#: arrival stating nothing means), or the world it arrives in (``world``), as for any being there.
+DECIDED_BY: Final = ("program", "world")
 #: A bridge's key: the lowercase name of the program's door, as the deployment declares it.
 BRIDGE: Final = re.compile(r"[a-z][a-z0-9_-]{0,31}")
 #: An adapter's version as its program states it: one to four whole numbers joined by dots, such
@@ -235,24 +240,38 @@ def check_external_record(record: object) -> None:
         )
 
 
-def arrived_from_outside(state: Mapping[str, Any], subject_id: str) -> bool:
-    """Whether ``subject_id`` came into this society from outside, as its state records: its own
-    program decides for it, and no owner's choice or direct request may (``decided_from_outside``).
-    An engine whose people carry no ``came_by`` holds nobody who did."""
+def decided_by_world(person: Mapping[str, Any]) -> bool:
+    """Whether a visitor's arrival said the world decides for it: then the owner's choice for it,
+    the gate's traveller choice or the routine does, as for any being here, and its program is
+    never asked."""
+    crossing = person.get("crossing")
+    return isinstance(crossing, Mapping) and crossing.get("decided_by") == "world"
+
+
+def decided_from_outside(state: Mapping[str, Any], subject_id: str) -> bool:
+    """Whether ``subject_id`` came into this society from outside and its own program decides for
+    it, as its state records: then no owner's choice or direct request may
+    (``decided_from_outside``). A visitor whose arrival said the world decides is not; an engine
+    whose people carry no ``came_by`` holds nobody who is."""
     for person in state.get("inhabitants", ()):
         if person.get("id") == subject_id:
-            return person.get("came_by") == "crossed"
+            return person.get("came_by") == "crossed" and not decided_by_world(person)
     return False
 
 
 def arrival_deciders(state: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
-    """Who decides for each visitor in this society, by its id: its arrival, the outside program
-    that sent it under its grant, as the state records it. Nobody records a choice for a visitor
-    (``decided_from_outside``), so this is how a host knows whom a door decides for."""
+    """Who decides for each visitor its own program decides for, by its id: the outside program
+    that sent it under its grant, as the state records it. Nobody records a choice for such a
+    visitor (``decided_from_outside``), so this is how a host knows whom a door decides for. A
+    visitor the world decides for is not here."""
     found: dict[str, dict[str, Any]] = {}
     for person in state.get("inhabitants", ()):
         crossing = person.get("crossing")
-        if person.get("came_by") == "crossed" and isinstance(crossing, Mapping):
+        if (
+            person.get("came_by") == "crossed"
+            and isinstance(crossing, Mapping)
+            and not decided_by_world(person)
+        ):
             found[str(person["id"])] = decider(
                 {"kind": "external", "bridge": crossing["bridge"], "grant_id": crossing["grant_id"]}
             )

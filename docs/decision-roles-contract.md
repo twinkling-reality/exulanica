@@ -203,6 +203,21 @@ still decides for back to their routine as one choice (`release_external_choice`
 society's lock, so a choice made meanwhile is never undone and a retry returns the choice it
 recorded.
 
+**A gate's travellers.** A visitor whose arrival says the world decides for it (`decided_by`
+`world`, [crossings](synthetic-society-contract.md#the-society-of-things-v7)) is decided for as any
+being of the world is, and the world's owner names the mind a gate's travellers get once, when
+opening the gate, before any of them has arrived: a choice of the same profile naming a group
+instead of people, `group: {kind: "arrivals_under_grant", grant_id}` with `people: []` (the table
+admits exactly one of the two, migration "a choice may name a gate's visitors"). The route that
+records the grant records it in the grant's own transaction
+(`SocietyModelChoiceRepository.record_traveller_choice`, refused as any choice of a model is), and
+revoking the grant hands its travellers back to the routine (`release_traveller_choice`). Who
+decides for such a visitor is, in order: a choice naming it, the latest group choice of its grant
+where its kind allows that decider, and the routine. The bound on the people models run applies to a
+group's visitors when a minute asks, in the order they came; past it the routine decides for the
+rest (`travellers_over_bound`). The host asks by `SocietyModelChoiceRepository.deciding`, and its
+program is never asked.
+
 A choice may name only people of this society and a model the manifest declares, offers the
 person's role and the contract can ask by a verified mechanism; otherwise it is refused by name
 (`CHOICE_REFUSALS`): `422` for `person_not_in_this_world`, `person_named_twice`,
@@ -220,11 +235,12 @@ to refuse the choice: a choice outlives a deployment.
 words with whether this process can ask each; whether this host asks models for the world at all,
 and why not (`host_refusal`: `models_not_run_here`, `provider_credential_absent`,
 `process_budget_spent` or `process_share_spent`); each person's choice with its decider, and why its
-model is not asked here when it is not (`refusal`, one of `MODEL_REFUSALS`); each person's latest
-model decision; and per model the decisions asked, accepted and applied, why the rest were not acted
-on, latency and cost, over the society's latest 2,000 decisions (`DECISIONS_READ`). An outside
-program's decisions name no model and are neither summarised nor counted among the models'. Neither
-route asks a model.
+model is not asked here when it is not (`refusal`, one of `MODEL_REFUSALS`) and where the decider
+comes from (`from`: `choice`, `travellers` or `travellers_over_bound`); each gate's travellers' mind
+(`travellers`: `{grant_id, choice_seq, decider, model}`); each person's latest model decision; and
+per model the decisions asked, accepted and applied, why the rest were not acted on, latency and
+cost, over the society's latest 2,000 decisions (`DECISIONS_READ`). An outside program's decisions
+name no model and are neither summarised nor counted among the models'. Neither route asks a model.
 
 In a saved world the People panel offers the choice for one person or for everyone and shows this
 read (`web/packages/app/src/composition/society-models-mount.ts`). Where the host cannot ask a
@@ -278,9 +294,11 @@ with no model client asks no model.
   the label of the offered option of the adapter's idle kind (waiting a minute, for a person), read
   from the request's own context.
 - **A visitor.** In a society of things, a visitor from outside is decided for by the program that
-  sent it, as its arrival records: the host asks that program's door with the decider read from
-  the state, no choice is recorded for it, and neither an owner's choice nor a person's direct
-  request may name it (`decided_from_outside`).
+  sent it, as its arrival records: the host asks that program's door with the decider read from the
+  state, no choice is recorded for it, and neither an owner's choice nor a person's direct request
+  may name it (`decided_from_outside`). A visitor whose arrival said the world decides for it is not
+  asked through any door: a choice naming it, or its gate's travellers' choice, decides for it as
+  for any being, and only a direct request is still refused it.
 - **Bounds.** External asks are outside the models' spending, the process's budget and a world's
   hourly bounds, which `world_hour` counts from model calls alone; how often a program is asked is
   its grant's to bound.
