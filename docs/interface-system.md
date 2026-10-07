@@ -175,12 +175,14 @@ people live there. Under the title "Who runs this world", one card per decision 
 there are and who decides for them now ("Their own routine", "8 by Nemotron 3 Nano 30B", "Fixed
 timing"); choosing a card shows that role's choice under it, people first. For people, every model
 the server offers is a card with its served name and description, and a line comparing its served
-price with the cheapest model offered beside it ("Lowest cost", "About 3 times the lowest cost"); the
-card's title states the prices exactly. Their own routine is the first card. Under the cards come
-the people, each with who decides for them now, and one primary action kept at the panel's foot
+price with the cheapest model offered beside it ("Lowest cost", "About 3 times the lowest cost");
+the card's title states the prices exactly. Their own routine is the first card. Under the cards
+come the people, each with who decides for them now, and one primary action kept at the panel's foot
 that says what it will do ("Let Qwen3 235B Instruct decide for 4 people", "Give one person their own
 routine"); once the server records a choice the people are unticked and the action says what the
-choice came to. What each model decided, and how the panel's models decide, follow below it.
+choice came to. Another surface opens the panel with its subjects chosen through `openDecides` on
+the world's environment selection, as a person would choose them. What each model decided, and how
+the panel's models decide, follow below it.
 
 ### Look
 
@@ -195,8 +197,11 @@ Escape goes back, and the world under the sheet takes no key while it is open. U
 a new version of the world's appearance through the same preview and Apply as any change in Design
 (`useStylePack` in `composition/appearance.ts`): a change already open in Design is decided there
 first, and a design another writer changed meanwhile is never saved over, so the person is asked to
-choose again. The world is drawn in the new look the next time it opens. A pack the host serves no
-picture for shows none.
+choose again. Once saved, the sheet says it is drawing the world in the new look and redraws the open
+world in it (`redrawWorldLook` in `composition/world-look-redraw.ts`), the old look kept up until
+the new one is ready; a world it cannot redraw then is drawn in the new look the next time it opens,
+and the sheet says why. Each pack's picture is the preview its list entry names by digest
+(`preview_sha256`), fetched and held to that digest; a pack with none shows none, never a stand-in.
 
 ## 4. Actions
 

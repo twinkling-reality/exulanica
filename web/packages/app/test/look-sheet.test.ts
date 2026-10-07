@@ -9,13 +9,18 @@ const pack = (packId: string, title: string, picture: string | null = `/${packId
 });
 const PACKS = [pack('cozy', 'Cozy town'), pack('finished', 'Finished town'), pack('toon', 'Toon town', null)];
 
+let built: ReturnType<typeof buildLookSheet>;
 const press = (target: Element, key: string): void => {
   target.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
 };
 
-const sheet = (onUse = vi.fn(async (option: LookOption) => `Now drawn in ${option.title}.`)) => {
+const sheet = (onUse = vi.fn(async (option: LookOption) => {
+  // As the page does once it is saved: the chosen look becomes Now.
+  built.show(PACKS, option.packId);
+  return `Now drawn in ${option.title}.`;
+})) => {
   const onClose = vi.fn();
-  const built = buildLookSheet({ worldTitle: 'Saturday market', onUse, onClose });
+  built = buildLookSheet({ worldTitle: 'Saturday market', onUse, onClose });
   document.body.replaceChildren(built.root);
   built.show(PACKS, 'cozy');
   return { ...built, onUse, onClose };
@@ -43,6 +48,8 @@ describe('the Look sheet', () => {
     expect(text(root, '[data-action="look.keep"] span')).toBe('Keep Cozy town');
     press(root, 'Enter');
     await vi.waitFor(() => expect(text(root, '.look-sheet-status')).toBe('Now drawn in Finished town.'));
+    // Use went with the look becoming Now, and the keyboard stayed in the sheet.
+    expect(root.contains(document.activeElement)).toBe(true);
     expect(onUse).toHaveBeenCalledTimes(1);
     expect(onUse.mock.calls[0]![0].packId).toBe('finished');
   });
@@ -78,5 +85,26 @@ describe('the Look sheet', () => {
     expect(authorWords([])).toBe('');
     expect(authorWords(['Exulanica'])).toBe('By Exulanica');
     expect(authorWords(['A', 'B', 'C'])).toBe('By A, B and C');
+  });
+});
+
+describe('using a look that takes a while', () => {
+  it('says what it is doing while it works, then what came of it, and offers nothing twice meanwhile', async () => {
+    let finish: (words: string) => void = () => undefined;
+    const onUse = vi.fn((option: LookOption, say: (words: string) => void) => {
+      say(`Drawing the world in ${option.title}…`);
+      return new Promise<string>((resolve) => { finish = resolve; });
+    });
+    const built = buildLookSheet({ worldTitle: 'Saturday market', onUse, onClose: vi.fn() });
+    document.body.replaceChildren(built.root);
+    built.show(PACKS, 'cozy');
+    press(built.root, 'ArrowRight');
+    press(built.root, 'Enter');
+    await vi.waitFor(() => expect(text(built.root, '.look-sheet-status')).toBe('Drawing the world in Finished town…'));
+    expect(use(built.root).disabled).toBe(true);
+    press(built.root, 'Enter');
+    expect(onUse).toHaveBeenCalledTimes(1);
+    finish('The world is now drawn in Finished town.');
+    await vi.waitFor(() => expect(text(built.root, '.look-sheet-status')).toBe('The world is now drawn in Finished town.'));
   });
 });

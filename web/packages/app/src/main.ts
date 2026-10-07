@@ -72,6 +72,7 @@ import { el, replace } from './ui/dom.js';
 import { button, errorState } from './ui/system/components.js';
 import { createLayout, MODAL_BACKGROUND_REGIONS, type Layout } from './ui/system/layout.js';
 import { mountActions, type MountedActions } from './composition/actions.js';
+import { redrawWorldLook } from './composition/world-look-redraw.js';
 import { buildLookSheet, type LookOption } from './ui/look-sheet.js';
 import type { ListedStylePack } from './world-look.js';
 import { fill } from './ui/copy.js';
@@ -1198,6 +1199,24 @@ async function mount(): Promise<void> {
   let defaultLook: string | null = null;
   const packsForLook = (): Promise<readonly ListedStylePack[]> => (lookPacks ??= import('./world-look.js')
     .then((look) => { defaultLook = look.DEFAULT_WORLD_LOOK; return look.listedStylePacks(lookAccess!); }));
+  /**
+   * Each pack's preview picture as a page-local address, fetched once by the digest the list names
+   * and held to it (`stylePackContent`); null for a pack with none or one that could not be read.
+   */
+  const lookPictures = new Map<string, Promise<string | null>>();
+  const lookPicture = (pack: ListedStylePack): Promise<string | null> => {
+    const sha = pack.preview_sha256 ?? null;
+    if (sha === null) return Promise.resolve(null);
+    let held = lookPictures.get(sha);
+    if (held === undefined) {
+      held = import('./world-look.js')
+        .then((look) => look.stylePackContent(lookAccess!, sha, `${pack.title}'s picture`))
+        .then((bytes) => URL.createObjectURL(new Blob([bytes], { type: pack.preview_media_type ?? 'image/jpeg' })))
+        .catch(() => { lookPictures.delete(sha); return null; });
+      lookPictures.set(sha, held);
+    }
+    return held;
+  };
   /** The pack this world is drawn in: the one its appearance names, else the default look. */
   const currentLook = (): string | null => state.worldStyleConnection?.state.current.stylePack?.packId ?? defaultLook;
   const reflectLook = (): void => {
@@ -1219,21 +1238,27 @@ async function mount(): Promise<void> {
     }
     dispatchShell({ type: 'show-world' });
     shell.querySelector('section.look-sheet')?.remove();
-    const offered: readonly LookOption[] = packs.map((pack) => ({
+    const pictures = await Promise.all(packs.map(lookPicture));
+    const offered: readonly LookOption[] = packs.map((pack, index) => ({
       packId: pack.pack_id, title: pack.title, description: pack.description, authors: pack.authors,
-      licence: pack.licence, picture: null,
+      licence: pack.licence, picture: pictures[index] ?? null,
     }));
     const sheet = buildLookSheet({
       worldTitle: state.activeWorldEntry?.title ?? 'This world',
-      onUse: async (option) => {
+      onUse: async (option, say) => {
         const listed = packs.find((pack) => pack.pack_id === option.packId)!;
-        const result = await appearance.useStylePack({
-          packId: listed.pack_id, version: listed.version, manifestSha256: listed.manifest_sha256,
-        });
+        const binding = { packId: listed.pack_id, version: listed.version, manifestSha256: listed.manifest_sha256 };
+        const result = await appearance.useStylePack(binding);
         if (!result.saved) return result.words;
         sheet.show(offered, currentLook());
         reflectLook();
-        return `${result.words} The world is drawn in ${option.title} the next time it opens.`;
+        // Saving names the pack; drawing the open world in it is the redraw's (LOOK's
+        // composition/world-look-redraw.ts), which keeps the old look up until the new one is ready.
+        say(`${result.words} Drawing the world in ${option.title}…`);
+        const drawn = await redrawWorldLook(binding);
+        return drawn.drawn
+          ? `${result.words} The world is now drawn in ${option.title}.`
+          : `${result.words} It could not be drawn now${drawn.reason === null ? '' : ` (${drawn.reason})`}, so it is drawn in ${option.title} the next time the world opens.`;
       },
       onClose: () => {
         sheet.root.remove();

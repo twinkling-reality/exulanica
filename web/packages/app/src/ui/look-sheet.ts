@@ -54,8 +54,11 @@ const typing = (target: EventTarget | null): boolean => target instanceof HTMLEl
 export function buildLookSheet(options: {
   /** The world's title, for the line that says where the sheet is. */
   readonly worldTitle: string;
-  /** Use a pack; resolves to what happened in words, said in the sheet's status line. */
-  readonly onUse: (option: LookOption) => Promise<string>;
+  /**
+   * Use a pack; resolves to what happened in words, said in the sheet's status line. `say` puts
+   * words there while it works, such as that the world is being drawn in the new look.
+   */
+  readonly onUse: (option: LookOption, say: (words: string) => void) => Promise<string>;
   readonly onClose: () => void;
 }): LookSheet {
   const backdrop = el('figure', { class: 'look-sheet-backdrop', 'aria-hidden': 'true' });
@@ -132,10 +135,12 @@ export function buildLookSheet(options: {
     status.textContent = '';
     render();
     try {
-      status.textContent = await options.onUse(option);
+      status.textContent = await options.onUse(option, (words) => { status.textContent = words; });
     } finally {
       busy = false;
       render();
+      // Use is hidden once its look is Now; the keyboard stays in the sheet, on the chosen card.
+      if (!root.contains(document.activeElement) || use.hidden) cards[chosen]?.focus({ preventScroll: true });
     }
   };
 
