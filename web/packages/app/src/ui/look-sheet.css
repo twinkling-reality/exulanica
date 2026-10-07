@@ -20,6 +20,14 @@
   isolation: isolate;
 }
 #shell section.look-sheet[role='dialog']:focus { outline: none; }
+/* Live: the world itself, drawn in the look being looked at, shows through on the right. */
+#shell section.look-sheet[role='dialog'][data-live='true'] {
+  background:
+    /* Over the world's own top bar, so the sheet's keys read on the stage, never on the bar. */
+    linear-gradient(to bottom, var(--color-surface-solid) 0, var(--color-surface-solid) 6.5rem, transparent 11rem),
+    linear-gradient(to top, var(--color-surface-solid) 0%, color-mix(in srgb, var(--color-surface-solid) 70%, transparent) 22%, transparent 42%),
+    linear-gradient(to right, var(--color-surface-solid) 0%, var(--color-surface-solid) 30%, color-mix(in srgb, var(--color-surface-solid) 60%, transparent) 48%, transparent 70%);
+}
 
 #shell section.look-sheet > .look-sheet-backdrop {
   position: fixed;

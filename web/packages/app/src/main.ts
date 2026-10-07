@@ -74,6 +74,7 @@ import { createLayout, MODAL_BACKGROUND_REGIONS, type Layout } from './ui/system
 import { mountActions, type MountedActions } from './composition/actions.js';
 import { redrawWorldLook } from './composition/world-look-redraw.js';
 import { buildLookSheet, type LookOption } from './ui/look-sheet.js';
+import type { WorldStylePackBinding } from './world-style-api.js';
 import type { ListedStylePack } from './world-look.js';
 import { fill } from './ui/copy.js';
 import { actionState, perform } from './ui/actions/surfaces.js';
@@ -1243,13 +1244,26 @@ async function mount(): Promise<void> {
       packId: pack.pack_id, title: pack.title, description: pack.description, authors: pack.authors,
       licence: pack.licence, picture: pictures[index] ?? null,
     }));
+    const bindingOf = (packId: string): WorldStylePackBinding | null => {
+      const listed = packs.find((pack) => pack.pack_id === packId);
+      return listed === undefined ? null : { packId: listed.pack_id, version: listed.version, manifestSha256: listed.manifest_sha256 };
+    };
+    // The look drawn behind the sheet while a person browses, when it is not the world's own.
+    let browsed: string | null = null;
     const sheet = buildLookSheet({
       worldTitle: state.activeWorldEntry?.title ?? 'This world',
+      onBrowse: (option) => {
+        browsed = option.packId;
+        void redrawWorldLook(bindingOf(option.packId)).then((done) => {
+          // A world that cannot be drawn in another look while open is shown by its pictures.
+          if (!done.drawn) sheet.setLive(false);
+        });
+      },
       onUse: async (option, say) => {
-        const listed = packs.find((pack) => pack.pack_id === option.packId)!;
-        const binding = { packId: listed.pack_id, version: listed.version, manifestSha256: listed.manifest_sha256 };
+        const binding = bindingOf(option.packId)!;
         const result = await appearance.useStylePack(binding);
         if (!result.saved) return result.words;
+        browsed = null;
         sheet.show(offered, currentLook());
         reflectLook();
         // Saving names the pack; drawing the open world in it is the redraw's (LOOK's
@@ -1261,6 +1275,10 @@ async function mount(): Promise<void> {
           : `${result.words} It could not be drawn now${drawn.reason === null ? '' : ` (${drawn.reason})`}, so it is drawn in ${option.title} the next time the world opens.`;
       },
       onClose: () => {
+        // Leaving without Use puts the world back in its own look.
+        if (browsed !== null && browsed !== currentLook()) {
+          void redrawWorldLook(state.worldStyleConnection?.state.current.stylePack ?? null);
+        }
         sheet.root.remove();
         canvas.focus({ preventScroll: true });
       },

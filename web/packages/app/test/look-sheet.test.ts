@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 // Look: the sheet where a world's owner chooses which of the host's packs it is drawn in.
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { authorWords, buildLookSheet, licenceWords, type LookOption } from '../src/ui/look-sheet.js';
+import { BROWSE_PAUSE_MS, authorWords, buildLookSheet, licenceWords, type LookOption } from '../src/ui/look-sheet.js';
 
 const pack = (packId: string, title: string, picture: string | null = `/${packId}.jpg`): LookOption => ({
   packId, title, description: `${title}, in its own words.`, authors: ['Exulanica'],
@@ -106,5 +106,40 @@ describe('using a look that takes a while', () => {
     expect(onUse).toHaveBeenCalledTimes(1);
     finish('The world is now drawn in Finished town.');
     await vi.waitFor(() => expect(text(built.root, '.look-sheet-status')).toBe('The world is now drawn in Finished town.'));
+  });
+});
+
+describe('browsing looks on the world itself', () => {
+  it('draws the world in a look once a person rests on it, never on opening or in passing', () => {
+    vi.useFakeTimers();
+    try {
+      const onBrowse = vi.fn();
+      const live = buildLookSheet({ worldTitle: 'Saturday market', onUse: vi.fn(async () => ''), onClose: vi.fn(), onBrowse });
+      document.body.replaceChildren(live.root);
+      live.show(PACKS, 'cozy');
+      vi.advanceTimersByTime(BROWSE_PAUSE_MS * 2);
+      expect(onBrowse).not.toHaveBeenCalled();
+      expect(live.root.dataset['live']).toBe('true');
+      // See-through on the world: no picture behind the page.
+      expect(live.root.querySelector<HTMLElement>('.look-sheet-backdrop')!.hidden).toBe(true);
+      press(live.root, 'ArrowRight');
+      press(live.root, 'ArrowRight');
+      vi.advanceTimersByTime(BROWSE_PAUSE_MS + 1);
+      expect(onBrowse).toHaveBeenCalledTimes(1);
+      expect(onBrowse.mock.calls[0]![0].packId).toBe('toon');
+      // Without the world behind it, the sheet shows the packs' pictures and draws nothing.
+      live.setLive(false);
+      press(live.root, 'ArrowLeft');
+      vi.advanceTimersByTime(BROWSE_PAUSE_MS + 1);
+      expect(onBrowse).toHaveBeenCalledTimes(1);
+      expect(live.root.querySelector<HTMLElement>('.look-sheet-backdrop')!.hidden).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('is never live without a way to draw the world', () => {
+    const { root } = sheet();
+    expect(root.dataset['live']).toBe('false');
   });
 });

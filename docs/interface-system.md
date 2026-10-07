@@ -193,7 +193,11 @@ the dark stage in Your worlds' language. It names the chosen pack large with its
 description, its licence ("CC0, free to use") and who made it, and one primary action, Use this
 look, which the pack the world is drawn in now does not offer; under it a strip holds every pack
 `GET /world/style-packs` lists, the one drawn now marked Now. Keys: the arrows choose, Enter uses,
-Escape goes back, and the world under the sheet takes no key while it is open. Using a look saves
+Escape goes back, and the world under the sheet takes no key while it is open. The sheet is
+see-through on the world itself: resting on a look draws the open world in it behind the sheet
+(`redrawWorldLook`, a re-attach of the tiles already loaded), and leaving without Use puts the world
+back in its own look; a world that cannot be redrawn while open is shown by the packs' pictures
+instead. Using a look saves
 a new version of the world's appearance through the same preview and Apply as any change in Design
 (`useStylePack` in `composition/appearance.ts`): a change already open in Design is decided there
 first, and a design another writer changed meanwhile is never saved over, so the person is asked to

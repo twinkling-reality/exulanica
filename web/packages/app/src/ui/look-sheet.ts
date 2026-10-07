@@ -29,6 +29,8 @@ export interface LookOption {
 
 export interface LookSheet {
   readonly root: HTMLElement;
+  /** Show the world itself behind the sheet (true) or the packs' pictures (false). */
+  setLive(live: boolean): void;
   /** The packs, with the one the world is drawn in now (null where none of them). */
   show(options: readonly LookOption[], current: string | null): void;
   focus(): void;
@@ -47,6 +49,9 @@ export function authorWords(authors: readonly string[]): string {
   return `By ${authors.slice(0, -1).join(', ')} and ${authors[authors.length - 1]}`;
 }
 
+/** How long a person rests on a look before the world behind the sheet is drawn in it. */
+export const BROWSE_PAUSE_MS = 180;
+
 /** Whether a key press belongs to a field a person is typing in, where no key may act. */
 const typing = (target: EventTarget | null): boolean => target instanceof HTMLElement
   && (target.isContentEditable || target.closest('input, textarea, select') !== null);
@@ -60,6 +65,11 @@ export function buildLookSheet(options: {
    */
   readonly onUse: (option: LookOption, say: (words: string) => void) => Promise<string>;
   readonly onClose: () => void;
+  /**
+   * Draw the world behind the sheet in the look being looked at, while a person moves through
+   * them. Given, the sheet opens see-through on the world rather than over a picture of it.
+   */
+  readonly onBrowse?: (option: LookOption) => void;
 }): LookSheet {
   const backdrop = el('figure', { class: 'look-sheet-backdrop', 'aria-hidden': 'true' });
   const overline = el('p', { class: 'look-sheet-overline' });
@@ -96,6 +106,8 @@ export function buildLookSheet(options: {
   ]);
 
   let shown: readonly LookOption[] = [];
+  let live = options.onBrowse !== undefined;
+  root.dataset['live'] = String(live);
   let current: string | null = null;
   let chosen = 0;
   let busy = false;
@@ -118,14 +130,26 @@ export function buildLookSheet(options: {
       ...(option.authors.length === 0 ? [] : [el('span', { text: authorWords(option.authors) })]),
       el('span', { text: 'Your streets, people and history stay as they are' }),
     ]);
-    replace(backdrop, option.picture === null ? [] : [el('img', { src: option.picture, alt: '', decoding: 'async' })]);
-    backdrop.hidden = option.picture === null;
+    replace(backdrop, live || option.picture === null ? [] : [el('img', { src: option.picture, alt: '', decoding: 'async' })]);
+    backdrop.hidden = live || option.picture === null;
     cards.forEach((card, index) => card.setAttribute('aria-selected', String(index === chosen)));
   };
 
+  // The look a person moves to is drawn behind the sheet once they pause on it, so passing over
+  // a look on the way to another draws nothing.
+  let browseTimer: number | null = null;
+  const browse = (): void => {
+    if (browseTimer !== null) window.clearTimeout(browseTimer);
+    const option = shown[chosen];
+    if (!live || options.onBrowse === undefined || option === undefined) return;
+    browseTimer = window.setTimeout(() => { browseTimer = null; options.onBrowse?.(option); }, BROWSE_PAUSE_MS);
+  };
   const choose = (index: number): void => {
-    chosen = Math.min(shown.length - 1, Math.max(0, index));
+    const next = Math.min(shown.length - 1, Math.max(0, index));
+    const moved = next !== chosen;
+    chosen = next;
     render();
+    if (moved) browse();
   };
 
   const run = async (): Promise<void> => {
@@ -186,11 +210,18 @@ export function buildLookSheet(options: {
         cards.push(card);
         return card;
       }));
+      // Opening on the look drawn now draws nothing new.
       const at = next.findIndex((option) => option.packId === now);
-      choose(at < 0 ? 0 : at);
+      chosen = at < 0 ? 0 : at;
+      render();
     },
     focus() {
       (cards[chosen] ?? root).focus({ preventScroll: true });
+    },
+    setLive(next) {
+      live = next && options.onBrowse !== undefined;
+      root.dataset['live'] = String(live);
+      render();
     },
   };
 }
