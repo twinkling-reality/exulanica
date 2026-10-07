@@ -212,6 +212,13 @@ export interface LoadedGeneratedTile extends GeneratedTileMount {
   rangeAtTriangle(triangle: number): DrawnTileRange | null;
   /** The nearest drawn triangle along a renderer-space ray, and its record. */
   pick(origin: Vec3, direction: Vec3): TilePick | null;
+  /**
+   * THE SAME TILE IN ANOTHER LOOK. A look is read only when a tile is attached (its light, sky,
+   * shadows, surface finish and unavailable pattern), so the containers verified and decoded, the
+   * texture sets prepared, the plan and the navigation are this tile's own, shared, and only
+   * `attach` runs again. Nothing the tile states changes but `look`.
+   */
+  inLook(look: TileLook): LoadedGeneratedTile;
 }
 
 function ambientDigest(): TextureSetDigest | null {
@@ -689,6 +696,14 @@ export async function loadGeneratedTile(sources: GeneratedTileSources): Promise<
     },
     attach(host: GeneratedTileHost): GeneratedTileAttachment {
       return attachTile(host, tile, planned, prepared);
+    },
+    inLook(next: TileLook): LoadedGeneratedTile {
+      const relit: LoadedGeneratedTile = {
+        ...tile,
+        look: next,
+        attach: (host: GeneratedTileHost): GeneratedTileAttachment => attachTile(host, relit, planned, prepared),
+      };
+      return relit;
     },
   };
   return tile;

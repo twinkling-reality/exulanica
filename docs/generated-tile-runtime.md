@@ -264,6 +264,15 @@ record; both stay per entry, whatever surfaces it has. Version 2 records state t
 (the conformance terrain is `2f14328d-39f8-5bee-a06a-f963b701ccf3`), and every range carries it.
 Data view selection through `registerRepresentationSubjects` is not wired for tiles.
 
+A look is read only when a tile is attached: its light, sky, fog, shadows, surface finish and
+unavailable pattern. `inLook(look)` returns the loaded tile in another look, sharing the verified
+containers, the prepared texture sets, the plan and the navigation, so only `attach` runs again and
+a page draws a world in another look without loading it again.
+`web/packages/atlas-react/test/generated-tile-in-look.test.ts` holds that a tile loaded in one look
+and moved to another attaches exactly the scene a tile loaded in the other look attaches, either
+way, compared by value (scene settings, lights, entities, meshes, materials and the texels a look
+writes), never by pixels.
+
 ## 5. Standing and walking
 
 The binding (`atlas-binding.ts`, `generatedTile` option) takes a `GeneratedTileMount`

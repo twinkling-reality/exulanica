@@ -166,15 +166,15 @@ and the shell's `data-world-look` attribute states the pack asked for, what chos
 `redrawWorldLook(pack)` (`web/packages/app/src/composition/world-look-redraw.ts`) draws the open
 world in another pack, named exactly (null: the default), without opening the world again: the
 person stays where they stand, and its people and traffic go on. The pack is read and its pieces
-fetched first, and a pack the page cannot read leaves the world as it was and says why. The tiles
-are then loaded again from the bytes the page holds, in the new pack's light, and swapped on the
-same host: the old look is taken down before the new one goes up, and the traffic draws its vehicles
-in the new pack's bodies. Redraws run one after another in the order asked. Any part of the page may
+fetched first, and a pack the page cannot read leaves the world as it was and says why. The tiles,
+as the page loaded them, are then attached again in the new pack's light (`inLook`, in
+[the runtime](generated-tile-runtime.md#4-loading-a-tile)), so nothing is fetched, verified or
+decoded a second time, and swapped on the same host: the old look is taken down before the new one
+goes up, and the traffic draws its vehicles in the new pack's bodies. Redraws run one after another in the order asked. Any part of the page may
 ask by dispatching `exulanica:world-look-redraw` on the shell with the pack as the event's detail;
 `data-world-look` then states the look drawn (source `redraw`) and `data-world-look-redraw` the
-redraw's own result with its time. Because the tiles are loaded again, a redraw takes nearly as long
-as opening the world. A redraw changes nothing the world's appearance names: that is the
-appearance's own Apply (section 10).
+redraw's own result with its time. A redraw changes nothing the world's appearance names: that is
+the appearance's own Apply (section 10).
 
 ## 8. The authored packs
 

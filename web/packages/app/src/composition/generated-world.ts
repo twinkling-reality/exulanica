@@ -108,8 +108,8 @@ export interface GeneratedWorld {
   /** The bodies its traffic takes from its pack while its tiles are attached, if any. */
   readonly bodies: () => VehicleBodies | null;
   /**
-   * The same tiles loaded again in another look, from the bytes already held; refused, and nothing
-   * loaded, when the pack cannot be read.
+   * The same tiles, as loaded, in another look: nothing is fetched, verified or decoded again;
+   * refused, and nothing changed, when the pack cannot be read.
    */
   readonly relook: (choice: import('../world-look.js').WorldLookChoice) => Promise<{
     readonly tile: LoadedGeneratedTile;
@@ -218,16 +218,8 @@ export async function loadGeneratedWorld(
         access, choice.packId, library.textureManifest, containers.map((one) => one.bytes), choice.manifestSha256,
       )
   );
-  /** The world's tiles loaded in a prepared pack's light and dressed by it, or in the tile look. */
-  const loadIn = async (prepared: Prepared | null): Promise<{ tile: LoadedGeneratedTile; bodies: () => VehicleBodies | null }> => {
-    const plain = await route.loadGeneratedTile({
-      name: first!.name,
-      bytes: first!.bytes,
-      manifest: parseTextureSetManifest(library.textureManifest),
-      fetchSet: (set) => library.textureSet(set.contentSha256),
-      ...(neighbours.length === 0 ? {} : { neighbours }),
-      ...(prepared === null ? {} : { look: prepared.look }),
-    });
+  /** The world's tiles in a prepared pack's light and dressed by it, or in the tile look. */
+  const dressedIn = (plain: LoadedGeneratedTile, prepared: Prepared | null): { tile: LoadedGeneratedTile; bodies: () => VehicleBodies | null } => {
     const dressed = prepared === null ? null : worldLook.inWorldLook(plain, prepared);
     return { tile: dressed?.tile ?? plain, bodies: dressed?.bodies ?? (() => null) };
   };
@@ -240,7 +232,15 @@ export async function loadGeneratedWorld(
   } catch (error) {
     reason = error instanceof Error ? error.message : String(error);
   }
-  const drawn = await loadIn(prepared);
+  const plain = await route.loadGeneratedTile({
+    name: first!.name,
+    bytes: first!.bytes,
+    manifest: parseTextureSetManifest(library.textureManifest),
+    fetchSet: (set) => library.textureSet(set.contentSha256),
+    ...(neighbours.length === 0 ? {} : { neighbours }),
+    ...(prepared === null ? {} : { look: prepared.look }),
+  });
+  const drawn = dressedIn(plain, prepared);
   const loaded = drawn.tile;
   // Where a person arrives is the world's own spawn, served in the region's frame: east, height,
   // south. The renderer's frame is east, up and south in metres, so it is read across unchanged.
@@ -263,7 +263,9 @@ export async function loadGeneratedWorld(
     bodies: drawn.bodies,
     async relook(next) {
       const nextPrepared = await prepare(next);
-      const again = await loadIn(nextPrepared);
+      // A look is read only when tiles are attached, so the tiles as loaded are drawn again in the
+      // new pack's light: nothing is fetched, verified or decoded a second time.
+      const again = dressedIn(plain.inLook(nextPrepared?.look ?? route.TILE_LOOK_V1), nextPrepared);
       return {
         tile: { ...again.tile, start },
         bodies: again.bodies,

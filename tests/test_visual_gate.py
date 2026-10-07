@@ -15,8 +15,10 @@ import dataclasses
 import hashlib
 import importlib.util
 import json
+import os
 import re
 import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -1678,8 +1680,67 @@ _CORRIDOR_RECORD = "docs/evaluation/2026-09-19-corridor-under-test.json"
 _INVENTED = "Invented placeholder words standing in for a reason nobody gave."
 
 
+#: The commit the refused run was measured at, as its record names it.
+_MEASURED_AT = "bd4db95a"
+
+
+def _renderer_the_run_read(tmp_path: Path) -> Path:
+    """A repository with this one's history and, at HEAD and on disk, the renderer the run read.
+
+    The writer scores a run only while the renderer it read is the one at HEAD and on disk, which is
+    the gate's own rule and stays so. The run under test is a record of 2026-09-19, and this tree's
+    renderer moves on, so the writer is pointed at a shared clone with one commit on top of HEAD
+    that restores the renderer the run read, copied from the commit it was measured at, and the
+    ignore rules that keep a judge's words private. Nothing of this tree is changed.
+    """
+    run = json.loads((_REFUSED_ARTIFACTS / "run.json").read_bytes())
+    path = run["scored"]["renderer"]["path"]
+    source = tmp_path / "source"
+
+    # One author and one date, so the commit, and every record naming HEAD, is the same each time.
+    fixed = {**os.environ, "GIT_AUTHOR_DATE": "2026-09-19T00:00:00Z"}
+    fixed["GIT_COMMITTER_DATE"] = fixed["GIT_AUTHOR_DATE"]
+
+    def git(*arguments: str) -> str:
+        return subprocess.run(
+            ["git", *arguments], cwd=source, capture_output=True, text=True, check=True, env=fixed
+        ).stdout.strip()
+
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=_ROOT, capture_output=True, text=True, check=True
+    ).stdout.strip()
+    subprocess.run(
+        ["git", "clone", "--quiet", "--shared", "--no-checkout", str(_ROOT), str(source)],
+        check=True,
+    )
+    git("update-ref", "--no-deref", "HEAD", head)
+    git("read-tree", "HEAD")
+    blob = git("rev-parse", f"{_MEASURED_AT}:{path}")
+    git("update-index", "--cacheinfo", f"100644,{blob},{path}")
+    git(
+        "-c",
+        "user.name=visual gate test",
+        "-c",
+        "user.email=visual-gate-test@invalid",
+        "commit",
+        "--quiet",
+        "--allow-empty",
+        "-m",
+        "the renderer the recorded run read",
+    )
+    data = subprocess.run(
+        ["git", "cat-file", "blob", blob], cwd=source, capture_output=True, check=True
+    ).stdout
+    assert hashlib.sha256(data).hexdigest() == run["scored"]["renderer"]["sha256"]
+    (source / path).parent.mkdir(parents=True)
+    (source / path).write_bytes(data)
+    shutil.copyfile(_ROOT / ".gitignore", source / ".gitignore")
+    return source
+
+
 def _corridor_writer(monkeypatch, tmp_path: Path):
-    """The writer pointed at a document root holding the real rubric, chain, baseline and store."""
+    """The writer pointed at a document root holding the real rubric, chain, baseline and store,
+    and at a source holding the renderer the run read (:func:`_renderer_the_run_read`)."""
     root = tmp_path / "root"
     (root / "docs/evaluation").mkdir(parents=True)
     for name in ("visual-gate-rubric.md", "visual-gate-corridor-walk.md"):
@@ -1691,6 +1752,7 @@ def _corridor_writer(monkeypatch, tmp_path: Path):
     shutil.copyfile(_ROOT / _V5_ARTIFACTS / "visual-gate-rubric.md", copy)
     writer = _writer(monkeypatch, root)
     monkeypatch.setattr(writer, "BASELINE", root / _BASELINE_PATH)
+    monkeypatch.setattr(writer, "SOURCE_ROOT", _renderer_the_run_read(tmp_path))
     return writer, root
 
 
@@ -1772,7 +1834,7 @@ def _corridor(writer, run: Path, judgement: Path, record: str = _CORRIDOR_RECORD
         judgement=str(judgement),
         supplementary=_SUPPLEMENT,
         record=record,
-        measured_at="bd4db95a",
+        measured_at=_MEASURED_AT,
         replace=False,
     )
     for name, value in changes.items():
@@ -1808,6 +1870,18 @@ def test_the_corridor_verb_writes_a_gate_record_when_the_judgement_holds(monkeyp
     assert [capture["sha256"] for capture in record["captures"]] == [
         capture["sha256"] for capture in run["captures"]
     ]
+
+
+def test_the_corridor_verb_scores_nothing_once_the_renderer_differs_from_what_the_run_read(
+    monkeypatch, tmp_path
+):
+    writer, root = _corridor_writer(monkeypatch, tmp_path)
+    run = json.loads((_REFUSED_ARTIFACTS / "run.json").read_bytes())
+    drawn = writer.SOURCE_ROOT / run["scored"]["renderer"]["path"]
+    drawn.write_bytes(drawn.read_bytes() + b"// a renderer the run did not read\n")
+    with pytest.raises(SystemExit, match="differs from HEAD or from what the run read"):
+        _corridor(writer, _corridor_run(tmp_path), _corridor_judgement_file(tmp_path))
+    assert not (root / _CORRIDOR_RECORD).exists()
 
 
 def test_the_corridor_verb_can_say_pass_so_the_bar_is_not_a_constant(monkeypatch, tmp_path):

@@ -4,11 +4,12 @@
  * `redrawWorldLook(pack)` draws the world the page has open in `pack`, a pack the host serves named
  * exactly (null: the default look), without opening the world again: the person stays where they
  * stand, and its people and traffic go on. The pack is read and its pieces fetched first, and a pack
- * the page cannot read leaves the world as it was and says why. The world's tiles are then loaded
- * again from the bytes the page already holds, in the new pack's light, and swapped on the same
- * host: the old light, dressing and ink are taken down before the new ones go up, and the traffic
- * draws its vehicles in the new pack's bodies from the next frame. It resolves with what it drew
- * and how long that took. Redraws run one after another, in the order they were asked for.
+ * the page cannot read leaves the world as it was and says why. The world's tiles, as the page
+ * loaded them, are then attached again in the new pack's light (nothing is fetched, verified or
+ * decoded a second time) and swapped on the same host: the old light, dressing and ink are taken
+ * down before the new ones go up, and the traffic draws its vehicles in the new pack's bodies from
+ * the next frame. It resolves with what it drew and how long that took. Redraws run one after
+ * another, in the order they were asked for.
  *
  * Any part of the page may also ask by dispatching `WORLD_LOOK_REDRAW_EVENT` on the shell with the
  * pack as the event's detail; the shell's `data-world-look` attribute then states the look drawn,

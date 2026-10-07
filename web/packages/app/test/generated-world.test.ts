@@ -6,7 +6,8 @@ import type { GeneratedGround, GeneratedTile, SavedWorldEntry } from '../src/wor
 // The tile runtime and the texture library are replaced, so a test sees what the page hands the
 // runtime: which containers, in which roles, read from where.
 const loadGeneratedTile = vi.hoisted(() => vi.fn());
-vi.mock('@exulanica/atlas-react/generated-tile', () => ({ loadGeneratedTile }));
+const TILE_LOOK_V1 = vi.hoisted(() => ({ id: 'exulanica.generated-tile-look', version: 1 }));
+vi.mock('@exulanica/atlas-react/generated-tile', () => ({ loadGeneratedTile, TILE_LOOK_V1 }));
 vi.mock('../src/texture-library.js', () => ({
   committedTextureLibrary: async () => ({
     textureManifest: new Uint8Array(),
@@ -105,6 +106,31 @@ describe('a saved generated world of several tiles', () => {
     // A person opens at the served arrival, which may lie on any of the tiles.
     if (!isGeneratedWorld(loaded)) throw new Error('not loaded');
     expect(loaded.tile.start).toMatchObject({ x: 128, z: -58.75 });
+  });
+
+  it('draws itself in another look from the tiles it loaded, reading and loading nothing again', async () => {
+    const tiles = [tile(0, 'baked'), tile(1, 'baked')];
+    const bytes = Object.fromEntries(tiles.map((one, at) => [one.bakedTileId!, new Uint8Array([at + 1])]));
+    const { fetch, read } = tileRoute(bytes);
+    vi.stubGlobal('fetch', fetch);
+    const looks: unknown[] = [];
+    const plain = {
+      navigationWorld: { eyeHeight: 1.6, surface: { sample: () => ({ height: 0.105 }) } },
+      inLook(look: unknown) {
+        looks.push(look);
+        return { ...plain, look };
+      },
+    };
+    loadGeneratedTile.mockResolvedValue(plain);
+    const loaded = await loadGeneratedWorld(access, entry(tiles), '?look=today');
+    if (!isGeneratedWorld(loaded)) throw new Error('not loaded');
+    const reads = read.length;
+    const again = await loaded.relook({ packId: null, manifestSha256: null, source: 'redraw' });
+    expect(loadGeneratedTile).toHaveBeenCalledTimes(1);
+    expect(read).toHaveLength(reads);
+    expect(looks).toEqual([TILE_LOOK_V1]);
+    expect(again.tile).toMatchObject({ look: TILE_LOOK_V1, start: loaded.tile.start });
+    expect(again.look).toEqual({ pack: null, source: 'redraw', drawn: false, reason: null });
   });
 
   it('opens beside the served arrival when the drawn ground carves the point itself', async () => {
