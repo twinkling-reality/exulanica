@@ -1,0 +1,89 @@
+{
+  "profile": "exulanica.look/v1",
+  "look": "kaykit-mannequin",
+  "version": 1,
+  "label": "two-tone mannequin",
+  "body_plan": "humanoid/v1",
+  "look_kind": "skinned",
+  "container": {
+    "sha256": "aaff6383b471b7ee46d1cc35dc761a60c6ece69241a411d5e829b330795f2d88",
+    "bytes": 570756,
+    "media_type": "model/gltf-binary"
+  },
+  "rig": {
+    "bones": {
+      "chest": "chest",
+      "head": "head",
+      "hips": "hips",
+      "leftFoot": "foot.l",
+      "leftHand": "wrist.l",
+      "leftLowerArm": "lowerarm.l",
+      "leftLowerLeg": "lowerleg.l",
+      "leftToes": "toes.l",
+      "leftUpperArm": "upperarm.l",
+      "leftUpperLeg": "upperleg.l",
+      "rightFoot": "foot.r",
+      "rightHand": "wrist.r",
+      "rightLowerArm": "lowerarm.r",
+      "rightLowerLeg": "lowerleg.r",
+      "rightToes": "toes.r",
+      "rightUpperArm": "upperarm.r",
+      "rightUpperLeg": "upperleg.r",
+      "spine": "spine"
+    },
+    "clips": {
+      "idle": "idle",
+      "walk": "walk",
+      "run": "run",
+      "reach": "reach",
+      "hold": "hold",
+      "sit": "sit"
+    },
+    "ground_speed_mm_per_s": {
+      "walk": 568,
+      "run": 2681
+    }
+  },
+  "height_mm": 1750,
+  "sampling": "linear",
+  "light": null,
+  "role": null,
+  "origin": {
+    "profile": "exulanica.origin/v1",
+    "class": "imported",
+    "by": {
+      "kind": "project"
+    },
+    "sources": [
+      {
+        "reference": "https://kaylousberg.itch.io/kaykit-character-animations",
+        "retrieved_on": "2026-10-07",
+        "revision": "Free 1.1, KayKit_Character_Animations_1.1.zip sha256 65882f31f905ad2e953819648a59287cdeab8f623908d5ef701971d3758be20f",
+        "licence_page_sha256": "7ab41a1b2d83835c975b51f4623412ea486084264bbaaddccd6fd96c140d6ab4"
+      }
+    ],
+    "licence": {
+      "spdx": "CC0-1.0",
+      "verdict": "SHIP",
+      "attribution": null,
+      "share_alike": false,
+      "licence_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "licence_text_sha256": "373b159044d1a886ed15f57ca5a7673ba14e2623c460283452705f2056912ed9"
+    },
+    "authors": [
+      "Kay Lousberg"
+    ],
+    "lineage": {
+      "ingredients": [
+        "11422afd50abf7e8c92ea107e2e0bc94abd38023d6d15f55ad580347efbfa29e",
+        "368a4c0733280bc810c004b81f31408f43c00e307cf914061e80f192ba25685b",
+        "5f725c0f745f36078c7238968cd5c04843cbc6260689eb6e7f5e2bbd7ffdd7ad",
+        "ab6ffeed40c8281dd0ce0506534eadf7385151f1c266643a10fa2a0f0a7ba3b1",
+        "e3b62dc122c5073373376a846e354137add2088ddcce8731c389fc5c20734aad"
+      ],
+      "receipts": [],
+      "translation_manifest_sha256": "c154b9169a0089e1e76a9158b6b332708fca8529e95cdcf45f249bac89cf5e41"
+    },
+    "distribution": "public"
+  }
+}

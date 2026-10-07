@@ -1,0 +1,146 @@
+{
+  "files": [
+    {
+      "source": "animations",
+      "path": "KayKit_Character_Animations_1.1/Mannequin Character/characters/Mannequin_Medium.glb",
+      "sha256": "368a4c0733280bc810c004b81f31408f43c00e307cf914061e80f192ba25685b"
+    },
+    {
+      "source": "animations",
+      "path": "KayKit_Character_Animations_1.1/Animations/gltf/Rig_Medium/Rig_Medium_General.glb",
+      "sha256": "5f725c0f745f36078c7238968cd5c04843cbc6260689eb6e7f5e2bbd7ffdd7ad"
+    },
+    {
+      "source": "animations",
+      "path": "KayKit_Character_Animations_1.1/Animations/gltf/Rig_Medium/Rig_Medium_MovementBasic.glb",
+      "sha256": "11422afd50abf7e8c92ea107e2e0bc94abd38023d6d15f55ad580347efbfa29e"
+    },
+    {
+      "source": "animations",
+      "path": "KayKit_Character_Animations_1.1/Animations/gltf/Rig_Medium/Rig_Medium_Tools.glb",
+      "sha256": "e3b62dc122c5073373376a846e354137add2088ddcce8731c389fc5c20734aad"
+    },
+    {
+      "source": "animations",
+      "path": "KayKit_Character_Animations_1.1/Animations/gltf/Rig_Medium/Rig_Medium_Simulation.glb",
+      "sha256": "ab6ffeed40c8281dd0ce0506534eadf7385151f1c266643a10fa2a0f0a7ba3b1"
+    }
+  ],
+  "joints": {
+    "chest": "spine",
+    "foot.l": "lowerleg.l",
+    "foot.r": "lowerleg.r",
+    "hand.l": "wrist.l",
+    "hand.r": "wrist.r",
+    "head": "chest",
+    "hips": "root",
+    "lowerarm.l": "upperarm.l",
+    "lowerarm.r": "upperarm.r",
+    "lowerleg.l": "upperleg.l",
+    "lowerleg.r": "upperleg.r",
+    "root": null,
+    "spine": "hips",
+    "toes.l": "foot.l",
+    "toes.r": "foot.r",
+    "upperarm.l": "chest",
+    "upperarm.r": "chest",
+    "upperleg.l": "hips",
+    "upperleg.r": "hips",
+    "wrist.l": "lowerarm.l",
+    "wrist.r": "lowerarm.r"
+  },
+  "meshes": [
+    "Mannequin_Medium_ArmLeft",
+    "Mannequin_Medium_ArmRight",
+    "Mannequin_Medium_Body",
+    "Mannequin_Medium_Head",
+    "Mannequin_Medium_LegLeft",
+    "Mannequin_Medium_LegRight"
+  ],
+  "materials": [
+    "Character_Material"
+  ],
+  "pictures": [
+    "mannequin_texture"
+  ],
+  "height_mm": 2204,
+  "clips": {
+    "Rig_Medium_General.glb": {
+      "Death_A": 800,
+      "Death_A_Pose": 0,
+      "Death_B": 2633,
+      "Death_B_Pose": 0,
+      "Hit_A": 667,
+      "Hit_B": 867,
+      "Idle_A": 1067,
+      "Idle_B": 2133,
+      "Interact": 1300,
+      "PickUp": 1300,
+      "Spawn_Air": 1300,
+      "Spawn_Ground": 1300,
+      "T-Pose": 0,
+      "Throw": 1367,
+      "Use_Item": 1600
+    },
+    "Rig_Medium_MovementBasic.glb": {
+      "Jump_Full_Long": 2333,
+      "Jump_Full_Short": 1167,
+      "Jump_Idle": 1067,
+      "Jump_Land": 667,
+      "Jump_Start": 600,
+      "Running_A": 800,
+      "Running_B": 800,
+      "T-Pose": 0,
+      "Walking_A": 1067,
+      "Walking_B": 1067,
+      "Walking_C": 1600
+    },
+    "Rig_Medium_Simulation.glb": {
+      "Cheering": 1667,
+      "Lie_Down": 3000,
+      "Lie_Idle": 2667,
+      "Lie_StandUp": 2333,
+      "Push_Ups": 1033,
+      "Sit_Chair_Down": 800,
+      "Sit_Chair_Idle": 3600,
+      "Sit_Chair_StandUp": 800,
+      "Sit_Floor_Down": 1000,
+      "Sit_Floor_Idle": 4000,
+      "Sit_Floor_StandUp": 1133,
+      "Sit_Ups": 1733,
+      "T-Pose": 0,
+      "Waving": 2133
+    },
+    "Rig_Medium_Tools.glb": {
+      "Chop": 4333,
+      "Chopping": 1333,
+      "Dig": 4667,
+      "Digging": 1400,
+      "Fishing_Bite": 2233,
+      "Fishing_Cast": 1933,
+      "Fishing_Catch": 3233,
+      "Fishing_Idle": 2333,
+      "Fishing_Reeling": 1600,
+      "Fishing_Struggling": 3433,
+      "Fishing_Tug": 1900,
+      "Hammer": 4333,
+      "Hammering": 2667,
+      "Holding_A": 1000,
+      "Holding_B": 1000,
+      "Holding_C": 1000,
+      "Lockpick": 3000,
+      "Lockpicking": 2333,
+      "Pickaxe": 6033,
+      "Pickaxing": 3733,
+      "Saw": 2400,
+      "Sawing": 667,
+      "T-Pose": 0,
+      "Work_A": 2533,
+      "Work_B": 3100,
+      "Work_C": 3667,
+      "Working_A": 1500,
+      "Working_B": 2533,
+      "Working_C": 2000
+    }
+  }
+}

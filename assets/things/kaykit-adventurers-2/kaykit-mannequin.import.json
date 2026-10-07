@@ -1,0 +1,13 @@
+{
+  "profile": "exulanica.reviewed-asset-import/v1",
+  "asset_key": "things.kaykit-mannequin.v1",
+  "title": "KayKit : Character Animations 1.1, free tier: two-tone mannequin",
+  "summary": "A mannequin in blue and red halves with a drawn smile, rigged, with clips to stand, walk, run, reach to the ground, hold a thing up and sit.",
+  "content_sha256": "aaff6383b471b7ee46d1cc35dc761a60c6ece69241a411d5e829b330795f2d88",
+  "byte_size": 570756,
+  "licence_id": "CC0-1.0",
+  "licence_sha256": "373b159044d1a886ed15f57ca5a7673ba14e2623c460283452705f2056912ed9",
+  "source_url": "https://kaylousberg.itch.io/kaykit-character-animations",
+  "source_revision": "Free 1.1, KayKit_Character_Animations_1.1.zip sha256 65882f31f905ad2e953819648a59287cdeab8f623908d5ef701971d3758be20f",
+  "producer": "exulanica-look-import/1"
+}

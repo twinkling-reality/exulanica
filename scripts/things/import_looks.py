@@ -5,9 +5,11 @@
 
 An import document is data: each source pack it reads (its page, its archive by digest, its
 licence file), and for each look it makes, the files it reads from which source, how a figure's
-joints map onto the body plan's bones and sockets, which clip each motion uses, the box an object
-must stand inside, and in plain words why each joint or clip that does not come across stays
-behind. This tool is the one translator for every such document; it names no pack, figure or thing.
+joints map onto the body plan's bones and sockets, which clip each motion uses, the joints its clips
+move that the figure lacks, any region printed on its picture that a body here does not show (a
+name tag), the box an object must stand inside, and in plain words why each joint, clip or region
+that does not come across stays behind. This tool is the one translator for every such document; it
+names no pack, figure or thing.
 
 It reads each archive once, by digest, and writes beside the import document:
 
@@ -26,7 +28,10 @@ It reads each archive once, by digest, and writes beside the import document:
     translation manifest accounts for;
 
 and under ``assets/catalogs/things``, each look document and its translation manifest. The
-manifest names the look by key and version; the look's origin names the manifest by digest.
+manifest names the look by key and version; the look's origin names the manifest by digest. The
+manifest names this tool by its key, version and the digest of the file that first made it: an
+edit since that makes the same look again keeps that digest, so a shipped look never moves, and a
+look made differently names the file that made it.
 
 A figure's ground speed per moving motion is measured here from its own clip, not stated: the
 median horizontal speed of the feet the document names while each is within ``stance_mm`` of its
@@ -48,7 +53,7 @@ import math
 import struct
 import sys
 import zipfile
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any, Final
@@ -328,12 +333,74 @@ def _animation(gltf: Gltf, name: str) -> Mapping[str, Any] | None:
     return None
 
 
+def _cover(
+    figure: Gltf,
+    document: dict[str, Any],
+    binary: bytearray,
+    parts: Sequence[int],
+    cover: Mapping[str, Mapping[str, Any]],
+) -> dict[str, dict[str, int]]:
+    """Cover a region printed on the figure's picture, on each part ``cover`` names: every texture
+    coordinate of the part inside the region's box draws from one point of the same picture
+    instead, so the region shows that point's plain colour and no pixel of the picture changes.
+    The covered corners are the part's own island of whole triangles, or the cover is refused."""
+    source = figure.document
+    nodes = source["nodes"]
+    by_name = {source["meshes"][nodes[i]["mesh"]]["name"]: nodes[i]["mesh"] for i in parts}
+    users: dict[int, int] = {}
+    for mesh in source["meshes"]:
+        for primitive in mesh["primitives"]:
+            index = primitive["attributes"].get("TEXCOORD_0")
+            if index is not None:
+                users[index] = users.get(index, 0) + 1
+    done: dict[str, dict[str, int]] = {}
+    for name, region in sorted(cover.items()):
+        if name not in by_name:
+            raise ImportRefused(f"the cover names {name!r}, which is not one of the figure's parts")
+        (u0, v0), (u1, v1) = region["uv_from"], region["uv_to"]
+        point = tuple(_f32(value) for value in region["uv"])
+        corners = triangles = 0
+        for primitive in source["meshes"][by_name[name]]["primitives"]:
+            index = primitive["attributes"].get("TEXCOORD_0")
+            if index is None or users[index] != 1 or "indices" not in primitive:
+                raise ImportRefused(
+                    f"{name}'s texture coordinates are its own, on indexed triangles"
+                )
+            accessor = document["accessors"][index]
+            view = source["bufferViews"][accessor["bufferView"]]
+            if accessor["componentType"] != _FLOAT or view.get("byteStride", 8) != 8:
+                raise ImportRefused("texture coordinates are tightly packed float pairs")
+            values = figure.values(index)
+            inside = {k for k, (u, v) in enumerate(values) if u0 <= u <= u1 and v0 <= v <= v1}
+            order = [k for (k,) in figure.values(primitive["indices"])]
+            for start in range(0, len(order), 3):
+                held = sum(1 for k in order[start : start + 3] if k in inside)
+                if 0 < held < 3:
+                    raise ImportRefused(f"the cover on {name} cuts across a triangle")
+                triangles += held == 3
+            base = view.get("byteOffset", 0) + accessor.get("byteOffset", 0)
+            for k in sorted(inside):
+                struct.pack_into("<2f", binary, base + 8 * k, *point)
+            if "min" in accessor:
+                moved = [point if k in inside else value for k, value in enumerate(values)]
+                accessor["min"] = [min(value[i] for value in moved) for i in range(2)]
+                accessor["max"] = [max(value[i] for value in moved) for i in range(2)]
+            corners += len(inside)
+        if not corners:
+            raise ImportRefused(f"the cover on {name} holds none of its texture coordinates")
+        done[name] = {"corners": corners, "triangles": triangles}
+    return done
+
+
 def merge_figure(
     figure: Gltf,
     clip_files: Mapping[str, Gltf],
     clips: Sequence[Mapping[str, str]],
     in_place: Sequence[str],
     height_mm: int,
+    *,
+    absent: Collection[str] = (),
+    cover: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> tuple[bytes, dict[str, Any]]:
     """The figure as one skinned mesh with only ``clips``, each kept in place and named by the
     motion it plays, scaled into its vertices, bind matrices, joints and clips so it stands
@@ -345,7 +412,11 @@ def merge_figure(
     matrix are multiplied by the factor, and nothing else changes. The mesh nodes on the one skin
     become one mesh whose parts are their primitives, unchanged, on one node at the root of the
     scene; the scene's top node, which carries no transform, is dissolved, so its joints become
-    roots of the scene too and no plain node stands between a joint and the scene's root."""
+    roots of the scene too and no plain node stands between a joint and the scene's root.
+
+    A clip that moves a joint the figure lacks is refused, unless the joint is one of ``absent``:
+    then its channels on that joint are left out, and what was done says so. ``cover`` names the
+    regions printed on the figure's picture that it does not show (:func:`_cover`)."""
     source = figure.document
     if source.get("animations"):
         raise ImportRefused("the figure carries clips of its own; this import adds them")
@@ -420,6 +491,7 @@ def merge_figure(
         column = list(matrix)
         column[12:15] = [_f32(value * factor) for value in column[12:15]]
         struct.pack_into("<16f", binary, bind_base + 64 * number, *column)
+    covered = _cover(figure, document, binary, parts, cover or {})
     _align(binary)
     views = document["bufferViews"]
 
@@ -454,10 +526,14 @@ def merge_figure(
         samplers: list[dict[str, Any]] = []
         channels: list[dict[str, Any]] = []
         drift = 0.0
+        left_out: set[str] = set()
         for channel in animation["channels"]:
             sampler = animation["samplers"][channel["sampler"]]
             target = names[channel["target"]["node"]]
             if target not in joints or joints[target] not in renumber:
+                if target in absent and target not in joints:
+                    left_out.add(target)
+                    continue
                 raise ImportRefused(
                     f"clip {wanted['clip']} moves {target!r}, which the figure's skeleton lacks"
                 )
@@ -487,7 +563,7 @@ def merge_figure(
                 }
             )
         animations.append({"name": wanted["motion"], "channels": channels, "samplers": samplers})
-        done[wanted["clip"]] = {"drift": drift}
+        done[wanted["clip"]] = {"drift": drift, "left_out": sorted(left_out)}
     document["animations"] = animations
     _align(binary)
     document["buffers"] = [{"byteLength": len(binary)}]
@@ -499,6 +575,7 @@ def merge_figure(
         "natural_mm": natural_mm,
         "parts": len(primitives),
         "clips": done,
+        "covered": covered,
     }
 
 
@@ -785,7 +862,7 @@ def figure_manifest(
 ) -> dict[str, Any]:
     reasons = look["reasons"]
     bone_of = {joint: bone for bone, joint in look["bones"].items()}
-    socket_of = {joint: socket for socket, joint in look["sockets"].items()}
+    socket_of = {joint: socket for socket, joint in look.get("sockets", {}).items()}
     files = _counted(len(reading["files"]), "file", "files")
     fields: list[dict[str, Any]] = [
         _field(
@@ -826,11 +903,30 @@ def figure_manifest(
                 f"its {meshes} came across as one mesh of {parts}",
             )
         )
+    covered = made["covered"]
     for key, one, many in (
         ("materials", "material", "materials"),
         ("pictures", "picture", "pictures"),
     ):
         stated = _counted(len(reading[key]), one, many)
+        if key == "pictures" and covered:
+            regions = [look["cover"][name] for name in covered]
+            fields.append(
+                _field(
+                    "/pictures",
+                    "approximated",
+                    "/container",
+                    "; ".join(
+                        f"its {region['what']} ({_counted(done['triangles'], 'triangle', 'triangles')}"
+                        f" of {name}) is drawn in one plain colour of the same picture, no pixel "
+                        f"changed: {region['reason']}"
+                        for (name, done), region in zip(covered.items(), regions, strict=True)
+                    ),
+                    f"its {stated} came across, its "
+                    f"{' and '.join(region['what'] for region in regions)} covered",
+                )
+            )
+            continue
         words = f"its {stated} came across as {'it is' if len(reading[key]) == 1 else 'they are'}"
         fields.append(_field(f"/{key}", "exact", "/container", None, words))
     factor = made["factor"]
@@ -853,15 +949,29 @@ def figure_manifest(
             if (file, clip) in kept:
                 motion = kept[(file, clip)]
                 drift_mm = made["clips"][clip]["drift"] * factor * 1000
+                left_out = made["clips"][clip]["left_out"]
+                why, how = [], []
                 if drift_mm >= 0.5:
+                    why.append(
+                        f"kept in place: its {' and '.join(look['in_place'])} hold their place "
+                        f"across the ground, {round(drift_mm)} mm of drift removed"
+                    )
+                    how.append("kept in place")
+                if left_out:
+                    because = sorted({look["absent_joints"][joint] for joint in left_out})
+                    why.append(
+                        f"its channels on {' and '.join(left_out)}, joints this figure lacks, were "
+                        f"left out: {'; '.join(because)}"
+                    )
+                    how.append("without the joints it lacks")
+                if why:
                     fields.append(
                         _field(
                             at,
                             "approximated",
                             f"/rig/clips/{motion}",
-                            f"kept in place: its {' and '.join(look['in_place'])} hold their place "
-                            f"across the ground, {round(drift_mm)} mm of drift removed",
-                            f"its clip {clip} came across as its {motion} clip, kept in place",
+                            "; ".join(why),
+                            f"its clip {clip} came across as its {motion} clip, {', '.join(how)}",
                         )
                     )
                 else:
@@ -1008,22 +1118,29 @@ def _figure(
         {"file": clip["path"], "clip": clip["clip"], "motion": clip["motion"]}
         for clip in look["clips"]
     ]
-    container, made = merge_figure(figure, clip_files, clips, look["in_place"], look["height_mm"])
+    container, made = merge_figure(
+        figure,
+        clip_files,
+        clips,
+        look["in_place"],
+        look["height_mm"],
+        absent=look.get("absent_joints", {}),
+        cover=look.get("cover", {}),
+    )
     reading = figure_reading(figure, clip_files, made["natural_mm"], read.files)
     merged = read_glb(container)
     speed = look["ground_speed"]
     motions = {clip["motion"]: clip["motion"] for clip in look["clips"]}
     played = {str(a["name"]): read_clip(merged, a) for a in merged.document["animations"]}
-    rig = {
-        "bones": dict(sorted(look["bones"].items())),
-        "clips": motions,
-        "sockets": dict(sorted(look["sockets"].items())),
-        "ground_speed_mm_per_s": {
-            motion: ground_speed_mm_per_s(
-                merged, played[motions[motion]], speed["feet"], speed["stance_mm"], speed["samples"]
-            )
-            for motion in speed["motions"]
-        },
+    rig: dict[str, Any] = {"bones": dict(sorted(look["bones"].items())), "clips": motions}
+    if look.get("sockets"):
+        # A figure with no joint for a socket states none: a held thing then sits at its bone.
+        rig["sockets"] = dict(sorted(look["sockets"].items()))
+    rig["ground_speed_mm_per_s"] = {
+        motion: ground_speed_mm_per_s(
+            merged, played[motions[motion]], speed["feet"], speed["stance_mm"], speed["samples"]
+        )
+        for motion in speed["motions"]
     }
     return container, made, reading, rig
 
@@ -1038,6 +1155,21 @@ def _object(look: Mapping[str, Any], read: Read) -> tuple[bytes, dict[str, Any],
     source = read_gltf(read(source_key, look["gltf"]["path"]), beside)
     container, made = fit_object(source, look["fit_box_mm"], look["fit_margin_mm"])
     return container, made, object_reading(source, read.files)
+
+
+def _first_translator(path: Path, manifest: dict[str, Any]) -> dict[str, Any]:
+    """``manifest`` naming the importer that first made it: when the committed manifest at
+    ``path`` is this one but for the translator's digest, under the same translator key and
+    version, its digest is kept, so an importer edited since makes the same look again without
+    changing a byte of it (and a shipped look never moves). A manifest that differs in anything
+    else, or comes from another translator or version, names the importer that made it now."""
+    if not path.exists():
+        return manifest
+    committed = json.loads(path.read_text("utf-8"))
+    first, made = committed.get("translator", {}), manifest["translator"]
+    if (first.get("key"), first.get("version")) != (made["key"], made["version"]):
+        return manifest
+    return committed if {**manifest, "translator": first} == committed else manifest
 
 
 def make(plan_path: Path, archives: Mapping[str, Archive]) -> list[Output]:
@@ -1065,6 +1197,9 @@ def make(plan_path: Path, archives: Mapping[str, Archive]) -> list[Output]:
             rig = None
         else:
             raise ImportRefused(f"look {look['look']}: a {look['look_kind']} look is not imported")
+        manifest = _first_translator(
+            MANIFESTS / f"{look['look']}.v{look['version']}.json", manifest
+        )
         sources = [first, *sorted({file["source"] for file in read.files} - {first})]
         origin = _origin(plan, sources, licences, read.files, sha256_of_canonical(manifest).hex())
         document = look_document(look, container, origin, rig)

@@ -197,6 +197,161 @@
         "height": 1000
       },
       "fit_margin_mm": 1
+    },
+    {
+      "look": "kaykit-mannequin",
+      "version": 1,
+      "label": "two-tone mannequin",
+      "summary": "A mannequin in blue and red halves with a drawn smile, rigged, with clips to stand, walk, run, reach to the ground, hold a thing up and sit.",
+      "look_kind": "skinned",
+      "body_plan": "humanoid/v1",
+      "source_type": "character",
+      "figure": {
+        "source": "animations",
+        "path": "KayKit_Character_Animations_1.1/Mannequin Character/characters/Mannequin_Medium.glb"
+      },
+      "height_mm": 1750,
+      "bones": {
+        "hips": "hips",
+        "spine": "spine",
+        "chest": "chest",
+        "head": "head",
+        "leftUpperLeg": "upperleg.l",
+        "leftLowerLeg": "lowerleg.l",
+        "leftFoot": "foot.l",
+        "leftToes": "toes.l",
+        "rightUpperLeg": "upperleg.r",
+        "rightLowerLeg": "lowerleg.r",
+        "rightFoot": "foot.r",
+        "rightToes": "toes.r",
+        "leftUpperArm": "upperarm.l",
+        "leftLowerArm": "lowerarm.l",
+        "leftHand": "wrist.l",
+        "rightUpperArm": "upperarm.r",
+        "rightLowerArm": "lowerarm.r",
+        "rightHand": "wrist.r"
+      },
+      "clips": [
+        {
+          "motion": "idle",
+          "source": "animations",
+          "path": "KayKit_Character_Animations_1.1/Animations/gltf/Rig_Medium/Rig_Medium_General.glb",
+          "clip": "Idle_A"
+        },
+        {
+          "motion": "walk",
+          "source": "animations",
+          "path": "KayKit_Character_Animations_1.1/Animations/gltf/Rig_Medium/Rig_Medium_MovementBasic.glb",
+          "clip": "Walking_A"
+        },
+        {
+          "motion": "run",
+          "source": "animations",
+          "path": "KayKit_Character_Animations_1.1/Animations/gltf/Rig_Medium/Rig_Medium_MovementBasic.glb",
+          "clip": "Running_A"
+        },
+        {
+          "motion": "reach",
+          "source": "animations",
+          "path": "KayKit_Character_Animations_1.1/Animations/gltf/Rig_Medium/Rig_Medium_General.glb",
+          "clip": "PickUp"
+        },
+        {
+          "motion": "hold",
+          "source": "animations",
+          "path": "KayKit_Character_Animations_1.1/Animations/gltf/Rig_Medium/Rig_Medium_Tools.glb",
+          "clip": "Holding_A"
+        },
+        {
+          "motion": "sit",
+          "source": "animations",
+          "path": "KayKit_Character_Animations_1.1/Animations/gltf/Rig_Medium/Rig_Medium_Simulation.glb",
+          "clip": "Sit_Chair_Idle"
+        }
+      ],
+      "in_place": [
+        "root",
+        "hips"
+      ],
+      "ground_speed": {
+        "motions": [
+          "walk",
+          "run"
+        ],
+        "feet": [
+          "foot.l",
+          "foot.r",
+          "toes.l",
+          "toes.r"
+        ],
+        "stance_mm": 10,
+        "samples": 240
+      },
+      "absent_joints": {
+        "handslot.l": "a slot the clips carry for a held thing; this figure has none, so a thing it holds sits at its hand bone",
+        "handslot.r": "a slot the clips carry for a held thing; this figure has none, so a thing it holds sits at its hand bone"
+      },
+      "cover": {
+        "Mannequin_Medium_Body": {
+          "what": "name tag",
+          "uv_from": [
+            0.5,
+            0.5
+          ],
+          "uv_to": [
+            1.0,
+            1.0
+          ],
+          "uv": [
+            0.5456,
+            0.2
+          ],
+          "reason": "a name printed on its chest; a body here shows no name, so the tag is drawn in the blue of the top around it"
+        }
+      },
+      "reasons": {
+        "joints": {
+          "root": "the rig's own root below the hips; the body plan starts at the hips, so it stays in the figure and moves with its clips",
+          "hand.l": "a palm joint past the wrist; the body plan's left hand is the wrist joint, so this stays in the figure and moves with its clips",
+          "hand.r": "a palm joint past the wrist; the body plan's right hand is the wrist joint, so this stays in the figure and moves with its clips"
+        },
+        "clips": {
+          "Death_A": "this world has no dying",
+          "Death_A_Pose": "this world has no dying",
+          "Death_B": "this world has no dying",
+          "Death_B_Pose": "this world has no dying",
+          "Hit_A": "this world has no harm",
+          "Hit_B": "this world has no harm",
+          "Idle_B": "one idle clip is kept; this is a second idle",
+          "Interact": "a push with one hand at chest height; no motion of a person's body is drawn with it",
+          "Spawn_Air": "things arrive by the world's rules, never by a clip",
+          "Spawn_Ground": "things arrive by the world's rules, never by a clip",
+          "T-Pose": "the figure's own rest pose is kept; a clip of it adds nothing",
+          "Throw": "this world has no throwing",
+          "Use_Item": "no motion of a person's body is drawn with it",
+          "Jump_Full_Long": "walking has no jumping",
+          "Jump_Full_Short": "walking has no jumping",
+          "Jump_Idle": "walking has no jumping",
+          "Jump_Land": "walking has no jumping",
+          "Jump_Start": "walking has no jumping",
+          "Running_B": "one run clip is kept; this is a second run",
+          "Walking_B": "one walk clip is kept; this is another walk",
+          "Walking_C": "one walk clip is kept; this is another walk",
+          "Holding_B": "one holding clip is kept; this one holds a thing across the body",
+          "Holding_C": "one holding clip is kept; this one holds a thing across the body",
+          "Sit_Chair_Down": "the movement into a seat; the world blends from standing to sitting",
+          "Sit_Chair_StandUp": "the movement out of a seat; the world blends from sitting to standing",
+          "Sit_Floor_Down": "this world seats people on seats, not on the ground",
+          "Sit_Floor_Idle": "this world seats people on seats, not on the ground",
+          "Sit_Floor_StandUp": "this world seats people on seats, not on the ground",
+          "Waving": "a greeting is a line said, not a wave",
+          "Cheering": "a motion no ability here draws"
+        },
+        "files": {
+          "Rig_Medium_Tools.glb": "a tool or work motion; no ability here uses a tool",
+          "Rig_Medium_Simulation.glb": "a motion no ability here draws"
+        }
+      }
     }
   ]
 }

@@ -7,14 +7,19 @@ What is shown here, with no database and none of the source archives:
     check; its translation manifest is the one its origin names, reads, targets that look, and
     accounts for every field of the committed source reading, whose files are its ingredients;
 *   an imported figure's rig names only joints and clips its container holds, its clips stay in
-    place on the joints its import document names, and it stands at the height its look states;
+    place on the joints its import document names, it stands at the height its look states, and
+    a region its import covers (a printed name tag) draws from one plain point of its picture;
 *   a static look a kind lists lies inside the kind's box, its container read from the file;
 *   every file an imported look names (its container, import receipt, source reading and its
     sources' licence files) is allowlisted for the API image and copied into it;
+*   a manifest made again by an importer edited since keeps the digest of the importer that first
+    made it, and only while nothing else in it differs;
 *   the importer's merge, on a small figure made here: only the named clips come across, named by
     their motions, each joint the import holds in place keeps its first key's ground position while
     it rises and falls, and the height is baked into the vertices, the joints' and clips'
-    translations and the inverse bind matrices, with no node scaled.
+    translations and the inverse bind matrices, with no node scaled; a clip's channels on a joint
+    the figure lacks are left out only where the import names that joint, and a covered region of
+    the picture is drawn from one point of it, on whole triangles only.
 
 The archives themselves are checked by ``scripts/things/import_looks.py --check`` where they are
 present; nothing here needs them.
@@ -139,7 +144,7 @@ def test_an_imported_figure_s_rig_names_only_what_its_container_holds(look):
     clips = {animation["name"] for animation in gltf["animations"]}
     rig = doc["rig"]
     assert set(rig["bones"].values()) <= joints
-    assert set(rig["sockets"].values()) <= joints
+    assert set(rig.get("sockets", {}).values()) <= joints
     assert set(rig["clips"].values()) == clips  # only the clips its motions use came across
     assert set(rig["ground_speed_mm_per_s"]) <= set(rig["clips"])
 
@@ -170,6 +175,46 @@ def test_an_imported_figure_s_clips_stay_in_place(look):
             assert {(x, z) for x, _, z in keys} == {(keys[0][0], keys[0][2])}
             seen += 1
     assert seen, "the clips move the joints the import holds in place"
+
+
+def _covers() -> list[tuple[str, str]]:
+    found = []
+    for doc in _figures():
+        plan = _json(_receipts()[doc["container"]["sha256"]].parent / "import.json")
+        entry = next(entry for entry in plan["looks"] if entry["look"] == doc["look"])
+        found += [(doc["look"], part) for part in sorted(entry.get("cover", {}))]
+    return found
+
+
+def test_an_imported_figure_ships_with_a_covered_region():
+    assert _covers()
+
+
+@pytest.mark.parametrize(("look", "part"), _covers())
+def test_a_covered_region_of_an_imported_figure_draws_from_its_one_point(look, part):
+    """Read from the committed container, apart from the importer: no texture coordinate of the
+    covered part falls inside the covered box, but for the one point the cover draws from."""
+    doc = _json(LOOKS / f"{look}.v1.json")
+    plan = _json(_receipts()[doc["container"]["sha256"]].parent / "import.json")
+    region = next(entry for entry in plan["looks"] if entry["look"] == look)["cover"][part]
+    payload = _container(doc)
+    gltf = _gltf(payload)
+    binary_start = 20 + struct.unpack("<I", payload[12:16])[0] + 8
+    point = tuple(struct.unpack("<2f", struct.pack("<2f", *region["uv"])))
+    (u0, v0), (u1, v1) = region["uv_from"], region["uv_to"]
+    at_point = 0
+    for mesh in gltf["meshes"]:
+        for primitive in mesh["primitives"]:
+            accessor = gltf["accessors"][primitive["attributes"]["TEXCOORD_0"]]
+            view = gltf["bufferViews"][accessor["bufferView"]]
+            start = binary_start + view.get("byteOffset", 0) + accessor.get("byteOffset", 0)
+            corners = [
+                struct.unpack_from("<2f", payload, start + 8 * i) for i in range(accessor["count"])
+            ]
+            inside = [c for c in corners if u0 <= c[0] <= u1 and v0 <= c[1] <= v1]
+            assert all(c == point for c in inside)
+            at_point += corners.count(point)
+    assert at_point, "the cover's point draws the covered corners"
 
 
 @pytest.mark.parametrize("look", [doc["look"] for doc in _figures()])
@@ -268,16 +313,18 @@ def _glb(document: dict[str, Any], binary: bytes) -> bytes:
 
 
 def _small_figure() -> tuple[bytes, bytes]:
-    """A figure of three joints and one triangle 2 m tall whose inverse bind matrices undo its rest
-    pose (the hips 1 m above the root, the foot back on the ground), and a clip file with two
-    clips."""
+    """A figure of three joints and one indexed, textured triangle 2 m tall whose inverse bind
+    matrices undo its rest pose (the hips 1 m above the root, the foot back on the ground), and a
+    clip file with three clips, one of which moves a joint the figure lacks."""
     positions = struct.pack("<9f", 0, 0, 0, 0.5, 0, 0, 0, 2.0, 0)
     joints = struct.pack("<12B", 0, 0, 0, 0, 1, 0, 0, 0, 2, 0, 0, 0)
     weights = struct.pack("<12f", 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
     identity = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]
     hips = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, -1, 0, 1]
     matrices = struct.pack("<48f", *identity, *hips, *identity)
-    figure_binary = positions + joints + weights + matrices
+    texcoords = struct.pack("<6f", 0.6, 0.6, 0.9, 0.6, 0.75, 0.9)
+    indices = struct.pack("<3H", 0, 1, 2)
+    figure_binary = positions + joints + weights + matrices + texcoords + indices
     figure = {
         "asset": {"version": "2.0"},
         "scene": 0,
@@ -292,7 +339,17 @@ def _small_figure() -> tuple[bytes, bytes]:
         "meshes": [
             {
                 "name": "Body",
-                "primitives": [{"attributes": {"POSITION": 0, "JOINTS_0": 1, "WEIGHTS_0": 2}}],
+                "primitives": [
+                    {
+                        "attributes": {
+                            "POSITION": 0,
+                            "JOINTS_0": 1,
+                            "WEIGHTS_0": 2,
+                            "TEXCOORD_0": 4,
+                        },
+                        "indices": 5,
+                    }
+                ],
             }
         ],
         "skins": [{"joints": [1, 2, 3], "inverseBindMatrices": 3}],
@@ -308,12 +365,16 @@ def _small_figure() -> tuple[bytes, bytes]:
             {"bufferView": 1, "componentType": 5121, "count": 3, "type": "VEC4"},
             {"bufferView": 2, "componentType": 5126, "count": 3, "type": "VEC4"},
             {"bufferView": 3, "componentType": 5126, "count": 3, "type": "MAT4"},
+            {"bufferView": 4, "componentType": 5126, "count": 3, "type": "VEC2"},
+            {"bufferView": 5, "componentType": 5123, "count": 3, "type": "SCALAR"},
         ],
         "bufferViews": [
             {"buffer": 0, "byteOffset": 0, "byteLength": 36},
             {"buffer": 0, "byteOffset": 36, "byteLength": 12},
             {"buffer": 0, "byteOffset": 48, "byteLength": 48},
             {"buffer": 0, "byteOffset": 96, "byteLength": 192},
+            {"buffer": 0, "byteOffset": 288, "byteLength": 24},
+            {"buffer": 0, "byteOffset": 312, "byteLength": 6},
         ],
         "buffers": [{"byteLength": len(figure_binary)}],
     }
@@ -323,7 +384,7 @@ def _small_figure() -> tuple[bytes, bytes]:
     clips_binary = times + drifting + turning
     clips = {
         "asset": {"version": "2.0"},
-        "nodes": [{"name": "root"}, {"name": "hips"}, {"name": "foot"}],
+        "nodes": [{"name": "root"}, {"name": "hips"}, {"name": "foot"}, {"name": "slot"}],
         "animations": [
             {
                 "name": "Walk",
@@ -337,6 +398,14 @@ def _small_figure() -> tuple[bytes, bytes]:
                 "name": "Dance",
                 "channels": [{"sampler": 0, "target": {"node": 2, "path": "rotation"}}],
                 "samplers": [{"input": 0, "output": 2}],
+            },
+            {
+                "name": "Reach",
+                "channels": [
+                    {"sampler": 0, "target": {"node": 1, "path": "rotation"}},
+                    {"sampler": 1, "target": {"node": 3, "path": "translation"}},
+                ],
+                "samplers": [{"input": 0, "output": 2}, {"input": 0, "output": 1}],
             },
         ],
         "accessors": [
@@ -404,6 +473,59 @@ def test_the_importer_merges_only_the_named_clips_in_place_at_the_stated_height(
         skin["joints"], merged.values(skin["inverseBindMatrices"]), strict=True
     ):
         assert matrix[12:15] == (0.0, undo[names[joint]], 0.0)
+
+
+def test_the_importer_leaves_out_only_named_absent_joints_and_covers_whole_triangles():
+    importer = _importer()
+    figure, clip_file = _small_figure()
+    read = importer.read_glb
+    files = {"clips.glb": read(clip_file)}
+    reach = [{"file": "clips.glb", "clip": "Reach", "motion": "reach"}]
+    with pytest.raises(importer.ImportRefused, match="'slot', which the figure's skeleton lacks"):
+        importer.merge_figure(read(figure), files, reach, ["hips"], 1800)
+    payload, made = importer.merge_figure(
+        read(figure), files, reach, ["hips"], 1800, absent=["slot"]
+    )
+    merged = read(payload)
+    names = [node["name"] for node in merged.document["nodes"]]
+    channels = merged.document["animations"][0]["channels"]
+    assert "slot" not in names and [names[c["target"]["node"]] for c in channels] == ["hips"]
+    assert made["clips"]["Reach"]["left_out"] == ["slot"]
+    # A cover draws every corner inside its box from one point of the picture, whole triangles only.
+    cover = {"Body": {"uv_from": [0.5, 0.5], "uv_to": [1.0, 1.0], "uv": [0.25, 0.125]}}
+    payload, made = importer.merge_figure(
+        read(figure), files, reach, ["hips"], 1800, absent=["slot"], cover=cover
+    )
+    merged = read(payload)
+    corners = merged.document["meshes"][0]["primitives"][0]["attributes"]["TEXCOORD_0"]
+    assert merged.values(corners) == [(0.25, 0.125)] * 3
+    assert made["covered"] == {"Body": {"corners": 3, "triangles": 1}}
+    for box, refusal in (
+        (([0.85, 0.5], [1.0, 0.7]), "cuts across a triangle"),
+        (([0.0, 0.0], [0.1, 0.1]), "holds none"),
+    ):
+        cover = {"Body": {"uv_from": box[0], "uv_to": box[1], "uv": [0.25, 0.125]}}
+        with pytest.raises(importer.ImportRefused, match=refusal):
+            importer.merge_figure(
+                read(figure), files, reach, ["hips"], 1800, absent=["slot"], cover=cover
+            )
+
+
+def test_a_manifest_keeps_the_importer_that_first_made_it_only_while_it_is_the_same(tmp_path):
+    importer = _importer()
+    committed = _json(MANIFESTS / "kaykit-sword.v1.json")
+    path = tmp_path / "kaykit-sword.v1.json"
+    path.write_text(json.dumps(committed), encoding="utf-8")
+    made_again = copy.deepcopy(committed)
+    made_again["translator"]["sha256"] = "0" * 64  # an importer edited since
+    assert importer._first_translator(path, made_again) == committed
+    changed = copy.deepcopy(made_again)
+    changed["fields"][0]["words"] = "the files it was read from"
+    assert importer._first_translator(path, changed) == changed
+    renamed = copy.deepcopy(made_again)
+    renamed["translator"]["version"] = committed["translator"]["version"] + 1
+    assert importer._first_translator(path, renamed) == renamed
+    assert importer._first_translator(tmp_path / "absent.json", made_again) == made_again
 
 
 def test_every_file_an_imported_look_names_ships_in_the_api_image():

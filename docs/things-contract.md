@@ -402,6 +402,7 @@ kind suggesting a look the library does not hold at the kind's digest each stop 
 | `bench`, `cafe-table`, `seating-planter`, `market-stall`, `planter-tree`, `lamp-post` | `static` | authored here, CC0, pinned to the reviewed asset's dedication |
 | `kaykit-knight` | `skinned` | imported, CC0: the knight of Kay Lousberg's KayKit Adventurers 2.0, with idle, walk, run and pick-up clips from that pack and holding and sitting clips from KayKit Character Animations 1.1, standing 1,800 mm, holding at its own hand slots |
 | `kaykit-sword` | `static` | imported, CC0: the one-handed sword of KayKit Adventurers 2.0, scaled to stand inside the sword's box |
+| `kaykit-mannequin` | `skinned` | imported, CC0: the medium mannequin of KayKit Character Animations 1.1 with that pack's idle, walk, run, pick-up, holding and sitting clips, standing 1,750 mm, its printed name tag covered; no hand slots, so it holds things at its hand bones |
 
 ### Imported looks
 
@@ -410,18 +411,24 @@ A look made from a pack another maker published is imported by one translator,
 (`exulanica.look-import/v1`, `assets/things/<folder>/import.json`) that states, as data, each source
 pack (its page and the date it was read, its archive by digest, its licence file), and for each
 look the files it reads, how a figure's joints map onto the body plan's bones and sockets, the clip
-each motion uses, the box an object stands inside, and why each joint or clip that does not come
-across stays behind. The translator names no pack or thing. It merges a rigged figure into the
-shared skinned shape (`exulanica.skinned-glb/v1`): one skinned mesh of the figure's parts with only
-the clips its motions use, each named by its motion, holding the joints the document names at their
-first key's ground position so a clip never carries the figure, with the uniform scale that stands
-it at the look's height baked into its vertices, bind matrices, joints and clips, so no node is
-scaled. It fits an object inside its box and prepares it as any person's static container is. It measures each
+each motion uses, the joints its clips move that the figure lacks, any region printed on its picture
+that a body here does not show, the box an object stands inside, and why each joint, clip or region
+that does not come across stays behind. The translator names no pack or thing. It merges a rigged
+figure into the shared skinned shape (`exulanica.skinned-glb/v1`): one skinned mesh of the figure's
+parts with only the clips its motions use, each named by its motion, holding the joints the document
+names at their first key's ground position so a clip never carries the figure, with the uniform
+scale that stands it at the look's height baked into its vertices, bind matrices, joints and clips,
+so no node is scaled. A clip's channels on a joint the figure lacks are left out only where the
+document names that joint; a printed region such as a name tag is covered by drawing its triangles
+from one plain point of the same picture, no pixel changed. It fits an object inside its box and
+prepares it as any person's static container is. It measures each
 moving clip's ground speed from the clip itself. Beside the import document it commits each
 container with a reviewed import receipt, each source's licence file byte for byte and a source
 reading per look; under `assets/catalogs/things` it writes the look and its translation manifest
-(version 2), which accounts for every field of the reading. The archives are never committed; with
-them present, `--check` makes everything again and compares every byte. The API image carries
+(version 2), which accounts for every field of the reading and names the importer by the digest of
+the file that first made it, so an importer edited since makes a shipped look again without moving
+it. The archives are never committed; with them present, `--check` makes everything again and
+compares every byte. The API image carries
 `assets/things` beside the catalogs.
 
 ## Creatures: bodies drafted from words
@@ -620,7 +627,7 @@ These are material limits of the boundary above, not partial behaviour:
 | Catalogs | [`catalogs.py`](../exulanica/things/catalogs.py), [`assets/catalogs/things`](../assets/catalogs/things) | `tests/test_thing_kinds.py`, `tests/test_catalog_provenance.py` (every entry says why it exists) |
 | Thing kinds | [`kinds.py`](../exulanica/things/kinds.py) | `tests/test_thing_kinds.py` (each refusal by name, against a positive control) |
 | Looks | [`looks.py`](../exulanica/things/looks.py), [`authored.py`](../exulanica/things/authored.py), [`pieces.py`](../exulanica/things/pieces.py), [`recipes`](../assets/catalogs/things/recipes) | `tests/test_thing_kinds.py`, `tests/test_thing_looks_and_origins.py` (each authored container written again and admitted, a blocky figure's joints, a static look inside its box), `tests/test_thing_recipes.py` (each recipe read or refused by name, the blocky figures one stated body, no things module naming a shipped key) |
-| Imported looks | [`import_looks.py`](../scripts/things/import_looks.py), [`assets/things`](../assets/things) | `tests/test_thing_imports.py` (each imported look held to its committed container, receipt, licence, manifest and source reading; a figure's rig naming only what its container holds, its clips in place, its height; an imported static look inside its kind's box; the merge on a small figure made in the test; every file shipped in the API image) |
+| Imported looks | [`import_looks.py`](../scripts/things/import_looks.py), [`assets/things`](../assets/things) | `tests/test_thing_imports.py` (each imported look held to its committed container, receipt, licence, manifest and source reading; a figure's rig naming only what its container holds, its clips in place, its height; an imported static look inside its kind's box; the merge on a small figure made in the test, with a joint the figure lacks and a covered region; every file shipped in the API image), `tests/test_thing_skinned_looks.py` (every shipped skinned look read by the skinned container reader) |
 | Origin record and vocabularies | [`origin.py`](../exulanica/things/origin.py), [`vocabularies.py`](../exulanica/things/vocabularies.py) | `tests/test_thing_looks_and_origins.py` |
 | Translation manifests and lines | [`manifests.py`](../exulanica/things/manifests.py), [`lines.py`](../exulanica/things/lines.py) | `tests/test_thing_looks_and_origins.py` (words held to the line rule, a look's import, each refusal against a positive control) |
 | Shipped kinds and looks | [`shipped_things.py`](../scripts/things/shipped_things.py), the lock `kinds.lock.json` | `tests/test_thing_kinds.py` (`--check`), `tests/test_placed_things.py` (every shipped version at its locked digest; a changed, unlocked or missing file refused) |
