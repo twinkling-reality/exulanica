@@ -163,7 +163,11 @@ show.
 Create a world (`ui/world-recipes.ts`, `ui/world-description.ts`, `ui/create-world.css`) is one full
 sheet in the same language: describing the town in the person's own words comes first, the recipes
 as picture cards under it, and the values with Create this town in the right column; the shares
-that set the mix of buildings and shops sit behind one disclosure. Escape goes back; Command or
+that set the mix of buildings and shops sit behind one disclosure. Above Create this town a Look
+row names the look the town will be made in, the host's default (the pack `GET /world/style-packs`
+marks default) until the person chooses another; Change look opens the Look sheet to choose only
+(Choose this look, nothing saved), and the town is made bound to the look chosen (`style_pack` on
+`POST /worlds/generated`). Escape goes back; Command or
 Control with Enter creates the town once its values are admitted.
 
 ### Who decides

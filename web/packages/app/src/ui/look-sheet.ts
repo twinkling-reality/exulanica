@@ -70,13 +70,18 @@ export function buildLookSheet(options: {
    * them. Given, the sheet opens see-through on the world rather than over a picture of it.
    */
   readonly onBrowse?: (option: LookOption) => void;
+  /**
+   * Words for a sheet that only chooses (a town not made yet): the primary action's words and the
+   * caption of the look chosen so far, in place of "Use this look" and "Now".
+   */
+  readonly choosing?: { readonly use: string; readonly now: string };
 }): LookSheet {
   const backdrop = el('figure', { class: 'look-sheet-backdrop', 'aria-hidden': 'true' });
   const overline = el('p', { class: 'look-sheet-overline' });
   const title = el('h1', { class: 'look-sheet-title' });
   const about = el('p', { class: 'look-sheet-about' });
   const use = el('button', { type: 'button', class: 'look-sheet-use', 'data-action': 'look.use' }, [
-    el('span', { text: 'Use this look' }), el('kbd', { text: '↵' }),
+    el('span', { text: options.choosing?.use ?? 'Use this look' }), el('kbd', { text: '↵' }),
   ]) as HTMLButtonElement;
   const keep = el('button', { type: 'button', class: 'look-sheet-keep', 'data-action': 'look.keep' }, [
     el('span'), el('kbd', { text: 'Esc' }),
@@ -86,8 +91,8 @@ export function buildLookSheet(options: {
   const strip = el('div', { class: 'look-sheet-strip', role: 'listbox', 'aria-label': 'Looks' });
   const keys = el('p', { class: 'look-sheet-keys', 'aria-hidden': 'true' }, [
     el('span', {}, [el('kbd', { text: '← →' }), 'Choose']),
-    el('span', {}, [el('kbd', { text: '↵' }), 'Use']),
-    el('span', {}, [el('kbd', { text: 'Esc' }), 'Back to the world']),
+    el('span', {}, [el('kbd', { text: '↵' }), options.choosing === undefined ? 'Use' : 'Choose this look']),
+    el('span', {}, [el('kbd', { text: 'Esc' }), options.choosing === undefined ? 'Back to the world' : 'Back']),
   ]);
   const root = el('section', {
     class: 'look-sheet', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Look', 'data-ui-stage': 'dark', tabindex: '-1',
@@ -123,7 +128,7 @@ export function buildLookSheet(options: {
     const isNow = option.packId === current;
     use.hidden = isNow;
     use.disabled = busy;
-    use.querySelector('span')!.textContent = busy ? 'Working…' : 'Use this look';
+    use.querySelector('span')!.textContent = busy ? 'Working…' : options.choosing?.use ?? 'Use this look';
     keep.querySelector('span')!.textContent = isNow ? `Keep ${option.title}` : now === null ? 'Back to the world' : `Keep ${now.title}`;
     replace(meta, [
       el('span', { text: licenceWords(option.licence) }),
@@ -202,7 +207,7 @@ export function buildLookSheet(options: {
           ...(option.picture === null ? [] : [el('span', { class: 'look-sheet-picture', 'aria-hidden': 'true' }, [
             el('img', { src: option.picture, alt: '', loading: 'lazy', decoding: 'async' }),
           ])]),
-          el('span', { class: 'look-sheet-caption', text: option.packId === now ? 'Now' : `Look ${index + 1}` }),
+          el('span', { class: 'look-sheet-caption', text: option.packId === now ? options.choosing?.now ?? 'Now' : `Look ${index + 1}` }),
           el('span', { class: 'look-sheet-card-title', text: option.title }),
         ]) as HTMLButtonElement;
         card.addEventListener('focus', () => choose(index));
@@ -222,6 +227,38 @@ export function buildLookSheet(options: {
       live = next && options.onBrowse !== undefined;
       root.dataset['live'] = String(live);
       render();
+    },
+  };
+}
+
+export interface LookRow {
+  readonly root: HTMLElement;
+  /** Show the look a new town will be made in, with a line on why it is this one. */
+  show(option: LookOption, line: string): void;
+}
+
+/**
+ * The look a town not made yet will be drawn in, beside its values in Create a world: its picture,
+ * title and a line, and Change look, which opens the Look sheet to choose another.
+ */
+export function buildLookRow(onChange: () => void): LookRow {
+  const picture = el('span', { class: 'look-row-picture', 'aria-hidden': 'true' });
+  const title = el('span', { class: 'look-row-title' });
+  const line = el('span', { class: 'look-row-line' });
+  const change = el('button', { type: 'button', class: 'look-row-change', 'data-action': 'look.change', text: 'Change look' });
+  change.addEventListener('click', onChange);
+  const root = el('section', { class: 'look-row', 'aria-label': 'Look', hidden: true }, [
+    el('p', { class: 'look-row-label', text: 'Look' }),
+    el('div', { class: 'look-row-body' }, [picture, el('span', { class: 'look-row-words' }, [title, line]), change]),
+  ]);
+  return {
+    root,
+    show(option, words) {
+      root.hidden = false;
+      setText(title, option.title);
+      setText(line, words);
+      replace(picture, option.picture === null ? [] : [el('img', { src: option.picture, alt: '', decoding: 'async' })]);
+      picture.hidden = option.picture === null;
     },
   };
 }

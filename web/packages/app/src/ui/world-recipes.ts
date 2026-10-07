@@ -53,6 +53,8 @@ export interface WorldRecipesPanel {
    * to the page.
    */
   focus(): void;
+  /** Where the look a new town is made in is shown, above Create this town (empty until filled). */
+  readonly lookSlot: HTMLElement;
   /** Say where the values shown came from, such as a saved world's own; null says nothing. */
   showOrigin(words: string | null): void;
 }
@@ -111,6 +113,7 @@ export function buildWorldRecipes(options: {
     }
   };
   const origin = el('p', { class: 'world-recipes-origin', role: 'status', hidden: true });
+  const lookSlot = el('div', { class: 'world-recipes-look' });
   const root = el('section', {
     class: 'world-recipes', role: 'dialog', 'aria-label': say('worldRecipes.heading'),
     'data-ui-stage': 'dark', tabindex: '-1',
@@ -124,6 +127,7 @@ export function buildWorldRecipes(options: {
     ]),
     el('div', { class: 'world-recipes-side' }, [
       controls,
+      lookSlot,
       status,
       el('div', { class: 'world-recipes-actions' }, [make, close]),
     ]),
@@ -267,6 +271,7 @@ export function buildWorldRecipes(options: {
 
   return {
     root,
+    lookSlot,
     focus() {
       const describe = root.querySelector<HTMLElement>('.world-description-input');
       const target = describe !== null && usable(describe) ? describe

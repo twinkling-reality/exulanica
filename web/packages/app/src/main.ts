@@ -73,9 +73,9 @@ import { button, errorState } from './ui/system/components.js';
 import { createLayout, MODAL_BACKGROUND_REGIONS, type Layout } from './ui/system/layout.js';
 import { mountActions, type MountedActions } from './composition/actions.js';
 import { redrawWorldLook } from './composition/world-look-redraw.js';
-import { buildLookSheet, type LookOption } from './ui/look-sheet.js';
+import { buildLookRow, buildLookSheet } from './ui/look-sheet.js';
 import type { WorldStylePackBinding } from './world-style-api.js';
-import type { ListedStylePack } from './world-look.js';
+import { readLookLibrary, type LookLibrary } from './composition/look-library.js';
 import { fill } from './ui/copy.js';
 import { actionState, perform } from './ui/actions/surfaces.js';
 import { actionSpec, availability } from './ui/actions/registry.js';
@@ -353,9 +353,44 @@ function showWorldRecipes(
     ]).then(([{ buildWorldRecipes }, { attachWorldDescription }, { WorldSpecificationClient }]) => {
       if (!stand.isConnected) return;
       const specification = new WorldSpecificationClient(credentials);
+      // The look the town is made in: the host's default until the person changes it, sent with
+      // the making so the town is bound to it (`style_pack` on POST /worlds/generated).
+      let looks: LookLibrary | null = null;
+      let chosenLook: string | null = null;
+      const lookRow = buildLookRow(() => {
+        if (looks === null) return;
+        const library = looks;
+        shell.querySelector('section.look-sheet')?.remove();
+        const sheet = buildLookSheet({
+          worldTitle: 'A new town',
+          choosing: { use: 'Choose this look', now: 'Chosen' },
+          onUse: async (option) => {
+            chosenLook = option.packId;
+            lookRow.show(option, 'Your choice. You can change it any time later in Design.');
+            sheet.root.remove();
+            current.querySelector<HTMLElement>('.look-row-change')?.focus({ preventScroll: true });
+            return '';
+          },
+          onClose: () => {
+            sheet.root.remove();
+            current.querySelector<HTMLElement>('.look-row-change')?.focus({ preventScroll: true });
+          },
+        });
+        shell.append(sheet.root);
+        sheet.show(library.options, chosenLook ?? library.defaultId);
+        sheet.focus();
+      });
+      void readLookLibrary(credentials).then((library) => {
+        looks = library;
+        const first = library.options.find((option) => option.packId === library.defaultId);
+        if (first === undefined) return;
+        lookRow.show(first, 'The look this server draws new towns in. You can change it now, or any time later in Design.');
+      }, () => undefined);
       const panel = buildWorldRecipes({
         specification: () => specification.specification(),
-        make: (preset, values) => client.makeGenerated(preset.key, preset.label, values),
+        make: (preset, values) => client.makeGenerated(
+          preset.key, preset.label, values, chosenLook === null ? null : looks?.binding(chosenLook) ?? null,
+        ),
         open: async (entry) => {
           panel.root.remove();
           state.savedWorldEntries = await client.entries();
@@ -373,6 +408,7 @@ function showWorldRecipes(
       current = panel.root;
       // Focus moves into the panel as it replaces the stand-in, which took it with it; Describe it
       // takes it once attached (composition/world-description.ts).
+      panel.lookSlot.append(lookRow.root);
       panel.focus();
       attachWorldDescription(panel, { credentials, specification: () => specification.specification() });
       // A saved world's own values, loaded as a person's edit is: what is out of range now is said
@@ -1202,59 +1238,36 @@ async function mount(): Promise<void> {
     onShowCustomize: () => dispatchShell({ type: 'toggle-options' }),
     ...(lookOffered ? { onChangeLook: () => void openLook() } : {}),
   });
-  // world-look.js loads with a generated world's tiles, never with the page, so it is read here too.
-  let lookPacks: Promise<readonly ListedStylePack[]> | null = null;
+  let library: Promise<LookLibrary> | null = null;
+  const lookLibrary = (): Promise<LookLibrary> => (library ??= readLookLibrary(lookAccess!));
   let defaultLook: string | null = null;
-  const packsForLook = (): Promise<readonly ListedStylePack[]> => (lookPacks ??= import('./world-look.js')
-    .then((look) => { defaultLook = look.DEFAULT_WORLD_LOOK; return look.listedStylePacks(lookAccess!); }));
-  /**
-   * Each pack's preview picture as a page-local address, fetched once by the digest the list names
-   * and held to it (`stylePackContent`); null for a pack with none or one that could not be read.
-   */
-  const lookPictures = new Map<string, Promise<string | null>>();
-  const lookPicture = (pack: ListedStylePack): Promise<string | null> => {
-    const sha = pack.preview_sha256 ?? null;
-    if (sha === null) return Promise.resolve(null);
-    let held = lookPictures.get(sha);
-    if (held === undefined) {
-      held = import('./world-look.js')
-        .then((look) => look.stylePackContent(lookAccess!, sha, `${pack.title}'s picture`))
-        .then((bytes) => URL.createObjectURL(new Blob([bytes], { type: pack.preview_media_type ?? 'image/jpeg' })))
-        .catch(() => { lookPictures.delete(sha); return null; });
-      lookPictures.set(sha, held);
-    }
-    return held;
-  };
-  /** The pack this world is drawn in: the one its appearance names, else the default look. */
+  /** The pack this world is drawn in: the one its appearance names, else the host's default. */
   const currentLook = (): string | null => state.worldStyleConnection?.state.current.stylePack?.packId ?? defaultLook;
   const reflectLook = (): void => {
     if (!lookOffered) { appearance.options.setLook(null); return; }
-    void packsForLook().then(
-      (packs) => appearance.options.setLook(packs.find((pack) => pack.pack_id === currentLook())?.title ?? null),
-      () => appearance.options.setLook(null),
+    void lookLibrary().then(
+      (looks) => {
+        defaultLook = looks.defaultId;
+        appearance.options.setLook(looks.options.find((option) => option.packId === currentLook())?.title ?? null);
+      },
+      () => { library = null; appearance.options.setLook(null); },
     );
   };
   reflectLook();
   openLook = async () => {
-    let packs: readonly ListedStylePack[];
+    let looks: LookLibrary;
     try {
-      packs = await packsForLook();
+      looks = await lookLibrary();
+      defaultLook = looks.defaultId;
     } catch {
-      lookPacks = null;
+      library = null;
       appearance.options.reportWorldLifecycle('failed', 'The looks this server offers could not be read. Try again in a moment.');
       return;
     }
     dispatchShell({ type: 'show-world' });
     shell.querySelector('section.look-sheet')?.remove();
-    const pictures = await Promise.all(packs.map(lookPicture));
-    const offered: readonly LookOption[] = packs.map((pack, index) => ({
-      packId: pack.pack_id, title: pack.title, description: pack.description, authors: pack.authors,
-      licence: pack.licence, picture: pictures[index] ?? null,
-    }));
-    const bindingOf = (packId: string): WorldStylePackBinding | null => {
-      const listed = packs.find((pack) => pack.pack_id === packId);
-      return listed === undefined ? null : { packId: listed.pack_id, version: listed.version, manifestSha256: listed.manifest_sha256 };
-    };
+    const offered = looks.options;
+    const bindingOf = (packId: string): WorldStylePackBinding | null => looks.binding(packId);
     // The look drawn behind the sheet while a person browses, when it is not the world's own.
     let browsed: string | null = null;
     const sheet = buildLookSheet({

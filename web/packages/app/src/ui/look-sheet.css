@@ -143,3 +143,39 @@
   border: 1px solid var(--color-text);
   cursor: pointer;
 }
+
+/* Create a world's Look row: the look a new town is made in, and Change look. */
+#shell section.world-recipes .look-row[hidden] { display: none; }
+#shell section.world-recipes .look-row { display: grid; gap: 0.5rem; margin: 0.75rem 0 0; }
+#shell section.world-recipes .look-row-label {
+  margin: 0;
+  font: 500 0.68rem/1.4 var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+#shell section.world-recipes .look-row-body {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.9rem;
+  align-items: center;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 12px;
+}
+#shell section.world-recipes .look-row-picture { width: 6rem; aspect-ratio: 16 / 10; overflow: hidden; border-radius: 8px; }
+#shell section.world-recipes .look-row-picture[hidden] { display: none; }
+#shell section.world-recipes .look-row-picture img { width: 100%; height: 100%; object-fit: cover; }
+#shell section.world-recipes .look-row-words { display: grid; gap: 0.2rem; }
+#shell section.world-recipes .look-row-title { font: 450 0.95rem/1.3 var(--font-ui); color: var(--color-text); }
+#shell section.world-recipes .look-row-line { font-size: 0.8rem; line-height: 1.4; color: var(--color-text-muted); }
+#shell section.world-recipes .look-row-body > button.look-row-change {
+  min-height: 2.25rem;
+  padding: 0 0.9rem;
+  border-radius: 999px;
+  font: 500 0.85rem/1 var(--font-ui);
+  color: var(--color-text);
+  background: transparent;
+  border: 1px solid var(--color-border-strong);
+  cursor: pointer;
+}

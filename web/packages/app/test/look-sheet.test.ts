@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 // Look: the sheet where a world's owner chooses which of the host's packs it is drawn in.
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { BROWSE_PAUSE_MS, authorWords, buildLookSheet, licenceWords, type LookOption } from '../src/ui/look-sheet.js';
+import { BROWSE_PAUSE_MS, authorWords, buildLookRow, buildLookSheet, licenceWords, type LookOption } from '../src/ui/look-sheet.js';
 
 const pack = (packId: string, title: string, picture: string | null = `/${packId}.jpg`): LookOption => ({
   packId, title, description: `${title}, in its own words.`, authors: ['Exulanica'],
@@ -141,5 +141,37 @@ describe('browsing looks on the world itself', () => {
   it('is never live without a way to draw the world', () => {
     const { root } = sheet();
     expect(root.dataset['live']).toBe('false');
+  });
+});
+
+describe('the look of a town not made yet', () => {
+  it('says the look in the row, and Change look opens the sheet to choose another', () => {
+    const onChange = vi.fn();
+    const row = buildLookRow(onChange);
+    document.body.replaceChildren(row.root);
+    expect(row.root.hidden).toBe(true);
+    row.show(PACKS[0]!, 'The look this server draws new towns in.');
+    expect(row.root.hidden).toBe(false);
+    expect(row.root.querySelector('.look-row-title')!.textContent).toBe('Cozy town');
+    expect(row.root.querySelector('img')!.getAttribute('src')).toBe('/cozy.jpg');
+    row.show(PACKS[2]!, 'Your choice.');
+    expect(row.root.querySelector<HTMLElement>('.look-row-picture')!.hidden).toBe(true);
+    row.root.querySelector<HTMLButtonElement>('[data-action="look.change"]')!.click();
+    expect(onChange).toHaveBeenCalledTimes(1);
+  });
+
+  it('chooses rather than uses, in its own words', () => {
+    const choosing = buildLookSheet({
+      worldTitle: 'A new town', onUse: vi.fn(async () => ''), onClose: vi.fn(),
+      choosing: { use: 'Choose this look', now: 'Chosen' },
+    });
+    document.body.replaceChildren(choosing.root);
+    choosing.show(PACKS, 'cozy');
+    expect(choosing.root.querySelector('.look-sheet-caption')!.textContent).toBe('Chosen');
+    expect(choosing.root.querySelector('[data-action="look.use"] span')!.textContent).toBe('Choose this look');
+    expect(choosing.root.querySelector('.look-sheet-keys')!.textContent).toContain('Choose this look');
+    expect(choosing.root.querySelector('.look-sheet-keys')!.textContent).not.toContain('Back to the world');
+    // Choosing draws nothing: there is no world yet.
+    expect(choosing.root.dataset['live']).toBe('false');
   });
 });
