@@ -22,7 +22,7 @@ from typing import Any, Final
 
 from exulanica_agent._version import VERSION
 from exulanica_agent.body import Body
-from exulanica_agent.facade import PROMPT, RESOURCES, TOOLS, Facade, UnknownTool
+from exulanica_agent.facade import PROMPT, RESOURCES, Facade, UnknownTool
 
 __all__ = ["SERVER_NAME", "build_server", "serve_http", "serve_stdio"]
 
@@ -69,7 +69,7 @@ def build_server(facade: Facade) -> Any:
                 open_world_hint=spec.open_world,
             ),
         )
-        for spec in TOOLS
+        for spec in facade.tools
     ]
     resources = [
         types.Resource(
@@ -82,10 +82,11 @@ def build_server(facade: Facade) -> Any:
         for spec in RESOURCES
     ]
     ttl = {spec.uri: spec.ttl_ms for spec in RESOURCES}
-    schemas = {spec.name: dict(spec.input_schema) for spec in TOOLS}
+    schemas = {spec.name: dict(spec.input_schema) for spec in facade.tools}
 
     async def list_tools(_ctx: Any, _params: Any) -> Any:
-        return types.ListToolsResult(tools=tools, ttl_ms=3_600_000, cache_scope="public")
+        # The list is the grant's (see facade.offered), so a cached copy is this key's alone.
+        return types.ListToolsResult(tools=tools, ttl_ms=3_600_000, cache_scope="private")
 
     async def call_tool(_ctx: Any, params: Any) -> Any:
         try:
@@ -138,7 +139,7 @@ def build_server(facade: Facade) -> Any:
         version=VERSION,
         title="Exulanica: a body in a world",
         instructions=_INSTRUCTIONS,
-        cache_hints={"tools/list": CacheHint(ttl_ms=3_600_000, scope="public")},
+        cache_hints={"tools/list": CacheHint(ttl_ms=3_600_000, scope="private")},
         get_tool_input_schema=schemas.get,
         on_list_tools=list_tools,
         on_call_tool=call_tool,

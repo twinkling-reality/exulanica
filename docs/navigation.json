@@ -22,7 +22,8 @@
         {"path": "capabilities/scene-reconstruction.md", "role": "guide", "owns": "Making a world from photographs and what reconstruction recovers"},
         {"path": "capabilities/companion.md", "role": "guide", "owns": "What the Companion does and what it is meant to become"},
         {"path": "capabilities/world-api.md", "role": "guide", "owns": "Authenticated routes for world state, people and models, with version-safe edits"},
-        {"path": "capabilities/developer-client.md", "role": "guide", "owns": "Independent Python client setup and demonstrated workflow"}
+        {"path": "capabilities/developer-client.md", "role": "guide", "owns": "Independent Python client setup and demonstrated workflow"},
+        {"path": "capabilities/outside-agents.md", "role": "guide", "owns": "Bringing an outside AI agent into a world through the door: the agent library, the MCP facade and the examples"}
       ]
     },
     {

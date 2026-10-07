@@ -6,10 +6,10 @@ Run with a Python that has ``exulanica-agent[mcp]`` (the SDK and its HTTP client
 
 It serves a stand-in door with one open turn (the same as ``mcp_stdio.py``), starts
 ``python -m exulanica_agent mcp --http <port>``, and checks: the SDK's client, presenting the agent
-key as its bearer credential, negotiates with the facade, lists the five tools in order, receives
-the turn and answers it; a request with no key, or with another key, is refused 401; a request
-naming another host is refused before any tool runs. It prints one JSON report and exits 0 only when
-every check holds. The key is a made-up test value.
+key as its bearer credential, negotiates with the facade, lists the tools its grant offers in
+order, receives the turn and answers it; a request with no key, or with another key, is refused
+401; a request naming another host is refused before any tool runs. It prints one JSON report and
+exits 0 only when every check holds. The key is a made-up test value.
 """
 
 from __future__ import annotations
@@ -117,7 +117,7 @@ def main() -> int:
         "a request with another key is refused": report["other_key"] == 401,
         "a request naming another host is refused": report["other_host"] in (400, 403, 421),
         "the SDK client negotiates": bool(report.get("negotiated")),
-        "the five tools in order": report.get("tools") == TOOLS,
+        "the grant's tools in order": report.get("tools") == TOOLS,
         "a turn is handed over": report.get("turn") == REQUEST_ID,
         "act reaches the door": report.get("door_answers") == ["go to the bench"],
         "the key never reaches stderr": not report["stderr_names_key"],

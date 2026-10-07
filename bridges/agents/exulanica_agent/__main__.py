@@ -2,8 +2,9 @@
 
 ``exulanica-agent mcp [--http PORT]``
     The MCP facade, for an MCP client to start: over stdio by default, or Streamable HTTP on
-    127.0.0.1. Reads ``EXULANICA_URL``, ``EXULANICA_AGENT_KEY``, ``EXULANICA_AGENT_NAME``,
-    ``EXULANICA_AGENT_MAKER`` and ``EXULANICA_AGENT_MIND``.
+    127.0.0.1. Reads ``EXULANICA_URL``, ``EXULANICA_AGENT_KEY`` (or the file
+    ``EXULANICA_AGENT_KEY_FILE`` names), ``EXULANICA_AGENT_NAME``, ``EXULANICA_AGENT_MAKER`` and
+    ``EXULANICA_AGENT_MIND``.
 ``exulanica-agent check``
     Says hello with the same settings and prints what the agent may do here and the world's rules;
     a way to see a setup works before starting a mind.
@@ -11,6 +12,9 @@
     For a world's owner, with an API token that may issue grants (``EXULANICA_TOKEN``): issues a
     grant for the agents' door and writes the agent key, shown once, to a new file only its owner
     may read. The key is never printed.
+``exulanica-agent key --grant <id> --key-file <f>``
+    For a world's owner: a new agent key for a grant, written the same way. A grant has one key at
+    a time, so the earlier key stops working at once, and an agent still holding it reads why.
 
 Exit codes: 0 when it worked, 1 when the world refused (with its words), 2 for a missing setting.
 """
@@ -25,7 +29,7 @@ import uuid
 from collections.abc import Sequence
 from pathlib import Path
 
-from exulanica_agent.body import ENV_KEY, ENV_URL, Body
+from exulanica_agent.body import ENV_URL, Body, agent_key
 from exulanica_agent.transport import AgentError, Door, DoorRefusal
 
 #: The bridge key a deployment admits outside agents under.
@@ -47,16 +51,51 @@ def _parser() -> argparse.ArgumentParser:
     grant.add_argument("--minutes", type=int, default=120, help="how long, at most 1440")
     grant.add_argument("--quiet", action="store_true", help="its things may not speak")
     grant.add_argument("--key-file", required=True, type=Path, help="a new file for the key")
+    key = commands.add_parser("key", help="a new agent key for a grant, ending the earlier one")
+    key.add_argument("--grant", required=True, help="the grant's id")
+    key.add_argument("--key-file", required=True, type=Path, help="a new file for the key")
     return parser
 
 
-def _grant(arguments: argparse.Namespace) -> int:
+def _owner_door(key_file: Path) -> Door | None:
+    """The door as the world's owner, or None after saying which setting is missing."""
     url, token = os.environ.get(ENV_URL), os.environ.get(ENV_TOKEN)
     if not url or not token:
         print(f"set {ENV_URL} and {ENV_TOKEN} (an owner's API token)", file=sys.stderr)
-        return 2
-    if arguments.key_file.exists():
-        print(f"{arguments.key_file} exists; the key goes into a new file", file=sys.stderr)
+        return None
+    if key_file.exists():
+        print(f"{key_file} exists; the key goes into a new file", file=sys.stderr)
+        return None
+    return Door(url, token)
+
+
+def _write_key(key_file: Path, key: object) -> bool:
+    """The key the world showed once, into a new file only its owner may read; never printed."""
+    if not isinstance(key, str):
+        print("the world showed no key", file=sys.stderr)
+        return False
+    descriptor = os.open(key_file, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+        handle.write(key + "\n")
+    return True
+
+
+def _owner_call(
+    door: Door, path: str, body: dict[str, object] | None, **query: str
+) -> dict[str, object]:
+    """The door's answer to an owner's request, or an empty answer after printing why not."""
+    try:
+        return door.call("POST", path, body, query=query or None)
+    except DoorRefusal as refusal:
+        print(f"refused: {refusal.code or refusal.status}: {refusal.detail}", file=sys.stderr)
+    except AgentError as error:
+        print(str(error), file=sys.stderr)
+    return {}
+
+
+def _grant(arguments: argparse.Namespace) -> int:
+    door = _owner_door(arguments.key_file)
+    if door is None:
         return 2
     if arguments.thing and not arguments.version:
         print("naming things needs --version, the world version they are in", file=sys.stderr)
@@ -73,25 +112,15 @@ def _grant(arguments: argparse.Namespace) -> int:
     }
     if arguments.version:
         body["version_id"] = arguments.version
-    try:
-        answer = Door(url, token).call(
-            "POST", "/door/grants", body, query={"world_id": arguments.world}
-        )
-    except DoorRefusal as refusal:
-        print(f"refused: {refusal.code or refusal.status}: {refusal.detail}", file=sys.stderr)
+    answer = _owner_call(door, "/door/grants", body, world_id=arguments.world)
+    if not answer:
         return 1
-    except AgentError as error:
-        print(str(error), file=sys.stderr)
-        return 1
-    credential = answer.get("channel_credential") or {}
+    credential = answer.get("channel_credential")
     key = credential.get("credential") if isinstance(credential, dict) else None
-    if not isinstance(key, str):
-        print("the world issued the grant but showed no key", file=sys.stderr)
+    if not _write_key(arguments.key_file, key):
         return 1
-    descriptor = os.open(arguments.key_file, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-    with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
-        handle.write(key + "\n")
-    grant = answer.get("grant") or {}
+    grant = answer.get("grant")
+    grant = grant if isinstance(grant, dict) else {}
     print(
         json.dumps(
             {
@@ -104,20 +133,40 @@ def _grant(arguments: argparse.Namespace) -> int:
     return 0
 
 
-def _key_from_file() -> None:
-    """Accept ``EXULANICA_AGENT_KEY_FILE`` in place of the key itself."""
-    path = os.environ.get(ENV_KEY + "_FILE")
-    if path and not os.environ.get(ENV_KEY):
-        os.environ[ENV_KEY] = Path(path).read_text(encoding="utf-8").strip()
+def _new_key(arguments: argparse.Namespace) -> int:
+    try:
+        grant_id = str(uuid.UUID(arguments.grant))
+    except ValueError:
+        print("--grant takes a grant's id", file=sys.stderr)
+        return 2
+    door = _owner_door(arguments.key_file)
+    if door is None:
+        return 2
+    answer = _owner_call(door, f"/door/grants/{grant_id}/channel-credentials", None)
+    if not answer or not _write_key(arguments.key_file, answer.get("credential")):
+        return 1
+    print(
+        json.dumps(
+            {
+                "grant_id": grant_id,
+                "expires_at": answer.get("expires_at"),
+                "key_file": str(arguments.key_file),
+                "earlier_key": "ended",
+            }
+        )
+    )
+    return 0
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     arguments = _parser().parse_args(argv)
     if arguments.command == "grant":
         return _grant(arguments)
-    _key_from_file()
+    if arguments.command == "key":
+        return _new_key(arguments)
     try:
-        body = Body.connect()
+        key = agent_key()
+        body = Body.connect(key=key)
     except AgentError as error:
         print(str(error), file=sys.stderr)
         return 2 if "needed" in str(error) or "give the agent" in str(error) else 1
@@ -129,7 +178,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         from exulanica_agent.mcp_server import serve_http, serve_stdio
 
         if arguments.http:
-            serve_http(body, os.environ[ENV_KEY], arguments.http)
+            assert key is not None  # Body.connect refused a missing key
+            serve_http(body, key, arguments.http)
         else:
             serve_stdio(body)
     return 0

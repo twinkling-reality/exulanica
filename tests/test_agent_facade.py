@@ -55,6 +55,7 @@ def tools(door: FakeDoor) -> Iterator[facade.Facade]:
     try:
         yield facade.Facade(body)
     finally:
+        door.release()
         body.close(wait_seconds=5)
 
 
@@ -107,7 +108,7 @@ def test_an_unknown_tool_is_a_protocol_error_not_a_tools_failure(tools):
 @pytest.mark.parametrize(
     ("name", "arguments", "words"),
     [
-        ("wait_for_turn", {"wait_seconds": 21}, "from 0 to 20"),
+        ("wait_for_turn", {"wait_seconds": 51}, "from 0 to 50"),
         ("wait_for_turn", {"seconds": 5}, "takes no seconds"),
         ("act", {"action": "wait a minute"}, "needs turn"),
         ("act", {"turn": "x", "action": 3}, "text"),
@@ -190,6 +191,16 @@ def test_act_refusals_say_how_to_put_them_right(door, tools):
     assert late.is_error and "routine" in late.text
 
 
+def test_after_an_answer_act_sends_the_agent_to_its_next_turn(door, tools):
+    door.push(person_ask())
+    handle = tools.call("wait_for_turn", {"wait_seconds": 5}).structured["turn"]["turn"]
+    first = tools.call("act", {"turn": handle, "action": "wait a minute"})
+    assert not first.is_error and "call wait_for_turn" in first.text
+    second = tools.call("act", {"turn": handle, "action": "go to the bench"})
+    assert second.is_error and "wait_for_turn" in second.text
+    assert len(door.requests_to("/door/channel/answers")) == 1
+
+
 def test_what_happened_reports_each_turns_outcome_once(door, tools):
     frame = person_ask()
     door.push(frame)
@@ -224,10 +235,28 @@ def test_world_rules_carry_the_worlds_own_instruction_and_the_turns_time(door, t
     assert "Nothing you send is run" in rules
 
 
-def test_enter_world_needs_a_permission_for_a_body_of_its_own(door, tools):
-    result = tools.call("enter_world", {})
-    assert result.is_error and "not bring a body" in result.text
+def test_enter_world_is_offered_only_when_the_grant_allows_a_body_of_its_own(door, tools):
+    # A grant to decide for things only: no tool a mind would be refused, so none is listed.
+    assert [tool.name for tool in tools.tools] == [
+        "wait_for_turn",
+        "act",
+        "what_happened",
+        "world_rules",
+    ]
+    with pytest.raises(facade.UnknownTool):
+        tools.call("enter_world", {})
     assert door.requests_to("/door/channel/arrivals") == []
+    visitor = FakeDoor(grant=grant_view(visitors=1))
+    body = Body.connect(
+        "http://127.0.0.1:9", KEY, name="Scout", maker="Acme", opener=visitor.opener
+    )
+    try:
+        assert [tool.name for tool in facade.Facade(body).tools] == [
+            tool.name for tool in facade.TOOLS
+        ]
+    finally:
+        visitor.release()
+        body.close(wait_seconds=5)
 
 
 def test_enter_world_asks_the_door_to_let_the_agents_body_in():
@@ -256,8 +285,10 @@ def test_enter_world_asks_the_door_to_let_the_agents_body_in():
             refused = facade.Facade(other).call("enter_world", {})
             assert refused.is_error and "does not take visitors yet" in refused.text
         finally:
+            door2.release()
             other.close(wait_seconds=5)
     finally:
+        door.release()
         body.close(wait_seconds=5)
 
 

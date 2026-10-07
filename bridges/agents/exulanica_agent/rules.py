@@ -18,6 +18,8 @@ def _permission(summary: Mapping[str, Any]) -> list[str]:
     things = summary.get("things") or []
     visitors = summary.get("visitors_maximum") or 0
     lines = []
+    if summary.get("world_words"):
+        lines.append(f"- This world, in its owner's words: {summary['world_words']}")
     if things:
         lines.append(
             f"- You decide for {len(things)} of this world's own things, which its owner handed "

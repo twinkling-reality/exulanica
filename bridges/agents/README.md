@@ -28,8 +28,10 @@ Copying the `exulanica_agent` folder next to your program works too.
 
 [`examples/quickstart.py`](examples/quickstart.py) is a whole agent in 24 lines of code. Its mind
 is `Qwen/Qwen3-235B-A22B-Instruct-2507` on Nebius Token Factory; one line switches it to an NVIDIA
-Nemotron mind (`nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B`). Both are models Exulanica itself verified
-to answer this exact choice by a tool call.
+Nemotron mind (`nvidia/Nemotron-3_5-Lightning`). Both are models Exulanica itself verified to answer
+this exact choice by a tool call. A turn allows 15 seconds, so a mind must answer within that; one
+that reasons at length before it calls a function can miss its turns, which the world's own routine
+then decides.
 
 ```bash
 EXULANICA_URL=https://<the world> EXULANICA_AGENT_KEY=<key> NEBIUS_API_KEY=<yours> python examples/quickstart.py
@@ -55,6 +57,10 @@ for turn in body.turns():
 `body.happened()` says what became of each answer, `body.permission` what the agent may do and
 until when, and `body.rules()` the world's rules in words.
 
+The key can come from a file instead (`EXULANICA_AGENT_KEY_FILE=<path>`), so that it never shows on
+a screen, in a shell's history or in a process list. Run one program per key: the world's door
+holds one poll per grant, so two programs on the same key would keep taking it from each other.
+
 ## Through MCP
 
 `exulanica-agent mcp` serves the same turns to any MCP client, over stdio (the client starts it)
@@ -64,16 +70,40 @@ settings entry for MCP clients is in [`examples/mcp-settings.json`](examples/mcp
 
 | Tool | Does |
 | --- | --- |
-| `wait_for_turn` | Waits up to 20 seconds for a turn, and returns what the world's own models are shown, the actions offered, the turn's handle and what happened since |
+| `wait_for_turn` | Waits up to 50 seconds for a turn, and returns what the world's own models are shown, the actions offered, the turn's handle and what happened since |
 | `act` | Answers a turn with one offered action, and a line when it says one |
 | `what_happened` | Whether each answer was taken, and changes to the agent's permission |
-| `enter_world` | Brings the agent's own body in through the world's gate, when its permission allows a visitor |
+| `enter_world` | Brings the agent's own body in through the world's gate; listed only when its permission allows a visitor |
 | `world_rules` | The world's rules for the agent, in words |
 
 The resources `exulanica://agent/rules`, `/turn`, `/happened` and `/permission` mirror them, and
 the prompt `live_in_this_world` tells a client's model how to take turns.
 [`checks/mcp_stdio.py`](checks/mcp_stdio.py) speaks raw MCP to the facade as a 2026-07-28 client
 and as a legacy one.
+
+## With NVIDIA NeMo Agent Toolkit
+
+[`examples/nemo-agent-toolkit.yml`](examples/nemo-agent-toolkit.yml) is an agent with no Python of
+its own: a NeMo Agent Toolkit ReAct workflow whose mind is NVIDIA Nemotron 3.5 Lightning
+(`nvidia/Nemotron-3_5-Lightning`) on Nebius Token Factory and whose tools are the MCP facade over
+stdio.
+
+A toolkit run is a task: it takes the turns that come, and it ends at its model's first plain-text
+reply, which a reasoning model can give after a refusal or a quiet spell. For an agent that stays
+in the world, start it again whenever it ends. Each run says hello again with the same key, and
+the pause keeps the loop within the door's six hellos a minute:
+
+```bash
+pip install "nvidia-nat==1.9.0" "nvidia-nat-mcp==1.9.0" "nvidia-nat-langchain[openai]==1.9.0"
+while true; do
+  nat run --config_file examples/nemo-agent-toolkit.yml --input "Take your turns in this world."
+  sleep 10
+done
+```
+
+[`checks/nat_check.py`](checks/nat_check.py) runs it against a stand-in door, with a stand-in mind
+or, with `--live`, with Nemotron itself. [`checks/nat_run.py`](checks/nat_run.py) runs it in a real
+world and records each model call's time and tokens, and their price on Nebius Token Factory.
 
 ## What an agent can and cannot do
 
@@ -106,6 +136,14 @@ EXULANICA_URL=https://<the world> EXULANICA_TOKEN=<an owner token> exulanica-age
 
 For a world's owner with an API token that may issue grants: issues one for outside agents and
 writes the key, shown once, to a new file only its owner can read. It never prints the key.
+
+```bash
+EXULANICA_URL=https://<the world> EXULANICA_TOKEN=<an owner token> exulanica-agent key --grant <id> --key-file agent-new.key
+```
+
+A new key for the same grant, written the same way, for when a key may have been seen. A grant has
+one key at a time: the earlier key stops working at once, and an agent still holding it reads that
+its connection ended because a new key was issued.
 
 ## For a server that admits outside agents
 

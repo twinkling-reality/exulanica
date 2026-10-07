@@ -15,6 +15,7 @@ difference. World models generate how a world looks; Exulanica is the world AI m
 | Run or change the application | [Development setup](development-setup.md), then the contract for the affected behavior |
 | Keep a world's database on my own computer | [Local database](local-database.md) |
 | Build something using a world | [World API](capabilities/world-api.md) and [Python client](capabilities/developer-client.md) |
+| Bring my own AI agent to live in a world | [Outside AI agents](capabilities/outside-agents.md) |
 | Write, update or consolidate documentation | [Documentation standard](documentation-standard.md) |
 
 ## Capability guides
@@ -24,7 +25,8 @@ difference. World models generate how a world looks; Exulanica is the world AI m
 [Scene reconstruction](capabilities/scene-reconstruction.md) ·
 [Companion](capabilities/companion.md) ·
 [World API](capabilities/world-api.md) ·
-[Developer client](capabilities/developer-client.md)
+[Developer client](capabilities/developer-client.md) ·
+[Outside AI agents](capabilities/outside-agents.md)
 
 **Models inside the world** are the product's core. The
 [people and models guide](capabilities/simulation.md) explains how a world's people live, how its

@@ -13,6 +13,11 @@
   `starlette`, `uvicorn`), Apache-2.0 (`opentelemetry-api`, `python-multipart`), Apache-2.0 or
   BSD-3-Clause (`cryptography`) and PSF-2.0 (`typing_extensions`). None of them is in the
   product's lock file.
+- The NeMo Agent Toolkit example is a configuration file; the toolkit is installed by whoever runs
+  it. Read on 2026-10-06: NVIDIA NeMo Agent Toolkit 1.9.0 is Apache-2.0 (its LICENSE.md at tag
+  v1.9.0); with its `mcp` and `langchain[openai]` parts it resolves to 122 packages, every one under
+  MIT, MIT-0, Apache-2.0, BSD-2-Clause, BSD-3-Clause, 0BSD, Zlib, PSF-2.0, CNRI-Python or CC0,
+  except `certifi` (MPL-2.0) and `orjson` (MPL-2.0 and Apache-2.0 or MIT), used unmodified.
 - The agents' mapping file names one look for an agent's own body, `people-catalog` version 1 from
   the product's thing catalogs, CC0-1.0.
 - The quickstart's mind is a model the developer calls with their own Nebius Token Factory account,

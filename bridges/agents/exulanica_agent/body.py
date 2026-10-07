@@ -17,6 +17,7 @@ anywhere but the one header of each request (:mod:`exulanica_agent.transport`).
 from __future__ import annotations
 
 import collections
+import contextlib
 import json
 import os
 import threading
@@ -24,14 +25,21 @@ import time
 import uuid
 from collections.abc import Callable, Iterator, Mapping
 from importlib import resources
+from pathlib import Path
 from typing import Any, Final
 
 from exulanica_agent._version import VERSION
 from exulanica_agent.happenings import (
     Happening,
+    from_arrival_refused,
+    from_arrived,
+    from_departed,
     from_ended,
     from_grant,
+    from_happened,
     from_outcome,
+    from_said,
+    from_stopped,
     permission_summary,
 )
 from exulanica_agent.rules import world_rules
@@ -40,6 +48,7 @@ from exulanica_agent.turns import Answer, FrameRefused, Turn, turn_from_frame
 
 __all__ = [
     "ENV_KEY",
+    "ENV_KEY_FILE",
     "ENV_MAKER",
     "ENV_MIND",
     "ENV_NAME",
@@ -48,11 +57,15 @@ __all__ = [
     "READS",
     "Body",
     "HelloRefused",
+    "agent_key",
     "mapping",
 ]
 
 ENV_URL: Final = "EXULANICA_URL"
 ENV_KEY: Final = "EXULANICA_AGENT_KEY"
+#: A file holding the key, read in its place, so the key itself never appears where a screen or a
+#: process list could show it.
+ENV_KEY_FILE: Final = "EXULANICA_AGENT_KEY_FILE"
 ENV_NAME: Final = "EXULANICA_AGENT_NAME"
 ENV_MAKER: Final = "EXULANICA_AGENT_MAKER"
 ENV_MIND: Final = "EXULANICA_AGENT_MIND"
@@ -66,18 +79,26 @@ HAPPENINGS_KEPT: Final = 50
 _BACKOFF_SECONDS: Final = (1.0, 2.0, 4.0, 8.0, 15.0, 30.0)
 #: How long a frames request may take beyond the door's hold.
 _POLL_SLACK_SECONDS: Final = 10.0
+#: The least time from one poll's start to the next when the door answered with no frames. A door
+#: may let a held poll go early, to share its places or because a newer poll of the same grant took
+#: it, so two programs on one key would otherwise take the poll from each other in a tight loop.
+_EMPTY_POLL_SECONDS: Final = 1.0
 _DECLARED_MAXIMA: Final = {"name": 40, "maker": 40, "mind": 60}
 #: Words for the refusals an answer can meet, keyed by the door's codes.
 _ANSWER_WORDS: Final = {
     "answer_too_late": "This turn is over: the world's own routine decided it. Wait for the next.",
     "unknown_reference": "This turn is not open to you: it is over or unknown. Wait for the next.",
-    "answer_already_given": "This turn was already answered.",
+    "answer_already_given": "This turn is already answered. Wait for the next one.",
     "answer_not_for_this_request": "That answer names another turn.",
     "answer_not_offered": "That is not one of the offered actions.",
     "line_not_offered": "This action says nothing: give no line.",
     "line_missing": "This action says something: give its line.",
+    "line_refused": "That line breaks the line rule: one line, no control characters, and no "
+    "longer than its action allows.",
     "grant_ended": "Your permission in this world has ended.",
     "unauthenticated": "The world does not accept this agent's key any more.",
+    "hello_first": "The world's door asked this agent to say hello again, which it does by "
+    "itself. Wait for your next turn.",
 }
 #: Words for the refusals a hello can meet, so a developer reads what to do.
 _HELLO_WORDS: Final = {
@@ -112,6 +133,23 @@ def mapping() -> dict[str, Any]:
     """The agents' mapping file this library presents at hello, as a fresh object."""
     text = resources.files("exulanica_agent").joinpath(MAPPING_FILE).read_text(encoding="utf-8")
     return json.loads(text)
+
+
+def agent_key(key: str | None = None) -> str | None:
+    """The agent's key: ``key`` if given, else ``EXULANICA_AGENT_KEY``, else the first line of the
+    file ``EXULANICA_AGENT_KEY_FILE`` names; None when none is set."""
+    if key:
+        return key
+    if os.environ.get(ENV_KEY):
+        return os.environ[ENV_KEY]
+    path = os.environ.get(ENV_KEY_FILE)
+    if not path:
+        return None
+    try:
+        lines = Path(path).read_text(encoding="utf-8").splitlines()
+    except OSError as exc:
+        raise AgentError(f"the file {ENV_KEY_FILE} names cannot be read") from exc
+    return lines[0].strip() if lines else None
 
 
 def _declared(name: str | None, maker: str | None, mind: str | None) -> dict[str, str]:
@@ -156,6 +194,7 @@ class Body:
         self._hold_seconds = 15
         self._summary: dict[str, Any] | None = None
         self._ended: str | None = None
+        self._ending: str | None = None
         self._open: dict[str, Turn] = {}
         self._given: set[str] = set()
         self._answered: dict[str, tuple[str, str | None]] = {}
@@ -166,6 +205,12 @@ class Body:
         self._last_instruction: str | None = None
         self._line_maxima: set[int] = set()
         self._entered_at: float | None = None
+        #: The agent's own bodies in the world, by thing id, from their arrival to their leaving.
+        self._bodies: set[str] = set()
+        #: Departures this body has reported to the door, so a repeated frame is reported once.
+        self._reported: set[str] = set()
+        #: Departures to report as received, outside the lock: the agent carries nothing home.
+        self._deliveries: list[tuple[str, object]] = []
 
     def __repr__(self) -> str:
         return f"Body(url={self._door.url!r}, name={self._declared['name']!r})"
@@ -187,15 +232,15 @@ class Body:
         """A body on the grant ``key`` opens in the world at ``url``, said hello and polling.
 
         Each argument left out is read from the environment: ``EXULANICA_URL``,
-        ``EXULANICA_AGENT_KEY``, ``EXULANICA_AGENT_NAME``, ``EXULANICA_AGENT_MAKER`` and
-        ``EXULANICA_AGENT_MIND``.
+        ``EXULANICA_AGENT_KEY`` (or a file named by ``EXULANICA_AGENT_KEY_FILE``),
+        ``EXULANICA_AGENT_NAME``, ``EXULANICA_AGENT_MAKER`` and ``EXULANICA_AGENT_MIND``.
         """
         url = url or os.environ.get(ENV_URL)
-        key = key or os.environ.get(ENV_KEY)
+        key = agent_key(key)
         if not url:
             raise AgentError(f"the world's address is needed: url= or {ENV_URL}")
         if not key:
-            raise AgentError(f"the agent's key is needed: key= or {ENV_KEY}")
+            raise AgentError(f"the agent's key is needed: key=, {ENV_KEY} or {ENV_KEY_FILE}")
         body = cls(
             Door(url, key, opener=opener),
             name=name or os.environ.get(ENV_NAME) or "",
@@ -214,8 +259,15 @@ class Body:
         thread.start()
 
     def close(self, wait_seconds: float = 0.0) -> None:
-        """Stop polling; the current poll ends within the door's hold. With ``wait_seconds``,
-        wait up to that long for it to end."""
+        """Stop polling; the current poll ends within the door's hold. A body of the agent's own
+        still in the world is reported gone, so the world stops waiting for its answers at once.
+        With ``wait_seconds``, wait up to that long for the poll to end."""
+        with self._lock:
+            bodies = sorted(self._bodies)
+        for thing_id in bodies:
+            # Best effort: the world departs a silent body after its quiet minutes anyway.
+            with contextlib.suppress(AgentError, DoorRefusal):
+                self._door.call("POST", "/door/channel/gone", {"thing_id": thing_id}, timeout=5.0)
         self._closing.set()
         with self._lock:
             self._lock.notify_all()
@@ -267,6 +319,7 @@ class Body:
             with self._lock:
                 cursor = self._cursor
                 hold = self._hold_seconds
+            started = time.monotonic()
             try:
                 answer = self._door.call(
                     "GET",
@@ -284,9 +337,13 @@ class Body:
                 continue
             failures = 0
             self._take(answer)
+            frames = answer.get("frames")
+            if not (isinstance(frames, list) and frames):
+                self._pause(_EMPTY_POLL_SECONDS - (time.monotonic() - started))
 
     def _pause(self, seconds: float) -> None:
-        self._closing.wait(seconds)
+        if seconds > 0:
+            self._closing.wait(seconds)
 
     def _after_refusal(self, refusal: DoorRefusal) -> bool:
         """Act on a refused poll; False once there is nothing more to read."""
@@ -298,7 +355,7 @@ class Body:
                 self._hello()
             except HelloRefused as again:
                 if again.code not in _HELLO_AGAIN:
-                    self._end(again.code)
+                    self._end(again.code, _HELLO_WORDS.get(again.code))
                     return False
                 self._pause(again.retry_after_s or 60.0)
             except AgentError:
@@ -307,12 +364,17 @@ class Body:
         self._pause(refusal.retry_after_s or 1.0)
         return True
 
-    def _end(self, reason: str) -> None:
+    def _end(self, reason: str, why: str | None = None) -> None:
+        """No more turns come: the door refused this body with ``reason``, which no frame
+        explained; the agent reads why in words (``why``, or the words for the code)."""
         with self._lock:
             if self._ended is None:
                 self._ended = reason
                 if self._summary is not None:
                     self._summary = {**self._summary, "ended": reason}
+                stopped = from_stopped(reason, why)
+                self._ending = stopped.words
+                self._note(stopped)
             self._open.clear()
             self._known.clear()
             self._lock.notify_all()
@@ -327,7 +389,31 @@ class Body:
                     self._frame(frame, now)
             if isinstance(cursor, str):
                 self._cursor = cursor
+            deliveries, self._deliveries = self._deliveries, []
             self._lock.notify_all()
+        for departure, carried in deliveries:
+            self._report_delivery(departure, carried)
+
+    def _report_delivery(self, departure: str, carried: object) -> None:
+        """Tell the door a departure was received, so it stops repeating it. An agent has nowhere
+        outside the world to keep a thing, so anything carried is reported not delivered."""
+        held = (
+            [item for item in carried if isinstance(item, Mapping)]
+            if isinstance(carried, list)
+            else []
+        )
+        body = {
+            "delivered": [],
+            "not_delivered": [
+                {"thing_id": item.get("thing_id"), "reason": "an outside agent keeps no things"}
+                for item in held
+            ],
+        }
+        try:
+            self._door.call("POST", f"/door/channel/departures/{departure}/delivered", body)
+        except (AgentError, DoorRefusal):
+            with self._lock:
+                self._reported.discard(departure)  # reported again when the frame repeats
 
     def _note(self, happening: Happening) -> None:
         self._recent.append(happening)
@@ -376,9 +462,30 @@ class Body:
                     summary["ended"] = self._ended
                 self._summary = summary
                 self._note(from_grant(scope, summary["ends_at"]))
+        elif kind == "arrived":
+            happening = from_arrived(frame)
+            if happening.thing is not None:
+                self._bodies.add(happening.thing)
+            self._note(happening)
+        elif kind == "arrival_refused":
+            self._note(from_arrival_refused(frame))
+        elif kind == "said":
+            self._note(from_said(frame))
+        elif kind == "happened":
+            self._note(from_happened(frame))
+        elif kind == "departed":
+            departure = frame.get("departure_id")
+            if isinstance(departure, str) and departure not in self._reported:
+                happening = from_departed(frame)
+                self._bodies.discard(happening.thing or "")
+                self._note(happening)
+                self._reported.add(departure)
+                self._deliveries.append((departure, frame.get("carried")))
         elif kind == "grant_ended":
             reason = frame.get("reason")
-            self._note(from_ended(frame))
+            ended = from_ended(frame)
+            self._note(ended)
+            self._ending = ended.words
             self._ended = reason if isinstance(reason, str) else "ended"
             if self._summary is not None:
                 self._summary = {**self._summary, "ended": self._ended}
@@ -401,8 +508,15 @@ class Body:
 
     @property
     def ended(self) -> str | None:
+        """Why no more turns come, as the door named it; None while they may."""
         with self._lock:
             return self._ended
+
+    @property
+    def ending(self) -> str | None:
+        """Why no more turns come, in words; None while they may."""
+        with self._lock:
+            return self._ending
 
     def rules(self) -> str:
         """The world's rules for this agent, in words (:mod:`exulanica_agent.rules`)."""
@@ -483,35 +597,33 @@ class Body:
         if line is not None:
             body["line"] = line
         with self._lock:
+            if turn.turn in self._answered:
+                # The door takes one answer a turn; a second would be refused there.
+                return Answer(False, "answer_already_given", _ANSWER_WORDS["answer_already_given"])
             # Kept before sending: the host may record the turn, and its outcome arrive, before the
             # door's answer to this request returns, and the outcome must find what was answered.
-            earlier = self._answered.get(turn.turn)
             self._answered[turn.turn] = (action, line)
         try:
             self._door.call("POST", "/door/channel/answers", body)
         except DoorRefusal as refusal:
             code = refusal.code or str(refusal.status)
             with self._lock:
-                self._unanswer(turn.turn, earlier)
+                self._unanswer(turn.turn)
                 if code in ("answer_too_late", "unknown_reference", "answer_already_given"):
                     self._open.pop(turn.turn, None)
             return Answer(False, code, _ANSWER_WORDS.get(code, refusal.detail or code))
         except AgentError as error:
             with self._lock:
-                self._unanswer(turn.turn, earlier)
+                self._unanswer(turn.turn)
             return Answer(False, "no_connection", str(error))
         with self._lock:
             self._lock.notify_all()
         return Answer(True)
 
-    def _unanswer(self, handle: str, earlier: tuple[str, str | None] | None) -> None:
-        """Forget an answer the door did not store, keeping any earlier one it did."""
-        if handle not in self._open:
-            return
-        if earlier is None:
+    def _unanswer(self, handle: str) -> None:
+        """Forget an answer the door did not store, while its turn is still open."""
+        if handle in self._open:
             self._answered.pop(handle, None)
-        else:
-            self._answered[handle] = earlier
 
     def enter(self, look: str | None = None) -> Answer:
         """Bring the agent's own body in through the world's gate, when its permission allows a

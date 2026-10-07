@@ -28,6 +28,8 @@ AGENTS_ROOT = ROOT / "bridges" / "agents"
 PACKAGE = AGENTS_ROOT / "exulanica_agent"
 KEY = "test-agent-key-" + "k" * 28
 GRANT_ID = "6d2f9c2e-6c1b-4c55-9d7a-8e6f0a1b2c3d"
+#: A world owner's API token, for the commands that issue grants and keys.
+OWNER_TOKEN = "test-owner-token-" + "o" * 24
 
 if str(AGENTS_ROOT) not in sys.path:
     sys.path.insert(0, str(AGENTS_ROOT))
@@ -35,6 +37,7 @@ if str(AGENTS_ROOT) not in sys.path:
 agent = importlib.import_module("exulanica_agent")
 transport = importlib.import_module("exulanica_agent.transport")
 facade = importlib.import_module("exulanica_agent.facade")
+command = importlib.import_module("exulanica_agent.__main__")
 AgentError = agent.AgentError
 Body = agent.Body
 DoorRefusal = agent.DoorRefusal
@@ -135,13 +138,23 @@ class FakeDoor:
         #: Called with an answer's body before the door replies to it, as the host might record
         #: the turn while the reply is still on its way.
         self.on_answer: Callable[[Any], None] | None = None
+        #: The agent keys the owner's routes issued, in order: each shown once.
+        self.issued: list[str] = []
         self._frames: list[dict[str, Any]] = []
         self._served = 0
+        self._released = False
         self._lock = threading.Condition()
 
     def push(self, *frames: dict[str, Any]) -> None:
         with self._lock:
             self._frames.extend(frames)
+            self._lock.notify_all()
+
+    def release(self) -> None:
+        """End the poll it holds, and hold none after, so a body closes without waiting out a
+        hold."""
+        with self._lock:
+            self._released = True
             self._lock.notify_all()
 
     def delivered(self) -> bool:
@@ -168,6 +181,7 @@ class FakeDoor:
                 "path": path,
                 "query": query,
                 "keyed": authorization == f"Bearer {KEY}",
+                "owner": authorization == f"Bearer {OWNER_TOKEN}",
                 "body": body,
             }
         )
@@ -183,8 +197,10 @@ class FakeDoor:
             }
         if (method, path) == ("GET", "/door/channel/frames"):
             with self._lock:
-                if self._served >= len(self._frames):
-                    self._lock.wait(0.05)
+                self._lock.wait_for(
+                    lambda: self._released or self._served < len(self._frames),
+                    timeout=self.hold_seconds,
+                )
                 frames = self._frames[self._served :]
                 self._served = len(self._frames)
             return 200, {
@@ -198,7 +214,24 @@ class FakeDoor:
             return 202, {"received": True, "answer_sha256": "a" * 64}
         if (method, path) == ("POST", "/door/channel/arrivals"):
             return 202, {"received": True}
+        if method == "POST" and path.startswith("/door/channel/departures/"):
+            return 204, {}
+        if (method, path) == ("POST", "/door/channel/gone"):
+            return 202, {"received": True}
+        if (method, path) == ("POST", "/door/grants"):
+            return 201, {"grant": self.grant, "channel_credential": self._issue()}
+        if (method, path) == ("POST", f"/door/grants/{GRANT_ID}/channel-credentials"):
+            return 201, self._issue()
         return 404, {"code": "", "detail": "no such route"}
+
+    def _issue(self) -> dict[str, Any]:
+        key = f"issued-agent-key-{len(self.issued) + 1}-{uuid.uuid4().hex}"
+        self.issued.append(key)
+        return {
+            "credential": key,
+            "expires_at": "2026-10-07T02:00:00.000000+00:00",
+            "shown": "once",
+        }
 
     def opener(self, request: Any, timeout: float) -> Any:
         """The library's opener: one request in, an answer or an HTTPError out."""
@@ -216,6 +249,35 @@ class FakeDoor:
         if status >= 400:
             raise urllib.error.HTTPError(request.full_url, status, "refused", {}, io.BytesIO(data))
         return _Answer(data)
+
+
+def app_opener(client: Any) -> Any:
+    """The library's opener, serving each request from an application's test client: the library's
+    own requests, headers and bodies reach the real routes, with no socket."""
+
+    def opener(request: Any, timeout: float) -> Any:
+        parsed = urllib.parse.urlsplit(request.full_url)
+        target = parsed.path + ("?" + parsed.query if parsed.query else "")
+        response = client.request(
+            request.get_method(),
+            target,
+            headers=dict(request.header_items()),
+            content=request.data,
+        )
+        if response.status_code >= 400:
+            raise urllib.error.HTTPError(
+                request.full_url, response.status_code, "refused", {}, io.BytesIO(response.content)
+            )
+        return _Answer(response.content)
+
+    return opener
+
+
+def agents_bridge(**figures: Any) -> dict[str, Any]:
+    """The agents' bridge entry the examples declare, with ``figures`` (such as a short hold for a
+    test) over it."""
+    entry = json.loads((AGENTS_ROOT / "examples" / "bridge-entry.json").read_text())
+    return {**entry, **figures}
 
 
 class _Answer(io.BytesIO):

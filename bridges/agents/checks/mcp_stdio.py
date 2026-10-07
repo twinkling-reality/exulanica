@@ -32,7 +32,9 @@ KEY = "check-key-" + "k" * 33
 REQUEST_ID = "3f1c7a52-0d4e-4b1a-9c55-2e7f6a8b9c0d"
 MODERN = "2026-07-28"
 LEGACY = "2025-06-18"
-TOOLS = ["wait_for_turn", "act", "what_happened", "enter_world", "world_rules"]
+#: The tools the stand-in grant offers: it decides for a thing and brings no body of its own, so
+#: enter_world is not among them.
+TOOLS = ["wait_for_turn", "act", "what_happened", "world_rules"]
 
 
 def _asked() -> dict[str, Any]:
@@ -94,6 +96,8 @@ class _Door:
                 threading.Event().wait(0.2)
             return 200, {"profile": "exulanica.door-frame/v1", "frames": frames, "cursor": "c1"}
         if (method, path) == ("POST", "/door/channel/answers"):
+            if any(answer["request_id"] == body["request_id"] for answer in self.answers):
+                return 409, {"code": "answer_already_given", "detail": "answered already"}
             self.answers.append(body)
             return 202, {"received": True, "answer_sha256": "a" * 64}
         return 404, {"code": "", "detail": "no such route"}
@@ -266,8 +270,8 @@ def main() -> int:
         server.shutdown()
     holds = {
         "server/discover lists 2026-07-28": MODERN in (report.get("discover_versions") or []),
-        "the five tools in order (modern)": report.get("tools") == TOOLS,
-        "the five tools in order (legacy)": report.get("legacy_tools") == TOOLS,
+        "the grant's tools in order (modern)": report.get("tools") == TOOLS,
+        "the grant's tools in order (legacy)": report.get("legacy_tools") == TOOLS,
         "a turn is handed over": report.get("turn") == REQUEST_ID,
         "act reaches the door": report.get("door_answers") == ["wait a minute"],
         "a wrong turn is an error result": report.get("act_refusal_is_error") is True,

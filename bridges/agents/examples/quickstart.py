@@ -7,7 +7,7 @@ from exulanica_agent import Body, Turn
 
 MIND = "https://api.tokenfactory.nebius.com/v1/chat/completions"
 MODEL = "Qwen/Qwen3-235B-A22B-Instruct-2507"
-# MODEL = "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"  # one line for an NVIDIA Nemotron mind
+# MODEL = "nvidia/Nemotron-3_5-Lightning"  # one line for an NVIDIA Nemotron mind
 KEY = os.environ["NEBIUS_API_KEY"]
 
 
