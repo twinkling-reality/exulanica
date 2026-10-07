@@ -144,11 +144,14 @@ class ReadingBound:
         return max(0, room // (self.per_person_us + self.per_pair_us))
 
     def decided_most(self, population: int) -> int:
-        """The most of ``population`` people a model may decide for in one run."""
+        """The most of ``population`` people a model may decide for in one run. A line whose
+        decided terms are both zero for ``population`` says deciding adds nothing to a read, so
+        everybody is decided wherever the undecided read fits."""
         room = self.run_us - self.estimate_us(population, 0)
-        return max(
-            0, min(population, room // (self.per_decided_us + self.per_pair_us * population))
-        )
+        each = self.per_decided_us + self.per_pair_us * population
+        if each == 0:
+            return population if room >= 0 else 0
+        return max(0, min(population, room // each))
 
 
 def family_of(catalogs: ComparisonCatalogs) -> str | None:
@@ -194,7 +197,7 @@ def _catalog_lines(path: Path) -> dict[tuple[str, int], dict[str, Any]]:
             or not isinstance(entry.get("source_sha256"), str)
             or any(type(value) is not int or value < 0 for value in values.values())
             or values["replay_per_person_us"] < 1
-            or values["replay_per_decided_person_us"] < 1
+            or values["replay_per_decided_person_us"] + values["replay_per_decided_pair_us"] < 1
         ):
             raise ComparisonRefused("reading_catalog", f"entry {entry.get('key')!r} is malformed")
         lines[(family, window)] = {
@@ -236,7 +239,10 @@ def reading_bound(catalogs: ComparisonCatalogs, family: str | None = None) -> Re
             f"{window} minutes",
         )
     line = values if measured is None else measured
-    if line["replay_per_person_us"] < 1 or line["replay_per_decided_person_us"] < 1:
+    if (
+        line["replay_per_person_us"] < 1
+        or line["replay_per_decided_person_us"] + line["replay_per_decided_pair_us"] < 1
+    ):
         raise ComparisonRefused(
             "protocol_keys", "the protocol's replay line states no cost for a person"
         )

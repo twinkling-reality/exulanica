@@ -140,6 +140,8 @@ def test_a_family_the_catalog_does_not_name_reads_the_protocols_line(tmp_path, m
         {"state_family": "district"},
         {"extraction": "typed_by_hand"},
         {"replay_per_person_us": 0},
+        # A line on which deciding for somebody costs nothing at all.
+        {"replay_per_decided_person_us": 0, "replay_per_decided_pair_us": 0},
         {"replay_fixed_ms": -1},
         {"replay_per_decided_pair_us": 1.5},
         {"source_sha256": None},
@@ -150,6 +152,33 @@ def test_a_malformed_line_is_refused_by_name(tmp_path, monkeypatch, changes):
     monkeypatch.setattr(reading, "READING_CATALOG", path)
     with pytest.raises(ComparisonRefused, match="reading_catalog"):
         reading.population_maximum(_catalogs(COMPARISON_SCORE_BY_FAMILY["living"]))
+
+
+@pytest.mark.parametrize("population", [38, 88, 128])
+def test_a_line_whose_decided_person_term_is_zero_is_read_by_its_pair_term(
+    tmp_path, monkeypatch, population
+):
+    """A fit may put the cost of one more decided person at zero when the pair term carries what
+    deciding adds; such a line is read, and its bounds are the hand-derived ones."""
+    line = {**LIVING, "replay_per_decided_person_us": 0}
+    path = _catalog(tmp_path, [_living_entry(replay_per_decided_person_us=0)])
+    monkeypatch.setattr(reading, "READING_CATALOG", path)
+    living = _catalogs(COMPARISON_SCORE_BY_FAMILY["living"])
+    assert reading.population_maximum(living) == _by_hand(line)
+    assert reading.decided_maximum(living, population) == _by_hand(line, population)
+
+
+def test_a_bound_whose_decided_terms_are_zero_decides_for_everybody_who_fits():
+    """A measured line handed straight to the bound (as the measuring scripts do) may state no
+    cost for deciding: everybody is decided where the undecided read fits, and nobody where it
+    does not, with no division by its zero terms."""
+    bound = reading.ReadingBound(
+        run_us=1_000, fixed_us=0, per_person_us=10, per_decided_us=0, per_pair_us=0
+    )
+    assert bound.decided_most(50) == 50
+    assert bound.decided_most(100) == 100
+    assert bound.decided_most(101) == 0
+    assert bound.decided_most(0) == 0
 
 
 def test_a_catalog_naming_one_family_twice_is_refused(tmp_path, monkeypatch):
