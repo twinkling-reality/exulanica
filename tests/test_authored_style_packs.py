@@ -5,7 +5,8 @@
 the committed bytes to be exactly what the script writes, so a piece changed by hand, or a script
 changed without its files, fails here. Each manifest is read by the product's reader against the
 catalogs in this tree, each piece is held to its family's budget, and each frame that stretches is
-held to the smallest opening the grammars cut, read from the grammars themselves.
+held to the smallest opening the grammars cut, read from the grammars themselves. Every earlier
+version stays published as it was, and a version bump retires the committed pack by itself.
 """
 
 from __future__ import annotations
@@ -13,6 +14,7 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import json
+import shutil
 import struct
 import sys
 from pathlib import Path
@@ -151,3 +153,75 @@ def test_every_pack_shows_itself_in_one_listed_picture_of_one_size() -> None:
         data = (PACKS / folder / preview).read_bytes()
         assert len(data) <= style_packs.PREVIEW_MAX_BYTES, folder
         assert _jpeg_size(data) == (1600, 1000), folder
+
+
+def _style_packs_copy(tmp_path: Path) -> Path:
+    """A root holding a copy of the committed style pack folder, for the builder to change."""
+    shutil.copytree(ROOT / "assets" / "style-packs", tmp_path / "assets" / "style-packs")
+    return tmp_path
+
+
+def _ledger(root: Path) -> list[dict[str, Any]]:
+    return json.loads((root / "assets" / "style-packs" / "published.v1.json").read_text())[
+        "versions"
+    ]
+
+
+def test_every_earlier_version_is_published_exactly_as_its_ledger_and_manifest_state() -> None:
+    builder = _builder()
+    assert builder.published_problems(ROOT, sorted(_manifests())) == []
+
+
+def test_a_version_bump_retires_the_committed_pack_whole_and_appends_the_ledger(
+    tmp_path: Path,
+) -> None:
+    builder = _builder()
+    root = _style_packs_copy(tmp_path)
+    before = _ledger(root)
+    current = _manifests()["exulanica.toon-town"]["version"]
+    builder.retire(root, "exulanica.toon-town", current)
+    committed = PACKS / "exulanica.toon-town"
+    folder = root / "assets" / "style-packs" / "published" / "exulanica.toon-town" / str(current)
+    text = (committed / "manifest.json").read_bytes()
+    assert (folder / "manifest.json").read_bytes() == text
+    for file in json.loads(text)["files"]:
+        assert (folder / file["path"]).read_bytes() == (committed / file["path"]).read_bytes()
+    entry = {
+        "pack_id": "exulanica.toon-town",
+        "version": current,
+        "manifest_sha256": hashlib.sha256(text[:-1]).hexdigest(),
+    }
+    after = _ledger(root)
+    assert after == sorted([*before, entry], key=lambda e: (e["pack_id"], e["version"]))
+    # Retiring it again changes nothing; a published folder holding other bytes is refused.
+    builder.retire(root, "exulanica.toon-town", current)
+    assert _ledger(root) == after
+    (folder / "preview.jpg").write_bytes(b"other")
+    with pytest.raises(ValueError, match="is published with other bytes"):
+        builder.retire(root, "exulanica.toon-town", current)
+
+
+@pytest.mark.parametrize("breakage", ["published_file", "ledger_entry"])
+def test_check_refuses_an_edited_published_file_or_a_version_the_ledger_misses(
+    tmp_path: Path, breakage: str
+) -> None:
+    builder = _builder()
+    root = _style_packs_copy(tmp_path)
+    ids = sorted(_manifests())
+    # The positive control: the unbroken copy holds every version as published.
+    assert builder.published_problems(root, ids) == []
+    if breakage == "published_file":
+        picture = root / "assets/style-packs/published/exulanica.toon-town/2/preview.jpg"
+        picture.write_bytes(picture.read_bytes() + b"x")
+        expected = "exulanica.toon-town version 2: preview.jpg is not the bytes its manifest states"
+    else:
+        ledger = root / "assets" / "style-packs" / "published.v1.json"
+        document = json.loads(ledger.read_text())
+        document["versions"] = [
+            e
+            for e in document["versions"]
+            if (e["pack_id"], e["version"]) != ("exulanica.cozy-town", 1)
+        ]
+        ledger.write_text(json.dumps(document))
+        expected = "does not list exulanica.cozy-town version 1"
+    assert any(expected in problem for problem in builder.published_problems(root, ids))

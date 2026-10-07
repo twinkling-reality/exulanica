@@ -34,7 +34,7 @@ lowercase `\u` escapes. Both readers write the same bytes.
 | `title`, `description`, `tags` | What a person reads in a library; tags are lowercase words |
 | `origin`, `provenance` | `authored`, `uploaded`, `drafted`, `generated` or `imported`, and what each requires: a drafted pack names the model, prompt version, execution and the digest of the words; a generated one names its generation receipts |
 | `licence`, `authors` | `CC0-1.0`, or `CC-BY-4.0` with its attribution; who made it |
-| `preview` | A listed picture (`.jpg`, `.png` or `.webp`, at most 512 KiB) that shows what the pack looks like, for a person choosing one, or none |
+| `preview` | A listed picture (`.jpg`, `.png` or `.webp`, at most 512 KiB) that shows what the pack looks like, for a person choosing one, or none; absent, none |
 | `base` | The pack this one is drawn on, by id, version and manifest digest, or none |
 | `light` | Named presets (at most six) and the default one; each preset is a sky, a fog, a sun with a one-tap, three-tap or five-tap shadow filter, image light, contact shadowing and a finish, in whole-number units. A pack may not choose soft (PCSS) shadows: they alone cost more than a frame ([render look](generated-tile-runtime.md#61-the-render-look-a-style-chooses)) |
 | `shading` | `pbr`, `toon` with its bands, or `flat`, and an ink colour or none |
@@ -47,6 +47,12 @@ lowercase `\u` escapes. Both readers write the same bytes.
 A pack with no base states its light and shading. A pack drawn on a base states only what it changes:
 its swatches, surfaces, modules, presets, shading and edge replace the base's, and anything it leaves
 out is the base's. A chain holds at most four manifests.
+
+A profile changes without breaking a manifest written under it. A field added within a profile is
+optional, and its absence keeps the meaning a manifest had before the field existed: `preview` came
+after the first packs were published, and a manifest without it names no picture. A change that a
+manifest written earlier could not meet needs a new profile, which readers read beside the old one,
+so every published version stays readable.
 
 ## 3. Look roles
 
@@ -128,7 +134,7 @@ it, then the rules across sections, and refuses with the first fault by reason a
 
 | Reason | What it refuses |
 | --- | --- |
-| `shape` | An unknown or missing key, a value of the wrong kind, a fraction, a malformed id, role, path or text, a file whose media type is not its extension's |
+| `shape` | An unknown key or a missing one the profile requires, a value of the wrong kind, a fraction, a malformed id, role, path or text, a file whose media type is not its extension's |
 | `range` | A whole number outside its bounds, a value not in its list, fog or toon bands out of order, a soft (PCSS) shadow filter, a stretch zone outside its piece or of no length, a picture over 512 KiB |
 | `reference` | A role of an unknown family or of a family not dressed that way, a swatch, texture set, preset or file that is not there, a preview naming no listed file, a listed file nothing uses, provenance that is not the origin, a pack with no base and no light or shading, a stretch on a piece of a family that is not fill |
 | `duplicate` | Two swatches of one key or one colour, two files of one path |
@@ -197,6 +203,13 @@ holds the committed files to the script, the product's reader, the piece budgets
 and the previews' format and size; `web/packages/atlas-react/test/style-pack-authored.test.ts`
 reads them as the page does and holds each preset's shade light to that bound.
 
+Every version a pack has published stays servable, so a world keeps the look it was given. Writing a
+new version first retires the committed one: the script copies its folder whole to
+`assets/style-packs/published/<pack id>/<version>/` and appends the version to the ledger
+`assets/style-packs/published.v1.json`, so keeping an earlier version is part of bumping one.
+`--check` refuses a published folder that no longer holds the bytes its ledger entry and manifest
+state, and a version below the current one that the ledger does not list.
+
 ## 9. The library the host serves
 
 The host serves its committed library, and nothing of a pack is bundled with the page, as no 3D
@@ -211,10 +224,19 @@ dot is passed over; no pack id or listed path can start with one. `assets/style-
 when the person making it names none; a default that is not a pack of the library, or a file stating
 anything else, refuses the library the same way.
 
+A pack's earlier versions stay served. Each is read from its folder under
+`assets/style-packs/published/` by the same rules as a pack folder and held to its entry in
+`published.v1.json` (`exulanica.style-pack-published/v1`); a published folder whose manifest is not
+the one its entry records, an entry with no folder, a folder with no entry, and a version that is
+not below its pack's current one each refuse the library. `changes.v1.json`
+(`exulanica.style-pack-changes/v1`) holds the host's own note on what a version changed, one plain
+sentence of at most 200 characters, for a version the library holds. The notes live beside the
+packs rather than in their manifests, so writing a note never moves a digest.
+
 | Route | Answer |
 | --- | --- |
-| `GET /world/style-packs` | `exulanica.style-pack-list/v1`: each pack's id, version and manifest digest, title, description and tags, origin, licence with the attribution it requires, authors, file count and bytes, its preview picture's digest and media type (`preview_sha256`, `preview_media_type`, or null), and whether it is the default (`default`) |
-| `GET /world/style-packs/{content_sha256}` | A manifest as its canonical bytes (`application/json`) or a file a manifest lists (its stated media type), named by the SHA-256 of exactly those bytes and cached as immutable; any other digest is 404 `unknown_reference` |
+| `GET /world/style-packs` | `exulanica.style-pack-list/v1`, each pack at its current version: its id, version and manifest digest, title, description and tags, origin, licence with the attribution it requires, authors, file count and bytes, its preview picture's digest and media type (`preview_sha256`, `preview_media_type`, or null), whether it is the default (`default`), the note on what this version changed (`changes`, or null), and its earlier versions the host still serves (`earlier_versions`, oldest first, each its `version`, `manifest_sha256`, `preview_sha256` and `preview_media_type`) |
+| `GET /world/style-packs/{content_sha256}` | A manifest of any version the library holds, as its canonical bytes (`application/json`), or a file a manifest lists (its stated media type), named by the SHA-256 of exactly those bytes and cached as immutable; any other digest is 404 `unknown_reference` |
 
 Both need a session holding `world.read`. A request names a digest and nothing else, so no request
 reaches a path. The page reads the list, fetches a pack's manifest by the digest the list names and
@@ -235,14 +257,17 @@ rolled back with the rest of the appearance and kept in its history
 ([appearance authority](world-version-authorities.md#appearance-authority)). A pack the host's
 library does not hold at exactly that version and digest is refused when it is named, applied or
 rolled back to, so a world is never stored naming a pack its host cannot serve; a world read from
-history whose pack the host no longer holds says so in the version's warnings. The page fetches a
-world's pack by the manifest digest its appearance names, so it draws exactly the bytes the world
-was given. A pack states no structure, so naming one never moves the world's topology. A world
+history whose pack the host no longer holds says so in the version's warnings. The library holds
+every version it has published (section 9), so a world given an earlier version keeps it: the page
+fetches a world's pack by the manifest digest its appearance names, so it draws exactly the bytes the
+world was given, and moving to the current version is a choice of its own through the same preview
+and Apply. `listedVersion` (`web/packages/app/src/world-look.ts`) places a digest as a listed pack's
+current version or an earlier one. A pack states no structure, so naming one never moves the world's topology. A world
 package exported from a world does not yet carry the pack its appearance names.
 
 A world made by `POST /worlds/generated` is made wearing a look: the pack its `style_pack` names
-(`{pack_id, version, manifest_sha256}`, a pack of the library at exactly that version and digest,
-else 422 `invalid_style_data` and nothing made), or the library's default when it names none
+(`{pack_id, version, manifest_sha256}`, a version the library holds at exactly that digest, else
+422 `invalid_style_data` and nothing made), or the library's default when it names none
 (`exulanica/world/creation_look.py`). The world is made first, its first appearance naming no pack;
 the pack is then named by the appearance's next version through the same preview and Apply a
 person's change takes, its provenance `user` with the reference `world-creation`, and the saved

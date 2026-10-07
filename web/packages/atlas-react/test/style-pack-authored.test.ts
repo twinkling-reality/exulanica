@@ -3,8 +3,8 @@
  * The authored style packs, read the way the page reads them: each manifest by the browser's reader
  * against this tree's catalogs, each piece by its digest and the palette piece reader, its one
  * preview picture by its digest, each frame that stretches resolved into the smallest and largest
- * openings the city grammar cuts, and each light preset's sky as the renderer lights a surface with
- * it.
+ * openings the city grammar cuts, each light preset's sky as the renderer lights a surface with it,
+ * and every earlier version the host still serves.
  */
 import { createHash } from 'node:crypto';
 import { readFileSync, readdirSync } from 'node:fs';
@@ -83,6 +83,27 @@ describe('the authored packs', () => {
           }
         }
         expect(blue / red, `${folder} ${name}`).toBeLessThanOrEqual(2);
+      }
+    }
+  });
+
+  it('keep every earlier version readable by the page, each the manifest its ledger entry records', () => {
+    const ledger = JSON.parse(readFileSync('../assets/style-packs/published.v1.json', 'utf8')) as {
+      versions: { pack_id: string; version: number; manifest_sha256: string }[];
+    };
+    expect(ledger.versions.length).toBeGreaterThan(0);
+    for (const entry of ledger.versions) {
+      const folder = `../assets/style-packs/published/${entry.pack_id}/${entry.version}`;
+      const file = readFileSync(`${folder}/manifest.json`);
+      expect(createHash('sha256').update(file.subarray(0, file.length - 1)).digest('hex')).toBe(entry.manifest_sha256);
+      const manifest = readStylePackManifest(JSON.parse(file.toString('utf8')), { families, textureSets });
+      expect([manifest.pack_id, manifest.version]).toEqual([entry.pack_id, entry.version]);
+      const colours = new Set(manifest.palette.swatches.map((s) => s.srgb8.join(',')));
+      for (const listed of manifest.files) {
+        const bytes = new Uint8Array(readFileSync(`${folder}/${listed.path}`));
+        expect(createHash('sha256').update(bytes).digest('hex')).toBe(listed.sha256);
+        if (listed.media_type !== 'model/gltf-binary') continue;
+        for (const group of readStylePiece(bytes, TABLE).groups) expect(colours.has(group.srgb8.join(','))).toBe(true);
       }
     }
   });

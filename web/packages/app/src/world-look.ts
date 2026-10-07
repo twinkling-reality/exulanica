@@ -74,7 +74,15 @@ export function worldLookChoice(search: string, bound: WorldStylePackBinding | n
   return { packId: DEFAULT_WORLD_LOOK, manifestSha256: null, source: 'default' };
 }
 
-/** One pack as the host lists it. */
+/** An earlier version of a listed pack, still served by its digest, so a world drawn in it keeps its look. */
+export interface EarlierStylePackVersion {
+  readonly version: number;
+  readonly manifest_sha256: string;
+  readonly preview_sha256: string | null;
+  readonly preview_media_type: string | null;
+}
+
+/** One pack as the host lists it, at its current version. */
 export interface ListedStylePack {
   readonly pack_id: string;
   readonly version: number;
@@ -89,6 +97,30 @@ export interface ListedStylePack {
   readonly preview_media_type?: string | null;
   /** Whether the host makes a world in this pack when its maker names none; absent from an older host. */
   readonly default?: boolean;
+  /** The host's note on what this version changed from the one before, for a person; null for none. */
+  readonly changes?: string | null;
+  /** The pack's earlier versions the host still serves, oldest first; absent from an older host. */
+  readonly earlier_versions?: readonly EarlierStylePackVersion[];
+}
+
+/** Which listed pack a manifest digest is a version of, which version, and whether it is the current one. */
+export interface ListedVersion {
+  readonly pack: ListedStylePack;
+  readonly version: number;
+  readonly current: boolean;
+}
+
+/**
+ * The listed pack and version `manifestSha256` names: the current version or an earlier one the host
+ * still serves. Undefined for a digest the host lists under no pack, which it does not serve.
+ */
+export function listedVersion(packs: readonly ListedStylePack[], manifestSha256: string): ListedVersion | undefined {
+  for (const pack of packs) {
+    if (pack.manifest_sha256 === manifestSha256) return { pack, version: pack.version, current: true };
+    const earlier = pack.earlier_versions?.find((one) => one.manifest_sha256 === manifestSha256);
+    if (earlier !== undefined) return { pack, version: earlier.version, current: false };
+  }
+  return undefined;
 }
 
 /** The pack the host's list marks its default, or `DEFAULT_WORLD_LOOK` from a list marking none. */

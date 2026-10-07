@@ -131,6 +131,19 @@ class StylePackContext:
 Reader = Callable[[Any, str], Any]
 
 
+@dataclass(frozen=True, slots=True)
+class _Optional:
+    """A field a manifest may leave out.
+
+    A field added within a profile is optional and its absence keeps the meaning a manifest had
+    before the field existed, so every manifest written under the profile still reads. A manifest
+    that leaves it out is returned without it, as given, so its bytes and digest are its own; a
+    reader of the result takes the absence as that earlier meaning.
+    """
+
+    read: Reader
+
+
 def _fail(reason: str, path: str, detail: str) -> Any:
     raise StylePackRefused(reason, path, detail)
 
@@ -139,16 +152,19 @@ def _join(path: str, key: str) -> str:
     return key if path == "" else f"{path}.{key}"
 
 
-def _object(value: Any, path: str, fields: Mapping[str, Reader]) -> dict[str, Any]:
+def _object(value: Any, path: str, fields: Mapping[str, Reader | _Optional]) -> dict[str, Any]:
     if not isinstance(value, dict):
         _fail("shape", path, "must be an object")
     for key in value:
         if key not in fields:
             _fail("shape", path, f"has an unknown key {json.dumps(key)}")
     out: dict[str, Any] = {}
-    for key, read in fields.items():
+    for key, field in fields.items():
         if key not in value:
+            if isinstance(field, _Optional):
+                continue
             _fail("shape", path, f"is missing {json.dumps(key)}")
+        read = field.read if isinstance(field, _Optional) else field
         out[key] = read(value[key], _join(path, key))
     return out
 
@@ -497,8 +513,11 @@ def read_manifest(value: Any, context: StylePackContext) -> dict[str, Any]:
                 },
             ),
             "authors": _list(_text(_TEXT_MAX["author"]), 1, 16),
-            "preview": _nullable(
-                _pattern(_IMAGE_PATH, "a lowercase relative path ending .jpg, .png or .webp")
+            # Added after the first packs were published: a manifest from before it names none.
+            "preview": _Optional(
+                _nullable(
+                    _pattern(_IMAGE_PATH, "a lowercase relative path ending .jpg, .png or .webp")
+                )
             ),
             "base": _nullable(
                 lambda v, p: _object(
@@ -728,7 +747,7 @@ def _check_whole(manifest: dict[str, Any], context: StylePackContext) -> None:
             for axis, z in enumerate(variant["stretch_mm"]):
                 if z is not None and not z[0] < z[1] <= variant["size_mm"][axis]:
                     _fail("range", f"{where}[{axis}]", "must lie within the piece, low below high")
-    preview = manifest["preview"]
+    preview = manifest.get("preview")
     if preview is not None:
         if preview not in listed:
             _fail("reference", "preview", f"names no listed file {json.dumps(preview)}")

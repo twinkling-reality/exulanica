@@ -9,8 +9,10 @@ import {
   WORLD_LOOKS,
   addressedWorldLook,
   listedDefault,
+  listedVersion,
   prepareWorldLook,
   worldLookChoice,
+  type ListedStylePack,
 } from '../src/world-look.js';
 
 // Relative to web/, where the suite runs.
@@ -46,6 +48,20 @@ function committedLibrary(): Served {
     return { pack_id: manifest.pack_id, version: manifest.version, manifest_sha256: sha256(bytes), title: manifest.title, licence: manifest.licence };
   });
   return { list: { profile: STYLE_PACK_LIST_PROFILE, packs }, content };
+}
+
+/** An earlier version of a pack as the host serves it, built here from its published folder. */
+function publishedVersion(packId: string, version: number): { digest: string; content: Map<string, Uint8Array<ArrayBuffer>> } {
+  const folder = `${PACKS}/../published/${packId}/${version}`;
+  const file = readFileSync(`${folder}/manifest.json`);
+  const bytes = new Uint8Array(file.subarray(0, file.length - 1));
+  const manifest = JSON.parse(new TextDecoder().decode(bytes)) as { files: { path: string }[] };
+  const content = new Map<string, Uint8Array<ArrayBuffer>>([[sha256(bytes), bytes]]);
+  for (const listed of manifest.files) {
+    const piece = new Uint8Array(readFileSync(`${folder}/${listed.path}`));
+    content.set(sha256(piece), piece);
+  }
+  return { digest: sha256(bytes), content };
 }
 
 /** A fetch answering as the host does, recording each request's address and credential. */
@@ -141,6 +157,19 @@ describe('a pack the host serves, prepared for a world', () => {
     expect(asked.some((request) => request.url === `${ACCESS.baseUrl}/world/style-packs`)).toBe(false);
   });
 
+  it('is the earlier version a world was given, read by its very manifest, the first written before previews', async () => {
+    const served = committedLibrary();
+    for (const version of [1, 2]) {
+      const earlier = publishedVersion('exulanica.toon-town', version);
+      const asked: { url: string; authorization: string | null }[] = [];
+      vi.stubGlobal('fetch', host({ list: served.list, content: new Map([...served.content, ...earlier.content]) }, asked));
+      const prepared = await prepareWorldLook(ACCESS, 'exulanica.toon-town', TEXTURES, [], earlier.digest);
+      expect(prepared.packId).toBe('exulanica.toon-town');
+      expect(prepared.pack.chain.map((manifest) => manifest.version)).toEqual([version]);
+      expect(asked[0]!.url).toBe(`${ACCESS.baseUrl}/world/style-packs/${earlier.digest}`);
+    }
+  });
+
   it('is refused when the manifest a world names is not the pack it names', async () => {
     const served = committedLibrary();
     const listed = (served.list as { packs: { pack_id: string; manifest_sha256: string }[] }).packs;
@@ -182,5 +211,21 @@ describe('a pack the host serves, prepared for a world', () => {
     swapped.set(pieceDigest, new Uint8Array(readFileSync(`${PACKS}/exulanica.toon-town/pieces/fence.glb`)));
     vi.stubGlobal('fetch', host({ ...served, content: swapped }, []));
     await expect(prepareWorldLook(ACCESS, 'exulanica.toon-town', TEXTURES, [])).rejects.toThrow('not the ones its digest names');
+  });
+});
+
+describe('a listed version', () => {
+  const pack = (packId: string, version: number, digest: string, earlier: readonly [number, string][]): ListedStylePack => ({
+    pack_id: packId, version, manifest_sha256: digest, title: packId, description: '', authors: [],
+    licence: { id: 'CC0-1.0', attribution: null },
+    earlier_versions: earlier.map(([number, sha]) => ({ version: number, manifest_sha256: sha, preview_sha256: null, preview_media_type: null })),
+  });
+  const packs = [pack('exulanica.cozy-town', 3, 'c'.repeat(64), [[1, 'a'.repeat(64)], [2, 'b'.repeat(64)]]), pack('exulanica.toon-town', 3, 'f'.repeat(64), [])];
+
+  it('names the pack and version a digest is, current or earlier, and nothing for a digest no pack lists', () => {
+    expect(listedVersion(packs, 'c'.repeat(64))).toEqual({ pack: packs[0], version: 3, current: true });
+    expect(listedVersion(packs, 'b'.repeat(64))).toEqual({ pack: packs[0], version: 2, current: false });
+    expect(listedVersion(packs, 'f'.repeat(64))).toEqual({ pack: packs[1], version: 3, current: true });
+    expect(listedVersion(packs, 'e'.repeat(64))).toBeUndefined();
   });
 });

@@ -1289,14 +1289,10 @@ class WorldStyleRepository:
         )
 
     def _library_holds(self, binding: StylePackBinding) -> bool:
-        """Whether the library holds ``binding``'s pack at exactly its version and manifest."""
+        """Whether the library holds ``binding``'s pack at exactly its version and manifest, its
+        current version or an earlier one it still serves."""
         library = self._style_packs if self._style_packs is not None else style_pack_library()
-        held = library.pack(binding.pack_id)
-        return (
-            held is not None
-            and held.version == binding.version
-            and held.manifest_sha256 == binding.manifest_sha256
-        )
+        return library.holds(binding.pack_id, binding.version, binding.manifest_sha256)
 
     def _require_library_pack(self, binding: StylePackBinding) -> None:
         if not self._library_holds(binding):

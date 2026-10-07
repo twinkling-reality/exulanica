@@ -14,13 +14,26 @@ one, so nothing it holds is ever served.
 
 ``assets/style-packs/library.v1.json`` names the library's default pack, the look a town is made
 in when the person making it names none; a default that is not a pack of the library refuses the
-library. The library lists each pack with what a person choosing one needs: its id, version and
-manifest digest; its title, description and tags; its origin; its licence with the attribution it
-requires, and its authors; its preview picture's digest and media type, when it has one; and
-whether it is the default. It serves each
-manifest as its canonical bytes, so the digest that identifies a pack names exactly the bytes
-served, and each listed file as the media type its manifest states, all as committed content by
-digest (:mod:`exulanica.world.committed_content`). The host reads it once, when it starts
+library.
+
+A pack's earlier versions stay servable, so a world drawn in one keeps its look when the pack
+moves on. Each is a whole pack folder as it was published, ``assets/style-packs/published/<pack
+id>/<version>/``, checked by the same rules as a pack folder, and ``published.v1.json`` beside the
+packs folder is their ledger: each one's pack id, version and manifest digest, appended when the
+version was retired and never changed. A published folder whose manifest no longer hashes to its
+entry, an entry with no folder, a folder with no entry, and a version that is not below its pack's
+current one each refuse the library. ``changes.v1.json`` holds the host's own note on what a pack
+version changed, one sentence for a person, for any version the library holds.
+
+The library lists each pack's current version with what a person choosing one needs: its id,
+version and manifest digest; its title, description and tags; its origin; its licence with the
+attribution it requires, and its authors; its preview picture's digest and media type, when it
+has one; whether it is the default; the note on what this version changed, or none; and its
+earlier versions, oldest first, each with its manifest digest and preview picture. It holds every
+version, current and earlier, so a world may name any of them, and serves each manifest as its
+canonical bytes, so the digest that identifies a pack names exactly the bytes served, and each
+listed file as the media type its manifest states, all as committed content by digest
+(:mod:`exulanica.world.committed_content`). The host reads it once, when it starts
 (``exulanica.api.app``), and ``exulanica.api.routes.style_packs`` serves it.
 """
 
@@ -43,11 +56,14 @@ from exulanica.world.style_packs import (
 )
 
 __all__ = [
+    "CHANGES_PROFILE",
     "LIBRARY_DIRECTORY",
     "LIBRARY_FILE",
     "LIBRARY_PROFILE",
     "LIST_PROFILE",
     "MANIFEST_MEDIA_TYPE",
+    "PUBLISHED_PROFILE",
+    "EarlierVersion",
     "LibraryPack",
     "StylePackLibrary",
     "StylePackLibraryRefused",
@@ -66,7 +82,16 @@ LIBRARY_PROFILE: Final = "exulanica.style-pack-library/v1"
 LIST_PROFILE: Final = "exulanica.style-pack-list/v1"
 #: The media type a manifest is served as: its canonical JSON.
 MANIFEST_MEDIA_TYPE: Final = "application/json"
+#: The profile of the published versions' ledger, beside the packs folder as ``published.v1.json``.
+PUBLISHED_PROFILE: Final = "exulanica.style-pack-published/v1"
+#: The profile of the notes on what each version changed, beside it as ``changes.v1.json``.
+CHANGES_PROFILE: Final = "exulanica.style-pack-changes/v1"
+#: A note's length at most: one sentence.
+CHANGES_MAX: Final = 200
 _MANIFEST: Final = "manifest.json"
+_PUBLISHED: Final = "published"
+_PUBLISHED_FILE: Final = "published.v1.json"
+_CHANGES_FILE: Final = "changes.v1.json"
 
 
 class StylePackLibraryRefused(ValueError):
@@ -74,8 +99,26 @@ class StylePackLibraryRefused(ValueError):
 
 
 @dataclass(frozen=True, slots=True)
+class EarlierVersion:
+    """An earlier version of a library pack, still served by its digest."""
+
+    version: int
+    manifest_sha256: str
+    preview_sha256: str | None
+    preview_media_type: str | None
+
+    def listing(self) -> dict[str, Any]:
+        return {
+            "version": self.version,
+            "manifest_sha256": self.manifest_sha256,
+            "preview_sha256": self.preview_sha256,
+            "preview_media_type": self.preview_media_type,
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class LibraryPack:
-    """One committed pack as the library lists it."""
+    """One committed pack, at its current version, as the library lists it."""
 
     pack_id: str
     version: int
@@ -94,6 +137,10 @@ class LibraryPack:
     #: The preview picture's SHA-256 and media type, or None for a pack with no picture.
     preview_sha256: str | None = None
     preview_media_type: str | None = None
+    #: The host's note on what this version changed from the one before, or None.
+    changes: str | None = None
+    #: The pack's earlier versions the library still serves, oldest first.
+    earlier_versions: tuple[EarlierVersion, ...] = ()
 
     def listing(self) -> dict[str, Any]:
         return {
@@ -110,6 +157,8 @@ class LibraryPack:
             "total_bytes": self.total_bytes,
             "preview_sha256": self.preview_sha256,
             "preview_media_type": self.preview_media_type,
+            "changes": self.changes,
+            "earlier_versions": [earlier.listing() for earlier in self.earlier_versions],
         }
 
 
@@ -123,8 +172,18 @@ class StylePackLibrary:
     default: str
 
     def pack(self, pack_id: str) -> LibraryPack | None:
-        """The committed pack ``pack_id`` names, or None."""
+        """The committed pack ``pack_id`` names, at its current version, or None."""
         return next((pack for pack in self.packs if pack.pack_id == pack_id), None)
+
+    def holds(self, pack_id: str, version: int, manifest_sha256: str) -> bool:
+        """Whether the library serves ``pack_id`` at exactly ``version`` and ``manifest_sha256``,
+        its current version or an earlier one."""
+        pack = self.pack(pack_id)
+        if pack is None:
+            return False
+        held = [(pack.version, pack.manifest_sha256)]
+        held.extend((old.version, old.manifest_sha256) for old in pack.earlier_versions)
+        return (version, manifest_sha256) in held
 
     @property
     def default_pack(self) -> LibraryPack:
@@ -157,9 +216,9 @@ def _refuse(folder: str, detail: str) -> StylePackLibraryRefused:
     return StylePackLibraryRefused(f"style pack {folder}: {detail}")
 
 
-def _read_pack(folder: Path, context: StylePackContext) -> _Read:
-    """One folder's manifest as read and every item it serves, the manifest first."""
-    name = folder.name
+def _read_pack(folder: Path, context: StylePackContext, pack_id: str, name: str) -> _Read:
+    """One folder's manifest as read and every item it serves, the manifest first: ``pack_id`` is
+    the id the folder's place names, and ``name`` how a refusal names the folder."""
     text = (folder / _MANIFEST).read_text(encoding="utf-8")
     try:
         manifest = json.loads(text)
@@ -172,7 +231,7 @@ def _read_pack(folder: Path, context: StylePackContext) -> _Read:
         read = read_manifest(manifest, context)
     except StylePackRefused as refused:
         raise _refuse(name, f"its manifest is refused: {refused}") from refused
-    if read["pack_id"] != name:
+    if read["pack_id"] != pack_id:
         raise _refuse(name, f"its folder is not named by its pack id {read['pack_id']}")
     manifest_bytes = canonical.encode("ascii")
     items = [
@@ -201,7 +260,7 @@ def _read_pack(folder: Path, context: StylePackContext) -> _Read:
 
 def _preview(manifest: dict[str, Any]) -> dict[str, str | None]:
     """The listed file a manifest names as its preview, by digest and media type."""
-    path = manifest["preview"]
+    path = manifest.get("preview")
     file = next((file for file in manifest["files"] if file["path"] == path), None)
     if file is None:
         return {"preview_sha256": None, "preview_media_type": None}
@@ -230,13 +289,113 @@ def _default(library_file: Path, packs: dict[str, _Read]) -> str:
     return str(document["default"])
 
 
+def _records(path: Path, profile: str, key: str, fields: set[str]) -> list[dict[str, Any]]:
+    """The records a library file beside the packs folder lists under ``key``, each holding
+    exactly ``fields``; none when the file is absent."""
+    if not path.exists():
+        return []
+    try:
+        document = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as unread:
+        raise StylePackLibraryRefused(f"{path.name} cannot be read: {unread}") from unread
+    if (
+        not isinstance(document, dict)
+        or set(document) != {"profile", key}
+        or document["profile"] != profile
+        or not isinstance(document[key], list)
+        or any(not isinstance(record, dict) or set(record) != fields for record in document[key])
+    ):
+        raise StylePackLibraryRefused(
+            f"{path.name} is not {profile}: a profile and a list of {key}, each "
+            f"{', '.join(sorted(fields))}, nothing else"
+        )
+    order = [(record["pack_id"], record["version"]) for record in document[key]]
+    if any(
+        not isinstance(pack_id, str) or isinstance(version, bool) or not isinstance(version, int)
+        for pack_id, version in order
+    ) or order != sorted(set(order)):
+        raise StylePackLibraryRefused(
+            f"{path.name} lists its {key} once each, by pack id and then version"
+        )
+    return list(document[key])
+
+
+def _published(directory: Path, context: StylePackContext) -> list[_Read]:
+    """Every earlier version the ledger beside ``directory`` lists, read from its folder and held
+    to its entry; a folder the ledger does not list refuses the library."""
+    root = directory.parent / _PUBLISHED
+    entries = _records(
+        directory.parent / _PUBLISHED_FILE,
+        PUBLISHED_PROFILE,
+        "versions",
+        {"pack_id", "version", "manifest_sha256"},
+    )
+    listed = {(entry["pack_id"], str(entry["version"])) for entry in entries}
+    if root.is_dir():
+        for pack_folder in sorted(root.iterdir()):
+            if pack_folder.name.startswith("."):
+                continue
+            versions = sorted(pack_folder.iterdir()) if pack_folder.is_dir() else [pack_folder]
+            for folder in versions:
+                if folder.name.startswith("."):
+                    continue
+                if (pack_folder.name, folder.name) not in listed:
+                    raise _refuse(
+                        f"{pack_folder.name} published {folder.name}",
+                        f"is not a version {_PUBLISHED_FILE} lists",
+                    )
+    reads = []
+    for entry in entries:
+        pack_id, version = entry["pack_id"], entry["version"]
+        name = f"{pack_id} version {version}"
+        folder = root / pack_id / str(version)
+        if folder.is_symlink() or not folder.is_dir():
+            raise _refuse(name, f"is listed in {_PUBLISHED_FILE} and has no published folder")
+        read = _read_pack(folder, context, pack_id, name)
+        if read.manifest["version"] != version:
+            raise _refuse(name, f"its manifest states version {read.manifest['version']}")
+        if read.digest != entry["manifest_sha256"]:
+            raise _refuse(name, f"its manifest is not the one {_PUBLISHED_FILE} records")
+        reads.append(read)
+    return reads
+
+
+def _notes(directory: Path, held: set[tuple[str, int]]) -> dict[tuple[str, int], str]:
+    """The notes beside ``directory`` on what a version changed, each for a version the library
+    holds, one sentence of plain text."""
+    notes = {}
+    for record in _records(
+        directory.parent / _CHANGES_FILE,
+        CHANGES_PROFILE,
+        "notes",
+        {"pack_id", "version", "changes"},
+    ):
+        key = (record["pack_id"], record["version"])
+        name = f"{key[0]} version {key[1]}"
+        if key not in held:
+            raise _refuse(name, f"has a note in {_CHANGES_FILE} and is not a version it holds")
+        text = record["changes"]
+        if (
+            not isinstance(text, str)
+            or not 1 <= len(text) <= CHANGES_MAX
+            or text != text.strip()
+            or any(ord(character) < 0x20 or 0x7F <= ord(character) < 0xA0 for character in text)
+        ):
+            raise _refuse(
+                name, f"its note must be 1 to {CHANGES_MAX} characters of trimmed plain text"
+            )
+        notes[key] = text
+    return notes
+
+
 def load_style_pack_library(
     directory: Path = LIBRARY_DIRECTORY,
     context: StylePackContext | None = None,
     library_file: Path = LIBRARY_FILE,
 ) -> StylePackLibrary:
-    """Read and check every pack in ``directory`` and the default ``library_file`` names; refuse
-    the library at the first broken rule."""
+    """Read and check every pack in ``directory``, the default ``library_file`` names, and the
+    published versions and notes beside ``directory``; refuse the library at the first broken
+    rule."""
     context = load_context(_ROOT) if context is None else context
     packs: dict[str, _Read] = {}
     for folder in sorted(directory.iterdir()):
@@ -244,20 +403,33 @@ def load_style_pack_library(
             continue
         if folder.is_symlink() or not folder.is_dir():
             raise _refuse(folder.name, "is not a pack folder")
-        read = _read_pack(folder, context)
+        read = _read_pack(folder, context, folder.name, folder.name)
         packs[read.manifest["pack_id"]] = read
-    for pack_id, read in packs.items():
+    published = _published(directory, context)
+    earlier: dict[str, list[_Read]] = {}
+    for read in published:
+        pack_id = read.manifest["pack_id"]
+        current = packs.get(pack_id)
+        if current is None or read.manifest["version"] >= current.manifest["version"]:
+            raise _refuse(
+                f"{pack_id} version {read.manifest['version']}",
+                "is published and is not below a current version of the library",
+            )
+        earlier.setdefault(pack_id, []).append(read)
+    held = {
+        (read.manifest["pack_id"], read.manifest["version"]): read.digest
+        for read in (*packs.values(), *published)
+    }
+    for read in (*packs.values(), *published):
         base = read.manifest["base"]
         if base is None:
             continue
-        found = packs.get(base["pack_id"])
-        if (
-            found is None
-            or found.manifest["version"] != base["version"]
-            or found.digest != base["manifest_sha256"]
-        ):
-            raise _refuse(pack_id, f"its base {base['pack_id']} is not a pack of the library")
+        if held.get((base["pack_id"], base["version"])) != base["manifest_sha256"]:
+            raise _refuse(
+                read.manifest["pack_id"], f"its base {base['pack_id']} is not a pack of the library"
+            )
     default = _default(library_file, packs)
+    notes = _notes(directory, set(held))
     return StylePackLibrary(
         packs=tuple(
             LibraryPack(
@@ -274,10 +446,23 @@ def load_style_pack_library(
                 files=len(read.manifest["files"]),
                 total_bytes=sum(len(item.data) for item in read.items),
                 **_preview(read.manifest),
+                changes=notes.get((pack_id, read.manifest["version"])),
+                earlier_versions=tuple(
+                    EarlierVersion(
+                        version=old.manifest["version"],
+                        manifest_sha256=old.digest,
+                        **_preview(old.manifest),
+                    )
+                    for old in sorted(
+                        earlier.get(pack_id, []), key=lambda old: old.manifest["version"]
+                    )
+                ),
             )
             for pack_id, read in sorted(packs.items())
         ),
-        content=CommittedContent(item for read in packs.values() for item in read.items),
+        content=CommittedContent(
+            item for read in (*packs.values(), *published) for item in read.items
+        ),
         default=default,
     )
 

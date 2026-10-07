@@ -168,8 +168,7 @@ def create_generated_world(
         if named is None
         else StylePackBinding(named.pack_id, named.version, named.manifest_sha256)
     )
-    held = library.pack(pack.pack_id)
-    if held is None or (held.version, held.manifest_sha256) != (pack.version, pack.manifest_sha256):
+    if not library.holds(pack.pack_id, pack.version, pack.manifest_sha256):
         return _problem(
             422,
             "invalid_style_data",

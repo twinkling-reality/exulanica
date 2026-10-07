@@ -14,6 +14,13 @@ Each pack also lists ``preview.jpg``: the pack drawn by the product on one gener
 its arrival camera, the same town and camera for every pack, captured once at 1600x1000 and
 committed beside its pieces. This script lists it and writes it back unchanged; it never makes it.
 
+A world keeps the look it was given, so every version a pack has published stays servable. When
+``VERSION`` is above the committed manifest's version, writing first retires the committed pack: its
+folder is copied whole to ``assets/style-packs/published/<pack id>/<version>/`` and the version is
+appended to the ledger ``assets/style-packs/published.v1.json``. ``--check`` also refuses a
+published folder that no longer holds the bytes its ledger entry and manifest state, and a version
+below ``VERSION`` the ledger does not list.
+
 Pieces are glTF metres, +Y up, +Z front, pivot at the base centre. A window or a door is a frame
 whose bars keep their size, so it states stretch zones between them; a car, a tree and a fence are
 scaled whole. Positions are rounded to a tenth of a millimetre before they are written, so a float's
@@ -49,6 +56,11 @@ PACKS: Final = Path("assets/style-packs/packs")
 VERSION: Final = 3
 #: Each pack's committed preview picture, inside its folder.
 PREVIEW: Final = "preview.jpg"
+#: Every earlier version of each pack, a whole pack folder each, as ``<pack id>/<version>/``.
+PUBLISHED: Final = Path("assets/style-packs/published")
+#: The ledger of those versions, appended when a version is retired and never changed.
+LEDGER: Final = Path("assets/style-packs/published.v1.json")
+LEDGER_PROFILE: Final = "exulanica.style-pack-published/v1"
 
 
 def load_kind_catalogs_bounds() -> list[dict[str, Any]]:
@@ -1106,6 +1118,89 @@ def build(spec: PackSpec, table: Sequence[int]) -> dict[str, bytes]:
     return out
 
 
+def _manifest_digest(text: bytes) -> str:
+    """A manifest file's digest: of its canonical JSON, without the newline that ends the file."""
+    return hashlib.sha256(text[:-1]).hexdigest()
+
+
+def read_ledger(root: Path) -> list[dict[str, Any]]:
+    """The published versions the ledger lists, by pack id and then version."""
+    path = root / LEDGER
+    if not path.exists():
+        return []
+    document = json.loads(path.read_text(encoding="utf-8"))
+    if document.get("profile") != LEDGER_PROFILE:
+        raise ValueError(f"{LEDGER} is not {LEDGER_PROFILE}")
+    return list(document["versions"])
+
+
+def write_ledger(root: Path, versions: Sequence[dict[str, Any]]) -> None:
+    ordered = sorted(versions, key=lambda entry: (entry["pack_id"], entry["version"]))
+    document = {"profile": LEDGER_PROFILE, "versions": ordered}
+    (root / LEDGER).write_text(style_packs.canonical_json(document) + "\n", encoding="utf-8")
+
+
+def retire(root: Path, pack_id: str, version: int) -> None:
+    """Retire a pack's committed folder, at ``version``, to its published folder and the ledger.
+
+    The folder is copied whole, its manifest and every file the manifest lists, so the version
+    stays servable by its digest. A version already published must hold exactly these bytes.
+    """
+    folder = root / PACKS / pack_id
+    text = (folder / "manifest.json").read_bytes()
+    manifest = json.loads(text)
+    if manifest["version"] != version:
+        raise ValueError(f"{pack_id}: the committed manifest is version {manifest['version']}")
+    target = root / PUBLISHED / pack_id / str(version)
+    names = ["manifest.json", *(file["path"] for file in manifest["files"])]
+    for name in names:
+        source = (folder / name).read_bytes()
+        path = target / name
+        if path.exists():
+            if path.read_bytes() != source:
+                raise ValueError(f"{path.relative_to(root)} is published with other bytes")
+            continue
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(source)
+    entry = {"pack_id": pack_id, "version": version, "manifest_sha256": _manifest_digest(text)}
+    versions = read_ledger(root)
+    listed = [e for e in versions if (e["pack_id"], e["version"]) == (pack_id, version)]
+    if listed and listed != [entry]:
+        raise ValueError(f"{LEDGER} lists {pack_id} version {version} with another manifest")
+    if not listed:
+        write_ledger(root, [*versions, entry])
+
+
+def published_problems(root: Path, pack_ids: Sequence[str]) -> list[str]:
+    """What breaks the rule that every earlier version stays servable exactly as published."""
+    problems: list[str] = []
+    versions = read_ledger(root)
+    listed = {(entry["pack_id"], entry["version"]) for entry in versions}
+    for pack_id in pack_ids:
+        for version in range(1, VERSION):
+            if (pack_id, version) not in listed:
+                problems.append(f"{LEDGER} does not list {pack_id} version {version}")
+    for entry in versions:
+        folder = root / PUBLISHED / entry["pack_id"] / str(entry["version"])
+        name = f"{entry['pack_id']} version {entry['version']}"
+        manifest_path = folder / "manifest.json"
+        if not manifest_path.is_file():
+            problems.append(f"{name} has no published manifest")
+            continue
+        text = manifest_path.read_bytes()
+        if _manifest_digest(text) != entry["manifest_sha256"]:
+            problems.append(f"{name}: its manifest is not the one {LEDGER} records")
+            continue
+        for file in json.loads(text)["files"]:
+            path = folder / file["path"]
+            if (
+                not path.is_file()
+                or hashlib.sha256(path.read_bytes()).hexdigest() != file["sha256"]
+            ):
+                problems.append(f"{name}: {file['path']} is not the bytes its manifest states")
+    return problems
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--check", action="store_true", help="refuse if a committed file differs")
@@ -1114,6 +1209,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     stale: list[str] = []
     for spec in SPECS:
         folder = ROOT / PACKS / spec.pack_id
+        committed = folder / "manifest.json"
+        if not args.check and committed.is_file():
+            version = json.loads(committed.read_bytes())["version"]
+            if version > VERSION:
+                raise ValueError(f"{spec.pack_id}: version {version} is committed, above {VERSION}")
+            if version < VERSION:
+                retire(ROOT, spec.pack_id, version)
         for name, data in build(spec, table).items():
             path = folder / name
             if args.check:
@@ -1122,6 +1224,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                 continue
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(data)
+    if args.check:
+        stale.extend(published_problems(ROOT, [spec.pack_id for spec in SPECS]))
     if stale:
         print("stale:\n" + "\n".join(stale), file=sys.stderr)
         return 1

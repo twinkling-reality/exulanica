@@ -42,6 +42,13 @@ def committed(pack_id: str) -> StylePackBinding:
     )
 
 
+def published(pack_id: str, version: int) -> StylePackBinding:
+    """An earlier version of a pack, read from its published folder."""
+    text = (PACKS.parent / "published" / pack_id / str(version) / "manifest.json").read_bytes()
+    assert json.loads(text)["version"] == version
+    return StylePackBinding(pack_id, version, hashlib.sha256(text[:-1]).hexdigest())
+
+
 def naming(current, pack: StylePackBinding | None, **more):
     """A proposal over ``current`` that names ``pack`` (None: no pack)."""
     return replace(proposal(current, **more), style_pack_stated=True, style_pack=pack)
@@ -245,3 +252,25 @@ def test_a_version_naming_a_pack_the_host_does_not_hold_reads_with_a_warning(rep
     read = elsewhere.current()
     assert read.style_pack == cozy
     assert any(cozy.pack_id in warning for warning in read.warnings)
+
+
+def test_an_earlier_version_the_library_serves_is_named_applied_and_rolled_back_to(repository):
+    # A world given version 2 keeps it, and moving to the current version is a choice of its own.
+    styles = fixture_styles(repository)
+    initial = styles.register_topology(topology())
+    earlier = published("exulanica.toon-town", 2)
+    current = committed("exulanica.toon-town")
+    assert earlier.version < current.version
+    first = apply(styles, styles.preview(naming(initial, earlier)), initial)
+    assert first.style_pack == earlier
+    assert first.warnings == ()
+    second = apply(styles, styles.preview(naming(first, current)), first)
+    assert second.style_pack == current
+    restored = styles.rollback(
+        first.version_id,
+        base_style_version_id=second.version_id,
+        base_topology_digest="topology-a",
+        provenance=ProposalProvenance(ProposalOrigin.USER, uuid.uuid4()),
+    )
+    assert restored.style_pack == earlier
+    assert styles.current().warnings == ()

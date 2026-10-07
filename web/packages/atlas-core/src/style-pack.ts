@@ -172,8 +172,8 @@ export interface StylePackManifest {
   readonly provenance: StylePackProvenance;
   readonly licence: { readonly id: StylePackLicence; readonly attribution: string | null };
   readonly authors: readonly string[];
-  /** The listed picture that shows what the pack looks like, or null. */
-  readonly preview: string | null;
+  /** The listed picture that shows what the pack looks like, or null; absent (none) from a manifest written before it existed. */
+  readonly preview?: string | null;
   readonly base: { readonly pack_id: string; readonly version: number; readonly manifest_sha256: string } | null;
   readonly light: { readonly default_preset: string; readonly presets: Readonly<Record<string, StylePackLightPreset>> } | null;
   readonly shading: {
@@ -216,7 +216,17 @@ const FILE_PATH = /^[a-z0-9][a-z0-9_-]{0,63}(\/[a-z0-9][a-z0-9_.-]{0,63}){0,3}\.
 const TEXT_MAX = { title: 80, description: 400, author: 120, attribution: 400, reference: 400, model: 200, prompt: 120 } as const;
 
 type Json = unknown;
-type Fields = Readonly<Record<string, (value: Json, path: string) => unknown>>;
+/**
+ * A field a manifest may leave out. A field added within a profile is optional and its absence keeps
+ * the meaning a manifest had before the field existed, so every manifest written under the profile
+ * still reads. A manifest that leaves it out is returned without it, as given, so its bytes and
+ * digest are its own; a reader of the result takes the absence as that earlier meaning.
+ */
+interface Optional {
+  readonly read: (value: Json, path: string) => unknown;
+}
+const optional = (read: (value: Json, path: string) => unknown): Optional => ({ read });
+type Fields = Readonly<Record<string, ((value: Json, path: string) => unknown) | Optional>>;
 
 const fail = (reason: StylePackRefusalReason, path: string, detail: string): never => {
   throw new StylePackRefusal(reason, path, detail);
@@ -228,9 +238,12 @@ function object(value: Json, path: string, fields: Fields): Record<string, unkno
   const record = value as Record<string, unknown>;
   for (const key of Object.keys(record)) if (!Object.hasOwn(fields, key)) fail('shape', path, `has an unknown key ${JSON.stringify(key)}`);
   const out: Record<string, unknown> = {};
-  for (const [key, read] of Object.entries(fields)) {
-    if (!Object.hasOwn(record, key)) fail('shape', path, `is missing ${JSON.stringify(key)}`);
-    out[key] = read(record[key], join(path, key));
+  for (const [key, field] of Object.entries(fields)) {
+    if (!Object.hasOwn(record, key)) {
+      if (typeof field !== 'function') continue;
+      fail('shape', path, `is missing ${JSON.stringify(key)}`);
+    }
+    out[key] = (typeof field === 'function' ? field : field.read)(record[key], join(path, key));
   }
   return out;
 }
@@ -386,7 +399,8 @@ export function readStylePackManifest(value: Json, context: StylePackContext): S
     provenance,
     licence: (v, p) => object(v, p, { id: oneOf(STYLE_PACK_LICENCES), attribution: nullable(text(TEXT_MAX.attribution)) }),
     authors: list(text(TEXT_MAX.author), 1, 16),
-    preview: nullable(pattern(IMAGE_PATH, 'a lowercase relative path ending .jpg, .png or .webp')),
+    // Added after the first packs were published: a manifest from before it names none.
+    preview: optional(nullable(pattern(IMAGE_PATH, 'a lowercase relative path ending .jpg, .png or .webp'))),
     base: nullable((v, p) => object(v, p, {
       pack_id: pattern(PACK_ID, 'a namespaced id such as exulanica.cozy-town'), version: integer(1, 1_000_000), manifest_sha256: pattern(SHA256, 'a lowercase SHA-256'),
     })),
@@ -503,9 +517,10 @@ function checkWhole(manifest: StylePackManifest, context: StylePackContext): Sty
       });
     });
   }
-  if (manifest.preview !== null) {
-    if (!listed.has(manifest.preview)) fail('reference', 'preview', `names no listed file ${JSON.stringify(manifest.preview)}`);
-    used.add(manifest.preview);
+  const preview = manifest.preview ?? null;
+  if (preview !== null) {
+    if (!listed.has(preview)) fail('reference', 'preview', `names no listed file ${JSON.stringify(preview)}`);
+    used.add(preview);
   }
   for (const path of listed.keys()) if (!used.has(path)) fail('reference', 'files', `lists ${JSON.stringify(path)}, which nothing uses`);
   return manifest;

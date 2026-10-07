@@ -3,7 +3,9 @@
 Expected values come from the committed files themselves (each manifest file is its canonical JSON
 and one newline, so its digest is the SHA-256 of the file without that newline), never from the
 loader under test. Each refusal is a copy of the committed library with one thing broken, and the
-unbroken copy loads, so every refusal is the broken thing's.
+unbroken copy loads, so every refusal is the broken thing's. Earlier versions of a pack stay held
+and served, so a world drawn in one keeps its look; they are read from their published folders and
+the ledger beside the packs folder.
 """
 
 from __future__ import annotations
@@ -25,10 +27,12 @@ from exulanica.world.style_pack_library import (
     StylePackLibraryRefused,
     load_style_pack_library,
 )
-from exulanica.world.style_packs import load_context
+from exulanica.world.style_packs import load_context, read_manifest
 
 ROOT = Path(__file__).resolve().parents[1]
-PACKS = ROOT / "assets" / "style-packs" / "packs"
+STYLE_PACKS = ROOT / "assets" / "style-packs"
+PACKS = STYLE_PACKS / "packs"
+PUBLISHED = STYLE_PACKS / "published"
 CONTEXT = load_context(ROOT)
 
 
@@ -46,6 +50,22 @@ def _copy(tmp_path: Path) -> Path:
     library = tmp_path / "packs"
     shutil.copytree(PACKS, library)
     return library
+
+
+def _ledger() -> list[dict]:
+    """The published versions, read from the committed ledger."""
+    document = json.loads((STYLE_PACKS / "published.v1.json").read_text("utf-8"))
+    assert document["profile"] == "exulanica.style-pack-published/v1"
+    return document["versions"]
+
+
+def _published() -> dict[tuple[str, int], tuple[dict, bytes]]:
+    """Each published version's manifest and its canonical bytes, read from its folder."""
+    found = {}
+    for entry in _ledger():
+        text = (PUBLISHED / entry["pack_id"] / str(entry["version"]) / "manifest.json").read_bytes()
+        found[(entry["pack_id"], entry["version"])] = (json.loads(text), text[:-1])
+    return found
 
 
 def _load(library: Path):
@@ -77,10 +97,17 @@ def test_the_library_is_the_committed_folders_each_listed_with_its_licence() -> 
 def test_it_serves_each_manifest_and_listed_file_by_digest_and_nothing_else() -> None:
     library = load_style_pack_library()
     expected: dict[str, tuple[str, bytes]] = {}
-    for folder, (manifest, canonical) in _committed().items():
+    folders = {PACKS / folder: read for folder, read in _committed().items()}
+    folders.update(
+        {
+            PUBLISHED / pack_id / str(version): read
+            for (pack_id, version), read in _published().items()
+        }
+    )
+    for folder, (manifest, canonical) in folders.items():
         expected[hashlib.sha256(canonical).hexdigest()] = ("application/json", canonical)
         for file in manifest["files"]:
-            data = (PACKS / folder / file["path"]).read_bytes()
+            data = (folder / file["path"]).read_bytes()
             expected[hashlib.sha256(data).hexdigest()] = (file["media_type"], data)
     assert len(library.content) == len(expected)
     for digest, (media_type, data) in expected.items():
@@ -227,3 +254,141 @@ def test_committed_content_holds_bytes_to_their_digest_and_one_media_type() -> N
         CommittedContent([item, ServedItem(digest, "application/json", data)])
     with pytest.raises(CommittedContentRefused, match="not a SHA-256"):
         CommittedContent([ServedItem(digest.upper(), "model/gltf-binary", data)])
+
+
+def test_every_earlier_version_is_held_served_and_listed_as_published() -> None:
+    library = load_style_pack_library()
+    published = _published()
+    committed = _committed()
+    # Every version below a pack's current one was published, and nothing else was.
+    assert sorted(published) == sorted(
+        (pack_id, version)
+        for pack_id, (manifest, _canonical) in committed.items()
+        for version in range(1, manifest["version"])
+    )
+    for entry in _ledger():
+        manifest, canonical = published[(entry["pack_id"], entry["version"])]
+        digest = hashlib.sha256(canonical).hexdigest()
+        assert entry["manifest_sha256"] == digest
+        assert manifest["pack_id"] == entry["pack_id"] and manifest["version"] == entry["version"]
+        assert library.holds(entry["pack_id"], entry["version"], digest)
+        assert library.content.get(digest).data == canonical
+    for listed in library.listing()["packs"]:
+        manifest, canonical = committed[listed["pack_id"]]
+        assert library.holds(
+            listed["pack_id"], manifest["version"], hashlib.sha256(canonical).hexdigest()
+        )
+        expected = []
+        for (pack_id, version), (old, old_canonical) in sorted(published.items()):
+            if pack_id != listed["pack_id"]:
+                continue
+            files = {file["path"]: file for file in old["files"]}
+            picture = files.get(old.get("preview"))
+            expected.append(
+                {
+                    "version": version,
+                    "manifest_sha256": hashlib.sha256(old_canonical).hexdigest(),
+                    "preview_sha256": None if picture is None else picture["sha256"],
+                    "preview_media_type": None if picture is None else picture["media_type"],
+                }
+            )
+        assert listed["earlier_versions"] == expected
+    # Another version, or a held version under another digest, is not held.
+    cozy, cozy_canonical = committed["exulanica.cozy-town"]
+    assert not library.holds("exulanica.cozy-town", cozy["version"] + 1, "0" * 64)
+    assert not library.holds("exulanica.cozy-town", 1, hashlib.sha256(cozy_canonical).hexdigest())
+    assert not library.holds("exulanica.nowhere-town", 1, "0" * 64)
+
+
+def test_every_published_manifest_still_reads_under_this_trees_reader() -> None:
+    # A field added within the profile is optional: version 1 was written before previews and
+    # names none.
+    for (pack_id, version), (manifest, _canonical) in _published().items():
+        assert (manifest["pack_id"], manifest["version"]) == (pack_id, version)
+        # Read as given, so its bytes and digest stay its own.
+        assert read_manifest(manifest, CONTEXT) == manifest
+    assert any("preview" not in manifest for manifest, _canonical in _published().values())
+
+
+def test_the_listing_carries_the_hosts_note_on_each_current_version() -> None:
+    document = json.loads((STYLE_PACKS / "changes.v1.json").read_text("utf-8"))
+    assert document["profile"] == "exulanica.style-pack-changes/v1"
+    notes = {(note["pack_id"], note["version"]): note["changes"] for note in document["notes"]}
+    for listed in load_style_pack_library().listing()["packs"]:
+        assert listed["changes"] == notes.get((listed["pack_id"], listed["version"]))
+
+
+def _copy_all(tmp_path: Path) -> Path:
+    """The committed style pack folder whole: packs, published versions, ledger, notes, default."""
+    shutil.copytree(STYLE_PACKS, tmp_path / "style-packs")
+    return tmp_path / "style-packs"
+
+
+def _load_all(root: Path):
+    return load_style_pack_library(root / "packs", CONTEXT, root / "library.v1.json")
+
+
+def _rewrite(path: Path, change) -> None:
+    document = json.loads(path.read_text("utf-8"))
+    change(document)
+    path.write_text(_canonical(document) + "\n")
+
+
+@pytest.mark.parametrize(
+    ("breakage", "named"),
+    [
+        ("published_file", "pieces/tree.glb is not the bytes its manifest states"),
+        ("published_manifest", "is not the one published.v1.json records"),
+        ("entry_without_folder", "has no published folder"),
+        ("folder_without_entry", "is not a version published.v1.json lists"),
+        ("current_version_published", "is not below a current version of the library"),
+        ("ledger_order", "lists its versions once each"),
+        ("ledger_shape", "is not exulanica.style-pack-published/v1"),
+        ("note_unheld", "is not a version it holds"),
+        ("note_text", "trimmed plain text"),
+        ("notes_shape", "is not exulanica.style-pack-changes/v1"),
+    ],
+)
+def test_a_broken_published_version_or_note_refuses_the_library(
+    tmp_path: Path, breakage: str, named: str
+) -> None:
+    root = _copy_all(tmp_path)
+    # The positive control: the unbroken copy loads with every earlier version.
+    assert all(pack.earlier_versions for pack in _load_all(root).packs)
+    ledger = root / "published.v1.json"
+    notes = root / "changes.v1.json"
+    toon = root / "published" / "exulanica.toon-town"
+    if breakage == "published_file":
+        data = bytearray((toon / "2" / "pieces/tree.glb").read_bytes())
+        data[-1] ^= 1
+        (toon / "2" / "pieces/tree.glb").write_bytes(bytes(data))
+    elif breakage == "published_manifest":
+        _rewrite(toon / "2" / "manifest.json", lambda m: m.update(title="Another town"))
+    elif breakage == "entry_without_folder":
+        shutil.rmtree(toon / "1")
+    elif breakage == "folder_without_entry":
+        _rewrite(ledger, lambda d: d.update(versions=d["versions"][1:]))
+    elif breakage == "current_version_published":
+        current = json.loads((root / "packs" / "exulanica.toon-town" / "manifest.json").read_text())
+        shutil.copytree(root / "packs" / "exulanica.toon-town", toon / str(current["version"]))
+        text = (toon / str(current["version"]) / "manifest.json").read_bytes()
+        entry = {
+            "pack_id": "exulanica.toon-town",
+            "version": current["version"],
+            "manifest_sha256": hashlib.sha256(text[:-1]).hexdigest(),
+        }
+        _rewrite(ledger, lambda d: d["versions"].append(entry))
+        _rewrite(ledger, lambda d: d["versions"].sort(key=lambda e: (e["pack_id"], e["version"])))
+    elif breakage == "ledger_order":
+        _rewrite(ledger, lambda d: d["versions"].reverse())
+    elif breakage == "ledger_shape":
+        _rewrite(ledger, lambda d: d.update(profile="exulanica.style-pack-published/v2"))
+    elif breakage == "note_unheld":
+        _rewrite(notes, lambda d: d["notes"][0].update(version=99))
+    elif breakage == "note_text":
+        _rewrite(notes, lambda d: d["notes"][0].update(changes="x" * 201))
+    elif breakage == "notes_shape":
+        _rewrite(notes, lambda d: d.update(notes={}))
+    with pytest.raises(StylePackLibraryRefused) as refused:
+        _load_all(root)
+    assert named in str(refused.value)

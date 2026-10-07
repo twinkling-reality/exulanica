@@ -123,3 +123,24 @@ def test_a_digest_the_library_does_not_hold_is_404_and_anything_else_is_no_path(
     assert _get(client, f"/world/style-packs/{store_file}").status_code == 404
     for malformed in ("E" * 64, "e" * 63, "manifest.json", "..%2Fpiece-budgets.v1.json"):
         assert _get(client, f"/world/style-packs/{malformed}").status_code in (404, 422), malformed
+
+
+def test_an_earlier_version_is_served_by_its_digest_as_it_was_published(client) -> None:
+    # A world drawn in version 2 keeps it: its manifest and picture stay served by digest.
+    ledger = json.loads((PACKS.parent / "published.v1.json").read_text("utf-8"))["versions"]
+    entry = next(e for e in ledger if (e["pack_id"], e["version"]) == ("exulanica.toon-town", 2))
+    folder = PACKS.parent / "published" / "exulanica.toon-town" / "2"
+    text = (folder / "manifest.json").read_bytes()
+    response = _get(client, f"/world/style-packs/{entry['manifest_sha256']}")
+    assert response.status_code == 200
+    assert response.content == text[:-1]
+    assert response.headers["content-type"] == "application/json"
+    picture = (folder / json.loads(text)["preview"]).read_bytes()
+    response = _get(client, f"/world/style-packs/{hashlib.sha256(picture).hexdigest()}")
+    assert response.status_code == 200
+    assert response.content == picture
+    listed = {p["pack_id"]: p for p in _get(client, "/world/style-packs").json()["packs"]}
+    earlier = listed["exulanica.toon-town"]["earlier_versions"]
+    assert [e["version"] for e in earlier] == [1, 2]
+    assert earlier[1]["manifest_sha256"] == entry["manifest_sha256"]
+    assert earlier[1]["preview_sha256"] == hashlib.sha256(picture).hexdigest()

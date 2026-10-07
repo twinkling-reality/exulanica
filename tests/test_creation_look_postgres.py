@@ -49,6 +49,15 @@ def _committed(pack_id: str) -> dict[str, object]:
     }
 
 
+def _published(pack_id: str, version: int) -> dict[str, object]:
+    text = (STYLE_PACKS / "published" / pack_id / str(version) / "manifest.json").read_bytes()
+    return {
+        "pack_id": pack_id,
+        "version": version,
+        "manifest_sha256": hashlib.sha256(text[:-1]).hexdigest(),
+    }
+
+
 def _default() -> str:
     return json.loads((STYLE_PACKS / "library.v1.json").read_text("utf-8"))["default"]
 
@@ -125,3 +134,11 @@ def test_rolling_back_to_the_first_version_returns_the_world_to_naming_no_pack(m
     )
     assert rolled.status_code == 200, rolled.text
     assert rolled.json()["style_pack"] is None
+
+
+def test_a_world_may_be_made_in_an_earlier_version_the_library_still_serves(made):
+    earlier = _published("exulanica.toon-town", 2)
+    response = _make(made, style_pack=earlier)
+    assert response.status_code == 201, response.text
+    current, _versions = _styles(made, response.json())
+    assert current["style_pack"] == earlier
