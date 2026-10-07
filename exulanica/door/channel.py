@@ -40,11 +40,12 @@ from typing import Any
 import psycopg
 from psycopg.types.json import Jsonb
 
-from exulanica.canonical import CanonicalisationError, sha256_of_canonical
+from exulanica.canonical import CanonicalisationError, canonical_json, sha256_of_canonical
 from exulanica.door.bridges import Bridge, BridgeDirectory
 from exulanica.door.grants import Grant, GrantRepository
 from exulanica.door.mapping import MappingRefused, check_mapping, check_plain, check_reads
 from exulanica.door.protocol import (
+    ASKED_BYTES_MAXIMUM,
     DECLARED_CHARACTERS_MAXIMUM,
     DECLARED_MIND_MAXIMUM,
     FRAME_PROFILE,
@@ -62,6 +63,7 @@ from exulanica.door.protocol import (
 )
 from exulanica.door.secrets import ChannelSession
 from exulanica.errors import ExulanicaError
+from exulanica.models.manifest import AnsweringMechanism
 from exulanica.world.deciders import ADAPTER_VERSION
 from exulanica.world.decision_roles import decision_roles
 
@@ -377,23 +379,32 @@ class ChannelRepository:
                 {**self._ids, "ask": cursor.ask, "limit": room},
             ).fetchall()
             registry = decision_roles()
+            asked_bytes = 0
             for row in asks:
-                position["ask"] = row["ask_seq"]
                 if row["recorded"] is not None:
+                    position["ask"] = row["ask_seq"]
                     continue  # answered already, or closed: its outcome follows, not the ask
                 request = row["request"]
                 role = registry.for_request(request["profile"])
                 if role is None:
                     raise LookupError("an ask names a request no registered role writes")
-                frames.append(
-                    asked_frame(
-                        ask_seq=row["ask_seq"],
-                        request=request,
-                        instruction=role.instruction,
-                        choice_description=role.choice_description,
-                        deadline_ms=request["provider_config"]["deadline_ms"],
-                    )
+                frame = asked_frame(
+                    ask_seq=row["ask_seq"],
+                    request=request,
+                    instruction=role.instruction,
+                    choice_description=role.choice_description,
+                    deadline_ms=request["provider_config"]["deadline_ms"],
+                    messages=role.adapter.messages(
+                        role, request["context"], AnsweringMechanism.TOOL_CALL
+                    ),
+                    act=role.choice(request["context"]).tool(),
                 )
+                size = len(canonical_json(frame))
+                if asked_bytes and asked_bytes + size > ASKED_BYTES_MAXIMUM:
+                    break  # the next poll reads on from this ask
+                asked_bytes += size
+                frames.append(frame)
+                position["ask"] = row["ask_seq"]
         ended = grant.ended(now)
         if ended is not None and not cursor.ended and len(frames) < FRAMES_PER_POLL:
             frames.append(
@@ -457,7 +468,7 @@ class ChannelRepository:
         if line is not None:
             fault = words_fault(line, maximum=LINE_CHARACTERS_MAXIMUM)
             if fault is not None:
-                raise ChannelRefused("line_refused", 422, f"a line {fault}")
+                raise ChannelRefused("line_refused", 422, fault)
         document = {key: body[key] for key in ("request_id", "request_sha256", "label")}
         if line is not None:
             document["line"] = line
@@ -508,5 +519,5 @@ def _declaration(declared: Mapping[str, str]) -> dict[str, str]:
             slash=key == "mind",
         )
         if fault is not None:
-            raise ChannelRefused("declared_refused", 422, f"a declared {key} {fault}")
+            raise ChannelRefused("declared_refused", 422, f"the declared {key}: {fault}")
     return {key: declared[key] for key in sorted(declared)}

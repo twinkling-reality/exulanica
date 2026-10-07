@@ -1,8 +1,10 @@
 """The door for outside programs: grants for a world's owner, and a channel for a bridge.
 
 A world's owner lets a bridge the deployment admits decide for some of the world's things, or bring
-visitors in, by issuing a grant (``POST /door/grants``); revokes it; ends its credentials without
-ending it (``POST /door/grants/{grant_id}/credentials/revoke``); and opens it either with an invite
+visitors in, by issuing a grant (``POST /door/grants``); named things are bound in the version the
+body names, through the choice record, in the grant's own transaction. The owner revokes a grant;
+ends its credentials without ending it (``POST /door/grants/{grant_id}/credentials/revoke``); and
+opens it either with an invite
 a server bridge redeems (``POST /door/grants/{grant_id}/invites``) or with a channel credential
 shown once (``.../channel-credentials``), for a program the owner runs or a server bridge declared
 for the owner's workspace alone. These owner routes need ``world.write`` and ``door.grant``; the
@@ -51,6 +53,7 @@ from exulanica.api.dependencies import (
     ScopedConnection,
     get_services,
 )
+from exulanica.api.routes.society_models import CHOICE_CONFLICTS
 from exulanica.api.world_scope import WorldId
 from exulanica.door.bridges import BridgeDirectory
 from exulanica.door.channel import (
@@ -110,7 +113,8 @@ BODY_LIMITS: Final = (
     ("POST", "/door/channel/hello", HELLO_BODY_BYTES),
     ("POST", "/door/channel/answers", ANSWER_BODY_BYTES),
 )
-#: How a grant refusal answers, by its code.
+#: How a grant refusal answers, by its code. A refusal of the choice record that binds a grant's
+#: named things answers as the choices route answers it: CHOICE_CONFLICTS 409, any other 422.
 _GRANT_STATUS: Final = {
     "invalid_scope": 422,
     "invalid_idempotency_key": 422,
@@ -122,7 +126,7 @@ _GRANT_STATUS: Final = {
     "unknown_grant": 404,
     "grant_ended": 409,
     "too_many_secrets": 409,
-    "named_things_unavailable": 409,
+    **dict.fromkeys(CHOICE_CONFLICTS, 409),
 }
 #: The poller threads every held poll in one process reads with, and so the most connections the
 #: process's held polls use at once.
@@ -152,7 +156,7 @@ def _unavailable() -> JSONResponse:
 def _refused(exc: GrantRefused) -> JSONResponse:
     if exc.code in ("unknown_grant",):
         return _problem(404, "unknown_reference", "nothing at this address is available")
-    return _problem(_GRANT_STATUS.get(exc.code, 409), exc.code, exc.detail)
+    return _problem(_GRANT_STATUS.get(exc.code, 422), exc.code, exc.detail)
 
 
 def _shown_once(issued: Any) -> dict[str, Any]:
@@ -174,6 +178,8 @@ class IssueBody(BaseModel):
     visitors_maximum: int = Field(default=0, ge=0, le=VISITORS_MAXIMUM)
     kinds: list[str] = Field(default_factory=list, max_length=16)
     things: list[uuid.UUID] = Field(default_factory=list, max_length=THINGS_MAXIMUM)
+    #: The world version the named things are bound in; a version's society is its own.
+    version_id: uuid.UUID | None = None
     gate: uuid.UUID | None = None
     may_carry_in: bool = False
     may_carry_out: bool = False
@@ -257,17 +263,12 @@ def issue_grant(
             "direct_credential_not_offered",
             "this bridge's grants open only with invites its own server redeems",
         )
-    if body.things:
-        # A named thing is bound by the thing contract's choice record, which this server does
-        # not yet have; a grant naming one is refused rather than issued half bound.
-        return _problem(
-            409, "named_things_unavailable", "this server cannot yet hand a world's own things over"
-        )
     try:
         scope = Scope(
             visitors_maximum=body.visitors_maximum,
             kinds=tuple(body.kinds),
             things=tuple(str(thing) for thing in body.things),
+            version_id=None if body.version_id is None else str(body.version_id),
             gate=None if body.gate is None else str(body.gate),
             may_carry_in=body.may_carry_in,
             may_carry_out=body.may_carry_out,

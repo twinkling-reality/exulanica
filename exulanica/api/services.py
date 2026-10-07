@@ -392,6 +392,7 @@ class Services:
             policy_for=self.person_decision_policy,
             manifest=load_manifest(),
             manifest_sha256=hashlib.sha256(MANIFEST_PATH.read_bytes()).hexdigest(),
+            external=None if self.door is None else self.door.asker(),
         )
 
     def person_decision_policy(self, workspace_id: uuid.UUID) -> WorkspaceRequestPolicy:

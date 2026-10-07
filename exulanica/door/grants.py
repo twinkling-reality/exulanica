@@ -27,6 +27,12 @@ A grant may carry ``world_words``, the words its owner chose for its bridge to s
 the world (a title for a panel). The door never reads the world's own title, which is the owner's
 content and may hold a name.
 
+A grant that names some of the world's own things binds them to the bridge in the version it names,
+through the choice record (``SocietyModelChoiceRepository.record_external_choice``), in the grant's
+own transaction, so a thing is never decided for by a program whose grant does not exist; revoking
+hands them back to their routine the same way (``release_external_choice``). A new world version
+starts its society again, so a binding is a version's, as a model choice is.
+
 The repository runs on a connection scoped to the owner's workspace and is the one writer of the
 grant tables. Its idempotency: an issue names an ``idempotency_key``, from which the grant's id is
 derived, so a repeated issue answers with the grant it made and a key reused for a different grant
@@ -56,6 +62,11 @@ from exulanica.door.credentials import (
 from exulanica.door.protocol import words_fault
 from exulanica.door.retention import prune
 from exulanica.errors import ExulanicaError
+from exulanica.world.society_decision_contract import decision_contract, person_role
+from exulanica.world.society_model_choice_repository import (
+    ModelChoiceRefused,
+    SocietyModelChoiceRepository,
+)
 
 __all__ = [
     "GRANT_PROFILE",
@@ -122,6 +133,7 @@ class Scope:
     visitors_maximum: int = 0
     kinds: tuple[str, ...] = ()
     things: tuple[str, ...] = ()
+    version_id: str | None = None
     gate: str | None = None
     may_carry_in: bool = False
     may_carry_out: bool = False
@@ -143,12 +155,17 @@ class Scope:
             raise GrantRefused(
                 "invalid_scope", f"a grant decides for at most {THINGS_MAXIMUM} named things"
             )
-        for value in (*self.things, *(() if self.gate is None else (self.gate,))):
+        named = (self.gate, self.version_id)
+        for value in (*self.things, *(value for value in named if value is not None)):
             try:
                 if str(uuid.UUID(value)) != value:
                     raise ValueError(value)
             except (TypeError, ValueError, AttributeError) as exc:
                 raise GrantRefused("invalid_scope", "a thing is named by its id") from exc
+        if bool(self.things) != (self.version_id is not None):
+            raise GrantRefused(
+                "invalid_scope", "a grant names the world version its things are bound in"
+            )
         if self.visitors_maximum == 0 and not self.things:
             raise GrantRefused(
                 "invalid_scope", "a grant lets its bridge bring visitors in or names things"
@@ -158,13 +175,14 @@ class Scope:
         if self.world_words is not None:
             fault = words_fault(self.world_words, maximum=WORLD_WORDS_MAXIMUM)
             if fault is not None:
-                raise GrantRefused("invalid_scope", f"a grant's world words {fault}")
+                raise GrantRefused("invalid_scope", f"a grant's world words: {fault}")
 
     def document(self) -> dict[str, Any]:
         return {
             "visitors_maximum": self.visitors_maximum,
             "kinds": sorted(self.kinds),
             "things": sorted(self.things),
+            "version_id": self.version_id,
             "gate": self.gate,
             "may_carry_in": self.may_carry_in,
             "may_carry_out": self.may_carry_out,
@@ -178,6 +196,7 @@ class Scope:
             visitors_maximum=document["visitors_maximum"],
             kinds=tuple(document["kinds"]),
             things=tuple(document["things"]),
+            version_id=document["version_id"],
             gate=document["gate"],
             may_carry_in=document["may_carry_in"],
             may_carry_out=document["may_carry_out"],
@@ -312,6 +331,38 @@ class GrantRepository:
             issued_at=row["issued_at"],
         )
 
+    def _choices(self, world_id: str) -> SocietyModelChoiceRepository:
+        return SocietyModelChoiceRepository(self._connection, self._workspace_id, world_id=world_id)
+
+    def _bind(self, world_id: str, grant_id: uuid.UUID, bridge: str, scope: Scope) -> None:
+        """Bind the grant's named things to its bridge in the version it names, or refuse."""
+        assert scope.version_id is not None
+        try:
+            self._choices(world_id).record_external_choice(
+                uuid.UUID(scope.version_id),
+                person_role(),
+                request_id=uuid.uuid5(grant_id, "bind"),
+                subjects=list(scope.things),
+                bridge=bridge,
+                grant_id=grant_id,
+                chosen_by=self._actor,
+                contract=decision_contract(),
+            )
+        except ModelChoiceRefused as exc:
+            raise GrantRefused(exc.code, exc.detail) from exc
+
+    def _release(self, grant: Grant) -> None:
+        """Hand the grant's named things back to their routine in the version they were bound in."""
+        assert grant.scope.version_id is not None
+        self._choices(grant.world_id).release_external_choice(
+            uuid.UUID(grant.scope.version_id),
+            person_role(),
+            request_id=uuid.uuid5(grant.grant_id, "release"),
+            grant_id=grant.grant_id,
+            chosen_by=self._actor,
+            contract=decision_contract(),
+        )
+
     def issue(
         self,
         *,
@@ -380,6 +431,8 @@ class GrantRepository:
                     self._actor,
                 ),
             )
+            if scope.things:
+                self._bind(world_id, grant_id, bridge.key, scope)
             issued = self.current(grant_id)
         assert issued is not None
         return issued, True
@@ -401,6 +454,8 @@ class GrantRepository:
                 "values (%s, %s, %s)",
                 (self._workspace_id, grant_id, self._actor),
             )
+            if grant.scope.things:
+                self._release(grant)
             revoked = self.current(grant_id)
         assert revoked is not None
         return revoked

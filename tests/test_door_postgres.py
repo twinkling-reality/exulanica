@@ -148,17 +148,17 @@ def _issue(door, key: str = "grant-key-0001", **scope: Any) -> Any:
     )
 
 
-def _grant_for(door, subject: str) -> uuid.UUID:
-    """A grant naming one of the world's things, issued as the repository issues it: the route
-    refuses named things until the thing contract can bind them."""
+def _grant_for(door, *subjects: str) -> uuid.UUID:
+    """A grant naming some of the world's people, bound in its version through the choice record,
+    issued as the grant route issues it."""
     world = door["world"]
     with door["database"].session(world["workspace"]) as connection:
         grant, _ = GrantRepository(connection, world["workspace"], world["session"].actor).issue(
             world_id=_world_id(door),
             bridge=door["runtime"].bridges.get("test-bridge"),
-            scope=Scope(things=(subject,)),
+            scope=Scope(things=subjects, version_id=str(world["binding"].version_id)),
             minutes=60,
-            idempotency_key=f"things-{subject}",
+            idempotency_key=f"things-{'-'.join(sorted(subjects))}"[:128],
         )
     return grant.grant_id
 
@@ -226,8 +226,21 @@ def test_a_grant_names_a_bridge_offered_here_a_registered_world_and_no_unbound_t
         },
     )
     assert (elsewhere.status_code, elsewhere.json()["code"]) == (404, "unknown_world")
-    named = _issue(door, things=[str(uuid.uuid4())])
-    assert (named.status_code, named.json()["code"]) == (409, "named_things_unavailable")
+    # A named thing is bound in the version the grant names, so a grant naming one names it, and
+    # binds only one of that version's people (the choice record's own refusal).
+    unbound = _issue(door, things=[str(uuid.uuid4())])
+    assert (unbound.status_code, unbound.json()["code"]) == (422, "invalid_scope")
+    stranger = _issue(
+        door,
+        key="grant-key-0003",
+        things=[str(uuid.uuid4())],
+        version_id=str(door["world"]["binding"].version_id),
+    )
+    # Nobody lives in the version yet: the choice record finds no society to bind in, and the whole
+    # grant is refused with it, so no grant exists that names a thing it cannot decide for.
+    assert (stranger.status_code, stranger.json()["code"]) == (404, "unknown_reference")
+    listed = door["client"].get("/door/grants", headers=OWNER, params={"world_id": _world_id(door)})
+    assert all(grant["scope"]["things"] == [] for grant in listed.json()["grants"])
     nothing = _issue(door, visitors_maximum=0, kinds=[])
     assert (nothing.status_code, nothing.json()["code"]) == (422, "invalid_scope")
 
@@ -355,9 +368,9 @@ def test_a_channel_credential_opens_its_own_grant_and_no_other_route(door):
 # -- the asker --------------------------------------------------------------------------------
 
 
-def _person_request(door) -> tuple[dict[str, Any], str]:
-    """A request really reserved for one person of the world's society, as the host reserves
-    one, asked under an external decider: built by the role's own request builder and stored."""
+def _person_requests(door, count: int) -> list[tuple[dict[str, Any], str]]:
+    """Requests really reserved for people of the world's society, one each, as the host reserves
+    them, asked under an external decider: built by the role's own request builder."""
     world = door["world"]
     stays._inhabited(world, door["client"])
     connection = world["connection"]
@@ -384,6 +397,7 @@ def _person_request(door) -> tuple[dict[str, Any], str]:
         "contract": contract.binding(),
         "deadline_ms": DEADLINE_MS_DEFAULT,
     }
+    found = []
     for person in sorted(p["id"] for p in state["inhabitants"]):
         if not role.adapter.due(state, person):
             continue
@@ -398,10 +412,15 @@ def _person_request(door) -> tuple[dict[str, Any], str]:
             provider_config=model_shaped,
         )
         if request is not None:
-            break
-    else:
-        pytest.fail("nobody in the fixture society is at a choice point")
-    return request, person
+            found.append((request, person))
+        if len(found) == count:
+            return found
+    pytest.fail(f"fewer than {count} people in the fixture society are at a choice point")
+
+
+def _person_request(door) -> tuple[dict[str, Any], str]:
+    [found] = _person_requests(door, 1)
+    return found
 
 
 def _store_external(door, request: dict[str, Any], grant_id: uuid.UUID) -> dict[str, Any]:
@@ -602,7 +621,9 @@ def test_no_answer_by_the_deadline_and_a_revoked_grant_each_say_so(door):
     assert Cursor.decode(read["cursor"]).ended is True
 
 
-def test_configuration_names_a_quiet_bridge_and_a_thing_the_grant_no_longer_names(door):
+def test_configuration_names_a_quiet_bridge_a_thing_the_grant_no_longer_names_and_its_end(
+    door, monkeypatch
+):
     _request, person = _person_request(door)
     grant_id = _grant_for(door, person)
     world = door["world"]
@@ -631,6 +652,39 @@ def test_configuration_names_a_quiet_bridge_and_a_thing_the_grant_no_longer_name
         asker.configuration(
             world["workspace"], _world_id(door), person, {**decider, "bridge": "other-bridge"}
         )
+    # Once its end passes, a grant that was never revoked still binds the person, and is not asked.
+    with door["runtime"].database.session(world["workspace"]) as connection:
+        grant = GrantRepository(connection, world["workspace"], world["session"].actor).current(
+            grant_id
+        )
+    assert grant is not None
+    monkeypatch.setattr(GrantRepository, "now", lambda _self: grant.expires_at)
+    assert asker.configuration(world["workspace"], _world_id(door), person, decider)[1] == (
+        "grant_expired"
+    )
+
+
+def test_one_poll_stops_adding_asked_frames_past_its_byte_bound(door, monkeypatch):
+    (first, one), (second, two) = _person_requests(door, 2)
+    grant_id = _grant_for(door, one, two)
+    channel = _credential(door, grant_id)
+    cursor = _hello(door, channel).json()["cursor"]
+    asked_first = _store_external(door, first, grant_id)
+    asked_second = _store_external(door, second, grant_id)
+    world = door["world"]
+    asker = door["runtime"].asker()
+    for external in (asked_first, asked_second):
+        asker._write_ask(world["workspace"], grant_id, uuid.UUID(external["request_id"]))
+    # A bound smaller than any frame: the first asked frame always goes, and the next waits.
+    monkeypatch.setattr("exulanica.door.channel.ASKED_BYTES_MAXIMUM", 1)
+    read = _frames(door, channel, cursor).json()
+    assert [f["request_id"] for f in read["frames"] if f["kind"] == "asked"] == [
+        asked_first["request_id"]
+    ]
+    again = _frames(door, channel, read["cursor"]).json()
+    assert [f["request_id"] for f in again["frames"] if f["kind"] == "asked"] == [
+        asked_second["request_id"]
+    ]
 
 
 def test_an_answer_after_the_turn_is_decided_is_too_late_and_outcomes_follow_in_order(door):

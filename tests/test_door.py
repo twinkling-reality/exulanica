@@ -254,9 +254,9 @@ def _nested(depth):
         (lambda document: document["items"][0]["kind"].update(version=1.5), "fractional"),
         (lambda document: document["game"].update(content=None), "fractional number or null"),
         (lambda document: document["game"].update(content=_nested(9)), "nests at most 8"),
-        (lambda document: document["items"][0].update(words="a\u200bsword"), "words is one line"),
-        (lambda document: document["items"][0].update(words=" a sword"), "no space at either"),
-        (lambda document: document["items"][0].update(words="x" * 201), "1 to 200 characters"),
+        (lambda document: document["items"][0].update(words="a\u200bsword"), "separator"),
+        (lambda document: document["items"][0].update(words=" a sword"), "no white space"),
+        (lambda document: document["items"][0].update(words="x" * 201), "1 to 200 code points"),
         (lambda document: document["actions"][0].update(ability="Say Loud"), "ability"),
     ],
 )
@@ -284,18 +284,18 @@ def test_a_game_names_its_actions_with_its_own_identifiers_and_items_travel_in_a
     [
         ("A torch, which arrives as a lantern", None),
         ("Скаут говорит", None),
-        ("", "1 to 40 characters"),
-        ("x" * 41, "1 to 40 characters"),
-        (" padded", "no space at either end"),
-        ("e\u0301", "Unicode NFC"),
-        ("a\nb", "one line"),
-        ("a\u200eb", "one line"),
-        ("a\ue000b", "one line"),
-        ("a\u2028b", "one line"),
-        (12, "1 to 40 characters"),
+        ("", "1 to 40 code points"),
+        ("x" * 41, "1 to 40 code points"),
+        (" padded", "no white space at either end"),
+        ("e\u0301", "normal form C"),
+        ("a\nb", "no control, format or separator"),
+        ("a\u200eb", "no control, format or separator"),
+        ("a\ue000b", "no control, format or separator"),
+        ("a\u2028b", "no control, format or separator"),
+        (12, "a line is text"),
     ],
 )
-def test_text_a_person_reads_meets_one_rule(text, fault):
+def test_text_a_person_reads_meets_the_line_rule(text, fault):
     found = words_fault(text, maximum=40)
     assert (found is None) if fault is None else (fault in found), found
 

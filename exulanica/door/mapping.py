@@ -86,7 +86,7 @@ def _require(condition: bool, where: str) -> None:
 
 def _words(value: Any, where: str) -> str:
     fault = words_fault(value, maximum=WORDS_CHARACTERS_MAXIMUM)
-    _require(fault is None, f"{where} {fault}")
+    _require(fault is None, f"{where}: {fault}")
     return value
 
 

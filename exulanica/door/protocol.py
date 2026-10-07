@@ -12,14 +12,18 @@ own revisions (``grant``, and ``grant_ended`` once it is revoked or past its end
 therefore never disagrees with the history it reports.
 
 An ``asked`` frame carries the request's context byte for byte as a model reads it, with the role's
-instruction and the description of the one choice, so an agent behind a bridge reads the same words
-a model does and nothing a model would not.
+instruction and the description of the one choice, and the same request rendered as a model is sent
+it: the role's own messages, the one function a model is forced to call (``act``), and the world
+minute it was asked at. So an agent behind a bridge reads the same words a model does and nothing a
+model would not, and no adapter renders a role's words a second time. One poll's answer stops adding
+asked frames once it reaches :data:`ASKED_BYTES_MAXIMUM`; the next poll reads on.
 
 Bounds are declared here once and enforced where each document is read: a body's size by the
 application's body limit before it is parsed (``exulanica.api.routes.door.BODY_LIMITS``), and its
 fields where the door reads them. Nothing a bridge sends has a free-form field: every body is a
 closed schema, and an unknown field is refused. Every text a person reads from a bridge or about
-one (a line, a mapping's words, the name and maker a program declares) meets one rule,
+one (a line, a mapping's words, the name and maker a program declares) meets the one line rule
+every thing's words meet (:func:`exulanica.things.lines.check_line`), through
 :func:`words_fault`: one line in Unicode NFC of a bounded number of code points, with no control,
 format, surrogate, private use or separator character.
 
@@ -41,9 +45,11 @@ from dataclasses import dataclass
 from typing import Any, Final
 
 from exulanica.canonical import canonical_json
+from exulanica.things.lines import LineRefused, check_line
 
 __all__ = [
     "ANSWER_BODY_BYTES",
+    "ASKED_BYTES_MAXIMUM",
     "DEADLINE_MS_DEFAULT",
     "DECLARED_CHARACTERS_MAXIMUM",
     "DECLARED_MIND_MAXIMUM",
@@ -93,6 +99,10 @@ QUIET_SECONDS: Final = 10
 DEADLINE_MS_DEFAULT: Final = 3000
 #: The most frames one poll's answer carries; a bridge with more waiting polls again at once.
 FRAMES_PER_POLL: Final = 32
+#: The most bytes of asked frames one poll's answer carries past its first, in canonical JSON: a
+#: context is at most 12,000 bytes and its rendering about as much again, so eight or so asks a
+#: poll, and never a 32-frame answer of nearly a megabyte.
+ASKED_BYTES_MAXIMUM: Final = 262144
 #: Body bounds, in bytes of the request as it arrives, refused before the body is parsed. An answer
 #: holds two identifiers, a label and a line of at most 200 code points, which JSON escapes may
 #: spell in up to twelve bytes each; a hello holds the mapping file.
@@ -112,10 +122,6 @@ DECLARED_MIND_MAXIMUM: Final = 60
 #: How many game fields an adapter may declare it reads.
 READS_MAXIMUM: Final = 64
 
-#: Unicode categories no text a person reads from a bridge may carry: controls, format characters
-#: (zero-width and direction marks among them), surrogates, private use, and line and paragraph
-#: separators.
-_REFUSED_CATEGORIES: Final = frozenset({"Cc", "Cf", "Cs", "Co", "Zl", "Zp"})
 #: Declared words are allowed, never listed against: letters, marks and digits of any script, and
 #: these few marks. No colon or at sign, so no scheme or address reads as one.
 _DECLARED_MARKS: Final = frozenset(" .,'&()_+-")
@@ -198,16 +204,12 @@ class Cursor:
 
 
 def words_fault(text: object, *, maximum: int) -> str | None:
-    """Why ``text`` is not words a person may read here, or None: one line in Unicode NFC of 1 to
-    ``maximum`` code points with no space at either end, and no character of a refused category."""
-    if not isinstance(text, str) or not 1 <= len(text) <= maximum:
-        return f"is 1 to {maximum} characters"
-    if unicodedata.normalize("NFC", text) != text:
-        return "is written in Unicode NFC"
-    if text.strip() != text:
-        return "has no space at either end"
-    if any(unicodedata.category(character) in _REFUSED_CATEGORIES for character in text):
-        return "is one line with no control, format, private use or separator character"
+    """Why ``text`` is not words a person may read here, or None: the line rule
+    (:func:`exulanica.things.lines.check_line`) with ``maximum`` code points."""
+    try:
+        check_line(text, maximum=maximum)
+    except LineRefused as exc:
+        return str(exc)
     return None
 
 
@@ -242,18 +244,24 @@ def asked_frame(
     instruction: str,
     choice_description: str,
     deadline_ms: int,
+    messages: list[dict[str, str]],
+    act: Mapping[str, Any],
 ) -> dict[str, Any]:
-    """The frame asking a bridge to choose for one thing: the request as a model is asked it."""
+    """The frame asking a bridge to choose for one thing: the request as a model is asked it, its
+    context and the role's words, and the same request rendered as a model is sent it."""
     return {
         "kind": "asked",
         "ask_seq": ask_seq,
         "request_id": request["request_id"],
         "request_sha256": request["document_sha256"],
         "subject_id": request["subject_id"],
+        "minute": request["base_tick"],
         "deadline_ms": deadline_ms,
         "instruction": instruction,
         "choice_description": choice_description,
         "context": request["context"],
+        "messages": messages,
+        "act": dict(act),
     }
 
 

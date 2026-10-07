@@ -27280,6 +27280,18 @@
       "maxItems": 8,
       "title": "Things"
      },
+     "version_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Version Id"
+     },
      "gate": {
       "anyOf": [
        {
