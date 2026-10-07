@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 from exulanica_pieces.budgets import read_budgets
 from exulanica_pieces.canonical import Refused, canonical_bytes, sha256_hex
-from exulanica_pieces.records import REGENERATION, read_receipt, read_request
+from exulanica_pieces.records import REGENERATION, read_receipt, read_request, seed_for
 
 from exulanica_appearance.assets.dryrun import (
     CASE_PATH,
@@ -87,6 +87,50 @@ def test_a_held_receipt_refuses_a_changed_grip_measure(repository: Path, tmp_pat
         bare = {k: v for k, v in document["measured"].items() if k != "hold"}
         with pytest.raises(Refused, match="exactly"):
             read_receipt(canonical_bytes(dict(document, measured=bare)), request)
+
+
+def test_a_receipt_is_judged_by_its_recipe_s_box_fill_bar(repository: Path, tmp_path: Path) -> None:
+    dry_run(repository, tmp_path)
+    budgets = read_budgets(repository)
+    bench = next(
+        p.read_bytes()
+        for p in sorted(tmp_path.glob("request-*.json"))
+        if json.loads(p.read_bytes())["look_role"] == "prop.bench"
+    )
+    raw = next(
+        p.read_bytes()
+        for p in sorted((tmp_path / "receipts").glob("*.json"))
+        if json.loads(p.read_bytes())["request_sha256"] == sha256_hex(bench)
+    )
+    document = json.loads(raw)
+    # The same bench made to a kind under a recipe whose bar is 500 per mille; the stub bench
+    # fills 1,000, so the receipt is rewritten as though it filled 600: within 500, not 800.
+    request = dict(
+        json.loads(bench),
+        box_fill_minimum_permille=500,
+        recipe={"catalog_version": 1, "sha256": "ab" * 32},
+        thing_kind={"key": "bench", "sha256": "cd" * 32, "version": 1},
+    )
+    request = read_request(canonical_bytes(request), budgets)
+    digest = sha256_hex(canonical_bytes(request))
+    width = document["measured"]["size_mm"]["width"]
+    measured = dict(
+        document["measured"],
+        box_fill_permille=600,
+        size_mm=dict(document["measured"]["size_mm"], width=1800 * 600 // 1000),
+    )
+    assert width == 1800
+    changed = dict(
+        document,
+        measured=measured,
+        request_sha256=digest,
+        seed=seed_for(digest, document["variant"]),
+        verdict={"over": [], "within": True},
+    )
+    read_receipt(canonical_bytes(changed), request)
+    default = dict(changed, verdict={"over": ["box_fill"], "within": False})
+    with pytest.raises(Refused, match="verdict"):
+        read_receipt(canonical_bytes(default), request)
 
 
 def test_the_committed_case_is_what_the_dry_run_makes_now(repository: Path) -> None:

@@ -11,7 +11,10 @@ value checked), like every appearance record.
   in ``thing_kind`` (key, version and sha256, as the kind catalog states them), so the piece's
   receipt leads back to the kind it was made for. A piece made for a thing a hand holds
   carries ``hold``: the thing kind's grip point and axis and the widest section a hand closes
-  around, all in the kind's slot frame, copied from the thing kind and its body plan. A ``v1``
+  around, all in the kind's slot frame, copied from the thing kind and its body plan. A request
+  built from a piece recipe catalog entry names it in ``recipe`` (the catalog's version and the
+  entry's sha256, :mod:`exulanica_pieces.recipes`), and carries the entry's box fill bar in
+  ``box_fill_minimum_permille`` when the entry states one. A ``v1``
   request, whose budget came from a table this module held before the pack format's file existed,
   is still read as it was; only ``v2`` requests are built.
 - ``exulanica.generated-asset-job/v2``: one batch, fixed before it runs: the requests, the route's
@@ -69,6 +72,7 @@ __all__ = [
     "REQUEST_PROFILE",
     "REQUEST_PROFILE_V1",
     "ROUTES",
+    "box_fill_minimum",
     "box_fill_permille",
     "build_job",
     "build_receipt",
@@ -98,7 +102,7 @@ HOLD_AXES: Final = ("+x", "-x", "+y", "-y", "+z", "-z")
 #: along that side lands on the piece and not in the gap a smaller fit leaves.
 HOLD_FILL_MINIMUM_PER_MILLE: Final = 800
 #: A piece made to a thing kind fills at least this share of the kind's box along its longest side,
-#: so a gate is not drawn a third of its gateway's size.
+#: so a gate is not drawn a third of its gateway's size, unless its recipe states another bar.
 BOX_FILL_MINIMUM_PER_MILLE: Final = 800
 RECEIPT_PROFILE: Final = "exulanica.generated-asset/v1"
 REGENERATION: Final = (
@@ -158,7 +162,15 @@ _REQUEST_KEYS: Final = (
     "slot_mm",
     "variants",
 )
-_REQUEST_OPTIONAL: Final = ("description", "hold", "thing_kind", "tile_module_mm")
+_REQUEST_OPTIONAL: Final = (
+    "box_fill_minimum_permille",
+    "description",
+    "hold",
+    "recipe",
+    "thing_kind",
+    "tile_module_mm",
+)
+_RECIPE_KEYS: Final = ("catalog_version", "sha256")
 _THING_KIND_KEYS: Final = ("key", "sha256", "version")
 _THING_KIND_KEY: Final = re.compile(r"[a-z][a-z0-9_]{0,47}")
 _HOLD_KEYS: Final = ("axis", "grip", "section_mm_maximum")
@@ -238,6 +250,20 @@ def _check_request(document: object, budgets: PieceBudgets | None) -> dict[str, 
             or not is_sha256(kind["sha256"])
         ):
             raise Refused("thing_kind names a kind's key, its version from 1 and its sha256")
+    if "recipe" in document:
+        if document["profile"] == REQUEST_PROFILE_V1:
+            raise Refused("a v1 request names no recipe")
+        recipe = exact_keys(document["recipe"], _RECIPE_KEYS, "recipe")
+        if not is_count(recipe["catalog_version"], 1) or not is_sha256(recipe["sha256"]):
+            raise Refused("recipe names the catalog's version from 1 and the entry's sha256")
+    if "box_fill_minimum_permille" in document:
+        bar = document["box_fill_minimum_permille"]
+        if not measures_box_fill(document) or "recipe" not in document:
+            raise Refused(
+                "only a recipe's piece made to a thing kind, not held, states a box fill bar"
+            )
+        if not is_count(bar, 1) or bar > 1000:
+            raise Refused("box_fill_minimum_permille is 1 to 1,000")
     pack = exact_keys(document["pack"], _PACK_KEYS, "pack")
     if not isinstance(pack["id"], str) or _PACK_ID.fullmatch(pack["id"]) is None:
         raise Refused("pack.id is lower case letters, digits, dots and hyphens")
@@ -344,6 +370,8 @@ def build_request(
     tile_module_mm: int | None = None,
     hold: Mapping[str, Any] | None = None,
     thing_kind: Mapping[str, Any] | None = None,
+    recipe: Mapping[str, Any] | None = None,
+    box_fill_minimum_permille: int | None = None,
 ) -> bytes:
     """A v2 request's canonical bytes; its budget is filled from the pack format's file."""
     family, _ = split_role(look_role)
@@ -366,6 +394,10 @@ def build_request(
         document["hold"] = {**hold, "grip": dict(hold["grip"])}
     if thing_kind is not None:
         document["thing_kind"] = dict(thing_kind)
+    if recipe is not None:
+        document["recipe"] = dict(recipe)
+    if box_fill_minimum_permille is not None:
+        document["box_fill_minimum_permille"] = box_fill_minimum_permille
     raw = canonical_bytes(document)
     read_request(raw, budgets)
     return raw
@@ -377,13 +409,20 @@ def read_request(raw: bytes, budgets: PieceBudgets | None) -> dict[str, Any]:
     return _check_request(parse_canonical(raw, "request"), budgets)
 
 
-def cache_scope(request: Mapping[str, Any]) -> str:
+def cache_scope(request: Mapping[str, Any], recipe_words: str | None = None) -> str:
     """``catalog`` when the request is built from catalog content only, else ``workspace``.
 
     A description may carry a person's words, and a shared cache would tell one workspace what
-    another asked for, so such a request is cached within its own workspace.
+    another asked for, so such a request is cached within its own workspace. A description is
+    catalog content only when it is ``recipe_words``: the words of the recipe catalog entry the
+    request names, which the caller looked up by that entry's digest
+    (:meth:`exulanica_pieces.recipes.PieceRecipes.words_of`).
     """
-    return "workspace" if "description" in request else "catalog"
+    if "description" not in request:
+        return "catalog"
+    if "recipe" in request and recipe_words is not None and request["description"] == recipe_words:
+        return "catalog"
+    return "workspace"
 
 
 def cache_key(request_sha256: str, components_sha256: str, postprocess_version: str) -> str:
@@ -613,6 +652,11 @@ def box_fill_permille(size_mm: Mapping[str, int], slot_mm: Mapping[str, int]) ->
     return size_mm[longest] * 1000 // slot_mm[longest]
 
 
+def box_fill_minimum(request: Mapping[str, Any]) -> int:
+    """The box fill bar a piece made to ``request`` is held to: its recipe's, else the default."""
+    return int(request.get("box_fill_minimum_permille", BOX_FILL_MINIMUM_PER_MILLE))
+
+
 def measures_box_fill(request: Mapping[str, Any]) -> bool:
     """A piece made to a thing kind and not held is held to its box's fill.
 
@@ -624,8 +668,12 @@ def verdict(
     measured: Mapping[str, Any],
     budget: Mapping[str, Any],
     hold: Mapping[str, Any] | None = None,
+    box_fill_bar: int = BOX_FILL_MINIMUM_PER_MILLE,
 ) -> dict[str, Any]:
     """Within budget, or each measure over it named. The budget is the request's.
+
+    A piece whose box fill was measured names ``box_fill`` when it fills less than
+    ``box_fill_bar`` per mille, the request's :func:`box_fill_minimum`.
 
     A held piece also names ``hold_fill`` when it fills less than
     :data:`HOLD_FILL_MINIMUM_PER_MILLE` of its box's longest side, and ``grip_section`` when
@@ -636,9 +684,7 @@ def verdict(
         for key in ("glb_bytes", "materials", "texture_side_px", "triangles", "vertices")
         if measured[key] > budget[key]
     ]
-    if "box_fill_permille" in measured and (
-        measured["box_fill_permille"] < BOX_FILL_MINIMUM_PER_MILLE
-    ):
+    if "box_fill_permille" in measured and measured["box_fill_permille"] < box_fill_bar:
         over.append("box_fill")
     if hold is not None:
         held = measured["hold"]
@@ -715,7 +761,7 @@ def read_receipt(raw: bytes, request: Mapping[str, Any]) -> dict[str, Any]:
         raise Refused("the measured size is the output's size")
     if hold is not None:
         _check_hold_measured(measured["hold"], hold["axis"])
-    if document["verdict"] != verdict(measured, request["budget"], hold):
+    if document["verdict"] != verdict(measured, request["budget"], hold, box_fill_minimum(request)):
         raise Refused("receipt.verdict is not what the measures and the request's budget say")
     exact_keys(document["seconds"], _SECONDS_KEYS, "receipt.seconds")
     if not all(is_count(value) for value in document["seconds"].values()):

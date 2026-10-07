@@ -15,7 +15,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 PIECES = ROOT / "exulanica_pieces"
 #: What the product may read: plain Python.
-FORMAT_MODULES = ("budgets", "canonical", "colour", "records", "vocabulary")
+FORMAT_MODULES = ("budgets", "canonical", "colour", "recipes", "records", "vocabulary")
 
 
 def _imports(path: Path) -> set[str]:
@@ -60,11 +60,13 @@ def test_the_format_modules_load_where_numpy_cannot() -> None:
         "sys.modules['numpy'] = None\n"
         "import exulanica_pieces.canonical, exulanica_pieces.colour\n"
         "import exulanica_pieces.records, exulanica_pieces.vocabulary\n"
+        "from exulanica_pieces.recipes import load_recipes\n"
         "from exulanica_pieces.budgets import read_budgets\n"
         "from exulanica_pieces.colour import read_table\n"
         "from pathlib import Path\n"
         f"read_table(Path({str(ROOT)!r}))\n"
         f"read_budgets(Path({str(ROOT)!r}))\n"
+        f"load_recipes(Path({str(ROOT)!r}))\n"
         "print('loaded without numpy')\n"
     )
     completed = subprocess.run(

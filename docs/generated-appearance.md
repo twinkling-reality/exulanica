@@ -457,7 +457,27 @@ still reads as it did), `exulanica.generated-asset-job/v2` (one batch fixed befo
 prompt template's version, every prompt and seed, the weights listing, code, container and stop at
 150 per cent of the estimate; a `v1` job, written before the template had a version, still reads) and `exulanica.generated-asset/v1` (one piece: every input by digest, every step, the GLB,
 what was measured against the budget, origin generated, truth invented, CC0-1.0 and the
-regeneration sentence). A seed is drawn from the request digest under a prefix.
+regeneration sentence). A seed is drawn from the request digest under a prefix. A request built
+from a recipe catalog entry names it (`recipe`: the catalog's version and the entry's sha256) and
+carries the entry's box fill bar when it states one (`box_fill_minimum_permille`).
+
+**Recipes.** What to ask a model for when a thing kind needs a piece comes from the kind's own
+document (`exulanica_pieces.recipes`, plain Python the product may read): the look role is
+`prop.<kind>` for a thing a hand holds and `fixture.<kind>` for any other object, the slot is the
+kind's box, the hold is its holdable offer's grip and axis with the hand's widest section from the
+body plan catalog, the subject is the look role's leaf (or the kind's appearance words where it has
+them), four variants, route A. So a kind nobody has written anything for, a model-drafted one
+included, generates with no catalog edit. A drafted creature's recipe states route C, the creature
+route, with its appearance words and its extent (length along the depth) as its box; a being with no
+box of its own (a person, a light) has nothing to generate. The catalog
+[`assets/catalogs/generation/piece-recipes.v1.json`](../assets/catalogs/generation/piece-recipes.v1.json)
+holds only what was measured to do better for one kind version: plain words for the concept picture
+(lower case, no numeral, at most 80 characters), a variant count, or a box fill bar other than 800
+per mille, each entry with the measurement that justified it. Version 1 describes the well, the
+lamp post and the cafe table, each measured on Nebius against the bare kind name; the gate's arch
+wording was never run against the bare name, so the gate has no entry. An entry's words are catalog
+content, so a piece made with them is shared across workspaces; any other description is cached
+within its workspace.
 
 **Held pieces.** A piece made for a thing a hand holds (a sword, a lantern) is made to its thing
 kind: the request takes the kind's box as its slot and carries the kind's grip, a point in the
@@ -501,8 +521,9 @@ job without creating it; the bucket key is read from its file in one process and
 command in that command's environment only, never on a command line. Route A's colour comes from TRELLIS's Gaussians; route
 B's is a prototype projection of the cut-out seen from the front, approximate by construction.
 
+
 **Planned, not built:** the operator's choice of route from the blind side-by-side pictures, route
-B's zero-area refusals, pieces that fill a thin box (gates, benches, lamp posts, stalls), a shopfront
+B's zero-area refusals, pieces that fill a thin box (gates, benches, lamp posts), a shopfront
 request shaped for a shallow fill slot, the admission's `generated` rights
 basis, the generation queue under the spending authority, and the Companion's offer of new pieces
 for a pack.

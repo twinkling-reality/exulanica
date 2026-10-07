@@ -25,7 +25,12 @@ from exulanica_pieces.geometry.mesh import (
     orient,
     simplify_to,
 )
-from exulanica_pieces.records import box_fill_permille, measures_box_fill, verdict
+from exulanica_pieces.records import (
+    box_fill_minimum,
+    box_fill_permille,
+    measures_box_fill,
+    verdict,
+)
 
 __all__ = ["POSTPROCESS_VERSION", "Piece", "make_piece"]
 
@@ -90,7 +95,9 @@ def make_piece(
         measured["hold"] = measure_hold(fitted, slot, size, hold)
     if measures_box_fill(request):
         measured["box_fill_permille"] = box_fill_permille(size, slot)
-    return Piece(glb, steps, measured, verdict(measured, request["budget"], hold))
+    return Piece(
+        glb, steps, measured, verdict(measured, request["budget"], hold, box_fill_minimum(request))
+    )
 
 
 def _better_yaw(mesh: Mesh, slot: Mapping[str, int]) -> tuple[Mesh, int]:

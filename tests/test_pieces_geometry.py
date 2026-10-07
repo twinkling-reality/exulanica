@@ -318,6 +318,20 @@ def test_a_piece_made_to_a_kind_records_how_much_of_its_box_it_fills() -> None:
     )  # fmt: skip
     assert piece.measured["box_fill_permille"] == 400 * 1000 // 3000
     assert piece.verdict == {"over": ["box_fill"], "within": False}
+    # Under a recipe whose bar is 100 per mille, the same 133 is within.
+    barred = read_request(
+        build_request(
+            pack=PACK, variants=1, route="S", budgets=budgets, look_role="fixture.gate",
+            slot_mm=slot, thing_kind=kind, box_fill_minimum_permille=100,
+            recipe={"catalog_version": 1, "sha256": "ef" * 32},
+        ),
+        budgets,
+    )  # fmt: skip
+    piece = make_piece(
+        _box((1.0, 1.0, 1.0)), up="+Z", front="-Y", request=barred,
+        simplifier=cluster_simplify, table=table,
+    )  # fmt: skip
+    assert piece.verdict == {"over": [], "within": True}
 
 
 def test_a_contained_piece_drawn_deep_is_turned_to_fill_its_box() -> None:

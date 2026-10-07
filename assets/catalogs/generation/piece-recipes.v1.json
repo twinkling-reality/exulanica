@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "catalog_id": "piece-recipes",
+  "catalog_version": 1,
+  "entries": [
+    {
+      "kind": {
+        "key": "cafe_table",
+        "version": 1
+      },
+      "description": "a small cafe table with a chair on each side, facing each other across it",
+      "reason": "Measured on Nebius AI Cloud, route A, cozy town pack (demo runs 3 and 4, 2026-10-06): asked for by its key, the four pieces were a table alone filling 406 to 541 per mille of the 1,720 mm box; described as the table and both its chairs, as lane THINGS states the kind, three filled 409, 774 and 798 per mille and the fourth was refused over its triangle budget.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica generated pieces from measured runs; see the entry reason"
+      }
+    },
+    {
+      "kind": {
+        "key": "lamp_post",
+        "version": 1
+      },
+      "description": "a tall slender street lamp: a thin post, one arm to one side, a lamp hanging",
+      "reason": "Measured on Nebius AI Cloud, route A, cozy town pack (demo runs 3 and 4, 2026-10-06): asked for by its key, the four lamp posts filled 189 to 235 per mille of the 6 m box; described as one thin post with one arm and a hanging lamp, as lane THINGS states the kind, they filled 292 to 310. Both are under the default bar, which stays, so a lamp post is refused until a recipe fills its box.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica generated pieces from measured runs; see the entry reason"
+      }
+    },
+    {
+      "kind": {
+        "key": "well",
+        "version": 1
+      },
+      "description": "a round stone village water well with a small wooden roof and a bucket",
+      "reason": "Measured on Nebius AI Cloud, route A, cozy town pack (demo runs 1 to 3, 2026-10-06): asked for by its key, the four wells were narrow shafts 922 to 1,245 mm wide in the 1,600 mm box; with these words all eight stood 1,547 to 1,600 mm wide under a roof, filling the box.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica generated pieces from measured runs; see the entry reason"
+      }
+    }
+  ]
+}

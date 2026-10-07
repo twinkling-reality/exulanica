@@ -22,6 +22,7 @@ __all__ = [
     "is_sha256",
     "is_text",
     "parse_canonical",
+    "parse_strict",
     "sha256_hex",
 ]
 
@@ -58,6 +59,16 @@ def canonical_bytes(value: Any) -> bytes:
 
 
 def parse_canonical(raw: bytes, where: str) -> Any:
+    document = parse_strict(raw, where)
+    if canonical_bytes(document) != raw:
+        raise Refused(f"{where} is not canonical JSON")
+    return document
+
+
+def parse_strict(raw: bytes, where: str) -> Any:
+    """ASCII JSON with no repeated key and no fraction, laid out however it is: a reviewed catalog
+    is indented for its reader, a record is canonical."""
+
     def pairs(items: list[tuple[str, Any]]) -> dict[str, Any]:
         result: dict[str, Any] = {}
         for key, item in items:
@@ -75,8 +86,6 @@ def parse_canonical(raw: bytes, where: str) -> Any:
         )
     except (UnicodeDecodeError, json.JSONDecodeError) as error:
         raise Refused(f"{where} is not ASCII JSON") from error
-    if canonical_bytes(document) != raw:
-        raise Refused(f"{where} is not canonical JSON")
     return document
 
 
