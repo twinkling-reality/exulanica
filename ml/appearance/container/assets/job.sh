@@ -4,8 +4,8 @@
 #
 #   sh /mnt/data/runs/<job or session sha256>/job.sh
 #
-# Environment, set by the submit command: ROUTE (A or B), JOB (the job record's sha256, or in a
-# session the session record's), CODE_SHA256 (the staged code archive's), STOP_SECONDS (the job
+# Environment, set by the submit command: ROUTE (A, B or C), JOB (the job record's sha256, or in
+# a session the session record's), CODE_SHA256 (the staged code archive's), STOP_SECONDS (the job
 # record's stop, or the session's hard stop) and MODE: "job" runs one staged job; "session" loads
 # the route once and serves the bucket's queue until its idle stop, a stop marker or its hard stop
 # (exulanica_appearance/assets/session.py). Nothing here reads a credential: the bucket arrives as
@@ -23,11 +23,11 @@ run="$data/runs/$JOB"
 # bucket only through "publish": each finished file written once, every minute and at exit.
 work=/opt/work
 mkdir -p "$work/out"
-case "$ROUTE" in A|B) ;; *) echo "ROUTE is A or B" >&2; exit 2 ;; esac
+case "$ROUTE" in A|B|C) ;; *) echo "ROUTE is A, B or C" >&2; exit 2 ;; esac
 mode=${MODE:-job}
 case "$mode" in job|session) ;; *) echo "MODE is job or session" >&2; exit 2 ;; esac
 # File names are lower case, and the job's file system tells the cases apart.
-route=$(printf '%s' "$ROUTE" | tr AB ab)
+route=$(printf '%s' "$ROUTE" | tr ABC abc)
 
 echo "phase code $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 test "$(sha256sum "$run/code.tar" | cut -d' ' -f1)" = "$CODE_SHA256"
@@ -71,13 +71,18 @@ echo "phase run $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 export HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 PYTHONUNBUFFERED=1
 standins="$code/ml/appearance/container/assets/standins"
 case "$ROUTE" in
-  A) upstream="/opt/upstream/trellis:/opt/upstream/utils3d" ;;
+  A|C) upstream="/opt/upstream/trellis:/opt/upstream/utils3d" ;;
   B) upstream="/opt/upstream/step1x" ;;
 esac
 if [ "$mode" = session ]; then
   PYTHONPATH="$standins:$upstream:$code:$code/ml/appearance" python -m exulanica_appearance assets session serve \
     --code "$code" --route "$ROUTE" --session "$run/session.json" --code-sha256 "$CODE_SHA256" \
     --root "$data" --weights "$work/weights" --work "$work/out" --ledger "$work/published.txt"
+elif [ "$ROUTE" = C ]; then
+  # A creature job: each item from its plan's sketch to a checked skinned look.
+  PYTHONPATH="$standins:$upstream:$code:$code/ml/appearance" python -m exulanica_appearance creatures run \
+    --code "$code" --upstream /opt/upstream --job "$run/job.json" --requests "$run/requests" \
+    --sketches "$run/sketches" --weights "$work/weights" --out "$work/out"
 else
   PYTHONPATH="$standins:$upstream:$code:$code/ml/appearance" python -m exulanica_appearance assets remote run \
     --code "$code" --route "$ROUTE" --job "$run/job.json" --requests "$run/requests" \

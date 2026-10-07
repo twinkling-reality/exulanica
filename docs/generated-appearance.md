@@ -541,12 +541,78 @@ for every variant under the same cache key), reads the latest heartbeat, writes 
 fetches what the session wrote, and turns the done markers into charge lines. A run record of
 profile `exulanica.appearance-gpu-run/v2` carries those lines: each request's milliseconds at the
 listed rate, rounded up, and the account it is charged to; the rest of the session's cost is start-up,
-loading and idle time. The session serves route A; the creature route joins it when that route lands.
+loading and idle time. The session serves route A; route C, built, does not join it yet.
+
+**Route C: a creature's sculpted look.** A creature drafted from words wears its sketch at once
+(see the [things contract](things-contract.md)); route C makes it a sculpted, rigged look with no
+learned rig. The product writes an `exulanica.creature-look-request/v1`
+([`creature_looks.py`](../exulanica/things/creature_looks.py)): the body plan's key, digest, bones
+and chains, each bone's joint, end and thickness at rest in whole millimetres, the sketch
+container's digest, and the recipe's appearance and colour words. It holds no account, workspace or
+person's words. The job (`ml/appearance/exulanica_appearance/creatures/`) runs each item through
+these steps:
+
+1. It draws the sketch as a depth picture from a fixed three-quarter camera.
+2. It draws a concept picture that follows that depth picture: Z-Image with the Fun union control
+   2.1 through VideoX-Fun at Track A's pinned commit, with Track A's settings, as one picture
+   rather than a tile. The words are a fixed sentence holding the recipe's words, with no numeral.
+3. It takes route A's cut-out and mesh.
+4. It turns the mesh into the slot frame and simplifies it to 20,000 triangles.
+5. It registers the mesh onto the sketch. Every 10 degrees of turn is scored by silhouette overlap
+   times depth agreement, the three best are refined to the degree, and the mesh is fitted to the
+   sketch's box axis by axis. A mesh whose proportions differ from the plan's by more than a
+   quarter is refused. The refusal keeps the turn, every score and the three scales it refused.
+6. It colours the mesh with at most 64 swatches of its own: a creature carries its colours, not a
+   pack's.
+7. It rigs the mesh with the plan's own skeleton. The joints within each chain are moved to the
+   middle of their limb. The skin is weighted by bone heat (Baran and Popovic, 2007), with numpy
+   alone or scipy where installed.
+8. It checks the rig, each refusal by name: weights whole, joints inside and near the plan's, bones
+   mostly inside, every limb bone moving some of the body, and no limb's swing dragging another
+   limb. Every check is measured whichever one refuses, and the refusal names the first rule
+   broken.
+9. It writes an `exulanica.skinned-glb/v1` container (`exulanica_pieces/geometry/skinned.py`) and
+   reads it back with the product's reader.
+
+Each item leaves a receipt and a row of the contact sheet: the control picture, the concept, the
+cut-out, four sides at rest and two poses. A refused item's receipt holds what its refusing stage
+measured, as a passed one does. The job's entry script runs route C with route A's packages plus
+VideoX-Fun's imports.
+
+**Status of route C:** built and run once, in the pre-registered rig trial on Nebius AI Cloud
+([record](evaluation/2026-10-07-creature-rig-trial.json), from
+`ml/appearance/evidence/creature-rig-trial-1/` by `scripts/record_creature_rig_trial.py`):
+
+- **The trial.** Eight held-out bodies, two items each. A body counts when one of its items passes
+  every check, and the plan-guided rig becomes the default at five.
+- **The result.** One body counted, by one item, so every creature wears its sketch. A sculpted
+  look is offered only where an item passed.
+- **The refusals.**
+  - Twelve items were refused at registration, their meshes out of the plan's proportions:
+    both items of five bodies, and one item of two more.
+  - Three were refused at the rig check, a joint 117 to 304 mm from where the plan puts it.
+  - The trial ran before refusals kept their measures, so its receipts state each refusal and
+    the rule it broke, and only a passed item's measures.
+
+Nothing in the product asks for a sculpted look yet. `python -m exulanica_appearance creatures
+dry-run` fills each sketch into a closed mesh, gives it in TRELLIS's frame at a turn the seed
+decides, and runs every later step.
+
+**Route C's known limit:**
+
+- **The camera and the words disagree.** The control camera looks along the plan's forward axis
+  turned 35 degrees, so it draws each body from its back right, while the concept's words ask
+  for the front left.
+- **One view hides a long body's length.** A long body seen 35 degrees off its axis shows about
+  0.57 of its length across the picture (the sine of 35 degrees). The rest is depth that the
+  3D model has to infer from a single painted view.
 
 **Planned, not built:** the operator's choice of route from the blind side-by-side pictures, route
 B's zero-area refusals, pieces that fill a thin box (gates, benches, lamp posts), a shopfront
 request shaped for a shallow fill slot, the admission's `generated` rights
 basis, a measured session run (how soon a file written from this Mac appears in the mount's listing,
 and memory with two routes loaded), the product's own writer to the queue under the spending
-authority, and the Companion's offer of new pieces for a pack.
+authority, and the Companion's offer of new pieces for a pack. Route C's camera on the plan's
+front left, as its words say, and a creature's body built on its sketch's own voxels, so the 3D
+model only details and paints it, are planned for a second pre-registered trial.
 

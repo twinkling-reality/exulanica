@@ -1,0 +1,447 @@
+{
+ "profile": "exulanica.digest-bound-record/v1",
+ "record": {
+  "authoritative_total": "the provider's billing page, read by the operator",
+  "compute": {
+   "gpu": "RTX PRO 6000 Blackwell Server Edition, 96 GB",
+   "instance_type": "gpu-rtx6000-a, preset 1gpu-24vcpu-218gb",
+   "provider": "Nebius AI Cloud, uk-south2, Serverless AI job",
+   "rate_cents_per_hour": 180,
+   "rate_source": "nebius.com/prices, RTX PRO 6000 on demand per GPU-hour, read 2026-10-06 about 20:27 UTC; started_at is the first STARTING state the watcher saw (polled each minute), deleted_at the finish of the job's delete operation (13:30:47.627Z, rounded up), hard_deadline_at the service's one-hour timeout from started_at"
+  },
+  "creatures": {
+   "dragon": {
+    "counted": false,
+    "outcomes": [
+     "refused",
+     "refused"
+    ]
+   },
+   "floating_eight": {
+    "counted": true,
+    "outcomes": [
+     "passed",
+     "refused"
+    ]
+   },
+   "four_arms": {
+    "counted": false,
+    "outcomes": [
+     "refused",
+     "refused"
+    ]
+   },
+   "raptor": {
+    "counted": false,
+    "outcomes": [
+     "refused",
+     "refused"
+    ]
+   },
+   "serpent": {
+    "counted": false,
+    "outcomes": [
+     "refused",
+     "refused"
+    ]
+   },
+   "ten_legs": {
+    "counted": false,
+    "outcomes": [
+     "refused",
+     "refused"
+    ]
+   },
+   "three_heads": {
+    "counted": false,
+    "outcomes": [
+     "refused",
+     "refused"
+    ]
+   },
+   "winged_horse": {
+    "counted": false,
+    "outcomes": [
+     "refused",
+     "refused"
+    ]
+   }
+  },
+  "items": [
+   {
+    "creature": "dragon",
+    "joint_moved_mm_largest": null,
+    "leaked_per_mille_largest": null,
+    "look_sha256": null,
+    "outcome": "refused",
+    "receipt": "988f556d49ac8f533693ce90cd3bdf6cfd0a88f22e205d538f59a5727c97f69b",
+    "refusal": "sculpt_proportions_unfit",
+    "refusal_detail": "the sculpted body's length, width and height are not the plan's proportions",
+    "registration_overlap_per_mille": null,
+    "registration_yaw_degrees": null,
+    "seconds": {
+     "concept": 30,
+     "control": 0,
+     "cutout": 1,
+     "mesh": 11,
+     "simplify": 0
+    },
+    "triangles": null,
+    "variant": 0
+   },
+   {
+    "creature": "dragon",
+    "joint_moved_mm_largest": null,
+    "leaked_per_mille_largest": null,
+    "look_sha256": null,
+    "outcome": "refused",
+    "receipt": "fe253d167c178c5f38921faffe81333132fdfdbc5357351454eb4655407744d4",
+    "refusal": "sculpt_proportions_unfit",
+    "refusal_detail": "the sculpted body's length, width and height are not the plan's proportions",
+    "registration_overlap_per_mille": null,
+    "registration_yaw_degrees": null,
+    "seconds": {
+     "concept": 20,
+     "control": 0,
+     "cutout": 0,
+     "mesh": 4,
+     "simplify": 0
+    },
+    "triangles": null,
+    "variant": 1
+   },
+   {
+    "creature": "floating_eight",
+    "joint_moved_mm_largest": 28,
+    "leaked_per_mille_largest": 0,
+    "look_sha256": "78d4686af2caef142acee92dffd85dbd2000f24502f918f0e4d7b66c4419d106",
+    "outcome": "passed",
+    "receipt": "5412e824755513d05897ca039df0b99686b5e0eeee8b06620293aa8c621aefe8",
+    "refusal": null,
+    "refusal_detail": null,
+    "registration_overlap_per_mille": 954,
+    "registration_yaw_degrees": 248,
+    "seconds": {
+     "check": 0,
+     "concept": 20,
+     "control": 0,
+     "cutout": 0,
+     "mesh": 4,
+     "register": 43,
+     "rig": 1,
+     "simplify": 0
+    },
+    "triangles": 20000,
+    "variant": 0
+   },
+   {
+    "creature": "floating_eight",
+    "joint_moved_mm_largest": null,
+    "leaked_per_mille_largest": null,
+    "look_sha256": null,
+    "outcome": "refused",
+    "receipt": "cfb2435a00130450f76464ea6f63046fcd7ee40df12dd55d79dcc7e39ee8a544",
+    "refusal": "rig_joint_far_from_plan",
+    "refusal_detail": "joint tentacle1Segment2 lies 229 mm from where the plan puts it",
+    "registration_overlap_per_mille": 779,
+    "registration_yaw_degrees": 226,
+    "seconds": {
+     "concept": 20,
+     "control": 0,
+     "cutout": 0,
+     "mesh": 4,
+     "register": 42,
+     "rig": 1,
+     "simplify": 0
+    },
+    "triangles": null,
+    "variant": 1
+   },
+   {
+    "creature": "four_arms",
+    "joint_moved_mm_largest": null,
+    "leaked_per_mille_largest": null,
+    "look_sha256": null,
+    "outcome": "refused",
+    "receipt": "2cf73ced860dd159fa412634d29b57ec7ebfc6492e61c21072403d1cf47ea0c2",
+    "refusal": "rig_joint_far_from_plan",
+    "refusal_detail": "joint spine2 lies 117 mm from where the plan puts it",
+    "registration_overlap_per_mille": 694,
+    "registration_yaw_degrees": 9,
+    "seconds": {
+     "concept": 20,
+     "control": 0,
+     "cutout": 0,
+     "mesh": 4,
+     "register": 40,
+     "rig": 1,
+     "simplify": 0
+    },
+    "triangles": null,
+    "variant": 0
+   },
+   {
+    "creature": "four_arms",
+    "joint_moved_mm_largest": null,
+    "leaked_per_mille_largest": null,
+    "look_sha256": null,
+    "outcome": "refused",
+    "receipt": "90d3e57241c89122fecddfe81f2d11cfe6703a67e78dfb7ccf18c5a732522da7",
+    "refusal": "sculpt_proportions_unfit",
+    "refusal_detail": "the sculpted body's length, width and height are not the plan's proportions",
+    "registration_overlap_per_mille": null,
+    "registration_yaw_degrees": null,
+    "seconds": {
+     "concept": 20,
+     "control": 0,
+     "cutout": 0,
+     "mesh": 4,
+     "simplify": 0
+    },
+    "triangles": null,
+    "variant": 1
+   },
+   {
+    "creature": "raptor",
+    "joint_moved_mm_largest": null,
+    "leaked_per_mille_largest": null,
+    "look_sha256": null,
+    "outcome": "refused",
+    "receipt": "adaf53cd5432bc5d14ea88f553f978f148cf2b56f072084156654ee69098ef4e",
+    "refusal": "sculpt_proportions_unfit",
+    "refusal_detail": "the sculpted body's length, width and height are not the plan's proportions",
+    "registration_overlap_per_mille": null,
+    "registration_yaw_degrees": null,
+    "seconds": {
+     "concept": 20,
+     "control": 0,
+     "cutout": 0,
+     "mesh": 4,
+     "simplify": 0
+    },
+    "triangles": null,
+    "variant": 0
+   },
+   {
+    "creature": "raptor",
+    "joint_moved_mm_largest": null,
+    "leaked_per_mille_largest": null,
+    "look_sha256": null,
+    "outcome": "refused",
+    "receipt": "8ac7fd148c759237dd19d50573fcbb4b6c6dce24446a8bbf6f840ea3d17a6490",
+    "refusal": "sculpt_proportions_unfit",
+    "refusal_detail": "the sculpted body's length, width and height are not the plan's proportions",
+    "registration_overlap_per_mille": null,
+    "registration_yaw_degrees": null,
+    "seconds": {
+     "concept": 20,
+     "control": 0,
+     "cutout": 0,
+     "mesh": 4,
+     "simplify": 0
+    },
+    "triangles": null,
+    "variant": 1
+   },
+   {
+    "creature": "serpent",
+    "joint_moved_mm_largest": null,
+    "leaked_per_mille_largest": null,
+    "look_sha256": null,
+    "outcome": "refused",
+    "receipt": "bd20371d72ad3b888a8ad27fccd11d548f57f013743763e60de2bc02ed109919",
+    "refusal": "sculpt_proportions_unfit",
+    "refusal_detail": "the sculpted body's length, width and height are not the plan's proportions",
+    "registration_overlap_per_mille": null,
+    "registration_yaw_degrees": null,
+    "seconds": {
+     "concept": 20,
+     "control": 0,
+     "cutout": 0,
+     "mesh": 4,
+     "simplify": 0
+    },
+    "triangles": null,
+    "variant": 0
+   },
+   {
+    "creature": "serpent",
+    "joint_moved_mm_largest": null,
+    "leaked_per_mille_largest": null,
+    "look_sha256": null,
+    "outcome": "refused",
+    "receipt": "78e754ca13148e3975a597607b7989efa51d2765e3c864751970c9da01f18a00",
+    "refusal": "sculpt_proportions_unfit",
+    "refusal_detail": "the sculpted body's length, width and height are not the plan's proportions",
+    "registration_overlap_per_mille": null,
+    "registration_yaw_degrees": null,
+    "seconds": {
+     "concept": 20,
+     "control": 0,
+     "cutout": 0,
+     "mesh": 4,
+     "simplify": 0
+    },
+    "triangles": null,
+    "variant": 1
+   },
+   {
+    "creature": "ten_legs",
+    "joint_moved_mm_largest": null,
+    "leaked_per_mille_largest": null,
+    "look_sha256": null,
+    "outcome": "refused",
+    "receipt": "7610596a726ef76828c1d7b04d0b10f4a4e6456272a8c2f86949c93c6f2085c7",
+    "refusal": "sculpt_proportions_unfit",
+    "refusal_detail": "the sculpted body's length, width and height are not the plan's proportions",
+    "registration_overlap_per_mille": null,
+    "registration_yaw_degrees": null,
+    "seconds": {
+     "concept": 20,
+     "control": 0,
+     "cutout": 0,
+     "mesh": 4,
+     "simplify": 0
+    },
+    "triangles": null,
+    "variant": 0
+   },
+   {
+    "creature": "ten_legs",
+    "joint_moved_mm_largest": null,
+    "leaked_per_mille_largest": null,
+    "look_sha256": null,
+    "outcome": "refused",
+    "receipt": "b161490de469635f712c0e664d612ee2aa1e6503a8f6ea51793b64672f71458c",
+    "refusal": "sculpt_proportions_unfit",
+    "refusal_detail": "the sculpted body's length, width and height are not the plan's proportions",
+    "registration_overlap_per_mille": null,
+    "registration_yaw_degrees": null,
+    "seconds": {
+     "concept": 20,
+     "control": 0,
+     "cutout": 0,
+     "mesh": 4,
+     "simplify": 0
+    },
+    "triangles": null,
+    "variant": 1
+   },
+   {
+    "creature": "three_heads",
+    "joint_moved_mm_largest": null,
+    "leaked_per_mille_largest": null,
+    "look_sha256": null,
+    "outcome": "refused",
+    "receipt": "85e3765e55a0675d9a052692b74228c62d75d160578656ba5c41a16c5f277071",
+    "refusal": "sculpt_proportions_unfit",
+    "refusal_detail": "the sculpted body's length, width and height are not the plan's proportions",
+    "registration_overlap_per_mille": null,
+    "registration_yaw_degrees": null,
+    "seconds": {
+     "concept": 20,
+     "control": 0,
+     "cutout": 0,
+     "mesh": 4,
+     "simplify": 0
+    },
+    "triangles": null,
+    "variant": 0
+   },
+   {
+    "creature": "three_heads",
+    "joint_moved_mm_largest": null,
+    "leaked_per_mille_largest": null,
+    "look_sha256": null,
+    "outcome": "refused",
+    "receipt": "a7942f0cdf6a2760e84da71ba539dab127fae3f5214131ad53f5b3b1aa04f485",
+    "refusal": "sculpt_proportions_unfit",
+    "refusal_detail": "the sculpted body's length, width and height are not the plan's proportions",
+    "registration_overlap_per_mille": null,
+    "registration_yaw_degrees": null,
+    "seconds": {
+     "concept": 20,
+     "control": 0,
+     "cutout": 0,
+     "mesh": 5,
+     "simplify": 0
+    },
+    "triangles": null,
+    "variant": 1
+   },
+   {
+    "creature": "winged_horse",
+    "joint_moved_mm_largest": null,
+    "leaked_per_mille_largest": null,
+    "look_sha256": null,
+    "outcome": "refused",
+    "receipt": "5aaf3e5b216690cd1edf8db993d9eb3e3b965a6f8040b95204cbfdcc4a1223c4",
+    "refusal": "sculpt_proportions_unfit",
+    "refusal_detail": "the sculpted body's length, width and height are not the plan's proportions",
+    "registration_overlap_per_mille": null,
+    "registration_yaw_degrees": null,
+    "seconds": {
+     "concept": 21,
+     "control": 0,
+     "cutout": 0,
+     "mesh": 4,
+     "simplify": 0
+    },
+    "triangles": null,
+    "variant": 0
+   },
+   {
+    "creature": "winged_horse",
+    "joint_moved_mm_largest": null,
+    "leaked_per_mille_largest": null,
+    "look_sha256": null,
+    "outcome": "refused",
+    "receipt": "3e893b3e2f12dd4c14ac2712a1cad58434305129a5984076bd8eeabceff7e368",
+    "refusal": "rig_joint_far_from_plan",
+    "refusal_detail": "joint leg2Left2 lies 304 mm from where the plan puts it",
+    "registration_overlap_per_mille": 687,
+    "registration_yaw_degrees": 183,
+    "seconds": {
+     "concept": 21,
+     "control": 0,
+     "cutout": 0,
+     "mesh": 4,
+     "register": 39,
+     "rig": 1,
+     "simplify": 0
+    },
+    "triangles": null,
+    "variant": 1
+   }
+  ],
+  "job": {
+   "code_sha256": "258f7d839f87a9c161657f58b5568fc08169b46c17eb46a58193f034bba1a595",
+   "computed_cost_microdollars": 805213,
+   "container_finished_at": "2026-10-07T13:28:42.667Z",
+   "container_milliseconds": 1610425,
+   "container_started_at": "2026-10-07T13:01:52.242Z",
+   "job_id": "aijob-e05a6bpbaa08m615at",
+   "job_sha256": "5416c9bf6f3c56e42ea494053cdb1f3e19f5f950a6e2405d8678c4604d65439b",
+   "outcome": "ran: 16 items, 1 passed, 12 refused at registration (sculpt_proportions_unfit), 3 refused at the rig check (rig_joint_far_from_plan); the service reports FAILED because the run exits 3 when any item is refused",
+   "upper_bound_cost_microdollars": 910500,
+   "upper_bound_from": "2026-10-07T13:00:27Z",
+   "upper_bound_to": "2026-10-07T13:30:48Z"
+  },
+  "kind": "exulanica.creature-rig-trial/v1",
+  "preregistration_sha256": "9b1390682569cafd02ad0fa0700f11e8eee2e2810b0d8ef3c87be724159c646f",
+  "rule": {
+   "counted": "a creature counts when at least one of its two items passed every check",
+   "default_at": 5,
+   "verdict": "the sketch stays the default; a sculpted look is offered only where an item passed"
+  },
+  "script": "scripts/record_creature_rig_trial.py",
+  "script_sha256": "8650ce76371bc8d34f858da90699c8ef051c5c5efe4d6b9c8aa92fd8100fa88b",
+  "totals": {
+   "creatures": 8,
+   "creatures_counted": 1,
+   "items": 16,
+   "items_passed": 1
+  }
+ },
+ "record_sha256": "ec7fab7bca697802eb1f2aec1ee94d3b5da573e325044f11124ff8854ecadeba"
+}

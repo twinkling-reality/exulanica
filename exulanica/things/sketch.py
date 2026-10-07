@@ -30,7 +30,7 @@ from exulanica.things.bodies import BodyGrammar, BodyRecipe, BuiltBody, Point, b
 from exulanica.things.looks import LOOK_PROFILE
 from exulanica.things.pieces import MeshPart, Node, Part, write_container
 
-__all__ = ["SKETCH_LABEL", "SKETCH_WRITER", "sketch_look"]
+__all__ = ["SKETCH_LABEL", "SKETCH_WRITER", "colour_names", "sketch_look"]
 
 #: The writer's identity: a change to any shape or colour rule below is a new version.
 SKETCH_WRITER: Final = "exulanica-body-sketch/v1"
@@ -134,12 +134,17 @@ def _membrane(name: str, corners: tuple[Point, ...], colour: str) -> MeshPart:
     return MeshPart(name, corners, triangles, colour, double_sided=True)
 
 
+def colour_names(recipe: BodyRecipe) -> tuple[str, str, str, str]:
+    """The recipe's colours by role, body, belly, accent and eyes: the accent is the belly's
+    where the recipe names two, and the eyes amber where it names three or fewer."""
+    names = recipe.colours
+    accent = names[2] if len(names) > 2 else names[1]
+    eyes = names[3] if len(names) > 3 else _EYE_COLOUR
+    return names[0], names[1], accent, eyes
+
+
 def _colours(recipe: BodyRecipe, grammar: BodyGrammar) -> tuple[str, str, str, str]:
-    named = [grammar.colours[name] for name in recipe.colours]
-    body = named[0]
-    belly = named[1]
-    accent = named[2] if len(named) > 2 else named[1]
-    eyes = named[3] if len(named) > 3 else grammar.colours[_EYE_COLOUR]
+    body, belly, accent, eyes = (grammar.colours[name] for name in colour_names(recipe))
     return body, belly, accent, eyes
 
 

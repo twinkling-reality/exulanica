@@ -18,6 +18,8 @@
     assets dry-run   --repository ROOT --out DIR
     assets remote prepare|run ...   on the rented machine, from container/assets/job.sh
     assets nebius stage|submit|status|fetch|cancel|clear|usage ...   on this Mac
+    creatures dry-run --repository ROOT --staged DIR --out DIR   a staged creature job, stand-in models
+    creatures run ...   on the rented machine, from container/assets/job.sh (route C)
 
 Every command reads and writes files only. None downloads a model, and none needs a GPU.
 """
@@ -361,9 +363,17 @@ def _assets_nebius(args: argparse.Namespace) -> int:
             bucket=args.bucket,
             region=args.region,
             cutouts=Path(args.cutouts) if args.cutouts else None,
+            sketches=Path(args.sketches) if args.sketches else None,
         )
     elif args.step == "submit":
-        job = read_job(Path(args.job).read_bytes())
+        from exulanica_appearance.creatures.job import JOB_PROFILE, read_creature_job
+
+        raw = Path(args.job).read_bytes()
+        job = (
+            read_creature_job(raw)
+            if json.loads(raw).get("profile") == JOB_PROFILE
+            else read_job(raw)
+        )
         result = nebius.submit(
             route=job["route"],
             job_sha256=args.job_sha256,
@@ -508,6 +518,68 @@ def _assets_session(args: argparse.Namespace) -> int:
     return 0
 
 
+def _creature_job(
+    job: Path, requests: Path, sketches: Path
+) -> tuple[bytes, list[bytes], dict[str, bytes]]:
+    """A creature job's record, its requests (*.json) and its sketches (*.glb), by sha256."""
+    from exulanica_appearance.canonical import sha256_hex
+
+    held = {}
+    for path in sorted(sketches.glob("*.glb")):
+        data = path.read_bytes()
+        held[sha256_hex(data)] = data
+    return (
+        job.read_bytes(),
+        [path.read_bytes() for path in sorted(requests.glob("*.json"))],
+        held,
+    )
+
+
+def _creature_results(results: dict) -> int:
+    print(json.dumps(results, indent=1, sort_keys=True))
+    return 0 if all(item["outcome"] == "passed" for item in results["items"]) else REFUSED
+
+
+def _creatures_dry_run(args: argparse.Namespace) -> int:
+    from exulanica_appearance.creatures.job import run_creature_job
+    from exulanica_appearance.creatures.standin import StandInBackend
+
+    staged = Path(args.staged)
+    job, requests, sketches = _creature_job(
+        staged / "job.json", staged / "requests", staged / "sketches"
+    )
+    return _creature_results(
+        run_creature_job(
+            job_raw=job,
+            requests=requests,
+            sketches=sketches,
+            backend=StandInBackend(),
+            repository=Path(args.repository),
+            out=Path(args.out),
+        )
+    )
+
+
+def _creatures_run(args: argparse.Namespace) -> int:
+    from exulanica_appearance.creatures.backend import RouteCBackend, place_videox
+    from exulanica_appearance.creatures.job import run_creature_job
+
+    place_videox(Path(args.code), Path(args.upstream))
+    job, requests, sketches = _creature_job(
+        Path(args.job), Path(args.requests), Path(args.sketches)
+    )
+    return _creature_results(
+        run_creature_job(
+            job_raw=job,
+            requests=requests,
+            sketches=sketches,
+            backend=RouteCBackend(Path(args.weights)),
+            repository=Path(args.code),
+            out=Path(args.out),
+        )
+    )
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m exulanica_appearance")
     groups = parser.add_subparsers(dest="group", required=True)
@@ -632,6 +704,7 @@ def main(argv: list[str] | None = None) -> int:
     for name in ("--repository", "--job", "--requests", "--bucket", "--region"):
         nebius_stage.add_argument(name, required=True)
     nebius_stage.add_argument("--cutouts")
+    nebius_stage.add_argument("--sketches")
     nebius_submit = on_nebius.add_parser("submit")
     for name in (
         "--job", "--job-sha256", "--code-sha256", "--bucket-id", "--subnet-id", "--platform",
@@ -693,6 +766,15 @@ def main(argv: list[str] | None = None) -> int:
         session_charges.add_argument(name, required=True)
     for command in on_session.choices.values():
         command.set_defaults(run=_assets_session)
+    creatures = groups.add_parser("creatures").add_subparsers(dest="command", required=True)
+    creatures_dry = creatures.add_parser("dry-run")
+    for name in ("--repository", "--staged", "--out"):
+        creatures_dry.add_argument(name, required=True)
+    creatures_dry.set_defaults(run=_creatures_dry_run)
+    creatures_run = creatures.add_parser("run")
+    for name in ("--code", "--upstream", "--job", "--requests", "--sketches", "--weights", "--out"):
+        creatures_run.add_argument(name, required=True)
+    creatures_run.set_defaults(run=_creatures_run)
 
     args = parser.parse_args(argv)
     try:

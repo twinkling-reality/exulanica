@@ -160,9 +160,11 @@ def stage(
     bucket: str,
     region: str,
     cutouts: Path | None = None,
+    sketches: Path | None = None,
 ) -> dict[str, Any]:
     """Copy everything the job reads to ``s3://<bucket>/runs/<job sha256>/``, and any cut-outs
-    an item names to ``out/inputs/``, where every job writes its own and route B reads them."""
+    an item names to ``out/inputs/``, where every job writes its own and route B reads them. A
+    creature job (route C) also reads its requests' sketch containers, from ``sketches/``."""
     job_raw = job.read_bytes()
     job_sha256 = sha256_hex(job_raw)
     code = code_archive(repository)
@@ -177,6 +179,11 @@ def stage(
     for path in sorted(requests.glob("*.json")):
         (staging / "requests" / path.name).write_bytes(path.read_bytes())
         files[f"requests/{path.name}"] = sha256_hex(path.read_bytes())
+    if sketches is not None:
+        (staging / "sketches").mkdir(parents=True, exist_ok=True)
+        for path in sorted(sketches.glob("*.glb")):
+            (staging / "sketches" / path.name).write_bytes(path.read_bytes())
+            files[f"sketches/{path.name}"] = sha256_hex(path.read_bytes())
     _aws(
         region,
         [
@@ -226,8 +233,8 @@ def submit_arguments(
 
     In ``session`` mode ``job_sha256`` is the session record's digest and ``timeout_seconds`` its
     hard stop."""
-    if route not in ("A", "B"):
-        raise Refused("a job on the rented machine takes route A or B")
+    if route not in ("A", "B", "C"):
+        raise Refused("a job on the rented machine takes route A, B or C")
     if mode not in ("job", "session"):
         raise Refused("a submission runs one job or a session")
     # The service's shortest timeout is one hour, so a shorter stop still risks an hour; the

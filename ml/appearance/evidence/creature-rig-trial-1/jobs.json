@@ -1,0 +1,14 @@
+{
+ "jobs": [
+  {
+   "attempt": 1,
+   "code_sha256": "258f7d839f87a9c161657f58b5568fc08169b46c17eb46a58193f034bba1a595",
+   "container_finished_at": "2026-10-07T13:28:42.667Z",
+   "container_started_at": "2026-10-07T13:01:52.242Z",
+   "job_id": "aijob-e05a6bpbaa08m615at",
+   "job_sha256": "5416c9bf6f3c56e42ea494053cdb1f3e19f5f950a6e2405d8678c4604d65439b",
+   "outcome": "ran: 16 items, 1 passed, 12 refused at registration (sculpt_proportions_unfit), 3 refused at the rig check (rig_joint_far_from_plan); the service reports FAILED because the run exits 3 when any item is refused",
+   "route": "C"
+  }
+ ]
+}

@@ -44,6 +44,14 @@ ROUTE_WEIGHTS: Final = {
     ),
     # Route B starts from route A's cut-outs: it makes no concept picture or cut-out of its own.
     "B": ("stepfun-ai__Step1X-3D@bf7084495b3a.json",),
+    # Route C draws a creature's concept picture following its plan's sketch (Z-Image with the
+    # union control, Track A's candidate a2), then takes route A's cut-out and mesh.
+    "C": (
+        "Tongyi-MAI__Z-Image@04cc4abb7c50.json",
+        "alibaba-pai__Z-Image-Fun-Controlnet-Union-2.1@755999a93490.json",
+        "ZhengPeng7__BiRefNet@e2bf8e4460fc.json",
+        "microsoft__TRELLIS-image-large@25e0d31ffbeb.json",
+    ),
 }
 #: Read by repository id through the Hugging Face cache rather than from a path.
 ROUTE_CACHED: Final = {"B": ("facebook__dinov2-with-registers-large@e4c89a4e0558.json",)}
@@ -184,7 +192,7 @@ def prepare(
     ]
     trees = fetch_upstream(sources, route, upstream)
     report: dict[str, Any] = {"route": route, "trees": trees, "weights": {}}
-    if route == "A":
+    if route in ("A", "C"):
         report["dinov2_checkpoint"] = _torch_hub(sources, upstream, torch_home)
     for name in ROUTE_WEIGHTS[route]:
         raw = (code / "ml/appearance/weights" / name).read_bytes()
