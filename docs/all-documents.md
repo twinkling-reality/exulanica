@@ -7,7 +7,7 @@ Start from the [documentation hub](README.md). Each document has one subject hom
 an explicit responsibility. A role describes how to use a document, not whether a feature
 is implemented. Contracts and scoped evidence establish capability claims.
 
-**106 documents** in the public catalog.
+**108 documents** in the public catalog.
 
 - [Product and architecture](#orientation)
 - [Capability guides](#capabilities)
@@ -48,6 +48,7 @@ Choose a feature or integrate as an external developer.
 | [Companion](capabilities/companion.md) | guide | What the Companion does and what it is meant to become |
 | [World API](capabilities/world-api.md) | guide | Authenticated routes for world state, people and models, with version-safe edits |
 | [Developer client](capabilities/developer-client.md) | guide | Independent Python client setup and demonstrated workflow |
+| [Outside AI agents](capabilities/outside-agents.md) | guide | Bringing an outside AI agent into a world through the door: the agent library, the MCP facade and the examples |
 
 <a id="simulation"></a>
 
@@ -225,4 +226,5 @@ a record's original status is not proof of the implementation's present capabili
 | [0029-a-world-kind-is-data-a-site-grammar-realises](adr/0029-a-world-kind-is-data-a-site-grammar-realises.md) | ADR-0029: A world kind is data that one site grammar realises |
 | [0030-a-thing-is-a-typed-record-whose-looks-never-reach-the-simulation](adr/0030-a-thing-is-a-typed-record-whose-looks-never-reach-the-simulation.md) | ADR-0030: A thing is a typed record whose looks never reach the simulation |
 | [0031-an-outside-program-decides-only-through-the-door](adr/0031-an-outside-program-decides-only-through-the-door.md) | ADR-0031: An outside program decides for a world's things only through the door |
+| [0032-an-outside-ai-agent-enters-through-the-same-door-as-a-game](adr/0032-an-outside-ai-agent-enters-through-the-same-door-as-a-game.md) | ADR-0032: An outside AI agent enters through the same door as a game |
 | [gsplat-training-and-recorded-rung](adr/gsplat-training-and-recorded-rung.md) | Gaussian optimization and recorded scene rung are separate decisions |
