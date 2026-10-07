@@ -311,3 +311,22 @@ def test_s1_identifies_a_manifest_by_its_canonical_bytes_without_the_final_newli
     assert DRIVE.canonical_manifest(b'{"a":1}\n') == b'{"a":1}'
     assert DRIVE.canonical_manifest(b'{"a":1}') is None
     assert DRIVE.canonical_manifest(b'{"a":1}\n\n') is None
+
+
+def test_w1_writes_exactly_one_figure_of_the_farm_kind_as_a_float():
+    """A-70: the refused upload differs from the farm kind in one figure only, now a float; the
+    identity and version are left as they are."""
+    document = json.loads((ROOT / DRIVE.FARM_KIND).read_text())
+    floated, changed = DRIVE.float_figure(document)
+
+    def figures(value):
+        if isinstance(value, dict):
+            return [x for v in value.values() for x in figures(v)]
+        if isinstance(value, list):
+            return [x for v in value for x in figures(v)]
+        return [value] if isinstance(value, (int, float)) and not isinstance(value, bool) else []
+
+    assert changed
+    assert floated["kind"] == document["kind"] and floated["version"] == document["version"]
+    assert sum(isinstance(f, float) for f in figures(floated)) == 1
+    assert len(figures(floated)) == len(figures(document))

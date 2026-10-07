@@ -7,6 +7,7 @@
     .venv/bin/python scripts/acceptance/domain_rows.py catalog     --worktree PATH --out DIR
     .venv/bin/python scripts/acceptance/domain_rows.py made-with   --worktree PATH --out DIR
     .venv/bin/python scripts/acceptance/domain_rows.py packs       --worktree PATH --out DIR
+    .venv/bin/python scripts/acceptance/domain_rows.py kinds       --worktree PATH --out DIR
 
 Each subcommand checks rows against the stack ``launch.py up`` started for ``--worktree``,
 restarts that stack's API with ``launch.py restart-api`` where a row needs a fresh process, and
@@ -31,8 +32,11 @@ leaves the stack running:
 - ``made-with``: A5 (a generated world's saved entry states what it was made with, and a new world
   made from those values states the same). The stack is started with ``--workspaces 2
   --no-derivative-worker``.
-- ``packs``: S1 (the committed style pack library the host serves, against the committed files).
-  Any stack with two workspaces.
+- ``packs``: S1 (the committed style pack library the host serves, against the committed files)
+  and S2 (a world's appearance naming its pack). Any stack with two workspaces.
+- ``kinds``: W1 (a creator's world kind kept in its workspace) and W2 (a world of a kind, its site
+  drawing, title and body limits). The stack is started with ``--workspaces 2 --read-only-token
+  --no-derivative-worker``.
 
 Every row ends ``passed``, ``failed`` or ``blocked``, by the rules of ``foundation.py``, whose
 records, clients and stack this file uses. Like it, this is an independent client: it imports
@@ -3948,7 +3952,394 @@ def packs(arguments: argparse.Namespace) -> int:
     (out / "evidence").mkdir(parents=True, exist_ok=True)
     transcripts = Transcripts(out / "transcripts")
     started = dt.datetime.now(dt.UTC).isoformat()
-    rows = [row_s1(stack, transcripts, worktree)]
+    s1 = row_s1(stack, transcripts, worktree)
+    listing = F.client(stack, transcripts, "w1", "token").call("S2", "GET", "/world/style-packs")[1]
+    rows = [s1, row_s2(stack, transcripts, listing or {})]
+    write_results(out, stack, rows, started, sys.argv[1:])
+    return 0 if all(row.status != "failed" for row in rows) else 1
+
+
+def style_query(entry: Mapping[str, Any]) -> dict[str, str]:
+    return {"world_id": entry["world_id"]}
+
+
+def preview_body(current: Mapping[str, Any], **changes: Any) -> dict[str, Any]:
+    """A whole-world appearance proposal over the world's current style, keeping its profile."""
+    held = current.get("current") or {}
+    # The current style states its whole-world profile as ``global_style``.
+    profile = held.get("global_style") or {}
+    body = {
+        "proposal_id": str(uuid.uuid4()),
+        "origin": "settings",
+        "origin_reference": "q10-s2",
+        "scope": {"kind": "global"},
+        "base_style_version_id": held.get("version_id"),
+        "base_topology_digest": current.get("current_topology_digest"),
+        "profile": {
+            "profile_id": profile.get("profile_id"),
+            "profile_version": profile.get("profile_version"),
+            "parameters": profile.get("parameters") or {},
+        },
+    }
+    body.update(changes)
+    return body
+
+
+def row_s2(stack: Stack, transcripts: Any, listing: Mapping[str, Any]) -> Row:
+    row = Row(
+        "S2",
+        "style_packs.world_binding",
+        "On a generated town: a whole-world preview naming the toon pack as the library lists it "
+        "states that pack and writes no version; applying it makes a version naming it, which the "
+        "current style reads; rolling back to the base version reads no pack; the toon pack named "
+        "with a digest the library does not hold, and a regional proposal naming a pack, are "
+        "refused invalid_style_data and write nothing; the other workspace is answered 404.",
+    )
+    w1 = F.client(stack, transcripts, "w1", "token")
+    w2 = F.client(stack, transcripts, "w2", "token-2")
+    packs = {p.get("pack_id"): p for p in (listing.get("packs") or [])}
+
+    def named(pack_id: str) -> dict[str, Any]:
+        found = packs.get(pack_id) or {}
+        return {k: found.get(k) for k in ("pack_id", "version", "manifest_sha256")}
+
+    toon, cozy = named("exulanica.toon-town"), named("exulanica.cozy-town")
+    status_town, town = w1.call(
+        "S2", "POST", "/worlds/generated", body={"recipe": "small_town", "title": "Q10 S2 town"}
+    )
+    row.expect(status_town == 201, f"the town answered {status_town} {F.problem_code(town)}")
+    if status_town != 201:
+        return row.close()
+    query = style_query(town)
+
+    def current() -> dict[str, Any]:
+        return w1.call("S2", "GET", "/world/styles/current", query=query)[1]
+
+    def versions() -> int:
+        return len(w1.call("S2", "GET", "/world/styles/versions", query=query)[1] or [])
+
+    base = current()
+    base_id = (base.get("current") or {}).get("version_id")
+    count = versions()
+    status_preview, preview = w1.call(
+        "S2",
+        "POST",
+        "/world/styles/previews",
+        query=query,
+        body=preview_body(base, style_pack=toon),
+    )
+    candidate = (preview.get("candidate") or {}).get("style_pack")
+    row.expect(
+        status_preview == 201 and candidate == toon,
+        f"the preview answered {status_preview} {F.problem_code(preview)} naming {candidate}",
+    )
+    row.expect(versions() == count, "the preview wrote a version")
+    status_apply, applied = w1.call(
+        "S2",
+        "POST",
+        f"/world/styles/previews/{preview.get('preview_id')}/apply",
+        query=query,
+        body={
+            "base_style_version_id": base_id,
+            "base_topology_digest": base.get("current_topology_digest"),
+        },
+    )
+    after = current()
+    row.expect(
+        status_apply == 200 and applied.get("style_pack") == toon,
+        f"apply answered {status_apply} {F.problem_code(applied)} naming {applied.get('style_pack')}",
+    )
+    row.expect(
+        (after.get("current") or {}).get("style_pack") == toon,
+        "the current style names another pack",
+    )
+    mutant_fails = applied.get("style_pack") != cozy
+    row.expect(mutant_fails, "the apply check passed against the cozy pack")
+    status_back, back = w1.call(
+        "S2",
+        "POST",
+        "/world/styles/rollback",
+        query=query,
+        body={
+            "base_style_version_id": (after.get("current") or {}).get("version_id"),
+            "base_topology_digest": after.get("current_topology_digest"),
+            "target_version_id": base_id,
+            "origin": "settings",
+            "origin_reference": "q10-s2",
+        },
+    )
+    rolled = current()
+    row.expect(
+        status_back == 200 and (rolled.get("current") or {}).get("style_pack") is None,
+        f"rollback answered {status_back} {F.problem_code(back)}; the pack reads "
+        f"{(rolled.get('current') or {}).get('style_pack')}",
+    )
+    count = versions()
+    wrong = {**toon, "manifest_sha256": "0" * 64}
+    status_wrong, refused = w1.call(
+        "S2",
+        "POST",
+        "/world/styles/previews",
+        query=query,
+        body=preview_body(rolled, style_pack=wrong),
+    )
+    row.expect(
+        status_wrong == 422
+        and F.problem_code(refused) == "invalid_style_data"
+        and "exulanica.toon-town" in str(refused.get("detail")),
+        f"an unheld digest answered {status_wrong} {F.problem_code(refused)}",
+    )
+    region = (town.get("generated_ground") or {}).get("region_id") or "region:generated"
+    status_region, regional = w1.call(
+        "S2",
+        "POST",
+        "/world/styles/previews",
+        query=query,
+        body=preview_body(rolled, style_pack=toon, scope={"kind": "region", "region_id": region}),
+    )
+    row.expect(
+        status_region == 422 and F.problem_code(regional) == "invalid_style_data",
+        f"a regional proposal naming a pack answered {status_region} {F.problem_code(regional)}",
+    )
+    row.expect(versions() == count, "a refused preview wrote a version")
+    status_stranger, _ = w2.call("S2", "GET", "/world/styles/current", query=query)
+    row.expect(status_stranger == 404, f"the other workspace was answered {status_stranger}")
+    row.observed = {
+        "town": town.get("entry_id"),
+        "toon": toon,
+        "preview": [status_preview, candidate],
+        "apply": [status_apply, applied.get("style_pack")],
+        "rollback": [status_back, (rolled.get("current") or {}).get("style_pack")],
+        "unheld_digest": [status_wrong, F.problem_code(refused)],
+        "regional": [status_region, F.problem_code(regional)],
+        "stranger": status_stranger,
+        "mutant_cozy_fails": mutant_fails,
+    }
+    return row.close()
+
+
+# -- W1 and W2: a creator's world kind, and a world of a kind ---------------------------------------
+
+#: The repository's farm kind (A-70, A-71): the document W1 uploads under a new key.
+FARM_KIND = Path("tests") / "fixtures" / "world-kinds" / "fixture-farm.json"
+W1_KIND = "q10_acceptance_farm"
+#: The contract's request body limits: an upload's, and a world's of a kind.
+KIND_BODY_LIMIT = 131_072
+KIND_WORLD_BODY_LIMIT = 16_384
+
+
+def float_figure(document: Any) -> tuple[Any, bool]:
+    """The document with its first integer figure (depth first) written as a float."""
+    done = False
+
+    def walk(value: Any) -> Any:
+        nonlocal done
+        if done:
+            return value
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, int):
+            done = True
+            return float(value) + 0.5
+        if isinstance(value, dict):
+            return {k: walk(v) if k not in ("version",) else v for k, v in value.items()}
+        if isinstance(value, list):
+            return [walk(v) for v in value]
+        return value
+
+    changed = {
+        k: (walk(v) if k in ("parameters", "presets", "site", "parts", "zones") else v)
+        for k, v in document.items()
+    }
+    return changed, done
+
+
+def raw_json(
+    stack: Stack, token_file: str, path: str, payload: bytes
+) -> tuple[int, dict[str, str], bytes]:
+    return raw_call(stack, token_file, "POST", path, body=payload, content_type="application/json")
+
+
+def row_w1(stack: Stack, transcripts: Any, worktree: Path) -> tuple[Row, dict[str, Any] | None]:
+    row = Row(
+        "W1",
+        "kinds.upload",
+        "The repository's farm kind under a new key, uploaded to workspace 1, is kept with origin "
+        "uploaded and listed by GET /worlds/kinds for workspace 1 only; the same document again is "
+        "409 kind_version_exists; the document with one integer figure written as a float is "
+        "refused 422 by name and nothing is kept; a body over 131,072 bytes is 413; the read-only "
+        "grant's upload is refused and nothing is kept.",
+    )
+    w1 = F.client(stack, transcripts, "w1", "token")
+    w2 = F.client(stack, transcripts, "w2", "token-2")
+    read_only = F.client(stack, transcripts, "read-only", "token-read")
+    # An uploaded kind states its origin as uploaded; the route refuses any other (A-70).
+    document = {
+        **json.loads((worktree / FARM_KIND).read_text()),
+        "kind": W1_KIND,
+        "origin": "uploaded",
+    }
+
+    def kinds(c: Any) -> list[str]:
+        return sorted(
+            k.get("kind") for k in (c.call("W1", "GET", "/worlds/kinds")[1] or {}).get("kinds", [])
+        )
+
+    before = kinds(w1)
+    status_ro, refused_ro = read_only.call(
+        "W1", "POST", "/worlds/kinds", body={"document": document}
+    )
+    row.expect(status_ro in (403, 404), f"the read-only upload answered {status_ro}")
+    floated, has_float = float_figure(document)
+    status_float, refused_float = w1.call("W1", "POST", "/worlds/kinds", body={"document": floated})
+    row.expect(
+        has_float and status_float == 422 and F.problem_code(refused_float) is not None,
+        f"a float figure answered {status_float} {F.problem_code(refused_float)}",
+    )
+    row.expect(kinds(w1) == before, "a refused upload kept a kind")
+    big = json.dumps({"document": {**document, "summary": "x" * (KIND_BODY_LIMIT + 1)}}).encode()
+    status_big, _, _ = raw_json(stack, "token", "/worlds/kinds", big)
+    row.expect(status_big == 413, f"a body over the limit answered {status_big}")
+    status_kept, kept = w1.call("W1", "POST", "/worlds/kinds", body={"document": document})
+    view = kept.get("kind") or {}
+    row.expect(
+        status_kept in (200, 201)
+        and view.get("kind") == W1_KIND
+        and view.get("origin") == "uploaded"
+        and view.get("source") == "workspace",
+        f"the upload answered {status_kept} {F.problem_code(kept)} {view.get('origin')}",
+    )
+    mine, theirs = kinds(w1), kinds(w2)
+    row.expect(W1_KIND in mine and W1_KIND not in theirs, f"listed {mine} and {theirs}")
+    status_again, again = w1.call("W1", "POST", "/worlds/kinds", body={"document": document})
+    row.expect(
+        status_again == 409 and F.problem_code(again) == "kind_version_exists",
+        f"the same document again answered {status_again} {F.problem_code(again)}",
+    )
+    row.observed = {
+        "read_only": [status_ro, F.problem_code(refused_ro)],
+        "float": [status_float, F.problem_code(refused_float)],
+        "too_big": status_big,
+        "kept": [status_kept, view.get("kind"), view.get("version"), view.get("origin")],
+        "listed": {"w1": mine, "w2": theirs},
+        "again": [status_again, F.problem_code(again)],
+    }
+    return row.close(), (view if status_kept in (200, 201) else None)
+
+
+def row_w2(stack: Stack, transcripts: Any, kept: Mapping[str, Any] | None) -> Row:
+    row = Row(
+        "W2",
+        "kinds.world",
+        "A town made through POST /worlds/kinds/town/worlds and a world of W1's kind are each "
+        "saved and listed; the site drawing of W1's kind's world answers with an entity tag equal "
+        "to the SHA-256 of its canonical JSON, and the other workspace is answered 404 for it; a "
+        "title holding a NUL, and one holding a zero-width space, are 422 invalid_saved_world_entry "
+        "and add no entry; a body over 16,384 bytes is 413.",
+    )
+    w1 = F.client(stack, transcripts, "w1", "token")
+    if kept is None:
+        row.blocked_by.append("W1 kept no kind to make a world of")
+        return row.close()
+    town_kind = next(
+        (
+            k
+            for k in (w1.call("W2", "GET", "/worlds/kinds")[1] or {}).get("kinds", [])
+            if k.get("kind") == "town"
+        ),
+        {},
+    )
+    town_preset = ((town_kind.get("presets") or [{}])[0]).get("key")
+    status_town, town = w1.call(
+        "W2",
+        "POST",
+        "/worlds/kinds/town/worlds",
+        body={"preset": town_preset, "title": "Q10 W2 town"},
+    )
+    farm_preset = ((kept.get("presets") or [{}])[0]).get("key")
+    status_farm, farm = w1.call(
+        "W2",
+        "POST",
+        f"/worlds/kinds/{W1_KIND}/worlds",
+        body={"preset": farm_preset, "title": "Q10 W2 farm"},
+    )
+    listed = {e.get("entry_id") for e in (w1.call("W2", "GET", "/world-entries")[1] or [])}
+    row.expect(
+        status_town in (200, 201) and town.get("entry_id") in listed,
+        f"the town answered {status_town} {F.problem_code(town)}",
+    )
+    row.expect(
+        status_farm in (200, 201) and farm.get("entry_id") in listed,
+        f"the farm answered {status_farm} {F.problem_code(farm)}",
+    )
+    site_path = f"/world/versions/{farm.get('authored_version_id')}/site"
+    query = urllib.parse.urlencode({"world_id": farm.get("world_id", "")})
+    status_site, headers, body = (None, {}, b"")
+    deadline = time.monotonic() + 120
+    while time.monotonic() < deadline:
+        status_site, headers, body = raw_call(stack, "token", "GET", f"{site_path}?{query}")
+        if status_site != 503:
+            break
+        time.sleep(3)
+    named = {k.lower(): v for k, v in headers.items()}
+    tag = named.get("etag", "").strip('"')
+    canonical = (
+        hashlib.sha256(
+            json.dumps(
+                json.loads(body), sort_keys=True, separators=(",", ":"), ensure_ascii=False
+            ).encode()
+        ).hexdigest()
+        if status_site == 200
+        else None
+    )
+    row.expect(
+        status_site == 200 and tag == canonical, f"the site answered {status_site}, tag {tag[:12]}"
+    )
+    status_stranger, _, _ = raw_call(stack, "token-2", "GET", f"{site_path}?{query}")
+    row.expect(status_stranger == 404, f"the other workspace was answered {status_stranger}")
+    before = len(listed)
+    titles = {}
+    for name, title in (("nul", "Q10 W2\x00farm"), ("zero_width", "Q10 W2​farm")):
+        status_title, refused = w1.call(
+            "W2",
+            "POST",
+            f"/worlds/kinds/{W1_KIND}/worlds",
+            body={"preset": farm_preset, "title": title},
+        )
+        titles[name] = [status_title, F.problem_code(refused)]
+        row.expect(
+            status_title == 422 and F.problem_code(refused) == "invalid_saved_world_entry",
+            f"a {name} title answered {status_title} {F.problem_code(refused)}",
+        )
+    big = json.dumps(
+        {"preset": farm_preset, "title": "x" * 150, "values": {"pad": "y" * KIND_WORLD_BODY_LIMIT}}
+    ).encode()
+    status_big, _, _ = raw_json(stack, "token", f"/worlds/kinds/{W1_KIND}/worlds", big)
+    row.expect(status_big == 413, f"a body over the limit answered {status_big}")
+    after = len(w1.call("W2", "GET", "/world-entries")[1] or [])
+    row.expect(after == before, "a refused world added an entry")
+    row.observed = {
+        "town": [status_town, town.get("entry_id")],
+        "farm": [status_farm, farm.get("entry_id")],
+        "site": [status_site, tag, canonical],
+        "stranger": status_stranger,
+        "titles": titles,
+        "too_big": status_big,
+    }
+    return row.close()
+
+
+def kinds(arguments: argparse.Namespace) -> int:
+    worktree = LAUNCH.checkout(arguments.worktree)
+    stack = Stack.read(worktree)
+    if len(workspace_ids(stack)) < 2 or not stack.token_file("token-read").exists():
+        raise SystemExit("kinds needs a stack started with --workspaces 2 --read-only-token")
+    out = Path(arguments.out).resolve()
+    (out / "evidence").mkdir(parents=True, exist_ok=True)
+    transcripts = Transcripts(out / "transcripts")
+    started = dt.datetime.now(dt.UTC).isoformat()
+    w1, kept = row_w1(stack, transcripts, worktree)
+    rows = [w1, row_w2(stack, transcripts, kept)]
     write_results(out, stack, rows, started, sys.argv[1:])
     return 0 if all(row.status != "failed" for row in rows) else 1
 
@@ -4011,6 +4402,9 @@ def build_parser() -> argparse.ArgumentParser:
     library = commands.add_parser("packs")
     library.add_argument("--worktree", required=True)
     library.add_argument("--out", required=True)
+    kept = commands.add_parser("kinds")
+    kept.add_argument("--worktree", required=True)
+    kept.add_argument("--out", required=True)
     return parser
 
 
@@ -4026,6 +4420,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "catalog": catalog,
         "made-with": made_with,
         "packs": packs,
+        "kinds": kinds,
     }
     return commands[arguments.command](arguments)
 

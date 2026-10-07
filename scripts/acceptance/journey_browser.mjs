@@ -54,13 +54,17 @@ const RECIPES = `document.querySelector('section.world-recipes')`;
 // What the shell states of a generated world's look (docs/style-pack-contract.md): the pack asked
 // for, whether it was drawn and why not, as JSON.
 const WORLD_LOOK = `document.querySelector('#shell')?.getAttribute('data-world-look') ?? null`;
-// N1.m (A-65): the town opened with no look named, with the tile look and with the toon pack, and
-// what the shell states for each, from the contract's words for the team's packs.
+// N1.m (A-65, A-69): the town opened with no look named, with the tile look and with the toon pack,
+// and what the shell states for each, from the contract's words for the team's packs; then, once the
+// town's own appearance names the toon pack, opened with no look named.
 const LOOKS = [
-  { query: '', look: { pack: 'exulanica.cozy-town', drawn: true, reason: null } },
-  { query: '?look=today', look: { pack: null, drawn: false, reason: null } },
-  { query: '?look=toon', look: { pack: 'exulanica.toon-town', drawn: true, reason: null } },
+  { query: '', look: { pack: 'exulanica.cozy-town', source: 'default', drawn: true, reason: null } },
+  { query: '?look=today', look: { pack: null, source: 'address', drawn: false, reason: null } },
+  { query: '?look=toon', look: { pack: 'exulanica.toon-town', source: 'address', drawn: true, reason: null } },
 ];
+const WORLD_LOOK_CASE = { query: '', look: { pack: 'exulanica.toon-town', source: 'world', drawn: true, reason: null } };
+const sameLook = (read, look) => read?.pack === look.pack && read?.source === look.source
+  && read?.drawn === look.drawn && read?.reason === look.reason;
 // How long the town's tiles may take to bake before the page can draw it, and how often to look.
 const BAKE_MS = 600_000;
 const BAKE_LOOK_MS = 5_000;
@@ -276,18 +280,41 @@ const STEP_HANDLERS = {
       { states: tiles.map((t) => t.state) });
     const title = (await ctx.api('GET', `/world-entries/${town}`)).body?.title ?? null;
     const seen = [];
-    for (const { query, look } of LOOKS) {
+    const openIn = async (query, look, name) => {
       await enter(ctx, () => ctx.page.navigate(`${ctx.runtime.app_url}${query}`), town);
       const stated = await ctx.page.waitFor(WORLD_LOOK, SETTLE_MS * 2, `the town's look for "${query}"`);
       const opened = await ctx.page.evaluate(`document.querySelector('input[aria-label="World title"]')?.value ?? null`);
       const read = JSON.parse(stated);
       seen.push({ query, stated: read, opened });
-      ctx.observe(`look${query || '-default'}`, read?.pack === look.pack && read?.drawn === look.drawn && read?.reason === look.reason && opened === title, { query, stated: read, expected: look, opened, title });
-      await ctx.screenshot(`look${query.replace(/[^a-z]/g, '-') || '-default'}`, `the town opened with "${query || 'no look named'}"`);
-    }
+      ctx.observe(name, sameLook(read, look) && opened === title, { query, stated: read, expected: look, opened, title });
+      await ctx.screenshot(name.replace(/[^a-z-]/g, '-'), `the town opened with "${query || 'no look named'}"`);
+    };
+    for (const { query, look } of LOOKS) await openIn(query, look, `look${query || '-default'}`);
     // The check can tell the looks apart: the three addresses stated three different looks.
     ctx.observe('looks-differ', new Set(seen.map((one) => JSON.stringify([one.stated?.pack, one.stated?.drawn]))).size === LOOKS.length,
       { stated: seen.map((one) => one.stated) });
+    // A-69: the town's own appearance names the toon pack, as the library lists it, through a
+    // whole-world preview and its apply; opened with no look named, the page draws the world's pack.
+    const entry = (await ctx.api('GET', `/world-entries/${town}`)).body;
+    const query = `?world_id=${encodeURIComponent(entry?.world_id ?? '')}`;
+    const listed = ((await ctx.api('GET', '/world/style-packs')).body?.packs ?? []).find((p) => p.pack_id === 'exulanica.toon-town');
+    const current = (await ctx.api('GET', `/world/styles/current${query}`)).body;
+    const held = current?.current ?? {};
+    const preview = await ctx.api('POST', `/world/styles/previews${query}`, {
+      proposal_id: crypto.randomUUID(), origin: 'settings', origin_reference: 'q10-n1m', scope: { kind: 'global' },
+      base_style_version_id: held.version_id, base_topology_digest: current?.current_topology_digest,
+      profile: { profile_id: held.global_style?.profile_id, profile_version: held.global_style?.profile_version, parameters: held.global_style?.parameters ?? {} },
+      style_pack: { pack_id: listed?.pack_id, version: listed?.version, manifest_sha256: listed?.manifest_sha256 },
+    });
+    // Applied as the page applies it, moving the saved entry to the new version, so the town opens in it.
+    const applied = await ctx.api('POST', `/world/styles/previews/${preview.body?.preview_id}/apply${query}`, {
+      base_style_version_id: held.version_id, base_topology_digest: current?.current_topology_digest,
+      saved_entry: { entry_id: entry?.entry_id, base_revision: entry?.revision, authored_state_sha256: entry?.authored_state_sha256,
+        authored_edit_seq: entry?.authored_edit_seq, style_version_id: entry?.style_version_id },
+    });
+    ctx.observe('town-names-the-toon-pack', preview.status === 201 && applied.status === 200
+      && applied.body?.style_pack?.pack_id === 'exulanica.toon-town', { preview: preview.status, apply: applied.status, style_pack: applied.body?.style_pack ?? null });
+    await openIn(WORLD_LOOK_CASE.query, WORLD_LOOK_CASE.look, 'look-world');
     ctx.facts.town_looks = seen;
   },
   async 'worlds-values'(ctx) {

@@ -3943,10 +3943,12 @@ WORLDS_ROWS = (
         "worlds.look",
         "worlds-look",
         "N1.l's town, its tiles baked, opened with no look in the address states in the shell's "
-        "data-world-look the cozy pack (exulanica.cozy-town) drawn; opened with ?look=today the "
-        "tile look (no pack); opened with ?look=toon the toon pack (exulanica.toon-town) drawn; "
-        "each time under the town's title (A-65). Functional only; how each look appears stays "
-        "with the experience owner.",
+        "data-world-look the cozy pack (exulanica.cozy-town) drawn, chosen by default; opened with "
+        "?look=today the tile look (no pack) and with ?look=toon the toon pack "
+        "(exulanica.toon-town) drawn, each chosen by the address; once the town's appearance names "
+        "the toon pack (preview and apply through the API), opened with no look it states the toon "
+        "pack drawn, chosen by the world; each time under the town's title (A-65, A-69). "
+        "Functional only; how each look appears stays with the experience owner.",
     ),
     (
         "N1.n",
