@@ -5,14 +5,17 @@
 
 A scene document (``exulanica.demo-scene/v1``) is data: the things placed by kind, each placed from
 where a person arrives in the world (``right_mm`` to their right, ``forward_mm`` ahead, and
-``turn_microradians`` counterclockwise from facing the way they face, so a turn of pi faces them),
+``turn_microradians`` counterclockwise seen from above, where a turn of 0 faces the person arriving,
+as an object a person places in front of themselves turns to face them, and a turn of pi faces the
+way they face),
 and the open model chosen as each being's mind. Placing from the arrival lets one document dress any
 saved world: a starter, a town made from words, a site made from a world kind. This script names no
 scene, kind or thing; it reads the document and makes the same edits a person's browser makes, each
 bound to the saved world so the world reopens with them:
 
 1.  ``--entry`` names the saved world to dress; without it, ``POST /world-entries/starter`` makes or
-    reuses the workspace's starter world;
+    reuses the workspace's starter world under the scene's title (a starter the app made first,
+    under its own title, is refused as a conflict: name that world with ``--entry``);
 2.  the world's own arrival point and facing come from its entry (a starter's spawn, a generated
     town's or site's arrival), and each place is turned into the region's frame from them;
 3.  ``POST /world/versions/{version}/things`` places each thing by its shipped kind, in the
@@ -120,13 +123,16 @@ class Api:
 
 
 def refusal(method: str, path: str, status: int, problem: Any) -> str:
-    """A server's refusal in words: its code, or the first thing a request's check refused (where
-    in the request, and why), or the status alone when the answer names neither."""
+    """A server's refusal in words: its code with the detail the server states beside it, or the
+    first thing a request's check refused (where in the request, and why), or the status alone
+    when the answer names neither."""
     said = ""
     if isinstance(problem, dict):
         detail = problem.get("detail")
         if problem.get("code"):
             said = str(problem["code"])
+            if isinstance(detail, str) and detail:
+                said = f"{said} ({detail})"
         elif isinstance(detail, list) and detail and isinstance(detail[0], dict):
             where = ".".join(str(part) for part in detail[0].get("loc", []))
             said = f"{where}: {detail[0].get('msg', '')}".strip(": ")
@@ -143,8 +149,9 @@ class Arrival:
     facing: tuple[float, float]
 
     def pose(self, place: Mapping[str, int]) -> dict[str, int]:
-        """A place stated from this arrival, as a pose in the region's frame. A thing faces north
-        at yaw 0 and its yaw turns counterclockwise seen from above, as every placed object's."""
+        """A place stated from this arrival, as a pose in the region's frame. A placed object's own
+        z axis points south at yaw 0 and its yaw turns counterclockwise seen from above, as the
+        renderer turns every placed object: at a turn of 0 the thing faces the person arriving."""
         east, south = self.facing
         length = math.hypot(east, south)
         forward = (east / length, south / length)

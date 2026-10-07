@@ -5,6 +5,9 @@ What is shown here, with no database and no server:
 *   every scene document under ``scripts/demo/scenes`` names only shipped thing kinds at shipped
     versions, places each thing once, and chooses minds only for its own beings and only open
     models the model manifest serves;
+*   the newest version of each scene, the one a rehearsal builds, chooses only a decider each
+    being's kind allows and only models its engine offers to a being's decisions, as the society's
+    model choice route requires; older versions stay as published for the records naming them;
 *   a place stated from where a person arrives becomes the same pose in any world's frame: on a
     starter (the spawn faces north) and for an arrival facing east, checked against arithmetic done
     here rather than the builder's;
@@ -24,7 +27,9 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from exulanica.models.manifest import load_manifest
 from exulanica.things.kinds import shipped_thing_kinds
+from exulanica.world.decision_roles import decision_roles
 
 ROOT = Path(__file__).resolve().parents[1]
 SCENES = ROOT / "scripts/demo/scenes"
@@ -64,6 +69,32 @@ def test_a_scene_names_shipped_kinds_and_served_models(path):
     for mind in scene["minds"]:
         assert mind["thing_id"] in beings
         assert mind["decider"]["model_id"] in served
+
+
+def _newest_scenes() -> list[Path]:
+    """The newest version of each scene, by the version its document states."""
+    newest: dict[str, tuple[int, Path]] = {}
+    for path in _scenes():
+        scene = json.loads(path.read_text(encoding="utf-8"))
+        held = newest.get(scene["scene"])
+        if held is None or scene["version"] > held[0]:
+            newest[scene["scene"]] = (scene["version"], path)
+    return sorted(path for _, path in newest.values())
+
+
+@pytest.mark.parametrize("path", _newest_scenes(), ids=lambda path: path.name)
+def test_a_scene_s_newest_version_chooses_minds_its_engine_offers(path):
+    scene = _builder().read_scene(path)
+    hosted = [role for role in decision_roles() if role.chosen and role.hosted_by(scene["engine"])]
+    assert len(hosted) == 1, "the engine hosts one role a chosen model decides for, its people's"
+    offered = {spec.model_id for spec in load_manifest().offered_models(hosted[0].chosen)}
+    kinds = {thing["thing_id"]: thing["kind"] for thing in scene["things"]}
+    shipped = shipped_thing_kinds()
+    for mind in scene["minds"]:
+        kind = shipped[(kinds[mind["thing_id"]]["kind"], kinds[mind["thing_id"]]["version"])]
+        assert mind["decider"]["kind"] in kind.document["deciders"]["allowed"], mind["thing_id"]
+        if mind["decider"]["kind"] == "model":
+            assert mind["decider"]["model_id"] in offered, mind["thing_id"]
 
 
 def test_a_scene_places_each_thing_once_and_minds_only_its_own(tmp_path):
@@ -113,8 +144,9 @@ def test_a_place_becomes_the_same_pose_from_any_arrival():
         "z_mm": 21_300,
         "yaw_microradians": 4_712_390,
     }
-    facing_them = dict(place, turn_microradians=3_141_593)
-    assert town.pose(facing_them)["yaw_microradians"] == 1_570_797
+    # A turn of 0 faces the person arriving; a turn of pi faces the way they face.
+    facing_their_way = dict(place, turn_microradians=3_141_593)
+    assert town.pose(facing_their_way)["yaw_microradians"] == 1_570_797
 
 
 class _Server:
@@ -279,6 +311,10 @@ def test_a_refusal_names_its_code_or_what_the_request_check_refused():
     refusal = _builder().refusal
     assert refusal("POST", "/x", 409, {"code": "thing_kind_unshipped"}) == (
         "POST /x: 409 thing_kind_unshipped"
+    )
+    conflict = {"code": "saved_world_conflict", "detail": "the starter has another title"}
+    assert refusal("POST", "/x", 409, conflict) == (
+        "POST /x: 409 saved_world_conflict (the starter has another title)"
     )
     detail = {"detail": [{"loc": ["body", "profile"], "msg": "Input should be 'v1'", "type": "e"}]}
     assert refusal("POST", "/x", 422, detail) == "POST /x: 422 body.profile: Input should be 'v1'"
