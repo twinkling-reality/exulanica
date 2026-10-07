@@ -337,6 +337,18 @@ there. The six pieces of furniture are derived from the world object catalog, th
 perches and hosted flyers as that catalog derives them, so no figure is stated twice. The kinds are
 this project's own, under the repository's licence.
 
+The host serves what it ships, the same for every workspace and only to a session (`world.read`):
+`GET /things/library` lists every kind with the looks it suggests, every look with its container
+and the body plans catalog's digest (`exulanica.thing-library/v1`), and
+`GET /things/library/{content_sha256}` answers a kind or a look as its canonical JSON, the body
+plans catalog as its file, or a look's container as `model/gltf-binary`, named by the SHA-256 of
+exactly those bytes and cached as immutable; any other digest is 404 `unknown_reference`
+([`thing_library.py`](../exulanica/world/thing_library.py)). The library is read when the host
+starts. An authored look's container is written from its pieces, a furniture look's is its reviewed
+asset and an imported look's is the container file committed with its import, each held to the
+digest its look pins. A look file named for another look or version, a container no source gives, and a
+kind suggesting a look the library does not hold at the kind's digest each stop the start, named.
+
 | Kind | Class | Body | Abilities | Offers | Deciders | Look |
 | --- | --- | --- | --- | --- | --- | --- |
 | `knight` | being | humanoid, 1,700 to 1,900 mm | wait, stand, talk, rest, visit, pick_up, put_down, give, take, follow, say | talk_to, hear, receive, be_followed | the routine by default; a model, the owner or an outside program | `blocky-knight` |
@@ -502,8 +514,8 @@ These are material limits of the boundary above, not partial behaviour:
 
 - No society engine reads a thing kind, and no ability module runs: the abilities catalog names
   modules no registry states. A world's people are the society's own, drawn as today.
-- No store holds a workspace's own kinds or looks, or the look chosen for a thing, and no route
-  serves a kind, a look or a look's container. A placed thing names a shipped kind.
+- No store holds a workspace's own kinds or looks, or the look chosen for a thing: the library
+  serves the shipped ones only. A placed thing names a shipped kind.
 - The browser draws no thing by its look kind.
 - No importer or crossing writes a translation manifest; the reader and its accounting check exist.
 - No route drafts a creature or keeps its documents, and no model has been measured as its drafter:
@@ -522,6 +534,7 @@ These are material limits of the boundary above, not partial behaviour:
 | Origin record and vocabularies | [`origin.py`](../exulanica/things/origin.py), [`vocabularies.py`](../exulanica/things/vocabularies.py) | `tests/test_thing_looks_and_origins.py` |
 | Translation manifests and lines | [`manifests.py`](../exulanica/things/manifests.py), [`lines.py`](../exulanica/things/lines.py) | `tests/test_thing_looks_and_origins.py` (words held to the line rule, a look's import, each refusal against a positive control) |
 | Shipped kinds and looks | [`shipped_things.py`](../scripts/things/shipped_things.py), the lock `kinds.lock.json` | `tests/test_thing_kinds.py` (`--check`), `tests/test_placed_things.py` (every shipped version at its locked digest; a changed, unlocked or missing file refused) |
+| The thing library | [`thing_library.py`](../exulanica/world/thing_library.py), [`things.py`](../exulanica/api/routes/things.py) | `tests/test_thing_library.py` (every shipped document and container by digest, an imported container by the digest its look pins, each refusal against a positive control), `tests/test_thing_library_routes.py` (a session required, the bytes a digest names, 404 otherwise), `tests/test_image_ships_startup_reads.py` (every file it reads ships in the API image) |
 | Placed things | [`placed_things.py`](../exulanica/world/placed_things.py), the object repository, [`world_things.py`](../exulanica/api/routes/world_things.py), migration 0152 | `tests/test_placed_things.py`, `tests/test_placed_things_postgres.py` (as the deployed writer: place, move, remove, undo and place again; the kind fixed by the table; another workspace sees nothing; a branch keeps them; the routes' refusals by name), `tests/test_edit_kind_undo_postgres.py` |
 | Creatures: recipes, plans, sketches, assembly | [`bodies.py`](../exulanica/things/bodies.py), [`sketch.py`](../exulanica/things/sketch.py), [`creatures.py`](../exulanica/things/creatures.py), [`body-grammar.v1.json`](../assets/catalogs/things/body-grammar.v1.json) | `tests/test_creature_bodies.py` (thirteen hand-written creatures: each body where its recipe says, a left limb the mirror of its right, each limb of a lying body hung from the stretch of spine beside it, the bone count the recipe's own sum, each refusal by name, the sketch read back from its bytes) |
 | The creature drafter | [`creature_drafting.py`](../exulanica/selection/creature_drafting.py), [`creature-drafting.v1.json`](../exulanica/selection/creature-drafting.v1.json) | `tests/test_creature_drafting.py` (scripted replies: a pass with its provenance, a refusal repaired with its check's sentence, two refusals, a form outside the schema, a reply cut off in blank space), `tests/test_hosted_boundary.py` (its request carries no saved name) |

@@ -1058,6 +1058,13 @@ def style_pack_content(owner) -> str:
     return style_pack_library().packs[0].manifest_sha256
 
 
+def thing_library_content(owner) -> str:
+    """A shipped thing kind, which the host serves every workspace by its digest."""
+    from exulanica.world.thing_library import thing_library
+
+    return thing_library().listing()["kinds"][0]["sha256"]
+
+
 def invented_digest() -> str:
     return uuid.uuid4().hex * 2
 
