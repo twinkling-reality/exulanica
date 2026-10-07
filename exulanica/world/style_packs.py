@@ -38,6 +38,7 @@ __all__ = [
     "COLOUR_ENCODING",
     "EXTENSION_MEDIA_TYPES",
     "IMAGE_MEDIA_TYPES",
+    "OWN_WORK",
     "PREVIEW_MAX_BYTES",
     "PROFILE",
     "LookFamily",
@@ -54,7 +55,10 @@ __all__ = [
 
 PROFILE: Final = "exulanica.style-pack/v1"
 COLOUR_ENCODING: Final = "exulanica.srgb8-linear16/v1"
-LICENCES: Final = ("CC0-1.0", "CC-BY-4.0")
+#: A person's own work, kept for their own workspace: the licence id the things record reads as
+#: never public (``exulanica.things.origin.OWN_WORK``). Only an uploaded pack may state it.
+OWN_WORK: Final = "LicenseRef-Exulanica-Own-Work"
+LICENCES: Final = ("CC0-1.0", "CC-BY-4.0", OWN_WORK)
 ORIGINS: Final = ("authored", "uploaded", "drafted", "generated", "imported")
 #: The pictures a pack may carry, as its one preview: what it looks like, for a person choosing.
 IMAGE_MEDIA_TYPES: Final = ("image/jpeg", "image/png", "image/webp")
@@ -93,7 +97,16 @@ _FILE_PATH: Final = re.compile(
     r"[a-z0-9][a-z0-9_-]{0,63}(/[a-z0-9][a-z0-9_.-]{0,63}){0,3}\.(glb|jpg|png|webp)"
 )
 _TEXTURE_SET: Final = re.compile(r"[a-z0-9][a-z0-9.-]{0,63}")
-_CONTROL: Final = re.compile(r"[\x00-\x1f\x7f]")
+#: C0 controls, DEL and C1 controls.
+_CONTROL: Final = re.compile(r"[\x00-\x1f\x7f-\x9f]")
+#: The Unicode Bidi_Control characters: marks, embeddings, overrides and isolates, which can make
+#: text read in an order other than the one it is stored in.
+_BIDI_CONTROL: Final = re.compile("[\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]")
+#: A surrogate code point on its own: JSON can escape one, but it is no character, and no UTF-8
+#: or UTF-16 encoder writes it.
+_SURROGATE: Final = re.compile("[\ud800-\udfff]")
+#: The largest whole number both readers hold exactly (JavaScript's Number.MAX_SAFE_INTEGER).
+_SAFE_INTEGER: Final = 2**53 - 1
 _TEXT_MAX: Final = {
     "title": 80,
     "description": 400,
@@ -220,11 +233,15 @@ def _text(maximum: int, *, allow_empty: bool = False) -> Reader:
         # No leading or trailing space, and no control character: the same rule in every reader.
         if value.startswith(" ") or value.endswith(" ") or (not allow_empty and value == ""):
             _fail("shape", path, "must be trimmed text, not empty")
+        if _SURROGATE.search(value):
+            _fail("shape", path, "must hold no lone surrogate")
         # JavaScript counts UTF-16 code units; count the same here.
         if len(value.encode("utf-16-le")) // 2 > maximum:
             _fail("range", path, f"must be at most {maximum} characters")
         if _CONTROL.search(value):
             _fail("shape", path, "must hold no control characters")
+        if _BIDI_CONTROL.search(value):
+            _fail("shape", path, "must hold no bidirectional control characters")
         return str(value)
 
     return read
@@ -650,6 +667,10 @@ def _check_whole(manifest: dict[str, Any], context: StylePackContext) -> None:
         _fail("licence", "licence.attribution", "is required for CC-BY-4.0")
     if licence["id"] == "CC0-1.0" and licence["attribution"] is not None:
         _fail("licence", "licence.attribution", "must be null for CC0-1.0")
+    if licence["id"] == OWN_WORK and manifest["origin"] != "uploaded":
+        _fail("licence", "licence.id", f"{OWN_WORK} is for an uploaded pack only")
+    if licence["id"] == OWN_WORK and licence["attribution"] is not None:
+        _fail("licence", "licence.attribution", f"must be null for {OWN_WORK}")
     if manifest["base"] is None and (manifest["light"] is None or manifest["shading"] is None):
         _fail(
             "reference",
@@ -763,9 +784,23 @@ def _utf16_key(text: str) -> bytes:
 
 
 def canonical_json(value: Any) -> str:
-    """Canonical JSON: keys sorted, no whitespace, ASCII with lowercase escapes, integers only."""
-    if isinstance(value, float):
-        raise StylePackRefused("shape", "", "a canonical manifest holds whole numbers only")
+    """Canonical JSON: keys sorted, no whitespace, ASCII with lowercase escapes, integers only.
+
+    Every number at every depth is a whole number both readers hold exactly, as the browser's
+    ``canonicalJson`` requires; a fraction, a non-finite number (which ``json.loads`` reads from
+    ``NaN`` and ``Infinity``) or a whole number past 2**53 - 1 is refused by name.
+    """
+    pending = [value]
+    while pending:
+        item = pending.pop()
+        if isinstance(item, float) or (
+            isinstance(item, int) and not isinstance(item, bool) and abs(item) > _SAFE_INTEGER
+        ):
+            raise StylePackRefused("shape", "", "a canonical manifest holds whole numbers only")
+        if isinstance(item, dict):
+            pending.extend(item.values())
+        elif isinstance(item, list):
+            pending.extend(item)
     return json.dumps(
         value, sort_keys=True, separators=(",", ":"), ensure_ascii=True, allow_nan=False
     )

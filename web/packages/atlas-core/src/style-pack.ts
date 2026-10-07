@@ -24,7 +24,9 @@
 
 export const STYLE_PACK_PROFILE = 'exulanica.style-pack/v1';
 export const STYLE_PACK_COLOUR_ENCODING = 'exulanica.srgb8-linear16/v1';
-export const STYLE_PACK_LICENCES = ['CC0-1.0', 'CC-BY-4.0'] as const;
+/** A person's own work, kept for their own workspace and never public. Only an uploaded pack may state it. */
+export const STYLE_PACK_OWN_WORK = 'LicenseRef-Exulanica-Own-Work';
+export const STYLE_PACK_LICENCES = ['CC0-1.0', 'CC-BY-4.0', STYLE_PACK_OWN_WORK] as const;
 export const STYLE_PACK_ORIGINS = ['authored', 'uploaded', 'drafted', 'generated', 'imported'] as const;
 /** The pictures a pack may carry, as its one preview: what it looks like, for a person choosing. */
 export const STYLE_PACK_IMAGE_MEDIA_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
@@ -249,7 +251,10 @@ function object(value: Json, path: string, fields: Fields): Record<string, unkno
 }
 
 const integer = (min: number, max: number) => (value: Json, path: string): number => {
-  if (typeof value !== 'number' || !Number.isInteger(value)) return fail('shape', path, 'must be a whole number');
+  if (typeof value !== 'number') return fail('shape', path, 'must be a whole number');
+  // JSON.parse reads a whole number too long for a double as Infinity; the other reader holds it exactly and finds it out of range.
+  if (!Number.isFinite(value)) return fail('range', path, `must be within ${min} to ${max}`);
+  if (!Number.isInteger(value)) return fail('shape', path, 'must be a whole number');
   if (value < min || value > max) fail('range', path, `must be within ${min} to ${max}`);
   return value;
 };
@@ -259,13 +264,19 @@ const oneOf = <T extends string>(values: readonly T[]) => (value: Json, path: st
 const literal = (expected: string) => (value: Json, path: string): string => (value === expected ? expected : fail('shape', path, `must be ${JSON.stringify(expected)}`));
 const pattern = (re: RegExp, what: string) => (value: Json, path: string): string =>
   (typeof value === 'string' && re.test(value) ? value : fail('shape', path, `must be ${what}`));
+/** A surrogate code unit outside a pair: JSON can escape one, but it is no character. */
+const LONE_SURROGATE = /[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/;
+/** The Unicode Bidi_Control characters: marks, embeddings, overrides and isolates. */
+const BIDI_CONTROL = /[\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/;
 const text = (max: number, allowEmpty = false) => (value: Json, path: string): string => {
   if (typeof value !== 'string') return fail('shape', path, 'must be text');
   // No leading or trailing space, and no control character: the same rule in every reader.
   if (value.startsWith(' ') || value.endsWith(' ') || (!allowEmpty && value.length === 0)) fail('shape', path, 'must be trimmed text, not empty');
+  if (LONE_SURROGATE.test(value)) fail('shape', path, 'must hold no lone surrogate');
   if (value.length > max) fail('range', path, `must be at most ${max} characters`);
   // eslint-disable-next-line no-control-regex
-  if (/[\u0000-\u001f\u007f]/.test(value)) fail('shape', path, 'must hold no control characters');
+  if (/[\u0000-\u001f\u007f-\u009f]/.test(value)) fail('shape', path, 'must hold no control characters');
+  if (BIDI_CONTROL.test(value)) fail('shape', path, 'must hold no bidirectional control characters');
   return value;
 };
 const nullable = <T>(read: (value: Json, path: string) => T) => (value: Json, path: string): T | null => (value === null ? null : read(value, path));
@@ -459,6 +470,8 @@ function checkWhole(manifest: StylePackManifest, context: StylePackContext): Sty
   if (manifest.provenance.kind !== manifest.origin) fail('reference', 'provenance.kind', 'must equal the origin');
   if (manifest.licence.id === 'CC-BY-4.0' && manifest.licence.attribution === null) fail('licence', 'licence.attribution', 'is required for CC-BY-4.0');
   if (manifest.licence.id === 'CC0-1.0' && manifest.licence.attribution !== null) fail('licence', 'licence.attribution', 'must be null for CC0-1.0');
+  if (manifest.licence.id === STYLE_PACK_OWN_WORK && manifest.origin !== 'uploaded') fail('licence', 'licence.id', `${STYLE_PACK_OWN_WORK} is for an uploaded pack only`);
+  if (manifest.licence.id === STYLE_PACK_OWN_WORK && manifest.licence.attribution !== null) fail('licence', 'licence.attribution', `must be null for ${STYLE_PACK_OWN_WORK}`);
   if (manifest.base === null && (manifest.light === null || manifest.shading === null)) {
     fail('reference', manifest.light === null ? 'light' : 'shading', 'is required in a pack with no base');
   }

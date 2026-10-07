@@ -57,6 +57,33 @@ def test_canonical_bytes_are_the_browsers() -> None:
         style_packs.canonical_json(0.5)
 
 
+@pytest.mark.parametrize(
+    "value",
+    [
+        {"a": [1, {"b": 0.5}]},
+        {"a": float("nan")},
+        [float("inf")],
+        {"a": 9_007_199_254_740_992},
+        {"a": -9_007_199_254_740_992},
+    ],
+    ids=["a nested fraction", "NaN", "Infinity", "2**53", "-(2**53)"],
+)
+def test_canonical_bytes_hold_whole_numbers_the_browser_holds_exactly(value: Any) -> None:
+    # json.loads reads NaN and Infinity; the browser's canonicalJson refuses a number at any depth
+    # that is not a safe integer, so this one refuses the same, by name rather than ValueError.
+    with pytest.raises(style_packs.StylePackRefused):
+        style_packs.canonical_json(value)
+    assert style_packs.canonical_json({"a": [9_007_199_254_740_991, True]}) == (
+        '{"a":[9007199254740991,true]}'
+    )
+
+
+def test_own_work_is_the_licence_id_the_things_record_keeps_private() -> None:
+    from exulanica.things.origin import OWN_WORK
+
+    assert style_packs.OWN_WORK == OWN_WORK == "LicenseRef-Exulanica-Own-Work"
+
+
 def test_reading_returns_the_manifest_it_was_given() -> None:
     manifest = CASES["cases"][0]["manifest"]
     assert style_packs.read_manifest(manifest, _context()) == manifest

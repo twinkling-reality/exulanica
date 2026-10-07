@@ -24,16 +24,19 @@ world looks and nothing about what it is.
 ## 2. The manifest
 
 A pack is a manifest, profile `exulanica.style-pack/v1`, and the files it lists. Every number in a
-manifest is a whole number in a stated unit (per mille, millimetres, millidegrees, millionths), and
-the manifest's identity is the SHA-256 of its canonical bytes: keys sorted, no whitespace, ASCII with
-lowercase `\u` escapes. Both readers write the same bytes.
+manifest is a whole number in a stated unit (per mille, millimetres, millidegrees, millionths) that
+both readers hold exactly (at most 2^53 - 1 in size), and the manifest's identity is the SHA-256 of
+its canonical bytes: keys sorted, no whitespace, ASCII with lowercase `\u` escapes. Both readers
+write the same bytes. Text is trimmed and holds no lone surrogate, no control character (C0, DEL or
+C1) and no bidirectional control character (the Unicode `Bidi_Control` set), so what a person reads
+is the text as stored, in the order it is stored.
 
 | Field | What it holds |
 | --- | --- |
 | `pack_id`, `version` | A namespaced id (`exulanica.cozy-town`) and a whole-number version |
 | `title`, `description`, `tags` | What a person reads in a library; tags are lowercase words |
 | `origin`, `provenance` | `authored`, `uploaded`, `drafted`, `generated` or `imported`, and what each requires: a drafted pack names the model, prompt version, execution and the digest of the words; a generated one names its generation receipts |
-| `licence`, `authors` | `CC0-1.0`, or `CC-BY-4.0` with its attribution; who made it |
+| `licence`, `authors` | `CC0-1.0`, or `CC-BY-4.0` with its attribution, or for an uploaded pack only `LicenseRef-Exulanica-Own-Work` with none (a person's own work, used in their own workspace and never public); who made it |
 | `preview` | A listed picture (`.jpg`, `.png` or `.webp`, at most 512 KiB) that shows what the pack looks like, for a person choosing one, or none; absent, none |
 | `base` | The pack this one is drawn on, by id, version and manifest digest, or none |
 | `light` | Named presets (at most six) and the default one; each preset is a sky, a fog, a sun with a one-tap, three-tap or five-tap shadow filter, image light, contact shadowing and a finish, in whole-number units. A pack may not choose soft (PCSS) shadows: they alone cost more than a frame ([render look](generated-tile-runtime.md#61-the-render-look-a-style-chooses)) |
@@ -134,16 +137,22 @@ it, then the rules across sections, and refuses with the first fault by reason a
 
 | Reason | What it refuses |
 | --- | --- |
-| `shape` | An unknown key or a missing one the profile requires, a value of the wrong kind, a fraction, a malformed id, role, path or text, a file whose media type is not its extension's |
-| `range` | A whole number outside its bounds, a value not in its list, fog or toon bands out of order, a soft (PCSS) shadow filter, a stretch zone outside its piece or of no length, a picture over 512 KiB |
+| `shape` | An unknown key or a missing one the profile requires, a value of the wrong kind, a fraction, a malformed id, role, path or text, text holding a lone surrogate, a control character or a bidirectional control character, a file whose media type is not its extension's |
+| `range` | A whole number outside its bounds (one too long for a double included), a value not in its list, fog or toon bands out of order, a soft (PCSS) shadow filter, a stretch zone outside its piece or of no length, a picture over 512 KiB |
 | `reference` | A role of an unknown family or of a family not dressed that way, a swatch, texture set, preset or file that is not there, a preview naming no listed file, a listed file nothing uses, provenance that is not the origin, a pack with no base and no light or shading, a stretch on a piece of a family that is not fill |
 | `duplicate` | Two swatches of one key or one colour, two files of one path |
-| `licence` | CC-BY-4.0 without attribution, attribution on CC0-1.0 |
+| `licence` | CC-BY-4.0 without attribution, attribution on CC0-1.0, the own-work id on a pack that is not uploaded or with an attribution |
 
 `assets/style-packs/manifest-cases.v1.json` holds both readers to the same verdict on every case: the
 same refusal by reason and path, or the same digest; `tests/test_style_packs.py` and
 `web/packages/atlas-core/test/style-pack.test.ts` run it, and the latter also holds the resolver,
 the variant choice and the fit rules, stretching included.
+
+A reader never refuses a manifest it once accepted, since a world drawn in that manifest names it by
+digest and no digest can be repaired. Every published version is read through both readers
+(`tests/test_style_pack_library.py` and `web/packages/atlas-react/test/style-pack-authored.test.ts`).
+A rule that would refuse a manifest already stored applies at admission only, never in the readers
+that draw a world.
 `web/packages/atlas-core/test/style-piece.test.ts` holds the piece reader to a piece it writes
 itself, apart from the pieces' writer.
 
