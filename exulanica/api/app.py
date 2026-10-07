@@ -88,6 +88,7 @@ from exulanica.api.routes import (
     capabilities,
     character_appearance,
     companion,
+    door,
     environment_sources,
     evidence,
     formation,
@@ -433,7 +434,7 @@ def create_app(services: Services | None = None, *, verify: bool = True) -> Fast
     app.add_middleware(AdmissionMiddleware, admission=app.state.admission)
     # Pure ASGI and outermost, so it runs before routing and before any body is read; a route
     # whose body is a small document states its own tighter limit beside the route.
-    app.add_middleware(BodyLimit, routes=world_kinds.BODY_LIMITS)
+    app.add_middleware(BodyLimit, routes=(*world_kinds.BODY_LIMITS, *door.BODY_LIMITS))
 
     app.include_router(health.router)
     app.include_router(accounts.router)
@@ -500,6 +501,7 @@ def create_app(services: Services | None = None, *, verify: bool = True) -> Fast
     app.include_router(world_kinds.site_router)
     app.include_router(references.router)
     app.include_router(world_drafts.router)
+    app.include_router(door.router)
     # After the last router and before the application is handed to anybody: a route nobody
     # declared, or a declaration for a route that is gone, is a build failure with its name in it.
     require_complete_declaration(app)

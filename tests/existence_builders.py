@@ -836,6 +836,27 @@ def workspace_asset(owner) -> str:
     ]
 
 
+def door_grant(owner) -> str:
+    """A grant letting the sweep's test bridge bring one visitor into the owner's world (API)."""
+    registered_world(owner.repository.connection, owner.workspace_id, WORLD, actor=owner.actor)
+    made = _ok(
+        in_world(
+            owner,
+            "POST",
+            "/door/grants",
+            json={
+                "idempotency_key": "existence-sweep-grant",
+                "bridge": "test-bridge",
+                "visitors_maximum": 1,
+                "kinds": ["player"],
+            },
+        ),
+        200,
+        201,
+    )
+    return made["grant"]["grant_id"]
+
+
 def world_entry(owner) -> str:
     """The workspace's starter world (API)."""
     return _ok(owner.request("POST", "/world-entries/starter", json={"title": "My world"}), 200)[

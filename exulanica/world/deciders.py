@@ -58,7 +58,7 @@ KINDS: Final = ("routine", "model", "person", "external")
 #: The deciders an owner's choice binds a subject to through the choices route: a person decides
 #: through direct requests, and an outside program only under a grant its route records.
 OWNER_CHOOSES: Final = ("routine", "model")
-#: A bridge's key: the lowercase name of the program's door, such as ``luanti``.
+#: A bridge's key: the lowercase name of the program's door, as the deployment declares it.
 BRIDGE: Final = re.compile(r"[a-z][a-z0-9_-]{0,31}")
 #: An adapter's version as its program states it: one to four whole numbers joined by dots, such
 #: as ``0.1.0``. Numbers alone, so no name or other text can ride in it.

@@ -118,7 +118,10 @@ class Database:
 
     @contextmanager
     def unscoped(self) -> Iterator[psycopg.Connection]:
-        """A connection with no workspace. For migrations, the schema check and nothing else.
+        """A connection with no workspace. For migrations, the schema check, and the door's two
+        reads before any workspace is known: looking up a presented secret in ``door_secret`` and
+        counting a bridge's refused redemptions in ``door_redemption_refusal``, the two tables
+        migration 0149 keeps outside every workspace (:mod:`exulanica.door.secrets`). Nothing else.
 
         This opens a connection and declines to declare a workspace. That is the whole of what
         it does, and **what the connection can then see is a property of the role behind the URL

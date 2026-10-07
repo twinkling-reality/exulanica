@@ -192,6 +192,10 @@ INSTANCE_TABLES: Final[Mapping[str, str]] = {
     # owner's decision to serve a faulted tile is about that deployment's bakes (migration 0144).
     "baked_tile_stage": "the bake stage the destination's own migrations state",
     "baked_tile_fault_clearance": "host-owner decision on this deployment's faulted bakes",
+    # The door's secrets open a deployment's grants to the bridges it admits; a seed never carries
+    # a credential, even a digest of one. A destination issues its own.
+    "door_secret": "per-deployment door credentials, never carried by an import",
+    "door_redemption_refusal": "per-deployment record of a bridge's refused invite redemptions",
 }
 
 #: Tables with no ``workspace_id`` that nevertheless hold this workspace's rows, with the exact

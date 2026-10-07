@@ -846,3 +846,43 @@ def test_the_api_alone_connects_through_the_proxy():
     assert proxied["EXULANICA_READONLY_DATABASE_URL"].endswith("@127.0.0.1:19434/exulanica")
     assert proxied["EXULANICA_PURGE_DATABASE_URL"] == exports["EXULANICA_PURGE_DATABASE_URL"]
     assert proxied["OWNER_URL"] == exports["OWNER_URL"]
+
+
+def test_door_bridges_fill_the_run_s_synthetic_workspaces_and_reach_the_api_alone(tmp_path):
+    declared = [
+        {"bridge": "a", "listed": False, "workspaces": "synthetic"},
+        {"bridge": "b", "listed": True},
+        {"bridge": "c", "listed": False, "workspaces": ["11111111-1111-1111-1111-111111111111"]},
+    ]
+    path = tmp_path / "bridges.json"
+    path.write_text(json.dumps(declared))
+    setting = LAUNCH.door_bridges_setting(path, ["w1", "w2"])
+    assert json.loads(setting) == [
+        {"bridge": "a", "listed": False, "workspaces": ["w1", "w2"]},
+        declared[1],
+        declared[2],
+    ]
+    environment = LAUNCH.api_environment(
+        exports={
+            "EXULANICA_DATABASE_URL": "u",
+            "EXULANICA_READONLY_DATABASE_URL": "r",
+            "EXULANICA_PURGE_DATABASE_URL": "p",
+        },
+        grant={},
+        data_dir=tmp_path,
+        model=False,
+        derivative_worker=True,
+        society_playback={},
+        door_bridges=setting,
+        environ={"EXULANICA_DOOR_BRIDGES": "[]", "HOME": "/home/someone"},
+    )
+    assert environment["EXULANICA_DOOR_BRIDGES"] == setting
+    plain = LAUNCH.build_parser().parse_args(["up", "--worktree", "w"])
+    assert plain.door_bridges is None
+
+
+@pytest.mark.parametrize("written", ["{}", "[1]", "not json"])
+def test_a_door_bridges_file_that_is_not_an_array_of_objects_is_refused(tmp_path, written):
+    path = tmp_path / "bridges.json"
+    path.write_text(written)
+    assert _refusal(LAUNCH.door_bridges_setting, path, []) == "door-bridges-file"

@@ -99,6 +99,7 @@ __all__ = [
     "ROUTE_RULE_SECTIONS",
     "SELF_CHARGING_TILE_ROUTES",
     "Authentication",
+    "Channel",
     "Permission",
     "PermissionRefused",
     "Public",
@@ -155,6 +156,10 @@ class Permission(StrEnum):
     #: the person asking to the source's acceptable use policy. Held by an account owner and by a
     #: token whose grant names it; never by a guest.
     REFERENCES_REQUEST = "references.request"
+    #: Letting an outside program into a world: issuing, opening and revoking a door grant. It
+    #: always sits beside ``world.write``, and is isolated by name because a grant hands some of
+    #: a world's choices to a program its owner does not run.
+    DOOR_GRANT = "door.grant"
 
 
 #: Routes that require ``tiles.materialise`` and charge the tile quota themselves, once per tile
@@ -228,6 +233,27 @@ class Requires:
                 raise RouteDeclarationError(f"{permission!r} is not a Permission")
 
 
+@dataclass(frozen=True, slots=True)
+class Channel:
+    """A route an outside program reaches with a door credential, and no account ever does.
+
+    ``credential`` names which: ``bridge``, the deployment's credential for one admitted bridge,
+    which only redeems an invite; or ``grant``, a channel credential that opens one grant's
+    channel. The door resolves it before the route runs (:mod:`exulanica.door.secrets`); an
+    account's token or browser session is refused here exactly as an unknown credential is, and
+    a door credential reaches no other route, so the two families never overlap.
+    """
+
+    credential: str
+    reason: str
+
+    def __post_init__(self) -> None:
+        if self.credential not in ("bridge", "grant"):
+            raise RouteDeclarationError("a channel route takes a bridge or a grant credential")
+        if not self.reason.strip():
+            raise RouteDeclarationError("a channel route must say what its credential opens")
+
+
 def _requires(*permissions: Permission) -> Requires:
     return Requires(frozenset(permissions))
 
@@ -261,6 +287,7 @@ ACCOUNT_OWNER_PERMISSIONS: Final[frozenset[Permission]] = frozenset(
         _P.OPERATIONS_READ,
         _P.OPERATIONS_WRITE,
         _P.REFERENCES_REQUEST,
+        _P.DOOR_GRANT,
     }
 )
 
@@ -529,6 +556,9 @@ _OPERATIONS_WRITES: Final = _every(
 #: and the shipped thing library.
 _WORLD_READS: Final = _every(
     _WORLD_READ,
+    "GET /door/bridges",
+    "GET /door/grants",
+    "GET /door/grants/{grant_id}",
     "GET /materials/library",
     "GET /materials/makers",
     "GET /materials/recipes",
@@ -731,8 +761,45 @@ _WORLD_READS_READING_ADMISSION: Final = _every(
     "GET /worlds/personal-source",
 )
 
+#: Issuing, opening and revoking a door grant: a change to who may decide in a world, so
+#: ``world.write``, and isolated by name as ``door.grant``.
+_DOOR_GRANTS: Final = _every(
+    _requires(_P.WORLD_WRITE, _P.DOOR_GRANT),
+    "POST /door/grants",
+    "POST /door/grants/{grant_id}/channel-credentials",
+    "POST /door/grants/{grant_id}/credentials/revoke",
+    "POST /door/grants/{grant_id}/invites",
+    "POST /door/grants/{grant_id}/revoke",
+)
+
+#: The one route a bridge's own deployment credential reaches.
+_BRIDGE_CHANNEL: Final[Mapping[str, Channel]] = MappingProxyType(
+    {
+        "POST /door/invites/redeem": Channel(
+            "bridge", "redeems one invite for the grant it opens, as the bridge it was issued to"
+        ),
+    }
+)
+
+#: The routes a channel credential reaches, each acting only on the one grant it opens.
+_GRANT_CHANNEL: Final[Mapping[str, Channel]] = MappingProxyType(
+    {
+        "POST /door/channel/answers": Channel(
+            "grant", "answers an ask of the grant its credential opens"
+        ),
+        "GET /door/channel/frames": Channel(
+            "grant", "reads what was sent to the grant its credential opens"
+        ),
+        "POST /door/channel/hello": Channel(
+            "grant", "presents an adapter and its mapping for the grant its credential opens"
+        ),
+    }
+)
+
 #: Every section, in reading order. A route is declared by appearing in exactly one of them.
-ROUTE_RULE_SECTIONS: Final[tuple[Mapping[str, Public | Authentication | Requires], ...]] = (
+ROUTE_RULE_SECTIONS: Final[
+    tuple[Mapping[str, Public | Authentication | Requires | Channel], ...]
+] = (
     _PUBLIC_ROUTES,
     _SIGN_IN_ROUTES,
     _LIBRARY_READS,
@@ -754,6 +821,9 @@ ROUTE_RULE_SECTIONS: Final[tuple[Mapping[str, Public | Authentication | Requires
     _WORLD_WRITES,
     _WORLD_WRITES_READING_ADMISSION,
     _WORLD_READS_READING_ADMISSION,
+    _DOOR_GRANTS,
+    _BRIDGE_CHANNEL,
+    _GRANT_CHANNEL,
 )
 
 
@@ -766,9 +836,9 @@ def route_key(route: str) -> tuple[str, str]:
 
 
 def _declare(
-    sections: Iterable[Mapping[str, Public | Authentication | Requires]],
-) -> Mapping[tuple[str, str], Public | Authentication | Requires]:
-    declared: dict[tuple[str, str], Public | Authentication | Requires] = {}
+    sections: Iterable[Mapping[str, Public | Authentication | Requires | Channel]],
+) -> Mapping[tuple[str, str], Public | Authentication | Requires | Channel]:
+    declared: dict[tuple[str, str], Public | Authentication | Requires | Channel] = {}
     for section in sections:
         for route, rule in section.items():
             key = route_key(route)
@@ -787,12 +857,12 @@ def _declare(
 #: 403. The probes are derived from this map in tests/route_probes.py, so a new route is swept the
 #: moment it is declared; a route whose default request would stop at validation before reaching
 #: its own lookup is given a realistic body in that module's PROBE_OVERRIDES.
-ROUTE_RULES: Final[Mapping[tuple[str, str], Public | Authentication | Requires]] = _declare(
-    ROUTE_RULE_SECTIONS
+ROUTE_RULES: Final[Mapping[tuple[str, str], Public | Authentication | Requires | Channel]] = (
+    _declare(ROUTE_RULE_SECTIONS)
 )
 
 
-def rule_for(method: str, path: str | None) -> Public | Authentication | Requires | None:
+def rule_for(method: str, path: str | None) -> Public | Authentication | Requires | Channel | None:
     """The declaration for one matched route, or None when there is none.
 
     Read from the module attribute at call time rather than captured, so the one map is the one
@@ -851,7 +921,8 @@ def require(
     rule = rule_for(method, path)
     if isinstance(rule, Public | Authentication):
         return rule
-    if rule is None:
+    if rule is None or isinstance(rule, Channel):
+        # No account permission reaches a channel route: its credential is the door's own.
         raise PermissionRefused(method=method, path=path, missing=frozenset())
     missing = rule.permissions - held
     if missing:

@@ -60,6 +60,7 @@ from exulanica.api.permissions import Permission, Requires, route_key
 from exulanica.api.routes.character_appearance import CharacterAppearanceRuntime
 from exulanica.api.services import Services
 from exulanica.db.roles import provision_runtime_role
+from exulanica.door.runtime import DoorRuntime
 from exulanica.store.local import LocalContentAddressedStore
 from exulanica.store.namespaces import LocalWorkspaceStores, tile_store
 from exulanica.world import TopologyContract, WorldStyleRepository
@@ -72,6 +73,7 @@ from exulanica.world.workspace_preparations import WorkspacePreparationRepositor
 from fastapi.responses import JSONResponse
 from fastapi.testclient import TestClient
 
+import door_support
 from character_appearance_fixtures import family
 from conftest import scratch_role_database
 from route_probes import (
@@ -303,6 +305,7 @@ def existence(tmp_path, photo_dir, repository, spine_schema):
         workspace_assets=WorkspaceAssetRuntime(
             stores=LocalWorkspaceStores(tmp_path / "workspace-assets")
         ),
+        door=DoorRuntime(database=database, bridges=door_support.bridges()),
     )
     app = create_app(services, verify=False)
     # A 500 is an answer to compare, not an exception to stop at: a foreign id that makes the

@@ -76,6 +76,8 @@ from exulanica.errors import ExulanicaError
 __all__ = [
     "ACCOUNT_ONLY_TABLES",
     "BACKUP_ROLE",
+    "COLUMN_UPDATE_TABLES",
+    "DOOR_RUNTIME_FUNCTIONS",
     "EXECUTOR_ROLE",
     "INSERT_ONLY_TABLES",
     "PURGE_CROSS_WORKSPACE_TABLES",
@@ -268,7 +270,31 @@ INSERT_ONLY_TABLES: Final = (
     # Migration 0148 appends our own record of each search a reference request sent and refuses
     # every update of one.
     "reference_lookup",
+    # Migration 0149 appends a door grant, each revision of it and its revocation, each mapping a
+    # bridge presented and each declaration a program made, each ask the host writes to a channel
+    # and each answer a bridge gives, and the refused invite redemptions, and refuses every update
+    # of each; only door_prune removes a refusal, once it is a day old.
+    "door_grant",
+    "door_grant_revision",
+    "door_grant_revocation",
+    "door_mapping",
+    "door_declaration",
+    "door_ask",
+    "door_answer",
+    "door_redemption_refusal",
 )
+
+#: Tables the runtime may change only in the named columns: provisioning takes the table's UPDATE
+#: back and grants it on these columns alone. Migration 0149's door secrets gain the time an invite
+#: was used and the time a secret was revoked, each once, and nothing else about a secret changes.
+COLUMN_UPDATE_TABLES: Final[tuple[tuple[str, tuple[str, ...]], ...]] = (
+    ("door_secret", ("used_at", "revoked_at")),
+)
+
+#: Functions with their owner's rights the runtime executes for the door. The runtime holds no
+#: DELETE: migration 0149's ``door_prune`` removes the door's global rows past their retention, a
+#: bounded batch at a time, and its tables' triggers refuse every other delete.
+DOOR_RUNTIME_FUNCTIONS: Final = (("door_prune", "integer"),)
 
 #: The vocabulary is administered, not generated. Without revoking this the role could insert a
 #: predicate row even though it cannot update one.
@@ -537,6 +563,7 @@ def provision_runtime_role(
         _grant_functions(connection, schema, role_name, SPENDING_READ_FUNCTIONS)
         if not read_only:
             _grant_functions(connection, schema, role_name, SPENDING_RUNTIME_FUNCTIONS)
+            _grant_functions(connection, schema, role_name, DOOR_RUNTIME_FUNCTIONS)
             connection.execute(
                 sql.SQL("grant usage, select on all sequences in schema {} to {}").format(
                     schema, role_name
@@ -556,6 +583,22 @@ def provision_runtime_role(
                 connection.execute(
                     sql.SQL("revoke {} on {} from {}").format(
                         revoked, sql.Identifier(table), role_name
+                    )
+                )
+            columned = _present_tables(
+                connection, tuple(table for table, _columns in COLUMN_UPDATE_TABLES)
+            )
+            for table, columns in COLUMN_UPDATE_TABLES:
+                if table not in columned:
+                    continue
+                connection.execute(
+                    sql.SQL("revoke update on {} from {}").format(sql.Identifier(table), role_name)
+                )
+                connection.execute(
+                    sql.SQL("grant update ({}) on {} to {}").format(
+                        sql.SQL(", ").join(sql.Identifier(column) for column in columns),
+                        sql.Identifier(table),
+                        role_name,
                     )
                 )
             for sequence in _ADMIN_ONLY_SEQUENCES:

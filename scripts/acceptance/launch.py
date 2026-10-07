@@ -73,6 +73,10 @@ starts exactly what it always did:
   ``--spending process|durable`` states the scripted API's ``EXULANICA_SPENDING`` explicitly.
 - ``--read-only-token`` adds one more token, ``token-read``, for the first workspace with
   ``world.read`` alone, so a client can be shown a refusal its grant earns.
+- ``--door-bridges FILE`` admits the outside programs a JSON array of bridge declarations names
+  (``EXULANICA_DOOR_BRIDGES``, digests only, never a credential), so an adapter can be run against
+  the slot's API. An entry's ``"workspaces": "synthetic"`` becomes the run's synthetic workspace
+  ids, which the file cannot know before the run makes them; the API's own loader checks the rest.
 - ``--peer-token`` adds ``token-peer``: a second actor in the first workspace with the same
   permissions, so a client can be shown what one actor's private work looks like to another.
 - ``--depth-worker``, with ``--no-derivative-worker``, runs the production derivative worker
@@ -120,7 +124,7 @@ import time
 import urllib.error
 import urllib.request
 import uuid
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import NoReturn
 
@@ -179,6 +183,7 @@ PERMISSIONS = (
     "operations.read",
     "operations.write",
     "references.request",
+    "door.grant",
 )
 #: What ``--tiles`` adds to the synthetic grant, which the account owner's does not carry.
 TILES_PERMISSION = "tiles.materialise"
@@ -245,6 +250,7 @@ REFUSALS = {
     "spending-mode-missing": "--model needs EXULANICA_SPENDING, durable or process, how the API spends",
     "api-origin": "the API did not confirm it imported exulanica from the checkout",
     "token-refused": "the API did not accept the synthetic token",
+    "door-bridges-file": "--door-bridges names a file holding one JSON array of bridge objects",
     "no-answer": "a service did not answer in time",
     "build-failed": "vite build failed",
     "build-token": "the production build environment carries a VITE_ variable",
@@ -476,6 +482,26 @@ def synthetic_permissions(tiles: bool) -> list[str]:
     return [*PERMISSIONS, TILES_PERMISSION] if tiles else list(PERMISSIONS)
 
 
+def door_bridges_setting(path: Path, workspace_ids: Sequence[str]) -> str:
+    """``EXULANICA_DOOR_BRIDGES`` from a file of bridge declarations: each entry's ``"workspaces":
+    "synthetic"`` becomes the run's synthetic workspace ids; anything else is passed as written,
+    for the API's own loader to admit or refuse at its start."""
+    try:
+        declared = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        refuse("door-bridges-file", REFUSALS["door-bridges-file"])
+    if not isinstance(declared, list) or not all(isinstance(entry, dict) for entry in declared):
+        refuse("door-bridges-file", REFUSALS["door-bridges-file"])
+    return json.dumps(
+        [
+            {**entry, "workspaces": list(workspace_ids)}
+            if entry.get("workspaces") == "synthetic"
+            else entry
+            for entry in declared
+        ]
+    )
+
+
 def api_environment(
     *,
     exports: Mapping[str, str],
@@ -484,6 +510,7 @@ def api_environment(
     model: bool,
     derivative_worker: bool,
     society_playback: Mapping[str, str],
+    door_bridges: str | None = None,
     environ: Mapping[str, str] | None = None,
 ) -> dict[str, str]:
     environment = clean_environment(environ)
@@ -502,6 +529,8 @@ def api_environment(
         # Absence means on, so the production shape, a separately started worker, is spelled.
         environment["EXULANICA_DERIVATIVE_WORKER"] = "off"
     environment.update(society_playback)
+    if door_bridges is not None:
+        environment["EXULANICA_DOOR_BRIDGES"] = door_bridges
     return environment
 
 
@@ -1030,6 +1059,8 @@ def up(arguments: argparse.Namespace) -> None:
         model_environment()  # refuse before anything starts, not after the database has
     if not arguments.society_playback:
         society_playback_environment(None, arguments.society_tick_interval_ms)  # likewise
+    if arguments.door_bridges is not None:
+        door_bridges_setting(arguments.door_bridges, [])  # likewise
     directory = state_dir(worktree)
     state_file = directory / "state.json"
     if state_file.exists():
@@ -1217,6 +1248,13 @@ def up(arguments: argparse.Namespace) -> None:
         }
         peer_grant = {"token_file": str(peer_file), **grant[peer]}
 
+    door_bridges = None
+    if arguments.door_bridges is not None:
+        door_bridges = door_bridges_setting(
+            arguments.door_bridges, [workspace_id, *(other["workspace_id"] for other in others)]
+        )
+        state["door_bridges"] = door_bridges
+
     # People are drawn only from published catalogs (migration 0131), so a run publishes before
     # its API starts, exactly as a deployment must.
     published = run(
@@ -1244,6 +1282,7 @@ def up(arguments: argparse.Namespace) -> None:
             workspace_id if arguments.society_playback else None,
             arguments.society_tick_interval_ms,
         ),
+        door_bridges=door_bridges,
     )
     environment.update(model_witness_environment(environment, run_dir))
     plan = None
@@ -1553,6 +1592,7 @@ def restart_api(arguments: argparse.Namespace) -> None:
             state["workspace_id"] if playback else None,
             playback.get("base_tick_interval_ms") if isinstance(playback, Mapping) else None,
         ),
+        door_bridges=state.get("door_bridges"),
     )
     environment.update(model_witness_environment(environment, run_dir))
     scripted = state.get("scripted_model")
@@ -1745,6 +1785,13 @@ def build_parser() -> argparse.ArgumentParser:
                 action="store_true",
                 help="with --no-derivative-worker, run the production derivative worker with the "
                 "depth model from the local model cache, offline (default: no depth)",
+            )
+            command.add_argument(
+                "--door-bridges",
+                metavar="FILE",
+                help="admit the outside programs a JSON array of bridge declarations names "
+                '(EXULANICA_DOOR_BRIDGES; an entry\'s "workspaces": "synthetic" becomes the '
+                "run's synthetic workspaces) (default: no bridge)",
             )
             command.add_argument(
                 "--society-tick-interval-ms",

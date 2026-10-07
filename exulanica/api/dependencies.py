@@ -37,6 +37,14 @@ and a request refused for capacity is never charged.
 sign-in routes return without leaving the loop, so liveness needs no worker thread. Everything that
 can reach a database, the credential lookup, the refusal record, the share and the charge, runs in
 the threadpool, in that order.
+
+**A channel route is the door's, and resolves the door's credential instead.** Its declaration
+(:class:`~exulanica.api.permissions.Channel`) names which: the deployment's credential for one
+bridge, or a channel credential that opens one grant (:mod:`exulanica.door.secrets`). Anything else
+presented there, an account's token or a browser session included, is refused as an unknown
+credential is, with 401, and a door credential presented on any other route meets the token
+directory, which does not know it. A channel credential's workspace is claimed against its share of
+the capacity class, as an account's is.
 """
 
 from __future__ import annotations
@@ -55,6 +63,7 @@ from exulanica.api.permissions import (
     MEMBERSHIP_ROLE_PERMISSIONS,
     SELF_CHARGING_TILE_ROUTES,
     Authentication,
+    Channel,
     Permission,
     PermissionRefused,
     Public,
@@ -64,12 +73,16 @@ from exulanica.api.permissions import (
 )
 from exulanica.api.quotas import charge_tiles
 from exulanica.api.services import Services
+from exulanica.door.bridges import Bridge, BridgeNotAccepted
+from exulanica.door.secrets import ChannelNotAccepted, ChannelSession, open_channel
 from exulanica.epistemics.assertions import AssertionWriter
 from exulanica.identity import IdentityRepository
 from exulanica.selection.validation import Session
 
 __all__ = [
     "TILES_PER_REQUEST",
+    "CurrentBridge",
+    "CurrentChannel",
     "CurrentSession",
     "HeldPermissions",
     "ReadOnlyConnection",
@@ -100,6 +113,9 @@ _AUTHORISED = "exulanica_authorised_session"
 #: Where it leaves the grant it held the route to, beside the session, for a read that says which
 #: other routes the caller may use (:func:`held_permissions`).
 _AUTHORISED_GRANT = "exulanica_authorised_grant"
+#: Where it leaves what a channel route's door credential resolved to: the bridge, or the channel.
+_DOOR_BRIDGE = "exulanica_door_bridge"
+_DOOR_CHANNEL = "exulanica_door_channel"
 
 
 def _matched_path(request: Request) -> str | None:
@@ -151,7 +167,66 @@ async def authorise_route(request: Request) -> None:
     path = _matched_path(request)
     if _needs_no_credential(request, path):
         return
+    rule = rule_for(request.method, path)
+    if isinstance(rule, Channel):
+        await run_in_threadpool(_authorise_channel, request, rule)
+        return
     await run_in_threadpool(_authorise, request, path)
+
+
+def _bearer(request: Request) -> str:
+    scheme, _, presented = (request.headers.get("authorization") or "").partition(" ")
+    if scheme.lower() != "bearer" or not presented.strip():
+        raise TokenNotAccepted("expected an Authorization header of the form 'Bearer <token>'")
+    return presented.strip()
+
+
+def _door_bridge(request: Request) -> Bridge:
+    door = get_services(request).door
+    presented = _bearer(request)
+    if door is None:
+        raise TokenNotAccepted("no door credential opens anything here")
+    try:
+        return door.bridges.for_credential(presented)
+    except BridgeNotAccepted as exc:
+        raise TokenNotAccepted("no door credential opens anything here") from exc
+
+
+def _door_channel(request: Request) -> ChannelSession:
+    services = get_services(request)
+    presented = _bearer(request)
+    if services.door is None:
+        raise TokenNotAccepted("no door credential opens anything here")
+    try:
+        return open_channel(services.database, services.door.bridges, presented)
+    except ChannelNotAccepted as exc:
+        raise TokenNotAccepted("no door credential opens anything here") from exc
+
+
+def _authorise_channel(request: Request, rule: Channel) -> None:
+    """The door's half of the floor: resolve the credential a channel route declares, or refuse."""
+    if rule.credential == "bridge":
+        setattr(request.state, _DOOR_BRIDGE, _door_bridge(request))
+        return
+    channel = _door_channel(request)
+    claim_workspace(request.scope, channel.workspace_id)
+    setattr(request.state, _DOOR_CHANNEL, channel)
+
+
+def current_bridge(request: Request) -> Bridge:
+    """The bridge whose deployment credential reached this channel route."""
+    found = getattr(request.state, _DOOR_BRIDGE, None)
+    return found if found is not None else _door_bridge(request)
+
+
+def current_channel(request: Request) -> ChannelSession:
+    """The grant whose channel credential reached this channel route."""
+    found = getattr(request.state, _DOOR_CHANNEL, None)
+    return found if found is not None else _door_channel(request)
+
+
+CurrentBridge = Annotated[Bridge, Depends(current_bridge)]
+CurrentChannel = Annotated[ChannelSession, Depends(current_channel)]
 
 
 def _authorise(request: Request, path: str | None) -> None:

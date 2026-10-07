@@ -227,6 +227,27 @@
       "ends": {"table": "character_catalog_publication", "columns": ["catalog_sha256"]},
       "absent": "carry",
       "order": null
+    },
+    {
+      "kind": "door_grant",
+      "table": "door_grant_revocation",
+      "shape": "event",
+      "note": "A world's owner revoking a door grant (migration 0149): no outside program is asked or answers under it again, and nothing revises it. The row is the whole revocation. A restore writes it again when the restored database holds the grant, so a grant ended after a backup does not open again.",
+      "identity": ["workspace_id", "grant_id"],
+      "withdrawn": {"column": "revoked_at", "is": "not null"},
+      "workspace": "workspace_id",
+      "ends": {"table": "door_grant", "columns": ["workspace_id", "grant_id"]},
+      "order": null
+    },
+    {
+      "kind": "door_secret",
+      "table": "door_secret",
+      "shape": "column",
+      "note": "An owner ending a door grant's invites and channel credentials without ending the grant (migration 0149), as after one leaked: the secret opens nothing again. A restore writes the revocation again when the restored database holds the secret, so a credential ended after a backup does not open again.",
+      "identity": ["secret_sha256"],
+      "columns": ["revoked_at"],
+      "withdrawn": {"column": "revoked_at", "is": "not null"},
+      "workspace": "workspace_id"
     }
   ],
   "excluded": [

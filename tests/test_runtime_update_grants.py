@@ -43,6 +43,15 @@ RUNTIME_UPDATES: dict[str, str] = {
     "companion_answer": "answers are superseded and withdrawn, by the API and by a tombstone",
     "derived_artifact": "identity changes and person withdrawal mark derivatives stale",
     "derived_environment_asset": "withdrawal sets withdrawn_at (environment/repository.py)",
+    "door_presence": (
+        "a bridge's hello and each of its polls move its grant's presence forward "
+        "(door/channel.py); migration 0149 refuses a move backwards and every delete"
+    ),
+    "door_secret": (
+        "redeeming an invite sets used_at, and an owner ending a grant's credentials sets "
+        "revoked_at, the two columns the runtime may update (door/secrets.py, door/grants.py); "
+        "migration 0149 refuses every other change and every delete before retention"
+    ),
     "entity": "naming and merging, name and withdrawal triggers, and a bridge decision's lock",
     "entity_link": "a link's state changes (identity/links.py)",
     "environment_source_admission": "withdrawal sets withdrawn_at (environment/repository.py)",

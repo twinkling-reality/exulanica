@@ -45,7 +45,7 @@ from exulanica.api.dependencies import (
     scoped_connection,
     scoped_sessions,
 )
-from exulanica.api.permissions import Authentication, Public, Requires, rule_for
+from exulanica.api.permissions import Authentication, Channel, Public, Requires, rule_for
 from exulanica.api.routes import mounted_routes
 from exulanica.world.society_controls import DEFAULT_BASE_TICK_INTERVAL_MS
 
@@ -125,6 +125,8 @@ def _permission(method: str, path: str) -> dict[str, object]:
         return {"public": rule.reason}
     if isinstance(rule, Authentication):
         return {"authentication": rule.reason}
+    if isinstance(rule, Channel):
+        return {"channel": rule.credential}
     # An application create_app built cannot reach this: it refuses an undeclared route.
     return {"undeclared": True}
 

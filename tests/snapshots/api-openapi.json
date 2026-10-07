@@ -18543,6 +18543,662 @@
      }
     }
    }
+  },
+  "/door/bridges": {
+   "get": {
+    "tags": [
+     "door"
+    ],
+    "summary": "Bridges",
+    "description": "The bridges this deployment offers this workspace, in words, and who runs each.",
+    "operationId": "bridges_door_bridges_get",
+    "parameters": [
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Bridges Door Bridges Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/door/grants": {
+   "post": {
+    "tags": [
+     "door"
+    ],
+    "summary": "Issue Grant",
+    "description": "Issue a grant in one world for one bridge, or answer with the one this key issued.",
+    "operationId": "issue_grant_door_grants_post",
+    "parameters": [
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/IssueBody"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Issue Grant Door Grants Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "get": {
+    "tags": [
+     "door"
+    ],
+    "summary": "World Grants",
+    "description": "Every grant issued in one world, newest first, each as it stands now.",
+    "operationId": "world_grants_door_grants_get",
+    "parameters": [
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response World Grants Door Grants Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/door/grants/{grant_id}": {
+   "get": {
+    "tags": [
+     "door"
+    ],
+    "summary": "One Grant",
+    "operationId": "one_grant_door_grants__grant_id__get",
+    "parameters": [
+     {
+      "name": "grant_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Grant Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response One Grant Door Grants  Grant Id  Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/door/grants/{grant_id}/revoke": {
+   "post": {
+    "tags": [
+     "door"
+    ],
+    "summary": "Revoke Grant",
+    "description": "End a grant now. Revoking twice changes nothing.",
+    "operationId": "revoke_grant_door_grants__grant_id__revoke_post",
+    "parameters": [
+     {
+      "name": "grant_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Grant Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Revoke Grant Door Grants  Grant Id  Revoke Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/door/grants/{grant_id}/credentials/revoke": {
+   "post": {
+    "tags": [
+     "door"
+    ],
+    "summary": "Revoke Credentials",
+    "description": "End every live invite and channel credential of a grant now, without ending the grant: after\na credential leaked, the owner ends them all and gives the bridge a new one.",
+    "operationId": "revoke_credentials_door_grants__grant_id__credentials_revoke_post",
+    "parameters": [
+     {
+      "name": "grant_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Grant Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Revoke Credentials Door Grants  Grant Id  Credentials Revoke Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/door/grants/{grant_id}/invites": {
+   "post": {
+    "tags": [
+     "door"
+    ],
+    "summary": "Invite",
+    "description": "A one-use invite to a standing grant of a server bridge, shown once, for a player of its\nbridge to use.",
+    "operationId": "invite_door_grants__grant_id__invites_post",
+    "parameters": [
+     {
+      "name": "grant_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Grant Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Invite Door Grants  Grant Id  Invites Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/door/grants/{grant_id}/channel-credentials": {
+   "post": {
+    "tags": [
+     "door"
+    ],
+    "summary": "Channel Credential",
+    "description": "A channel credential for a standing grant, shown once: for a program its owner runs, or a\nserver bridge declared for this workspace alone.",
+    "operationId": "channel_credential_door_grants__grant_id__channel_credentials_post",
+    "parameters": [
+     {
+      "name": "grant_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Grant Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Channel Credential Door Grants  Grant Id  Channel Credentials Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/door/invites/redeem": {
+   "post": {
+    "tags": [
+     "door"
+    ],
+    "summary": "Redeem",
+    "description": "Redeem one invite, as the bridge whose credential is presented, for a channel credential.",
+    "operationId": "redeem_door_invites_redeem_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/RedeemBody"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Redeem Door Invites Redeem Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/door/channel/hello": {
+   "post": {
+    "tags": [
+     "door"
+    ],
+    "summary": "Hello",
+    "description": "Present the adapter, its mapping and the program's own words for this grant.",
+    "operationId": "hello_door_channel_hello_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/HelloBody"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Hello Door Channel Hello Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/door/channel/answers": {
+   "post": {
+    "tags": [
+     "door"
+    ],
+    "summary": "Answer",
+    "description": "Answer one open ask of this grant with one of the labels it offered.",
+    "operationId": "answer_door_channel_answers_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ChannelAnswerBody"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Answer Door Channel Answers Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/door/channel/frames": {
+   "get": {
+    "tags": [
+     "door"
+    ],
+    "summary": "Frames",
+    "description": "What was sent to this grant after the cursor, held up to the bridge's hold for something.",
+    "operationId": "frames_door_channel_frames_get",
+    "parameters": [
+     {
+      "name": "after",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "maxLength": 200
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "After"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Frames Door Channel Frames Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
   }
  },
  "components": {
@@ -21734,6 +22390,46 @@
     "title": "CaptureWindow",
     "description": "One half-open interval on capture wall-clock time.\n\nHalf-open at the end, matching every other interval in this system, so two adjacent windows\ntile without overlapping and a capture on the boundary belongs to exactly one of them.\n\nCapture time comes from EXIF. ADR-0005 records why this dimension is the most reliable one\nin the product: it costs no model call and it is correct for effectively every photograph,\nincluding the ones that can never be reconstructed."
    },
+   "ChannelAnswerBody": {
+    "properties": {
+     "request_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Request Id"
+     },
+     "request_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Request Sha256"
+     },
+     "label": {
+      "type": "string",
+      "maxLength": 120,
+      "minLength": 1,
+      "title": "Label"
+     },
+     "line": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 800
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Line"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "request_id",
+     "request_sha256",
+     "label"
+    ],
+    "title": "ChannelAnswerBody"
+   },
    "CharacterRecipe": {
     "properties": {
      "profile": {
@@ -23326,6 +24022,42 @@
      "subject_id"
     ],
     "title": "DecisionBody"
+   },
+   "DeclaredBody": {
+    "properties": {
+     "name": {
+      "type": "string",
+      "maxLength": 60,
+      "minLength": 1,
+      "title": "Name"
+     },
+     "maker": {
+      "type": "string",
+      "maxLength": 60,
+      "minLength": 1,
+      "title": "Maker"
+     },
+     "mind": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 60,
+        "minLength": 1
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Mind"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "name",
+     "maker"
+    ],
+    "title": "DeclaredBody"
    },
    "DeclaredFloorView": {
     "properties": {
@@ -25439,6 +26171,48 @@
     "type": "object",
     "title": "HTTPValidationError"
    },
+   "HelloBody": {
+    "properties": {
+     "adapter_version": {
+      "type": "string",
+      "maxLength": 32,
+      "minLength": 1,
+      "title": "Adapter Version"
+     },
+     "mapping": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Mapping"
+     },
+     "reads": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "maxItems": 64,
+      "minItems": 1,
+      "title": "Reads"
+     },
+     "declared": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/DeclaredBody"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "adapter_version",
+     "mapping",
+     "reads"
+    ],
+    "title": "HelloBody"
+   },
    "HistoryRow": {
     "properties": {
      "event_id": {
@@ -26389,6 +27163,104 @@
      "detail"
     ],
     "title": "InvalidPair"
+   },
+   "IssueBody": {
+    "properties": {
+     "idempotency_key": {
+      "type": "string",
+      "maxLength": 128,
+      "minLength": 8,
+      "title": "Idempotency Key"
+     },
+     "bridge": {
+      "type": "string",
+      "maxLength": 32,
+      "minLength": 1,
+      "title": "Bridge"
+     },
+     "visitors_maximum": {
+      "type": "integer",
+      "maximum": 4.0,
+      "minimum": 0.0,
+      "title": "Visitors Maximum",
+      "default": 0
+     },
+     "kinds": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "maxItems": 16,
+      "title": "Kinds"
+     },
+     "things": {
+      "items": {
+       "type": "string",
+       "format": "uuid"
+      },
+      "type": "array",
+      "maxItems": 8,
+      "title": "Things"
+     },
+     "gate": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Gate"
+     },
+     "may_carry_in": {
+      "type": "boolean",
+      "title": "May Carry In",
+      "default": false
+     },
+     "may_carry_out": {
+      "type": "boolean",
+      "title": "May Carry Out",
+      "default": false
+     },
+     "may_speak": {
+      "type": "boolean",
+      "title": "May Speak",
+      "default": true
+     },
+     "world_words": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 80
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "World Words"
+     },
+     "minutes": {
+      "type": "integer",
+      "maximum": 1440.0,
+      "minimum": 1.0,
+      "title": "Minutes",
+      "default": 120
+     },
+     "channel_credential": {
+      "type": "boolean",
+      "title": "Channel Credential",
+      "default": false
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "idempotency_key",
+     "bridge"
+    ],
+    "title": "IssueBody"
    },
    "ItemBasis": {
     "type": "string",
@@ -31791,6 +32663,28 @@
     ],
     "title": "ReconstructionSceneRow",
     "description": "A durable multi-photograph scene with recorded and deliverable state kept separate."
+   },
+   "RedeemBody": {
+    "properties": {
+     "code": {
+      "type": "string",
+      "maxLength": 40,
+      "minLength": 1,
+      "title": "Code"
+     },
+     "requester": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Requester"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "code",
+     "requester"
+    ],
+    "title": "RedeemBody"
    },
    "ReferenceBody": {
     "properties": {

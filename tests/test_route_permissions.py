@@ -42,6 +42,7 @@ from exulanica.api.permissions import (
     MEMBERSHIP_ROLE_PERMISSIONS,
     ROUTE_RULES,
     Authentication,
+    Channel,
     Permission,
     PermissionRefused,
     Public,
@@ -49,6 +50,7 @@ from exulanica.api.permissions import (
     RouteDeclarationError,
     authentication_routes,
     public_paths,
+    require,
     require_complete_declaration,
 )
 from exulanica.api.routes import routable_paths
@@ -97,9 +99,10 @@ def _probe_kwargs(method: str, path: str) -> dict:
 
 
 SWEPT = routable_paths(_application())
-AUTHENTICATED = sorted(
-    key for key in SWEPT if not isinstance(ROUTE_RULES.get(key), Public | Authentication)
-)
+#: Every route an account's credential may reach, by what its grant holds.
+AUTHENTICATED = sorted(key for key in SWEPT if isinstance(ROUTE_RULES.get(key), Requires))
+#: The door's channel routes, which a door credential reaches and an account's never does.
+CHANNELS = sorted(key for key in SWEPT if isinstance(ROUTE_RULES.get(key), Channel))
 
 
 # -- the declaration ------------------------------------------------------------------------
@@ -117,6 +120,9 @@ def test_the_sweep_sees_the_authenticated_surface_by_name():
     ):
         assert key in SWEPT, key
     assert len(AUTHENTICATED) > len(SWEPT) - len(AUTHENTICATED)
+    assert set(SWEPT) == set(AUTHENTICATED) | set(CHANNELS) | {
+        key for key in SWEPT if isinstance(ROUTE_RULES[key], Public | Authentication)
+    }
 
 
 def test_every_mounted_route_resolves_a_declaration_and_every_declaration_a_route():
@@ -128,7 +134,20 @@ def test_every_mounted_route_resolves_a_declaration_and_every_declaration_a_rout
 @pytest.mark.parametrize(("method", "path"), SWEPT)
 def test_each_route_has_its_own_declaration(method, path):
     rule = ROUTE_RULES[(method, path)]
-    assert isinstance(rule, Public | Authentication | Requires), (method, path)
+    assert isinstance(rule, Public | Authentication | Requires | Channel), (method, path)
+
+
+def test_only_the_door_declares_channel_routes_and_no_account_permission_reaches_one():
+    """A channel route is the door's, and an account's grant, however wide, never satisfies one."""
+    channel = sorted(key for key, rule in ROUTE_RULES.items() if isinstance(rule, Channel))
+    assert channel and all(path.startswith("/door/") for _method, path in channel)
+    for method, path in channel:
+        with pytest.raises(PermissionRefused):
+            require(frozenset(Permission), method, path)
+    with pytest.raises(RouteDeclarationError):
+        Channel("account", "a credential the door does not issue")
+    with pytest.raises(RouteDeclarationError):
+        Channel("grant", "  ")
 
 
 def test_a_route_nobody_declared_stops_the_application_being_built(monkeypatch):
@@ -251,7 +270,7 @@ def test_no_route_that_changes_state_is_satisfied_by_a_read_alone():
     """A POST or DELETE needing only reads is a hole, except the named read-shaped POSTs."""
     read_shaped = READ_SHAPED_POSTS
     for (method, path), rule in ROUTE_RULES.items():
-        if method == "GET" or isinstance(rule, Public | Authentication):
+        if method == "GET" or isinstance(rule, Public | Authentication | Channel):
             continue
         if (method, path) in read_shaped:
             continue
@@ -326,26 +345,21 @@ def test_a_route_reaching_a_model_through_the_client_factory_alone_is_counted():
     assert _reaches_a_model(reaches_a_model_through_the_factory)
 
 
-#: Names the refusal ledger's check admits before the enum holds them, each with the lane whose
-#: pending migration adds it to the vocabulary; one leaves here when the enum gains it.
-PENDING_PERMISSIONS = {"door.grant": "lane BRIDGE's door adds it (pending migration 0149)"}
-
-
 def test_the_refusal_ledger_check_names_exactly_the_vocabulary():
-    """The last migration to state the ledger's permission column (0061, restated since) closes it
-    over the same set as the enum, and the names a pending lane's migration adds."""
-    stating = [
+    """The newest migration stating the refusal ledger's permission check (0061, widened since)
+    closes the column over the same set as the enum, and bounds it by the enum's size."""
+    stating = sorted(
         path
-        for path in sorted(migration_directory().glob("*.sql"))
+        for path in migration_directory().glob("*.sql")
         if "missing_permissions <@ array[" in path.read_text(encoding="utf-8")
-    ]
+    )
     assert stating[0].name == "0061_route_permissions.sql"
     sql = stating[-1].read_text(encoding="utf-8")
-    block = sql.split("missing_permissions <@ array[", 1)[1].split("]::text[]", 1)[0]
-    assert sorted(re.findall(r"'([a-z.]+)'", block)) == sorted(
-        {*ALL_PERMISSIONS, *PENDING_PERMISSIONS}
-    )
-    assert not set(PENDING_PERMISSIONS) & set(ALL_PERMISSIONS)
+    head, tail = sql.rsplit("missing_permissions <@ array[", 1)
+    block = tail.split("]::text[]", 1)[0]
+    assert sorted(re.findall(r"'([a-z.]+)'", block)) == ALL_PERMISSIONS
+    bound = re.findall(r"cardinality\(missing_permissions\)\s+between\s+1\s+and\s+(\d+)", head)
+    assert bound and int(bound[-1]) == len(ALL_PERMISSIONS)
 
 
 def test_every_membership_role_the_schema_allows_has_a_declared_grant():
@@ -628,6 +642,18 @@ def test_every_authenticated_route_refuses_an_anonymous_caller(floor, method, pa
     response = floor.client.request(method, _fill(path), **_probe_kwargs(method, path))
     assert response.status_code == 401, response.text
     assert response.json()["code"] == "unauthenticated"
+
+
+@pytest.mark.postgres
+@pytest.mark.parametrize(("method", "path"), CHANNELS)
+def test_no_account_credential_reaches_a_channel_route(floor, method, path):
+    """The widest account grant is a stranger to the door: 401, as an unknown credential, never a
+    refusal that says the route or a grant exists, and nothing is counted against the account."""
+    for who in ("operator", "viewer", "reads"):
+        before = _refusal_rows(floor, floor.workspace_a, who)
+        response = floor.request(who, method, _fill(path), **_probe_kwargs(method, path))
+        assert (response.status_code, response.json()["code"]) == (401, "unauthenticated")
+        assert _refusal_rows(floor, floor.workspace_a, who) == before
 
 
 @pytest.mark.postgres

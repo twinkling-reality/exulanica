@@ -10,8 +10,10 @@ same end of the same block (two changes to one section collided there on 2026-09
 3.  no two sections declare the same requirement.
 
 The sign-in and public sections are the two exceptions to the first rule by nature, because each
-of their routes carries its own reason; they are still sorted and still unique. Everything here
-reads the module's data, not its source text, and runs without a database.
+of their routes carries its own reason; they are still sorted and still unique. A channel section
+declares one credential, a bridge's or a grant's, and each credential has one section, while each
+of its routes says what that credential opens there. Everything here reads the module's data, not
+its source text, and runs without a database.
 """
 
 from __future__ import annotations
@@ -22,6 +24,7 @@ from exulanica.api.permissions import (
     ROUTE_RULE_SECTIONS,
     ROUTE_RULES,
     Authentication,
+    Channel,
     Public,
     Requires,
     RouteDeclarationError,
@@ -45,6 +48,7 @@ def test_each_section_is_sorted_by_path_then_method(index):
 
 def test_each_requirement_has_one_section_and_each_section_one_requirement():
     requirements: list[frozenset[str]] = []
+    credentials: list[str] = []
     reason_sections = {Public: 0, Authentication: 0}
     for section in ROUTE_RULE_SECTIONS:
         kinds = {type(rule) for rule in section.values()}
@@ -54,9 +58,14 @@ def test_each_requirement_has_one_section_and_each_section_one_requirement():
             declared = {frozenset(map(str, rule.permissions)) for rule in section.values()}
             assert len(declared) == 1, f"one section declares {sorted(map(sorted, declared))}"
             requirements.extend(declared)
+        elif kind is Channel:
+            opened = {rule.credential for rule in section.values()}
+            assert len(opened) == 1, f"one channel section takes {sorted(opened)}"
+            credentials.extend(opened)
         else:
             reason_sections[kind] += 1
     assert len(requirements) == len(set(requirements)), "two sections declare one requirement"
+    assert sorted(credentials) == ["bridge", "grant"], "each door credential has one section"
     assert reason_sections == {Public: 1, Authentication: 1}
 
 

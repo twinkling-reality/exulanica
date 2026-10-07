@@ -396,6 +396,11 @@ layers = [
   # The HTTP surface depends on everything and nothing depends on it. That is the definition of
   # a thin API: routes validate and delegate, so a route has nothing another module could want.
   "api",
+  # The door for outside programs: bridges, grants, the long-poll channel and the asker the
+  # decision host is given. Only the HTTP surface (and the harness above it) reaches it, and the
+  # contracts below keep it from reaching the workflows: it reads worlds, writes its own tables and
+  # knows no game. A game is an adapter in `bridges/` plus a mapping file, which is data.
+  "door",
   # Environment source admission composes scoped persistence, content-addressed storage and the
   # graph's established read-finalization discipline. Query, placement and rendering remain
   # outside it, and none of the lower workflows imports this admission boundary.
@@ -783,6 +788,42 @@ name = "The product never imports the lettering tool"
 type = "forbidden"
 source_modules = ["exulanica"]
 forbidden_modules = ["exulanica_lettering_tool"]
+
+[[tool.importlinter.contracts]]
+# The door is reached through the HTTP surface and nothing else: the package projection and the
+# acceptance workflow, the two layers above the API besides the harness, may not import it, so no
+# exported world and no orchestrated run depends on an outside program being connected. Direct
+# imports only: the acceptance workflow composes the whole application, door included, through
+# `exulanica.api.services`, which is the HTTP surface's own composition.
+name = "Only the HTTP surface reaches the door"
+type = "forbidden"
+source_modules = ["exulanica.orchestration", "exulanica.world_package"]
+forbidden_modules = ["exulanica.door"]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+# The door reads worlds and the decision records and keeps its own tables; it never reaches a
+# workflow that handles photographs, evidence, people or packages. What a bridge sends is checked
+# here and becomes a receipt through the decision host, never a direct write anywhere else. Indirect
+# imports count, except the world layer's own imports of the store: the decision contract the door
+# reads its bounds from reaches the store through the world's catalogs and composition.
+name = "The door reaches no photograph, evidence or person workflow"
+type = "forbidden"
+ignore_imports = ["exulanica.world.** -> exulanica.store.**"]
+source_modules = ["exulanica.door"]
+forbidden_modules = [
+  "exulanica.capture",
+  "exulanica.consent",
+  "exulanica.corpus",
+  "exulanica.environment",
+  "exulanica.evidence",
+  "exulanica.graph",
+  "exulanica.identity",
+  "exulanica.ingest",
+  "exulanica.reconstruction",
+  "exulanica.selection",
+  "exulanica.store",
+]
 
 [[tool.importlinter.contracts]]
 # The training code in `ml/` is not part of the product: its own environment, its own container,

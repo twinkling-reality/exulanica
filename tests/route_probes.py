@@ -794,6 +794,7 @@ class Shared:
 #: here fails the sweep by name. Sorted by address.
 EXISTENCE_BUILDERS: Final[Mapping[str, Owned | Shared]] = {
     "/companion/memory/answers/{answer_id}": Owned(build.companion_answer),
+    "/door/grants/{grant_id}": Owned(build.door_grant),
     "/environment-resources/places/{place_id}": Owned(build.declared_place),
     "/environment-resources/sources/{admission_id}": Owned(build.environment_source),
     # The sweep fills {kind} with "source", so the resource is an admitted source.

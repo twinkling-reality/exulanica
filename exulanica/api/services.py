@@ -72,6 +72,7 @@ from exulanica.api.society_control_worker import (
 from exulanica.api.society_runtime import AuthoredWorldSocietyBinding, SocietyRuntime
 from exulanica.consent.place_name_rights import released_place_names
 from exulanica.db.session import DATABASE_URL_ENV, Database
+from exulanica.door.runtime import DoorRuntime, door_runtime
 from exulanica.env import env_get, env_name, resolve_data_dir
 from exulanica.epistemics.caption_embeddings import CaptionEmbeddingPass
 from exulanica.epistemics.hosted_requests import (
@@ -274,6 +275,10 @@ class Services:
     content_stores: ContentStores | None = None
     #: Dedicated account persistence and verified Google browser sessions, when configured.
     accounts: AccountRuntime | None = None
+    #: The door for outside programs: the bridges ``EXULANICA_DOOR_BRIDGES`` declares, their
+    #: grants' channels and the asker the decision host is given. None in a hand-built Services,
+    #: which makes the door's routes refuse every door credential and its owner routes answer 503.
+    door: DoorRuntime | None = None
     #: Explicit host allowlist. Empty leaves automatic society playback disabled.
     #: ``build_services`` reads it from ``EXULANICA_SOCIETY_CONTROL_WORKSPACES``.
     society_control_workspaces: tuple[uuid.UUID, ...] = ()
@@ -1002,6 +1007,7 @@ def build_services(
         executor_shares_the_write_role=readonly_url is None,
         model_client=client,
         accounts=accounts,
+        door=door_runtime(database, environ),
         environment_admission_root=data_dir / "environment-inbox",
         materials=_material_runtime(stores, environ),
         workspace_assets=WorkspaceAssetRuntime(
