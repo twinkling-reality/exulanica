@@ -1,1 +1,1 @@
-lane THINGS (2026-10-03 wave): the thing kind store. It names neither world_alternate_thing nor the edit log checks; anything that does takes a number above 0152 (tests/test_edit_kinds.py)
+a hole kept for lane THINGS (2026-10-03 wave): reserved for the thing kind store and never used, because a migration that depends on objects of a higher-numbered landed one takes a fresh number (the look choice table took 0156)
