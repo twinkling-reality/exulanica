@@ -102,6 +102,20 @@ def test_0099_registers_every_world_a_populated_schema_held(owner, spine_schema,
             admin.execute(
                 "alter table world_alternate_object add column workspace_preparation_id uuid"
             )
+            # A placed thing and the edit log's thing_id, which migration 0152 adds and the
+            # current version read and edit writes name. Before 0099 a version held no placed
+            # thing, so an empty view and an empty column stand in, dropped before 0099 runs.
+            admin.execute(
+                "create view world_alternate_thing as select null::uuid as workspace_id,"
+                "null::text as world_id,null::uuid as version_id,null::text as thing_id,"
+                "null::text as kind,null::integer as kind_version,null::bytea as kind_sha256,"
+                "null::text as region_id,null::bigint as x_mm,null::bigint as y_mm,"
+                "null::bigint as z_mm,null::bigint as yaw_microradians,null::text as origin_kind,"
+                "null::text as origin_role,null::boolean as removed,"
+                "null::boolean as addition_undone,null::uuid as created_edit_id,"
+                "null::uuid as last_edit_id where false"
+            )
+            admin.execute("alter table world_alternate_version_edit add column thing_id text")
             admin.commit()
 
             # A personal world: a composed topology, a structural snapshot and a version.
@@ -180,6 +194,8 @@ def test_0099_registers_every_world_a_populated_schema_held(owner, spine_schema,
                         TopologyContract(f"{world}-topology", ("region-a",), world_id=world)
                     )
             admin.execute("alter table world_alternate_object drop column workspace_preparation_id")
+            admin.execute("drop view world_alternate_thing")
+            admin.execute("alter table world_alternate_version_edit drop column thing_id")
             admin.commit()
 
             before = _world_tables(admin, scratch)
