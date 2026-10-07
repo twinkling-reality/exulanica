@@ -1,0 +1,187 @@
+{
+  "profile": "exulanica.bridge-mapping/v1",
+  "key": "luanti-minetest-game",
+  "version": 1,
+  "game": {
+    "label": "Luanti",
+    "content": "Minetest Game"
+  },
+  "visitors": [
+    {
+      "game_type": "player",
+      "kind": {
+        "key": "visitor",
+        "version": 1
+      },
+      "label": "traveller from Luanti",
+      "words": "a Luanti player arrives as a traveller, a person who walks, talks, carries and gives",
+      "outcome": "approximated",
+      "reason_words": "the player's body crosses as a person of this world; what a player does in the game, such as digging and building, stays there",
+      "looks": [
+        {
+          "look_key": "default-skin",
+          "look": "sha256:8418d1ea1b1c5953b6c74b7ea96f3377c764fc5b73ac9ac8b9625eaf91da78df",
+          "licence": {
+            "spdx": "CC-BY-SA-3.0",
+            "attribution": "character.png by Jordach (CC BY-SA 3.0), from Minetest Game",
+            "share_alike": true,
+            "licence_url": "https://creativecommons.org/licenses/by-sa/3.0/"
+          },
+          "source_sha256": "351626fcb8155d6285315a213ff4ae668a9607a3eda776663512dd799ec8437a"
+        },
+        {
+          "look_key": "cc0-traveller",
+          "look": "sha256:45d65686f899ae246d0c01e1a679213e67bb7935a157f26ec304c7dada339e3d",
+          "licence": {
+            "spdx": "CC0-1.0"
+          },
+          "reason_words": "a player whose picture is not the game's own arrives in this world's own CC0 look"
+        }
+      ]
+    }
+  ],
+  "items": [
+    {
+      "game_item": "default:sword_steel",
+      "kind": {
+        "key": "sword",
+        "version": 1
+      },
+      "ways": "both",
+      "words": "a steel sword is a sword here, and a sword leaving becomes a steel sword",
+      "outcome": "exact"
+    },
+    {
+      "game_item": "default:sword_wood",
+      "kind": {
+        "key": "sword",
+        "version": 1
+      },
+      "ways": "in",
+      "words": "a wooden sword becomes a sword",
+      "outcome": "approximated",
+      "reason_words": "this world has one kind of sword"
+    },
+    {
+      "game_item": "default:sword_stone",
+      "kind": {
+        "key": "sword",
+        "version": 1
+      },
+      "ways": "in",
+      "words": "a stone sword becomes a sword",
+      "outcome": "approximated",
+      "reason_words": "this world has one kind of sword"
+    },
+    {
+      "game_item": "default:sword_bronze",
+      "kind": {
+        "key": "sword",
+        "version": 1
+      },
+      "ways": "in",
+      "words": "a bronze sword becomes a sword",
+      "outcome": "approximated",
+      "reason_words": "this world has one kind of sword"
+    },
+    {
+      "game_item": "default:sword_mese",
+      "kind": {
+        "key": "sword",
+        "version": 1
+      },
+      "ways": "in",
+      "words": "a mese sword becomes a sword",
+      "outcome": "approximated",
+      "reason_words": "this world has one kind of sword"
+    },
+    {
+      "game_item": "default:sword_diamond",
+      "kind": {
+        "key": "sword",
+        "version": 1
+      },
+      "ways": "in",
+      "words": "a diamond sword becomes a sword",
+      "outcome": "approximated",
+      "reason_words": "this world has one kind of sword"
+    },
+    {
+      "game_item": "default:torch",
+      "kind": {
+        "key": "lantern",
+        "version": 1
+      },
+      "ways": "both",
+      "words": "a torch becomes a lantern, and a lantern leaving becomes a torch",
+      "outcome": "approximated",
+      "reason_words": "this world has no torches; a lantern is the nearest thing that is held and gives light"
+    }
+  ],
+  "actions": [
+    {
+      "game_action": "chat",
+      "ability": "say",
+      "words": "what the player types in chat, the traveller says",
+      "outcome": "exact"
+    },
+    {
+      "game_action": "menu choice",
+      "ability": "the option chosen",
+      "words": "what the player picks from the menu of the world's options, the traveller does",
+      "outcome": "exact"
+    }
+  ],
+  "never_crosses": [
+    {
+      "field": "player name",
+      "words": "the player's name",
+      "reason_words": "a person's name never crosses"
+    },
+    {
+      "field": "hp",
+      "words": "the player's health",
+      "reason_words": "this world has no health"
+    },
+    {
+      "field": "breath",
+      "words": "the player's breath",
+      "reason_words": "this world has no breathing"
+    },
+    {
+      "field": "privileges",
+      "words": "the player's privileges on the server",
+      "reason_words": "a game's permissions mean nothing here"
+    },
+    {
+      "field": "physics",
+      "words": "how the player moves in the game",
+      "reason_words": "this world's own movement decides how things move here"
+    },
+    {
+      "field": "skin",
+      "words": "a player's picture when it is not the game's own",
+      "reason_words": "its licence is not known; that player arrives in this world's own CC0 look"
+    },
+    {
+      "field": "position",
+      "words": "where the player stands in the game",
+      "reason_words": "a traveller arrives at this world's own gate"
+    },
+    {
+      "field": "inventory",
+      "words": "everything the player carries but what is in their hand",
+      "reason_words": "only what is in the hand may cross; the rest stays in the game"
+    },
+    {
+      "field": "item wear and metadata",
+      "words": "how worn an item is, and what is written on it",
+      "reason_words": "kept by the game under the thing's id and restored if it comes back"
+    },
+    {
+      "field": "items without a mapping",
+      "words": "any item this file does not name",
+      "reason_words": "nothing here matches them; they stay in the game"
+    }
+  ]
+}

@@ -701,3 +701,17 @@ are never converted, subset or renamed internally; a change to them that is not 
 needs a new entry here first. The files, sizes and digests are in `THIRD_PARTY_NOTICES.md`
 ("Interface typefaces"), held there and to `SOURCE.json` by
 `web/packages/presentation/test/interface-typefaces.test.ts`.
+
+## 14. Game art a bridge carries
+
+| Item | Licence | Where | Verdict |
+| --- | --- | --- | --- |
+| Minetest Game's player picture, `mods/player_api/models/character.png` (by Jordach, SHA-256 `351626fcb8155d6285315a213ff4ae668a9607a3eda776663512dd799ec8437a`), as the look a Luanti traveller wearing the game's own picture arrives in | CC BY-SA 3.0, as `mods/player_api/license.txt` of ContentDB release 38214 states it (SHA-256 `3726836be696070e5e66c58cc2f00f3ad901fca07dccc651c9df6291fc00da67`, read 2026-10-07) | Built at a deployment from the operator's own copy by `bridges/luanti/tools/build_look.py`, which refuses any other picture or licence file; admitted to a workspace's thing store at the digest the bridge's mapping file names; never committed, never in a shipped image | **SHIP-ATTRIB**, share-alike |
+
+The built look is an adaptation under CC BY-SA 3.0, or a later version with the same license
+elements. Its origin names the author, the source, the licence and its address, sets
+`share_alike`, and states the change: close shades merged, each pixel a coloured face on the
+humanoid/v1 bones. Every display credits it: the thing card, the world's credits and a film's
+credits. It is never relicensed and never mixed into the bytes of an Apache-2.0 or CC0 artifact,
+and an export or package refuses a share-alike look whose origin lacks its attribution. A player's
+own custom picture is never used: any other picture arrives in a CC0 look.

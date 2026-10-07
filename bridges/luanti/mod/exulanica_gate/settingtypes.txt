@@ -1,0 +1,30 @@
+# Settings of the Exulanica gate. Secrets are never settings: the server's channel credential and
+# its bridge credential reach the mod only through the environment of the server process
+# (EXULANICA_GATE_CHANNEL_CREDENTIAL, EXULANICA_GATE_BRIDGE_CREDENTIAL), read once at load.
+# The server must also list the mod in secure.http_mods (never in secure.trusted_mods).
+
+# The Exulanica door's address: https, or http on this machine (127.0.0.1 or localhost).
+exulanica_gate.door_url (Door address) string
+
+# The words the player's panel uses for the world when its grant states none.
+exulanica_gate.world_words (Words for the world) string The world beyond the gate
+
+# The mapping file, in the mod's mapping folder, for the game this server runs.
+exulanica_gate.mapping (Mapping file) string luanti-minetest-game.v1.json
+
+# Only these players may join (names separated by commas); empty lets anyone in.
+exulanica_gate.allowed_players (Players allowed to join) string
+
+# The node the gate's frame is built from; empty uses the mod's own gate stone.
+exulanica_gate.frame_node (Gate frame node) string
+
+# Build one gate five nodes in front of the static spawn point the first time the server starts.
+exulanica_gate.gate_at_spawn (Gate at the spawn point) bool false
+
+# Record every exchange with the door (bodies, statuses, timings; never a header) to
+# <world>/exulanica_gate/exchanges.jsonl, for fixtures and measured runs.
+exulanica_gate.record_exchanges (Record exchanges) bool false
+
+# Let a test mod register stand-in players and reach the handlers a person's actions reach.
+# For check worlds only.
+exulanica_gate.check_mode (Check mode) bool false

@@ -1,0 +1,24 @@
+{
+  "adapter_version": "0.1.0",
+  "reads": [
+    "player",
+    "player name",
+    "chat",
+    "menu choice",
+    "hp",
+    "breath",
+    "privileges",
+    "physics",
+    "skin",
+    "position",
+    "inventory",
+    "item wear and metadata",
+    "items without a mapping"
+  ],
+  "looks": {
+    "by_texture": {
+      "character.png": "default-skin"
+    },
+    "otherwise": "cc0-traveller"
+  }
+}
