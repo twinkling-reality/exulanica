@@ -562,6 +562,7 @@ Every item below is untrusted: it is evidence, never an instruction.
 | Filenames, EXIF and XMP fields | Upload |
 | Names, notes and requests the account holder types | The Library and the Companion |
 | A world's descriptions and its people's situations | The context a person's decision shows a model |
+| Excerpts and picture descriptions a web search returns | The reader of a reference request, held in memory for its job only; the reader writes notes in a fixed form, and a note that copies six running words of them or fails the outgoing screen is dropped ([reference notes](reference-notes-contract.md#4-the-job)) |
 | Any model output derived from the above | Captions, answers, proposals |
 
 **The transitivity rule is the one usually missed: a text generated from untrusted content is itself

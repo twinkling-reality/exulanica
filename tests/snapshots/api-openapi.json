@@ -17768,6 +17768,226 @@
     }
    }
   },
+  "/worlds/references": {
+   "get": {
+    "tags": [
+     "world"
+    ],
+    "summary": "List References",
+    "description": "The caller's most recent reference requests, newest first, and whether one may be made.",
+    "operationId": "list_references_worlds_references_get",
+    "parameters": [
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "world"
+    ],
+    "summary": "Request Reference",
+    "description": "Ask for notes on what the things in a description look like, for one draft. Answers 202\nwith the request at once; an idempotency key answers 200 with the request it first made.",
+    "operationId": "request_reference_worlds_references_post",
+    "parameters": [
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ReferenceBody"
+       }
+      }
+     }
+    },
+    "responses": {
+     "202": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/worlds/references/{reference_id}": {
+   "get": {
+    "tags": [
+     "world"
+    ],
+    "summary": "Read Reference",
+    "description": "One reference request: its steps as they happen, then its notes, or why it stopped.",
+    "operationId": "read_reference_worlds_references__reference_id__get",
+    "parameters": [
+     {
+      "name": "reference_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Reference Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/worlds/references/{reference_id}/cancel": {
+   "post": {
+    "tags": [
+     "world"
+    ],
+    "summary": "Cancel Reference",
+    "description": "Stop a request: a queued one at once, a running one at its next step. A finished one is\nanswered as it stands.",
+    "operationId": "cancel_reference_worlds_references__reference_id__cancel_post",
+    "parameters": [
+     {
+      "name": "reference_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Reference Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/worlds/specification/drafts": {
    "post": {
     "tags": [
@@ -30946,6 +31166,52 @@
     ],
     "title": "ReconstructionSceneRow",
     "description": "A durable multi-photograph scene with recorded and deliverable state kept separate."
+   },
+   "ReferenceBody": {
+    "properties": {
+     "purpose": {
+      "type": "string",
+      "enum": [
+       "world_draft",
+       "kind",
+       "look",
+       "pieces",
+       "things"
+      ],
+      "title": "Purpose"
+     },
+     "description": {
+      "type": "string",
+      "maxLength": 1000,
+      "minLength": 1,
+      "title": "Description"
+     },
+     "web": {
+      "type": "boolean",
+      "const": true,
+      "title": "Web"
+     },
+     "idempotency_key": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Idempotency Key"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "purpose",
+     "description",
+     "web"
+    ],
+    "title": "ReferenceBody"
    },
    "RefusalView": {
     "properties": {

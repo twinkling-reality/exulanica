@@ -673,8 +673,9 @@ its own role. The [local database](local-database.md) guide owns its steps.
   traffic controller would (5.4.3) and one more, idle, that holds its lock.
 - `exulanica-wmp` is owned by the [world memory package](world-memory-package.md), and
   `exulanica-gsplat-scene-v1` by [scene training](gsplat-scene-jobs.md).
-- `TAVILY_API_KEY` is read only by `scripts/verify_web_lookup.py`, a one-off credential check. No
-  product code calls a web-lookup provider.
+- `TAVILY_API_KEY`, `EXULANICA_REFERENCE_WORKER` and `EXULANICA_REFERENCE_WORKSPACES` configure
+  reference notes, owned by the [reference notes contract](reference-notes-contract.md#7-configuration).
+  Web notes need `https://api.tavily.com` in `EXULANICA_EGRESS_ALLOWLIST`.
 - The test suite's settings, such as `EXULANICA_TEST_DATABASE_URL`, `EXULANICA_TEST_POSTGRES`,
   `EXULANICA_REQUIRE_POSTGRES` and `EXULANICA_REFERENCE_DATABASE_URL`, are in
   [development setup](development-setup.md).

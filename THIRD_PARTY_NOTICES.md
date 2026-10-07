@@ -180,7 +180,9 @@ section 5f of the terms. What binds this product:
 | 8b | Personal data processed on the customer's behalf falls under the Data Processing Agreement | Hosted requests carrying personal data rely on that agreement |
 | 11c | Hosted models may carry their own licence agreements, which the customer and its end users must follow | The model licence rows in this section and in the license matrix apply in full |
 
-**Tavily Search API.** No product code calls it; `scripts/verify_web_lookup.py` is a one-off
+**Tavily Search API.** The reference job calls it for the workspaces an installation lists, and
+keeps our own record of each search and nothing it returned
+([reference notes](docs/reference-notes-contract.md)); `scripts/verify_web_lookup.py` is a one-off
 credential check that keeps the request it sent, the status and the latency, and no part of the
 response. Read on 2026-10-06: the Platform Terms of Service (<https://www.tavily.com/terms>, last
 updated 2026-05-04), the Acceptable Use Policy (<https://www.tavily.com/acceptable-use-policy>, last

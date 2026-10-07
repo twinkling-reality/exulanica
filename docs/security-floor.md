@@ -251,8 +251,10 @@ fails when the list below changes.
 
 This is a development and deployment safety rail, described as one, and it is not a substitute for
 the network's own limit. **A process-level allowlist is not a network-level one.** Egress is
-allowlisted for the model transport, the catalog preflight and Google sign-in, and for nothing
-else:
+allowlisted for the model transport, the catalog preflight, Google sign-in and the reference
+sources, whose adapters send through the model transport narrowed to their one origin
+([reference notes](reference-notes-contract.md#3-the-boundary-on-every-outgoing-query)), and for
+nothing else:
 
 - `exulanica/environment/nyc_open_data.py`, `exulanica/environment/owned_district.py` and
   `exulanica/evaluation/benchmark.py` open URLs with `urllib` and do not pass through it.

@@ -391,7 +391,9 @@ _WORLD_READS_WITH_A_MODEL: Final = _every(
 #: people commits the world's host to asking it, and a comparison started from the application,
 #: of who decides for a world's people or for a town's signals, commits it to asking the models
 #: compared, within the bound its owner stated. Cancelling a comparison takes the same grants as
-#: starting one, so nobody else ends an owner's paid run.
+#: starting one, so nobody else ends an owner's paid run. A reference request commits the workspace
+#: to a planning and a reading call and to web searches against its credits; stopping one takes
+#: the same grants.
 _WORLD_WRITES_WITH_A_MODEL: Final = _every(
     _requires(_P.WORLD_WRITE, _P.MODEL_INVOKE),
     "POST /world/versions/{version_id}/models/{role_key}",
@@ -400,6 +402,8 @@ _WORLD_WRITES_WITH_A_MODEL: Final = _every(
     "POST /world/versions/{version_id}/society/models",
     "POST /world/versions/{version_id}/traffic/comparisons",
     "POST /world/versions/{version_id}/traffic/comparisons/{comparison_id}/cancel",
+    "POST /worlds/references",
+    "POST /worlds/references/{reference_id}/cancel",
 )
 
 #: The only way new photographs arrive.
@@ -576,6 +580,8 @@ _WORLD_READS: Final = _every(
     "GET /worlds/capabilities",
     "GET /worlds/kinds",
     "GET /worlds/recipes",
+    "GET /worlds/references",
+    "GET /worlds/references/{reference_id}",
     "GET /worlds/specification",
 )
 

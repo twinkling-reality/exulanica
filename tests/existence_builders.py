@@ -909,6 +909,26 @@ def derivative_job(owner) -> uuid.UUID:
     return job_id
 
 
+def reference_request(owner) -> uuid.UUID:
+    """A queued reference request and its job (domain: the API asks for web notes only where an
+    installation configures a source and lists the workspace)."""
+    from exulanica.references import store
+    from exulanica.references.drafting import reference_prompts
+
+    made, _ = store.create_request(
+        owner.repository.connection,
+        owner.workspace_id,
+        offered_to=(owner.workspace_id,),
+        owner_actor_id=owner.actor,
+        purpose="kind",
+        web=True,
+        description="a harbour town with whitewashed houses",
+        withheld_words=(),
+        prompts_sha256=reference_prompts().sha256,
+    )
+    return made.reference_id
+
+
 def reconstruction_job(owner) -> uuid.UUID:
     """A queued scene reconstruction over three admitted captures (domain)."""
     from test_reconstruction_scene_jobs import _captures, _enqueue

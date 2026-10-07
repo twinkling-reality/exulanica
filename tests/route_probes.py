@@ -599,6 +599,9 @@ PROBE_OVERRIDES: Final[dict[str, dict[str, Any]]] = {
     "POST /worlds/kinds": {"json": {"document": {"profile": "exulanica.world-kind/v1"}}},
     "POST /worlds/kinds/{kind}/worlds": {"json": {"preset": "small_farm", "title": "A probe"}},
     "POST /worlds/personal-source": {"json": {"topology_digest": _ZERO_DIGEST}},
+    "POST /worlds/references": {
+        "json": {"purpose": "kind", "description": "a harbour town", "web": True}
+    },
 }
 
 
@@ -850,6 +853,7 @@ EXISTENCE_BUILDERS: Final[Mapping[str, Owned | Shared]] = {
     "/world/versions/{version_id}/traffic/comparisons/{comparison_id}/runs/{run_id}": Owned(
         build.signal_comparison_run
     ),
+    "/worlds/references/{reference_id}": Owned(build.reference_request),
 }
 
 #: Routes that ask about a narrower kind than their address names, each with the builder that makes
