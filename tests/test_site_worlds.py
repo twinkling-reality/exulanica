@@ -138,3 +138,133 @@ def test_one_world_draws_the_same_document_each_time_and_another_world_another()
 
     assert drawn(first, "world:generated:a") == drawn(again, "world:generated:a")
     assert drawn(first, "world:generated:a") != drawn(other, "world:generated:b")
+
+
+def _offsite_home(place: dict[str, Any]) -> dict[str, Any]:
+    return next(d for d in place["destinations"] if d["destination_id"] == "home:offsite")
+
+
+def test_the_home_off_the_site_is_the_kind_s_own_words_or_the_catalog_s():
+    # The building site's workers live off the site. Stating nothing, their home is the catalog's.
+    _kind, composed = _composed("site")
+    default = load_kind_catalogs().society_defaults["offsite_home"]
+    stored = json.loads(json.dumps(composed.receipt))
+    place = SITE.society_place("place:test", stored, composed.records)
+    home = _offsite_home(place)
+    assert (home["label"], home["use_class"]) == (default.words, default.use_class)
+    assert stored["society"]["offsite_home"] == {
+        "label": default.words,
+        "use_class": default.use_class,
+    }
+    # A receipt written before kinds stated it records none, and reads the catalog's: the same
+    # place.
+    older = copy.deepcopy(stored)
+    del older["society"]["offsite_home"]
+    assert SITE.society_place("place:test", older, composed.records) == place
+    # A kind that says where its people sleep is read in its own words.
+    document = json.loads((FIXTURES / "fixture-site.json").read_text(encoding="utf-8"))
+    document["society"]["offsite_home"] = {
+        "label": "the workers' hostel in town",
+        "use_class": "residential",
+    }
+    stated = read_kind(document)
+    made = SITE.compose_kind(stated, stated.values(stated.presets[0][0]), "world:generated:test")
+    home = _offsite_home(SITE.society_place("place:test", dict(made.receipt), made.records))
+    assert (home["label"], home["use_class"]) == ("the workers' hostel in town", "residential")
+
+
+@pytest.mark.parametrize(
+    ("home", "code"),
+    [
+        ({"label": "the canteen", "use_class": "cafe"}, "kind_role_unmet"),
+        ({"label": "nowhere", "use_class": "no_such_use"}, "kind_reference_unknown"),
+        ({"label": "", "use_class": "residential"}, "kind_out_of_bounds"),
+        ({"label": "a hostel"}, "kind_document_invalid"),
+    ],
+)
+def test_a_home_off_the_site_that_is_no_home_is_refused_by_name(home, code):
+    from exulanica.world.kinds.document import KindRefused
+
+    document = json.loads((FIXTURES / "fixture-site.json").read_text(encoding="utf-8"))
+    document["society"]["offsite_home"] = home
+    with pytest.raises(KindRefused) as refused:
+        read_kind(document)
+    assert refused.value.code == code
+    assert refused.value.where.startswith("society.offsite_home")
+
+
+def test_a_site_world_s_people_are_where_its_kind_says_and_a_town_s_where_they_were():
+    from exulanica.world.society_living_decisions import living_situation
+    from exulanica.world.society_repository import consumed_places
+
+    defaults = load_kind_catalogs().society_defaults
+    _kind, composed = _composed("farm")
+    place = SITE.society_place("place:test", dict(composed.receipt), composed.records)
+    assert place["words"] == {"here": defaults["here"].words, "around": defaults["around"].words}
+    document = json.loads((FIXTURES / "fixture-farm.json").read_text(encoding="utf-8"))
+    document["society"]["place_words"] = {"here": "on this farm", "around": "across the farm"}
+    stated = read_kind(document)
+    made = SITE.compose_kind(stated, stated.values(stated.presets[0][0]), "world:generated:test")
+    place = SITE.society_place("place:test", dict(made.receipt), made.records)
+    assert place["words"] == {"here": "on this farm", "around": "across the farm"}
+    # A person asked to choose is told where they are; a town's person, as always, in the town.
+    context = {
+        "clock": {"minute_of_day": 8 * 60, "day": 1},
+        "doing": {"status": "active"},
+        "role": None,
+        "needs": [],
+    }
+    assert living_situation(context)[0].startswith("It is 08:00 on day 1 in the town, ")
+    assert living_situation({**context, "here": "on this farm"})[0].startswith(
+        "It is 08:00 on day 1 on this farm, "
+    )
+    # The places an input states serve the words, keyed by the ground the catalog keys them by.
+    served = consumed_places(
+        {
+            "input_seq": 1,
+            "document_sha256": "a" * 64,
+            "availability": "available",
+            "unavailable_reason": None,
+            "navigation": {"profile": "site-walking-surfaces/v1", "clearance_mm": 340},
+            "targets": [],
+            "living": {"place": place},
+        }
+    )
+    assert served["place_words"] == {
+        "ground": "generated_site",
+        "here": "on this farm",
+        "around": "across the farm",
+    }
+    town = dict(place)
+    del town["words"]
+    served = consumed_places(
+        {
+            "input_seq": 1,
+            "document_sha256": "a" * 64,
+            "availability": "available",
+            "unavailable_reason": None,
+            "navigation": {"profile": "city-walking-surfaces/v1", "clearance_mm": 340},
+            "targets": [],
+            "living": {"place": town},
+        }
+    )
+    assert "place_words" not in served
+
+
+@pytest.mark.parametrize(
+    ("words", "code"),
+    [
+        ({"here": "on this farm"}, "kind_document_invalid"),
+        ({"here": "", "around": "across the farm"}, "kind_out_of_bounds"),
+        ({"here": "on this farm\n", "around": "across the farm"}, "kind_document_invalid"),
+    ],
+)
+def test_place_words_that_cannot_be_said_are_refused_by_name(words, code):
+    from exulanica.world.kinds.document import KindRefused
+
+    document = json.loads((FIXTURES / "fixture-farm.json").read_text(encoding="utf-8"))
+    document["society"]["place_words"] = words
+    with pytest.raises(KindRefused) as refused:
+        read_kind(document)
+    assert refused.value.code == code
+    assert refused.value.where.startswith("society.place_words")

@@ -9,6 +9,7 @@ import {
   requireMetadataOnlyEntryUpdate,
   type WorkspaceWorlds,
 } from '../src/world-entry-api.js';
+import { engineCreatedOver } from '../src/society-engines.js';
 
 /** The count policy the server checks world creation against, read from the server's own file. */
 const SERVER_POLICY = JSON.parse(readFileSync(
@@ -255,6 +256,19 @@ describe('saved world entry client', () => {
     await expect(client([wire({ source_kind: 'generated', generated_site: site, generated_ground: ground })])
       .entries()).rejects.toThrow('generated ground or site');
     await expect(client([wire({ generated_site: site })]).entries()).rejects.toThrow('generated ground or site');
+  });
+
+  it('reads the engine the server says a world\'s society is created with, and refuses an unknown one', async () => {
+    const client = (body: unknown) => new WorldEntryClient({
+      baseUrl: 'https://exulanica.test', token: 'private', fetch: vi.fn(async () => Response.json(body)),
+    });
+    const engine = engineCreatedOver('town');
+    const [served] = await client([wire({ society_engine: engine })]).entries();
+    expect(served!.societyEngine).toBe(engine);
+    const [none] = await client([wire({ society_engine: null })]).entries();
+    expect(none!.societyEngine).toBeNull();
+    await expect(client([wire({ society_engine: 'exulanica-society/v99' })]).entries())
+      .rejects.toThrow('Unknown society engine');
   });
 
   it('opens a personal-source world a caller names without reading the list', async () => {

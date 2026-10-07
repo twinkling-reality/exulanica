@@ -18,6 +18,7 @@ import pytest
 from exulanica.selection.inhabitant_words import (
     ACTIVITY_WORDS,
     CATALOG_PATH,
+    PlaceWords,
     WordsCatalogRefused,
     inhabitant_words,
     inhabitant_words_catalog,
@@ -42,11 +43,13 @@ SQUARE_MINUTES = 90
 
 
 def _said(case: dict) -> dict:
+    place = case.get("place_words")
     words = inhabitant_words(
         case["person"],
         CASES["places"].get,
         CASES["people"].get,
         profile=case.get("profile"),
+        place_words=None if place is None else PlaceWords(**place),
     )
     return {"who": words.who, "what": words.what, "doing": words.doing, "why": words.why}
 
@@ -62,7 +65,7 @@ def test_the_cases_reach_every_sentence_of_what_a_person_is_doing():
     expected = [case["expected"]["doing"] for case in CASES["cases"]]
     for code, template in catalog.tables["doing"].items():
         pattern = re.escape(template)
-        for name in ("place", "partner", "still"):
+        for name in ("place", "partner", "still", "around"):
             pattern = pattern.replace(re.escape("{" + name + "}"), ".*")
         assert any(re.fullmatch(pattern, said) for said in expected), code
 

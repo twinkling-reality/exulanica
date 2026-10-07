@@ -1252,6 +1252,41 @@
       "code": "living_what_neither",
       "words": "A simulated {role} in this town. No home or workplace is recorded for them.",
       "reason": "Words for a living resident’s recorded home and workplace availability."
+    },
+    {
+      "key": "phrase.living_what_home_work@generated_site",
+      "kind": "phrase",
+      "code": "living_what_home_work@generated_site",
+      "words": "A simulated {role} {here}. They have a home and an assigned workplace.",
+      "reason": "Words for a living resident’s recorded home and workplace availability. For a world made from a world kind (the society ground generated_site): where they are is the kind's own words ({here})."
+    },
+    {
+      "key": "phrase.living_what_home@generated_site",
+      "kind": "phrase",
+      "code": "living_what_home@generated_site",
+      "words": "A simulated {role} {here}. They have a home and no assigned workplace.",
+      "reason": "Words for a living resident’s recorded home and workplace availability. For a world made from a world kind (the society ground generated_site): where they are is the kind's own words ({here})."
+    },
+    {
+      "key": "phrase.living_what_work@generated_site",
+      "kind": "phrase",
+      "code": "living_what_work@generated_site",
+      "words": "A simulated {role} {here}. They have an assigned workplace and no recorded home.",
+      "reason": "Words for a living resident’s recorded home and workplace availability. For a world made from a world kind (the society ground generated_site): where they are is the kind's own words ({here})."
+    },
+    {
+      "key": "phrase.living_what_neither@generated_site",
+      "kind": "phrase",
+      "code": "living_what_neither@generated_site",
+      "words": "A simulated {role} {here}. No home or workplace is recorded for them.",
+      "reason": "Words for a living resident’s recorded home and workplace availability. For a world made from a world kind (the society ground generated_site): where they are is the kind's own words ({here})."
+    },
+    {
+      "key": "doing.living_heading_unknown@generated_site",
+      "kind": "doing",
+      "code": "living_heading_unknown@generated_site",
+      "words": "walking {around}",
+      "reason": "Words for a living resident travelling to a selected activity, before performing it. For a world made from a world kind (the society ground generated_site): where they walk is the kind's own words ({around})."
     }
   ]
 }

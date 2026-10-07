@@ -87,8 +87,10 @@ Implementation:
 - which engines exist and what each can do: `exulanica/world/society-engines.v2.json`, read by
   `exulanica/world/society_engines.py`;
 - the grounds a society stands on, with what people walk, the population rule, lattice and
-  declared area of each: `assets/catalogs/society-ground/society-ground.v3.json` (versions 1 and 2
-  kept beside it), read by `exulanica/world/society_grounds.py`;
+  declared area of each, the dependency its input names its place under and the kinds of the
+  world's own records its people's activities may name:
+  `assets/catalogs/society-ground/society-ground.v4.json` (versions 1 to 3 kept beside it), read by
+  `exulanica/world/society_grounds.py`;
 - sending a society's people away and bringing them back:
   `exulanica/world/society_presence.py`;
 - the frozen v1 engine and the fixed tables stored v1 to v3 histories depend on:
@@ -527,7 +529,7 @@ about the person's world.
   that is not the built-in authored starter at a supported module version, and a ground kind the
   projection has no rule for are refused with the reason rather than guessed at.
 - Declared by the ground's entry in the society ground catalog
-  (`assets/catalogs/society-ground/society-ground.v3.json`, read by
+  (`assets/catalogs/society-ground/society-ground.v4.json`, read by
   `exulanica/world/society_grounds.py`): the walkable area on a ground that states none, and a
   route lattice at two metre spacing over the area, inset by the navigation clearance. A flat
   rectangle has no paths of its own, so a graph over it is a discretisation the entry fixes, not a
@@ -1392,7 +1394,9 @@ what the society reads.
 
 A world made from a world kind is lived in the same way and by the same engine. Its input is
 walking-surfaces-v2 with the navigation profile `site-walking-surfaces/v1`: the place the site's
-records make, named among its dependencies as `site_place` rather than `city_place`, and the
+records make, named among its dependencies under the kind its ground states (`site_place`, where
+a town's states `city_place`; ground catalog version 4's `place_dependency`, with the record kinds
+its activities may name, `record_subjects`), and the
 town's routine binding with the kind's overlay, `exulanica.routine-overlay/v1`, which adds the
 kind's own use classes and employment share and is named by its own digest. The
 [world kinds contract](world-kinds-contract.md#people-in-a-site-world) owns the site place and

@@ -183,3 +183,89 @@ def test_the_repository_starts_a_saved_world_with_its_grounds_population(saved_w
     assert document["navigation"]["profile"] == ground_builder.NAVIGATION_PROFILE
     assert society["population_size"] == 3
     assert len(society["state"]["inhabitants"]) == 3
+
+
+def test_each_ground_states_the_place_its_input_names_and_the_records_its_people_use():
+    from exulanica.world.society_grounds import place_dependency_for, record_subjects_for
+
+    stated = json.loads(
+        (CATALOG_DIRECTORY / f"society-ground.v{CATALOG_VERSION}.json").read_text("utf-8")
+    )
+    assert {entry["key"] for entry in stated["entries"]} == {g.key for g in society_grounds()}
+    for entry in stated["entries"]:
+        ground = society_ground_for_composer(entry["composer_key"])
+        assert ground.place_dependency == entry["place_dependency"]
+        assert ground.record_subjects == tuple(entry["record_subjects"])
+        assert place_dependency_for(ground.navigation_profile) == entry["place_dependency"]
+        assert record_subjects_for(ground.navigation_profile) == tuple(entry["record_subjects"])
+    # A profile no ground states names no place and no records.
+    assert place_dependency_for("bounded-sidewalk-graph/v1") == "none"
+    assert record_subjects_for("bounded-sidewalk-graph/v1") == ()
+
+
+@pytest.mark.parametrize(
+    ("change", "message"),
+    [
+        (lambda entries: entries[2].update(place_dependency="none"), "names the place"),
+        (lambda entries: entries[0].update(place_dependency="city_place"), "names the place"),
+        (lambda entries: entries[2].update(record_subjects=[]), "names records"),
+        (lambda entries: entries[0].update(record_subjects=["city.premises"]), "names records"),
+        (
+            lambda entries: entries[2].update(record_subjects=["city.street_furniture", "city.a"]),
+            "sorted",
+        ),
+        (lambda entries: entries[2].update(record_subjects=["premises"]), "record kinds"),
+        (lambda entries: entries[3].update(place_dependency="town_place"), "is one of"),
+    ],
+    ids=[
+        "surfaces-no-place",
+        "lattice-place",
+        "surfaces-no-records",
+        "lattice-records",
+        "unsorted",
+        "not-a-kind",
+        "unknown-place",
+    ],
+)
+def test_a_ground_naming_the_wrong_place_or_records_is_refused(tmp_path, change, message):
+    with pytest.raises(CatalogError, match=message):
+        _malformed(tmp_path, change)
+
+
+def test_an_activity_may_name_only_the_records_its_own_ground_states():
+    from exulanica.world.society_input_policy import (
+        UNREACHABLE,
+        WALKING_SURFACES_INPUT_V2,
+        validate_local_affordances,
+    )
+
+    def document(navigation_profile: str, subject: str) -> dict:
+        return {
+            "profile": WALKING_SURFACES_INPUT_V2,
+            "version_id": "v",
+            "navigation": {"profile": navigation_profile},
+            "availability": "available",
+            "targets": [],
+            "unavailable_affordances": [
+                {
+                    "target_id": f"{subject}:o:sit",
+                    "subject_id": f"{subject}:o",
+                    "object_id": "o",
+                    "version_id": "v",
+                    "affordance": "sit",
+                    "reason": UNREACHABLE,
+                }
+            ],
+        }
+
+    site = society_ground_for_composer("site-plan")
+    town = society_ground_for_composer("city-grammar-town")
+    validate_local_affordances(document(site.navigation_profile, "site.fixture"), {"sit"})
+    validate_local_affordances(document(town.navigation_profile, "city.street_furniture"), {"sit"})
+    # A site's input naming a town's record kind, or a town's a site's, is refused.
+    for profile, subject in (
+        (site.navigation_profile, "city.street_furniture"),
+        (town.navigation_profile, "site.fixture"),
+    ):
+        with pytest.raises(ValueError, match="identity or reason mismatch"):
+            validate_local_affordances(document(profile, subject), {"sit"})

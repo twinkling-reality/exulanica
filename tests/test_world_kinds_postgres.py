@@ -11,12 +11,14 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import time
 import uuid
 from pathlib import Path
 from typing import Any
 
 import psycopg
 import pytest
+from exulanica.api import society_runtime as runtime_module
 from exulanica.api.routes import world_kinds as kinds_route
 from exulanica.world.generated_worlds import (
     SiteRecordsElsewhere,
@@ -24,11 +26,19 @@ from exulanica.world.generated_worlds import (
     town_records,
 )
 from exulanica.world.kinds import repository as kinds_repository
-from exulanica.world.kinds.worker import JobOutcome, Kept, kind_worker
+from exulanica.world.kinds.catalogs import load_kind_catalogs
+from exulanica.world.kinds.worker import (
+    PLACE_SECONDS,
+    JobOutcome,
+    Kept,
+    kind_worker,
+    place_key,
+    site_ground_place_id,
+)
 from exulanica.world.society_engines import CREATES
 from exulanica.world.world_recipes import town_recipe
 
-from personal_world_support import OWNER_TOKEN, STRANGER_TOKEN
+from personal_world_support import OWNER_TOKEN, STRANGER_TOKEN, place_object
 from test_society_made_world import made as imported_made  # noqa: F401
 
 pytestmark = pytest.mark.postgres
@@ -162,6 +172,8 @@ def test_people_live_in_a_site_world_on_its_own_surfaces_under_its_own_routine(m
     api = made
     _keep(api, "cafe")
     entry = _world(api, "fixture_cafe", "quiet_cafe", "Our cafe")
+    # The entry says which engine its people are brought in with; the page derives none.
+    assert entry["society_engine"] == LIVING
     society = f"/world/versions/{entry['authored_version_id']}/society?world_id={entry['world_id']}"
     created = api.post(society, {"region_id": "region:generated", "profile": LIVING})
     assert created.status_code in (200, 201), created.text
@@ -184,6 +196,14 @@ def test_people_live_in_a_site_world_on_its_own_surfaces_under_its_own_routine(m
     assert len(body["state"]["inhabitants"]) == residents
     assert {ref["kind"] for ref in document["dependency_refs"]} >= {"site_place"}
     assert "city_place" not in {ref["kind"] for ref in document["dependency_refs"]}
+    # The place says where its people are in the kind's words (the catalog's, stating none), and
+    # the society's places serve them keyed by its ground.
+    defaults = load_kind_catalogs().society_defaults
+    words = {"here": defaults["here"].words, "around": defaults["around"].words}
+    assert place["words"] == words
+    served = api.get(f"{society}&places=true")
+    assert served.status_code == 200, served.text
+    assert served.json()["places"]["place_words"] == {"ground": "generated_site", **words}
 
 
 def test_a_kind_version_is_append_only_and_stays_in_its_workspace(made):
@@ -507,3 +527,149 @@ def test_a_title_holding_a_control_or_format_character_is_refused_before_anythin
         )
         assert refused.status_code == 422, refused.text
         assert refused.json()["code"] == "invalid_saved_world_entry"
+
+
+def _society_lock_held(api) -> bool:
+    """Whether another session holds this workspace's society lock now (``SocietyRuntime._lock``:
+    a transactional advisory lock on the workspace's hash under the key space 880024)."""
+    workspace = str(api.repository.workspace_id)
+    with api.database.session(api.repository.workspace_id) as connection:
+        key = connection.execute(
+            "select hashtextextended(%s, 880024) as key", (workspace,)
+        ).fetchone()["key"]
+        unsigned = key & 0xFFFF_FFFF_FFFF_FFFF
+        held = connection.execute(
+            "select count(*) as held from pg_locks where locktype = 'advisory' and granted "
+            "and objsubid = 1 and classid::bigint = %s and objid::bigint = %s "
+            "and pid <> pg_backend_pid()",
+            (unsigned >> 32, unsigned & 0xFFFF_FFFF),
+        ).fetchone()["held"]
+    return bool(held)
+
+
+def _society_inputs(api, world_id: str) -> int:
+    with api.database.session(api.repository.workspace_id) as connection:
+        return connection.execute(
+            "select count(*) as inputs from world_society_input i join world_society s on "
+            "s.workspace_id = i.workspace_id and s.society_id = i.society_id "
+            "where s.workspace_id = %s and s.world_id = %s",
+            (api.repository.workspace_id, world_id),
+        ).fetchone()["inputs"]
+
+
+def test_a_place_not_kept_is_waited_for_before_any_lock_and_only_read_under_it(made, monkeypatch):
+    api = made
+    workspace = str(api.repository.workspace_id)
+    # The instrument first: it sees the workspace's society lock while another session holds it.
+    assert not _society_lock_held(api)
+    with api.database.session(api.repository.workspace_id) as holder:
+        holder.execute("select pg_advisory_lock(hashtextextended(%s, 880024))", (workspace,))
+        assert _society_lock_held(api)
+        holder.execute("select pg_advisory_unlock(hashtextextended(%s, 880024))", (workspace,))
+    _keep(api, "farm")
+    entry = _world(api, "fixture_farm", "small_farm", "Our farm")
+    worker = kind_worker()
+    # Nothing kept, as after a restart: the place is made again when people are brought in.
+    monkeypatch.setattr(worker, "places", Kept(16, copies=True))
+    asked: list[tuple[str, float, bool]] = []
+    run = worker.run
+
+    def watched(key: str, seconds: float, *args: Any, **kwargs: Any) -> JobOutcome:
+        if key.startswith("place:"):
+            asked.append((key, seconds, _society_lock_held(api)))
+        return run(key, seconds, *args, **kwargs)
+
+    monkeypatch.setattr(worker, "run", watched)
+    version, world = entry["authored_version_id"], entry["world_id"]
+    society = f"/world/versions/{version}/society?world_id={world}"
+    created = api.post(society, {"region_id": "region:generated", "profile": LIVING})
+    assert created.status_code in (200, 201), created.text
+    assert created.json()["state"]["inhabitants"]
+    with api.database.session(api.repository.workspace_id) as connection:
+        digest, _ = generation_receipt(
+            connection, api.repository.workspace_id, world, uuid.UUID(entry["source_snapshot_id"])
+        )
+    # Asked for once, by its workspace, and waited for with no lock held; under the lock the place
+    # was only read from what the worker kept.
+    assert asked == [(place_key(workspace, digest, site_ground_place_id()), PLACE_SECONDS, False)]
+
+    # Lost between the two (other worlds' places push it out), it is asked for again under the lock
+    # without waiting, and the request is answered 503, nothing written; asking again reads it.
+    class Forgetful(Kept):
+        def get(self, key: str) -> dict[str, Any] | None:
+            return None if _society_lock_held(api) else super().get(key)
+
+    forgetful = Forgetful(16, copies=True)
+    monkeypatch.setattr(worker, "places", forgetful)
+    asked.clear()
+    lost = _world(api, "fixture_farm", "small_farm", "Our lost farm")
+    lost_society = (
+        f"/world/versions/{lost['authored_version_id']}/society?world_id={lost['world_id']}"
+    )
+    refused = api.post(lost_society, {"region_id": "region:generated", "profile": LIVING})
+    assert refused.status_code == 503, refused.text
+    assert refused.json()["code"] == "kind_work_overran"
+    assert refused.headers["retry-after"] == "2"
+    assert _society_inputs(api, lost["world_id"]) == 0
+    assert [(seconds, held) for _key, seconds, held in asked] == [(PLACE_SECONDS, False), (0, True)]
+    kept = Kept(16, copies=True)
+    for key in {key for key, _seconds, _held in asked}:
+        for _ in range(200):
+            found = Kept.get(forgetful, key)
+            if found is not None:
+                break
+            time.sleep(0.05)
+        assert found is not None
+        kept.put(key, found)
+    monkeypatch.setattr(worker, "places", kept)
+    again = api.post(lost_society, {"region_id": "region:generated", "profile": LIVING})
+    assert again.status_code in (200, 201), again.text
+
+    # A place the worker cannot make now is answered 503 with when to ask again, nothing written.
+    class Busy:
+        places = Kept(1, copies=True)
+
+        def run(self, *args: Any, **kwargs: Any) -> JobOutcome:
+            return JobOutcome("busy")
+
+    monkeypatch.setattr(runtime_module, "kind_worker", Busy)
+    other = _world(api, "fixture_farm", "small_farm", "Our other farm")
+    refused = api.post(
+        f"/world/versions/{other['authored_version_id']}/society?world_id={other['world_id']}",
+        {"region_id": "region:generated", "profile": LIVING},
+    )
+    assert refused.status_code == 503, refused.text
+    assert refused.json()["code"] == "kind_work_busy"
+    assert refused.headers["retry-after"] == "2"
+    assert _society_inputs(api, other["world_id"]) == 0
+
+
+def test_an_edit_of_a_site_world_with_people_reads_the_place_its_last_input_carries(
+    made, monkeypatch
+):
+    api = made
+    _keep(api, "farm")
+    entry = _world(api, "fixture_farm", "small_farm", "Our farm")
+    version, world = entry["authored_version_id"], entry["world_id"]
+    society = f"/world/versions/{version}/society?world_id={world}"
+    created = api.post(society, {"region_id": "region:generated", "profile": LIVING})
+    assert created.status_code in (200, 201), created.text
+    assert _society_inputs(api, world) == 1
+    # From here the worker keeps nothing and may not be asked: an edit composes its people's next
+    # input from the place their last input carries.
+    monkeypatch.setattr(runtime_module, "kind_worker", _WorkerThatMustNotRun)
+    edited = place_object(api, api.entry(entry["entry_id"]), "region:generated")
+    assert edited["authored_edit_seq"] > entry["authored_edit_seq"]
+    assert _society_inputs(api, world) == 2
+    with api.database.session(api.repository.workspace_id) as connection:
+        first, second = (
+            row["document"]
+            for row in connection.execute(
+                "select i.document from world_society_input i join world_society s on "
+                "s.workspace_id = i.workspace_id and s.society_id = i.society_id where "
+                "s.workspace_id = %s and s.world_id = %s order by i.input_seq",
+                (api.repository.workspace_id, world),
+            ).fetchall()
+        )
+    assert second["living"]["place"] == first["living"]["place"]
+    assert second["authored_state"] != first["authored_state"]

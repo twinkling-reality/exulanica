@@ -25,6 +25,8 @@ from exulanica.world.kinds.worker import (
     check_job,
     compose_job,
     drawing_job,
+    place_job,
+    site_ground_place_id,
 )
 
 FIXTURES = Path(__file__).parent / "fixtures" / "world-kinds"
@@ -218,16 +220,23 @@ def test_the_jobs_answer_a_check_a_world_and_its_drawing_as_plain_data() -> None
     refused = check_job(closed)
     assert (refused["status"], refused["code"]) == ("refused", "kind_unreachable")
     world_id = "world:generated:worker-test"
-    composed = compose_job(farm, {"width_mm": 96_000, "barns": 1}, world_id)
+    composed = compose_job("w", farm, {"width_mm": 96_000, "barns": 1}, world_id)
     assert composed["status"] == "done"
     made = composed["composed"]
     assert made.receipt["kind"]["kind"] == "fixture_farm"
-    # The drawing read later, from the receipt alone, is the one made with the world.
+    # The drawing and the place read later, from the receipt alone, are the ones made with the
+    # world: the place its checks built, named as its society's ground names it.
     worker_module._records.clear()
-    drawn = drawing_job(world_id, dict(made.receipt), made.receipt_sha256)
+    drawn = drawing_job("w", world_id, dict(made.receipt), made.receipt_sha256)
     assert drawn["status"] == "done"
     assert (drawn["body"], drawn["sha256"]) == (composed["body"], composed["sha256"])
     assert json.loads(drawn["body"])["profile"] == "exulanica.site-drawing/v1"
+    worker_module._records.clear()
+    placed = place_job("w", dict(made.receipt), made.receipt_sha256, composed["place_id"])
+    assert placed == composed["placed"]
+    assert placed["place"]["place_id"] == site_ground_place_id()
+    # Another workspace's records are its own, generated again rather than read across.
+    assert set(worker_module._records) == {f"w:{made.receipt_sha256}"}
 
 
 def test_a_worker_process_that_dies_answers_unavailable_and_the_next_job_starts_a_new_one():
@@ -275,3 +284,40 @@ def test_a_pool_that_cannot_take_a_job_leaves_no_job_behind_and_the_next_is_serv
     # Nothing counts against the queue or the workspace, and the next job starts a new pool.
     assert worker._running == {}
     assert worker.run("second", 5.0, lambda: {"status": "done"}, workspace="w").status == "done"
+
+
+class _NodesLowered:
+    """The kind catalogs with the walking graph's bound lowered, everything else as they are."""
+
+    def __init__(self, catalogs: Any, nodes: int) -> None:
+        self._catalogs = catalogs
+        self._nodes = nodes
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._catalogs, name)
+
+    def bound(self, key: str) -> tuple[int, int]:
+        return (1, self._nodes) if key == "walking_nodes" else self._catalogs.bound(key)
+
+
+def test_a_place_whose_walking_graph_outgrows_its_bound_is_refused_by_name(monkeypatch) -> None:
+    from exulanica.world.composers import site_plan
+    from exulanica.world.kinds.catalogs import load_kind_catalogs
+
+    farm = json.loads((FIXTURES / "fixture-farm.json").read_text(encoding="utf-8"))
+    world_id = "world:generated:graph-test"
+    composed = compose_job("w", farm, {"width_mm": 96_000, "barns": 1}, world_id)
+    made = composed["composed"]
+    nodes = len(composed["placed"]["place"]["nodes"])
+    # At the bound the checks held it to, the place is made; one place under its size, refused.
+    monkeypatch.setattr(
+        site_plan, "load_kind_catalogs", lambda: _NodesLowered(load_kind_catalogs(), nodes)
+    )
+    placed = place_job("w", dict(made.receipt), made.receipt_sha256, site_ground_place_id())
+    assert placed["status"] == "done"
+    monkeypatch.setattr(
+        site_plan, "load_kind_catalogs", lambda: _NodesLowered(load_kind_catalogs(), nodes - 1)
+    )
+    refused = place_job("w", dict(made.receipt), made.receipt_sha256, site_ground_place_id())
+    assert (refused["status"], refused["code"]) == ("refused", "kind_graph_over_budget")
+    assert refused["detail"].startswith("kind_graph_over_budget: ")

@@ -984,9 +984,13 @@ export function mountEnvironmentSelection(
     const detail = runtime?.inhabitantDetail(inhabitant.id) ?? 'not-drawn';
     const shown = { near: 'A full character near you', far: 'A simple distant figure of the same person',
       indoors: 'Inside premises; interiors are not drawn', 'not-drawn': 'Too far away to draw; identity is retained' }[detail];
+    // A site world's places are named in its kind's own words, served with its places; a town's
+    // read as they always have.
+    const placeWords = society?.places?.placeWords ?? null;
     const where = (destination: string | null | undefined) => {
       if (!destination) return 'an open spot';
       const place = society?.places?.livingDestinations?.get(destination);
+      if (placeWords !== null) return place?.label || `a place ${placeWords.here}`;
       if (place?.useClass === 'residential') return 'home';
       if (place?.useClass === 'bench') return 'a bench';
       if (place?.label && place.label !== place.useClass) return place.label;
@@ -995,7 +999,7 @@ export function mountEnvironmentSelection(
     };
     const live = liveSociety?.inspect(inhabitant.id);
     const ordinal = state.inhabitants.findIndex((person) => person.id === inhabitant.id);
-    const words = livingInhabitantWords({ role: inhabitant.role ?? null, has_home: inhabitant.has_home === true, has_work: inhabitant.has_work === true, action: inhabitant.action ?? null, goal }, ordinal);
+    const words = livingInhabitantWords({ role: inhabitant.role ?? null, has_home: inhabitant.has_home === true, has_work: inhabitant.has_work === true, action: inhabitant.action ?? null, goal }, ordinal, placeWords);
     const needs = Object.keys(inhabitant.needs ?? {}).map(livingNeedLabel).join(', ');
     const simulationClock = state.day === undefined || state.minute_of_day === undefined
       ? 'Unavailable'
@@ -1968,12 +1972,10 @@ export function mountEnvironmentSelection(
     liveSociety = createLiveSociety({
       preview: false, credentials: deps.credentials, worldId: entry.worldId,
       versionId: entry.authoredVersionId, placeId: null, regionId,
-      // The engine a saved world's society is created with is the engine table's for its ground:
-      // a town's, where the served entry declares a generated ground or a world kind's site,
-      // whose people live the town's routine with the kind's own places, and a saved world's own
-      // otherwise. Opening the world never creates anything; the person asks.
-      profile: engineCreatedOver(entry.generatedGround != null || entry.generatedSite != null
-        ? 'town' : 'saved_world'),
+      // The engine a saved world's society is created with is the engine table's for its ground,
+      // which the server derives and serves with the entry; an entry built without it is a saved
+      // world's own. Opening the world never creates anything; the person asks.
+      profile: entry.societyEngine ?? engineCreatedOver('saved_world'),
       createOnConnect: false, places: true,
       ...(deps.societyClient ? { client: deps.societyClient } : {}),
       onChange: reflectSavedWorldSociety,

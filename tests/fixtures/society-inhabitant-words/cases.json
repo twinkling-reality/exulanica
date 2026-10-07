@@ -1287,6 +1287,105 @@
         "why": "Their routine chose this to meet a need."
       },
       "profile": "exulanica-society/v5"
+    },
+    {
+      "case": "living heading unknown on a site, in its kind's words",
+      "person": {
+        "ordinal": 0,
+        "role": {
+          "label": "farmhand"
+        },
+        "home": {
+          "destination_id": "home"
+        },
+        "work": {
+          "destination_id": "work"
+        },
+        "action": {
+          "kind": "move",
+          "reason": "following_route"
+        },
+        "goal": {
+          "activity": "unknown",
+          "reason": "most_pressing_need"
+        }
+      },
+      "place_words": {
+        "ground": "generated_site",
+        "here": "on this farm",
+        "around": "across the farm"
+      },
+      "expected": {
+        "who": "Resident 1",
+        "what": "A simulated farmhand on this farm. They have a home and an assigned workplace.",
+        "doing": "walking across the farm",
+        "why": "Their routine chose this to meet a need."
+      },
+      "profile": "exulanica-society/v5"
+    },
+    {
+      "case": "living heading to work on a site keeps the activity's own words",
+      "person": {
+        "ordinal": 2,
+        "role": {
+          "label": "builder"
+        },
+        "home": null,
+        "work": {
+          "destination_id": "work"
+        },
+        "action": {
+          "kind": "move",
+          "reason": "following_route"
+        },
+        "goal": {
+          "activity": "work",
+          "reason": "shift_due"
+        }
+      },
+      "place_words": {
+        "ground": "generated_site",
+        "here": "at this building site",
+        "around": "across the site"
+      },
+      "expected": {
+        "who": "Resident 3",
+        "what": "A simulated builder at this building site. They have an assigned workplace and no recorded home.",
+        "doing": "walking to work",
+        "why": "Their work shift is due."
+      },
+      "profile": "exulanica-society/v5"
+    },
+    {
+      "case": "a site's own words are put in as they are, never read as slots",
+      "person": {
+        "ordinal": 1,
+        "role": null,
+        "home": {
+          "destination_id": "home"
+        },
+        "work": null,
+        "action": {
+          "kind": "move",
+          "reason": "following_route"
+        },
+        "goal": {
+          "activity": "unknown",
+          "reason": "most_pressing_need"
+        }
+      },
+      "place_words": {
+        "ground": "generated_site",
+        "here": "at {role}'s yard",
+        "around": "round {here}"
+      },
+      "expected": {
+        "who": "Resident 2",
+        "what": "A simulated resident at {role}'s yard. They have a home and no assigned workplace.",
+        "doing": "walking round {here}",
+        "why": "Their routine chose this to meet a need."
+      },
+      "profile": "exulanica-society/v5"
     }
   ]
 }

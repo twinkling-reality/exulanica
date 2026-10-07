@@ -91,6 +91,11 @@ moves it, and the kind catalogs' digests are provenance: only its grammar, its r
 its records coming out otherwise make it unavailable, with the reasons above
 ([world kinds](world-kinds-contract.md#a-world-made-from-a-kind)).
 
+Every entry states `society_engine`: the engine a society over its world is created with, the
+engine table's for the ground its snapshot's composer states
+(`exulanica.world.society_grounds.created_engine`), or null for a world no ground is stated for.
+A page names it when it brings people in and derives none of its own.
+
 Every entry states `takes_photographs`, its world kind's own rule
 ([`WORLD_KINDS`](../exulanica/world/worlds.py)): false for a world generated from a recipe, whose
 entry refuses an attachment by name (`world_takes_no_photographs`). The browser offers Add photos

@@ -70,9 +70,12 @@ from exulanica.world.kinds.worker import (
     JobOutcome,
     KindWorkWaiting,
     check_job,
+    check_key,
     compose_job,
     drawing_job,
+    drawing_key,
     kind_worker,
+    place_key,
 )
 from exulanica.world.saved_entries import InvalidSavedWorldTitle, SavedWorldEntryRepository
 from exulanica.world.world_recipes import (
@@ -390,7 +393,7 @@ def upload_kind(
     # Kept by the workspace with the document: two workspaces sending one document are told nothing
     # of each other's checks.
     outcome = worker.run(
-        f"check:{session.workspace_id}:{kind.sha256}",
+        check_key(str(session.workspace_id), kind.sha256),
         CHECK_SECONDS,
         check_job,
         dict(kind.document),
@@ -420,6 +423,7 @@ class _WorkerComposer:
 
     def __init__(self, workspace: uuid.UUID) -> None:
         self.workspace = str(workspace)
+        #: The last world's drawing and its society's place, each by where the worker keeps it.
         self.drawn: tuple[str, dict[str, Any]] | None = None
         self.placed: tuple[str, dict[str, Any]] | None = None
 
@@ -427,9 +431,11 @@ class _WorkerComposer:
         self, kind: KindDocument, values: Mapping[str, int], world_id: str
     ) -> ComposedWorld:
         outcome = kind_worker().run(
-            f"compose:{kind.sha256}:{world_id}:{json.dumps(dict(values), sort_keys=True)}",
+            f"compose:{self.workspace}:{kind.sha256}:{world_id}:"
+            f"{json.dumps(dict(values), sort_keys=True)}",
             COMPOSE_SECONDS,
             compose_job,
+            self.workspace,
             dict(kind.document),
             dict(values),
             world_id,
@@ -442,10 +448,13 @@ class _WorkerComposer:
             raise SiteRefused(answer["code"], answer["refusals"])
         composed: ComposedWorld = answer["composed"]
         self.drawn = (
-            composed.receipt_sha256,
+            drawing_key(self.workspace, composed.receipt_sha256),
             {"status": "done", "body": answer["body"], "sha256": answer["sha256"]},
         )
-        self.placed = (f"{composed.receipt_sha256}:{answer['place_id']}", answer["placed"])
+        self.placed = (
+            place_key(self.workspace, composed.receipt_sha256, answer["place_id"]),
+            answer["placed"],
+        )
         return composed
 
 
@@ -516,10 +525,10 @@ def create_kind_world(
             worker = kind_worker()
             if composer.drawn is not None:
                 # The page reads the new world's drawing next: it is kept, made with the world.
-                worker.drawings.put(f"drawing:{composer.drawn[0]}", composer.drawn[1])
+                worker.drawings.put(*composer.drawn)
             if composer.placed is not None:
                 # Bringing people in reads the place its society walks: kept, made with the world.
-                worker.places.put(f"place:{composer.placed[0]}", composer.placed[1])
+                worker.places.put(*composer.placed)
     except UnknownWorldRecipe as exc:
         return _problem(404, exc.code, str(exc))
     except KindValueRefused as exc:
@@ -574,9 +583,10 @@ def read_site_drawing(
         return _problem(409, "generated_world_unreadable", str(exc))
     worker = kind_worker()
     outcome = worker.run(
-        f"drawing:{digest}",
+        drawing_key(str(session.workspace_id), digest),
         DRAWING_SECONDS,
         drawing_job,
+        str(session.workspace_id),
         world_id,
         dict(receipt),
         digest,

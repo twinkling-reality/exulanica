@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseSociety } from '../src/society-api.js';
+import { parsePlaceWords, parseSociety } from '../src/society-api.js';
 
 describe('society browser contract', () => {
   it('accepts at least one hundred explicitly synthetic inhabitants', () => {
@@ -211,5 +211,17 @@ describe('living society snapshots', () => {
       /carries no support height/,
     );
     expect(() => parseSociety({...row([person(0), person(1)]), version_id: 'other'})).toThrow(/living society/);
+  });
+});
+
+describe('place words served with a site world\'s places', () => {
+  it('reads the ground and the words, none for a town, and refuses words that say nothing', () => {
+    expect(parsePlaceWords({ ground: 'generated_site', here: 'on this farm', around: 'across the farm' }))
+      .toEqual({ ground: 'generated_site', here: 'on this farm', around: 'across the farm' });
+    expect(parsePlaceWords(undefined)).toBeNull();
+    expect(parsePlaceWords(null)).toBeNull();
+    expect(() => parsePlaceWords({ ground: 'generated_site', here: '', around: 'across the farm' }))
+      .toThrow('Invalid place words');
+    expect(() => parsePlaceWords({ here: 'on this farm', around: 'across the farm' })).toThrow('Invalid place words');
   });
 });

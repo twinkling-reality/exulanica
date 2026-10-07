@@ -55,6 +55,7 @@ from exulanica.world.society_composition import (
 )
 from exulanica.world.society_grounds import (
     SocietyGroundKind,
+    place_dependency_for,
     refuse_population_over_budget,
     society_ground_for_navigation,
 )
@@ -69,7 +70,6 @@ from exulanica.world.society_living import current_routine
 from exulanica.world.society_place import ceil_distance
 from exulanica.world.society_planner import (
     CLEARANCE_MM,
-    SITE_NAVIGATION_PROFILE,
     input_sha256,
     validate_society_input,
 )
@@ -379,9 +379,8 @@ def build_walking_surfaces_input(
     )
     refs.append(
         {
-            "kind": "site_place"
-            if ground.navigation_profile == SITE_NAVIGATION_PROFILE
-            else "city_place",
+            # The kind of place its ground says the producer of its surfaces makes.
+            "kind": place_dependency_for(ground.navigation_profile),
             "identity": ground.place_id,
             "sha256": place["document_sha256"],
         }

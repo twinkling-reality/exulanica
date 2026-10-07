@@ -93,11 +93,17 @@ class PartUse:
 
 @dataclass(frozen=True, slots=True)
 class SiteSociety:
-    """What a site's society reads beside its records: each part's use by key, and how many people
-    live off the site and come in through its entry."""
+    """What a site's society reads beside its records: each part's use by key, how many people
+    live off the site and come in through its entry, and the words and use class of the home they
+    have there. The kind's reader resolves each default once (the ``kind-society`` catalog); this
+    module reads what it resolved and states none of its own."""
 
     uses: Mapping[str, PartUse]
     offsite_residents: int
+    offsite_home: PartUse
+    #: What is said of where its people are ("on this farm") and walk ("across the farm").
+    here: str
+    around: str
 
     def document(self) -> dict[str, object]:
         return {
@@ -106,16 +112,39 @@ class SiteSociety:
                 for key, use in sorted(self.uses.items())
             },
             "offsite_residents": self.offsite_residents,
+            "offsite_home": {
+                "label": self.offsite_home.label,
+                "use_class": self.offsite_home.use_class,
+            },
+            "place_words": {"here": self.here, "around": self.around},
         }
 
     @classmethod
     def read(cls, document: Mapping[str, Any]) -> SiteSociety:
+        """A society as a receipt records it. A receipt written before kinds stated the off-site
+        home and their place words records neither, and reads the ``kind-society`` catalog's."""
+        from exulanica.world.kinds.catalogs import load_kind_catalogs
+
+        defaults = load_kind_catalogs().society_defaults
+        home = document.get("offsite_home")
+        if home is None:
+            default = defaults["offsite_home"]
+            offsite_home = PartUse(default.words, default.use_class)
+        else:
+            offsite_home = PartUse(str(home["label"]), str(home["use_class"]))
+        words = document.get("place_words") or {
+            "here": defaults["here"].words,
+            "around": defaults["around"].words,
+        }
         return cls(
             uses={
                 str(key): PartUse(str(value["label"]), str(value["use_class"]))
                 for key, value in document["uses"].items()
             },
             offsite_residents=int(document["offsite_residents"]),
+            offsite_home=offsite_home,
+            here=str(words["here"]),
+            around=str(words["around"]),
         )
 
 
@@ -620,7 +649,7 @@ def place_from_site_records(
             name, (structure.door_x_mm + dx * APPROACH_MM, structure.door_y_mm + dy * APPROACH_MM)
         )
         join_into_zone(name, by_zone_structure[structure.identity], "premises_access")
-        use_key = part.use_class or ("residential" if "home" in roles else "")
+        use_key = part.use_class
         residents = None
         if "home" in roles and structure.identity in sleepers:
             residents = sleepers[structure.identity]
@@ -664,7 +693,7 @@ def place_from_site_records(
         if not places:
             continue
         part = use_of(fixture.part_key)
-        use_key = part.use_class or ("bench" if "seat" in roles else "")
+        use_key = part.use_class
         if not use_key:
             continue
         fx, fy = _FRONT[fixture.yaw_quarter_turns]
@@ -714,8 +743,8 @@ def place_from_site_records(
             "site.extent:offsite",
             entry,
             "premises",
-            "residential",
-            "home, off the site",
+            society.offsite_home.use_class,
+            society.offsite_home.label,
             indoors=True,
             residents=society.offsite_residents,
         )
@@ -799,5 +828,8 @@ def place_from_site_records(
         "unsupported": sorted(unsupported),
         "availability": "available",
         "unavailable_reason": None,
+        # What is said of where its people are and walk, in the kind's words, read where a town
+        # says "in this town" and "through town".
+        "words": {"here": society.here, "around": society.around},
     }
     return seal_place(place)

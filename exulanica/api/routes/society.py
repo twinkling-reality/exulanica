@@ -19,8 +19,10 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from exulanica.api.dependencies import CurrentSession, ScopedConnection, get_services
 from exulanica.api.world_scope import WorldId
+from exulanica.world.kinds.worker import KindWorkWaiting
 from exulanica.world.society import (
     SocietyLivesElsewhere,
+    SocietyPlaceWaiting,
     UnavailableSocietyInput,
     served_events,
     served_snapshot,
@@ -114,6 +116,13 @@ def _repository(
 def _call(operation: Callable[[], Any], *, invalid_status: int = 422) -> Any:
     try:
         return operation()
+    except (KindWorkWaiting, SocietyPlaceWaiting) as exc:
+        # A site world's place the kind worker has not made yet: ask again after Retry-After.
+        return JSONResponse(
+            status_code=503,
+            content={"code": exc.code, "detail": str(exc)},
+            headers={"Retry-After": str(exc.retry_seconds)},
+        )
     except UnavailableSocietyInput as exc:
         return JSONResponse(
             status_code=424, content={"code": "unavailable_society_input", "detail": str(exc)}
@@ -151,6 +160,16 @@ def create_society(
 ) -> Any:
     def create() -> dict:
         repo = _repository(connection, session, request, world_id)
+        runtime = get_services(request).society_runtime
+        if (
+            runtime is not None
+            and body.place_id is None
+            and creatable_engine(body.profile).takes_inputs
+            and repo.held(version_id, profile=body.profile, region_id=body.region_id) is None
+        ):
+            # A site world's place is made in the kind worker and waited for here, before the
+            # transaction and its locks; inside it the place is only read.
+            runtime.prepare_saved_world(connection, session, version_id, body.region_id)
         # One transaction: a saved world's place, its first input and its society are made
         # together or not at all, so a refusal such as nothing reachable leaves nothing behind.
         with connection.transaction():

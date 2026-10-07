@@ -232,6 +232,10 @@ class SavedWorldEntry:
     #: What to draw of a world made from a world kind (``GeneratedSite``): its kind, region and
     #: where a person arrives; None for every other world.
     generated_site: object | None = None
+    #: The engine a society over this world is created with: the engine table's for the ground its
+    #: snapshot's composer states (:func:`~exulanica.world.society_grounds.created_engine`); None
+    #: for a world no ground is stated for.
+    society_engine: str | None = None
 
 
 class SavedWorldEntryRepository:
@@ -1575,6 +1579,11 @@ class SavedWorldEntryRepository:
             unreadable_reason,
         )
         from exulanica.world.society_authored_ground import declared_floor
+        from exulanica.world.society_grounds import (
+            UnknownSocietyGround,
+            created_engine,
+            society_ground_for_composer,
+        )
         from exulanica.world.starter import authored_starter_scene
 
         source_invalidated = bool(row["source_invalidated"])
@@ -1603,6 +1612,12 @@ class SavedWorldEntryRepository:
             except InvalidStructuralData as exc:
                 unreadable = unreadable_reason(exc)
         unavailable = source_invalidated or authored_changed or unreadable is not None
+        try:
+            society_engine: str | None = created_engine(
+                society_ground_for_composer(str(row["composer_key"]))
+            )
+        except UnknownSocietyGround:
+            society_engine = None
         source_kind = row["source_kind"]
         if source_kind not in {"personal", "authored", "generated"}:
             raise ValueError("unknown saved world source kind")
@@ -1627,6 +1642,7 @@ class SavedWorldEntryRepository:
             declared_floor=declared_floor(str(row["composer_key"])),
             generated_ground=ground,
             generated_site=site,
+            society_engine=society_engine,
             authored_version_id=row["authored_version_id"],
             authored_state_sha256=row["authored_state_sha256"],
             authored_edit_seq=row["authored_edit_seq"],

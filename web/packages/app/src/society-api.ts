@@ -13,6 +13,7 @@
  */
 
 import { isObjectActivity } from './society-activity-words.js';
+import type { PlaceWords } from './society-inhabitant-words.js';
 import { ApiError, Transport, type TransportOptions } from '@exulanica/graph-client';
 import type { OwnedSocietyState } from '@exulanica/atlas-react/playcanvas';
 import { DEFAULT_SOCIETY_ENGINE, engineCreatedOver, societyEngine, type SocietyEngineProfile } from './society-engines.js';
@@ -127,6 +128,21 @@ export interface SocietyPlaces {
   readonly targets: readonly SocietyPlace[];
   readonly unreachable: readonly SocietyUnreachablePlace[];
   readonly livingDestinations?: ReadonlyMap<string, { readonly useClass: string | null; readonly label: string | null }>;
+  /**
+   * Where a site world's people are and walk, in their ground's own words, as the server serves
+   * them with the places its input states; null for a town's, whose words are the catalog's own.
+   */
+  readonly placeWords?: PlaceWords | null;
+}
+
+/** A site world's place words as the server serves them with its places; null for a town's. */
+export function parsePlaceWords(value: unknown): PlaceWords | null {
+  if (value == null) return null;
+  const words = record(value);
+  if (!textValue(words['ground']) || !textValue(words['here']) || !textValue(words['around'])) {
+    throw new Error('Invalid place words');
+  }
+  return Object.freeze({ ground: words['ground'], here: words['here'], around: words['around'] });
 }
 
 const record = (value: unknown): Readonly<Record<string, unknown>> => {
@@ -276,6 +292,7 @@ function placesOf(row: Readonly<Record<string, unknown>>): SocietyPlaces | null 
     unavailableReason: places['unavailable_reason'] as string | null,
     walkableArea,
     clearanceMm: places['clearance_mm'] as number,
+    placeWords: parsePlaceWords(places['place_words']),
     livingDestinations: new Map((Array.isArray(places['living_destinations']) ? places['living_destinations'] : []).map((value) => {
       const destination = record(value);
       if (!textValue(destination['destination_id']) ||

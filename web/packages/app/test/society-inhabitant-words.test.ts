@@ -3,13 +3,14 @@
 // (tests/test_inhabitant_words.py). A change to either side's choice fails one of the two.
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { inhabitantWordsFrom, livingInhabitantWords, livingNeedLabel, REASON_WORDS, type WordedPerson } from '../src/society-inhabitant-words.js';
+import { inhabitantWordsFrom, livingInhabitantWords, livingNeedLabel, REASON_WORDS, type PlaceWords, type WordedPerson } from '../src/society-inhabitant-words.js';
 import { parseSociety } from '../src/society-api.js';
 import { inhabitantWords } from '../src/ui/world-inhabitants.js';
 
 interface Case {
   readonly case: string;
   readonly profile?: string;
+  readonly place_words?: PlaceWords;
   readonly person: WordedPerson;
   readonly expected: { readonly who: string; readonly what: string; readonly doing: string; readonly why: string };
 }
@@ -69,6 +70,7 @@ describe('a simulated person in words, as the server says them', () => {
         (targetId) => CASES.places[targetId] ?? null,
         (id) => CASES.people[id] ?? null,
         held.profile ?? null,
+        held.place_words ?? null,
       );
       expect(said, held.case).toEqual(held.expected);
     }

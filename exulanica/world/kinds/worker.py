@@ -17,10 +17,12 @@ thread. A request waits for its job without holding the lock, within these bound
 - **a bound on jobs waiting** (:data:`JOBS_WAITING`) and **on one workspace's jobs**
   (:data:`WORKSPACE_JOBS`, a job counting until it finishes, whoever stopped waiting for it): past
   either a request is answered ``busy`` rather than queued;
-- **finished checks, drawings and places are kept** by what they are made from
-  (:data:`CHECKS_KEPT`, :data:`DRAWINGS_KEPT`, :data:`PLACES_KEPT`), so asking again after
-  ``overran`` reads the finished work; a composed world is never kept, since each is made for a
-  fresh identity, but its drawing and its society's place are, made with it;
+- **finished checks, drawings and places are kept** by their workspace and what they are made
+  from (:data:`CHECKS_KEPT`, :data:`DRAWINGS_KEPT`, :data:`PLACES_KEPT`; :func:`check_key`,
+  :func:`drawing_key`, :func:`place_key`), so asking again after ``overran`` reads the finished
+  work and no workspace reads or waits on another's; a composed world is never kept, since each is
+  made for a fresh identity, but its drawing and its society's place are, made with it. A kept
+  place is handed out as a copy of its own, so no request changes what another reads;
 - a worker that dies answers ``unavailable``, and the next job starts a new process; at every
   request, one whose oldest job runs past :data:`STUCK_SECONDS` is replaced and its process stopped.
 
@@ -33,6 +35,7 @@ the drawing, or ``{"status": "refused", ...}`` with the refusal's code and words
 
 from __future__ import annotations
 
+import copy
 import functools
 import json
 import logging
@@ -64,11 +67,14 @@ __all__ = [
     "KindWorkWaiting",
     "KindWorker",
     "check_job",
+    "check_key",
     "close_kind_worker",
     "compose_job",
     "drawing_job",
+    "drawing_key",
     "kind_worker",
     "place_job",
+    "place_key",
     "site_ground_place_id",
 ]
 
@@ -114,10 +120,12 @@ JobStatus = Literal["done", "overran", "busy", "unavailable"]
 
 class Kept:
     """Finished jobs kept by what they were made from, the least recently read dropped past
-    ``size``; safe to share between threads."""
+    ``size``; safe to share between threads. With ``copies``, each read hands out a copy of its
+    own, for answers a reader goes on to build from."""
 
-    def __init__(self, size: int) -> None:
+    def __init__(self, size: int, *, copies: bool = False) -> None:
         self._size = size
+        self._copies = copies
         self._lock = threading.Lock()
         self._items: OrderedDict[str, dict[str, Any]] = OrderedDict()
 
@@ -126,7 +134,9 @@ class Kept:
             found = self._items.get(key)
             if found is not None:
                 self._items.move_to_end(key)
-            return found
+        if found is not None and self._copies:
+            return copy.deepcopy(found)
+        return found
 
     def put(self, key: str, value: dict[str, Any]) -> None:
         with self._lock:
@@ -177,21 +187,55 @@ class KindWorkWaiting(RuntimeError):
         self.retry_seconds = retry
 
 
+def check_key(workspace: str, document_sha256: str) -> str:
+    """Where a kind's finished check is kept: by its workspace and its document."""
+    return f"check:{workspace}:{document_sha256}"
+
+
+def drawing_key(workspace: str, receipt_sha256: str) -> str:
+    """Where a site world's drawing is kept: by its workspace and its receipt."""
+    return f"drawing:{workspace}:{receipt_sha256}"
+
+
+def place_key(workspace: str, receipt_sha256: str, place_id: str) -> str:
+    """Where the place a site world's society walks is kept: by its workspace, its receipt and
+    its place."""
+    return f"place:{workspace}:{receipt_sha256}:{place_id}"
+
+
 # -- in the worker process -----------------------------------------------------------------------
 
-#: The records of the site worlds this process made or read last, by receipt digest: the drawing
-#: read just after a world is made finds the records its making generated.
+#: The records of the site worlds this process made or read last, by workspace and receipt
+#: digest: the drawing read just after a world is made finds the records its making generated.
 _RECORDS_KEPT: Final = 8
 _records: OrderedDict[str, tuple[object, ...]] = OrderedDict()
 _records_lock = threading.Lock()
 
 
-def _keep_records(receipt_sha256: str, records: tuple[object, ...]) -> None:
+def _keep_records(workspace: str, receipt_sha256: str, records: tuple[object, ...]) -> None:
+    key = f"{workspace}:{receipt_sha256}"
     with _records_lock:
-        _records[receipt_sha256] = records
-        _records.move_to_end(receipt_sha256)
+        _records[key] = records
+        _records.move_to_end(key)
         while len(_records) > _RECORDS_KEPT:
             _records.popitem(last=False)
+
+
+def _records_of(workspace: str, receipt: Mapping[str, Any], receipt_sha256: str) -> Any:
+    """The records a receipt generates again, or the ones this process kept for it; a refusal's
+    words when its receipt no longer reads."""
+    from exulanica.world.composers.site_plan import records
+    from exulanica.world.errors import InvalidStructuralData
+
+    with _records_lock:
+        found = _records.get(f"{workspace}:{receipt_sha256}")
+    if found is None:
+        try:
+            found = tuple(records(receipt))
+        except InvalidStructuralData as exc:
+            return str(exc)
+        _keep_records(workspace, receipt_sha256, found)
+    return found
 
 
 def _drawn(
@@ -222,15 +266,23 @@ def site_ground_place_id() -> str:
 def _placed(
     place_id: str, receipt: Mapping[str, Any], records: tuple[object, ...]
 ) -> dict[str, Any]:
-    """The place a site world's society walks, made from its records, or why it cannot be."""
+    """The place a site world's society walks, made from its records within the walking graph's
+    budget, or why it cannot be, by name."""
     from exulanica.grammar.errors import CatalogError
     from exulanica.world.composers.site_plan import society_place
     from exulanica.world.errors import InvalidStructuralData
+    from exulanica.world.society_site_place import GraphOverBudget
 
     try:
         return {"status": "done", "place": society_place(place_id, receipt, records)}
+    except GraphOverBudget as exc:
+        return {
+            "status": "refused",
+            "code": "kind_graph_over_budget",
+            "detail": f"kind_graph_over_budget: {exc}",
+        }
     except (CatalogError, InvalidStructuralData, ValueError) as exc:
-        return {"status": "refused", "detail": str(exc)}
+        return {"status": "refused", "code": "kind_place_refused", "detail": str(exc)}
 
 
 def check_job(document: dict[str, Any]) -> dict[str, Any]:
@@ -250,60 +302,50 @@ def check_job(document: dict[str, Any]) -> dict[str, Any]:
         }
 
 
-def compose_job(document: dict[str, Any], values: dict[str, int], world_id: str) -> dict[str, Any]:
-    """Compose the world the kind makes with ``values`` for ``world_id`` and draw it, or say why
-    not."""
+def compose_job(
+    workspace: str, document: dict[str, Any], values: dict[str, int], world_id: str
+) -> dict[str, Any]:
+    """Compose the world the kind makes with ``values`` for ``world_id`` and draw it, with the
+    place its society walks (the one its checks built), or say why not."""
     from exulanica.world.composers.site_plan import compose_kind
     from exulanica.world.kinds.document import read_kind
     from exulanica.world.kinds.samples import SiteRefused
 
+    place_id = site_ground_place_id()
     try:
-        composed = compose_kind(read_kind(document), values, world_id)
+        composed = compose_kind(read_kind(document), values, world_id, place_id=place_id)
     except SiteRefused as refused:
         return {"status": "refused", "code": refused.code, "refusals": list(refused.refusals)}
     records = tuple(composed.records)
-    _keep_records(composed.receipt_sha256, records)
-    place_id = site_ground_place_id()
+    _keep_records(workspace, composed.receipt_sha256, records)
     return {
         "status": "done",
         "composed": composed,
         **_drawn(world_id, composed.receipt, composed.receipt_sha256, records),
         "place_id": place_id,
-        "placed": _placed(place_id, composed.receipt, records),
+        "placed": {"status": "done", "place": composed.place},
     }
 
 
-def drawing_job(world_id: str, receipt: dict[str, Any], receipt_sha256: str) -> dict[str, Any]:
+def drawing_job(
+    workspace: str, world_id: str, receipt: dict[str, Any], receipt_sha256: str
+) -> dict[str, Any]:
     """A site world's drawing, from the records its receipt generates again (or the ones its making
     left here), or the reason its receipt no longer reads."""
-    from exulanica.world.composers.site_plan import records
-    from exulanica.world.errors import InvalidStructuralData
-
-    with _records_lock:
-        found = _records.get(receipt_sha256)
-    if found is None:
-        try:
-            found = tuple(records(receipt))
-        except InvalidStructuralData as exc:
-            return {"status": "refused", "detail": str(exc)}
-        _keep_records(receipt_sha256, found)
+    found = _records_of(workspace, receipt, receipt_sha256)
+    if isinstance(found, str):
+        return {"status": "refused", "detail": found}
     return {"status": "done", **_drawn(world_id, receipt, receipt_sha256, found)}
 
 
-def place_job(receipt: dict[str, Any], receipt_sha256: str, place_id: str) -> dict[str, Any]:
+def place_job(
+    workspace: str, receipt: dict[str, Any], receipt_sha256: str, place_id: str
+) -> dict[str, Any]:
     """The place a site world's society walks, from the records its receipt generates again (or
     the ones its making left here), or the reason it cannot be made."""
-    from exulanica.world.composers.site_plan import records
-    from exulanica.world.errors import InvalidStructuralData
-
-    with _records_lock:
-        found = _records.get(receipt_sha256)
-    if found is None:
-        try:
-            found = tuple(records(receipt))
-        except InvalidStructuralData as exc:
-            return {"status": "refused", "detail": str(exc)}
-        _keep_records(receipt_sha256, found)
+    found = _records_of(workspace, receipt, receipt_sha256)
+    if isinstance(found, str):
+        return {"status": "refused", "code": "kind_place_refused", "detail": found}
     return _placed(place_id, receipt, found)
 
 
@@ -356,12 +398,12 @@ class KindWorker:
         self._lock = threading.Lock()
         self._executor: Executor | None = None
         self._running: dict[str, _Running] = {}
-        #: Finished checks, by the kind document's digest.
+        #: Finished checks, by their workspace and the kind document's digest.
         self.checks = Kept(CHECKS_KEPT)
-        #: Finished drawings, by their receipt's digest.
+        #: Finished drawings, by their workspace and receipt's digest.
         self.drawings = Kept(DRAWINGS_KEPT)
-        #: Finished places, by their receipt's digest and place.
-        self.places = Kept(PLACES_KEPT)
+        #: Finished places, by their workspace, receipt's digest and place, each read a copy.
+        self.places = Kept(PLACES_KEPT, copies=True)
 
     def run(
         self,

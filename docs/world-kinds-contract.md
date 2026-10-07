@@ -28,11 +28,19 @@ wherever it appears. A kind is identified by its key (`[a-z][a-z0-9_]{0,31}`), i
 | `origin`, `provenance`, `licence` | `authored`, `drafted`, `uploaded` or `imported`; who or what made it; one of Apache-2.0, CC-BY-4.0, CC0-1.0, MIT |
 | `generator` | `site-plan` version 1, the composer that generates every kind this profile states |
 | `site` | Enclosure (`open` or `indoor`), width and depth, the ground's part, the spine path from the entry, an optional boundary and the entry's width |
-| `society` | Off-site residents who come in through the entry, and the share of residents who work, per mille |
+| `society` | Off-site residents who come in through the entry, the share of residents who work, per mille, and optionally the words and use class of the off-site residents' home (`offsite_home`) and what is said of where its people are and walk (`place_words`: `here`, such as "on this farm", and `around`, such as "across the farm") |
 | `use_classes` | The kind's own workplaces, shops and homes in the society's use-class form, with shifts from the shift catalog |
 | `parts` | Each part's key, label, description, form, engine roles, look role, use class and the sizes its form needs |
 | `zones` | Each zone's placement, share of the site, access, pattern and the parts it holds with counts |
 | `parameters`, `presets` | At most sixteen values a person may change, each with its range and step, and one to eight named presets |
+
+What a kind's society reads where the kind states nothing is the
+[kind society catalog](../assets/catalogs/world-kinds/kind-society.v1.json), resolved once as the
+kind is read: the use class a seat (`bench`) and a home (`residential`) take when they name none,
+the home off the site ("home, off the site", `residential`), and the place words `here` ("here")
+and `around` ("around here"). An off-site home's use class is a residential one; place words are
+one line of at most 60 characters each. A world records what was resolved in its receipt's
+society, and a receipt written before kinds stated these reads the catalog's.
 
 A **figure** is a whole number, a parameter's value (`{"parameter": key}`) or, for a figure drawn
 per placed thing, a span the seed draws from (`{"from": a, "to": b}`). Lengths a layout steps along
@@ -180,10 +188,30 @@ city's `city_place`. The living engine is `exulanica-society/v5`, unchanged; the
 [society contract](synthetic-society-contract.md) owns inputs and engines. A site world's society
 ground is the society ground catalog's `generated_site` entry (catalog version 3). The page hosts
 a site world's people in the site's frame, as it hosts a town's. The place a site world's society
-walks is made in the kind worker from the world's receipt, never on a request's thread, kept by the
-receipt and the place, and made with the world when the world is made; while the worker has not
-made it, bringing people in is refused by name (424 `unavailable_society_input`, saying the place is
-still being made), and asking again reads it.
+walks is made in the kind worker from the world's receipt, never on a request's thread, and kept by
+the workspace, the receipt and the place; the place the world's checks built is kept when the world
+is made. Nothing waits for the worker inside a transaction:
+
+- **Bringing people in** asks the worker for the place before its transaction begins, holding no
+  lock, and waits for it at most 15 s; inside the transaction the place is only read from what the
+  worker keeps.
+- **Each later input**, such as one an edit composes, is composed from the place the society's last
+  input carries (held to its `site_place` digest, the world's snapshot, which names the receipt,
+  and the routine the receipt names), so an edit never asks the worker.
+- A place neither holds is asked of the worker without waiting, and the request is answered 503
+  `kind_work_overran`, `kind_work_busy` or `kind_work_unavailable` with a `Retry-After`, nothing
+  written; asking again reads the finished place.
+- A place whose walking graph would grow past the bounds catalog's `walking_nodes` is refused by
+  name (424 `unavailable_society_input`, its detail naming `kind_graph_over_budget`), as a kind's
+  checks refuse it.
+
+A site's place states the kind's place words (`words`: `here`, `around`), which a town's never
+does. People are told and spoken of in them: a person asked to choose is told it is a given
+minute "on this farm" rather than "in the town"; the inspector and the Companion read the words
+the inhabitant words catalog keys by the society ground `generated_site`
+("A simulated farmhand on this farm.", "walking across the farm"), served with the society's
+places as `place_words`. A world's saved entry serves `society_engine`, the engine its people are
+brought in with, which the page reads rather than deriving from the entry's shape.
 
 ## A world made from a kind
 
@@ -302,9 +330,15 @@ town's receipt or digest depends on the adapter.
 - Roads and parking are drawn as surfaces and kept clear; nothing drives in a site world. Water is
   never walked, and nothing moves on it.
 - A kind's sample worlds house at most 128 people and lay at most 962 walking places, the bounds
-  a living society's tick was measured on; a site is at most 256 m on a side.
+  a living society's tick was measured on in towns; a site near them (879 places, 128 people)
+  ticked within a town's in the same run (`scripts/measure_living_site.py`), measured on a loaded
+  development machine, so the figures compare the two rather than state either's time on a quiet
+  one. A site is at most 256 m on a side.
 - One kind worker process serves the whole server, so one workspace's slow kinds can keep
   another's waiting until its own jobs finish, within the bounds above.
+- An edit of a site world whose society's last input carries no place (its people were
+  unavailable), or was made from another snapshot, needs the place from the worker: it is answered
+  503 `kind_work_*`, and not made, until the worker has made that place.
 - A kept kind is read again with the catalogs this server holds; a world of a kind regenerates
   from the kind document its receipt carries, read with those catalogs too and laid out again
   within the layout budget, so a later bound that refuses the document, or a lower budget than its

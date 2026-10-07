@@ -213,7 +213,22 @@ def validate_place(document: dict[str, Any], routine: RoutineModel) -> None:
 
 
 def _validate_place(document: dict[str, Any], routine: RoutineModel) -> None:
-    _require(isinstance(document, dict) and set(document) == _FIELDS, "invalid place fields")
+    # A site's place, and the living place a site world's input projects to, also states what is
+    # said of where its people are and walk (``words``); a town's never does.
+    fields = set(document) if isinstance(document, dict) else set()
+    _require(
+        fields == _FIELDS
+        or (fields == _FIELDS | {"words"} and document.get("profile") == PLACE_PROFILE_V2),
+        "invalid place fields",
+    )
+    if "words" in fields:
+        words = document["words"]
+        _require(
+            isinstance(words, dict)
+            and set(words) == {"here", "around"}
+            and all(_text(value) and len(value) <= 60 for value in words.values()),
+            "invalid place words",
+        )
     _require(document["profile"] in PLACE_PROFILES, "unsupported place profile")
     heights = document["profile"] == PLACE_PROFILE_V2
     _require(_text(document["place_id"]), "invalid place identity")

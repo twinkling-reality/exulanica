@@ -60,6 +60,7 @@ from exulanica.selection.answer import (
 from exulanica.selection.calls import CallLog
 from exulanica.selection.inhabitant_words import (
     InhabitantWordsCatalog,
+    PlaceWords,
     inhabitant_words,
     inhabitant_words_catalog,
 )
@@ -461,6 +462,9 @@ class SocietyScene:
     selected: str | None
     selected_events: tuple[Mapping[str, Any], ...] = ()
     labels: _Labels = field(default_factory=_Labels)
+    #: Where its people are and walk in their ground's own words (a site world's), served with
+    #: the places its input states; None for a town's, whose words are the catalog's own.
+    place_words: PlaceWords | None = None
     #: Inhabitants the question names by a name only they carry, by id.
     named: tuple[str, ...] = ()
     #: The question names a part several inhabitants share.
@@ -701,6 +705,11 @@ def read_scene(
         question=question,
         saved=saved,
     )
+    words = places.get("place_words")
+    if isinstance(words, Mapping):
+        scene.place_words = PlaceWords(
+            str(words["ground"]), str(words["here"]), str(words["around"])
+        )
     if decisions:
         scene.deciding_models = _deciding_models(decisions, load_manifest())
     scene.object_edits = _object_edits(
@@ -1025,6 +1034,7 @@ class _Builder:
             lambda other: scene.labels.person(other) if other in scene.people else None,
             self.catalog,
             profile=scene.profile,
+            place_words=scene.place_words,
         )
 
     def state(self, inhabitant_id: str, line: str) -> SocietyEvidenceItem:

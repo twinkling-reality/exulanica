@@ -40,6 +40,17 @@ class UnavailableSocietyInput(SocietyError):
     pass
 
 
+class SocietyPlaceWaiting(UnavailableSocietyInput):
+    """A society's place still being made elsewhere (a site world's, in the kind worker): refused
+    wherever an unavailable input is, and answered 503 with ``code`` and ``Retry-After`` by the
+    routes that bring people in and edit worlds, so a caller can tell "ask again" from "never"."""
+
+    def __init__(self, detail: str, *, code: str, retry_seconds: int) -> None:
+        super().__init__(detail)
+        self.code = code
+        self.retry_seconds = retry_seconds
+
+
 class SocietyBytesNotRead(RuntimeError):
     """Rows read under the asset read lock name stored bytes other than those read before it.
 

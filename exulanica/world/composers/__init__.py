@@ -124,6 +124,9 @@ class ComposedWorld:
     receipt_sha256: str
     candidate: SpatialCandidate
     records: tuple[object, ...]
+    #: For a world made from a world kind and asked for with its society's place, that place, the
+    #: one its checks built; None otherwise.
+    place: Mapping[str, Any] | None = None
 
 
 @dataclass(frozen=True, slots=True)

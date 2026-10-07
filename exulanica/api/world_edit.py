@@ -61,7 +61,8 @@ from exulanica.world import (
     WorldObjectRepository,
 )
 from exulanica.world.errors import InvalidThingPlacement, ThingLimitReached
-from exulanica.world.society import UnavailableSocietyInput
+from exulanica.world.kinds.worker import KindWorkWaiting
+from exulanica.world.society import SocietyPlaceWaiting, UnavailableSocietyInput
 from exulanica.world.workspace_assets import WorkspaceAssetWithdrawn
 from exulanica.world.worlds import require_world
 
@@ -225,6 +226,14 @@ OBJECT_PROBLEMS: Final[tuple[tuple[type[Exception], int, str], ...]] = (
 
 
 def object_problem(exc: Exception) -> JSONResponse | None:
+    if isinstance(exc, KindWorkWaiting | SocietyPlaceWaiting):
+        # A site world's place the kind worker has not made yet, which an edit composing its
+        # people's next input needed: the edit is not made; ask again after Retry-After.
+        return JSONResponse(
+            status_code=503,
+            content={"code": exc.code, "detail": str(exc)},
+            headers={"Retry-After": str(exc.retry_seconds)},
+        )
     for kind, status, code in OBJECT_PROBLEMS:
         if isinstance(exc, kind):
             return JSONResponse(status_code=status, content={"code": code, "detail": str(exc)})

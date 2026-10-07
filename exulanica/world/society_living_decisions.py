@@ -202,12 +202,17 @@ def living_context(
 ) -> dict[str, Any]:
     """What a living person sees, as a request of ``profile`` records it: the coming minute, what
     they are doing, the job they hold, each need against the level the routine sees to it at, and
-    their options in order. ``engine`` names the state's engine, which says how it is read."""
+    their options in order. ``engine`` names the state's engine, which says how it is read. A
+    person in a site world is told where they are in its kind's words (``here``), which the place
+    their input carries states; a town's context states none, and reads as it always has."""
     person = _person(state, subject_id)
     routine = routine_for(dict(state))
     absolute = state["clock"]["start_minute_of_day"] + state["tick"] + 1
     action = person["action"]
-    return {
+    living = source.get("living")
+    place = living.get("place") if isinstance(living, Mapping) else None
+    words = place.get("words") if isinstance(place, Mapping) else None
+    context = {
         "profile": profile,
         "engine": state["profile"],
         "subject_id": subject_id,
@@ -226,6 +231,9 @@ def living_context(
         "doing": {"kind": action["kind"], "status": action["status"], "reason": action["reason"]},
         "options": [option.as_record() for option in options],
     }
+    if isinstance(words, Mapping):
+        context["here"] = str(words["here"])
+    return context
 
 
 def living_situation(context: Mapping[str, Any]) -> list[str]:
@@ -240,7 +248,8 @@ def living_situation(context: Mapping[str, Any]) -> list[str]:
     else:
         now = "you are free to choose what to do"
     lines = [
-        f"It is {minute // 60:02d}:{minute % 60:02d} on day {clock['day']} in the town, and {now}.",
+        f"It is {minute // 60:02d}:{minute % 60:02d} on day {clock['day']} "
+        f"{context.get('here', 'in the town')}, and {now}.",
         f"You work as a {context['role']}." if context["role"] else "You have no job.",
     ]
     lines.extend(

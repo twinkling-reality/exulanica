@@ -12,6 +12,9 @@
   it and what the engine does with it.
 * ``kind-bound.v1.json``: every figure a kind is held to, each with its least and greatest value
   and why.
+* ``kind-society.v1.json``: what a kind's society reads where the kind states nothing: the use
+  class a seat and a home take when they name none, the words and use class of the home at the
+  entry of everybody who lives off the site, and the words said of where its people are and walk.
 
 The site grammar's closed words (:mod:`exulanica.grammar.grammars.site.plan`) and these catalogs
 state the same vocabularies; :func:`load_kind_catalogs` refuses them if they differ.
@@ -42,8 +45,10 @@ __all__ = [
     "CATALOG_DIRECTORY",
     "DRESSINGS",
     "FITS",
+    "SOCIETY_DEFAULTS",
     "KindCatalogs",
     "LookFamily",
+    "SocietyDefault",
     "load_kind_catalogs",
 ]
 
@@ -81,6 +86,20 @@ def _role_forms(where: str, value: object) -> FieldValue:
     return forms
 
 
+def _words(where: str, value: object) -> FieldValue:
+    """A default's words or use class: one line of at most 60 characters, or none where a part's
+    own are read (or, for words alone, no use class)."""
+    if type(value) is not str or value != value.strip() or "\n" in value or len(value) > 60:
+        raise CatalogError(f"{where} is one line of at most 60 characters")
+    return value
+
+
+#: What a kind's society reads where the kind states nothing, by these keys: words said of where
+#: its people are and walk (``here``, ``around``), and the use class (and words) of a home, the
+#: home off the site and a seat.
+SOCIETY_DEFAULTS: Final = ("around", "here", "home", "offsite_home", "seat")
+
+
 def _bound(where: str, values: dict[str, FieldValue]) -> None:
     if cast(int, values["minimum"]) > cast(int, values["maximum"]):
         raise CatalogError(f"{where}: a bound's minimum is at most its maximum")
@@ -112,6 +131,11 @@ _SCHEMAS: Final = {
         (("minimum", _FIGURE), ("maximum", _FIGURE), ("reason", text_field)),
         entry_check=_bound,
     ),
+    "kind-society": CatalogSchema(
+        "kind-society",
+        1,
+        (("use_class", _words), ("words", _words), ("reason", text_field)),
+    ),
 }
 
 
@@ -125,13 +149,22 @@ class LookFamily:
 
 
 @dataclass(frozen=True, slots=True)
+class SocietyDefault:
+    """What a kind's society reads where the kind states nothing: a use class, words, or both."""
+
+    use_class: str
+    words: str
+
+
+@dataclass(frozen=True, slots=True)
 class KindCatalogs:
-    """The three catalogs as read, and the digest of each file's bytes."""
+    """The four catalogs as read, and the digest of each file's bytes."""
 
     families: Mapping[str, LookFamily]
     role_forms: Mapping[str, frozenset[str]]
     bounds: Mapping[str, tuple[int, int]]
     sha256: Mapping[str, str]
+    society_defaults: Mapping[str, SocietyDefault]
 
     def bound(self, key: str) -> tuple[int, int]:
         found = self.bounds.get(key)
@@ -148,7 +181,7 @@ def _read(directory: Path, catalog_id: str) -> dict[str, dict[str, FieldValue]]:
 
 @functools.cache
 def load_kind_catalogs(directory: Path = CATALOG_DIRECTORY) -> KindCatalogs:
-    """Read the three catalogs and hold them to the site grammar's closed words."""
+    """Read the four catalogs and hold them to the site grammar's closed words."""
     import hashlib
 
     families = _read(directory, "look-family")
@@ -163,6 +196,11 @@ def load_kind_catalogs(directory: Path = CATALOG_DIRECTORY) -> KindCatalogs:
             f"the kind-role catalog states {sorted(roles)}, the site grammar {ROLES}"
         )
     bounds = _read(directory, "kind-bound")
+    defaults = _read(directory, "kind-society")
+    if tuple(sorted(defaults)) != SOCIETY_DEFAULTS:
+        raise CatalogError(
+            f"the kind-society catalog states {sorted(defaults)}, not {list(SOCIETY_DEFAULTS)}"
+        )
     return KindCatalogs(
         families=MappingProxyType(
             {
@@ -192,6 +230,12 @@ def load_kind_catalogs(directory: Path = CATALOG_DIRECTORY) -> KindCatalogs:
             {
                 name: hashlib.sha256(directory.joinpath(f"{name}.v1.json").read_bytes()).hexdigest()
                 for name in sorted(_SCHEMAS)
+            }
+        ),
+        society_defaults=MappingProxyType(
+            {
+                key: SocietyDefault(str(values["use_class"]), str(values["words"]))
+                for key, values in sorted(defaults.items())
             }
         ),
     )

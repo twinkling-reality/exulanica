@@ -26,6 +26,7 @@ it resembles. Pure: no connection and no store. The catalog is read once per pro
 from __future__ import annotations
 
 import functools
+import re
 import sys
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
@@ -47,13 +48,17 @@ __all__ = [
     "GROUND_ARRIVALS",
     "GROUND_FLOORS",
     "GROUND_NAVIGATIONS",
+    "PLACE_DEPENDENCIES",
     "POPULATION_RULES",
     "SocietyGroundKind",
     "SocietyPopulationRefused",
     "UnknownSocietyGround",
     "created_engine",
     "load_society_grounds",
+    "place_dependencies",
+    "place_dependency_for",
     "placed_affordance_refusal",
+    "record_subjects_for",
     "refuse_population_over_budget",
     "society_ground_for_composer",
     "society_ground_for_navigation",
@@ -62,7 +67,7 @@ __all__ = [
 ]
 
 CATALOG_ID: Final = "society-ground"
-CATALOG_VERSION: Final = 3
+CATALOG_VERSION: Final = 4
 CATALOG_DIRECTORY: Final = (
     Path(__file__).resolve().parents[2].joinpath("assets", "catalogs", CATALOG_ID)
 )
@@ -78,6 +83,9 @@ GROUND_NAVIGATIONS: Final = ("lattice", "walking_surfaces")
 #: How many people a society over a ground starts with: the figure its entry states, or one for
 #: each place in a home the world's own premises offer, up to the figure its entry states.
 POPULATION_RULES: Final = ("stated", "residents")
+#: The dependency an input over a ground names the place its people walk under: none for a
+#: lattice, else the kind of place the producer of the world's own surfaces makes.
+PLACE_DEPENDENCIES: Final = ("none", "city_place", "site_place")
 #: A figure a form states none of: a ground that walks its world's surfaces states no lattice and
 #: declares no area, and says so with this, which its entry check requires.
 _STATES_NONE: Final = 0
@@ -123,6 +131,10 @@ class SocietyGroundKind:
     navigation: str = "lattice"
     #: How the population is found: one of :data:`POPULATION_RULES`.
     population_rule: str = "stated"
+    #: The dependency kind its input names its place under: one of :data:`PLACE_DEPENDENCIES`.
+    place_dependency: str = "none"
+    #: The kinds of the world's own records an activity in its input may name as its subject.
+    record_subjects: tuple[str, ...] = ()
 
 
 def _figure(values: Mapping[str, object], name: str) -> int:
@@ -213,6 +225,44 @@ _FIELDS_V2: Final = (
 )
 
 
+def _record_subjects(where: str, value: object) -> tuple[str, ...]:
+    """Record kinds, each a family and a kind (``city.premises``), sorted, none twice."""
+    if not isinstance(value, list) or not all(
+        isinstance(kind, str) and _RECORD_KIND.fullmatch(kind) for kind in value
+    ):
+        raise CatalogError(f"{where} is a list of record kinds such as city.premises")
+    if value != sorted(set(value)):
+        raise CatalogError(f"{where} is sorted with no kind twice")
+    return tuple(value)
+
+
+_RECORD_KIND: Final = re.compile(r"[a-z]+\.[a-z][a-z_]*")
+
+
+def _entry_check_v4(where: str, values: Mapping[str, Any]) -> None:
+    _entry_check(where, values)
+    walks_surfaces = values["navigation"] == "walking_surfaces"
+    if walks_surfaces != (values["place_dependency"] != "none"):
+        raise CatalogError(
+            f"{where}: exactly a ground that walks its world's surfaces names the place they make"
+        )
+    if walks_surfaces != bool(values["record_subjects"]):
+        raise CatalogError(
+            f"{where}: exactly a ground that walks its world's surfaces names records people use"
+        )
+
+
+#: Version 4 states, for each ground, the dependency its input names its place under and the kinds
+#: of the world's own records its people's activities may name, beside version 3's fields.
+_FIELDS_V4: Final = (
+    *_FIELDS_V2,
+    ("place_dependency", _choice(PLACE_DEPENDENCIES)),
+    ("place_dependency_reason", text_field),
+    ("record_subjects", _record_subjects),
+    ("record_subjects_reason", text_field),
+)
+
+
 _SCHEMAS: Final = MappingProxyType(
     {
         1: CatalogSchema(
@@ -237,6 +287,7 @@ _SCHEMAS: Final = MappingProxyType(
         ),
         2: CatalogSchema(CATALOG_ID, 2, _FIELDS_V2, entry_check=_entry_check),
         3: CatalogSchema(CATALOG_ID, 3, _FIELDS_V2, entry_check=_entry_check),
+        4: CatalogSchema(CATALOG_ID, 4, _FIELDS_V4, entry_check=_entry_check_v4),
     }
 )
 
@@ -268,6 +319,8 @@ def load_society_grounds(
             declared_half_extent_mm=_figure(values, "declared_half_extent_mm"),
             navigation=str(values.get("navigation", "lattice")),
             population_rule=str(values.get("population_rule", "stated")),
+            place_dependency=str(values.get("place_dependency", "none")),
+            record_subjects=tuple(values.get("record_subjects", ())),
         )
         for entry in catalog.entries
         for values in (dict(entry.values),)
@@ -316,6 +369,29 @@ def society_ground_for_navigation(navigation_profile: str) -> SocietyGroundKind:
     raise UnknownSocietyGround(
         f"no society ground is stated for the navigation profile {navigation_profile!r}"
     )
+
+
+def place_dependency_for(navigation_profile: str) -> str:
+    """The dependency kind an input with this navigation profile names its place under, as its
+    ground states it; ``none`` for a profile no ground walks its world's surfaces by."""
+    for ground in society_grounds():
+        if ground.navigation_profile == navigation_profile:
+            return ground.place_dependency
+    return "none"
+
+
+def place_dependencies() -> frozenset[str]:
+    """Every dependency kind a ground names a place under."""
+    return frozenset(g.place_dependency for g in society_grounds()) - {"none"}
+
+
+def record_subjects_for(navigation_profile: str) -> tuple[str, ...]:
+    """The kinds of a world's own records an input with this navigation profile may name an
+    activity of, as its ground states them; none for a profile no ground states."""
+    for ground in society_grounds():
+        if ground.navigation_profile == navigation_profile:
+            return ground.record_subjects
+    return ()
 
 
 def placed_affordance_refusal(ground: SocietyGroundKind) -> str | None:

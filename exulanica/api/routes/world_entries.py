@@ -187,6 +187,10 @@ class SavedWorldEntryView(BaseModel):
     generated_ground: GeneratedGroundView | None = None
     #: Set for a world made from a world kind: its kind, region and where a person arrives.
     generated_site: GeneratedSiteView | None = None
+    #: The engine a society over this world is created with, the engine table's for its ground
+    #: (``POST /world/versions/{version_id}/society`` names it as its ``profile``); null for a
+    #: world no society ground is stated for. A page reads it here rather than deriving it.
+    society_engine: str | None = None
     authored_version_id: uuid.UUID
     authored_state_sha256: str
     authored_edit_seq: int

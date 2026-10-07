@@ -29,7 +29,9 @@ come out otherwise, is refused by name (``generated_world_*``), never generated 
 
 from __future__ import annotations
 
+import functools
 import hashlib
+import json
 import re
 from collections.abc import Mapping
 from typing import Any, Final
@@ -211,10 +213,13 @@ def compose_kind(
     world_id: str,
     *,
     base_routine: RoutineModel | None = None,
+    place_id: str | None = None,
 ) -> ComposedWorld:
     """The world ``kind`` makes with ``values`` for ``world_id``: its receipt, its structural
-    candidate and its records. Refused as :func:`~exulanica.world.kinds.samples.compose_site`
-    refuses (:class:`~exulanica.world.kinds.samples.SiteRefused`, every candidate named)."""
+    candidate and its records, and with ``place_id`` the place its society walks there, the one its
+    checks built (:func:`society_place` makes the same from the receipt). Refused as
+    :func:`~exulanica.world.kinds.samples.compose_site` refuses
+    (:class:`~exulanica.world.kinds.samples.SiteRefused`, every candidate named)."""
     if base_routine is None:
         from exulanica.world.society_living import town_routine
 
@@ -258,7 +263,17 @@ def compose_kind(
             next(r for r in world.records if isinstance(r, SiteExtentRecord)),
         ),
         records=world.records,
+        place=None if place_id is None else _placed_at(world.place, place_id),
     )
+
+
+def _placed_at(place: Mapping[str, Any], place_id: str) -> dict[str, Any]:
+    """A place a check built under another identity, as the place ``place_id`` names: the place
+    names its identity once, so it is the same document sealed again."""
+    from exulanica.world.society_place import seal_place
+
+    stated = {key: value for key, value in place.items() if key != "document_sha256"}
+    return seal_place({**stated, "place_id": place_id})
 
 
 def _check_current(receipt: Mapping[str, Any]) -> None:
@@ -295,10 +310,16 @@ def receipt_kind(receipt: Mapping[str, Any]) -> KindDocument:
 
 def receipt_routine(receipt: Mapping[str, Any]) -> RoutineModel:
     """The routine a receipt's world lives under: the town routine its binding names, with the
-    kind's overlay, held to the digest the receipt records."""
+    kind's overlay, held to the digest the receipt records. Read once per binding: the catalogs it
+    names are read from disk the first time only."""
+    return _routine_of(json.dumps(receipt["routine"], sort_keys=True, separators=(",", ":")))
+
+
+@functools.lru_cache(maxsize=32)
+def _routine_of(binding: str) -> RoutineModel:
     from exulanica.world.society_catalogs import ROUTINE_DIRECTORY, load_routine_model
 
-    stated = receipt["routine"]
+    stated = json.loads(binding)
     base = load_routine_model(
         ROUTINE_DIRECTORY,
         versions={str(k): int(v) for k, v in stated["base"]["catalog_versions"].items()},
@@ -352,12 +373,15 @@ def records(receipt: Mapping[str, Any]) -> tuple[object, ...]:
 def society_place(
     place_id: str, receipt: Mapping[str, Any], generated: tuple[object, ...]
 ) -> dict[str, Any]:
-    """The place a receipt's world hands its society, under the routine the receipt names."""
+    """The place a receipt's world hands its society, under the routine the receipt names, its
+    walking graph held to the bounds catalog's ``walking_nodes`` while it is built (refused as
+    :class:`~exulanica.world.society_site_place.GraphOverBudget`), as a kind's checks hold it."""
     return place_from_site_records(
         place_id=place_id,
         records=generated,
         society=SiteSociety.read(receipt["society"]),
         routine=receipt_routine(receipt),
+        node_limit=load_kind_catalogs().bound("walking_nodes")[1],
     )
 
 

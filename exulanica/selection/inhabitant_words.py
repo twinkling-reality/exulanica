@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from functools import cache
@@ -33,6 +34,7 @@ __all__ = [
     "ActivityWords",
     "InhabitantWords",
     "InhabitantWordsCatalog",
+    "PlaceWords",
     "WordsCatalogRefused",
     "inhabitant_words",
     "inhabitant_words_catalog",
@@ -178,6 +180,25 @@ def inhabitant_words_catalog(path: Path = CATALOG_PATH) -> InhabitantWordsCatalo
     )
 
 
+_SLOT: Final = re.compile(r"\{([a-z_]+)\}")
+
+
+def _fill(template: str, values: Mapping[str, str]) -> str:
+    """``template`` with each ``{name}`` slot given in ``values`` filled, in one pass."""
+    return _SLOT.sub(lambda found: values.get(found.group(1), found.group(0)), template)
+
+
+@dataclass(frozen=True, slots=True)
+class PlaceWords:
+    """Where a person is, in the words of their world's ground: the society ground entry the
+    catalog keys a ground's own words by (``living_what_home@generated_site``), and what is said of
+    where its people are (``here``) and walk (``around``), as a site's place states them."""
+
+    ground: str
+    here: str
+    around: str
+
+
 @dataclass(frozen=True, slots=True)
 class InhabitantWords:
     """A person's own words at the top of the inspector: who, what they are doing now, and why."""
@@ -189,9 +210,20 @@ class InhabitantWords:
 
 
 def _living_inhabitant_words(
-    person: Mapping[str, Any], catalog: InhabitantWordsCatalog
+    person: Mapping[str, Any], catalog: InhabitantWordsCatalog, place: PlaceWords | None = None
 ) -> InhabitantWords:
-    """Read a living resident's performed action, never a raw need level or stored because."""
+    """Read a living resident's performed action, never a raw need level or stored because. With
+    ``place``, the words its ground states in the catalog stand in for a town's."""
+
+    def ground(kind: str, code: str, **values: str) -> str:
+        if place is not None:
+            found = catalog.tables[kind].get(f"{code}@{place.ground}")
+            if found is not None:
+                # One pass: a kind's own words are put in as they are, never read as slots.
+                return _fill(found, {"here": place.here, "around": place.around, **values})
+        words = catalog.words(kind, code)
+        return words.format(**values) if values else words
+
     phrase = catalog.tables["phrase"]
     ordinal = person["ordinal"]
     role = person.get("role")
@@ -212,9 +244,10 @@ def _living_inhabitant_words(
     goal = person.get("goal")
     goal_activity = goal.get("activity") if isinstance(goal, Mapping) else None
     if kind == "move":
-        doing = catalog.tables["doing"].get(
-            f"living_heading_{goal_activity}", catalog.words("doing", "living_heading_unknown")
-        )
+        heading = f"living_heading_{goal_activity}"
+        if heading not in catalog.tables["doing"]:
+            heading = "living_heading_unknown"
+        doing = ground("doing", heading)
     else:
         doing = catalog.tables["doing"].get(kind and f"living_{kind}") or catalog.words(
             "doing", "living_unknown"
@@ -233,7 +266,7 @@ def _living_inhabitant_words(
     )
     return InhabitantWords(
         who=phrase["living_who"].format(number=ordinal + 1),
-        what=phrase[what_key].format(role=role_label),
+        what=ground("phrase", what_key, role=role_label),
         doing=doing,
         why=phrase[reason_key],
     )
@@ -246,6 +279,7 @@ def inhabitant_words(
     catalog: InhabitantWordsCatalog | None = None,
     *,
     profile: str | None = None,
+    place_words: PlaceWords | None = None,
 ) -> InhabitantWords:
     """Who a simulated person is and what they are doing, from their recorded state.
 
@@ -253,11 +287,13 @@ def inhabitant_words(
     ``partner`` writes another person, or None for one not in the society. The choice follows
     ``inhabitantWords`` in the inspector line for line, and the shared cases hold the two equal.
     ``profile`` names the recorded engine for living words; callers without a profile retain the
-    purposeful words. Talking has no content, so nothing here says what anybody talked about.
+    purposeful words. ``place_words`` says where a living person is in their ground's own words
+    (a site world's); without it they are a town's. Talking has no content, so nothing here says
+    what anybody talked about.
     """
     words = catalog or inhabitant_words_catalog()
     if profile is not None and society_engine(profile).state_family == "living":
-        return _living_inhabitant_words(person, words)
+        return _living_inhabitant_words(person, words, place_words)
     phrase = words.tables["phrase"]
     doing_words = words.tables["doing"]
     who = person.get("display_name") or phrase["who_unnamed"]

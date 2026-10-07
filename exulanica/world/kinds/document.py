@@ -230,10 +230,6 @@ _FORM_LOOKS: Final = {
 }
 #: The roles that make a part somewhere the society goes, and the use-class kind each needs.
 _USE_ROLES: Final = {"home": "residential", "workplace": "workplace", "shop": "workplace"}
-#: The use class a seat takes when it names none: the society's bench, where people rest.
-DEFAULT_SEAT_USE: Final = "bench"
-#: The use class a home takes when it names none: the society's residential unit.
-DEFAULT_HOME_USE: Final = "residential"
 
 
 class KindRefused(ValueError):
@@ -692,6 +688,44 @@ def _read_part(
     )
 
 
+def _offsite_home(
+    reader: _Reader, raw: object, use_classes: Mapping[str, Mapping[str, Any]]
+) -> PartUse:
+    """The home at the entry of everybody who lives off the site: as the kind states it (its words
+    and a residential use class), else as the ``kind-society`` catalog does."""
+    if raw is None:
+        default = reader.catalogs.society_defaults["offsite_home"]
+        return PartUse(default.words, default.use_class)
+    where = "society.offsite_home"
+    stated = _keys(where, raw, frozenset({"label", "use_class"}))
+    label = _text(f"{where}.label", stated["label"], reader.bound("label_characters"))
+    use_class = _key(f"{where}.use_class", stated["use_class"])
+    kind = _use_kind(reader, use_classes, use_class)
+    if not kind:
+        raise KindRefused("kind_reference_unknown", f"names no use class {use_class!r}", where)
+    if kind != "residential":
+        raise KindRefused(
+            "kind_role_unmet", f"is a home, so its use class is residential, not {kind}", where
+        )
+    return PartUse(label, use_class)
+
+
+def _place_words(reader: _Reader, raw: object) -> tuple[str, str]:
+    """What is said of where the kind's people are (``here``: "on this farm") and walk
+    (``around``: "across the farm"), as the kind states it, else as the ``kind-society`` catalog
+    does: words a person reads in place of a town's ("in this town", "through town")."""
+    defaults = reader.catalogs.society_defaults
+    if raw is None:
+        return (defaults["here"].words, defaults["around"].words)
+    where = "society.place_words"
+    stated = _keys(where, raw, frozenset({"here", "around"}))
+    bound = reader.bound("label_characters")
+    return (
+        _text(f"{where}.here", stated["here"], bound),
+        _text(f"{where}.around", stated["around"], bound),
+    )
+
+
 def _check_roles(
     reader: _Reader,
     where: str,
@@ -862,6 +896,16 @@ class KindDocument:
     zones: tuple[_ReadZone, ...]
     _site: Mapping[str, Any]
     _offsite: _Figure
+    #: What the society reads where the kind states nothing, resolved once as the kind is read: the
+    #: use class a seat and a home take when they name none (``kind-society`` catalog), and the
+    #: home at the entry of everybody who lives off the site, as the kind states it or as the
+    #: catalog does.
+    _seat_use: str
+    _home_use: str
+    _offsite_home: PartUse
+    #: The words said of where its people are and walk (``here``, ``around``), as the kind states
+    #: them or as the catalog does.
+    _place_words: tuple[str, str]
 
     def reference(self) -> dict[str, object]:
         """What a world made from this kind records of it."""
@@ -920,12 +964,16 @@ class KindDocument:
         for part in self.parts.values():
             use = part.use_class
             if not use and "seat" in part.roles:
-                use = DEFAULT_SEAT_USE
+                use = self._seat_use
             if not use and "home" in part.roles:
-                use = DEFAULT_HOME_USE
+                use = self._home_use
             uses[part.key] = PartUse(part.label, use)
         return SiteSociety(
-            uses=MappingProxyType(uses), offsite_residents=self.offsite_residents(values)
+            uses=MappingProxyType(uses),
+            offsite_residents=self.offsite_residents(values),
+            offsite_home=self._offsite_home,
+            here=self._place_words[0],
+            around=self._place_words[1],
         )
 
     def plan(self, values: Mapping[str, int]) -> SitePlan:
@@ -1144,13 +1192,23 @@ def read_kind(
             "kind_role_unmet", "an indoor site's outer walls are a boundary part", "site.boundary"
         )
     site["boundary"] = boundary
+    stated_society = raw["society"]
+    optional = (
+        set(stated_society) & {"offsite_home", "place_words"}
+        if isinstance(stated_society, dict)
+        else set()
+    )
     society = _keys(
-        "society", raw["society"], frozenset({"employment_permille", "offsite_residents"})
+        "society",
+        stated_society,
+        frozenset({"employment_permille", "offsite_residents", *optional}),
     )
     employment = _int("society.employment_permille", society["employment_permille"], (1, 1000))
     offsite = reader.figure(
         "society.offsite_residents", society["offsite_residents"], "offsite_residents"
     )
+    offsite_home = _offsite_home(reader, society.get("offsite_home"), use_classes)
+    place_words = _place_words(reader, society.get("place_words"))
     zones: list[_ReadZone] = []
     for index, item in enumerate(_list("zones", raw["zones"], reader.bound("zones"))):
         where = f"zones[{index}]"
@@ -1282,4 +1340,8 @@ def read_kind(
         zones=tuple(zones),
         _site=MappingProxyType(site),
         _offsite=offsite,
+        _seat_use=reader.catalogs.society_defaults["seat"].use_class,
+        _home_use=reader.catalogs.society_defaults["home"].use_class,
+        _offsite_home=offsite_home,
+        _place_words=place_words,
     )

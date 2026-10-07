@@ -33089,6 +33089,17 @@
        }
       ]
      },
+     "society_engine": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Society Engine"
+     },
      "authored_version_id": {
       "type": "string",
       "format": "uuid",

@@ -462,7 +462,7 @@
       "key": "walking_nodes",
       "minimum": 1,
       "maximum": 962,
-      "reason": "Measured: the largest walking graph a living society's tick was measured to hold within its budget, 962 places in the market towns of the world specification's tick measurement (exulanica/world/world_recipes.py, TICK_BUDGET_REASON); a kind whose sample worlds walk larger graphs is refused until a site graph is measured itself.",
+      "reason": "Measured: the largest walking graph a living society's tick was measured to hold within its budget, 962 places in the market towns of the world specification's tick measurement (exulanica/world/world_recipes.py, TICK_BUDGET_REASON); a site graph near it (879 places) at 128 people ticked within a town's in the same run (scripts/measure_living_site.py, the site ground's population reason).",
       "licence": {
         "spdx": "Apache-2.0",
         "verdict": "SHIP",

@@ -106,6 +106,9 @@ def consumed_places(document: dict[str, Any]) -> dict[str, Any]:
     yet is not described here, because nothing in the society has acted on it.
     """
     navigation = document["navigation"]
+    living = document.get("living")
+    place = living.get("place") if isinstance(living, dict) else None
+    words = place.get("words") if isinstance(place, dict) else None
     return {
         "input_seq": document["input_seq"],
         "input_sha256": document["document_sha256"],
@@ -132,7 +135,26 @@ def consumed_places(document: dict[str, Any]) -> dict[str, Any]:
             if "living" in document
             else {}
         ),
+        # What is said of where a site world's people are and walk, keyed by the society ground
+        # the catalog states its words for; a town's place states none, and serves none.
+        **(
+            {
+                "place_words": {
+                    "ground": _ground_key(navigation["profile"]),
+                    "here": words["here"],
+                    "around": words["around"],
+                }
+            }
+            if isinstance(words, dict)
+            else {}
+        ),
     }
+
+
+def _ground_key(navigation_profile: str) -> str:
+    from exulanica.world.society_grounds import society_ground_for_navigation
+
+    return society_ground_for_navigation(navigation_profile).key
 
 
 class SocietyRepository:

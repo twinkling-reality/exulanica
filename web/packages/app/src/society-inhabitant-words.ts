@@ -152,6 +152,7 @@ export function inhabitantWordsFrom(
   place: (targetId: string) => string | null,
   partner: (inhabitantId: string) => string | null,
   profile: string | null = null,
+  placeWords: PlaceWords | null = null,
 ): InhabitantWords {
   const living = person as unknown as {
     readonly ordinal?: number;
@@ -171,7 +172,7 @@ export function inhabitantWordsFrom(
       has_work: living.work != null,
       action: living.action ?? null,
       goal: living.goal ?? null,
-    }, living.ordinal);
+    }, living.ordinal, placeWords);
   }
   const who = person.display_name ?? words('phrase', 'who_unnamed');
   const what = fill(words('phrase', 'what'), { role: person.role ?? words('phrase', 'role_unknown') });
@@ -224,11 +225,20 @@ export function livingInhabitantWords(
     readonly goal?: { readonly activity: string; readonly reason?: string } | null;
   },
   ordinal: number,
+  placeWords: PlaceWords | null = null,
 ): InhabitantWords {
+  // A ground's own words (keyed `code@ground`) stand in for a town's, with the kind's words for
+  // where its people are and walk put in as they are, in one pass.
+  const grounded = (kind: Kind, code: string, values: Readonly<Record<string, string>> = {}): string => {
+    const own = placeWords === null ? undefined : TABLES[kind][`${code}@${placeWords.ground}`];
+    if (own !== undefined) return fill(own, { here: placeWords!.here, around: placeWords!.around, ...values });
+    return fill(words(kind, code), values);
+  };
   const kind = person.action?.kind ?? 'idle';
   const activity = person.goal?.activity;
+  const heading = `living_heading_${activity}` in TABLES.doing ? `living_heading_${activity}` : 'living_heading_unknown';
   const doing = kind === 'move'
-    ? TABLES.doing[`living_heading_${activity}`] ?? words('doing', 'living_heading_unknown')
+    ? grounded('doing', heading)
     : TABLES.doing[`living_${kind}`] ?? words('doing', 'living_unknown');
   const reason = person.goal?.reason ?? person.action?.reason;
   const home = person.has_home === true;
@@ -242,10 +252,21 @@ export function livingInhabitantWords(
     : 'living_why_other';
   return {
     who: fill(words('phrase', 'living_who'), { number: ordinal + 1 }),
-    what: fill(words('phrase', whatKey), { role: person.role ?? 'resident' }),
+    what: grounded('phrase', whatKey, { role: person.role ?? 'resident' }),
     doing,
     why: words('phrase', key),
   };
+}
+
+/**
+ * Where a living person is, in their world's ground's own words: the society ground entry the
+ * catalog keys those words by, and what is said of where its people are and walk, as the server
+ * serves them for a world made from a world kind.
+ */
+export interface PlaceWords {
+  readonly ground: string;
+  readonly here: string;
+  readonly around: string;
 }
 
 /** One phrase of the catalog, with its `{name}` slots filled. */

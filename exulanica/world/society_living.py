@@ -38,7 +38,7 @@ import threading
 import uuid
 from collections import OrderedDict
 from collections.abc import Iterable, Sequence
-from functools import cache, partial
+from functools import cache, lru_cache, partial
 from itertools import pairwise
 from pathlib import Path
 from typing import Any, Final
@@ -253,16 +253,23 @@ def _bound_routine(named: dict[str, Any]) -> RoutineModel:
     and, where a world kind laid an overlay over them, that overlay laid again
     (:func:`~exulanica.world.kinds.routine.overlay_routine`). A binding with no overlay reads
     exactly as it always has."""
-    routine = _routine(
-        tuple(sorted((str(k), int(v)) for k, v in named["catalog_versions"].items())),
-        society_catalogs.ROUTINE_DIRECTORY,
-    )
+    versions = tuple(sorted((str(k), int(v)) for k, v in named["catalog_versions"].items()))
+    directory = society_catalogs.ROUTINE_DIRECTORY
     overlay = named.get("overlay")
     if overlay is None:
-        return routine
+        return _routine(versions, directory)
+    stated = json.dumps(overlay, sort_keys=True, separators=(",", ":"))
+    return _overlaid(versions, directory, stated)
+
+
+@lru_cache(maxsize=32)
+def _overlaid(versions: tuple[tuple[str, int], ...], directory: Path, overlay: str) -> RoutineModel:
+    """The routine these catalog versions make with a world kind's overlay laid over it, laid once
+    per routine and overlay rather than at every read of a decision's context or a minute's
+    claim."""
     from exulanica.world.kinds.routine import overlay_routine
 
-    return overlay_routine(routine, overlay)
+    return overlay_routine(_routine(versions, directory), json.loads(overlay))
 
 
 #: How many prepared places one process keeps, the least recently read dropped first: a place is a

@@ -113,22 +113,27 @@ WALKING_SURFACES_BY_FAMILY: Final[Mapping[str, str]] = {
     "purposeful": WALKING_SURFACES_COMPOSITION,
     "living": WALKING_SURFACES_COMPOSITION_V2,
 }
-#: The kinds of a world's own records an input may name an activity of, besides the objects its
-#: person placed, per input profile: a record's subject is its kind and its identity.
-WORLD_RECORD_SUBJECTS: Final[Mapping[str, tuple[str, ...]]] = {
-    WALKING_SURFACES_INPUT: ("city.premises", "city.street_furniture"),
-    # A site world's records (a world made from a world kind) are walked through the same living
-    # input: its structures, areas and fixtures, and the home at its entry of everybody who lives
-    # off the site.
-    WALKING_SURFACES_INPUT_V2: (
-        "city.premises",
-        "city.street_furniture",
-        "site.area",
-        "site.extent",
-        "site.fixture",
-        "site.structure",
-    ),
-}
+#: The input profiles whose activities may name a world's own records as their subjects, besides
+#: the objects its person placed: those composed over a world's own walking surfaces. Which kinds
+#: of record, the ground its navigation profile names states (the society ground catalog's
+#: ``record_subjects``): a record's subject is its kind and its identity.
+WORLD_RECORD_INPUTS: Final = (WALKING_SURFACES_INPUT, WALKING_SURFACES_INPUT_V2)
+#: Record kinds an input profile's activities may name as their subjects whatever ground it is
+#: composed over, by profile: none yet.
+PROFILE_RECORD_SUBJECTS: Final[Mapping[str, tuple[str, ...]]] = {}
+
+
+def _record_subjects(document: Mapping[str, Any]) -> tuple[str, ...]:
+    stated = PROFILE_RECORD_SUBJECTS.get(document["profile"], ())
+    if document["profile"] not in WORLD_RECORD_INPUTS:
+        return stated
+    from exulanica.world.society_grounds import record_subjects_for
+
+    navigation = document.get("navigation")
+    profile = navigation.get("profile") if isinstance(navigation, Mapping) else None
+    return (*record_subjects_for(str(profile)), *stated)
+
+
 #: Why an activity may be recorded as unavailable on its own, per input profile. A profile only
 #: ever gains reasons in a new version, so a stored input is read with the vocabulary it was
 #: written under.
@@ -200,8 +205,7 @@ def validate_local_affordances(document: dict, affordances: Collection[str]) -> 
         if row["version_id"] != document["version_id"] or row["affordance"] not in affordances:
             raise ValueError("unavailable affordance scope or action mismatch")
         subjects = {f"authored:{row['version_id']}:{row['object_id']}"} | {
-            f"{kind}:{row['object_id']}"
-            for kind in WORLD_RECORD_SUBJECTS.get(document["profile"], ())
+            f"{kind}:{row['object_id']}" for kind in _record_subjects(document)
         }
         if (
             row["subject_id"] not in subjects

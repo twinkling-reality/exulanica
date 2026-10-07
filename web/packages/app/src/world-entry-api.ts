@@ -1,6 +1,7 @@
 /** Exact, durable workspace entries into personal authored worlds, and the worlds they name. */
 
 import { Transport, type GraphPayload, type TransportOptions } from '@exulanica/graph-client';
+import { societyEngine, type SocietyEngineProfile } from './society-engines.js';
 import { worldPath } from './world-scope.js';
 
 /**
@@ -159,6 +160,13 @@ export interface SavedWorldEntry {
    * it.
    */
   readonly generatedSite?: GeneratedSite | null;
+  /**
+   * The engine a society over this world is created with, as the server derives it from the
+   * world's ground: the page names it when it brings people in, and derives none of its own. Null
+   * for a world no society ground is stated for; optional so entries built elsewhere need not
+   * name it.
+   */
+  readonly societyEngine?: SocietyEngineProfile | null;
   readonly arrival?: SavedArrivalDescriptor | null;
   readonly arrivalUnavailableReason?: 'arrival_source_unavailable' | null;
   readonly arrivalScene?: GraphPayload['reconstruction_scenes'][number] | null;
@@ -881,6 +889,7 @@ function parseEntry(value: unknown): SavedWorldEntry {
     declaredFloor: parseDeclaredFloor(row['declared_floor']),
     generatedGround,
     generatedSite,
+    societyEngine: row['society_engine'] == null ? null : societyEngine(row['society_engine']).engine,
     arrival,
     arrivalUnavailableReason: arrivalUnavailableReason ?? null,
     arrivalScene,

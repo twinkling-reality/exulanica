@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "catalog_id": "kind-society",
+  "catalog_version": 1,
+  "entries": [
+    {
+      "key": "around",
+      "use_class": "",
+      "words": "around here",
+      "reason": "Where a site's people walk on their way, said of them where their kind states no words of its own (\"walking around here\"); a kind says it in its own words, such as \"across the farm\".",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "here",
+      "use_class": "",
+      "words": "here",
+      "reason": "Where a site's people are, said of them where their kind states no words of its own (\"a simulated farmhand here\"); a kind says it in its own words, such as \"on this farm\".",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "home",
+      "use_class": "residential",
+      "words": "",
+      "reason": "The use class a part with the home role takes when its kind names none: the society's residential unit, whose residents are the sleepers of the beds in its rooms. It is read by the part's own words.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "offsite_home",
+      "use_class": "residential",
+      "words": "home, off the site",
+      "reason": "Where everybody who lives off a site has their home when its kind states none of its own: one residential unit at the entry, which they come in through and go back out by, read by these words.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    },
+    {
+      "key": "seat",
+      "use_class": "bench",
+      "words": "",
+      "reason": "The use class a part with the seat role takes when its kind names none: the society's bench, where people rest. It is read by the part's own words.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica world kinds; see the entry reasons"
+      }
+    }
+  ]
+}
