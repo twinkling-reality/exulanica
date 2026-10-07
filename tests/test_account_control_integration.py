@@ -40,7 +40,8 @@ def services(tmp_path, **kwargs):
 
 
 def test_account_only_startup_never_replaces_explicit_bad_tokens(monkeypatch, tmp_path):
-    runtime = object()
+    # A runtime stand-in with no guest entry, as Google sign-in alone configures.
+    runtime = SimpleNamespace(guest=None)
     monkeypatch.setattr("exulanica.api.services.load_account_runtime", lambda _: runtime)
     environ = {"EXULANICA_DATABASE_URL": "postgresql://unused", "EXULANICA_DATA_DIR": str(tmp_path)}
     assert len(build_services(environ).tokens) == 0
@@ -87,7 +88,7 @@ def test_account_workspace_query_matches_current_membership_and_revocation_autho
     assert "u.disabled_at is null" in connection.statement
     assert "w.disabled_at is null" in connection.statement
     assert "m.revoked_at is null" in connection.statement
-    assert "m.membership_role='owner'" in connection.statement
+    assert "m.membership_role in ('owner','guest')" in connection.statement
     assert "m.user_id=w.owner_user_id" in connection.statement
     assert "account_browser_session" not in connection.statement
 

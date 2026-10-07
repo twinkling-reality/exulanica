@@ -44,6 +44,19 @@ def _body_cap(conf: str) -> int:
     return int(caps[0]) * MIB
 
 
+def _zone_seconds_per_request(conf: str, zone: str) -> int:
+    """How many seconds one request of a limit zone's rate takes, read as nginx reads a rate: a
+    whole number of requests per second (r/s) or per minute (r/m), its only two units. A rate in
+    any other unit stops nginx from starting."""
+    rate = re.search(rf"zone={zone}:\d+m rate=(\S+);", conf)
+    assert rate is not None, zone
+    stated = re.fullmatch(r"([1-9]\d*)r/(s|m)", rate.group(1))
+    assert stated is not None, f"nginx cannot start with rate={rate.group(1)}"
+    period = {"s": 1, "m": 60}[stated.group(2)]
+    assert period % int(stated.group(1)) == 0
+    return period // int(stated.group(1))
+
+
 def _without_body_cap(conf: str) -> str:
     """The configuration with its body cap, the comment above it and the cap's refusal removed."""
     lines = conf.splitlines()
@@ -79,33 +92,119 @@ def test_the_proxys_own_refusals_take_the_problem_shape(which):
     conf = _installation_configuration() if which == "installation" else _reviewer_configuration()
     # Answers from the API pass through unchanged.
     assert not re.search(r"^\s*proxy_intercept_errors", conf, re.M)
-    pages = dict(re.findall(r"^\s*error_page (\d{3}) = @([a-z_]+);$", conf, re.M))
-    assert set(pages) == {"413", "429", "502", "504"}
+    pages = sorted(set(re.findall(r"^\s*error_page (\d{3}) = @([a-z_]+);$", conf, re.M)))
+    assert pages == [
+        ("413", "body_too_large"),
+        ("413", "guest_body_too_large"),
+        ("429", "guest_entries_limited"),
+        ("429", "rate_limited"),
+        ("502", "upstream_unavailable"),
+        ("504", "upstream_timeout"),
+    ]
+    # Each refusal's code and Retry-After, by the location that answers it: a limit's refusal asks
+    # for the time its zone's rate gives one request, the guest entry's own and not the write's.
     expected = {
-        "413": ("body_too_large", None),
-        "429": ("rate_limited", 2),
-        "502": ("upstream_unavailable", 5),
-        "504": ("upstream_timeout", None),
+        "body_too_large": ("body_too_large", None),
+        "guest_body_too_large": ("body_too_large", None),
+        "rate_limited": ("rate_limited", _zone_seconds_per_request(conf, "exulanica_writes")),
+        "guest_entries_limited": (
+            "rate_limited",
+            _zone_seconds_per_request(conf, "exulanica_guest_entries"),
+        ),
+        "upstream_unavailable": ("upstream_unavailable", 5),
+        "upstream_timeout": ("upstream_timeout", None),
     }
-    for status, location in pages.items():
+    for status, location in pages:
         block = conf.split(f"location @{location} {{", 1)[1].split("\n    }", 1)[0]
         assert "default_type application/json;" in block
         answered = re.search(r"^\s*return (\d{3}) '(.*)';$", block, re.M)
         assert answered is not None and answered.group(1) == status
+        # nginx ends a single-quoted string at the next quote: one inside stops it from starting.
+        assert "'" not in answered.group(2), location
         body = json.loads(answered.group(2))
-        code, retry_after = expected[status]
+        code, retry_after = expected[location]
         assert body["code"] == code
         assert isinstance(body["detail"], str) and body["detail"]
         header = re.search(r'add_header Retry-After "(\d+)" always;', block)
         assert (int(header.group(1)) if header else None) == retry_after
         assert body.get("retry_after_seconds") == retry_after
-        if status == "413":
+        if location == "body_too_large":
             assert body["limit_bytes"] == _body_cap(conf)
+        if location == "guest_body_too_large":
+            guest = conf.split("location = /api/auth/guest {", 1)[1].split("\n    }", 1)[0]
+            cap = re.search(r"client_max_body_size (\d+)k;", guest)
+            assert cap is not None and body["limit_bytes"] == int(cap.group(1)) * 1024
         if status == "504":
             timeout = re.search(r"proxy_read_timeout (\d+)s;", conf)
             assert timeout is not None and f"within {timeout.group(1)} seconds" in body["detail"]
-    # The write limit's Retry-After is its rate: one write every two seconds.
-    assert "rate=30r/m;" in conf
+    # Every zone's rate is one nginx can start with. The write limit is one write every two
+    # seconds; the guest entry's is far slower, and no slower than nginx can count.
+    for zone in re.findall(r"^limit_req_zone \S+ zone=(\w+):", conf, re.M):
+        _zone_seconds_per_request(conf, zone)
+    assert _zone_seconds_per_request(conf, "exulanica_writes") == 2
+    assert _zone_seconds_per_request(conf, "exulanica_guest_entries") == 60
+
+
+@pytest.mark.parametrize("which", ["installation", "reviewer"])
+def test_every_location_reaching_the_api_answers_the_proxys_four_problem_pages(which):
+    """nginx gives a location that names any error_page only its own, not the server's beside
+    them. So every location that reaches the API either names none, and takes the server's four,
+    or names all four of 413, 429, 502 and 504: a dead API answers the problem shape, not nginx's
+    HTML page, wherever the request went."""
+    conf = _installation_configuration() if which == "installation" else _reviewer_configuration()
+    server = set(re.findall(r"^    error_page (\d{3}) = @", conf, re.M))
+    assert server == {"413", "429", "502", "504"}
+    blocks = re.findall(r"^    location ([^@{][^{]*)\{(.*?)\n    \}", conf, re.M | re.S)
+    reaching = [
+        (name.strip(), body) for name, body in blocks if "proxy_pass http://api:8000" in body
+    ]
+    assert [name for name, _ in reaching] == ["= /api/auth/guest", "/api/"]
+    for name, body in reaching:
+        own = set(re.findall(r"^\s*error_page (\d{3}) = @", body, re.M))
+        assert own in (set(), server), (name, own)
+    guest = dict(reaching)["= /api/auth/guest"]
+    assert re.search(r"^\s*client_max_body_size 1k;$", guest, re.M)
+
+
+@pytest.mark.parametrize("which", ["installation", "reviewer"])
+def test_a_guest_entry_is_counted_by_the_address_the_edge_set(which):
+    """The guest entry's limit is per client address, and that address is the one the edge put in
+    X-Forwarded-For: trusted only from a container network's private ranges, and without
+    real_ip_recursive, which would let an address a client wrote earlier in the header be counted.
+    The edge replaces the header it receives (its Caddyfile trusts no proxy before it)."""
+    conf = _installation_configuration() if which == "installation" else _reviewer_configuration()
+    assert re.findall(r"^\s*set_real_ip_from (\S+);$", conf, re.M) == [
+        "10.0.0.0/8",
+        "172.16.0.0/12",
+        "192.168.0.0/16",
+    ]
+    assert re.search(r"^\s*real_ip_header X-Forwarded-For;$", conf, re.M)
+    directives = "\n".join(line for line in conf.splitlines() if not line.lstrip().startswith("#"))
+    assert "real_ip_recursive" not in directives
+    mapping = conf.split("map $request_method $exulanica_guest_client {", 1)[1].split("}", 1)[0]
+    assert re.search(r"^\s*POST \$binary_remote_addr;$", mapping, re.M)
+    assert re.search(r'^\s*default "";$', mapping, re.M)
+    zone = r"^limit_req_zone \$exulanica_guest_client zone=exulanica_guest_entries:"
+    assert re.search(zone, conf, re.M)
+    guest = conf.split("location = /api/auth/guest {", 1)[1].split("\n    }", 1)[0]
+    assert "limit_req zone=exulanica_guest_entries burst=3 nodelay;" in guest
+    assert "limit_req zone=exulanica_writes burst=20 nodelay;" in guest
+    for caddyfile in ("deploy/judge/Caddyfile", "deploy/public/Caddyfile"):
+        assert "trusted_proxies" not in (ROOT / caddyfile).read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize("which", ["installation", "reviewer"])
+def test_the_api_is_reached_at_the_host_and_port_the_browser_used(which):
+    """The sign-in routes compare the origin they were reached at with the configured browser
+    origin, which names its port when it is not the scheme's default (https://host:8443). nginx's
+    $host drops the port, so every location that reaches the API passes the Host header as the
+    browser sent it."""
+    conf = _installation_configuration() if which == "installation" else _reviewer_configuration()
+    locations = re.findall(r"location [^{]*\{(.*?)\n    \}", conf, re.S)
+    reaching = [block for block in locations if "proxy_pass http://api:8000" in block]
+    assert len(reaching) == 2
+    for block in reaching:
+        assert re.findall(r"proxy_set_header Host (\S+);", block) == ["$http_host"]
 
 
 def test_the_client_image_fetches_nothing_and_states_its_provenance():

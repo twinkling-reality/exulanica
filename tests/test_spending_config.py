@@ -10,8 +10,10 @@ from __future__ import annotations
 
 import json
 import uuid
+from types import SimpleNamespace
 
 import pytest
+from exulanica.api.account_runtime import load_guest_entry
 from exulanica.api.services import build_services
 from exulanica.db.session import Database
 from exulanica.ingest.worker_command import MODEL_KEY_ENVS, worker_model_client
@@ -134,3 +136,43 @@ def test_the_worker_composes_its_client_by_the_same_rule(tmp_path):
     )
     assert process is not None and process.spending_source is None
     assert worker_model_client({}, database) is None
+
+
+GUEST_ENTRY = {
+    "EXULANICA_GUEST_ENTRY": "open",
+    "EXULANICA_GUEST_ENTRIES_PER_DAY": "10",
+    "EXULANICA_ACCOUNT_BROWSER_ORIGINS": '["https://app.test"]',
+    "EXULANICA_ACCOUNT_DATABASE_URL": "postgresql://localhost:5433/never-connected-to",
+}
+
+
+def test_a_guest_entry_with_a_model_credential_needs_durable_spending(tmp_path, monkeypatch):
+    """A guest's allowance is a grant under the durable authority: under process spending a
+    visitor has none and would spend from the fuse every owner shares, so startup refuses."""
+    # The account runtime as the environment configures it, without its database check: only its
+    # guest entry is read here, and that is parsed from the same settings.
+    monkeypatch.setattr(
+        "exulanica.api.services.load_account_runtime",
+        lambda environ: SimpleNamespace(guest=load_guest_entry(environ)),
+    )
+    with pytest.raises(SpendingConfigurationError, match="needs EXULANICA_SPENDING=durable"):
+        build_services(
+            _environ(tmp_path, EXULANICA_SPENDING="process", **GUEST_ENTRY, **CREDENTIALS),
+            model_client=_client(),
+        )
+    # With no model at all a guest spends nothing, and the guest entry starts.
+    services = build_services(_environ(tmp_path, **GUEST_ENTRY))
+    assert services.accounts is not None and services.accounts.guest is not None
+    # Under durable spending it starts with the model.
+    FileSpendingWitness(tmp_path / "witness").ensure_directory_id()
+    durable = build_services(
+        _environ(
+            tmp_path,
+            EXULANICA_SPENDING="durable",
+            EXULANICA_SPENDING_WITNESS_DIR=str(tmp_path / "witness"),
+            **GUEST_ENTRY,
+            **CREDENTIALS,
+        ),
+        model_client=_client(),
+    )
+    assert durable.spending is not None and durable.accounts is not None

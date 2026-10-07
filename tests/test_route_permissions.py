@@ -30,6 +30,7 @@ from types import MappingProxyType, SimpleNamespace
 import psycopg
 import pytest
 from exulanica.api import permissions
+from exulanica.api.account_repository import AccountSession
 from exulanica.api.admission import AdmissionSettings
 from exulanica.api.app import create_app
 from exulanica.api.authorisation import TokenDirectory, TokenNotAccepted, load_token_directory
@@ -37,6 +38,7 @@ from exulanica.api.authorisation import TokenNotAccepted as _NotAccepted
 from exulanica.api.dependencies import _grant
 from exulanica.api.permissions import (
     ACCOUNT_OWNER_PERMISSIONS,
+    GUEST_PERMISSIONS,
     MEMBERSHIP_ROLE_PERMISSIONS,
     ROUTE_RULES,
     Authentication,
@@ -332,15 +334,35 @@ def test_the_refusal_ledger_check_names_exactly_the_vocabulary():
 
 
 def test_every_membership_role_the_schema_allows_has_a_declared_grant():
-    """Migration 0058 closes membership_role; a new role there fails here until it has a grant."""
-    sql = (migration_directory() / "0058_accounts_and_sessions.sql").read_text(encoding="utf-8")
-    checks = re.findall(r"membership_role\s+text\s+not\s+null\s+check\(([^)]*)\)", sql)
-    assert len(checks) == 1, checks
-    roles = set(re.findall(r"'([a-z_]+)'", checks[0]))
-    assert roles == set(MEMBERSHIP_ROLE_PERMISSIONS) == {"owner"}
-    # And the session lookup a browser request goes through still admits that role alone.
+    """Migration 0058 closed membership_role and 0139 widened it; a new role in the latest check
+    fails here until it has a grant."""
+    allowed: set[str] | None = None
+    for path in sorted(migration_directory().glob("*.sql")):
+        sql = path.read_text(encoding="utf-8")
+        for check in re.findall(
+            r"membership_role\s+text\s+not\s+null\s+check\(([^)]*)\)"
+            r"|check \(membership_role in \(([^)]*)\)\)",
+            sql,
+        ):
+            allowed = set(re.findall(r"'([a-z_]+)'", "".join(check)))
+    assert allowed == set(MEMBERSHIP_ROLE_PERMISSIONS) == {"owner", "guest"}
+    # And the session lookup a browser request goes through admits those roles alone.
     source = inspect.getsource(importlib.import_module("exulanica.api.account_repository"))
-    assert "m.membership_role='owner'" in source
+    assert "m.membership_role in ('owner','guest')" in source
+
+
+def test_a_guest_holds_the_journey_and_nothing_else():
+    """A visitor may make and open worlds, choose models, compare, ask and correct the Companion
+    and delete what they made; never intake, consent, admission, operations or tiles."""
+    assert MEMBERSHIP_ROLE_PERMISSIONS["guest"] is GUEST_PERMISSIONS
+    assert {
+        Permission.WORLD_READ,
+        Permission.WORLD_WRITE,
+        Permission.MODEL_INVOKE,
+        Permission.LIBRARY_READ,
+        Permission.LIBRARY_WRITE,
+        Permission.DELETION_WRITE,
+    } == GUEST_PERMISSIONS
 
 
 def test_the_owner_grant_is_everything_but_tiles():
@@ -463,14 +485,17 @@ class StubAccounts:
     needs from it is only the session a cookie resolves to, or ``TokenNotAccepted``.
     """
 
-    def __init__(self, cookie: str, session: Session) -> None:
-        self.cookie, self.session, self.calls = cookie, session, 0
+    def __init__(self, cookie: str, session: Session, role: str = "owner") -> None:
+        self.cookie, self.session, self.role, self.calls = cookie, session, role, 0
 
     def authenticate_request(self, request) -> Session:
+        return self.browser_session(request).session
+
+    def browser_session(self, request) -> AccountSession:
         self.calls += 1
         if request.cookies.get(SESSION_COOKIE) != self.cookie:
             raise _NotAccepted("browser session was not accepted")
-        return self.session
+        return AccountSession(uuid.uuid4(), self.session, "c" * 43, None, self.role)  # type: ignore[arg-type]
 
 
 @dataclass
@@ -798,15 +823,18 @@ def test_a_bad_bearer_header_never_falls_back_to_the_cookie(floor):
     assert floor.accounts.calls == before
 
 
-def test_the_browser_grant_is_the_owner_grant_and_holds_no_tiles():
+@pytest.mark.parametrize(
+    ("role", "grant"), [("owner", ACCOUNT_OWNER_PERMISSIONS), ("guest", GUEST_PERMISSIONS)]
+)
+def test_the_browser_grant_is_the_membership_role_s_and_holds_no_tiles(role, grant):
     session = Session(uuid.uuid4(), uuid.uuid4())
-    accounts = StubAccounts("c", session)
+    accounts = StubAccounts("c", session, role)
     services = type("Services", (), {"accounts": accounts})()
     app = type("App", (), {"state": type("State", (), {"services": services})()})()
     request = type("Request", (), {"cookies": {SESSION_COOKIE: "c"}, "app": app})()
     resolved, held = _grant(request, None)  # type: ignore[arg-type]
     assert resolved is session
-    assert held is ACCOUNT_OWNER_PERMISSIONS
+    assert held is grant
     assert Permission.TILES_MATERIALISE not in held
 
 

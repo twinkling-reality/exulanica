@@ -285,6 +285,10 @@
     {
       "table": "spending_event",
       "reason": "The durable spending ledger's chain (migration 0124). Its revocation events record revocations whose own rows are carried (spending_authority, spending_grant); a restored ledger is carried forward from the spending witness, never replayed from a checkpoint."
+    },
+    {
+      "table": "spending_guest_policy",
+      "reason": "An operator's guest policy, ended when another replaces it or the operator withdraws it (migration 0139). A restore may bring back a policy that had ended, so spending_grant_guest grants nothing under a policy set before the authority's latest restore reconciliation or reauthorization: the operator states it again, and spending status shows which policies wait for that."
     }
   ]
 }

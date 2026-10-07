@@ -67,7 +67,7 @@ def test_current_workspace_query_uses_membership_revocation_not_browser_sessions
     assert "u.disabled_at is null" in statement
     assert "w.disabled_at is null" in statement
     assert "m.revoked_at is null" in statement
-    assert "m.membership_role='owner'" in statement
+    assert "m.membership_role in ('owner','guest')" in statement
     assert "m.user_id=w.owner_user_id" in statement
     assert "account_browser_session" not in statement
 

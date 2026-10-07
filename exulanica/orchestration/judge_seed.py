@@ -161,6 +161,8 @@ INSTANCE_TABLES: Final[Mapping[str, str]] = {
     "account_membership": "per-deployment account authorization relationship",
     "account_user": "per-deployment account identity",
     "account_workspace": "per-deployment account-owned workspace registry",
+    "account_guest_entry": "per-deployment guest entry that made a guest's account",
+    "account_guest_day": "per-deployment count of a day's guest entries",
     # Cross-workspace match calibration, keyed on `predicate_id` and accumulated by whichever
     # deployment ran the matcher. Carrying one deployment's empirical bins into another would be
     # importing a confidence curve measured on a corpus the destination does not hold.
@@ -181,6 +183,7 @@ INSTANCE_TABLES: Final[Mapping[str, str]] = {
     "spending_grant_revocation": "per-deployment spending grant revocation",
     "spending_reservation": "per-deployment spending reservation and settlement",
     "spending_event": "per-deployment spending ledger",
+    "spending_guest_policy": "per-deployment figures a guest workspace is granted",
     # The host publishes its character catalogs; a destination publishes its own, and a saved look
     # it cannot resolve there reads as unavailable rather than borrowing the source's catalog.
     "character_catalog_publication": "host-admin character catalog publication, per deployment",

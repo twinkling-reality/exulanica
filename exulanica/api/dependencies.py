@@ -52,7 +52,7 @@ from starlette.concurrency import run_in_threadpool
 from exulanica.api.admission import claim_workspace
 from exulanica.api.authorisation import TokenNotAccepted
 from exulanica.api.permissions import (
-    ACCOUNT_OWNER_PERMISSIONS,
+    MEMBERSHIP_ROLE_PERMISSIONS,
     SELF_CHARGING_TILE_ROUTES,
     Authentication,
     Permission,
@@ -117,12 +117,12 @@ def _grant(request: Request, authorization: str | None) -> tuple[Session, frozen
     An explicit header always wins, including malformed or expired credentials. A failed bearer
     request cannot acquire different authority by falling back to a browser cookie.
 
-    A bearer token holds the permissions its grant names. A browser session holds
-    :data:`~exulanica.api.permissions.ACCOUNT_OWNER_PERMISSIONS`, and that is a declaration rather
-    than a default: a browser session exists only for an account membership, migration 0058 allows
-    exactly one membership role, ``owner``, and ``AccountRepository.session`` refuses any membership
-    that is not it. ``tests/test_route_permissions.py`` reads that check and fails when a second
-    role appears, so a new role cannot inherit the owner's grant by omission.
+    A bearer token holds the permissions its grant names. A browser session holds the grant of its
+    membership role, :data:`~exulanica.api.permissions.MEMBERSHIP_ROLE_PERMISSIONS`, and that is a
+    declaration rather than a default: a browser session exists only for an account membership, the
+    migrations allow ``owner`` and ``guest`` (0058, 0139), and ``AccountRepository.session``
+    refuses any other. ``tests/test_route_permissions.py`` reads the latest check and fails when a
+    role appears without a grant, so a new role cannot inherit another's by omission.
 
     The scheme is checked before a token is looked up, so a caller sending a basic credential gets
     the same refusal as a caller sending nothing, rather than having their value compared against
@@ -130,7 +130,8 @@ def _grant(request: Request, authorization: str | None) -> tuple[Session, frozen
     """
     services = get_services(request)
     if authorization is None and services.accounts is not None:
-        return services.accounts.authenticate_request(request), ACCOUNT_OWNER_PERMISSIONS
+        account = services.accounts.browser_session(request)
+        return account.session, MEMBERSHIP_ROLE_PERMISSIONS[account.role]
     scheme, _, presented = (authorization or "").partition(" ")
     if scheme.lower() != "bearer" or not presented:
         raise TokenNotAccepted("expected an Authorization header of the form 'Bearer <token>'")

@@ -436,10 +436,67 @@ the owned workspace with cookie credentials and adds its in-memory CSRF value to
 signed-out session is offered Google sign-in; a host without account configuration shows the
 developer-token entry instead. An account starts with an empty workspace of its own, with no world
 copied into it and no link inferred to existing bearer data. Derivative workers combine their
-configured workspaces with a fresh account-role query for active owner memberships when accounts
-are configured; a browser session is never taken as membership authority. Account revocation keeps
-historical attribution. Full account-data deletion, invitations, retention cleanup and request rate
-limits are not built. Access logs must redact callback query values, cookies and CSRF tokens.
+configured workspaces with a fresh account-role query for active owner and guest memberships when
+accounts are configured; a browser session is never taken as membership authority. Account
+revocation keeps historical attribution. Full account-data deletion, invitations and retention
+cleanup are not built. Access logs must redact callback query values, cookies and CSRF tokens.
+
+**The guest entry.** A host may also admit visitors with no account of their own (migration 0139),
+with or without Google sign-in beside it:
+
+| Variable | Purpose |
+| --- | --- |
+| `EXULANICA_GUEST_ENTRY` | `off` (the default), `open`, or `code` |
+| `EXULANICA_GUEST_ENTRY_CODE_SHA256` | With `code`: the lowercase SHA-256 of the code visitors are given. The code itself is never configured |
+| `EXULANICA_GUEST_ENTRIES_PER_DAY` | Required with a guest entry, no default: how many guests a day (UTC) enters |
+| `EXULANICA_GUEST_SESSION_SECONDS` | How long a guest's session lasts: 604800 (seven days) by default, at most thirty days |
+
+It needs `EXULANICA_ACCOUNT_DATABASE_URL` and `EXULANICA_ACCOUNT_BROWSER_ORIGINS`. With a model
+credential it also needs `EXULANICA_SPENDING=durable`, and startup refuses otherwise: a guest's
+allowance is a grant under the durable authority, and under process spending every visitor would
+spend from the fuse the owners share.
+
+`POST /auth/guest` (`{}`, or `{"code": "..."}`) checks the request's `Origin` and the code. Then,
+in one transaction on the account role, it counts the day's entries against the limit and makes:
+- a user with no identity;
+- a workspace;
+- a membership in the role `guest`;
+- the entry;
+- a session with the same `__Host-` cookie and CSRF token a sign-in sets.
+
+After that commits, the workspace is granted its allowance by the spending authority's guest policy
+([model spending](model-spending-contract.md#2-authorities-grants-and-bounds)) and given its first
+world from the arrival list (8.2). Either may fail without undoing the entry.
+
+Once the account exists it answers 201 with the session cookie, `role`, `allowance`, `arrival` and
+`incomplete`, which names each step that failed: `allowance` with the refusal's code (for instance
+`guest_grants_exhausted`) or `allowance_failed`, and `arrival` with `arrival_not_made`. A guest who
+holds no allowance on a provider is granted it on their next `GET /auth/session`. The refusals,
+before anything is made, are:
+- 403 `guest_entry_code_wrong`;
+- 403 `origin_not_permitted`;
+- 429 `guest_entries_exhausted` when the day is full, with `Retry-After` the seconds to 00:00 UTC;
+- 503 `guest_entry_off` on a host with accounts and no guest entry;
+- 503 `guest_entry_unavailable`, with `Retry-After` 30, when the account database does not answer;
+- 503 `account_unavailable`, as every account route answers, on a host with no accounts.
+
+**What one address can do.** The client proxies count entries per address, three at once and then
+one a minute, so one script from one address takes about 60 entries an hour, and a day of 100 in
+under two hours. Every later visitor that day is then refused `guest_entries_exhausted`, and that
+script holds the day's allowances. Spending stays within the operator's figures (the day's limit,
+the policy's grants a day, the authority); the front door is what is lost. For an event, use
+`code` with a code given only to the people invited, at least 20 characters (`public.sh init`
+refuses a shorter one): only its unsalted SHA-256 is kept, and a wrong code is answered at once.
+
+A guest holds the journey's permissions and no others
+([security floor](security-floor.md#1-route-permissions)). `GET /auth/session` answers a guest's
+`role` and `allowance`. A session's last use (`seen_at`) is written at most once a minute. The
+client proxies count guest entries per client address, three at once and then one a minute (the
+slowest rate nginx states), apart from the write limit (5.4.8), accept an entry's body only up to
+1 KiB, and answer their own refusals in the problem shape in that location too; the day's limit is
+the cap. They pass the API the host and port the browser used, which the sign-in routes compare
+with the configured origin. Nothing a guest made is deleted when their session ends; whoever
+holds the cookie holds the workspace, and a lost cookie leaves it reachable by nobody.
 
 #### 5.1.5 Society playback
 
@@ -1221,13 +1278,11 @@ workspaces names many worlds, each its workspace's own.
 **Built and not built.**
 - Built: the composition, `deploy/public/public.sh`, the tile worker and the arrival worlds, and the
   host's health and preflight timers.
-- Not built:
-  - a visitor's own entry (a guest session with a workspace of its own, its arrival world and an
-    allowance from the authority);
-  - models for workspaces found through accounts.
-
-  Until they exist, the server admits holders of tokens the operator mints (`mint`). The people of
-  those tokens' workspaces play, and may be decided by models under each workspace's grant.
+- Built: a visitor's own entry (5.1.4): one request makes a guest's workspace, gives it its
+  allowance under the guest policy and its first world from the arrival list.
+- Not built: models for workspaces found through accounts, and playing a visitor's town only while
+  it is watched. Until they are, a guest's town opens with its people on their routines, and the
+  operator's minted tokens (`mint`) remain the way to a town whose people models decide.
 
 `deploy/public/public.sh` runs every step. Every step but `build`, `images` and `save` reads the
 secrets directory `EXULANICA_DEPLOY_DIR`:
@@ -1238,9 +1293,9 @@ secrets directory `EXULANICA_DEPLOY_DIR`:
 | `images`, `save <file>` | Print the image IDs; write the four images to one gzip archive and print its sha256 |
 | `init` | Writes `public.env` (mode 0600, in a directory created 0700). It holds seven generated role passwords, the `public` profile, the host, issuer, edge address and ports, the backup and custody directories, and the model endpoint's allowlist. It also writes the operator's token, whose grant holds `operations.read` alone. Custody inside the backup directory is refused. The fuse is left empty |
 | `mint <label>`, `revoke <label>` | Add or remove a token for a workspace of its own, minted by the image's `exulanica-seed token` with the reviewer's permissions. The next `up` serves the change and plays those workspaces |
-| `up` | Starts the server from loaded images, never building. It refuses until the fuse is filled in. `restore-marker`, `migrate` and `catalogs` run to completion on every start |
+| `up` | Starts the server from loaded images, never building. It refuses until the fuse is filled in, and refuses when the merged Compose configuration publishes a port for `api` or `client`: only the edge may, because the API trusts forwarded headers from anything that reaches it and the client proxy trusts `X-Forwarded-For` from private ranges. `restore-marker`, `migrate` and `catalogs` run to completion on every start |
 | `prepare-towns` | Makes the arrival worlds in the operator's workspace, inside the API's container (`exulanica-arrival-worlds prepare`), and prints each tile's state; run it again to read them once baked |
-| `issue-authority`, `grant <label>`, `spending` | Issue the server's spending authority from `EXULANICA_AUTHORITY_USD`, `EXULANICA_AUTHORITY_CALLS` and `EXULANICA_AUTHORITY_VALID_UNTIL`; grant a minted workspace `EXULANICA_GRANT_USD` and `EXULANICA_GRANT_CALLS` under it; print the authorities' state. Each runs `python -m exulanica.spending` as the owner in a one-shot container on the server's network, with the witness volume |
+| `issue-authority`, `guest-policy`, `guest-policy-withdraw`, `grant <label>`, `spending` | Issue the server's spending authority from `EXULANICA_AUTHORITY_USD`, `EXULANICA_AUTHORITY_CALLS` and `EXULANICA_AUTHORITY_VALID_UNTIL`; grant a minted workspace `EXULANICA_GRANT_USD` and `EXULANICA_GRANT_CALLS` under it; set what each guest is granted under it (`EXULANICA_GUEST_USD`, `EXULANICA_GUEST_CALLS`, `EXULANICA_GUEST_DAYS`) and how many guests it grants in a UTC day (`EXULANICA_GUEST_GRANTS_PER_DAY`, the day's entries unless stated); end that policy so no guest is granted anything until another is set; print the authorities' state and each live guest policy, with whether it must be set again. Each runs `python -m exulanica.spending` as the owner in a one-shot container on the server's network, with the witness volume |
 | `backup-now` | One maintenance pass now (9.3) |
 | `status` | The containers, readiness from inside the client container, Docker's disk use and the backup and custody file systems |
 | `watch` | One liveness and readiness read through the edge, resolved to this machine. Three liveness failures in a row recreate the API container, because Docker restarts a container that exits and never one that only fails its health check (section 9) |
@@ -1264,10 +1319,15 @@ a second disk for backups. The layout the systemd units name:
    `gunzip -c public-images.tar.gz | docker load` and `deploy/public/public.sh images`; the IDs
    must equal the build host's.
 2. Run `init` with `EXULANICA_PUBLIC_HOST`, `EXULANICA_TLS` (the certificate contact email),
-   `EXULANICA_EDGE_ADDRESS=0.0.0.0`, `EXULANICA_BACKUP_PATH` and `EXULANICA_CUSTODY_PATH`. Then fill
-   in the fuse in `public.env`.
+   `EXULANICA_EDGE_ADDRESS=0.0.0.0`, `EXULANICA_BACKUP_PATH`, `EXULANICA_CUSTODY_PATH` and the
+   guest entry (`EXULANICA_GUEST_ENTRY`, `EXULANICA_GUEST_ENTRY_CODE` for `code`,
+   `EXULANICA_GUEST_ENTRIES_PER_DAY`), a code of at least 20 characters; only the code's SHA-256
+   is written. Then fill in the fuse in
+   `public.env`.
 3. `read -rs NEBIUS_API_KEY && export NEBIUS_API_KEY`, then `up`, then `issue-authority` with the
-   allowance the operator approved, then `prepare-towns`, run again until every tile reads baked.
+   allowance the operator approved, then `guest-policy` with each visitor's figures, then
+   `prepare-towns`, run again until every tile reads baked: a visitor's arrival world is made only
+   once its tiles are.
 4. Install the four units in `deploy/public/` into `/etc/systemd/system`, then
    `systemctl enable --now exulanica-public-watch.timer exulanica-public-preflight.timer`. The watch
    timer runs every minute and the preflight daily; both write to the journal.
@@ -1298,8 +1358,14 @@ arrival world, not only the one being baked (migration 0072's rule), until the o
 decision to serve its stored first bake (`exulanica-tile-fault clear`, 9.1). A visitor's copy of
 an arrival world is made only once its tiles are baked. No off-host copy of the backups
 is made, so the loss of the host loses both disks. A
-restore has not been timed on the host (D-3). The process fuse starts again at every restart; the
-authority does not. Per-address limits do not bound how many addresses write at once.
+restore has not been timed on the host (D-3). After a restore, reconcile the authority, then set
+the guest policy again (`guest-policy`): a policy set before a restore's reconciliation or a
+reauthorization grants nothing, because the restored database may hold one the operator had
+replaced or withdrawn. The process fuse starts again at every restart; the authority does not.
+Per-address limits do not bound how many addresses write at once. The edge's access log drops
+cookies, the authorization header and a session's CSRF token, and keeps a visitor's address only
+to its network (/24, /48); it is kept by size (each container's log, ten files of 10 MB), not
+for a stated time.
 
 ## 9. Backups and recovery
 

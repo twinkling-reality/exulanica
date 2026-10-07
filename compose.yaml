@@ -116,6 +116,12 @@ services:
       EXULANICA_GOOGLE_RETURN_URIS: ${EXULANICA_GOOGLE_RETURN_URIS:-}
       EXULANICA_ACCOUNT_BROWSER_ORIGINS: ${EXULANICA_ACCOUNT_BROWSER_ORIGINS:-}
       EXULANICA_ACCOUNT_DATABASE_URL: ${EXULANICA_ACCOUNT_DATABASE_URL:-}
+      # The guest entry (docs/deployment.md 5.1.4): off unless stated; its figures are the
+      # operator's, with no default for the day's limit.
+      EXULANICA_GUEST_ENTRY: ${EXULANICA_GUEST_ENTRY:-}
+      EXULANICA_GUEST_ENTRY_CODE_SHA256: ${EXULANICA_GUEST_ENTRY_CODE_SHA256:-}
+      EXULANICA_GUEST_ENTRIES_PER_DAY: ${EXULANICA_GUEST_ENTRIES_PER_DAY:-}
+      EXULANICA_GUEST_SESSION_SECONDS: ${EXULANICA_GUEST_SESSION_SECONDS:-}
       <<: *society-playback
       # Who plays: "on" (the default), this process in threads; "process", the playback-worker
       # service below, started with `--profile playback`, and this process plays nothing.

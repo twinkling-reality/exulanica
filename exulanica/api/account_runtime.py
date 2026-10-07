@@ -42,11 +42,13 @@ from psycopg.rows import dict_row
 from starlette.requests import Request
 
 from exulanica.api.account_repository import (
+    GUEST_SESSION_SECONDS_MAXIMUM,
     ISSUER,
     AccountRejected,
     AccountRepository,
     AccountSession,
     AccountUnavailable,
+    GuestEntry,
 )
 from exulanica.api.authorisation import TokenNotAccepted
 from exulanica.db.account_workspaces import (
@@ -135,6 +137,63 @@ class GoogleAccountConfig:
             hashlib.sha256(self.client_secret.encode()).hexdigest(),
         ]
         return hashlib.sha256(json.dumps(value, separators=(",", ":")).encode()).hexdigest()
+
+
+class GuestCodeRefused(AccountRejected):
+    """The entry code sent does not open this server's guest entry."""
+
+
+class GuestEntryOff(AccountUnavailable):
+    """This server is configured without a guest entry, as against one whose database failed."""
+
+
+#: The guest entry's modes: ``open`` admits anyone who asks, ``code`` anyone who also sends the code
+#: whose SHA-256 the server is configured with. ``off`` (or no setting) mounts no entry at all.
+GUEST_ENTRY_MODES = ("open", "code")
+
+
+@dataclass(frozen=True)
+class GuestEntryConfig:
+    """How a visitor enters without an account: ``EXULANICA_GUEST_ENTRY`` and its figures."""
+
+    mode: str
+    browser_origins: tuple[str, ...]
+    entries_per_day: int
+    session_seconds: int = 7 * 24 * 60 * 60
+    code_sha256: str | None = field(default=None, repr=False)
+
+    def __post_init__(self) -> None:
+        if self.mode not in GUEST_ENTRY_MODES:
+            raise ValueError("guest entry is open or code")
+        if not self.browser_origins:
+            raise ValueError("a guest entry needs the exact browser origins it is made from")
+        for value in self.browser_origins:
+            if origin(value) != value:
+                raise ValueError("browser origins cannot contain a path or query")
+        if (self.mode == "code") != (self.code_sha256 is not None):
+            raise ValueError("an entry code's digest is configured exactly when the mode is code")
+        if self.code_sha256 is not None and (
+            len(self.code_sha256) != 64 or set(self.code_sha256) - set("0123456789abcdef")
+        ):
+            raise ValueError("the entry code is configured as its lowercase SHA-256")
+        if type(self.entries_per_day) is not int or not 1 <= self.entries_per_day <= 1_000_000:
+            raise ValueError("a day admits between one and a million guests")
+        if (
+            type(self.session_seconds) is not int
+            or not 60 <= self.session_seconds <= GUEST_SESSION_SECONDS_MAXIMUM
+        ):
+            raise ValueError("a guest session lasts between one minute and thirty days")
+
+    def admits(self, code: str | None) -> bool:
+        """Whether ``code`` opens the entry: always in ``open``; in ``code``, its digest compared
+        in constant time."""
+        if self.mode == "open":
+            return True
+        if not isinstance(code, str) or not 1 <= len(code) <= 256:
+            return False
+        digest = hashlib.sha256(code.encode("utf-8")).hexdigest()
+        assert self.code_sha256 is not None
+        return secrets.compare_digest(digest, self.code_sha256)
 
 
 class GoogleOIDCProvider:
@@ -310,13 +369,43 @@ class GoogleOIDCProvider:
 
 @dataclass(frozen=True)
 class AccountRuntime:
-    config: GoogleAccountConfig
+    """Browser accounts: Google sign-in, the guest entry, or both, on one account database.
+
+    ``config`` and ``provider`` are Google's, both or neither. ``guest`` is the guest entry's.
+    At least one is configured, and when both are their browser origins are the same list.
+    """
+
+    config: GoogleAccountConfig | None
     database_url: str = field(repr=False)
-    provider: GoogleOIDCProvider
+    provider: GoogleOIDCProvider | None
+    guest: GuestEntryConfig | None = None
 
     def __post_init__(self) -> None:
-        if self.provider.config != self.config:
+        if (self.config is None) != (self.provider is None):
+            raise ValueError("Google's configuration and provider are configured together")
+        if self.provider is not None and self.provider.config != self.config:
             raise ValueError("OIDC provider and account runtime must use the same configuration")
+        if self.config is None and self.guest is None:
+            raise ValueError("an account runtime offers Google sign-in, a guest entry or both")
+        if (
+            self.config is not None
+            and self.guest is not None
+            and self.config.browser_origins != self.guest.browser_origins
+        ):
+            raise ValueError("Google sign-in and the guest entry serve the same browser origins")
+
+    @property
+    def browser_origins(self) -> tuple[str, ...]:
+        """The exact origins a browser's writes, and a guest's entry, may come from."""
+        if self.config is not None:
+            return self.config.browser_origins
+        assert self.guest is not None
+        return self.guest.browser_origins
+
+    def _google(self) -> tuple[GoogleAccountConfig, GoogleOIDCProvider]:
+        if self.config is None or self.provider is None:
+            raise AccountUnavailable("Google sign-in is not configured")
+        return self.config, self.provider
 
     @contextmanager
     def repository(self) -> Iterator[AccountRepository]:
@@ -349,19 +438,20 @@ class AccountRuntime:
             return repository.active_owned_workspaces()
 
     def start(self, return_uri: str | None = None) -> tuple[str, str]:
-        target = return_uri or self.config.return_uris[0]
-        if target not in self.config.return_uris:
+        config, provider = self._google()
+        target = return_uri or config.return_uris[0]
+        if target not in config.return_uris:
             raise AccountRejected("unregistered return URI")
         state, browser, nonce, verifier = (secrets.token_urlsafe(32) for _ in range(4))
-        url = self.provider.authorization_url(state=state, nonce=nonce, verifier=verifier)
+        url = provider.authorization_url(state=state, nonce=nonce, verifier=verifier)
         with self.repository() as repo:
             repo.begin_login(
                 state=state,
                 browser=browser,
                 nonce=nonce,
                 verifier=verifier,
-                config_sha256=self.config.fingerprint,
-                callback_uri=self.config.callback_uri,
+                config_sha256=config.fingerprint,
+                callback_uri=config.callback_uri,
                 return_uri=target,
             )
         return url, browser
@@ -375,18 +465,19 @@ class AccountRuntime:
         response_issuer: str | None = None,
         previous_token: str | None = None,
     ) -> tuple[str, str, AccountSession]:
+        config, provider = self._google()
         with self.repository() as repo:
-            attempt = repo.claim_login(state, browser, self.config.fingerprint)
+            attempt = repo.claim_login(state, browser, config.fingerprint)
         try:
-            if response_issuer is not None and response_issuer != self.config.issuer:
+            if response_issuer is not None and response_issuer != config.issuer:
                 raise AccountRejected("authorization response issuer mismatch")
-            issuer, subject = self.provider.verify_code(code, attempt)
+            issuer, subject = provider.verify_code(code, attempt)
             with self.repository() as repo:
                 token, session = repo.finish_login(
                     attempt,
                     issuer=issuer,
                     subject=subject,
-                    session_seconds=self.config.session_seconds,
+                    session_seconds=config.session_seconds,
                     previous_token=previous_token,
                 )
             return attempt["return_uri"], token, session
@@ -400,7 +491,7 @@ class AccountRuntime:
             with self.repository() as repo:
                 account = repo.session(request.cookies.get(SESSION_COOKIE))
             if request.method.upper() not in ("GET", "HEAD", "OPTIONS"):
-                if request.headers.get("origin") not in self.config.browser_origins:
+                if request.headers.get("origin") not in self.browser_origins:
                     raise AccountRejected("untrusted request origin")
                 supplied = request.headers.get("x-csrf-token", "")
                 if not secrets.compare_digest(supplied.encode(), account.csrf_token.encode()):
@@ -408,6 +499,26 @@ class AccountRuntime:
             return account
         except AccountRejected as exc:
             raise TokenNotAccepted("browser session was not accepted") from exc
+
+    def enter_guest(self, request: Request, code: str | None) -> GuestEntry:
+        """A visitor's new guest account, workspace and session.
+
+        Refused by :class:`AccountUnavailable` where no guest entry is configured, and by
+        :class:`AccountRejected` for an ``Origin`` outside the browser origins or a code that does
+        not open the entry; :class:`GuestEntriesExhausted` when today's entries are all taken.
+        """
+        if self.guest is None:
+            raise GuestEntryOff("guest entry is not configured")
+        if request.headers.get("origin") not in self.browser_origins:
+            raise AccountRejected("untrusted request origin")
+        if not self.guest.admits(code):
+            raise GuestCodeRefused("the entry code does not open this server")
+        with self.repository() as repo:
+            return repo.enter_guest(
+                entries_per_day=self.guest.entries_per_day,
+                session_seconds=self.guest.session_seconds,
+                previous_token=request.cookies.get(SESSION_COOKIE),
+            )
 
     def authenticate_request(self, request: Request) -> Session:
         return self.browser_session(request).session
@@ -418,43 +529,86 @@ class AccountRuntime:
             repo.logout(request.cookies[SESSION_COOKIE])
 
 
+def _json_strings(value: str, name: str) -> tuple[str, ...]:
+    parsed = json.loads(value)
+    if not isinstance(parsed, list) or not all(isinstance(v, str) for v in parsed):
+        raise ValueError(f"{name} must be a JSON string array")
+    return tuple(parsed)
+
+
+def load_guest_entry(environ: Mapping[str, str]) -> GuestEntryConfig | None:
+    """The guest entry ``EXULANICA_GUEST_ENTRY`` configures (``off``, ``open``, ``code``), or None.
+
+    ``open`` and ``code`` need ``EXULANICA_GUEST_ENTRIES_PER_DAY`` (no default: the figure is the
+    operator's), ``EXULANICA_ACCOUNT_BROWSER_ORIGINS`` and ``EXULANICA_ACCOUNT_DATABASE_URL``;
+    ``code`` needs ``EXULANICA_GUEST_ENTRY_CODE_SHA256``. ``EXULANICA_GUEST_SESSION_SECONDS``
+    defaults to seven days. A malformed or partial setting stops startup.
+    """
+    mode = (environ.get("EXULANICA_GUEST_ENTRY") or "off").strip()
+    if mode == "off":
+        return None
+    try:
+        per_day = environ.get("EXULANICA_GUEST_ENTRIES_PER_DAY")
+        if not per_day:
+            raise ValueError("EXULANICA_GUEST_ENTRIES_PER_DAY is required with a guest entry")
+        origins = environ.get("EXULANICA_ACCOUNT_BROWSER_ORIGINS")
+        if not origins or not environ.get("EXULANICA_ACCOUNT_DATABASE_URL"):
+            raise ValueError("a guest entry needs the account database and the browser origins")
+        seconds = environ.get("EXULANICA_GUEST_SESSION_SECONDS")
+        return GuestEntryConfig(
+            mode=mode,
+            browser_origins=_json_strings(origins, "EXULANICA_ACCOUNT_BROWSER_ORIGINS"),
+            entries_per_day=int(per_day),
+            session_seconds=int(seconds) if seconds else 7 * 24 * 60 * 60,
+            code_sha256=environ.get("EXULANICA_GUEST_ENTRY_CODE_SHA256") or None,
+        )
+    except (ValueError, TypeError) as exc:
+        raise AccountUnavailable(f"guest entry configuration is invalid: {exc}") from exc
+
+
 def load_account_runtime(environ: Mapping[str, str]) -> AccountRuntime | None:
-    """Absent configuration disables Google explicitly; partial configuration is a boot error."""
-    names = (
+    """Google sign-in, the guest entry, both or neither; a partial configuration is a boot error.
+
+    Google's four settings (client, secret, callback, return URIs) are all or none, and with them
+    the browser origins and the account database. The guest entry is :func:`load_guest_entry`'s.
+    """
+    google_names = (
         "EXULANICA_GOOGLE_CLIENT_ID",
         "EXULANICA_GOOGLE_CLIENT_SECRET",
         "EXULANICA_GOOGLE_CALLBACK_URI",
         "EXULANICA_GOOGLE_RETURN_URIS",
-        "EXULANICA_ACCOUNT_BROWSER_ORIGINS",
-        "EXULANICA_ACCOUNT_DATABASE_URL",
     )
-    if not any(environ.get(name) for name in names):
+    shared = ("EXULANICA_ACCOUNT_BROWSER_ORIGINS", "EXULANICA_ACCOUNT_DATABASE_URL")
+    guest = load_guest_entry(environ)
+    google = any(environ.get(name) for name in google_names)
+    if not google and guest is None:
+        if any(environ.get(name) for name in shared):
+            raise AccountUnavailable("Google account configuration is incomplete")
         return None
-    if not all(environ.get(name) for name in names):
-        raise AccountUnavailable("Google account configuration is incomplete")
+    config: GoogleAccountConfig | None = None
+    provider: GoogleOIDCProvider | None = None
+    if google:
+        if not all(environ.get(name) for name in (*google_names, *shared)):
+            raise AccountUnavailable("Google account configuration is incomplete")
+        try:
+            config = GoogleAccountConfig(
+                client_id=environ[google_names[0]],
+                client_secret=environ[google_names[1]],
+                callback_uri=environ[google_names[2]],
+                return_uris=_json_strings(environ[google_names[3]], google_names[3]),
+                browser_origins=_json_strings(environ[shared[0]], shared[0]),
+            )
+        except (ValueError, TypeError) as exc:
+            raise AccountUnavailable("Google account configuration is invalid") from exc
+        # Required only when sign-in is configured, and checked for inclusion: the shared list also
+        # names the model endpoint. load_egress_allowlist and narrowed_to both raise
+        # EgressConfigurationError naming what is absent, which stops startup.
+        egress = load_egress_allowlist(environ)
+        provider = GoogleOIDCProvider(config, egress=egress)
     try:
-        returns = json.loads(environ[names[3]])
-        origins = json.loads(environ[names[4]])
-        if (
-            not isinstance(returns, list)
-            or not isinstance(origins, list)
-            or not all(isinstance(v, str) for v in [*returns, *origins])
-        ):
-            raise ValueError("allowlists must be JSON string arrays")
-        config = GoogleAccountConfig(
-            client_id=environ[names[0]],
-            client_secret=environ[names[1]],
-            callback_uri=environ[names[2]],
-            return_uris=tuple(returns),
-            browser_origins=tuple(origins),
-        )
-    except (ValueError, TypeError) as exc:
-        raise AccountUnavailable("Google account configuration is invalid") from exc
-    # Required only when sign-in is configured, and checked for inclusion: the shared list also
-    # names the model endpoint. load_egress_allowlist and narrowed_to both raise
-    # EgressConfigurationError naming what is absent, which stops startup.
-    egress = load_egress_allowlist(environ)
-    runtime = AccountRuntime(config, environ[names[5]], GoogleOIDCProvider(config, egress=egress))
+        runtime = AccountRuntime(config, environ[shared[1]], provider, guest)
+    except ValueError as exc:
+        raise AccountUnavailable(f"account configuration is invalid: {exc}") from exc
     application_url = env_get("DATABASE_URL", environ)
     if not application_url:
         raise AccountUnavailable(

@@ -39,12 +39,35 @@ def require_secret(value: str | None) -> str:
     return value
 
 
+#: The longest a guest's browser session may be held for: 30 days (migration 0139's sessions name
+#: no other bound, and the configuration states the actual figure).
+GUEST_SESSION_SECONDS_MAXIMUM = 30 * 24 * 60 * 60
+#: How often a session's last use is written: a visitor's town plays while somebody was seen in it
+#: recently, and once a minute is enough to say so without a write on every request.
+SEEN_INTERVAL_SECONDS = 60
+
+
+class GuestEntriesExhausted(AccountRejected):
+    """Today's guest entries are all taken; the server states the limit."""
+
+
 @dataclass(frozen=True)
 class AccountSession:
     user_id: uuid.UUID
     session: Session
     csrf_token: str
     expires_at: datetime
+    #: The membership role the session is held in: ``owner`` (Google sign-in) or ``guest``.
+    role: str = "owner"
+
+
+@dataclass(frozen=True)
+class GuestEntry:
+    """A guest's new session, with the entry that made it."""
+
+    token: str
+    account: AccountSession
+    entry_id: uuid.UUID
 
 
 class AccountRepository:
@@ -229,22 +252,108 @@ class AccountRepository:
     def session(self, token: str | None) -> AccountSession:
         digest = secret_digest(require_secret(token))
         row = self.connection.execute(
-            "select s.user_id,s.workspace_id,s.csrf_token,s.expires_at,u.actor_id "
+            "select s.user_id,s.workspace_id,s.csrf_token,s.expires_at,u.actor_id,"
+            "m.membership_role,s.seen_at "
             "from account_browser_session s join account_user u using(user_id) "
             "join account_membership m using(user_id,workspace_id) "
             "join account_workspace w using(workspace_id) where s.session_sha256=%s "
             "and s.revoked_at is null and s.expires_at>now() and u.disabled_at is null "
-            "and m.revoked_at is null and m.membership_role='owner' "
+            "and m.revoked_at is null and m.membership_role in ('owner','guest') "
             "and w.owner_user_id=u.user_id and w.disabled_at is null",
             (digest,),
         ).fetchone()
         if row is None:
             raise AccountRejected("session unavailable")
+        # The session's last use, at most once a minute, forward only (migration 0139).
+        self.connection.execute(
+            "update account_browser_session set seen_at=now() where session_sha256=%s "
+            "and (seen_at is null or seen_at < now() - make_interval(secs => %s))",
+            (digest, SEEN_INTERVAL_SECONDS),
+        )
         return AccountSession(
             row["user_id"],
             Session(workspace_id=row["workspace_id"], actor=row["actor_id"]),
             row["csrf_token"],
             row["expires_at"],
+            row["membership_role"],
+        )
+
+    def enter_guest(
+        self,
+        *,
+        entries_per_day: int,
+        session_seconds: int,
+        previous_token: str | None = None,
+    ) -> GuestEntry:
+        """A guest's user, workspace, membership, entry and session, in one transaction.
+
+        Today's entries (UTC) are counted first, in the same transaction, against
+        ``entries_per_day``: the day that is full refuses with :class:`GuestEntriesExhausted`
+        and nothing is written. The user has no identity; the workspace is theirs alone and holds
+        nothing yet. A session the browser already held is revoked, as a sign-in does.
+        """
+        if type(entries_per_day) is not int or entries_per_day < 1:
+            raise ValueError("a day admits at least one guest")
+        if type(session_seconds) is not int or not (
+            60 <= session_seconds <= GUEST_SESSION_SECONDS_MAXIMUM
+        ):
+            raise ValueError("a guest session lasts between one minute and thirty days")
+        token, csrf = secrets.token_urlsafe(32), secrets.token_urlsafe(32)
+        user_id, actor, workspace, entry_id = (uuid.uuid4() for _ in range(4))
+        with self.connection.transaction():
+            counted = self.connection.execute(
+                "insert into account_guest_day(entry_day,entries) "
+                "values((now() at time zone 'UTC')::date,1) on conflict (entry_day) do update "
+                "set entries=account_guest_day.entries+1 "
+                "where account_guest_day.entries < %s returning entries",
+                (entries_per_day,),
+            ).fetchone()
+            if counted is None:
+                raise GuestEntriesExhausted("today's guest entries are all taken")
+            self.connection.execute(
+                "insert into account_user(user_id,actor_id) values(%s,%s)", (user_id, actor)
+            )
+            self.connection.execute(
+                "insert into account_workspace(workspace_id,owner_user_id) values(%s,%s)",
+                (workspace, user_id),
+            )
+            self.connection.execute(
+                "insert into account_membership(workspace_id,user_id,membership_role) "
+                "values(%s,%s,'guest')",
+                (workspace, user_id),
+            )
+            self.connection.execute(
+                "insert into account_guest_entry(entry_id,user_id,workspace_id,entry_day) "
+                "values(%s,%s,%s,(now() at time zone 'UTC')::date)",
+                (entry_id, user_id, workspace),
+            )
+            if previous_token is not None:
+                try:
+                    old_sha = secret_digest(require_secret(previous_token))
+                except AccountRejected:
+                    pass
+                else:
+                    self.connection.execute(
+                        "update account_browser_session set revoked_at=now() where "
+                        "session_sha256=%s and revoked_at is null",
+                        (old_sha,),
+                    )
+            row = self.connection.execute(
+                "insert into account_browser_session(session_sha256,user_id,workspace_id,"
+                "csrf_token,guest_entry_id,expires_at,seen_at) "
+                "values(%s,%s,%s,%s,%s,now()+%s*interval '1 second',now()) returning expires_at",
+                (secret_digest(token), user_id, workspace, csrf, entry_id, session_seconds),
+            ).fetchone()
+        return GuestEntry(
+            token,
+            AccountSession(
+                user_id,
+                Session(workspace_id=workspace, actor=actor),
+                csrf,
+                row["expires_at"],
+                "guest",
+            ),
+            entry_id,
         )
 
     def logout(self, token: str) -> None:

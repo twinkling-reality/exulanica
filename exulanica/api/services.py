@@ -101,6 +101,7 @@ from exulanica.spending import (
     WITNESS_DIR_ENV,
     DurableSpending,
     FileSpendingWitness,
+    SpendingConfigurationError,
     durable_spending_from_env,
     spending_mode,
 )
@@ -944,6 +945,19 @@ def build_services(
         client = ModelClient()
     if client is not None and spending is not None and client.spending_source is None:
         client = client.with_spending_source(spending)
+    if (
+        accounts is not None
+        and accounts.guest is not None
+        and client is not None
+        and spending is None
+    ):
+        # A guest's allowance is a grant under the durable authority. Under process spending a
+        # visitor has none, and every one of them would spend from the fuse the owners share.
+        raise SpendingConfigurationError(
+            "a guest entry (EXULANICA_GUEST_ENTRY) with a model credential needs "
+            "EXULANICA_SPENDING=durable: under process spending a visitor has no allowance of "
+            "their own"
+        )
     stores = content_stores(environ, data_dir=data_dir)
     store = stores.blobs
     comparison_player = _comparison_player(env_get("COMPARISON_WORKER", environ))

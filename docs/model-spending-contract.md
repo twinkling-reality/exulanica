@@ -52,7 +52,23 @@ admission:
 
 Nothing is granted because a workspace exists: a workspace with no live grant refuses every attempt
 as `spending_not_granted`, and no import, seed or restore creates a grant (spending tables never
-travel in a workspace seed). A grant is never larger than what it is granted under, in ceiling, calls
+travel in a workspace seed). The one grant the runtime makes is a guest's (migration 0139). An
+operator sets an authority's **guest policy** (`guest-policy`: a ceiling, a call limit, how many
+days it lasts and how many workspaces it grants in a UTC day). The runtime's `spending_grant_guest`
+then grants exactly those figures, once, to a guest workspace that holds no grant under that
+authority. It is a step of the ledger, like an admission: taken under the authority's witness lock
+and its state row lock, with its witness advance written before the commit and confirmed after. It
+reads the policy only after taking the state row lock, so a grant racing a replacement takes the
+policy that stands after it. It accepts no figure from its caller, refuses a workspace holding
+another grant under the authority, refuses once the policy's grants of the day are spent
+(`guest_grants_exhausted`, counted under that lock, so the database bounds a day's guest grants
+whatever process asks), and is executable by the runtime role alone. A policy ends when another
+replaces it or the operator withdraws it (`guest-policy-withdraw`); one set before the authority's
+latest restore reconciliation or reauthorization grants nothing until set again
+(`guest_policy_needs_restating`), because a restore may bring back a policy that had ended.
+`status --authorities` and `reconcile-restore` show each live policy and whether it waits for that.
+A day's guest grants are thus bounded by the policy's figure, and the authority's ceiling bounds
+everyone together. A grant is never larger than what it is granted under, in ceiling, calls
 or validity, and a trigger refuses one that would be, for every role. Because every admission is
 checked against the authority, the grant and any bound, grants together never pass their authority
 and a bound never passes its grant.
@@ -295,7 +311,7 @@ read; reconciliation is an operator's act.
 `python -m exulanica.spending` with an administrative database URL (a role with SUPERUSER or
 BYPASSRLS) and the witness directory; each command prints one JSON document, and writes the
 directory's marker first where it has none. `issue`, `adjust`,
-`grant`, `revoke`, `reconcile`, `reconcile-restore`, `reauthorize`, `expire` (release every
+`grant`, `guest-policy`, `guest-policy-withdraw`, `revoke`, `reconcile`, `reconcile-restore`, `reauthorize`, `expire` (release every
 workspace's attempts never dispatched in time; run it on a schedule), `verify` (the ledger's digest
 chain), `install-witness-copy` and `status`. `--operator` is a label for the record: lower case letters,
 digits and `:._-`, never a name, an address or a key. The runtime roles may not execute any of these.

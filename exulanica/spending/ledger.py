@@ -118,6 +118,17 @@ class _Remembered:
     until: float
 
 
+#: Why a guest's allowance is not granted, by the reason ``spending_grant_guest`` answers.
+_GUEST_REFUSALS: Final = {
+    "workspace_holds_a_grant": "this workspace's allowance is not a guest's to grant",
+    "guest_policy_needs_restating": (
+        "the guest policy was set before the authority's latest restore or reauthorization, so "
+        "the operator sets it again before it grants anything"
+    ),
+    "guest_grants_exhausted": "the guest policy has granted as many visitors as it does today",
+}
+
+
 class DurableSpending:
     """Every workspace's durable spending, for one process: the source a client is composed with.
 
@@ -196,6 +207,60 @@ class DurableSpending:
             (workspace_id, bound_id, self._actor(), reason),
         )
         return not bool(document.get("repeated"))
+
+    def grant_guest(self, workspace_id: uuid.UUID, *, provider: str) -> uuid.UUID | None:
+        """A guest workspace's allowance from ``provider``'s authority, by its guest policy.
+
+        The figures are the policy's, never the caller's (migration 0139); the step is a ledger
+        step taken under the authority's witness lock, as an admission is, so the witness moves
+        with the ledger. Answers the grant, the same one when asked again, or None where no guest
+        policy is set for ``provider``. Refused, raising :class:`SpendingRefused`, under
+        ``spending_not_granted`` for a workspace that holds another grant from the authority
+        (``workspace_holds_a_grant``), a policy set before the authority's latest restore
+        reconciliation or reauthorization (``guest_policy_needs_restating``) and a policy whose
+        grants of the day are spent (``guest_grants_exhausted``); as an admission is refused by a
+        suspended, revoked or expired authority; and ``spending_unavailable`` when the database
+        does not answer.
+        """
+        for _ in range(2):
+            try:
+                with self.database.session(workspace_id) as connection:
+                    row = connection.execute(
+                        "select spending_guest_policy_authority(%s) as authority_id", (provider,)
+                    ).fetchone()
+            except psycopg.Error as exc:
+                raise SpendingRefused(
+                    "spending_unavailable",
+                    detail="database_unavailable",
+                    message=(
+                        "the spending authority's database did not answer "
+                        f"({type(exc).__name__}), so no allowance was granted"
+                    ),
+                ) from exc
+            authority = None if row is None else row["authority_id"]
+            if authority is None:
+                return None
+            document = self._witnessed(
+                workspace_id,
+                authority,
+                "select spending_grant_guest(%s, %s, %s, %s, %s) as document",
+                (workspace_id, provider, authority, self._actor()),
+            )
+            outcome = document.get("outcome")
+            if outcome == "granted":
+                return uuid.UUID(str(document["grant_id"]))
+            if outcome == "authority_changed":
+                continue
+            reason = document.get("reason")
+            if reason == "no_guest_policy":
+                return None
+            if reason in _GUEST_REFUSALS:
+                raise SpendingRefused(
+                    "spending_not_granted", detail=reason, message=_GUEST_REFUSALS[reason]
+                )
+            # Refused as an admission is: suspended, revoked or expired, by the authority's reason.
+            raise refusal_from_document(document)
+        raise SpendingRefused("spending_unavailable", detail="authority_changed")
 
     # -- the steps --------------------------------------------------------------------------
 

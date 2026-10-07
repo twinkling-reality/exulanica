@@ -10,7 +10,9 @@
 # bypass them.
 #
 # Caddy's access log records request headers with Authorization and Cookie values redacted, so a
-# bearer token or a session cookie does not reach the log.
+# bearer token or a session cookie does not reach the log; the filter below also drops a session's
+# CSRF token and keeps a visitor's address only to its network (/24 for IPv4, /48 for IPv6). The
+# log is kept by size, not time: the compose logging bound (docs/deployment.md 8.2).
 {
 	admin off
 }
@@ -32,7 +34,20 @@
 	}
 	log {
 		output stdout
-		format json
+		format filter {
+			wrap json
+			fields {
+				request>headers>X-Csrf-Token delete
+				request>remote_ip ip_mask {
+					ipv4 24
+					ipv6 48
+				}
+				request>client_ip ip_mask {
+					ipv4 24
+					ipv6 48
+				}
+			}
+		}
 	}
 	# The edge's own refusals, in the problem shape the API and the client proxy answer with
 	# ({"code", "detail"}), with the client proxy's codes and Retry-After. handle_errors runs only for

@@ -126,6 +126,8 @@ SPENDING_ADMIN_TABLES: Final = (
     "spending_authority_state",
     "spending_authority_revocation",
     "spending_event",
+    # Migration 0139: the authority's guest policy, the operator's terms for a visitor's grant.
+    "spending_guest_policy",
 )
 #: The role unattended maintenance reads a complete backup and withdrawal export as. It reads
 #: every row of every workspace and writes nothing: see :func:`provision_backup_role`.
@@ -155,8 +157,9 @@ READ_ONLY_TABLES: Final = (
 )
 
 #: What the runtime may call on migration 0124's durable spending: admit, dispatch and settle an
-#: attempt, and open and close a bound, each with its owner's rights and each acting for the
-#: session's workspace only. Issuing, granting, revoking, reconciling and reauthorizing are an
+#: attempt, open and close a bound, and grant a guest workspace by the guest policy (0139), each
+#: with its owner's rights and each acting for the session's workspace only. Issuing, granting
+#: any other allowance, setting a guest policy, revoking, reconciling and reauthorizing are an
 #: operator's, and no runtime role may execute them.
 SPENDING_RUNTIME_FUNCTIONS: Final = (
     ("spending_admit", "uuid,uuid,text,uuid,text,text,text,numeric,text,jsonb"),
@@ -164,6 +167,10 @@ SPENDING_RUNTIME_FUNCTIONS: Final = (
     ("spending_settle", "uuid,uuid,text,text,numeric,integer,integer,jsonb"),
     ("spending_open_bound", "uuid,text,text,numeric,integer,timestamptz,text,text"),
     ("spending_close_bound", "uuid,uuid,text,text"),
+    # Migration 0139: a visitor's grant, by the authority's guest policy, once per workspace, and
+    # which authority that policy is under (an id, never an amount).
+    ("spending_grant_guest", "uuid,text,uuid,text,jsonb"),
+    ("spending_guest_policy_authority", "text"),
 )
 
 #: What the runtime and the read-only role may read of an authority: its state, and no amount.

@@ -28,14 +28,17 @@ class AccountWorkspaceUnavailable(ExulanicaError):
 
 
 def active_owned_workspaces(connection: psycopg.Connection) -> frozenset[uuid.UUID]:
-    """Read current owner authority without treating a browser session as membership."""
+    """Read current owner and guest authority without treating a browser session as membership.
+
+    A guest's workspace is theirs as an owner's is (migration 0139): the workers that drain an
+    account's queues drain a guest's too, so a town a visitor makes is baked."""
     rows = connection.execute(
         "select w.workspace_id from account_workspace w "
         "join account_user u on u.user_id=w.owner_user_id "
         "join account_membership m on m.workspace_id=w.workspace_id "
         "and m.user_id=w.owner_user_id "
         "where u.disabled_at is null and w.disabled_at is null "
-        "and m.revoked_at is null and m.membership_role='owner' "
+        "and m.revoked_at is null and m.membership_role in ('owner','guest') "
         "order by w.workspace_id"
     ).fetchall()
     return frozenset(row["workspace_id"] for row in rows)

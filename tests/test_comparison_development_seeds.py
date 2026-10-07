@@ -13,6 +13,7 @@ import hashlib
 import json
 import shutil
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from exulanica.api.services import build_services
@@ -145,7 +146,8 @@ def test_the_committed_catalog_reads_and_gives_its_development_seeds_in_order():
 
 
 def test_a_server_with_no_seeds_setting_holds_every_development_seed(monkeypatch, tmp_path):
-    runtime = object()
+    # A runtime stand-in with no guest entry, as Google sign-in alone configures.
+    runtime = SimpleNamespace(guest=None)
     monkeypatch.setattr("exulanica.api.services.load_account_runtime", lambda _: runtime)
     environ = {"EXULANICA_DATABASE_URL": "postgresql://unused", "EXULANICA_DATA_DIR": str(tmp_path)}
     services = build_services(environ)

@@ -72,7 +72,11 @@ def test_the_migration_takes_back_what_a_provisioner_granted_before_it(monkeypat
                 for role, read_only in roles.items():
                     provision_runtime_role(admin, role=role, read_only=read_only)
                 admin.commit()
-                admin.execute(MIGRATION.sql)
+                # 0124 and every migration after it, so the spending tables later ones add (the
+                # guest policy, 0139) are taken back from a provisioner's grants as well.
+                for migration in everything:
+                    if migration.version >= MIGRATION.version:
+                        admin.execute(migration.sql)
                 for role in roles:
                     for table in (*SPENDING_TABLES, *SPENDING_ADMIN_TABLES):
                         held = _held(admin, role, table)

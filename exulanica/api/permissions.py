@@ -47,11 +47,12 @@ which is the first route whose cost scales with what the caller asked for and th
 that charges MORE than one tile.
 
 **Who holds what.** A bearer token holds exactly the permissions its grant in
-``EXULANICA_API_TOKENS`` names. A browser session holds :data:`ACCOUNT_OWNER_PERMISSIONS`, because
-a browser session exists only for an account membership and migration 0058 allows one membership
-role, ``owner``. That is a declaration keyed on the role the database enforces, not a default: a
-second role in 0058's check fails ``tests/test_route_permissions.py`` until it is given a grant of
-its own here.
+``EXULANICA_API_TOKENS`` names. A browser session holds its membership role's grant
+(:data:`MEMBERSHIP_ROLE_PERMISSIONS`): :data:`ACCOUNT_OWNER_PERMISSIONS` for an ``owner``,
+:data:`GUEST_PERMISSIONS` for a ``guest`` (migration 0139), because a browser session exists only
+for an account membership and the migrations allow those two roles. That is a declaration keyed on
+the roles the database enforces, not a default: a role added to the latest check fails
+``tests/test_route_permissions.py`` until it is given a grant of its own here.
 
 **Consent withdrawal rides with consent.** ``POST /person-subjects/{subject_id}/consents`` records
 ``granted``, ``revoked`` and ``withdrawn`` alike, and ``/identity/subjects/unlink`` withdraws what
@@ -92,6 +93,8 @@ if TYPE_CHECKING:
 
 __all__ = [
     "ACCOUNT_OWNER_PERMISSIONS",
+    "GUEST_PERMISSIONS",
+    "MEMBERSHIP_ROLE_PERMISSIONS",
     "ROUTE_RULES",
     "ROUTE_RULE_SECTIONS",
     "SELF_CHARGING_TILE_ROUTES",
@@ -227,13 +230,12 @@ def _requires(*permissions: Permission) -> Requires:
 
 _P = Permission
 
-#: What a browser session holds. A browser session exists only for an account membership whose
-#: role is ``owner``, the one role migration 0058 allows: the person whose workspace it is. Every
-#: permission except ``tiles.materialise``, which is withheld and is an OPEN DECISION: three
-#: routes require it, and a browser session still cannot ask for a world or read a tile's bytes.
-#: Granting it
-#: lets a browser spend the workspace's tile ceiling, which is why it is granted here deliberately
-#: or not at all rather than inherited. A world generated from a reviewed recipe
+#: What an owner's browser session holds: the person whose workspace it is (a guest's holds
+#: :data:`GUEST_PERMISSIONS`). Every permission except ``tiles.materialise``, which is withheld and
+#: is an OPEN DECISION: three routes require it, and a browser session still cannot ask for a world
+#: or read a tile's bytes. Granting it lets a browser spend the workspace's tile ceiling, which is
+#: why it is granted here deliberately or not at all rather than inherited. A world generated from
+#: a reviewed recipe
 #: (``POST /worlds/generated``) is not asked for through that door: it is bounded by the
 #: world-count policy's ``generated`` limit and the recipes' stated tile counts, not by the tile
 #: quota, and its page reads its own baked tiles through its version
@@ -257,10 +259,28 @@ ACCOUNT_OWNER_PERMISSIONS: Final[frozenset[Permission]] = frozenset(
     }
 )
 
+#: What a guest's browser session holds (migration 0139): a visitor who entered with no account
+#: may make a world and open it, choose and swap the models that decide for its people, start and
+#: read a comparison, ask the Companion, keep and correct what it remembers, and delete what they
+#: made. Nothing else: no photograph intake, no consent or admission of a source, no operations
+#: read or write (capacity and installation facts are every workspace's), and no tile ceiling. A
+#: guest's allowance is read from ``GET /auth/session``, so it needs no ``operations.read``.
+GUEST_PERMISSIONS: Final[frozenset[Permission]] = frozenset(
+    {
+        _P.WORLD_READ,
+        _P.WORLD_WRITE,
+        _P.MODEL_INVOKE,
+        _P.LIBRARY_READ,
+        _P.LIBRARY_WRITE,
+        _P.DELETION_WRITE,
+    }
+)
+
 #: Membership roles the account schema allows, each with the grant a browser session in that role
-#: holds. ``tests/test_route_permissions.py`` compares the keys with migration 0058's check.
+#: holds. ``tests/test_route_permissions.py`` compares the keys with the migrations' check (0058,
+#: widened by 0139).
 MEMBERSHIP_ROLE_PERMISSIONS: Final[Mapping[str, frozenset[Permission]]] = MappingProxyType(
-    {"owner": ACCOUNT_OWNER_PERMISSIONS}
+    {"owner": ACCOUNT_OWNER_PERMISSIONS, "guest": GUEST_PERMISSIONS}
 )
 _LIBRARY_READ = _requires(_P.LIBRARY_READ)
 _LIBRARY_WRITE = _requires(_P.LIBRARY_WRITE)
@@ -279,6 +299,10 @@ _SIGN_IN_CALLBACK = (
 _SIGN_IN_SESSION = "reports the browser session its own cookie names, and refuses without one"
 _SIGN_IN_LOGOUT = (
     "ends the browser session its own cookie names, and must work for any holder of it"
+)
+_SIGN_IN_GUEST = (
+    "makes a guest's account, workspace and session; there is no credential yet, and it checks "
+    "its own origin, entry code and day's limit"
 )
 
 #: Every method a route can be declared under: what routable_paths reports, which leaves out the
@@ -318,6 +342,7 @@ _SIGN_IN_ROUTES: Final[Mapping[str, Authentication]] = MappingProxyType(
     {
         "GET /auth/google/callback": Authentication(_SIGN_IN_CALLBACK),
         "GET /auth/google/start": Authentication(_SIGN_IN_START),
+        "POST /auth/guest": Authentication(_SIGN_IN_GUEST),
         "POST /auth/logout": Authentication(_SIGN_IN_LOGOUT),
         "GET /auth/session": Authentication(_SIGN_IN_SESSION),
     }

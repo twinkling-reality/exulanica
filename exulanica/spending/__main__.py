@@ -86,6 +86,24 @@ def _parser() -> argparse.ArgumentParser:
     terms(grant)
     decided(grant)
 
+    guest = commands.add_parser(
+        "guest-policy",
+        help="set the figures every guest workspace is granted under an authority, once each",
+    )
+    guest.add_argument("--authority", type=uuid.UUID, required=True)
+    guest.add_argument("--ceiling-usd", type=Decimal, required=True)
+    guest.add_argument("--max-calls", type=int, required=True)
+    guest.add_argument("--valid-for-days", type=int, required=True)
+    guest.add_argument("--grants-per-day", type=int, required=True)
+    decided(guest)
+
+    withdraw_guest = commands.add_parser(
+        "guest-policy-withdraw",
+        help="end an authority's guest policy: no guest is granted anything until another is set",
+    )
+    withdraw_guest.add_argument("--authority", type=uuid.UUID, required=True)
+    decided(withdraw_guest)
+
     revoke = commands.add_parser("revoke", help="revoke an authority, or a grant or bound of it")
     revoke.add_argument("--authority", type=uuid.UUID, required=True)
     revoke.add_argument("--workspace", type=uuid.UUID)
@@ -194,6 +212,22 @@ def _decided(
             reason=arguments.reason,
         )
         return {"epoch": epoch}
+    if command == "guest-policy":
+        policy = operator.set_guest_policy(
+            arguments.authority,
+            ceiling_usd=arguments.ceiling_usd,
+            max_calls=arguments.max_calls,
+            valid_for_days=arguments.valid_for_days,
+            grants_per_day=arguments.grants_per_day,
+            operator=arguments.operator,
+            reason=arguments.reason,
+        )
+        return {"policy_id": str(policy)}
+    if command == "guest-policy-withdraw":
+        outcome = operator.withdraw_guest_policy(
+            arguments.authority, operator=arguments.operator, reason=arguments.reason
+        )
+        return {"outcome": outcome}
     if command == "grant":
         grant = operator.grant(
             arguments.authority,
@@ -229,7 +263,15 @@ def _decided(
         document = operator.reconcile_restore(
             arguments.authority, operator=arguments.operator, reason=arguments.reason
         )
-        return {key: value for key, value in document.items() if key != "witness"}
+        answer = {key: value for key, value in document.items() if key != "witness"}
+        # A restored database can hold a guest policy the operator had replaced or withdrawn; it
+        # grants nothing until set again, and this says which.
+        answer["guest_policies"] = [
+            policy
+            for policy in operator.guest_policies()
+            if policy["authority_id"] == str(arguments.authority)
+        ]
+        return answer
     if command == "reauthorize":
         epoch = operator.reauthorize(
             arguments.authority,
@@ -250,7 +292,10 @@ def _decided(
         return {"outcome": "installed", "state": "copy"}
     if command == "status":
         if arguments.authorities:
-            return {"authorities": authority_states(database)}
+            return {
+                "authorities": authority_states(database),
+                "guest_policies": operator.guest_policies(),
+            }
         return workspace_status(database, arguments.workspace)
     raise AssertionError(command)
 

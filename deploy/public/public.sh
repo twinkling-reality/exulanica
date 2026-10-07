@@ -14,6 +14,8 @@
 #   up                start the server; the first run installs, migrates and publishes the catalogs
 #   prepare-towns     make the arrival worlds once in the operator's workspace, so their tiles bake
 #   issue-authority   issue the server's spending authority from the EXULANICA_AUTHORITY_* values
+#   guest-policy      set what each guest is granted under it, from the EXULANICA_GUEST_* values
+#   guest-policy-withdraw  end the guest policy: no guest is granted anything until another is set
 #   grant <label>     grant a rehearsal visitor's workspace an allowance under the authority
 #   spending          the authority's state, as the operator command prints it
 #   backup-now        one maintenance pass now: export, backup set and verification when due
@@ -24,8 +26,11 @@
 #   down              stop the server and keep its volumes
 #   destroy           stop the server and delete its volumes, database, store and witness included
 #
-# `init` reads EXULANICA_PUBLIC_HOST, EXULANICA_TLS, EXULANICA_EDGE_ADDRESS, EXULANICA_BACKUP_PATH
-# and EXULANICA_CUSTODY_PATH from the environment, and optionally the port settings. It leaves
+# `init` reads EXULANICA_PUBLIC_HOST, EXULANICA_TLS, EXULANICA_EDGE_ADDRESS, EXULANICA_BACKUP_PATH,
+# EXULANICA_CUSTODY_PATH and EXULANICA_GUEST_ENTRY (off, open or code, with
+# EXULANICA_GUEST_ENTRY_CODE, at least 20 characters, and EXULANICA_GUEST_ENTRIES_PER_DAY) from the
+# environment, and optionally the port settings. The entry code itself is never written: only its
+# sha256. It leaves
 # EXULANICA_BUDGET_USD and EXULANICA_BUDGET_MAX_CALLS empty, and `up` refuses until both are filled.
 #
 # SECRETS. Database passwords and tokens live in files created mode 0600 inside a directory
@@ -177,6 +182,7 @@ PY
       EXULANICA_BACKUP_ROLE_PASSWORD="$marker" EXULANICA_API_TOKENS="$marker" \
       EXULANICA_WORKSPACE_IDS="$marker" EXULANICA_BACKUP_PATH="$here" EXULANICA_CUSTODY_PATH="$here" \
       EXULANICA_EDGE_ADDRESS=127.0.0.1 EXULANICA_PUBLIC_HOST="$marker" EXULANICA_TLS=internal \
+      EXULANICA_PUBLIC_ORIGIN="https://$marker" \
       EXULANICA_BUDGET_USD="$marker" EXULANICA_BUDGET_MAX_CALLS="$marker" \
       EXULANICA_CODE_REVISION="$revision" EXULANICA_CLIENT_TREE_SHA256="$tree_sha256" \
       EXULANICA_NODE_VERSION="$(node --version)" EXULANICA_PNPM_VERSION="$(cd web && pnpm --version)" \
@@ -215,6 +221,26 @@ PY
     backup="$(cd "$EXULANICA_BACKUP_PATH" && pwd -P)"
     custody="$(cd "$EXULANICA_CUSTODY_PATH" && pwd -P)"
     case "$custody/" in "$backup/"*) refuse "custody must not be inside the backup directory" ;; esac
+    : "${EXULANICA_GUEST_ENTRY:?set EXULANICA_GUEST_ENTRY to off, open or code}"
+    guest_code_sha256=""
+    case "$EXULANICA_GUEST_ENTRY" in
+      off) ;;
+      open | code)
+        : "${EXULANICA_GUEST_ENTRIES_PER_DAY:?set EXULANICA_GUEST_ENTRIES_PER_DAY; the limit of each day is a figure the operator states}"
+        if [ "$EXULANICA_GUEST_ENTRY" = code ]; then
+          : "${EXULANICA_GUEST_ENTRY_CODE:?set EXULANICA_GUEST_ENTRY_CODE to the code visitors are given}"
+          # Only the code's unsalted SHA-256 is kept, and a wrong code is answered at once, so a
+          # short code falls to guessing: twenty characters or more.
+          [ "${#EXULANICA_GUEST_ENTRY_CODE}" -ge 20 ] \
+            || refuse "EXULANICA_GUEST_ENTRY_CODE is at least 20 characters"
+          guest_code_sha256="$(printf '%s' "$EXULANICA_GUEST_ENTRY_CODE" | openssl dgst -sha256 -r | cut -d' ' -f1)"
+        fi
+        ;;
+      *) refuse "EXULANICA_GUEST_ENTRY is off, open or code" ;;
+    esac
+    https_port="${EXULANICA_EDGE_HTTPS_PORT:-443}"
+    public_origin="https://$EXULANICA_PUBLIC_HOST"
+    [ "$https_port" = 443 ] || public_origin="$public_origin:$https_port"
     umask 077
     mkdir -p "$deploy_dir" "$token_dir"
     chmod 700 "$deploy_dir" "$token_dir"
@@ -232,17 +258,22 @@ EXULANICA_PROFILE=public
 EXULANICA_BACKUP_PATH=$backup
 EXULANICA_CUSTODY_PATH=$custody
 EXULANICA_PUBLIC_HOST=$EXULANICA_PUBLIC_HOST
+EXULANICA_PUBLIC_ORIGIN=$public_origin
 EXULANICA_TLS=$EXULANICA_TLS
 EXULANICA_EDGE_ADDRESS=$EXULANICA_EDGE_ADDRESS
 EXULANICA_EDGE_HTTP_PORT=${EXULANICA_EDGE_HTTP_PORT:-80}
 EXULANICA_EDGE_HTTPS_PORT=${EXULANICA_EDGE_HTTPS_PORT:-443}
-EXULANICA_CLIENT_PORT=${EXULANICA_CLIENT_PORT:-8080}
 # The process fuse in USD and in calls, for one API process life. Filled in by the operator; up
 # refuses until both are. The durable authority (issue-authority) is the money.
 EXULANICA_BUDGET_USD=
 EXULANICA_BUDGET_MAX_CALLS=
 # The origins the API may reach. The API checks at startup that the model endpoint is in it.
 EXULANICA_EGRESS_ALLOWLIST='["https://api.tokenfactory.nebius.com"]'
+# The guest entry: off, open, or code (only the code's sha256 is kept), and the day's limit.
+EXULANICA_GUEST_ENTRY=$EXULANICA_GUEST_ENTRY
+EXULANICA_GUEST_ENTRY_CODE_SHA256=$guest_code_sha256
+EXULANICA_GUEST_ENTRIES_PER_DAY=${EXULANICA_GUEST_ENTRIES_PER_DAY:-}
+EXULANICA_GUEST_SESSION_SECONDS=${EXULANICA_GUEST_SESSION_SECONDS:-}
 ENV
     # The operator's own token: a workspace of its own and operations.read alone, for the
     # installation facts, capacity and spending reads. It makes no world and asks no model.
@@ -295,6 +326,16 @@ PY
       docker image inspect "$image" >/dev/null 2>&1 \
         || refuse "$image is not loaded on this host; load the images built and checked elsewhere"
     done
+    # Only the edge publishes a port. The API trusts forwarded headers from anything that reaches
+    # it (FORWARDED_ALLOW_IPS), and the client proxy trusts X-Forwarded-For from private ranges, so
+    # a published port on either would let a local process choose its scheme or counted address.
+    # Checked on the merged configuration, which is what Compose runs, not on the overlay's text.
+    published="$(compose config --format json | python3 -c '
+import json, sys
+services = json.load(sys.stdin)["services"]
+print(" ".join(name for name in ("api", "client") if services.get(name, {}).get("ports")))
+')"
+    [ -z "$published" ] || refuse "these services publish a port, which only the edge may: $published"
     if [ -z "${NEBIUS_API_KEY:-}" ]; then
       echo "NEBIUS_API_KEY is not set: every route that asks a model will say no credential is configured" >&2
     fi
@@ -308,6 +349,11 @@ PY
     # first writes the restore marker only on an empty database, the second applies what is new,
     # the third publishes the catalogs the image carries.
     compose up -d --wait --no-build --pull missing
+    # A service that exits at once can read healthy for a moment before its first restart (an
+    # nginx configuration it refuses, for one), so `up` looks again a few seconds later.
+    sleep 5
+    restarting="$(compose ps --status restarting --services)"
+    [ -z "$restarting" ] || refuse "these services keep restarting; read their logs: $restarting"
     compose ps
     ;;
 
@@ -358,6 +404,34 @@ PY
     owner_run python -m exulanica.spending grant --authority "$authority" --workspace "$workspace" \
       --ceiling-usd "$EXULANICA_GRANT_USD" --max-calls "$EXULANICA_GRANT_CALLS" \
       --valid-until "$valid_until" --operator public-server --reason "rehearsal visitor $label"
+    ;;
+
+  guest-policy)
+    # What each guest workspace is granted under the server's authority, once, by the runtime's
+    # guest step (migration 0139). Replaces the policy it had; grants already made stay.
+    need_env_file
+    [ -f "$authority_file" ] || refuse "no authority yet; run issue-authority first"
+    : "${EXULANICA_GUEST_USD:?set EXULANICA_GUEST_USD to what each guest may spend, in USD}"
+    : "${EXULANICA_GUEST_CALLS:?set EXULANICA_GUEST_CALLS to the call limit of each guest}"
+    : "${EXULANICA_GUEST_DAYS:?set EXULANICA_GUEST_DAYS to how long the allowance of a guest lasts, 1 to 31}"
+    # How many guests the policy grants in a UTC day, counted by the database whatever asks: the
+    # day's entries unless stated.
+    grants_per_day="${EXULANICA_GUEST_GRANTS_PER_DAY:-$(env_value EXULANICA_GUEST_ENTRIES_PER_DAY)}"
+    [ -n "$grants_per_day" ] \
+      || refuse "set EXULANICA_GUEST_GRANTS_PER_DAY, or EXULANICA_GUEST_ENTRIES_PER_DAY in $env_file"
+    authority="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["authority_id"])' "$authority_file")"
+    owner_run python -m exulanica.spending guest-policy --authority "$authority" \
+      --ceiling-usd "$EXULANICA_GUEST_USD" --max-calls "$EXULANICA_GUEST_CALLS" \
+      --valid-for-days "$EXULANICA_GUEST_DAYS" --grants-per-day "$grants_per_day" \
+      --operator public-server --reason "each visitor's allowance on the public server"
+    ;;
+
+  guest-policy-withdraw)
+    need_env_file
+    [ -f "$authority_file" ] || refuse "no authority yet; run issue-authority first"
+    authority="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["authority_id"])' "$authority_file")"
+    owner_run python -m exulanica.spending guest-policy-withdraw --authority "$authority" \
+      --operator public-server --reason "${EXULANICA_GUEST_WITHDRAW_REASON:-withdrawn by the operator}"
     ;;
 
   spending)
@@ -445,7 +519,7 @@ print(json.dumps(sorted({p.catalog_origin for p in load_manifest().providers.val
     ;;
 
   *)
-    sed -n '2,25p' "$0" >&2
+    sed -n '2,30p' "$0" >&2
     exit 2
     ;;
 esac

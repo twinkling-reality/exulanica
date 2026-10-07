@@ -54,11 +54,15 @@ before a database connection is opened for the route.
 browser session holds `ACCOUNT_OWNER_PERMISSIONS`: `admission.read`, `admission.write`,
 `consent.read`, `consent.write`, `deletion.write`, `intake.write`, `library.read`,
 `library.write`, `model.invoke`, `operations.read`, `operations.write`, `world.read` and
-`world.write`, which is every permission except `tiles.materialise`. That grant is keyed on the
-membership role, not assumed: a browser session exists only for an account membership, migration
-0058 allows one role, `owner`, and `AccountRepository.session` requires it.
-`tests/test_route_permissions.py` reads 0058's check and fails when a second role appears, until
-that role is given a grant of its own. Withholding `tiles.materialise` from a browser session is an
+`world.write`, which is every permission except `tiles.materialise`. A guest's browser session
+(migration 0139, [deployment](deployment.md#514-browser-accounts)) holds `GUEST_PERMISSIONS`:
+`world.read`, `world.write`, `model.invoke`, `library.read`, `library.write` and
+`deletion.write`, the journey of making a world, choosing its models, comparing, asking the
+Companion and deleting what one made, and nothing else: no intake, consent, admission, operations
+or tiles. That grant is keyed on the membership role, not assumed: a browser session exists only
+for an account membership, the migrations allow the roles `owner` and `guest`, and
+`AccountRepository.session` requires one of them. `tests/test_route_permissions.py` reads the
+latest check and fails when a role appears without a grant of its own. Withholding `tiles.materialise` from a browser session is an
 open decision: three routes require it (section 2), so a browser session cannot ask for a generated
 world or read a tile's bytes until somebody grants it here deliberately. An explicit Authorization
 header never falls back to the cookie. Rejected alternative: letting a browser session inherit whatever a bearer token would hold,

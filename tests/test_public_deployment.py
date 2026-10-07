@@ -13,6 +13,7 @@ refusing to start without the operator's ceilings, and keeping the model credent
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import pathlib
@@ -221,6 +222,8 @@ def _init_env(directory: pathlib.Path) -> dict[str, str]:
         "EXULANICA_EDGE_ADDRESS": "127.0.0.1",
         "EXULANICA_BACKUP_PATH": str(backup),
         "EXULANICA_CUSTODY_PATH": str(custody),
+        "EXULANICA_GUEST_ENTRY": "open",
+        "EXULANICA_GUEST_ENTRIES_PER_DAY": "100",
     }
 
 
@@ -309,3 +312,100 @@ def test_a_rehearsal_visitor_cannot_take_the_operators_label(tmp_path):
     assert refused.returncode == 2
     refused = _script(tmp_path, "revoke", "operator")
     assert refused.returncode == 2
+
+
+@needs_shell
+def test_init_keeps_the_entry_code_s_digest_and_never_the_code(tmp_path):
+    code = "a-code-only-the-judges-are-given"
+    env = {
+        **_init_env(tmp_path),
+        "EXULANICA_GUEST_ENTRY": "code",
+        "EXULANICA_GUEST_ENTRY_CODE": code,
+    }
+    result = _script(tmp_path, "init", **env)
+    assert result.returncode == 0, result.stderr
+    lines = _env_lines(tmp_path / "deploy" / "public.env")
+    assert lines["EXULANICA_GUEST_ENTRY"] == "code"
+    assert lines["EXULANICA_GUEST_ENTRY_CODE_SHA256"] == hashlib.sha256(code.encode()).hexdigest()
+    assert lines["EXULANICA_PUBLIC_ORIGIN"] == "https://public.example"
+    for path in (tmp_path / "deploy").rglob("*"):
+        if path.is_file():
+            assert code not in path.read_text(encoding="utf-8"), path
+
+
+@needs_shell
+def test_init_refuses_a_guest_entry_without_its_day_s_limit(tmp_path):
+    env = {**_init_env(tmp_path)}
+    del env["EXULANICA_GUEST_ENTRIES_PER_DAY"]
+    refused = _script(tmp_path, "init", **env)
+    assert refused.returncode != 0
+    assert "EXULANICA_GUEST_ENTRIES_PER_DAY" in refused.stderr
+    assert not (tmp_path / "deploy" / "public.env").exists()
+
+
+def test_the_api_reaches_accounts_as_its_own_role_and_trusts_only_the_proxy_s_scheme():
+    api = OVERLAY_SERVICES["api"]
+    assert "EXULANICA_ACCOUNT_DATABASE_URL: postgresql://exulanica_accounts:" in api
+    assert '"${EXULANICA_PUBLIC_ORIGIN:?' in api
+    assert 'FORWARDED_ALLOW_IPS: "*"' in api
+    # Trusting any forwarder is safe only while nothing but the client proxy reaches the API.
+    assert re.search(r"^    ports: !reset \[\]$", api, re.M)
+
+
+@needs_shell
+def test_init_refuses_an_entry_code_short_enough_to_guess(tmp_path):
+    """Only the code's unsalted SHA-256 is kept and a wrong code is answered at once, so a short
+    code falls to guessing: init refuses one under 20 characters."""
+    env = {**_init_env(tmp_path), "EXULANICA_GUEST_ENTRY": "code"}
+    refused = _script(tmp_path, "init", **env, EXULANICA_GUEST_ENTRY_CODE="nineteen-characters")
+    assert len("nineteen-characters") == 19
+    assert refused.returncode != 0 and "at least 20 characters" in refused.stderr
+    assert not (tmp_path / "deploy" / "public.env").exists()
+    accepted = _script(tmp_path, "init", **env, EXULANICA_GUEST_ENTRY_CODE="twenty-characters-ok")
+    assert accepted.returncode == 0, accepted.stderr
+
+
+def test_only_the_edge_publishes_a_port_and_up_checks_the_merged_configuration():
+    """The client proxy trusts X-Forwarded-For from private ranges and the API trusts forwarded
+    headers from anything that reaches it, so neither may publish a port: the overlay resets
+    both, and `up` reads the merged configuration Compose runs, not this text, before it starts."""
+    for name in ("api", "client"):
+        assert re.search(r"^    ports: !reset \[\]$", OVERLAY_SERVICES[name], re.M), name
+    script = SCRIPT.read_text(encoding="utf-8")
+    up = script.split("\n  up)\n", 1)[1].split("\n    ;;\n", 1)[0]
+    assert "compose config --format json" in up
+    assert '("api", "client")' in up
+    assert "refuse" in up.split("compose config --format json", 1)[1]
+    # The check runs before anything starts.
+    assert up.index("compose config --format json") < up.index("compose up -d")
+
+
+def test_the_edge_log_drops_the_csrf_token_and_keeps_only_an_address_s_network():
+    log = CADDYFILE.split("\tlog {", 1)[1].split("\n\t}\n", 1)[0]
+    assert "request>headers>X-Csrf-Token delete" in log
+    for field in ("request>remote_ip", "request>client_ip"):
+        block = log.split(f"{field} ip_mask {{", 1)[1].split("}", 1)[0]
+        assert "ipv4 24" in block and "ipv6 48" in block
+
+
+def test_the_guest_policy_states_its_grants_a_day_and_can_be_withdrawn():
+    script = SCRIPT.read_text(encoding="utf-8")
+    policy = script.split("\n  guest-policy)\n", 1)[1].split("\n    ;;\n", 1)[0]
+    assert '--grants-per-day "$grants_per_day"' in policy
+    assert (
+        "EXULANICA_GUEST_GRANTS_PER_DAY" in policy and "EXULANICA_GUEST_ENTRIES_PER_DAY" in policy
+    )
+    withdraw = script.split("\n  guest-policy-withdraw)\n", 1)[1].split("\n    ;;\n", 1)[0]
+    assert "python -m exulanica.spending guest-policy-withdraw" in withdraw
+
+
+def test_up_refuses_a_service_that_keeps_restarting():
+    """A service that exits at once can read healthy for a moment before its first restart, as
+    a client proxy whose nginx configuration nginx refuses did in a rehearsal; `up` looks again
+    after starting and refuses while any service is restarting."""
+    script = SCRIPT.read_text(encoding="utf-8")
+    up = script.split("\n  up)\n", 1)[1].split("\n    ;;\n", 1)[0]
+    started = up.index("compose up -d")
+    check = up.index("compose ps --status restarting --services")
+    assert started < check
+    assert "refuse" in up[check:]

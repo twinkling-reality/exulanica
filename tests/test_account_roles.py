@@ -106,15 +106,24 @@ def test_migration_strips_preexisting_default_grants(monkeypatch):
                     revoke_account_access(admin, role=role)
                 admin.commit()
                 admin.execute(next(m.sql for m in all_migrations if m.version == "0058"))
+                # 0058's own tables; a later migration's account tables are held by its own test.
+                created = [
+                    table
+                    for table in ACCOUNT_TABLES
+                    if admin.execute("select to_regclass(%s) is not null ok", (table,)).fetchone()[
+                        "ok"
+                    ]
+                ]
+                assert created and len(created) < len(ACCOUNT_TABLES)
                 for role, read_only in zip(roles, (False, True), strict=True):
-                    for table in ACCOUNT_TABLES:
+                    for table in created:
                         assert not admin.execute(
                             "select has_table_privilege(%s,%s,'SELECT,INSERT,UPDATE') ok",
                             (role, table),
                         ).fetchone()["ok"]
                     # Reprovisioning the same role must not reopen account tables.
                     provision_runtime_role(admin, role=role, read_only=read_only)
-                    for table in ACCOUNT_TABLES:
+                    for table in created:
                         assert not admin.execute(
                             "select has_table_privilege(%s,%s,'SELECT,INSERT,UPDATE') ok",
                             (role, table),

@@ -27,7 +27,9 @@ def test_sign_in_reopen_csrf_logout_and_server_owned_scope(account_api):
     api = account_api
     assert api.client.get("/auth/session").status_code == 401
     account = api.login()
-    assert set(account) == {"user_id", "actor", "workspace_id", "expires_at", "csrf_token"}
+    assert set(account) == {"user_id", "actor", "workspace_id", "expires_at", "csrf_token", "role"}
+    # A Google sign-in is an owner; only a guest's session carries an allowance.
+    assert account["role"] == "owner"
     cookie = api.client.cookies.get(SESSION_COOKIE)
     assert cookie and cookie not in str(account)
     with TestClient(

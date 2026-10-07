@@ -141,6 +141,53 @@
     }
    }
   },
+  "/auth/guest": {
+   "post": {
+    "tags": [
+     "accounts"
+    ],
+    "summary": "Guest Entry",
+    "description": "Enter as a guest: an account with no identity, a workspace of its own and a session.\n\nAfter the account's transaction commits, the workspace is given its allowance by the spending\nauthority's guest policy and its first world from the installation's arrival list. Either can\nfail without undoing the entry, so once the account exists the answer is always 201 with the\nsession cookie, and ``incomplete`` names each step that failed (``allowance`` with the\nrefusal's code, or ``arrival``). A visitor whose allowance is missing is granted it on their\nnext session read (``GET /auth/session``).",
+    "operationId": "guest_entry_auth_guest_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "anyOf": [
+         {
+          "$ref": "#/components/schemas/GuestEntryBody"
+         },
+         {
+          "type": "null"
+         }
+        ],
+        "title": "Body"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/auth/logout": {
    "post": {
     "tags": [
@@ -25248,6 +25295,27 @@
     ],
     "title": "GraphPayload",
     "description": "One immutable read of the workspace, at one state version."
+   },
+   "GuestEntryBody": {
+    "properties": {
+     "code": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 256,
+        "minLength": 1
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Code"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "title": "GuestEntryBody",
+    "description": "What a visitor sends to enter: nothing, or the code the server asks for."
    },
    "HTTPValidationError": {
     "properties": {

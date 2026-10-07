@@ -21,7 +21,14 @@ ACCOUNT_TABLES = (
     "account_membership",
     "account_login_attempt",
     "account_browser_session",
+    # Migration 0139: a guest's entry, and each day's count of them.
+    "account_guest_entry",
+    "account_guest_day",
 )
+
+#: The tables migration 0058 made, which every database with accounts holds. A database
+#: provisioned below a later migration holds the rest of :data:`ACCOUNT_TABLES` once it is applied.
+ACCOUNT_TABLES_FROM_0058 = ACCOUNT_TABLES[:6]
 
 
 class AccountRoleUnsafe(ValueError):
@@ -98,7 +105,8 @@ def assert_account_role(connection: psycopg.Connection, *, role: str | None = No
             "where n.nspname=current_schema() and c.relkind in ('r','p','v','m','f')",
             (role, role),
         ).fetchall()
-        if {r["relname"] for r in rows if r["relname"] in ACCOUNT_TABLES} != set(ACCOUNT_TABLES):
+        present = {r["relname"] for r in rows if r["relname"] in ACCOUNT_TABLES}
+        if not set(ACCOUNT_TABLES_FROM_0058) <= present:
             raise AccountRoleUnsafe("account schema is incomplete")
         for table in rows:
             if table["relname"] not in ACCOUNT_TABLES and (
@@ -165,9 +173,12 @@ def provision_account_role(
             )
         )
         for table in ACCOUNT_TABLES:
-            cursor.execute(
-                sql.SQL("grant select,insert,update on table {}.{} to {}").format(
-                    sql.Identifier(schema), sql.Identifier(table), sql.Identifier(role)
+            # A table a later migration adds is granted once that migration has made it, as the
+            # runtime roles' functions are (exulanica/db/roles.py _grant_functions).
+            if cursor.execute("select to_regclass(%s) is not null ok", (table,)).fetchone()["ok"]:
+                cursor.execute(
+                    sql.SQL("grant select,insert,update on table {}.{} to {}").format(
+                        sql.Identifier(schema), sql.Identifier(table), sql.Identifier(role)
+                    )
                 )
-            )
         assert_account_role(connection, role=role)
