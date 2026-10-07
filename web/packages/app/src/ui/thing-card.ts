@@ -10,7 +10,7 @@ import { el } from './dom.js';
 /** The mark beside the title and the mind: "AI", or where a visitor came from. */
 export interface CardMark {
   readonly kind: 'ai' | 'from';
-  /** The pill's words: "AI", "from Luanti". */
+  /** The pill's words: "AI", or "from" and the label the door lists for a visitor's bridge. */
   readonly text: string;
   /** What a screen reader says for it. */
   readonly label: string;

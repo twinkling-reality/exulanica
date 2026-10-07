@@ -17,8 +17,8 @@ describe('markOf', () => {
   });
 
   it('marks a visitor a person plays from a game by where it came from, never as AI', () => {
-    expect(markOf({ running: null, crossing: { bridge: 'luanti' }, bridge: { label: 'Luanti', ai: false } }))
-      .toEqual({ kind: 'from', label: 'from Luanti', full: 'A person playing Luanti' });
+    expect(markOf({ running: null, crossing: { bridge: 'blockgame' }, bridge: { label: 'Block Game', ai: false } }))
+      .toEqual({ kind: 'from', label: 'from Block Game', full: 'A person playing Block Game' });
   });
 
   it('marks an outside agent as AI from outside, in its own name', () => {
@@ -34,6 +34,6 @@ describe('markOf', () => {
 
   it('says who runs it to a screen reader', () => {
     expect(markLabel({ kind: 'ai', short: 'Qwen3', full: 'Qwen3 235B Instruct' })).toBe('run by an AI model, Qwen3 235B Instruct');
-    expect(markLabel({ kind: 'from', label: 'from Luanti', full: 'A person playing Luanti' })).toBe('A person playing Luanti');
+    expect(markLabel({ kind: 'from', label: 'from Block Game', full: 'A person playing Block Game' })).toBe('A person playing Block Game');
   });
 });
