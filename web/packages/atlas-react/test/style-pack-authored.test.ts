@@ -2,13 +2,16 @@
 /**
  * The authored style packs, read the way the page reads them: each manifest by the browser's reader
  * against this tree's catalogs, each piece by its digest and the palette piece reader, its one
- * preview picture by its digest, and each frame that stretches resolved into the smallest and
- * largest openings the city grammar cuts.
+ * preview picture by its digest, each frame that stretches resolved into the smallest and largest
+ * openings the city grammar cuts, and each light preset's sky as the renderer lights a surface with
+ * it.
  */
 import { createHash } from 'node:crypto';
 import { readFileSync, readdirSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { readStylePackManifest, readStylePiece, resolveLookRole, resolveStylePack, type LookFamily } from '@exulanica/atlas-core';
+import { renderSkyRadiance } from '../src/playcanvas/generated-tile/sky.js';
+import { renderLookOfPreset } from '../src/playcanvas/style-pack/preset-look.js';
 
 // Relative to web/, where the suite runs.
 const PACKS = '../assets/style-packs/packs';
@@ -57,6 +60,29 @@ describe('the authored packs', () => {
           const dressing = resolveLookRole(pack, { identity: `${folder}:${leaf}`, lookRole: `window.${leaf}`, positionMm: [0, 0, 0], yawQuarterTurns: 0, boxMm }, families, 'module');
           expect(dressing, `${folder} window.${leaf} ${boxMm.join('x')}`).toMatchObject({ kind: 'module' });
         }
+      }
+    }
+  });
+
+  it('light a surface in shade at most twice as blue as red, so a shaded street never reads navy', () => {
+    for (const folder of folders) {
+      const pack = resolveStylePack([readStylePackManifest(JSON.parse(readFileSync(`${PACKS}/${folder}/manifest.json`, 'utf8')), { families, textureSets })]);
+      for (const [name, preset] of Object.entries(pack.light.presets)) {
+        const look = renderLookOfPreset(preset, pack.shading, pack.edge);
+        // The sky's light on an upward-facing surface the sun does not reach: its radiance as the
+        // renderer lights with it, weighted by the cosine over the upper hemisphere.
+        let red = 0;
+        let blue = 0;
+        for (let i = 0; i < 64; i += 1) {
+          const theta = ((i + 0.5) / 64) * (Math.PI / 2);
+          for (let j = 0; j < 256; j += 1) {
+            const phi = ((j + 0.5) / 256) * 2 * Math.PI;
+            const radiance = renderSkyRadiance(look, [Math.sin(theta) * Math.cos(phi), Math.cos(theta), Math.sin(theta) * Math.sin(phi)], true);
+            red += radiance[0] * Math.cos(theta) * Math.sin(theta);
+            blue += radiance[2] * Math.cos(theta) * Math.sin(theta);
+          }
+        }
+        expect(blue / red, `${folder} ${name}`).toBeLessThanOrEqual(2);
       }
     }
   });

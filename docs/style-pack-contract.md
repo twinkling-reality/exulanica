@@ -184,16 +184,18 @@ warm light, some windows lit) and `exulanica.finished-town` (the town's own text
 wall, road, path and ground material, physically lit, slate roofs). Each states a day and an evening
 preset, a preview picture, surfaces for the town's materials and for every surface family's default,
 window and door frames that stretch, a hatchback, a sedan, one van for minivans and panel vans and a
-bus for the traffic (bicycles keep the traffic's boxes), a tree and a fence. Every preview is the
-pack drawn by the product on one generated market town at its arrival camera, the same town and
-camera for all three, 1600 by 1000 pixels with the interface hidden.
+bus for the traffic (bicycles keep the traffic's boxes), a tree and a fence. Each preset's sky
+lights a surface in shade with at most twice as much blue as red, so a shaded street reads grey
+rather than navy. Every preview is the pack drawn by the product on one generated market town at
+its arrival camera, the same town and camera for all three, 1600 by 1000 pixels with the interface
+hidden.
 `scripts/style_packs/authored_packs.py` writes every byte of the pieces and manifests from boxes,
 prisms, cones and faceted spheres through the shared piece writer, lists each committed preview,
 and refuses a frame whose fixed parts would not fit the smallest opening the city grammar cuts or
 the smallest door a site cuts, each read from the grammars. `tests/test_authored_style_packs.py`
 holds the committed files to the script, the product's reader, the piece budgets, those openings
 and the previews' format and size; `web/packages/atlas-react/test/style-pack-authored.test.ts`
-reads them as the page does.
+reads them as the page does and holds each preset's shade light to that bound.
 
 ## 9. The library the host serves
 

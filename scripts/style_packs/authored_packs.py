@@ -46,7 +46,7 @@ from exulanica_pieces.geometry.mesh import Mesh
 ROOT: Final = Path(__file__).resolve().parents[2]
 PACKS: Final = Path("assets/style-packs/packs")
 #: The packs' version: a change to any byte a manifest states moves it.
-VERSION: Final = 2
+VERSION: Final = 3
 #: Each pack's committed preview picture, inside its folder.
 PREVIEW: Final = "preview.jpg"
 
@@ -624,17 +624,17 @@ TOON: Final = PackSpec(
         "day": preset(
             exposure=920,
             tone="neutral",
-            sky=("#3b82dc", "#cfe9fb", "#86c46a", "#b5b2a8"),
+            sky=("#4f8fdc", "#f2e6c8", "#86c46a", "#b5b2a8"),
             sky_intensity=1000,
             glow=250,
-            clouds=(420, "#ffffff", "#cddcf0", 1200, 3),
-            fog=(1000, "#cfe6f5"),
-            sun=(50, 150, "#fff5e6", 2100, "pcf1"),
-            environment=850,
+            clouds=(520, "#ffffff", "#ddd6cc", 1200, 3),
+            fog=(1000, "#eceae2"),
+            sun=(50, 150, "#fff5e6", 1850, "pcf1"),
+            environment=1100,
             contact=("lighting", 600, 50),
             bloom=12,
             grading=(1000, 1050, 1060, "#ffffff"),
-            enhance=(60, -50, 80),
+            enhance=(60, -50, 40),
             vignette=160,
         ),
         "evening": preset(
@@ -680,7 +680,7 @@ TOON: Final = PackSpec(
         swatch("metal_top", "#5d6a8f", 550),
         swatch("awning", "#ef5d6f"),
         swatch("roof", "#e0674f"),
-        swatch("asphalt", "#4d5566", 900),
+        swatch("asphalt", "#5e5c59", 900),
         swatch("kerb", "#f2eee6"),
         swatch("paint_white", "#ffffff"),
         swatch("paint_yellow", "#ffcc33"),
@@ -884,17 +884,17 @@ FINISHED: Final = PackSpec(
         "day": preset(
             exposure=920,
             tone="aces2",
-            sky=("#2d68c4", "#d3e3f2", "#6e7c5c", "#8a8a84"),
+            sky=("#5a84c4", "#eadfcc", "#6e7c5c", "#8a8a84"),
             sky_intensity=1050,
             glow=550,
-            clouds=(300, "#ffffff", "#b9c5d6", 1400, 13),
-            fog=(800, "#c7d6e6"),
-            sun=(36, 142, "#ffeed4", 3300, "pcf5"),
+            clouds=(450, "#fffaf2", "#cbc6c0", 1400, 13),
+            fog=(800, "#dfe0de"),
+            sun=(36, 142, "#fff6ea", 3300, "pcf5"),
             environment=1150,
             contact=("lighting", 500, 500),
             bloom=10,
-            grading=(1000, 1080, 1050, "#fffcf7"),
-            enhance=(100, -60, 160),
+            grading=(1000, 1080, 1020, "#ffffff"),
+            enhance=(100, -60, 60),
             vignette=180,
         ),
         "evening": preset(
