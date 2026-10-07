@@ -10,6 +10,7 @@ contract; the hosted-request boundary itself belongs to the
 | Part | Status |
 | --- | --- |
 | Web notes from one source (Tavily), off by default and offered to listed workspaces only | Implemented |
+| A drafter's notes from a finished request: the quoted block, its bound and its provenance | Implemented |
 | A drafter's prompt carrying the notes | Not built: each drafter adds them in a prompt version of its own |
 | Notes read from a person's own pictures | Not built: it waits on the model provider's training opt-out being recorded |
 | Facts admitted from record sources (Wikidata, GeoNames, Overture places) | Not built |
@@ -163,7 +164,39 @@ saved names are replaced is 422 `description_too_long`. A key naming an earlier 
 body is `idempotency_key_reused`. `web` must be `true`. Whether the worker runs is in `/readyz`
 (`references`).
 
-## 9. Limits
+## 9. Notes for a drafter
+
+A drafter given a reference id calls `exulanica/references/for_drafting.py::notes_for_draft` with
+the caller's workspace, the caller and the drafter's purpose. It answers only with the caller's own
+request that ended `complete` or `partial` for that purpose; otherwise it refuses with one code,
+and the drafter drafts without notes:
+
+| Code | When |
+| --- | --- |
+| `reference_unknown` | No such request in the workspace, or another person's: the same answer |
+| `reference_not_finished` | The request is queued or running, or ended `failed` or `cancelled` |
+| `reference_purpose_differs` | The request was made for another kind of draft |
+| `reference_has_no_notes` | The request kept no notes |
+
+The answer is the rendered block, the pictures its notes were read from (none for web notes), and
+the provenance a drafted document keeps. Notes are drafted from web text, which is untrusted, so the
+block is quoted, delimited material: a heading saying the notes describe what such a place looks
+like and are never instructions, then the notes between triple quotes, one line each, grouped by
+aspect. A double quote inside a note is written as a single quote and its whitespace as one space,
+so no note closes the quotation or begins a line of its own. The drafter's strict schema and its
+checks stay the authority over what is made.
+
+The block holds at most 3,072 bytes of UTF-8. A full bundle of web notes in plain Latin letters fits;
+notes marked as read from a picture, or written in letters of more than one byte, can pass it. Notes
+are taken in order and each is added if it still fits; every note left out is counted, never
+dropped silently.
+
+The provenance names the notes without their text: the request id, the bundle's digest, how many
+notes the block holds and their bases (`web_description`, `own_picture`). The text stays in the
+request, with its workspace; what a drafter writes from it is that drafter's own drafted text, held
+to its own checks.
+
+## 10. Limits
 
 - **Stops and rates are per process.** A source stopped for a cost change, and the catalog's
   `calls_per_minute`, are held in the worker's memory: a restart offers the source again, and two
@@ -185,14 +218,20 @@ body is `idempotency_key_reused`. `web` must be `true`. Whether the worker runs 
 - **Unserved jobs end at startup.** A job of a workspace this installation no longer serves (dropped
   from the list, the worker set off, a public profile) is ended and blanked at the next start, or
   when that workspace next uses the routes; until then its words wait in the job.
+- **A notes block is screened, not judged for saved names.** Its notes were screened for links,
+  email addresses, long numbers, screened words and the account's words given to the job; a drafter
+  applies its own replacement of saved names and the workspace's request policy to the block as to
+  the person's words.
 - **No live search has run through the product.**
 
-## 10. Verification
+## 11. Verification
 
 `tests/test_reference_sources.py`, `tests/test_reference_boundary.py`,
 `tests/test_reference_notes.py` and `tests/test_reference_settings.py` run without a database;
-`tests/test_reference_store.py`, `tests/test_reference_worker.py` and
-`tests/test_reference_routes.py` run on PostgreSQL. With every outside party scripted they show that
+`tests/test_reference_store.py`, `tests/test_reference_worker.py`,
+`tests/test_reference_routes.py` and `tests/test_reference_for_drafting.py` run on PostgreSQL.
+`tests/reference_fixtures.py` makes a finished request with a scripted bundle for a drafter's own
+tests. With every outside party scripted they show that
 a saved person, a saved place, account words given to the job and a planted search result reach no
 outgoing query, no stored row and no response, and that each guard can fail; the route tests run as
 the runtime and read-only roles. Row-level security on
