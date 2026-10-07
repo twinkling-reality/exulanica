@@ -8,6 +8,7 @@
     .venv/bin/python scripts/acceptance/domain_rows.py made-with   --worktree PATH --out DIR
     .venv/bin/python scripts/acceptance/domain_rows.py packs       --worktree PATH --out DIR
     .venv/bin/python scripts/acceptance/domain_rows.py kinds       --worktree PATH --out DIR
+    .venv/bin/python scripts/acceptance/domain_rows.py references  --worktree PATH --out DIR
 
 Each subcommand checks rows against the stack ``launch.py up`` started for ``--worktree``,
 restarts that stack's API with ``launch.py restart-api`` where a row needs a fresh process, and
@@ -32,11 +33,13 @@ leaves the stack running:
 - ``made-with``: A5 (a generated world's saved entry states what it was made with, and a new world
   made from those values states the same). The stack is started with ``--workspaces 2
   --no-derivative-worker``.
+- ``references``: R1 (reference notes where the installation does not offer them). The stack is
+  started with ``--workspaces 2 --read-only-token --no-derivative-worker`` and no reference worker.
 - ``packs``: S1 (the committed style pack library the host serves, against the committed files)
   and S2 (a world's appearance naming its pack). Any stack with two workspaces.
-- ``kinds``: W1 (a creator's world kind kept in its workspace) and W2 (a world of a kind, its site
-  drawing, title and body limits). The stack is started with ``--workspaces 2 --read-only-token
-  --no-derivative-worker``.
+- ``kinds``: W1 (a creator's world kind kept in its workspace), W2 (a world of a kind, its site
+  drawing, title and body limits) and W3 (people living in it). The stack is started with
+  ``--workspaces 2 --read-only-token --no-derivative-worker``.
 
 Every row ends ``passed``, ``failed`` or ``blocked``, by the rules of ``foundation.py``, whose
 records, clients and stack this file uses. Like it, this is an independent client: it imports
@@ -4227,7 +4230,10 @@ def row_w1(stack: Stack, transcripts: Any, worktree: Path) -> tuple[Row, dict[st
     return row.close(), (view if status_kept in (200, 201) else None)
 
 
-def row_w2(stack: Stack, transcripts: Any, kept: Mapping[str, Any] | None) -> Row:
+def row_w2(
+    stack: Stack, transcripts: Any, kept: Mapping[str, Any] | None
+) -> tuple[Row, dict[str, Any] | None, dict[str, Any] | None]:
+    """W2, and the world of W1's kind with its served drawing, for W3."""
     row = Row(
         "W2",
         "kinds.world",
@@ -4240,7 +4246,7 @@ def row_w2(stack: Stack, transcripts: Any, kept: Mapping[str, Any] | None) -> Ro
     w1 = F.client(stack, transcripts, "w1", "token")
     if kept is None:
         row.blocked_by.append("W1 kept no kind to make a world of")
-        return row.close()
+        return row.close(), None, None
     town_kind = next(
         (
             k
@@ -4326,7 +4332,9 @@ def row_w2(stack: Stack, transcripts: Any, kept: Mapping[str, Any] | None) -> Ro
         "titles": titles,
         "too_big": status_big,
     }
-    return row.close()
+    drawing = json.loads(body) if status_site == 200 else None
+    farm_entry = F.read_entry(w1, "W2", farm["entry_id"]) if status_farm in (200, 201) else None
+    return row.close(), farm_entry, drawing
 
 
 def kinds(arguments: argparse.Namespace) -> int:
@@ -4339,7 +4347,181 @@ def kinds(arguments: argparse.Namespace) -> int:
     transcripts = Transcripts(out / "transcripts")
     started = dt.datetime.now(dt.UTC).isoformat()
     w1, kept = row_w1(stack, transcripts, worktree)
-    rows = [w1, row_w2(stack, transcripts, kept)]
+    w2, farm, drawing = row_w2(stack, transcripts, kept)
+    rows = [w1, w2, row_w3(stack, transcripts, farm, drawing)]
+    write_results(out, stack, rows, started, sys.argv[1:])
+    return 0 if all(row.status != "failed" for row in rows) else 1
+
+
+# -- W3: people live in a world of a kind -----------------------------------------------------------
+
+#: The society a world of a kind is brought in with, and the input profile its record names (A-73).
+SITE_ENGINE = "exulanica-society/v5"
+SITE_INPUT_PROFILE = "exulanica.society-input/walking-surfaces-v2"
+
+
+def inside_site(position: Sequence[int], extent: Mapping[str, Any], shrink: float = 1.0) -> bool:
+    """Whether a plan position (east, south) in the region's frame lies inside the site the drawing
+    states (x east, y north from its south-west corner, so y is minus south), with its bounds
+    shrunk about their centre by ``shrink``."""
+    x, y = position[0], -position[1]
+    width, depth = extent["widthMm"], extent["depthMm"]
+    half_x, half_y = width * shrink / 2, depth * shrink / 2
+    return abs(x - width / 2) <= half_x and abs(y - depth / 2) <= half_y
+
+
+def row_w3(
+    stack: Stack, transcripts: Any, farm: Mapping[str, Any] | None, site: Mapping[str, Any] | None
+) -> Row:
+    row = Row(
+        "W3",
+        "kinds.people",
+        "People brought into W2's world of a kind are placed inside the site its served drawing "
+        "states; the society runs the living engine exulanica-society/v5 and its input record "
+        "names the walking-surfaces-v2 profile; after one manual step every inhabitant is still "
+        "inside the site.",
+    )
+    if not farm or not site:
+        row.blocked_by.append("W2 made no world of a kind with a drawing")
+        return row.close()
+    w1 = F.client(stack, transcripts, "w1", "token")
+    query = F.world_query(farm)
+    region = (farm.get("generated_site") or {}).get("region_id")
+    status, made = w1.call(
+        "W3",
+        "POST",
+        F.version_path(farm, "/society"),
+        query=query,
+        body={"region_id": region, "profile": SITE_ENGINE},
+    )
+    row.expect(status in (200, 201), f"bringing people in answered {status} {F.problem_code(made)}")
+    if status not in (200, 201):
+        return row.close()
+    extent = site.get("extent") or {}
+    _, read = F.society(w1, "W3", farm)
+    people = (read.get("state") or {}).get("inhabitants") or []
+    placed = [p.get("position_mm") for p in people]
+    row.expect(read.get("profile") == SITE_ENGINE, f"the society runs {read.get('profile')}")
+    status_input, record = w1.call(
+        "W3",
+        "GET",
+        F.version_path(farm, f"/society/inputs/{read.get('input_seq')}"),
+        query=query,
+    )
+    row.expect(
+        status_input == 200 and record.get("input_profile") == SITE_INPUT_PROFILE,
+        f"the input record answered {status_input} naming {record.get('input_profile')}",
+    )
+    row.expect(
+        len(placed) > 0 and all(p and inside_site(p, extent) for p in placed),
+        f"{len(placed)} people, not all inside {extent}",
+    )
+    mutant_fails = not all(p and inside_site(p, extent, 0.1) for p in placed)
+    row.expect(mutant_fails, "the inside check passed with the site shrunk to a tenth")
+    status_step, stepped = F.advance(w1, "W3", farm, read)
+    _, after = F.society(w1, "W3", farm)
+    moved = [p.get("position_mm") for p in (after.get("state") or {}).get("inhabitants") or []]
+    row.expect(
+        status_step in (200, 201)
+        and after.get("current_tick") == (read.get("current_tick") or 0) + 1,
+        f"a manual step answered {status_step} {F.problem_code(stepped)}",
+    )
+    row.expect(
+        len(moved) == len(placed) and all(p and inside_site(p, extent) for p in moved),
+        "after a step someone is outside the site",
+    )
+    row.observed = {
+        "farm": farm.get("entry_id"),
+        "extent": extent,
+        "population": len(placed),
+        "placed": placed,
+        "after_step": moved,
+        "engine": read.get("profile"),
+        "input_profile": record.get("input_profile"),
+        "mutant_tenth_fails": mutant_fails,
+    }
+    return row.close()
+
+
+# -- R1: reference notes where an installation does not offer them -------------------------------
+
+#: The contract's four codes for an installation that does not offer web notes (A-72).
+REFERENCE_REFUSALS = (
+    "references_operator_only",
+    "references_not_run_here",
+    "reference_budget_unavailable",
+    "references_not_configured",
+)
+
+
+def row_r1(stack: Stack, transcripts: Any) -> Row:
+    row = Row(
+        "R1",
+        "references.not_offered",
+        "Where web reference notes are not offered: the list holds no request and the capability "
+        "is refused with one of the contract's four codes; a valid request is refused 409 with that "
+        "code and nothing is queued or written; web false and a 1001-character description are "
+        "422; the read-only grant is refused 403; an unknown reference is 404 for its read and its "
+        "cancel.",
+    )
+    w1 = F.client(stack, transcripts, "w1", "token")
+    read_only = F.client(stack, transcripts, "read-only", "token-read")
+    status_list, listed = w1.call("R1", "GET", "/worlds/references")
+    named = [c for c in REFERENCE_REFUSALS if c in json.dumps(listed.get("capabilities"))]
+    row.expect(
+        status_list == 200 and listed.get("references") == [] and len(named) == 1,
+        f"the list answered {status_list} with codes {named}",
+    )
+    body = {"purpose": "world_draft", "description": "a quiet harbour town", "web": True}
+    before = stack.evidence_digest()
+    status_ask, refused = w1.call("R1", "POST", "/worlds/references", body=body)
+    after = stack.evidence_digest()
+    row.expect(
+        status_ask == 409 and named and F.problem_code(refused) == named[0],
+        f"a request answered {status_ask} {F.problem_code(refused)}",
+    )
+    row.expect(before == after, "the refused request wrote to the store or database")
+    row.expect(
+        (w1.call("R1", "GET", "/worlds/references")[1] or {}).get("references") == [],
+        "a request was queued",
+    )
+    status_web, _ = w1.call("R1", "POST", "/worlds/references", body={**body, "web": False})
+    status_long, _ = w1.call(
+        "R1", "POST", "/worlds/references", body={**body, "description": "x" * 1001}
+    )
+    row.expect(
+        status_web == 422 and status_long == 422, f"shapes answered {status_web} {status_long}"
+    )
+    status_ro, _ = read_only.call("R1", "POST", "/worlds/references", body=body)
+    row.expect(status_ro == 403, f"the read-only request answered {status_ro}")
+    unknown = uuid.uuid4()
+    status_read, _ = w1.call("R1", "GET", f"/worlds/references/{unknown}")
+    status_cancel, _ = w1.call("R1", "POST", f"/worlds/references/{unknown}/cancel")
+    row.expect(
+        status_read == 404 and status_cancel == 404,
+        f"an unknown reference answered {status_read} and {status_cancel}",
+    )
+    row.observed = {
+        "capability_code": named,
+        "request": [status_ask, F.problem_code(refused)],
+        "evidence_unchanged": before == after,
+        "shapes": [status_web, status_long],
+        "read_only": status_ro,
+        "unknown": [status_read, status_cancel],
+    }
+    return row.close()
+
+
+def references(arguments: argparse.Namespace) -> int:
+    worktree = LAUNCH.checkout(arguments.worktree)
+    stack = Stack.read(worktree)
+    if not stack.token_file("token-read").exists():
+        raise SystemExit("references needs a stack started with --read-only-token")
+    out = Path(arguments.out).resolve()
+    (out / "evidence").mkdir(parents=True, exist_ok=True)
+    transcripts = Transcripts(out / "transcripts")
+    started = dt.datetime.now(dt.UTC).isoformat()
+    rows = [row_r1(stack, transcripts)]
     write_results(out, stack, rows, started, sys.argv[1:])
     return 0 if all(row.status != "failed" for row in rows) else 1
 
@@ -4405,6 +4587,9 @@ def build_parser() -> argparse.ArgumentParser:
     kept = commands.add_parser("kinds")
     kept.add_argument("--worktree", required=True)
     kept.add_argument("--out", required=True)
+    asked = commands.add_parser("references")
+    asked.add_argument("--worktree", required=True)
+    asked.add_argument("--out", required=True)
     return parser
 
 
@@ -4421,6 +4606,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "made-with": made_with,
         "packs": packs,
         "kinds": kinds,
+        "references": references,
     }
     return commands[arguments.command](arguments)
 

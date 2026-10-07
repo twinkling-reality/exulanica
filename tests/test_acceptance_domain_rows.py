@@ -351,3 +351,14 @@ def test_w1_writes_exactly_one_figure_of_the_farm_kind_as_a_float():
     assert floated["kind"] == document["kind"] and floated["version"] == document["version"]
     assert sum(isinstance(f, float) for f in figures(floated)) == 1
     assert len(figures(floated)) == len(figures(document))
+
+
+def test_w3_reads_a_plan_position_inside_a_site_by_its_drawings_frame():
+    """A-73: a position is (east, south) in the region's frame and the drawing's site runs x east
+    and y north from its south-west corner, so a person at (43.6 m, -54.75 m) stands inside a 96 m
+    by 128 m site, and outside it once the site is shrunk to a tenth about its centre."""
+    extent = {"widthMm": 96_000, "depthMm": 128_000}
+    assert DRIVE.inside_site([43_600, -54_750], extent)
+    assert not DRIVE.inside_site([43_600, 54_750], extent)
+    assert not DRIVE.inside_site([43_600, -54_750], extent, 0.1)
+    assert DRIVE.inside_site([48_000, -64_000], extent, 0.1)

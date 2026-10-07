@@ -43,9 +43,10 @@ const MOVE_KEY = 'ArrowRight';
 // The steps, in order: each one is a person's action in the page. Your worlds comes first after
 // signing in (N1.k), the journey follows (N1.j), and Your worlds with two worlds and Create a world
 // close it (N1.l), so neither changes the world the journey uses. N1.l's town is then opened in each
-// look (N1.m) and its values shown in Create a world (N1.n).
+// look (N1.m), its values shown in Create a world (N1.n) and its look chosen in the Look sheet (N1.o);
+// last, what the shell states of the look that Use drew (N1.p), so a failure of it stops nothing else.
 const STEPS = ['worlds-first', 'journey-open', 'journey-stall', 'journey-people', 'journey-bench',
-  'journey-response', 'journey-why', 'worlds-create', 'worlds-look', 'worlds-values'];
+  'journey-response', 'journey-why', 'worlds-create', 'worlds-look', 'worlds-values', 'worlds-look-sheet', 'worlds-look-stated'];
 // The second saved world N1.l makes through the API, so Your worlds lists two.
 const SECOND_WORLD_TITLE = 'Q10 second world';
 const SECOND_WORLD_RECIPE = 'small_town';
@@ -367,6 +368,71 @@ const STEP_HANDLERS = {
     const after = (await ctx.api('GET', `/world-entries/${town}`)).body;
     ctx.observe('escape-returns-to-your-worlds', closed, { closed });
     ctx.observe('town-unchanged', same(after, before), { changed: !same(after, before) });
+  },
+  async 'worlds-look-sheet'(ctx) {
+    // N1.o (A-74): in the town, Design opens with O; Change look opens the Look sheet over it.
+    const town = ctx.facts.town_entry_id;
+    if (!town) throw new Error('N1.l made no town to dress');
+    await enter(ctx, () => ctx.page.navigate(ctx.runtime.app_url), town);
+    await ctx.page.waitFor(WORLD_LOOK, SETTLE_MS * 2, 'the town drawn in its look');
+    const origin = await ctx.page.evaluate('performance.timeOrigin');
+    await ctx.page.key('KeyO', 'o', { text: 'o' });
+    await ctx.page.click(ACTION('look.open'), 'Change look');
+    const SHEET = `document.querySelector('section.look-sheet')`;
+    await ctx.page.waitFor(`(${SHEET}?.querySelectorAll('button.look-sheet-card').length ?? 0) > 0 ? true : null`,
+      SETTLE_MS, 'the Look sheet to offer its packs');
+    const listed = (await ctx.api('GET', '/world/style-packs')).body?.packs ?? [];
+    const cards = await ctx.page.evaluate(`[...${SHEET}.querySelectorAll('button.look-sheet-card')].map(b => ({
+      pack: b.dataset.packId ?? null, picture: !!b.querySelector('.look-sheet-picture img') }))`);
+    ctx.observe('sheet-offers-the-library', same(cards.map((c) => c.pack).sort(), listed.map((p) => p.pack_id).sort())
+      && cards.every((c) => c.picture === (listed.find((p) => p.pack_id === c.pack)?.preview_sha256 != null))
+      && cards.every((c) => c.picture), { cards, listed: listed.map((p) => [p.pack_id, p.preview_sha256 ?? null]) });
+    await ctx.screenshot('look-sheet', 'the Look sheet over the town');
+    await ctx.page.click(`${SHEET}.querySelector('button.look-sheet-card[data-pack-id="exulanica.cozy-town"]')`, 'the cozy look');
+    await ctx.page.click(ACTION('look.use', SHEET), 'Use this look');
+    // A-74 as amended: what a person sees, the sheet's own words for what it drew. The shell's
+    // data-world-look is recorded here as it stands; N1.p expects it (A-76).
+    const title = listed.find((p) => p.pack_id === 'exulanica.cozy-town')?.title ?? 'exulanica.cozy-town';
+    const said = await ctx.page.waitFor(`(() => { const t = ${SHEET}?.querySelector('p.look-sheet-status')?.textContent ?? '';
+      return /is now drawn in|could not be drawn now/.test(t) ? t : null; })()`, SETTLE_MS * 4, 'the sheet to say what it drew');
+    const unchanged = (await ctx.page.evaluate('performance.timeOrigin')) === origin;
+    const attribute = await ctx.page.evaluate(WORLD_LOOK);
+    ctx.facts.look_sheet_origin = origin;
+    ctx.observe('use-redraws-the-open-town', said.includes(`is now drawn in ${title}`) && unchanged,
+      { said, title, same_page: unchanged, data_world_look: attribute === null ? null : JSON.parse(attribute) });
+    const entry = (await ctx.api('GET', `/world-entries/${town}`)).body;
+    const query = `?world_id=${encodeURIComponent(entry?.world_id ?? '')}`;
+    const versions = (await ctx.api('GET', `/world/styles/versions${query}`)).body ?? [];
+    const named = versions.find((v) => v.version_id === entry?.style_version_id) ?? null;
+    ctx.observe('entry-names-the-cozy-pack', named?.style_pack?.pack_id === 'exulanica.cozy-town',
+      { style_version_id: entry?.style_version_id ?? null, style_pack: named?.style_pack ?? null });
+    await ctx.screenshot('look-used', 'the town redrawn in the cozy look');
+  },
+  async 'worlds-look-stated'(ctx) {
+    // N1.p (A-76): after N1.o's Use, the shell states the cozy pack drawn by the redraw; once the
+    // town is opened again, drawn because the world names it.
+    const town = ctx.facts.town_entry_id;
+    const settled = async (wanted) => {
+      const deadline = Date.now() + SETTLE_MS;
+      let read = null;
+      while (Date.now() < deadline) {
+        const value = await ctx.page.evaluate(WORLD_LOOK);
+        read = value === null ? null : JSON.parse(value);
+        if (sameLook(read, wanted)) break;
+        await sleep(PAGE_SETTLE_MS);
+      }
+      return read;
+    };
+    const redrawn = { pack: 'exulanica.cozy-town', source: 'redraw', drawn: true, reason: null };
+    const afterUse = await settled(redrawn);
+    const unchanged = (await ctx.page.evaluate('performance.timeOrigin')) === ctx.facts.look_sheet_origin;
+    ctx.observe('stated-after-use', sameLook(afterUse, redrawn) && unchanged,
+      { stated: afterUse, expected: redrawn, same_page: unchanged });
+    await enter(ctx, () => ctx.page.navigate(ctx.runtime.app_url), town);
+    const named = { pack: 'exulanica.cozy-town', source: 'world', drawn: true, reason: null };
+    const reopened = await settled(named);
+    ctx.observe('stated-after-reopening', sameLook(reopened, named), { stated: reopened, expected: named });
+    await ctx.screenshot('look-stated', 'the town opened again in the look it names');
   },
   async 'journey-open'(ctx) {
     await open(ctx);

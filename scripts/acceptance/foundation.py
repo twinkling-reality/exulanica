@@ -3960,6 +3960,25 @@ WORLDS_ROWS = (
         "choice exactly); the town's entry reads the same afterwards; Escape returns to Your "
         "worlds (A-66). Functional only.",
     ),
+    (
+        "N1.o",
+        "worlds.look_sheet",
+        "worlds-look-sheet",
+        "In N1.l's town, Design opens with O and Change look opens the Look sheet, which offers "
+        "exactly the packs GET /world/style-packs lists, each with its preview; choosing the cozy "
+        "pack and pressing Use redraws the open town without a page load (the sheet says the "
+        "world is now drawn in the cozy pack's title; the page's time origin unchanged), and the "
+        "town's saved entry then names a style version whose pack is the cozy pack (A-74 as "
+        "amended). Functional only.",
+    ),
+    (
+        "N1.p",
+        "worlds.look_stated",
+        "worlds-look-stated",
+        "After N1.o's Use, within 30 s and on the same page, the shell's data-world-look states the "
+        "cozy pack drawn by the redraw; once the town is opened again it states the cozy pack "
+        "drawn, chosen by the world (A-76); the last step of the session.",
+    ),
 )
 
 
