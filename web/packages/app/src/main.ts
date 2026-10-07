@@ -926,6 +926,16 @@ async function mount(): Promise<void> {
     ),
     onPanelOpen: () => { companion.dismiss(); objects.close(); character.reach(); },
     onObjects: () => objects.toggle(),
+    // Somebody crossing in, leaving or turned away: one sentence where every notice appears.
+    onVisitorNotice: (notice) => {
+      const seeWho = notice.seeWho;
+      actions?.host.toasts.show({
+        message: notice.message,
+        tone: notice.tone,
+        // Long enough to read a sentence and reach See who before it goes.
+        ...(seeWho === null ? {} : { action: { label: 'See who', run: seeWho }, durationMs: 10_000 }),
+      });
+    },
     onDistrictPlacementChange: () => {
       void objects.begin();
     },

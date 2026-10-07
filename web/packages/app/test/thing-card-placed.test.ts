@@ -178,12 +178,15 @@ describe('origin words', () => {
     expect(creditOf(origin({ licence: { spdx: 'CC-BY-4.0', attribution: 'Pat Maker', share_alike: false, licence_url: null } })))
       .toEqual({ text: 'Credit: Pat Maker, CC-BY-4.0', href: null });
   });
-  it('read a version\'s look choices by placed id and refuse another profile', () => {
+  it('read a version\'s look choices by placed id, or by thing id for a thing no author placed, and refuse another profile', () => {
     const looks = readThingLooks({ profile: 'exulanica.thing-look-choices/v1', version_id: 'v', looks: [
       { thing_id: 't', placed_id: 'knight-1', look: { look: 'blocky-knight', version: 1, sha256: 'c'.repeat(64) }, chosen_by: 'owner', chosen_at: 'x' },
       { thing_id: 'u', placed_id: null, look: { look: 'blocky-knight', version: 1, sha256: 'c'.repeat(64) }, chosen_by: 'crossing', chosen_at: 'x' },
     ] });
-    expect([...looks]).toEqual([['knight-1', { key: 'blocky-knight', version: 1, sha256: 'c'.repeat(64) }]]);
+    expect([...looks]).toEqual([
+      ['knight-1', { key: 'blocky-knight', version: 1, sha256: 'c'.repeat(64) }],
+      ['u', { key: 'blocky-knight', version: 1, sha256: 'c'.repeat(64) }],
+    ]);
     expect(() => readThingLooks({ profile: 'exulanica.thing-look-choices/v2', looks: [] })).toThrow();
   });
 });

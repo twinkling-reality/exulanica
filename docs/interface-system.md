@@ -229,8 +229,26 @@ its card and leaves the pointer free; a click on nothing, and any press that dra
 looks around as it always has. No click picks anything while a field had focus at the press or a
 sheet is modal on the world. Both ways pick the nearest along the ray, a person or a thing.
 
-Visitors, a thing's abilities, what it holds and what it said join the card as the server serves
-them.
+A person of a society of things also reads, from the drawn state and the host's thing library,
+its kind's summary; the look it is drawn in (the one chosen for it, else its kind's first), with
+who made it and its licence, and no look row where it is drawn as one of the world's people; what
+it holds ("Holding: a sword"); and how it came: "You placed it here." with its kind's origin, "One
+of the people who live in this world.", or, for a visitor, "Came in from" the bridge's label as
+the door lists it. A visitor is decided for by the program it came with, so its card offers no
+Change: its Mind names who runs it by its mark ("A person playing Block Game", "An outside AI
+agent") and says "Decided from outside, through" the bridge, adding "It is not an AI." only where
+the door's entry says no AI runs that bridge; a bridge the door does not list reads "Decided from
+outside this world." with no claim either way.
+
+A visitor notice: when a newly read minute records a crossing, the toast region says so in one
+sentence, from the event, the kinds' labels, the door's entry and the words catalog's reasons:
+"A knight came in from Block Game, carrying a sword." with See who, which opens its card; "The
+knight from Block Game left, taking a sword, because" and the reason the society recorded; and,
+for an arrival the society refused, "A knight could not come in, because" and its reason. An
+arrival waits for the door to name its bridge before it is told. An author's placements raise no notice,
+and nothing that happened before the page first read the world's events does either.
+
+A thing's abilities and what it said join the card as the server serves them.
 
 ### Look
 

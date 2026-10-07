@@ -97,6 +97,7 @@ import { AttachedMarks, type MarkedSubject } from '@exulanica/atlas-react/things
 import { markLabel, markOf } from './thing-marks.js';
 import { DoorBridgesClient, type DoorBridge } from '../door-bridges-api.js';
 import { ThingLooksClient, type ThingLookChoice } from '../thing-looks-api.js';
+import { visitorNotice, VisitorNoticeWatch, type FreshEvent, type KindReference } from './visitor-notices.js';
 import '../ui/thing-marks.css';
 
 /** Where the development preview's real-engine society recording is served. */
@@ -128,6 +129,11 @@ export interface EnvironmentSelectionDependencies {
   readonly onPanelOpen?: () => void;
   readonly onObjects?: () => void;
   readonly showStatus: (message: string, kind?: 'progress' | 'failure') => void;
+  /**
+   * Tell the person, in one sentence, that somebody crossed in from outside, left again or was
+   * turned away; `seeWho` opens the visitor's card while it is still here, and is null otherwise.
+   */
+  readonly onVisitorNotice?: (notice: ShownVisitorNotice) => void;
   /**
    * The admitted building now selected, or null. Only the admission and feature: the server
    * resolves the canonical place and any confirmed bridge from them when the Companion asks.
@@ -172,6 +178,32 @@ export interface SelectedPerson {
   readonly note: InspectionNote;
   /** Who runs them now, or null where nobody here takes a model choice or before the first read. */
   readonly mind: PersonMind | null;
+  /** Set where they are a thing of a society of things: what its state says they are. */
+  readonly being?: SelectedBeing;
+}
+
+/** A person of a society of things, as its drawn state says: its kind, how it came, what it holds. */
+export interface SelectedBeing {
+  readonly kind: KindReference;
+  readonly cameBy: 'populated' | 'placed' | 'crossed';
+  /** The version's placed thing it is, for one its author placed. */
+  readonly placedId: string | null;
+  /**
+   * For a visitor: the bridge it crossed through and the door's entry for it, null where the door
+   * does not list that bridge here (or has not been read yet).
+   */
+  readonly crossing: { readonly bridge: string; readonly entry: DoorBridge | null } | null;
+  /** The things it holds now, by the state's own ids and kinds. */
+  readonly holding: readonly { readonly id: string; readonly kind: KindReference }[];
+  /** The saved world and version it lives in, for the looks chosen for its things. */
+  readonly world: { readonly worldId: string; readonly versionId: string } | null;
+}
+
+/** A visitor notice as Selected hands it out: its sentence, its tone, and how to see who. */
+export interface ShownVisitorNotice {
+  readonly message: string;
+  readonly tone: 'info' | 'caution';
+  readonly seeWho: (() => void) | null;
 }
 
 /** Whether a person is typing in a field, where no click on the world may pick anything. */
@@ -335,7 +367,8 @@ export function mountEnvironmentSelection(
   const offerInhabitantView = (id: string): void => {
     const note = inspector.note();
     if (inhabitantView === null || note === null) return;
-    const shown = inhabitantView.show(id, { note, mind: societyModels?.mindOf(id) ?? null });
+    const being = beingOf(id);
+    const shown = inhabitantView.show(id, { note, mind: societyModels?.mindOf(id) ?? null, ...(being === null ? {} : { being }) });
     inhabitantView.root.hidden = !shown;
     if (!shown) inhabitantView.hide();
     inspector.setUnderView(shown);
@@ -518,6 +551,11 @@ export function mountEnvironmentSelection(
   let looksRead = false;
   const looksSeen = new Set<string>();
   let looksAskedAt = Number.NEGATIVE_INFINITY;
+  let bridgesReading = false;
+  /** Which of a society's events are new, and the bridge each visitor crossed through. */
+  const visitorWatch = new VisitorNoticeWatch();
+  /** Crossings read but not yet told, while the door says which bridge they came through. */
+  let heldNotices: readonly FreshEvent[] = [];
   let authoredWorldFailure: string | null = null;
   let chosen: NYCLocalFeature | null = null;
   let admittedFeaturesByProvider = new Map<string, NYCLocalFeature>();
@@ -1872,6 +1910,12 @@ export function mountEnvironmentSelection(
           noticing = { ...noticing, noticed: true };
         }
       }
+      // Who crossed in, left or was turned away since the page last read the world's events.
+      visitorWatch.see(society.state.inhabitants);
+      if (view.eventsAvailable) {
+        heldNotices = [...heldNotices, ...visitorWatch.take(society.societyId, view.events)];
+        tellVisitors();
+      }
       canvas.dataset.societyPopulation = String(society.populationSize);
       canvas.dataset.societyRendered = String(runtime.drawnInhabitantCount);
       canvas.dataset.societyTick = String(society.currentTick);
@@ -1968,14 +2012,67 @@ export function mountEnvironmentSelection(
     const now = performance.now();
     if (now - bridgesAskedAt < 60_000) return;
     bridgesAskedAt = now;
+    bridgesReading = true;
     void new DoorBridgesClient(deps.credentials).read().then((read) => {
+      bridgesReading = false;
       if ((phase as string) === 'disposed') return;
       bridges = read;
       refreshMarks();
+      // The open card and any held notice name the bridge now.
+      if (selectedInhabitant !== null && inspectedInhabitant === selectedInhabitant) offerInhabitantView(selectedInhabitant);
+      tellVisitors();
     }, () => {
+      bridgesReading = false;
       // A door that answers nothing names no bridge: such visitors stay marked as from outside.
       bridges ??= new Map();
+      tellVisitors();
     });
+  }
+
+  /** A person of the drawn society of things, as the card reads them; null for anyone else. */
+  function beingOf(id: string): SelectedBeing | null {
+    const state = society?.state ?? null;
+    const person = state?.inhabitants.find((held) => held.id === id);
+    if (person?.kind === undefined || person.came_by === undefined) return null;
+    const crossing = person.came_by === 'crossed' ? person.crossing ?? null : null;
+    if (crossing !== null && bridges?.has(crossing.bridge) !== true) readBridges();
+    return {
+      kind: person.kind,
+      cameBy: person.came_by,
+      placedId: person.placed_id ?? null,
+      crossing: crossing === null ? null : { bridge: crossing.bridge, entry: bridges?.get(crossing.bridge) ?? null },
+      holding: (state?.things ?? []).filter((thing) => thing.held_by === id).map((thing) => ({ id: thing.id, kind: thing.kind })),
+      world: savedWorld === null ? null : { worldId: savedWorld.worldId, versionId: savedWorld.versionId },
+    };
+  }
+
+  /**
+   * Hand on the notices of the crossings a newly read minute recorded. One that names a bridge
+   * the door has not been asked about waits for that answer, so it says where the visitor came from.
+   */
+  function tellVisitors(): void {
+    const tell = deps.onVisitorNotice;
+    if (tell === undefined || heldNotices.length === 0) { heldNotices = []; return; }
+    const unknown = heldNotices.some((held) => held.bridgeKey !== null && bridges?.has(held.bridgeKey) !== true);
+    if (unknown && (bridgesReading || performance.now() - bridgesAskedAt >= 60_000)) { readBridges(); return; }
+    const kinds = things?.layer.maker.library.list.kinds ?? [];
+    const words = {
+      kindLabel: (kind: KindReference) => kinds.find((one) => one.kind === kind.kind && one.version === kind.version && one.sha256 === kind.sha256)?.label ?? null,
+      bridge: (key: string) => bridges?.get(key) ?? null,
+    };
+    for (const held of heldNotices) {
+      const notice = visitorNotice(held.event, words, held.bridgeKey);
+      if (notice === null) continue;
+      const subjectId = notice.subjectId;
+      tell({
+        message: notice.message,
+        tone: notice.tone,
+        seeWho: subjectId === null ? null : () => {
+          if (!inspectInhabitant(subjectId)) deps.showStatus('They are no longer in this world.');
+        },
+      });
+    }
+    heldNotices = [];
   }
 
   /**
@@ -2539,6 +2636,8 @@ export function mountEnvironmentSelection(
       looksRead = false;
       looksSeen.clear();
       looksAskedAt = Number.NEGATIVE_INFINITY;
+      visitorWatch.reset();
+      heldNotices = [];
       if (deps.env.canvas) delete deps.env.canvas.dataset['thingMarks'];
       if (deps.env.canvas) for (const key of ['thingsDrawn', 'thingsMissed', 'thingsFailure']) delete deps.env.canvas.dataset[key];
       savedWorldActions.clear();

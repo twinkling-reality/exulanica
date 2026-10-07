@@ -7,6 +7,13 @@ import type { OriginRecord } from '../thing-card-api.js';
 import { authorWords, licenceWords } from '../ui/look-sheet.js';
 import type { CardLink } from '../ui/thing-card.js';
 
+const VOWEL = /^[aeiou]/iu;
+
+/** "a knight", "an elf": the article a label takes, by its first letter. */
+export function withArticle(label: string): string {
+  return `${VOWEL.test(label) ? 'an' : 'a'} ${label}`;
+}
+
 /** The host a source reference names, for its link's words; the reference itself when it is no URL. */
 export function sourceName(reference: string): string {
   try {
@@ -56,7 +63,8 @@ export function creditOf(origin: OriginRecord): CardLink | { readonly text: stri
 
 /** Where a kind of thing came from, after "You placed it here." */
 export function kindCameWords(label: string, origin: OriginRecord): string {
-  const a = `A ${label}`;
+  const named = withArticle(label);
+  const a = named.charAt(0).toUpperCase() + named.slice(1);
   switch (origin.class) {
     case 'authored':
       return origin.by === 'project' ? `${a} is one of Exulanica's own kinds.` : `${a} is a kind made in this workspace.`;

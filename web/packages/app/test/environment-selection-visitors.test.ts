@@ -1,0 +1,256 @@
+// @vitest-environment happy-dom
+
+import { readFileSync } from 'node:fs';
+import { describe, expect, it, vi } from 'vitest';
+import { ApiError } from '@exulanica/graph-client';
+import type { AtlasScene } from '@exulanica/atlas-core';
+import type { AttachedMarksOptions, MarkedSubject, PlacedThingRecord, ThingLayerOptions } from '@exulanica/atlas-react/things';
+import { mountEnvironmentSelection, type SelectedPerson, type ShownVisitorNotice } from '../src/composition/environment-selection.js';
+import { parseSociety, type SocietySnapshot } from '../src/society-api.js';
+import { parseSocietyControl } from '../src/society-control-api.js';
+import type { SocietyEvent } from '../src/society-api.js';
+import type { SocietyModels } from '../src/society-models-api.js';
+import type { AlternateVersion } from '../src/world-objects-api.js';
+import type { AppEnvironment, SessionState } from '../src/composition/session-state.js';
+
+/*
+ * A notice when somebody crosses into a saved world's society of things, leaves or is turned away,
+ * through Selected's mount as the app wires it: nothing for what happened before the page looked,
+ * an arrival held until the door names its bridge, "See who" opening the visitor's card with what
+ * its state says it is. Event shapes and reasons are the society of things' own
+ * (docs/synthetic-society-contract.md); the bridge's words are the door's entry.
+ */
+
+const KNIGHT = { kind: 'knight', version: 1, sha256: 'a'.repeat(64) };
+const QWEN = { provider: 'nebius', modelId: 'Qwen/Qwen3-235B-A22B-Instruct-2507', name: 'Qwen3 235B Instruct' };
+
+const { FakeLayer, FakeMarks, bridgeReads } = vi.hoisted(() => {
+  class Layer {
+    placed: readonly PlacedThingRecord[] = [];
+    readonly maker = { library: { list: { kinds: [{ kind: 'knight', version: 1, sha256: 'a'.repeat(64), label: 'knight' }], looks: [] } } };
+    constructor(readonly options: ThingLayerOptions) {}
+    setSociety() {}
+    async setPlaced(things: readonly PlacedThingRecord[]) { this.placed = things; }
+    pick() { return null; }
+    setPicked() {}
+    get drawn() { return []; }
+    get misses() { return []; }
+    destroy() {}
+  }
+  class Marks {
+    readonly sets: ReadonlyMap<string, MarkedSubject>[] = [];
+    destroyed = false;
+    constructor(readonly options: AttachedMarksOptions) {}
+    set(subjects: ReadonlyMap<string, MarkedSubject>) { (this.sets as ReadonlyMap<string, MarkedSubject>[]).push(subjects); }
+    destroy() { this.destroyed = true; }
+  }
+  return { FakeLayer: Layer, FakeMarks: Marks, bridgeReads: { count: 0, answer: Promise.resolve() as Promise<void> } };
+});
+vi.mock('@exulanica/atlas-react/things', async (original) => ({
+  ...(await original<typeof import('@exulanica/atlas-react/things')>()),
+  ThingLayer: FakeLayer,
+  AttachedMarks: FakeMarks,
+}));
+vi.mock('../src/things-library.js', () => ({ openThingLibrary: vi.fn(async () => ({ library: true })) }));
+vi.mock('../src/door-bridges-api.js', () => ({
+  DoorBridgesClient: class {
+    async read() {
+      bridgeReads.count += 1;
+      await bridgeReads.answer;
+      return new Map([['blockgame', { bridge: 'blockgame', label: 'Block Game', game: 'Block Game', runBy: 'server', ai: false }]]);
+    }
+  },
+}));
+
+const WORLD = 'world:authored:saved';
+const catalog = JSON.parse(readFileSync(`${process.cwd()}/../assets/catalogs/society-words/society-inhabitant-words.v1.json`, 'utf8')) as
+  { entries: { kind: string; code: string; words: string }[] };
+/** Why an event happened, as the words catalog says it. */
+const because = (code: string): string => catalog.entries.find((entry) => entry.kind === 'event_reason' && entry.code === code)!.words;
+const version = {
+  schemaVersion: 5, versionId: 'version', worldId: WORLD, sourceSnapshotId: 'snapshot', parentVersionId: null,
+  title: 'My world', origin: 'authored', styleVersionId: 'style', stateSha256: '1'.repeat(64), editSeq: 2,
+  sourceInvalidated: false, createdBy: 'actor', createdAt: '2026-10-07T00:00:00Z',
+  objects: [], elementOverrides: [], environmentInstances: [], edits: [], things: [],
+} as unknown as AlternateVersion;
+
+const person = (id: string, extra: Record<string, unknown>) => ({
+  id, synthetic: true, position_mm: [2000, 4000], display_name: id, role: 'steward', goal: null, route: null,
+  motion_path_mm: [[2000, 4000]],
+  action: { kind: 'idle', status: 'active', target_id: null, remaining_ticks: 0, reason: 'awaiting_goal' },
+  explanation: { summary: 'Waits (simulated).', event_ids: [] }, ...extra,
+});
+
+const SWORD = { kind: 'sword', version: 3, sha256: 'c'.repeat(64) };
+const crossed = (id: string) => person(id, { kind: KNIGHT, came_by: 'crossed', placed_id: null, crossing: { arrival_id: `arrival-${id}`, bridge: 'blockgame', grant_id: 'grant-1' } });
+
+/** What the server holds now: the society's people and things at a tick, and its latest events. */
+const server = {
+  tick: 3,
+  people: [person('knight-0', { kind: KNIGHT, came_by: 'placed', placed_id: 'knight-1' })] as Record<string, unknown>[],
+  things: [] as Record<string, unknown>[],
+  events: [] as SocietyEvent[],
+};
+const society = (): SocietySnapshot => parseSociety({
+  society_id: 'society', version_id: 'version', branch_id: 'version', place_id: 'derived-place',
+  population_size: server.people.length, current_tick: server.tick, state_sha256: String(server.tick).repeat(64), input_seq: 1, input_sha256: 'b'.repeat(64),
+  state: { profile: 'exulanica-society/v7', society_id: 'society', branch_id: 'version', tick: server.tick, input_seq: 1,
+    input_sha256: 'b'.repeat(64), inhabitants: server.people, things: server.things },
+  places: {
+    input_seq: 1, input_sha256: 'b'.repeat(64), availability: 'available', unavailable_reason: null,
+    walkable_area: { source: 'declared', centre_mm: [0, 0], half_width_mm: 12000, half_depth_mm: 12000 },
+    clearance_mm: 450, targets: [], unavailable_affordances: [],
+  },
+});
+
+let order = 0;
+const event = (kind: string, subject: string, reason: string, thing: Record<string, unknown>): SocietyEvent => {
+  order += 1;
+  return {
+    event_id: `event-${order}`, subject_id: subject, tick: server.tick, event_kind: kind, document_sha256: 'e'.repeat(64),
+    document: { synthetic: true, summary: 'Knight (simulated).', reason, order, thing },
+  } as SocietyEvent;
+};
+
+/** The models read: Qwen asked for the knight; a model chosen for the routine person but not asked. */
+const models = (): SocietyModels => ({
+  societyId: 'society', takesModelChoices: true, hostRefusal: null, modelPeopleMaximum: 8, models: [],
+  choices: [
+    { subjectId: 'knight-0', model: QWEN, choiceSeq: 1, refusal: null },
+    { subjectId: 'routine-0', model: QWEN, choiceSeq: 2, refusal: 'model_not_asked_here' },
+  ],
+  latest: [], byModel: [], decisionsCounted: 0, decisionsMaximum: 0,
+});
+
+function mount() {
+  const notices: ShownVisitorNotice[] = [];
+  const showStatus = vi.fn();
+  const missing = () => new ApiError(404, 'unknown_reference', 'no such society');
+  const crowd = {
+    root: { parent: { name: 'authored-region:region:starter' } },
+    setSociety: vi.fn(() => 0), clearSociety: vi.fn(), revealInhabitant: vi.fn(), setFigures: vi.fn(), societyJumps: [],
+    visibleInhabitantIds: [], inhabitantRepresentation: vi.fn(() => null),
+    inhabitantDetail: vi.fn(() => 'near'), coincidentInhabitants: vi.fn(() => []),
+    societyCounts: { population: 4, outdoors: 4, indoors: 0, near: 4, far: 0, drawn: 4 },
+    drawnInhabitantCount: 4, inhabitantSeatAtPlace: vi.fn(() => false), setSeatingLayout: vi.fn(), seatingMisses: [],
+    pickInhabitant: vi.fn(() => null), anchorOf: vi.fn(() => false),
+  };
+  const stage = document.createElement('div');
+  const overlayRoot = document.createElement('div');
+  stage.append(overlayRoot);
+  const controls = { state: { x: 0, y: 1.68, z: 4 }, onInteract: vi.fn() as (() => void) | null, forward: () => ({ x: 0, y: 0, z: -1 }) };
+  const binding = {
+    app: { app: true }, camera: { forward: { x: 0, y: 0, z: -1 } }, controls, invalidate: vi.fn(),
+    regionRoots: new Map(), ownedDistrict: null, generatedTile: null, authoredSociety: crowd,
+    memoryLayerVisible: false, onMemoryLayerChange: null, overlay: { root: overlayRoot },
+  };
+  const societyClient = { read: vi.fn(async () => society()), create: vi.fn(), connect: vi.fn(), advance: vi.fn(), events: vi.fn(async () => server.events) };
+  const control = () => parseSocietyControl({
+    profile: 'exulanica.society-control/v1', society_id: 'society', branch_id: 'version', persisted: false,
+    revision: 0, mode: 'paused', speed: 1, base_tick_interval_ms: 1000, tick_interval_ms: 1000,
+    interval_semantics: 'minimum_wait_after_batch_completion', last_batch_execution: null,
+    simulated_seconds_per_tick: 60, max_catchup_ticks: 3, next_due_at: null, reason: null,
+    lease_expires_at: null, last_event_seq: 0, current_tick: server.tick, state_sha256: String(server.tick).repeat(64),
+    play_ineligible_reason: null, play_eligible: true,
+  }, 'version');
+  const controlClient = { read: vi.fn(async () => control()), configure: vi.fn(), step: vi.fn() };
+  const worldClient = { connect: vi.fn(async () => ({ assets: [], version })), assets: vi.fn(() => []) };
+  const modelsClient = { read: vi.fn(async () => { if (modelsAnswer === null) throw missing(); return modelsAnswer; }), choose: vi.fn() };
+  let modelsAnswer: SocietyModels | null = models();
+  const canvas = document.createElement('canvas');
+  const shell = document.createElement('div');
+  const mounted = mountEnvironmentSelection({
+    env: { canvas, shell, preview: false, systemReducedMotion: { matches: false } } as unknown as AppEnvironment,
+    state: {
+      atlas: { binding },
+      activeWorldEntry: { worldId: WORLD, authoredVersionId: 'version', title: 'My world',
+        authoredScene: { region: { regionId: 'region:starter' } } },
+    } as unknown as SessionState,
+    scene: { islands: [] } as unknown as AtlasScene,
+    credentials: { baseUrl: 'https://example.test', token: 'token' },
+    showStatus, admissionId: null, onVisitorNotice: (notice) => { notices.push(notice); },
+    worldClient: worldClient as never, societyClient: societyClient as never, societyControlClient: controlClient as never,
+    societyModelsClient: modelsClient as never,
+  });
+  document.body.append(mounted.root);
+  const shown: { id: string; about: SelectedPerson }[] = [];
+  mounted.useInhabitantView({
+    root: document.createElement('section'),
+    show: (id, about) => { shown.push({ id, about }); return true; },
+    hide: () => undefined,
+  });
+  return { mounted, notices, shown, showStatus };
+}
+
+const settle = async () => { for (let i = 0; i < 12; i += 1) await new Promise((resolve) => setTimeout(resolve, 0)); };
+
+const refresh = async () => {
+  [...document.querySelectorAll('button')].find((button) => button.textContent === 'Refresh persisted society')!.click();
+  await settle();
+};
+
+describe('visitors crossing into a saved world', () => {
+  it('tells of each crossing once, names its bridge, and opens the visitor\'s card from See who', async () => {
+    // Before the page looks: a visitor already came and went.
+    server.events = [event('thing_arrived', 'visitor-0', 'crossed_in', { kind: KNIGHT, came_by: 'crossed', crossing_id: 'c0', carried: [] })];
+    const { mounted, notices, shown, showStatus } = mount();
+    await mounted.begin();
+    await settle();
+    expect(notices).toEqual([]);
+    expect(bridgeReads.count).toBe(0);
+
+    // The next minute: a visitor crosses in holding a sword, the author places a being, and a
+    // crossing is turned away at the limit.
+    server.tick = 4;
+    server.people = [...server.people, crossed('visitor-1')];
+    server.things = [
+      { id: 'sword-1', placed_id: null, kind: SWORD, position_mm: null, yaw_microradians: null, held_by: 'visitor-1' },
+      { id: 'sword-2', placed_id: null, kind: SWORD, position_mm: null, yaw_microradians: null, held_by: 'knight-0' },
+    ];
+    server.events = [
+      ...server.events,
+      event('thing_arrived', 'visitor-1', 'crossed_in', { kind: KNIGHT, came_by: 'crossed', placed_id: null, crossing_id: 'c1', gate: 'gate', carried: [{ thing_id: 'sword-1', kind: SWORD }] }),
+      event('thing_arrived', 'knight-2', 'placed_by_author', { kind: KNIGHT, came_by: 'placed', placed_id: 'knight-2' }),
+      event('arrival_refused', 'visitor-9', 'visitor_limit', { kind: KNIGHT, came_by: 'crossed', placed_id: null, crossing_id: 'c9', gate: 'gate' }),
+    ];
+    // The door answers slowly: the arrival waits for it to name the bridge.
+    let answer!: () => void;
+    bridgeReads.answer = new Promise<void>((resolve) => { answer = resolve; });
+    await refresh();
+    expect(bridgeReads.count).toBe(1);
+    expect(notices.map(({ message }) => message)).toEqual([]);
+    answer();
+    await settle();
+    expect(notices.map(({ message, tone }) => ({ message, tone }))).toEqual([
+      { message: 'A knight came in from Block Game.', tone: 'info' },
+      { message: `A knight could not come in, because ${because('visitor_limit')}.`, tone: 'caution' },
+    ]);
+    expect(notices[1]!.seeWho).toBeNull();
+
+    notices[0]!.seeWho!();
+    const card = shown.at(-1)!;
+    expect(card.id).toBe('visitor-1');
+    expect(card.about.being).toEqual({
+      kind: KNIGHT, cameBy: 'crossed', placedId: null,
+      crossing: { bridge: 'blockgame', entry: { bridge: 'blockgame', label: 'Block Game', game: 'Block Game', runBy: 'server', ai: false } },
+      holding: [{ id: 'sword-1', kind: SWORD }],
+      world: { worldId: WORLD, versionId: 'version' },
+    });
+
+    // Read again with nothing new, nothing is told again.
+    await refresh();
+    expect(notices).toHaveLength(2);
+
+    // The minute it leaves, its departure names where it came from although the state no longer lists it.
+    server.tick = 5;
+    server.people = server.people.filter((one) => one['id'] !== 'visitor-1');
+    server.things = [];
+    server.events = [...server.events, event('thing_departed', 'visitor-1', 'sent_home', { kind: KNIGHT, came_by: 'crossed', placed_id: null, carried: [{ id: 'sword-1', kind: SWORD }] })];
+    await refresh();
+    expect(notices.at(-1)!.message).toBe(`The knight from Block Game left because ${because('sent_home')}.`);
+    // See who on an arrival whose visitor has gone says so.
+    notices[0]!.seeWho!();
+    expect(showStatus).toHaveBeenCalledWith('They are no longer in this world.');
+    mounted.dispose();
+  });
+});

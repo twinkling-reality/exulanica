@@ -68,6 +68,8 @@ export interface ThingCardModel {
   readonly mind: CardMind | null;
   /** Null leaves the row out (a person drawn from the world's people catalog). */
   readonly looks?: CardLooks | null;
+  /** What it holds, in words ("a sword"); null leaves the row out. */
+  readonly holding?: string | null;
   readonly cameFrom: string;
 }
 
@@ -206,6 +208,11 @@ export function buildThingCard(handlers: ThingCardHandlers): ThingCard {
     }
     if (model.mind !== null) parts.push(mindRow(model.mind));
     if (model.looks != null) parts.push(looksRow(model.looks));
+    if (model.holding != null) {
+      const holding = row('Holding');
+      holding.append(el('p', { text: model.holding }));
+      parts.push(holding);
+    }
     const came = row('Came from');
     came.append(el('p', { text: model.cameFrom }));
     parts.push(came);

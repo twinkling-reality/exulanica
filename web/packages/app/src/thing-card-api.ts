@@ -97,7 +97,10 @@ export function readLookFacts(value: unknown): LookFacts {
   return { label: text(held['label'], 'look label'), origin: readOrigin(held['origin']) };
 }
 
-/** The look each placed thing of a version wears now, by its placed id; absent means its kind's first. */
+/**
+ * The look each thing of a version wears now: a placed thing's by its placed id, and a thing no
+ * author placed (a visitor, or what it carried in) by its own id; absent means its kind's first.
+ */
 export function readThingLooks(value: unknown): ReadonlyMap<string, LookReference> {
   const held = object(value, 'thing looks');
   if (held['profile'] !== 'exulanica.thing-look-choices/v1') invalid('thing looks profile');
@@ -106,13 +109,13 @@ export function readThingLooks(value: unknown): ReadonlyMap<string, LookReferenc
   for (const row of looks) {
     const entry = object(row, 'thing look');
     const placed = entry['placed_id'];
-    if (placed === null) continue;
+    const id = placed === null ? text(entry['thing_id'], 'thing id') : text(placed, 'placed id');
     const look = object(entry['look'], 'thing look reference');
     const version = look['version'];
     if (!Number.isSafeInteger(version) || (version as number) < 1) invalid('thing look version');
     const sha256 = text(look['sha256'], 'thing look digest');
     if (!/^[0-9a-f]{64}$/u.test(sha256)) invalid('thing look digest');
-    worn.set(text(placed, 'placed id'), { key: text(look['look'], 'thing look key'), version: version as number, sha256 });
+    worn.set(id, { key: text(look['look'], 'thing look key'), version: version as number, sha256 });
   }
   return worn;
 }
