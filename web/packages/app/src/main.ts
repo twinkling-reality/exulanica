@@ -105,6 +105,7 @@ import {
 import { keepWorldPicture, worldPicture } from './composition/world-pictures.js';
 import { CapabilitiesClient } from './capabilities-api.js';
 import { mountEnvironmentSelection } from './composition/environment-selection.js';
+import { mountThingCard } from './composition/thing-card-mount.js';
 import { createSavedWorldFlight } from './composition/saved-world-flight.js';
 import { lazyPanel } from './composition/lazy-panel.js';
 import { createSegmentSession, mountSegments, segmentsFirst } from './composition/segments.js';
@@ -1134,6 +1135,12 @@ async function mount(): Promise<void> {
   state.disposeSocietyComparison = societyComparison === null
     ? null
     : () => societyComparison.dispose();
+  // The thing card is what Selected shows first for a person: who they are, what mind runs them,
+  // changed in place, and where they came from.
+  environmentSelection.useInhabitantView(mountThingCard({
+    selection: environmentSelection,
+    compare: societyComparison === null ? null : () => { if (actions !== null) void perform(actions.host, 'compare.open'); },
+  }).view);
   const character = mountCharacter({ env, state, onClose: () => dispatchShell({ type: 'toggle-character' }) });
   state.disposeCharacter = () => character.dispose();
   const mapPeek = new MapPeek({

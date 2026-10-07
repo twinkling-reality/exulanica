@@ -184,6 +184,31 @@ choice came to. Another surface opens the panel with its subjects chosen through
 the world's environment selection, as a person would choose them. What each model decided, and how
 the panel's models decide, follow below it.
 
+### The thing card
+
+The thing card (`web/packages/app/src/ui/thing-card.ts`, `ui/thing-card.css`, mounted by
+`composition/thing-card-mount.ts`) is what Selected shows first for anything picked in a world. In a
+few lines it answers what this is (its name and summary), what it is doing now, what mind runs it
+and where it came from; under it the inspector keeps the subject's own controls and its record,
+which then reads "How we know". Every word about the subject comes from what the server and
+Selected already hold; the card writes only its frame words ("Now", "Mind", "Came from").
+
+The mind is an open model by its served name and line, or "Their own routine" ("What they would do
+anyway. No AI is asked."), or, where a chosen model is not asked here, Who decides' own words for
+why. Change lists the routine and every model the server offers for people, with Who decides' cost
+words, the one running now marked Now; one click chooses it through Who decides' own choose
+(`environmentSelection.decide`), so the card and the panel always say the same. "All minds in this
+world" opens Who decides with this subject chosen, and "Compare with another mind" opens Compare.
+
+The mark: anything a model is asked for wears a small dark pill reading "AI" beside its name and
+its mind, with "run by an AI model" and the model's name for a screen reader; a visitor a person
+plays from a game wears "from" and its game instead; a being its own routine runs, and every
+object, wears nothing. One function decides it (`composition/thing-marks.ts`) for the card and for
+the marks drawn in the world, and a model that is chosen but not asked here is no AI mark.
+
+In this version the card serves the people of a world; placed things, visitors and their looks
+join it as the server serves their cards.
+
 ### Look
 
 Look (`web/packages/app/src/ui/look-sheet.ts`, `ui/look-sheet.css`) is where the owner of a generated

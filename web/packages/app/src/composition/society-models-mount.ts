@@ -13,7 +13,9 @@
 import { problemSentence, problemWords } from '../ui/words/problems.js';
 import { ApiError } from '@exulanica/graph-client';
 import type { Credentials } from '../config.js';
-import { SocietyModelsClient, type ModelRef, type SocietyModel, type SocietyModels } from '../society-models-api.js';
+import {
+  SocietyModelsClient, type ModelRef, type NamedModelRef, type SocietyModel, type SocietyModels,
+} from '../society-models-api.js';
 import { WorldModelsClient, type SignalRole } from '../world-models-api.js';
 import {
   buildSocietyModels,
@@ -35,6 +37,24 @@ export interface ChoiceOutcome {
 export interface DecidesTarget {
   readonly role: 'people' | 'signals';
   readonly subjectIds: readonly string[];
+}
+
+/** Who runs one person now, for another surface (the thing card and the marks over people). */
+export interface PersonMind {
+  /** The model this host asks for them now, or null when their own routine decides. */
+  readonly running: NamedModelRef | null;
+  /** Who decides for them, in Who decides' own words. */
+  readonly words: string;
+}
+
+/**
+ * The model asked for a person now: the one chosen for them, unless this host asks no model or
+ * not theirs (a refusal on the read or on their choice), when their own routine decides.
+ */
+function runningModel(view: SocietyModels, subjectId: string): NamedModelRef | null {
+  if (view.hostRefusal !== null) return null;
+  const choice = view.choices.find((held) => held.subjectId === subjectId);
+  return choice === undefined || choice.refusal !== null ? null : choice.model;
 }
 
 export interface MountedSocietyModels {
@@ -59,6 +79,10 @@ export interface MountedSocietyModels {
   decide(subjectIds: readonly string[], model: ModelRef | null): Promise<ChoiceOutcome>;
   /** The models the last read offered for people, or null before it or where none is chosen here. */
   models(): readonly SocietyModel[] | null;
+  /** Who runs this person now, or null before the first read or where none is chosen here. */
+  mindOf(subjectId: string): PersonMind | null;
+  /** Every person a model is asked for now, by the same rule as `mindOf`. */
+  runningModels(): ReadonlyMap<string, NamedModelRef>;
   dispose(): void;
 }
 
@@ -234,6 +258,19 @@ export function mountSocietyModels(options: {
       section.showRole('signals');
       const light = target.subjectIds.find((id) => signals.choose(id));
       return light === undefined ? 0 : 1;
+    },
+    mindOf(subjectId) {
+      if (view === null || !view.takesModelChoices) return null;
+      return { running: runningModel(view, subjectId), words: choiceWords(view, subjectId) };
+    },
+    runningModels() {
+      const running = new Map<string, NamedModelRef>();
+      if (view === null || !view.takesModelChoices) return running;
+      for (const choice of view.choices) {
+        const model = runningModel(view, choice.subjectId);
+        if (model !== null) running.set(choice.subjectId, model);
+      }
+      return running;
     },
     personDetails(subjectId) {
       if (view === null || !view.takesModelChoices) return [];

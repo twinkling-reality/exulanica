@@ -3,7 +3,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ApiError } from '@exulanica/graph-client';
 import type { AtlasScene } from '@exulanica/atlas-core';
-import { mountEnvironmentSelection } from '../src/composition/environment-selection.js';
+import { mountEnvironmentSelection, type SelectedPerson } from '../src/composition/environment-selection.js';
 import type { AlternateVersion } from '../src/world-objects-api.js';
 import type { SeatingLayout } from '@exulanica/atlas-react/playcanvas';
 import type { AppEnvironment, SessionState } from '../src/composition/session-state.js';
@@ -295,21 +295,33 @@ describe('a saved world holds inhabitants only when the person asks', () => {
     const details = [...inspector.querySelectorAll('dt')].map((dt) => [dt.textContent, dt.nextElementSibling?.textContent]);
     expect(details).toContainEqual(['Decided by', 'Nemotron 3 Nano 30B, which you chose.']);
     expect(details).toContainEqual(['Latest decision', 'At simulated minute 1, Nemotron 3 Nano 30B chose “rest, 4 m away”, and they did it.']);
-    // Another surface's view of the selected person (the thing card) takes Selected when it can.
+    // Another surface's view of the selected person (the thing card) takes the top of Selected
+    // when it can, given the inspector's words and who runs them; the inspector stays under it
+    // with the person's controls and its record, which then reads "How we know".
     const card = document.createElement('section');
-    const shown: string[] = [];
+    const shown: { id: string; about: SelectedPerson }[] = [];
     let takes = true;
-    const view = { root: card, show: vi.fn((id: string) => { shown.push(id); return takes; }), hide: vi.fn() };
+    const view = { root: card, show: vi.fn((id: string, about: SelectedPerson) => { shown.push({ id, about }); return takes; }), hide: vi.fn() };
     mounted.useInhabitantView(view);
     expect(card.isConnected).toBe(true);
+    expect(card.nextElementSibling).toBe(inspector);
     expect(card.hidden).toBe(false);
-    expect(inspector.hidden).toBe(true);
-    expect(shown.at(-1)).toBe('person-0');
+    expect(inspector.hidden).toBe(false);
+    expect(inspector.hasAttribute('data-under-view')).toBe(true);
+    expect(inspector.querySelector('summary')?.textContent).toBe('How we know');
+    expect(shown.at(-1)?.id).toBe('person-0');
+    expect(shown.at(-1)?.about.note.title).toBe('Person 0');
+    expect(shown.at(-1)?.about.mind).toEqual({
+      running: { provider: MODEL.provider, modelId: MODEL.model_id, name: 'Nemotron 3 Nano 30B' },
+      words: 'Nemotron 3 Nano 30B, which you chose.',
+    });
     takes = false;
     controls.onInteract?.();
     for (let i = 0; i < 2; i += 1) await settle();
     expect(card.hidden).toBe(true);
     expect(inspector.hidden).toBe(false);
+    expect(inspector.hasAttribute('data-under-view')).toBe(false);
+    expect(inspector.querySelector('summary')?.textContent).toBe('Origin and details');
     mounted.useInhabitantView(null);
     expect(card.isConnected).toBe(false);
     // The same surface chooses who decides, by the panel's own path and in its words.

@@ -281,6 +281,32 @@ describe('the mounted section', () => {
     ]);
   });
 
+  it('names the model running each person for the card and the marks, and none where it is not asked', async () => {
+    const answers = [
+      read(),
+      read({ host_refusal: 'process_budget_spent' }),
+      read({ choices: [{ ...read().choices[0], refusal: 'model_not_offered' }] }),
+    ];
+    let index = 0;
+    const fetcher = vi.fn(async () => answer(answers[index]!));
+    const client = new SocietyModelsClient({ baseUrl: 'https://example.test', token: 't', worldId: 'w', fetch: fetcher as typeof fetch });
+    const mounted = mountSocietyModels({ credentials: { baseUrl: 'https://example.test', token: 't' }, world: { worldId: 'w', versionId: 'version' }, client });
+    const people = [{ id: 'ada', name: 'Ada' }, { id: 'bea', name: 'Bea' }];
+    expect(mounted.mindOf('ada')).toBeNull();
+    await mounted.refresh(1, people);
+    const nemotron = { provider: 'nebius_token_factory', modelId: MODEL, name: 'Nemotron 3 Nano 30B' };
+    expect(mounted.mindOf('ada')).toEqual({ running: nemotron, words: 'Nemotron 3 Nano 30B, which you chose.' });
+    expect(mounted.mindOf('bea')).toEqual({ running: null, words: 'Their own routine.' });
+    expect([...mounted.runningModels()]).toEqual([['ada', nemotron]]);
+    // Chosen but not asked, by this host or for this choice: their routine runs them, so no mark.
+    for (index = 1; index < answers.length; index += 1) {
+      await mounted.refresh(1 + index, people);
+      expect(mounted.mindOf('ada')?.running).toBeNull();
+      expect(mounted.mindOf('ada')?.words).toMatch(/^Their own routine for now, because /u);
+      expect(mounted.runningModels().size).toBe(0);
+    }
+  });
+
   it('never reads while a read is out, and reads the latest minute once after it', async () => {
     const waiting: (() => void)[] = [];
     const fetcher = vi.fn(async () => {

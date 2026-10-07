@@ -40,7 +40,9 @@ import {
   type SocietyPlaybackSpeed,
 } from '../society-control-api.js';
 import { createLiveSociety, type LiveSociety, type LiveSocietyView } from './live-society.js';
-import { mountSocietyModels, type ChoiceOutcome, type DecidesTarget, type MountedSocietyModels } from './society-models-mount.js';
+import {
+  mountSocietyModels, type ChoiceOutcome, type DecidesTarget, type MountedSocietyModels, type PersonMind,
+} from './society-models-mount.js';
 import type { ModelRef, SocietyModel, SocietyModelsClient } from '../society-models-api.js';
 import { unreadMinutes } from './society-unread-minutes.js';
 import { SocietyDistrictClient, type SocietyDistrictPlacement, type SocietyDistrictView } from '../society-district-api.js';
@@ -74,7 +76,7 @@ import type { CompanionSocietyContext, SimulationCitation, SocietyQuestion } fro
 import { drawSimulated, type SimulatedReferences, type SocietyNames } from '../companion-simulated.js';
 import { hasInhabitantWords, livingInhabitantWords, livingNeedLabel, outcomeWords, phrase } from '../society-inhabitant-words.js';
 import { ACTION_LABELS, ACTIVITY_LABELS, filled, objectActivity } from '../society-activity-words.js';
-import { createLivingWorldInspector } from '../ui/living-world-inspector.js';
+import { createLivingWorldInspector, type InspectionNote } from '../ui/living-world-inspector.js';
 import {
   OBJECT_ROLE_LABELS,
   WorldObjectsClient,
@@ -156,11 +158,22 @@ export interface EnvironmentSelectionDependencies {
   };
 }
 
-/** A view another surface shows in Selected for a person, in place of the inspector. */
+/** What Selected knows about a selected person, for another surface's view of them. */
+export interface SelectedPerson {
+  /** The inspector's own words and record for them. */
+  readonly note: InspectionNote;
+  /** Who runs them now, or null where nobody here takes a model choice or before the first read. */
+  readonly mind: PersonMind | null;
+}
+
+/**
+ * A view another surface shows at the top of Selected for a person (the thing card). The
+ * inspector stays under it with only the person's controls and its record.
+ */
 export interface InhabitantView {
   readonly root: HTMLElement;
   /** Show this person; false leaves them to the inspector. Called again on every refresh. */
-  show(subjectId: string): boolean;
+  show(subjectId: string, about: SelectedPerson): boolean;
   hide(): void;
 }
 
@@ -292,7 +305,17 @@ export function mountEnvironmentSelection(
   const showInspector = (): void => {
     inhabitantView?.hide();
     if (inhabitantView !== null) inhabitantView.root.hidden = true;
+    inspector.setUnderView(false);
     inspector.root.hidden = false;
+  };
+  /** Once the inspector holds this person, another surface's view may take the top of Selected. */
+  const offerInhabitantView = (id: string): void => {
+    const note = inspector.note();
+    if (inhabitantView === null || note === null) return;
+    const shown = inhabitantView.show(id, { note, mind: societyModels?.mindOf(id) ?? null });
+    inhabitantView.root.hidden = !shown;
+    if (!shown) inhabitantView.hide();
+    inspector.setUnderView(shown);
   };
   const title = el('h2', { text: 'NYC Open Data' });
   // Says what the open world is once the renderer has decided it (see `attach`); nothing is
@@ -712,15 +735,10 @@ export function mountEnvironmentSelection(
     place.disabled = true; modify.disabled = true; remove.disabled = true;
     invalidateProposal('Select an authored object before editing.');
     selected.textContent = 'Selected synthetic inhabitant';
-    if (inhabitantView !== null && inhabitantView.show(id)) {
-      inhabitantView.root.hidden = false;
-      inspector.root.hidden = true;
-      return true;
-    }
     showInspector();
     // Which reader applies is the state's family in the engine table, never its engine's name.
     const family = societyEngine(state.profile).stateFamily;
-    if (family === 'living') { inspectLivingInhabitant(inhabitant, state); return true; }
+    if (family === 'living') { inspectLivingInhabitant(inhabitant, state); offerInhabitantView(id); return true; }
     const purposeful = family === 'purposeful';
     const goal = inhabitant.goal && 'kind' in inhabitant.goal ? inhabitant.goal : null;
     const representation = crowd()?.inhabitantRepresentation(id);
@@ -786,6 +804,7 @@ export function mountEnvironmentSelection(
       if (worded) addAskActions();
       addSavedWorldActions();
     }
+    offerInhabitantView(id);
     return true;
   }
 
@@ -2210,8 +2229,9 @@ export function mountEnvironmentSelection(
       inhabitantView = view;
       if (view !== null) {
         view.root.hidden = true;
-        inspector.root.after(view.root);
+        inspector.root.before(view.root);
       }
+      inspector.setUnderView(false);
       inspector.root.hidden = false;
       if (selectedInhabitant !== null && inspectedInhabitant === selectedInhabitant) inspectInhabitant(selectedInhabitant, false);
     },

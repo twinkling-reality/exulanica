@@ -1,0 +1,124 @@
+/*
+ * The thing card at the top of Selected: a title with its mark, a summary, what it is doing now,
+ * its mind (changed in place) and where it came from. The inspector stays under it with the
+ * subject's controls and its record ("How we know"), so its own title and words are not repeated.
+ */
+#shell .thing-card { display: flex; flex-direction: column; gap: var(--space-3); }
+#shell .thing-card[hidden] { display: none; }
+#shell .living-world-inspector[data-under-view] > :is(h3, p) { display: none; }
+#shell .world-panel:has(.thing-card:not([hidden])) .environment-selection-selected { display: none; }
+
+#shell .thing-card-title { display: flex; align-items: center; gap: var(--space-2); }
+#shell .world-panel .thing-card .thing-card-title h3 {
+  margin: 0;
+  font: var(--weight-display) 26px/1.15 var(--font-display);
+  letter-spacing: -.01em;
+  text-transform: none;
+  color: var(--color-text);
+}
+#shell .thing-card-summary,
+#shell .thing-card-muted { margin: 0; font-size: var(--text-md); line-height: var(--text-md-line); color: var(--color-text-muted); }
+#shell .thing-card-faint { margin: 0; font-size: var(--text-sm); line-height: var(--text-sm-line); color: var(--color-text-faint); }
+
+#shell .thing-card-now {
+  display: flex;
+  gap: var(--space-2);
+  align-items: baseline;
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-md);
+  line-height: var(--text-md-line);
+  background: var(--color-surface-sunken);
+  border-radius: var(--radius-md);
+}
+#shell .thing-card-now b { font-weight: var(--weight-medium); }
+
+#shell .thing-card-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+}
+#shell .thing-card-row p { margin: 0; font-size: var(--text-md); line-height: var(--text-md-line); }
+#shell .thing-card-row-head { display: flex; align-items: center; gap: var(--space-2); margin: 0 0 var(--space-1); }
+#shell .world-panel .thing-card .thing-card-row-head h4 {
+  margin: 0;
+  font: 500 11px/14px var(--font-mono);
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+}
+#shell .thing-card-mind-name { font-size: var(--text-lg) !important; line-height: var(--text-lg-line) !important; font-weight: var(--weight-medium); }
+
+/* The mark: the same pill wherever a model runs something, and where a visitor came from. */
+#shell .thing-card-mark {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: var(--radius-full);
+  font: 600 11px/1 var(--font-mono);
+  letter-spacing: .08em;
+  text-transform: none;
+  color: var(--color-surface-solid);
+  background: var(--color-text);
+}
+#shell .thing-card-mark-from { color: var(--color-text); background: var(--color-surface-raised); border: 1.5px solid var(--color-text); }
+
+#shell .world-panel .thing-card button.thing-card-change {
+  margin: 0 0 0 auto;
+  min-height: 0;
+  padding: 0 var(--space-1);
+  font: var(--weight-medium) var(--text-md)/var(--text-md-line) var(--font-ui);
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--color-accent-text);
+  background: transparent;
+  border: 0;
+}
+#shell .thing-card-choices { display: flex; flex-direction: column; gap: 6px; margin-top: var(--space-1); }
+#shell .world-panel .thing-card button.thing-card-choice {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 0;
+  margin: 0;
+  padding: var(--space-2) 10px;
+  text-align: left;
+  color: var(--color-text);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+}
+#shell .world-panel .thing-card button.thing-card-choice:hover:not(:disabled) { background: var(--color-surface-hover); }
+#shell .world-panel .thing-card button.thing-card-choice[data-now] { border: 2px solid var(--color-text); color: var(--color-text); opacity: 1; }
+#shell .world-panel .thing-card button.thing-card-choice:disabled:not([data-now]) { color: var(--color-text-disabled); }
+#shell .thing-card-choice-text { display: flex; flex-direction: column; gap: 2px; flex: 1; font-weight: var(--weight-regular); }
+#shell .thing-card-choice-name { font-size: var(--text-md); line-height: 18px; font-weight: var(--weight-medium); }
+#shell .thing-card-choice-text small { font-size: var(--text-xs); line-height: var(--text-xs-line); font-weight: var(--weight-regular); color: var(--color-text-muted); }
+#shell .thing-card-badge,
+#shell .thing-card-now-badge {
+  font: 500 10px/14px var(--font-mono);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+}
+#shell .thing-card-now-badge { color: var(--color-text); white-space: nowrap; }
+#shell .thing-card-outcome {
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-positive-soft);
+  border-radius: var(--radius-md);
+}
+#shell .thing-card-links { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-1); margin-top: var(--space-1) !important; }
+#shell .world-panel .thing-card button.thing-card-link {
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  font: var(--weight-medium) var(--text-md)/var(--text-md-line) var(--font-ui);
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--color-accent-text);
+  background: transparent;
+  border: 0;
+}
