@@ -7,7 +7,9 @@ value checked), like every appearance record.
   fit, the optional plain description, the pack (id, version, digest, palette, style words), the
   budget with the digest of the piece budgets file it came from, how many variants, and which
   route. Nothing about who asked. A request with a description may carry a person's words, so it
-  is cached within its workspace only (:func:`cache_scope`). A piece made for a thing a hand holds
+  is cached within its workspace only (:func:`cache_scope`). A piece made to a thing kind names it
+  in ``thing_kind`` (key, version and sha256, as the kind catalog states them), so the piece's
+  receipt leads back to the kind it was made for. A piece made for a thing a hand holds
   carries ``hold``: the thing kind's grip point and axis and the widest section a hand closes
   around, all in the kind's slot frame, copied from the thing kind and its body plan. A ``v1``
   request, whose budget came from a table this module held before the pack format's file existed,
@@ -146,7 +148,9 @@ _REQUEST_KEYS: Final = (
     "slot_mm",
     "variants",
 )
-_REQUEST_OPTIONAL: Final = ("description", "hold", "tile_module_mm")
+_REQUEST_OPTIONAL: Final = ("description", "hold", "thing_kind", "tile_module_mm")
+_THING_KIND_KEYS: Final = ("key", "sha256", "version")
+_THING_KIND_KEY: Final = re.compile(r"[a-z][a-z0-9_]{0,47}")
 _HOLD_KEYS: Final = ("axis", "grip", "section_mm_maximum")
 _GRIP_KEYS: Final = ("x_mm", "y_mm", "z_mm")
 _PACK_KEYS: Final = ("id", "palette", "sha256", "style", "version")
@@ -213,6 +217,17 @@ def _check_request(document: object, budgets: PieceBudgets | None) -> dict[str, 
         if document["profile"] == REQUEST_PROFILE_V1:
             raise Refused("a v1 request holds no grip")
         _check_hold(document["hold"], document["fit"], slot)
+    if "thing_kind" in document:
+        if document["profile"] == REQUEST_PROFILE_V1:
+            raise Refused("a v1 request names no thing kind")
+        kind = exact_keys(document["thing_kind"], _THING_KIND_KEYS, "thing_kind")
+        if (
+            not isinstance(kind["key"], str)
+            or _THING_KIND_KEY.fullmatch(kind["key"]) is None
+            or not is_count(kind["version"], 1)
+            or not is_sha256(kind["sha256"])
+        ):
+            raise Refused("thing_kind names a kind's key, its version from 1 and its sha256")
     pack = exact_keys(document["pack"], _PACK_KEYS, "pack")
     if not isinstance(pack["id"], str) or _PACK_ID.fullmatch(pack["id"]) is None:
         raise Refused("pack.id is lower case letters, digits, dots and hyphens")
@@ -318,6 +333,7 @@ def build_request(
     description: str | None = None,
     tile_module_mm: int | None = None,
     hold: Mapping[str, Any] | None = None,
+    thing_kind: Mapping[str, Any] | None = None,
 ) -> bytes:
     """A v2 request's canonical bytes; its budget is filled from the pack format's file."""
     family, _ = split_role(look_role)
@@ -338,6 +354,8 @@ def build_request(
         document["tile_module_mm"] = tile_module_mm
     if hold is not None:
         document["hold"] = {**hold, "grip": dict(hold["grip"])}
+    if thing_kind is not None:
+        document["thing_kind"] = dict(thing_kind)
     raw = canonical_bytes(document)
     read_request(raw, budgets)
     return raw

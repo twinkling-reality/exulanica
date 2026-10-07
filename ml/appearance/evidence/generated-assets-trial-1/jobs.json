@@ -1,0 +1,146 @@
+{
+ "jobs": [
+  {
+   "attempt": 1,
+   "code_sha256": "ab68f436d47e750b23db0b52b884cd9246647a8b79abb41509a041648722b6bd",
+   "container_finished_at": "2026-10-06T20:33:53.882Z",
+   "container_started_at": "2026-10-06T20:33:38.716Z",
+   "job_id": "aijob-e05q2aa1we2tg2maep",
+   "job_sha256": "57a2acbec0901a1755ba27d883dbd9f48ea127d57abb2ef7648831bcd9becddb",
+   "outcome": "failed: install could not open lock-route-A.txt (file names are lower case; this Mac's disk does not tell cases apart)",
+   "route": "A"
+  },
+  {
+   "attempt": 2,
+   "code_sha256": "f8be4a793747356967282b67e8809a08b086eeb020eac6956811a509503d8620",
+   "container_finished_at": "2026-10-06T20:55:43.819Z",
+   "container_started_at": "2026-10-06T20:53:07.425Z",
+   "job_id": "aijob-e05hq5n2153r7vprf8",
+   "job_sha256": "780251455e1d08fb2e0a2ef366dee9693d2d27908f0c99c72f9db4299d776f88",
+   "outcome": "failed: prepare could not set a file's mode or times on the bucket mount",
+   "route": "A"
+  },
+  {
+   "attempt": 3,
+   "code_sha256": "f672c7373bab0643d56fa771474e2553f5bb9362b265c7dd492dccc801a984b3",
+   "container_finished_at": "2026-10-06T21:12:31.679Z",
+   "container_started_at": "2026-10-06T21:03:39.802Z",
+   "job_id": "aijob-e05gxaw8x88yqgenzj",
+   "job_sha256": "da00e1461e2edc279edde27f76c40fd5554f419cd61d6b1efa084dd0f8e81dc2",
+   "outcome": "failed: TRELLIS's package imports its text-to-3D pipeline, which needs open3d",
+   "route": "A"
+  },
+  {
+   "attempt": 4,
+   "code_sha256": "f246fecbc7c30a8ddb56fcefabddd82018d42c31c4a608bc57b60bc28a57e005",
+   "container_finished_at": "2026-10-06T21:30:35.289Z",
+   "container_started_at": "2026-10-06T21:21:51.180Z",
+   "job_id": "aijob-e05cbwyxm5yt7hxxrz",
+   "job_sha256": "d8d7cea5e4f47b5751bab752a98f815c74bc9e92881a982f05b7d458553ccfc0",
+   "outcome": "failed: TRELLIS loads the radiance-field decoder the weights leave out, then looks it up online",
+   "route": "A"
+  },
+  {
+   "attempt": 5,
+   "code_sha256": "5927ace192c72d67e817d40b498eb763c31160bb5ebd1e8e9bf9a657a29a172d",
+   "container_finished_at": "2026-10-06T21:46:05.764Z",
+   "container_started_at": "2026-10-06T21:37:16.631Z",
+   "job_id": "aijob-e05cs6zx3hk54pbjzq",
+   "job_sha256": "878c62a4effb24861cb64a34989a1067e52ef15e33f4854e362bca1ae3f13088",
+   "outcome": "failed: xformers sent attention to a Hopper-only kernel on the Blackwell card; one concept picture and cut-out made",
+   "route": "A"
+  },
+  {
+   "attempt": 6,
+   "code_sha256": "0699a3ba2a1697476e80c43ad7440e1960a40129ed676d06d0713524e6975e23",
+   "container_finished_at": "2026-10-06T22:04:34.452Z",
+   "container_started_at": "2026-10-06T21:52:56.974Z",
+   "job_id": "aijob-e05tkzsmaghtp23jvc",
+   "job_sha256": "94398bc4f7b0c3c607e37f7f0903dd0066d379ca9f7de89f83ac5bce3a2d54c2",
+   "outcome": "ran: 16 items, 13 pieces with receipts (11 within every check, 2 swords over the hold checks of their first box), 3 shopfront items refused at the fill fit",
+   "route": "A"
+  },
+  {
+   "attempt": 1,
+   "code_sha256": "0699a3ba2a1697476e80c43ad7440e1960a40129ed676d06d0713524e6975e23",
+   "container_finished_at": "2026-10-06T22:21:54.721Z",
+   "container_started_at": "2026-10-06T22:13:10.420Z",
+   "job_id": "aijob-e05dkn7tzfs8kjkz4s",
+   "job_sha256": "98d9f3d898bc945c14974dfab90b8755036d31f43c71bce85887f609c960c32d",
+   "outcome": "failed: the weights check refused a Hugging Face cache snapshot's links into its repository's blobs",
+   "route": "B"
+  },
+  {
+   "attempt": 2,
+   "code_sha256": "488f9bf4f496c5d87644a42843729922ff9e7093d431e80c510ae80df3e31102",
+   "container_finished_at": "2026-10-06T22:37:38.918Z",
+   "container_started_at": "2026-10-06T22:28:48.804Z",
+   "job_id": "aijob-e05atsvcqc0eekshxg",
+   "job_sha256": "f2b09eeacc83a9c2fbc215a8324726e0193986d6907cdfc9dcd979e428a514fd",
+   "outcome": "failed: Step1X-3D names pymeshlab.MeshSet in an annotation; the stand-in refused attribute access",
+   "route": "B"
+  },
+  {
+   "attempt": 3,
+   "code_sha256": "38aaf891e178042a77a6a371400cc0dcc88107535962d1a3d16acaee54d670d6",
+   "container_finished_at": "2026-10-06T22:57:30.669Z",
+   "container_started_at": "2026-10-06T22:48:34.150Z",
+   "job_id": "aijob-e05jsbrqd55b3e90m7",
+   "job_sha256": "8f1d0da8464b58d42fca3d0cb787488d9e3d82069c899a08efbc3b533b8c6dc9",
+   "outcome": "failed: the shared helper loaded Z-Image eagerly; route B's diffusers has none",
+   "route": "B"
+  },
+  {
+   "attempt": 4,
+   "code_sha256": "76de80e028298e136fa1fb4c7e58c26e07429aab93e125f8216a0a7196c2f0f7",
+   "container_finished_at": "2026-10-06T23:08:04.010Z",
+   "container_started_at": "2026-10-06T23:03:43.408Z",
+   "job_id": "aijob-e05fqk320h3qehmxa5",
+   "job_sha256": "9447994dcf98aeccfdbacb53ce6bc2b46a26be6a430a97a36da31fd9edbc3adc",
+   "outcome": "failed: Step1X-3D's input check refuses the image types it names",
+   "route": "B"
+  },
+  {
+   "attempt": 5,
+   "code_sha256": "5c5e5056265e34880448b9f570720bdf10f7b14acb769151111f3770a8c6cd76",
+   "container_finished_at": "2026-10-06T23:23:14.621Z",
+   "container_started_at": "2026-10-06T23:15:07.730Z",
+   "job_id": "aijob-e05xvhwzanjt082w60",
+   "job_sha256": "d42929acd2b4790404ca1e6238ebea050722a4943ba7bdccdfdca8724d0a1a16",
+   "outcome": "failed: every mesh had non-finite positions",
+   "route": "B"
+  },
+  {
+   "attempt": 6,
+   "code_sha256": "bf9835e337526a39b271cd7570cb0049048729c586cca48e61e6d0c807472504",
+   "container_finished_at": "2026-10-07T00:16:56.274Z",
+   "container_started_at": "2026-10-07T00:08:42.042Z",
+   "job_id": "aijob-e05afd81t7gxfp4kzz",
+   "job_sha256": "18bcbb81839aa0f20bc1ad8d67c8f05635ac3339c631c6a14dc68c7035a94afd",
+   "outcome": "failed: non-finite positions after a float32 VAE decode",
+   "route": "B"
+  },
+  {
+   "attempt": 7,
+   "code_sha256": "29e846b34f454b0665368c8c8c3b2724c889431cd444f524d7502d9f57849a65",
+   "container_finished_at": "2026-10-07T00:31:49.171Z",
+   "container_started_at": "2026-10-07T00:23:40.916Z",
+   "job_id": "aijob-e05aty146xh9swj7af",
+   "job_sha256": "7073280733957dbb135cdf2df553c19e8cc1cd49ac90cf3bb9ac2a55ea55b335",
+   "outcome": "failed: latents and decoded field finite; the hierarchical volume decoder marks unrefined cells NaN",
+   "route": "B"
+  },
+  {
+   "attempt": 8,
+   "code_sha256": "c5af45d1943e1dccf535d1f976ce7101331350505a413790241e84c869746ecb",
+   "container_finished_at": "2026-10-07T00:51:31.205Z",
+   "container_started_at": "2026-10-07T00:38:37.639Z",
+   "job_id": "aijob-e05sqgeh158ye4eakn",
+   "job_sha256": "7a3c67bf52acf641baad0d2080ad9b13d116cebc54a4da8a74f5fb8cae2c6ddf",
+   "outcome": "ran: 13 items on route A's cut-outs, 7 pieces with receipts (5 within every check, 2 swords over grip_section), 6 refused for a zero-area triangle",
+   "route": "B"
+  }
+ ],
+ "profile": "exulanica.generated-assets-trial-jobs/v1",
+ "source": "each job's final status (nebius ai job get) and its staged digests, saved by the lane's watcher and stage commands"
+}

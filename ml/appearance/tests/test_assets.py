@@ -95,3 +95,38 @@ def test_the_committed_case_is_what_the_dry_run_makes_now(repository: Path) -> N
     for document in (fresh, committed):
         document["receipt"].pop("seconds")  # the only figure a run measures by the clock
     assert committed == fresh, f"rewrite {CASE_PATH} with dryrun.case_bytes"
+
+
+def test_the_trial_evidence_reads_strictly_and_its_run_record_names_every_receipt(
+    repository: Path,
+) -> None:
+    """The first rented run's records, as the job wrote them (evidence/generated-assets-trial-1)."""
+    from exulanica_pieces.records import read_job
+
+    from exulanica_appearance.gpu_run import read_gpu_run
+
+    root = repository / "ml/appearance/evidence/generated-assets-trial-1"
+    budgets = read_budgets(repository)
+    requests = {
+        sha256_hex(p.read_bytes()): read_request(p.read_bytes(), budgets)
+        for p in (root / "requests").glob("*.json")
+    }
+    job_raw = (root / "job-a.json").read_bytes()
+    job = read_job(job_raw)
+    assert job["route"] == "A" and len(job["items"]) == 16
+    receipts = {}
+    for path in (root / "receipts").glob("*.json"):
+        document = json.loads(path.read_bytes())
+        read_receipt(canonical_bytes(document), requests[document["request_sha256"]])
+        assert path.stem == sha256_hex(path.read_bytes()) and document["job_sha256"] == sha256_hex(
+            job_raw
+        )
+        receipts[path.stem] = document
+    roles = sorted(requests[r["request_sha256"]]["look_role"] for r in receipts.values())
+    assert roles.count("door.shopfront_bay") == 0 and len(roles) == 13
+    within = [r for r in receipts.values() if r["verdict"]["within"]]
+    assert len(within) == 11
+    run = read_gpu_run(
+        (repository / "ml/appearance/evidence/gpu-run-aijob-e05tkzsmaghtp23jvc.json").read_bytes()
+    )
+    assert run["generations"] == sorted(receipts)

@@ -447,3 +447,21 @@ def test_the_shared_case_is_one_held_piece_s_records_read_strictly() -> None:
         "CC0-1.0",
     )
     assert receipt["verdict"] == {"over": [], "within": True}
+
+
+def test_a_request_may_name_the_thing_kind_it_is_made_for() -> None:
+    kind = {"key": "lantern", "sha256": "5c" * 32, "version": 1}
+    raw = build_request(
+        pack=PACK, variants=1, route="S", budgets=BUDGETS, thing_kind=kind, hold=SWORD_HOLD, **SWORD
+    )
+    assert read_request(raw, BUDGETS)["thing_kind"] == kind
+    for bad in (
+        {"key": "Lantern", "sha256": "5c" * 32, "version": 1},
+        {"key": "lantern", "sha256": "5c" * 31, "version": 1},
+        {"key": "lantern", "sha256": "5c" * 32, "version": 0},
+        {"key": "lantern", "version": 1},
+    ):
+        with pytest.raises(Refused, match="thing_kind"):
+            build_request(
+                pack=PACK, variants=1, route="S", budgets=BUDGETS, thing_kind=bad, **BENCH
+            )

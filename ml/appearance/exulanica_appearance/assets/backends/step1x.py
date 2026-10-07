@@ -43,13 +43,25 @@ class Step1XBackend:
 
     def __init__(self, weights: Path) -> None:
         import torch
+        from step1x3d_geometry.models.autoencoders.surface_extractors import MCSurfaceExtractor
+        from step1x3d_geometry.models.autoencoders.volume_decoders import VanillaVolumeDecoder
         from step1x3d_geometry.models.pipelines.pipeline import Step1X3DGeometryPipeline
 
         self._torch = torch
+        self._work = weights.parent
         self._shared = Shared(weights)
         self._pipeline = Step1X3DGeometryPipeline.from_pretrained(
-            str(weights / "stepfun-ai__Step1X-3D"), subfolder="Step1X-3D-Geometry-1300m"
+            str(weights / "stepfun-ai__Step1X-3D"),
+            subfolder="Step1X-3D-Geometry-1300m",
+            torch_dtype=torch.float32,
         ).to("cuda")
+        self._pipeline.vae.to(torch.float32)
+        # The configured hierarchical decoder evaluates only cells near the surface and marks
+        # every other cell NaN, so marching cubes makes non-finite positions there that upstream's
+        # trimesh export quietly removes (measured on Nebius, 2026-10-06: about half of every
+        # mesh). The dense decoder evaluates every cell instead, so nothing needs removing.
+        self._volume = VanillaVolumeDecoder()
+        self._surface = MCSurfaceExtractor()
 
     def simplifier(self) -> Simplifier:
         return quadric_simplify
@@ -64,16 +76,45 @@ class Step1XBackend:
         from PIL import Image
 
         image = Image.open(io.BytesIO(cutout)).convert("RGBA")
-        generator = self._torch.Generator(device="cuda").manual_seed(seed)
+        # Step1X-3D's input check refuses the very types it names (a PIL image or a tensor) and
+        # accepts a file path, which its own inference script passes; and it decodes bfloat16
+        # latents with its VAE cast to float16, which gave non-finite positions on every item
+        # (measured on Nebius, 2026-10-06). Both read in the pinned tree. So the cut-out goes in
+        # as a file on the machine's disk, the latents come out, and the VAE decodes them in
+        # float32 with the arguments the pipeline itself passes.
+        torch = self._torch
+        path = self._work / "step1x-input.png"
+        path.write_bytes(cutout)
+        generator = torch.Generator(device="cuda").manual_seed(seed)
         out = self._pipeline(
-            image, guidance_scale=7.5, num_inference_steps=50, generator=generator, output_type="np"
-        )
-        vertices, faces = out.mesh[0]
-        vertices = np.asarray(vertices, dtype=np.float64)
+            str(path), guidance_scale=7.5, num_inference_steps=50, generator=generator,
+            output_type="latent",
+        )  # fmt: skip
+        vae = self._pipeline.vae
+        latents = out.mesh.float()
+        with torch.no_grad():
+            decoded = vae.decode(latents)
+            grid = self._volume(
+                decoded, vae.query, bounds=1.05, octree_resolution=384, num_chunks=65536,
+                enable_pbar=False,
+            )[0]  # fmt: skip
+            meshes = self._surface(grid, mc_level=0.0, bounds=1.05, octree_resolution=384)
+        result = meshes[0]
+        if result is None:
+            raise RuntimeError("marching cubes found no surface in the decoded field")
+        finite = torch.isfinite(result.verts).all(dim=-1)
+        if not bool(finite.all()):
+            # Said with where it starts, so the cause is found rather than the vertices dropped.
+            raise RuntimeError(
+                f"{int((~finite).sum())} of {len(finite)} positions are not finite; latents "
+                f"finite: {bool(torch.isfinite(latents).all())}, decoded field finite: "
+                f"{bool(torch.isfinite(decoded).all())}, grid finite: "
+                f"{bool(torch.isfinite(grid).all())}"
+            )
+        vertices = result.verts.detach().float().cpu().numpy().astype(np.float64)
+        faces = result.faces.detach().cpu().numpy().astype(np.int64)
         colours = project_colours(vertices, np.asarray(image))
-        return RawMesh(
-            Mesh(vertices, np.asarray(faces, dtype=np.int64), colours), up="+Y", front="+Z"
-        )
+        return RawMesh(Mesh(vertices, faces, colours), up="+Y", front="+Z")
 
     def runtime(self) -> dict[str, Any]:
         return dict(self._shared.runtime(), model="stepfun-ai/Step1X-3D geometry 1300m")

@@ -388,7 +388,17 @@ with the part, and the piece is appearance inside it.
 with a stub in place of the models (`python -m exulanica_appearance assets dry-run`), through the
 same runner a job on a rented GPU uses, and a test
 prepares every stub piece through the product's own static profile and finds it placeable at the
-size its receipt states. No model has made a piece and no GPU has run. The budgets are the style
+size its receipt states. Both routes have run on rented GPUs (Nebius AI Cloud, one RTX PRO 6000
+Blackwell, Serverless AI jobs); [`docs/evaluation/2026-10-07-nebius-generated-assets-trial.json`](evaluation/2026-10-07-nebius-generated-assets-trial.json)
+records every job, including each failed attempt and why, with its container times and cost, and
+every piece by receipt. On the same 16 trial items, route A made 13 pieces (11 within every check)
+at 8 to 10 seconds a piece; on route A's 13 cut-outs, route B made 7 (5 within every check) at about
+40 seconds a mesh and was refused 6 times for a zero-area triangle. A demo job of eight thing kinds
+at four variants in the cozy look made 32 pieces on route A, 27 within every check; several of them
+fill only part of their kind's box, because the model draws them deeper than the box allows, and a
+fill check and prompt wording from the box's proportions are still to come. The requests, jobs,
+results and receipts are in `ml/appearance/evidence/generated-assets-trial-1/` and
+`generated-assets-demo-1/`, and each rented job's record in `ml/appearance/evidence/gpu-run-aijob-*.json`. The budgets are the style
 pack format's, read from [`assets/style-packs/piece-budgets.v1.json`](../assets/style-packs/piece-budgets.v1.json)
 by `exulanica_pieces.budgets`, the same file the [style pack contract](style-pack-contract.md) holds
 pieces to.
@@ -456,24 +466,36 @@ piece's request, job and receipt from the dry run for readers of these records e
 under the digest of its request, weights listing and post-process version; a request that carries a
 description may hold a person's words and is cached within its workspace only.
 
-**The job (built, not yet run).** A job runs on Nebius Serverless AI from a public Python image
+**The job.** A job runs on Nebius Serverless AI from a public Python image
 pinned by digest and installs at start from a hash-locked requirements file per route
 (`ml/appearance/container/assets/lock-route-a.txt` and `lock-route-b.txt`, binary wheels only), so
 no image is built for it. It fetches the pinned upstream code as GitHub archives and holds each
 extracted tree to its commit's tree id, computed without git; Step1X-3D's package is patched to
-import only its models. Modules the upstream code imports but the job never uses, among them
-plyfile (GPL-3.0), easydict (LGPL-3.0) and pymeshlab (GPL-3.0), are replaced by small stand-ins
-(`container/assets/standins/`), and nvdiffrast is never installed. Weights are fetched once at their
-pinned revisions into the job's bucket and every file is checked against its manifest; the DINOv2
-file TRELLIS loads through torch.hub is not on Hugging Face, so its digest is recorded on its first
-fetch and later jobs are held to it. The job record's stop bounds the whole job, setup included. On
-the operator's machine, `python -m exulanica_appearance assets nebius stage | submit | status |
-fetch | cancel` drives the aws and nebius command lines; submit refuses a job whose worst case
-(its timeout, at least the service's one hour, times the day's rate) exceeds the allocated bound,
-and no credential passes through the code. Route A's colour comes from TRELLIS's Gaussians; route
+import only its models, and TRELLIS's to import only its image-to-3D pipeline (its text-to-3D
+pipeline needs open3d, which the job does not install). Modules the upstream code imports but the job
+never uses, among them plyfile (GPL-3.0), easydict (LGPL-3.0) and pymeshlab (GPL-3.0), are replaced by
+small stand-ins (`container/assets/standins/`) that may be named but refuse to be used, and
+nvdiffrast is never installed. The job works on the machine's own disk: weights are fetched at their
+pinned revisions and every file is checked against its manifest (a Hugging Face cache snapshot within
+its repository's cache folder); the DINOv2 file TRELLIS loads through torch.hub is not on Hugging
+Face, so its digest is recorded on its first fetch and later jobs are held to it. TRELLIS loads from a
+view of its weights that lists only the models they hold; Step1X-3D is given its cut-out as a file
+and its latents are decoded in float32 over every cell of the grid (its default decoder marks the
+cells it does not refine as NaN); and TRELLIS's attention runs on PyTorch's
+`scaled_dot_product_attention`, because the pinned xformers dispatches some calls to a kernel built
+for an earlier GPU generation that fails on Blackwell. Outputs reach the job's bucket only by plain
+writes, each file once, every minute and at exit, since the bucket mount refuses a file's mode and
+times. The job record's stop bounds the whole job, setup included. On the operator's machine,
+`python -m exulanica_appearance assets nebius stage | submit | status | fetch | cancel | clear |
+usage` drives the aws and nebius command lines; submit refuses a job whose worst case (its timeout,
+at least the service's one hour, times the day's rate) exceeds the allocated bound and can validate a
+job without creating it; the bucket key is read from its file in one process and handed to each aws
+command in that command's environment only, never on a command line. Route A's colour comes from TRELLIS's Gaussians; route
 B's is a prototype projection of the cut-out seen from the front, approximate by construction.
 
-**Planned, not built:** the measured trial of both routes, the admission's `generated` rights
+**Planned, not built:** the operator's choice of route from the blind side-by-side pictures, route
+B's zero-area refusals, a fill check for every piece made to a kind, a shopfront request shaped for a
+shallow fill slot, the admission's `generated` rights
 basis, the generation queue under the spending authority, and the Companion's offer of new pieces
 for a pack.
 

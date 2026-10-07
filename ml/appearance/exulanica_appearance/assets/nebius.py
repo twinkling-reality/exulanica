@@ -7,10 +7,15 @@
   its stop at 150 per cent of the estimate, times the rate read that day) fits the allocated bound.
 - ``status``, ``fetch``, ``cancel``: ``nebius ai job get``, an aws sync of the outputs, and
   ``nebius ai job cancel``.
+- ``clear`` and ``usage``: remove everything the bucket holds, and list what it still holds, so
+  weights and outputs are not kept (and billed) once fetched.
 
-No credential passes through this module: the aws CLI reads the file
-``EXULANICA_GEN_S3_CREDENTIALS`` names (as ``AWS_SHARED_CREDENTIALS_FILE``), and the nebius CLI
-its own profile. Nothing is printed but the commands' own output.
+The bucket key is the JSON file ``EXULANICA_GEN_S3_KEY_FILE`` names (fields aws_access_key_id,
+aws_secret_access_key, endpoint_url, region, bucket, as the account setup writes it, mode 600).
+It is read in this process and handed to each aws child in that child's environment only: never
+on a command line, never printed, never written to another file; the aws CLI's own credential and
+config files are switched off for the call. The job itself reads no key: the bucket arrives as a
+mount. The nebius CLI uses its own profile. Nothing is printed but the commands' own output.
 """
 
 from __future__ import annotations
@@ -28,8 +33,10 @@ from exulanica_pieces.canonical import Refused, sha256_hex
 
 __all__ = [
     "IMAGE",
+    "clear",
     "code_archive",
     "submit_arguments",
+    "usage",
     "worst_case_cents",
 ]
 
@@ -91,14 +98,36 @@ def _run(command: Sequence[str], *, environment: dict[str, str] | None = None) -
     return completed.stdout
 
 
-def _aws(region: str, arguments: Sequence[str]) -> str:
-    credentials = os.environ.get("EXULANICA_GEN_S3_CREDENTIALS")
-    if not credentials:
-        raise Refused("EXULANICA_GEN_S3_CREDENTIALS names no credentials file")
-    environment = dict(os.environ, AWS_SHARED_CREDENTIALS_FILE=credentials)
-    environment.pop("AWS_ACCESS_KEY_ID", None)
-    environment.pop("AWS_SECRET_ACCESS_KEY", None)
+_KEY_FIELDS: Final = (
+    "aws_access_key_id",
+    "aws_secret_access_key",
+    "bucket",
+    "endpoint_url",
+    "region",
+)
+
+
+def _aws(region: str, arguments: Sequence[str], bucket: str) -> str:
+    path = os.environ.get("EXULANICA_GEN_S3_KEY_FILE")
+    if not path:
+        raise Refused("EXULANICA_GEN_S3_KEY_FILE names no bucket key file")
+    key = json.loads(Path(path).read_text(encoding="utf-8"))
+    if not isinstance(key, dict) or set(key) != set(_KEY_FIELDS):
+        raise Refused(f"the bucket key file holds exactly {', '.join(_KEY_FIELDS)}")
     endpoint = f"https://storage.{region}.nebius.cloud"
+    if (key["region"], key["endpoint_url"], key["bucket"]) != (region, endpoint, bucket):
+        raise Refused("the bucket key file is for another region, endpoint or bucket")
+    environment = {
+        name: value
+        for name, value in os.environ.items()
+        if not name.startswith("AWS_") and name != "EXULANICA_GEN_S3_KEY_FILE"
+    }
+    environment.update(
+        AWS_ACCESS_KEY_ID=key["aws_access_key_id"],
+        AWS_SECRET_ACCESS_KEY=key["aws_secret_access_key"],
+        AWS_SHARED_CREDENTIALS_FILE=os.devnull,
+        AWS_CONFIG_FILE=os.devnull,
+    )
     return _run(
         ["aws", "--endpoint-url", endpoint, "--region", region, *arguments], environment=environment
     )
@@ -139,6 +168,7 @@ def stage(
             str(staging),
             f"s3://{bucket}/runs/{job_sha256}/",
         ],
+        bucket,
     )
     if cutouts is not None:
         _aws(
@@ -151,6 +181,7 @@ def stage(
                 str(cutouts),
                 f"s3://{bucket}/out/inputs/",
             ],
+            bucket,
         )
     return {"code_sha256": files["code.tar"], "files": files, "job_sha256": job_sha256}
 
@@ -169,6 +200,7 @@ def submit_arguments(
     bound_cents: int,
     preemptible: bool,
     profile: str,
+    dry_run: bool = False,
 ) -> list[str]:
     """The ``nebius ai job create`` command, or a refusal when the worst case passes the bound."""
     if route not in ("A", "B"):
@@ -199,15 +231,21 @@ def submit_arguments(
         "--env", f"STOP_SECONDS={timeout_seconds}",
         "--container-command", "sh",
         "--args", f"{_MOUNT}/runs/{job_sha256}/job.sh",
+        "--async",
         "--format", "json",
     ]  # fmt: skip
-    if preemptible:
-        command.append("--preemptible")
+    command.append("--preemptible" if preemptible else "--on-demand")
+    if dry_run:
+        command.append("--dry-run")
     return command
 
 
 def submit(**arguments: Any) -> dict[str, Any]:
-    return json.loads(_run(submit_arguments(**arguments)))
+    """The create operation (its resource_id is the job's id), or a dry run's verdict in words."""
+    output = _run(submit_arguments(**arguments))
+    if arguments.get("dry_run"):
+        return {"dry_run": output.strip()}
+    return json.loads(output)
 
 
 def status(job_id: str, profile: str) -> dict[str, Any]:
@@ -224,4 +262,18 @@ def cancel(job_id: str, profile: str) -> str:
 
 def fetch(*, bucket: str, region: str, out: Path) -> str:
     out.mkdir(parents=True, exist_ok=True)
-    return _aws(region, ["s3", "sync", "--only-show-errors", f"s3://{bucket}/out/", str(out)])
+    return _aws(
+        region, ["s3", "sync", "--only-show-errors", f"s3://{bucket}/out/", str(out)], bucket
+    )
+
+
+def clear(*, bucket: str, region: str) -> str:
+    """Remove every object: weights, caches, staged runs and outputs. Storage bills per byte held."""
+    return _aws(
+        region, ["s3", "rm", "--recursive", "--only-show-errors", f"s3://{bucket}/"], bucket
+    )
+
+
+def usage(*, bucket: str, region: str) -> str:
+    """What the bucket still holds, with the totals line the aws CLI prints."""
+    return _aws(region, ["s3", "ls", "--recursive", "--summarize", f"s3://{bucket}/"], bucket)

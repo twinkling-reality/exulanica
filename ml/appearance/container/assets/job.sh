@@ -14,7 +14,14 @@ if [ -z "${UNDER_STOP:-}" ]; then
 fi
 data=/mnt/data
 run="$data/runs/$JOB"
+# The bucket mount takes plain writes but not a file's mode or times, so every piece of work (pip,
+# upstream code, weights, caches, outputs) stays on the machine's own disk, and outputs reach the
+# bucket only through "publish": each finished file written once, every minute and at exit.
+work=/opt/work
+mkdir -p "$work/out"
 case "$ROUTE" in A|B) ;; *) echo "ROUTE is A or B" >&2; exit 2 ;; esac
+# File names are lower case, and the job's file system tells the cases apart.
+route=$(printf '%s' "$ROUTE" | tr AB ab)
 
 echo "phase code $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 test "$(sha256sum "$run/code.tar" | cut -d' ' -f1)" = "$CODE_SHA256"
@@ -31,13 +38,23 @@ apt-get install -y -qq --no-install-recommends gcc libc6-dev > /dev/null
 echo "phase install $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 python -m pip install --quiet --no-deps --require-hashes --only-binary :all: \
   --extra-index-url https://download.pytorch.org/whl/cu128 \
-  -r "$code/ml/appearance/container/assets/lock-route-$ROUTE.txt"
+  -r "$code/ml/appearance/container/assets/lock-route-$route.txt"
+
+publish() {
+  PYTHONPATH="$code:$code/ml/appearance" python -m exulanica_appearance assets remote publish \
+    --source "$work/out" --target "$data/out" --ledger "$work/published.txt"
+}
+( while sleep 60; do publish > /dev/null || echo "publish failed" >&2; done ) &
+publisher=$!
+trap 'kill "$publisher" 2>/dev/null; echo "phase publish $(date -u +%Y-%m-%dT%H:%M:%SZ)"; publish || true' EXIT
+trap 'exit 143' TERM
 
 echo "phase prepare $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-export TORCH_HOME="$data/torch-home" HF_HOME="$data/hf-home"
+export TORCH_HOME="$work/torch-home" HF_HOME="$work/hf-home"
 PYTHONPATH="$code:$code/ml/appearance" python -m exulanica_appearance assets remote prepare \
-  --code "$code" --route "$ROUTE" --upstream /opt/upstream --weights "$data/weights" \
-  --torch-home "$TORCH_HOME" --hf-home "$HF_HOME" --report "$run/prepare-$(date -u +%Y%m%dT%H%M%SZ).json"
+  --code "$code" --route "$ROUTE" --upstream /opt/upstream --weights "$work/weights" \
+  --torch-home "$TORCH_HOME" --hf-home "$HF_HOME" \
+  --report "$work/out/prepare-$ROUTE-$(date -u +%Y%m%dT%H%M%SZ).json"
 
 echo "phase run $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 export HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 PYTHONUNBUFFERED=1
@@ -48,5 +65,5 @@ case "$ROUTE" in
 esac
 PYTHONPATH="$standins:$upstream:$code:$code/ml/appearance" python -m exulanica_appearance assets remote run \
   --code "$code" --route "$ROUTE" --job "$run/job.json" --requests "$run/requests" \
-  --weights "$data/weights" --cutouts "$data/out/inputs" --out "$data/out"
+  --weights "$work/weights" --cutouts "$data/out/inputs" --out "$work/out"
 echo "phase done $(date -u +%Y-%m-%dT%H:%M:%SZ)"

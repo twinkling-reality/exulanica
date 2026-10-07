@@ -8,6 +8,12 @@ loads is not on Hugging Face: its digest is recorded the first time it is fetche
 job is held to that record.
 
 ``run`` loads the route's backend and runs the job record (``exulanica_appearance.assets.job``).
+
+``publish`` copies the job's outputs from the machine's own disk to the bucket mount. The mount
+takes plain writes but refuses setting a file's mode or times (measured on Nebius, 2026-10-06: a
+copytree onto it failed with "Operation not permitted"), so the job does all its work on its own
+disk and publishes each output by writing its bytes once: no rename, no mode or time, never over
+other bytes.
 """
 
 from __future__ import annotations
@@ -27,7 +33,7 @@ from exulanica_appearance.assets.gittree import tree_id
 from exulanica_appearance.canonical import Refused as WeightsRefused
 from exulanica_appearance.weights import read_weights, verify_directory
 
-__all__ = ["ROUTE_WEIGHTS", "fetch_upstream", "prepare", "weights_directory"]
+__all__ = ["ROUTE_WEIGHTS", "fetch_upstream", "prepare", "publish", "weights_directory"]
 
 #: The weights manifests each route loads, by file name under ml/appearance/weights.
 ROUTE_WEIGHTS: Final = {
@@ -36,11 +42,8 @@ ROUTE_WEIGHTS: Final = {
         "ZhengPeng7__BiRefNet@e2bf8e4460fc.json",
         "microsoft__TRELLIS-image-large@25e0d31ffbeb.json",
     ),
-    "B": (
-        "Tongyi-MAI__Z-Image-Turbo@f332072aa78b.json",
-        "ZhengPeng7__BiRefNet@e2bf8e4460fc.json",
-        "stepfun-ai__Step1X-3D@bf7084495b3a.json",
-    ),
+    # Route B starts from route A's cut-outs: it makes no concept picture or cut-out of its own.
+    "B": ("stepfun-ai__Step1X-3D@bf7084495b3a.json",),
 }
 #: Read by repository id through the Hugging Face cache rather than from a path.
 ROUTE_CACHED: Final = {"B": ("facebook__dinov2-with-registers-large@e4c89a4e0558.json",)}
@@ -169,7 +172,7 @@ def _fetch_cached(manifest_raw: bytes, hf_home: Path) -> int:
     refs = cache / f"models--{owner}--{name}" / "refs"
     refs.mkdir(parents=True, exist_ok=True)
     (refs / "main").write_text(manifest["revision"], encoding="ascii")
-    return verify_directory(manifest_raw, Path(path))
+    return verify_directory(manifest_raw, Path(path), within=cache / f"models--{owner}--{name}")
 
 
 def prepare(
@@ -201,3 +204,36 @@ def backend_for(route: str, weights: Path) -> Any:
 
     module_name, class_name = ROUTES[route].split(":")
     return getattr(importlib.import_module(module_name), class_name)(weights)
+
+
+def publish(source: Path, target: Path, ledger: Path) -> dict[str, int]:
+    """Write every finished file under ``source`` to the same path under ``target``, once.
+
+    ``ledger`` (on the machine's disk) lists what is already published, so a file is read back
+    from the mount at most once. A file still being written (``*.partial``) waits for the next
+    call. A target that already holds other bytes is refused: outputs are written once."""
+    published = set(ledger.read_text(encoding="utf-8").split()) if ledger.exists() else set()
+    counts = {"published": 0, "already": 0}
+    for path in sorted(p for p in source.rglob("*") if p.is_file()):
+        if path.name.endswith(".partial"):
+            continue
+        relative = path.relative_to(source).as_posix()
+        data = path.read_bytes()
+        entry = f"{relative}@{hashlib.sha256(data).hexdigest()}"
+        if entry in published:
+            counts["already"] += 1
+            continue
+        destination = target / relative
+        if destination.exists():
+            if destination.read_bytes() != data:
+                raise Refused(f"{destination} already holds other bytes; output is written once")
+            counts["already"] += 1
+        else:
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            with open(destination, "wb") as handle:
+                handle.write(data)
+            counts["published"] += 1
+        published.add(entry)
+        with open(ledger, "a", encoding="utf-8") as handle:
+            handle.write(entry + "\n")
+    return counts

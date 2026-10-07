@@ -8,7 +8,13 @@
       "tree": "7b81d40fde026ec5a63396d34b386caababfd411",
       "licence": "MIT",
       "routes": ["A"],
-      "gitlinks": {"trellis/representations/mesh/flexicubes": "815e075a2a400d06c48d94c347674344ed6ae5c5"}
+      "gitlinks": {"trellis/representations/mesh/flexicubes": "815e075a2a400d06c48d94c347674344ed6ae5c5"},
+      "patch": {
+        "file": "trellis/pipelines/__init__.py",
+        "replace": "from .trellis_text_to_3d import TrellisTextTo3DPipeline\n",
+        "with": "",
+        "reason": "import only the image-to-3D pipeline; the text-to-3D pipeline imports open3d, which the job does not install (found by a static import audit of the pinned tree, 2026-10-06)"
+      }
     },
     {
       "name": "flexicubes",

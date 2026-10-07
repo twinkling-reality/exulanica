@@ -17,7 +17,7 @@
     runner gate      --results DIR --staged DIR --billed-seconds N --budget-seconds N --rate-cents N --out FILE
     assets dry-run   --repository ROOT --out DIR
     assets remote prepare|run ...   on the rented machine, from container/assets/job.sh
-    assets nebius stage|submit|status|fetch|cancel ...   on this Mac
+    assets nebius stage|submit|status|fetch|cancel|clear|usage ...   on this Mac
 
 Every command reads and writes files only. None downloads a model, and none needs a GPU.
 """
@@ -316,6 +316,14 @@ def _assets_remote_prepare(args: argparse.Namespace) -> int:
     return 0
 
 
+def _assets_remote_publish(args: argparse.Namespace) -> int:
+    from exulanica_appearance.assets.remote import publish
+
+    counts = publish(Path(args.source), Path(args.target), Path(args.ledger))
+    print(json.dumps(counts, sort_keys=True))
+    return 0
+
+
 def _assets_remote_run(args: argparse.Namespace) -> int:
     from exulanica_appearance.assets.job import run_job
     from exulanica_appearance.assets.remote import backend_for
@@ -369,11 +377,16 @@ def _assets_nebius(args: argparse.Namespace) -> int:
             bound_cents=args.bound_cents,
             preemptible=args.preemptible,
             profile=args.profile,
+            dry_run=args.dry_run,
         )
     elif args.step == "status":
         result = nebius.status(args.id, args.profile)
     elif args.step == "cancel":
         result = nebius.cancel(args.id, args.profile)
+    elif args.step == "clear":
+        result = nebius.clear(bucket=args.bucket, region=args.region)
+    elif args.step == "usage":
+        result = nebius.usage(bucket=args.bucket, region=args.region)
     else:
         result = nebius.fetch(bucket=args.bucket, region=args.region, out=Path(args.out))
     print(json.dumps(result, indent=1, sort_keys=True) if not isinstance(result, str) else result)
@@ -494,6 +507,10 @@ def main(argv: list[str] | None = None) -> int:
     for name in ("--code", "--route", "--job", "--requests", "--weights", "--cutouts", "--out"):
         remote_run.add_argument(name, required=True)
     remote_run.set_defaults(run=_assets_remote_run)
+    remote_publish = remote.add_parser("publish")
+    for name in ("--source", "--target", "--ledger"):
+        remote_publish.add_argument(name, required=True)
+    remote_publish.set_defaults(run=_assets_remote_publish)
 
     on_nebius = assets.add_parser("nebius").add_subparsers(dest="step", required=True)
     nebius_stage = on_nebius.add_parser("stage")
@@ -509,6 +526,7 @@ def main(argv: list[str] | None = None) -> int:
     nebius_submit.add_argument("--rate-cents", type=int, required=True)
     nebius_submit.add_argument("--bound-cents", type=int, required=True)
     nebius_submit.add_argument("--preemptible", action="store_true")
+    nebius_submit.add_argument("--dry-run", action="store_true")
     for step in ("status", "cancel"):
         command = on_nebius.add_parser(step)
         command.add_argument("--id", required=True)
@@ -516,6 +534,10 @@ def main(argv: list[str] | None = None) -> int:
     nebius_fetch = on_nebius.add_parser("fetch")
     for name in ("--bucket", "--region", "--out"):
         nebius_fetch.add_argument(name, required=True)
+    for step in ("clear", "usage"):
+        command = on_nebius.add_parser(step)
+        command.add_argument("--bucket", required=True)
+        command.add_argument("--region", required=True)
     on_nebius.required = True
     for command in on_nebius.choices.values():
         command.set_defaults(run=_assets_nebius)

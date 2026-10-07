@@ -187,6 +187,29 @@ def test_verify_directory_checks_sizes_and_digests(metadata, tmp_path):
         verify_directory(raw, download)
 
 
+def test_a_cache_snapshot_resolves_within_its_repository_only(metadata, tmp_path):
+    """The Hugging Face cache links a snapshot's files into its repository's blobs (measured on
+    Nebius, 2026-10-06: a check held to the snapshot refused DINOv2's config.json)."""
+    raw = build_weights(_spec(), "2026-09-17", metadata)
+    repository = tmp_path / "hub" / "models--owner--model"
+    blobs, snapshot = repository / "blobs", repository / "snapshots" / REVISION
+    blobs.mkdir(parents=True)
+    (snapshot / "transformer").mkdir(parents=True)
+    (blobs / "big").write_bytes(BIG)
+    (blobs / "small").write_bytes(SMALL)
+    (snapshot / "transformer" / "model.safetensors").symlink_to("../../../blobs/big")
+    (snapshot / "transformer" / "config.json").symlink_to("../../../blobs/small")
+    with pytest.raises(Refused, match="resolves outside"):
+        verify_directory(raw, snapshot)
+    assert verify_directory(raw, snapshot, within=repository) == len(BIG) + len(SMALL)
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.write_bytes(SMALL)
+    (snapshot / "transformer" / "config.json").unlink()
+    (snapshot / "transformer" / "config.json").symlink_to(elsewhere)
+    with pytest.raises(Refused, match="resolves outside"):
+        verify_directory(raw, snapshot, within=repository)
+
+
 def test_every_committed_manifest_reads_and_names_an_allowed_licence():
     # The two spec files name what is pinned; every other file is a manifest. Ten for the
     # appearance tracks and four for generated assets.

@@ -1131,6 +1131,10 @@ tifffile==2026.9.20 \
     --hash=sha256:30e145a7042ce7143ae50a50fe8b7221b0070aae22adab8f9e79a264be6b5cdc \
     --hash=sha256:9b913167b8f66a57f2e7c0454486c4c4607196d494797461226166bd0755c0e6
     # via scikit-image
+timm==1.0.30 \
+    --hash=sha256:1444a3af7e17fdba5440ac2bcf6e4b728da96dd62289ed9e1bcba31a545f5935 \
+    --hash=sha256:c8e27adf6801a2fdfb570dbbdd171f2f084756eefc673df8cfaab06bd14864f3
+    # via -r container/assets/requirements-route-b.in
 tokenizers==0.21.4 \
     --hash=sha256:1340ff877ceedfa937544b7d79f5b7becf33a4cfb58f89b3b49927004ef66f78 \
     --hash=sha256:2107ad649e2cda4488d41dfd031469e9da3fcbfd6183e74e4958fa729ffbf9c6 \

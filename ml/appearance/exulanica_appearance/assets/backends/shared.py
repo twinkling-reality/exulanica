@@ -49,24 +49,51 @@ def quadric_simplify(mesh: Mesh, target: int) -> tuple[Mesh, dict[str, object]]:
 
 
 class Shared:
-    """Loads the concept and cut-out models once per job."""
+    """The concept and cut-out models, each loaded on its first use and kept for the job.
+
+    Route B starts from route A's cut-outs and its lock pins a diffusers without Z-Image (Step1X-3D
+    needs that release; measured on Nebius, 2026-10-06), so a route B job loads neither model, and
+    its weights leave them out."""
 
     def __init__(self, weights: Path) -> None:
         import torch
-        from diffusers import ZImagePipeline
-        from transformers import AutoModelForImageSegmentation
 
         self._torch = torch
-        self._concept = ZImagePipeline.from_pretrained(
-            str(weights / "Tongyi-MAI__Z-Image-Turbo"), torch_dtype=torch.bfloat16
-        ).to("cuda")
-        self._cutout = (
-            AutoModelForImageSegmentation.from_pretrained(
-                str(weights / "ZhengPeng7__BiRefNet"), trust_remote_code=True
+        self._weights = weights
+        self._concept_model: Any = None
+        self._cutout_model: Any = None
+
+    def _concept(self, *args: Any, **kwargs: Any) -> Any:
+        if self._concept_model is None:
+            directory = self._weights / "Tongyi-MAI__Z-Image-Turbo"
+            if not directory.is_dir():
+                raise RuntimeError(
+                    "this job holds no concept model; start its items from a cut-out"
+                )
+            from diffusers import ZImagePipeline
+
+            self._concept_model = ZImagePipeline.from_pretrained(
+                str(directory), torch_dtype=self._torch.bfloat16
+            ).to("cuda")
+        return self._concept_model(*args, **kwargs)
+
+    def _cutout(self, *args: Any) -> Any:
+        if self._cutout_model is None:
+            directory = self._weights / "ZhengPeng7__BiRefNet"
+            if not directory.is_dir():
+                raise RuntimeError(
+                    "this job holds no cut-out model; start its items from a cut-out"
+                )
+            from transformers import AutoModelForImageSegmentation
+
+            self._cutout_model = (
+                AutoModelForImageSegmentation.from_pretrained(
+                    str(directory), trust_remote_code=True
+                )
+                .to("cuda")
+                .eval()
             )
-            .to("cuda")
-            .eval()
-        )
+        return self._cutout_model(*args)
 
     def concept(self, prompt: str, seed: int) -> bytes:
         torch = self._torch

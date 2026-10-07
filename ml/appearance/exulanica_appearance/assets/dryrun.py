@@ -67,7 +67,8 @@ STUB_PACK: Final = {
 
 #: What the stub is asked for: the trial's six pieces, the shopfront dressed per opening. The lantern
 #: and the sword take the thing kinds' boxes and grips (slot frame: x across, y deep, z up): the
-#: sword extends up from a grip 150 mm above its pommel, the lantern hangs below its ring.
+#: sword (kind version 2, a box wide and deep enough for a model's guard and pommel) extends up
+#: from a grip 150 mm above its pommel, the lantern hangs below its ring.
 STUB_REQUESTS: Final = (
     {"look_role": "prop.bench", "slot_mm": {"width": 1800, "height": 900, "depth": 700}},
     {
@@ -81,7 +82,7 @@ STUB_REQUESTS: Final = (
     },
     {
         "look_role": "prop.sword",
-        "slot_mm": {"width": 120, "height": 1000, "depth": 40},
+        "slot_mm": {"width": 240, "height": 1000, "depth": 80},
         "hold": {
             "axis": "+z",
             "grip": {"x_mm": 0, "y_mm": 0, "z_mm": 150},
@@ -240,9 +241,9 @@ def stub_mesh(look_role: str) -> Mesh:
     if look_role == "prop.sword":
         return _join(
             [
-                (*_box((-0.025, -0.02, 0), (0.025, 0.02, 0.03)), dark),
+                (*_box((-0.03, -0.04, 0), (0.03, 0.04, 0.03)), dark),
                 (*_box((-0.015, -0.015, 0.03), (0.015, 0.015, 0.2)), wood),
-                (*_box((-0.06, -0.015, 0.2), (0.06, 0.015, 0.25)), dark),
+                (*_box((-0.12, -0.02, 0.2), (0.12, 0.02, 0.25)), dark),
                 (*_box((-0.02, -0.005, 0.25), (0.02, 0.005, 1.0)), cream),
             ]
         )

@@ -1,0 +1,16 @@
+{
+ "jobs": [
+  {
+   "attempt": 1,
+   "code_sha256": "c5af45d1943e1dccf535d1f976ce7101331350505a413790241e84c869746ecb",
+   "container_finished_at": "2026-10-07T01:11:23.644Z",
+   "container_started_at": "2026-10-07T00:57:45.627Z",
+   "job_id": "aijob-e05m136tnnrvvzc6rg",
+   "job_sha256": "95836638b2a223c1f4091aae25eba47c211e90830e89c573fef09deca81bd0d0",
+   "outcome": "ran: 32 items of eight thing kinds in the cozy look, 32 pieces with receipts (27 within every check; 4 swords over the hold checks, 1 lantern over grip_section); several within-check pieces fill only part of their kind's box",
+   "route": "A"
+  }
+ ],
+ "profile": "exulanica.generated-assets-trial-jobs/v1",
+ "source": "the job's final status (nebius ai job get) and its staged digests, saved by the lane's watcher and stage commands"
+}

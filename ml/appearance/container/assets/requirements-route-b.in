@@ -18,6 +18,9 @@ einops>=0.8,<1
 packaging>=24
 beautifulsoup4>=4.12,<5
 scikit-image>=0.23,<1
+# Step1X-3D's autoencoder imports timm's Attention at module level (static import audit, 2026-10-06);
+# the same release route A locks, Apache-2.0.
+timm>=1.0,<2
 trimesh>=4.3,<5
 numpy>=1.26,<3
 pillow>=10,<12

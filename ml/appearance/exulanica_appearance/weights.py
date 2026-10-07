@@ -324,15 +324,20 @@ def _read_lineage(lineage: object, where: str) -> None:
         raise Refused(f"{where}: lineage is sorted by component and source, each once")
 
 
-def verify_directory(raw_manifest: bytes, directory: Path) -> int:
-    """Check every listed file under ``directory``; return the bytes checked, or refuse."""
+def verify_directory(raw_manifest: bytes, directory: Path, *, within: Path | None = None) -> int:
+    """Check every listed file under ``directory``; return the bytes checked, or refuse.
+
+    Each file must resolve inside ``within`` (``directory`` itself by default). A Hugging Face
+    cache snapshot passes its repository's cache folder: the snapshot's files are links into that
+    folder's ``blobs``, so they resolve outside the snapshot but never outside the repository."""
     manifest = read_weights(raw_manifest)
-    root = directory.resolve()
+    base = directory.resolve()
+    root = (within or directory).resolve()
     checked = 0
     for item in manifest["files"]:
-        path = (root / item["path"]).resolve()
+        path = (base / item["path"]).resolve()
         if root not in path.parents:
-            raise Refused(f"{item['path']} resolves outside {directory}")
+            raise Refused(f"{item['path']} resolves outside {within or directory}")
         if not path.is_file():
             raise Refused(f"{item['path']} is missing from {directory}")
         size = path.stat().st_size
