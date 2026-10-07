@@ -33,6 +33,7 @@ records the choice and the alternatives it rejected.
 - [Looks](#looks)
 - [The origin record](#the-origin-record)
 - [Translation manifests](#translation-manifests)
+- [Lines](#lines)
 - [The kinds and looks this repository ships](#the-kinds-and-looks-this-repository-ships)
 - [What is not built](#what-is-not-built)
 - [Implementation and evidence](#implementation-and-evidence)
@@ -51,7 +52,8 @@ records the choice and the alternatives it rejected.
 | look | One way a thing of a body plan is drawn, `exulanica.look/v1` | a character look, which is a recipe over one catalog body |
 | look kind | How a look is drawn, and which plans it fits | a style pack's look role, which one look kind draws |
 | origin record | Where a piece came from, `exulanica.origin/v1` | an assertion's provenance, which says who supports a claim |
-| translation manifest | What an import or a crossing kept and lost, `exulanica.translation-manifest/v1` | |
+| translation manifest | What an import or a crossing kept and lost, `exulanica.translation-manifest/v2` | |
+| line | One plain line of words, held to one rule wherever words are stored or said | |
 
 ## A thing kind
 
@@ -171,7 +173,7 @@ The world object catalog's uses map onto offers: `rest` to `rest_at` with its pl
 | `profile`, `look`, `version`, `label` | `exulanica.look/v1`; a lowercase key; a whole number; lowercase words of at most 80 characters, the card's |
 | `body_plan`, `look_kind` | the plan it fits and the look kind that draws it, which must fit that plan |
 | `container` | `{sha256, bytes, media_type}` of one binary glTF, where its look kind draws one, and none otherwise |
-| `rig` | where its look kind is rigged: every bone of the plan it maps to one of the rig's joints, each joint once, all the plan's required bones mapped, and the rig's clip for each motion it has |
+| `rig` | where its look kind is rigged: every bone of the plan it maps to one of the rig's joints, each joint once, all the plan's required bones mapped, and the rig's clip for each motion it has; it may also state `sockets`, the rig's joint for each of the plan's sockets (each joint once), and `ground_speed_mm_per_s`, how fast each of its moving clips (`walk`, `run`) carries the body at the look's own height, whole millimetres a second from 1 to 10,000 |
 | `height_mm` | its natural height, within the plan's bounds, for a body with a height; none otherwise |
 | `sampling` | `linear`, or `nearest` for pixel art |
 | `light` | where its look kind is a light: an sRGB colour, an intensity and a radius |
@@ -189,6 +191,15 @@ The world object catalog's uses map onto offers: `rest` to `rest_at` with its pl
 | `static` | rigid | One `exulanica.static-glb/v1` container inside the thing's box: a reviewed object, a person's prepared asset or a generated piece |
 | `look_role` | rigid | A look role the world's style pack dresses, fitted to the thing's box |
 | `none` | all | Nothing is drawn; the thing is still there |
+
+Where a held thing goes is a socket of the body plan, which names the bone it is on
+(`hand.right` on `rightHand`). In a `rigid_on_bones` container a socket's place is a node named
+`socket:<socket key>`, a child of its bone's node; in a `skinned` look it is the rig's joint
+`rig.sockets` names. The node's origin is the grip and the thing extends along the node's slot
+`+z`, which is the glTF node's `+Y`, so a held thing follows the node as a clip moves it; a thing
+whose holdable axis is `-z` hangs straight down from the origin whatever the joint does, which is
+presentation alone. Where a look states no socket node, a thing is held at its bone node's origin
+and turned with the body.
 
 **Requirement:** no look reference enters a society's input, state or decision context. Looks are
 records apart from what a thing is, a kind is given to a society only through its semantics, and
@@ -260,7 +271,15 @@ assertion ([world memory model, section 3.1](world-memory-model.md)).
 Bringing something into a world from elsewhere is a translation, and none is silent. An import or a
 crossing writes a manifest ([`manifests.py`](../exulanica/things/manifests.py)): the translator
 (key, version, digest), the source (its format, the source's own type for the thing, the digest of
-what it read), the thing kind and look it became, and every field of the source exactly once:
+what it read), what it made, and every field of the source exactly once, each with `words`: one
+[line](#lines) saying what the field is and what it became ("A torch, which arrives as a lantern"),
+taken from the translator's own data (a crossing's mapping file), so whoever shows a manifest needs
+no words of its own for any program. A field that is not exact also states its `reason`, the plain
+why. What it made is a thing kind by digest, with the look it is drawn in or none (a crossing, a
+kind's import); or, for an import whose product is a look alone, no kind and the look by key and
+version only, the look naming the manifest by digest in its origin record's lineage, so neither
+digest depends on the other. A manifest of the first profile, `exulanica.translation-manifest/v1`,
+states no words and is read as it was written:
 
 | Disposition | Meaning |
 | --- | --- |
@@ -273,6 +292,15 @@ what it read), the thing kind and look it became, and every field of the source 
 exactly once, at its own path or under one of its ancestors, and no path names a field the source
 lacks. Foreign mechanics are never emulated: a field only a module this world's rules hold could
 act on is dropped or opaque.
+
+## Lines
+
+A line is one plain line of words, held to one rule wherever words are stored or said
+([`lines.py`](../exulanica/things/lines.py)): 1 to 200 code points in Unicode normal form C, with
+no control, format, surrogate, private-use, line-separator or paragraph-separator character
+(categories Cc, Cf, Cs, Co, Zl and Zp) and no white space at either end. Text not already in normal
+form C is refused rather than rewritten, so what is stored is what was written; a caller holding
+text from outside normalises it first. A translation manifest's words are lines.
 
 ## The kinds and looks this repository ships
 
@@ -328,7 +356,7 @@ These are material limits of the boundary above, not partial behaviour:
 | Thing kinds | [`kinds.py`](../exulanica/things/kinds.py) | `tests/test_thing_kinds.py` (each refusal by name, against a positive control) |
 | Looks | [`looks.py`](../exulanica/things/looks.py), [`authored.py`](../exulanica/things/authored.py), [`pieces.py`](../exulanica/things/pieces.py) | `tests/test_thing_kinds.py`, `tests/test_thing_looks_and_origins.py` (each authored container written again and admitted, a blocky figure's joints, a static look inside its box) |
 | Origin record and vocabularies | [`origin.py`](../exulanica/things/origin.py), [`vocabularies.py`](../exulanica/things/vocabularies.py) | `tests/test_thing_looks_and_origins.py` |
-| Translation manifests | [`manifests.py`](../exulanica/things/manifests.py) | `tests/test_thing_looks_and_origins.py` |
+| Translation manifests and lines | [`manifests.py`](../exulanica/things/manifests.py), [`lines.py`](../exulanica/things/lines.py) | `tests/test_thing_looks_and_origins.py` (words held to the line rule, a look's import, each refusal against a positive control) |
 | Shipped kinds and looks | [`shipped_things.py`](../scripts/things/shipped_things.py), the lock `kinds.lock.json` | `tests/test_thing_kinds.py` (`--check`), `tests/test_placed_things.py` (every shipped version at its locked digest; a changed, unlocked or missing file refused) |
 | Placed things | [`placed_things.py`](../exulanica/world/placed_things.py), the object repository, [`world_things.py`](../exulanica/api/routes/world_things.py), migration 0152 | `tests/test_placed_things.py`, `tests/test_placed_things_postgres.py` (as the deployed writer: place, move, remove, undo and place again; the kind fixed by the table; another workspace sees nothing; a branch keeps them; the routes' refusals by name), `tests/test_edit_kind_undo_postgres.py` |
 | Purity | The import contract "Things are pure data" in `pyproject.toml`: no database, store, evidence, pipeline, world, traffic, movement step, model or numeric stack | `lint-imports` |

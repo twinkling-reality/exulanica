@@ -59,6 +59,12 @@ _TOP: Final = frozenset(
 )
 #: The motions a rig may name clips for: the body plans' motions.
 _MOTIONS: Final = ("idle", "walk", "run", "reach", "hold", "talk", "sit")
+#: The motions that carry a body over the ground: a rig may state how fast each of its clips does,
+#: so whoever draws it can match the clip to the pace it is drawn moving at.
+_MOVING: Final = ("walk", "run")
+#: The fields a rig always states, and those it may.
+_RIG: Final = frozenset({"bones", "clips"})
+_RIG_MAY: Final = frozenset({"sockets", "ground_speed_mm_per_s"})
 
 
 class LookRefused(ValueError):
@@ -103,8 +109,16 @@ def _whole(where: str, value: object, minimum: int, maximum: int) -> int:
     return value
 
 
-def _rig(where: str, value: object, plan_bones: frozenset[str], required: tuple[str, ...]) -> None:
-    rig = _closed(where, value, frozenset({"bones", "clips"}))
+def _rig(
+    where: str,
+    value: object,
+    plan_bones: frozenset[str],
+    required: tuple[str, ...],
+    plan_sockets: frozenset[str],
+) -> None:
+    if not isinstance(value, Mapping) or not _RIG <= set(value) <= _RIG | _RIG_MAY:
+        raise _refuse(where, f"states {sorted(_RIG)} and may state {sorted(_RIG_MAY)}")
+    rig = value
     bones = rig["bones"]
     if not isinstance(bones, Mapping) or not bones:
         raise _refuse(f"{where}.bones", "maps body plan bones to the rig's joints")
@@ -128,6 +142,31 @@ def _rig(where: str, value: object, plan_bones: frozenset[str], required: tuple[
             raise _refuse(f"{where}.clips.{motion}", f"is one of {list(_MOTIONS)}")
         if type(clip) is not str or _CLIP.fullmatch(clip) is None:
             raise _refuse(f"{where}.clips.{motion}", "names one of the rig's clips")
+    if "sockets" in rig:
+        # Where a held thing goes in this rig: each of the plan's sockets, by the rig's joint.
+        sockets = rig["sockets"]
+        if not isinstance(sockets, Mapping) or not sockets:
+            raise _refuse(f"{where}.sockets", "maps the plan's sockets to the rig's joints")
+        for socket, joint in sockets.items():
+            if socket not in plan_sockets:
+                raise _refuse(f"{where}.sockets.{socket}", "is not one of the plan's sockets")
+            if type(joint) is not str or _JOINT.fullmatch(joint) is None:
+                raise _refuse(f"{where}.sockets.{socket}", "names one of the rig's joints")
+        if len(set(sockets.values())) != len(sockets):
+            raise _refuse(f"{where}.sockets", "maps each joint once")
+    if "ground_speed_mm_per_s" in rig:
+        # How fast each moving clip carries the body, in whole millimetres a second, at the
+        # look's own height.
+        speeds = rig["ground_speed_mm_per_s"]
+        if not isinstance(speeds, Mapping) or not speeds:
+            raise _refuse(f"{where}.ground_speed_mm_per_s", "maps moving motions to speeds")
+        for motion, speed in speeds.items():
+            if motion not in _MOVING or motion not in clips:
+                raise _refuse(
+                    f"{where}.ground_speed_mm_per_s.{motion}",
+                    f"is one of {list(_MOVING)} with a clip of its own",
+                )
+            _whole(f"{where}.ground_speed_mm_per_s.{motion}", speed, 1, 10_000)
 
 
 def read_look(raw: object, *, catalogs: ThingCatalogs | None = None) -> Look:
@@ -165,7 +204,13 @@ def read_look(raw: object, *, catalogs: ThingCatalogs | None = None) -> Look:
         raise _refuse("container", f"a {look_kind.key} look draws no file")
     rig = document["rig"]
     if look_kind.rig:
-        _rig("rig", rig, plan.bone_names, plan.required_bones)
+        _rig(
+            "rig",
+            rig,
+            plan.bone_names,
+            plan.required_bones,
+            frozenset(socket.key for socket in plan.sockets),
+        )
     elif rig is not None:
         raise _refuse("rig", f"a {look_kind.key} look names no rig")
     height = document["height_mm"]

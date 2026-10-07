@@ -1,10 +1,12 @@
 """What an import or a crossing kept and lost: the translation manifest every translation writes.
 
 Bringing something into a world from elsewhere is a translation, and nothing about it is silent.
-Every importer and every crossing writes a manifest, profile ``exulanica.translation-manifest/v1``:
+Every importer and every crossing writes a manifest, profile ``exulanica.translation-manifest/v2``:
 which translator (key, version, digest), from what source (its format, the source's own type for
 the thing, the digest of what it read), into which thing kind and look, and for every field of the
-source exactly one disposition:
+source exactly one disposition, with ``words``: one plain line (:mod:`exulanica.things.lines`)
+saying what the field is and what it became, written by the translator's own data (a crossing's
+mapping file), so whoever shows the manifest needs no words of its own for any program:
 
 *   ``exact``: carried across unchanged, to the field it names;
 *   ``approximated``: carried across with a stated reason, to the field it names (an arm of one
@@ -13,6 +15,14 @@ source exactly one disposition:
     crosses; health: this world has no health);
 *   ``opaque``: kept and never read here: by an importer verbatim in the kind's ``ext``; by a
     crossing, by the program it came from, under the thing's id, never stored here.
+
+A field's ``reason`` is the plain why of every field that is not exact. A manifest of the first
+profile, ``exulanica.translation-manifest/v1``, states no words and is read as it was written.
+
+What a translation made is its ``target``: a thing kind by digest, with the look it is drawn in or
+none (a crossing, a kind's import); or, for an import whose product is a look alone, no kind and the
+look by key and version only. That look names the manifest by digest in its origin record's
+lineage, so the two are bound one way and neither digest depends on the other.
 
 :func:`read_manifest` holds a manifest to its shape, and :func:`check_accounting` to its source:
 every field the source states appears exactly once, and nothing else does. Foreign mechanics are
@@ -30,16 +40,21 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Any, Final
 
+from exulanica.things.lines import LineRefused, check_line
+
 __all__ = [
     "DISPOSITIONS",
     "MANIFEST_PROFILE",
+    "MANIFEST_PROFILES",
     "ManifestRefused",
     "TranslationManifest",
     "check_accounting",
     "read_manifest",
 ]
 
-MANIFEST_PROFILE: Final = "exulanica.translation-manifest/v1"
+#: The profile a translation writes; the first, which states no words, is still read.
+MANIFEST_PROFILE: Final = "exulanica.translation-manifest/v2"
+MANIFEST_PROFILES: Final = ("exulanica.translation-manifest/v1", MANIFEST_PROFILE)
 DISPOSITIONS: Final = ("exact", "approximated", "dropped", "opaque")
 #: The most fields one manifest accounts for: a game entity or an asset's declared fields, not a
 #: mesh's every vertex.
@@ -50,6 +65,8 @@ _HEX64: Final = re.compile(r"[0-9a-f]{64}")
 _POINTER: Final = re.compile(r"(/[^/\x00-\x1f]{1,64}){1,8}")
 _TOP: Final = frozenset({"profile", "translator", "source", "target", "fields"})
 _FIELD: Final = frozenset({"path", "disposition", "to", "reason"})
+#: A field of the second profile also says, in words, what it is and what it became.
+_FIELD_WITH_WORDS: Final = _FIELD | {"words"}
 
 
 class ManifestRefused(ValueError):
@@ -100,8 +117,9 @@ class TranslationManifest:
 def read_manifest(raw: object) -> TranslationManifest:
     """``raw`` as a translation manifest, or :class:`ManifestRefused`."""
     document = _closed("manifest", raw, _TOP)
-    if document["profile"] != MANIFEST_PROFILE:
-        raise _fail("profile", f"is {MANIFEST_PROFILE}")
+    if document["profile"] not in MANIFEST_PROFILES:
+        raise _fail("profile", f"is one of {list(MANIFEST_PROFILES)}")
+    worded = document["profile"] == MANIFEST_PROFILE
     translator = _closed(
         "translator", document["translator"], frozenset({"key", "version", "sha256"})
     )
@@ -116,18 +134,31 @@ def read_manifest(raw: object) -> TranslationManifest:
             raise _fail(f"source.{key}", "is a lowercase key")
     _hex("source.sha256", source["sha256"])
     target = _closed("target", document["target"], frozenset({"kind", "look"}))
-    kind = _closed("target.kind", target["kind"], frozenset({"kind", "version", "sha256"}))
-    _hex("target.kind.sha256", kind["sha256"])
-    if target["look"] is not None:
-        look = _closed("target.look", target["look"], frozenset({"look", "version", "sha256"}))
-        _hex("target.look.sha256", look["sha256"])
+    if worded and target["kind"] is None:
+        # A look's import: the look by key and version, which names this manifest by digest.
+        look = _closed("target.look", target["look"], frozenset({"look", "version"}))
+        if type(look["look"]) is not str or _KEY.fullmatch(look["look"]) is None:
+            raise _fail("target.look.look", "is a look's key")
+        if type(look["version"]) is not int or not 1 <= look["version"] <= 10_000:
+            raise _fail("target.look.version", "is a whole number from 1")
+    else:
+        kind = _closed("target.kind", target["kind"], frozenset({"kind", "version", "sha256"}))
+        _hex("target.kind.sha256", kind["sha256"])
+        if target["look"] is not None:
+            look = _closed("target.look", target["look"], frozenset({"look", "version", "sha256"}))
+            _hex("target.look.sha256", look["sha256"])
     fields = document["fields"]
     if not isinstance(fields, list) or not 1 <= len(fields) <= FIELDS_MAXIMUM:
         raise _fail("fields", f"accounts for 1 to {FIELDS_MAXIMUM} fields")
     dispositions: dict[str, str] = {}
     for index, raw_field in enumerate(fields):
         at = f"fields[{index}]"
-        field = _closed(at, raw_field, _FIELD)
+        field = _closed(at, raw_field, _FIELD_WITH_WORDS if worded else _FIELD)
+        if worded:
+            try:
+                check_line(field["words"])
+            except LineRefused as exc:
+                raise _fail(f"{at}.words", str(exc)) from exc
         path = field["path"]
         if type(path) is not str or _POINTER.fullmatch(path) is None:
             raise _fail(f"{at}.path", "is a JSON pointer into the source")

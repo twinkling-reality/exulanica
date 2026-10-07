@@ -8,7 +8,10 @@ What is shown here, with no database:
     and a static look lies inside its kind's box;
 *   the origin record refuses by name what its rules forbid, and each origin vocabulary that
     already exists reads into it;
-*   a translation manifest accounts for every field of its source exactly once.
+*   a translation manifest accounts for every field of its source exactly once, and one of the
+    second profile says in words, held to the line rule, what each field became; a look's import
+    names its look by key and version, the look naming the manifest by digest;
+*   a rigged look may state where each of its plan's sockets is and how fast its moving clips go.
 """
 
 from __future__ import annotations
@@ -26,6 +29,8 @@ from exulanica.grammar.documents import read_json
 from exulanica.things.authored import AUTHORED_LOOKS, container_of, nodes_of
 from exulanica.things.catalogs import thing_catalogs
 from exulanica.things.kinds import shipped_thing_kinds
+from exulanica.things.lines import LineRefused, check_line
+from exulanica.things.looks import LookRefused, read_look
 from exulanica.things.manifests import ManifestRefused, check_accounting, read_manifest
 from exulanica.things.origin import ADAPTER_VERSION as ORIGIN_ADAPTER_VERSION
 from exulanica.things.origin import OriginRefused, read_origin
@@ -374,3 +379,123 @@ def test_a_manifest_accounts_for_every_source_field_exactly_once():
 def test_a_manifest_field_is_refused_by_name_where_its_shape_is_wrong(field):
     with pytest.raises(ManifestRefused):
         read_manifest(_manifest([field]))
+
+
+def test_a_line_is_one_plain_line_within_its_bound():
+    assert check_line("Take it, traveller. It is yours.") == "Take it, traveller. It is yours."
+    assert check_line("x" * 200) == "x" * 200
+    for refused in (
+        "",
+        "x" * 201,
+        "two\nlines",
+        " padded",
+        "padded ",
+        "Cafe\u0301",  # not in normal form C
+        "hidden\u200btext",  # a format character
+        "private\ue000use",
+        "tab\there",
+        42,
+    ):
+        with pytest.raises(LineRefused):
+            check_line(refused)
+
+
+def _worded(fields: list[dict[str, Any]], words: dict[str, str]) -> dict[str, Any]:
+    return {
+        **_manifest([{**field, "words": words[field["path"]]} for field in fields]),
+        "profile": "exulanica.translation-manifest/v2",
+    }
+
+
+_WORDS = {
+    "/name": "A player's name, which stays at home",
+    "/hp": "Health, which this world does not keep",
+    "/skin": "A skin, which arrives as rigid parts on a figure",
+    "/inventory/0": "A sword, which arrives held in the right hand",
+}
+
+
+def test_a_second_profile_manifest_says_in_words_what_each_field_became():
+    manifest = read_manifest(_worded(_ACCOUNTED, _WORDS))
+    check_accounting(manifest, _SOURCE)  # the positive control
+    assert manifest.document["fields"][2]["words"] == _WORDS["/skin"]
+    # A manifest of the first profile states no words and is read as it was written.
+    read_manifest(_manifest(_ACCOUNTED))
+    for broken in (
+        {**_WORDS, "/hp": "two\nlines"},
+        {**_WORDS, "/hp": "x" * 201},
+        {**_WORDS, "/hp": "Cafe\u0301"},
+    ):
+        with pytest.raises(ManifestRefused):
+            read_manifest(_worded(_ACCOUNTED, broken))
+    unworded = _worded(_ACCOUNTED, _WORDS)
+    del unworded["fields"][0]["words"]
+    with pytest.raises(ManifestRefused):
+        read_manifest(unworded)
+
+
+def test_a_look_s_import_names_its_look_by_key_and_version_alone():
+    imported = {
+        **_worded(_ACCOUNTED, _WORDS),
+        "target": {"kind": None, "look": {"look": "kaykit-knight", "version": 1}},
+    }
+    read_manifest(imported)  # the positive control
+    for target in (
+        {"kind": None, "look": None},
+        {"kind": None, "look": {"look": "kaykit-knight", "version": 1, "sha256": "a" * 64}},
+        {"kind": None, "look": {"look": "Kaykit", "version": 1}},
+    ):
+        with pytest.raises(ManifestRefused):
+            read_manifest({**imported, "target": target})
+    # The first profile always names its kind.
+    with pytest.raises(ManifestRefused):
+        read_manifest({**_manifest(_ACCOUNTED), "target": imported["target"]})
+
+
+def _skinned(**rig: Any) -> dict[str, Any]:
+    plan = thing_catalogs().plan("humanoid/v1")
+    assert plan is not None
+    origin = read_json(LOOKS / "blocky-knight.v1.json")["origin"]
+    return {
+        "profile": "exulanica.look/v1",
+        "look": "test-skinned",
+        "version": 1,
+        "label": "test figure",
+        "body_plan": "humanoid/v1",
+        "look_kind": "skinned",
+        "container": {"sha256": "a" * 64, "bytes": 1024, "media_type": "model/gltf-binary"},
+        "rig": {
+            "bones": {bone: f"joint_{bone}" for bone in plan.required_bones},
+            "clips": {"idle": "Idle_A", "walk": "Walking_A", "run": "Running_A"},
+            **rig,
+        },
+        "height_mm": 1800,
+        "sampling": "linear",
+        "light": None,
+        "role": None,
+        "origin": origin,
+    }
+
+
+def test_a_rigged_look_states_its_sockets_and_the_ground_speed_of_its_moving_clips():
+    sockets = {"hand.right": "handslot.r", "hand.left": "handslot.l"}
+    speeds = {"walk": 500, "run": 2380}
+    read_look(_skinned())  # neither is required
+    read_look(_skinned(sockets=sockets, ground_speed_mm_per_s=speeds))  # the positive control
+    for rig in (
+        {"sockets": {"hand.middle": "handslot.m"}},  # not one of the plan's sockets
+        {"sockets": {"hand.right": "handslot", "hand.left": "handslot"}},  # one joint twice
+        {"sockets": {}},
+        {"ground_speed_mm_per_s": {"idle": 10}},  # idle carries nobody anywhere
+        {"ground_speed_mm_per_s": {"walk": 0}},
+        {"ground_speed_mm_per_s": {"walk": 10_001}},
+        {"ground_speed_mm_per_s": {"walk": 500.5}},
+        {"tails": {}},  # a key a rig does not state
+    ):
+        with pytest.raises(LookRefused):
+            read_look(_skinned(**rig))
+    # A speed is stated only for a moving clip the rig has.
+    walker = _skinned(ground_speed_mm_per_s={"run": 2380})
+    del walker["rig"]["clips"]["run"]
+    with pytest.raises(LookRefused):
+        read_look(walker)
