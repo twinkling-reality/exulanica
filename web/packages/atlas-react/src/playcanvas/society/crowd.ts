@@ -203,6 +203,8 @@ export interface CrowdSeatingMiss {
  */
 const NEAR_LIMIT = NEAR_INHABITANT_BUDGET;
 const REFRESH_METRES = 4;
+/** How far over the top of a person's box a mark over them hangs. */
+const MARK_CLEARANCE_METRES = 0.18;
 const DEFAULT_INTERVAL_MS = 1_850;
 const MILLISECONDS_PER_SECOND = 1000;
 /** Two recorded points this close are one point: the state's unit is the millimetre. */
@@ -635,6 +637,23 @@ export class SocietyCrowd {
 
   positionOf(id: string): readonly [number, number] | null {
     return this.walkers.get(id)?.position ?? null;
+  }
+
+  /**
+   * Where a mark over an inhabitant hangs, in world space: just over the top of the box they are
+   * drawn and picked by, written into `out`. False when they are not drawn outdoors now.
+   */
+  anchorOf(id: string, out: pc.Vec3): boolean {
+    const walker = this.walkers.get(id);
+    if (walker === undefined || walker.indoors) return false;
+    const renderable = this.near.get(id);
+    if (renderable === undefined && !this.farIds.includes(id)) return false;
+    if (renderable && (!renderable.root.enabled || renderable.root.tags.has('native-character-hidden'))) return false;
+    const [x, y, z] = walker.drawn;
+    const height = renderable?.standingHeight ?? this.far.appearanceOf(id).heightMetres;
+    out.set(x, y + height + MARK_CLEARANCE_METRES, z);
+    this.root.getWorldTransform().transformPoint(out, out);
+    return true;
   }
 
   /** What an inhabitant's far figure draws: the far form of that person's own look. */

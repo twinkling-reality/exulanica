@@ -92,6 +92,10 @@ import type { SocietyPlaces } from '../society-api.js';
 import { engineCreatedOver, societyEngine } from '../society-engines.js';
 import type { SavedWorldFlight, SavedWorldFlightStatus } from './saved-world-flight.js';
 import { mountThings, type MountedThings, type ThingsDependencies } from './things.js';
+import { AttachedMarks, type MarkedSubject } from '@exulanica/atlas-react/things';
+import { markLabel, markOf } from './thing-marks.js';
+import { DoorBridgesClient, type DoorBridge } from '../door-bridges-api.js';
+import '../ui/thing-marks.css';
 
 /** Where the development preview's real-engine society recording is served. */
 const SOCIETY_RECORDING_URL = '/preview-api/society/recording';
@@ -485,6 +489,12 @@ export function mountEnvironmentSelection(
   /** Whether the society's crowd draws its things through `things`, and whether that is being set up. */
   let figuresSet = false;
   let thingsMounting = false;
+  /** Who runs each being of the open saved world's society, marked over it; null until attached. */
+  let marks: AttachedMarks | null = null;
+  /** The door's bridges by key, read when a visitor's bridge is first seen; null before any read. */
+  let bridges: ReadonlyMap<string, DoorBridge> | null = null;
+  /** When the bridges were last asked for, so a bridge the door does not list is asked at most once a minute. */
+  let bridgesAskedAt = Number.NEGATIVE_INFINITY;
   let authoredWorldFailure: string | null = null;
   let chosen: NYCLocalFeature | null = null;
   let admittedFeaturesByProvider = new Map<string, NYCLocalFeature>();
@@ -1787,6 +1797,7 @@ export function mountEnvironmentSelection(
       runtime?.clearSociety();
       things?.setSociety(null);
       renderedSnapshot = null;
+      marks?.set(new Map());
       if (selectedInhabitant) { selectedInhabitant = null; clearInspector(); selected.textContent = 'Selected inhabitant is unavailable.'; }
       delete canvas.dataset.societyPopulation;
       delete canvas.dataset.societyRendered;
@@ -1833,7 +1844,52 @@ export function mountEnvironmentSelection(
       credentials: deps.credentials, world,
       ...(deps.societyModelsClient ? { client: deps.societyModelsClient } : {}),
       // A read that changes who decides for the inspected person says so in the open inspector.
-      onRead: () => { if (selectedInhabitant !== null && inspectedInhabitant === selectedInhabitant) inspectInhabitant(selectedInhabitant, false); },
+      onRead: () => {
+        if (selectedInhabitant !== null && inspectedInhabitant === selectedInhabitant) inspectInhabitant(selectedInhabitant, false);
+        refreshMarks();
+      },
+    });
+  }
+
+  /**
+   * Mark who runs each person of the drawn state, decided by the one function the card shares
+   * (`markOf`): the model asked for them by the last models read, or the bridge a visitor crossed
+   * through. A visitor whose bridge is not yet known asks the door, at most once a minute.
+   */
+  function refreshMarks(state: OwnedSocietyState | null = renderedSnapshot?.state ?? null): void {
+    if (marks === null) return;
+    const people = state?.inhabitants ?? [];
+    const running = societyModels?.runningModels() ?? new Map();
+    const kinds = things?.layer.maker.library.list.kinds ?? [];
+    const subjects = new Map<string, MarkedSubject>();
+    let unknownBridge = false;
+    for (const person of people) {
+      const crossing = person.came_by === 'crossed' ? person.crossing ?? null : null;
+      const bridge = crossing === null ? null : bridges?.get(crossing.bridge) ?? null;
+      if (crossing !== null && bridge === null) unknownBridge = true;
+      const mark = markOf({ running: running.get(person.id) ?? null, crossing, bridge, declared: null });
+      if (mark === null) continue;
+      const kind = person.kind;
+      const label = kind === undefined ? null
+        : kinds.find((one) => one.kind === kind.kind && one.version === kind.version && one.sha256 === kind.sha256)?.label ?? null;
+      subjects.set(person.id, { mark, label, spoken: markLabel(mark) });
+    }
+    marks.set(subjects);
+    if (deps.env.canvas) deps.env.canvas.dataset['thingMarks'] = String(subjects.size);
+    if (unknownBridge) readBridges();
+  }
+
+  function readBridges(): void {
+    const now = performance.now();
+    if (now - bridgesAskedAt < 60_000) return;
+    bridgesAskedAt = now;
+    void new DoorBridgesClient(deps.credentials).read().then((read) => {
+      if ((phase as string) === 'disposed') return;
+      bridges = read;
+      refreshMarks();
+    }, () => {
+      // A door that answers nothing names no bridge: such visitors stay marked as from outside.
+      bridges ??= new Map();
     });
   }
 
@@ -1916,6 +1972,8 @@ export function mountEnvironmentSelection(
     }
     things?.setSociety(next.state.things === undefined ? null : next.state);
     reflectSeatingMisses(runtime);
+    // The state just drawn: `renderedSnapshot` names it only once this returns.
+    refreshMarks(next.state);
     moved = [...named.values()];
   }
 
@@ -2053,6 +2111,17 @@ export function mountEnvironmentSelection(
     };
     atlas.controls.onInteract = installedInteract;
     phase = 'attached';
+    // The marks write into the element the world shows through, beside the anchor overlay's nodes.
+    const stage = atlas.overlay?.root.parentElement ?? null;
+    if (stage !== null) {
+      marks = new AttachedMarks({
+        app: atlas.app, camera: atlas.camera, parent: stage,
+        anchors: () => atlas.authoredSociety ?? null,
+        selected: () => selectedInhabitant,
+        onPick: (id) => { inspectInhabitant(id); },
+        invalidate: () => atlas.invalidate(),
+      });
+    }
     liveSociety = createLiveSociety({
       preview: false, credentials: deps.credentials, worldId: entry.worldId,
       versionId: entry.authoredVersionId, placeId: null, regionId,
@@ -2365,6 +2434,10 @@ export function mountEnvironmentSelection(
       things?.destroy();
       things = null;
       figuresSet = false;
+      marks?.destroy();
+      marks = null;
+      bridges = null;
+      if (deps.env.canvas) delete deps.env.canvas.dataset['thingMarks'];
       if (deps.env.canvas) for (const key of ['thingsDrawn', 'thingsMissed', 'thingsFailure']) delete deps.env.canvas.dataset[key];
       savedWorldActions.clear();
       recording = null;

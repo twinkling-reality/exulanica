@@ -126,6 +126,14 @@ export class AuthoredRegionSociety {
     this.crowd.setFigures(figures);
   }
 
+  /**
+   * Where a mark over an inhabitant hangs, in world space (`SocietyCrowd.anchorOf`), or false when
+   * they are not drawn outdoors now. Those in flight are drawn by the flock and hang no mark yet.
+   */
+  anchorOf(id: string, out: pc.Vec3): boolean {
+    return this.crowd.anchorOf(id, out);
+  }
+
   /** Everyone drawn as everyone else is although their state says what they do, and why. */
   get seatingMisses(): readonly CrowdSeatingMiss[] {
     return this.crowd.seatingMisses;

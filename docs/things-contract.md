@@ -608,6 +608,18 @@ turned by its yaw, or is held in the socket the state names, its grip at the soc
 object the state does not list is not drawn. A rigged look whose rig names a hold clip stands in it
 while it holds something.
 
+Who runs each person of a saved world's society is marked over them, by one decision the thing card
+makes too ([`composition/thing-marks.ts`](../web/packages/app/src/composition/thing-marks.ts)): a
+person whose model is asked (chosen for them, and refused neither by the host nor for them) wears an
+`AI` pill with the first word of the model's served name; a visitor wears its bridge's mark as the
+door lists it here, `from` and the bridge's label for a game a person plays, an outlined `AI` pill
+for an outside agent, and `from outside` for a bridge the door does not list; everyone else, and every
+object, wears none. The pills are part of the page, not the picture: a fixed pool of nodes placed each
+frame over the box a person is drawn and picked by, read by a screen reader in the card's words and
+picked by a click as by aiming. The model's short name and the person's kind show over the selected
+person, a speaking one and the three nearest marked people within 12 m drawn on screen; no pill is
+drawn beyond 60 m.
+
 Aiming and pressing E picks the nearest drawn thing or person along the ray. A picked thing raises
 one event on the shell, `exulanica:thing-pick`, whose detail names it by the version's id, the
 society's thing id and its person id where each exists, and how it was picked; the same event with
@@ -625,8 +637,11 @@ These are material limits of the boundary above, not partial behaviour:
   placed thing names a shipped kind and a thing wears a shipped look. The world's owner has no
   route to choose a look, and a look is recorded only where a door records its crossing's.
 - The browser draws no hand-over between two people as it happens (a thing is drawn in the hand
-  the state names at each minute), no line and no mark of who decides, and no look chosen for a
-  thing: things wear their kind's first look.
+  the state names at each minute), no line a person says (the bubble that draws one, opening with
+  its speaker's pill, is built; nothing carries lines to it), and no look chosen for a thing: things
+  wear their kind's first look. An outside agent's pill says `agent` rather than the name it gives
+  itself, which no read serves the page yet, and a person in flight wears no pill: the flock draws
+  them, not the crowd.
 - No crossing writes a translation manifest yet; the look importer writes one for each look it
   makes.
 - No route drafts a creature or keeps its documents. The drafter is measured and bound to its own
@@ -656,4 +671,4 @@ These are material limits of the boundary above, not partial behaviour:
 | The skinned container | [`skinned.py`](../exulanica_pieces/skinned.py) | `tests/test_skinned_glb.py` (containers built in the test from struct packing: a positive control, then each rule broken alone and refused by name) |
 | No creature in code | | `tests/test_no_creature_code.py` (with a planted name the scan finds) |
 | Purity | The import contract "Things are pure data" in `pyproject.toml`: no database, store, evidence, pipeline, world, traffic, movement step, model or numeric stack | `lint-imports` |
-| Drawing | [`things/`](../web/packages/atlas-react/src/playcanvas/things), [`composition/things.ts`](../web/packages/app/src/composition/things.ts), [`things-library.ts`](../web/packages/app/src/things-library.ts) | `web/packages/atlas-react/test/things-*.test.ts` (the shipped documents read, digests refused, skeletons read by shape with a ten-legged plan, planted feet, placement, misses, picking, a society's things through the crowd, a held thing in its holder's hand), `web/packages/atlas-react/test/society-crowd-things.test.ts`, `web/packages/app/test/things-composition.test.ts`, `web/packages/app/test/environment-selection-things.test.ts` |
+| Drawing | [`things/`](../web/packages/atlas-react/src/playcanvas/things), [`composition/things.ts`](../web/packages/app/src/composition/things.ts), [`things-library.ts`](../web/packages/app/src/things-library.ts) | `web/packages/atlas-react/test/things-*.test.ts` (the shipped documents read, digests refused, skeletons read by shape with a ten-legged plan, planted feet, placement, misses, picking, a society's things through the crowd, a held thing in its holder's hand, the marks and lines overlay), `web/packages/atlas-react/test/society-crowd-things.test.ts`, `web/packages/atlas-react/test/society-crowd-anchors.test.ts`, `web/packages/app/test/things-composition.test.ts`, `web/packages/app/test/environment-selection-things.test.ts`, `web/packages/app/test/environment-selection-marks.test.ts`, `web/packages/app/test/thing-marks.test.ts`, `web/packages/app/test/door-bridges-api.test.ts` |

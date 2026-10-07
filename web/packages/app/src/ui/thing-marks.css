@@ -1,0 +1,99 @@
+/*
+ * Who runs what you see: a small dark pill over a being, white outlined so it reads over any world,
+ * and the same pill at the start of every line it says. Its colours are the world-mark tokens,
+ * fixed in every scheme: it sits over the world, whose colours no theme sets. The marks follow the
+ * anchor overlay in the stage, so they paint over it with no layer of their own.
+ */
+
+.thing-mark {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.16rem;
+  white-space: nowrap;
+}
+
+.thing-mark-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  min-height: 1.15rem;
+  padding: 0.1rem 0.4rem;
+  font: 600 0.62rem / 1 var(--font-mono);
+  letter-spacing: 0.06em;
+  color: var(--color-world-mark-ink);
+  background: var(--color-world-mark);
+  border: 1px solid var(--color-world-mark-edge);
+  border-radius: var(--radius-full);
+  box-shadow: var(--elevation-world-mark);
+  cursor: pointer;
+}
+
+.thing-mark-pill:focus-visible {
+  outline: 2px solid var(--color-world-mark-ink);
+  outline-offset: 2px;
+}
+
+/* Someone from outside the world: a person playing a game, or an AI agent of its own. */
+.thing-mark-from,
+.thing-mark-outside {
+  border-style: dashed;
+}
+
+.thing-mark-from {
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  background: var(--color-world-mark-soft);
+}
+
+.thing-mark-name {
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.thing-mark-label {
+  font: 500 0.66rem / 1.1 var(--font-ui);
+  color: var(--color-world-mark-ink);
+  text-shadow: 0 0 3px var(--color-world-mark-halo), 0 1px 2px var(--color-world-mark-halo);
+}
+
+/* A line: who said it, and the words, over the speaker's mark. */
+.thing-line {
+  display: grid;
+  gap: 0.22rem;
+  max-width: 17rem;
+  padding: 0.36rem 0.5rem 0.42rem;
+  color: var(--color-world-mark-ink);
+  background: var(--color-world-mark-line);
+  border: 1px solid var(--color-world-mark-edge-soft);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--elevation-world-line);
+}
+
+.thing-line-head {
+  display: flex;
+  align-items: center;
+  gap: 0.36rem;
+}
+
+.thing-line-head .thing-mark-pill {
+  cursor: default;
+}
+
+.thing-line-speaker {
+  font: 500 0.6rem / 1.2 var(--font-mono);
+  color: var(--color-world-mark-ink-muted);
+}
+
+.thing-line-text {
+  font: 400 0.76rem / 1.38 var(--font-ui);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+@media (forced-colors: active) {
+  .thing-mark-pill,
+  .thing-line {
+    border-color: CanvasText;
+  }
+}

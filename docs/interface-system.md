@@ -93,6 +93,10 @@ The application is the brand; the world, and what speaks from inside it, is the 
 | The world on the canvas; the Companion's speech, choices and command buttons; Design's previews of the world | the world's profile |
 | Provenance, uncertainty, caution and error, wherever they are drawn | the world's hue, at the lightness the surface under them needs |
 
+The marks of who runs a being, and the lines it says, belong to neither: their world-mark tokens
+(`--color-world-mark` and its kin in `tokens.css`) are fixed in every scheme, a dark fill with white
+words and outline, so they read over any world, and no theme or profile changes them.
+
 Every brand surface but the stage follows the Settings choice "Light or dark"; the world keeps its own light.
 `web/packages/app/src/ui/system/bridge.css` section 4 points the older surfaces' variables at the
 tokens; `web/packages/app/test/ui-brand-surfaces.test.ts` holds Aeroheart's meaning roles at their

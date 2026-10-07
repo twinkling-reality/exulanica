@@ -134,6 +134,19 @@
   --elevation-3: 0 10px 32px #11181c24, 0 2px 6px #11181c14;
   --elevation-4: 0 18px 56px #11181c33, 0 4px 12px #11181c1a;
 
+  /* Marks over the world (who runs a being, and its lines): fixed in every scheme, because they sit
+   * over the world, whose colours no theme sets. */
+  --color-world-mark: #10171bdd;
+  --color-world-mark-soft: #10171b99;
+  --color-world-mark-line: #10171be8;
+  --color-world-mark-ink: #ffffff;
+  --color-world-mark-ink-muted: #ffffffbf;
+  --color-world-mark-edge: #ffffffd9;
+  --color-world-mark-edge-soft: #ffffff59;
+  --color-world-mark-halo: #000000;
+  --elevation-world-mark: 0 1px 3px #00000059;
+  --elevation-world-line: 0 4px 14px #00000052;
+
   /* Motion: every duration becomes 0ms under reduced motion (below). */
   --duration-fast: 120ms;
   --duration-base: 200ms;

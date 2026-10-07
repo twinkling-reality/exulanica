@@ -2,8 +2,9 @@
  * @exulanica/atlas-react/things
  *
  * Drawing the things a world holds by their looks: the library they are read from, one dispatch by
- * look kind, the skeleton and motion of any body plan, and the layer that stands a version's placed
- * things where it puts them. A separate entry from `./playcanvas`, as the generated site's is.
+ * look kind, the skeleton and motion of any body plan, the layer that stands a version's placed
+ * things where it puts them, and the marks of who runs each being with the lines it says. A
+ * separate entry from `./playcanvas`, as the generated site's is.
  */
 
 export type {
@@ -51,3 +52,5 @@ export type { FigureMade, FigureMakerOptions } from './figure-maker.js';
 export { ThingFigureMaker } from './figure-maker.js';
 export type { ThingCrowdFiguresOptions, ThingFigureMiss } from './crowd-figures.js';
 export { ThingCrowdFigures, ThingCrowdRenderable } from './crowd-figures.js';
+export type { AttachedMarksOptions, MarkAnchors, MarkedSubject, ThingLine, ThingMark } from './marks.js';
+export { AttachedMarks, LINES_MAXIMUM, MARKS_MAXIMUM, MARK_RANGE_METRES, NAMED_NEAREST, NAME_RANGE_METRES, ThingMarks, lineSeconds } from './marks.js';
