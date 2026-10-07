@@ -158,6 +158,20 @@ def create_society(
     request: Request,
     world_id: WorldId,
 ) -> Any:
+    # A society of things is made through the routes only where the host offers it
+    # (EXULANICA_SOCIETY_OF_THINGS); elsewhere it is refused by name before anything is read.
+    if (
+        society_engine(body.profile).state_family == "things"
+        and not get_services(request).societies_of_things
+    ):
+        return JSONResponse(
+            status_code=409,
+            content={
+                "code": "society_engine_not_offered",
+                "detail": f"this host makes no society with {body.profile} through its routes",
+            },
+        )
+
     def create() -> dict:
         repo = _repository(connection, session, request, world_id)
         runtime = get_services(request).society_runtime

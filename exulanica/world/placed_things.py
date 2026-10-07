@@ -35,6 +35,7 @@ __all__ = [
     "ThingKindReference",
     "ThingPlacement",
     "named_kind",
+    "placeable_by_author",
     "placed_thing_document",
     "shipped_kind",
     "validate_placed_thing",
@@ -128,6 +129,19 @@ def shipped_kind(
     if kind.sha256 != reference.sha256:
         raise InvalidThingPlacement(
             f"thing kind {reference.kind} version {reference.version} has another digest"
+        )
+    return kind
+
+
+def placeable_by_author(kind: ThingKind) -> ThingKind:
+    """``kind``, when an author may place a thing of it, or
+    :class:`~exulanica.world.errors.InvalidThingPlacement`: a being an author places is decided
+    for by its routine until somebody chooses otherwise, so a kind whose deciders exclude the
+    routine (a visitor, decided for only by the program that sends it) is never placed."""
+    deciders = kind.document["deciders"]
+    if kind.klass == "being" and (deciders is None or "routine" not in deciders["allowed"]):
+        raise InvalidThingPlacement(
+            f"a {kind.kind} is decided for only from outside, so an author does not place one"
         )
     return kind
 

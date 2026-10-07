@@ -85,7 +85,8 @@ beside the kinds, `assets/catalogs/things/kinds.lock.json`, names every shipped 
 digest it shipped with, and the kind loader refuses a file it does not name at that digest, or a
 locked version with no file. A thing names its kind by all
 three: a world's author places one by its kind in a version's authored plane
-([world objects contract, section 14](world-objects-contract.md#14-placed-things)). What a society
+([world objects contract, section 14](world-objects-contract.md#14-placed-things)), a being only
+where its kind's deciders allow the routine. What a society
 is given of a kind is `ThingKind.semantics()`: every field but `looks`, `origin`, `ext` and
 `summary`, with the kind's reference, so no look reaches a society through its kind.
 

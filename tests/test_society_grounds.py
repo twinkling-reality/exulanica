@@ -18,6 +18,7 @@ import pytest
 from exulanica.canonical import canonical_json
 from exulanica.environment.district_geometry import segment_blocked
 from exulanica.grammar.errors import CatalogError
+from exulanica.things.kinds import shipped_thing_kinds
 from exulanica.world import society_authored_ground as ground_builder
 from exulanica.world.society_authored_ground import build_authored_ground_society_input_v3
 from exulanica.world.society_catalogs import load_comparison_catalogs
@@ -269,3 +270,45 @@ def test_an_activity_may_name_only_the_records_its_own_ground_states():
     ):
         with pytest.raises(ValueError, match="identity or reason mismatch"):
             validate_local_affordances(document(profile, subject), {"sit"})
+
+
+def test_each_ground_names_the_shipped_being_its_population_is_made_of():
+    villager = dict(shipped_thing_kinds()[("villager", 1)].reference())
+    grounds = load_society_grounds()
+    assert [ground.population_kind for ground in grounds] == [villager] * len(grounds)
+
+
+def _reference(key: str, version: int) -> dict:
+    return dict(shipped_thing_kinds()[(key, version)].reference())
+
+
+@pytest.mark.parametrize(
+    ("change", "message"),
+    [
+        (lambda entries: entries[0].pop("population_kind"), "missing"),
+        (
+            lambda entries: entries[0].update(
+                population_kind=_reference("villager", 1) | {"sha256": "e" * 64}
+            ),
+            "population_kind",
+        ),
+        (lambda entries: entries[0].update(population_kind=_reference("well", 1)), "routine"),
+        (lambda entries: entries[0].update(population_kind=_reference("visitor", 1)), "routine"),
+        (lambda entries: entries[0].update(population_kind={"kind": "villager"}), "digest"),
+        (
+            lambda entries: entries[1].update(population_kind=_reference("knight", 1)),
+            "state different figures",
+        ),
+    ],
+    ids=[
+        "no-kind",
+        "another-digest",
+        "an-object",
+        "decided-only-from-outside",
+        "not-a-reference",
+        "one-profile-two-kinds",
+    ],
+)
+def test_a_ground_naming_a_kind_no_population_may_be_is_refused(tmp_path, change, message):
+    with pytest.raises(CatalogError, match=message):
+        _malformed(tmp_path, change)

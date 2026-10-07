@@ -835,6 +835,20 @@
       "reason": "Authored: why a society of things recorded that a thing came, moved or went, or could not, when the event records a reason that is not a choice the planner makes."
     },
     {
+      "key": "event_reason.id_taken",
+      "kind": "event_reason",
+      "code": "id_taken",
+      "words": "somebody here already has the name it would have",
+      "reason": "Authored: why a society of things recorded that a thing came, moved or went, or could not, when the event records a reason that is not a choice the planner makes."
+    },
+    {
+      "key": "event_reason.malformed_crossing",
+      "kind": "event_reason",
+      "code": "malformed_crossing",
+      "words": "what its program sent could not be read",
+      "reason": "Authored: why a society of things recorded that a thing came, moved or went, or could not, when the event records a reason that is not a choice the planner makes."
+    },
+    {
       "key": "event_reason.not_here",
       "kind": "event_reason",
       "code": "not_here",

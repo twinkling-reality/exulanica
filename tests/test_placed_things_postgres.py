@@ -11,7 +11,7 @@ What is shown, against PostgreSQL:
 *   a version branched from another keeps its placed things, and carrying one plans to carry them;
 *   the routes place a thing by its kind (the digest filled from the shipped library), answer with
     the whole version, and refuse by name a kind that is not shipped, a digest that is not its own,
-    and an id already placed;
+    a being only an outside program decides for, and an id already placed;
 *   a version holds a bounded number of things, removed ones included, and refuses one more by
     name; undoing a placement makes room again.
 """
@@ -232,6 +232,8 @@ def test_the_routes_place_a_thing_by_its_kind_and_refuse_by_name(objects_api):
         (body(kind={"kind": "no_such_kind", "version": 1}), "invalid_thing_placement"),
         (body(kind={**kind_body(kind), "sha256": "a" * 64}), "invalid_thing_placement"),
         (body(region_id="region-z"), "invalid_thing_placement"),
+        # A visitor is decided for only by the program that sends it, so no author places one.
+        (body(kind={"kind": "visitor", "version": 1}), "invalid_thing_placement"),
     ):
         answer = objects_api.post(path, refused)
         assert (answer.status_code, answer.json()["code"]) == (422, code), answer.text

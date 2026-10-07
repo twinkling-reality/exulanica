@@ -20,6 +20,7 @@ import uuid
 
 import pytest
 from exulanica.world.crossings import (
+    CROSSINGS_PER_MINUTE,
     BoundCrossing,
     ConsumedCrossing,
     register_crossing_stream,
@@ -33,9 +34,23 @@ from test_society_saved_world_api import OWNER, routes
 from things_society_support import MemoryCrossings, arrival, departure
 
 saved_world = helpers.saved_world
-world_app = saved_world_api.world_app
+saved_world_app = saved_world_api.world_app
 pytestmark = pytest.mark.postgres
 V7 = "exulanica-society/v7"
+
+
+@pytest.fixture
+def world_app(saved_world_app):
+    """The saved world's app on a host that offers societies of things
+    (``EXULANICA_SOCIETY_OF_THINGS``), and the one that does not."""
+    world, make_app, runtime, database = saved_world_app
+
+    def offering(offered: bool = True):
+        app = make_app()
+        app.state.services = dataclasses.replace(app.state.services, societies_of_things=offered)
+        return app
+
+    return world, offering, runtime, database
 
 
 @pytest.fixture
@@ -221,3 +236,49 @@ def test_a_visitor_crosses_in_through_the_gate_and_goes_home(world_app, crossing
             )
         )
         assert _refused(client, world) == "a crossing is bound to a minute the society never ran"
+
+
+def test_a_host_that_does_not_offer_societies_of_things_refuses_one_by_name(world_app):
+    world, offering, _, _ = world_app
+    scope, _, society_route = routes(world)
+    asked = {"region_id": world["binding"].region_id, "profile": V7}
+    with TestClient(offering(False)) as client:
+        _place(client, world, "well", "well", 2, -4_000, 2_000)
+        refused = client.post(society_route, headers=OWNER, params=scope, json=asked)
+        assert refused.status_code == 409, refused.text
+        assert refused.json()["code"] == "society_engine_not_offered"
+    # The positive control: a host that offers it makes the same society from the same request.
+    with TestClient(offering(True)) as client:
+        made = client.post(society_route, headers=OWNER, params=scope, json=asked)
+        assert made.status_code in (200, 201), made.text
+
+
+def test_a_minute_takes_a_bounded_number_of_crossings_and_the_rest_wait(world_app, crossings):
+    world, make_app, _, _ = world_app
+    with TestClient(make_app()) as client:
+        _place(client, world, "well", "well", 2, -4_000, 2_000)
+        _place(client, world, "gate", "gate", 1, 0, 6_000)
+        society = _make_society(client, world)
+        society_id = uuid.UUID(society["society_id"])
+        for index in range(CROSSINGS_PER_MINUTE + 1):
+            crossings.hand(society_id, arrival(index))
+        society = _step(client, world, society)
+        assert len(crossings.bound[society_id]) == CROSSINGS_PER_MINUTE
+        _step(client, world, society)
+        assert len(crossings.bound[society_id]) == CROSSINGS_PER_MINUTE + 1
+        assert _replayed(client, world)
+
+
+def test_a_society_that_took_crossings_replays_only_with_its_door_s_stream(world_app, crossings):
+    world, make_app, _, _ = world_app
+    with TestClient(make_app()) as client:
+        _place(client, world, "well", "well", 2, -4_000, 2_000)
+        _place(client, world, "gate", "gate", 1, 0, 6_000)
+        society = _make_society(client, world)
+        crossings.hand(uuid.UUID(society["society_id"]), arrival(1))
+        _step(client, world, society)
+        assert _replayed(client, world)  # the positive control, with the stream registered
+        register_crossing_stream(None)
+        assert _refused(client, world) == (
+            "a society that took crossings replays only with its door's stream registered"
+        )

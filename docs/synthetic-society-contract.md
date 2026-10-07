@@ -87,9 +87,10 @@ Implementation:
 - which engines exist and what each can do: `exulanica/world/society-engines.v2.json`, read by
   `exulanica/world/society_engines.py`;
 - the grounds a society stands on, with what people walk, the population rule, lattice and
-  declared area of each, the dependency its input names its place under and the kinds of the
-  world's own records its people's activities may name:
-  `assets/catalogs/society-ground/society-ground.v4.json` (versions 1 to 3 kept beside it), read by
+  declared area of each, the dependency its input names its place under, the kinds of the
+  world's own records its people's activities may name and the thing kind its population is made
+  of:
+  `assets/catalogs/society-ground/society-ground.v5.json` (versions 1 to 4 kept beside it), read by
   `exulanica/world/society_grounds.py`;
 - sending a society's people away and bringing them back:
   `exulanica/world/society_presence.py`;
@@ -530,7 +531,7 @@ about the person's world.
   that is not the built-in authored starter at a supported module version, and a ground kind the
   projection has no rule for are refused with the reason rather than guessed at.
 - Declared by the ground's entry in the society ground catalog
-  (`assets/catalogs/society-ground/society-ground.v4.json`, read by
+  (`assets/catalogs/society-ground/society-ground.v5.json`, read by
   `exulanica/world/society_grounds.py`): the walkable area on a ground that states none, and a
   route lattice at two metre spacing over the area, inset by the navigation clearance. A flat
   rectangle has no paths of its own, so a graph over it is a discretisation the entry fixes, not a
@@ -1452,11 +1453,14 @@ process.
 The society of things (`exulanica/world/society_things.py`) is the purposeful society where
 everybody is a thing of a stated kind ([things contract](things-contract.md)). A society is made
 with it by name over a saved world's own lattice ground, a starter or a world made from
-photographs (`creates` does not name it, so a new world's society stays v2 unless asked for). Its
-people walk, choose, stay and talk by the purposeful planner's rules, and each of them names its
-kind by key, version and digest, and how it came: `populated` (the villagers its ground's
-population brings, the purposeful genesis's own people with the same names and draws), `placed` (a
-being the world's author placed in the version) or `crossed` (a visitor from an outside program).
+photographs (`creates` does not name it, so a new world's society stays v2 unless asked for). The
+route makes one only on a host that sets `EXULANICA_SOCIETY_OF_THINGS` on, and refuses it by name
+elsewhere (`society_engine_not_offered`): its people do not yet pick things up, hand them over or
+follow anybody. Its people walk, choose, stay and talk by the purposeful planner's rules, and each
+of them names its kind by key, version and digest, and how it came: `populated` (the people its
+ground's population brings, the purposeful genesis's own people with the same names and draws, of
+the kind the ground's catalog entry names, `population_kind`), `placed` (a being the world's author
+placed in the version) or `crossed` (a visitor from an outside program).
 
 **Its input carries the things its author placed.** It reads
 `exulanica.society-input/authored-ground-v5` (migration 0151): the fourth profile's projection, at
@@ -1464,12 +1468,16 @@ the opening source its version pins or, where the ground states its own arrival,
 `things` list: every thing placed in the region and not removed, in id order, each with its kind's
 semantics (the kind document without its looks, origin, summary and `ext`), its position and yaw
 on the ground, its height above the ground where it does not rest on it, and, for a gate, the point
-visitors arrive at, turned with it. A placed object whose kind blocks walking is an obstacle, its
-box turned with it; one whose kind offers a rest or a visit offers it at its kind's places, as a
-target of origin `thing` (`thing:<placed id>`), under the routine's entry for its kind; one off the
-ground offers none and still blocks. Every placed thing is a `placed_thing` dependency and each
-kind a `thing_kind` dependency by digest; a thing whose kind is not shipped at the digest it names
-makes the input unavailable (`unknown_thing_kind:<placed id>`). A society's inputs keep its arrival
+visitors arrive at, turned with it; and the kind its population is made of, as the ground's
+catalog entry names it, so genesis and replay read it from the input. A placed object whose kind
+blocks walking is an obstacle, its box turned with it; one whose kind makes an offer with places
+that a purposeful ability serves (the abilities catalog: `rest` serves `rest_at` and `visit`
+serves `visit`) offers that activity at its kind's places, as a target of origin `thing`
+(`thing:<placed id>`), under the routine's entry for its kind; one off the ground offers none and
+still blocks. A placed thing's places and obstacle are named after `thing/`, a separator no
+authored object's id can hold, so they never meet an authored object's. Every placed thing is a
+`placed_thing` dependency and each kind a `thing_kind` dependency by digest; a thing whose kind is
+not shipped at the digest it names makes the input unavailable (`unknown_thing_kind:<placed id>`). A society's inputs keep its arrival
 for its whole life and may move on to a later things composition, never back.
 
 **A minute.** The planner's minute, the person's direct requests and the people's decisions come
@@ -1478,47 +1486,61 @@ first, unchanged, and every event they record names v7; then the things phase:
 * placed beings follow the latest input: one an edit places arrives at the open node nearest where
   it was placed (`thing_arrived`, `placed_by_author`), one an edit moves is put where the edit says
   (`thing_moved`, `moved_by_author`), one an edit removes or replaces leaves (`thing_departed`,
-  `removed_by_author`); one that cannot be placed (the society is full, or no node is open) is
-  refused once (`arrival_refused`); an unavailable input changes nobody;
+  `removed_by_author`); one that cannot be placed is refused once while its placement stands
+  (`arrival_refused`: `no_place_to_stand`, or `id_taken` where somebody or something here already
+  has the id it would have) and tried again when it is moved; one refused because the society is
+  full (`society_full`) is tried again every minute, silently, and comes when there is room; an
+  unavailable input changes nobody;
 * the crossings a door handed over, in the order it wrote them: a visitor arrives at the open node
   nearest a gate's arrival point, holding what it carried in, and leaves when its program calls it
   back (`sent_home`) or its grant ends (`grant_ended`), taking what it holds. An arrival is refused
   by name where the version holds no gate to arrive through or not the one named
   (`no_arrival_place`), the society holds 16 visitors already (`visitor_limit`), its kind is not
   a shipped being an outside program may decide for, or what it carries not a shipped holdable
-  object (`unknown_kind`), or a thing of its id is already here (`already_here`); a departure naming
-  nobody who crossed in is `departure_refused`, `not_here`.
+  object (`unknown_kind`), or its id or the id of a thing it carries is already somebody's or
+  something's here (`already_here`); a departure naming nobody who crossed in is
+  `departure_refused`, `not_here`. A crossing whose document fails its check is refused
+  (`malformed_crossing`), with an event naming the crossing and nothing from the document, so no
+  crossing ever stops a society's minutes.
 
-Each event of the things phase carries `at_ms` 0: it takes effect as the minute begins. A minute
-with nothing to reconcile and no crossing records the planner's events alone, the same documents a
-purposeful society records but for the engine they name.
+Each event of the things phase carries `at_ms` 0: it takes effect as the minute begins (`at_ms`
+is the moment within the minute, 0 to 59,999). A minute with nothing to reconcile and no crossing
+records the planner's events alone, the same documents a purposeful society records but for the
+engine they name.
 
 **Crossings.** A door fills the port `CrossingStream` (`exulanica/world/crossings.py`): the
-crossings no minute has consumed, read on the minute's connection under the society's lock; each
-bound once to the event its minute recorded, after the minute's events are written; and every
-bound crossing with its minute, for replay. Its documents are an arrival,
-`exulanica.thing-arrival/v1` (the thing's id, its kind, its origin record of class `crossed`, the
-translation manifest's digest, what it carries, its grant and the gate, or none), and a departure,
-`exulanica.thing-departure/v1`; neither carries a look or free text from the program.
-`society_of_version` names the society a version holds and its engine. With no stream registered,
-nothing crosses. Replay reads the bound crossings back and refuses by name a minute whose
-recomputed crossings differ, or a crossing bound to a minute the society never ran.
+crossings no minute has consumed, at most 32 a minute in the order the door wrote them (the rest
+wait for later minutes), read on the minute's connection under the society's lock; each bound
+once to the event its minute recorded, after the minute's events are written; and every bound
+crossing with its minute, for replay. Its documents are an arrival, `exulanica.thing-arrival/v1`
+(the thing's id, its kind, its origin record of class `crossed`, the translation manifest's
+digest, what it carries, its grant and the gate, or none), and a departure,
+`exulanica.thing-departure/v1`. Neither carries a look. An arrival's origin record may carry
+bounded text the program states (authors, an attribution, source references); the society copies
+none of it into its state or events, which hold the visitor's id, its kind's reference, the bridge
+and the grant. `society_of_version` names the society a version holds and its engine. With no
+stream registered, nothing crosses, and a society that took crossings is refused replay by name.
+Replay reads the bound crossings back and refuses by name a minute whose recomputed crossings
+differ, or a crossing bound to a minute the society never ran.
 
-**Who decides.** The world's owner may choose a model for a person as in a purposeful society. A
-visitor is decided for by the program that sent it, as its arrival records: the decision host asks
-its door with the decider `{external, bridge, grant_id}` read from the state, no choice is recorded
-for it, an owner's choice naming it is refused (`decided_from_outside`), and so is a person's
-direct request (`decided_from_outside`), in the society and in the database
-(`society_person_may_be_directed`, migration 0151).
+**Who decides.** The world's owner may choose a model for a person as in a purposeful society, but
+only a decider the person's kind allows (`decider_not_allowed`, the kind's `deciders.allowed`), and
+an author places no being only an outside program may decide for
+([world objects contract](world-objects-contract.md#14-placed-things)). A visitor is decided for by
+the program that sent it, as its arrival records: the decision host asks its door with the decider
+`{external, bridge, grant_id}` read from the state, no choice is recorded for it, an owner's choice
+naming it is refused (`decided_from_outside`), and so is a person's direct request
+(`decided_from_outside`), in the society and in the database (`society_person_may_be_directed`,
+migration 0151).
 
 **What its state may state as it grows.** A being states `mode` only where it moves by more than
-walking, `height_mm` only while it flies, `velocity_mm_s` only while it flies and its module
-states one, and `size_class_mm` only where it is not the people's size; a placed object states
-`height_mm` only off the ground. A velocity is three whole millimetres a second, each within
-100,000 either way: x and y along the ground (`position_mm`'s two axes) and z up (the rate of
-`height_mm`). The next minute's flight starts from it. The state check admits them from the
-first state, so a stored society of walkers needs nothing rewritten when another movement module
-lands. The things composition states one walking lattice, the people's.
+walking (a walker states none), `height_mm` only while it flies, `velocity_mm_s` only while it flies
+and its module states one, and `size_class_mm` only where it is not the people's size; a placed
+object states `height_mm` only off the ground. A velocity is three whole millimetres a second, each
+within 100,000 either way: x and y along the ground (`position_mm`'s two axes) and z up (the rate of
+`height_mm`). The next minute's flight starts from it. The state check admits them from the first
+state, so a stored society of walkers needs nothing rewritten when another movement module lands.
+The things composition states one walking lattice, the people's.
 
 It runs no comparison of models and no experiment, and its people are not sent away. A placed
 thing's footprint is its kind's whole box, so a kind whose box overhangs its base (a tree's

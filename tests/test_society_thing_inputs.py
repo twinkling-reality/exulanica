@@ -10,7 +10,11 @@ What is shown here, with no database:
 *   every placed thing is bound by reference, removed ones included, and each kind by digest; a
     thing whose kind is not shipped at its digest makes the input unavailable by name;
 *   the input's list of things is held to its shape, and a things input may move on to a later
-    things input keeping its arrival, never back to another composition.
+    things input keeping its arrival, never back to another composition;
+*   an authored object named like a placed thing shares no node or obstacle with it;
+*   a placed thing's activity is the purposeful ability its kind's offer serves, read from the
+    abilities catalog, and the input records the kind its population is made of, as its ground's
+    catalog entry names it.
 """
 
 from __future__ import annotations
@@ -28,7 +32,8 @@ from exulanica.world.society_planner import (
 )
 from exulanica.world.society_thing_inputs import validate_input_things
 
-from things_society_support import compose, pinned_arrival, thing
+import living_square_support as square
+from things_society_support import compose, pinned_arrival, reference, thing
 
 WELL = thing("well", "well", 2, -4_000, 2_000)
 
@@ -65,7 +70,7 @@ def test_a_blocking_object_takes_its_ground_and_offers_its_visit_at_its_kind_s_p
         "visit",
     )
     assert target["place_node_ids"] and all(
-        node.startswith("place:thing:well:") for node in target["place_node_ids"]
+        node.startswith("place:thing/well:") for node in target["place_node_ids"]
     )
     [entry] = document["things"]
     assert set(entry) == {"placed_id", "kind", "position_mm", "yaw_microradians", "arrival_mm"}
@@ -158,3 +163,64 @@ def test_a_things_input_keeps_the_arrival_its_society_was_made_with():
     for unpinned in (compose((WELL,), input_seq=2, edit_seq=edits + 1),):
         with pytest.raises(ValueError, match="arrival"):
             validate_input_successor(first, unpinned)
+
+
+def test_an_authored_object_named_like_a_placed_thing_shares_nothing_with_it():
+    objects = list(square.square_objects())
+    # Every object the square holds, plus a bench of its own named as a placed thing is spelled,
+    # standing clear of everything else.
+    bench = next(obj for obj in objects if obj.object_id.endswith("-bench"))
+    objects.append(
+        dataclasses.replace(
+            bench,
+            object_id="thing:well",
+            transform=dataclasses.replace(bench.transform, x_mm=8_000, z_mm=2_000),
+        )
+    )
+    document = compose((WELL,), objects=objects)
+    validate_society_input(document)
+    nodes = [node["node_id"] for node in document["navigation"]["nodes"]]
+    assert len(nodes) == len(set(nodes))
+    placed = [node for node in nodes if node.startswith("place:thing/well:")]
+    authored = [node for node in nodes if node.startswith("place:thing:well:")]
+    assert placed and authored
+
+
+def test_a_thing_s_activity_is_the_purposeful_ability_its_offer_serves():
+    from exulanica.world.society_authored_ground import thing_activities
+
+    # Read from the abilities catalog: rest serves rest_at and visit serves visit; an offer with no
+    # places (talk_to) and every other module's abilities give no activity.
+    assert thing_activities() == (("rest_at", "rest"), ("visit", "visit"))
+
+
+def test_a_things_input_records_the_kind_its_ground_s_population_is_made_of():
+    from exulanica.things.kinds import shipped_thing_kinds
+    from exulanica.world.society_grounds import society_ground_for_navigation
+
+    document = compose((WELL,))
+    ground = society_ground_for_navigation(document["navigation"]["profile"])
+    assert document["population_kind"] == ground.population_kind
+    assert document["population_kind"] == dict(shipped_thing_kinds()[("villager", 1)].reference())
+    validate_input_things(document)  # the positive control
+    broken = copy.deepcopy(document)
+    broken["population_kind"] = {"kind": "villager", "version": 1}
+    with pytest.raises(ValueError, match="population is made of"):
+        validate_input_things(broken)
+
+
+def test_a_things_input_records_whichever_kind_its_ground_names(monkeypatch):
+    # The ground's catalog entry is the one place the kind is stated: a ground naming another being
+    # makes inputs that record that being.
+    import exulanica.world.society_grounds as grounds
+
+    named = grounds.society_ground_for_navigation
+    traveller = reference("traveller", 1)
+    monkeypatch.setattr(
+        grounds,
+        "society_ground_for_navigation",
+        lambda profile: dataclasses.replace(named(profile), population_kind=traveller),
+    )
+    document = compose((WELL,))
+    assert document["population_kind"] == traveller
+    validate_input_things(document)

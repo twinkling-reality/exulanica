@@ -4,9 +4,12 @@ A visitor from an outside program comes in through a door (a bridge, under a gra
 owner issued) and leaves the same way. The door keeps the crossings it is handed, in the order it
 wrote them. A society of things (:mod:`exulanica.world.society_things`) takes the crossings not
 yet consumed at each minute, on the minute's connection, in its transaction and under the
-society's lock, and binds each to the event that minute recorded for it, once
-(:class:`CrossingStream`). Replay reads the bound crossings back with their minutes and recomputes
-every arrival and departure from them, so a society's history never asks the door again.
+society's lock, at most :data:`CROSSINGS_PER_MINUTE` a minute (the rest wait for the next), and
+binds each to the event that minute recorded for it, once (:class:`CrossingStream`). A crossing the
+society cannot take (a document that fails its check, a visitor or a carried thing whose id is
+already here) is bound as refused with its own event, so no crossing ever stops a society's
+minutes. Replay reads the bound crossings back with their minutes and recomputes every arrival and
+departure from them, so a society's history never asks the door again.
 
 A crossing is one of two documents:
 
@@ -17,8 +20,11 @@ A crossing is one of two documents:
 *   a departure, ``exulanica.thing-departure/v1``: who leaves, and why: ``sent_away`` by its
     program, or ``grant_ended``.
 
-Neither carries a look or any free text from the program: a visitor's look is a separate
-appearance record beside its arrival, and what the visitor is called in the world is its kind's.
+Neither carries a look: a visitor's look is a separate appearance record beside its arrival. An
+arrival's origin record may carry bounded text the program states (authors, an attribution, source
+references), and its kind and gate are keys of a fixed shape; a society copies none of the origin
+into its state or events, which hold the visitor's id, its kind's reference, the bridge and the
+grant, and what the visitor is called in the world is its kind's.
 
 With no stream registered, nothing crosses and a society of things advances without visitors.
 
@@ -41,9 +47,11 @@ from exulanica.world.deciders import BRIDGE
 __all__ = [
     "ARRIVAL_PROFILE",
     "ARRIVAL_REFUSALS",
+    "CROSSINGS_PER_MINUTE",
     "DEPARTURE_PROFILE",
     "DEPARTURE_REASONS",
     "DISPOSITIONS",
+    "MALFORMED",
     "BoundCrossing",
     "ConsumedCrossing",
     "Crossing",
@@ -60,17 +68,23 @@ ARRIVAL_PROFILE: Final = "exulanica.thing-arrival/v1"
 DEPARTURE_PROFILE: Final = "exulanica.thing-departure/v1"
 #: Why a departure happens: the program sent its visitor away, or the grant it came under ended.
 DEPARTURE_REASONS: Final = ("sent_away", "grant_ended")
+#: Why a crossing the society cannot read at all is refused, arrival or departure: its document
+#: fails its check, so the society names nothing from it.
+MALFORMED: Final = "malformed_crossing"
+#: The most crossings one minute takes, in the door's order; the rest wait for later minutes, so a
+#: door that queues without end never makes one minute do unbounded work.
+CROSSINGS_PER_MINUTE: Final = 32
 #: Why an arrival is refused: the version holds no gate to arrive through (or not the one named),
 #: the society holds as many visitors as it takes, the kind is not one a visitor may be, or a thing
 #: with that id is already here.
 ARRIVAL_REFUSALS: Final = frozenset(
-    {"no_arrival_place", "visitor_limit", "unknown_kind", "already_here"}
+    {"no_arrival_place", "visitor_limit", "unknown_kind", "already_here", MALFORMED}
 )
 #: What became of each crossing, by its document: an arrival arrived or was refused, and a
-#: departure departed or found nobody of that id here.
+#: departure departed, found nobody of that id here, or was refused as malformed.
 DISPOSITIONS: Final = {
     ARRIVAL_PROFILE: ("arrived", "refused"),
-    DEPARTURE_PROFILE: ("departed", "not_here"),
+    DEPARTURE_PROFILE: ("departed", "not_here", "refused"),
 }
 _ARRIVAL_FIELDS: Final = frozenset(
     {
@@ -134,9 +148,11 @@ class CrossingStream(Protocol):
         workspace_id: uuid.UUID,
         society_id: uuid.UUID,
         tick: int,
+        *,
+        limit: int,
     ) -> Sequence[Crossing]:
-        """The crossings for this society no minute has consumed, in the order the door wrote
-        them; ``tick`` is the minute about to take them."""
+        """The first ``limit`` crossings for this society no minute has consumed, in the order the
+        door wrote them; ``tick`` is the minute about to take them."""
         ...
 
     def bind(

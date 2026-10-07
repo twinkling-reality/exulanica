@@ -67,7 +67,7 @@ __all__ = [
 ]
 
 CATALOG_ID: Final = "society-ground"
-CATALOG_VERSION: Final = 4
+CATALOG_VERSION: Final = 5
 CATALOG_DIRECTORY: Final = (
     Path(__file__).resolve().parents[2].joinpath("assets", "catalogs", CATALOG_ID)
 )
@@ -135,6 +135,9 @@ class SocietyGroundKind:
     place_dependency: str = "none"
     #: The kinds of the world's own records an activity in its input may name as its subject.
     record_subjects: tuple[str, ...] = ()
+    #: The thing kind its population is made of, ``{kind, version, sha256}``: a shipped being the
+    #: routine decides for. None below version 5, whose grounds stated no kind.
+    population_kind: Mapping[str, Any] | None = None
 
 
 def _figure(values: Mapping[str, object], name: str) -> int:
@@ -263,6 +266,46 @@ _FIELDS_V4: Final = (
 )
 
 
+def _population_kind(where: str, value: object) -> Mapping[str, Any]:
+    """A thing kind named by key, version and digest, the shape a thing's kind reference has."""
+    if (
+        not isinstance(value, dict)
+        or set(value) != {"kind", "version", "sha256"}
+        or not isinstance(value["kind"], str)
+        or type(value["version"]) is not int
+        or not isinstance(value["sha256"], str)
+        or re.fullmatch(r"[0-9a-f]{64}", value["sha256"]) is None
+    ):
+        raise CatalogError(f"{where} names a thing kind by key, version and digest")
+    return dict(value)
+
+
+def _entry_check_v5(where: str, values: Mapping[str, Any]) -> None:
+    _entry_check_v4(where, values)
+    # Read here, not at import: the thing kinds read catalogs this module's readers import.
+    from exulanica.world.errors import InvalidThingPlacement
+    from exulanica.world.placed_things import ThingKindReference, shipped_kind
+
+    try:
+        kind = shipped_kind(ThingKindReference(**values["population_kind"]))
+    except InvalidThingPlacement as exc:
+        raise CatalogError(f"{where}: population_kind: {exc}") from exc
+    deciders = kind.document["deciders"]
+    if kind.klass != "being" or deciders is None or "routine" not in deciders["allowed"]:
+        raise CatalogError(
+            f"{where}: population_kind is a being the routine decides for, not a {kind.kind}"
+        )
+
+
+#: Version 5 states, for each ground, the thing kind its population is made of, beside version
+#: 4's fields.
+_FIELDS_V5: Final = (
+    *_FIELDS_V4,
+    ("population_kind", _population_kind),
+    ("population_kind_reason", text_field),
+)
+
+
 _SCHEMAS: Final = MappingProxyType(
     {
         1: CatalogSchema(
@@ -288,6 +331,7 @@ _SCHEMAS: Final = MappingProxyType(
         2: CatalogSchema(CATALOG_ID, 2, _FIELDS_V2, entry_check=_entry_check),
         3: CatalogSchema(CATALOG_ID, 3, _FIELDS_V2, entry_check=_entry_check),
         4: CatalogSchema(CATALOG_ID, 4, _FIELDS_V4, entry_check=_entry_check_v4),
+        5: CatalogSchema(CATALOG_ID, 5, _FIELDS_V5, entry_check=_entry_check_v5),
     }
 )
 
@@ -321,6 +365,9 @@ def load_society_grounds(
             population_rule=str(values.get("population_rule", "stated")),
             place_dependency=str(values.get("place_dependency", "none")),
             record_subjects=tuple(values.get("record_subjects", ())),
+            population_kind=(
+                dict(values["population_kind"]) if "population_kind" in values else None
+            ),
         )
         for entry in catalog.entries
         for values in (dict(entry.values),)
@@ -336,6 +383,9 @@ def load_society_grounds(
             ground.population,
             ground.lattice_mm,
             ground.declared_half_extent_mm,
+            None
+            if ground.population_kind is None
+            else tuple(sorted(ground.population_kind.items())),
         )
         if figures.setdefault(ground.navigation_profile, stated) != stated:
             raise CatalogError(

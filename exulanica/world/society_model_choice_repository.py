@@ -40,6 +40,7 @@ from exulanica.world.deciders import arrived_from_outside, decider, model_of, of
 from exulanica.world.decision_roles import DecisionContract, DecisionRole, decision_roles
 from exulanica.world.society import UnknownSociety
 from exulanica.world.society_planner import input_sha256
+from exulanica.world.society_things import kind_allows
 
 __all__ = [
     "CHOICE_REFUSALS",
@@ -70,6 +71,9 @@ CHOICE_REFUSALS: Final = {
     "decided_from_outside": (
         "somebody this choice names came into the world from outside, and the program they came "
         "with decides for them; end its grant or send them away instead"
+    ),
+    "decider_not_allowed": (
+        "somebody this choice names is a kind of thing that kind of decider may not decide for"
     ),
 }
 
@@ -364,6 +368,9 @@ class SocietyModelChoiceRepository:
                 raise ModelChoiceRefused("person_not_in_this_world")
             if any(arrived_from_outside(society["state"], subject) for subject in chosen):
                 raise ModelChoiceRefused("decided_from_outside")
+            state = society["state"]
+            if not all(kind_allows(state, subject, record["kind"]) for subject in chosen):
+                raise ModelChoiceRefused("decider_not_allowed")
             if record["kind"] != "routine":
                 occupied: dict[tuple[str, str], bool] = {}
                 for row in rows:

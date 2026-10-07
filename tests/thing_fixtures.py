@@ -11,12 +11,20 @@ from __future__ import annotations
 from typing import Any
 
 from exulanica.things.kinds import ThingKind, shipped_thing_kinds
-from exulanica.world.placed_things import ThingKindReference
+from exulanica.world.errors import InvalidThingPlacement
+from exulanica.world.placed_things import ThingKindReference, placeable_by_author
 
 
 def placeable_kinds() -> list[ThingKind]:
-    """Every shipped kind, in key and version order."""
-    return [kind for _key, kind in sorted(shipped_thing_kinds().items())]
+    """Every shipped kind an author may place, in key and version order: every object, and every
+    being its routine may decide for."""
+    placeable = []
+    for _key, kind in sorted(shipped_thing_kinds().items()):
+        try:
+            placeable.append(placeable_by_author(kind))
+        except InvalidThingPlacement:
+            continue
+    return placeable
 
 
 def placeable_kind(index: int = 0) -> ThingKind:

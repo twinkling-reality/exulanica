@@ -951,8 +951,10 @@ the relation enables and forces row-level security.
 
 A placement names a kind that is shipped at the stated version, with that version's digest when it
 states one; with none, the shipped digest is stored. Anything else is refused as
-`422 invalid_thing_placement`, as are an id of the wrong shape, a region the snapshot lacks and a
-pose out of bounds; an id already placed in the version is `409 invalid_object_state`. A version
+`422 invalid_thing_placement`, as are an id of the wrong shape, a region the snapshot lacks, a pose
+out of bounds and a being whose kind's deciders exclude the routine, such as a visitor, which only
+the program that sends it decides for; an id already placed in the version is
+`409 invalid_object_state`. A version
 holds at most 256 placed things, removed ones included, since its delta keeps them; one more is
 refused as `409 thing_limit_reached`, and undoing a placement makes room again. What a placed
 thing is never changes after it is placed: the table's trigger refuses a change to its kind or

@@ -29,6 +29,7 @@ from typing import Any, Final, Literal
 import psycopg
 from psycopg.rows import dict_row
 
+from exulanica.things.catalogs import thing_catalogs
 from exulanica.things.kinds import ThingKind
 from exulanica.world.arrival_selection import ArrivalDescriptor
 from exulanica.world.authored_delta import AlternateVersion, version_delta_sha256
@@ -126,6 +127,10 @@ def ground_place_id(region_id: str) -> str:
 #: How a place's node is named: this prefix, the object's own identity and the place's index in
 #: the order ``destination_places`` fills them, so a place keeps its identity when another drops.
 PLACE_NODE_PREFIX: Final = "place:"
+#: How a placed thing's places and obstacle are named: after a separator no authored object's id
+#: can hold (``OBJECT_ID_PATTERN``), so an authored object named like a placed thing never shares
+#: a node or an obstacle with it.
+PLACED_THING_PREFIX: Final = "thing/"
 
 
 @dataclass(frozen=True, slots=True)
@@ -823,8 +828,12 @@ def _place_targets(
             if not joins:
                 continue
             kept.append(point)
-            # A placed thing's places are named apart from an authored object's of the same id.
-            name = obj.object_id if item.origin == "authored" else f"thing:{obj.object_id}"
+            # A placed thing's places are named apart from every authored object's.
+            name = (
+                obj.object_id
+                if item.origin == "authored"
+                else f"{PLACED_THING_PREFIX}{obj.object_id}"
+            )
             chosen.append((f"{PLACE_NODE_PREFIX}{name}:{index}", point, joins[0][2]))
         if not chosen:
             records.append(_refused_activity(version_id, obj, reviewed, UNREACHABLE, item.origin))
@@ -995,9 +1004,23 @@ def build_authored_ground_society_input_v5(
     )
 
 
-#: The activity a placed thing offers people, by the offer of its kind that states it, in this
-#: order: one at most, the first its kind offers, since a place belongs to one activity.
-_THING_ACTIVITIES: Final = (("rest_at", "rest"), ("visit", "visit"))
+#: The ability module the purposeful planner is: its abilities are the activities it plans.
+PURPOSEFUL_MODULE: Final = "exulanica-ability/purposeful/v1"
+
+
+def thing_activities() -> tuple[tuple[str, str], ...]:
+    """The activity a placed thing offers people, by the offer of its kind that states it, as the
+    abilities catalog says: each ability the purposeful planner serves whose target offer states
+    places, as (offer, activity), in the catalog's order. A thing offers one at most, the first its
+    kind offers, since a place belongs to one activity."""
+    catalogs = thing_catalogs()
+    return tuple(
+        (ability.target_offer, ability.key)
+        for ability in catalogs.abilities.values()
+        if ability.module == PURPOSEFUL_MODULE
+        and ability.target_offer is not None
+        and any(p.name == "places" for p in catalogs.offers[ability.target_offer].parameters)
+    )
 
 
 def things_in_region(version: AlternateVersion, ground: SocietyGround) -> list[PlacedThing]:
@@ -1055,13 +1078,13 @@ def _things_one_by_one(
         if body["blocks_walking"]:
             obstacles.append(
                 (
-                    f"thing:{thing.thing_id}",
+                    f"{PLACED_THING_PREFIX}{thing.thing_id}",
                     footprint_ring(centre, half, transform.yaw_microradians),
                 )
             )
         offers = {offer["key"]: offer["parameters"] for offer in semantics["offers"]}
         found = next(
-            ((offer, affordance) for offer, affordance in _THING_ACTIVITIES if offer in offers),
+            ((offer, affordance) for offer, affordance in thing_activities() if offer in offers),
             None,
         )
         if found is None:
@@ -1200,6 +1223,15 @@ def _authored_ground_with_routine(
     # The things composition states its arrival either way: the pinned one, or none.
     if arrival is not None or things:
         document["arrival"] = None if arrival is None else arrival.model_dump(mode="json")
+    if things:
+        # Its population is made of the kind the ground's catalog entry names, recorded here so
+        # genesis and replay read it from the input, whatever a later catalog version says.
+        from exulanica.world.society_grounds import society_ground_for_navigation
+
+        kind = society_ground_for_navigation(ground.navigation_profile).population_kind
+        if kind is None:
+            raise ValueError("the ground's catalog entry names no kind its population is made of")
+        document["population_kind"] = dict(kind)
     document["document_sha256"] = input_sha256(document)
     validate_society_input(document)
     return document

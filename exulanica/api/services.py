@@ -138,6 +138,7 @@ __all__ = [
     "SOCIETY_AUTHORED_WORLDS_ENV",
     "SOCIETY_CONTROL_WORKER_ENV",
     "SOCIETY_CONTROL_WORKSPACES_ENV",
+    "SOCIETY_OF_THINGS_ENV",
     "SOCIETY_TICK_INTERVAL_MS_ENV",
     "Services",
     "SocietySettingRefused",
@@ -192,6 +193,7 @@ SOCIETY_TICK_INTERVAL_MS_ENV: Final = env_name("SOCIETY_TICK_INTERVAL_MS")
 #: Every way a society setting is refused at startup, by the name the refusal carries.
 SOCIETY_SETTING_REFUSALS: Final = {
     "society_control_worker_not_boolean": "must be an explicit boolean",
+    "society_of_things_not_boolean": "must be an explicit boolean",
     "society_control_workspaces_not_json": "must be a JSON array of workspace ids",
     "society_control_workspaces_not_array": "must be a JSON array of workspace ids",
     "society_control_workspaces_not_uuid": "names an entry that is not a workspace id",
@@ -221,6 +223,10 @@ class SocietySettingRefused(ValueError):
 #: precedence for the version it names. Nothing is ever registered or created by saving a world;
 #: a society exists only once somebody asks for it.
 SOCIETY_AUTHORED_WORLDS_ENV: Final = env_name("SOCIETY_AUTHORED_WORLDS")
+#: Whether a world's owner may make a society of things through the routes: off unless it is set
+#: on, since its people do not yet pick things up, hand them over or follow anybody, and a society
+#: made now is one every later version of its engine must keep replaying.
+SOCIETY_OF_THINGS_ENV: Final = env_name("SOCIETY_OF_THINGS")
 
 #: The registration file's own profile, so a file written for a later shape is refused here
 #: rather than half-read.
@@ -290,6 +296,9 @@ class Services:
     #: process; ``process``, the playback worker's process; ``none``, nobody. ``here`` for a
     #: hand-built Services, as before the setting existed; ``build_services`` reads the setting.
     playback_player: Literal["here", "process", "none"] = "here"
+    #: Whether the routes make a society of things (:data:`SOCIETY_OF_THINGS_ENV`); off for a
+    #: hand-built Services, as for a host that does not set it.
+    societies_of_things: bool = False
     #: The development seeds comparisons started from the application run on, in the seed
     #: catalog's order; ``build_services`` takes them from the seed catalog a new comparison is
     #: defined under, which commits their text.
@@ -1027,6 +1036,11 @@ def build_services(
             env_get("SOCIETY_TICK_INTERVAL_MS", environ)
         ),
         playback_player=playback_player,
+        societies_of_things=_explicitly_enabled(
+            env_get("SOCIETY_OF_THINGS", environ),
+            "society_of_things_not_boolean",
+            SOCIETY_OF_THINGS_ENV,
+        ),
         comparison_seeds=development_seeds(load_comparison_catalogs()),
         runs_comparison_worker=comparison_player == "here",
         comparisons_played_elsewhere=comparison_player == "process",
@@ -1193,14 +1207,19 @@ def _enabled(value: str | None) -> bool:
     return (value or "").strip().lower() not in ("0", "false", "off", "no")
 
 
-def _explicitly_enabled(value: str | None) -> bool:
-    """Parse an opt-in switch; absence and explicit false are both safely off."""
+def _explicitly_enabled(
+    value: str | None,
+    code: str = "society_control_worker_not_boolean",
+    variable: str = SOCIETY_CONTROL_WORKER_ENV,
+) -> bool:
+    """Parse an opt-in switch; absence and explicit false are both safely off. Anything else is
+    refused by ``code``, naming the setting ``variable``."""
     normalized = (value or "").strip().lower()
     if normalized in ("", "0", "false", "off", "no"):
         return False
     if normalized in ("1", "true", "on", "yes"):
         return True
-    raise SocietySettingRefused("society_control_worker_not_boolean", SOCIETY_CONTROL_WORKER_ENV)
+    raise SocietySettingRefused(code, variable)
 
 
 def _society_control_workspaces(value: str | None) -> tuple[uuid.UUID, ...]:

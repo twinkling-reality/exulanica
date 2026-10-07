@@ -10,7 +10,7 @@ from typing import Any
 import psycopg
 from psycopg.types.json import Jsonb
 
-from exulanica.world.crossings import BoundCrossing, crossing_stream
+from exulanica.world.crossings import CROSSINGS_PER_MINUTE, BoundCrossing, crossing_stream
 from exulanica.world.decision_roles import decision_roles
 from exulanica.world.role_decisions import append_role_events, apply_receipts
 from exulanica.world.society import (
@@ -738,14 +738,21 @@ class SocietyRepository:
                     )
                 if engine.state_family == "things":
                     # Placed beings as the latest input places them, then the crossings the door
-                    # handed over and no minute has consumed, in the order it wrote them.
+                    # handed over and no minute has consumed, in the order it wrote them, at most
+                    # a minute's worth: the rest wait for later minutes.
                     stream = crossing_stream()
                     pending = (
                         ()
                         if stream is None
-                        else stream.pending(
-                            self.connection, self.workspace_id, row["society_id"], state["tick"]
-                        )
+                        else tuple(
+                            stream.pending(
+                                self.connection,
+                                self.workspace_id,
+                                row["society_id"],
+                                state["tick"],
+                                limit=CROSSINGS_PER_MINUTE,
+                            )
+                        )[:CROSSINGS_PER_MINUTE]
                     )
                     state, events, crossed = advance_things(
                         row["state"], state, row["seed"], inputs[-1], events, pending
@@ -1123,6 +1130,17 @@ class SocietyRepository:
                 # The crossings each minute consumed, as the door bound them, by minute.
                 consumed: dict[int, list[Any]] = {}
                 stream = crossing_stream()
+                if engine.state_family == "things" and stream is None:
+                    took = self.connection.execute(
+                        "select 1 from world_society_event where workspace_id=%s "
+                        "and society_id=%s and document->'thing' ? 'crossing_id' limit 1",
+                        (self.workspace_id, row["society_id"]),
+                    ).fetchone()
+                    if took is not None:
+                        raise ValueError(
+                            "a society that took crossings replays only with its door's stream "
+                            "registered"
+                        )
                 if engine.state_family == "things" and stream is not None:
                     for taken in stream.consumed(
                         self.connection, self.workspace_id, row["society_id"]

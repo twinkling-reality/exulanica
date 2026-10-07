@@ -21,12 +21,15 @@ replay through the replay route. What is shown:
     it recorded, and nobody who came from outside can be given a model or the routine by the
     world's owner;
 *   a request a stopped host left open closes in the program's own terms, and a request any text
-    of which would carry a saved name is undone, not sent.
+    of which would carry a saved name is undone, not sent;
+*   in a society of things, a visitor is decided for by its own program from its arrival, and a
+    grant names only beings whose kind allows an outside program (``decider_not_allowed``).
 """
 
 from __future__ import annotations
 
 import copy
+import dataclasses
 import hashlib
 import json
 import time
@@ -125,6 +128,14 @@ def _doorkeeping_host(world, services, door) -> DecisionHost:
         manifest=manifest,
         manifest_sha256="a" * 64,
         external=door,
+    )
+
+
+def _offering_societies_of_things(client) -> None:
+    """The application as a host that offers societies of things (``EXULANICA_SOCIETY_OF_THINGS``)
+    composes it."""
+    client.app.state.services = dataclasses.replace(
+        client.app.state.services, societies_of_things=True
     )
 
 
@@ -508,6 +519,7 @@ def test_the_test_door_answers_in_the_receipt_s_one_shape():
 @pytest.mark.parametrize("saved_world", [2], indirect=True)
 def test_a_visitor_s_own_program_decides_for_it_from_its_arrival_with_no_choice_recorded(app):
     world, client = app
+    _offering_societies_of_things(client)
     services = _services(client)
     stream = things_support.MemoryCrossings()
     register_crossing_stream(stream)
@@ -543,3 +555,28 @@ def test_a_visitor_s_own_program_decides_for_it_from_its_arrival_with_no_choice_
         assert replayed.json()["replay_verified"] is True
     finally:
         register_crossing_stream(None)
+
+
+@pytest.mark.parametrize("saved_world", [2], indirect=True)
+def test_an_outside_program_decides_only_for_a_being_whose_kind_allows_it(app):
+    world, client = app
+    _offering_societies_of_things(client)
+    services = _services(client)
+    things_api._place(client, world, "well", "well", 2, -4_000, 2_000)
+    things_api._place(client, world, "knight", "knight", 1, 3_000, 3_000)
+    snapshot = things_api._make_society(client, world)
+    people = snapshot["state"]["inhabitants"]
+    villager = next(person["id"] for person in people if person["came_by"] == "populated")
+    [knight] = [person["id"] for person in people if person["came_by"] == "placed"]
+    # A villager's kind allows the routine, a model and a person, never an outside program.
+    with pytest.raises(ModelChoiceRefused) as caught:
+        _grant(services, world, [villager])
+    assert caught.value.code == "decider_not_allowed"
+    with pytest.raises(ModelChoiceRefused) as caught:
+        _grant(services, world, [villager, knight], grant=uuid.UUID(int=7))
+    assert caught.value.code == "decider_not_allowed"
+    # The positive control: a knight's kind allows one, and the same grant takes it.
+    assert _grant(services, world, [knight])["people"] == [knight]
+    with services.database.session(world["workspace"]) as connection:
+        current = _repository(connection, world).current(world["binding"].version_id, person_role())
+    assert set(current) == {knight}

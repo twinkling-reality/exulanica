@@ -197,9 +197,10 @@ class MemoryCrossings:
     def hand(self, society_id: uuid.UUID, crossing: Crossing) -> None:
         self.handed.setdefault(society_id, []).append(crossing)
 
-    def pending(self, connection, workspace_id, society_id, tick) -> list[Crossing]:
+    def pending(self, connection, workspace_id, society_id, tick, *, limit) -> list[Crossing]:
         consumed = {each.crossing.crossing_id for each in self.bound.get(society_id, [])}
-        return [c for c in self.handed.get(society_id, []) if c.crossing_id not in consumed]
+        waiting = [c for c in self.handed.get(society_id, []) if c.crossing_id not in consumed]
+        return waiting[:limit]
 
     def bind(self, connection, workspace_id, society_id, tick, bound: Sequence[BoundCrossing]):
         by_id = {c.crossing_id: c for c in self.handed.get(society_id, [])}

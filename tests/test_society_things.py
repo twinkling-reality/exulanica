@@ -20,21 +20,31 @@ What is shown here, with no database:
 
 from __future__ import annotations
 
+import ast
 import copy
 import json
 import uuid
+from pathlib import Path
 
 import pytest
-from exulanica.world.crossings import CrossingRefused
+from exulanica.world import society_things
+from exulanica.world.crossings import CrossingRefused, check_crossing
 from exulanica.world.deciders import arrival_deciders
 from exulanica.world.society import society_state_sha256
-from exulanica.world.society_planner import advance_purposeful_society, initial_purposeful_society
+from exulanica.world.society_planner import (
+    advance_purposeful_society,
+    initial_purposeful_society,
+    input_sha256,
+)
 from exulanica.world.society_things import (
     THING_NAMESPACE,
+    THING_OUTCOMES,
+    THING_REASONS,
     THINGS_PROFILE,
     VISITORS_MAXIMUM,
     advance_things,
     initial_things_society,
+    kind_allows,
     validate_things_state,
 )
 
@@ -90,6 +100,21 @@ def test_genesis_is_the_purposeful_people_as_villagers_then_each_placed_being():
         ("well", "well", None),
     ]
     assert "look" not in json.dumps(state)
+    validate_things_state(state)
+
+
+def test_genesis_makes_its_people_of_the_kind_its_input_names():
+    # The input records the kind its ground's catalog entry named when it was composed, and genesis
+    # reads it there: an input naming another being makes the same people, of that kind.
+    document = compose((GATE,))
+    named = copy.deepcopy(document)
+    named["population_kind"] = reference("traveller", 1)
+    named["document_sha256"] = input_sha256(named)
+    state = initial_things_society(SOCIETY, SEED, named, population=POPULATION)
+    villagers = initial_things_society(SOCIETY, SEED, document, population=POPULATION)
+    assert [(p["id"], p["display_name"], p["kind"]["kind"]) for p in state["inhabitants"]] == [
+        (p["id"], p["display_name"], "traveller") for p in villagers["inhabitants"]
+    ]
     validate_things_state(state)
 
 
@@ -235,11 +260,87 @@ def test_each_crossing_that_cannot_happen_is_refused_by_name_with_an_event_of_it
     bare = compose((WELL,))
     _, _, bound = _minute(_genesis(WELL), bare, [arrival(5)])
     assert [(b.disposition, b.reason) for b in bound] == [("refused", "no_arrival_place")]
-    # A malformed crossing is refused before anything is decided.
+    # A crossing the society cannot read is refused and bound, never stopping the minute: its event
+    # names its crossing and nothing from its document.
     broken = arrival(6)
     broken.document["profile"] = "exulanica.thing-arrival/v9"
-    with pytest.raises(CrossingRefused):
-        _minute(state, document, [broken])
+    lost = departure(visitor["id"], 11)
+    lost.document["reason"] = "wandered_off"
+    for crossing, kind in ((broken, "arrival_refused"), (lost, "departure_refused")):
+        with pytest.raises(CrossingRefused):
+            check_crossing(crossing)  # the positive control: its check does refuse it
+        after, events, bound = _minute(state, document, [crossing])
+        assert [(b.disposition, b.reason) for b in bound] == [("refused", "malformed_crossing")]
+        [event] = [e for e in events if e.event_id == bound[0].event_id]
+        assert (event.kind, str(event.subject_id)) == (kind, str(crossing.crossing_id))
+        assert event.document["thing"] == {"crossing_id": str(crossing.crossing_id)}
+        validate_things_state(after)
+    # A visitor, or a thing it carries, whose id is already somebody's or something's here.
+    villager = _person(state, came_by="populated")
+    well = next(t for t in state["things"] if t["placed_id"] == "well")
+    sword = reference("sword", 2)
+    for colliding in (
+        arrival(7, carried=[{"thing_id": villager["id"], "kind": sword}]),
+        arrival(8, carried=[{"thing_id": well["id"], "kind": sword}]),
+    ):
+        _, _, bound = _minute(state, document, [colliding])
+        assert [(b.disposition, b.reason) for b in bound] == [("refused", "already_here")]
+
+
+def test_a_placed_being_whose_id_a_visitor_holds_is_refused_by_name_until_it_moves():
+    state = _genesis(GATE)
+    document = compose((GATE,))
+    held = str(uuid.uuid5(THING_NAMESPACE, f"{document['world_id']}:knight"))
+    taken = arrival(1)
+    taken.document["thing_id"] = held
+    state, _, bound = _minute(state, document, [taken])
+    assert [b.disposition for b in bound] == ["arrived"]
+    placed = compose((GATE, KNIGHT), input_seq=2, edit_seq=EDITS + 1)
+    planned, events = advance_purposeful_society(state, SEED, [document, placed])
+    state, events, _ = advance_things(state, planned, SEED, placed, events)
+    [refused] = [e for e in events if e.kind == "arrival_refused"]
+    assert (refused.document["reason"], refused.document["thing"]["placed_id"]) == (
+        "id_taken",
+        "knight",
+    )
+    assert [r["reason"] for r in state["refused_placements"]] == ["id_taken"]
+    # The refusal holds while the placement does: the next minute says nothing more.
+    planned, events = advance_purposeful_society(state, SEED, [placed])
+    state, events, _ = advance_things(state, planned, SEED, placed, events)
+    assert not [e for e in events if e.kind == "arrival_refused"]
+    # Moved, it is a new placement, tried again.
+    moved = compose(
+        (GATE, thing("knight", "knight", 1, -2_000, 4_000)), input_seq=3, edit_seq=EDITS + 2
+    )
+    planned, events = advance_purposeful_society(state, SEED, [placed, moved])
+    state, events, _ = advance_things(state, planned, SEED, moved, events)
+    assert [e.document["reason"] for e in events if e.kind == "arrival_refused"] == ["id_taken"]
+    assert [r["placed_at_mm"] for r in state["refused_placements"]] == [[-2_000, 4_000]]
+
+
+def test_a_being_refused_for_a_full_society_waits_silently_and_comes_when_there_is_room(
+    monkeypatch,
+):
+    import exulanica.world.society_things as engine
+
+    full = {"now": True}
+    monkeypatch.setattr(engine._Minute, "full", lambda self: full["now"])
+    state = _genesis(GATE)
+    document = compose((GATE,))
+    placed = compose((GATE, KNIGHT), input_seq=2, edit_seq=EDITS + 1)
+    planned, events = advance_purposeful_society(state, SEED, [document, placed])
+    state, events, _ = advance_things(state, planned, SEED, placed, events)
+    assert [e.document["reason"] for e in events if e.kind == "arrival_refused"] == ["society_full"]
+    planned, events = advance_purposeful_society(state, SEED, [placed])
+    state, events, _ = advance_things(state, planned, SEED, placed, events)
+    assert not [e for e in events if e.kind in ("arrival_refused", "thing_arrived")]
+    full["now"] = False
+    planned, events = advance_purposeful_society(state, SEED, [placed])
+    state, events, _ = advance_things(state, planned, SEED, placed, events)
+    assert [e.document["reason"] for e in events if e.kind == "thing_arrived"] == [
+        "placed_by_author"
+    ]
+    assert state["refused_placements"] == []
 
 
 def test_a_society_takes_a_bounded_number_of_visitors():
@@ -268,6 +369,7 @@ def test_the_same_minute_twice_is_the_same_state_and_the_same_events():
         (lambda p: p.update(came_by="flew_in"), "stated way"),
         (lambda p: p.update(crossing={"arrival_id": "x"}), "placement and crossing"),
         (lambda p: p.update(mode="swimming"), "mode a module serves"),
+        (lambda p: p.update(mode="walking"), "a walker states no mode"),
         (lambda p: p.update(height_mm=1_000), "height while it flies"),
         (lambda p: p.update(mode="flight"), "height while it flies"),
         (lambda p: p.update(size_class_mm=450), "size class"),
@@ -295,3 +397,68 @@ def test_the_state_check_holds_each_person_to_its_kind_and_its_movement(change, 
     change(broken["inhabitants"][0])
     with pytest.raises(ValueError, match=message):
         validate_things_state(broken)
+
+
+WORDS = Path(__file__).resolve().parents[1] / (
+    "assets/catalogs/society-words/society-inhabitant-words.v1.json"
+)
+
+
+def _emitted() -> tuple[set[str], set[str]]:
+    """Every reason and outcome the things phase's source passes to an ``emit`` as text."""
+    reasons: set[str] = set()
+    outcomes: set[str] = set()
+
+    def texts(node: ast.AST) -> list[str]:
+        if isinstance(node, ast.IfExp):
+            return [*texts(node.body), *texts(node.orelse)]
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            return [node.value]
+        return []
+
+    tree = ast.parse(Path(society_things.__file__).read_text(encoding="utf-8"))
+    for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == "emit"
+            and len(node.args) >= 4
+        ):
+            reasons.update(texts(node.args[2]))
+            outcomes.update(texts(node.args[3]))
+    return reasons, outcomes
+
+
+def test_every_reason_and_outcome_the_things_phase_records_is_stated_and_has_words():
+    reasons, outcomes = _emitted()
+    # The positive control: the scan reads the reasons and outcomes the phase writes as text.
+    assert {"placed_by_author", "crossed_in"} <= reasons and {"arrived", "not_arrived"} <= outcomes
+    assert reasons <= THING_REASONS
+    assert outcomes <= set(THING_OUTCOMES)
+    codes = {(entry["kind"], entry["code"]) for entry in json.loads(WORDS.read_text())["entries"]}
+    assert sorted(r for r in THING_REASONS if ("event_reason", r) not in codes) == []
+    assert sorted(o for o in THING_OUTCOMES if ("outcome", o) not in codes) == []
+
+
+def test_only_the_deciders_a_kind_allows_may_decide_for_its_beings():
+    state = _genesis(GATE, KNIGHT)
+    state, _, _ = _minute(state, compose((GATE, KNIGHT)), [arrival(1)])
+    villager = _person(state, came_by="populated")
+    knight = _person(state, came_by="placed")
+    visitor = _person(state, came_by="crossed")
+    allowed = {
+        name: {
+            kind
+            for kind in ("routine", "model", "person", "external")
+            if kind_allows(state, person["id"], kind)
+        }
+        for name, person in (("villager", villager), ("knight", knight), ("visitor", visitor))
+    }
+    assert allowed == {
+        "villager": {"routine", "model", "person"},
+        "knight": {"routine", "model", "person", "external"},
+        "visitor": {"external"},
+    }
+    # A society whose people state no kind leaves the choice to its own rules.
+    purposeful = initial_purposeful_society(SOCIETY, SEED, compose(()), population=POPULATION)
+    assert kind_allows(purposeful, purposeful["inhabitants"][0]["id"], "external")

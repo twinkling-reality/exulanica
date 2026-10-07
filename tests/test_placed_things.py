@@ -32,6 +32,7 @@ from exulanica.world.placed_things import (
     PlacedThing,
     ThingKindReference,
     named_kind,
+    placeable_by_author,
     placed_thing_document,
     validate_placed_thing,
 )
@@ -148,3 +149,12 @@ def test_a_shipped_kind_version_never_changes(tmp_path):
     assert refused(edited) == "thing_kind_not_locked"
     assert refused(unlocked) == "thing_kind_not_locked"
     assert refused(lambda paths: paths[0].unlink()) == "thing_kind_not_locked"
+
+
+def test_an_author_places_no_being_only_an_outside_program_decides_for():
+    kinds = shipped_thing_kinds()
+    # The positive control: beings the routine may decide for, and objects, are placed.
+    for key in (("knight", 1), ("villager", 1), ("well", 2)):
+        assert placeable_by_author(kinds[key]) is kinds[key]
+    with pytest.raises(InvalidThingPlacement, match="decided for only from outside"):
+        placeable_by_author(kinds[("visitor", 1)])

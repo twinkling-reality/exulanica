@@ -107,7 +107,9 @@ from exulanica.world.placed_things import (
     PlacedThing,
     ThingKindReference,
     ThingPlacement,
+    placeable_by_author,
     placed_thing_document,
+    shipped_kind,
     validate_placed_thing,
 )
 from exulanica.world.point_map_source_authority import PointMapSourceAuthority
@@ -2486,7 +2488,7 @@ class WorldObjectRepository:
                 f"a version holds at most {PLACED_THINGS_MAXIMUM} placed things, removed ones "
                 "included; undo a placement to make room, or place it in another version"
             )
-        return validate_placed_thing(
+        placed = validate_placed_thing(
             PlacedThing(
                 thing_id=placement.thing_id,
                 kind=placement.kind,
@@ -2496,6 +2498,8 @@ class WorldObjectRepository:
             ),
             region_ids=self._source_region_ids(row["source_snapshot_id"]),
         )
+        placeable_by_author(shipped_kind(placement.kind))
+        return placed
 
     def _insert_thing(
         self,

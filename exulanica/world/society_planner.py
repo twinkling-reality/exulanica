@@ -264,7 +264,7 @@ def _validate_society_input(document: dict[str, Any]) -> None:
     if document.get("profile") in ARRIVAL_INPUTS:
         fields.add("arrival")
     if document.get("profile") in THING_INPUTS:
-        fields.add("things")
+        fields.update(("things", "population_kind"))
     _require(set(document) == fields, "invalid society input fields")
     profile = document["profile"]
     _require(profile in NAVIGATION_PROFILES, "unsupported society input profile")

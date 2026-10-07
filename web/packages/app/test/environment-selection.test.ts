@@ -703,6 +703,14 @@ function liveSnapshot(tick = 0, absent: string | null = null): SocietySnapshot {
         explanation:{summary:tick?'The target was removed.':'Awaiting a goal.',event_ids:tick?['event','outside-window']:[]}}))}});
 }
 function livingSnapshot(): SocietySnapshot { return parseSociety(producerLivingResponse); }
+/** The same people in a society of things (v7): its family reads as the purposeful society's. */
+function thingsSnapshot(tick = 0): SocietySnapshot {
+  const purposeful = liveSnapshot(tick);
+  return parseSociety({ society_id:'society', version_id:'version',branch_id:'version',place_id:'place',population_size:100,current_tick:tick,
+    state_sha256:String(tick + 1).repeat(64),input_seq:1,input_sha256:'b'.repeat(64),
+    state:{...purposeful.state, profile:'exulanica-society/v7', things:[],
+      inhabitants:purposeful.state.inhabitants.map(person=>({...person,came_by:'populated',placed_id:null,crossing:null}))}});
+}
 function livingTownSnapshot(): SocietySnapshot {
   const state = producerLivingResponse as unknown as { readonly state: Record<string, unknown> };
   return parseSociety({ ...producerLivingResponse, state: { ...state.state, profile: 'exulanica-society/v5' } });
@@ -730,10 +738,10 @@ const servedModels = (engine: string, takes: boolean) => parseSocietyModels({
   contract: { versions: {}, sha256: 'c'.repeat(64), model_people_maximum: 8 },
   models: [], choices: [], latest: [], by_model: [], decisions_read: { counted: 0, maximum: 2000 },
 });
-function liveMount(preview = false, living = false, interpretation: unknown = undefined, takesModelChoices = false, town = false) {
+function liveMount(preview = false, living = false, interpretation: unknown = undefined, takesModelChoices = false, town = false, things = false) {
   const canvas = document.createElement('canvas');
   const controls = {state:{x:0,y:1.68,z:0},onInteract:null as (()=>void)|null};
-  const snapshot = town ? livingTownSnapshot : living ? livingSnapshot : liveSnapshot;
+  const snapshot = things ? thingsSnapshot : town ? livingTownSnapshot : living ? livingSnapshot : liveSnapshot;
   const initialSnapshot = snapshot();
   const inhabitantId = initialSnapshot.state.inhabitants[0]!.id;
   const connectedCatalog = living ? { ...catalog, placeId: initialSnapshot.placeId } : catalog;
@@ -825,6 +833,12 @@ describe('persisted living world controls',()=>{
     expect(mount.root.textContent).toContain(`Sequence 1 · ${'b'.repeat(64)}`);
     expect(mount.root.textContent).toContain('Simulation clockUnavailable');
     expect(mount.root.textContent).toContain('Routine catalogsUnavailable');
+    mount.dispose();
+  });
+  it('reads a society of things\' people as the purposeful society\'s, with their recorded explanation',async()=>{
+    const {mount,controls}=liveMount(false,false,undefined,false,false,true);await mount.begin();controls.onInteract?.();
+    expect(mount.root.textContent).toContain('Awaiting a goal.');
+    expect(mount.root.textContent).not.toContain('No persisted goal or action is available');
     mount.dispose();
   });
   it('renders exact Python-produced v4 routine, input, tick, day and bounded event coverage',async()=>{

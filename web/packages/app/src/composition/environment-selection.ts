@@ -739,7 +739,8 @@ export function mountEnvironmentSelection(
     // Which reader applies is the state's family in the engine table, never its engine's name.
     const family = societyEngine(state.profile).stateFamily;
     if (family === 'living') { inspectLivingInhabitant(inhabitant, state); offerInhabitantView(id); return true; }
-    const purposeful = family === 'purposeful';
+    // A society of things' people walk and choose as the purposeful society's do, beside its things.
+    const purposeful = family === 'purposeful' || family === 'things';
     const goal = inhabitant.goal && 'kind' in inhabitant.goal ? inhabitant.goal : null;
     const representation = crowd()?.inhabitantRepresentation(id);
     const liveInspection = liveSociety?.inspect(id);

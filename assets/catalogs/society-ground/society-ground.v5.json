@@ -1,0 +1,159 @@
+{
+  "schema_version": 1,
+  "catalog_id": "society-ground",
+  "catalog_version": 5,
+  "entries": [
+    {
+      "key": "authored_starter",
+      "composer_key": "authored-starter-world",
+      "navigation_profile": "authored-ground-lattice/v1",
+      "navigation": "lattice",
+      "navigation_reason": "People walk a square lattice over the area this ground states or declares: a flat ground has no paths of its own, so the lattice is the route graph this entry chooses, at the spacing below.",
+      "arrival": "spawn",
+      "arrival_reason": "A person arrives where the starter's snapshot states its spawn, and the society reads that point from the world: nobody starts on it or within 2,000 mm of it, and a successor that moves it is refused.",
+      "floor": "stated",
+      "floor_reason": "The starter's own ground module states the ground people stand on, and the app draws it; the society reads it and declares nothing more to stand on.",
+      "population_rule": "stated",
+      "population": 8,
+      "population_reason": "A society on this ground starts with eight people. Its area is a square about 23 metres across with 121 places to stand, and a population sized for a district (128) would stand people on top of each other from the first minute; a handful reads as people living somewhere. Eight is also what one comparison of models runs (the comparison protocol's population_maximum), so every society made here can be compared.",
+      "lattice_mm": 2000,
+      "lattice_reason": "People route over a square lattice at this spacing. A flat ground has no paths of its own, so a route graph over it is a choice this entry makes rather than a fact the world states. Two metres keeps every point of the area within 1,415 mm of a lattice node, which is inside the reviewed object reach, and keeps a 24 m area at 121 nodes and 220 edges. Every stored input records the spacing it was composed with, so another figure is a new navigation profile, never an edit of this one.",
+      "declared_half_extent_mm": 12000,
+      "declared_area_reason": "Where the ground states no edge (the endless plane every new starter uses), the society declares a square of this half extent about the region origin and says in its input that it did; the stored world stays endless. The figure keeps the lattice at 121 nodes, which holds one tick of 128 people near a tenth of a second, and it equals the only bounded starter ground the product has shipped, so an old and a new starter give a society the same area and the same node identities.",
+      "reason": "The ground of a saved world made from the built-in starter: a flat authored region whose society walks a lattice over the area the ground states or, where it states none, the area declared here. Read by the society's ground builder, which composes over it, and by the repository, which starts a society over it with this population.",
+      "place_dependency": "none",
+      "place_dependency_reason": "People walk a lattice this ground states or declares, which is no place a producer makes from the world's records, so its input names none.",
+      "record_subjects": [],
+      "record_subjects_reason": "A lattice's people use only the objects a person placed; the world states no records of its own an activity could name.",
+      "population_kind": {
+        "kind": "villager",
+        "version": 1,
+        "sha256": "c2d6681e1727bb24886c1a20b3b1ee5ad9fb8bd15608f8bef3e71e73213ddeca"
+      },
+      "population_kind_reason": "A starter's people are the villagers every saved world begins with: people who walk, rest, visit and talk by the routine, whom a chosen model or the world's owner may decide for.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reasons"
+      }
+    },
+    {
+      "key": "made_world",
+      "composer_key": "atlas-world-composer",
+      "navigation_profile": "authored-ground-lattice/v1",
+      "navigation": "lattice",
+      "navigation_reason": "People walk a square lattice over the area this ground states or declares: a flat ground has no paths of its own, so the lattice is the route graph this entry chooses, at the spacing below.",
+      "arrival": "region_origin",
+      "arrival_reason": "A world made from photographs states no spawn and places no region, so the society takes the origin of the region its people live in as where a person arrives. The rule needs nothing authored per world: every region has an origin, the frame the society's lattice and every placed object are measured in, and the same rule holds for every made world. Nothing in the world states another point to prefer.",
+      "floor": "declared",
+      "floor_reason": "A made world states no ground, so every one of its regions has a floor the society declares: a square of the declared half extent about the region origin at height 0 in its frame. The app draws it as a floor in every region, so a person sees what people and placed objects stand on, and furniture and the small square can be placed on it where nothing was reconstructed.",
+      "population_rule": "stated",
+      "population": 8,
+      "population_reason": "Eight people, as on the starter's ground: a made world's region states no extent, so its society declares the same 24 m square and walks the same lattice (navigation profile authored-ground-lattice/v1), and the figure that suits that area suits it here. It is also what one comparison of models runs, so a made world's society can be compared.",
+      "lattice_mm": 2000,
+      "lattice_reason": "The same two metre lattice as the starter's navigation profile, which this ground shares: every point of the area within 1,415 mm of a node, inside the reviewed object reach. A navigation profile names one discretisation, so a ground that shares it states the same figures, and the catalog refuses one that does not.",
+      "declared_half_extent_mm": 12000,
+      "declared_area_reason": "A made world states no ground, so the society declares a square of this half extent about the region origin, the area the starter's lattice and population were measured over. Photographs in the region are drawn without collision, so they do not narrow it; an object placed outside it is still in the world and its activity is recorded as unreachable.",
+      "reason": "The region of a world made from a person's photographs, which states no ground, no spawn and no position: a society stands in one of its regions, named when people are brought in, and walks a declared area about that region's origin. Read by the society's ground builder, which dispatches on the snapshot's composer, and by the repository through the navigation profile the input records.",
+      "place_dependency": "none",
+      "place_dependency_reason": "People walk a lattice this ground states or declares, which is no place a producer makes from the world's records, so its input names none.",
+      "record_subjects": [],
+      "record_subjects_reason": "A lattice's people use only the objects a person placed; the world states no records of its own an activity could name.",
+      "population_kind": {
+        "kind": "villager",
+        "version": 1,
+        "sha256": "c2d6681e1727bb24886c1a20b3b1ee5ad9fb8bd15608f8bef3e71e73213ddeca"
+      },
+      "population_kind_reason": "A world made from photographs is peopled as a starter is, by villagers who walk, rest, visit and talk by the routine.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reasons"
+      }
+    },
+    {
+      "key": "generated_town",
+      "composer_key": "city-grammar-town",
+      "navigation_profile": "city-walking-surfaces/v1",
+      "navigation": "walking_surfaces",
+      "navigation_reason": "People walk the surfaces the world's own city records state: each footway beside its kerb, round each block's corner toward the curb its record names as next, across a carriageway only on a crossing record, and in and out of a premises through its entrance, as the city place producer derives them (exulanica/world/society_city_place.py) from the navigation table the city grammar's descriptor states. The graph is the world's, not a choice this entry makes, so it states no lattice.",
+      "arrival": "spawn",
+      "arrival_reason": "A person arrives where the world's snapshot states its spawn, which the world's composer derived by one rule when it generated the world: the standing spot its walking surfaces offer nearest the centre of the world's extent. The society reads that point from the world, as it reads the starter's.",
+      "floor": "stated",
+      "floor_reason": "The world's own records state every surface a person stands on, and the app draws the world's baked tiles; the society declares nothing more to stand on.",
+      "population_rule": "residents",
+      "population": 128,
+      "population_reason": "A society on this ground holds one inhabitant for each place in a home the world's premises offer: every premises with a door onto the walking surfaces counts its use class's resident capacity (assets/catalogs/society/society-use-class.v1.json), the rule the living society populates a city place by. The figure here is the most people the rule may produce, and a world whose homes hold more is refused by name when its society is created. It is the tick budget the other grounds are held to, one tick of 128 people near a tenth of a second: on the small town's walking graph (387 nodes), one purposeful tick of 128 people took 62 ms at the median and 78 ms at the 95th percentile over 60 ticks on the development machine, measured with scripts/measure_generated_world.py on a quiet machine. The small town's rule produced 30 to 58 people over the 20 worlds that measurement made.",
+      "lattice_mm": 0,
+      "lattice_reason": "This ground walks the world's own surfaces and states no lattice, so it states no spacing.",
+      "declared_half_extent_mm": 0,
+      "declared_area_reason": "The world states its own extent, the tiles it covers, and its surfaces run to its edge, so the society declares no area: it walks the rectangle the world's tiles cover, a walking clearance beyond each edge so that a footway at the edge stays inside it.",
+      "reason": "The ground of a world generated from a recipe of the city grammar: the streets, footways, crossings and premises its own records state. Read by the society's ground builder, which dispatches on the entry's navigation and floor forms, and by the repository, which starts a society over it with the population its rule derives from the world's premises.",
+      "place_dependency": "city_place",
+      "place_dependency_reason": "The city place producer (exulanica/world/society_city_place.py) makes the place people walk from the town's city records; the input names it as a city place, by its digest.",
+      "record_subjects": [
+        "city.premises",
+        "city.street_furniture"
+      ],
+      "record_subjects_reason": "A town's people use its premises and its street furniture, each the subject of a record of the town's own.",
+      "population_kind": {
+        "kind": "villager",
+        "version": 1,
+        "sha256": "c2d6681e1727bb24886c1a20b3b1ee5ad9fb8bd15608f8bef3e71e73213ddeca"
+      },
+      "population_kind_reason": "A town generated from words is peopled by villagers until its own kind of people is stated here.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reasons"
+      }
+    },
+    {
+      "key": "generated_site",
+      "composer_key": "site-plan",
+      "navigation_profile": "site-walking-surfaces/v1",
+      "navigation": "walking_surfaces",
+      "navigation_reason": "People walk the surfaces the world's own site records state: the corridors each zone keeps clear along its front, its sides and the lane before its areas, a lattice over the rest of its walkable ground, the paths, and the ways to each structure's door, each area's access point and each fixture people use, as the site place producer derives them (exulanica/world/society_site_place.py). The graph is the world's, not a choice this entry makes, so it states no lattice.",
+      "arrival": "spawn",
+      "arrival_reason": "A person arrives where the world's snapshot states its spawn, on the spine a few metres in from the entry, which the site composer derived when it generated the world; the society reads that point from the world, as it reads a town's.",
+      "floor": "stated",
+      "floor_reason": "The world's own records state every surface a person stands on, all on the level ground a site stands on, and the app draws them; the society declares nothing more to stand on.",
+      "population_rule": "residents",
+      "population": 128,
+      "population_reason": "A society on this ground holds one inhabitant for each place in a home the world's destinations offer: the sleepers of the beds in its homes' rooms, a home's use class where it has no beds, and the people its kind brings in from homes off the site. The figure is the most people the rule may produce; a world whose homes hold more is refused by name, and every world a kind makes was held to this ceiling by the kind's own checks before the kind was admitted. Measured with scripts/measure_living_site.py on 2026-10-06, a site near the walking graph's bound (879 places, 36 destinations) at 128 people and a market town (918 places) at 128 in the same run: one living tick took 14 ms at the median and 32 ms at the 95th percentile on the site and 12 and 30 ms on the town, over 240 minutes each on a loaded development machine (31 to 39 percent idle), so the site is held to the town's figure.",
+      "lattice_mm": 0,
+      "lattice_reason": "This ground walks the world's own surfaces and states no lattice, so it states no spacing.",
+      "declared_half_extent_mm": 0,
+      "declared_area_reason": "The world states its own extent, the site's width and depth, and its surfaces run to its edge, so the society declares no area: it walks the rectangle the site covers, a walking clearance beyond each edge.",
+      "reason": "The ground of a world generated from a world kind by the site grammar: the paths, yards, doors, fields and fixtures its own records state. Read by the society's ground builder, which dispatches on the entry's navigation and floor forms, and by the repository, which starts a society over it with the population its rule derives from the world's destinations.",
+      "place_dependency": "site_place",
+      "place_dependency_reason": "The site place producer (exulanica/world/society_site_place.py) makes the place people walk from the site's records; the input names it as a site place, by its digest.",
+      "record_subjects": [
+        "site.area",
+        "site.extent",
+        "site.fixture",
+        "site.structure"
+      ],
+      "record_subjects_reason": "A site's people use its structures, areas and fixtures, and the home at its entry of everybody who lives off the site, each the subject of a record of the site's own.",
+      "population_kind": {
+        "kind": "villager",
+        "version": 1,
+        "sha256": "c2d6681e1727bb24886c1a20b3b1ee5ad9fb8bd15608f8bef3e71e73213ddeca"
+      },
+      "population_kind_reason": "A site generated from a world kind is peopled by villagers until its own kind of people is stated here.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica synthetic society; see the entry reasons"
+      }
+    }
+  ]
+}

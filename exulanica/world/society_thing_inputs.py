@@ -79,6 +79,20 @@ def _offers(kind: Mapping[str, Any]) -> set[str]:
     return {offer["key"] for offer in kind["offers"]}
 
 
+def _check_reference(reference: Any, what: str) -> None:
+    if (
+        not isinstance(reference, dict)
+        or set(reference) != {"kind", "version", "sha256"}
+        or not isinstance(reference["kind"], str)
+        or _KEY.fullmatch(reference["kind"]) is None
+        or type(reference["version"]) is not int
+        or reference["version"] < 1
+        or not isinstance(reference["sha256"], str)
+        or _HEX64.fullmatch(reference["sha256"]) is None
+    ):
+        raise ValueError(f"{what} is named by key, version and digest")
+
+
 def _check_kind(kind: Any) -> None:
     if not isinstance(kind, dict) or set(kind) != SEMANTIC_FIELDS:
         raise ValueError("a placed thing's kind is its semantics")
@@ -108,6 +122,7 @@ def validate_input_things(document: Mapping[str, Any]) -> None:
     """The things a v5 input carries, held to their shape: each placed thing once, in id order,
     with its kind's semantics, a ground position, a yaw within one turn, and an arrival point
     exactly where its kind offers arrival through it. An unavailable input carries none."""
+    _check_reference(document["population_kind"], "the kind a things input's population is made of")
     things = document["things"]
     if not isinstance(things, list) or len(things) > THINGS_BOUND:
         raise ValueError("thing bound exceeded")

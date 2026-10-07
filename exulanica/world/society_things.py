@@ -44,12 +44,16 @@ from typing import Any, Final
 from exulanica.things.kinds import ThingKind
 from exulanica.world.crossings import (
     ARRIVAL_PROFILE,
+    CROSSINGS_PER_MINUTE,
+    DEPARTURE_PROFILE,
+    MALFORMED,
     BoundCrossing,
     Crossing,
+    CrossingRefused,
     check_crossing,
 )
 from exulanica.world.errors import InvalidThingPlacement
-from exulanica.world.placed_things import ThingKindReference, named_kind, shipped_kind
+from exulanica.world.placed_things import ThingKindReference, shipped_kind
 from exulanica.world.society import (
     SOCIETY_NAMESPACE,
     SocietyEvent,
@@ -71,14 +75,15 @@ from exulanica.world.society_thing_inputs import (
 
 __all__ = [
     "CAME_BY",
-    "POPULATION_KIND",
     "THINGS_PROFILE",
     "THING_EVENT_KINDS",
     "THING_NAMESPACE",
+    "THING_OUTCOMES",
     "THING_REASONS",
     "VISITORS_MAXIMUM",
     "advance_things",
     "initial_things_society",
+    "kind_allows",
     "validate_things_state",
 ]
 
@@ -86,8 +91,6 @@ THINGS_PROFILE: Final = "exulanica-society/v7"
 #: The namespace a placed thing's id in a society is made in, with its world's id and its placed id,
 #: so a thing a branch keeps is the same thing in every version that keeps it.
 THING_NAMESPACE: Final = uuid.uuid5(SOCIETY_NAMESPACE, "exulanica.placed-thing/v1")
-#: The kind of the people a ground's population brings.
-POPULATION_KIND: Final = ("villager", 1)
 #: How each person came to be in the society.
 CAME_BY: Final = ("populated", "placed", "crossed")
 #: The most visitors a society of things holds at once, so outside programs never crowd out the
@@ -110,6 +113,7 @@ THING_REASONS: Final = frozenset(
         "removed_by_author",
         "society_full",
         "no_place_to_stand",
+        "id_taken",
         # A visitor.
         "crossed_in",
         "sent_home",
@@ -119,7 +123,17 @@ THING_REASONS: Final = frozenset(
         "unknown_kind",
         "already_here",
         "not_here",
+        MALFORMED,
     }
+)
+#: Every outcome the things phase records, stated once: the browser has words for exactly these.
+THING_OUTCOMES: Final = (
+    "arrived",
+    "not_arrived",
+    "not_placed",
+    "put_elsewhere",
+    "departed",
+    "not_departed",
 )
 #: Why a visitor left, by the reason its departure states: the program that sent it called it
 #: back, or the grant it came under ended. Named apart from the world's owner sending everyone
@@ -352,32 +366,60 @@ class _Minute:
 
 
 def _refusal_key(entry: Mapping[str, Any]) -> dict[str, Any]:
-    return {"placed_id": entry["placed_id"], "kind": _reference(entry["kind"])}
+    """A placement as a refusal names it: its id, its kind and where it was put, so moving it is a
+    new placement."""
+    return {
+        "placed_id": entry["placed_id"],
+        "kind": _reference(entry["kind"]),
+        "placed_at_mm": list(entry["position_mm"]),
+    }
 
 
 def _place_beings(minute: _Minute, *, record: bool) -> None:
     """Every placed being of the input that is not here yet comes, in id order, to the open node
     nearest where it was placed: recorded as arriving after genesis, silently at it. One that
-    cannot (the society is full, or no node is open) is refused once, until its placement
-    changes."""
+    cannot is refused once, until its placement changes: no node is open there, or its id is
+    already somebody's or something's here. One refused because the society is full is tried
+    again every minute, silently, and comes when there is room."""
     state, document = minute.state, minute.document
     present = {
         person["placed_id"] for person in state["inhabitants"] if person["came_by"] == "placed"
     }
-    refused = [_refusal_key(entry) for entry in state["refused_placements"]]
     nodes = {n["node_id"]: n["position_mm"] for n in document["navigation"]["nodes"]}
     for entry in placed_beings(document):
-        if entry["placed_id"] in present or _refusal_key(entry) in refused:
+        if entry["placed_id"] in present:
             continue
+        key = _refusal_key(entry)
+        held = next(
+            (
+                refusal
+                for refusal in state["refused_placements"]
+                if {name: refusal[name] for name in key} == key
+            ),
+            None,
+        )
+        if held is not None and (held["reason"] != "society_full" or minute.full()):
+            continue
+        if held is not None:
+            state["refused_placements"].remove(held)
         identity = _thing_id(document["world_id"], entry["placed_id"])
+        here = {person["id"] for person in state["inhabitants"]} | {
+            thing["id"] for thing in state["things"]
+        }
         node = (
             None
-            if minute.full()
+            if minute.full() or identity in here
             else open_node_near(dict(document), state["inhabitants"], entry["position_mm"])
         )
         if node is None:
-            reason = "society_full" if minute.full() else "no_place_to_stand"
-            state["refused_placements"].append({**_refusal_key(entry), "reason": reason})
+            reason = (
+                "id_taken"
+                if identity in here
+                else "society_full"
+                if minute.full()
+                else "no_place_to_stand"
+            )
+            state["refused_placements"].append({**key, "reason": reason})
             if record:
                 minute.emit(
                     "arrival_refused",
@@ -477,12 +519,14 @@ def _reconcile(minute: _Minute) -> None:
             name=person["display_name"],
             details={"kind": person["kind"], "came_by": "placed", "placed_id": person["placed_id"]},
         )
-    # A refusal holds while its placement does: one whose thing was removed or changed is dropped.
+    # A refusal holds while its placement does: one whose thing was removed, changed or moved is
+    # dropped, so the placement is tried again.
     state["refused_placements"] = [
         held
         for held in state["refused_placements"]
         if held["placed_id"] in wanted
-        and _reference(wanted[held["placed_id"]]["kind"]) == held["kind"]
+        and _refusal_key(wanted[held["placed_id"]])
+        == {name: held[name] for name in ("placed_id", "kind", "placed_at_mm")}
     ]
     _place_beings(minute, record=True)
     state["things"] = [
@@ -512,14 +556,14 @@ def _arrive(minute: _Minute, crossing: Crossing, document: Mapping[str, Any]) ->
     gate = document["gate"]
     if gate is None and gates:
         gate = min(gates)
-    held_ids = {thing["id"] for thing in state["things"]}
+    # Every id a person or a thing has here: the visitor and each thing it carries must be new.
+    here = {person["id"] for person in state["inhabitants"]} | {
+        thing["id"] for thing in state["things"]
+    }
     reason = None
     if kind is None or any(found is None for found in carried_kinds):
         reason = "unknown_kind"
-    elif any(person["id"] == identity for person in state["inhabitants"]) or held_ids & {
-        identity,
-        *(held["thing_id"] for held in document["carried"]),
-    }:
+    elif here & {identity, *(held["thing_id"] for held in document["carried"])}:
         reason = "already_here"
     elif (
         sum(1 for person in state["inhabitants"] if person["came_by"] == "crossed")
@@ -598,6 +642,39 @@ def _arrive(minute: _Minute, crossing: Crossing, document: Mapping[str, Any]) ->
     return BoundCrossing(crossing.crossing_id, "arrived", None, event.event_id)
 
 
+def kind_allows(state: Mapping[str, Any], subject_id: str, decider_kind: str) -> bool:
+    """Whether a decider of ``decider_kind`` (``routine``, ``model``, ``person`` or ``external``)
+    may decide for ``subject_id`` here, by its kind's allowed deciders: true for a person of a
+    society whose people state no kind."""
+    person = next((p for p in state["inhabitants"] if p["id"] == subject_id), None)
+    if person is None or "kind" not in person:
+        return True
+    try:
+        kind = shipped_kind(ThingKindReference(**person["kind"]))
+    except (InvalidThingPlacement, TypeError):
+        return False
+    deciders = kind.document["deciders"]
+    return deciders is not None and decider_kind in deciders["allowed"]
+
+
+def _malformed(minute: _Minute, crossing: Crossing) -> BoundCrossing:
+    """A crossing whose document fails its check, refused and bound with an event that names its
+    crossing and nothing from the document: a departure's when the document says it is one, an
+    arrival's otherwise."""
+    document = crossing.document
+    departing = isinstance(document, Mapping) and document.get("profile") == DEPARTURE_PROFILE
+    event = minute.emit(
+        "departure_refused" if departing else "arrival_refused",
+        str(crossing.crossing_id),
+        MALFORMED,
+        "not_departed" if departing else "not_arrived",
+        person=None,
+        name="A visitor",
+        details={"crossing_id": str(crossing.crossing_id)},
+    )
+    return BoundCrossing(crossing.crossing_id, "refused", MALFORMED, event.event_id)
+
+
 def _carried_kind(reference: Mapping[str, Any]) -> ThingKind | None:
     """The shipped object a visitor may carry, by its exact reference, or None."""
     try:
@@ -645,7 +722,8 @@ def initial_things_society(
     )
     state = initial_purposeful_society(society_id, seed, document, population=population)
     state["profile"] = THINGS_PROFILE
-    villager = named_kind(*POPULATION_KIND).document()
+    # The kind the ground's catalog entry names, as the input recorded it.
+    villager = dict(document["population_kind"])
     for person in state["inhabitants"]:
         person.update(
             kind=dict(villager),
@@ -676,18 +754,32 @@ def advance_things(
     ``document`` the input it consumed last. Answers the state, every event of the minute, and
     what became of each crossing, in the order they were handed over."""
     _require(state["profile"] == THINGS_PROFILE, "the things phase is a society of things'")
+    _require(len(crossings) <= CROSSINGS_PER_MINUTE, "a minute takes a bounded number of crossings")
     result = deepcopy(state)
     minute = _Minute(previous, result, seed, document, events)
     _reconcile(minute)
     bound = []
     for crossing in crossings:
-        checked = check_crossing(crossing)
+        try:
+            checked = check_crossing(crossing)
+        except CrossingRefused:
+            bound.append(_malformed(minute, crossing))
+            continue
         if checked["profile"] == ARRIVAL_PROFILE:
             bound.append(_arrive(minute, crossing, checked))
         else:
             bound.append(_depart(minute, crossing, checked))
     validate_things_state(result)
     return result, tuple(minute.events), tuple(bound)
+
+
+#: Why a placed being is not in the society: it is full, no node is open where it was put, or the
+#: id it would have is already somebody's or something's here.
+_PLACEMENT_REFUSALS: Final = ("society_full", "no_place_to_stand", "id_taken")
+
+
+def _point_shape(value: Any) -> bool:
+    return isinstance(value, list) and len(value) == 2 and all(type(c) is int for c in value)
 
 
 def _reference_shape(value: Any) -> bool:
@@ -707,6 +799,7 @@ def _optional_movement(person: Mapping[str, Any]) -> None:
     its module states one, a size class other than the people's."""
     mode = person.get("mode", "walking")
     _require(mode in MODES, "a being moves by a mode a module serves")
+    _require(person.get("mode") != "walking", "a walker states no mode")
     _require(
         ("height_mm" in person) == (mode == "flight")
         and (
@@ -791,8 +884,9 @@ def validate_things_state(state: Mapping[str, Any]) -> None:
     for held in refused:
         _require(
             isinstance(held, dict)
-            and set(held) == {"placed_id", "kind", "reason"}
+            and set(held) == {"placed_id", "kind", "placed_at_mm", "reason"}
             and _reference_shape(held["kind"])
-            and held["reason"] in ("society_full", "no_place_to_stand"),
+            and _point_shape(held["placed_at_mm"])
+            and held["reason"] in _PLACEMENT_REFUSALS,
             "invalid refused placement",
         )
