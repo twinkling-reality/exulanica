@@ -185,6 +185,63 @@ def test_a_declaration_that_disagrees_or_is_not_admitted_writes_nothing(api: Ass
     assert api.namespace_files() == []
 
 
+def test_a_body_the_form_parser_refuses_is_an_invalid_declaration(api: AssetsApi) -> None:
+    # The route reads its own body, so the multipart parser's refusals are its to answer: each is
+    # 422 invalid_declaration, never the parser's own 400 or an exception escaping as a 500.
+    payload = cube().build()
+    text = json.dumps(declaration(payload))
+
+    def raw(*parts: bytes) -> bytes:
+        return b"".join(b"--b\r\n" + part + b"\r\n" for part in parts) + b"--b--\r\n"
+
+    field = b'Content-Disposition: form-data; name="declaration"\r\n\r\n' + text.encode()
+    content = (
+        b'Content-Disposition: form-data; name="content"; filename="object.glb"\r\n'
+        b"Content-Type: model/gltf-binary\r\n\r\n" + payload
+    )
+    extra = b'Content-Disposition: form-data; name="more"; filename="more.glb"\r\n\r\nx'
+    nine_headers = (
+        b'Content-Disposition: form-data; name="declaration"\r\n'
+        + b"".join(b"X-Header-%d: 1\r\n" % n for n in range(9))
+        + b"\r\n"
+        + text.encode()
+    )
+    long_header = (
+        b'Content-Disposition: form-data; name="declaration"\r\nX-Long: '
+        + b"y" * 5000
+        + b"\r\n\r\n"
+        + text.encode()
+    )
+    over = b'Content-Disposition: form-data; name="declaration"\r\n\r\n' + b" " * (64 * 1024 + 1)
+    second_field = b'Content-Disposition: form-data; name="note"\r\n\r\nhello'
+    bodies = {
+        "a declaration over 64 KiB": raw(over, content),
+        "a second file": raw(field, content, extra),
+        "a second field": raw(field, second_field, content),
+        "a part with nine headers": raw(nine_headers, content),
+        "a header line of 5,000 bytes": raw(long_header, content),
+    }
+    # The positive control: the same framing with one field and one file is admitted.
+    admitted = api.client.post(
+        "/workspace-assets",
+        headers={**api.headers(), "Content-Type": "multipart/form-data; boundary=b"},
+        content=raw(field, content),
+    )
+    assert admitted.status_code == 201, admitted.text
+    before = api.counts()
+    for name, body in bodies.items():
+        response = api.client.post(
+            "/workspace-assets",
+            headers={**api.headers(), "Content-Type": "multipart/form-data; boundary=b"},
+            content=body,
+        )
+        assert (response.status_code, response.json()["code"]) == (422, "invalid_declaration"), (
+            name,
+            response.text,
+        )
+    assert api.counts() == before
+
+
 def test_content_over_the_byte_ceiling_is_refused_before_a_row(api: AssetsApi) -> None:
     payload = b"\x00" * (32 * 1024 * 1024 + 4)
     before = api.counts()

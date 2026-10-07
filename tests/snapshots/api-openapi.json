@@ -5657,16 +5657,6 @@
       }
      }
     ],
-    "requestBody": {
-     "required": true,
-     "content": {
-      "multipart/form-data": {
-       "schema": {
-        "$ref": "#/components/schemas/Body_admit_workspace_asset_workspace_assets_post"
-       }
-      }
-     }
-    },
     "responses": {
      "201": {
       "description": "Successful Response",
@@ -5682,6 +5672,32 @@
        "application/json": {
         "schema": {
          "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "requestBody": {
+     "required": true,
+     "content": {
+      "multipart/form-data": {
+       "schema": {
+        "type": "object",
+        "required": [
+         "declaration",
+         "content"
+        ],
+        "properties": {
+         "declaration": {
+          "type": "string",
+          "maxLength": 65536,
+          "title": "Declaration"
+         },
+         "content": {
+          "type": "string",
+          "contentMediaType": "application/octet-stream",
+          "title": "Content"
+         }
         }
        }
       }
@@ -22063,26 +22079,6 @@
     ],
     "title": "BindingBody",
     "description": "One enclosing scope's values, as a caller states them.\n\nDeliberately almost unvalidated here. ``level`` and every key of ``values`` are checked by\n:meth:`CascadeBinding.of` and the cascade, which refuse an unknown level, an unknown\nparameter, a level too fine for a parameter, a second binding at one level and a value outside\nits declared range, each naming the thing that was wrong. A pattern on this model would refuse\nfirst and name a field path instead, which is a worse answer to the same question."
-   },
-   "Body_admit_workspace_asset_workspace_assets_post": {
-    "properties": {
-     "declaration": {
-      "type": "string",
-      "maxLength": 65536,
-      "title": "Declaration"
-     },
-     "content": {
-      "type": "string",
-      "contentMediaType": "application/octet-stream",
-      "title": "Content"
-     }
-    },
-    "type": "object",
-    "required": [
-     "declaration",
-     "content"
-    ],
-    "title": "Body_admit_workspace_asset_workspace_assets_post"
    },
    "Body_intake_intake_post": {
     "properties": {

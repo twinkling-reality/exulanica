@@ -228,7 +228,7 @@ Every route requires a session for the workspace. Writes need `admission.write` 
 
 | Route | Answers |
 | --- | --- |
-| `POST /workspace-assets` | 201 admitted, 200 already admitted; 422 `invalid_declaration` (with `problems`), `licence_not_admitted`, `attribution_required`, `content_digest_mismatch`, `asset_content_refused` (reason in `detail`); 413 `asset_too_large`; 429 `workspace_asset_quota_exceeded` |
+| `POST /workspace-assets` | 201 admitted, 200 already admitted; 422 `invalid_declaration` (with `problems`), `licence_not_admitted`, `attribution_required`, `content_digest_mismatch`, `asset_content_refused` (reason in `detail`); 413 `asset_too_large`, or `body_too_large` for a body over the route's bound; 429 `workspace_asset_quota_exceeded` |
 | `GET /workspace-assets` | The live assets and an `admission` block stating content kinds, units, licences, rights bases, use policy and every bound |
 | `GET /workspace-assets/{asset_id}` | One asset with its preparation and `availability`: `placeable`, or `not_placeable` with `not_prepared`, `preparing`, `preparation_failed`, `preparation_cancelled`, `incompatible` or `prepared_bytes_missing` |
 | `POST /workspace-assets/{asset_id}/preparation` | 202 while a run waits or runs, 200 once prepared or when a content failure is answered |
@@ -245,8 +245,14 @@ stored under.
 
 `POST /workspace-assets` is an upload in the API's admission classes, as `POST /intake` is
 ([deployment](deployment.md#541-admission)): it shares their limit and a workspace's share with
-photograph uploads, may take 600 seconds for its body, and is refused 503 `capacity_exhausted` or
-429 `workspace_capacity_exhausted` before its body is read.
+photograph uploads and may take 600 seconds for its body. Its body is bounded to one asset and one
+declaration at their bounds with the multipart framing around them, about 32 MiB, and a body
+declared over that is refused 413 `body_too_large` before any of it is read. The route reads its own
+body: it is refused 503 `capacity_exhausted` when its class is full, 401 without a credential and
+429 `workspace_capacity_exhausted` at its workspace's share, each before its body is read, and it
+holds no database connection while the body arrives. A body that is not one `declaration` field of
+at most 64 KiB and one `content` file, including one the multipart parser cannot read, is 422
+`invalid_declaration`.
 
 ## Capabilities
 

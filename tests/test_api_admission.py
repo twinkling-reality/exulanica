@@ -35,6 +35,8 @@ from exulanica.api.admission import (
     CapacityRefused,
     require_capacity_declaration,
 )
+from exulanica.api.body_limit import MAX_BODY_BYTES
+from exulanica.api.routes import workspace_assets as workspace_assets_routes
 from exulanica.db.session import Database
 
 from account_fixtures import account_role as account_role
@@ -192,6 +194,90 @@ def test_an_asset_upload_holds_the_upload_class_a_photograph_upload_waits_for(se
     assert refused._sent == 1
     counts = app.state.admission.snapshot()["classes"][UPLOADS]
     assert (counts["in_flight"], counts["refused"]) == (0, 1)
+
+
+def test_an_asset_upload_is_authenticated_and_held_to_its_share_before_its_body_is_read(served):
+    # The route reads its own body, so the caller is authenticated and the workspace's upload share
+    # claimed before any of it is read: each refusal below is answered while its body is still
+    # arriving, which a route the framework parsed first could not do.
+    # Three upload slots, so each request below meets its own refusal rather than a full class.
+    app = served.app(requests=2, workspace_requests=1, uploads=3, workspace_uploads=1, threads=9)
+    multipart = (b"content-type", b"multipart/form-data; boundary=held")
+    holder = Exchange(
+        app,
+        "POST",
+        "/workspace-assets",
+        headers=[*auth(FIRST_TOKEN), multipart],
+        body=[b"--held\r\n"],
+        hold_body=True,
+    )
+    again = Exchange(
+        app,
+        "POST",
+        "/workspace-assets",
+        headers=[*auth(FIRST_TOKEN), multipart],
+        body=[b"--held\r\n"],
+        hold_body=True,
+    )
+    stranger = Exchange(
+        app, "POST", "/workspace-assets", headers=[multipart], body=[b"--held\r\n"], hold_body=True
+    )
+    read_when_answered: dict[str, int] = {}
+
+    async def main() -> None:
+        with anyio.fail_after(10):
+            async with anyio.create_task_group() as group:
+                group.start_soon(holder.run)
+                # It reads its first piece only once its share is claimed, then waits for more.
+                await _until(lambda: holder._sent == 1)
+                group.start_soon(again.run)
+                group.start_soon(stranger.run)
+                await again.started.wait()
+                read_when_answered["again"] = again._sent
+                await stranger.started.wait()
+                read_when_answered["stranger"] = stranger._sent
+                for exchange in (holder, again, stranger):
+                    exchange.leave()
+
+    anyio.run(main)
+    assert again.status == 429
+    assert again.json()["code"] == "workspace_capacity_exhausted"
+    assert again.json()["capacity"] == "uploads"
+    assert stranger.status == 401
+    assert read_when_answered == {"again": 0, "stranger": 0}
+
+
+def test_an_asset_upload_over_its_routes_limit_is_refused_before_its_body_is_read(served):
+    # The server-wide limit is sized for photographs; an asset upload's own is one asset and one
+    # declaration at their bounds, with the framing around them.
+    app = served.app(requests=2, workspace_requests=1, uploads=2, workspace_uploads=1, threads=8)
+    over = Exchange(
+        app,
+        "POST",
+        "/workspace-assets",
+        headers=[
+            *auth(FIRST_TOKEN),
+            (b"content-type", b"multipart/form-data; boundary=held"),
+            (b"content-length", str(workspace_assets_routes.UPLOAD_BODY_MAXIMUM + 1).encode()),
+        ],
+        body=[b"--held\r\n"],
+        hold_body=True,
+    )
+    read_when_answered: dict[str, int] = {}
+
+    async def main() -> None:
+        with anyio.fail_after(10):
+            async with anyio.create_task_group() as group:
+                group.start_soon(over.run)
+                await over.started.wait()
+                read_when_answered["over"] = over._sent
+                over.leave()
+
+    anyio.run(main)
+    assert over.status == 413
+    assert over.json()["code"] == "body_too_large"
+    assert read_when_answered == {"over": 0}
+    assert workspace_assets_routes.UPLOAD_BODY_MAXIMUM < MAX_BODY_BYTES
 
 
 def test_a_slot_comes_back_after_success_failure_and_a_client_that_left(served):

@@ -360,6 +360,11 @@ bounds to `MAX_BODY_BYTES` (512 MiB):
   counted as it arrives and cut off the moment the running total crosses the limit. The overshoot
   is one chunk rather than the whole body.
 
+A route may declare a lower bound beside itself (`BODY_LIMITS`), which the same middleware applies
+the same two ways. `POST /workspace-assets` holds one asset and one declaration at their bounds with
+the framing around them, and reads its own body only after its caller is authenticated and its
+workspace's upload share is claimed ([workspace asset admission](workspace-asset-admission.md#admission)).
+
 In front of the API, each composition's client proxy carries a body cap of its own, set by the
 installation profile it serves:
 

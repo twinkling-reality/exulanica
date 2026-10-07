@@ -434,7 +434,10 @@ def create_app(services: Services | None = None, *, verify: bool = True) -> Fast
     app.add_middleware(AdmissionMiddleware, admission=app.state.admission)
     # Pure ASGI and outermost, so it runs before routing and before any body is read; a route
     # whose body is a small document states its own tighter limit beside the route.
-    app.add_middleware(BodyLimit, routes=(*world_kinds.BODY_LIMITS, *door.BODY_LIMITS))
+    app.add_middleware(
+        BodyLimit,
+        routes=(*world_kinds.BODY_LIMITS, *door.BODY_LIMITS, *workspace_assets.BODY_LIMITS),
+    )
 
     app.include_router(health.router)
     app.include_router(accounts.router)

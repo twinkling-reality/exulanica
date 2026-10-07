@@ -8,6 +8,9 @@ shape of an answer, and ``docs/workspace-asset-admission.md`` states it.
     person's JSON declaration and one ``content`` file. It answers 201 with the new asset, or 200
     with the live asset an identical declaration over identical bytes already made. Every refusal
     is answered before a row or a byte is written. Bytes only: no path, no URL, nothing fetched.
+    Its body is limited to what one upload can hold (``BODY_LIMITS``), and the route reads it
+    itself, after the caller is authenticated and the workspace's upload share claimed, holding no
+    database connection while it arrives.
 *   ``GET /workspace-assets`` lists the workspace's live assets and states what may be admitted
     (content kinds, units, licences and every bound, with units in the names).
 *   ``GET /workspace-assets/{asset_id}`` is one asset with its preparation and one decision,
@@ -34,12 +37,18 @@ checks (:func:`~exulanica.world.workspace_preparations.queues_a_run`,
 from __future__ import annotations
 
 import uuid
-from collections.abc import Mapping
-from typing import Annotated, Any, Final
+from collections.abc import Callable, Mapping
+from contextlib import AbstractContextManager
+from typing import Any, Final
 
 import psycopg
-from fastapi import APIRouter, File, Form, Request, UploadFile
+from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, Response
+from python_multipart.exceptions import ParseError
+from starlette.concurrency import run_in_threadpool
+from starlette.datastructures import UploadFile
+from starlette.exceptions import HTTPException
+from starlette.formparsers import MultiPartException
 
 from exulanica.api.capabilities import (
     AVAILABLE,
@@ -177,6 +186,44 @@ def _refused(error: Exception) -> JSONResponse:
         response.headers["Retry-After"] = "1"
         return response
     raise error
+
+
+#: The most an upload's body may hold: the content and the declaration at their bounds, and the
+#: multipart framing around them. Refused before any of it is read (:mod:`exulanica.api.
+#: body_limit`): the server-wide limit is sized for photographs.
+UPLOAD_BODY_MAXIMUM: Final = MAX_ASSET_BYTES + MAX_DECLARATION_BYTES + 64 * 1024
+BODY_LIMITS: Final = (("POST", "/workspace-assets", UPLOAD_BODY_MAXIMUM),)
+#: The upload's form, stated for the API description: the route reads its own body, so the
+#: framework derives none.
+_UPLOAD_FORM: Final[dict[str, Any]] = {
+    "requestBody": {
+        "required": True,
+        "content": {
+            "multipart/form-data": {
+                "schema": {
+                    "type": "object",
+                    "required": ["declaration", "content"],
+                    "properties": {
+                        "declaration": {
+                            "type": "string",
+                            "maxLength": MAX_DECLARATION_BYTES,
+                            "title": "Declaration",
+                        },
+                        "content": {
+                            "type": "string",
+                            "contentMediaType": "application/octet-stream",
+                            "title": "Content",
+                        },
+                    },
+                }
+            }
+        },
+    }
+}
+_FORM_REFUSED: Final = (
+    f"the body is one declaration field of at most {MAX_DECLARATION_BYTES} bytes "
+    "and one content file, and nothing else"
+)
 
 
 def _json(content: Any, status: int = 200) -> JSONResponse:
@@ -418,27 +465,60 @@ def _described(
 # -- routes --------------------------------------------------------------------------------------
 
 
-@router.post("", status_code=201)
-def admit_workspace_asset(
-    request: Request,
-    connection: ScopedConnection,
-    session: CurrentSession,
-    declaration: Annotated[str, Form(max_length=MAX_DECLARATION_BYTES)],
-    content: Annotated[UploadFile, File()],
+@router.post("", status_code=201, openapi_extra=_UPLOAD_FORM)
+async def admit_workspace_asset(
+    request: Request, session: CurrentSession, sessions: ScopedSessions
 ) -> JSONResponse:
+    # The route declares no form parameter, so the framework reads none of the body before the
+    # app's dependencies have authenticated the caller and claimed the workspace's upload share;
+    # and it opens its connection only once the body is in, so none is held while it arrives.
     try:
-        repository = _repository(request, connection, session)
-        data = content.file.read(MAX_ASSET_BYTES + 1)
-        if len(data) > MAX_ASSET_BYTES:
-            raise AssetTooLarge(f"a workspace asset is at most {MAX_ASSET_BYTES} bytes")
-        result = repository.admit(declaration.encode("utf-8"), data)
-    except (PreparationError, _Unavailable) as error:
-        return _refused(error)
-    present = _present(repository, result.preparation)
-    return _json(
-        _asset_view(result.asset, result.preparation, present),
-        status=201 if result.created else 200,
-    )
+        form = await request.form(max_files=1, max_fields=1, max_part_size=MAX_DECLARATION_BYTES)
+    except (MultiPartException, ParseError):
+        # ParseError: a body the multipart parser cannot read, such as a part with more headers,
+        # or a longer header line, than it reads.
+        return _refused(InvalidDeclaration([_FORM_REFUSED]))
+    except HTTPException as error:
+        # Inside an app, Starlette answers its own parser's limits (a second file or field, a field
+        # over its size) with a 400; any other answer passes on as it is.
+        if error.status_code != 400:
+            raise
+        return _refused(InvalidDeclaration([_FORM_REFUSED]))
+    try:
+        declaration = form.get("declaration")
+        content = form.get("content")
+        if (
+            set(form.keys()) != {"declaration", "content"}
+            or not isinstance(declaration, str)
+            or not isinstance(content, UploadFile)
+        ):
+            return _refused(InvalidDeclaration([_FORM_REFUSED]))
+        return await run_in_threadpool(_admit, request, session, sessions, declaration, content)
+    finally:
+        await form.close()
+
+
+def _admit(
+    request: Request,
+    session: Session,
+    sessions: Callable[[], AbstractContextManager[psycopg.Connection]],
+    declaration: str,
+    content: UploadFile,
+) -> JSONResponse:
+    with sessions() as connection:
+        try:
+            repository = _repository(request, connection, session)
+            data = content.file.read(MAX_ASSET_BYTES + 1)
+            if len(data) > MAX_ASSET_BYTES:
+                raise AssetTooLarge(f"a workspace asset is at most {MAX_ASSET_BYTES} bytes")
+            result = repository.admit(declaration.encode("utf-8"), data)
+        except (PreparationError, _Unavailable) as error:
+            return _refused(error)
+        present = _present(repository, result.preparation)
+        return _json(
+            _asset_view(result.asset, result.preparation, present),
+            status=201 if result.created else 200,
+        )
 
 
 @router.get("")
