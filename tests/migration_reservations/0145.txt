@@ -1,1 +1,1 @@
-lane GEN (2026-10-03 wave), package 4: the generated-piece product side (requests, batches, outputs)
+a hole kept for lane GEN (2026-10-03 wave): reserved for package 4, the generated-piece product side, and never used, because from 0157 every migration lands numbered above main's highest
