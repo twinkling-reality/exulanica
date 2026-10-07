@@ -21,6 +21,7 @@ from exulanica.things.authored import AUTHORED_LOOKS, container_of
 from exulanica.world.assets import reviewed_assets
 from exulanica.world.thing_library import (
     BODY_PLANS,
+    IMPORTED_CONTAINERS,
     LIBRARY_PROFILE,
     LOOKS_DIRECTORY,
     ThingLibraryRefused,
@@ -87,6 +88,10 @@ def test_it_serves_each_document_and_container_by_digest_and_nothing_else() -> N
     assert plans is not None and plans.data == BODY_PLANS.read_bytes()
     expected.add(plans.sha256)
     furniture = {asset.content_sha256: asset.payload for asset in reviewed_assets()}
+    imported = {
+        hashlib.sha256(path.read_bytes()).hexdigest(): path.read_bytes()
+        for path in IMPORTED_CONTAINERS.rglob("*.glb")
+    }
     made = 0
     for document in _documents(LOOKS).values():
         container = document["container"]
@@ -98,8 +103,10 @@ def test_it_serves_each_document_and_container_by_digest_and_nothing_else() -> N
         if document["look"] in AUTHORED_LOOKS:
             assert item.data == container_of(document["look"])
             made += 1
-        else:
+        elif container["sha256"] in furniture:
             assert item.data == furniture[container["sha256"]]
+        else:
+            assert item.data == imported[container["sha256"]]
         expected.add(item.sha256)
     # The positive control: authored and furniture containers both reach the library.
     assert 0 < made < len(expected)
@@ -131,7 +138,9 @@ def test_an_imported_container_is_read_by_the_digest_its_look_pins(tmp_path: Pat
         },
     }
     _write(looks / "imported-gate.v1.json", imported)
+    # The shipped imported looks keep their own containers; the gate's is the one left out.
     packs = tmp_path / "things"
+    shutil.copytree(IMPORTED_CONTAINERS, packs)
     (packs / "a-pack").mkdir(parents=True)
     with pytest.raises(ThingLibraryRefused, match="no source gives the container look imported"):
         load_thing_library(looks_directory=looks, imported_directory=packs)
