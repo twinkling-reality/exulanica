@@ -26,6 +26,7 @@ import hashlib
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
+from types import MappingProxyType
 from typing import Any, Final
 
 from exulanica.canonical import canonical_json
@@ -44,6 +45,7 @@ __all__ = [
     "ThingLibrary",
     "ThingLibraryRefused",
     "load_thing_library",
+    "shipped_looks",
     "thing_library",
 ]
 
@@ -170,3 +172,10 @@ def load_thing_library(
 def thing_library() -> ThingLibrary:
     """The shipped library, read and checked once per process."""
     return load_thing_library()
+
+
+@functools.cache
+def shipped_looks() -> Mapping[tuple[str, int], Look]:
+    """Every shipped look by key and version, each read and checked, once per process: the looks
+    the library serves, without reading a container."""
+    return MappingProxyType({(look.look, look.version): look for look in _looks(LOOKS_DIRECTORY)})

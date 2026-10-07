@@ -1,10 +1,12 @@
-"""Things placed in an authored version by their kind: place, move, remove and undo.
+"""Things placed in an authored version by their kind: place, move, remove and undo, and the look
+each thing of a version wears.
 
 A placed thing names a shipped thing kind by key, version and digest and stands in a region of the
 version's source snapshot at its kind's own size (:mod:`exulanica.world.placed_things`). Every edit
 names the version state it was made against and runs in
 :func:`exulanica.api.world_edit.commit_edit`, like every other authored edit, and answers with the
-whole version.
+whole version. ``GET .../thing-looks`` answers the latest look chosen for each thing of the
+version (:mod:`exulanica.world.thing_looks`), never cached.
 """
 
 from __future__ import annotations
@@ -13,14 +15,22 @@ import uuid
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Path, Request, Response
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, StrictInt
 
 from exulanica.api.dependencies import CurrentSession
-from exulanica.api.world_edit import BaseStateBody, EntryBoundEditBody, WriteObjects, commit_edit
+from exulanica.api.world_edit import (
+    BaseStateBody,
+    EntryBoundEditBody,
+    ReadObjects,
+    WriteObjects,
+    commit_edit,
+)
 from exulanica.api.world_version_document import AlternateVersionView
 from exulanica.world.authored_delta import AlternateVersion
 from exulanica.world.objects import MAX_YAW_MICRORADIANS, ObjectOrigin, Transform
 from exulanica.world.placed_things import UNSCALED_MILLI, ThingPlacement, named_kind
+from exulanica.world.thing_looks import look_choices
 
 router = APIRouter(prefix="/world", tags=["world"])
 
@@ -161,4 +171,17 @@ def undo_thing_edit(
         lambda: repository.undo(
             version_id, base_state_sha256=body.base_state_sha256, actor=session.actor
         ),
+    )
+
+
+@router.get(
+    "/versions/{version_id}/thing-looks",
+    summary="The look each thing of a version wears: the latest choice per thing.",
+)
+def thing_looks(version_id: Annotated[uuid.UUID, Path()], repository: ReadObjects) -> JSONResponse:
+    return JSONResponse(
+        content=look_choices(
+            repository.connection, repository.workspace_id, repository.world_id, version_id
+        ),
+        headers={"Cache-Control": "private, no-store"},
     )

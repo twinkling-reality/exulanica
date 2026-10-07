@@ -231,6 +231,21 @@ records apart from what a thing is, a kind is given to a society only through it
 a crossing's look rides beside its arrival, never in it. Swapping a thing's look therefore changes
 no state and no decision.
 
+The look a thing wears in a version is a choice recorded beside it
+([`thing_looks.py`](../exulanica/world/thing_looks.py), migration 0156): a shipped look by key,
+version and digest, one the library holds, whose body plan is the thing's kind's (refused otherwise
+as `look_not_shipped`, `look_unfit` or `thing_kind_not_shipped`). `check_crossing_look` checks the
+look a crossing brings, reading only the shipped catalogs, so a door refuses an arrival before it
+writes anything; `record_crossing_look` records it, for a door to call in the transaction of the
+minute that binds the arrival as arrived, once per crossing however often it is handed over. Choices
+are appended and never changed, each naming the crossing or the actor that made it, and the newest
+per thing is worn; a thing with none wears its kind's first look.
+`GET /world/versions/{version_id}/thing-looks` (`world.read`, never cached) answers
+`exulanica.thing-look-choices/v1`: the newest choice for each thing of the version, in thing id
+order, each with the thing's id in its society, the author's id for a placed thing, the look, who
+chose it and when. Choices stay with the version, as its society does.
+
+
 The looks this repository authors are recipe documents, profile `exulanica.look-recipe/v1`, under
 [`assets/catalogs/things/recipes`](../assets/catalogs/things/recipes), one file per recipe version,
 each with its origin record. A recipe states named nodes, each at a point in the slot frame and
@@ -585,8 +600,9 @@ These are material limits of the boundary above, not partial behaviour:
 
 - No society engine reads a thing kind, and no ability module runs: the abilities catalog names
   modules no registry states. A world's people are the society's own, drawn as today.
-- No store holds a workspace's own kinds or looks, or the look chosen for a thing: the library
-  serves the shipped ones only. A placed thing names a shipped kind.
+- No store holds a workspace's own kinds or looks: the library serves the shipped ones only, a
+  placed thing names a shipped kind and a thing wears a shipped look. The world's owner has no
+  route to choose a look, and a look is recorded only where a door records its crossing's.
 - The browser draws no thing a society moves, no held thing, no line and no mark of who decides,
   and no look chosen for a thing: placed things stand in their kind's first look.
 - No crossing writes a translation manifest yet; the look importer writes one for each look it
@@ -609,6 +625,7 @@ These are material limits of the boundary above, not partial behaviour:
 | Translation manifests and lines | [`manifests.py`](../exulanica/things/manifests.py), [`lines.py`](../exulanica/things/lines.py) | `tests/test_thing_looks_and_origins.py` (words held to the line rule, a look's import, each refusal against a positive control) |
 | Shipped kinds and looks | [`shipped_things.py`](../scripts/things/shipped_things.py), the lock `kinds.lock.json` | `tests/test_thing_kinds.py` (`--check`), `tests/test_placed_things.py` (every shipped version at its locked digest; a changed, unlocked or missing file refused) |
 | The thing library | [`thing_library.py`](../exulanica/world/thing_library.py), [`things.py`](../exulanica/api/routes/things.py) | `tests/test_thing_library.py` (every shipped document and container by digest, an imported container by the digest its look pins, each refusal against a positive control), `tests/test_thing_library_routes.py` (a session required, the bytes a digest names, 404 otherwise), `tests/test_image_ships_startup_reads.py` (every file it reads ships in the API image) |
+| Look choices | [`thing_looks.py`](../exulanica/world/thing_looks.py), [`world_things.py`](../exulanica/api/routes/world_things.py) (the read), migration 0156 | `tests/test_thing_looks.py` (a shipped look fit for the kind, each refusal by name), `tests/test_thing_looks_postgres.py` (as the deployed writer: one look per crossing, the newest per thing, no change or removal; the table's shape and its append-only trigger; another workspace sees nothing; the route) |
 | Placed things | [`placed_things.py`](../exulanica/world/placed_things.py), the object repository, [`world_things.py`](../exulanica/api/routes/world_things.py), migration 0152 | `tests/test_placed_things.py`, `tests/test_placed_things_postgres.py` (as the deployed writer: place, move, remove, undo and place again; the kind fixed by the table; another workspace sees nothing; a branch keeps them; the routes' refusals by name), `tests/test_edit_kind_undo_postgres.py` |
 | Creatures: recipes, plans, sketches, assembly | [`bodies.py`](../exulanica/things/bodies.py), [`sketch.py`](../exulanica/things/sketch.py), [`creatures.py`](../exulanica/things/creatures.py), [`body-grammar.v1.json`](../assets/catalogs/things/body-grammar.v1.json) | `tests/test_creature_bodies.py` (thirteen hand-written creatures: each body where its recipe says, a left limb the mirror of its right, each limb of a lying body hung from the stretch of spine beside it, the bone count the recipe's own sum, each refusal by name, the sketch read back from its bytes) |
 | The creature drafter | [`creature_drafting.py`](../exulanica/selection/creature_drafting.py), [`creature-drafting.v1.json`](../exulanica/selection/creature-drafting.v1.json) | `tests/test_creature_drafting.py` (scripted replies: a pass with its provenance, a refusal repaired with its check's sentence, two refusals, a form outside the schema, a reply cut off in blank space), `tests/test_hosted_boundary.py` (its request carries no saved name) |

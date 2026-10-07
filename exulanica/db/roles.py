@@ -284,6 +284,9 @@ INSERT_ONLY_TABLES: Final = (
     "door_ask",
     "door_answer",
     "door_redemption_refusal",
+    # Migration 0156 appends the look each thing of a version wears and refuses every update and
+    # delete of one.
+    "world_thing_look",
 )
 
 #: Tables the runtime may change only in the named columns: provisioning takes the table's UPDATE

@@ -145,6 +145,7 @@ VERSION_TABLES: Final[Mapping[str, str]] = {
     "world_alternate_environment_instance": "carried while its source can still be placed",
     "world_alternate_point_map_instance": "carried while its depth right and bytes allow it",
     "world_alternate_thing": "carried: it names a shipped kind by a digest that never changes",
+    "world_thing_look": "stays in the previous version with the society its visitors crossed into",
     "world_alternate_version_edit": "carried whole when every row carries, otherwise not at all",
     "world_character_appearance_revision": "the avatar's carried; an inhabitant's stay",
     "world_society": "stays in the previous version; inhabitants who are here refuse",
