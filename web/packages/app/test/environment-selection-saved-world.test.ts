@@ -295,6 +295,37 @@ describe('a saved world holds inhabitants only when the person asks', () => {
     const details = [...inspector.querySelectorAll('dt')].map((dt) => [dt.textContent, dt.nextElementSibling?.textContent]);
     expect(details).toContainEqual(['Decided by', 'Nemotron 3 Nano 30B, which you chose.']);
     expect(details).toContainEqual(['Latest decision', 'At simulated minute 1, Nemotron 3 Nano 30B chose “rest, 4 m away”, and they did it.']);
+    // Another surface's view of the selected person (the thing card) takes Selected when it can.
+    const card = document.createElement('section');
+    const shown: string[] = [];
+    let takes = true;
+    const view = { root: card, show: vi.fn((id: string) => { shown.push(id); return takes; }), hide: vi.fn() };
+    mounted.useInhabitantView(view);
+    expect(card.isConnected).toBe(true);
+    expect(card.hidden).toBe(false);
+    expect(inspector.hidden).toBe(true);
+    expect(shown.at(-1)).toBe('person-0');
+    takes = false;
+    controls.onInteract?.();
+    for (let i = 0; i < 2; i += 1) await settle();
+    expect(card.hidden).toBe(true);
+    expect(inspector.hidden).toBe(false);
+    mounted.useInhabitantView(null);
+    expect(card.isConnected).toBe(false);
+    // The same surface chooses who decides, by the panel's own path and in its words.
+    expect(mounted.models()?.map((model) => model.name)).toEqual(['Nemotron 3 Nano 30B']);
+    const choices = modelsClient.choose.mock.calls.length;
+    const outcome = await mounted.decide({
+      role: 'people', subjectIds: ['person-4'], model: { provider: MODEL.provider, modelId: MODEL.model_id },
+    });
+    expect(modelsClient.choose).toHaveBeenCalledTimes(choices + 1);
+    expect(modelsClient.choose).toHaveBeenLastCalledWith(
+      'version', ['person-4'], { provider: MODEL.provider, modelId: MODEL.model_id },
+    );
+    expect(outcome).toEqual({
+      recorded: true,
+      words: 'One person is now decided by the model you chose, from the next time they choose what to do.',
+    });
     // A minute advanced is read once more, and the same minute drawn again is not.
     const reads = modelsClient.read.mock.calls.length;
     const advance = () => [...panel().querySelectorAll('button')].find((b) => b.textContent === 'Next minute')!;

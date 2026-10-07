@@ -13,7 +13,7 @@
 import { problemSentence, problemWords } from '../ui/words/problems.js';
 import { ApiError } from '@exulanica/graph-client';
 import type { Credentials } from '../config.js';
-import { SocietyModelsClient, type ModelRef, type SocietyModels } from '../society-models-api.js';
+import { SocietyModelsClient, type ModelRef, type SocietyModel, type SocietyModels } from '../society-models-api.js';
 import { WorldModelsClient, type SignalRole } from '../world-models-api.js';
 import {
   buildSocietyModels,
@@ -24,6 +24,12 @@ import {
   type ChoosablePerson,
 } from '../ui/society-models.js';
 import { buildSignalModels } from '../ui/world-signals-models.js';
+
+/** What a choice came to: whether the server recorded it, and the words the panel says for it. */
+export interface ChoiceOutcome {
+  readonly recorded: boolean;
+  readonly words: string;
+}
 
 /** Whose decider another surface asks Who decides to show, by role and the server's subject ids. */
 export interface DecidesTarget {
@@ -45,6 +51,14 @@ export interface MountedSocietyModels {
    * ticked, or the one traffic light selected. Returns how many it chose.
    */
   chooseFor(target: DecidesTarget): number;
+  /**
+   * Choose who decides for these people from another surface (the thing card), by the same path
+   * as the panel's own action: what the server recorded, said in the panel's own words, after a
+   * read begun after it.
+   */
+  decide(subjectIds: readonly string[], model: ModelRef | null): Promise<ChoiceOutcome>;
+  /** The models the last read offered for people, or null before it or where none is chosen here. */
+  models(): readonly SocietyModel[] | null;
   dispose(): void;
 }
 
@@ -92,7 +106,7 @@ export function mountSocietyModels(options: {
 
   const signals = buildSignalModels({ onChoose: (signalId, model) => void chooseSignal(signalId, model) });
   const section = buildSocietyModels({
-    onChoose: (chosen, model) => void choose(chosen, model),
+    onChoose: (chosen, model) => { void choose(chosen, model); },
     signals: signals.root,
   });
   const render = () => {
@@ -150,8 +164,10 @@ export function mountSocietyModels(options: {
     if (again && !disposed) { again = false; await refresh(wanted, people, true); }
   }
 
-  async function choose(chosen: readonly string[], model: ModelRef | null): Promise<void> {
-    if (disposed || busy || chosen.length === 0) return;
+  async function choose(chosen: readonly string[], model: ModelRef | null): Promise<ChoiceOutcome> {
+    if (disposed) return { recorded: false, words: 'This world is no longer open.' };
+    if (busy) return { recorded: false, words: 'Another choice is still being recorded. Try again in a moment.' };
+    if (chosen.length === 0) return { recorded: false, words: 'Nobody was chosen, so nothing changed.' };
     busy = true;
     message = '';
     render();
@@ -175,6 +191,7 @@ export function mountSocietyModels(options: {
       message = recordedWords(view, chosen, model);
       render();
     }
+    return { recorded, words: message };
   }
 
   async function chooseSignal(signalId: string, model: ModelRef | null): Promise<void> {
@@ -203,6 +220,15 @@ export function mountSocietyModels(options: {
   return {
     root: section.root,
     refresh,
+    decide(subjectIds, model) {
+      if (view === null || !view.takesModelChoices) {
+        return Promise.resolve({ recorded: false, words: 'Nobody here can be decided for by a model.' });
+      }
+      return choose(subjectIds, model);
+    },
+    models() {
+      return view === null || !view.takesModelChoices ? null : view.models;
+    },
     chooseFor(target) {
       if (target.role === 'people') return section.chooseFor(target.subjectIds);
       section.showRole('signals');

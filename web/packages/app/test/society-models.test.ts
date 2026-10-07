@@ -213,6 +213,11 @@ describe('the mounted section', () => {
     box.dispatchEvent(new Event('change'));
     mounted.root.querySelector<HTMLButtonElement>('button.society-models-choose')!.click();
     await vi.waitFor(() => expect(mounted.root.textContent).toContain(CHOICE_REFUSAL_WORDS['too_many_model_people']));
+    // Another surface asking the same gets the same words back, and nothing is said recorded.
+    expect(await mounted.decide(['ada'], { provider: 'nebius_token_factory', modelId: MODEL })).toEqual({
+      recorded: false, words: CHOICE_REFUSAL_WORDS['too_many_model_people'],
+    });
+    expect(await mounted.decide([], null)).toEqual({ recorded: false, words: 'Nobody was chosen, so nothing changed.' });
   });
 
   it('says a recorded choice leaves them to their routine for now, and why, when this host asks no model', async () => {

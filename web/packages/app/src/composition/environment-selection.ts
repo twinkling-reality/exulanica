@@ -40,8 +40,8 @@ import {
   type SocietyPlaybackSpeed,
 } from '../society-control-api.js';
 import { createLiveSociety, type LiveSociety, type LiveSocietyView } from './live-society.js';
-import { mountSocietyModels, type DecidesTarget, type MountedSocietyModels } from './society-models-mount.js';
-import type { SocietyModelsClient } from '../society-models-api.js';
+import { mountSocietyModels, type ChoiceOutcome, type DecidesTarget, type MountedSocietyModels } from './society-models-mount.js';
+import type { ModelRef, SocietyModel, SocietyModelsClient } from '../society-models-api.js';
 import { unreadMinutes } from './society-unread-minutes.js';
 import { SocietyDistrictClient, type SocietyDistrictPlacement, type SocietyDistrictView } from '../society-district-api.js';
 import {
@@ -155,6 +155,14 @@ export interface EnvironmentSelectionDependencies {
   };
 }
 
+/** A view another surface shows in Selected for a person, in place of the inspector. */
+export interface InhabitantView {
+  readonly root: HTMLElement;
+  /** Show this person; false leaves them to the inspector. Called again on every refresh. */
+  show(subjectId: string): boolean;
+  hide(): void;
+}
+
 export interface MountedEnvironmentSelection {
   readonly root: HTMLElement;
   begin(): Promise<void>;
@@ -166,6 +174,19 @@ export interface MountedEnvironmentSelection {
    * swap). Returns how many it chose; 0 where this world offers no such choice.
    */
   openDecides(target: DecidesTarget): number;
+  /**
+   * Choose who decides for these people from another surface, by Who decides' own choose: what
+   * the server recorded, in the panel's words. Where nobody here takes a model choice, says so.
+   */
+  decide(target: { readonly role: 'people'; readonly subjectIds: readonly string[]; readonly model: ModelRef | null }): Promise<ChoiceOutcome>;
+  /** The models the last read of Who decides offered for people, or null. */
+  models(): readonly SocietyModel[] | null;
+  /**
+   * Another surface's view of a selected person (the thing card), shown in Selected in place of
+   * the inspector whenever `show` answers true for the person selected; null puts the inspector
+   * back for everyone.
+   */
+  useInhabitantView(view: InhabitantView | null): void;
   setWelcomeVisible(visible: boolean): void;
   afterAuthoredEdit(versionId: string): Promise<void>;
   districtPlacement(): SocietyDistrictPlacement | null;
@@ -264,6 +285,14 @@ export function mountEnvironmentSelection(
     'aria-label': 'NYC Open Data semantic selection',
   });
   const inspector = createLivingWorldInspector();
+  /** Another surface's view of a selected person, shown in place of the inspector when it can. */
+  let inhabitantView: InhabitantView | null = null;
+  /** Selected shows the inspector: what any selection but a person another view shows uses. */
+  const showInspector = (): void => {
+    inhabitantView?.hide();
+    if (inhabitantView !== null) inhabitantView.root.hidden = true;
+    inspector.root.hidden = false;
+  };
   const title = el('h2', { text: 'NYC Open Data' });
   // Says what the open world is once the renderer has decided it (see `attach`); nothing is
   // claimed before then, because a sentence written here would describe one kind of world for all.
@@ -546,6 +575,7 @@ export function mountEnvironmentSelection(
     const doc = runtime?.interpretation;
     if (!doc) return;
     workspace.inspect();
+    showInspector();
     if (!keepInhabitant) selectedInhabitant = null;
     inspectedInhabitant = null;
     citedWords = null;
@@ -679,6 +709,12 @@ export function mountEnvironmentSelection(
     place.disabled = true; modify.disabled = true; remove.disabled = true;
     invalidateProposal('Select an authored object before editing.');
     selected.textContent = 'Selected synthetic inhabitant';
+    if (inhabitantView !== null && inhabitantView.show(id)) {
+      inhabitantView.root.hidden = false;
+      inspector.root.hidden = true;
+      return true;
+    }
+    showInspector();
     // Which reader applies is the state's family in the engine table, never its engine's name.
     const family = societyEngine(state.profile).stateFamily;
     if (family === 'living') { inspectLivingInhabitant(inhabitant, state); return true; }
@@ -1070,6 +1106,7 @@ export function mountEnvironmentSelection(
 
   function reportSelection(feature: NYCLocalFeature, reveal = true): void {
     if (reveal) workspace.inspect();
+    showInspector();
     selectedInhabitant = null;
     inspectedInhabitant = null;
     directedAction = null;
@@ -2123,6 +2160,19 @@ export function mountEnvironmentSelection(
     },
     closePanels: () => workspace.close(false),
     openPanel: (name) => workspace.openPanel(name),
+    decide: (target) => societyModels?.decide(target.subjectIds, target.model)
+      ?? Promise.resolve({ recorded: false, words: 'Nobody here can be decided for by a model.' }),
+    models: () => societyModels?.models() ?? null,
+    useInhabitantView: (view) => {
+      if (inhabitantView !== null && inhabitantView !== view) { inhabitantView.hide(); inhabitantView.root.remove(); }
+      inhabitantView = view;
+      if (view !== null) {
+        view.root.hidden = true;
+        inspector.root.after(view.root);
+      }
+      inspector.root.hidden = false;
+      if (selectedInhabitant !== null && inspectedInhabitant === selectedInhabitant) inspectInhabitant(selectedInhabitant, false);
+    },
     openDecides: (target) => {
       workspace.openPanel('decides');
       return societyModels?.chooseFor(target) ?? 0;
