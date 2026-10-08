@@ -93,3 +93,36 @@ describe('a simulated person in words, as the server says them', () => {
     expect(inhabitantWords(person, rows)).toEqual(held.expected);
   });
 });
+
+describe('a person a program from outside decides for', () => {
+  // A decider's choice is recorded as chosen_by_their_model whichever decider made it; for a person
+  // whose own program decides, no model of this world was asked, so the words must not credit one.
+  const phrase = (code: string) => CATALOG.entries.find((entry) => entry.kind === 'phrase' && entry.code === code)!.words;
+  const reason = (code: string) => CATALOG.entries.find((entry) => entry.kind === 'reason' && entry.code === code)!.words;
+  const chosen = CASES.cases.find((one) => one.person.goal !== null && typeof one.person.goal === 'object' &&
+    'reason' in one.person.goal && (one.person.goal as { reason: string }).reason === 'chosen_by_their_model');
+
+  it('says its own program chose, where a model is credited for anyone else', () => {
+    const person = chosen?.person ?? ({
+      display_name: 'Visitor', role: null, goal: null,
+      action: { kind: 'idle', status: 'active', target_id: null, remaining_ticks: 0, reason: 'chosen_by_their_model' },
+    } as unknown as WordedPerson);
+    const because = (words: string) => phrase('because').replace('{reason}', words);
+    const ours = inhabitantWordsFrom(person, () => 'the well', () => 'Knight', null, null, false);
+    const outside = inhabitantWordsFrom(person, () => 'the well', () => 'Knight', null, null, true);
+    expect(ours.why).toBe(because(reason('chosen_by_their_model')));
+    expect(outside.why).toBe(because(phrase('chosen_by_their_program')));
+    expect(outside.why).not.toMatch(/model/u);
+    // Nothing else changes.
+    expect({ ...outside, why: '' }).toEqual({ ...ours, why: '' });
+  });
+
+  it('leaves every other reason as it is', () => {
+    const person = {
+      display_name: 'Visitor', role: null, goal: null,
+      action: { kind: 'idle', status: 'active', target_id: null, remaining_ticks: 0, reason: 'awaiting_goal' },
+    } as unknown as WordedPerson;
+    expect(inhabitantWordsFrom(person, () => null, () => null, null, null, true).why)
+      .toBe(inhabitantWordsFrom(person, () => null, () => null, null, null, false).why);
+  });
+});

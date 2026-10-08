@@ -859,7 +859,9 @@ export function mountEnvironmentSelection(
     // engine: a stored society of a retired engine shares the purposeful family and has none.
     const worded = savedWorld !== null && purposeful && hasInhabitantWords(state.profile);
     const words = worded && society?.places
-      ? inhabitantWords(inhabitant, placeRows(savedObjects() ?? [], society.places), state.inhabitants, state.profile)
+      ? inhabitantWords(inhabitant, placeRows(savedObjects() ?? [], society.places), state.inhabitants, state.profile,
+        // A visitor its own program decides for: its choices are that program's, never a model's.
+        inhabitant.came_by === 'crossed' && inhabitant.crossing != null && inhabitant.crossing.decided_by !== 'world')
       : null;
     inspector.show({
       subject: id,

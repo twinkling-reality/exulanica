@@ -153,6 +153,12 @@ export function inhabitantWordsFrom(
   partner: (inhabitantId: string) => string | null,
   profile: string | null = null,
   placeWords: PlaceWords | null = null,
+  /**
+   * Set where a program from outside the world decides for this person: their choices are recorded
+   * as any decider's are (`chosen_by_their_model`), but no model was asked, so the words say their
+   * own program chose. The server's Companion does not pass it.
+   */
+  decidedFromOutside = false,
 ): InhabitantWords {
   const living = person as unknown as {
     readonly ordinal?: number;
@@ -212,7 +218,8 @@ export function inhabitantWordsFrom(
   const acting = action.status === 'blocked'
     || (under !== undefined && under.setting !== 'object' && action.reason !== under.underWayReason);
   const code = !acting && goal !== null ? goal.reason : action.reason;
-  return { who, what, doing, why: fill(words('phrase', 'because'), { reason: reasonWords(code) }) };
+  const reason = decidedFromOutside && code === 'chosen_by_their_model' ? words('phrase', 'chosen_by_their_program') : reasonWords(code);
+  return { who, what, doing, why: fill(words('phrase', 'because'), { reason }) };
 }
 
 /** The living inspector reads the same activity and reason phrases as the Companion. */

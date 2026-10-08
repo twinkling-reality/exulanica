@@ -331,6 +331,13 @@
       "reason": "Authored: one piece of the sentence that says who a simulated person is or what they are doing, shared by the inspector and the Companion so the two never say it differently."
     },
     {
+      "key": "phrase.chosen_by_their_program",
+      "kind": "phrase",
+      "code": "chosen_by_their_program",
+      "words": "its own program chose it",
+      "reason": "Authored: why a person did what they do when the program that came with them from outside decides for them: their choice is recorded with the reason a decider's choice records (chosen_by_their_model), but no model of this world was asked, so the words never credit one."
+    },
+    {
       "key": "phrase.because",
       "kind": "phrase",
       "code": "because",

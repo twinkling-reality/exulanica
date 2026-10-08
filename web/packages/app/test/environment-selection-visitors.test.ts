@@ -343,3 +343,36 @@ describe('a visitor of a kind its workspace made', () => {
     mounted.dispose();
   });
 });
+
+describe('why a visitor its own program decides for did something', () => {
+  it('credits its own program, never a model, where a world-run being and a placed one credit their model', async () => {
+    const catalog = JSON.parse(readFileSync(`${process.cwd()}/../assets/catalogs/society-words/society-inhabitant-words.v1.json`, 'utf8')) as
+      { entries: { kind: string; code: string; words: string }[] };
+    const words = (kind: string, code: string) => catalog.entries.find((entry) => entry.kind === kind && entry.code === code)!.words;
+    const chose = { kind: 'idle', status: 'active', target_id: null, remaining_ticks: 0, reason: 'chosen_by_their_model' };
+    server.tick = 7;
+    server.people = [
+      person('knight-0', { kind: KNIGHT, came_by: 'placed', placed_id: 'knight-1', action: chose }),
+      person('visitor-1', { kind: KNIGHT, came_by: 'crossed', placed_id: null, action: chose, crossing: { arrival_id: 'a1', bridge: 'blockgame', grant_id: 'g1' } }),
+      person('visitor-2', { kind: KNIGHT, came_by: 'crossed', placed_id: null, action: chose, crossing: { arrival_id: 'a2', bridge: 'blockgame', grant_id: 'g2', decided_by: 'world' } }),
+    ];
+    server.things = [];
+    server.events = [];
+    const { mounted, shown, crowd } = mount();
+    crowd.visibleInhabitantIds = ['knight-0', 'visitor-1', 'visitor-2'];
+    await mounted.begin();
+    await settle();
+    const pick = [...document.querySelectorAll('select')].find((one) => one.getAttribute('aria-label') === 'Inspect nearby inhabitant')!;
+    const activityOf = (id: string): string => {
+      pick.value = id;
+      pick.dispatchEvent(new Event('change'));
+      return shown.at(-1)!.about.note.activity;
+    };
+    const because = (reason: string) => words('phrase', 'because').replace('{reason}', reason);
+    expect(activityOf('visitor-1')).toContain(because(words('phrase', 'chosen_by_their_program')));
+    expect(activityOf('visitor-1')).not.toContain(words('reason', 'chosen_by_their_model'));
+    expect(activityOf('visitor-2')).toContain(because(words('reason', 'chosen_by_their_model')));
+    expect(activityOf('knight-0')).toContain(because(words('reason', 'chosen_by_their_model')));
+    mounted.dispose();
+  });
+});

@@ -330,6 +330,8 @@ export function inhabitantWords(
   rows: readonly PlaceRow[],
   people: readonly Inhabitant[] = [],
   profile: string | null = null,
+  /** Set where a program from outside the world decides for them (`inhabitantWordsFrom`). */
+  decidedFromOutside = false,
 ): InhabitantWords {
   const named = new Map<string, string>();
   for (const row of rows) if (row.status.kind === 'usable') named.set(row.status.targetId, row.label);
@@ -338,6 +340,8 @@ export function inhabitantWords(
     (targetId) => named.get(targetId) ?? null,
     (id) => people.find((other) => other.id === id)?.display_name ?? null,
     profile,
+    null,
+    decidedFromOutside,
   );
 }
 
