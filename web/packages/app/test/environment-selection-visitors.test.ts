@@ -99,6 +99,8 @@ const server = {
   people: [person('knight-0', { kind: KNIGHT, came_by: 'placed', placed_id: 'knight-1' })] as Record<string, unknown>[],
   things: [] as Record<string, unknown>[],
   events: [] as SocietyEvent[],
+  /** Who outside programs decide for now, as the models read lists them; nobody unless a test says. */
+  outside: [] as NonNullable<SocietyModels['outside']>,
 };
 const society = (): SocietySnapshot => parseSociety({
   society_id: 'society', version_id: 'version', branch_id: 'version', place_id: 'derived-place',
@@ -128,7 +130,7 @@ const models = (): SocietyModels => ({
     { subjectId: 'knight-0', model: QWEN, choiceSeq: 1, refusal: null },
     { subjectId: 'routine-0', model: QWEN, choiceSeq: 2, refusal: 'model_not_asked_here' },
   ],
-  latest: [], byModel: [], decisionsCounted: 0, decisionsMaximum: 0,
+  latest: [], byModel: [], decisionsCounted: 0, decisionsMaximum: 0, outside: server.outside,
 });
 
 function mount() {
@@ -376,3 +378,35 @@ describe('why a visitor its own program decides for did something', () => {
     mounted.dispose();
   });
 });
+
+describe('why one of the world\'s own people a grant hands to an outside program did something', () => {
+  it('credits that program, never a model, as the models read lists them', async () => {
+    const catalog = JSON.parse(readFileSync(`${process.cwd()}/../assets/catalogs/society-words/society-inhabitant-words.v1.json`, 'utf8')) as
+      { entries: { kind: string; code: string; words: string }[] };
+    const words = (kind: string, code: string) => catalog.entries.find((entry) => entry.kind === kind && entry.code === code)!.words;
+    const because = (reason: string) => words('phrase', 'because').replace('{reason}', reason);
+    const chose = { kind: 'idle', status: 'active', target_id: null, remaining_ticks: 0, reason: 'chosen_by_their_model' };
+    server.tick = 9;
+    server.people = [person('knight-0', { kind: KNIGHT, came_by: 'placed', placed_id: 'knight-1', action: chose })];
+    server.things = [];
+    server.events = [];
+    server.outside = [{
+      subjectId: 'knight-0', came: 'run', grantId: 'grant-1', bridge: 'agents', bridgeLabel: 'Outside AI agents',
+      runBy: 'owner', ai: true, connected: true, declared: { name: 'Scout', maker: 'Acme', mind: null },
+    }];
+    try {
+      const { mounted, shown, crowd } = mount();
+      crowd.visibleInhabitantIds = ['knight-0'];
+      await mounted.begin();
+      await settle();
+      const pick = [...document.querySelectorAll('select')].find((one) => one.getAttribute('aria-label') === 'Inspect nearby inhabitant')!;
+      pick.value = 'knight-0';
+      pick.dispatchEvent(new Event('change'));
+      expect(shown.at(-1)!.about.note.activity).toContain(because(words('phrase', 'chosen_by_their_program')));
+      expect(shown.at(-1)!.about.note.activity).not.toContain(words('reason', 'chosen_by_their_model'));
+      mounted.dispose();
+    } finally {
+      server.outside = [];
+    }
+   });
+ });

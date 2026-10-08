@@ -860,8 +860,10 @@ export function mountEnvironmentSelection(
     const worded = savedWorld !== null && purposeful && hasInhabitantWords(state.profile);
     const words = worded && society?.places
       ? inhabitantWords(inhabitant, placeRows(savedObjects() ?? [], society.places), state.inhabitants, state.profile,
-        // A visitor its own program decides for: its choices are that program's, never a model's.
-        inhabitant.came_by === 'crossed' && inhabitant.crossing != null && inhabitant.crossing.decided_by !== 'world')
+        // Anyone an outside program decides for (a visitor it brought, or one of this world's own
+        // people a grant hands it): their choices are that program's, never a model's.
+        (inhabitant.came_by === 'crossed' && inhabitant.crossing != null && inhabitant.crossing.decided_by !== 'world')
+          || societyModels?.mindOf(id)?.outside != null)
       : null;
     inspector.show({
       subject: id,
