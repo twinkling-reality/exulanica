@@ -97,6 +97,7 @@ from exulanica.references.pictures import (
 __all__ = [
     "DEADLINE_SECONDS",
     "PROCESS_RESERVE_PERCENT",
+    "QUERY_CLEAR_RETRY_SECONDS",
     "QUERY_CLEAR_SECONDS",
     "STEPS",
     "ReferenceWorker",
@@ -106,6 +107,9 @@ _LOG = logging.getLogger(__name__)
 
 #: How often a worker clears each workspace's search query text past its retention.
 QUERY_CLEAR_SECONDS: Final = 3600.0
+#: How soon a worker tries a failed clear again: not every pass, which would send the database a
+#: refused statement each second while the failure lasts.
+QUERY_CLEAR_RETRY_SECONDS: Final = 60.0
 #: The longest a request runs before it ends partial with what it has.
 DEADLINE_SECONDS: Final = 30.0
 STEPS: Final = ("plan", "search", "read", "bundle")
@@ -315,8 +319,9 @@ class ReferenceWorker:
         self._rate = _Rate(clock)
         #: Sources stopped for the life of this process, with the reason.
         self._stopped: dict[str, str] = {}
-        #: When each workspace's old query text was last cleared here, on this worker's clock.
-        self._queries_cleared: dict[uuid.UUID, float] = {}
+        #: When each workspace's old query text is next due to be cleared here, on this worker's
+        #: clock: an hour after a clear, a minute after a failed one.
+        self._next_clear: dict[uuid.UUID, float] = {}
         #: Workspaces whose last clear failed, so a failure is logged once, not every pass.
         self._clear_failing: set[uuid.UUID] = set()
 
@@ -342,18 +347,23 @@ class ReferenceWorker:
             store.abandon_stranded(connection, workspace_id)
             store.expire_unclaimed(connection, workspace_id)
             # A process that runs for weeks clears its workspaces' old query text hourly.
-            last = self._queries_cleared.get(workspace_id)
             now = self._clear_clock()
-            if last is None or now - last >= QUERY_CLEAR_SECONDS:
-                # A failed clear never stops the claim: it is tried again on the next pass, and
-                # logged once until it succeeds.
-                if store.try_clear_old_queries(connection, workspace_id) is None:
+            due = self._next_clear.get(workspace_id)
+            if due is None or now >= due:
+                # A failed clear never stops the claim: it is tried again a minute later, and
+                # logged once, with its class, until it succeeds.
+                cleared = store.try_clear_old_queries(connection, workspace_id)
+                if isinstance(cleared, store.ClearFailed):
+                    self._next_clear[workspace_id] = now + QUERY_CLEAR_RETRY_SECONDS
                     if workspace_id not in self._clear_failing:
                         self._clear_failing.add(workspace_id)
-                        _LOG.warning("clearing old reference queries failed; retried each pass")
+                        _LOG.warning(
+                            "clearing old reference queries failed; retried every minute",
+                            extra={"failure": cleared.failure},
+                        )
                 else:
                     self._clear_failing.discard(workspace_id)
-                    self._queries_cleared[workspace_id] = now
+                    self._next_clear[workspace_id] = now + QUERY_CLEAR_SECONDS
             claimed = store.claim(connection, workspace_id, worker=self._worker)
         if claimed is None:
             return None

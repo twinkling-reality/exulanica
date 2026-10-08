@@ -133,6 +133,20 @@ def test_the_table_allows_only_an_old_query_cleared(searched, change, words):
     repository.connection.rollback()
 
 
+def test_an_old_query_cleared_beside_another_change_is_refused(searched):
+    """The one change allowed on an old row is the clear alone: anything else beside it is refused
+    and the row is left as it was."""
+    repository, _runtime, _readonly, old, _young = searched
+    connection = repository.connection
+    before = _row(connection, old)
+    with pytest.raises(psycopg.errors.CheckViolation, match="appended and never changed"):
+        connection.execute(
+            "update reference_lookup set query = null, credits = 2 where lookup_id = %s", (old,)
+        )
+    connection.rollback()
+    assert _row(connection, old) == before
+
+
 def test_a_cleared_query_stays_cleared_and_its_time_is_the_database_s(searched):
     repository, _runtime, _readonly, old, _young = searched
     connection = repository.connection
@@ -252,6 +266,23 @@ def test_the_reference_routes_and_startup_clear_old_queries(searched, monkeypatc
     references_route._sweep(services, repository.workspace_id)
     dataclasses.replace(services).sweep_references()
     assert cleared == [repository.workspace_id] * 2
+
+
+class _AnyWorkspace:
+    """The owner's connection as a Database whose sessions open for any workspace (the owner is
+    not bound by row security), for a sweep over workspaces the test names."""
+
+    def __init__(self, repository) -> None:
+        self._repository = repository
+
+    def session(self, workspace_id):
+        import contextlib
+
+        @contextlib.contextmanager
+        def opened():
+            yield self._repository.connection
+
+        return opened()
 
 
 class _Owner:
@@ -376,37 +407,115 @@ def test_the_migration_grants_the_runtime_role_named_exulanica_app(searched):
         raise psycopg.Rollback()
 
 
-def test_a_failed_clear_never_fails_the_routes_startup_or_the_worker(searched, monkeypatch):
+def test_a_failed_clear_never_fails_the_routes_or_startup_and_names_its_class(
+    searched, monkeypatch, caplog
+):
     import dataclasses
+    import logging
 
     from exulanica.api.routes import references as references_route
     from exulanica.api.services import Services
 
     repository = searched[0]
+    # A second workspace this process knows, sorted after a failing first one, so a sweep that
+    # stopped at the first failure would never reach it.
+    first, second = sorted((repository.workspace_id, uuid.uuid4()))
     tried: list[uuid.UUID] = []
 
-    def refused(connection, workspace_id):
+    def refused_first(connection, workspace_id):
         tried.append(workspace_id)
-        raise psycopg.errors.InsufficientPrivilege("permission denied for function")
+        if workspace_id == first:
+            raise psycopg.errors.InsufficientPrivilege("permission denied for function")
+        return 0
 
-    monkeypatch.setattr(store, "clear_old_queries", refused)
+    monkeypatch.setattr(store, "clear_old_queries", refused_first)
     services = Services(
-        database=_Owner(repository),
-        readonly_database=_Owner(repository),
+        database=_AnyWorkspace(repository),
+        readonly_database=_AnyWorkspace(repository),
         store=None,
         tokens=None,
         executor_shares_the_write_role=True,
         model_client=None,
-        reference_workspaces=(repository.workspace_id,),
+        reference_workspaces=(first, second),
     )
-    references_route._sweep(services, repository.workspace_id)
-    assert dataclasses.replace(services).sweep_references() == 0
+    with caplog.at_level(logging.WARNING):
+        references_route._sweep(services, first)
+        assert dataclasses.replace(services).sweep_references() == 0
+    assert tried == [first, first, second]
+    failures = [getattr(record, "failure", None) for record in caplog.records]
+    assert failures == ["InsufficientPrivilege", "InsufficientPrivilege"]
+
+
+def test_a_failed_clear_never_stops_the_worker_s_claim_and_is_tried_a_minute_later(
+    searched, monkeypatch, caplog
+):
+    import logging
+
+    from exulanica.references import worker as worker_module
+
+    repository = searched[0]
+    tried: list[uuid.UUID] = []
+    claims: list[uuid.UUID] = []
+
+    def refused(connection, workspace_id):
+        tried.append(workspace_id)
+        raise psycopg.errors.UndefinedFunction(
+            "function reference_lookup_clear_queries does not exist"
+        )
+
+    def counted_claim(connection, workspace_id, *, worker):
+        claims.append(workspace_id)
+        return None
+
+    monkeypatch.setattr(store, "clear_old_queries", refused)
+    monkeypatch.setattr(worker_module.store, "claim", counted_claim)
+    now = [1000.0]
+    worker = _worker(repository, clear_clock=lambda: now[0])
+    with caplog.at_level(logging.WARNING):
+        assert worker.run_once(repository.workspace_id) is None
+        # The next pass, a second later: claimed again, the clear not tried again yet.
+        now[0] += 1
+        assert worker.run_once(repository.workspace_id) is None
+        # A minute after the failure (59 s after the last pass), it is tried again, not in an hour.
+        now[0] += 59
+        assert worker.run_once(repository.workspace_id) is None
+    assert claims == [repository.workspace_id] * 3
     assert tried == [repository.workspace_id] * 2
-    # The worker goes on to its claim, and tries again on its next pass rather than in an hour.
-    worker = _worker(repository, clear_clock=lambda: 1000.0)
-    assert worker.run_once(repository.workspace_id) is None
-    assert worker.run_once(repository.workspace_id) is None
-    assert tried == [repository.workspace_id] * 4
+    # Logged once while it keeps failing, with its class.
+    failures = [getattr(record, "failure", None) for record in caplog.records]
+    assert failures == ["UndefinedFunction"]
+    assert worker_module.QUERY_CLEAR_RETRY_SECONDS == 60.0
+
+
+def test_a_runtime_role_refused_the_clear_still_claims_in_the_same_session(searched):
+    """The real refusal, not a stub: the runtime role without EXECUTE is refused, and its session
+    (autocommit, as the product opens it) still claims a queued request afterwards."""
+    from reference_fixtures import queued_reference
+
+    repository, runtime, _readonly, old, _young = searched
+    owner = repository.connection
+    reference_id = queued_reference(owner, repository.workspace_id)
+    function = "reference_lookup_clear_queries(uuid)"
+    owner.execute(
+        psycopg.sql.SQL("revoke execute on function {} from {}").format(
+            psycopg.sql.SQL(function), psycopg.sql.Identifier(RUNTIME)
+        )
+    )
+    owner.commit()
+    try:
+        with runtime.session(repository.workspace_id) as connection:
+            cleared = store.try_clear_old_queries(connection, repository.workspace_id)
+            claimed = store.claim(connection, repository.workspace_id, worker="retention-test")
+        assert cleared == store.ClearFailed("InsufficientPrivilege")
+        assert claimed is not None and claimed.request.reference_id == reference_id
+        assert _row(owner, old)["query"] is not None
+    finally:
+        owner.execute(
+            psycopg.sql.SQL("grant execute on function {} to {}").format(
+                psycopg.sql.SQL(function), psycopg.sql.Identifier(RUNTIME)
+            )
+        )
+        owner.commit()
 
 
 def _worker(repository, **changes):

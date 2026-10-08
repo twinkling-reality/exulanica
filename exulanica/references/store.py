@@ -44,6 +44,7 @@ __all__ = [
     "QUERY_RETENTION_DAYS",
     "QUEUED_EXPIRY_SECONDS",
     "ClaimedRequest",
+    "ClearFailed",
     "ReferenceRequest",
     "RequestKeyReused",
     "RequestLimitReached",
@@ -636,17 +637,28 @@ def clear_old_queries(connection: psycopg.Connection, workspace_id: uuid.UUID) -
     return int(_first(row)) if row is not None else 0
 
 
-def try_clear_old_queries(connection: psycopg.Connection, workspace_id: uuid.UUID) -> int | None:
-    """:func:`clear_old_queries`, or None when the database refused or failed it.
+@dataclass(frozen=True)
+class ClearFailed:
+    """A clear the database refused or failed, by the class of what it raised (for example
+    ``UndefinedFunction`` below the migration, ``InsufficientPrivilege`` without the grant)."""
+
+    failure: str
+
+
+def try_clear_old_queries(
+    connection: psycopg.Connection, workspace_id: uuid.UUID
+) -> int | ClearFailed:
+    """:func:`clear_old_queries`, or :class:`ClearFailed` naming the error's class when the
+    database refused or failed it.
 
     A clear that fails (the function not yet granted, a database below its migration, a lost
     connection) never fails what called it: the list, a request, the worker's claim or startup go
-    on, and the next sweep tries again. The caller logs the failure's class.
+    on, and a later sweep tries again. The caller logs the class it is given.
     """
     try:
         return clear_old_queries(connection, workspace_id)
-    except psycopg.Error:
-        return None
+    except psycopg.Error as failure:
+        return ClearFailed(type(failure).__name__)
 
 
 def end_unserved(connection: psycopg.Connection, workspace_id: uuid.UUID) -> int:

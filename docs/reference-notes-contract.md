@@ -131,8 +131,9 @@ search record: the database's `reference_lookup_clear_queries`, run as the login
 clears a workspace's old queries, and the table's trigger allows exactly that change and no other. A
 query is cleared at the first sweep after its 30 days: at each process start, for every workspace
 the process knows; hourly in a process that plays reference jobs, for the workspaces it serves; and
-whenever the workspace next uses the reference routes. A clear that fails is logged and tried again
-at the next sweep; it never fails the list, a request, the worker's claim or startup.
+whenever the workspace next uses the reference routes. A clear that fails is logged with its
+error's class and tried again: by a worker a minute later, by startup and the routes at their next
+sweep. It never fails the list, a request, the worker's claim or startup.
 
 ## 6. Spending
 
@@ -321,8 +322,9 @@ from them keeps only the digest it recorded. An expired right is not a stop and 
   own included (the route is not given the account's display name or email), reaches the planner as
   typed, as it reaches the world drafter, and the planner is told never to write one into a query.
   A query that carried one would be kept by the source for good.
-- **A query can outlive its 30 days.** It is cleared at the first sweep after them (section 5), so a
-  workspace no running process knows, serves or hears from keeps its old query text until one does;
+- **A query can outlive its 30 days.** It is cleared at the first sweep after them (section 5). A
+  process that only knows a workspace sweeps it when it starts, so a query that turns 30 days old
+  in a workspace no process has started, served or heard from since keeps its text until one does;
   and physical copies (below) keep it as long as those copies are kept. A restore of a backup taken
   before a clear brings the text back into the live table until the restored installation's next
   sweep. A judge seed carries the text, and a judge stack does not clear it: its role cannot run the

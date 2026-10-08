@@ -166,8 +166,12 @@ def _sweep(services: Services, workspace_id: uuid.UUID) -> None:
             store.expire_unclaimed(connection, workspace_id)
         else:
             store.end_unserved(connection, workspace_id)
-        if store.try_clear_old_queries(connection, workspace_id) is None:
-            _LOG.warning("clearing old reference queries failed; the next sweep tries again")
+        cleared = store.try_clear_old_queries(connection, workspace_id)
+        if isinstance(cleared, store.ClearFailed):
+            _LOG.warning(
+                "clearing old reference queries failed; the next sweep tries again",
+                extra={"failure": cleared.failure},
+            )
 
 
 def _invalid_description(description: str) -> str | None:

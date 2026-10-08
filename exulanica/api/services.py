@@ -728,8 +728,12 @@ class Services:
                     ended += reference_store.expire_unclaimed(connection, workspace_id)
                 else:
                     ended += reference_store.end_unserved(connection, workspace_id)
-                if reference_store.try_clear_old_queries(connection, workspace_id) is None:
-                    _LOG.warning("clearing old reference queries failed at startup; it is retried")
+                cleared = reference_store.try_clear_old_queries(connection, workspace_id)
+                if isinstance(cleared, reference_store.ClearFailed):
+                    _LOG.warning(
+                        "clearing old reference queries failed at startup; it is retried",
+                        extra={"failure": cleared.failure},
+                    )
         return ended
 
     def build_reference_worker(self) -> ReferenceWorker | None:
