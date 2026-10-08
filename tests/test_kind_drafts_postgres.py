@@ -344,22 +344,74 @@ def test_a_refused_draft_says_the_last_check_s_own_sentence(drafts):
     assert "No kind of world was drafted" not in refusal["detail"]
 
 
+def _remaining(monkeypatch, refused=None, available=None) -> None:
+    """The durable authority's answer for the drafter's provider, read as the routes read it."""
+    from exulanica.spending.status import SpendingRefusals
+
+    provider = load_manifest()[DRAFTER_ROLE].primary.provider
+    answer = SpendingRefusals(
+        {provider: refused}, {} if available is None else {provider: available}
+    )
+    monkeypatch.setattr(Services, "spending_refusals", lambda self, connection, workspace: answer)
+
+
 def test_a_workspace_whose_allowance_is_spent_is_told_before_anything_is_typed(drafts, monkeypatch):
     from exulanica.models.spending import SpendingRefused
 
     app, transport = drafts
-    asked: list[tuple[str, ...]] = []
-
-    def spent(self, connection, workspace_id, providers):  # type: ignore[no-untyped-def]
-        asked.append(tuple(providers))
-        return SpendingRefused("spending_limit_reached", scope="workspace")
-
-    monkeypatch.setattr(Services, "allowance_refusal", spent)
+    _remaining(monkeypatch, refused=SpendingRefused("spending_limit_reached", scope="workspace"))
     with app() as client:
         assert _drafting(client)["code"] == "budget_exceeded"
         refused = _start(client, "a small farm")
         assert refused.status_code == 429 and refused.json()["code"] == "budget_exceeded"
         assert refused.json()["spending"]["reason"] == "spending_limit_reached"
-    # The providers asked are the drafting role's.
-    assert set(asked) == {tuple(sorted({s.provider for s in load_manifest()[DRAFTER_ROLE].chain}))}
     assert transport.requests == []
+
+
+def test_an_allowance_too_small_for_one_attempt_is_told_before_anything_is_typed(
+    drafts, monkeypatch
+):
+    from exulanica.api.kind_drafts import attempt_floor_usd
+
+    app, transport = drafts
+    with app() as client:
+        [floor] = attempt_floor_usd(client.app.state.services.model_client).values()
+    _remaining(monkeypatch, available=floor - Decimal("0.0001"))
+    with app() as client:
+        assert _drafting(client)["code"] == "budget_exceeded"
+        refused = _start(client, "a small farm")
+        assert refused.status_code == 429 and refused.json()["code"] == "budget_exceeded"
+        assert refused.json()["spending"]["requested"] == str(floor)
+        # A refused start is no draft, and takes none of the person's starts.
+        listed = client.get("/worlds/kinds/drafts", headers={"Authorization": f"Bearer {TOKEN}"})
+        assert listed.json() == {"drafts": []}
+    _remaining(monkeypatch, available=floor)
+    with app() as client:
+        assert _drafting(client)["offered"] is True
+    assert transport.requests == []
+
+
+def test_a_draft_that_fails_after_a_paid_call_shows_what_it_cost(drafts, monkeypatch):
+    from exulanica.api import kind_drafts
+
+    def failing(workspace_id, drafts):  # type: ignore[no-untyped-def]
+        def check(document):  # type: ignore[no-untyped-def]
+            raise RuntimeError("not a refusal the job names")
+
+        return check
+
+    monkeypatch.setattr(kind_drafts, "_checked", failing)
+    app, transport = drafts
+    transport.responses.append(_reply(_farm()))
+    with app() as client:
+        ended = _ended(client, _start(client, "a small farm").json()["draft_id"])
+    assert ended["refusal"]["code"] == "kind_draft_failed"
+    assert ended["execution"] is not None and len(transport.requests) == 1
+
+
+def test_leaving_the_server_closes_its_drafts(drafts):
+    app, _transport = drafts
+    with app() as client:
+        registry = client.app.state.services.kind_drafts
+        assert not registry.closing
+    assert registry.closing

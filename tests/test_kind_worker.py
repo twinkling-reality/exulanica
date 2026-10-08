@@ -321,3 +321,35 @@ def test_a_place_whose_walking_graph_outgrows_its_bound_is_refused_by_name(monke
     refused = place_job("w", dict(made.receipt), made.receipt_sha256, site_ground_place_id())
     assert (refused["status"], refused["code"]) == ("refused", "kind_graph_over_budget")
     assert refused["detail"].startswith("kind_graph_over_budget: ")
+
+
+def test_a_closed_worker_answers_unavailable_and_starts_no_process(monkeypatch) -> None:
+    made: list[int] = []
+
+    def pool() -> Executor:
+        made.append(1)
+        return ThreadPoolExecutor(1)
+
+    worker = KindWorker(pool)
+    assert worker.run("a", 5.0, _held(_released()), workspace="w").status == "done"
+    worker.close()
+    closed = worker.run("b", 5.0, _held(_released()), workspace="w")
+    assert (closed.status, closed.reason) == ("unavailable", "closed")
+    assert made == [1]
+    # The server's own worker is replaced as it closes: a caller holding the closed one starts
+    # nothing, and the next server in the process has a worker that starts its own pool.
+    monkeypatch.setattr(worker_module, "_worker", KindWorker(pool))
+    monkeypatch.setattr(worker_module, "KindWorker", lambda: KindWorker(pool))
+    held = worker_module.kind_worker()
+    worker_module.close_kind_worker()
+    assert held.run("c", 5.0, _held(_released()), workspace="w").status == "unavailable"
+    fresh = worker_module.kind_worker()
+    assert fresh is not held
+    assert fresh.run("d", 5.0, _held(_released()), workspace="w").status == "done"
+    fresh.close()
+
+
+def _released() -> threading.Event:
+    release = threading.Event()
+    release.set()
+    return release

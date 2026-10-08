@@ -398,6 +398,7 @@ class KindWorker:
         self._lock = threading.Lock()
         self._executor: Executor | None = None
         self._running: dict[str, _Running] = {}
+        self._closed = False
         #: Finished checks, by their workspace and the kind document's digest.
         self.checks = Kept(CHECKS_KEPT)
         #: Finished drawings, by their workspace and receipt's digest.
@@ -418,6 +419,9 @@ class KindWorker:
         ``kept`` under ``key`` when it finishes, if given."""
         self._let_stuck_go()
         with self._lock:
+            if self._closed:
+                # Closed with its server: a job still asking (a draft's thread) starts no process.
+                return JobOutcome("unavailable", reason="closed")
             found = None if kept is None else kept.get(key)
             if found is not None:
                 return JobOutcome("done", found)
@@ -487,8 +491,10 @@ class KindWorker:
                 del self._running[key]
 
     def close(self) -> None:
-        """Stop the worker without waiting on a stuck job; the server's lifespan calls this."""
+        """Stop the worker without waiting on a stuck job, for good: a later job is answered
+        ``unavailable`` and starts no process. The server's lifespan calls this."""
         with self._lock:
+            self._closed = True
             executor, self._executor = self._executor, None
             self._running.clear()
         if executor is not None:
@@ -505,5 +511,10 @@ def kind_worker() -> KindWorker:
 
 
 def close_kind_worker() -> None:
-    """Stop the worker process; the server's lifespan calls this as it ends."""
-    _worker.close()
+    """Stop the worker process; the server's lifespan calls this as it ends. The worker is closed
+    for good and a fresh one, which starts nothing until its first job, takes its place, so a
+    caller that took the closed worker earlier (a draft still running) starts no process, and a
+    server started later in the same process (a test's) has a worker."""
+    global _worker
+    closed, _worker = _worker, KindWorker()
+    closed.close()

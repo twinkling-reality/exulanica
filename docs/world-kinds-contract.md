@@ -337,15 +337,18 @@ brief and the check's own sentence, never the reply's words; there is no fallbac
 The page calls a world kind a **kind of place**. Before anything is typed, `GET /worlds/kinds`
 says whether this caller may draft one here (`drafting`: `offered`, and otherwise `code`:
 `not_authorised` without world write and model invoke, `provider_credential_absent` without a
-model credential, `budget_exceeded` when the workspace's allowance for the drafting model is
-spent, `kind_cap_reached` when the workspace is full, `kind_draft_busy` while the workspace runs a
-draft, `kind_draft_limit` when the caller has started as many drafts this hour as one person may),
-with `refusals`, the closed list of every code a draft's routes and its job answer with, so the
-page shows no field the server would refuse this caller here. The server's own capacity changes
-from moment to moment, so an offered start may still be refused `kind_draft_capacity`, which says
-when to try again. A person asks for a draft with `POST /worlds/kinds/drafts` and the words they typed.
-The route answers at once, 202 with the draft's id, and never waits on the model: a job in the API process
-drafts on the `kind_drafter` role, holds each drafted kind to both stages in the kind worker as an
+model credential, `budget_exceeded` when the workspace's allowance for the drafting model admits
+no attempt, spent or below the least one attempt reserves (its answer bound and its instructions
+at the model's prices), `kind_cap_reached` when the workspace is full, `kind_draft_busy` while the
+workspace runs a draft, `kind_draft_limit` when the caller has started as many drafts this hour as
+one person may), with `refusals`, the closed list of every code a draft's routes and its job answer
+with, so the page shows no field the server would refuse this caller here. The server's own
+capacity changes from moment to moment, so an offered start may still be refused
+`kind_draft_capacity`, which says when to try again; an allowance just above that least amount may
+still meet its ceiling at a repair, and the draft then ends `budget_exceeded`. A person asks for a
+draft with `POST /worlds/kinds/drafts` and the words they typed. The route answers at once, 202
+with the draft's id, and never waits on the model: a job in the API process drafts on the
+`kind_drafter` role, holds each drafted kind to both stages in the kind worker as an
 upload is held, and keeps a passing kind in the workspace, origin `drafted`, under the key its
 brief states or, where the workspace already keeps that key, the key with the first number free
 after it. The kind's provenance names the role, the model, the prompt version and digest and the
@@ -364,10 +367,12 @@ states, which the page says in these words:
 
 A refusal that is not the drafted kind's (`budget_exceeded`, `kind_draft_unanswered`,
 `kind_work_unavailable`, `kind_draft_failed`, `kind_cap_reached`, `kind_version_exists`) is said in
-the closed list's words. Ready and refused carry what the drafting cost, every call made included. Saved names are replaced in the words before the job
-starts, and the workspace's rules, releasing no place's name, are applied again as each request
-leaves. A draft takes at most the role's timeout and the checks' bound for each of its three
-attempts. Making a world of the kept kind is `POST /worlds/kinds/{kind}/worlds`.
+the closed list's words. Ready and refused carry what the drafting cost, every call made included,
+except a draft ended for running past its deadline, whose calls the server no longer reads. Saved
+names are replaced in the words before the job starts, and the workspace's rules, releasing no
+place's name, are applied again as each request leaves. A draft takes at most the longest its
+client takes for one call of the role and the checks' bound, for each of its three attempts. Making
+a world of the kept kind is `POST /worlds/kinds/{kind}/worlds`.
 
 ## The town as a kind
 

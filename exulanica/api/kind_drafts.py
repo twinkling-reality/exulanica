@@ -20,6 +20,7 @@ stands: the page then reads ``kind_draft_unknown`` and offers to start again.
 from __future__ import annotations
 
 import dataclasses
+import functools
 import logging
 import math
 import threading
@@ -29,6 +30,7 @@ from collections.abc import Callable, Mapping
 from contextlib import AbstractContextManager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from decimal import Decimal
 from typing import Any, Final, Literal
 
 import psycopg
@@ -38,7 +40,16 @@ from exulanica.models.errors import BudgetExceededError, ModelError
 from exulanica.models.manifest import load_manifest
 from exulanica.models.spending import SpendingRefused
 from exulanica.selection.calls import CallLog, ModelCall
-from exulanica.selection.kind_drafting import DRAFT_ATTEMPTS, DRAFTER_ROLE, KindVerdict, draft_kind
+from exulanica.selection.kind_drafting import (
+    DRAFT_ATTEMPTS,
+    DRAFTER_ROLE,
+    KindVerdict,
+    draft_kind,
+    kind_drafting_prompt,
+    render_instructions,
+)
+from exulanica.spending.status import SpendingRefusals
+from exulanica.world.kinds.catalogs import load_kind_catalogs
 from exulanica.world.kinds.document import KindRefused, read_kind
 from exulanica.world.kinds.library import shipped_kinds
 from exulanica.world.kinds.repository import KindCapReached, KindVersionExists, WorkspaceKinds
@@ -54,8 +65,9 @@ __all__ = [
     "KindDraftCapacity",
     "KindDraftLimit",
     "KindDrafts",
+    "allowance_refusal",
+    "attempt_floor_usd",
     "draft_deadline_seconds",
-    "drafting_providers",
     "run_draft",
 ]
 
@@ -111,15 +123,59 @@ KIND_DRAFT_CODES: Final = (
 )
 
 
-def draft_deadline_seconds() -> float:
-    """The longest a draft takes: each attempt's call at the role's timeout and its checks."""
-    timeout = load_manifest()[DRAFTER_ROLE].timeout_seconds
-    return DRAFT_ATTEMPTS * (timeout + CHECK_SECONDS)
+def draft_deadline_seconds(client: ModelClient | None = None) -> float:
+    """The longest a draft takes: each attempt's call, as long as the longest the client drafting
+    can take for the role (its timeouts and retries; the role's timeout without a client), and its
+    checks."""
+    call = (
+        load_manifest()[DRAFTER_ROLE].timeout_seconds
+        if client is None
+        else client.worst_case_seconds(DRAFTER_ROLE)
+    )
+    return DRAFT_ATTEMPTS * (call + CHECK_SECONDS)
 
 
-def drafting_providers() -> tuple[str, ...]:
-    """The providers a draft may ask: those of the drafter role's chain, each once."""
-    return tuple(sorted({spec.provider for spec in load_manifest()[DRAFTER_ROLE].chain}))
+@functools.cache
+def _instructions_characters() -> int:
+    from exulanica.world.society_living import town_routine
+
+    return len(render_instructions(kind_drafting_prompt(), load_kind_catalogs(), town_routine()))
+
+
+def attempt_floor_usd(client: ModelClient) -> dict[str, Decimal]:
+    """By provider, the least one attempt of the drafter role reserves: its answer bound and its
+    instructions at its model's prices. The description, the form and the repairs are not counted,
+    so an allowance below it admits no attempt, and one above it may still meet a ceiling."""
+    role = load_manifest()[DRAFTER_ROLE]
+    answer = 0 if role.max_tokens is None else role.max_tokens.value
+    floors: dict[str, Decimal] = {}
+    for spec in role.chain:
+        usd = client.budget.estimate_usd(
+            spec, prompt_chars=_instructions_characters(), max_tokens=answer
+        )
+        floors[spec.provider] = min(usd, floors.get(spec.provider, usd))
+    return floors
+
+
+def allowance_refusal(
+    refusals: SpendingRefusals | None, client: ModelClient
+) -> SpendingRefused | None:
+    """The refusal a draft's first attempt would meet from the durable authority, before it is
+    started: a drafter provider's own refusal, or its remaining USD below one attempt's floor
+    (:func:`attempt_floor_usd`), which admission refuses though the allowance is not spent to zero
+    (as a society's model minds are read). None in a process no durable authority admits."""
+    if refusals is None:
+        return None
+    for provider, floor in sorted(attempt_floor_usd(client).items()):
+        refused = refusals.by_provider.get(provider)
+        if refused is not None:
+            return refused
+        remainder = refusals.available_usd.get(provider)
+        if remainder is not None and remainder < floor:
+            return SpendingRefused(
+                "spending_limit_reached", scope="workspace", detail="usd", requested=str(floor)
+            )
+    return None
 
 
 class KindDraftBusy(Exception):
@@ -160,6 +216,8 @@ class KindDraft:
     refusal: Mapping[str, Any] | None = None
     calls: tuple[ModelCall, ...] = ()
     model_id: str | None = None
+    #: The longest this draft takes (:func:`draft_deadline_seconds` of its client), where known.
+    deadline: float | None = None
 
 
 @dataclass
@@ -204,6 +262,8 @@ class KindDrafts:
         actor: uuid.UUID,
         description: str,
         job: Callable[[KindDraft, KindDrafts], None],
+        *,
+        deadline: float | None = None,
     ) -> KindDraft:
         """Start ``job`` on a thread of its own for a new draft, or refuse while the workspace,
         the person or the process already runs or started as many as it may."""
@@ -226,6 +286,7 @@ class KindDrafts:
                 started_at=datetime.now(UTC),
                 started=now,
                 changed=now,
+                deadline=deadline,
             )
             self._drafts[draft.draft_id] = draft
             snapshot = dataclasses.replace(draft)
@@ -311,10 +372,12 @@ class KindDrafts:
         """End as failed a draft still drafting well past its deadline (a job that can no longer
         finish), and drop drafts that ended over :attr:`keep_seconds` ago. A draft is kept while it
         counts toward its person's starts, which are counted from when it started."""
-        stale = self.deadline_seconds() + STALE_MARGIN_SECONDS
+        fallback = self.deadline_seconds()
         for draft_id, draft in list(self._drafts.items()):
             if draft.state == "drafting":
-                if now - draft.started > stale:
+                deadline = fallback if draft.deadline is None else draft.deadline
+                # Ended without its calls: the job's own log is out of reach here.
+                if now - draft.started > deadline + STALE_MARGIN_SECONDS:
                     draft.state, draft.refusal = "refused", dict(_FAILED)
                     draft.description, draft.changed = "", now
             elif now - draft.changed > self.keep_seconds:
@@ -353,15 +416,17 @@ def _checked(
 ) -> Callable[[dict[str, Any]], KindVerdict]:
     """Both stages of the kind checks, stage B in the kind worker, as an upload is checked."""
 
+    # The worker as the draft starts: once its server closes it, it starts no process again.
+    worker = kind_worker()
+
     def check(document: dict[str, Any]) -> KindVerdict:
         try:
             kind = read_kind(document)
         except KindRefused as refused:
             return KindVerdict(False, code=refused.code, where=refused.where, detail=refused.detail)
         if drafts.closing:
-            # The server is stopping and its kind worker with it: no worker is started again.
+            # The server is stopping and its kind worker with it.
             raise _ChecksUnavailable("closing")
-        worker = kind_worker()
         outcome = worker.run(
             check_key(str(workspace_id), kind.sha256),
             CHECK_SECONDS,
@@ -420,9 +485,12 @@ def run_draft(
         # Asked before ModelError, which it is: a spent allowance is not a model's silence.
         refusal: dict[str, Any] = {
             "code": "budget_exceeded",
-            "detail": "The workspace's allowance for the drafting model is spent.",
+            "detail": "This server's own spending limit for models is reached.",
         }
         if isinstance(spent, SpendingRefused):
+            # The authority's own sentence: spent, not granted, revoked, expired, suspended or
+            # unavailable, with no other workspace's figures.
+            refusal["detail"] = str(spent)
             refusal["spending"] = spent.problem_member()
         refused(refusal)
         return
@@ -446,6 +514,10 @@ def run_draft(
         # No free key, or the database while a key was chosen: after calls that were paid for.
         refused(_FAILED)
         return
+    except Exception as failed:  # anything else, named by its type, still shows what it cost
+        _LOG.warning("a kind draft failed: %s", type(failed).__qualname__)
+        refused(_FAILED)
+        return
     if outcome.document is None or outcome.kind is None or outcome.report is None:
         last = outcome.refusal
         check = None if last is None else last.check
@@ -467,7 +539,8 @@ def run_draft(
     except (KindCapReached, KindVersionExists) as stopped:
         refused({"code": stopped.code, "detail": str(stopped)})
         return
-    except psycopg.Error:
+    except Exception as failed:  # the database or anything else, after paid calls
+        _LOG.warning("a kind draft could not be kept: %s", type(failed).__qualname__)
         refused(_FAILED)
         return
     drafts.finish(

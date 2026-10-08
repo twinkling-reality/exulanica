@@ -226,7 +226,8 @@ programs of at most 32 workspaces at a time through one bridge: a listed bridge 
 at once needs more API processes, or some programs wait, and one left out past its hold and ten
 quiet seconds is reported not connected and its things fall to the routine
 ([deployment guide](deployment.md), 5.4, which says what several processes do not share: a kind of
-place being drafted needs each person routed to one of them). The frames route belongs to the streams admission class.
+place being drafted needs each person routed to one of them). The frames route belongs to the
+streams admission class.
 
 **Answers.** `POST /door/channel/answers` names one open ask of the grant (else 404
 `unknown_reference`), its request digest and one of the labels the request offered (else 422

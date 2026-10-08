@@ -54,8 +54,8 @@ from exulanica.api.kind_drafts import (
     KindDraftBusy,
     KindDraftCapacity,
     KindDraftLimit,
+    allowance_refusal,
     draft_deadline_seconds,
-    drafting_providers,
     run_draft,
 )
 from exulanica.api.permissions import Permission
@@ -389,7 +389,12 @@ def _drafting(
         code = "not_authorised"
     elif services.model_client is None:
         code = ModelNotConfigured.code
-    elif services.allowance_refusal(connection, workspace_id, drafting_providers()) is not None:
+    elif (
+        allowance_refusal(
+            services.spending_refusals(connection, workspace_id), services.model_client
+        )
+        is not None
+    ):
         code = "budget_exceeded"
     else:
         try:
@@ -555,7 +560,9 @@ def _draft_view(
         started_at=draft.started_at,
         elapsed_seconds=round((draft.changed if ended else now) - draft.started),
         poll_after_seconds=None if ended else DRAFT_POLL_SECONDS,
-        deadline_seconds=math.ceil(draft_deadline_seconds()),
+        deadline_seconds=math.ceil(
+            draft_deadline_seconds() if draft.deadline is None else draft.deadline
+        ),
         kind=kind,
         refusal=None if draft.refusal is None else KindDraftRefusalView(**draft.refusal),
         model_id=draft.model_id,
@@ -582,7 +589,8 @@ def start_kind_draft(
     """Admit the words and start the draft; answer at once, never waiting on the model.
 
     503 without a model credential; 429 ``budget_exceeded`` with its ``spending`` member when the
-    workspace's allowance for the drafting model is spent; 409 ``kind_cap_reached`` when the
+    workspace's allowance for the drafting model admits no attempt (spent, or below what one
+    reserves); 409 ``kind_cap_reached`` when the
     workspace keeps as many kinds as it may, each before anything is spent; 409
     ``kind_draft_busy`` while a draft runs in this workspace, with its ``draft_id`` when the caller
     started it; 429 ``kind_draft_limit`` with a ``Retry-After`` when the caller has started as many
@@ -593,8 +601,13 @@ def start_kind_draft(
     workspace_id = session.workspace_id
     if services.model_client is None:
         raise ModelNotConfigured()
-    # A spent allowance answers as every model route's does (429 budget_exceeded), not as a draft.
-    services.require_allowance(connection, workspace_id, drafting_providers())
+    # An allowance that admits no attempt answers as every model route's does (429
+    # budget_exceeded), not as a draft: spent, or below what one attempt reserves.
+    spent = allowance_refusal(
+        services.spending_refusals(connection, workspace_id), services.model_client
+    )
+    if spent is not None:
+        raise spent
     try:
         WorkspaceKinds(connection, workspace_id).refuse_when_full()
     except KindCapReached as exc:
@@ -626,6 +639,7 @@ def start_kind_draft(
                 text=sent.text,
                 placeholders=sent.placeholders,
             ),
+            deadline=draft_deadline_seconds(client),
         )
     except KindDraftBusy as busy:
         # The running draft's id is told only to the person who started it: its words are theirs.

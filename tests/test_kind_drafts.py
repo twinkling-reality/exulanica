@@ -197,10 +197,13 @@ def test_a_draft_reaching_its_checks_while_the_server_closes_starts_no_kind_work
 
     from kind_briefs import fixture_kind
 
-    def no_worker():
-        raise AssertionError("a kind worker was started while the server closed")
+    class _NoJob:
+        checks = None
 
-    monkeypatch.setattr(kind_drafts, "kind_worker", no_worker)
+        def run(self, *args, **kwargs):
+            raise AssertionError("a kind job was run while the server closed")
+
+    monkeypatch.setattr(kind_drafts, "kind_worker", _NoJob)
     drafts = KindDrafts()
     check = kind_drafts._checked(HERE, drafts)
     drafts.close()
@@ -274,3 +277,60 @@ def test_every_code_a_draft_answers_with_is_in_the_closed_list():
     # A kind's own refusals are the kind checks' codes, listed apart (KIND_CODES).
     answered -= {code for code, _meaning in KIND_CODES}
     assert answered <= listed, sorted(answered - listed)
+
+
+def _client(**options):
+    from exulanica.models.budget import BudgetGuard
+    from exulanica.models.client import ModelClient
+
+    from conftest import TEST_CEILING_USD, TEST_MAX_CALLS
+    from model_fakes import FakeTransport
+
+    return ModelClient(
+        api_key="test-key-not-real",
+        transport=FakeTransport(),
+        budget=BudgetGuard(ceiling_usd=TEST_CEILING_USD, max_calls=TEST_MAX_CALLS),
+        **options,
+    )
+
+
+def test_an_allowance_below_one_attempt_admits_no_draft_though_it_is_not_spent():
+    """Admission refuses an attempt that would cross the ceiling, so a remainder above zero but
+    below what one attempt reserves would start a draft that ends at its first call."""
+    from decimal import Decimal
+
+    from exulanica.api.kind_drafts import allowance_refusal, attempt_floor_usd
+    from exulanica.models.spending import SpendingRefused
+    from exulanica.spending.status import SpendingRefusals
+
+    client = _client()
+    [(provider, floor)] = attempt_floor_usd(client).items()
+    spec = load_manifest()[Role.KIND_DRAFTER].primary
+    # The floor is the answer bound and the instructions at the model's prices, above the answer
+    # bound alone.
+    answer = load_manifest()[Role.KIND_DRAFTER].max_tokens.value
+    assert floor > client.budget.estimate_usd(spec, max_tokens=answer) > 0
+    below = SpendingRefusals({provider: None}, {provider: floor - Decimal("0.0001")})
+    refused = allowance_refusal(below, client)
+    assert (refused.reason, refused.requested) == ("spending_limit_reached", str(floor))
+    assert allowance_refusal(SpendingRefusals({provider: None}, {provider: floor}), client) is None
+    spent = SpendingRefused("spending_revoked", scope="workspace")
+    assert allowance_refusal(SpendingRefusals({provider: spent}), client) is spent
+    assert allowance_refusal(None, client) is None
+
+
+def test_a_draft_s_deadline_is_its_client_s_longest_call_and_ends_it_when_passed():
+    # A client that retries takes longer than the role's one timeout, and its draft is given it.
+    client = _client(max_attempts=3)
+    longest = client.worst_case_seconds(Role.KIND_DRAFTER)
+    assert longest > load_manifest()[Role.KIND_DRAFTER].timeout_seconds
+    assert draft_deadline_seconds(client) == DRAFT_ATTEMPTS * (longest + CHECK_SECONDS)
+    clock = _Clock()
+    drafts = KindDrafts(clock=clock, deadline_seconds=lambda: 10_000.0)
+    release = threading.Event()
+    held = drafts.start(HERE, ACTOR, "a farm", _held(release), deadline=100.0)
+    clock.now += 100 + 120
+    assert drafts.read(HERE, ACTOR, held.draft_id).state == "drafting"
+    clock.now += 1
+    assert drafts.read(HERE, ACTOR, held.draft_id).state == "refused"
+    release.set()
