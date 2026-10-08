@@ -68,7 +68,9 @@ def _offer(api, offered: bool = True) -> None:
 
 
 def _scene():
-    return next(iter(shipped_scenes().values()))
+    """The newest shipped scene laid out for a starter, the one a starter is dressed with now."""
+    starters = {key: scene for key, scene in shipped_scenes().items() if scene.ground == "starter"}
+    return starters[max(starters)]
 
 
 def _starter(api) -> dict:

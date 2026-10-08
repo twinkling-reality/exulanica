@@ -6,6 +6,11 @@
       "scene": "three-strangers",
       "version": 3,
       "sha256": "6cbe616a765a82bb70df44df16307090a178f551ada6cb61c0ce08f3e3518ad6"
+    },
+    {
+      "scene": "three-strangers",
+      "version": 4,
+      "sha256": "3cd7cb81e9ddfa1e1a40ddfb241e8ec65541465e6b0a88bc2abc08ed007092aa"
     }
   ]
 }
