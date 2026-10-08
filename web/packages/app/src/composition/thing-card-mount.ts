@@ -12,19 +12,20 @@
  */
 
 import type { ThingLibrary } from '@exulanica/atlas-react/things';
-import { buildThingCard, type CardLine, type CardLooks, type CardMark, type CardMind, type CardMindChoice, type ThingCardModel } from '../ui/thing-card.js';
+import { buildThingCard, type CardLine, type CardLookOutcome, type CardLooks, type CardMark, type CardMind, type CardMindChoice, type ThingCardModel } from '../ui/thing-card.js';
 import { cameWords, costWords, modelLine, outsideShort } from '../ui/society-models.js';
 import type { ModelRef, SocietyModel } from '../society-models-api.js';
 import type { Credentials } from '../config.js';
 import { openThingLibrary } from '../things-library.js';
 import { fetchThingLooks, readKindFacts, readLookFacts, type KindFacts, type LookFacts, type LookReference } from '../thing-card-api.js';
 import type { InhabitantView, MountedEnvironmentSelection, SelectedBeing, SelectedPerson, SelectedThing } from './environment-selection.js';
-import { creditOf, kindCameWords, lookLine, sourceLink } from './thing-origin-words.js';
+import { creditOf, kindCameWords, lookLine, lookOptionLine, sourceLink, withArticle } from './thing-origin-words.js';
+import { chooseThingLook, fetchThingCardRoute, sameLook, type CardLookReference, type LookChoiceOutcome, type ThingCardRoute } from '../thing-card-route-api.js';
 import { lineMarkOf, markLabel, markOf, type ThingMark } from './thing-marks.js';
 import { carriedWords, type KindReference } from './visitor-notices.js';
 import type { BeingLine } from './being-lines.js';
 import { fetchCrossingManifest, type CrossingManifest, type CrossingRows } from '../crossing-manifest-api.js';
-import { THING_PICK_EVENT, type ThingPickDetail } from './things.js';
+import { THING_LOOK_CHOSEN_EVENT, THING_PICK_EVENT, type ThingLookChosenDetail, type ThingPickDetail } from './things.js';
 import '../ui/thing-card.css';
 
 const ROUTINE_KEY = 'routine';
@@ -47,6 +48,8 @@ export interface BeingFacts {
   readonly holding: string | null;
   /** For a visitor: what came across and what stayed behind, or null where its manifest is unread or unreadable. */
   readonly crossing?: CrossingRows | null;
+  /** Its card as the server serves it, or null where none is served (no society of things here, or not read yet). */
+  readonly route?: ThingCardRoute | null;
 }
 
 /**
@@ -119,8 +122,9 @@ export function personCard(
       summary: facts?.kind.summary ?? about.note.description,
       now: about.note.activity.trim() === '' ? null : about.note.activity,
       mind,
-      looks: looksOf(facts?.look ?? null),
-      holding: facts?.holding ?? null,
+      looks: routeLooks(facts?.route ?? null) ?? looksOf(facts?.look ?? null),
+      holding: routeHolding(facts?.route ?? null) ?? facts?.holding ?? null,
+      ...routeWords(facts?.route ?? null),
       crossing: facts?.crossing ?? null,
       said: cardLines(being.said, subjectId, models, true),
       heard: cardLines(being.heard, subjectId, models, false),
@@ -163,8 +167,9 @@ export function personCard(
     now: about.note.activity.trim() === '' ? null : about.note.activity,
     mind,
     ...(being === null ? {} : {
-      looks: looksOf(facts?.look ?? null),
-      holding: facts?.holding ?? null,
+      looks: routeLooks(facts?.route ?? null) ?? looksOf(facts?.look ?? null),
+      holding: routeHolding(facts?.route ?? null) ?? facts?.holding ?? null,
+      ...routeWords(facts?.route ?? null),
       said: cardLines(being.said, subjectId, models, true),
       heard: cardLines(being.heard, subjectId, models, false),
     }),
@@ -185,8 +190,69 @@ function looksOf(look: LookFacts | null): CardLooks | null {
 /** A label as a title: "blocky knight" reads "Blocky knight". */
 const title = (label: string): string => label.charAt(0).toUpperCase() + label.slice(1);
 
+/** The key the card's look choices go by: the look's own reference, never its position in the list. */
+export const lookKey = (ref: CardLookReference): string =>
+  ref.source === 'workspace' ? `workspace/${ref.sha256}` : `shipped/${ref.key}/${ref.version}/${ref.sha256}`;
+
+/** The look it wears, as its served card names it, and every look it may wear; null where no card is served. */
+function routeLooks(route: ThingCardRoute | null): CardLooks | null {
+  if (route === null) return null;
+  const origin = route.look.origin;
+  return {
+    name: title(route.look.label),
+    line: origin === null ? '' : lookLine(origin),
+    source: origin === null ? null : sourceLink(origin),
+    credit: origin === null ? null : creditOf(origin),
+    choices: route.looks.map((option) => ({
+      key: lookKey(option.ref),
+      name: title(option.label),
+      line: lookOptionLine(option.authors, option.licence),
+      now: sameLook(option.ref, route.look.ref),
+    })),
+  };
+}
+
+/** What it holds, from its served card, or null where the card states no hands (the card then keeps today's words). */
+const routeHolding = (route: ThingCardRoute | null): string | null | undefined =>
+  route === null || route.holding === null ? undefined : carriedWords(route.holding);
+
+/** What it can do and what others can do with it, from its served card. */
+const routeWords = (route: ThingCardRoute | null): { can?: readonly string[]; offers?: readonly string[] } =>
+  route === null ? {} : { can: route.can, offers: route.offers };
+
+/** The first twelve characters of a record's digest: enough to compare by eye. */
+const short = (sha256: string): string => sha256.slice(0, 12);
+
+/**
+ * The proof that a look changed nothing else: the world's record as the swap read it, and as read
+ * again after, compared. A differing record at the same minute is said, never hidden.
+ */
+export function lookProof(before: ThingCardRoute['society'], after: ThingCardRoute['society']): string {
+  if (before.tick !== after.tick) {
+    return `The world moved on from minute ${before.tick} to minute ${after.tick} between the two reads, so the two records are of different minutes. A look is kept beside a thing, never in what it does.`;
+  }
+  if (before.stateSha256 === after.stateSha256) {
+    return `This world's record at minute ${before.tick}, read as the look changed and again after: ${short(before.stateSha256)} and ${short(after.stateSha256)}, the same. A look is kept beside a thing, never in what it does.`;
+  }
+  return `This world's record at minute ${before.tick} read ${short(before.stateSha256)} as the look changed and ${short(after.stateSha256)} after.`;
+}
+
+/** Why a look was not changed, in words, from the route's refusal code. */
+export function lookRefusalWords(code: string): string {
+  switch (code) {
+    case 'look_unfit':
+      return 'That look is made for another body, so it cannot be drawn in it.';
+    case 'look_not_shipped':
+      return 'That look is no longer offered here. Choose another.';
+    case 'http_403':
+      return 'Only this world\'s owner can change how its things are drawn.';
+    default:
+      return 'The look was not changed. Try again in a moment.';
+  }
+}
+
 /** A placed thing's card, from its kind's and its worn look's facts. */
-export function placedThingCard(thing: SelectedThing, kind: KindFacts, look: LookFacts | null): ThingCardModel {
+export function placedThingCard(thing: SelectedThing, kind: KindFacts, look: LookFacts | null, route: ThingCardRoute | null = null): ThingCardModel {
   const mind: CardMind = kind.class === 'object'
     ? { name: 'None', line: 'It decides nothing.', mark: null, choices: [], ask: '', when: '' }
     // A being placed in a world whose people do not take things yet stands where it was placed.
@@ -199,7 +265,8 @@ export function placedThingCard(thing: SelectedThing, kind: KindFacts, look: Loo
     summary: kind.summary,
     now: null,
     mind,
-    looks: looksOf(look),
+    looks: routeLooks(route) ?? looksOf(look),
+    ...routeWords(route),
     cameFrom: `${placedByYou ? 'You placed it here. ' : ''}${kindCameWords(kind.label, kind.origin)}`,
   };
 }
@@ -228,6 +295,10 @@ export function mountThingCard(options: {
   readonly looks?: (worldId: string, versionId: string) => Promise<ReadonlyMap<string, LookReference>>;
   /** A visitor's crossing manifest; read with the credentials when left out. */
   readonly manifest?: (worldId: string, arrivalId: string) => Promise<CrossingManifest>;
+  /** A thing's served card by its society id (null where none is served); read with the credentials when left out. */
+  readonly card?: (worldId: string, versionId: string, thingId: string) => Promise<ThingCardRoute | null>;
+  /** Choose the look a thing is drawn in; sent with the credentials when left out. */
+  readonly chooseLook?: (worldId: string, versionId: string, thingId: string, look: CardLookReference) => Promise<LookChoiceOutcome>;
 }): MountedThingCard {
   const { selection } = options;
   let subject: string | null = null;
@@ -241,6 +312,27 @@ export function mountThingCard(options: {
   };
   const readLooks = options.looks ?? ((worldId: string, versionId: string) => fetchThingLooks(options.credentials, worldId, versionId));
   const readManifest = options.manifest ?? ((worldId: string, arrivalId: string) => fetchCrossingManifest(options.credentials, worldId, arrivalId));
+  const readCard = options.card ?? ((worldId: string, versionId: string, thingId: string) => fetchThingCardRoute(options.credentials, worldId, versionId, thingId));
+  const sendLook = options.chooseLook
+    ?? ((worldId: string, versionId: string, thingId: string, look: CardLookReference) => chooseThingLook(options.credentials, worldId, versionId, thingId, look));
+  /**
+   * Each thing's served card by version and society id, read at most once a minute: a failed read
+   * keeps the card last read and is asked again after a minute; null where none is served.
+   */
+  const routes = new Map<string, { readonly at: number; readonly card: ThingCardRoute | null }>();
+  const routeKey = (versionId: string, thingId: string): string => `${versionId}/${thingId}`;
+  const routeOf = (versionId: string, thingId: string): ThingCardRoute | null => routes.get(routeKey(versionId, thingId))?.card ?? null;
+  const routeDue = (versionId: string, thingId: string): boolean => {
+    const held = routes.get(routeKey(versionId, thingId));
+    return held === undefined || performance.now() - held.at >= 60_000;
+  };
+  const readRoute = async (worldId: string, versionId: string, thingId: string): Promise<void> => {
+    const key = routeKey(versionId, thingId);
+    const card = await readCard(worldId, versionId, thingId).catch(() => routes.get(key)?.card ?? null);
+    routes.set(key, { at: performance.now(), card });
+  };
+  /** What the card shows now with a served card, so a look chosen on it reaches the right thing; redrawn after a swap. */
+  let target: { readonly worldId: string; readonly versionId: string; readonly thingId: string; readonly redraw: () => void } | null = null;
   /** Each crossing's rows by its arrival, read once (a manifest never changes); null where unreadable. */
   const manifests = new Map<string, CrossingRows | null>();
   /** When a manifest read last failed, by arrival: asked again at most once a minute, quietly. */
@@ -284,9 +376,14 @@ export function mountThingCard(options: {
       kind, look,
       holding: carriedWords(being.holding.flatMap((held) => kindRead(held.kind)?.label ?? [])),
       crossing: arrival === null ? null : manifests.get(arrival) ?? null,
+      route: being.world === null ? null : routeOf(being.world.versionId, subjectId),
     };
   };
   const readBeing = async (subjectId: string, being: SelectedBeing): Promise<void> => {
+    // Its served card is read beside the rest; a server without it leaves the card as it was.
+    const route = being.world !== null && routeDue(being.world.versionId, subjectId)
+      ? readRoute(being.world.worldId, being.world.versionId, subjectId)
+      : Promise.resolve();
     const library = await openLibrary();
     opened = library;
     if (being.world !== null && !choicesFresh(being)) {
@@ -319,6 +416,7 @@ export function mountThingCard(options: {
       const look = await library.lookDocument(worn).then(readLookFacts, () => null);
       looks.set(refKey(worn, worn.key), look === null || look.peopleCatalog ? null : look);
     }
+    await route;
   };
   /** The thing's ring goes when the card stops showing it: hidden, or its panel closed. */
   const letGo = (): void => {
@@ -339,6 +437,29 @@ export function mountThingCard(options: {
     watched = panel;
     if (panel !== null) panelWatch.observe(panel, { attributes: true, attributeFilter: ['hidden'] });
   };
+  /**
+   * Draw the shown thing in another look: the server records the choice beside it and answers its
+   * card; the world is asked to redraw it at once, and its record is read again so the card can
+   * show that nothing it does changed.
+   */
+  async function chooseLookFor(key: string): Promise<CardLookOutcome> {
+    const shown = target;
+    const route = shown === null ? null : routeOf(shown.versionId, shown.thingId);
+    const option = route?.looks.find((one) => lookKey(one.ref) === key) ?? null;
+    if (shown === null || route === null || option === null) return { words: 'That look is no longer offered here. Choose another.', proof: null };
+    const outcome = await sendLook(shown.worldId, shown.versionId, shown.thingId, option.ref);
+    if (!outcome.chosen) return { words: lookRefusalWords(outcome.code), proof: null };
+    routes.set(routeKey(shown.versionId, shown.thingId), { at: performance.now(), card: outcome.card });
+    // Raised on the shell, which stays in the page however the card is closed meanwhile.
+    options.shell.dispatchEvent(new CustomEvent<ThingLookChosenDetail>(THING_LOOK_CHOSEN_EVENT, { bubbles: true, detail: { thingId: shown.thingId } }));
+    if (target === shown) shown.redraw();
+    const after = await readCard(shown.worldId, shown.versionId, shown.thingId).catch(() => null);
+    return {
+      words: `Now drawn as ${withArticle(outcome.card.look.label)}. Only its look changed: what it does, says and decides is exactly the same.`,
+      proof: after === null ? null : lookProof(outcome.card.society, after.society),
+    };
+  }
+
   const card = buildThingCard({
     async onChoose(key) {
       const chosen = subject;
@@ -356,6 +477,7 @@ export function mountThingCard(options: {
       if (subject !== null) selection.openDecides({ role: 'people', subjectIds: [subject] });
     },
     onCompare: options.compare,
+    onLook: chooseLookFor,
   });
   return {
     view: {
@@ -364,9 +486,15 @@ export function mountThingCard(options: {
         subject = subjectId;
         shownThing = null;
         const being = about.being ?? null;
+        const world = being?.world ?? null;
+        const redraw = (): void => {
+          if (subject === subjectId && being !== null) card.render(personCard(subjectId, about, selection.models(), factsNow(subjectId, being)));
+        };
+        target = world === null ? null : { worldId: world.worldId, versionId: world.versionId, thingId: subjectId, redraw };
         card.render(personCard(subjectId, about, selection.models(), being === null ? null : factsNow(subjectId, being)));
         const arrival = being === null ? null : crossingOf(being);
-        if (being !== null && (factsNow(subjectId, being) === null || !choicesFresh(being) || (arrival !== null && manifestDue(arrival)))) {
+        const routeStale = world !== null && routeDue(world.versionId, subjectId);
+        if (being !== null && (factsNow(subjectId, being) === null || !choicesFresh(being) || routeStale || (arrival !== null && manifestDue(arrival)))) {
           void readBeing(subjectId, being).then(() => {
             // Shown again from what Selected knows now, unless the card moved on meanwhile.
             if (subject === subjectId && factsNow(subjectId, being) !== null) {
@@ -379,17 +507,30 @@ export function mountThingCard(options: {
       showThing(thing) {
         subject = null;
         shownThing = thing.placed.thingId;
+        target = null;
         watchPanel();
         card.render(pendingCard(thing, 'Reading what this is', ''));
         void (async () => {
           try {
+            // Its served card, by the id its society gives it, read beside the rest.
+            const societyId = thing.societyThingId ?? null;
+            const route = societyId === null ? Promise.resolve() : readRoute(thing.worldId, thing.versionId, societyId);
             const things = await openLibrary();
             const named = { key: thing.placed.kind.kind, version: thing.placed.kind.version, sha256: thing.placed.kind.sha256 };
             const kind = readKindFacts(await things.kindDocument(named));
             const worn = (await readLooks(thing.worldId, thing.versionId)).get(thing.placed.thingId);
             const lookNamed = worn ?? kind.firstLook;
             const look = lookNamed === null ? null : readLookFacts(await things.lookDocument(lookNamed));
-            if (shownThing === thing.placed.thingId) card.render(placedThingCard(thing, kind, look));
+            await route;
+            const redraw = (): void => {
+              if (shownThing === thing.placed.thingId) {
+                card.render(placedThingCard(thing, kind, look, societyId === null ? null : routeOf(thing.versionId, societyId)));
+              }
+            };
+            if (shownThing === thing.placed.thingId && societyId !== null) {
+              target = { worldId: thing.worldId, versionId: thing.versionId, thingId: societyId, redraw };
+            }
+            redraw();
           } catch {
             if (shownThing === thing.placed.thingId) {
               card.render(pendingCard(thing, 'Not read', 'What this is could not be read. Close it and pick it again in a moment.'));
@@ -400,6 +541,7 @@ export function mountThingCard(options: {
       },
       hide() {
         subject = null;
+        target = null;
         letGo();
       },
     },

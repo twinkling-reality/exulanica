@@ -154,7 +154,7 @@ describe('what came across with a visitor, on its card', () => {
     const card = mountThingCard({
       selection: { decide: vi.fn(), models: () => null, openDecides: vi.fn() }, compare: null,
       shell, credentials: { baseUrl: 'https://example.test', token: 't' },
-      library: async () => library(), looks: async () => new Map(),
+      library: async () => library(), looks: async () => new Map(), card: async () => null,
       manifest: async (world, arrival) => { asked.push(arrival); return readCrossingManifest(await manifest(world, arrival)); },
     });
     shell.append(card.view.root);
@@ -242,7 +242,7 @@ describe('a being of a kind its workspace made', () => {
     const card = mountThingCard({
       selection: { decide: vi.fn(), models: () => null, openDecides: vi.fn() }, compare: null,
       shell, credentials: { baseUrl: 'https://example.test', token: 't' },
-      library: async () => held, looks: async () => new Map(),
+      library: async () => held, looks: async () => new Map(), card: async () => null,
     });
     shell.append(card.view.root);
     const made = being({ kind: { kind: 'griffin', version: 2, sha256: 'c'.repeat(64) }, holding: [{ id: 'charm-1', kind: { kind: 'charm', version: 3, sha256: 'd'.repeat(64) } }] });
@@ -295,6 +295,7 @@ function mount(worn: ReadonlyMap<string, LookReference> = new Map()) {
     looks: async (_world, versionId) => { lookReads.push(versionId); return worn; },
     // No crossing here is served: a visitor's rows are left out, with no network asked.
     manifest: async () => { throw new Error('not served'); },
+    card: async () => null,
   });
   shell.append(card.view.root);
   return { card, root: card.view.root, lookReads };

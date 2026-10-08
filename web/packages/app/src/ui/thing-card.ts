@@ -48,6 +48,15 @@ export interface CardLink {
   readonly href: string;
 }
 
+/** One look the card offers when its look is changed: its name, who made it and its licence. */
+export interface CardLookChoice {
+  /** What `onLook` is called with. */
+  readonly key: string;
+  readonly name: string;
+  readonly line: string;
+  readonly now: boolean;
+}
+
 /** How it looks: the look's name, who made it and its licence, where it came from, and any credit owed. */
 export interface CardLooks {
   readonly name: string;
@@ -55,6 +64,14 @@ export interface CardLooks {
   readonly source: CardLink | null;
   /** The credit its licence asks for (attribution or share-alike), with a link where there is one. */
   readonly credit: { readonly text: string; readonly href: string | null } | null;
+  /** The looks it may be drawn as; absent, or fewer than two, offers no Change. */
+  readonly choices?: readonly CardLookChoice[];
+}
+
+/** What came of changing a look, in words, and the proof that nothing else changed (null where there is none to show). */
+export interface CardLookOutcome {
+  readonly words: string;
+  readonly proof: string | null;
 }
 
 /**
@@ -90,6 +107,10 @@ export interface ThingCardModel {
   readonly looks?: CardLooks | null;
   /** What it holds, in words ("a sword"); null leaves the row out. */
   readonly holding?: string | null;
+  /** What it can do here, in the abilities catalog's words; empty or absent leaves the row out. */
+  readonly can?: readonly string[];
+  /** What others can do with it, in the offers catalog's words; empty or absent leaves the row out. */
+  readonly offers?: readonly string[];
   /** Its own last lines, newest first; empty or absent leaves the row out. */
   readonly said?: readonly CardLine[];
   /** The last lines it heard, newest first; empty or absent leaves the row out. */
@@ -106,6 +127,8 @@ export interface ThingCardHandlers {
   onAllMinds(): void;
   /** Open Compare; null where this world offers no comparison. */
   onCompare: (() => void) | null;
+  /** Draw it in another look, by the look's key; absent where no look can be changed from the card. */
+  onLook?(key: string): Promise<CardLookOutcome>;
 }
 
 export interface ThingCard {
@@ -128,6 +151,9 @@ export function buildThingCard(handlers: ThingCardHandlers): ThingCard {
   let choosing = false;
   let busy = false;
   let outcome: string | null = null;
+  let lookChoosing = false;
+  let lookBusy = false;
+  let lookOutcome: CardLookOutcome | null = null;
   let current: ThingCardModel | null = null;
 
   const row = (heading: string, extra: readonly Node[] = [], action: HTMLElement | null = null) => {
@@ -196,13 +222,59 @@ export function buildThingCard(handlers: ThingCardHandlers): ThingCard {
   });
 
   function looksRow(looks: CardLooks): HTMLElement {
-    const box = row('Looks like');
-    box.append(el('p', { class: 'thing-card-mind-name', text: looks.name }), el('p', { class: 'thing-card-muted', text: looks.line }));
-    if (looks.source !== null) box.append(el('p', {}, [link(looks.source)]));
-    if (looks.credit !== null) {
-      const credit = looks.credit;
-      box.append(el('p', { class: 'thing-card-credit' }, [credit.href === null ? credit.text : link({ text: credit.text, href: credit.href })]));
+    const choices = looks.choices ?? [];
+    const changeable = handlers.onLook !== undefined && choices.length > 1;
+    const toggle = changeable
+      ? el('button', {
+        type: 'button', class: 'thing-card-change', text: lookChoosing ? 'Done' : 'Change',
+        'data-action': 'card.look.change', 'aria-expanded': String(lookChoosing),
+      })
+      : null;
+    toggle?.addEventListener('click', () => { lookChoosing = !lookChoosing; draw(); });
+    const box = row('Looks like', [], toggle);
+    if (changeable && lookChoosing) {
+      const list = el('div', { class: 'thing-card-choices', role: 'list' });
+      for (const choice of choices) {
+        const button = el('button', {
+          type: 'button', class: 'thing-card-choice', 'data-action': 'card.look.choose', 'data-key': choice.key,
+          role: 'listitem',
+        }, [
+          el('span', { class: 'thing-card-choice-text' }, [
+            el('span', { class: 'thing-card-choice-name', text: choice.name }),
+            el('small', { text: choice.line }),
+          ]),
+          ...(choice.now ? [el('span', { class: 'thing-card-now-badge', text: 'Now' })] : []),
+        ]);
+        button.toggleAttribute('data-now', choice.now);
+        button.disabled = lookBusy || choice.now;
+        button.addEventListener('click', () => { void chooseLook(choice.key); });
+        list.append(button);
+      }
+      box.append(list, el('p', { class: 'thing-card-faint', text: lookBusy ? 'Changing…' : 'Only how it is drawn changes.' }));
+    } else {
+      box.append(el('p', { class: 'thing-card-mind-name', text: looks.name }), el('p', { class: 'thing-card-muted', text: looks.line }));
+      if (looks.source !== null) box.append(el('p', {}, [link(looks.source)]));
+      if (looks.credit !== null) {
+        const credit = looks.credit;
+        box.append(el('p', { class: 'thing-card-credit' }, [credit.href === null ? credit.text : link({ text: credit.text, href: credit.href })]));
+      }
     }
+    if (lookOutcome !== null) {
+      box.append(el('p', { class: 'thing-card-outcome', role: 'status', text: lookOutcome.words }));
+      if (lookOutcome.proof !== null) {
+        box.append(el('details', { class: 'thing-card-proof' }, [
+          el('summary', { text: 'How we know' }),
+          el('p', { class: 'thing-card-muted', text: lookOutcome.proof }),
+        ]));
+      }
+    }
+    return box;
+  }
+
+  /** A row of short phrases in the catalogs' own words. */
+  function wordsRow(heading: string, words: readonly string[]): HTMLElement {
+    const box = row(heading);
+    box.append(el('ul', { class: 'thing-card-chips' }, words.map((phrase) => el('li', { text: phrase }))));
     return box;
   }
 
@@ -267,6 +339,23 @@ export function buildThingCard(handlers: ThingCardHandlers): ThingCard {
     }
   }
 
+  async function chooseLook(key: string): Promise<void> {
+    const onLook = handlers.onLook;
+    if (lookBusy || onLook === undefined) return;
+    lookBusy = true;
+    lookOutcome = null;
+    draw();
+    try {
+      lookOutcome = await onLook(key);
+      lookChoosing = false;
+    } catch {
+      lookOutcome = { words: 'The look was not changed. Try again in a moment.', proof: null };
+    } finally {
+      lookBusy = false;
+      draw();
+    }
+  }
+
   function draw(): void {
     const model = current;
     if (model === null) { root.replaceChildren(); return; }
@@ -285,6 +374,8 @@ export function buildThingCard(handlers: ThingCardHandlers): ThingCard {
       holding.append(el('p', { text: model.holding }));
       parts.push(holding);
     }
+    if (model.can !== undefined && model.can.length > 0) parts.push(wordsRow('Can', model.can));
+    if (model.offers !== undefined && model.offers.length > 0) parts.push(wordsRow('With it', model.offers));
     if (model.crossing != null) parts.push(...crossingRows(model.crossing));
     if (model.said !== undefined && model.said.length > 0) parts.push(linesRow('Said lately', model.said));
     if (model.heard !== undefined && model.heard.length > 0) parts.push(linesRow('Heard lately', model.heard));
@@ -302,10 +393,12 @@ export function buildThingCard(handlers: ThingCardHandlers): ThingCard {
         subject = model.subject;
         choosing = false;
         outcome = null;
+        lookChoosing = false;
+        lookOutcome = null;
       }
       current = model;
       // A refresh while a choice is out redraws when it settles, from the newest model.
-      if (!busy) draw();
+      if (!busy && !lookBusy) draw();
     },
   };
 }

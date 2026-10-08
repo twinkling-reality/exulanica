@@ -233,6 +233,8 @@ export interface SelectedThing {
   readonly placed: PlacedThing;
   readonly worldId: string;
   readonly versionId: string;
+  /** The id the drawn society of things gives it, for its served card; null where no such society holds it. */
+  readonly societyThingId?: string | null;
 }
 
 /**
@@ -934,7 +936,8 @@ export function mountEnvironmentSelection(
     selected.textContent = 'Selected placed thing';
     inspector.setUnderView(false);
     inspector.root.hidden = true;
-    const shown = view.showThing({ placed, worldId: savedWorld.worldId, versionId: savedWorld.versionId });
+    const societyThingId = society?.state?.things?.find((thing) => thing.placed_id === placedId)?.id ?? null;
+    const shown = view.showThing({ placed, worldId: savedWorld.worldId, versionId: savedWorld.versionId, societyThingId });
     view.root.hidden = !shown;
     if (!shown) showInspector();
     return true;

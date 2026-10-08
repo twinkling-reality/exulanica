@@ -36,8 +36,17 @@ const httpLink = (reference: string | undefined): string | null => {
 
 /** Who made a look and its licence, in a line: "By Kay Lousberg. CC0, free to use." */
 export function lookLine(origin: OriginRecord): string {
-  const who = authorWords(origin.authors) || (origin.by === 'project' ? 'Made for Exulanica' : '');
-  const licence = licenceWords({ id: origin.licence.spdx, attribution: null });
+  return makerLine(authorWords(origin.authors) || (origin.by === 'project' ? 'Made for Exulanica' : ''), origin.licence.spdx);
+}
+
+/** The same line from a look's authors and licence alone, as the card lists the looks it may wear. */
+export function lookOptionLine(authors: readonly string[], spdx: string | null): string {
+  return makerLine(authorWords(authors), spdx);
+}
+
+function makerLine(who: string, spdx: string | null): string {
+  const licence = spdx === null ? null : licenceWords({ id: spdx, attribution: null });
+  if (licence === null) return who === '' ? '' : `${who}.`;
   return who === '' ? `${licence}.` : `${who}. ${licence}.`;
 }
 

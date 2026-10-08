@@ -133,3 +133,17 @@
   background: transparent;
   border: 0;
 }
+/* What it can do and what others can do with it: short phrases in the catalogs' own words. */
+#shell .thing-card-chips { display: flex; flex-wrap: wrap; gap: var(--space-1); margin: 0; padding: 0; list-style: none; }
+#shell .thing-card-chips li {
+  padding: 2px var(--space-2);
+  font-size: var(--text-sm);
+  line-height: var(--text-sm-line);
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+/* The proof under a changed look: closed until a person asks how we know. */
+#shell .thing-card-proof { margin-top: var(--space-1); }
+#shell .thing-card-proof summary { cursor: pointer; color: var(--color-accent-text); font-size: var(--text-sm); }
+#shell .thing-card-proof p { overflow-wrap: anywhere; }

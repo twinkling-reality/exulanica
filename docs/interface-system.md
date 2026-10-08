@@ -267,7 +267,8 @@ its own name in a visitor notice.
 
 A person of a society of things also reads, from the drawn state and the host's thing library,
 its kind's summary; the look it is drawn in (the one chosen for it, else its kind's first), with
-who made it and its licence, and no look row where it is drawn as one of the world's people; what
+who made it and its licence, and, until its own card is read from the server (below), no look row
+where it is drawn as one of the world's people; what
 it holds ("Holding: a sword"); and how it came: "You placed it here." with its kind's origin, "One
 of the people who live in this world.", or, for a visitor, "Came in from" the bridge's label as
 the door lists it. Who decides for a visitor comes from the data, never from how it came: one an
@@ -280,6 +281,24 @@ nothing about a person, so none is claimed. One of the world's own people a gran
 same way. A visitor the world decides for has its world mind like any being, the model named or
 its routine, with Change for the owner, and wears the world's mark for it (the AI pill naming the
 model, with where it came from).
+
+Where the world's society is a society of things, the card also reads the thing's own card from
+the server, by the id the society gives it (`GET /world/versions/{version_id}/society/things/{thing_id}`,
+`thing-card-route-api.ts`), at most once a minute, for a being and for a placed thing alike. It adds
+"Can", what the thing can do here, and "With it", what others can do with it, as short phrases in
+the abilities and offers catalogs' own words, only for what a module the world runs acts on; what a
+being holds when its world's beings have hands; and the look it wears with every look it may be
+drawn as. A server or a world without that card leaves these rows as they were, and a failed read is
+asked again after a minute. Change beside Looks like lists those looks, each with who made it and its
+licence, the one it wears marked Now; one click records the choice
+(`POST .../society/things/{thing_id}/look`) and the world redraws that thing at once
+(`THING_LOOK_CHOSEN_EVENT`). The card then says "Now drawn as a blocky knight. Only its look
+changed: what it does, says and decides is exactly the same.", and, closed under "How we know",
+this world's record at that minute as the swap read it and as read again after, by the first twelve
+characters of each digest, and that they are the same. Where the world moved on a minute between
+the two reads the card says so, and a record that differed at one minute would be said, never
+hidden; no digest shows anywhere else on the card. A look the server refuses is said in words: one
+made for another body, one no longer offered, or a person who is not the world's owner.
 
 A visitor's card also says what came across with it and what stayed behind, from its crossing's
 translation manifest (`GET /door/crossings/{arrival_id}/manifest`, the stored document): "Came

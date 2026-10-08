@@ -224,6 +224,8 @@ describe('a saved world\'s placed things', () => {
     }));
     expect(view.showThing).toHaveBeenCalledOnce();
     expect(view.showThing.mock.calls[0]![0]).toMatchObject({ worldId: WORLD, versionId: 'version', placed: { thingId: 'well-1', kind: KIND } });
+    // No society of things is drawn here, so it has no society id for its served card.
+    expect(view.showThing.mock.calls[0]![0].societyThingId).toBeNull();
     expect(root.hidden).toBe(false);
     expect(mounted.root.querySelector<HTMLElement>('.living-world-inspector')!.hidden).toBe(true);
     // A thing the version no longer places, and the ring's own clearing, open nothing.
@@ -237,5 +239,19 @@ describe('a saved world\'s placed things', () => {
       bubbles: true, detail: { placedId: 'well-1', thingId: null, subjectId: null, via: 'aim' },
     }));
     expect(view.showThing).toHaveBeenCalledOnce();
+  });
+
+  it('hands the card the id the drawn society of things gives a picked placed thing, for its served card', async () => {
+    const { mounted, shell } = mount(true);
+    await mounted.begin();
+    for (let i = 0; i < 6; i += 1) await new Promise((resolve) => setTimeout(resolve, 0));
+    const view = { root: document.createElement('section'), show: vi.fn(() => true), showThing: vi.fn((_thing: SelectedThing) => true), hide: vi.fn() };
+    mounted.useInhabitantView(view);
+    shell.dispatchEvent(new CustomEvent<ThingPickDetail>(THING_PICK_EVENT, {
+      bubbles: true, detail: { placedId: 'well-1', thingId: null, subjectId: null, via: 'pointer' },
+    }));
+    // The state's thing whose placed id is the pick's: 't-well' in thingsSociety above.
+    expect(view.showThing.mock.calls[0]![0]).toMatchObject({ placed: { thingId: 'well-1' }, societyThingId: 't-well' });
+    mounted.dispose();
   });
 });
