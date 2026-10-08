@@ -13,6 +13,11 @@
       "sha256": "3cd7cb81e9ddfa1e1a40ddfb241e8ec65541465e6b0a88bc2abc08ed007092aa"
     },
     {
+      "scene": "three-strangers",
+      "version": 5,
+      "sha256": "eb19d11820c4b013e5391f575d1b7b50ad97ba118512eb5a5d3371567b64875b"
+    },
+    {
       "scene": "three-strangers-in-town",
       "version": 1,
       "sha256": "f5e1b614710642b3bff1d89181a412bcde9f56263aea0d41ed8175199eeb8ddd"

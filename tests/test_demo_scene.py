@@ -8,7 +8,8 @@ What is shown here, with no database and no server:
     manifest serves; a scene's travellers reach the build record, and a gate it lacks is refused;
 *   the newest version of each scene, the one a rehearsal builds, chooses only a decider each
     being's kind allows and only models its engine offers to a being's decisions, as the society's
-    model choice route requires; older versions stay as published for the records naming them;
+    model choice route requires, and so does the mind it gives the travellers its gate lets in;
+    older versions stay as published for the records naming them;
 *   a place stated from where a person arrives becomes the same pose in any world's frame: on a
     starter (the spawn faces north) and for an arrival facing east, checked against arithmetic done
     here rather than the builder's;
@@ -103,6 +104,10 @@ def test_a_scene_s_newest_version_chooses_minds_its_engine_offers(path):
         assert mind["decider"]["kind"] in kind.document["deciders"]["allowed"], mind["thing_id"]
         if mind["decider"]["kind"] == "model":
             assert mind["decider"]["model_id"] in offered, mind["thing_id"]
+    # A gate's travellers are decided as the world's own beings are: the grant names this mind.
+    model = (scene.get("travellers") or {}).get("model")
+    if model is not None:
+        assert model["model_id"] in offered, "the travellers' mind"
 
 
 def test_a_scene_places_each_thing_once_and_minds_only_its_own(tmp_path):
