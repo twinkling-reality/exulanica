@@ -177,7 +177,26 @@ def _serve_mind(mind: _Mind) -> tuple[http.server.ThreadingHTTPServer, str]:
     return server, f"http://127.0.0.1:{server.server_address[1]}/v1"
 
 
-def _config(facade_python: str, mind_url: str | None, folder: Path) -> Path:
+def _set_once(text: str, key: str, value: str) -> str:
+    """``text`` with the one line setting ``key`` set to ``value``, written as a JSON string, which
+    YAML reads back as written whatever marks a declared name holds."""
+    if not value.isprintable():
+        raise SystemExit(f"{key} holds a character that cannot be written on one line")
+    line = re.compile(rf"^(\s+{re.escape(key)}:) .*$", re.MULTILINE)
+    if len(line.findall(text)) != 1:
+        raise SystemExit(f"the example does not set {key} on exactly one line")
+    return line.sub(lambda found: f"{found.group(1)} {json.dumps(value)}", text)
+
+
+def _config(
+    facade_python: str,
+    mind_url: str | None,
+    folder: Path,
+    *,
+    mind: str | None = None,
+    name: str | None = None,
+    maker: str | None = None,
+) -> Path:
     text = EXAMPLE.read_text(encoding="utf-8")
     start = text.index("      command: uvx")
     end = text.index("      env:")
@@ -189,6 +208,19 @@ def _config(facade_python: str, mind_url: str | None, folder: Path) -> Path:
     )
     if mind_url is not None:
         text = text.replace("https://api.tokenfactory.nebius.com/v1", mind_url)
+    if mind is not None:
+        # The model the toolkit calls is the mind the agent declares.
+        text = _set_once(text, "model_name", mind)
+        text = _set_once(text, "EXULANICA_AGENT_MIND", mind)
+    if name is not None:
+        # The instructions call the agent by the name it declares.
+        declared = re.findall(r"^\s+EXULANICA_AGENT_NAME: (.+)$", text, re.MULTILINE)
+        called = f"named {declared[0]}." if len(declared) == 1 else ""
+        if not called or text.count(called) != 1:
+            raise SystemExit("the example's instructions do not call its agent by name once")
+        text = _set_once(text.replace(called, f"named {name}."), "EXULANICA_AGENT_NAME", name)
+    if maker is not None:
+        text = _set_once(text, "EXULANICA_AGENT_MAKER", maker)
     path = folder / "agent.yml"
     path.write_text(text, encoding="utf-8")
     return path
@@ -247,9 +279,11 @@ def main() -> int:
         "no key in the output": not report["output_names_a_key"],
     }
     if not arguments.live:
-        holds["the toolkit offered the five tools"] = sorted(mind.tool_names) == sorted(
-            f"world__{name}"
-            for name in ("wait_for_turn", "act", "what_happened", "enter_world", "world_rules")
+        # The stand-in grant lets no body in, so the facade offers every tool but enter_world.
+        holds["the toolkit offered the four tools of a grant without a body"] = sorted(
+            mind.tool_names
+        ) == sorted(
+            f"world__{name}" for name in ("wait_for_turn", "act", "what_happened", "world_rules")
         )
     print(json.dumps({"report": report, "holds": holds}, indent=2))
     return 0 if all(holds.values()) else 1
