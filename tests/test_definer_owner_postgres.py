@@ -15,6 +15,7 @@ schema is shared with the session's other tests and a role belongs to the whole 
 from __future__ import annotations
 
 import contextlib
+import dataclasses
 import uuid
 from pathlib import Path
 from types import SimpleNamespace
@@ -599,26 +600,93 @@ def test_a_database_behind_the_code_is_held_to_the_grants_it_records(
         assert_definer_role(admin, applied=[DEFINER_MIGRATION])
 
 
-def test_an_entry_for_the_newest_migration_a_database_has_not_applied_passes_until_recorded(
-    admin, monkeypatch, tmp_path
-):
-    """The drop_last case: code that ships one more migration than the database records, whose
-    entry grants the owner something. The migration directory is left without the newest file, as
-    the one-behind tests do; the check reads the database's records alone, so it passes, and once
-    the newest version is recorded it refuses the grant as missing."""
+def _overloads(admin, name: str) -> list[str]:
+    return [
+        row["s"]
+        for row in admin.execute(
+            "select p.oid::regprocedure::text s from pg_proc p "
+            "where p.pronamespace = current_schema()::regnamespace and p.proname = %s",
+            (name,),
+        ).fetchall()
+    ]
+
+
+def _move_owner(admin, held: definer_role.ExpectedGrants, wanted: definer_role.ExpectedGrants):
+    """Grant and revoke on the owner what takes it from ``held`` to ``wanted``: table revocations
+    first (they also clear that privilege's column grants), then every grant, then the column and
+    function revocations."""
+    role = sql.Identifier(DEFINER_ROLE)
+
+    def privileges(names) -> sql.Composable:
+        return sql.SQL(", ").join(sql.SQL(name) for name in sorted(names))
+
+    for table, has in held.tables.items():
+        if gone := has - wanted.tables.get(table, frozenset()):
+            admin.execute(
+                sql.SQL("revoke {} on {} from {}").format(
+                    privileges(gone), sql.Identifier(table), role
+                )
+            )
+    for table, wants in wanted.tables.items():
+        admin.execute(
+            sql.SQL("grant {} on {} to {}").format(privileges(wants), sql.Identifier(table), role)
+        )
+    for table, by_column in wanted.columns.items():
+        for column, wants in by_column.items():
+            for privilege in sorted(wants):
+                admin.execute(
+                    sql.SQL("grant {} ({}) on {} to {}").format(
+                        sql.SQL(privilege), sql.Identifier(column), sql.Identifier(table), role
+                    )
+                )
+    for table, by_column in held.columns.items():
+        for column, has in by_column.items():
+            for privilege in sorted(has - wanted.columns.get(table, {}).get(column, frozenset())):
+                admin.execute(
+                    sql.SQL("revoke {} ({}) on {} from {}").format(
+                        sql.SQL(privilege), sql.Identifier(column), sql.Identifier(table), role
+                    )
+                )
+    for name in sorted(wanted.functions | held.functions):
+        verb = "grant" if name in wanted.functions else "revoke"
+        for signature in _overloads(admin, name):
+            admin.execute(
+                sql.SQL(
+                    "grant execute on function {} to {}"
+                    if verb == "grant"
+                    else "revoke execute on function {} from {}"
+                ).format(sql.SQL(signature), role)
+            )
+
+
+def _newest_entry_passes_until_recorded(admin, monkeypatch, tmp_path) -> None:
+    """The drop_last case for whatever entry the newest shipped migration has: the harness really
+    applied it, so what it grants or takes back is first undone on the owner, as if it had not run.
+    Its entry is then given one more grant (SELECT on capture), so recording it must refuse."""
     import shutil
 
     from exulanica import migrations as migrations_module
 
-    newest = max(shipped_versions())
+    shipped = shipped_versions()
+    newest = max(shipped)
+    without = definer_role.expected_grants(shipped - {newest})
+    _move_owner(admin, definer_role.expected_grants(shipped), without)
+    assert "SELECT" not in without.tables.get("capture", frozenset())
     trimmed = tmp_path / "migrations"
     trimmed.mkdir()
     for path in migrations_module.migration_directory().glob("*.sql"):
         if not path.name.startswith(newest + "_"):
             shutil.copy2(path, trimmed / path.name)
+    real = definer_role.GRANTS_BY_MIGRATION.get(newest, definer_role.DefinerGrants())
     grants = {
         **definer_role.GRANTS_BY_MIGRATION,
-        newest: definer_role.DefinerGrants(tables={"capture": frozenset({"SELECT"})}),
+        newest: dataclasses.replace(
+            real,
+            tables={
+                **real.tables,
+                "capture": real.tables.get("capture", frozenset()) | {"SELECT"},
+            },
+        ),
     }
     monkeypatch.setattr(definer_role, "GRANTS_BY_MIGRATION", grants)
     monkeypatch.setattr(migrations_module, "migration_directory", lambda: trimmed)
@@ -627,8 +695,75 @@ def test_an_entry_for_the_newest_migration_a_database_has_not_applied_passes_unt
     assert_definer_role(admin)
     start()
     _record(admin, newest)
-    with pytest.raises(DefinerRoleUnsafe, match="capture SELECT missing"):
+    # SELECT alone, or beside what the newest entry itself grants on capture.
+    with pytest.raises(DefinerRoleUnsafe, match=r"capture (\w+/)*SELECT(/\w+)* missing"):
         assert_definer_role(admin)
+
+
+def test_an_entry_for_the_newest_migration_a_database_has_not_applied_passes_until_recorded(
+    admin, monkeypatch, tmp_path
+):
+    """The drop_last case: code that ships one more migration than the database records, whose
+    entry grants the owner something. The migration directory is left without the newest file, as
+    the one-behind tests do; the check reads the database's records alone, so it passes, and once
+    the newest version is recorded it refuses the grant as missing. The newest migration's own
+    entry, whatever it holds, is undone first (_newest_entry_passes_until_recorded)."""
+    _newest_entry_passes_until_recorded(admin, monkeypatch, tmp_path)
+
+
+def test_the_newest_entry_is_undone_whatever_kind_of_grant_it_holds(admin, monkeypatch, tmp_path):
+    """The same case when the newest migration's entry holds every kind: a table, a column and a
+    function granted, and a table, a column and a function taken back (the column one granted by
+    the migration before it). Each is made on the database first, as the migrations would."""
+    shipped = shipped_versions()
+    newest, previous = sorted(shipped)[-1], sorted(shipped)[-2]
+    admin.execute(
+        "create function a_later_step() returns int language sql "
+        "set search_path = pg_catalog, pg_temp as 'select 1'"
+    )
+    admin.execute("revoke all on function a_later_step() from public")
+    real = definer_role.GRANTS_BY_MIGRATION
+    before_previous = real.get(previous, definer_role.DefinerGrants())
+    before_newest = real.get(newest, definer_role.DefinerGrants())
+    every_kind = {
+        **real,
+        previous: dataclasses.replace(
+            before_previous,
+            columns={
+                **before_previous.columns,
+                "embedding": {"embedding_id": frozenset({"UPDATE"})},
+            },
+        ),
+        newest: dataclasses.replace(
+            before_newest,
+            tables={**before_newest.tables, "capture": frozenset({"INSERT"})},
+            columns={**before_newest.columns, "embedding": {"embedding_id": frozenset({"INSERT"})}},
+            functions=before_newest.functions | {"a_later_step"},
+            revoked_tables={**before_newest.revoked_tables, "tombstone": frozenset({"SELECT"})},
+            revoked_columns={
+                **before_newest.revoked_columns,
+                "embedding": {"embedding_id": frozenset({"UPDATE"})},
+            },
+            revoked_functions=before_newest.revoked_functions | {"spending__charge"},
+        ),
+    }
+    held = definer_role.expected_grants(shipped)
+    monkeypatch.setattr(definer_role, "GRANTS_BY_MIGRATION", every_kind)
+    _move_owner(admin, held, definer_role.expected_grants(shipped))
+    assert_definer_role(admin)
+    _newest_entry_passes_until_recorded(admin, monkeypatch, tmp_path)
+    # Undone means each kind went back: the revoked ones held again, the granted ones gone.
+    with pytest.raises(DefinerRoleUnsafe) as refused:
+        assert_definer_role(admin)
+    for finding in (
+        "capture INSERT/SELECT missing",
+        "embedding.embedding_id INSERT missing",
+        "embedding.embedding_id UPDATE beyond",
+        "tombstone SELECT beyond",
+        "spending__charge executable beyond",
+        "a_later_step not executable",
+    ):
+        assert finding in str(refused.value), (finding, str(refused.value))
 
 
 def test_every_listed_migration_is_one_the_code_ships():
