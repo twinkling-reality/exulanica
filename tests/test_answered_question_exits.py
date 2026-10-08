@@ -175,7 +175,7 @@ def _square(context: Context, *, also_saved=(), refusal=None) -> None:
     """The society the page shows: the small square's recorded run, read as ``read_scene`` reads
     one, with any name ``also_saved`` saved beside the workspace's own."""
 
-    def read(connection, workspace_id, world_id, society, *, authorize, question, saved):
+    def read(connection, workspace_id, world_id, society, *, authorize, question, saved, bridges):
         if refusal is not None:
             return refusal
         return build_scene(
@@ -186,6 +186,7 @@ def _square(context: Context, *, also_saved=(), refusal=None) -> None:
             selected=society.inhabitant_id,
             question=question,
             saved=(*saved, *also_saved),
+            bridges=bridges,
         )
 
     context.monkeypatch.setattr(question_module, "read_scene", read)

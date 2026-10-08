@@ -29,7 +29,11 @@ from exulanica.selection.answer import (
     ClauseType,
 )
 from exulanica.selection.calls import CallLog
-from exulanica.selection.inhabitant_words import inhabitant_words, inhabitant_words_catalog
+from exulanica.selection.inhabitant_words import (
+    CATALOG_PATH,
+    inhabitant_words,
+    inhabitant_words_catalog,
+)
 from exulanica.selection.plan import SocietyAspect, SocietyScope, SocietySelector
 from exulanica.selection.society_question import (
     COMPOSER_ROLE,
@@ -906,3 +910,77 @@ def test_the_words_past_the_deadline_state_the_deadline_the_composer_was_given(m
     assert said.answer.clauses[1].text.startswith(
         f"The model that chooses the lines for this answer did not choose within {moved} seconds."
     )
+
+
+def _phrase(code: str) -> str:
+    """A phrase as the words catalog file states it, read from the file itself."""
+    entries = json.loads(CATALOG_PATH.read_text(encoding="utf-8"))["entries"]
+    return next(e["words"] for e in entries if e["kind"] == "phrase" and e["code"] == code)
+
+
+@pytest.mark.parametrize(
+    ("bridges", "came_from"),
+    [({"blockgame": "Block Game"}, "Block Game"), ({}, None)],
+    ids=["a-bridge-the-door-lists", "a-bridge-it-does-not"],
+)
+def test_who_someone_who_came_in_from_outside_is_says_where_they_came_from(bridges, came_from):
+    """Never called invented for this world: the page's words, with the door's label for the
+    bridge they crossed by (or outside this world), and who decides for them there."""
+    person = _explained()
+    crossed = copy.deepcopy(SNAPSHOT)
+    being = next(p for p in crossed["state"]["inhabitants"] if p["id"] == person["id"])
+    being.update(came_by="crossed", crossing={"bridge": "blockgame", "decided_by": "world"})
+    scene = build_scene(
+        crossed,
+        targets=TARGETS,
+        events=EVENTS,
+        explaining=EVENTS,
+        selected=uuid.UUID(person["id"]),
+        question="who is this?",
+        saved=(),
+        bridges=bridges,
+    )
+    text = _texts(_answer(scene, SocietyScope.SELECTED, SocietyAspect.WHO).answer)
+    origin = _phrase("from_outside") if came_from is None else came_from
+    said = _phrase("what_crossed_world").replace("{role}", person["role"]).replace("{from}", origin)
+    assert said in text
+    # The positive control: the same person, had they not crossed, is said as before.
+    plain = _texts(
+        _answer(
+            _scene(selected=uuid.UUID(person["id"])), SocietyScope.SELECTED, SocietyAspect.WHO
+        ).answer
+    )
+    assert _phrase("what").replace("{role}", person["role"]) in plain and said not in plain
+
+
+def test_the_question_route_hands_the_companion_the_bridge_labels_the_page_reads():
+    """The labels ``GET /door/bridges`` lists for the asking workspace, and none without a door."""
+    from types import SimpleNamespace
+
+    from exulanica.api.routes import door as door_routes
+    from exulanica.api.routes import selection
+
+    from door_support import bridges as declared
+
+    mine, theirs = uuid.UUID(int=0x1), uuid.UUID(int=0x2)
+    door = SimpleNamespace(bridges=declared(listed=False, workspaces=[str(mine)]))
+
+    def request(held):
+        services = SimpleNamespace(door=held)
+        return SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(services=services)))
+
+    for workspace in (mine, theirs):
+        session = SimpleNamespace(workspace_id=workspace)
+        page = door_routes.bridges(request(door), session)["bridges"]
+        assert selection._bridge_labels(request(door), session) == {
+            row["bridge"]: row["label"] for row in page
+        }
+    # The unlisted bridge is offered to its own workspace only.
+    assert selection._bridge_labels(request(door), SimpleNamespace(workspace_id=mine)) == {
+        "test-bridge": "A test bridge",
+        "other-bridge": "Another bridge",
+    }
+    assert selection._bridge_labels(request(door), SimpleNamespace(workspace_id=theirs)) == {
+        "other-bridge": "Another bridge"
+    }
+    assert selection._bridge_labels(request(None), SimpleNamespace(workspace_id=mine)) == {}

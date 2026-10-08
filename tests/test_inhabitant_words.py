@@ -50,6 +50,7 @@ def _said(case: dict) -> dict:
         CASES["people"].get,
         profile=case.get("profile"),
         place_words=None if place is None else PlaceWords(**place),
+        bridge_label=CASES["bridges"].get,
     )
     return {"who": words.who, "what": words.what, "doing": words.doing, "why": words.why}
 

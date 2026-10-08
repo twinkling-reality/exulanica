@@ -582,7 +582,20 @@ def _answer(
         selected_inhabitant_id=(
             None if body.society_context is None else body.society_context.inhabitant_id
         ),
+        society_bridges=(
+            None if body.society_context is None else _bridge_labels(request, session)
+        ),
     )
+
+
+def _bridge_labels(request: Request, session: Any) -> dict[str, str]:
+    """The label the door lists for each bridge it offers this workspace, by key, as
+    ``GET /door/bridges`` lists them for the page; none where the server admits no outside
+    programs."""
+    door = get_services(request).door
+    if door is None:
+        return {}
+    return {bridge.key: bridge.label for bridge in door.bridges.offered_to(session.workspace_id)}
 
 
 def _answer_view(outcome: AnsweredQuestion, answer: Answer) -> AnswerView:

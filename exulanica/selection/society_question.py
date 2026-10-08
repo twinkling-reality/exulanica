@@ -485,6 +485,9 @@ class SocietyScene:
     #: For each placed object an event targets and the authored ``edit_seq`` its input followed,
     #: the version edit that last set that object at or before it, as ``(edit_seq, edit_id)``.
     object_edits: Mapping[tuple[str, int], tuple[int, uuid.UUID]] = field(default_factory=dict)
+    #: The label the door lists for each bridge it offers this workspace, by key: where a person
+    #: who came in from outside came from, in the words the page uses.
+    bridges: Mapping[str, str] = field(default_factory=dict)
 
 
 #: The key an event read here carries its input's authored ``edit_seq`` under, or None: read from
@@ -576,6 +579,7 @@ def read_scene(
     authorize: Any,
     question: str,
     saved: Sequence[SavedName],
+    bridges: Mapping[str, str] | None = None,
 ) -> SocietyScene | SocietyRefusal:
     """Read the society the page shows, and what the question's words name in it.
 
@@ -588,7 +592,8 @@ def read_scene(
     Only events up to the version's presented minute are read (``exulanica.world-clock/v1``): a
     coupled world with roads runs its people ahead of what the page shows, by up to the clock's
     lead. A person's state line still describes the society's head minute: only the current
-    state is stored.
+    state is stored. ``bridges`` is the label the door lists for each bridge it offers this
+    workspace, by key, for the words of a person who came in from outside.
     """
     once = _AuthorizedOnce(authorize)
     repository = SocietyRepository(
@@ -704,6 +709,7 @@ def read_scene(
         selected=context.inhabitant_id,
         question=question,
         saved=saved,
+        bridges=bridges,
     )
     words = places.get("place_words")
     if isinstance(words, Mapping):
@@ -862,11 +868,13 @@ def build_scene(
     selected: uuid.UUID | None,
     question: str,
     saved: Sequence[SavedName],
+    bridges: Mapping[str, str] | None = None,
 ) -> SocietyScene:
     """A society snapshot, its targets and its latest events, read for one question.
 
     ``snapshot`` is :meth:`SocietyRepository.snapshot`'s shape and ``events`` its ``events``';
-    ``explaining`` holds the events people's states name as their explanation, however old.
+    ``explaining`` holds the events people's states name as their explanation, however old;
+    ``bridges`` the label the door lists for each bridge it offers, by key.
     Raises :class:`UnknownSocietyContext` when the selected inhabitant is not in it.
     """
     state = snapshot["state"]
@@ -887,6 +895,7 @@ def build_scene(
         selected_events=tuple(selected_events)[:EVENT_LINES],
         explaining={str(event["event_id"]): event for event in explaining},
         selected=chosen,
+        bridges=dict(bridges or {}),
     )
     if chosen is not None:
         scene.labels.person(chosen)
@@ -1035,6 +1044,7 @@ class _Builder:
             self.catalog,
             profile=scene.profile,
             place_words=scene.place_words,
+            bridge_label=scene.bridges.get,
         )
 
     def state(self, inhabitant_id: str, line: str) -> SocietyEvidenceItem:

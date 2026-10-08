@@ -599,6 +599,7 @@ def answer_question(
     society_version_id: uuid.UUID | None = None,
     selected_inhabitant_id: uuid.UUID | None = None,
     society_client: ModelClient | None = None,
+    society_bridges: Mapping[str, str] | None = None,
 ) -> AnsweredQuestion:
     """The whole path, once. Pass ``plan`` to answer from a Selection the user already approved.
 
@@ -645,6 +646,8 @@ def answer_question(
     (:mod:`exulanica.selection.society_question`). One this world does not hold, or a person not in
     it, is answered as a question asked with no society, alike in every case; one that cannot be
     read under current authorization is left out, and the answer says so first.
+    ``society_bridges`` is the label the door lists for each bridge it offers this workspace, by
+    key, so a person who came in from outside is said to have come from where the page says.
     """
     if not callable(before_compose):
         raise TypeError("a packet is composed only after a before_compose right check")
@@ -676,6 +679,7 @@ def answer_question(
                 if society_version_id is None
                 else SocietyContext(society_version_id, selected_inhabitant_id)
             ),
+            society_bridges=society_bridges or {},
         )
     except Exception as failed:
         # No answer exists to carry the record, so the error that ended the request
@@ -699,6 +703,7 @@ def _answered(
     before_compose: Callable[[Iterable[uuid.UUID], ModelHandoff], None],
     society: SocietyContext | None,
     society_client: ModelClient | None,
+    society_bridges: Mapping[str, str],
 ) -> AnsweredQuestion:
     """:func:`answer_question` after its preconditions, every call recorded in ``log``."""
     # A person's saved name never reaches a hosted model, and a place's only under a right the
@@ -726,6 +731,7 @@ def _answered(
                 authorize=society_authorizer,
                 question=question,
                 saved=saved,
+                bridges=society_bridges,
             )
         except UnknownSocietyContext:
             # A society this world does not hold, or a person not in it, whichever it was: the

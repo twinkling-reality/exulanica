@@ -280,16 +280,20 @@ def inhabitant_words(
     *,
     profile: str | None = None,
     place_words: PlaceWords | None = None,
+    bridge_label: Callable[[str], str | None] | None = None,
 ) -> InhabitantWords:
     """Who a simulated person is and what they are doing, from their recorded state.
 
     ``place`` writes a target the person uses, or returns None for one the world no longer holds;
     ``partner`` writes another person, or None for one not in the society. The choice follows
-    ``inhabitantWords`` in the inspector line for line, and the shared cases hold the two equal.
-    ``profile`` names the recorded engine for living words; callers without a profile retain the
-    purposeful words. ``place_words`` says where a living person is in their ground's own words
-    (a site world's); without it they are a town's. Talking has no content, so nothing here says
-    what anybody talked about.
+    ``inhabitantWordsFrom`` in the inspector line for line, and the shared cases hold the two
+    equal. ``profile`` names the recorded engine for living words; callers without a profile
+    retain the purposeful words. ``place_words`` says where a living person is in their ground's
+    own words (a site world's); without it they are a town's. ``bridge_label`` writes the label the
+    door lists for a bridge, or None for one it does not list: a person who came in from outside
+    is never called invented for this world, and their arrival's record says where they came from
+    and who decides for them here. Talking has no content, so nothing here says what anybody
+    talked about.
     """
     words = catalog or inhabitant_words_catalog()
     if profile is not None and society_engine(profile).state_family == "living":
@@ -297,7 +301,18 @@ def inhabitant_words(
     phrase = words.tables["phrase"]
     doing_words = words.tables["doing"]
     who = person.get("display_name") or phrase["who_unnamed"]
-    what = phrase["what"].format(role=person.get("role") or phrase["role_unknown"])
+    role = person.get("role") or phrase["role_unknown"]
+    # Only how they came decides: a crossing record on anyone who did not cross is not read.
+    crossing = person.get("crossing") if person.get("came_by") == "crossed" else None
+    if crossing is None:
+        what = phrase["what"].format(role=role)
+    else:
+        label = None if bridge_label is None else bridge_label(crossing["bridge"])
+        decided = "world" if crossing.get("decided_by") == "world" else "program"
+        what = _fill(
+            phrase[f"what_crossed_{decided}"],
+            {"role": role, "from": phrase["from_outside"] if label is None else label},
+        )
     action = person.get("action")
     goal = person.get("goal")
     goal = goal if isinstance(goal, Mapping) and "kind" in goal else None

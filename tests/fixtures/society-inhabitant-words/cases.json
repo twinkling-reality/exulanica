@@ -1,11 +1,14 @@
 {
-  "about": "Cases both readers of society-inhabitant-words.v1.json run: tests/test_inhabitant_words.py and web/packages/app/test/society-inhabitant-words.test.ts. Places and people are written by these maps.",
+  "about": "Cases both readers of society-inhabitant-words.v1.json run: tests/test_inhabitant_words.py and web/packages/app/test/society-inhabitant-words.test.ts. Places, people and the bridges the door lists are written by these maps.",
   "places": {
     "target:bench": "Bench 2",
     "target:pillar": "Pillar"
   },
   "people": {
     "p-b": "Bela Ash 2"
+  },
+  "bridges": {
+    "blockgame": "Block Game"
   },
   "cases": [
     {
@@ -1386,6 +1389,81 @@
         "why": "Their routine chose this to meet a need."
       },
       "profile": "exulanica-society/v5"
+    },
+    {
+      "case": "came in from outside, this world decides",
+      "person": {
+        "display_name": "Visitor 1",
+        "role": "traveller",
+        "goal": null,
+        "came_by": "crossed",
+        "crossing": {
+          "bridge": "blockgame",
+          "decided_by": "world"
+        }
+      },
+      "expected": {
+        "who": "Visitor 1",
+        "what": "A traveller who came in from Block Game, not invented for this world: this world decides what they do here.",
+        "doing": "Nothing is recorded about what they are doing.",
+        "why": ""
+      }
+    },
+    {
+      "case": "came in from outside, the program they came with decides",
+      "person": {
+        "display_name": "Visitor 1",
+        "role": "traveller",
+        "goal": null,
+        "came_by": "crossed",
+        "crossing": {
+          "bridge": "blockgame"
+        }
+      },
+      "expected": {
+        "who": "Visitor 1",
+        "what": "A traveller who came in from Block Game, not invented for this world: the program they came with decides what they do here.",
+        "doing": "Nothing is recorded about what they are doing.",
+        "why": ""
+      }
+    },
+    {
+      "case": "came in through a bridge the door does not list",
+      "person": {
+        "display_name": "Visitor 1",
+        "role": "traveller",
+        "goal": null,
+        "came_by": "crossed",
+        "crossing": {
+          "bridge": "elsewhere",
+          "decided_by": "program"
+        }
+      },
+      "expected": {
+        "who": "Visitor 1",
+        "what": "A traveller who came in from outside this world, not invented for this world: the program they came with decides what they do here.",
+        "doing": "Nothing is recorded about what they are doing.",
+        "why": ""
+      }
+    },
+    {
+      "case": "a crossing record on someone who did not cross is not read",
+      "person": {
+        "display_name": "Visitor 1",
+        "role": "traveller",
+        "goal": null,
+        "came_by": "placed",
+        "crossing": {
+          "bridge": "blockgame",
+          "decided_by": "world"
+        }
+      },
+      "expected": {
+        "who": "Visitor 1",
+        "what": "A simulated traveller, invented for this world: not anyone you know, and nothing they do is a memory.",
+        "doing": "Nothing is recorded about what they are doing.",
+        "why": ""
+      }
     }
   ]
 }
