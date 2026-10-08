@@ -11,7 +11,9 @@ not part of it, as it is not in the runner's own plan: ``-n`` decides which proc
 never whether it runs. Nor is how many jobs share it, when the run takes ``--part`` from the job's
 matrix and the matrix lists every part once: ``tests/conftest.py`` gives each test to exactly one
 part, so between them the jobs run the selection once. A part written any other way, or a matrix
-that misses or repeats one, is refused.
+that misses or repeats one, is refused, and so is anything in the job that would let a part stop
+counting while the run stays green: a matrix entry excluded or included beside the list, or an
+error the job is told to continue past.
 
 The run's skips are held to ``tests/expected_skips.toml`` by the runner's own check. The pytest run
 writes a junit file and a later step hands it to ``run_backend_suite.py --check-skips``, which fails
@@ -72,6 +74,11 @@ _PART = "--part"
 _MATRIX_PART = re.compile(r"\$\{\{ *matrix\.part *\}\}/(?P<parts>[0-9]+)")
 #: The matrix line that lists the parts, as a flow sequence: ``part: [1, 2, 3]``.
 _MATRIX_PARTS = re.compile(r"^ *part: *\[(?P<listed>[^\]]*)\] *(#.*)?$")
+#: The job that runs the backend suite, and the keys that would let one of its parts stop counting
+#: while the run stays green: a matrix entry removed or added beside the part list, and an error
+#: the job or a step is told to continue past.
+_SUITE_JOB = "python"
+_PART_ESCAPES = ("exclude", "include", "continue-on-error")
 
 
 @dataclass(frozen=True)
@@ -459,9 +466,81 @@ def part_problems(text: str) -> list[str]:
     return []
 
 
+def job_lines(text: str, job: str) -> list[tuple[int, str]]:
+    """The numbered lines of one job, from its key to the next job's or the end of the file."""
+    lines = text.splitlines()
+    start = next((index for index, line in enumerate(lines) if line == f"  {job}:"), None)
+    if start is None:
+        return []
+    end = next(
+        (index for index in range(start + 1, len(lines)) if re.match(r"^  \S", lines[index])),
+        len(lines),
+    )
+    return [(index + 1, lines[index]) for index in range(start, end)]
+
+
+def escape_problems(text: str) -> list[str]:
+    """Every key in the suite's job that lets a part stop counting without failing the run."""
+    problems = []
+    for number, line in job_lines(text, _SUITE_JOB):
+        stripped = line.strip()
+        for key in _PART_ESCAPES:
+            if re.match(rf"^(- +)?{re.escape(key)}:", stripped):
+                problems.append(
+                    f"line {number} declares {key} in the {_SUITE_JOB} job, which lets a part of "
+                    "the selection go unrun, or fail, while the run reports a pass"
+                )
+    return problems
+
+
 def test_the_workflow_runs_the_backend_runners_phase_one_and_nothing_narrower():
     assert selection_problems(WORKFLOW_TEXT) == []
     assert part_problems(WORKFLOW_TEXT) == []
+    assert escape_problems(WORKFLOW_TEXT) == []
+
+
+def test_the_reader_finds_the_suites_job_and_its_one_pytest_run():
+    """The guard on the guard for escapes: the lines it reads are the job that runs the suite."""
+    lines = [line for _, line in job_lines(WORKFLOW_TEXT, _SUITE_JOB)]
+    assert lines and lines[0] == f"  {_SUITE_JOB}:"
+    assert sum(1 for line in lines if _PYTEST.search(line) and "run:" in line) == 1
+
+
+@pytest.mark.parametrize(
+    ("old", "new", "key"),
+    [
+        pytest.param(
+            "part: [1,",
+            "exclude:\n          - part: 3\n        part: [1,",
+            "exclude",
+            id="excludes-a-part",
+        ),
+        pytest.param(
+            "part: [1,",
+            "include:\n          - part: 7\n        part: [1,",
+            "include",
+            id="includes-an-entry",
+        ),
+        pytest.param(
+            f"  {_SUITE_JOB}:\n    runs-on: ubuntu-latest\n",
+            f"  {_SUITE_JOB}:\n    runs-on: ubuntu-latest\n    continue-on-error: true\n",
+            "continue-on-error",
+            id="continues-past-a-failed-part",
+        ),
+        pytest.param(
+            "      - name: pytest\n",
+            "      - name: pytest\n        continue-on-error: true\n",
+            "continue-on-error",
+            id="continues-past-a-failed-pytest-step",
+        ),
+    ],
+)
+def test_a_part_that_could_stop_counting_while_the_run_passes_is_refused(old, new, key):
+    """Positive controls: each way a part could go missing or turn green is caught by name."""
+    assert WORKFLOW_TEXT.count(old) == 1, f"the control edits {old!r}, which the workflow lacks"
+    changed = WORKFLOW_TEXT.replace(old, new)
+    problems = escape_problems(changed)
+    assert any(f"declares {key}" in problem for problem in problems), problems
 
 
 def test_the_reader_finds_the_one_pytest_run_the_workflow_makes():

@@ -16,6 +16,11 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+# The token every job is given. Reading the repository is all any step does with it: the caches
+# the steps use authenticate with the runner's own token, and nothing is published.
+permissions:
+  contents: read
+
 jobs:
   python:
     runs-on: ubuntu-latest
@@ -29,10 +34,11 @@ jobs:
         part: [1, 2, 3, 4, 5, 6]
     env:
       # pytest-xdist workers on each runner, each with a PostgreSQL server of its own below. Two,
-      # not one for each of the runner's four processors (two cores of two threads): with four,
-      # every test ran at about half its serial speed, and a traffic test whose worker has the
-      # product's 30 s wait (WAIT_SECONDS in exulanica/world/episode_worker.py) exceeded it on
-      # the slower runners.
+      # not one for each of the runner's four processors (two cores of two threads). Measured
+      # 2026-10-08 on c7526834, all of phase 1 on one runner per arrangement (run 37732679791):
+      # with four workers tests/test_api.py took 1.31 to 1.65 s a test against 0.82 s serially,
+      # and the episode worker of tests/test_traffic_episodes.py exceeded the product's 30 s wait
+      # (WAIT_SECONDS in exulanica/world/episode_worker.py) on the slower runners.
       WORKERS: 2
     steps:
       - uses: actions/checkout@v4
@@ -65,8 +71,13 @@ jobs:
       # server has them.
       #
       # fsync and full_page_writes are off, as on every private server: they protect a cluster
-      # against a machine crash, no query sees them, and these servers are deleted with the job,
-      # while several servers flushing to one disk slow every worker.
+      # against a machine crash, no query sees them, and these servers are deleted with the job.
+      # max_locks_per_transaction is 256 rather than 64, because a session's last act is dropping
+      # its scratch schema in one transaction, which locks every object in it. Measured 2026-10-08
+      # on this image with c7526834's migrations: the drop of a freshly migrated schema took 8,983
+      # locks, and one transaction could hold about 14,900 under the default and about 55,700
+      # under 256. The serial job's one session at c7526834 (run 37730656783) outgrew the default
+      # and failed that drop with "out of shared memory".
       #
       # Trust authentication, because the suite logs in as the non-superuser roles it provisions,
       # by name and with no password of their own, exactly as it does on the private servers
@@ -84,7 +95,8 @@ jobs:
             port=$((5432 + worker))
             docker run --detach --name "postgres-$worker" --publish "127.0.0.1:$port:5432" \
               --env POSTGRES_PASSWORD=postgres --env POSTGRES_HOST_AUTH_METHOD=trust \
-              pgvector/pgvector:0.8.6-pg18 -c fsync=off -c full_page_writes=off
+              pgvector/pgvector:0.8.6-pg18 -c fsync=off -c full_page_writes=off \
+              -c max_locks_per_transaction=256
             urls+=("postgresql://postgres@localhost:$port/exulanica_spine_test")
           done
           for worker in $(seq 0 $((WORKERS - 1))); do

@@ -38,7 +38,7 @@ from PIL.TiffImagePlugin import IFDRational
 
 import ast_parse_race
 from model_fakes import FakeTransport, RecordingPolicy
-from pg_harness import migrated_schema, open_scratch_connection
+from pg_harness import migrated_schema, names_a_scratch_database, open_scratch_connection
 
 #: Explicit rather than environment-derived, so a developer's exported EXULANICA_BUDGET_USD cannot
 #: change what a test asserts.
@@ -552,10 +552,12 @@ def pytest_collection_modifyitems(config, items):
     if (written := config.getoption("part")) is None:
         return
     part, parts = chosen_part(written)
-    elsewhere = [item for item in items if part_of(item.nodeid, parts) != part]
+    kept, elsewhere = [], []
+    for item in items:
+        (kept if part_of(item.nodeid, parts) == part else elsewhere).append(item)
     if elsewhere:
         config.hook.pytest_deselected(items=elsewhere)
-        items[:] = [item for item in items if part_of(item.nodeid, parts) == part]
+        items[:] = kept
 
 
 # ---------------------------------------------------------------------------------------
@@ -571,8 +573,7 @@ def pytest_collection_modifyitems(config, items):
 # one database URL per server, separated by whitespace, and worker gwN takes the one at position
 # N. Continuous integration runs this way, one PostgreSQL container per worker, because a hosted
 # runner has the client programs and no server binaries to initialise a private server with. Each
-# server is prepared as a private one is, with the four runtime roles created before any migration
-# runs.
+# server gets the four runtime roles a private one has, created before any migration runs.
 #
 # Either way the URL is exported as EXULANICA_TEST_DATABASE_URL, so the harness, the fixtures and
 # any subprocess a test starts all read the one variable they always read. A child pytest that
@@ -586,12 +587,14 @@ _private_server = None
 
 
 def given_servers(listed: str) -> list[str]:
-    """The URLs EXULANICA_TEST_DATABASE_URLS names, refused when two of them share a server.
+    """The URLs EXULANICA_TEST_DATABASE_URLS names, refused when two of them share a server or one
+    names a database the harness may not touch.
 
     A server, not a database, because two databases of one server share its roles, and two workers
     provisioning the runtime roles at once fail each other's fixtures. The server is told by host
     and port as the URL writes them, so one server written as two different host names is not
-    caught here.
+    caught here. The database name is held to the harness's rule here, before anything connects,
+    because preparing a server creates roles that belong to all of it.
     """
     from exulanica.env import env_name
     from psycopg import ProgrammingError
@@ -609,6 +612,11 @@ def given_servers(listed: str) -> list[str]:
                 f"{env_name('TEST_DATABASE_URLS')} names {url!r}, which is not a URL: "
                 f"{str(error).strip()}"
             ) from error
+        if not names_a_scratch_database(url):
+            raise pytest.UsageError(
+                f"{env_name('TEST_DATABASE_URLS')} names {url}, whose database name does not "
+                "contain 'test'; the harness touches no other database"
+            )
         server = (str(parts.get("host") or "localhost"), str(parts.get("port") or 5432))
         if server in first:
             raise pytest.UsageError(
@@ -628,7 +636,13 @@ def given_server_for(worker: str | None, urls: list[str]) -> str:
     """
     from exulanica.env import env_name
 
-    position = 0 if worker is None else int(worker.removeprefix("gw"))
+    numbered = None if worker is None else re.fullmatch(r"gw([0-9]+)", worker)
+    if worker is not None and numbered is None:
+        raise pytest.UsageError(
+            f"worker {worker!r} is not numbered gw0, gw1 and on, so it has no position in "
+            f"{env_name('TEST_DATABASE_URLS')}; start workers with -n"
+        )
+    position = 0 if numbered is None else int(numbered[1])
     if position >= len(urls):
         raise pytest.UsageError(
             f"worker {worker} has no server of its own: {env_name('TEST_DATABASE_URLS')} names "
@@ -650,11 +664,13 @@ def _take_a_given_server(config, worker, listed: str, *, mode, explicit) -> None
         )
     urls = given_servers(listed)
     if worker is None and _distributing(config):
-        # The controller runs no test. Its workers inherit the list, so it is checked here once.
-        workers = int(config.option.numprocesses)
+        # The controller runs no test. Its workers inherit the list, so it is checked here once,
+        # against the workers pytest-xdist will start: for -n it sets one popen spec for each,
+        # after --maxprocesses has made them fewer.
+        workers = len(config.getoption("tx"))
         if workers > len(urls):
             raise pytest.UsageError(
-                f"-n {workers} needs a server for each worker, and "
+                f"pytest-xdist starts {workers} workers, each needing a server of its own, and "
                 f"{env_name('TEST_DATABASE_URLS')} names {len(urls)}"
             )
         return

@@ -99,7 +99,10 @@ work.
 
 A private server costs about a second to create and start. It uses the shared server's locale
 (`en_US.UTF-8`), connection limit and buffer size. It turns off `fsync` and `full_page_writes`,
-which protect against a machine crash and are pointless for a cluster that is deleted on exit.
+which protect against a machine crash and are pointless for a cluster that is deleted on exit. It
+allows 256 locks per transaction rather than 64, because a session ends by dropping its scratch
+schema in one transaction, which locks every object in it, and a freshly migrated schema alone
+takes most of what the default allows.
 The bootstrap role is the operating-system user, a superuser, exactly as on a Homebrew server.
 The four runtime roles (`exulanica_app`, `exulanica_ro`, `exulanica_purge`, `exulanica_accounts`)
 are created with no privileges before any migration runs, as on a provisioned server, because
@@ -117,21 +120,35 @@ other work, so six, one per performance core, is the setting to use.
 A machine without PostgreSQL's server binaries cannot initialise private servers. Continuous
 integration is one: it has the client programs only, so it starts a `pgvector/pgvector:0.8.6-pg18`
 container for each worker and names them, separated by whitespace, in
-`EXULANICA_TEST_DATABASE_URLS`:
+`EXULANICA_TEST_DATABASE_URLS`. The same on a workstation, on ports no local server claims (5433 is
+the shared server, which these runs must not touch):
 
 ```bash
-EXULANICA_TEST_DATABASE_URLS="postgresql://postgres@localhost:5432/exulanica_spine_test
-  postgresql://postgres@localhost:5433/exulanica_spine_test" \
+for port in 55432 55433; do
+  docker run --detach --rm --name "exulanica-test-$port" --publish "127.0.0.1:$port:5432" \
+    --env POSTGRES_HOST_AUTH_METHOD=trust pgvector/pgvector:0.8.6-pg18
+done
+for port in 55432 55433; do
+  until pg_isready --quiet --host localhost --port "$port" --username postgres; do sleep 1; done
+  psql "postgresql://postgres@localhost:$port/postgres" --command 'create database exulanica_spine_test'
+done
+EXULANICA_TEST_DATABASE_URLS="postgresql://postgres@localhost:55432/exulanica_spine_test
+  postgresql://postgres@localhost:55433/exulanica_spine_test" \
 EXULANICA_REQUIRE_POSTGRES=1 \
 uv run pytest -n 2 -m "not reference_copy"
 ```
 
 Worker `gw0` takes the first URL, `gw1` the second and so on, and a serial run takes the first.
 Each URL must name a different server, for the reason a private server is a whole server, so the
-suite refuses a list that names one server twice, a list shorter than `-n`, and the list beside
-`EXULANICA_TEST_DATABASE_URL` or `EXULANICA_TEST_POSTGRES`. Before any test runs, each worker
-creates the four runtime roles on its server if they are missing, as a private server has them.
-It creates nothing else: each database must already exist, and the server's settings are its own.
+suite refuses a list that names one server twice, a database whose name lacks "test", a list
+shorter than the workers started, and the list beside `EXULANICA_TEST_DATABASE_URL` or
+`EXULANICA_TEST_POSTGRES`. Before any test runs, each worker creates the four runtime roles on its
+server if they are missing, as a private server has them. Preparation creates nothing else: each
+database must already exist, and the server's settings are its own.
+
+Continuous integration also splits phase 1 into parts, one per runner, with `--part K/N`: each test
+belongs to exactly one part, by a digest of its node id. To replay a part of a run on a
+workstation, add the same `--part` to the command above.
 
 #### Expected failures
 

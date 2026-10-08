@@ -104,6 +104,14 @@ def apply_migration(conn, scratch: str) -> None:
         cursor.execute(migration.sql)
 
 
+def names_a_scratch_database(url: str) -> bool:
+    """Whether ``url`` names a database the harness may touch: one whose name contains "test".
+
+    The one rule for every way a test database is named, checked before anything connects.
+    """
+    return "test" in url.rsplit("/", 1)[-1]
+
+
 @contextmanager
 def migrated_schema() -> Iterator[tuple]:
     """Yield ``(psycopg, connection)`` with every migration applied, unmodified, to a throwaway
@@ -128,7 +136,7 @@ def migrated_schema() -> Iterator[tuple]:
     psycopg = pytest.importorskip(
         "psycopg", reason="psycopg is a required dependency; run `uv sync`"
     )
-    if "test" not in url.rsplit("/", 1)[-1]:
+    if not names_a_scratch_database(url):
         pytest.skip("refusing a database whose name does not contain 'test'")
 
     scratch = f"exulanica_test_{uuid.uuid4().hex[:12]}"

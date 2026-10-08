@@ -448,6 +448,22 @@ def test_the_test_tooling_refuses_a_local_database_reached_through_a_link(server
     assert database.marker.is_file()
 
 
+def test_a_private_test_server_holds_the_locks_its_session_ends_by_taking():
+    """Every private server allows 256 locks per transaction, not the default 64: a test session
+    ends by dropping its scratch schema in one transaction, which locks every object in it, and a
+    freshly migrated schema alone takes most of what the default allows (scripts/test_postgres.py
+    gives the measurement)."""
+    _require_server_binaries()
+    helper = _test_postgres_helper()
+    server, url = helper.start_test_server("locks")
+    try:
+        with psycopg.connect(url) as connection:
+            shown = connection.execute("show max_locks_per_transaction").fetchone()[0]
+    finally:
+        helper.remove_test_server(server)
+    assert shown == "256"
+
+
 def _free_port() -> int:
     return cluster._free_port()
 

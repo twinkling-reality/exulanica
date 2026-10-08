@@ -74,6 +74,11 @@ SETTINGS = {
     "shared_buffers": "128MB",
     "fsync": "off",
     "full_page_writes": "off",
+    # A session's last act drops its scratch schema in one transaction, which locks every object
+    # in it. Measured 2026-10-08 on pgvector/pgvector:0.8.6-pg18 with c7526834's migrations: the
+    # drop of a freshly migrated schema took 8,983 locks, and one transaction could hold about
+    # 14,900 under the default of 64 and about 55,700 under 256.
+    "max_locks_per_transaction": "256",
     "listen_addresses": "localhost",
     # TCP only. A socket path under $TMPDIR is longer than the 103 bytes macOS allows.
     "unix_socket_directories": "",
