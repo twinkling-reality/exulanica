@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { THING_LOOK_CHOICES_PROFILE, ThingLooksClient, parseThingLookChoices } from '../src/thing-looks-api.js';
+import { THING_LOOK_CHOICES_PROFILE, ThingLooksClient, parseLookChoices, parseThingLookChoices } from '../src/thing-looks-api.js';
 
 /*
  * The looks chosen for a version's things, read strictly. The body is THINGS's agreed read
@@ -36,5 +36,32 @@ describe('the looks chosen for a version\'s things', () => {
 
   it('reads a version whose things wear their kinds\' first looks as no choices', () => {
     expect(parseThingLookChoices(served([]), 'version-1')).toEqual([]);
+  });
+
+  it('names a look its workspace keeps by its own key and version, leaving out one no longer held', async () => {
+    const OWN = 'e'.repeat(64);
+    const GONE = 'f'.repeat(64);
+    const own = { thing_id: 'visitor-own', placed_id: null, look: { source: 'workspace', sha256: OWN }, chosen_by: 'crossing', chosen_at: '2026-10-09T14:06:00.000000Z' };
+    const gone = { ...own, thing_id: 'visitor-gone', look: { source: 'workspace', sha256: GONE } };
+    const fetch = vi.fn(async () => new Response(JSON.stringify({ ...served([owner]), workspace_looks: [own, gone] }), { status: 200 }));
+    const resolve = vi.fn(async (sha256: string) => (sha256 === OWN ? { key: 'own-traveller', version: 3, sha256 } : null));
+    const looks = await new ThingLooksClient({ baseUrl: 'http://host.test', token: 'token-1', worldId: 'world:1', fetch }).read('version-1', resolve);
+    expect(looks.get('visitor-own')).toEqual({
+      thingId: 'visitor-own', placedId: null, look: { key: 'own-traveller', version: 3, sha256: OWN },
+      chosenBy: 'crossing', chosenAt: '2026-10-09T14:06:00.000000Z',
+    });
+    // No longer held: left out, so the thing wears its kind's first look; the shipped choice stands.
+    expect(looks.has('visitor-gone')).toBe(false);
+    expect(looks.get(owner.thing_id)!.look.key).toBe('blocky-traveller');
+    expect(resolve.mock.calls.map((call) => call[0]).sort()).toEqual([OWN, GONE]);
+  });
+
+  it('refuses a thing in both lists and a workspace look named by more than its digest', () => {
+    const own = { thing_id: owner.thing_id, placed_id: 'knight', look: { source: 'workspace', sha256: SHA }, chosen_by: 'owner', chosen_at: '2026-10-09T14:06:00.000000Z' };
+    expect(() => parseLookChoices({ ...served([owner]), workspace_looks: [own] }, 'version-1')).toThrow(/two look choices/u);
+    const named = { ...own, thing_id: 'other', look: { source: 'workspace', sha256: SHA, look: 'own' } };
+    expect(() => parseLookChoices({ ...served([]), workspace_looks: [named] }, 'version-1')).toThrow(/digest alone/u);
+    // Stated only when some thing wears one: absent is none.
+    expect(parseLookChoices(served([owner]), 'version-1').workspace).toEqual([]);
   });
 });

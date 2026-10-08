@@ -24,7 +24,7 @@ const { FakeLayer, layers } = vi.hoisted(() => {
     /** How far along the ray the fake's thing stands, metres. */
     distance = 3;
     /** The maker the crowd's figures read the library's looks from. */
-    readonly maker = { library: { list: { kinds: [], looks: [] } } };
+    readonly maker = { library: { list: { kinds: [], looks: [] }, heldLook: async (sha256: string) => ({ key: 'workspace-look', version: 4, sha256 }) } };
     society: unknown = null;
     constructor(readonly options: ThingLayerOptions) { made.push(this); }
     setSociety(state: unknown) { this.society = state; }
@@ -158,6 +158,79 @@ describe('the looks chosen for a society of things\' things', () => {
     const figures = crowd.setFigures.mock.calls[0]![0] as { figureFor(person: unknown): { key: string } | null };
     const knight = thingsSociety().state.inhabitants[0]!;
     expect(figures.figureFor(knight)!.key).toContain(`|kaykit-mannequin/1/${'e'.repeat(64)}`);
+    mounted.dispose();
+  });
+
+  it('reads them again each minute while the society is drawn, so a withdrawn look leaves and a choice made elsewhere arrives', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
+    try {
+      let choices = new Map<string, ThingLookChoice>([
+        ['person-0', { thingId: 'person-0', placedId: 'knight-1', look: MANNEQUIN, chosenBy: 'owner', chosenAt: '2026-10-09T14:00:00.000000Z' }],
+      ]);
+      const looksClient = { read: vi.fn(async (_versionId: string) => choices as ReadonlyMap<string, ThingLookChoice>) };
+      const { mounted, crowd, canvas } = mount(true, looksClient);
+      await mounted.begin();
+      await vi.advanceTimersByTimeAsync(10);
+      expect(looksClient.read).toHaveBeenCalledTimes(1);
+      const layer = layers.at(-1)!;
+      expect(layer.looks).toEqual([['knight-1', MANNEQUIN]]);
+      // No new minute is drawn: within the minute nothing is asked again.
+      await vi.advanceTimersByTimeAsync(59_000);
+      expect(looksClient.read).toHaveBeenCalledTimes(1);
+      // Elsewhere the knight's look is withdrawn and the well is given one: the next minute's read carries both.
+      choices = new Map([['t-well', { thingId: 't-well', placedId: 'well-1', look: LOOK, chosenBy: 'owner', chosenAt: '2026-10-09T14:05:00.000000Z' }]]);
+      await vi.advanceTimersByTimeAsync(1_100);
+      expect(looksClient.read).toHaveBeenCalledTimes(2);
+      expect(layer.looks.slice(1)).toEqual([['well-1', LOOK], ['knight-1', null]]);
+      expect(crowd.refreshFigures).toHaveBeenCalledTimes(2);
+      expect(canvas.dataset['thingLooksChosen']).toBe('1');
+      // The crowd's figures no longer name the withdrawn look: the knight wears its kind's first.
+      const figures = crowd.setFigures.mock.calls[0]![0] as { figureFor(person: unknown): { key: string } | null };
+      expect(figures.figureFor(thingsSociety().state.inhabitants[0]!)?.key ?? '').not.toContain('kaykit-mannequin');
+      // Gone from the page: no read after it.
+      mounted.dispose();
+      await vi.advanceTimersByTimeAsync(120_000);
+      expect(looksClient.read).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('asks again a minute after a failed read, and dresses the things then', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
+    try {
+      let failing = true;
+      const choices = new Map<string, ThingLookChoice>([
+        ['t-well', { thingId: 't-well', placedId: 'well-1', look: LOOK, chosenBy: 'owner', chosenAt: '2026-10-09T14:01:00.000000Z' }],
+      ]);
+      const looksClient = { read: vi.fn(async (_versionId: string): Promise<ReadonlyMap<string, ThingLookChoice>> => {
+        if (failing) throw new Error('thing looks unavailable: HTTP 503');
+        return choices;
+      }) };
+      const { mounted, canvas } = mount(true, looksClient);
+      await mounted.begin();
+      await vi.advanceTimersByTimeAsync(10);
+      expect(canvas.dataset['thingLooksFailure']).toBe('thing looks unavailable: HTTP 503');
+      failing = false;
+      await vi.advanceTimersByTimeAsync(60_100);
+      expect(looksClient.read).toHaveBeenCalledTimes(2);
+      expect(layers.at(-1)!.looks).toEqual([['well-1', LOOK]]);
+      mounted.dispose();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('names a look its workspace keeps through the things\' own library', async () => {
+    let named: unknown = null;
+    const looksClient = { read: vi.fn(async (_versionId: string, resolve?: (sha256: string) => Promise<unknown>) => {
+      named = await resolve!('e'.repeat(64));
+      return new Map<string, ThingLookChoice>();
+    }) };
+    const { mounted } = mount(true, looksClient as never);
+    await mounted.begin();
+    await settle();
+    expect(named).toEqual({ key: 'workspace-look', version: 4, sha256: 'e'.repeat(64) });
     mounted.dispose();
   });
 

@@ -81,16 +81,19 @@ export function signalColour(): string {
   return value.toLowerCase();
 }
 
-/** The least time between two reads of the looks chosen for a society's things. */
+/**
+ * How often the looks chosen for a society's things are read while one is drawn: one private read a
+ * minute per open world page, which brings a choice made elsewhere (an owner's, in another browser)
+ * and drops one the store no longer lists (a withdrawn look's).
+ */
 export const LOOKS_READ_INTERVAL_MS = 60_000;
 
 /**
- * Whether the looks chosen for a society's things are to be read now: when none has been read, or
- * a state lists a thing no read has covered (a visitor's look is recorded in the minute that brings
- * it in), and never within `LOOKS_READ_INTERVAL_MS` of the last ask.
+ * Whether the looks chosen for a society's things are to be read now: once a minute while a society
+ * of things is drawn, the first time at once, and never within `LOOKS_READ_INTERVAL_MS` of the last
+ * ask. A visitor's look is recorded in the minute that brings it in, so it is read within a minute.
  */
-export function looksReadDue(ids: readonly string[], covered: ReadonlySet<string>, read: boolean, askedAt: number, now: number): boolean {
-  if (read && ids.every((id) => covered.has(id))) return false;
+export function looksReadDue(askedAt: number, now: number): boolean {
   return now - askedAt >= LOOKS_READ_INTERVAL_MS;
 }
 

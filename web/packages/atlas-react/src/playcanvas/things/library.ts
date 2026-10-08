@@ -115,6 +115,34 @@ export class ThingLibrary {
     return this.heldDocument(named, 'kind', (sha256) => this.heldThings!.kind(sha256));
   }
 
+  /**
+   * A look named by its digest alone, as a choice names one its workspace keeps: the shipped look at
+   * that digest, else the workspace's, its key and version from its own document held to that digest;
+   * null where neither holds it (absent, withdrawn or another workspace's).
+   */
+  async heldLook(sha256: string): Promise<Named | null> {
+    const shipped = this.list.looks.find((one) => one.sha256 === sha256);
+    if (shipped !== undefined) return { key: shipped.look, version: shipped.version, sha256 };
+    const held = this.heldThings;
+    if (held === null) return null;
+    let bytes: ArrayBuffer;
+    try {
+      bytes = await this.fetchFrom(sha256, null, async () => {
+        const answer = await held.look(sha256);
+        if (answer === null) throw new LibraryRefused('not_in_library', 'The workspace holds no look at that digest.');
+        return answer;
+      });
+    } catch (error) {
+      if (error instanceof LibraryRefused && error.reason === 'not_in_library') return null;
+      throw error;
+    }
+    const document = JSON.parse(new TextDecoder().decode(bytes)) as Record<string, unknown>;
+    const key = document['look'];
+    const version = document['version'];
+    if (typeof key !== 'string' || typeof version !== 'number') throw new LibraryRefused('not_in_library', 'A workspace look names no key and version.');
+    return { key, version, sha256 };
+  }
+
   /** A look's whole document as its canonical JSON, held to its digest (the card reads its origin). */
   async lookDocument(named: Named): Promise<unknown> {
     if (this.shipped(this.looks, named)) return this.json(named.sha256);

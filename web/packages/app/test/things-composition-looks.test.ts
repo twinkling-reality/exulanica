@@ -65,15 +65,13 @@ describe('the looks chosen for a society\'s things', () => {
     expect(layer.looks.at(-1)).toEqual(['well-1', null]);
   });
 
-  it('reads them when none was read, again for a thing no read covered, and never twice within the interval', () => {
-    const covered = new Set(['knight', 'well']);
-    // Nothing read yet: read at once.
-    expect(looksReadDue(['knight'], new Set(), false, Number.NEGATIVE_INFINITY, 0)).toBe(true);
-    // Read, and every thing covered: nothing to read, however long it has been.
-    expect(looksReadDue(['knight', 'well'], covered, true, 0, 10 * LOOKS_READ_INTERVAL_MS)).toBe(false);
-    // A visitor no read covered: read, but not within the interval of the last ask.
-    expect(looksReadDue(['knight', 'visitor'], covered, true, 1000, 1000 + LOOKS_READ_INTERVAL_MS - 1)).toBe(false);
-    expect(looksReadDue(['knight', 'visitor'], covered, true, 1000, 1000 + LOOKS_READ_INTERVAL_MS)).toBe(true);
+  it('reads them at once, then once a minute however settled the things are, never twice within the minute', () => {
+    // Nothing asked yet: read at once.
+    expect(looksReadDue(Number.NEGATIVE_INFINITY, 0)).toBe(true);
+    // Every thing read and nothing new: still read once the minute is out, for a choice made elsewhere or withdrawn.
+    expect(looksReadDue(1000, 1000 + LOOKS_READ_INTERVAL_MS - 1)).toBe(false);
+    expect(looksReadDue(1000, 1000 + LOOKS_READ_INTERVAL_MS)).toBe(true);
+    // One private read a minute per open world page.
     expect(LOOKS_READ_INTERVAL_MS).toBe(60_000);
   });
 });

@@ -810,9 +810,13 @@ while it holds something.
 A thing wears the look chosen for it where one is, from the looks chosen for its version's society
 (`GET /world/versions/{version_id}/thing-looks`): a person in the crowd, a placed thing in the layer; a
 thing with none wears its kind's first look. The choices are read when a society of things is first
-drawn and again when a state lists a thing no read has covered, as a visitor whose look its crossing
-chose, at most once a minute; a person whose look changes is made again where they stand, and nobody
-else is.
+drawn and then once a minute while it is drawn, playing or paused: one private read a minute for each
+open world page. A visitor whose look its crossing chose is dressed within a minute of arriving, a
+choice made in another browser arrives, and a choice the read no longer lists (one naming a look the
+workspace withdrew) leaves, the thing returning to its kind's first look. A thing wearing a look its
+workspace keeps is listed apart (`workspace_looks`) by the look's digest alone; its key and version
+are its own document's, read by that digest and held to it, and one no longer held is left out. A
+person whose look changes is made again where they stand, and nobody else is.
 
 A kind or look the shipped library does not hold at the digest named is asked of the workspace's
 own store (`GET /things/kinds/{sha256}`, `GET /things/looks/{sha256}` and its `/container`), only

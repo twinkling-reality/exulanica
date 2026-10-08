@@ -105,4 +105,20 @@ describe('a workspace\'s own looks beside the shipped library', () => {
     expect(kind.bodyPlan).toBe('humanoid/v1');
     expect(await refusal(library.kind({ key: 'own-creature', version: 2, sha256: digest }))).toBe('not_in_library');
   });
+
+  it('names a look by its digest alone: the shipped one at it, else the workspace\'s by its own document, else none', async () => {
+    const served = servedLibrary();
+    const own = workspaceLook();
+    const shipped = served.list.looks.find((one) => one.look === 'blocky-traveller')!;
+    const library = new ThingLibrary(served.list, (digest) => served.fetch(digest), store([own]).held);
+    expect(await library.heldLook(shipped.sha256)).toEqual({ key: 'blocky-traveller', version: shipped.version, sha256: shipped.sha256 });
+    expect(await library.heldLook(own.digest)).toEqual({ key: 'own-traveller', version: 1, sha256: own.digest });
+    // The name it gives is the one the drawing then reads it by.
+    expect((await library.look((await library.heldLook(own.digest))!)).look).toBe('own-traveller');
+    expect(await library.heldLook('0'.repeat(64))).toBeNull();
+    expect(await new ThingLibrary(served.list, (digest) => served.fetch(digest)).heldLook(own.digest)).toBeNull();
+    // Other bytes than the digest: refused by name, never named.
+    const other = workspaceLook('another-look');
+    expect(await refusal(new ThingLibrary(served.list, (d) => served.fetch(d), store([], () => other.raw).held).heldLook(own.digest))).toBe('digest_mismatch');
+  });
 });
