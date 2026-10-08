@@ -573,11 +573,16 @@ container's digest, and the recipe's appearance and colour words. It holds no ac
 person's words. The job (`ml/appearance/exulanica_appearance/creatures/`) runs each item through
 these steps:
 
-1. It draws the sketch as a depth picture from a fixed three-quarter camera.
+1. It draws the sketch as a depth picture from the plan's front left (a turn of 145 degrees from
+   its forward axis, 15 degrees above), the side the concept's words name.
 2. It draws a concept picture that follows that depth picture: Z-Image with the Fun union control
    2.1 through VideoX-Fun at Track A's pinned commit, with Track A's settings, as one picture
    rather than a tile. The words are a fixed sentence holding the recipe's words, with no numeral.
-3. It takes route A's cut-out and mesh.
+3. It takes route A's cut-out, then TRELLIS-image-large's second stage alone on the sketch's own
+   surface voxels (64 cubed in TRELLIS's frame, the box's longest side spanning the unit cube), so
+   the 3D model details and paints the plan's own body rather than inferring one from the picture.
+   TRELLIS's method signatures are checked against the pinned ones before any weights load, and
+   the voxels (int32, one object, inside the grid, each once) before sampling.
 4. It turns the mesh into the slot frame and simplifies it to 20,000 triangles.
 5. It registers the mesh onto the sketch. Every 10 degrees of turn is scored by silhouette overlap
    times depth agreement, the three best are refined to the degree, and the mesh is fitted to the
@@ -600,14 +605,32 @@ cut-out, four sides at rest and two poses. A refused item's receipt holds what i
 measured, as a passed one does. The job's entry script runs route C with route A's packages plus
 VideoX-Fun's imports.
 
-**Status of route C:** built and run once, in the pre-registered rig trial on Nebius AI Cloud
-([record](evaluation/2026-10-07-creature-rig-trial.json), from
+**Status of route C:** built and run in two pre-registered rig trials on Nebius AI Cloud. Each
+trial has eight held-out bodies, two items each; a body counts when one of its items passes every
+check, and the plan-guided rig becomes the default at five.
+
+The second trial ran route C as described above
+([record](evaluation/2026-10-07-creature-rig-trial-2.json), from
+`ml/appearance/evidence/creature-rig-trial-2/` by `scripts/record_creature_rig_trial_2.py`), on eight
+bodies freshly drafted from words, with the first trial's eight as development rows that are
+reported and never counted:
+
+- **The result.** Four of the eight held-out bodies counted, so every creature still wears its
+  sketch, and a sculpted look is offered only where an item passed. Fourteen of the 32 items
+  passed.
+- **The refusals.** Two items were refused at registration, both of one long, thin body. Sixteen
+  were refused at the rig check: eight with a bone mostly outside its mesh, six with a joint far
+  from where the plan puts it, two with a bone that moves none of the body.
+- **The time.** The mesh step took 3 to 4 s an item after the first, and a whole item about 27 s.
+- **A second reading**, which decides nothing: set beside the same requests with stand-in models,
+  13 of the 32 items had the same outcome, so the checks on the plan's own shape do not foretell
+  the route item by item.
+
+The first trial ran route C with the camera on the plan's back right and the whole mesh inferred
+from the cut-out ([record](evaluation/2026-10-07-creature-rig-trial.json), from
 `ml/appearance/evidence/creature-rig-trial-1/` by `scripts/record_creature_rig_trial.py`):
 
-- **The trial.** Eight held-out bodies, two items each. A body counts when one of its items passes
-  every check, and the plan-guided rig becomes the default at five.
-- **The result.** One body counted, by one item, so every creature wears its sketch. A sculpted
-  look is offered only where an item passed.
+- **The result.** One body counted, by one item.
 - **The refusals.**
   - Twelve items were refused at registration, their meshes out of the plan's proportions:
     both items of five bodies, and one item of two more.
@@ -616,17 +639,17 @@ VideoX-Fun's imports.
     the rule it broke, and only a passed item's measures.
 
 Nothing in the product asks for a sculpted look yet. `python -m exulanica_appearance creatures
-dry-run` fills each sketch into a closed mesh, gives it in TRELLIS's frame at a turn the seed
-decides, and runs every later step.
+dry-run` fills each sketch on a grid of 56 cells along its longest side, gives its surface unturned
+in TRELLIS's frame, as the second stage gives a mesh, and runs every later step.
 
 **Route C's known limit:**
 
-- **The camera and the words disagree.** The control camera looks along the plan's forward axis
-  turned 35 degrees, so it draws each body from its back right, while the concept's words ask
-  for the front left.
-- **One view hides a long body's length.** A long body seen 35 degrees off its axis shows about
-  0.57 of its length across the picture (the sine of 35 degrees). The rest is depth that the
-  3D model has to infer from a single painted view.
+- **Thin parts.** The 64-cubed structure is coarse for a long, thin body or thin limbs: the
+  second trial's long, thin body was refused for its proportions, and half of its rig refusals
+  were bones mostly outside their mesh. Read from the contact sheet, not measured: wings and legs come
+  out thinner than the sketch, and a centipede's legs were lost.
+- **The look follows the sketch.** Read from the contact sheet: a mesh keeps the sketch's flat
+  segments, and its colours, sampled from the decoded Gaussians, are duller than the concept's.
 
 **Planned, not built:** the operator's choice of route from the blind side-by-side pictures, route
 B's zero-area refusals, pieces that fill a thin box (benches, seating planters, and lamp posts,
@@ -634,7 +657,7 @@ whose 250 mm deep box no generated post has filled), a shopfront request shaped 
 slot, the admission's `generated` rights basis, a measured figure for how soon a file written from
 this Mac appears in the mount's listing and for a session's memory with two routes loaded, the
 product's own writer to the queue under the spending authority, and the Companion's offer of new
-pieces for a pack. Route C's camera on the plan's front left, as its words say, and a creature's
-body built on its sketch's own voxels, so the 3D model only details and paints it, are planned for a
-second pre-registered trial.
+pieces for a pack. Route C's checks refined for thin bodies (an allowance for the structure's grain
+in the proportion check, rig voxels sized to the thinnest limb, a bone's inside share for a thin
+wing), to be judged on freshly drafted bodies in another pre-registered trial.
 

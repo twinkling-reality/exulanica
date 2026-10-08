@@ -11,6 +11,8 @@ Everything here is numpy on the slot frame (metres; x across, y forward, z up):
     outside cannot reach), which tolerates a mesh that is not quite closed.
 *   :func:`voxel_surface` turns a filled grid into a closed mesh of its boundary faces: an offline
     stand-in for a sculpted mesh in tests, built from a sketch, with no model.
+*   :func:`trellis_structure` gives a sketch's surface voxels as TRELLIS's sparse structure, so the
+    3D model details and paints the plan's own body rather than inferring one from a picture.
 
 Deterministic: the same inputs give the same arrays on any machine with the same numpy.
 """
@@ -25,6 +27,8 @@ from typing import Final
 
 import numpy as np
 
+from exulanica_appearance.assets.backends.trellis import STRUCTURE_RESOLUTION
+
 __all__ = [
     "CONTROL_CAMERA",
     "Camera",
@@ -32,9 +36,13 @@ __all__ = [
     "project",
     "rasterise",
     "sketch_triangles",
+    "trellis_structure",
     "voxel_inside",
     "voxel_surface",
 ]
+
+#: Candidate pixels the rasteriser tests per batch, holding its memory to a few hundred megabytes.
+_RASTER_BATCH: Final = 1 << 21
 
 
 def _accessor(document: dict, binary: bytes, index: int) -> np.ndarray:
@@ -97,8 +105,10 @@ class Camera:
     pitch_deg: float
 
 
-#: The three-quarter view every control picture is drawn from, and a concept picture follows.
-CONTROL_CAMERA: Final = Camera(yaw_deg=-35.0, pitch_deg=15.0)
+#: The three-quarter view every control picture is drawn from, and a concept picture follows: from
+#: the plan's front left and a little above, as the concept's words say. A plan faces +y, so the
+#: camera looks back along it (yaw 180) turned 35 degrees toward the plan's left (-x).
+CONTROL_CAMERA: Final = Camera(yaw_deg=145.0, pitch_deg=15.0)
 
 
 def project(points: np.ndarray, camera: Camera) -> np.ndarray:
@@ -146,40 +156,103 @@ def rasterise(
         scale = float(size * (1 - 2 * margin) / max(high[0] - low[0], high[1] - low[1], 1e-9))
     else:
         centre, scale = frame.centre, frame.scale
-    depth = np.full((size, size), np.nan)
-    drawn = np.full((size, size), -1, dtype=np.int64)
     px = (projected[..., 0] - centre[0]) * scale + size / 2
     py = size / 2 - (projected[..., 1] - centre[1]) * scale
-    pz = projected[..., 2]
-    for index, ((x0, x1, x2), (y0, y1, y2), (z0, z1, z2)) in enumerate(
-        zip(px, py, pz, strict=True)
-    ):
-        left, right = (
-            int(max(np.floor(min(x0, x1, x2)), 0)),
-            int(min(np.ceil(max(x0, x1, x2)), size - 1)),
-        )
-        top, bottom = (
-            int(max(np.floor(min(y0, y1, y2)), 0)),
-            int(min(np.ceil(max(y0, y1, y2)), size - 1)),
-        )
-        if left > right or top > bottom:
-            continue
-        area = (x1 - x0) * (y2 - y0) - (x2 - x0) * (y1 - y0)
-        if abs(area) < 1e-12:
-            continue
-        xs, ys = np.meshgrid(np.arange(left, right + 1) + 0.5, np.arange(top, bottom + 1) + 0.5)
-        w0 = ((x1 - xs) * (y2 - ys) - (x2 - xs) * (y1 - ys)) / area
-        w1 = ((x2 - xs) * (y0 - ys) - (x0 - xs) * (y2 - ys)) / area
+    depth, drawn = _draw(px, py, projected[..., 2], size)
+    return Drawn(depth, drawn, centre, scale)
+
+
+def _draw(
+    px: np.ndarray, py: np.ndarray, pz: np.ndarray, size: int
+) -> tuple[np.ndarray, np.ndarray]:
+    """Triangles in pixel coordinates (T x 3 each) drawn all at once: a pixel whose centre lies in
+    a triangle (its three barycentric weights at least zero) takes the nearest depth, and of equal
+    depths the lowest triangle index, as drawing them one by one in order and replacing only a
+    strictly nearer depth would."""
+    depth = np.full((size, size), np.nan)
+    drawn = np.full((size, size), -1, dtype=np.int64)
+    left = np.maximum(np.floor(px.min(axis=1)), 0).astype(np.int64)
+    right = np.minimum(np.ceil(px.max(axis=1)), size - 1).astype(np.int64)
+    top = np.maximum(np.floor(py.min(axis=1)), 0).astype(np.int64)
+    bottom = np.minimum(np.ceil(py.max(axis=1)), size - 1).astype(np.int64)
+    x0, x1, x2 = px[:, 0], px[:, 1], px[:, 2]
+    y0, y1, y2 = py[:, 0], py[:, 1], py[:, 2]
+    z0, z1, z2 = pz[:, 0], pz[:, 1], pz[:, 2]
+    area = (x1 - x0) * (y2 - y0) - (x2 - x0) * (y1 - y0)
+    live = np.flatnonzero((left <= right) & (top <= bottom) & ~(np.abs(area) < 1e-12))
+    width = right[live] - left[live] + 1
+    counts = width * (bottom[live] - top[live] + 1)
+    pixels, depths, owners = [], [], []
+    start = 0
+    while start < len(live):
+        # Each batch takes whole triangles' boxes up to the batch size, and at least one box.
+        end = start + max(int(np.searchsorted(np.cumsum(counts[start:]), _RASTER_BATCH)), 1)
+        boxes = counts[start:end]
+        owner = np.repeat(live[start:end], boxes)
+        offset = np.arange(int(boxes.sum())) - np.repeat(np.cumsum(boxes) - boxes, boxes)
+        wide = np.repeat(width[start:end], boxes)
+        column = left[owner] + offset % wide
+        row = top[owner] + offset // wide
+        xs, ys = column + 0.5, row + 0.5
+        w0 = ((x1[owner] - xs) * (y2[owner] - ys) - (x2[owner] - xs) * (y1[owner] - ys)) / area[
+            owner
+        ]
+        w1 = ((x2[owner] - xs) * (y0[owner] - ys) - (x0[owner] - xs) * (y2[owner] - ys)) / area[
+            owner
+        ]
         w2 = 1 - w0 - w1
         inside = (w0 >= 0) & (w1 >= 0) & (w2 >= 0)
-        if not inside.any():
-            continue
-        z = w0 * z0 + w1 * z1 + w2 * z2
-        region = depth[top : bottom + 1, left : right + 1]
-        nearer = inside & (np.isnan(region) | (z > region))
-        region[nearer] = z[nearer]
-        drawn[top : bottom + 1, left : right + 1][nearer] = index
-    return Drawn(depth, drawn, centre, scale)
+        z = w0 * z0[owner] + w1 * z1[owner] + w2 * z2[owner]
+        pixels.append((row * size + column)[inside])
+        depths.append(z[inside])
+        owners.append(owner[inside])
+        start = end
+    pixel = np.concatenate(pixels) if pixels else np.zeros(0, dtype=np.int64)
+    # Boxes can hold candidates with no pixel centre inside any triangle: nothing is drawn.
+    if len(pixel):
+        z, owner = np.concatenate(depths), np.concatenate(owners)
+        order = np.lexsort((owner, -z, pixel))
+        pixel, z, owner = pixel[order], z[order], owner[order]
+        first = np.flatnonzero(np.r_[True, pixel[1:] != pixel[:-1]])
+        depth.flat[pixel[first]] = z[first]
+        drawn.flat[pixel[first]] = owner[first]
+    return depth, drawn
+
+
+def _samples(a: np.ndarray, b: np.ndarray, c: np.ndarray, spacing: float) -> np.ndarray:
+    """Points on the triangle (a, b, c), its corners among them, at most ``spacing`` apart along
+    its longest side."""
+    longest = max(np.linalg.norm(b - a), np.linalg.norm(c - a), np.linalg.norm(c - b))
+    steps = max(int(np.ceil(longest / spacing)), 1)
+    u, v = np.meshgrid(np.arange(steps + 1), np.arange(steps + 1))
+    keep = u + v <= steps
+    u, v = u[keep] / steps, v[keep] / steps
+    return a + np.outer(u, b - a) + np.outer(v, c - a)
+
+
+def trellis_structure(triangles: np.ndarray) -> np.ndarray:
+    """A sketch's triangles (T x 3 x 3, slot frame) as TRELLIS's sparse structure: the unique
+    (x, y, z) indices (N x 3, int32) of the voxels its surface passes through, in a grid of
+    :data:`STRUCTURE_RESOLUTION` across.
+
+    It is made as TRELLIS's own data is (``dataset_toolkits`` at the pinned commit):
+    - The frame is the slot frame turned half round about the vertical: +Z up, the front toward
+      -Y, so the slot's (x, y, z) is (-x, -y, z).
+    - The box is centred and scaled by one over its longest side, so it spans the unit cube from
+      -0.5 to 0.5.
+    - A voxel of side 1/64 is active when the surface passes through it. A point sampled on each
+      triangle a third of a voxel apart marks the voxel it falls in, as :func:`voxel_inside` marks
+      a surface, and a point on the cube's far faces counts in the last voxel."""
+    corners = triangles.reshape(-1, 3)
+    turned = np.stack([-corners[:, 0], -corners[:, 1], corners[:, 2]], axis=1)
+    low, high = turned.min(axis=0), turned.max(axis=0)
+    unit = ((turned - (low + high) / 2) / float((high - low).max())).reshape(-1, 3, 3)
+    voxel = 1.0 / STRUCTURE_RESOLUTION
+    cells = np.concatenate(
+        [np.floor((_samples(a, b, c, voxel / 3) + 0.5) / voxel) for a, b, c in unit]
+    )
+    cells = np.clip(cells, 0, STRUCTURE_RESOLUTION - 1).astype(np.int32)
+    return np.unique(cells, axis=0)
 
 
 def voxel_inside(
@@ -195,13 +268,7 @@ def voxel_inside(
     shape = np.ceil((corners.max(axis=0) - origin) / voxel).astype(int) + pad + 1
     surface = np.zeros(shape, dtype=bool)
     for a, b, c in triangles:
-        longest = max(np.linalg.norm(b - a), np.linalg.norm(c - a), np.linalg.norm(c - b))
-        steps = max(int(np.ceil(longest / (voxel / 3))), 1)
-        u, v = np.meshgrid(np.arange(steps + 1), np.arange(steps + 1))
-        keep = u + v <= steps
-        u, v = u[keep] / steps, v[keep] / steps
-        points = a + np.outer(u, b - a) + np.outer(v, c - a)
-        cells = np.floor((points - origin) / voxel).astype(int)
+        cells = np.floor((_samples(a, b, c, voxel / 3) - origin) / voxel).astype(int)
         surface[cells[:, 0], cells[:, 1], cells[:, 2]] = True
     outside = np.zeros(shape, dtype=bool)
     frontier = []

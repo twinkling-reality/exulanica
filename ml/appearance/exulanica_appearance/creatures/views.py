@@ -22,7 +22,7 @@ from exulanica_appearance.creatures.rig import _rotation, linear_blend
 __all__ = ["REST_YAWS", "pose", "render", "sheet_row", "views"]
 
 #: The four sides a look is drawn from at rest: the control camera's yaw and every quarter turn.
-REST_YAWS: Final = (-35.0, 55.0, 145.0, 235.0)
+REST_YAWS: Final = tuple((CONTROL_CAMERA.yaw_deg + 90.0 * turn) % 360.0 for turn in range(4))
 #: Degrees each chain turns in a stride: by role, positive forward or up.
 _STRIDE: Final = {"leg": 25.0, "arm": 20.0, "wing": 35.0, "tail": 12.0, "neck": 8.0, "fin": 15.0}
 _LIGHT: Final = np.array([-0.35, -0.45, 0.82]) / np.linalg.norm([-0.35, -0.45, 0.82])

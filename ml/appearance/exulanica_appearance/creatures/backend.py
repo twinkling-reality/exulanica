@@ -3,9 +3,11 @@
 The concept is Z-Image with the Fun union control 2.1, through VideoX-Fun at Track A's pinned
 commit, with Track A's candidate a2 settings (25 steps, guidance 4.0, control scale 0.9, a single
 space as the negative words, 1,024 pixels square). It draws one picture: no roll between steps and
-no wrap at the edges, since a creature is a figure in a frame, not a tile. The cut-out (BiRefNet),
-the mesh (TRELLIS-image-large, its attention through PyTorch's) and the simplifier are route A's
-own backend. Every model loads on its first use. Imported only on the rented machine.
+no wrap at the edges, since a creature is a figure in a frame, not a tile. The cut-out (BiRefNet)
+and the simplifier are route A's own backend. The mesh is TRELLIS-image-large's second stage alone
+(its attention through PyTorch's), on the sketch's own surface voxels: the 3D model details and
+paints the plan's body from the cut-out rather than inferring a body from one picture. Every model
+loads on its first use. Imported only on the rented machine.
 """
 
 from __future__ import annotations
@@ -94,8 +96,11 @@ class RouteCBackend:
         return self._route_a.cutout(picture)
 
     def mesh(self, cutout: bytes, seed: int, sketch: np.ndarray) -> Any:
-        del sketch
-        return self._route_a.mesh(cutout, seed, {})
+        from exulanica_appearance.creatures.geometry import trellis_structure
+
+        voxels = trellis_structure(sketch)
+        coords = np.concatenate([np.zeros((len(voxels), 1), dtype=np.int32), voxels], axis=1)
+        return self._route_a.mesh_on(cutout, seed, coords)
 
     def runtime(self) -> dict[str, Any]:
         from exulanica_appearance.runner.backends.videox import VIDEOX_FUN_ROOT

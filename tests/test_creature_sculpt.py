@@ -205,3 +205,26 @@ def test_the_creature_job_with_stand_in_models_writes_looks_the_product_reads(sc
         assert receipt["outcome"] == "passed" and receipt["output"]["sha256"] == item["look"]
     # Every item, refused or not, has its row of the contact sheet.
     assert len(results["rows"]) == 3
+
+
+@pytest.mark.parametrize("name", sorted(FIXTURES["development"]))
+def test_the_control_camera_sees_each_development_creature_from_its_front(name, sculpt):
+    # The concept's words ask for the front left: the camera must draw the plan's head nearer
+    # than its tail, or the picture model paints a face on the plan's back.
+    geometry, _rig, _write = sculpt
+    recipe = read_body_recipe(copy.deepcopy(FIXTURES["development"][name]["recipe"]))
+    built = build_body(recipe, key=name, version=1, title=name, origin=AUTHORED)
+    _document, container = sketch_look(
+        built, recipe, look=f"{name}-sketch", version=1, plan_name=f"{name}/v1", origin=AUTHORED
+    )
+    triangles, bones_of = geometry.sketch_triangles(container)
+    bones = np.asarray(bones_of)
+    centres = triangles.mean(axis=1)
+    toward = geometry.project(centres, geometry.CONTROL_CAMERA)[:, 2]
+    head = np.char.startswith(bones, "head")
+    tail = np.char.startswith(bones, "tail")
+    assert head.any(), name
+    if tail.any():
+        assert toward[head].mean() > toward[tail].mean(), name
+    # Every body faces +y: its head lies ahead of the middle of its sketch.
+    assert centres[head, 1].mean() > (centres[:, 1].max() + centres[:, 1].min()) / 2, name
