@@ -48,6 +48,7 @@ from exulanica.canonical import sha256_of_canonical
 from exulanica.db.roles import provision_runtime_role
 from exulanica.door.asker import DoorAsker
 from exulanica.door.bridges import load_bridge_directory
+from exulanica.door.channel import ChannelRepository
 from exulanica.door.credentials import credential_sha256
 from exulanica.door.grants import (
     SECRETS_ISSUED_MAXIMUM,
@@ -1180,11 +1181,21 @@ def test_a_closed_workspace_s_credentials_and_invites_open_nothing(door):
     assert _redeem(door, BRIDGE, code).status_code == 201
 
 
-def test_a_held_poll_ends_once_its_credential_is_ended(door):
+def test_a_held_poll_ends_once_its_credential_is_ended(door, monkeypatch):
     grant_id = _issue(door).json()["grant"]["grant_id"]
     first = _credential(door, grant_id)
     cursor = _frames(door, first, _hello(door, first).json()["cursor"]).json()["cursor"]
     client, _runtime = door["application"](_bridges(door["world"]["workspace"], hold_seconds=5))
+    # The route asks how many asks its grant has once its poll's first read found nothing new:
+    # from then on the poll is held, and the credential is ended under a held poll, not before it.
+    held = threading.Event()
+    asks = Notices.asks
+
+    def holding(self: Notices, grant: uuid.UUID) -> int:
+        held.set()
+        return asks(self, grant)
+
+    monkeypatch.setattr(Notices, "asks", holding)
     with client:
         result: dict[str, Any] = {}
 
@@ -1197,11 +1208,31 @@ def test_a_held_poll_ends_once_its_credential_is_ended(door):
 
         thread = threading.Thread(target=poll)
         thread.start()
-        time.sleep(0.5)
+        assert held.wait(timeout=10)
         _credential(door, grant_id)  # the owner's new credential ends the first
         thread.join(timeout=10)
     assert (result["read"].status_code, result["read"].json()["code"]) == (401, "unauthenticated")
     assert result["seconds"] < 4.0  # refused at its next read, not after its hold
+
+
+def test_a_poll_whose_credential_ends_before_its_first_read_is_unauthenticated(door, monkeypatch):
+    grant_id = _issue(door).json()["grant"]["grant_id"]
+    first = _credential(door, grant_id)
+    cursor = _hello(door, first).json()["cursor"]
+    client, _runtime = door["application"](_bridges(door["world"]["workspace"], hold_seconds=5))
+    # The owner's new credential ends the first after the poll's request was accepted and before its
+    # first read: the new credential also takes the first one's hello away, and the poll is told
+    # its credential no longer opens anything, never asked to say hello.
+    opened = ChannelRepository.open_poll
+
+    def switched(self: ChannelRepository, after: Cursor) -> Any:
+        _credential(door, grant_id)
+        return opened(self, after)
+
+    monkeypatch.setattr(ChannelRepository, "open_poll", switched)
+    with client:
+        read = client.get("/door/channel/frames", headers=first, params={"after": cursor})
+    assert (read.status_code, read.json()["code"]) == (401, "unauthenticated")
 
 
 def test_a_bridge_reads_its_grant_s_end_even_after_its_mapping_is_unpinned(door):

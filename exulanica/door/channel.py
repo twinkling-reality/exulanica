@@ -264,9 +264,21 @@ class ChannelRepository:
 
     def _presence(self, bridge: Bridge, doing: str) -> Presence:
         """This channel's own hello, while the deployment admits what it named, or a refusal that
-        asks the bridge to say hello first."""
+        asks the bridge to say hello first. A credential ended since its request was accepted is
+        refused as unauthenticated instead: the newer credential that ended it is what makes its
+        hello no longer count, and a poll's first read takes no lock that would keep the two
+        apart. Read after the hello, so it sees an end that took the hello away."""
         presence = presence_of(self._connection, self._session.workspace_id, self._session.grant_id)
         if presence is None or not presence.admitted_by(bridge):
+            live = self._connection.execute(
+                "select 1 from door_secret where secret_sha256 = %s and kind = 'channel' "
+                "and revoked_at is null and expires_at > statement_timestamp()",
+                (self._session.credential_sha256,),
+            ).fetchone()
+            if live is None:
+                raise ChannelRefused(
+                    "unauthenticated", 401, "no door credential opens anything here"
+                )
             raise ChannelRefused("hello_first", 409, f"say hello on this channel before {doing}")
         return presence
 
