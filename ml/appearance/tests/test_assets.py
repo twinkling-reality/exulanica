@@ -7,6 +7,7 @@ test_pieces_geometry.py); this file holds what needs the appearance package's dr
 from __future__ import annotations
 
 import json
+from itertools import pairwise
 from pathlib import Path
 
 import pytest
@@ -174,3 +175,64 @@ def test_the_trial_evidence_reads_strictly_and_its_run_record_names_every_receip
         (repository / "ml/appearance/evidence/gpu-run-aijob-e05tkzsmaghtp23jvc.json").read_bytes()
     )
     assert run["generations"] == sorted(receipts)
+
+
+def test_the_first_warm_session_s_evidence_reads_strictly_and_its_charges_are_its_markers(
+    repository: Path,
+) -> None:
+    """One warm session served three queue entries in turn (evidence/generated-assets-session-1):
+    every job runs the session's code, every receipt reads against its request, the entries were
+    claimed one after another, and the run record's charges are the done markers' milliseconds."""
+    from exulanica_pieces.records import read_job
+
+    from exulanica_appearance.assets.queue import charges_from_done, read_done, read_session
+    from exulanica_appearance.gpu_run import read_gpu_run
+
+    root = repository / "ml/appearance/evidence/generated-assets-session-1"
+    session_raw = (root / "session.json").read_bytes()
+    session = read_session(session_raw)
+    session_sha256 = sha256_hex(session_raw)
+    budgets = read_budgets(repository)
+    requests = {
+        sha256_hex(p.read_bytes()): read_request(p.read_bytes(), budgets)
+        for p in (root / "requests").glob("*.json")
+    }
+    jobs = {}
+    for path in (root / "jobs").glob("*.json"):
+        job = read_job(path.read_bytes())
+        assert path.stem == sha256_hex(path.read_bytes())
+        assert job["code_sha256"] == session["code_sha256"] and job["route"] == "A"
+        assert {item["request_sha256"] for item in job["items"]} <= set(requests)
+        jobs[path.stem] = job
+    receipts = {}
+    for path in (root / "receipts").glob("*.json"):
+        document = json.loads(path.read_bytes())
+        read_receipt(canonical_bytes(document), requests[document["request_sha256"]])
+        assert path.stem == sha256_hex(path.read_bytes()) and document["job_sha256"] in jobs
+        receipts[path.stem] = document
+    assert len(receipts) == sum(len(job["items"]) for job in jobs.values()) == 40
+    within = {}
+    for receipt in receipts.values():
+        kind = requests[receipt["request_sha256"]]["thing_kind"]["key"]
+        within[kind] = within.get(kind, 0) + receipt["verdict"]["within"]
+    assert sum(within.values()) == 14 and within["well"] == within["cafe_table"] == 4
+
+    done = [p.read_bytes() for p in sorted((root / "done").glob("*.json"))]
+    markers = sorted((read_done(raw) for raw in done), key=lambda marker: marker["claimed_at"])
+    assert [m["job_sha256"] for m in markers] and {m["job_sha256"] for m in markers} == set(jobs)
+    for marker in markers:
+        assert marker["session_sha256"] == session_sha256
+        assert (root / "claimed" / f"{marker['job_sha256']}.json").is_file()
+        assert set(marker["request_milliseconds"]) == {
+            item["request_sha256"] for item in jobs[marker["job_sha256"]]["items"]
+        }
+    for earlier, later in pairwise(markers):
+        assert later["claimed_at"] >= earlier["ended_at"]
+
+    run = read_gpu_run(
+        (repository / "ml/appearance/evidence/gpu-run-aijob-e05cx0ergby4xfwt0r.json").read_bytes()
+    )
+    assert run["generations"] == sorted(receipts)
+    account = run["charges"][0]["account"]
+    expected = charges_from_done(done, session_sha256=session_sha256, account=account)
+    assert [{k: c[k] for k in expected[0]} for c in run["charges"]] == expected

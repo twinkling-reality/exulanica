@@ -1,0 +1,123 @@
+{
+ "code_sha256": "60840d5ebf509dbf597517c8847c799cb2690d937679305a4d7c59b187c9e5d9",
+ "components_sha256": "97f9a5bba87ee08838f13673f8d749fd30260c92565f1be04cb670e17b4f94f3",
+ "entries": [
+  {
+   "items": 12,
+   "job_sha256": "c91a6074c2230c990b85593f74f1d5bfd159d429f907e606743a82d2dbe2fa7e",
+   "pieces": [
+    {
+     "kind": "cafe_table/v1",
+     "look_role": "fixture.cafe_table",
+     "recipe": true,
+     "request_sha256": "d5a93ca3a5e999b335d1160f7026f9b78e1af4da73695fd554c3aa4f6dac66e2",
+     "variants": 4,
+     "words": "a small cafe table with a chair on each side, facing each other across it"
+    },
+    {
+     "kind": "lamp_post/v1",
+     "look_role": "fixture.lamp_post",
+     "recipe": true,
+     "request_sha256": "694f61824c0624e0e1621e1e2961e7d878e285e08093540d6c2139df808303fe",
+     "variants": 4,
+     "words": "a tall slender street lamp: a thin post, one arm to one side, a lamp hanging"
+    },
+    {
+     "kind": "well/v1",
+     "look_role": "fixture.well",
+     "recipe": true,
+     "request_sha256": "4743c0a603612d267f971c07f7c3fe610a700b9722752b5c30f987c1ca8058a2",
+     "variants": 4,
+     "words": "a round stone village water well with a small wooden roof and a bucket"
+    }
+   ],
+   "stop": {
+    "estimate_seconds": 300,
+    "stop_at_seconds": 450
+   }
+  },
+  {
+   "items": 8,
+   "job_sha256": "dd5e6c7568b5b90236ad23e71e87f0d3f696836a47ad85925353c98d99bd7d3b",
+   "pieces": [
+    {
+     "kind": "lantern/v1",
+     "look_role": "prop.lantern",
+     "recipe": false,
+     "request_sha256": "6e618644e6b735c0f346c28a3e73c03c7a394e2eccefce50fb373f6ee6030018",
+     "variants": 4,
+     "words": null
+    },
+    {
+     "kind": "sword/v3",
+     "look_role": "prop.sword",
+     "recipe": false,
+     "request_sha256": "276fa7c2a5901ad6111fe01c2e45d31abe296df994b286731341a51395c0c2b4",
+     "variants": 4,
+     "words": null
+    }
+   ],
+   "stop": {
+    "estimate_seconds": 240,
+    "stop_at_seconds": 360
+   }
+  },
+  {
+   "items": 20,
+   "job_sha256": "f5ea45305e944f5adf3328670aed9ce46a86f37f73ea4adfbd39800a8e6b66fb",
+   "pieces": [
+    {
+     "kind": "bench/v1",
+     "look_role": "fixture.bench",
+     "recipe": false,
+     "request_sha256": "fd38799acc66b3cfccbeeeb04caa93faeb548e428c301783404ff06b373e2b05",
+     "variants": 4,
+     "words": null
+    },
+    {
+     "kind": "gate/v1",
+     "look_role": "fixture.gate",
+     "recipe": false,
+     "request_sha256": "fd79cb68bea6b1aaf75e5649687a739954a444bcfb4c28a7972161a2ee0d9ab5",
+     "variants": 4,
+     "words": null
+    },
+    {
+     "kind": "market_stall/v1",
+     "look_role": "fixture.market_stall",
+     "recipe": false,
+     "request_sha256": "906cd78ed5ee061a6128d1d18d0e4cd0c950350a2e99327aab0330e77d5438ab",
+     "variants": 4,
+     "words": null
+    },
+    {
+     "kind": "planter_tree/v1",
+     "look_role": "fixture.planter_tree",
+     "recipe": false,
+     "request_sha256": "6df9f2bd4c038ee06fc2be58370a70221d40500ad95861b1ce4751975b744a8a",
+     "variants": 4,
+     "words": null
+    },
+    {
+     "kind": "seating_planter/v1",
+     "look_role": "fixture.seating_planter",
+     "recipe": false,
+     "request_sha256": "e86ab0167126daaf577e1e4fe66bf47775fcf95855016a2d14793708aeb52698",
+     "variants": 4,
+     "words": null
+    }
+   ],
+   "stop": {
+    "estimate_seconds": 400,
+    "stop_at_seconds": 600
+   }
+  }
+ ],
+ "hand_section_mm": 60,
+ "pack": {
+  "id": "exulanica.cozy-town",
+  "sha256": "c9f3e58e0c83bd62bf5e58b5a7d44fbca47e9048521c2cfa48d1702d1797a6dc",
+  "version": 3
+ },
+ "recipes_sha256": "17a25eee34e31c1577d1b70a04ca10d46b6745f021f7a45ad910f728e6ecff0c"
+}

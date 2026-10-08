@@ -521,7 +521,7 @@ job without creating it; the bucket key is read from its file in one process and
 command in that command's environment only, never on a command line. Route A's colour comes from TRELLIS's Gaussians; route
 B's is a prototype projection of the cut-out seen from the front, approximate by construction.
 
-**The warm session** (built, not yet run on a rented machine). A cold job spends about 11 minutes
+**The warm session** (built, and run once on Nebius AI Cloud). A cold job spends about 11 minutes
 starting, installing and fetching weights before its first piece, while a piece itself takes 8 to 10
 seconds. A session is one Serverless AI job (`MODE=session` in `job.sh`) that loads its route once
 and serves batches from the bucket until it has had no ready batch for its idle stop (10 minutes by
@@ -542,6 +542,21 @@ fetches what the session wrote, and turns the done markers into charge lines. A 
 profile `exulanica.appearance-gpu-run/v2` carries those lines: each request's milliseconds at the
 listed rate, rounded up, and the account it is charged to; the rest of the session's cost is start-up,
 loading and idle time. The session serves route A; route C, built, does not join it yet.
+
+The first session run, on one RTX PRO 6000 (record
+[`gpu-run-aijob-e05cx0ergby4xfwt0r.json`](../ml/appearance/evidence/gpu-run-aijob-e05cx0ergby4xfwt0r.json)),
+served three batches in turn without reloading its models: each batch was claimed once the one
+before it had ended, and the first piece of a later batch took no longer than any other. From its
+first starting state to its first batch the job took about 10 minutes, installing and fetching
+weights; the first piece then took 23 seconds and every later one 6.6 to 12.7 seconds. The items of
+its 40 requests' variants took 353 of the 1,168 billed seconds, so the charge lines carry about 30
+per cent of the run's cost and start-up, loading and the stop the rest. Made from the recipe catalog
+and the shipped thing kinds in the cozy look, 14 of the 40 pieces were within every check: every
+well and cafe table, whose recipes carry measured words, and three of four lanterns and planter
+trees. Lamp posts, benches, gates, market stalls and seating planters came out short of their boxes,
+whose thin depth bounds the contain fit, and the swords failed their grip checks. The session
+record, jobs, requests, results, receipts and claim and done markers are in
+`ml/appearance/evidence/generated-assets-session-1/`.
 
 **Route C: a creature's sculpted look.** A creature drafted from words wears its sketch at once
 (see the [things contract](things-contract.md)); route C makes it a sculpted, rigged look with no
@@ -610,8 +625,8 @@ decides, and runs every later step.
 **Planned, not built:** the operator's choice of route from the blind side-by-side pictures, route
 B's zero-area refusals, pieces that fill a thin box (gates, benches, lamp posts), a shopfront
 request shaped for a shallow fill slot, the admission's `generated` rights
-basis, a measured session run (how soon a file written from this Mac appears in the mount's listing,
-and memory with two routes loaded), the product's own writer to the queue under the spending
+basis, a measured figure for how soon a file written from this Mac appears in the mount's listing
+and for a session's memory with two routes loaded, the product's own writer to the queue under the spending
 authority, and the Companion's offer of new pieces for a pack. Route C's camera on the plan's
 front left, as its words say, and a creature's body built on its sketch's own voxels, so the 3D
 model only details and paints it, are planned for a second pre-registered trial.
