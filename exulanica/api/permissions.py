@@ -460,6 +460,7 @@ _WORLD_WRITES_WITH_A_MODEL: Final = _every(
     "POST /world/versions/{version_id}/society/models",
     "POST /world/versions/{version_id}/traffic/comparisons",
     "POST /world/versions/{version_id}/traffic/comparisons/{comparison_id}/cancel",
+    "POST /worlds/kinds/drafts",
 )
 
 #: Asking for reference notes, and stopping a request. A request spends the operator's web source
@@ -656,6 +657,8 @@ _WORLD_READS: Final = _every(
     "GET /worlds",
     "GET /worlds/capabilities",
     "GET /worlds/kinds",
+    "GET /worlds/kinds/drafts",
+    "GET /worlds/kinds/drafts/{draft_id}",
     "GET /worlds/recipes",
     "GET /worlds/references",
     "GET /worlds/references/{reference_id}",

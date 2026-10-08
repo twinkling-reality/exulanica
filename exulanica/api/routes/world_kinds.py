@@ -20,31 +20,54 @@ per job, per workspace and in all; work the worker does not finish in time, or c
 answered 503 ``kind_work_overran``, ``kind_work_busy`` or ``kind_work_unavailable`` with a
 ``Retry-After``, and finished checks and drawings are kept, so asking again reads them. The upload's
 body is bounded before it is read (:data:`BODY_LIMITS`).
+
+``POST /worlds/kinds/drafts`` asks a model to draft a kind of world from a person's words and
+answers at once with a draft the page polls at ``GET /worlds/kinds/drafts/{draft_id}``: the job
+(:mod:`exulanica.api.kind_drafts`) drafts, checks and keeps the kind, and no route waits on it.
 """
 
 from __future__ import annotations
 
+import functools
 import json
 import math
 import uuid
 from collections.abc import Mapping
+from datetime import datetime
 from typing import Annotated, Any, Final, Literal
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse, Response
 from psycopg.rows import dict_row
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from exulanica.api.dependencies import (
     CurrentSession,
+    HeldPermissions,
     ReadOnlyConnection,
     ScopedConnection,
     get_services,
 )
+from exulanica.api.kind_drafts import (
+    KIND_DRAFT_CODES,
+    KindDraft,
+    KindDraftBusy,
+    KindDraftCapacity,
+    KindDraftLimit,
+    draft_deadline_seconds,
+    drafting_providers,
+    run_draft,
+)
+from exulanica.api.permissions import Permission
+from exulanica.api.routes.selection import ExecutionView, ModelNotConfigured, _execution
 from exulanica.api.routes.world_entries import SavedWorldEntryView, _view
 from exulanica.api.sayable import sayable
 from exulanica.api.services import Services
 from exulanica.api.world_scope import WorldId
+from exulanica.epistemics.hosted_requests import no_place_released
+from exulanica.models.manifest import load_manifest
+from exulanica.selection.kind_drafting import kind_drafting_prompt
+from exulanica.selection.world_drafting import sendable
 from exulanica.world.composers import ComposedWorld, GeneratedWorldRefused, UnknownWorldComposer
 from exulanica.world.errors import InvalidStructuralData
 from exulanica.world.generated_worlds import generation_receipt, states_site
@@ -106,11 +129,17 @@ UPLOAD_BODY_MAXIMUM = 2 * UPLOAD_BYTES_MAXIMUM
 #: The body asking for a world of a kind may carry: a preset, a title of 200 characters and 64
 #: values, a few kilobytes as JSON; 16 KB holds them with room.
 CREATE_BODY_MAXIMUM = 16_384
+#: The body asking for a draft may carry: a description of at most the drafter's 1,000 characters,
+#: at most four bytes each as UTF-8, with its envelope.
+DRAFT_BODY_MAXIMUM = 16_384
+#: How often the page asks after a draft, in seconds: a first brief takes 20 s or more.
+DRAFT_POLL_SECONDS: Final = 3
 #: The bodies these routes accept, refused before any of them is read (:mod:`exulanica.api.
 #: body_limit`): the server-wide limit is sized for photographs, and a kind is a small document.
 BODY_LIMITS: Final = (
     ("POST", "/worlds/kinds", UPLOAD_BODY_MAXIMUM),
     ("POST", "/worlds/kinds/{kind}/worlds", CREATE_BODY_MAXIMUM),
+    ("POST", "/worlds/kinds/drafts", DRAFT_BODY_MAXIMUM),
 )
 #: What an uploaded kind's provenance says, in place of anything the document carried.
 UPLOADED_BY: Final = "an upload to its workspace"
@@ -185,12 +214,28 @@ class KindRefusalView(BaseModel):
     meaning: str
 
 
+class KindDraftingView(BaseModel):
+    """Whether this caller may draft a kind of place here, read before anything is typed: the page
+    shows no field the server would refuse for this caller and workspace. ``code`` says why not,
+    from ``refusals``, the closed list of every code a draft's routes and its job answer with. The
+    server's own capacity changes from moment to moment, so a start that was offered may still be
+    refused ``kind_draft_capacity``."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    offered: bool
+    code: str | None
+    refusals: list[KindRefusalView]
+
+
 class KindLibraryView(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     profile: Literal["exulanica.world-kinds/v1"]
     kinds: list[KindView]
     refusals: list[KindRefusalView]
+    #: Optional within the profile: a reader that predates it reads the rest as before.
+    drafting: KindDraftingView | None = None
 
 
 class UploadKindBody(BaseModel):
@@ -330,9 +375,45 @@ def _town_view() -> KindView:
     )
 
 
+def _drafting(
+    services: Services,
+    held: frozenset[Permission],
+    connection: Any,
+    workspace_id: uuid.UUID,
+    actor: uuid.UUID,
+) -> KindDraftingView:
+    """Whether a draft would be taken from this caller, by the codes the draft route answers, in
+    the order it asks them."""
+    code: str | None = None
+    if not {Permission.WORLD_WRITE, Permission.MODEL_INVOKE} <= held:
+        code = "not_authorised"
+    elif services.model_client is None:
+        code = ModelNotConfigured.code
+    elif services.allowance_refusal(connection, workspace_id, drafting_providers()) is not None:
+        code = "budget_exceeded"
+    else:
+        try:
+            WorkspaceKinds(connection, workspace_id).refuse_when_full()
+        except KindCapReached as exc:
+            code = exc.code
+        else:
+            code = services.kind_drafts.refusal(workspace_id, actor)
+    return KindDraftingView(
+        offered=code is None,
+        code=code,
+        refusals=[KindRefusalView(code=c, meaning=m) for c, m in KIND_DRAFT_CODES],
+    )
+
+
 @router.get("", summary="The kinds of world a person can make worlds of.")
-def library(connection: ReadOnlyConnection, session: CurrentSession) -> KindLibraryView:
-    """The town, the shipped kinds and the workspace's own kinds, each in plain words."""
+def library(
+    connection: ReadOnlyConnection,
+    session: CurrentSession,
+    held: HeldPermissions,
+    services: Annotated[Services, Depends(get_services)],
+) -> KindLibraryView:
+    """The town, the shipped kinds and the workspace's own kinds, each in plain words, and whether
+    this caller may draft a new kind of place here."""
     kinds = [_town_view()]
     kinds.extend(_kind_view(kind, "shipped") for kind in shipped_kinds())
     kinds.extend(
@@ -343,6 +424,7 @@ def library(connection: ReadOnlyConnection, session: CurrentSession) -> KindLibr
         profile=LIBRARY_PROFILE,
         kinds=kinds,
         refusals=[KindRefusalView(code=code, meaning=meaning) for code, meaning in KIND_CODES],
+        drafting=_drafting(services, held, connection, session.workspace_id, session.actor),
     )
 
 
@@ -414,6 +496,205 @@ def upload_kind(
     except (KindVersionExists, KindCapReached) as exc:
         return _problem(409, exc.code, str(exc))
     return UploadedKindView(kind=_kind_view(kept.kind, "workspace"), validation=dict(report))
+
+
+class DraftKindBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    description: Annotated[
+        str, Field(min_length=1, max_length=kind_drafting_prompt().description_characters_maximum)
+    ]
+
+    @field_validator("description")
+    @classmethod
+    def _says_something(cls, value: str) -> str:
+        # A description of nothing but spaces would still cost a paid call.
+        if not value.strip():
+            raise ValueError("a description says in words what kind of place is wanted")
+        return value
+
+
+class KindDraftRefusalView(BaseModel):
+    code: str
+    detail: str
+    check: str | None = None
+    where: str | None = None
+    #: For ``budget_exceeded`` from the durable authority: the problem's ``spending`` member.
+    spending: dict[str, str] | None = None
+
+
+class KindDraftView(BaseModel):
+    draft_id: uuid.UUID
+    state: Literal["drafting", "ready", "refused"]
+    description: str
+    started_at: datetime
+    elapsed_seconds: int
+    poll_after_seconds: int | None
+    deadline_seconds: int
+    kind: KindView | None
+    refusal: KindDraftRefusalView | None
+    model_id: str | None
+    model_name: str | None
+    prompt_version: str
+    execution: ExecutionView | None
+
+
+def _draft_view(
+    draft: KindDraft, connection: Any, workspace_id: uuid.UUID, now: float
+) -> KindDraftView:
+    kind = None
+    if draft.state == "ready" and draft.kind is not None and draft.version is not None:
+        stored = WorkspaceKinds(connection, workspace_id).version(draft.kind, draft.version)
+        kind = None if stored is None else _kind_view(stored.kind, "workspace")
+    prompt = kind_drafting_prompt()
+    ended = draft.state != "drafting"
+    return KindDraftView(
+        draft_id=draft.draft_id,
+        state=draft.state,
+        description=draft.description,
+        started_at=draft.started_at,
+        elapsed_seconds=round((draft.changed if ended else now) - draft.started),
+        poll_after_seconds=None if ended else DRAFT_POLL_SECONDS,
+        deadline_seconds=math.ceil(draft_deadline_seconds()),
+        kind=kind,
+        refusal=None if draft.refusal is None else KindDraftRefusalView(**draft.refusal),
+        model_id=draft.model_id,
+        model_name=None if draft.model_id is None else load_manifest().model_name(draft.model_id),
+        prompt_version=prompt.prompt_version,
+        execution=_execution(draft.calls, (), prompt_version=prompt.prompt_version)
+        if draft.calls
+        else None,
+    )
+
+
+@router.post(
+    "/drafts",
+    response_model=KindDraftView,
+    status_code=202,
+    summary="Draft a kind of world from a description, as a job the page polls.",
+)
+def start_kind_draft(
+    body: DraftKindBody,
+    connection: ReadOnlyConnection,
+    session: CurrentSession,
+    services: Annotated[Services, Depends(get_services)],
+) -> KindDraftView | JSONResponse:
+    """Admit the words and start the draft; answer at once, never waiting on the model.
+
+    503 without a model credential; 429 ``budget_exceeded`` with its ``spending`` member when the
+    workspace's allowance for the drafting model is spent; 409 ``kind_cap_reached`` when the
+    workspace keeps as many kinds as it may, each before anything is spent; 409
+    ``kind_draft_busy`` while a draft runs in this workspace, with its ``draft_id`` when the caller
+    started it; 429 ``kind_draft_limit`` with a ``Retry-After`` when the caller has started as many
+    drafts this hour as one person may; 503 ``kind_draft_capacity`` with a ``Retry-After`` when
+    the server runs as many drafts as it may. Saved names are replaced before the job starts, and
+    the workspace's rules, releasing no place's name, are applied again as each request leaves.
+    """
+    workspace_id = session.workspace_id
+    if services.model_client is None:
+        raise ModelNotConfigured()
+    # A spent allowance answers as every model route's does (429 budget_exceeded), not as a draft.
+    services.require_allowance(connection, workspace_id, drafting_providers())
+    try:
+        WorkspaceKinds(connection, workspace_id).refuse_when_full()
+    except KindCapReached as exc:
+        return _problem(409, exc.code, str(exc))
+    sent = sendable(connection, workspace_id, body.description)
+
+    def readable() -> Any:
+        return services.readonly_database.session(workspace_id)
+
+    def opened() -> Any:
+        return services.database.session(workspace_id)
+
+    # Describing a world is no use a place-name right offers, so no grant reaches these requests;
+    # the policy opens its own connection for each judgement, since the request's is gone by then.
+    client = services.model_client.with_policy(
+        services.request_policy(workspace_id, readable, released_places=no_place_released)
+    )
+    try:
+        draft = services.kind_drafts.start(
+            workspace_id,
+            session.actor,
+            body.description,
+            functools.partial(
+                run_draft,
+                client=client,
+                opened=opened,
+                readable=readable,
+                actor=session.actor,
+                text=sent.text,
+                placeholders=sent.placeholders,
+            ),
+        )
+    except KindDraftBusy as busy:
+        # The running draft's id is told only to the person who started it: its words are theirs.
+        mine = {"draft_id": str(busy.draft_id)} if busy.actor == session.actor else {}
+        return _problem(409, "kind_draft_busy", str(busy), **mine)
+    except KindDraftLimit as limit:
+        return _problem(
+            429,
+            "kind_draft_limit",
+            "As many drafts as one person may start in an hour were started. Try again later.",
+            headers={"Retry-After": str(limit.retry_seconds)},
+        )
+    except KindDraftCapacity:
+        return _problem(
+            503,
+            "kind_draft_capacity",
+            "The server is drafting as many kinds as it may. Try again in a moment.",
+            headers={"Retry-After": "30"},
+        )
+    return _draft_view(draft, connection, workspace_id, services.kind_drafts.clock())
+
+
+class KindDraftListView(BaseModel):
+    drafts: list[KindDraftView]
+
+
+@router.get(
+    "/drafts",
+    response_model=KindDraftListView,
+    summary="The kinds of place this caller is drafting or drafted lately, newest first.",
+)
+def list_kind_drafts(
+    connection: ReadOnlyConnection,
+    session: CurrentSession,
+    services: Annotated[Services, Depends(get_services)],
+) -> KindDraftListView:
+    """The caller's drafts this server still holds in this workspace, newest first, so a reload,
+    a second tab or a return finds a draft still running without starting another."""
+    now = services.kind_drafts.clock()
+    return KindDraftListView(
+        drafts=[
+            _draft_view(draft, connection, session.workspace_id, now)
+            for draft in services.kind_drafts.listing(session.workspace_id, session.actor)
+        ]
+    )
+
+
+@router.get(
+    "/drafts/{draft_id}",
+    response_model=KindDraftView,
+    summary="A kind's draft: drafting, ready with the kept kind, or refused by name.",
+)
+def read_kind_draft(
+    draft_id: uuid.UUID,
+    connection: ReadOnlyConnection,
+    session: CurrentSession,
+    services: Annotated[Services, Depends(get_services)],
+) -> KindDraftView | JSONResponse:
+    """The draft's state; 404 ``kind_draft_unknown`` for an id this server does not hold for this
+    caller in this workspace (another person's draft reads so too), which a draft lost when the
+    server restarted reads as too."""
+    draft = services.kind_drafts.read(session.workspace_id, session.actor, draft_id)
+    if draft is None:
+        return _problem(
+            404,
+            "kind_draft_unknown",
+            "You have no draft with this id. If the server restarted while it ran, start it again.",
+        )
+    return _draft_view(draft, connection, session.workspace_id, services.kind_drafts.clock())
 
 
 class _WorkerComposer:

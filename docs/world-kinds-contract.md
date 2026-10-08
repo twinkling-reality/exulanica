@@ -297,7 +297,10 @@ stages.
 
 | Route | Permission | Behaviour |
 | --- | --- | --- |
-| `GET /worlds/kinds` | world read | The town, every shipped kind and the workspace's own kinds, each with its parts, parameters and presets in plain words |
+| `GET /worlds/kinds` | world read | The town, every shipped kind and the workspace's own kinds, each with its parts, parameters and presets in plain words, and whether this caller may draft a kind of place here |
+| `POST /worlds/kinds/drafts` | world write and model invoke | Starts a draft of a kind of place from a description (1 to 1,000 characters; a body over 16,384 bytes is refused 413 before it is read) and answers 202 with the draft at once; before anything is spent, 503 without a model credential, 429 `budget_exceeded` with its `spending` member when the workspace's allowance for the drafting model is spent and 409 `kind_cap_reached`; 409 `kind_draft_busy` while this workspace runs a draft, naming its `draft_id` only to the person who started it; 429 `kind_draft_limit` with a `Retry-After` when the caller has started 12 drafts in the last hour; 503 `kind_draft_capacity` with a `Retry-After` when the server runs as many drafts as it may |
+| `GET /worlds/kinds/drafts` | world read | The caller's drafts the server still holds in this workspace, newest first |
+| `GET /worlds/kinds/drafts/{draft_id}` | world read | The draft's state: drafting, ready with the kept kind, or refused by name; 404 `kind_draft_unknown` for an id the server does not hold for this caller in this workspace, another person's draft included |
 | `POST /worlds/kinds` | world write | Keeps a creator's kind (origin `uploaded`, at most 65,536 bytes; a body over 131,072 bytes is refused 413 before it is read) once both stages pass; 422 names the refusal and writes nothing; 409 `kind_version_exists` or `kind_cap_reached`, asked before any sample world is built; 503 when the worker cannot answer in time |
 | `POST /worlds/kinds/{kind}/worlds` | world write | Makes a world of a kind with a preset, values and a title, and saves its entry; the latest version unless one is named; a body over 16,384 bytes is refused 413 before it is read; 503 when the worker cannot answer in time |
 | `GET /world/versions/{version_id}/site` | world read | The drawing, served only to the world whose snapshot names its receipt, with its digest as the entity tag; made in the kind worker and kept, 503 with a `Retry-After` while it cannot be |
@@ -331,6 +334,41 @@ Both stages of the checks stay the one authority: a kind they refuse is refused 
 drafter sends one brief and at most two repairs, each naming the check's code, the place in the
 brief and the check's own sentence, never the reply's words; there is no fallback model.
 
+The page calls a world kind a **kind of place**. Before anything is typed, `GET /worlds/kinds`
+says whether this caller may draft one here (`drafting`: `offered`, and otherwise `code`:
+`not_authorised` without world write and model invoke, `provider_credential_absent` without a
+model credential, `budget_exceeded` when the workspace's allowance for the drafting model is
+spent, `kind_cap_reached` when the workspace is full, `kind_draft_busy` while the workspace runs a
+draft, `kind_draft_limit` when the caller has started as many drafts this hour as one person may),
+with `refusals`, the closed list of every code a draft's routes and its job answer with, so the
+page shows no field the server would refuse this caller here. The server's own capacity changes
+from moment to moment, so an offered start may still be refused `kind_draft_capacity`, which says
+when to try again. A person asks for a draft with `POST /worlds/kinds/drafts` and the words they typed.
+The route answers at once, 202 with the draft's id, and never waits on the model: a job in the API process
+drafts on the `kind_drafter` role, holds each drafted kind to both stages in the kind worker as an
+upload is held, and keeps a passing kind in the workspace, origin `drafted`, under the key its
+brief states or, where the workspace already keeps that key, the key with the first number free
+after it. The kind's provenance names the role, the model, the prompt version and digest and the
+words' digest, never the words. The page polls `GET /worlds/kinds/drafts/{draft_id}`, and
+`GET /worlds/kinds/drafts` lists the caller's drafts the server still holds, newest first, so a
+reload, a second tab or a return finds a draft still running. Only the person who started a
+draft reads it, and its `description` holds their words only while it runs: a draft that ended
+forgets them, so a page that offers the words again keeps them itself. A draft is in one of three
+states, which the page says in these words:
+
+| State | What the page says |
+| --- | --- |
+| `drafting` | "Drafting your kind of place, {elapsed} so far. It can take a few minutes. You can leave: it keeps going, and it will be among your kinds when it is ready." ({elapsed} from the answer's `elapsed_seconds`) |
+| `ready` | "{label}: {summary}" and "Drafted from your words by {model name}" (the answer's `model_name`), then its presets and values |
+| `refused` | "These words did not draft a kind of place people can live, walk and work in: {sentence} Try describing it another way." ({sentence} the refusal's `detail`: the last check's own sentence, or the drafter's where no check refused) |
+
+A refusal that is not the drafted kind's (`budget_exceeded`, `kind_draft_unanswered`,
+`kind_work_unavailable`, `kind_draft_failed`, `kind_cap_reached`, `kind_version_exists`) is said in
+the closed list's words. Ready and refused carry what the drafting cost, every call made included. Saved names are replaced in the words before the job
+starts, and the workspace's rules, releasing no place's name, are applied again as each request
+leaves. A draft takes at most the role's timeout and the checks' bound for each of its three
+attempts. Making a world of the kept kind is `POST /worlds/kinds/{kind}/worlds`.
+
 ## The town as a kind
 
 The library lists the town through an adapter (`exulanica.world-kind-adapter/v1`,
@@ -345,9 +383,17 @@ town's receipt or digest depends on the adapter.
 
 - The application draws a site's slots as the engine's primitives in fallback colours; no style
   pack dresses them.
-- No route drafts a kind yet; only `scripts/measure_kind_drafting_models.py` runs the drafter,
-  under the `kind_drafter` role (see [model and service selection](model-and-service-selection.md)).
-  The API keeps only a creator's upload; `drafted` is an origin the document states.
+- A draft's state lives in the API process that started it, so drafting needs one API process or
+  routing that sends each person to the same one ([deployment guide](deployment.md), 5.4): a poll
+  another process answers reads `kind_draft_unknown` while the draft still runs. A draft still
+  running when its process stops is lost, what it had spent stands, and its page reads
+  `kind_draft_unknown` and offers to start again. A ready draft's kind is kept in the workspace and
+  outlives the process; an ended draft's state is answered for an hour after it ended, and one
+  still drafting past its deadline and two minutes ends as `kind_draft_failed`. One workspace runs
+  one draft at a time, one person starts at most 12 an hour and the process runs two. Running
+  drafts on the durable job queue is planned work, not delivered.
+- A drafted kind is kept once it passes, without a separate accept, and takes one of the
+  workspace's kind versions; no kind is removed. Hiding a kind no world uses is planned work.
 - The library ships the town's adapter and no site-grammar kind. The three kinds under
   `tests/fixtures/world-kinds` are hand-written test fixtures.
 - Only the ground storey of a structure is walked inside.

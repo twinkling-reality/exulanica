@@ -142,6 +142,8 @@ class KindDraftRefusal:
     detail: str
     #: The last check that refused the kind, by code and where in the brief, when one did.
     check: tuple[str, str] | None = None
+    #: That check's own sentence, on one line, as the repair told the model: what a person reads.
+    sentence: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -356,6 +358,7 @@ def draft_kind(
     log: CallLog | None = None,
     max_tokens: int | None = None,
     trail: list[dict[str, Any]] | None = None,
+    key_for: Callable[[str], str] | None = None,
 ) -> KindDraftOutcome:
     """Ask the drafter for a kind of ``description``, compile and check it, with two repairs and
     no fallback.
@@ -369,6 +372,8 @@ def draft_kind(
 
     ``trail``, when given, is the caller's own list each attempt is recorded in as it goes, so a
     measurement keeps the attempts made before a call that raises (a provider's timeout).
+    ``key_for``, when given, chooses the kind's key from the one the brief states, before the
+    checks, so the kind checked is the kind kept (a workspace already keeping that key).
     """
     prompt = kind_drafting_prompt() if prompt is None else prompt
     catalogs = load_kind_catalogs() if catalogs is None else catalogs
@@ -389,6 +394,7 @@ def draft_kind(
     attempts: list[str] = []
     trail = [] if trail is None else trail
     last_check: tuple[str, str] | None = None
+    last_sentence: str | None = None
     for attempt in range(1, DRAFT_ATTEMPTS + 1):
         repair: str
         try:
@@ -418,6 +424,8 @@ def draft_kind(
                 catalogs=catalogs,
                 routine=routine,
             )
+            if key_for is not None:
+                compiled.document["kind"] = key_for(str(compiled.document["kind"]))
             verdict = check(compiled.document)
             if verdict.passed:
                 attempts.append("passed")
@@ -437,6 +445,7 @@ def draft_kind(
             # quote at most a key, a label or a figure the brief held to its pattern and bounds.
             detail = " ".join(verdict.detail.split())[:400]
             last_check = (verdict.code, where)
+            last_sentence = detail or None
             attempts.append(f"check:{verdict.code}")
             trail.append(
                 {
@@ -477,6 +486,7 @@ def draft_kind(
             "No kind of world was drafted from these words that people could live, walk and work "
             "in.",
             last_check,
+            last_sentence,
         ),
         model_id=None,
         calls=log.calls,

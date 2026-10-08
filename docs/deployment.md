@@ -834,6 +834,10 @@ decides, before any of it is taken, whether the process accepts a request now. *
 this section bounds one API process.** Several API processes behind one database hold several
 times each limit, and a workspace can hold its share in each of them; the database's
 `max_connections` must cover the sum (5.4.3).
+One thing is not shared between API processes: a kind of place being drafted
+([world kinds contract](world-kinds-contract.md)) lives in the process that started it, so behind
+several processes drafting needs routing that sends each person to the same process, or a poll
+another process answers reads the draft as unknown while it still runs.
 
 #### 5.4.1 Admission
 
@@ -1016,7 +1020,8 @@ towns played by the API process and then by the playback process
   between 8 and 16 concurrent requests (p95 15 to 28 ms), and at the requests limit of 24 the p95 is
   about 66 ms while the excess is refused in a few milliseconds. The limit sits above that knee
   because many requests wait on a model, a traffic worker or a lock rather than on the core. More
-  API processes behind one database is the boundary that expands it (5.4.3).
+  API processes behind one database is the boundary that expands it (5.4.3), with each person
+  routed to one process while drafting a kind of place (5.4).
 - **Faults:** a client killed while holding streams, a request cancelled mid-body, stalled upload
   bodies, a table lock held for twenty seconds, the derivative worker killed or paused past its
   lease, and the API killed mid-stream each gave every slot back. Every watched upload reached one

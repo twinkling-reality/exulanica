@@ -322,6 +322,8 @@ def test_every_route_that_can_reach_a_model_requires_model_invoke():
         # start a paid comparison may stop it.
         ("POST", "/world/versions/{version_id}/society/comparisons/{comparison_id}/cancel"),
         ("POST", "/world/versions/{version_id}/traffic/comparisons/{comparison_id}/cancel"),
+        # The job a kind's draft starts asks the model after the route has answered.
+        ("POST", "/worlds/kinds/drafts"),
         ("POST", "/worlds/specification/drafts"),
     ]
     assert found <= set(SWEPT)

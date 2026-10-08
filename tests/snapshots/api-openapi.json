@@ -18290,7 +18290,7 @@
      "world"
     ],
     "summary": "The kinds of world a person can make worlds of.",
-    "description": "The town, the shipped kinds and the workspace's own kinds, each in plain words.",
+    "description": "The town, the shipped kinds and the workspace's own kinds, each in plain words, and whether\nthis caller may draft a new kind of place here.",
     "operationId": "library_worlds_kinds_get",
     "parameters": [
      {
@@ -18381,6 +18381,174 @@
      },
      "422": {
       "description": "Refused by name; nothing was written."
+     }
+    }
+   }
+  },
+  "/worlds/kinds/drafts": {
+   "post": {
+    "tags": [
+     "world"
+    ],
+    "summary": "Draft a kind of world from a description, as a job the page polls.",
+    "description": "Admit the words and start the draft; answer at once, never waiting on the model.\n\n503 without a model credential; 429 ``budget_exceeded`` with its ``spending`` member when the\nworkspace's allowance for the drafting model is spent; 409 ``kind_cap_reached`` when the\nworkspace keeps as many kinds as it may, each before anything is spent; 409\n``kind_draft_busy`` while a draft runs in this workspace, with its ``draft_id`` when the caller\nstarted it; 429 ``kind_draft_limit`` with a ``Retry-After`` when the caller has started as many\ndrafts this hour as one person may; 503 ``kind_draft_capacity`` with a ``Retry-After`` when\nthe server runs as many drafts as it may. Saved names are replaced before the job starts, and\nthe workspace's rules, releasing no place's name, are applied again as each request leaves.",
+    "operationId": "start_kind_draft_worlds_kinds_drafts_post",
+    "parameters": [
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/DraftKindBody"
+       }
+      }
+     }
+    },
+    "responses": {
+     "202": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/KindDraftView"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "get": {
+    "tags": [
+     "world"
+    ],
+    "summary": "The kinds of place this caller is drafting or drafted lately, newest first.",
+    "description": "The caller's drafts this server still holds in this workspace, newest first, so a reload,\na second tab or a return finds a draft still running without starting another.",
+    "operationId": "list_kind_drafts_worlds_kinds_drafts_get",
+    "parameters": [
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/KindDraftListView"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/worlds/kinds/drafts/{draft_id}": {
+   "get": {
+    "tags": [
+     "world"
+    ],
+    "summary": "A kind's draft: drafting, ready with the kept kind, or refused by name.",
+    "description": "The draft's state; 404 ``kind_draft_unknown`` for an id this server does not hold for this\ncaller in this workspace (another person's draft reads so too), which a draft lost when the\nserver restarted reads as too.",
+    "operationId": "read_kind_draft_worlds_kinds_drafts__draft_id__get",
+    "parameters": [
+     {
+      "name": "draft_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Draft Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/KindDraftView"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
      }
     }
    }
@@ -25210,6 +25378,22 @@
     ],
     "title": "DraftBody"
    },
+   "DraftKindBody": {
+    "properties": {
+     "description": {
+      "type": "string",
+      "maxLength": 1000,
+      "minLength": 1,
+      "title": "Description"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "description"
+    ],
+    "title": "DraftKindBody"
+   },
    "DraftRefusalView": {
     "properties": {
      "code": {
@@ -28173,6 +28357,230 @@
     ],
     "title": "KindBody"
    },
+   "KindDraftListView": {
+    "properties": {
+     "drafts": {
+      "items": {
+       "$ref": "#/components/schemas/KindDraftView"
+      },
+      "type": "array",
+      "title": "Drafts"
+     }
+    },
+    "type": "object",
+    "required": [
+     "drafts"
+    ],
+    "title": "KindDraftListView"
+   },
+   "KindDraftRefusalView": {
+    "properties": {
+     "code": {
+      "type": "string",
+      "title": "Code"
+     },
+     "detail": {
+      "type": "string",
+      "title": "Detail"
+     },
+     "check": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Check"
+     },
+     "where": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Where"
+     },
+     "spending": {
+      "anyOf": [
+       {
+        "additionalProperties": {
+         "type": "string"
+        },
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Spending"
+     }
+    },
+    "type": "object",
+    "required": [
+     "code",
+     "detail"
+    ],
+    "title": "KindDraftRefusalView"
+   },
+   "KindDraftView": {
+    "properties": {
+     "draft_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Draft Id"
+     },
+     "state": {
+      "type": "string",
+      "enum": [
+       "drafting",
+       "ready",
+       "refused"
+      ],
+      "title": "State"
+     },
+     "description": {
+      "type": "string",
+      "title": "Description"
+     },
+     "started_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Started At"
+     },
+     "elapsed_seconds": {
+      "type": "integer",
+      "title": "Elapsed Seconds"
+     },
+     "poll_after_seconds": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Poll After Seconds"
+     },
+     "deadline_seconds": {
+      "type": "integer",
+      "title": "Deadline Seconds"
+     },
+     "kind": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/KindView"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "refusal": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/KindDraftRefusalView"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "model_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Model Id"
+     },
+     "model_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Model Name"
+     },
+     "prompt_version": {
+      "type": "string",
+      "title": "Prompt Version"
+     },
+     "execution": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/ExecutionView"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     }
+    },
+    "type": "object",
+    "required": [
+     "draft_id",
+     "state",
+     "description",
+     "started_at",
+     "elapsed_seconds",
+     "poll_after_seconds",
+     "deadline_seconds",
+     "kind",
+     "refusal",
+     "model_id",
+     "model_name",
+     "prompt_version",
+     "execution"
+    ],
+    "title": "KindDraftView"
+   },
+   "KindDraftingView": {
+    "properties": {
+     "offered": {
+      "type": "boolean",
+      "title": "Offered"
+     },
+     "code": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Code"
+     },
+     "refusals": {
+      "items": {
+       "$ref": "#/components/schemas/KindRefusalView"
+      },
+      "type": "array",
+      "title": "Refusals"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "offered",
+     "code",
+     "refusals"
+    ],
+    "title": "KindDraftingView",
+    "description": "Whether this caller may draft a kind of place here, read before anything is typed: the page\nshows no field the server would refuse for this caller and workspace. ``code`` says why not,\nfrom ``refusals``, the closed list of every code a draft's routes and its job answer with. The\nserver's own capacity changes from moment to moment, so a start that was offered may still be\nrefused ``kind_draft_capacity``."
+   },
    "KindLibraryView": {
     "properties": {
      "profile": {
@@ -28193,6 +28601,16 @@
       },
       "type": "array",
       "title": "Refusals"
+     },
+     "drafting": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/KindDraftingView"
+       },
+       {
+        "type": "null"
+       }
+      ]
      }
     },
     "additionalProperties": false,

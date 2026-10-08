@@ -64,6 +64,7 @@ from exulanica.api.installation import (
     installation_facts,
     load_installation,
 )
+from exulanica.api.kind_drafts import KindDrafts
 from exulanica.api.reference_pictures import reference_picture_source
 from exulanica.api.signal_comparison_runner import SignalComparisonRunner
 from exulanica.api.society_comparison_runner import SocietyComparisonRunner
@@ -341,6 +342,9 @@ class Services:
     #: grants' channels and the asker the decision host is given. None in a hand-built Services,
     #: which makes the door's routes refuse every door credential and its owner routes answer 503.
     door: DoorRuntime | None = None
+    #: The kinds of world being drafted from people's words in this process, as jobs the page
+    #: polls (:mod:`exulanica.api.kind_drafts`). Each Services holds its own.
+    kind_drafts: KindDrafts = field(default_factory=KindDrafts)
     #: Explicit host allowlist. Empty leaves automatic society playback disabled.
     #: ``build_services`` reads it from ``EXULANICA_SOCIETY_CONTROL_WORKSPACES``.
     society_control_workspaces: tuple[uuid.UUID, ...] = ()

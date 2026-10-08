@@ -384,6 +384,8 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     finally:
         gc.unfreeze()
         society_stop.set()
+        # A kind draft still running starts no kind worker once the server stops (closed below).
+        services.kind_drafts.close()
         if society_thread is not None:
             await asyncio.to_thread(society_thread.join)
         if comparison_thread is not None:

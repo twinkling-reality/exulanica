@@ -150,6 +150,9 @@ def test_three_refusals_are_refused_by_name_with_the_last_check():
         "kind_population_out_of_bounds",
         "a sample world of the kind",
     )
+    # The last check's own sentence, which the page shows a person.
+    assert outcome.refusal.sentence == outcome.trail[-1]["detail"]
+    assert "houses" in outcome.refusal.sentence
 
 
 def test_a_brief_outside_the_schema_or_cut_short_is_repaired():

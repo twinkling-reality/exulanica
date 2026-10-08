@@ -1,6 +1,7 @@
 """A workspace's own world kinds: each version kept as admitted (migration 0140).
 
-A kind a creator uploads, or a model drafts and the person accepts, is read and held to both
+A kind a creator uploads, or a model drafts from a person's words (kept once it passes, without a
+separate accept: the person asked for it and it was paid for), is read and held to both
 stages of its checks (:mod:`exulanica.world.kinds.document`, :mod:`exulanica.world.kinds.samples`)
 before it is appended here, with the report its sample worlds passed. A version is appended once
 and never changed; an edit is a new version. Rows stay inside their workspace by row-level
@@ -151,6 +152,18 @@ class WorkspaceKinds:
         assert found is not None
         return found
 
+    def refuse_when_full(self) -> None:
+        """Refuse when the workspace already keeps as many kind versions as it may
+        (:class:`KindCapReached`): asked before anything is spent on a kind not yet written, such
+        as a draft; the append asks again under the workspace's lock."""
+        with self.connection.cursor(row_factory=dict_row) as cursor:
+            row = cursor.execute(
+                "select count(*) as n from world_kind_version where workspace_id=%s",
+                (self.workspace_id,),
+            ).fetchone()
+        if row is not None and row["n"] >= KINDS_PER_WORKSPACE:
+            raise KindCapReached(_CAP.format(cap=KINDS_PER_WORKSPACE))
+
     def refuse_before_checks(self, kind: KindDocument) -> None:
         """Refuse a kind the append would refuse, before anything is built for it: a version or a
         document the workspace already keeps (:class:`KindVersionExists`), or a workspace already
@@ -199,6 +212,16 @@ class WorkspaceKinds:
                 (self.workspace_id, kind),
             ).fetchone()
         return None if row is None else self._stored(row)
+
+    def kind_keys(self) -> frozenset[str]:
+        """Every key the workspace keeps a kind under, whether or not its kind still reads: a new
+        kind under one of these would be refused as a version the workspace holds."""
+        with self.connection.cursor(row_factory=dict_row) as cursor:
+            rows = cursor.execute(
+                "select distinct kind from world_kind_version where workspace_id=%s",
+                (self.workspace_id,),
+            ).fetchall()
+        return frozenset(str(row["kind"]) for row in rows)
 
     def every_latest(self) -> tuple[StoredKind, ...]:
         """The latest version of every kind the workspace holds, by key."""

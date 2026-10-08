@@ -965,6 +965,28 @@ def derivative_job(owner) -> uuid.UUID:
     return job_id
 
 
+def kind_draft(owner) -> uuid.UUID:
+    """A kind's draft in the owner's workspace, ended (domain: a draft's job asks a model, so the
+    sweep starts one in the application's own drafts whose job ends refused without asking)."""
+    import threading
+
+    ended = threading.Event()
+
+    def job(draft, drafts) -> None:
+        drafts.finish(
+            draft,
+            state="refused",
+            refusal={"code": "kind_not_drafted", "detail": "made by the existence sweep"},
+        )
+        ended.set()
+
+    made = owner.app.state.services.kind_drafts.start(
+        owner.workspace_id, owner.actor, "a small farm", job
+    )
+    assert ended.wait(10), "the sweep's draft never ended"
+    return made.draft_id
+
+
 def reference_request(owner) -> uuid.UUID:
     """A queued reference request and its job (domain: the API asks for web notes only where an
     installation configures a source and lists the workspace)."""
