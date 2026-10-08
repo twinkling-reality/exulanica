@@ -1,20 +1,28 @@
 """Reference requests: notes on what the things in a person's words look like, for one draft.
 
-``POST /worlds/references`` takes a person's description, the drafter it is for (``purpose``) and
-an explicit ``"web": true``, and answers ``202`` at once with a request whose steps the page reads
-from ``GET /worlds/references/{reference_id}`` while a job plans the searches, sends them, reads
-what came back and keeps only notes in a model's own words (:mod:`exulanica.references.worker`).
+``POST /worlds/references`` takes a person's description, the drafter it is for (``purpose``), an
+explicit ``"web"`` and, where pictures are offered, up to four of the person's own pictures by
+capture id; it answers ``202`` at once with a request whose steps the page reads from
+``GET /worlds/references/{reference_id}`` while a job reads each picture, plans the searches, sends
+them, reads what came back and keeps only notes in a model's own words
+(:mod:`exulanica.references.worker`).
 Nothing a search returned is kept or served: a request serves its notes, its steps, and our own
 record of each search (source, outcome, result count, credits, when), never a query result, a web
 address or the query text. ``POST .../cancel`` stops a request at its next step.
 ``GET /worlds/references`` lists the caller's recent requests and the capability to make one, with
-the reason when it is unavailable.
+the reason when it is unavailable, and whether pictures are offered with the uses a person grants
+for them.
 
 Web notes are opt-in for every request, and offered only to the workspaces the installation lists
 (``EXULANICA_REFERENCE_WORKSPACES``) while the source is offered to the operator only, and never on
 an installation whose profile is ``public``. The description is sent with every saved name
 replaced (:func:`exulanica.selection.world_drafting.sendable`); an idempotency key answers with the
 request it first made.
+
+A person's own pictures are offered only where ``EXULANICA_REFERENCE_PICTURES`` is on as well, and a
+request names only pictures a privacy screening permits looking at and a current right for the
+picture role covers (:func:`exulanica.api.reference_pictures.picture_refusal`); the job checks both
+again before it reads each one.
 """
 
 from __future__ import annotations
@@ -45,7 +53,9 @@ from exulanica.api.dependencies import (
     ScopedConnection,
     get_services,
 )
+from exulanica.api.reference_pictures import picture_refusal
 from exulanica.api.services import Services
+from exulanica.ingest.personal_admission import model_right_offers
 from exulanica.references import store
 from exulanica.references.adapters import ReferenceSourceUnavailable
 from exulanica.references.bundle import read_bundle
@@ -79,8 +89,12 @@ class ReferenceBody(BaseModel):
     purpose: Literal["world_draft", "kind", "look", "pieces", "things"]
     #: The person's words, as they typed them; saved names are replaced before anything leaves.
     description: str = Field(min_length=1, max_length=1000)
-    #: Web notes are asked for on every request, explicitly; nothing else is offered yet.
-    web: Literal[True]
+    #: Whether web notes are asked for, explicitly on every request.
+    web: bool
+    #: The person's own pictures to read, by capture id, where pictures are offered.
+    pictures: list[uuid.UUID] | None = Field(
+        default=None, min_length=1, max_length=store.MAX_PICTURES
+    )
     idempotency_key: uuid.UUID | None = None
 
 
@@ -89,13 +103,14 @@ def _refusal(status: int, code: str, detail: str) -> JSONResponse:
 
 
 def unavailable_because(
-    services: Services, workspace_id: uuid.UUID, *, running: bool
+    services: Services, workspace_id: uuid.UUID, *, running: bool, web: bool = True
 ) -> str | None:
-    """Why this workspace may not ask for web notes here, or None when it may.
+    """Why this workspace may not ask for references here, or None when it may.
 
     ``running`` is whether the worker's thread is alive in this process. Everything a search could
     be refused by is asked here, before anything is queued: the source and its offer, the worker,
-    durable spending and the workspace's own grant for the source.
+    durable spending and, when ``web`` is asked for, the workspace's own grant for the source and
+    its adapter. A request for notes from pictures alone sends no search.
     """
     source = web_source()
     if source is None:
@@ -106,7 +121,11 @@ def unavailable_because(
         return "references_operator_only"
     if not services.runs_reference_worker or services.model_client is None or not running:
         return "references_not_run_here"
-    if services.spending is None or not _granted(services, workspace_id, source.key):
+    if services.spending is None:
+        return "reference_budget_unavailable"
+    if not web:
+        return None
+    if not _granted(services, workspace_id, source.key):
         return "reference_budget_unavailable"
     if services.reference_adapter_for is None:
         return "references_not_configured"
@@ -213,13 +232,62 @@ def _lookups(connection: Any, workspace_id: uuid.UUID, reference_id: uuid.UUID) 
 
 
 def _request_sha256(body: ReferenceBody) -> str:
+    fields: dict[str, Any] = {
+        "purpose": body.purpose,
+        "description": body.description,
+        "web": body.web,
+    }
+    # A request without pictures keeps the digest it had before pictures were offered.
+    if body.pictures:
+        fields["pictures"] = [str(picture) for picture in body.pictures]
     canonical = json.dumps(
-        {"purpose": body.purpose, "description": body.description, "web": body.web},
+        fields,
         sort_keys=True,
         separators=(",", ":"),
         ensure_ascii=False,
     ).encode()
     return hashlib.sha256(canonical).hexdigest()
+
+
+def _pictures(services: Services, workspace_id: uuid.UUID, *, running: bool) -> dict[str, Any]:
+    """Whether this workspace may name its own pictures here, and the uses a person grants for
+    them; the code says why not, for logs and tests, and the page shows nothing while it is set."""
+    code = (
+        unavailable_because(services, workspace_id, running=running, web=False)
+        if services.pictures_offered_to(workspace_id)
+        else "reference_pictures_not_offered"
+    )
+    pictures: dict[str, Any] = {
+        "offered": code is None,
+        "code": code,
+        "maximum": store.MAX_PICTURES,
+    }
+    if code is None:
+        pictures["consent"] = {
+            "uses": [
+                offer.as_record() for offer in model_right_offers(offered_on="reference_pictures")
+            ]
+        }
+    return pictures
+
+
+def _picture_refused(
+    services: Services, workspace_id: uuid.UUID, requester: uuid.UUID, pictures: list[uuid.UUID]
+) -> JSONResponse | None:
+    """The refusal of the first named picture ``requester`` may not have read, read as the request
+    policy reads rights, or None when every one may be."""
+    with services.readonly_database.session(workspace_id) as connection:
+        for capture_id in pictures:
+            reason, _rendition, _rights = picture_refusal(
+                connection, workspace_id, capture_id, requester
+            )
+            if reason is not None:
+                return _refusal(
+                    409,
+                    "reference_picture_not_admitted",
+                    f"picture {capture_id} may not be read for notes ({reason})",
+                )
+    return None
 
 
 @router.get("/references")
@@ -245,8 +313,9 @@ def list_references(
                 _view(found, _lookups(connection, session.workspace_id, found.reference_id))
             )
     _sweep(services, session.workspace_id)
+    running = _running(request)
     operation = reference_operation(
-        unavailable_because(services, session.workspace_id, running=_running(request))
+        unavailable_because(services, session.workspace_id, running=running)
     )
     return JSONResponse(
         {
@@ -254,6 +323,7 @@ def list_references(
             "capabilities": [
                 describe(operation, surface(request.app), held, installation_facts_of(services))
             ],
+            "pictures": _pictures(services, session.workspace_id, running=running),
         }
     )
 
@@ -266,15 +336,29 @@ def request_reference(
     session: CurrentSession,
     services: Annotated[Services, Depends(get_services)],
 ) -> JSONResponse:
-    """Ask for notes on what the things in a description look like, for one draft. Answers 202
-    with the request at once; an idempotency key answers 200 with the request it first made."""
+    """Ask for notes on what the things in a description and the person's own pictures look like,
+    for one draft. Answers 202 with the request at once; an idempotency key answers 200 with the
+    request it first made."""
     invalid = _invalid_description(body.description)
     if invalid is not None:
         return _refusal(422, invalid, "a description holds no control character")
+    pictures = body.pictures or []
+    if not body.web and not pictures:
+        return _refusal(422, "nothing_to_look_up", "ask for web notes, name pictures, or both")
+    if len(set(pictures)) != len(pictures):
+        return _refusal(422, "pictures_repeated", "each picture is named once")
     _sweep(services, session.workspace_id)
-    code = unavailable_because(services, session.workspace_id, running=_running(request))
+    code = unavailable_because(
+        services, session.workspace_id, running=_running(request), web=body.web
+    )
     if code is not None:
-        return _refusal(409, code, "web notes are not offered to this workspace here")
+        return _refusal(409, code, "references are not offered to this workspace here")
+    if pictures:
+        if not services.pictures_offered_to(session.workspace_id):
+            return _refusal(409, "reference_pictures_not_offered", "pictures are not offered here")
+        refused = _picture_refused(services, session.workspace_id, session.actor, pictures)
+        if refused is not None:
+            return refused
     sent = sendable(connection, session.workspace_id, body.description)
     if len(sent.text) > store.MAX_DESCRIPTION_CHARACTERS:
         return _refusal(
@@ -291,12 +375,13 @@ def request_reference(
             offered_to=services.reference_workspaces,
             owner_actor_id=session.actor,
             purpose=body.purpose,
-            web=True,
+            web=body.web,
             description=sent.text,
             withheld_words=(),
             prompts_sha256=reference_prompts().sha256,
             request_id=key,
             request_sha256=None if key is None else _request_sha256(body),
+            pictures=tuple(pictures),
         )
     except store.RequestNotOffered:
         return _refusal(409, "references_operator_only", "web notes are not offered here")

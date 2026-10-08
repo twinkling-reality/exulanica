@@ -45,6 +45,8 @@ OTHER_ACTOR_TOKEN = "references-other-actor-token-at-least-32-chars"
 STRANGER_TOKEN = "references-stranger-token-at-least-32-chars"
 DESCRIPTION = f"a harbour town where {PERSON} lives beside {PLACE}"
 READ_ONLY_ROLE = "exulanica_references_ro_suite"
+#: The actor TOKEN and its narrower siblings name.
+ACTOR = uuid.UUID("7a1c2e3d-4b5f-4a60-9c71-8d9e0f1a2b3c")
 
 
 @pytest.fixture(name="named")
@@ -94,8 +96,7 @@ def api(named, bench, spine_schema, monkeypatch):
     repository, content_store, _session, _entities = named
     repository.connection.commit()
     workspace_id = repository.workspace_id
-    actor = str(uuid.uuid4())
-    grant = {"workspace_id": str(workspace_id), "actor": actor}
+    grant = {"workspace_id": str(workspace_id), "actor": str(ACTOR)}
     no_model = [p for p in EVERY_PERMISSION if p != str(permissions.Permission.MODEL_INVOKE)]
     no_references = [
         p for p in EVERY_PERMISSION if p != str(permissions.Permission.REFERENCES_REQUEST)
@@ -413,3 +414,152 @@ def test_a_queued_request_of_a_workspace_dropped_from_the_list_ends_when_it_next
         repository.connection, repository.workspace_id, uuid.UUID(made["reference_id"])
     )
     assert (ended.status, ended.failure) == ("failed", "not_served")
+
+
+# -- a person's own pictures ---------------------------------------------------------------------
+
+PICTURE = uuid.UUID("5b1d7c2e-4a3f-4e86-9b0d-1c2e3f4a5b61")
+SECOND = uuid.UUID("5b1d7c2e-4a3f-4e86-9b0d-1c2e3f4a5b62")
+
+
+def _admit_every_picture(monkeypatch) -> list[uuid.UUID]:
+    """Every named picture reads as screened and covered by a right; the pictures asked after."""
+    asked: list[uuid.UUID] = []
+
+    def admitted(connection, workspace_id, capture_id, requester):
+        # Asked for the person making the request: the token's actor.
+        assert requester == ACTOR
+        asked.append(capture_id)
+        return None, object(), (uuid.uuid4(),)
+
+    monkeypatch.setattr(references_route, "picture_refusal", admitted)
+    return asked
+
+
+def _requests(repository) -> int:
+    count = repository.connection.cursor(row_factory=tuple_row).execute(
+        "select count(*) from reference_request"
+    )
+    return count.fetchone()[0]
+
+
+def test_pictures_are_not_offered_unless_turned_on_and_the_list_says_nothing_of_their_uses(
+    api,
+) -> None:
+    client, repository = api
+    listed = _get(client(), "/worlds/references").json()
+    assert listed["pictures"] == {
+        "offered": False,
+        "code": "reference_pictures_not_offered",
+        "maximum": 4,
+    }
+    refused = _post(client(), pictures=[str(PICTURE)])
+    assert (refused.status_code, refused.json()["code"]) == (409, "reference_pictures_not_offered")
+    assert _requests(repository) == 0
+
+
+def test_where_pictures_are_on_the_list_offers_exactly_the_reference_picture_uses(api) -> None:
+    from exulanica.ingest.personal_admission import MODEL_RIGHT_USES_PATH
+
+    raw = json.loads(MODEL_RIGHT_USES_PATH.read_text(encoding="utf-8"))
+    declared = [use for use in raw["uses"] if use.get("offered_on") == "reference_pictures"]
+    pictures = _get(api[0](reference_pictures=True), "/worlds/references").json()["pictures"]
+    assert (pictures["offered"], pictures["code"], pictures["maximum"]) == (True, None, 4)
+    uses = pictures["consent"]["uses"]
+    assert (
+        [use["role"] for use in uses] == [use["role"] for use in declared] == ["reference_vision"]
+    )
+    for use, stated in zip(uses, declared, strict=True):
+        assert use["offered_on"] == "reference_pictures"
+        assert (use["label"], use["stop"]) == (stated["label"], stated["stop"])
+        assert stated["purpose"] in use["notice"]
+
+
+def test_pictures_turned_on_still_follow_the_reference_offer(api) -> None:
+    pictures = _get(
+        api[0](reference_pictures=True, runs_reference_worker=False), "/worlds/references"
+    ).json()["pictures"]
+    assert (pictures["offered"], pictures["code"]) == (False, "reference_pictures_not_offered")
+    assert "consent" not in pictures
+    stopped = _get(api[0](reference_pictures=True, alive=False), "/worlds/references").json()
+    assert (stopped["pictures"]["offered"], stopped["pictures"]["code"]) == (
+        False,
+        "references_not_run_here",
+    )
+
+
+def test_a_picture_without_a_screening_and_a_right_is_refused_and_nothing_is_queued(api) -> None:
+    client, repository = api
+    refused = _post(client(reference_pictures=True), pictures=[str(PICTURE)])
+    assert (refused.status_code, refused.json()["code"]) == (409, "reference_picture_not_admitted")
+    assert "picture_not_screened" in refused.json()["detail"]
+    assert _requests(repository) == 0
+
+
+def test_notes_from_pictures_alone_need_no_search_grant_or_adapter(api, monkeypatch) -> None:
+    client, repository = api
+    asked = _admit_every_picture(monkeypatch)
+    monkeypatch.setattr(references_route, "_granted", lambda services, workspace, provider: False)
+    on = {"reference_pictures": True, "reference_adapter_for": None}
+    web = _post(client(**on))
+    assert (web.status_code, web.json()["code"]) == (409, "reference_budget_unavailable")
+    made = _post(client(**on), web=False, pictures=[str(SECOND), str(PICTURE)])
+    assert made.status_code == 202, made.text
+    assert (made.json()["web"], asked) == (False, [SECOND, PICTURE])
+    payload = (
+        repository.connection.cursor(row_factory=tuple_row)
+        .execute(
+            "select j.payload from job j join reference_request r on r.job_id = j.job_id "
+            "where r.reference_id = %s",
+            (uuid.UUID(made.json()["reference_id"]),),
+        )
+        .fetchone()[0]
+    )
+    assert payload["pictures"] == [str(SECOND), str(PICTURE)]
+    # Durable spending is still needed: a picture's reading is a model call.
+    spent = _post(client(**on, spending=None), web=False, pictures=[str(PICTURE)])
+    assert (spent.status_code, spent.json()["code"]) == (409, "reference_budget_unavailable")
+
+
+@pytest.mark.parametrize(
+    ("body", "code"),
+    [
+        ({"web": False}, "nothing_to_look_up"),
+        ({"web": False, "pictures": None}, "nothing_to_look_up"),
+        ({"pictures": [str(PICTURE), str(PICTURE)]}, "pictures_repeated"),
+    ],
+)
+def test_a_request_names_something_to_look_up_and_each_picture_once(
+    api, monkeypatch, body, code
+) -> None:
+    client, repository = api
+    _admit_every_picture(monkeypatch)
+    refused = _post(client(reference_pictures=True), **body)
+    assert (refused.status_code, refused.json()["code"]) == (422, code)
+    assert _requests(repository) == 0
+
+
+@pytest.mark.parametrize("count", [0, 5])
+def test_a_request_names_one_to_four_pictures(api, monkeypatch, count) -> None:
+    _admit_every_picture(monkeypatch)
+    named = [str(uuid.uuid4()) for _ in range(count)]
+    assert _post(api[0](reference_pictures=True), pictures=named).status_code == 422
+
+
+def test_an_idempotency_key_tells_requests_apart_by_their_pictures(api, monkeypatch) -> None:
+    _admit_every_picture(monkeypatch)
+    client = api[0](reference_pictures=True)
+    key = str(uuid.uuid4())
+    first = _post(client, idempotency_key=key, pictures=[str(PICTURE)])
+    again = _post(client, idempotency_key=key, pictures=[str(PICTURE)])
+    other = _post(client, idempotency_key=key, pictures=[str(SECOND)])
+    assert (first.status_code, again.status_code) == (202, 200)
+    assert (other.status_code, other.json()["code"]) == (409, "idempotency_key_reused")
+
+
+def test_a_request_without_pictures_keeps_the_digest_it_had_before_pictures() -> None:
+    import hashlib
+
+    body = references_route.ReferenceBody(purpose="kind", description="a quay", web=True)
+    written = '{"description":"a quay","purpose":"kind","web":true}'
+    assert references_route._request_sha256(body) == hashlib.sha256(written.encode()).hexdigest()

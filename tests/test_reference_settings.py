@@ -19,11 +19,13 @@ from exulanica.references.adapters import ReferenceSourceUnavailable
 from exulanica.references.adapters.tavily import TavilySearch
 from exulanica.references.catalogs import load_reference_catalogs
 from exulanica.references.settings import (
+    REFERENCE_PICTURES_ENV,
     REFERENCE_WORKER_ENV,
     REFERENCE_WORKSPACES_ENV,
     ReferenceSettingRefused,
     configured_adapter,
     plays_references_here,
+    reads_pictures_here,
     reference_workspaces,
 )
 from exulanica.references.worker import ReferenceWorker
@@ -41,9 +43,10 @@ def _source():
 
 
 def test_the_variables_are_named_as_the_installation_documents_name_them() -> None:
-    assert (REFERENCE_WORKER_ENV, REFERENCE_WORKSPACES_ENV) == (
+    assert (REFERENCE_WORKER_ENV, REFERENCE_WORKSPACES_ENV, REFERENCE_PICTURES_ENV) == (
         "EXULANICA_REFERENCE_WORKER",
         "EXULANICA_REFERENCE_WORKSPACES",
+        "EXULANICA_REFERENCE_PICTURES",
     )
 
 
@@ -58,6 +61,20 @@ def test_an_unrecognised_worker_setting_is_refused_by_name() -> None:
     with pytest.raises(ReferenceSettingRefused) as refused:
         plays_references_here("process")
     assert refused.value.code == "reference_worker_not_recognised"
+
+
+@pytest.mark.parametrize(
+    ("value", "read"),
+    [(None, False), ("", False), ("off", False), ("0", False), ("on", True), (" YES ", True)],
+)
+def test_pictures_are_read_only_where_set_on(value, read) -> None:
+    assert reads_pictures_here(value) is read
+
+
+def test_an_unrecognised_pictures_setting_is_refused_by_name() -> None:
+    with pytest.raises(ReferenceSettingRefused) as refused:
+        reads_pictures_here("operator")
+    assert refused.value.code == "reference_pictures_not_recognised"
 
 
 def test_the_workspace_list_is_read_whole_or_refused() -> None:
@@ -177,3 +194,45 @@ def test_readiness_reports_the_reference_worker_only_where_one_was_built(tmp_pat
     assert (dead["ok"], dead["configured"], dead["running"]) == (False, True, False)
     alive = _references_check(request(object(), True), services)
     assert (alive["ok"], alive["running"], alive["listed_workspaces"]) == (True, True, 1)
+
+
+def test_a_worker_reads_pictures_only_where_they_are_turned_on(tmp_path) -> None:
+    assert _services(tmp_path).build_reference_worker()._picture_source is None
+    on = _services(tmp_path, reference_pictures=True)
+    assert on.build_reference_worker()._picture_source is not None
+    assert on.pictures_offered_to(WORKSPACE)
+    assert not _services(tmp_path).pictures_offered_to(WORKSPACE)
+    assert not on.pictures_offered_to(uuid.uuid4())
+    assert not _services(
+        tmp_path, reference_pictures=True, runs_reference_worker=False
+    ).pictures_offered_to(WORKSPACE)
+
+
+def test_a_server_reads_the_pictures_setting_and_is_off_without_it(monkeypatch, tmp_path) -> None:
+    from types import SimpleNamespace
+
+    from exulanica.api.services import build_services
+
+    monkeypatch.setattr(
+        "exulanica.api.services.load_account_runtime", lambda _: SimpleNamespace(guest=None)
+    )
+    environ = {"EXULANICA_DATABASE_URL": "postgresql://unused", "EXULANICA_DATA_DIR": str(tmp_path)}
+    assert build_services(environ).reference_pictures is False
+    assert build_services({**environ, REFERENCE_PICTURES_ENV: "on"}).reference_pictures is True
+    with pytest.raises(ReferenceSettingRefused):
+        build_services({**environ, REFERENCE_PICTURES_ENV: "sometimes"})
+
+
+def test_pictures_are_never_offered_on_a_public_installation(tmp_path, monkeypatch) -> None:
+    from types import SimpleNamespace
+
+    # Whatever the web source's catalog entry offers: here, as if it were offered to everyone.
+    monkeypatch.setattr(Services, "references_offered_here", lambda self: True)
+    public = SimpleNamespace(profile=SimpleNamespace(id="public"))
+    private = SimpleNamespace(profile=SimpleNamespace(id="personal"))
+    assert not _services(
+        tmp_path, reference_pictures=True, installation=public
+    ).pictures_offered_to(WORKSPACE)
+    assert _services(tmp_path, reference_pictures=True, installation=private).pictures_offered_to(
+        WORKSPACE
+    )

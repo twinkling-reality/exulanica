@@ -63,6 +63,7 @@ from exulanica.api.installation import (
     installation_facts,
     load_installation,
 )
+from exulanica.api.reference_pictures import reference_picture_source
 from exulanica.api.signal_comparison_runner import SignalComparisonRunner
 from exulanica.api.society_comparison_runner import SocietyComparisonRunner
 from exulanica.api.society_comparison_start import development_seeds
@@ -96,6 +97,7 @@ from exulanica.references.catalogs import ReferenceSource, web_source
 from exulanica.references.settings import (
     configured_adapter,
     plays_references_here,
+    reads_pictures_here,
     reference_workspaces,
 )
 from exulanica.references.worker import ReferenceWorker
@@ -362,6 +364,9 @@ class Services:
     #: The workspaces that may ask for web notes (``EXULANICA_REFERENCE_WORKSPACES``); none when
     #: absent. A source offered to the operator only is offered to these alone.
     reference_workspaces: tuple[uuid.UUID, ...] = ()
+    #: Whether listed workspaces may ask for notes from their own pictures
+    #: (``EXULANICA_REFERENCE_PICTURES``); off for a hand-constructed Services, and off unless set.
+    reference_pictures: bool = False
     #: A reference source's adapter from this process's configuration, or a refusal naming what is
     #: missing; None for a hand-constructed Services.
     reference_adapter_for: Callable[[ReferenceSource], ReferenceAdapter] | None = None
@@ -659,6 +664,15 @@ class Services:
             and workspace_id in self.reference_workspaces
         )
 
+    def pictures_offered_to(self, workspace_id: uuid.UUID) -> bool:
+        """Whether this workspace may ask for notes from its own pictures here: references are
+        served to it, pictures are turned on, and the installation is not public, whatever the
+        web source's catalog entry offers."""
+        profile = self.installation.profile if self.installation is not None else None
+        if profile is not None and profile.id == "public":
+            return False
+        return self.reference_pictures and self.serves_references_to(workspace_id)
+
     def sweep_references(self) -> int:
         """End the reference jobs no worker here will take, for every workspace this process knows
         (its tokens', its accounts' and its listed ones), blanking their words; expire the stale
@@ -711,6 +725,13 @@ class Services:
             spending=self.spending,
             adapter_for=self.reference_adapter_for,
             workspaces=lambda: workspaces,
+            # A person's own pictures are read only where pictures are turned on, from the
+            # read-only database as the request policy reads rights.
+            picture_source=(
+                reference_picture_source(readonly.session, self.store)
+                if self.reference_pictures
+                else None
+            ),
         )
 
     def model_host_refusal(self, workspace_id: uuid.UUID, role: DecisionRole) -> str | None:
@@ -1148,6 +1169,7 @@ def build_services(
         comparisons_played_elsewhere=comparison_player == "process",
         runs_reference_worker=plays_references_here(env_get("REFERENCE_WORKER", environ)),
         reference_workspaces=reference_workspaces(env_get("REFERENCE_WORKSPACES", environ)),
+        reference_pictures=reads_pictures_here(env_get("REFERENCE_PICTURES", environ)),
         reference_adapter_for=lambda source: configured_adapter(source, environ),
         # A declared installation's marker is its profile's; otherwise the setting, if any.
         restore_state_path=installation.restore_state_path,

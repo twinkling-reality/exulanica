@@ -7,6 +7,9 @@
 * ``EXULANICA_REFERENCE_WORKSPACES``: a JSON array of the workspace ids that may ask for web notes.
   Absent, none may. A source whose catalog entry is ``operator_only`` is offered to these
   workspaces only, and on an installation whose profile is ``public`` to none at all.
+* ``EXULANICA_REFERENCE_PICTURES``: off unless ``on`` (or ``1``, ``true``, ``yes``): whether a
+  listed workspace may ask for notes from a person's own pictures. Off by default, because a
+  picture is sent to a hosted model only once the provider's terms are confirmed for it.
 * A source is configured when its credential variable is set and the egress allowlist declares its
   origin; :func:`configured_adapter` builds its adapter, or refuses as
   ``references_not_configured`` naming what is missing and never the credential.
@@ -30,16 +33,19 @@ from exulanica.references.adapters import (
 from exulanica.references.catalogs import ReferenceSource
 
 __all__ = [
+    "REFERENCE_PICTURES_ENV",
     "REFERENCE_WORKER_ENV",
     "REFERENCE_WORKSPACES_ENV",
     "ReferenceSettingRefused",
     "configured_adapter",
     "plays_references_here",
+    "reads_pictures_here",
     "reference_workspaces",
 ]
 
 REFERENCE_WORKER_ENV: Final = env_name("REFERENCE_WORKER")
 REFERENCE_WORKSPACES_ENV: Final = env_name("REFERENCE_WORKSPACES")
+REFERENCE_PICTURES_ENV: Final = env_name("REFERENCE_PICTURES")
 
 
 class ReferenceSettingRefused(ValueError):
@@ -59,6 +65,17 @@ def plays_references_here(value: str | None) -> bool:
     if normalized in ("0", "false", "off", "no"):
         return False
     raise ReferenceSettingRefused("reference_worker_not_recognised", REFERENCE_WORKER_ENV)
+
+
+def reads_pictures_here(value: str | None) -> bool:
+    """Whether listed workspaces may ask for notes from their own pictures
+    (``EXULANICA_REFERENCE_PICTURES``); off unless set on."""
+    normalized = (value or "").strip().lower()
+    if normalized in ("1", "true", "on", "yes"):
+        return True
+    if normalized in ("", "0", "false", "off", "no"):
+        return False
+    raise ReferenceSettingRefused("reference_pictures_not_recognised", REFERENCE_PICTURES_ENV)
 
 
 def reference_workspaces(value: str | None) -> tuple[uuid.UUID, ...]:

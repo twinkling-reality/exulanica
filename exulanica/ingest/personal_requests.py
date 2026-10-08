@@ -280,8 +280,10 @@ def admission_status(
     connection: psycopg.Connection, workspace: uuid.UUID, actor: uuid.UUID
 ) -> dict[str, Any]:
     """Current source metadata and this actor's operation identities, never original delivery."""
-    offers = model_right_offers()
-    stated = {offer.role: offer.notice for offer in offers}
+    # Every offer's words tell a right granted against them; the admission screen lists the uses
+    # offered on photographs only.
+    stated = {offer.role: offer.notice for offer in model_right_offers()}
+    offers = model_right_offers(offered_on="photos")
     with connection.transaction():
         connection.execute("select privacy_currency_lock(%s)", (workspace,))
         rows = connection.execute(

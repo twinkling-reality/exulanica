@@ -25,12 +25,14 @@ import re
 import uuid
 from collections import Counter
 from collections.abc import Iterable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import Final, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, create_model
 
+from exulanica.epistemics.saved_names import SavedName, recognised_spans
+from exulanica.errors import ExulanicaError
 from exulanica.models.client import ModelClient
 from exulanica.models.errors import StructuredOutputError, TruncatedResponseError
 from exulanica.models.manifest import Role
@@ -45,6 +47,8 @@ __all__ = [
     "PICTURE_ROLE",
     "REFUSALS",
     "PictureRead",
+    "PictureUnavailable",
+    "ReferencePicture",
     "picture_user_text",
     "read_picture",
     "screen_picture_notes",
@@ -62,6 +66,24 @@ _WORD: Final = re.compile(r"[a-z]+")
 #: Double quotation marks, straight, curly and angled: an apostrophe is a word's, not a quote.
 _QUOTES: Final = frozenset(chr(code) for code in (0x22, 0x201C, 0x201D, 0xAB, 0xBB))
 _SENTENCE_ENDS: Final = (".", "!", "?", ":", ";")
+
+
+@dataclass(frozen=True, slots=True)
+class ReferencePicture:
+    """A person's own picture as a reference job reads it: its rendition's bytes, and the rights it
+    may be read under, one per model of the picture role's chain, checked just now."""
+
+    image: bytes = field(repr=False)
+    right_ids: tuple[uuid.UUID, ...]
+
+
+class PictureUnavailable(ExulanicaError):
+    """A picture a job cannot read, by code: no screening permits it, no right names the picture
+    role's chain, or it has no rendition. The code is all a step shows."""
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(reason)
+        self.reason = reason
 
 
 @dataclass(frozen=True, slots=True)
@@ -170,10 +192,13 @@ def screen_picture_notes(
     drafted: Sequence[DraftedNote],
     *,
     withheld_words: Iterable[str] = (),
+    saved: Iterable[SavedName] = (),
     catalogs: ReferenceCatalogs | None = None,
 ) -> NoteScreen:
-    """The notes of ``drafted``, read from a person's own picture, that may be kept."""
+    """The notes of ``drafted``, read from a person's own picture, that may be kept. A note naming
+    one of the workspace's ``saved`` names, as the request boundary recognises them, is dropped."""
     catalogs = catalogs if catalogs is not None else load_reference_catalogs()
+    names = tuple(saved)
     dropped: Counter[str] = Counter()
     passed: list[DraftedNote] = []
     for note in drafted:
@@ -186,6 +211,8 @@ def screen_picture_notes(
             dropped["lettering"] += 1
         elif _cut(text):
             dropped["cut_word"] += 1
+        elif names and recognised_spans(text, names):
+            dropped["saved_name"] += 1
         else:
             passed.append(note)
     screened = keep_notes(passed, sources=(), withheld_words=withheld_words, catalogs=catalogs)

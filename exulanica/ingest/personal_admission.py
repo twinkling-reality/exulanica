@@ -446,6 +446,11 @@ MODEL_RIGHT_USES_PROFILE: Final = "exulanica.model-right-uses/v1"
 #: The admission a use is offered with. Detection queues the processing job the vision stage runs
 #: in; review records the screening depth needs.
 OfferedWith = Literal["detect", "review"]
+#: Where a use is offered: a person's photographs (the admission screen), or the pictures a person
+#: gives a world's reference notes (that step only, while pictures are offered). A use that states
+#: none is offered on photographs, as every use was before the field existed.
+OfferedOn = Literal["photos", "reference_pictures"]
+OFFERED_ON: Final = ("photos", "reference_pictures")
 #: One paragraph a person reads whole, and sends back in the request that grants it: the bound
 #: the purpose field and a place name notice already have.
 _NOTICE_LIMIT: Final = 2000
@@ -466,6 +471,7 @@ _USE_KEYS: Final = frozenset(
         "stop_confirm",
     }
 )
+_OPTIONAL_USE_KEYS: Final = frozenset({"offered_on"})
 _NOTICE_FIELDS: Final = frozenset({"what", "host", "purpose", "detail", "models", "kept"})
 
 
@@ -493,6 +499,7 @@ class ModelRightUse:
     stop: str
     stop_action: str
     stop_confirm: str
+    offered_on: OfferedOn = "photos"
 
 
 @dataclass(frozen=True, slots=True)
@@ -541,13 +548,21 @@ def parse_model_right_uses(raw: Mapping[str, Any]) -> ModelRightUses:
     hosted = {member.value for member in models_manifest.Role}
     uses: list[ModelRightUse] = []
     for entry in raw["uses"] if isinstance(raw["uses"], list) else ():
-        if not isinstance(entry, Mapping) or set(entry) != _USE_KEYS:
-            raise ValueError(f"a model right use has exactly the keys {sorted(_USE_KEYS)}")
+        if not isinstance(entry, Mapping) or not _USE_KEYS <= set(entry) <= (
+            _USE_KEYS | _OPTIONAL_USE_KEYS
+        ):
+            raise ValueError(
+                f"a model right use has exactly the keys {sorted(_USE_KEYS)}, and may state "
+                f"{sorted(_OPTIONAL_USE_KEYS)}"
+            )
         role = entry["role"]
         if role not in hosted:
             raise ValueError(f"the manifest states no hosted model role {role!r}")
         if entry["offered_with"] not in ("detect", "review"):
             raise ValueError(f"the {role} use is offered with detect or review")
+        offered_on = entry.get("offered_on", "photos")
+        if offered_on not in OFFERED_ON:
+            raise ValueError(f"the {role} use is offered on one of {list(OFFERED_ON)}")
         detail = entry["detail"]
         uses.append(
             ModelRightUse(
@@ -562,6 +577,7 @@ def parse_model_right_uses(raw: Mapping[str, Any]) -> ModelRightUses:
                 stop=_words(entry["stop"], f"the {role} stop sentence"),
                 stop_action=_words(entry["stop_action"], f"the {role} stop action"),
                 stop_confirm=_words(entry["stop_confirm"], f"the {role} stop confirmation"),
+                offered_on=offered_on,
             )
         )
     if not uses:
@@ -591,11 +607,13 @@ class ModelRightOffer:
     stop_action: str
     stop_confirm: str
     handoff: ModelHandoff
+    offered_on: OfferedOn = "photos"
 
     def as_record(self) -> dict[str, Any]:
         return {
             "role": self.role,
             "offered_with": self.offered_with,
+            "offered_on": self.offered_on,
             "label": self.label,
             "short": self.short,
             "notice": self.notice,
@@ -609,8 +627,11 @@ class ModelRightOffer:
 
 def model_right_offers(
     manifest: models_manifest.Manifest | None = None,
+    *,
+    offered_on: OfferedOn | None = None,
 ) -> tuple[ModelRightOffer, ...]:
-    """Every model right a person may grant, depth first, each with the exact words it needs.
+    """Every model right a person may grant, depth first, each with the exact words it needs; with
+    ``offered_on``, only those offered there (depth is offered on photographs).
 
     The hosted notices are filled from the manifest as it is, so the words name the models and host
     a grant would cover now, and a grant made against older words is refused.
@@ -641,9 +662,10 @@ def model_right_offers(
                 stop_action=use.stop_action,
                 stop_confirm=use.stop_confirm,
                 handoff=handoff,
+                offered_on=use.offered_on,
             )
         )
-    return tuple(offers)
+    return tuple(offer for offer in offers if offered_on in (None, offer.offered_on))
 
 
 def role_notices(manifest: models_manifest.Manifest | None = None) -> dict[str, str]:

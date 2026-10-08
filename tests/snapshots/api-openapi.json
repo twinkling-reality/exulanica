@@ -18578,7 +18578,7 @@
      "world"
     ],
     "summary": "Request Reference",
-    "description": "Ask for notes on what the things in a description look like, for one draft. Answers 202\nwith the request at once; an idempotency key answers 200 with the request it first made.",
+    "description": "Ask for notes on what the things in a description and the person's own pictures look like,\nfor one draft. Answers 202 with the request at once; an idempotency key answers 200 with the\nrequest it first made.",
     "operationId": "request_reference_worlds_references_post",
     "parameters": [
      {
@@ -32998,8 +32998,24 @@
      },
      "web": {
       "type": "boolean",
-      "const": true,
       "title": "Web"
+     },
+     "pictures": {
+      "anyOf": [
+       {
+        "items": {
+         "type": "string",
+         "format": "uuid"
+        },
+        "type": "array",
+        "maxItems": 4,
+        "minItems": 1
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Pictures"
      },
      "idempotency_key": {
       "anyOf": [

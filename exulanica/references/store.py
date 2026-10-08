@@ -72,17 +72,22 @@ QUEUED_EXPIRY_SECONDS: Final = 600
 #: The same ceiling the world drafter's description carries (reference-prompts.v1.json).
 MAX_DESCRIPTION_CHARACTERS: Final = 1000
 MAX_WITHHELD_WORDS: Final = 16
+#: The most of a person's own pictures one request reads, as many as a bundle lists.
+MAX_PICTURES: Final = 4
 #: One requester's unfinished requests, and requests in the last hour: a request spends up to three
 #: of the operator's source credits and two model calls, so one requester cannot queue without end.
 MAX_OPEN_PER_ACTOR: Final = 2
 MAX_PER_ACTOR_HOUR: Final = 20
 _MAX_WITHHELD_CHARACTERS: Final = 64
-FINISHED: Final = ("complete", "partial", "failed", "cancelled")
+#: A finished request's statuses: withdrawn is a complete or partial one whose notes were made from
+#: a picture its person stopped or deleted (migration 0160), with no bundle left.
+FINISHED: Final = ("complete", "partial", "failed", "cancelled", "withdrawn")
 _JOB_STATE: Final = {
     "complete": "done",
     "partial": "done",
     "failed": "failed",
     "cancelled": "cancelled",
+    "withdrawn": "done",
 }
 #: How long a job took, written as the tile bake writes it.
 _DURATION: Final = (
@@ -202,6 +207,7 @@ def create_request(
     prompts_sha256: str,
     request_id: uuid.UUID | None = None,
     request_sha256: str | None = None,
+    pictures: Sequence[uuid.UUID] = (),
 ) -> tuple[ReferenceRequest, bool]:
     """A new request and its queued job, or the earlier one its idempotency key names.
 
@@ -223,6 +229,8 @@ def create_request(
             f"at most {MAX_WITHHELD_WORDS} withheld words of at most "
             f"{_MAX_WITHHELD_CHARACTERS} characters"
         )
+    if len(pictures) > MAX_PICTURES or len(set(pictures)) != len(pictures):
+        raise ValueError(f"at most {MAX_PICTURES} pictures, each once")
     if request_id is not None:
         earlier = _by_key(connection, workspace_id, owner_actor_id, request_id)
         if earlier is not None:
@@ -233,6 +241,9 @@ def create_request(
         "description": description,
         "withheld_words": list(withheld_words),
     }
+    if pictures:
+        # Ids only: a picture's bytes stay in the store, read by the worker under its right.
+        payload["pictures"] = [str(picture) for picture in pictures]
     try:
         with connection.transaction(), connection.cursor(row_factory=dict_row) as cursor:
             # One requester at a time is counted, so two requests racing see each other.
@@ -297,6 +308,8 @@ class ClaimedRequest:
     request: ReferenceRequest
     description: str = field(repr=False)
     withheld_words: tuple[str, ...] = field(repr=False)
+    #: The person's own pictures the request reads, by capture id, in the order given.
+    pictures: tuple[uuid.UUID, ...] = ()
 
 
 def _fail_orphan(cursor: psycopg.Cursor[Any], job_id: uuid.UUID) -> None:
@@ -338,6 +351,7 @@ def claim(
                 reference_id = uuid.UUID(str(payload["reference_id"]))
                 description = str(payload["description"])
                 withheld = tuple(str(word) for word in payload["withheld_words"])
+                pictures = tuple(uuid.UUID(str(item)) for item in payload.get("pictures", ()))
             except (KeyError, TypeError, ValueError):
                 _fail_orphan(cursor, job["job_id"])
                 continue
@@ -358,7 +372,13 @@ def claim(
             request=_request(row),
             description=description,
             withheld_words=withheld,
+            pictures=pictures,
         )
+
+
+def _first(row: Any) -> Any:
+    """A one-column row's value, whichever row factory the connection was opened with."""
+    return next(iter(row.values())) if isinstance(row, Mapping) else row[0]
 
 
 def _holds(cursor: psycopg.Cursor[Any], claimed: ClaimedRequest) -> bool:
@@ -441,14 +461,27 @@ def finish(
     bundle: Mapping[str, Any] | None = None,
     bundle_sha256: str | None = None,
     failure: str | None = None,
-) -> bool:
+) -> str | None:
     """End the request and its job, blanking the person's words and clearing the request's digest;
-    False when the claim was lost."""
+    the status it ended with, or None when the claim was lost.
+
+    A bundle naming a picture whose right stopped, or which a tombstone blocks, while the job read
+    it is not kept: the request ends withdrawn with no bundle. The database answers that after
+    taking the named rights and the tombstones' lock, before the request's row, the order every
+    withdrawal takes them in (migration 0160).
+    """
     if status not in FINISHED:
         raise ValueError(f"a request finishes as one of {FINISHED}")
     with connection.transaction(), connection.cursor() as cursor:
         if not _holds(cursor, claimed):
-            return False
+            return None
+        if bundle is not None and bundle.get("pictures"):
+            stopped = connection.execute(
+                "select reference_bundle_withdrawn(%s, %s) as stopped",
+                (claimed.workspace_id, Jsonb(dict(bundle))),
+            ).fetchone()
+            if stopped is not None and _first(stopped):
+                status, bundle, bundle_sha256 = "withdrawn", None, None
         cursor.execute(
             "update reference_request set status=%s, steps=%s, bundle=%s, bundle_sha256=%s, "
             "failure=%s, request_sha256=null, finished_at=now() where workspace_id=%s "
@@ -477,7 +510,7 @@ def finish(
                 claimed.claim_token,
             ),
         )
-    return True
+    return status
 
 
 def request_cancel(

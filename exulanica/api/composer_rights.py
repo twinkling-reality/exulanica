@@ -33,10 +33,10 @@ from exulanica.ingest.model_rights import require_model_right
 from exulanica.ingest.repository import IngestRepository
 from exulanica.models.handoff import ModelHandoff
 
-__all__ = ["composer_rights_check", "photograph_text_right"]
+__all__ = ["composer_rights_check", "observation_screening", "photograph_text_right"]
 
 
-def _observation_screening(repository: IngestRepository, capture_id: uuid.UUID) -> uuid.UUID | None:
+def observation_screening(repository: IngestRepository, capture_id: uuid.UUID) -> uuid.UUID | None:
     """The receipt that lets this capture be looked at, chosen as the derivative worker chooses.
 
     The newest current eligible receipt first; otherwise the newest detection-only receipt that
@@ -71,7 +71,7 @@ def photograph_text_right(
     """
     repository = IngestRepository(connection, workspace_id)
     for capture_id in sorted(set(captures), key=str):
-        screening_id = _observation_screening(repository, capture_id)
+        screening_id = observation_screening(repository, capture_id)
         if screening_id is None:
             raise PrivacyAdmissionError(
                 f"capture {capture_id}: no privacy screening permits sending text derived "

@@ -50,6 +50,8 @@ pytestmark = pytest.mark.postgres
 #: The requests that name a photograph, and so need a personal model right for their role:
 #: docs/companion-question.md, "Every hosted request passes one boundary".
 PHOTOGRAPH_ROLES = ("vision", "embedding", "reasoning_cheap")
+#: The requests that name a picture a person gave a world's reference notes, offered on that step.
+REFERENCE_PICTURE_ROLES = ("reference_vision",)
 
 
 def _raw() -> dict:
@@ -60,12 +62,19 @@ def _raw() -> dict:
 
 
 def test_every_request_that_names_a_photograph_has_an_offered_right():
-    assert tuple(use.role for use in MODEL_RIGHT_USES.uses) == PHOTOGRAPH_ROLES
-    assert tuple(role_notices()) == ("depth", *PHOTOGRAPH_ROLES)
+    assert tuple(use.role for use in MODEL_RIGHT_USES.uses) == (
+        *PHOTOGRAPH_ROLES,
+        *REFERENCE_PICTURE_ROLES,
+    )
+    assert tuple(role_notices()) == ("depth", *PHOTOGRAPH_ROLES, *REFERENCE_PICTURE_ROLES)
+    assert {use.role: use.offered_on for use in MODEL_RIGHT_USES.uses} == {
+        **dict.fromkeys(PHOTOGRAPH_ROLES, "photos"),
+        **dict.fromkeys(REFERENCE_PICTURE_ROLES, "reference_pictures"),
+    }
     assert role_notices()["depth"] == DEPTH_MODEL_NOTICE
 
 
-@pytest.mark.parametrize("role", PHOTOGRAPH_ROLES)
+@pytest.mark.parametrize("role", (*PHOTOGRAPH_ROLES, *REFERENCE_PICTURE_ROLES))
 def test_a_hosted_notice_names_the_host_and_every_model_of_the_chain_in_order(role):
     notice = role_notices()[role]
     handoff = role_handoff(role)
@@ -97,6 +106,7 @@ def test_no_hosted_notice_says_people_are_hidden_before_the_model_sees_them():
         (lambda raw: raw["uses"][0].update(label=" padded"), "trimmed"),
         (lambda raw: raw["uses"][0].update(stop="line\nbreak"), "control character"),
         (lambda raw: raw.update(uses=[]), "at least one use"),
+        (lambda raw: raw["uses"][0].update(offered_on="everywhere"), "offered on one of"),
     ],
 )
 def test_the_uses_file_is_refused_whole_on_anything_it_does_not_know(change, refusal):
@@ -110,10 +120,26 @@ def test_the_uses_file_is_refused_whole_on_anything_it_does_not_know(change, ref
 # -- the status read states the offers -------------------------------------------------------------
 
 
+def test_an_older_uses_file_without_offered_on_reads_as_photographs():
+    raw = _raw()
+    raw["uses"] = [use for use in raw["uses"] if "offered_on" not in use]
+    older = parse_model_right_uses(raw)
+    assert [use.role for use in older.uses] == list(PHOTOGRAPH_ROLES)
+    assert {use.offered_on for use in older.uses} == {"photos"}
+    current = {use.role: use for use in MODEL_RIGHT_USES.uses}
+    assert all(use == current[use.role] for use in older.uses)
+
+
+def test_the_photo_admission_screen_lists_no_reference_picture_use(upload):
+    offers = upload.get("/personal-admission").json()["model_right_offers"]
+    assert {offer["offered_on"] for offer in offers} == {"photos"}
+    assert not {offer["role"] for offer in offers} & set(REFERENCE_PICTURE_ROLES)
+
+
 def test_the_status_read_states_every_offer_with_its_exact_words(upload):
     offers = upload.get("/personal-admission").json()["model_right_offers"]
     assert [offer["role"] for offer in offers] == ["depth", *PHOTOGRAPH_ROLES]
-    for offer, stated in zip(offers, model_right_offers(), strict=True):
+    for offer, stated in zip(offers, model_right_offers(offered_on="photos"), strict=True):
         assert offer == stated.as_record()
         assert offer["notice"] == role_notices()[offer["role"]]
         assert offer["models"] == [

@@ -54,6 +54,7 @@ NOTES_REFUSALS: Final[Mapping[str, str]] = MappingProxyType(
         "reference_not_finished": "the reference request is still running or ended without notes",
         "reference_purpose_differs": "the reference request was made for another kind of draft",
         "reference_has_no_notes": "the reference request found no notes to draft from",
+        "reference_withdrawn": "the notes were withdrawn with a picture they were made from",
     }
 )
 
@@ -87,6 +88,8 @@ def notes_for_draft(
     found = store.read_request(connection, workspace_id, reference_id, owner_actor_id=actor)
     if found is None:
         raise NotesRefused("reference_unknown")
+    if found.status == "withdrawn":
+        raise NotesRefused("reference_withdrawn")
     # 0148 keeps a bundle exactly on a complete or partial request; both are read, for the types.
     if found.status not in ("complete", "partial") or found.bundle is None:
         raise NotesRefused("reference_not_finished")

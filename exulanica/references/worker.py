@@ -13,9 +13,16 @@ One job, in steps the page reads as they happen:
     (:func:`~exulanica.references.drafting.read_notes`), and only notes that copy no run of a
     source's words and carry nothing personal are kept
     (:func:`~exulanica.references.notes.keep_notes`);
-4.  **bundle**: the notes become a reference bundle, complete or partial with the steps it missed.
+4.  **read_picture**, once for each of the person's own pictures the request names, before the web
+    steps: the picture source hands over the picture's rendition only under a current right for
+    the picture role's chain (:class:`~exulanica.references.pictures.ReferencePicture`), one reading
+    writes its notes or refuses the picture by reason
+    (:func:`~exulanica.references.pictures.read_picture`), and only notes that pass the picture
+    checks are kept (:func:`~exulanica.references.pictures.screen_picture_notes`);
+5.  **bundle**: the notes become a reference bundle, complete or partial with the steps it missed.
 
-A request that did not ask for web notes skips the first three. Every step checks the deadline,
+A request that did not ask for web notes skips plan, search and read; one that names no picture has
+no picture step. Every step checks the deadline,
 whether the person asked to stop and whether the process is shutting down; each model call is given
 what is left of the deadline as its own. Past the deadline, or at shutdown, the job ends partial
 with what it has, so the person is never left waiting on a source. What the searches returned lives
@@ -39,17 +46,18 @@ import logging
 import threading
 import time
 import uuid
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Sequence
 from contextlib import AbstractContextManager
 from decimal import Decimal
 from typing import Any, Final, Protocol
 
 import psycopg
 
+from exulanica.epistemics.saved_names import saved_names
 from exulanica.errors import ExulanicaError
 from exulanica.models.client import ModelClient
 from exulanica.models.errors import ModelError
-from exulanica.models.policy import HostedRequestPolicy, HostedRequestRefused
+from exulanica.models.policy import HostedRequest, HostedRequestPolicy, HostedRequestRefused
 from exulanica.models.results import ChatResult
 from exulanica.models.spending import (
     SpendingRefused,
@@ -70,10 +78,20 @@ from exulanica.references.bundle import (
     MAX_NOTES,
     BundleCall,
     BundleNote,
+    BundlePicture,
     ReferenceBundle,
 )
 from exulanica.references.catalogs import ReferenceSource, web_source
 from exulanica.references.notes import keep_notes
+from exulanica.references.pictures import (
+    PICTURE_ROLE,
+    REFUSALS,
+    PictureRead,
+    PictureUnavailable,
+    ReferencePicture,
+    read_picture,
+    screen_picture_notes,
+)
 
 __all__ = ["DEADLINE_SECONDS", "PROCESS_RESERVE_PERCENT", "STEPS", "ReferenceWorker"]
 
@@ -82,6 +100,8 @@ _LOG = logging.getLogger(__name__)
 #: The longest a request runs before it ends partial with what it has.
 DEADLINE_SECONDS: Final = 30.0
 STEPS: Final = ("plan", "search", "read", "bundle")
+#: A picture step's name: one per picture a request names, each with its capture id.
+PICTURE_STEP: Final = "read_picture"
 #: The share of the process's model budget (its USD fuse and its call count) reference jobs leave
 #: for every other feature: a job starts its planner only while more than this share remains, so a
 #: loop of reference requests can never spend the process's fuse down for the Companion or a world.
@@ -122,14 +142,45 @@ class _Stopped(ExulanicaError):
         self.why = why
 
 
-class _Steps:
-    """The steps as the page reads them: each waiting, running, done, skipped or missed."""
+class _Admitted:
+    """The workspace's request policy, noting whether it let a request carrying the picture
+    through, so a picture is named in the bundle even when no answer came back."""
 
-    def __init__(self, web: bool) -> None:
+    def __init__(self, policy: HostedRequestPolicy, capture_id: uuid.UUID) -> None:
+        self._policy = policy
+        self._capture_id = capture_id
+        self.workspace_id = getattr(policy, "workspace_id", None)
+        self.admitted = False
+
+    def admit(self, request: HostedRequest) -> Sequence[str]:
+        texts = self._policy.admit(request)
+        if self._capture_id in request.photographs:
+            self.admitted = True
+        return texts
+
+
+class _Steps:
+    """The steps as the page reads them: each waiting, running, done, skipped or missed, and a
+    picture step refused with the reason its reading gave."""
+
+    def __init__(self, web: bool, pictures: tuple[uuid.UUID, ...] = ()) -> None:
         self.items: list[dict[str, Any]] = [
             {"step": step, "state": "waiting" if web or step == "bundle" else "skipped"}
             for step in STEPS
         ]
+        # Each picture's step sits before the bundle's.
+        self.items[-1:-1] = [
+            {"step": PICTURE_STEP, "capture_id": str(picture), "state": "waiting"}
+            for picture in pictures
+        ]
+
+    def picture(self, capture_id: uuid.UUID, state: str, **facts: Any) -> None:
+        for item in self.items:
+            if item["step"] == PICTURE_STEP and item["capture_id"] == str(capture_id):
+                item.clear()
+                item.update(
+                    {"step": PICTURE_STEP, "capture_id": str(capture_id), "state": state, **facts}
+                )
 
     def set(self, step: str, state: str, **facts: Any) -> None:
         for item in self.items:
@@ -143,11 +194,14 @@ class _Steps:
                 item.update(state="missed", reason=reason)
 
     def missed(self) -> tuple[str, ...]:
-        return tuple(
+        missed = [
             item["step"]
             for item in self.items
             if item["state"] == "missed" and item["step"] in ("plan", "search", "read")
-        )
+        ]
+        if any(item["step"] == PICTURE_STEP and item["state"] == "missed" for item in self.items):
+            missed.append("pictures")
+        return tuple(missed)
 
 
 def _call(call: ChatResult) -> BundleCall:
@@ -213,6 +267,7 @@ class ReferenceWorker:
         spending: SpendingSource | None,
         adapter_for: Callable[[ReferenceSource], ReferenceAdapter],
         workspaces: Callable[[], Iterable[uuid.UUID]],
+        picture_source: Callable[[uuid.UUID, uuid.UUID], ReferencePicture] | None = None,
         worker: str = "references",
         deadline_seconds: float = DEADLINE_SECONDS,
         clock: Callable[[], float] = time.monotonic,
@@ -224,6 +279,9 @@ class ReferenceWorker:
         self._spending = spending
         self._adapter_for = adapter_for
         self._workspaces = workspaces
+        #: A person's own picture by workspace and capture, or a refusal by code; None where no
+        #: picture is read in this process.
+        self._picture_source = picture_source
         self._worker = worker
         self._deadline_seconds = deadline_seconds
         self._clock = clock
@@ -277,11 +335,14 @@ class ReferenceWorker:
     def _play(self, claimed: store.ClaimedRequest) -> str:
         started = self._clock()
         request = claimed.request
-        steps = _Steps(request.web)
+        steps = _Steps(request.web, claimed.pictures)
         calls: list[BundleCall] = []
         notes: list[BundleNote] = []
         lookups: list[uuid.UUID] = []
+        pictures: list[BundlePicture] = []
         try:
+            for capture_id in claimed.pictures:
+                self._picture(claimed, steps, calls, notes, pictures, started, capture_id)
             if request.web:
                 self._web(claimed, steps, calls, notes, lookups, started)
         except _Stopped as stopped:
@@ -300,7 +361,7 @@ class ReferenceWorker:
             world_id=None,
             notes=tuple(notes[:MAX_NOTES]),
             lookups=tuple(lookups),
-            pictures=(),
+            pictures=tuple(pictures),
             model_calls=tuple(calls),
             outcome=status,
             missed=missed,
@@ -313,11 +374,84 @@ class ReferenceWorker:
             bundle_sha256=bundle.digest,
         )
 
+    def _picture(
+        self,
+        claimed: store.ClaimedRequest,
+        steps: _Steps,
+        calls: list[BundleCall],
+        notes: list[BundleNote],
+        pictures: list[BundlePicture],
+        started: float,
+        capture_id: uuid.UUID,
+    ) -> None:
+        """Read one of the person's own pictures into notes, or say why not."""
+        self._check(claimed, steps, started)
+        if self._picture_source is None:
+            steps.picture(capture_id, "missed", reason="pictures_not_read_here")
+            return
+        if not self._process_has_room():
+            steps.picture(capture_id, "missed", reason="process_budget_spent")
+            return
+        steps.picture(capture_id, "running")
+        try:
+            picture = self._picture_source(
+                claimed.workspace_id, capture_id, claimed.request.owner_actor_id
+            )
+        except PictureUnavailable as unavailable:
+            # A person the product already found is the reader's own refusal, made before sending.
+            state = "refused" if unavailable.reason in REFUSALS else "missed"
+            steps.picture(capture_id, state, reason=unavailable.reason)
+            return
+        except Exception as failure:  # any other failure is a step the job missed
+            _LOG.warning("a picture could not be read: %s", type(failure).__name__)
+            steps.picture(capture_id, "missed", reason="picture_unreadable")
+            return
+        policy = _Admitted(self._policy_for(claimed.workspace_id), capture_id)
+        client = self._client.with_policy(policy)
+        try:
+            read = read_picture(
+                client, picture.image, capture_id=capture_id, deadline_s=self._remaining(started)
+            )
+        except (ModelError, SpendingRefused, ExulanicaError) as failure:
+            read = PictureRead(refused=_reason(failure))
+        if read.call is not None:
+            calls.append(_call(read.call))
+        if read.call is not None or policy.admitted:
+            # Named once the workspace's policy let it through, whatever the reading answered, and
+            # by the role's model when no answer came back to say which one read it.
+            model = (
+                (read.call.usage.provider, str(PICTURE_ROLE), read.call.usage.model_id)
+                if read.call is not None
+                else self._picture_model()
+            )
+            pictures.append(BundlePicture(capture_id, picture.right_ids, model))
+        if read.refused in REFUSALS:
+            steps.picture(capture_id, "refused", reason=read.refused)
+            return
+        if read.refused is not None:
+            steps.picture(capture_id, "missed", reason=read.refused)
+            return
+        with self._database.session(claimed.workspace_id) as connection:
+            names = saved_names(connection, claimed.workspace_id)
+        screened = screen_picture_notes(
+            read.notes, withheld_words=claimed.withheld_words, saved=names
+        )
+        notes.extend(
+            BundleNote(note.aspect, note.text, "own_picture", capture_id) for note in screened.kept
+        )
+        steps.picture(
+            capture_id, "done", kept=len(screened.kept), dropped=sum(screened.dropped.values())
+        )
+
+    def _picture_model(self) -> tuple[str, str, str]:
+        """The picture role's model as the manifest names it: the provider and its primary."""
+        binding = self._client.manifest[PICTURE_ROLE]
+        return (binding.primary.provider, str(PICTURE_ROLE), binding.primary.model_id)
+
     def _finish(self, claimed: store.ClaimedRequest, steps: _Steps, **outcome: Any) -> str:
         with self._database.session(claimed.workspace_id) as connection:
-            if not store.finish(connection, claimed, steps=steps.items, **outcome):
-                return "claim_lost"
-        return str(outcome["status"])
+            ended = store.finish(connection, claimed, steps=steps.items, **outcome)
+        return "claim_lost" if ended is None else ended
 
     def _source(self, source: ReferenceSource) -> tuple[ReferenceAdapter | None, str | None]:
         """The source's adapter, or why it is not offered now (stopped here or not configured)."""

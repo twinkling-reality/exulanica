@@ -1,6 +1,6 @@
 {
   "profile": "exulanica.model-right-uses/v1",
-  "note": "The hosted model roles a person may let process their own photographs from the app, one per role a grounded Companion answer needs, with the words each is granted against. A role absent from this list is not offered in the app; POST /personal-admission grants such a role only with no notice, as it grants every role the server states no words for. The notice is this template filled with one use's sentences, the host the manifest's endpoint names and every model of the role's chain, primary first; the person reads it before allowing the use, the browser sends it back unchanged, and the server compares it for exact equality, so a changed chain, host or sentence needs a new yes for new grants. offered_with names the admission that carries the grant: detect for these roles, because the processing job that detection queues is when the vision stage runs and a right given later arrives after the photograph was already refused. label, short, stop, stop_action and stop_confirm are the words the app shows for the control, the per-photo state, the confirmation before stopping and its two buttons, so the app holds no wording of its own for any right.",
+  "note": "The hosted model roles a person may let process their own photographs from the app, one per role: the three a grounded Companion answer needs, and the picture reader a world's reference notes use, with the words each is granted against. A role absent from this list is not offered in the app; POST /personal-admission grants such a role only with no notice, as it grants every role the server states no words for. The notice is this template filled with one use's sentences, the host the manifest's endpoint names and every model of the role's chain, primary first; the person reads it before allowing the use, the browser sends it back unchanged, and the server compares it for exact equality, so a changed chain, host or sentence needs a new yes for new grants. offered_with names the admission that carries the grant: detect for these roles, because the processing job that detection queues is when the vision stage runs and a right given later arrives after the photograph was already refused. label, short, stop, stop_action and stop_confirm are the words the app shows for the control, the per-photo state, the confirmation before stopping and its two buttons, so the app holds no wording of its own for any right.",
   "notice": "{what} will be sent to an AI service outside Exulanica, at {host}, where a model will {purpose}.{detail} The model is {models}. You can stop this at any time: nothing more is sent from then on, and {kept}.",
   "fallback_joiner": ", or when that one is unavailable, ",
   "uses": [
@@ -42,6 +42,20 @@
       "stop": "Stop sending this photo's descriptions to the answer model? From your next question, any answer that draws on it is put together by Exulanica without that model. Answers already given stay.",
       "stop_action": "Stop sending its descriptions for answers",
       "stop_confirm": "Stop sending them"
+    },
+    {
+      "role": "reference_vision",
+      "offered_with": "detect",
+      "offered_on": "reference_pictures",
+      "label": "Let an outside AI model read these pictures for your world's reference notes",
+      "short": "Picture notes",
+      "what": "A copy of each selected picture, reduced in size and without its location or camera details,",
+      "purpose": "write short notes about the places and things it shows, for drafting your world",
+      "detail": "The model is told to describe no person and to read no writing, and to refuse a picture that shows either.",
+      "kept": "the reference notes already made with it are withdrawn, though a world already drafted from them keeps what it drafted",
+      "stop": "Stop sending this picture to the reference notes model? Nothing more is sent from now on, and the reference notes already made with it are withdrawn. A world already drafted from them keeps what it drafted.",
+      "stop_action": "Stop sending this picture for notes",
+      "stop_confirm": "Stop sending it"
     }
   ]
 }

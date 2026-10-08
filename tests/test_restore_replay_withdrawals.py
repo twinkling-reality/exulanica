@@ -57,6 +57,8 @@ from test_place_name_rights import _state as _place_name_state
 from test_place_name_rights import _withdraw as _withdraw_place_name
 from test_place_name_rights import named as named
 from test_purge import purged as purged
+from test_reference_withdrawal import Pictured
+from test_reference_withdrawal import _delete as _delete_picture
 from test_restore_replay import _backup, _restore
 from test_restore_replay_search_entries import _seal
 from test_restore_replay_search_entries import commands as commands
@@ -337,6 +339,43 @@ def test_a_look_withdrawn_after_the_backup_stays_withdrawn(purged, commands, tmp
             )
 
     assert not _through_a_restore(purged, tmp_path, withdraw=withdraw, current=current)
+
+
+def test_notes_from_a_picture_stopped_after_the_backup_are_withdrawn_again(
+    purged, commands, tmp_path
+):
+    # Excluded from the catalog by name: the stop's own trigger withdraws them, and the replayed
+    # stop runs it again (migration 0160).
+    pictured = Pictured(purged)
+    read = pictured.finished()
+    web_only = pictured.finished(pictures=())
+    assert not _through_a_restore(
+        purged,
+        tmp_path,
+        withdraw=lambda: _stop(purged, pictured.rights[0].right_id),
+        current=lambda: pictured.request(read).status == "complete",
+    )
+    assert pictured.request(read).bundle is None
+    assert pictured.request(web_only).status == "complete", "a request naming no picture stays"
+
+
+def test_notes_from_a_picture_deleted_after_the_backup_are_withdrawn_again(
+    purged, commands, tmp_path
+):
+    pictured = Pictured(purged)
+    read = pictured.finished()
+
+    def delete() -> None:
+        with pictured.runtime() as connection:
+            _delete_picture(connection, pictured.workspace_id, pictured.capture_id)
+
+    assert not _through_a_restore(
+        purged,
+        tmp_path,
+        withdraw=delete,
+        current=lambda: pictured.request(read).status == "complete",
+    )
+    assert pictured.request(read).bundle is None
 
 
 def test_a_character_catalog_withdrawn_after_the_backup_stays_withdrawn(purged, commands, tmp_path):

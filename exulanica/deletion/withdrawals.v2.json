@@ -299,6 +299,10 @@
       "reason": "failure_class 'withdrawn' is written by the asset withdrawal's own trigger, which replaying the withdrawal runs again."
     },
     {
+      "table": "reference_request",
+      "reason": "status 'withdrawn' is written by the triggers on a picture right's stop and on a tombstone (migration 0160), which replaying the right's withdrawal and the tombstone runs again, and by a job's finish under a stop, which a request restored as running meets when it reads its pictures again under the replayed stop."
+    },
+    {
       "table": "place_record_state_event",
       "reason": "A state event with basis 'withdrawal' records a tombstone's effect on a place record and names that tombstone; every read of the record asks tombstone_blocks_place_record (migration 0063), which the replayed tombstone answers again."
     },
