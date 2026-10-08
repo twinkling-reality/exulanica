@@ -44,8 +44,12 @@ from test_society_saved_world_api import OWNER, routes
 saved_world = stays.saved_world
 app = stays.app
 pytestmark = pytest.mark.postgres
-#: Every grant ends: an end an hour from when the tests ran.
-_ENDS = datetime.now(UTC).replace(microsecond=0) + timedelta(hours=1)
+
+
+def _an_hour_from_now() -> datetime:
+    """Every grant ends: an end an hour from when the test stating it reads the clock. Read in the
+    test, never at import: a serial run reaches a module's last test hours after importing it."""
+    return datetime.now(UTC).replace(microsecond=0) + timedelta(hours=1)
 
 
 def _repository(connection, world) -> SocietyModelChoiceRepository:
@@ -88,6 +92,7 @@ def _visitors(world, client):
 @pytest.mark.parametrize("saved_world", [2], indirect=True)
 def test_a_gate_s_travellers_get_the_mind_its_owner_named(app):
     world, client = app
+    ends = _an_hour_from_now()
     services = decisions._services(client)
     snapshot, ours, theirs = _visitors(world, client)
     manifest, model_id = decisions._offered()
@@ -105,12 +110,12 @@ def test_a_gate_s_travellers_get_the_mind_its_owner_named(app):
             chosen_by=world["session"].actor,
             manifest=manifest,
             contract=contract,
-            ends_at=_ENDS,
+            ends_at=ends,
         )
         assert chosen["group"] == {
             "kind": "arrivals_under_grant",
             "grant_id": str(things_support.GRANT),
-            "ends_at": _ENDS.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "ends_at": ends.strftime("%Y-%m-%dT%H:%M:%SZ"),
         }
         assert (chosen["people"], chosen["decider"]["kind"]) == ([], "model")
         # The same key again is the same choice; another model under it is refused.
@@ -123,7 +128,7 @@ def test_a_gate_s_travellers_get_the_mind_its_owner_named(app):
             chosen_by=world["session"].actor,
             manifest=manifest,
             contract=contract,
-            ends_at=_ENDS,
+            ends_at=ends,
         )
         assert again["choice_seq"] == chosen["choice_seq"]
         with pytest.raises(ModelChoiceRefused) as refused:
@@ -136,7 +141,7 @@ def test_a_gate_s_travellers_get_the_mind_its_owner_named(app):
                 chosen_by=world["session"].actor,
                 manifest=manifest,
                 contract=contract,
-                ends_at=_ENDS,
+                ends_at=ends,
             )
         assert refused.value.code == "choice_key_reused"
         deciding = repository.deciding(version, role, contract)
@@ -230,7 +235,7 @@ def test_a_gate_s_travellers_get_the_mind_its_owner_named(app):
         )
         assert released is not None and released["decider"] == {"kind": "routine"}
         # It ends with the grant, as the choice it released did.
-        assert released["group"]["ends_at"] == _ENDS.strftime("%Y-%m-%dT%H:%M:%SZ")
+        assert released["group"]["ends_at"] == ends.strftime("%Y-%m-%dT%H:%M:%SZ")
         assert repository.traveller_choices(version, role)[str(things_support.GRANT)][
             "decider"
         ] == {"kind": "routine"}
@@ -570,6 +575,6 @@ def test_only_a_society_of_things_takes_a_gate_s_choice(app):
             chosen_by=world["session"].actor,
             manifest=manifest,
             contract=decision_contract(),
-            ends_at=_ENDS,
+            ends_at=_an_hour_from_now(),
         )
     assert refused.value.code == "engine_takes_no_traveller_choice"
