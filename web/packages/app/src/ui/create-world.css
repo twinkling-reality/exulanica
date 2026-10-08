@@ -315,3 +315,117 @@
 
 /* Before a recipe is chosen the right column holds nothing but Close. */
 #shell section.world-recipes .world-recipes-values[hidden] ~ .world-recipes-actions { margin-top: 0; }
+
+/* Kinds of place: text cards under the recipes, with no picture box where none is served. */
+#shell section.world-recipes .world-kinds-choice {
+  gap: 0.35rem;
+  width: 12rem;
+  min-height: 6.75rem;
+  padding: 0.85rem 0.9rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+#shell section.world-recipes .world-kinds-choice::before { content: none; }
+
+#shell section.world-recipes .world-kinds-choice-label { color: var(--color-text); }
+
+#shell section.world-recipes .world-kinds-choice-detail {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  font: 400 0.76rem / 1.4 var(--font-ui);
+  color: var(--color-text-muted);
+}
+
+#shell section.world-recipes .world-kinds-choice-new { border-style: dashed; border-color: var(--color-border-strong); }
+
+#shell section.world-recipes .world-kinds-choice[aria-pressed='true'] {
+  outline: 2px solid var(--color-text);
+  outline-offset: 3px;
+}
+
+#shell section.world-recipes .world-kinds-choice:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: 3px;
+}
+
+/* A kind's words, what it holds and its values, or the field that drafts a new one. */
+#shell section.world-recipes .world-kinds-side { display: grid; gap: 0.6rem; max-width: 40rem; }
+#shell section.world-recipes .world-kinds-side[hidden] { display: none; }
+
+#shell section.world-recipes .world-kinds-words {
+  margin: 0;
+  max-width: 44ch;
+  font: 400 1.05rem / 1.5 var(--font-ui);
+  color: var(--color-text);
+}
+
+#shell section.world-recipes .world-kinds-by,
+#shell section.world-recipes .world-kinds-holds {
+  margin: 0;
+  max-width: 52ch;
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--color-text-muted);
+}
+
+#shell section.world-recipes .world-kinds-new {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 0.75rem 1rem;
+  padding: 1rem 1rem 0.875rem;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-raised);
+}
+
+#shell section.world-recipes .world-kinds-new:focus-within { border-color: var(--color-text); }
+#shell section.world-recipes .world-kinds-new > * { grid-column: 1 / -1; margin: 0; }
+
+#shell section.world-recipes .world-kinds-label {
+  font: var(--weight-medium) 0.66rem / 1.35 var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+}
+
+#shell section.world-recipes .world-kinds-input {
+  min-height: 4.5rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  font: 400 1rem / 1.5 var(--font-ui);
+  resize: vertical;
+}
+
+#shell section.world-recipes .world-kinds-input:focus { outline: none; }
+
+#shell section.world-recipes .world-kinds-draft,
+#shell section.world-recipes .world-kinds-see {
+  justify-self: end;
+  min-height: 2rem;
+  padding: 0 0.875rem;
+  border: 1px solid var(--color-text);
+  border-radius: var(--radius-full);
+  background: var(--color-text);
+  color: var(--color-surface-solid);
+  font: 560 0.82rem / 1 var(--font-ui);
+  cursor: pointer;
+}
+
+#shell section.world-recipes .world-kinds-draft:disabled { opacity: 0.5; cursor: default; }
+#shell section.world-recipes .world-kinds-see { justify-self: start; background: transparent; color: var(--color-text); }
+#shell section.world-recipes .world-kinds-see[hidden] { display: none; }
+
+#shell section.world-recipes .world-kinds-status {
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--color-text-muted);
+}
+
+#shell section.world-recipes .world-kinds-status:empty { display: none; }
+#shell section.world-recipes .world-kinds-status:focus { outline: none; }

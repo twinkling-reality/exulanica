@@ -174,6 +174,24 @@ marks default) until the person chooses another; Change look opens the Look shee
 `POST /worlds/generated`). Escape goes back; Command or
 Control with Enter creates the town once its values are admitted.
 
+Under the recipes, every kind of place the server lists besides the town (`GET /worlds/kinds`: the
+kinds it ships and the workspace's own; `world-kinds-api.ts`) is a text card with its label and
+summary, and no picture box where none is served. Choosing one shows "{label}: {summary}", what it
+holds (its parts' labels), a control for each value it offers and Create this world, which makes a
+world of it (`POST /worlds/kinds/{kind}/worlds`, titled by the kind); a kind has no Look row, since
+no look dresses a site world yet. The last card, "A new kind of place", is there only where the
+library says this person may draft one (`drafting.offered`), or where a draft of theirs still runs
+(`GET /worlds/kinds/drafts`), which the page follows rather than starting another. It shows one
+field, "Describe the place", and Draft this kind of place (or Enter; Shift with Enter starts a new
+line; Escape leaves the field before the sheet). While the draft runs the right column says
+"Drafting your kind of place, {elapsed} so far. ..." with the time the server counts, the card says
+"Being drafted", and the person may leave. A ready draft's kind is listed and chosen, with "Drafted
+from your words by {model name}."; focus moves to Create this world only from the draft field. A
+draft refused for its kind says why in two sentences, the last check's own inside (the two sentences
+alone where no check refused); any other code is said in the server's closed list's words, and the
+field keeps the person's words (`ui/kind-draft.ts`; the words are those of [the kinds
+contract](world-kinds-contract.md#a-kind-drafted-from-words)).
+
 ### Who decides
 
 Who decides (`web/packages/app/src/ui/society-models.ts`, `ui/society-models.css`, mounted by
@@ -432,6 +450,7 @@ and so on). The names do not change when words do; drivers select with `ACTION(i
 | the index | Library | Index |
 | placing and arranging | Build | Create |
 | making a new world | Create a world | Make |
+| a world kind | kind of place | world kind, kind of world, grammar |
 
 ## 6. What holds it
 

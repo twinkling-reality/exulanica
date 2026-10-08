@@ -363,7 +363,7 @@ states, which the page says in these words:
 | --- | --- |
 | `drafting` | "Drafting your kind of place, {elapsed} so far. It can take a few minutes. You can leave: it keeps going, and it will be among your kinds when it is ready." ({elapsed} from the answer's `elapsed_seconds`) |
 | `ready` | "{label}: {summary}" and "Drafted from your words by {model name}" (the answer's `model_name`), then its presets and values |
-| `refused` | "These words did not draft a kind of place people can live, walk and work in: {sentence} Try describing it another way." ({sentence} the refusal's `detail`: the last check's own sentence, or the drafter's where no check refused) |
+| `refused` | "These words did not draft a kind of place people can live, walk and work in: {sentence} Try describing it another way." ({sentence} the refusal's `detail`, the last check's own sentence; where no check refused, the refusal's `check` is null and the page says the two sentences without it, since the drafter's own sentence would repeat the first) |
 
 A refusal that is not the drafted kind's (`budget_exceeded`, `kind_draft_unanswered`,
 `kind_draft_model_failed`, `kind_work_unavailable`, `kind_draft_failed`, `kind_cap_reached`,

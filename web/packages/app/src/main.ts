@@ -350,9 +350,11 @@ function showWorldRecipes(
       import('./ui/world-recipes.js'),
       import('./composition/world-description.js'),
       import('./world-specification.js'),
-    ]).then(([{ buildWorldRecipes }, { attachWorldDescription }, { WorldSpecificationClient }]) => {
+      import('./world-kinds-api.js'),
+    ]).then(([{ buildWorldRecipes }, { attachWorldDescription }, { WorldSpecificationClient }, { WorldKindsClient, KIND_DESCRIPTION_CHARACTERS }]) => {
       if (!stand.isConnected) return;
       const specification = new WorldSpecificationClient(credentials);
+      const kinds = new WorldKindsClient(credentials);
       // The look the town is made in: the host's default until the person changes it, sent with
       // the making so the town is bound to it (`style_pack` on POST /worlds/generated).
       let looks: LookLibrary | null = null;
@@ -400,6 +402,15 @@ function showWorldRecipes(
           await mount();
         },
         onClose,
+        // A world of a kind of place is titled by the kind, as a town is by its recipe.
+        kinds: {
+          library: () => kinds.library(),
+          drafts: () => kinds.drafts(),
+          startDraft: (description) => kinds.startDraft(description),
+          draft: (draftId) => kinds.draft(draftId),
+          make: (kind, preset, values) => client.makeOfKind(kind, preset, kind.label, values),
+          maximumCharacters: KIND_DESCRIPTION_CHARACTERS,
+        },
       });
       // A dialog over the world, opened and closed through the shell state like the other major
       // surfaces, so it cannot stay open under the next one and Escape takes it back.

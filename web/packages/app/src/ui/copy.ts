@@ -463,6 +463,39 @@ export const COPY: Readonly<Record<string, string>> = Object.freeze({
   'worldRecipes.making': 'Creating {recipe}…',
   'worldRecipes.close': 'Close',
   'worldRecipes.failed': 'The world was not created: {reason}',
+  // Kinds of place (GET /worlds/kinds): the workspace's own kinds as cards under the recipes, and
+  // the last card, a new kind of place drafted from a person's words (docs/world-kinds-contract.md).
+  'worldKinds.heading': 'Or a kind of place',
+  'worldKinds.new': 'A new kind of place',
+  'worldKinds.new.detail': 'Draft one from your words',
+  'worldKinds.drafting.card': 'Being drafted',
+  'worldKinds.field': 'Describe the place',
+  'worldKinds.placeholder': 'A vineyard on a slope, rows of vines, a press house and a shop by the gate',
+  'worldKinds.draft': 'Draft this kind of place',
+  'worldKinds.drafting':
+    'Drafting your kind of place, {elapsed} so far. It can take a few minutes. You can leave: it '
+    + 'keeps going, and it will be among your kinds when it is ready.',
+  'worldKinds.ready': '{label}: {summary}',
+  'worldKinds.draftedBy': 'Drafted from your words by {model}.',
+  'worldKinds.refused':
+    'These words did not draft a kind of place people can live, walk and work in: {sentence} Try '
+    + 'describing it another way.',
+  'worldKinds.refused.unchecked':
+    'These words did not draft a kind of place people can live, walk and work in. Try describing it '
+    + 'another way.',
+  'worldKinds.stopped': '{meaning} You can draft it again.',
+  'worldKinds.busy': 'You already have a kind of place being drafted.',
+  'worldKinds.seeIt': 'See it',
+  'worldKinds.capacity':
+    'Many kinds of place are being drafted on this server right now. Try again in a minute.',
+  'worldKinds.lost': 'This draft is no longer on the server, so it stopped. Draft it again.',
+  'worldKinds.holds': 'What it holds: {parts}',
+  'worldKinds.preset': 'Start from',
+  'worldKinds.make': 'Create this world',
+  'worldKinds.seconds': '{count} seconds',
+  'worldKinds.second': '1 second',
+  'worldKinds.minutes': '{count} minutes',
+  'worldKinds.minute': '1 minute',
   // Why a generated world shows no vehicles, by the traffic route's refusal code.
   'world.traffic.roads_unavailable':
     'No cars drive this town: its traffic cannot use one of its junctions.',

@@ -13,6 +13,13 @@
  * `setValues` sets a preset and values the same way from elsewhere, such as a model drafting a
  * specification from a person's words: it loads them into the controls and checks them exactly as
  * a person's edit is checked, so the controls never hold a value the page has not checked.
+ *
+ * Under the recipes, the kinds of place the server lists besides the town (`GET /worlds/kinds`:
+ * those it ships and the workspace's own) are cards too, with no picture box where none is served.
+ * Choosing one shows its words, what it holds and any values it offers, and "Create this world"
+ * makes a world of it (`POST /worlds/kinds/{kind}/worlds`). The last card, "A new kind of place",
+ * is there only where the server offers this person drafting one (`drafting`), or a draft of theirs
+ * runs; it shows one field (`./kind-draft.ts`), and a kind drafted ready is listed and chosen.
  */
 
 import { problemSentence } from './words/problems.js';
@@ -26,6 +33,8 @@ import {
   type WorldSpecification,
 } from '../world-specification.js';
 import { recipePicture } from './recipe-pictures.js';
+import { TOWN_KIND, type KindDraft, type KindLibrary, type WorldKind } from '../world-kinds-api.js';
+import { buildKindDraft, type KindDraftPanel } from './kind-draft.js';
 import './create-world.css';
 import { fill, say } from './copy.js';
 import { el } from './dom.js';
@@ -90,10 +99,33 @@ export function buildWorldRecipes(options: {
   ) => Promise<SavedWorldEntry>;
   readonly open: (entry: SavedWorldEntry) => Promise<void>;
   readonly onClose: () => void;
+  /** The kinds of place besides the town, and drafting a new one; absent offers neither. */
+  readonly kinds?: {
+    readonly library: () => Promise<KindLibrary>;
+    readonly drafts: () => Promise<readonly KindDraft[]>;
+    readonly startDraft: (description: string) => Promise<KindDraft>;
+    readonly draft: (draftId: string) => Promise<KindDraft>;
+    readonly make: (
+      kind: WorldKind,
+      preset: string,
+      values: Readonly<Record<string, number | string>>,
+    ) => Promise<SavedWorldEntry>;
+    /** The longest description the server reads. */
+    readonly maximumCharacters: number;
+    /** Ask again after `ms`; returns a cancel. Tests pass their own. */
+    readonly schedule?: (run: () => void, ms: number) => () => void;
+  };
 }): WorldRecipesPanel {
   const status = el('p', { class: 'world-recipes-status', role: 'status', 'aria-live': 'polite',
     text: say('worldRecipes.loading') });
   const list = el('div', { class: 'world-recipes-list' });
+  const kindList = el('div', { class: 'world-recipes-list world-kinds-list' });
+  const kindsBlock = el('div', { class: 'world-kinds', hidden: true }, [
+    el('p', { class: 'world-recipes-list-label', text: say('worldKinds.heading') }),
+    kindList,
+  ]);
+  // A kind's words and values, or the field that drafts a new one, in place of the town's values.
+  const kindSide = el('div', { class: 'world-kinds-side', hidden: true });
   const controls = el('div', { class: 'world-recipes-values', hidden: true });
   const make = el('button', { type: 'button', class: 'world-recipes-make', text: say('worldRecipes.make'), hidden: true });
   const close = el('button', { type: 'button', class: 'world-recipes-close', text: say('worldRecipes.close') });
@@ -124,8 +156,10 @@ export function buildWorldRecipes(options: {
       el('p', { class: 'world-recipes-introduction', text: say('worldRecipes.introduction') }),
       el('p', { class: 'world-recipes-list-label', text: say('worldRecipes.recipes') }),
       list,
+      kindsBlock,
     ]),
     el('div', { class: 'world-recipes-side' }, [
+      kindSide,
       controls,
       lookSlot,
       status,
@@ -141,9 +175,15 @@ export function buildWorldRecipes(options: {
   let chosen: Record<string, number | string> = {};
   let refusal: WorldRecipesRefusal | null = null;
   let making = false;
+  // What the right column holds: a town recipe's values, a kind of place, or the draft field.
+  let mode: 'town' | 'kind' | 'new' | null = null;
+  let kind: WorldKind | null = null;
+  let kindPreset: string | null = null;
+  let kindValues: Record<string, number | string> = {};
 
   const check = (): void => {
-    refusal = specification === null ? null : refusalOf(specification, chosen);
+    // A kind's controls offer only values inside its ranges; the server holds them again.
+    refusal = specification === null || mode !== 'town' ? null : refusalOf(specification, chosen);
     make.disabled = making || refusal !== null;
     if (!making) {
       status.textContent = refusal === null ? '' : fill('worldRecipes.refused', { reason: refusal.detail });
@@ -219,28 +259,115 @@ export function buildWorldRecipes(options: {
     if (more.childElementCount > 1) controls.append(more);
   };
 
+  /** Mark one card of either list pressed, every other one not. */
+  const press = (chosenCard: Element | null): void => {
+    for (const button of [...list.querySelectorAll('button'), ...kindList.querySelectorAll('button')]) {
+      button.setAttribute('aria-pressed', String(button === chosenCard));
+    }
+  };
+
+  /** The right column for a town recipe, a kind of place, or the draft field. */
+  const showMode = (next: 'town' | 'kind' | 'new'): void => {
+    mode = next;
+    controls.hidden = next !== 'town';
+    lookSlot.hidden = next !== 'town';
+    kindSide.hidden = next === 'town';
+    make.hidden = next === 'new';
+    make.textContent = say(next === 'town' ? 'worldRecipes.make' : 'worldKinds.make');
+  };
+
   const choose = (next: SpecificationPreset): void => {
     preset = next;
     chosen = { ...next.values };
-    for (const button of list.querySelectorAll<HTMLButtonElement>('button')) {
-      button.setAttribute('aria-pressed', String(button.getAttribute('data-recipe') === next.key));
-    }
-    controls.hidden = false;
-    make.hidden = false;
+    press(list.querySelector(`[data-recipe="${CSS.escape(next.key)}"]`));
+    showMode('town');
     renderValues();
     check();
   };
 
+  /** A kind's words, what it holds, and a control for each value it offers. */
+  const renderKind = (shown: WorldKind, modelName: string | null): void => {
+    const holds = [...new Set(shown.parts.map((part) => part.label))];
+    const values = el('div', { class: 'world-recipes-values' });
+    if (shown.presets.length > 1) {
+      const select = el('select', { 'aria-label': say('worldKinds.preset'), 'data-kind-preset': '' },
+        shown.presets.map((offered) => el('option', { value: offered.key, text: offered.label, selected: offered.key === kindPreset })));
+      select.addEventListener('change', () => {
+        const next = shown.presets.find((offered) => offered.key === select.value);
+        if (next === undefined) return;
+        kindPreset = next.key;
+        kindValues = { ...next.values };
+        renderKind(shown, modelName);
+      });
+      values.append(el('div', { class: 'world-recipes-parameter' }, [
+        el('label', { class: 'world-recipes-value' }, [el('span', { text: say('worldKinds.preset') }), select]),
+      ]));
+    }
+    for (const parameter of shown.parameters) {
+      const current = kindValues[parameter.key] ?? '';
+      const output = el('output', { text: String(current) });
+      const input = parameter.choices !== null
+        ? el('select', { 'aria-label': parameter.label, 'data-parameter': parameter.key },
+          parameter.choices.map((choice) => el('option', { value: choice, text: choice, selected: choice === current })))
+        : el('input', {
+          type: 'range', min: String(parameter.minimum ?? 0), max: String(parameter.maximum ?? 0),
+          step: String(parameter.step ?? 1), value: String(current), 'aria-label': parameter.label,
+          'data-parameter': parameter.key,
+        });
+      input.addEventListener('input', () => {
+        const next = parameter.choices !== null ? input.value : Number(input.value);
+        kindValues = { ...kindValues, [parameter.key]: next };
+        output.textContent = String(next);
+      });
+      values.append(el('div', { class: 'world-recipes-parameter' }, [
+        el('label', { class: 'world-recipes-value' }, [el('span', { text: parameter.label }), input, output]),
+        el('details', { class: 'world-recipes-reason' }, [
+          el('summary', { text: 'Why this range?' }),
+          el('p', { text: parameter.reason }),
+        ]),
+      ]));
+    }
+    kindSide.replaceChildren(
+      el('p', { class: 'world-kinds-words', text: fill('worldKinds.ready', { label: shown.label, summary: shown.summary }) }),
+      ...(modelName === null ? [] : [el('p', { class: 'world-kinds-by', text: fill('worldKinds.draftedBy', { model: modelName }) })]),
+      ...(holds.length === 0 ? [] : [el('p', { class: 'world-kinds-holds', text: fill('worldKinds.holds', { parts: holds.join(', ') }) })]),
+      values,
+    );
+  };
+
+  const chooseKind = (next: WorldKind, modelName: string | null = null): void => {
+    kind = next;
+    kindPreset = next.presets[0]?.key ?? null;
+    kindValues = { ...(next.presets[0]?.values ?? {}) };
+    press(kindList.querySelector(`[data-kind="${CSS.escape(next.kind)}"]`));
+    showMode('kind');
+    renderKind(next, modelName);
+    make.disabled = making || kindPreset === null;
+    status.textContent = '';
+  };
+
+  const cards = (): HTMLButtonElement[] => [...list.querySelectorAll('button'), ...kindList.querySelectorAll('button')];
+
   make.addEventListener('click', () => {
-    if (preset === null || refusal !== null || making) return;
-    const asked = preset;
+    if (making) return;
+    let made: Promise<SavedWorldEntry>;
+    let label: string;
+    if (mode === 'kind' && kind !== null && kindPreset !== null && options.kinds !== undefined) {
+      label = kind.label;
+      made = options.kinds.make(kind, kindPreset, { ...kindValues });
+    } else if (mode === 'town' && preset !== null && refusal === null) {
+      label = preset.label;
+      made = options.make(preset, { ...chosen });
+    } else {
+      return;
+    }
     making = true;
     make.disabled = true;
-    for (const button of list.querySelectorAll('button')) (button as HTMLButtonElement).disabled = true;
-    status.textContent = fill('worldRecipes.making', { recipe: asked.label });
-    void options.make(asked, { ...chosen }).then(options.open).catch((error: unknown) => {
+    for (const button of cards()) button.disabled = true;
+    status.textContent = fill('worldRecipes.making', { recipe: label });
+    void made.then(options.open).catch((error: unknown) => {
       making = false;
-      for (const button of list.querySelectorAll('button')) (button as HTMLButtonElement).disabled = false;
+      for (const button of cards()) button.disabled = false;
       status.textContent = fill('worldRecipes.failed', {
         reason: problemSentence(error),
       });
@@ -268,6 +395,82 @@ export function buildWorldRecipes(options: {
       reason: problemSentence(error),
     });
   });
+
+  // The kinds of place: read beside the recipes; a server without them leaves only the recipes.
+  const kinds = options.kinds;
+  if (kinds !== undefined) {
+    let drafting: KindLibrary['drafting'] = null;
+    let newCard: HTMLButtonElement | null = null;
+    let draftPanel: KindDraftPanel | null = null;
+    const kindCard = (offered: WorldKind): HTMLButtonElement => {
+      const card = el('button', {
+        type: 'button', class: 'world-recipes-choice world-kinds-choice', 'data-kind': offered.kind, 'aria-pressed': 'false',
+      }, [
+        el('span', { class: 'world-kinds-choice-label', text: offered.label }),
+        el('span', { class: 'world-kinds-choice-detail', text: offered.summary }),
+      ]);
+      card.addEventListener('click', () => chooseKind(offered));
+      return card;
+    };
+    const listKind = (offered: WorldKind): void => {
+      const card = kindCard(offered);
+      const earlier = kindList.querySelector(`[data-kind="${CSS.escape(offered.kind)}"]`);
+      if (earlier !== null) earlier.replaceWith(card);
+      else if (newCard !== null) kindList.insertBefore(card, newCard);
+      else kindList.append(card);
+      kindsBlock.hidden = false;
+    };
+    const panel = (): KindDraftPanel => {
+      draftPanel ??= buildKindDraft({
+        start: kinds.startDraft,
+        read: kinds.draft,
+        refusals: () => drafting?.refusals ?? [],
+        maximumCharacters: kinds.maximumCharacters,
+        onReady: (ready, modelName) => {
+          listKind(ready);
+          // Chosen only where the person is still looking at the draft; focus follows only from it.
+          if (mode !== 'new') return;
+          const focused = kindSide.contains(document.activeElement);
+          chooseKind(ready, modelName);
+          if (focused) make.focus({ preventScroll: true });
+        },
+        onRunning: (running) => {
+          newCard?.querySelector('.world-kinds-choice-detail')
+            ?.replaceChildren(say(running ? 'worldKinds.drafting.card' : 'worldKinds.new.detail'));
+        },
+        onLeave: () => newCard?.focus({ preventScroll: true }),
+        ...(kinds.schedule === undefined ? {} : { schedule: kinds.schedule }),
+      });
+      return draftPanel;
+    };
+    const offerNew = (): void => {
+      if (newCard !== null) return;
+      newCard = el('button', {
+        type: 'button', class: 'world-recipes-choice world-kinds-choice world-kinds-choice-new', 'data-kind-new': '', 'aria-pressed': 'false',
+      }, [
+        el('span', { class: 'world-kinds-choice-label', text: say('worldKinds.new') }),
+        el('span', { class: 'world-kinds-choice-detail', text: say('worldKinds.new.detail') }),
+      ]);
+      newCard.addEventListener('click', () => {
+        press(newCard);
+        showMode('new');
+        status.textContent = '';
+        kindSide.replaceChildren(panel().root);
+        panel().focus();
+      });
+      kindList.append(newCard);
+      kindsBlock.hidden = false;
+    };
+    void kinds.library().then(async (library) => {
+      drafting = library.drafting;
+      for (const offered of library.kinds) if (offered.kind !== TOWN_KIND) listKind(offered);
+      // A draft of this person's still running is found, not started again; it is followed here.
+      const running = drafting === null ? undefined
+        : (await kinds.drafts().catch(() => [])).find((held) => held.state === 'drafting');
+      if (drafting?.offered === true || running !== undefined) offerNew();
+      if (running !== undefined) panel().follow(running);
+    }, () => undefined);
+  }
 
   return {
     root,

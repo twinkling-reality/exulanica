@@ -490,6 +490,24 @@ export class WorldEntryClient {
     }));
   }
 
+  /**
+   * Make a world of a kind of place (`POST /worlds/kinds/{kind}/worlds`) with one of its presets
+   * and values, at the version listed, and save its entry.
+   */
+  async makeOfKind(
+    kind: { readonly kind: string; readonly version: number },
+    preset: string,
+    title: string,
+    values: Readonly<Record<string, number | string>>,
+  ): Promise<SavedWorldEntry> {
+    return parseEntry(await this.#transport.postJson<unknown>(`/worlds/kinds/${encodeURIComponent(kind.kind)}/worlds`, {
+      version: kind.version,
+      preset,
+      title,
+      ...(Object.keys(values).length === 0 ? {} : { values }),
+    }));
+  }
+
   /** Create or exact-idempotently reopen this workspace's source-independent starter. */
   async ensureStarter(title: string): Promise<SavedWorldEntry> {
     return parseEntry(await this.#transport.postJson<unknown>('/world-entries/starter', { title }));
