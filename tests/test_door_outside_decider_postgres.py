@@ -14,7 +14,10 @@ stopped. What is shown:
     version, the grant and the digest of the answer the bridge sent, and costs nothing;
 *   replay needs no bridge;
 *   revoking the grant hands the person back to the routine, and a quiet bridge's person is not
-    asked: its turn is recorded as ``decider_disconnected``.
+    asked: its turn is recorded as ``decider_disconnected``;
+*   the world's models read gives the person's latest decision under the grant (``latest``): the
+    bridge's answer, a turn a connected program let pass (``no_answer_in_time``, the routine
+    deciding) until a later answer replaces it, or none yet under a new grant.
 """
 
 from __future__ import annotations
@@ -99,12 +102,14 @@ def door(saved_world, spine_schema, monkeypatch):
 
 class _Bridge:
     """A fixture bridge: it polls its channel and answers every ask with the first label offered,
-    recording the bodies it sent, until it is stopped."""
+    recording the bodies it sent, until it is stopped. One that ``answers`` nothing keeps polling,
+    so it stays connected, and lets every ask's deadline pass."""
 
-    def __init__(self, client, channel: dict[str, str], cursor: str) -> None:
+    def __init__(self, client, channel: dict[str, str], cursor: str, answers: bool = True) -> None:
         self.client = client
         self.channel = channel
         self.cursor = cursor
+        self.answers = answers
         self.sent: list[dict[str, Any]] = []
         self.asked: list[dict[str, Any]] = []
         self.stopped = threading.Event()
@@ -131,6 +136,8 @@ class _Bridge:
                 if frame["kind"] != "asked":
                     continue
                 self.asked.append(frame)
+                if not self.answers:
+                    continue
                 body = {
                     "request_id": frame["request_id"],
                     "request_sha256": frame["request_sha256"],
@@ -180,10 +187,11 @@ def _channel(client, grant_id: str) -> tuple[dict[str, str], str]:
     return channel, hello.json()["cursor"]
 
 
-def _until_decided(world, client, services, host, snapshot) -> dict[str, Any]:
+def _until_decided(world, client, services, host, snapshot, after: int = 0) -> dict[str, Any]:
+    """Minutes asked and stepped until a decision later than decision ``after`` is recorded."""
     for _ in range(30):
         assert host.before_minute(_claim(world, snapshot), time.monotonic() + LEASE_SECONDS)
-        if _decisions(services, world, snapshot):
+        if any(d["decision_seq"] > after for d in _decisions(services, world, snapshot)):
             return snapshot
         snapshot = stays._step(world, client, snapshot)
     raise AssertionError("the person reached no choice point in thirty minutes")
@@ -195,6 +203,26 @@ def _choice_of(world, client, person: str) -> dict[str, Any]:
     assert read.status_code == 200, read.text
     [choice] = [entry for entry in read.json()["choices"] if entry["subject_id"] == person]
     return choice
+
+
+def _latest_of(world, client, person: str) -> dict[str, Any] | None:
+    """What the world's models read says of the person's latest decision from outside."""
+    scope, _, society = routes(world)
+    read = client.get(society + "/models", headers=OWNER, params=scope)
+    assert read.status_code == 200, read.text
+    [entry] = [entry for entry in read.json()["outside"] if entry["subject_id"] == person]
+    return entry["latest"]
+
+
+def _latest(receipt: dict[str, Any], consumed_tick: int | None = None) -> dict[str, Any]:
+    """An outside entry's ``latest`` for ``receipt``, consumed at ``consumed_tick`` or not yet."""
+    return {
+        "decision_seq": receipt["decision_seq"],
+        "base_tick": receipt["base_tick"],
+        "consumed_tick": consumed_tick,
+        "status": receipt["status"],
+        "reason": receipt["reason"],
+    }
 
 
 @pytest.mark.parametrize("saved_world", [2], indirect=True)
@@ -254,8 +282,11 @@ def test_a_bridge_decides_for_a_person_through_the_door_and_replay_needs_no_brid
         "source_ref_sha256": None,
     }
     assert "cost_usd" not in record
+    # The world's models read gives the person's latest decision from outside: the bridge's.
+    assert _latest_of(world, client, person) == _latest(receipt)
     # The minute applies the bridge's choice, and replay regenerates it with the bridge stopped.
-    stays._step(world, client, snapshot)
+    stepped = stays._step(world, client, snapshot)
+    assert _latest_of(world, client, person) == _latest(receipt, stepped["current_tick"])
     scope, _, society = routes(world)
     replayed = client.get(society + "/replay", headers=OWNER, params=scope)
     assert replayed.status_code == 200, replayed.text
@@ -291,6 +322,7 @@ def test_a_quiet_bridge_is_not_asked_and_revoking_hands_the_person_back(door, mo
             "ai": False,
             "connected": False,
             "declared": None,
+            "latest": _latest(receipt),
         }
     ]
     chosen = {"idempotency_key": str(uuid.uuid4()), "people": [person], "model": None}
@@ -303,3 +335,33 @@ def test_a_quiet_bridge_is_not_asked_and_revoking_hands_the_person_back(door, mo
     assert client.get(society + "/models", headers=OWNER, params=scope).json()["outside"] == []
     again = client.post(society + "/models", headers=OWNER, params=scope, json=chosen)
     assert again.status_code in (200, 201), again.text
+    # A new grant for the person has decided nothing yet: the ended grant's receipt is not its own.
+    _grant(world, client, person, key="outside-person-again")
+    assert _latest_of(world, client, person) is None
+
+
+@pytest.mark.parametrize("saved_world", [2], indirect=True)
+def test_a_program_that_never_answers_reads_as_missed_until_an_answer_replaces_it(door):
+    world, client, services = door
+    snapshot = stays._inhabited(world, client)
+    person = snapshot["state"]["inhabitants"][0]["id"]
+    grant_id = _grant(world, client, person, key="outside-person-silent")
+    host = services.decision_host()
+    channel, cursor = _channel(client, grant_id)
+    # Connected and asked, the program lets the deadline pass: the routine decides that turn.
+    with _Bridge(client, channel, cursor, answers=False) as silent:
+        snapshot = _until_decided(world, client, services, host, snapshot)
+    [missed] = _decisions(services, world, snapshot)
+    assert silent.asked and silent.sent == []
+    assert (missed["status"], missed["reason"]) == ("unavailable", "no_answer_in_time")
+    assert _latest_of(world, client, person) == _latest(missed)
+    # The program answers a later turn, and its answer is the latest.
+    snapshot = stays._step(world, client, snapshot)
+    with _Bridge(client, channel, silent.cursor) as answering:
+        snapshot = _until_decided(
+            world, client, services, host, snapshot, after=missed["decision_seq"]
+        )
+    answered = _decisions(services, world, snapshot)[-1]
+    assert answering.sent and answered["decision_seq"] > missed["decision_seq"]
+    assert (answered["status"], answered["reason"]) == ("accepted", "validated_choice")
+    assert _latest_of(world, client, person) == _latest(answered)

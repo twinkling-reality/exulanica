@@ -147,7 +147,8 @@ def test_a_visitor_crosses_in_through_the_door_and_goes_home(door, crossings):
         "thing_id": thing_id,
         "carried": [{"thing_id": sword["id"], "game_item": "test:sword"}],
     }
-    # The world's models read names the visitor among those decided for from outside.
+    # The world's models read names the visitor among those decided for from outside, with no
+    # decision of its program yet.
     scope, _, society_route = routes(world)
     models = client.get(society_route + "/models", headers=OWNER, params=scope).json()
     assert models["outside"] == [
@@ -161,6 +162,7 @@ def test_a_visitor_crosses_in_through_the_door_and_goes_home(door, crossings):
             "ai": False,
             "connected": True,
             "declared": None,
+            "latest": None,
         }
     ]
     # The visitor wears the shipped look its mapping named, chosen by its crossing.

@@ -249,10 +249,16 @@ and why not (`host_refusal`: `models_not_run_here`, `provider_credential_absent`
 `process_budget_spent` or `process_share_spent`); each person's choice with its decider, and why its
 model is not asked here when it is not (`refusal`, one of `MODEL_REFUSALS`) and where the decider
 comes from (`from`: `choice`, `travellers` or `travellers_over_bound`); each gate's travellers' mind
-(`travellers`: `{grant_id, choice_seq, decider, model}`); each person's latest model decision; and
+(`travellers`: `{grant_id, choice_seq, decider, model}`); each person's latest model decision;
 per model the decisions asked, accepted and applied, why the rest were not acted on, latency and
-cost, over the society's latest 2,000 decisions (`DECISIONS_READ`). An outside program's decisions
-name no model and are neither summarised nor counted among the models'. Neither route asks a model.
+cost, over the society's latest 2,000 decisions (`DECISIONS_READ`); and every subject an outside
+program decides for under a grant that stands (`outside`), with what the grant view says of its
+program. An outside program's decisions name no model and are neither summarised nor counted among
+the models'. Each `outside` entry gives its subject's latest receipt under the entry's own grant
+among those decisions (`latest`: `{decision_seq, base_tick, consumed_tick, status, reason}`, with
+`consumed_tick` null until a minute consumes it), or null when none of them is one. A turn the
+program left without a usable answer reads as its receipt does, such as `unavailable` with
+`no_answer_in_time`: the turn the routine decided. Neither route asks a model.
 
 In a saved world the People panel offers the choice for one person or for everyone and shows this
 read (`web/packages/app/src/composition/society-models-mount.ts`). Where the host cannot ask a

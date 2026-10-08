@@ -4,12 +4,13 @@
 needs: the models this server may ask for a person's decisions, each in plain words with whether
 it can be asked here and why not; whether this host asks models for this world at all; each
 person's current choice, with why its model is not asked here when it is not; each person's
-latest decision and what its minute did; and, per model, how many decisions were asked, accepted
-and applied, why the rest were not, and what they took and cost, over the society's latest
-``DECISIONS_READ`` decisions. ``POST`` at the same path records one choice, for one person or a
-group, of a model the manifest offers a person's decisions or of their own routine (no model). A
-choice is world data: append-only, with who made it; this host asking the model is the host's own
-business, stated in the read, never a reason to refuse the choice.
+latest decision and what its minute did; per model, how many decisions were asked, accepted and
+applied, why the rest were not, and what they took and cost, over the society's latest
+``DECISIONS_READ`` decisions; and who an outside program decides for, each with its latest
+decision under its grant among those. ``POST`` at the same path records one choice, for one
+person or a group, of a model the manifest offers a person's decisions or of their own routine (no
+model). A choice is world data: append-only, with who made it; this host asking the model is the
+host's own business, stated in the read, never a reason to refuse the choice.
 
 Both serve the decision role that decides for a society's people, as the role registry states it
 (:mod:`exulanica.world.decision_roles`): its offered models, its contract and its receipts. Neither
@@ -74,6 +75,8 @@ CHOICE_CONFLICTS: Final = frozenset(
 #: What the People panel shows: a society's people, so these routes serve the role that decides
 #: for them, as its registry entry names what it decides for.
 SUBJECT: Final = "person"
+#: What an outside entry says of its subject's latest decision by the program its grant opens to.
+OUTSIDE_LATEST: Final = ("decision_seq", "base_tick", "consumed_tick", "status", "reason")
 
 
 def _people_role() -> DecisionRole:
@@ -183,6 +186,29 @@ def _by_model(decisions: list[dict[str, Any]]) -> list[dict[str, Any]]:
             }
         )
     return summaries
+
+
+def _with_latest(
+    outside: list[dict[str, Any]], decisions: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """Each outside entry, in its order, with its subject's latest receipt among ``decisions``
+    whose decider is the entry's own grant (``latest``), or None when none of them is. A turn the
+    program left without a usable answer has such a receipt, with the outside reason the routine
+    decided for; another grant's receipts, or another subject's, are never an entry's."""
+    held: dict[tuple[str, str], dict[str, Any]] = {}
+    for decision in decisions:  # in decision order, so the last one kept is the latest
+        decider = decision["decider"]
+        if decider["kind"] == "external":
+            held[(decision["subject_id"], decider["grant_id"])] = decision
+    return [
+        {
+            **entry,
+            "latest": None
+            if (decision := held.get((entry["subject_id"], entry["grant_id"]))) is None
+            else {key: decision[key] for key in OUTSIDE_LATEST},
+        }
+        for entry in outside
+    ]
 
 
 @router.get("")
@@ -348,14 +374,18 @@ def society_models_view(
         "decisions_read": {"counted": len(decisions), "maximum": DECISIONS_READ},
         # Every subject an outside program decides for now under a grant that stands, the world's
         # own people a grant names (came "run") and the visitors that crossed in ("crossed"), with
-        # what the grant view says of its program. Added to this profile as an optional field: a
-        # reader that predates it reads everything else unchanged, and absent means nobody.
-        "outside": outside_deciders(
-            connection,
-            session.workspace_id,
-            state=snapshot["state"],
-            choices=choices,
-            bridges=None if services.door is None else services.door.bridges,
+        # what the grant view says of its program and the subject's latest decision under that
+        # grant among the decisions read. Added to this profile as optional fields: a reader that
+        # predates them reads everything else unchanged, and absent means nobody.
+        "outside": _with_latest(
+            outside_deciders(
+                connection,
+                session.workspace_id,
+                state=snapshot["state"],
+                choices=choices,
+                bridges=None if services.door is None else services.door.bridges,
+            ),
+            decisions,
         ),
     }
 

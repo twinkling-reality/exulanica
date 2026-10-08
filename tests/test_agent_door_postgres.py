@@ -467,22 +467,35 @@ def test_an_agents_own_body_comes_in_takes_its_turns_and_goes_home(door, crossin
             "crossing",
             {"look": mannequin.look, "version": mannequin.version, "sha256": mannequin.sha256},
         )
-        # Who decides for it, as its card reads it: an outside agent, by what the agent declared.
+        # Who decides for it, as its card reads it: an outside agent, by what the agent declared,
+        # with the agent's latest decision for it.
         scope, _, society_route = routes(world)
         models = client.get(society_route + "/models", headers=OWNER, params=scope).json()
-        assert models["outside"] == [
-            {
-                "subject_id": visitor["id"],
-                "came": "crossed",
-                "grant_id": grant_id,
-                "bridge": "agents",
-                "bridge_label": agents_bridge()["label"],
-                "run_by": "owner",
-                "ai": True,
-                "connected": True,
-                "declared": DECLARED,
-            }
+        [outside] = models["outside"]
+        latest = outside.pop("latest")
+        assert outside == {
+            "subject_id": visitor["id"],
+            "came": "crossed",
+            "grant_id": grant_id,
+            "bridge": "agents",
+            "bridge_label": agents_bridge()["label"],
+            "run_by": "owner",
+            "ai": True,
+            "connected": True,
+            "declared": DECLARED,
+        }
+        [*_, last] = [
+            d for d in _decisions(services, world, society) if d["subject_id"] == visitor["id"]
         ]
+        assert latest == {
+            "decision_seq": last["decision_seq"],
+            "base_tick": last["base_tick"],
+            # Whether a minute has consumed it yet is the playback's timing, not the agent's.
+            "consumed_tick": latest["consumed_tick"],
+            "status": last["status"],
+            "reason": last["reason"],
+        }
+        assert latest["consumed_tick"] is None or type(latest["consumed_tick"]) is int
         # Its owner sends it home: the agent reads why and acknowledges the departure once.
         sent = client.post(
             f"/door/grants/{grant_id}/send-away", headers=OWNER, json={"thing_id": visitor["id"]}
