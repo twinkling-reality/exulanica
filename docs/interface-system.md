@@ -248,7 +248,16 @@ for an arrival the society refused, "A knight could not come in, because" and it
 arrival waits for the door to name its bridge before it is told. An author's placements raise no notice,
 and nothing that happened before the page first read the world's events does either.
 
-A thing's abilities and what it said join the card as the server serves them.
+Said lately and Heard lately: a being's own last three lines, newest first, from the society's
+said events ("To the traveller", "To everyone near"), and the last three lines it heard, from its
+state ("Traveller, to it"), each with the world minute and the line shown as plain text, never as
+markup. Every line opens with the mark the world's line bubbles give it, by the one rule in
+`composition/thing-marks.ts` (`lineMarkOf`): a model's line is marked AI, naming the model only
+where the line's own record names one; an outside program's line wears its speaker's mark; a heard
+line whose said event the page no longer holds wears none. Said events are read by the drawing's
+reader (`saidLine`), and the rows are left out for a being that has said and heard nothing.
+
+A thing's abilities join the card as the server serves them.
 
 ### Look
 

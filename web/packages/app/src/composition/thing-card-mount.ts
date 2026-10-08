@@ -12,7 +12,7 @@
  */
 
 import type { ThingLibrary } from '@exulanica/atlas-react/things';
-import { buildThingCard, type CardLooks, type CardMark, type CardMind, type CardMindChoice, type ThingCardModel } from '../ui/thing-card.js';
+import { buildThingCard, type CardLine, type CardLooks, type CardMark, type CardMind, type CardMindChoice, type ThingCardModel } from '../ui/thing-card.js';
 import { costWords, modelLine } from '../ui/society-models.js';
 import type { ModelRef, SocietyModel } from '../society-models-api.js';
 import type { Credentials } from '../config.js';
@@ -20,8 +20,9 @@ import { openThingLibrary } from '../things-library.js';
 import { fetchThingLooks, readKindFacts, readLookFacts, type KindFacts, type LookFacts, type LookReference } from '../thing-card-api.js';
 import type { InhabitantView, MountedEnvironmentSelection, SelectedBeing, SelectedPerson, SelectedThing } from './environment-selection.js';
 import { creditOf, kindCameWords, lookLine, sourceLink } from './thing-origin-words.js';
-import { markLabel, markOf, type ThingMark } from './thing-marks.js';
+import { lineMarkOf, markLabel, markOf, type ThingMark } from './thing-marks.js';
 import { carriedWords, type KindReference } from './visitor-notices.js';
+import type { BeingLine } from './being-lines.js';
 import { THING_PICK_EVENT, type ThingPickDetail } from './things.js';
 import '../ui/thing-card.css';
 
@@ -56,6 +57,23 @@ function outsideMind(mark: ThingMark, entry: SelectedBeing['crossing']): CardMin
   return { name: mark.full, line, mark: cardMark(mark), choices: [], ask: '', when: '' };
 }
 
+/**
+ * A being's lines in the card's words: to whom (or from whom, for what it heard), the model that
+ * wrote it where the line's record names one, and its mark by the one rule the world's bubbles use
+ * (`lineMarkOf`).
+ */
+function cardLines(lines: readonly BeingLine[], subjectId: string, models: readonly SocietyModel[] | null, own: boolean): CardLine[] {
+  return lines.map((said) => {
+    const toWhom = said.toId === subjectId ? 'it' : said.to ?? 'everyone near';
+    const written = said.model;
+    const model = written === null ? null
+      : models?.find((one) => one.provider === written.provider && one.modelId === written.modelId) ?? null;
+    const mark = lineMarkOf({ decider: said.decider, model, speaker: said.speaker });
+    const who = own ? `To ${toWhom}` : `${said.speakerName}, to ${toWhom}`;
+    return { mark: mark === null ? null : cardMark(mark), who: model === null ? who : `${who} · ${model.name}`, line: said.line, minute: said.tick };
+  });
+}
+
 /** How a being came to be here, in words. */
 function beingCameWords(being: SelectedBeing, kind: KindFacts | null): string {
   switch (being.cameBy) {
@@ -88,6 +106,8 @@ export function personCard(
       mind: outsideMind(outside, crossing),
       looks: looksOf(facts?.look ?? null),
       holding: facts?.holding ?? null,
+      said: cardLines(being.said, subjectId, models, true),
+      heard: cardLines(being.heard, subjectId, models, false),
       cameFrom: beingCameWords(being, facts?.kind ?? null),
     };
   }
@@ -125,7 +145,12 @@ export function personCard(
     summary: facts?.kind.summary ?? about.note.description,
     now: about.note.activity.trim() === '' ? null : about.note.activity,
     mind,
-    ...(being === null ? {} : { looks: looksOf(facts?.look ?? null), holding: facts?.holding ?? null }),
+    ...(being === null ? {} : {
+      looks: looksOf(facts?.look ?? null),
+      holding: facts?.holding ?? null,
+      said: cardLines(being.said, subjectId, models, true),
+      heard: cardLines(being.heard, subjectId, models, false),
+    }),
     cameFrom: being === null ? 'One of the people who live in this world.' : beingCameWords(being, facts?.kind ?? null),
   };
 }

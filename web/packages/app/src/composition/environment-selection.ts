@@ -100,6 +100,7 @@ import { LineWatch, thingLine } from './thing-lines.js';
 import { DoorBridgesClient, type DoorBridge } from '../door-bridges-api.js';
 import { ThingLooksClient, type ThingLookChoice } from '../thing-looks-api.js';
 import { visitorNotice, VisitorNoticeWatch, type FreshEvent, type KindReference } from './visitor-notices.js';
+import { heardBy, saidBy, type BeingLine } from './being-lines.js';
 import '../ui/thing-marks.css';
 
 /** Where the development preview's real-engine society recording is served. */
@@ -199,6 +200,9 @@ export interface SelectedBeing {
   readonly holding: readonly { readonly id: string; readonly kind: KindReference }[];
   /** The saved world and version it lives in, for the looks chosen for its things. */
   readonly world: { readonly worldId: string; readonly versionId: string } | null;
+  /** Its own latest lines and the latest lines it heard, newest first (`being-lines.ts`). */
+  readonly said: readonly BeingLine[];
+  readonly heard: readonly BeingLine[];
 }
 
 /** A visitor notice as Selected hands it out: its sentence, its tone, and how to see who. */
@@ -2074,6 +2078,23 @@ export function mountEnvironmentSelection(
     if (person?.kind === undefined || person.came_by === undefined) return null;
     const crossing = person.came_by === 'crossed' ? person.crossing ?? null : null;
     if (crossing !== null && bridges?.has(crossing.bridge) !== true) readBridges();
+    const events = liveSociety?.view.eventsAvailable ? liveSociety.view.events : [];
+    const running = societyModels?.runningModels() ?? new Map();
+    const people = state?.inhabitants ?? [];
+    const kinds = things?.layer.maker.library.list.kinds ?? [];
+    const names = {
+      person: (other: string) => {
+        const found = people.find((held) => held.id === other);
+        return found === undefined ? null : inhabitantLabel(found);
+      },
+      kindLabel: (kind: KindReference) => kinds.find((one) => one.kind === kind.kind && one.version === kind.version && one.sha256 === kind.sha256)?.label ?? null,
+      speaker: (other: string) => {
+        const speaker = people.find((held) => held.id === other);
+        if (speaker === undefined) return null;
+        const crossed = speaker.came_by === 'crossed' ? speaker.crossing ?? null : null;
+        return { running: running.get(other) ?? null, crossing: crossed, bridge: crossed === null ? null : bridges?.get(crossed.bridge) ?? null, declared: null };
+      },
+    };
     return {
       kind: person.kind,
       cameBy: person.came_by,
@@ -2081,6 +2102,8 @@ export function mountEnvironmentSelection(
       crossing: crossing === null ? null : { bridge: crossing.bridge, entry: bridges?.get(crossing.bridge) ?? null },
       holding: (state?.things ?? []).filter((thing) => thing.held_by === id).map((thing) => ({ id: thing.id, kind: thing.kind })),
       world: savedWorld === null ? null : { worldId: savedWorld.worldId, versionId: savedWorld.versionId },
+      said: saidBy(id, events, names),
+      heard: heardBy(person, events, names),
     };
   }
 

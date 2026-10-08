@@ -57,6 +57,18 @@ export interface CardLooks {
   readonly credit: { readonly text: string; readonly href: string | null } | null;
 }
 
+/**
+ * One line a being said or heard: who said it to whom in words ("To the traveller", "The knight,
+ * to everyone near"), the speaker's mark, the line itself (shown as plain text, never markup) and
+ * the world minute it was said in.
+ */
+export interface CardLine {
+  readonly mark: CardMark | null;
+  readonly who: string;
+  readonly line: string;
+  readonly minute: number;
+}
+
 export interface ThingCardModel {
   /** Which thing this is: a new subject closes an open choice and forgets the last outcome. */
   readonly subject: string;
@@ -70,6 +82,10 @@ export interface ThingCardModel {
   readonly looks?: CardLooks | null;
   /** What it holds, in words ("a sword"); null leaves the row out. */
   readonly holding?: string | null;
+  /** Its own last lines, newest first; empty or absent leaves the row out. */
+  readonly said?: readonly CardLine[];
+  /** The last lines it heard, newest first; empty or absent leaves the row out. */
+  readonly heard?: readonly CardLine[];
   readonly cameFrom: string;
 }
 
@@ -180,6 +196,23 @@ export function buildThingCard(handlers: ThingCardHandlers): ThingCard {
     return box;
   }
 
+  function linesRow(heading: string, lines: readonly CardLine[]): HTMLElement {
+    const box = row(heading);
+    const list = el('ol', { class: 'thing-card-lines' });
+    for (const said of lines) {
+      list.append(el('li', { class: 'thing-card-line' }, [
+        el('p', { class: 'thing-card-line-who' }, [
+          ...(said.mark === null ? [] : [markPill(said.mark)]),
+          el('span', { text: said.who }),
+          el('span', { class: 'thing-card-faint', text: `minute ${said.minute}` }),
+        ]),
+        el('p', { class: 'thing-card-line-text', text: said.line }),
+      ]));
+    }
+    box.append(list);
+    return box;
+  }
+
   async function choose(key: string): Promise<void> {
     if (busy) return;
     busy = true;
@@ -213,6 +246,8 @@ export function buildThingCard(handlers: ThingCardHandlers): ThingCard {
       holding.append(el('p', { text: model.holding }));
       parts.push(holding);
     }
+    if (model.said !== undefined && model.said.length > 0) parts.push(linesRow('Said lately', model.said));
+    if (model.heard !== undefined && model.heard.length > 0) parts.push(linesRow('Heard lately', model.heard));
     const came = row('Came from');
     came.append(el('p', { text: model.cameFrom }));
     parts.push(came);

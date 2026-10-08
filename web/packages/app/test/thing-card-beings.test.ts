@@ -14,6 +14,7 @@ import type { SelectedBeing, SelectedPerson } from '../src/composition/environme
 import type { DoorBridge } from '../src/door-bridges-api.js';
 import type { LookReference } from '../src/thing-card-api.js';
 import { readKindFacts, readLookFacts } from '../src/thing-card-api.js';
+import { AN_AI_MODEL, markLabel } from '../src/composition/thing-marks.js';
 
 const repository = `${process.cwd()}/..`;
 const read = (path: string): Record<string, unknown> =>
@@ -52,7 +53,7 @@ const about = (being: SelectedBeing | undefined, running: SelectedPerson['mind']
 });
 const being = (fields: Partial<SelectedBeing>): SelectedBeing => ({
   kind: ref('knight'), cameBy: 'placed', placedId: 'knight-1', crossing: null, holding: [],
-  world: { worldId: 'world:authored:saved', versionId: 'version' }, ...fields,
+  world: { worldId: 'world:authored:saved', versionId: 'version' }, said: [], heard: [], ...fields,
 });
 const facts = (look: string | null, holding: string | null = null) => ({
   kind: readKindFacts(KINDS['knight']), look: look === null ? null : readLookFacts(LOOKS[look]), holding,
@@ -88,6 +89,35 @@ describe('a person of a society of things, on the card', () => {
     expect(placed.holding).toBeNull();
     const villager = personCard('person-0', about(being({ kind: ref('villager'), cameBy: 'populated', placedId: null })), null);
     expect(villager.cameFrom).toBe('One of the people who live in this world.');
+  });
+});
+
+describe('what a being said and heard, on its card', () => {
+  const QWEN = { provider: 'nebius_token_factory', modelId: 'Qwen/Qwen3-235B-A22B-Instruct-2507', name: 'Qwen3 235B Instruct', description: '', refusal: null } as never;
+  it('lists its own lines to whom, the lines it heard from whom, the model where named, and each line as plain text', () => {
+    const talking = being({
+      said: [{ tick: 7, speakerId: 'knight-0', speakerName: 'Knight', toId: null, to: null, line: 'Rest by the well.', decider: 'model', model: null, speaker: { running: null } }],
+      heard: [{ tick: 6, speakerId: 'traveller-0', speakerName: 'Traveller', toId: 'knight-0', to: 'Knight', line: '<b>Thank you</b>', decider: 'model', model: { provider: 'nebius_token_factory', modelId: 'Qwen/Qwen3-235B-A22B-Instruct-2507' }, speaker: { running: null } }],
+    });
+    const { card, root } = mount();
+    card.view.show('knight-0', about(talking));
+    const said = personCard('knight-0', about(talking), [QWEN]);
+    // The marks are lineMarkOf's (thing-marks.ts): an AI model unnamed, or the model the line names.
+    expect(said.said).toEqual([{ mark: { kind: 'ai', text: 'AI', label: markLabel(AN_AI_MODEL) }, who: 'To everyone near', line: 'Rest by the well.', minute: 7 }]);
+    expect(said.heard?.[0]?.mark?.label).toBe('run by an AI model, Qwen3 235B Instruct');
+    expect(said.heard?.[0]?.who).toBe('Traveller, to it · Qwen3 235B Instruct');
+    expect(rowText(root, 'Said lately')).toContain('To everyone near');
+    // A line is the society's text: shown as written, never as markup.
+    const heardRow = [...root.querySelectorAll('.thing-card-row')].find((row) => row.querySelector('h4')?.textContent === 'Heard lately')!;
+    expect(heardRow.querySelector('.thing-card-line-text')?.textContent).toBe('<b>Thank you</b>');
+    expect(heardRow.querySelector('b')).toBeNull();
+  });
+
+  it('leaves both rows out for a being that has said and heard nothing', () => {
+    const { card, root } = mount();
+    card.view.show('knight-0', about(being({})));
+    expect(rowText(root, 'Said lately')).toBeNull();
+    expect(rowText(root, 'Heard lately')).toBeNull();
   });
 });
 

@@ -129,7 +129,7 @@ function mount() {
   const crowd = {
     root: { parent: { name: 'authored-region:region:starter' } },
     setSociety: vi.fn(() => 0), clearSociety: vi.fn(), revealInhabitant: vi.fn(), setFigures: vi.fn(), societyJumps: [],
-    visibleInhabitantIds: [], inhabitantRepresentation: vi.fn(() => null),
+    visibleInhabitantIds: [] as string[], inhabitantRepresentation: vi.fn(() => null),
     inhabitantDetail: vi.fn(() => 'near'), coincidentInhabitants: vi.fn(() => []),
     societyCounts: { population: 4, outdoors: 4, indoors: 0, near: 4, far: 0, drawn: 4 },
     drawnInhabitantCount: 4, inhabitantSeatAtPlace: vi.fn(() => false), setSeatingLayout: vi.fn(), seatingMisses: [],
@@ -179,7 +179,7 @@ function mount() {
     show: (id, about) => { shown.push({ id, about }); return true; },
     hide: () => undefined,
   });
-  return { mounted, notices, shown, showStatus };
+  return { mounted, notices, shown, showStatus, crowd };
 }
 
 const settle = async () => { for (let i = 0; i < 12; i += 1) await new Promise((resolve) => setTimeout(resolve, 0)); };
@@ -235,6 +235,7 @@ describe('visitors crossing into a saved world', () => {
       crossing: { bridge: 'blockgame', entry: { bridge: 'blockgame', label: 'Block Game', game: 'Block Game', runBy: 'server', ai: false } },
       holding: [{ id: 'sword-1', kind: SWORD }],
       world: { worldId: WORLD, versionId: 'version' },
+      said: [], heard: [],
     });
 
     // Read again with nothing new, nothing is told again.
@@ -251,6 +252,35 @@ describe('visitors crossing into a saved world', () => {
     // See who on an arrival whose visitor has gone says so.
     notices[0]!.seeWho!();
     expect(showStatus).toHaveBeenCalledWith('They are no longer in this world.');
+    mounted.dispose();
+  });
+});
+
+describe('the lines a being said and heard, handed to its card', () => {
+  it('fills the selected being\'s lines from the events read and its state', async () => {
+    server.tick = 9;
+    server.people = [
+      person('knight-0', { kind: KNIGHT, came_by: 'placed', placed_id: 'knight-1',
+        heard: [{ tick: 9, from: 'traveller-0', from_kind: KNIGHT, from_number: 2, to: 'knight-0', line: 'Thank you.' }] }),
+      person('traveller-0', { kind: KNIGHT, came_by: 'placed', placed_id: 'traveller-1' }),
+    ];
+    server.things = [];
+    server.events = [
+      event('said', 'knight-0', 'chose_to_say', { line: 'Take it.', to: 'traveller-0', to_kind: KNIGHT, to_number: 2, from_kind: KNIGHT, from_number: 1, heard_by: ['traveller-0'], decider: 'model' }),
+      event('said', 'traveller-0', 'chose_to_say', { line: 'Thank you.', to: 'knight-0', to_kind: KNIGHT, to_number: 1, from_kind: KNIGHT, from_number: 2, heard_by: ['knight-0'], decider: 'model' }),
+    ];
+    const { mounted, shown, crowd } = mount();
+    // The People list names whom the crowd draws nearby.
+    crowd.visibleInhabitantIds = ['knight-0', 'traveller-0'];
+    await mounted.begin();
+    await settle();
+    const pick = [...document.querySelectorAll('select')].find((one) => one.getAttribute('aria-label') === 'Inspect nearby inhabitant')!;
+    pick.value = 'knight-0';
+    pick.dispatchEvent(new Event('change'));
+    const being = shown.at(-1)!.about.being!;
+    expect(being.said.map((line) => [line.line, line.toId, line.decider])).toEqual([['Take it.', 'traveller-0', 'model']]);
+    // Heard from the state; who decided it from the speaker's said event in the window.
+    expect(being.heard.map((line) => [line.line, line.speakerId, line.decider])).toEqual([['Thank you.', 'traveller-0', 'model']]);
     mounted.dispose();
   });
 });

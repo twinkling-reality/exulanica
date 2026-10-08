@@ -112,6 +112,12 @@
 }
 #shell a.thing-card-link { font: var(--weight-medium) var(--text-md)/var(--text-md-line) var(--font-ui); color: var(--color-accent-text); }
 #shell .thing-card-credit { color: var(--color-text-muted); }
+/* Lines a being said or heard: who and when on one line, the words under it, quoted. */
+#shell .thing-card-lines { display: flex; flex-direction: column; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+#shell .thing-card-line-who { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); font-size: var(--text-sm) !important; line-height: var(--text-sm-line) !important; color: var(--color-text-muted); }
+#shell .thing-card-line-text { overflow-wrap: anywhere; }
+#shell .thing-card-line-text::before { content: '\201C'; }
+#shell .thing-card-line-text::after { content: '\201D'; }
 #shell .thing-card-links { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-1); margin-top: var(--space-1) !important; }
 #shell .world-panel .thing-card button.thing-card-link {
   min-height: 0;
