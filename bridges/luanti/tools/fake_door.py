@@ -3,15 +3,17 @@
     python3 bridges/luanti/tools/fake_door.py --port 19525 --log FILE [--minute-s 2]
 
 It is not the door. It serves the channel routes a bridge uses (hello, frames by long-poll,
-answers, arrivals, delivered, gone) with the frame shapes the door's protocol states for crossings,
-keeps everything in memory and plays a short script, a world minute every ``--minute-s`` seconds:
-the grant lets one traveller in and things be carried both ways; an arrival is placed at the next
-minute; the world asks about the character every minute it is there (the gate leaves those asks to
-the world, so any answer is counted); on its first visit someone gives it a sword, and after three
-minutes it chooses to leave carrying what it holds; on a later visit it leaves after two minutes. A
-departure repeats in every poll until it is reported delivered. With ``--refuse-look`` an arrival
-in that look is refused ``look_not_shipped``, as a door refuses a look its library does not hold.
-Every body a bridge sends is appended to the log as one JSON line, headers never.
+answers, arrivals, delivered, gone, home) with the frame shapes the door's protocol states for
+crossings, keeps everything in memory and plays a short script, a world minute every
+``--minute-s`` seconds: the grant lets one traveller in and things be carried both ways; an arrival
+is placed at the next minute; the world asks about the character every minute it is there (the gate
+leaves those asks to the world, so any answer is counted); on its first visit someone gives it a
+sword, and after three minutes it chooses to leave carrying what it holds; on a later visit it
+leaves after two minutes; a character its player calls home leaves at the next minute, as one its
+world's owner sends home. A departure repeats in every poll until it is reported delivered. With
+``--refuse-look`` an arrival in that look is refused ``look_not_shipped``, as a door refuses a look
+its library does not hold. Every body a bridge sends is appended to the log as one JSON line,
+headers never.
 
 Standard library only; listens on 127.0.0.1.
 """
@@ -75,6 +77,9 @@ class Visit:
                 return
             visitor = self.visitor
             if visitor is None:
+                return
+            if visitor.get("called_home"):
+                self.depart("sent_home")
                 return
             stayed = self.minute - visitor["arrived_at"]
             if visitor["first"] and stayed == 2:
@@ -141,6 +146,17 @@ class Visit:
             }
         )
 
+    def call_home(self, thing_id: str) -> tuple[int, dict[str, Any]]:
+        """A player calls the character home: it departs at the next minute (why ``sent_home``, as
+        the owner's send-away), the call answered once as recorded and again as not."""
+        visitor = self.visitor
+        if visitor is None or visitor["thing_id"] != thing_id:
+            return 404, {"code": "unknown_reference", "detail": "no visitor of that id here"}
+        departure_id = str(uuid.uuid5(NAMESPACE, f"departure:{thing_id}:sent_home"))
+        recorded = not visitor.get("called_home")
+        visitor["called_home"] = True
+        return 202, {"departure_id": departure_id, "recorded": recorded}
+
     def depart(self, why: str) -> None:
         visitor = self.visitor
         departure_id = str(uuid.uuid5(NAMESPACE, f"departure:{visitor['thing_id']}:{why}"))
@@ -189,7 +205,8 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         url = urlparse(self.path)
         if url.path != "/door/channel/frames":
-            self._answer(404, {"code": "unknown_reference", "detail": "no such route here"})
+            # As the door answers a route it does not have.
+            self._answer(404, {"detail": "Not Found"})
             return
         after = int((parse_qs(url.query).get("after") or ["0"])[0])
         visit = self.visit
@@ -247,11 +264,17 @@ class Handler(BaseHTTPRequestHandler):
             elif url.path.startswith("/door/channel/departures/"):
                 visit.delivered.add(url.path.split("/")[4])
                 self._answer(202, {"received": True})
+            elif url.path == "/door/channel/home":
+                if set(body) != {"thing_id"}:
+                    self._answer(422, {"code": "invalid_home", "detail": "closed body"})
+                    return
+                self._answer(*visit.call_home(body["thing_id"]))
             elif url.path in ("/door/channel/answers", "/door/channel/gone"):
                 # Counted in the log; the gate sends neither.
                 self._answer(202, {"received": True})
             else:
-                self._answer(404, {"code": "unknown_reference", "detail": "no such route here"})
+                # As the door answers a route it does not have.
+                self._answer(404, {"detail": "Not Found"})
 
 
 def main(argv: list[str] | None = None) -> int:

@@ -104,8 +104,13 @@ end
 
 -- What the gate mod marks: arrivals, departures, deliveries, frames it leaves to the world.
 local marks = {}
+-- A step may look at the stand-in's screen at the moment of a mark.
+local mark_hook
 check.listen(function(what, details)
 	marks[#marks + 1] = {what = what, details = table.copy(details), at_ms = now_ms()}
+	if mark_hook then
+		mark_hook(marks[#marks])
+	end
 end)
 
 local function mark_since(index, what, test)
@@ -449,6 +454,59 @@ step("the departure is delivered once, and reported", 20, function()
 		departed .. " departure, report " .. tostring(reported and reported.details.status))
 	return true
 end)
+
+-- Calling a character home: with none away, /comehome says so; with one away, the door writes its
+-- departure and it comes home at the world's next minute, in the words of a call answered. Played
+-- against every door that lets a gate call its visitors home (check.py says which).
+if scenario == "crossing" or core.settings:get_bool("exulanica_gate_check.home_route", false) then
+	local calling
+	local home_call = "a player calls their character home with /comehome, and it comes home"
+	-- The line on the player's screen once the door has answered the call.
+	mark_hook = function(mark)
+		if mark.what == "called_home" then
+			mark.line = line_shown(player)
+		end
+	end
+	step(home_call, lives_s + 120, function()
+		local comehome = core.registered_chatcommands.comehome.func
+		if not calling then
+			local ok, said = comehome("checker")
+			calling = {stage = "walking", ok = ok, said = said, marks = #marks}
+			walk_in(player)
+			return false
+		end
+		local journey = check.journey("checker")
+		if calling.stage == "walking" then
+			if journey and journey.state == "across" then
+				calling.stage = "called"
+				calling.heard = #player.heard
+				comehome("checker")
+			end
+			return false
+		end
+		if journey ~= nil then
+			return false
+		end
+		local answered = player:heard_since(calling.heard, "Your character is on its way home from "
+			.. result.world_words .. ".")
+		local words = player:heard_since(calling.heard, "Your character came home from "
+			.. result.world_words .. ", carrying a torch.")
+		local called = mark_since(calling.marks, "called_home", function(details)
+			return details.status == 202
+		end)
+		local ok = calling.ok == false and calling.said == "Your character is here with you."
+			and answered ~= nil and called ~= nil and words ~= nil
+			and called.line == "Your character is coming home from " .. result.world_words .. "..."
+			and count(player.inventory, "default:torch") == 5 and line_shown(player) == nil
+		-- What the player was told from the call on, when the call did not bring it home.
+		local heard = {}
+		for at = calling.heard + 1, #player.heard do
+			heard[#heard + 1] = player.heard[at]
+		end
+		verdict(home_call, ok, ok and words or table.concat(heard, " | "))
+		return true
+	end)
+end
 
 local again
 if scenario ~= "crossing_invite" then

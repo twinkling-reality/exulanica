@@ -46,6 +46,9 @@ local function status_text(record)
 	if record.state == "leaving" then
 		return "Your character is crossing into " .. world_words(record) .. "..."
 	end
+	if record.called_home then
+		return "Your character is coming home from " .. world_words(record) .. "..."
+	end
 	return "Your character is in " .. world_words(record)
 end
 

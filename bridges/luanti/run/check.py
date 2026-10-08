@@ -253,12 +253,17 @@ def crossing_world(api: Api, placed: dict[str, Any], scene: Path) -> dict[str, A
     return world
 
 
-def world_may_decide(api: Api) -> bool:
-    """Whether this door's grants may say the world decides for their visitors: its published grant
-    body names the field (``GET /openapi.json`` is public)."""
+def door_offers(api: Api) -> dict[str, bool]:
+    """What this door offers that a crossing may use, from its published routes (``GET
+    /openapi.json`` is public): whether a grant may say the world decides for its visitors (the
+    grant body names the field), and whether a gate may call its visitors home (``POST
+    /door/channel/home``)."""
     schema = api("GET", "/openapi.json")
     body = schema.get("components", {}).get("schemas", {}).get("IssueBody", {})
-    return "visitors_decided_by" in body.get("properties", {})
+    return {
+        "world_decides": "visitors_decided_by" in body.get("properties", {}),
+        "calls_home": "/door/channel/home" in schema.get("paths", {}),
+    }
 
 
 def opened_to_travellers(
@@ -310,11 +315,13 @@ def luanti_world(
     player: str | None = None,
     carry: str | None = None,
     lives_s: float = 20.0,
+    calls_home: bool = False,
 ) -> Path:
     """A fresh flat world and its server settings: a check world with the check mod (told how long
-    the world's owner lets a character live in the world, ``lives_s``), or, given a ``player``, a
-    world for a person to play in, with the gate at the spawn and only that name let in, starting
-    with ``carry`` (the game's own item words) in the hand when given."""
+    the world's owner lets a character live in the world, ``lives_s``, and whether the door lets
+    a gate call its visitors home, ``calls_home``), or, given a ``player``, a world for a person to
+    play in, with the gate at the spawn and only that name let in, starting with ``carry`` (the
+    game's own item words) in the hand when given."""
     world = folder / "world"
     world.mkdir(parents=True)
     mods = "load_mod_exulanica_gate = true\n"
@@ -344,6 +351,7 @@ def luanti_world(
             "exulanica_gate.check_mode = true",
             f"exulanica_gate_check.scenario = {scenario}",
             f"exulanica_gate_check.lives_s = {round(lives_s)}",
+            f"exulanica_gate_check.home_route = {'true' if calls_home else 'false'}",
         ]
     else:
         settings += [
@@ -442,11 +450,13 @@ def act_as_owner(
     server: subprocess.Popen,
     limit_s: int,
     lives_s: float = LIVES_S,
+    closes_after: int = 2,
 ) -> dict[str, Any]:
     """Wait for the check's server to stop, acting meanwhile as the world's owner, each act once,
     from the mod's recording: send the character home once it has lived in the world for
     ``lives_s``, unless it has left by itself (where minds decide for it), and close the gate a
-    few seconds after it has crossed again (by then its player has left the game)."""
+    few seconds after its ``closes_after``-th arrival (by then its player has left the game; 0:
+    never)."""
     acts: dict[str, Any] = {}
     arrivals: list[tuple[float, str | None]] = []
     departed: set[str | None] = set()
@@ -477,9 +487,11 @@ def act_as_owner(
                     expected=(202, 404),
                 )
                 acts["sent_home" if "sent_away" in sent else "left_by_itself"] = lived
-        if len(arrivals) > 1 and "revoked" not in acts and now - arrivals[1][0] >= 5:
-            api("POST", f"/door/grants/{grant_id}/revoke", expected=(200,))
-            acts["revoked"] = {"after_arrival_s": round(now - arrivals[1][0], 1)}
+        if closes_after and len(arrivals) >= closes_after and "revoked" not in acts:
+            arrived_at = arrivals[closes_after - 1][0]
+            if now - arrived_at >= 5:
+                api("POST", f"/door/grants/{grant_id}/revoke", expected=(200,))
+                acts["revoked"] = {"after_arrival_s": round(now - arrived_at, 1)}
         time.sleep(0.5)
     return acts
 
@@ -541,6 +553,10 @@ def against_fake_door(arguments: argparse.Namespace, folder: Path) -> dict[str, 
         == ["default-skin", "cc0-traveller"],
         "the delivery was reported with both things": bool(delivered)
         and len(delivered[0]["delivered"]) == 2,
+        "the character was called home once": sum(
+            1 for entry in sent if entry["route"] == "/door/channel/home"
+        )
+        == 1,
     }
     return summary
 
@@ -747,6 +763,8 @@ def main(argv: list[str] | None = None) -> int:
             "travellers": world["travellers"],
         }
         summary["playback"] = play(api, world, arguments.minutes_speed)
+        offers = door_offers(api)
+        summary["door_offers"] = offers
         grant = {
             "visitors_maximum": 1,
             "kinds": ["player"],
@@ -755,7 +773,7 @@ def main(argv: list[str] | None = None) -> int:
             "may_carry_out": True,
             "world_words": world["words"],
             **opened_to_travellers(
-                world["travellers"], world_may_decide(api), arguments.traveller_mind
+                world["travellers"], offers["world_decides"], arguments.traveller_mind
             ),
         }
         issued = api(
@@ -792,6 +810,7 @@ def main(argv: list[str] | None = None) -> int:
             api.base,
             "crossing_invite" if arguments.invite else "crossing_door",
             lives_s=arguments.lives_s,
+            calls_home=offers["calls_home"],
         )
         recorded = luanti / "exulanica_gate" / "exchanges.jsonl"
         server = start_luanti(
@@ -803,8 +822,17 @@ def main(argv: list[str] | None = None) -> int:
             invite=invite,
         )
         del credential, invite, bridge_credential
+        # The gate closes a few seconds after the last crossing the check mod plays, the one whose
+        # player leaves the game; an invite's check plays none such.
+        closes_after = 0 if arguments.invite else (3 if offers["calls_home"] else 2)
         summary["owner_acts"] = act_as_owner(
-            api, summary["grant_id"], recorded, server, arguments.limit_s, arguments.lives_s
+            api,
+            summary["grant_id"],
+            recorded,
+            server,
+            arguments.limit_s,
+            arguments.lives_s,
+            closes_after,
         )
         exit_code = server.returncode
         summary["luanti_exit"] = exit_code
@@ -817,6 +845,9 @@ def main(argv: list[str] | None = None) -> int:
         exchanges = [json.loads(line) for line in recorded.read_text().splitlines()]
         summary["answers_posted"] = sum(
             1 for entry in exchanges if entry.get("path") == "/door/channel/answers"
+        )
+        summary["home_calls"] = sum(
+            1 for entry in exchanges if entry.get("path") == "/door/channel/home"
         )
         # Each ask about the character the gate left to the world, as the world recorded it.
         world_side = []

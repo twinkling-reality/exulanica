@@ -282,6 +282,15 @@ core.register_chatcommand("cross", {
 	end,
 })
 
+-- Not /home: Minetest Game's own sethome mod names a player's home point so, and the gate takes
+-- nothing away from a game.
+core.register_chatcommand("comehome", {
+	description = "Call your character home from the world it is in",
+	func = function(name)
+		return crossing.call_home(name)
+	end,
+})
+
 core.register_on_player_receive_fields(function(player, formname, fields)
 	local name = player:get_player_name()
 	if formname == INVITE_FORM then

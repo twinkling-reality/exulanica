@@ -235,6 +235,50 @@ function crossing.leave_home(name, chan, portal, outside)
 	send_arrival(name, record)
 end
 
+-- A player calls their character home (/comehome): the door writes the departure its owner's
+-- send-away would, at the world's next minute, and the departed frame brings the character back as
+-- any other. Returns what the chat command says at once; the door's answer is told when it comes.
+function crossing.call_home(name)
+	local record = deps.journey.record_of(name)
+	if not record or record.state == "returned" then
+		return false, "Your character is here with you."
+	end
+	if record.state ~= "across" then
+		return false, "Your character is still crossing; call it home once it has arrived."
+	end
+	local words = deps.journey.world_words(record)
+	if record.called_home then
+		return true, "Your character is on its way home from " .. words .. "."
+	end
+	local chan = deps.channel_of(record.grant_id)
+	if not (chan and chan.ready()) then
+		return false, "The gate cannot reach " .. words .. " right now; try again in a moment."
+	end
+	local subject = record.subject_id
+	local body = deps.json.object({{"thing_id", deps.json.string(subject)}})
+	chan.post("/door/channel/home", body, function(code, answer)
+		local reason = type(answer) == "table" and answer.code or nil
+		if code == 202 then
+			local current = deps.journey.record_of(name)
+			if current and current.subject_id == subject then
+				current.called_home = true
+				deps.journey.save(name, current)
+			end
+			deps.engine.tell(name, "Your character is on its way home from " .. words .. ".")
+		elseif reason == "unknown_reference" or reason == "grant_ended" then
+			-- No longer one of the world's visitors, or the gate closed: the world sends it home.
+			deps.engine.tell(name, "Your character is already on its way home from " .. words .. ".")
+		elseif code == 404 or code == 405 then
+			deps.engine.tell(name, "This world cannot call characters home yet; yours comes home "
+				.. "when the world sends it.")
+		else
+			deps.engine.tell(name, "The world did not answer; try /comehome again in a moment.")
+		end
+		deps.record.mark("called_home", {subject = subject, status = code})
+	end)
+	return true
+end
+
 local function on_arrived(frame)
 	for _, name in ipairs(journeys_where(function(record)
 		return record.arrival_id == frame.arrival_id
@@ -359,8 +403,12 @@ local function on_departed(chan, frame)
 		why = frame.why, delivered = brought})
 	if name then
 		local record = deps.journey.record_of(name)
-		local sentence = (WHY_WORDS[frame.why] or "Your character came back") .. " from "
-			.. deps.journey.world_words(record)
+		local opening = WHY_WORDS[frame.why] or "Your character came back"
+		if record.called_home and frame.why == "sent_home" then
+			-- The departure the player's own call wrote.
+			opening = "Your character came home"
+		end
+		local sentence = opening .. " from " .. deps.journey.world_words(record)
 		if #words > 0 then
 			sentence = sentence .. ", carrying " .. table.concat(words, " and ")
 		end

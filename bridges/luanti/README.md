@@ -6,8 +6,9 @@ the gate's light sends their character through it into an Exulanica world, throu
 itself and carrying one thing from the player's hand, and lives there, with a mind of that world.
 The player is never held and decides nothing for it: they play on, and one line above their hotbar
 says where their character is. When it comes home (it chooses to leave, the world's owner sends it,
-or the gate closes), what it carries lands in the player's inventory, or waits for them if they are
-away. Nothing in the Luanti window is a menu of the world's options; the world is seen in Exulanica.
+the player calls it home with `/comehome`, or the gate closes), what it carries lands in the
+player's inventory, or waits for them if they are away. Nothing in the Luanti window is a menu of
+the world's options; the world is seen in Exulanica.
 
 The mod uses the engine's own API and nothing of any game, so one mod serves every Luanti game.
 What a game's characters and items become in Exulanica is that game's mapping file
@@ -24,7 +25,7 @@ the next, so a deployment that pinned one keeps working: version 1 (profile
 | A character crossing into a world: through the world's gate with one thing from the hand, the player told once when it arrives, its things delivered once when it comes home (also to a player who left the game meanwhile) | Works against the door's crossing routes; a scripted check plays it on a headless server against the demo's scene (below) |
 | The world deciding for the character | The gate answers no ask about it; until the door hands a crossed character to a mind the world's owner chose, the world's routine settles each ask |
 | A character in the player's own look (the game's own player picture, built by `tools/build_look.py`) | The world shows it once its thing store holds the built look; until then the character arrives in the CC0 look |
-| Calling a character home from the game (`/home`) | Waits for the door's route for it |
+| Calling a character home from the game (`/comehome`; not `/home`, which Minetest Game's own `sethome` mod names a player's home point) | Works against the stand-in door, where the scripted check plays it; against the door once it publishes `POST /door/channel/home`, which the check then plays too. On a door without the route the player is told the world cannot call characters home yet |
 | Invites (`/cross`, a code pasted into a masked form, for a server whose gate opens only by codes) | Works against the door's invite routes; the scripted check plays it with `--invite`: a code that opens nothing refused in words, the world's code opening the gate for that player, the same code refused the second time, then the crossing |
 
 ## Layout
@@ -62,21 +63,23 @@ scene's gate, carrying things both ways. For a scene that names its travellers (
 through and the mind the world gives them), the grant opens that gate and, where the door's grants
 can say so, says the world decides for them; their paid mind is named only with `--traveller-mind`,
 under an allocation. The check then expects no ask about the character to reach the gate. With
-`--invite` the Luanti server has no channel credential of its own: the check gives the world an invite
-and the stand-in player types it into `/cross` (the bridge's own credential and the code reach the
-server's environment alone, and nothing records either). A headless Luanti server's check mod then walks a
-stand-in player into the gate with torches through the same handlers a person's actions reach,
-while the check acts as the world's owner from the mod's recording: it sends the character home
-after it has lived in the world for `--lives-s` seconds (20 by default) unless the world's minds
-lead it home first, and closes the gate once its player has left the game with the character away
-again. Whatever the world gave the character must come home into the player's inventory with the
-torch, and the character arrives in the player's own look where the world can show it, else in the
-free look with the player told why. It then reads the world's own records: the gate posted no
-answer, each ask about the character was settled by the world, and the society replays with no
-game running. Each run's folder (ignored) holds the server's log, the mod's recording of every
-exchange and a summary with no credential in it. With `--against fake` the same crossing runs
-against the stand-in door instead, with no stack, where the character is given a sword and leaves
-on its own.
+`--invite` the Luanti server has no channel credential of its own: the check gives the world an
+invite and the stand-in player types it into `/cross` (the bridge's own credential and the code
+reach the server's environment alone, and nothing records either). A headless Luanti server's check
+mod then walks a stand-in player into the gate with torches through the same handlers a person's
+actions reach, while the check acts as the world's owner from the mod's recording: it sends the
+character home after it has lived in the world for `--lives-s` seconds (20 by default) unless the
+world's minds lead it home first, and closes the gate once its player has left the game with the
+character away again. Where the door publishes its home route (`POST /door/channel/home`, read from
+its `/openapi.json`), the stand-in player also sends its character once more and calls it home with
+`/comehome`. Whatever the world gave the character must come home into the player's inventory with
+the torch, and the character arrives in the player's own look where the world can show it, else in
+the free look with the player told why. It then reads the world's own records: the gate posted no
+answer, each ask about the character was settled by the world, and the society replays with no game
+running. Each run's folder (ignored) holds the server's log, the mod's recording of every exchange
+and a summary with no credential in it. With `--against fake` the same crossing runs against the
+stand-in door instead, with no stack, where the character is given a sword and leaves on its own,
+and is called home with `/comehome` on a later visit.
 
 `--api URL --token-file FILE --record FILE` joins a stack the check did not start, where a scene
 was built for a take: it starts and stops no stack and builds nothing. That stack is started with
