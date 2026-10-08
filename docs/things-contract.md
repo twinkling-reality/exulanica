@@ -778,12 +778,15 @@ substituted or truncated is read. One figure draws each look kind:
 | `skinned` | The rigged container with its own clips; standing, walking and running blend by ground speed (`rig.ground_speed_mm_per_s`), a clip plays at most twice its pace, and a motion with no clip is drawn idle. A rig with no clips at all, as a creature sculpted for its own plan has, is posed by the same solved gait as `rigid_on_bones`, its skin following its joints; it must rest translation-only with each joint hung from its plan parent's, and is refused by name otherwise |
 | `rigid_on_bones` | The container's `bone:<name>` nodes, each hung from its nearest dressed ancestor in the body plan's parent table, posed procedurally |
 | `light` | An omni light of the look's colour, intensity and radius, a core and a glow, floating 1,250 mm over the thing's point and drifting within its radius (presentation only) |
-| `static` | The container at the thing's place, turned by its placed yaw as an authored object is |
+| `static` | The container at the thing's place, turned by its placed yaw as an authored object is, at its kind's size: scaled uniformly so its longest side is its kind's box's longest side, the side the hands fit to a socket; within 1 mm a metre of that it is drawn as authored |
 | `look_role` | The engine's box primitive in the kind's box: no style pack dresses a thing yet |
 | `none` | Nothing; the thing keeps its place |
 
 A body is drawn at its look's natural height kept inside its kind's height range, so a look never
-makes a kind taller or shorter than the kind allows. No bone is named in the drawing: a skeleton's
+makes a kind taller or shorter than the kind allows; an object is drawn as long as its kind says, so
+a thing in a hand is the size the society fitted to that hand, whatever unit its container was
+made in. The look keeps its own proportions, so a container shaped unlike its kind's box may reach
+past the box's narrower sides. No bone is named in the drawing: a skeleton's
 limbs are read from its shape and its plan's sockets (a chain ending near the ground is a leg, one
 carrying a socket an arm, the one ending highest the head), so any body plan's skeleton is read the
 same way. Standing figures breathe and turn their heads; walking figures step in their skeleton's

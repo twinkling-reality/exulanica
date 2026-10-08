@@ -103,11 +103,45 @@ export function placeHeld(entity: pc.Entity, grip: Grip, at: pc.Vec3, carry: Qua
   entity.setRotation(quat(carry));
 }
 
-/** A static container's figure: a solid object as placed, its front +Z. */
+/** How far a container's longest side may be from its kind's before it is drawn at the kind's: 1 mm a metre. */
+export const KIND_SIZE_TOLERANCE = 0.001;
+
+/**
+ * Draw a static look at its kind's size: `model`, a child of a figure's root, scaled uniformly
+ * about the root's origin so the longest side of what it draws equals the longest side of the
+ * kind's box, the measure the hands fit sockets by. Its proportions are its own. A container within
+ * `KIND_SIZE_TOLERANCE` of that size, or one that draws nothing, is left as authored. Answers the
+ * scale applied (1 where none).
+ */
+export function fitToKind(model: pc.Entity, boxMm: { readonly width: number; readonly depth: number; readonly height: number }): number {
+  let bounds: pc.BoundingBox | null = null;
+  for (const render of model.findComponents('render') as pc.RenderComponent[]) {
+    for (const instance of render.meshInstances) {
+      if (bounds === null) bounds = new pc.BoundingBox(instance.aabb.center.clone(), instance.aabb.halfExtents.clone());
+      else bounds.add(instance.aabb);
+    }
+  }
+  if (bounds === null) return 1;
+  const drawn = 2 * Math.max(bounds.halfExtents.x, bounds.halfExtents.y, bounds.halfExtents.z);
+  const scale = Math.max(boxMm.width, boxMm.depth, boxMm.height) / 1000 / drawn;
+  if (!Number.isFinite(scale) || Math.abs(scale - 1) <= KIND_SIZE_TOLERANCE) return 1;
+  const at = model.getLocalPosition();
+  const size = model.getLocalScale();
+  model.setLocalPosition(at.x * scale, at.y * scale, at.z * scale);
+  model.setLocalScale(size.x * scale, size.y * scale, size.z * scale);
+  return scale;
+}
+
+/**
+ * A static container's figure: a solid object as placed, its front +Z, drawn at its kind's size
+ * (`fitToKind`), so what a hand holds is as long as what the society fitted to the hand.
+ */
 export class StaticFigure implements ThingFigure {
   readonly root: pc.Entity;
   readonly standingHeight: number;
   readonly pickVolume: PickVolume;
+  /** The scale its container is drawn at to stand at its kind's size (1 where it is authored so). */
+  readonly kindScale: number;
 
   constructor(
     parent: pc.Entity,
@@ -118,6 +152,9 @@ export class StaticFigure implements ThingFigure {
   ) {
     this.root = new pc.Entity(name);
     this.root.addChild(model);
+    // Measured before the root joins the region, so the bounds are in the root's own frame. A look
+    // role's primitive is made at the kind's box already.
+    this.kindScale = lookKind === 'static' ? fitToKind(model, boxMm) : 1;
     parent.addChild(this.root);
     this.standingHeight = boxMm.height / 1000;
     // The kind's box in glTF axes: width across X, depth along Z, height up.
