@@ -146,3 +146,62 @@ def test_the_placeholders_the_description_was_sent_with_reach_the_boundary():
     choice = choose_look(client, sent, OPTIONS, placeholders=placeholders)
     assert choice.look_words == ("cozy town like [place A]",)
     assert dict(policy.requests[0].placeholders) == placeholders
+
+
+class _Timed(FakeTransport):
+    """A scripted transport that keeps how long each request was given."""
+
+    def __init__(self, responses: list[HttpResponse]) -> None:
+        super().__init__(responses)
+        self.timeouts: list[float] = []
+
+    def post_json(self, url, *, headers, payload, timeout):  # type: ignore[no-untyped-def]
+        self.timeouts.append(timeout)
+        return super().post_json(url, headers=headers, payload=payload, timeout=timeout)
+
+
+def _timed(*responses: HttpResponse) -> tuple[ModelClient, _Timed]:
+    transport = _Timed(list(responses))
+    client = ModelClient(
+        api_key="test-key-not-real",
+        transport=transport,
+        budget=BudgetGuard(ceiling_usd=TEST_CEILING_USD, max_calls=TEST_MAX_CALLS),
+        policy=RecordingPolicy(),
+    )
+    return client, transport
+
+
+def _ticks(*seconds: float):
+    """A clock reading each of ``seconds`` in turn."""
+    readings = iter(seconds)
+    return lambda: next(readings)
+
+
+def test_the_call_and_its_repair_share_one_deadline_the_roles_timeout():
+    timeout = load_manifest()[CHOOSER_ROLE].timeout_seconds
+    assert timeout == 10
+    client, transport = _timed(
+        _reply({"look": "exulanica.cozy-town", "look_words": ["snug"]}),
+        _reply({"look": "exulanica.cozy-town", "look_words": ["cozy"]}),
+    )
+    # The deadline is set at 0; the first call is sent at 0 and the repair at 7 s.
+    choice = choose_look(client, DESCRIPTION, OPTIONS, clock=_ticks(0.0, 0.0, 7.0))
+    assert choice.look == "exulanica.cozy-town"
+    first, repair = transport.timeouts
+    assert 9.5 < first <= 10
+    assert 2.5 < repair <= 3
+    # A shorter deadline is kept to; a longer one is held to the role's timeout.
+    client, transport = _timed(_reply({"look": None, "look_words": []}))
+    choose_look(client, DESCRIPTION, OPTIONS, deadline_s=4, clock=_ticks(0.0, 0.0))
+    assert 3.5 < transport.timeouts[0] <= 4
+    client, transport = _timed(_reply({"look": None, "look_words": []}))
+    choose_look(client, DESCRIPTION, OPTIONS, deadline_s=60, clock=_ticks(0.0, 0.0))
+    assert 9.5 < transport.timeouts[0] <= 10
+
+
+def test_no_repair_is_asked_once_the_deadline_has_passed():
+    client, transport = _timed(_reply({"look": "exulanica.cozy-town", "look_words": ["snug"]}))
+    choice = choose_look(client, DESCRIPTION, OPTIONS, clock=_ticks(0.0, 0.0, 10.5))
+    assert (choice.look, choice.look_words) == (None, ())
+    assert choice.refused is not None and "no time was left" in choice.refused
+    assert transport.call_count == 1

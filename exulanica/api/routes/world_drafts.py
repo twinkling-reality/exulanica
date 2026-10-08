@@ -199,7 +199,8 @@ def _unavailable(failed: Exception) -> LookReason:
         return "no_allowance"
     if isinstance(failed, PrivacyAdmissionError):
         return "request_refused"
-    return "timed_out" if getattr(failed, "timed_out", False) else "failed"
+    ended = getattr(failed, "timed_out", False) or getattr(failed, "deadline_ended", False)
+    return "timed_out" if ended else "failed"
 
 
 def _look_offer(client: ModelClient, sent: SentDescription) -> LookOfferView | None:

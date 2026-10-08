@@ -398,6 +398,7 @@ def test_a_refused_answer_offers_no_look_and_says_why(drafts):
     ("failure", "reason"),
     [
         (TransportError("no whole answer", timed_out=True), "timed_out"),
+        (TransportError("the step's deadline ended", deadline_ended=True), "timed_out"),
         (TransportError("the provider failed", retryable=False), "failed"),
         (BudgetExceededError("no allowance", spent_usd=1, ceiling_usd=1), "no_allowance"),
     ],

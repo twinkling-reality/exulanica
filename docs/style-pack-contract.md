@@ -311,7 +311,9 @@ and without it, and the draft's `execution` lists only the drafter's calls; the 
 in `look_offer.execution`. It spends the same allowance as the draft, through the same client.
 
 The step runs after the draft in the same request, so the answer comes that much later: a median
-of about 1 s in its measurement, and at most two calls at the role's timeout. The role's timeout,
+of about 1 s in its measurement, and never more than the role's timeout, one deadline over the call
+and its repair together. A repair is asked only while some of it is left; a call the deadline ends
+is `unavailable` with `timed_out`. The role's timeout,
 10 s, follows the manifest's timeout rule (the primary's longest measured call times two, rounded up
 to 5 s) from its pre-registered measurement, whose record holds the primary's own calls
 ([record](evaluation/2026-10-07-look-chooser-timings.json)): 59 calls, longest 4,830 ms. The

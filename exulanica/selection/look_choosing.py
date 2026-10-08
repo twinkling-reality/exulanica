@@ -8,6 +8,8 @@ answers a listed look or none, with the description's own words that chose it. D
 validation decides: a look not listed, a phrase not copied from the description, words without a
 look or a look without words are refused, repaired once, and then the step answers none. Whatever
 it answers, the person chooses; the library's default stands when it answers none or fails.
+The step is optional, so it runs within one deadline, the role's timeout, over its call and its
+repair together: the draft it follows is never kept waiting longer than that by it.
 
 The step's role, :data:`CHOOSER_ROLE`, has its timeout from a pre-registered measurement of its
 primary's own calls (the role's ``timeout_basis`` in the model manifest names the record).
@@ -17,8 +19,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import time
 import uuid
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated, Any, Final, Literal
@@ -157,13 +160,20 @@ def choose_look(
     placeholders: Mapping[uuid.UUID, str] | None = None,
     log: CallLog | None = None,
     max_tokens: int | None = None,
+    deadline_s: float | None = None,
+    clock: Callable[[], float] = time.monotonic,
 ) -> LookChoice:
     """Ask which listed look ``description`` asks for, with one repair, and answer none on a
     second refusal. ``description`` is the text as it was sent to the drafter (saved names
     already replaced, ``placeholders`` the record of those replacements, handed to the boundary
     with the request); ``options`` the library's looks. The model sees nothing else. A model
-    error (a timeout, a failure, a refused request, no allowance left) is the caller's."""
+    error (a timeout, a failure, a refused request, no allowance left) is the caller's.
+
+    The call and its repair share one deadline, ``deadline_s`` or else the role's timeout: each
+    is sent with what is left of it, and no repair is asked once none is left."""
     prompt = chooser_prompt() if prompt is None else prompt
+    timeout = float(client.manifest[role].timeout_seconds)
+    ends = clock() + (timeout if deadline_s is None else min(deadline_s, timeout))
     if max_tokens is None:
         # The ceiling the role declares, as the measurement that set its timeout asked with.
         declared = client.manifest[role].max_tokens
@@ -178,6 +188,10 @@ def choose_look(
     ]
     refused: str | None = None
     for attempt in range(1, ATTEMPTS + 1):
+        left = ends - clock()
+        if left <= 0:
+            refused = f"{refused}; no time was left to repair it"
+            break
         try:
             answered = client.structured(
                 role,
@@ -186,6 +200,7 @@ def choose_look(
                 prompt_version=prompt.prompt_version,
                 placeholders=placeholders,
                 max_tokens=max_tokens,
+                deadline_s=left,
             )
             log.record(answered.call)
             form = answered.value.model_dump()
