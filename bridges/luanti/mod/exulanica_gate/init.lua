@@ -433,12 +433,20 @@ if settings.check_mode then
 		lines = lines,
 		reads = reads,
 		picture_bytes = gate.picture_bytes,
+		-- The server's own channel, else the first an invite opened.
 		state = function()
-			if not server_channel then
+			local chan = server_channel
+			if not chan then
+				for _, opened in pairs(channels) do
+					chan = opened
+					break
+				end
+			end
+			if not chan then
 				return nil
 			end
-			return {state = server_channel.state, grant = server_channel.grant,
-				hold_seconds = server_channel.hold_seconds, world_words = server_channel.world_words}
+			return {state = chan.state, grant = chan.grant, hold_seconds = chan.hold_seconds,
+				world_words = chan.world_words}
 		end,
 		build_gate = function(origin, across_x)
 			gate.build(origin, across_x, frame_node)

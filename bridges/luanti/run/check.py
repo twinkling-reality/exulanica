@@ -290,8 +290,17 @@ def luanti_world(
     return world
 
 
-def start_luanti(folder: Path, world: Path, port: int, credential: str) -> subprocess.Popen:
-    """``luanti --server`` on ``world``, its credential in its environment and nowhere else."""
+def start_luanti(
+    folder: Path,
+    world: Path,
+    port: int,
+    credential: str | None,
+    *,
+    bridge_credential: str | None = None,
+    invite: str | None = None,
+) -> subprocess.Popen:
+    """``luanti --server`` on ``world``, its secrets in its environment and nowhere else: a grant's
+    channel credential, or the bridge's own credential with an invite code the check mod types."""
     binary = INSTALL / "app" / "luanti.app" / "Contents" / "MacOS" / "luanti"
     if not binary.exists():
         raise Refused("luanti-missing", f"{binary} (run bridges/luanti/run/install.sh first)")
@@ -301,8 +310,13 @@ def start_luanti(folder: Path, world: Path, port: int, credential: str) -> subpr
         "LUANTI_USER_PATH": str(INSTALL / "user"),
         "LUANTI_GAME_PATH": str(INSTALL / "games"),
         "LUANTI_MOD_PATH": f"{BRIDGE / 'mod'}:{CHECK_MOD}",
-        "EXULANICA_GATE_CHANNEL_CREDENTIAL": credential,
     }
+    if credential:
+        environment["EXULANICA_GATE_CHANNEL_CREDENTIAL"] = credential
+    if bridge_credential:
+        environment["EXULANICA_GATE_BRIDGE_CREDENTIAL"] = bridge_credential
+    if invite:
+        environment["EXULANICA_GATE_CHECK_INVITE"] = invite
     output = open(folder / "server.out", "w")  # noqa: SIM115 - the server writes to it until it stops
     return subprocess.Popen(
         [
@@ -509,6 +523,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--scene", type=Path, default=None, help="the scene to build")
     parser.add_argument(
+        "--invite",
+        action="store_true",
+        help="open the gate by an invite the check mod types into /cross, not a server credential",
+    )
+    parser.add_argument(
         "--traveller-mind",
         action="store_true",
         help="give travellers the mind the scene names (its model calls are paid for: only under "
@@ -533,6 +552,9 @@ def main(argv: list[str] | None = None) -> int:
         return 0 if checks and not failed else 1
 
     adapter = json.loads((MOD / "adapter.json").read_text())
+    # The bridge's own credential redeems invites; only its digest is declared, and the credential
+    # reaches the Luanti server's environment alone, and only in an invite check.
+    bridge_credential = secrets.token_urlsafe(32)
     folder = CHECKOUT / ".exulanica" / "luanti-checks" / time.strftime("%Y%m%d-%H%M%S")
     folder.mkdir(parents=True)
     bridges = [
@@ -542,7 +564,7 @@ def main(argv: list[str] | None = None) -> int:
             "game": "Luanti (Minetest Game)",
             "run_by": "server",
             "ai": False,
-            "credential_sha256": hashlib.sha256(secrets.token_bytes(32)).hexdigest(),
+            "credential_sha256": hashlib.sha256(bridge_credential.encode()).hexdigest(),
             "mapping_sha256": [mapping_digest()],
             "adapter_versions": [adapter["adapter_version"]],
             "listed": False,
@@ -602,19 +624,41 @@ def main(argv: list[str] | None = None) -> int:
                 "bridge": "luanti",
                 "version_id": world["version"],
                 "minutes": 60,
-                "channel_credential": True,
+                "channel_credential": not arguments.invite,
                 **grant,
             },
         )
-        credential = issued["channel_credential"]["credential"]
+        credential = None if arguments.invite else issued["channel_credential"]["credential"]
+        invite = None
+        if arguments.invite:
+            invite = api(
+                "POST", f"/door/grants/{issued['grant']['grant_id']}/invites", expected=(201,)
+            )["code"]
         summary["grant_id"] = issued["grant"]["grant_id"]
         if arguments.play:
+            if arguments.invite:
+                # A person types the code their world shows them; this check shows none.
+                raise Refused(
+                    "invite-play", "--play serves a gate opened by the server's credential"
+                )
             play_until_stopped(arguments, folder, api, world, credential, summary)
             return 0
-        luanti = luanti_world(folder, arguments.luanti_port, api.base)
+        luanti = luanti_world(
+            folder,
+            arguments.luanti_port,
+            api.base,
+            "crossing_invite" if arguments.invite else "crossing_door",
+        )
         recorded = luanti / "exulanica_gate" / "exchanges.jsonl"
-        server = start_luanti(folder, luanti, arguments.luanti_port, credential)
-        del credential
+        server = start_luanti(
+            folder,
+            luanti,
+            arguments.luanti_port,
+            credential,
+            bridge_credential=bridge_credential if arguments.invite else None,
+            invite=invite,
+        )
+        del credential, invite, bridge_credential
         summary["owner_acts"] = act_as_owner(
             api, summary["grant_id"], recorded, server, arguments.limit_s
         )

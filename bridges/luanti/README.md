@@ -25,7 +25,7 @@ the next, so a deployment that pinned one keeps working: version 1 (profile
 | The world deciding for the character | The gate answers no ask about it; until the door hands a crossed character to a mind the world's owner chose, the world's routine settles each ask |
 | A character in the player's own look (the game's own player picture, built by `tools/build_look.py`) | The world shows it once its thing store holds the built look; until then the character arrives in the CC0 look |
 | Calling a character home from the game (`/home`) | Waits for the door's route for it |
-| Invites (`/cross`, a code pasted into a masked form) | Written to the door's invite route; not yet run against it |
+| Invites (`/cross`, a code pasted into a masked form, for a server whose gate opens only by codes) | Works against the door's invite routes; the scripted check plays it with `--invite`: a code that opens nothing refused in words, the world's code opening the gate for that player, the same code refused the second time, then the crossing |
 
 ## Layout
 
@@ -61,7 +61,10 @@ being on its routine, no model called) and grants the `luanti` bridge one travel
 scene's gate, carrying things both ways. For a scene that names its travellers (the gate they come
 through and the mind the world gives them), the grant opens that gate and, where the door's grants
 can say so, says the world decides for them; their paid mind is named only with `--traveller-mind`,
-under an allocation. The check then expects no ask about the character to reach the gate. A headless Luanti server's check mod then walks a
+under an allocation. The check then expects no ask about the character to reach the gate. With
+`--invite` the Luanti server has no channel credential of its own: the check gives the world an invite
+and the stand-in player types it into `/cross` (the bridge's own credential and the code reach the
+server's environment alone, and nothing records either). A headless Luanti server's check mod then walks a
 stand-in player into the gate with torches through the same handlers a person's actions reach,
 while the check acts as the world's owner from the mod's recording: it sends the character home
 after it has lived in the world for a while, and closes the gate once its player has left the game

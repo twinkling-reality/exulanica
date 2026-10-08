@@ -167,9 +167,73 @@ local GAME_FORM = "the game's own inventory form"
 -- (tools/fake_door.py), which plays the world's side: it asks about the character (left to the
 -- world), and its character leaves with a sword it was given;
 -- crossing_door: the same crossing against the door itself, whose world's owner (check.py) sends
--- the character home and later closes the gate.
+-- the character home and later closes the gate;
+-- crossing_invite: the gate opened by an invite code the player types into /cross (the server has
+-- no channel credential of its own), then one crossing, sent home by the world's owner.
 local scenario = core.settings:get("exulanica_gate_check.scenario") or "crossing_door"
 result.scenario = scenario
+-- Read once, in a check world only; typed into the form as a player pastes it, never logged.
+local invite_code = scenario == "crossing_invite" and os.getenv("EXULANICA_GATE_CHECK_INVITE") or nil
+-- Forms shown before the player walks in (an invite's form): none may be added while away.
+local forms_at_walk = 0
+
+-- Submit the form last shown to a stand-in, through the handlers a person's submission reaches.
+local function submit_form(stand, fields)
+	local shown = stand.forms[#stand.forms]
+	if not shown then
+		return false
+	end
+	for _, handler in ipairs(core.registered_on_player_receive_fields) do
+		if handler(stand, shown[1], fields) then
+			return true
+		end
+	end
+	return false
+end
+
+-- A player types /cross and pastes a code into the form it opens.
+local function type_code(stand, code)
+	if core.registered_chatcommands.cross.func(stand.name) == false then
+		return false
+	end
+	return submit_form(stand, {exg_open = "Open the gate", exg_code = code})
+end
+
+if scenario == "crossing_invite" then
+	step("a server with no credential of its own opens no gate until a code is typed", 10, function()
+		player = player or stand_in("checker", {x = 0.5, y = 9, z = 2})
+		verdict("a server with no credential of its own opens no gate until a code is typed",
+			check.state() == nil and type(invite_code) == "string")
+		return true
+	end)
+
+	-- Each typed code is answered in words once the door answers: wait for the words.
+	local function code_step(name, code_of, words_expected)
+		local heard_from
+		step(name, 30, function()
+			if not heard_from then
+				heard_from = #player.heard
+				type_code(player, code_of())
+				return false
+			end
+			local words = player:heard_since(heard_from, words_expected)
+			if words then
+				verdict(name, true, words)
+				return true
+			end
+		end)
+	end
+	-- Not shaped as an invite at all: the door answers a malformed code as it answers an unknown one.
+	code_step("a code that opens nothing is refused in words", function()
+		return "no such code"
+	end, "That code opens nothing here")
+	code_step("the code the world's owner gave opens the gate for this player", function()
+		return invite_code
+	end, "The gate is open for you")
+	code_step("a code opens a gate once", function()
+		return invite_code
+	end, "That code opens nothing here")
+end
 
 step("the server's channel said hello and polls", 90, function()
 	local state = check.state()
@@ -226,14 +290,16 @@ end
 local walked_at
 step("a player walks into the gate: one torch goes with their character, and they play on", 20,
 	function()
-		if not player then
+		if not (player and player.ready) then
 			check.build_gate(gate_origin, true)
-			player = stand_in("checker", {x = 0.5, y = 9, z = 2})
+			player = player or stand_in("checker", {x = 0.5, y = 9, z = 2})
 			player.inventory:set_stack("main", 1, ItemStack("default:torch 5"))
+			player.ready = true
 			return false
 		end
 		if not walked_at then
 			walked_at = now_ms()
+			forms_at_walk = #player.forms
 			walk_in(player)
 			return false
 		end
@@ -248,7 +314,7 @@ step("a player walks into the gate: one torch goes with their character, and the
 			player.inventory:get_stack("main", 1):get_count() == 4 and player.physics.speed == 1
 				and player.physics.jump == 1 and player.inventory_form == GAME_FORM
 				and player:get_pos().z > gate_origin.z + 1
-				and #player.forms == 0
+				and #player.forms == forms_at_walk
 				and shown:find("Your character is crossing into " .. result.world_words, 1, true) ~= nil,
 			"four torches stay in the hand; out the far side, not held; no menu; the line: " .. shown)
 		return true
@@ -285,7 +351,7 @@ step("the world decides for the character: the gate answers no ask about it", 12
 			return false
 		end
 		verdict("the world decides for the character: the gate answers no ask about it",
-			mark_since(0, "frame_ignored", asked_frame) == nil and #player.forms == 0,
+			mark_since(0, "frame_ignored", asked_frame) == nil and #player.forms == forms_at_walk,
 			"the world decides; no ask reached the gate")
 		return true
 	end
@@ -293,7 +359,7 @@ step("the world decides for the character: the gate answers no ask about it", 12
 		return false
 	end
 	verdict("the world decides for the character: the gate answers no ask about it",
-		mark_since(0, "answered") == nil and #player.forms == 0,
+		mark_since(0, "answered") == nil and #player.forms == forms_at_walk,
 		"the door named the gate; its asks were left to the world")
 	return true
 end)
@@ -353,6 +419,7 @@ step("the departure is delivered once, and reported", 20, function()
 end)
 
 local again
+if scenario ~= "crossing_invite" then
 step("a player who leaves the game while their character is away is told on return", 240,
 	function()
 		if not again then
@@ -389,6 +456,7 @@ step("a player who leaves the game while their character is away is told on retu
 			tostring(words))
 		return true
 	end)
+end
 
 if scenario == "crossing_door" then
 	step("the gate's end is read and the channel stops", 60, function()
