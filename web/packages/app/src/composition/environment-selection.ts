@@ -100,7 +100,7 @@ import { markLabel, markOf, type MarkInput } from './thing-marks.js';
 import { LineWatch, thingLine } from './thing-lines.js';
 import { DoorBridgesClient, type DoorBridge } from '../door-bridges-api.js';
 import { ThingLooksClient, type ThingLookChoice } from '../thing-looks-api.js';
-import { visitorNotice, VisitorNoticeWatch, type FreshEvent, type KindReference } from './visitor-notices.js';
+import { kindDocumentLabel, kindKey, noticeKinds, visitorNotice, VisitorNoticeWatch, type FreshEvent, type KindReference } from './visitor-notices.js';
 import { heardBy, saidBy, type BeingLine } from './being-lines.js';
 import '../ui/thing-marks.css';
 
@@ -565,6 +565,10 @@ export function mountEnvironmentSelection(
   const lineWatch = new LineWatch();
   /** Crossings read but not yet told, while the door says which bridge they came through. */
   let heldNotices: readonly FreshEvent[] = [];
+  /** Labels of kinds the shipped list does not hold, from their own documents; null where unreadable. */
+  const documentLabels = new Map<string, string | null>();
+  /** Those kinds whose documents are being read now. */
+  const kindsReading = new Set<string>();
   let authoredWorldFailure: string | null = null;
   let chosen: NYCLocalFeature | null = null;
   let admittedFeaturesByProvider = new Map<string, NYCLocalFeature>();
@@ -2119,9 +2123,35 @@ export function mountEnvironmentSelection(
     if (tell === undefined || heldNotices.length === 0) { heldNotices = []; return; }
     const unknown = heldNotices.some((held) => held.bridgeKey !== null && bridges?.has(held.bridgeKey) !== true);
     if (unknown && (bridgesReading || performance.now() - bridgesAskedAt >= 60_000)) { readBridges(); return; }
-    const kinds = things?.layer.maker.library.list.kinds ?? [];
+    const library = things?.layer.maker.library ?? null;
+    const kinds = library?.list.kinds ?? [];
+    const listedLabel = (kind: KindReference): string | undefined =>
+      kinds.find((one) => one.kind === kind.kind && one.version === kind.version && one.sha256 === kind.sha256)?.label;
+    // A kind the shipped list does not hold (a workspace's own) is named from its own document,
+    // read once by digest before anything is told, so it is never announced as "a visitor".
+    // Nothing is told while any held notice's kind is still being read: a later minute's read
+    // must not tell the earlier crossings without their names.
+    const unread = library === null ? [] : heldNotices.flatMap((held) => noticeKinds(held.event))
+      .filter((kind) => listedLabel(kind) === undefined && !documentLabels.has(kindKey(kind)));
+    if (library !== null && unread.length > 0) {
+      const toRead = unread.filter((kind) => !kindsReading.has(kindKey(kind)));
+      for (const kind of toRead) kindsReading.add(kindKey(kind));
+      if (toRead.length > 0) {
+        void Promise.allSettled(toRead.map(async (kind) => {
+          try {
+            documentLabels.set(kindKey(kind), kindDocumentLabel(await library.kindDocument({ key: kind.kind, version: kind.version, sha256: kind.sha256 })));
+          } catch {
+            // Read and unreadable: told with the generic words.
+            documentLabels.set(kindKey(kind), null);
+          } finally {
+            kindsReading.delete(kindKey(kind));
+          }
+        })).then(() => { if ((phase as string) !== 'disposed') tellVisitors(); });
+      }
+      return;
+    }
     const words = {
-      kindLabel: (kind: KindReference) => kinds.find((one) => one.kind === kind.kind && one.version === kind.version && one.sha256 === kind.sha256)?.label ?? null,
+      kindLabel: (kind: KindReference) => listedLabel(kind) ?? documentLabels.get(kindKey(kind)) ?? null,
       bridge: (key: string) => bridges?.get(key) ?? null,
     };
     for (const held of heldNotices) {
@@ -2703,6 +2733,8 @@ export function mountEnvironmentSelection(
       visitorWatch.reset();
       lineWatch.reset();
       heldNotices = [];
+      documentLabels.clear();
+      kindsReading.clear();
       if (deps.env.canvas) delete deps.env.canvas.dataset['thingMarks'];
       if (deps.env.canvas) for (const key of ['thingsDrawn', 'thingsMissed', 'thingsFailure']) delete deps.env.canvas.dataset[key];
       savedWorldActions.clear();

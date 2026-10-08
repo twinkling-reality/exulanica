@@ -119,6 +119,14 @@ describe('the thing card for a placed thing', () => {
     expect(credit?.href).toBe('https://creativecommons.org/licenses/by-sa/3.0/');
   });
 
+  it('reads a placed thing\'s first look from its kind\'s document, for a kind the shipped list does not hold', async () => {
+    const lib = { ...library(), kindEntry: () => { throw new Error('not in the shipped list'); } } as unknown as ThingLibrary;
+    const { card, root } = mount({ lib });
+    card.view.showThing!(placed(KNIGHT, 'knight-1'));
+    await settle();
+    expect(rowText(root, 'Looks like')).toContain('Armoured knight');
+  });
+
   it('shows the thing picked last, never an answer that arrives late for another', async () => {
     let releaseKnight!: () => void;
     const knightHeld = new Promise<void>((resolve) => { releaseKnight = resolve; });

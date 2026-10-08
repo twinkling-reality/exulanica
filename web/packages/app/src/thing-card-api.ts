@@ -30,11 +30,15 @@ export interface KindFacts {
   /** Who runs a being of this kind until somebody chooses: its decider kind, or null for an object. */
   readonly decidedBy: string | null;
   readonly origin: OriginRecord;
+  /** The kind's first look, which a thing of it wears until another is chosen; null for none. */
+  readonly firstLook: LookReference | null;
 }
 
 export interface LookFacts {
   readonly label: string;
   readonly origin: OriginRecord;
+  /** Whether it draws a being as one of the world's people (the people catalog's look kind). */
+  readonly peopleCatalog: boolean;
 }
 
 export interface LookReference {
@@ -77,6 +81,16 @@ export function readOrigin(value: unknown): OriginRecord {
   };
 }
 
+/** The first of a kind's looks, by key, version and digest, or null where it lists none. */
+function firstLookOf(value: unknown): LookReference | null {
+  if (!Array.isArray(value)) return invalid('thing kind looks');
+  if (value.length === 0) return null;
+  const first = object(value[0], 'thing kind look');
+  const version = first['version'];
+  if (!Number.isSafeInteger(version) || (version as number) < 1) invalid('thing kind look version');
+  return { key: text(first['look'], 'thing kind look key'), version: version as number, sha256: text(first['sha256'], 'thing kind look digest') };
+}
+
 export function readKindFacts(value: unknown): KindFacts {
   const held = object(value, 'thing kind');
   if (held['profile'] !== 'exulanica.thing-kind/v1') invalid('thing kind profile');
@@ -88,13 +102,18 @@ export function readKindFacts(value: unknown): KindFacts {
     class: kindClass,
     decidedBy: kindClass === 'being' ? text(object(deciders, 'thing kind deciders')['default'], 'decider') : null,
     origin: readOrigin(held['origin']),
+    firstLook: firstLookOf(held['looks']),
   };
 }
 
 export function readLookFacts(value: unknown): LookFacts {
   const held = object(value, 'look');
   if (held['profile'] !== 'exulanica.look/v1') invalid('look profile');
-  return { label: text(held['label'], 'look label'), origin: readOrigin(held['origin']) };
+  return {
+    label: text(held['label'], 'look label'),
+    origin: readOrigin(held['origin']),
+    peopleCatalog: held['look_kind'] === 'catalog_person',
+  };
 }
 
 /**

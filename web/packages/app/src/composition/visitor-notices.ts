@@ -48,6 +48,25 @@ function kindOf(value: unknown): KindReference | null {
   return typeof kind === 'string' && typeof version === 'number' && typeof sha256 === 'string' ? { kind, version, sha256 } : null;
 }
 
+/** A kind reference as one key, for keeping what was read about it. */
+export const kindKey = (kind: KindReference): string => `${kind.kind}/${kind.version}/${kind.sha256}`;
+
+/** Every kind a crossing event names (the visitor's and what it carried), for reading their labels. */
+export function noticeKinds(event: SocietyEvent): readonly KindReference[] {
+  const thing = record(record(event.document)['thing']);
+  const carried = Array.isArray(thing['carried']) ? thing['carried'] : [];
+  return [thing['kind'], ...carried.map((held) => record(held)['kind'])].flatMap((value) => {
+    const kind = kindOf(value);
+    return kind === null ? [] : [kind];
+  });
+}
+
+/** A kind document's own label, or null where it states none. */
+export function kindDocumentLabel(document: unknown): string | null {
+  const label = record(document)['label'];
+  return typeof label === 'string' && label.trim() !== '' ? label : null;
+}
+
 /** What a list of carried things is, in words: "a sword and a lantern"; null for nothing. */
 export function carriedWords(labels: readonly string[]): string | null {
   const named = labels.map(withArticle);

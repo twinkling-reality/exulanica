@@ -92,6 +92,37 @@ describe('a person of a society of things, on the card', () => {
   });
 });
 
+describe('a being of a kind its workspace made', () => {
+  it('reads its summary, first look and what it holds from the kinds\' own documents, not the shipped list', async () => {
+    // A kind and a held object no shipped list holds: the library answers them by digest from the
+    // workspace's store (DRAW 8), the list knows nothing of them.
+    const griffin = { ...KINDS['knight'], kind: 'griffin', label: 'griffin', summary: 'A winged beast someone described in words.', looks: [{ look: 'blocky-knight', version: 1, sha256: looksOf('knight')[1]!.sha256 }] };
+    const charm = { ...KINDS['sword'], kind: 'charm', label: 'charm' };
+    const shipped = library();
+    const held = {
+      ...shipped,
+      list: { ...shipped.list, kinds: [] },
+      kindDocument: async (named: { key: string }) => ({ griffin, charm } as Record<string, unknown>)[named.key] ?? KINDS[named.key],
+      lookDocument: shipped.lookDocument,
+    } as unknown as ThingLibrary;
+    const shell = document.createElement('div');
+    document.body.replaceChildren(shell);
+    const card = mountThingCard({
+      selection: { decide: vi.fn(), models: () => null, openDecides: vi.fn() }, compare: null,
+      shell, credentials: { baseUrl: 'https://example.test', token: 't' },
+      library: async () => held, looks: async () => new Map(),
+    });
+    shell.append(card.view.root);
+    const made = being({ kind: { kind: 'griffin', version: 2, sha256: 'c'.repeat(64) }, holding: [{ id: 'charm-1', kind: { kind: 'charm', version: 3, sha256: 'd'.repeat(64) } }] });
+    card.view.show('griffin-0', about(made));
+    await settle();
+    const root = card.view.root;
+    expect(root.querySelector('.thing-card-summary')?.textContent).toBe('A winged beast someone described in words.');
+    expect(rowText(root, 'Looks like')).toContain('Blocky knight');
+    expect(rowText(root, 'Holding')).toBe('Holdinga charm');
+  });
+});
+
 describe('what a being said and heard, on its card', () => {
   const QWEN = { provider: 'nebius_token_factory', modelId: 'Qwen/Qwen3-235B-A22B-Instruct-2507', name: 'Qwen3 235B Instruct', description: '', refusal: null } as never;
   it('lists its own lines to whom, the lines it heard from whom, the model where named, and each line as plain text', () => {

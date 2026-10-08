@@ -24,10 +24,18 @@ import type { AppEnvironment, SessionState } from '../src/composition/session-st
 const KNIGHT = { kind: 'knight', version: 1, sha256: 'a'.repeat(64) };
 const QWEN = { provider: 'nebius', modelId: 'Qwen/Qwen3-235B-A22B-Instruct-2507', name: 'Qwen3 235B Instruct' };
 
-const { FakeLayer, FakeMarks, bridgeReads } = vi.hoisted(() => {
+const { FakeLayer, FakeMarks, bridgeReads, kindReads } = vi.hoisted(() => {
   class Layer {
     placed: readonly PlacedThingRecord[] = [];
-    readonly maker = { library: { list: { kinds: [{ kind: 'knight', version: 1, sha256: 'a'.repeat(64), label: 'knight' }], looks: [] } } };
+    readonly maker = { library: {
+      list: { kinds: [{ kind: 'knight', version: 1, sha256: 'a'.repeat(64), label: 'knight' }], looks: [] },
+      // A kind the workspace made, which no shipped list holds, is read by digest (DRAW 8).
+      kindDocument: async (named: { key: string }) => {
+        kindReads.count += 1;
+        await kindReads.answer;
+        return named.key === 'griffin' ? { kind: 'griffin', version: 1, label: 'griffin' } : null;
+      },
+    } };
     constructor(readonly options: ThingLayerOptions) {}
     setSociety() {}
     async setPlaced(things: readonly PlacedThingRecord[]) { this.placed = things; }
@@ -44,7 +52,8 @@ const { FakeLayer, FakeMarks, bridgeReads } = vi.hoisted(() => {
     set(subjects: ReadonlyMap<string, MarkedSubject>) { (this.sets as ReadonlyMap<string, MarkedSubject>[]).push(subjects); }
     destroy() { this.destroyed = true; }
   }
-  return { FakeLayer: Layer, FakeMarks: Marks, bridgeReads: { count: 0, answer: Promise.resolve() as Promise<void> } };
+  return { FakeLayer: Layer, FakeMarks: Marks, bridgeReads: { count: 0, answer: Promise.resolve() as Promise<void> },
+    kindReads: { count: 0, answer: Promise.resolve() as Promise<void> } };
 });
 vi.mock('@exulanica/atlas-react/things', async (original) => ({
   ...(await original<typeof import('@exulanica/atlas-react/things')>()),
@@ -281,6 +290,56 @@ describe('the lines a being said and heard, handed to its card', () => {
     expect(being.said.map((line) => [line.line, line.toId, line.decider])).toEqual([['Take it.', 'traveller-0', 'model']]);
     // Heard from the state; who decided it from the speaker's said event in the window.
     expect(being.heard.map((line) => [line.line, line.speakerId, line.decider])).toEqual([['Thank you.', 'traveller-0', 'model']]);
+    mounted.dispose();
+  });
+});
+
+describe('a visitor of a kind its workspace made', () => {
+  it('is announced by its own kind\'s label, read from the kind\'s document, never as a visitor', async () => {
+    const GRIFFIN = { kind: 'griffin', version: 1, sha256: 'f'.repeat(64) };
+    server.tick = 7;
+    server.people = [person('knight-0', { kind: KNIGHT, came_by: 'placed', placed_id: 'knight-1' })];
+    server.things = [];
+    server.events = [];
+    const { mounted, notices } = mount();
+    await mounted.begin();
+    await settle();
+    server.tick = 8;
+    server.people = [...server.people, person('griffin-0', { kind: GRIFFIN, came_by: 'crossed', placed_id: null, crossing: { arrival_id: 'a', bridge: 'blockgame', grant_id: 'g' } })];
+    server.events = [event('thing_arrived', 'griffin-0', 'crossed_in', { kind: GRIFFIN, came_by: 'crossed', placed_id: null, crossing_id: 'c', gate: 'gate', carried: [] })];
+    await refresh();
+    expect(notices.map(({ message }) => message)).toEqual(['A griffin came in from Block Game.']);
+    mounted.dispose();
+  });
+
+  it('tells nothing while a kind is still being read, even when a later minute brings another crossing', async () => {
+    const GRIFFIN = { kind: 'griffin', version: 1, sha256: 'f'.repeat(64) };
+    const crossedGriffin = (id: string) => person(id, { kind: GRIFFIN, came_by: 'crossed', placed_id: null, crossing: { arrival_id: `a-${id}`, bridge: 'blockgame', grant_id: 'g' } });
+    const arrived = (id: string) => event('thing_arrived', id, 'crossed_in', { kind: GRIFFIN, came_by: 'crossed', placed_id: null, crossing_id: `c-${id}`, gate: 'gate', carried: [] });
+    server.tick = 6;
+    server.people = [person('knight-0', { kind: KNIGHT, came_by: 'placed', placed_id: 'knight-1' })];
+    server.things = [];
+    server.events = [];
+    let release!: () => void;
+    kindReads.answer = new Promise<void>((resolve) => { release = resolve; });
+    const reads = kindReads.count;
+    const { mounted, notices } = mount();
+    await mounted.begin();
+    await settle();
+    server.tick = 7;
+    server.people = [...server.people, crossedGriffin('griffin-0')];
+    server.events = [arrived('griffin-0')];
+    await refresh();
+    // The second minute's crossing arrives while the griffin's document is still being read.
+    server.tick = 8;
+    server.people = [...server.people, crossedGriffin('griffin-1')];
+    server.events = [...server.events, arrived('griffin-1')];
+    await refresh();
+    expect(notices).toEqual([]);
+    expect(kindReads.count - reads).toBe(1);
+    release();
+    await settle();
+    expect(notices.map(({ message }) => message)).toEqual(['A griffin came in from Block Game.', 'A griffin came in from Block Game.']);
     mounted.dispose();
   });
 });

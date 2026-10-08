@@ -229,11 +229,11 @@ export function mountThingCard(options: {
   const looks = new Map<string, LookFacts | null>();
   let choices: { readonly version: string; readonly at: number; readonly worn: ReadonlyMap<string, LookReference> } | null = null;
   const refKey = (ref: { readonly version: number; readonly sha256: string }, key: string): string => `${key}/${ref.version}/${ref.sha256}`;
-  const listed = (kind: KindReference) =>
-    opened?.list.kinds.find((one) => one.kind === kind.kind && one.version === kind.version && one.sha256 === kind.sha256);
-  /** The look a being is drawn in: the one chosen for it, or its kind's first. */
+  /** A kind's facts once read, by its reference: a shipped kind or one the workspace keeps alike. */
+  const kindRead = (kind: KindReference): KindFacts | undefined => kinds.get(refKey(kind, kind.kind));
+  /** The look a being is drawn in: the one chosen for it, or its kind's first (from the kind's document). */
   const wornLook = (subjectId: string, being: SelectedBeing): LookReference | null =>
-    choices?.worn.get(being.placedId ?? subjectId) ?? listed(being.kind)?.looks[0] ?? null;
+    choices?.worn.get(being.placedId ?? subjectId) ?? kindRead(being.kind)?.firstLook ?? null;
   const choicesRead = (being: SelectedBeing): boolean =>
     being.world === null || (choices !== null && choices.version === being.world.versionId);
   const choicesFresh = (being: SelectedBeing): boolean =>
@@ -244,11 +244,12 @@ export function mountThingCard(options: {
    */
   const factsNow = (subjectId: string, being: SelectedBeing): BeingFacts | null => {
     if (opened === null || !choicesRead(being)) return null;
-    const kind = kinds.get(refKey(being.kind, being.kind.kind));
+    const kind = kindRead(being.kind);
+    if (kind === undefined) return null;
     const worn = wornLook(subjectId, being);
     const look = worn === null ? null : looks.get(refKey(worn, worn.key));
-    if (kind === undefined || look === undefined) return null;
-    return { kind, look, holding: carriedWords(being.holding.flatMap((held) => listed(held.kind)?.label ?? [])) };
+    if (look === undefined) return null;
+    return { kind, look, holding: carriedWords(being.holding.flatMap((held) => kindRead(held.kind)?.label ?? [])) };
   };
   const readBeing = async (subjectId: string, being: SelectedBeing): Promise<void> => {
     const library = await openLibrary();
@@ -257,14 +258,19 @@ export function mountThingCard(options: {
       const { worldId, versionId } = being.world;
       choices = { version: versionId, at: performance.now(), worn: await readLooks(worldId, versionId) };
     }
-    const named = { key: being.kind.kind, version: being.kind.version, sha256: being.kind.sha256 };
-    const kindKey = refKey(being.kind, being.kind.kind);
-    if (!kinds.has(kindKey)) kinds.set(kindKey, readKindFacts(await library.kindDocument(named)));
+    const readKind = async (kind: KindReference): Promise<void> => {
+      if (kindRead(kind) !== undefined) return;
+      kinds.set(refKey(kind, kind.kind), readKindFacts(await library.kindDocument({ key: kind.kind, version: kind.version, sha256: kind.sha256 })));
+    };
+    await readKind(being.kind);
+    // What it holds is named by each held thing's own kind; one that cannot be read is left unnamed.
+    await Promise.allSettled(being.holding.map((held) => readKind(held.kind)));
     const worn = wornLook(subjectId, being);
     if (worn !== null && !looks.has(refKey(worn, worn.key))) {
-      const listed = library.list.looks.find((one) => one.look === worn.key && one.version === worn.version && one.sha256 === worn.sha256);
-      // A look from the people catalog draws the being as one of the world's people: no look row.
-      looks.set(refKey(worn, worn.key), listed?.lookKind === 'catalog_person' ? null : readLookFacts(await library.lookDocument(worn)));
+      // A look from the people catalog draws the being as one of the world's people, and one that
+      // cannot be read is left out: either way, no look row, and the rest of the card still shows.
+      const look = await library.lookDocument(worn).then(readLookFacts, () => null);
+      looks.set(refKey(worn, worn.key), look === null || look.peopleCatalog ? null : look);
     }
   };
   /** The thing's ring goes when the card stops showing it: hidden, or its panel closed. */
@@ -331,11 +337,9 @@ export function mountThingCard(options: {
           try {
             const things = await openLibrary();
             const named = { key: thing.placed.kind.kind, version: thing.placed.kind.version, sha256: thing.placed.kind.sha256 };
-            const entry = things.kindEntry(named);
             const kind = readKindFacts(await things.kindDocument(named));
             const worn = (await readLooks(thing.worldId, thing.versionId)).get(thing.placed.thingId);
-            const first = entry.looks[0];
-            const lookNamed = worn ?? first ?? null;
+            const lookNamed = worn ?? kind.firstLook;
             const look = lookNamed === null ? null : readLookFacts(await things.lookDocument(lookNamed));
             if (shownThing === thing.placed.thingId) card.render(placedThingCard(thing, kind, look));
           } catch {

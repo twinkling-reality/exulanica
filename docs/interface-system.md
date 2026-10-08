@@ -257,6 +257,10 @@ its card and leaves the pointer free; a click on nothing, and any press that dra
 looks around as it always has. No click picks anything while a field had focus at the press or a
 sheet is modal on the world. Both ways pick the nearest along the ray, a person or a thing.
 
+A kind or look its workspace made reads exactly as a shipped one: its label, summary, first look and
+origin come from its own document, read by digest, so a creature made from words has its own card and
+its own name in a visitor notice.
+
 A person of a society of things also reads, from the drawn state and the host's thing library,
 its kind's summary; the look it is drawn in (the one chosen for it, else its kind's first), with
 who made it and its licence, and no look row where it is drawn as one of the world's people; what
