@@ -299,17 +299,22 @@ answers 424 `unavailable_society_input`, as the society read does. The card stat
   kind's size, only its kind's own shipped looks), each with its licence as its origin states it;
 - its kind's origin record, the lines a being said lately (`lines`, newest first, at most eight,
   each with its minute and who decided it, read through an index of said events by speaker,
-  migration 0167, and refused as the events read refuses them where the input a line was said under
-  names something no longer available), and `crossing`, null until a door states its record;
+  migration 0167), and `crossing`, null until a door states its record. A line said under an input
+  that no longer authorizes (one naming something withdrawn since) is left out, and the card says
+  how many and why (`lines_left_out: {count, reason}`, stated only where some were): the society's
+  own inputs decide whether it may be read at all, so one old line never refuses the whole card;
 - the society's minute and state digest as the card was read (`society: {tick, state_sha256}`).
 
 `POST /world/versions/{version_id}/society/things/{thing_id}/look` (`world.write`) records the
 world's owner's choice of a look, `{look: {look, version, sha256}}` or `{look: {source: "workspace",
 sha256}}`, one the card would list, appended to the look table with the actor who chose it, and
-answers the card as it read it before, with only the look it now wears replaced: the card is read
-once, under the workspace's lock, which the transaction holds until it ends, so nothing else on it
-can change. A look is chosen beside a thing, never in it, so the minute and the state digest the
-answer states are the ones the card stated before. A look the library does not hold, or another
+answers the card as it read it before, with only the look it now wears replaced. The card is read
+once in the swap's transaction, the inputs its lines were said under announced with the society's
+own before the first authorization, so their stored bytes are read before the asset read lock is
+taken ([asset-read-currency.md](asset-read-currency.md)). A look is chosen beside a thing, never in
+it, so the minute and the state digest the answer states are the ones the card stated before; a
+line left out does not hold the swap back, since nothing the swap writes depends on what that
+line's input names. A look the library does not hold, or another
 workspace's (answered exactly as a digest nobody keeps), is refused `look_not_shipped`, and one made
 for another body, or for another kind of object, `look_unfit`; nothing is written. The owner may
 dress any thing or being of the world, a visitor another program decides for included: a look is

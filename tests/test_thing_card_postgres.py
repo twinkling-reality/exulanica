@@ -229,13 +229,9 @@ def test_a_chosen_look_the_library_no_longer_serves_is_passed_by(app, monkeypatc
     )
 
 
-@pytest.mark.parametrize("saved_world", [2], indirect=True)
-def test_a_line_said_under_an_input_no_longer_available_is_refused_as_the_events_read(app):
-    """The knight says a line under the society's first input; the author then places a lamp, so
-    the society reads a second. Once the first names something no longer available, the knight's
-    card is refused by name, as the events read showing that line is, while the society's own read
-    (the second input) still answers."""
-    world, client = app
+def _speaking_knight(client, world):
+    """A knight decided by the scripted speaker beside a second knight, under a seed in which it
+    says its line in the first minute; answers the knight and the minute after it spoke."""
     client.app.state.services = dataclasses.replace(
         client.app.state.services, societies_of_things=True
     )
@@ -255,14 +251,40 @@ def test_a_line_said_under_an_input_no_longer_available_is_refused_as_the_events
     snapshot = stays._step(world, client, snapshot)
     said = _card(client, world, speaker["id"]).json()["lines"]
     assert [line["line"] for line in said] == [lines.LINE]
+    return speaker, snapshot
+
+
+@pytest.mark.parametrize("saved_world", [2], indirect=True)
+def test_a_line_said_under_an_input_no_longer_available_is_left_out_and_the_rest_answered(app):
+    """The knight says a line under the society's first input; the author then places a lamp, so
+    the society reads a second. Once the first names something no longer available, the events
+    read refuses the page that shows the line, while the knight's card answers without it, says
+    how many lines it left out and why, and its look can still be changed."""
+    world, client = app
+    speaker, snapshot = _speaking_knight(client, world)
     things_api._place(client, world, "lamp", "lamp_post", 1, -6_000, 6_000)
     snapshot = stays._step(world, client, snapshot)
     before = _refusing(client, lambda document: document["input_seq"] == 1)
     scope, _, society = routes(world)
     assert client.get(society, headers=OWNER, params=scope).status_code == 200
     events = client.get(society + "/events", headers=OWNER, params=scope)
+    assert (events.status_code, events.json()["code"]) == (424, "unavailable_society_input")
     card = _card(client, world, speaker["id"])
-    assert [(answer.status_code, answer.json()["code"]) for answer in (events, card)] == [
-        (424, "unavailable_society_input")
-    ] * 2
+    assert card.status_code == 200, card.text
+    assert (card.json()["lines"], card.json()["lines_left_out"]) == (
+        [],
+        {"count": 1, "reason": "unavailable_society_input"},
+    )
+    other = next(
+        look for look in card.json()["looks"] if look["look"] != card.json()["look"]["look"]
+    )
+    swapped = _swap(client, world, speaker["id"], _shipped(other))
+    assert swapped.status_code == 200, swapped.text
+    assert _shipped(swapped.json()["look"]) == _shipped(other)
     client.app.state.society_input_authorizer = before
+    # Authorized again, the line is shown and nothing is said to be left out.
+    shown = _card(client, world, speaker["id"]).json()
+    assert ([line["line"] for line in shown["lines"]], "lines_left_out" in shown) == (
+        [lines.LINE],
+        False,
+    )

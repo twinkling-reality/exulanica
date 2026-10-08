@@ -76,8 +76,8 @@ from exulanica.world.world_clock_repository import WorldClockRepository
 INPUT_PROFILES = INPUT_ENGINES
 #: The most events one read returns: the read's own bound, a page of a society's history.
 EVENTS_READ_MAXIMUM = 256
-#: A being's lines, newest first: what :meth:`SocietyRepository.lines_said` asks, which migration
-#: 0167's index of said events by speaker serves.
+#: A being's lines, newest first: what :meth:`SocietyRepository.snapshot_and_lines` asks, which
+#: migration 0167's index of said events by speaker serves.
 LINES_SAID_SQL = (
     "select tick,document from world_society_event "
     "where workspace_id=%s and society_id=%s and subject_id=%s and event_kind='said' "
@@ -543,17 +543,53 @@ class SocietyRepository:
 
     def snapshot(self, version_id: uuid.UUID, *, places: bool = False) -> dict[str, Any]:
         """The current state; ``places`` adds, for a society with inputs, where inhabitants go."""
+        snapshot, _lines, _left_out = self._read(version_id, places=places)
+        return snapshot
+
+    def snapshot_and_lines(
+        self, version_id: uuid.UUID, subject_id: uuid.UUID, *, limit: int = 8
+    ) -> tuple[dict[str, Any], list[dict[str, Any]], int]:
+        """The current state as :meth:`snapshot` answers it, the lines ``subject_id`` said lately
+        (newest first, at most ``limit``, each said event's minute and document), and how many of
+        those were left out. The lines are read first, through migration 0167's index of said
+        events by speaker, and the inputs they were said under are announced with the state's own
+        before the first authorization, so a transaction that goes on holding the asset read lock
+        reads no stored bytes under it. A line whose input no longer authorizes is left out and
+        counted, and the rest are answered: the state's own inputs decide whether the society may
+        be read at all."""
+        return self._read(version_id, lines_of=subject_id, limit=limit)
+
+    def _read(
+        self,
+        version_id: uuid.UUID,
+        *,
+        places: bool = False,
+        lines_of: uuid.UUID | None = None,
+        limit: int = 8,
+    ) -> tuple[dict[str, Any], list[dict[str, Any]], int]:
         self._lock()
         row = self._row(version_id)
         if row is None:
             raise UnknownSociety("society is unavailable")
+        said = (
+            []
+            if lines_of is None
+            else self.connection.execute(
+                LINES_SAID_SQL,
+                (self.workspace_id, row["society_id"], lines_of, max(1, min(limit, 64))),
+            ).fetchall()
+        )
         current = None
+        left_out: set[int] = set()
         if row["engine_version"] in INPUT_PROFILES:
             # A historical snapshot is not a current rights grant. Authorizer checks dependencies
             # of the current state plus queued input. Historical replay checks every input below.
             consumed, latest = row["state"]["input_seq"], self._chain(row)
             memories = self._memories(row)
-            documents = self._inputs(row, [consumed, latest, *memories])
+            spoken = sorted(
+                {value["document"]["input_seq"] for value in said} - {consumed, latest, *memories}
+            )
+            documents = self._inputs(row, [consumed, latest, *memories, *spoken])
             current = documents[consumed]
             with inputs_ahead(self.connection, documents.values()):
                 self._authorize(current)
@@ -561,10 +597,20 @@ class SocietyRepository:
                     self._authorize(documents[latest])
                 for sequence in memories:
                     self._authorize(documents[sequence])
+                for sequence in spoken:
+                    try:
+                        self._authorize(documents[sequence])
+                    except UnavailableSocietyInput:
+                        left_out.add(sequence)
         snapshot = self._snapshot(row)
         if places and current is not None:
             snapshot["places"] = consumed_places(current)
-        return snapshot
+        lines = [
+            {"tick": int(value["tick"]), "document": value["document"]}
+            for value in said
+            if value["document"]["input_seq"] not in left_out
+        ]
+        return snapshot, lines, len(said) - len(lines)
 
     def _decisions(self, row: dict, *, after: int = 0) -> list[dict]:
         """The stored receipts after ``after``, in decision order, each held to its request."""
@@ -1046,26 +1092,6 @@ class SocietyRepository:
             if authored is None
             else {"edit_seq": authored["edit_seq"], "delta_sha256": authored["delta_sha256"]},
         }
-
-    def lines_said(
-        self, version_id: uuid.UUID, subject_id: uuid.UUID, *, limit: int = 8
-    ) -> list[dict[str, Any]]:
-        """The lines ``subject_id`` said, newest first, at most ``limit``: each said event's minute
-        and document, read under the same authorization as every events read (the current state's,
-        then the input each line shown was said under). Said events are indexed by their speaker
-        (migration 0167), so this reads only the lines it shows."""
-        self.snapshot(version_id)
-        row = self._row(version_id)
-        rows = self.connection.execute(
-            LINES_SAID_SQL,
-            (self.workspace_id, row["society_id"], subject_id, max(1, min(limit, 64))),
-        ).fetchall()
-        if row["engine_version"] in INPUT_PROFILES:
-            shown = {value["document"]["input_seq"] for value in rows}
-            documents = self._inputs(row, shown)
-            for sequence in sorted(shown):
-                self._authorize(documents[sequence])
-        return [{"tick": int(r["tick"]), "document": r["document"]} for r in rows]
 
     def events(self, version_id: uuid.UUID, *, limit: int = 256) -> tuple[dict[str, Any], ...]:
         return self.events_page(version_id, limit=limit)[0]

@@ -48,10 +48,12 @@ from exulanica.world.society_repository import SocietyRepository
 from fastapi.testclient import TestClient
 
 import test_society_authored_world_postgres as helpers
+import test_society_lines_postgres as society_lines
 import test_society_person_decisions_postgres as person_decisions
 import test_society_runtime as district
 import test_society_saved_world_api as saved_api
 import test_society_stay_requests_api as stays
+import test_thing_card_postgres as thing_cards
 import test_world_arrangements as arrangements
 from asset_lock_support import recorded_store_reads
 from comparison_support import SEEDS, seeded_catalogs
@@ -474,6 +476,29 @@ def test_a_history_of_directed_requests_reads_nothing_under_the_lock(app, monkey
     history = client.get(society + "/actions", headers=saved_api.OWNER, params=scope)
     assert history.status_code == 200, history.text
     assert len({e["request"]["input_seq"] for e in history.json()["events"]}) == 2
+    assert reads.under_the_lock == []
+    assert _society_read_its_bytes(reads)
+
+
+@pytest.mark.parametrize("saved_world", [helpers.AUTHORED_GROUND_MODULE_VERSION], indirect=True)
+def test_a_look_swap_beside_a_line_said_before_an_edit_reads_nothing_under_the_lock(
+    app, monkeypatch
+):
+    """A knight speaks under the first input, which names two reviewed assets; the author then
+    removes one of the objects, so the input the society reads now names one fewer. Choosing the
+    knight's look reads its card in the swap's transaction, lines and all: the input the line was
+    said under is announced with the society's own, so its bytes are read before the lock."""
+    world, client = app
+    _furnished(client, world)
+    speaker, _snapshot = thing_cards._speaking_knight(client, world)
+    _remove(client, world, "object:second")
+    stays._step(world, client, _state(client, world))
+    card = thing_cards._card(client, world, speaker["id"]).json()
+    other = next(look for look in card["looks"] if look["look"] != card["look"]["look"])
+    reads = _reads(world, client, monkeypatch)
+    swapped = thing_cards._swap(client, world, speaker["id"], thing_cards._shipped(other))
+    assert swapped.status_code == 200, swapped.text
+    assert [line["line"] for line in swapped.json()["lines"]] == [society_lines.LINE]
     assert reads.under_the_lock == []
     assert _society_read_its_bytes(reads)
 

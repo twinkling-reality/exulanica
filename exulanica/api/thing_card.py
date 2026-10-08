@@ -85,7 +85,7 @@ def _card(
     thing_id: uuid.UUID,
 ) -> tuple[dict[str, Any], Mapping[str, Any]]:
     """The card, and the thing or being it was read from in the same snapshot."""
-    snapshot = society.snapshot(version_id)
+    snapshot, said, left_out = society.snapshot_and_lines(version_id, thing_id, limit=LINES_SHOWN)
     state = snapshot["state"]
     if society_engine(snapshot["profile"]).state_family != "things":
         raise UnknownWorldResource("this version's society holds no things")
@@ -129,7 +129,13 @@ def _card(
         "looks": _looks(connection, workspace_id, kind),
         "kind_origin": kind.document["origin"],
         "crossing": None,
-        "lines": None if person is None else _lines(society, version_id, thing_id),
+        "lines": None if person is None else _lines(said),
+        # Lines said under an input that no longer authorizes are left out, and say so.
+        **(
+            {"lines_left_out": {"count": left_out, "reason": "unavailable_society_input"}}
+            if person is not None and left_out
+            else {}
+        ),
         "society": {"tick": int(state["tick"]), "state_sha256": snapshot["state_sha256"]},
     }
     return card, held
@@ -440,12 +446,10 @@ def _shipped_looks(kind: Any) -> list[dict[str, Any]]:
     ]
 
 
-def _lines(
-    society: SocietyRepository, version_id: uuid.UUID, subject: uuid.UUID
-) -> list[dict[str, Any]]:
+def _lines(lines: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
     """The lines the being said lately, newest first, each with who decided it."""
     found = []
-    for said in society.lines_said(version_id, subject, limit=LINES_SHOWN):
+    for said in lines:
         details = said["document"]["thing"]
         decider: dict[str, Any] = {"kind": details["decider"]}
         if "model" in details:
