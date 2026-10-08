@@ -3,7 +3,8 @@
     EXULANICA_TOKEN=<token> python3 scripts/demo/build_scene.py scripts/demo/scenes/<scene>.v1.json \
         --base-url http://127.0.0.1:<api port> --record <record.json>
 
-A scene document (``exulanica.demo-scene/v1``) is data: the things placed by kind, each placed from
+A scene document (``exulanica.scene/v1`` from the scene catalog, ``assets/catalogs/scenes``, or the
+demo's earlier ``exulanica.demo-scene/v1``) is data: the things placed by kind, each placed from
 where a person arrives in the world (``right_mm`` to their right, ``forward_mm`` ahead, and
 ``turn_microradians`` counterclockwise seen from above, where a turn of 0 faces the person arriving,
 as an object a person places in front of themselves turns to face them, and a turn of pi faces the
@@ -59,7 +60,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-SCENE_PROFILE = "exulanica.demo-scene/v1"
+#: The profiles a scene document may state: the catalog's, and the demo's earlier one.
+SCENE_PROFILES = ("exulanica.scene/v1", "exulanica.demo-scene/v1")
 RECORD_PROFILE = "exulanica.demo-scene-build/v1"
 TIMEOUT_SECONDS = 30
 #: A full turn in microradians, the most a placed thing's yaw states.
@@ -69,20 +71,28 @@ FULL_TURN = 6_283_185
 MINDS_NAMESPACE = uuid.uuid5(uuid.NAMESPACE_URL, "exulanica.demo-scene-build/v1/minds")
 
 
+def mind_key(scene_sha256: str, society_id: str, thing_id: str) -> uuid.UUID:
+    """The key a being's mind is chosen under: the scene's digest, the society and the thing."""
+    return uuid.uuid5(MINDS_NAMESPACE, f"{scene_sha256}:{society_id}:{thing_id}")
+
+
 class SceneRefused(RuntimeError):
     """A scene this script will not build, or a server answer it will not accept."""
 
 
 def read_scene(path: Path) -> dict[str, Any]:
     scene = json.loads(path.read_text(encoding="utf-8"))
-    if scene.get("profile") != SCENE_PROFILE:
-        raise SceneRefused(f"{path} is not an {SCENE_PROFILE} document")
+    if scene.get("profile") not in SCENE_PROFILES:
+        raise SceneRefused(f"{path} is not a scene document ({', '.join(SCENE_PROFILES)})")
     ids = [thing["thing_id"] for thing in scene["things"]]
     if len(set(ids)) != len(ids):
         raise SceneRefused("each thing is placed once")
     for mind in scene.get("minds", []):
         if mind["thing_id"] not in ids:
             raise SceneRefused(f"a mind is chosen for {mind['thing_id']}, which the scene lacks")
+    gate = scene.get("travellers", {}).get("gate")
+    if gate is not None and gate not in ids:
+        raise SceneRefused(f"travellers come through {gate}, which the scene lacks")
     return scene
 
 
@@ -257,7 +267,7 @@ def build(api: Api, scene: Mapping[str, Any], entry_id: str | None = None) -> di
         version["edit_seq"],
     ):
         raise SceneRefused("the saved world does not reopen at the version built")
-    return {
+    record = {
         "profile": RECORD_PROFILE,
         "scene": {"scene": scene["scene"], "version": scene["version"], "sha256": _digest(scene)},
         "built_at": dt.datetime.now(dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -284,6 +294,12 @@ def build(api: Api, scene: Mapping[str, Any], entry_id: str | None = None) -> di
         "minds": list(scene.get("minds", [])),
         "engine": scene.get("engine"),
     }
+    if "travellers" in scene:
+        # The gate travellers come through and the mind they are given: whoever opens the gate
+        # (a game's own tool, or the world's owner) passes them to the door's grant. This script
+        # opens no gate and holds no grant's key.
+        record["travellers"] = scene["travellers"]
+    return record
 
 
 def _model(decider: Mapping[str, Any]) -> dict[str, str] | None:
@@ -321,10 +337,7 @@ def bring_to_life(api: Api, scene: Mapping[str, Any], record: Mapping[str, Any])
         if person is None:
             raise SceneRefused(f"{mind['thing_id']} is not among the society's people")
         model = _model(mind["decider"])
-        key = uuid.uuid5(
-            MINDS_NAMESPACE,
-            f"{record['scene']['sha256']}:{society['society_id']}:{mind['thing_id']}",
-        )
+        key = mind_key(record["scene"]["sha256"], society["society_id"], mind["thing_id"])
         api.call(
             "POST",
             f"{society_path}/models",

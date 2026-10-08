@@ -650,6 +650,47 @@ intake's own check), `look_unknown` and `withdrawal_reason_refused`. Each refuse
 written. The command's own are `mapping_refused` (a file that is not a mapping) and
 `mapping_not_admitted` (no declared bridge pins it).
 
+## Scenes
+
+A scene (`exulanica.scene/v1`) is data a server lays into a saved world: things by their shipped
+kind and version, each placed from where a person arrives in the world (`right_mm` to their right,
+`forward_mm` ahead and `turn_microradians` counterclockwise seen from above, where a turn of 0 faces
+the person arriving, as an object a person places in front of themselves turns to face them), the
+open model each of its beings is given as a mind, the society engine it lives on, the ground it is
+laid out for (a starter, a generated town or a site) and, optionally, the gate travellers come
+through with the mind they are given there. Each version ships as
+`assets/catalogs/scenes/<scene>.v<N>.json` with a line in `scenes.lock.json`
+(`exulanica.scene-lock/v1`) naming its digest, the SHA-256 of its canonical JSON; a shipped version
+never changes. The reader ([`scenes.py`](../exulanica/world/scenes.py)) refuses a scene by name: a
+thing named twice or by an id a placement refuses, a kind not shipped (`scene_kind_unshipped`) or
+one an author may not place (`scene_kind_not_placeable`), a place more than a kilometre to either
+side of the arrival or ahead of or behind it (each bound by itself), a mind for anything but one of
+its beings or by a decider its kind does not allow, a model the manifest does not declare, a
+travellers' gate that is not one of its things offering arrival, an engine the engine table does not
+state or no longer makes, and minds on an engine that is not a society of things, which alone seats
+placed beings.
+
+The scene dressing ([`scene_dressing.py`](../exulanica/api/scene_dressing.py)) lays a scene into a
+saved world from the world's own arrival, through the paths a person's edits and choices take. Each
+thing is placed with the things route's edit, inside the binding to the saved entry every authored
+edit runs in, so the world reopens with it. The owner's own edits stand: a thing already placed as
+the scene places it is left as it is, and so is one of the same kind the owner moved
+(`things_left_moved`), one the owner removed (`things_left_removed`) and one whose placing the owner
+undid (`things_left_undone`); only a thing of another kind under the scene's id is refused
+(`scene_thing_placed_otherwise`), and an edit's refusal comes back by the code the authored-edit
+routes answer with. The version's society is then made as the society route makes one, and each mind
+is recorded as the owner's choice under a key drawn from the scene's digest, the society and the
+thing, the same key the demo builder uses, so asking again records nothing new. A refusal of the
+society, such as a host that does not offer the engine (`society_engine_not_offered`) or one with no
+adapter for a society's first input (`unavailable_society_input`), keeps the things placed and comes
+back by the code the society routes answer with. A model the people role does not take is refused
+for that being alone, by its code, and the routine decides for it; the owner's later choice of a
+mind stands, since the latest choice decides. A scene laid out for another ground than the world's
+is refused (`scene_ground_mismatch`). The caller has already found the actor allowed to change the
+world and to cause what its minds spend, and passes the workspace's connection idle: each step
+commits its own. The mind a gate gives travellers is the door's: it is recorded with the grant when
+the world's owner opens the gate, never by the dressing.
+
 ## Drawing
 
 The browser draws a thing from its look, never from what it is
@@ -774,6 +815,9 @@ These are material limits of the boundary above, not partial behaviour:
   stays every creature's default. Nothing in the product asks for a sculpted look yet. A look request is written by
   [`creature_looks.py`](../exulanica/things/creature_looks.py) from a creature's body and sketch.
 
+- Nothing calls the scene dressing yet: a guest's arrival world dressed with a scene, named by the
+  arrival catalog, is planned with the society of things on a public server.
+
 ## Implementation and evidence
 
 | Part | Source | Tests |
@@ -794,6 +838,7 @@ These are material limits of the boundary above, not partial behaviour:
 | A workspace's own things | [`thing_store.py`](../exulanica/world/thing_store.py), [`thing_store_command.py`](../exulanica/api/thing_store_command.py), the routes in [`thing_store.py`](../exulanica/api/routes/thing_store.py), migration 0159, the `looks` namespace in [`namespaces.py`](../exulanica/store/namespaces.py), the seed's refusal in [`judge_seed.py`](../exulanica/orchestration/judge_seed.py) | `tests/test_thing_store_admission.py` (with no database: a static and a skinned look read by their containers' readers, a broken rig refused; a look the reader refuses, a shipped key, a look that draws no file and another container each refused by name; the line rule on the label and each word of the origin, its licence's address included, the field named; a share-alike look refused without its attribution, its authors or its licence's address), `tests/test_thing_store_postgres.py` (as the deployed writer: a drafted creature kept whole and read back at its assembly's digests; no update or delete, even by the table's owner (the owner's TRUNCATE is not refused: no truncate guard like 0013's is attached); another workspace reads none of it and keeps its own; each table's row written only in its own workspace's context, even by a superuser; a shipped kind, plan or look key, another container, a held version drawn from other bytes and a full library of kinds or of looks each refused with nothing written, bytes included; a look kept only after its intake's own check, with its licence as columns; the table's own checks on a share-alike look's credit, a container profile and its look kind, a kind's plan digest and a withdrawal's digest; a withdrawn look passed by unless asked for, its kind still read, and a look the reader refuses withdrawn by its row), `tests/test_restore_replay_withdrawals.py` (a look withdrawn after a backup stays withdrawn through a real restore), `tests/test_thing_store_command.py` (a mapping admitted only when a declared bridge pins it and the door's check reads it; the intake's check on the entry's digest, source, SPDX identifier and share-alike mark and on the look being imported; a look document that is not JSON and a withdrawal reason that is not one line refused by the dry runs; against PostgreSQL, a dry run that writes nothing, a copy relabelled CC0 and public and an unpinned mapping refused with nothing written, the positive control, once only, a listing and a withdrawal), `tests/test_thing_store_routes.py` (as a deployment serves them: the document's bytes hash to the URL's digest; the container's bytes, tag and `no-cache`, a revalidation answered 304 with no body; a kind; another workspace's, a withdrawn, a revalidated withdrawn and an absent one all 404 alike, and missing bytes too; 503 without a look store; a session required), `tests/test_judge_seed.py` (a workspace holding a look or a kind of its own is not seeded), `tests/test_existence_oracle.py` (a stranger cannot tell a held look or kind from an invented digest) |
 | The skinned container | [`skinned.py`](../exulanica_pieces/skinned.py) | `tests/test_skinned_glb.py` (containers built in the test from struct packing: a positive control, then each rule broken alone and refused by name) |
 | A creature's look request and its sculpted look | [`creature_looks.py`](../exulanica/things/creature_looks.py), `ml/appearance/exulanica_appearance/creatures/` | `tests/test_creature_sculpt.py` (each development creature's sketch filled, rigged, written and read back against its plan's tree; the creature job end to end with stand-in models, a body that is not its plan's refused by the rig with its measures in the receipt), `ml/appearance/tests/test_creature_rig.py` and `test_creature_route.py` (a box figure: every check against a positive control, fused legs refused with every measure, a missing leg, a turn undone to the degree, a stretched body refused with the fit it refused; the all-at-once rasteriser equal to the loop; the camera on each plan's front left; the sketch's voxels in TRELLIS's frame), `ml/appearance/tests/test_trellis_second_stage.py` (the second stage's call order, and each refusal of a structure and of a pipeline's signatures alone); the two rig trials on Nebius AI Cloud, [first record](evaluation/2026-10-07-creature-rig-trial.json) and [second record](evaluation/2026-10-07-creature-rig-trial-2.json), each held equal to what its script builds from its evidence (`tests/test_creature_rig_trial_record.py`, `tests/test_creature_rig_trial_2_record.py`) |
+| Scenes and their dressing | [`scenes.py`](../exulanica/world/scenes.py), [`scene_dressing.py`](../exulanica/api/scene_dressing.py), [`assets/catalogs/scenes`](../assets/catalogs/scenes) | `tests/test_scenes.py` (every shipped scene locked at its digest; each refusal by name against the shipped scene; poses equal to the demo builder's, which shares no code with it, and a turned arrival's worked by hand), `tests/test_scene_dressing_postgres.py` (a starter dressed through the application: its things bound to the saved entry where the builder would place them, in the arrival's region, authored as fictional and placed by the owner, the society and each mind read back, a second dressing changing nothing, a thing placed as another kind refused, the owner's moves, removals and undos standing, a host without the engine, a society with no first input, a model the role refuses for one being alone, another workspace and a busy connection refused), `tests/test_demo_scene.py` |
 | No creature in code | | `tests/test_no_creature_code.py` (with a planted name the scan finds) |
 | Purity | The import contract "Things are pure data" in `pyproject.toml`: no database, store, evidence, pipeline, world, traffic, movement step, model or numeric stack | `lint-imports` |
 | Drawing | [`things/`](../web/packages/atlas-react/src/playcanvas/things), [`composition/things.ts`](../web/packages/app/src/composition/things.ts), [`things-library.ts`](../web/packages/app/src/things-library.ts) | `web/packages/atlas-react/test/things-*.test.ts` (the shipped documents read, digests refused, skeletons read by shape with a ten-legged plan, planted feet, placement, misses, picking, a society's things through the crowd, a held thing in its holder's hand, the marks and lines overlay), `web/packages/atlas-react/test/society-crowd-things.test.ts`, `web/packages/atlas-react/test/society-crowd-anchors.test.ts`, `web/packages/atlas-react/test/society-crowd-refresh.test.ts`, `web/packages/atlas-react/test/things-placed-facing.test.ts`, `web/packages/app/test/things-composition.test.ts`, `web/packages/app/test/environment-selection-things.test.ts`, `web/packages/app/test/environment-selection-marks.test.ts`, `web/packages/app/test/thing-marks.test.ts`, `web/packages/app/test/thing-lines.test.ts`, `web/packages/app/test/environment-selection-lines.test.ts`, `web/packages/app/test/door-bridges-api.test.ts`, `web/packages/app/test/thing-looks-api.test.ts`, `web/packages/app/test/things-composition-looks.test.ts`, `web/packages/app/test/environment-selection-looks.test.ts`, `web/packages/app/test/things-composition-facing.test.ts`, `web/packages/app/test/things-library-held.test.ts` |

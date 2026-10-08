@@ -17,13 +17,15 @@ from fastapi import APIRouter, Path, Query, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
-from exulanica.api.dependencies import CurrentSession, ScopedConnection, get_services
+from exulanica.api.dependencies import CurrentSession, ScopedConnection
+from exulanica.api.society_making import (
+    SocietyHooks,
+    make_society,
+    society_refusal,
+    society_repository,
+)
 from exulanica.api.world_scope import WorldId
-from exulanica.world.kinds.worker import KindWorkWaiting
 from exulanica.world.society import (
-    SocietyLivesElsewhere,
-    SocietyPlaceWaiting,
-    UnavailableSocietyInput,
     served_events,
     served_snapshot,
 )
@@ -31,20 +33,12 @@ from exulanica.world.society_decision_repository import SocietyDecisionRepositor
 from exulanica.world.society_engines import (
     DEFAULT_ENGINE,
     ENGINES,
-    RetiredSocietyEngine,
-    creatable_engine,
-    society_engine,
 )
-from exulanica.world.society_grounds import SocietyPopulationRefused
-from exulanica.world.society_planner import SocietyStartRefused
 from exulanica.world.society_presence import PresenceRefused
 from exulanica.world.society_repository import (
     EVENTS_READ_MAXIMUM,
-    InvalidEventCursor,
     SocietyRepository,
 )
-from exulanica.world.world_clock import ClockRefused
-from exulanica.world.worlds import require_world
 
 router = APIRouter(prefix="/world", tags=["society"])
 #: The profiles a creation may name: the engine table's, in its order. A retired one is refused
@@ -99,54 +93,20 @@ def _repository(
     request: Request,
     world_id: str,
 ) -> SocietyRepository:
-    """The named world's societies. A world the workspace does not hold is an unknown resource,
-    and the repository refuses a version that does not belong to the world named here."""
-    require_world(connection, session.workspace_id, world_id)
-    authorizer = getattr(request.app.state, "society_input_authorizer", None)
-    return SocietyRepository(
-        connection,
-        session.workspace_id,
-        world_id=world_id,
-        input_authorizer=(
-            None if authorizer is None else lambda doc: authorizer(connection, session, doc)
-        ),
-    )
+    """The named world's societies (:func:`~exulanica.api.society_making.society_repository`)."""
+    return society_repository(connection, session, SocietyHooks.of_app(request.app), world_id)
 
 
 def _call(operation: Callable[[], Any], *, invalid_status: int = 422) -> Any:
+    """``operation``'s answer, or its refusal answered by the society table
+    (:func:`~exulanica.api.society_making.society_refusal`)."""
     try:
         return operation()
-    except (KindWorkWaiting, SocietyPlaceWaiting) as exc:
-        # A site world's place the kind worker has not made yet: ask again after Retry-After.
-        return JSONResponse(
-            status_code=503,
-            content={"code": exc.code, "detail": str(exc)},
-            headers={"Retry-After": str(exc.retry_seconds)},
-        )
-    except UnavailableSocietyInput as exc:
-        return JSONResponse(
-            status_code=424, content={"code": "unavailable_society_input", "detail": str(exc)}
-        )
-    except SocietyStartRefused as exc:
-        # The world as it is gives its people nowhere to be: named, so a caller acts on the code.
-        return JSONResponse(status_code=409, content={"code": exc.code, "detail": exc.detail})
-    except RetiredSocietyEngine as exc:
-        return JSONResponse(status_code=409, content={"code": exc.code, "detail": str(exc)})
-    except SocietyLivesElsewhere as exc:
-        return JSONResponse(status_code=409, content={"code": exc.code, "detail": str(exc)})
-    except SocietyPopulationRefused as exc:
-        # The world's own premises imply a population no society over its ground may start with.
-        return JSONResponse(status_code=409, content={"code": exc.code, "detail": exc.detail})
-    except InvalidEventCursor as exc:
-        return JSONResponse(status_code=422, content={"code": exc.code, "detail": str(exc)})
-    except ClockRefused as exc:
-        # A coupled world's society waits for its traffic (clock_lead_exhausted): retry later.
-        return JSONResponse(status_code=409, content={"code": exc.code, "detail": exc.detail})
-    except ValueError as exc:
-        return JSONResponse(
-            status_code=invalid_status,
-            content={"code": "invalid_society_state", "detail": str(exc)},
-        )
+    except Exception as exc:
+        refusal = society_refusal(exc, invalid_status=invalid_status)
+        if refusal is None:
+            raise
+        return refusal.response()
 
 
 @router.post("/versions/{version_id}/society")
@@ -160,73 +120,19 @@ def create_society(
 ) -> Any:
     # A society of things is made through the routes only where the host offers it
     # (EXULANICA_SOCIETY_OF_THINGS); elsewhere it is refused by name before anything is read.
-    if (
-        society_engine(body.profile).state_family == "things"
-        and not get_services(request).societies_of_things
-    ):
-        return JSONResponse(
-            status_code=409,
-            content={
-                "code": "society_engine_not_offered",
-                "detail": f"this host makes no society with {body.profile} through its routes",
-            },
+    # Made as a server's scene dressing makes one (exulanica.api.society_making).
+    return _call(
+        lambda: make_society(
+            SocietyHooks.of_app(request.app),
+            connection,
+            session,
+            world_id,
+            version_id,
+            region_id=body.region_id,
+            profile=body.profile,
+            place_id=body.place_id,
         )
-
-    def create() -> dict:
-        repo = _repository(connection, session, request, world_id)
-        runtime = get_services(request).society_runtime
-        if (
-            runtime is not None
-            and body.place_id is None
-            and creatable_engine(body.profile).takes_inputs
-            and repo.held(version_id, profile=body.profile, region_id=body.region_id) is None
-        ):
-            # A site world's place is made in the kind worker and waited for here, before the
-            # transaction and its locks; inside it the place is only read.
-            runtime.prepare_saved_world(connection, session, version_id, body.region_id)
-        # One transaction: a saved world's place, its first input and its society are made
-        # together or not at all, so a refusal such as nothing reachable leaves nothing behind.
-        with connection.transaction():
-            creatable_engine(body.profile)
-            # Asked again, the version's society is read back with nothing composed, and a
-            # creation naming another region is refused by name.
-            held = repo.held(version_id, profile=body.profile, region_id=body.region_id)
-            if held is not None:
-                return served_snapshot(held)
-            document = None
-            place_id = body.place_id
-            if society_engine(body.profile).takes_inputs:
-                provider = getattr(request.app.state, "society_initial_input", None)
-                if provider is None:
-                    raise UnavailableSocietyInput(
-                        "purposeful society input adapter is not configured"
-                    )
-                if place_id is None:
-                    runtime = get_services(request).society_runtime
-                    if runtime is None:
-                        raise UnavailableSocietyInput("saved-world society is not configured")
-                    place_id = runtime.saved_world_place(
-                        connection, session, version_id, body.region_id
-                    )
-                # The engine says how a world's own walking surfaces are composed for it.
-                document = provider(
-                    connection, session, version_id, place_id, body.region_id, body.profile
-                )
-            elif place_id is None:
-                raise ValueError("a society without inputs needs a place_id")
-            return served_snapshot(
-                repo.create(
-                    version_id,
-                    place_id=place_id,
-                    region_id=body.region_id,
-                    seed=get_services(request).society_seed(session.workspace_id, world_id),
-                    actor=session.actor,
-                    profile=body.profile,
-                    initial_input=document,
-                )
-            )
-
-    return _call(create)
+    )
 
 
 @router.post("/versions/{version_id}/society/decisions")

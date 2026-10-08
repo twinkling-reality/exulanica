@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Callable
-from typing import Annotated, Final, Literal, Protocol
+from typing import Annotated, Any, Final, Literal, Protocol
 
 from fastapi import Depends, Request, Response
 from fastapi.responses import JSONResponse
@@ -172,8 +172,22 @@ def object_write_repository(
     request: Request,
     world_id: WorldId,
 ) -> WorldObjectRepository:
-    require_world(connection, session.workspace_id, world_id)
     observer = getattr(request.app.state, "society_authored_edit", None)
+    return writing_repository(connection, session, services, observer, world_id)
+
+
+def writing_repository(
+    connection: Any,
+    session: Any,
+    services: Services,
+    observer: Callable[..., Any] | None,
+    world_id: str,
+) -> WorldObjectRepository:
+    """The repository every authored edit writes through: the world's store and workspace assets,
+    and ``observer``, the application's hook that tells the version's society of each edit. The
+    routes' dependency (:func:`object_write_repository`) and a server's scene dressing both make
+    it here."""
+    require_world(connection, session.workspace_id, world_id)
     return WorldObjectRepository(
         connection,
         session.workspace_id,
@@ -225,19 +239,31 @@ OBJECT_PROBLEMS: Final[tuple[tuple[type[Exception], int, str], ...]] = (
 )
 
 
-def object_problem(exc: Exception) -> JSONResponse | None:
+def object_problem_code(exc: Exception) -> tuple[int, str, int | None] | None:
+    """How this surface answers ``exc``: its status, its code and, for a place still being made,
+    the seconds to wait before asking again; None for an exception it lets through.
+    :func:`object_problem` answers with it, and a server's scene dressing names its refusals by
+    it (:mod:`exulanica.api.scene_dressing`)."""
     if isinstance(exc, KindWorkWaiting | SocietyPlaceWaiting):
         # A site world's place the kind worker has not made yet, which an edit composing its
         # people's next input needed: the edit is not made; ask again after Retry-After.
-        return JSONResponse(
-            status_code=503,
-            content={"code": exc.code, "detail": str(exc)},
-            headers={"Retry-After": str(exc.retry_seconds)},
-        )
+        return 503, exc.code, exc.retry_seconds
     for kind, status, code in OBJECT_PROBLEMS:
         if isinstance(exc, kind):
-            return JSONResponse(status_code=status, content={"code": code, "detail": str(exc)})
+            return status, code, None
     return None
+
+
+def object_problem(exc: Exception) -> JSONResponse | None:
+    answer = object_problem_code(exc)
+    if answer is None:
+        return None
+    status, code, retry_seconds = answer
+    return JSONResponse(
+        status_code=status,
+        content={"code": code, "detail": str(exc)},
+        headers=None if retry_seconds is None else {"Retry-After": str(retry_seconds)},
+    )
 
 
 class EntryBoundEdit(Protocol):
@@ -246,6 +272,47 @@ class EntryBoundEdit(Protocol):
 
     base_state_sha256: str
     saved_entry: SavedEntryAdvanceBody | None
+
+
+def bound_edit(
+    repository: WorldObjectRepository,
+    version_id: uuid.UUID,
+    body: EntryBoundEdit,
+    operation: Callable[[], AlternateVersion],
+) -> AlternateVersion:
+    """Run one mutation in one transaction with the saved entry it names, and answer with what it
+    wrote: the entry's resume point is held at the base the edit names and moved to the version
+    the edit wrote, or nothing is written. A refusal is raised for the caller to answer.
+
+    The saved entry, the version and the base come from ``version_id`` and ``body`` here rather
+    than from every caller, so nothing can bind a saved world to a different base than the one its
+    edit names: every route through :func:`commit_edit`, and the scene dressing a server runs for
+    a new world (:mod:`exulanica.api.scene_dressing`).
+    """
+    saved_entry = body.saved_entry
+    with repository.connection.transaction():
+        entries = SavedWorldEntryRepository(repository.connection, repository.workspace_id)
+        if saved_entry is not None:
+            entries.lock_authored_advance_base(
+                saved_entry.entry_id,
+                base_revision=saved_entry.base_revision,
+                world_id=repository.world_id,
+                authored_version_id=version_id,
+                authored_state_sha256=saved_entry.authored_state_sha256,
+                authored_edit_seq=saved_entry.authored_edit_seq,
+                mutation_base_state_sha256=body.base_state_sha256,
+            )
+        version = operation()
+        if saved_entry is not None:
+            entries.advance_authored_locked(
+                saved_entry.entry_id,
+                base_revision=saved_entry.base_revision,
+                world_id=repository.world_id,
+                authored_version_id=version.version_id,
+                result_state_sha256=version.state_sha256,
+                result_edit_seq=version.edit_seq,
+            )
+    return version
 
 
 def commit_edit(
@@ -259,37 +326,14 @@ def commit_edit(
 
     The whole version rather than the changed object, because the caller needs the new
     ``state_sha256`` to make its next edit and a second round trip to fetch it is a second chance
-    for another writer to move the base first. The saved entry, the version and the base come from
-    ``version_id`` and ``body`` here rather than from every caller, so no route can bind a saved
-    world to a different base than the one its edit names.
+    for another writer to move the base first. The binding to the saved entry is
+    :func:`bound_edit`'s.
 
     ``operation`` answers with what it wrote, without availability: the transaction may hold the
     global asset read lock until it commits. The body's availability is read after the block.
     """
-    saved_entry = body.saved_entry
     try:
-        with repository.connection.transaction():
-            entries = SavedWorldEntryRepository(repository.connection, repository.workspace_id)
-            if saved_entry is not None:
-                entries.lock_authored_advance_base(
-                    saved_entry.entry_id,
-                    base_revision=saved_entry.base_revision,
-                    world_id=repository.world_id,
-                    authored_version_id=version_id,
-                    authored_state_sha256=saved_entry.authored_state_sha256,
-                    authored_edit_seq=saved_entry.authored_edit_seq,
-                    mutation_base_state_sha256=body.base_state_sha256,
-                )
-            version = operation()
-            if saved_entry is not None:
-                entries.advance_authored_locked(
-                    saved_entry.entry_id,
-                    base_revision=saved_entry.base_revision,
-                    world_id=repository.world_id,
-                    authored_version_id=version.version_id,
-                    result_state_sha256=version.state_sha256,
-                    result_edit_seq=version.edit_seq,
-                )
+        version = bound_edit(repository, version_id, body, operation)
     except Exception as exc:
         problem = object_problem(exc)
         if problem is None:

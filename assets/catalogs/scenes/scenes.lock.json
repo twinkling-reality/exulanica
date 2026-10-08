@@ -1,0 +1,11 @@
+{
+  "profile": "exulanica.scene-lock/v1",
+  "reason": "Every scene version this repository ships, with the digest it shipped with: a shipped version never changes, so a world dressed with it names it by digest, the scene reader refuses a file this does not name at its digest, and a changed scene is a new version and a new line.",
+  "scenes": [
+    {
+      "scene": "three-strangers",
+      "version": 3,
+      "sha256": "6cbe616a765a82bb70df44df16307090a178f551ada6cb61c0ce08f3e3518ad6"
+    }
+  ]
+}

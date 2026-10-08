@@ -2,9 +2,10 @@
 
 What is shown here, with no database and no server:
 
-*   every scene document under ``scripts/demo/scenes`` names only shipped thing kinds at shipped
-    versions, places each thing once, and chooses minds only for its own beings and only open
-    models the model manifest serves;
+*   every scene document under ``scripts/demo/scenes`` and in the scene catalog
+    (``assets/catalogs/scenes``) names only shipped thing kinds at shipped versions, places
+    each thing once, and chooses minds only for its own beings and only open models the model
+    manifest serves; a scene's travellers reach the build record, and a gate it lacks is refused;
 *   the newest version of each scene, the one a rehearsal builds, chooses only a decider each
     being's kind allows and only models its engine offers to a being's decisions, as the society's
     model choice route requires; older versions stay as published for the records naming them;
@@ -33,6 +34,8 @@ from exulanica.world.decision_roles import decision_roles
 
 ROOT = Path(__file__).resolve().parents[1]
 SCENES = ROOT / "scripts/demo/scenes"
+#: The scene catalog the product ships (exulanica.scene/v1), which the builder reads too.
+CATALOG = ROOT / "assets/catalogs/scenes"
 MANIFEST = ROOT / "exulanica/models/models.manifest.json"
 
 
@@ -50,11 +53,16 @@ def _scenes() -> list[Path]:
     return sorted(SCENES.glob("*.json"))
 
 
+def _all_scenes() -> list[Path]:
+    """The demo's scenes and the catalog's, every one the builder may be given."""
+    return _scenes() + sorted(CATALOG.glob("*.v*.json"))
+
+
 def test_scenes_ship():
     assert _scenes()
 
 
-@pytest.mark.parametrize("path", _scenes(), ids=lambda path: path.name)
+@pytest.mark.parametrize("path", _all_scenes(), ids=lambda path: path.name)
 def test_a_scene_names_shipped_kinds_and_served_models(path):
     scene = _builder().read_scene(path)
     shipped = shipped_thing_kinds()
@@ -74,7 +82,7 @@ def test_a_scene_names_shipped_kinds_and_served_models(path):
 def _newest_scenes() -> list[Path]:
     """The newest version of each scene, by the version its document states."""
     newest: dict[str, tuple[int, Path]] = {}
-    for path in _scenes():
+    for path in _all_scenes():
         scene = json.loads(path.read_text(encoding="utf-8"))
         held = newest.get(scene["scene"])
         if held is None or scene["version"] > held[0]:
@@ -305,6 +313,21 @@ def test_the_builder_refuses_another_engine_and_a_mind_that_reads_back_as_anothe
     elsewhere.engine = "exulanica-society/v2"
     with pytest.raises(builder.SceneRefused, match="runs exulanica-society/v2"):
         builder.bring_to_life(elsewhere, scene, builder.build(elsewhere, scene))
+
+
+def test_the_builder_records_the_travellers_a_scene_names_and_refuses_a_gate_it_lacks(tmp_path):
+    builder = _builder()
+    catalogued = next(path for path in _all_scenes() if path.parent == CATALOG)
+    scene = builder.read_scene(catalogued)
+    assert "travellers" in scene, "the positive control: the catalog's scene names its travellers"
+    # Whoever opens the gate reads them from the record; the builder opens none.
+    assert builder.build(_Server(), scene)["travellers"] == scene["travellers"]
+    assert "travellers" not in builder.build(_Server(), builder.read_scene(_scenes()[0]))
+    stray = dict(scene, travellers=dict(scene["travellers"], gate="nowhere"))
+    path = tmp_path / "scene.json"
+    path.write_text(json.dumps(stray), encoding="utf-8")
+    with pytest.raises(builder.SceneRefused, match="lacks"):
+        builder.read_scene(path)
 
 
 def test_a_refusal_names_its_code_or_what_the_request_check_refused():
