@@ -83,8 +83,10 @@ from exulanica.errors import ExulanicaError
 from exulanica.models.manifest import AnsweringMechanism
 from exulanica.world.deciders import ADAPTER_VERSION
 from exulanica.world.decision_roles import decision_roles
+from exulanica.world.society_decision_repository import UNANSWERED_WINDOW_TICKS
 
 __all__ = [
+    "UNANSWERED_WINDOW",
     "ChannelRefused",
     "ChannelRepository",
     "Head",
@@ -161,6 +163,11 @@ def presence_of(
     return None if row is None else Presence(**row)
 
 
+#: How long after an ask its request may still gain a receipt, beyond its own deadline: the minutes
+#: in which the host closes a request that a stopped process left unanswered (a playing world's
+#: minute is a minute). Past it no receipt will come, so the ask's outcome is passed over and
+#: nothing after it, the grant's end included, waits for it.
+UNANSWERED_WINDOW: Final = dt.timedelta(minutes=UNANSWERED_WINDOW_TICKS)
 #: This grant's arrivals the society took. A society's minute takes crossings in the order the door
 #: wrote them, so their ``crossing_seq`` is the order they were taken in, and a cursor holds the
 #: last one it was told of.
@@ -462,8 +469,15 @@ class ChannelRepository:
             position["grant"] = grant.grant_seq
         outcomes = self._connection.execute(
             "select a.ask_seq, a.request_id, d.document->>'status' as status, "
-            "d.document->>'reason' as reason "
-            "from door_ask a left join world_society_decision d "
+            "d.document->>'reason' as reason, "
+            # An ask no receipt can close any more: past its deadline and the unanswered window.
+            "(d.request_id is null and a.recorded_at < statement_timestamp() - %(window)s "
+            "  - make_interval(secs => coalesce("
+            "      (r.document->'provider_config'->>'deadline_ms')::numeric, 0) / 1000)) as passed "
+            "from door_ask a join world_society_decision_request r "
+            "  on r.workspace_id = a.workspace_id and r.society_id = a.society_id "
+            " and r.request_id = a.request_id "
+            "left join world_society_decision d "
             "  on d.workspace_id = a.workspace_id and d.society_id = a.society_id "
             " and d.request_id = a.request_id "
             "where a.workspace_id = %(w)s and a.grant_id = %(g)s "
@@ -474,11 +488,17 @@ class ChannelRepository:
                 "outcome": cursor.outcome,
                 "ask": cursor.ask,
                 "limit": FRAMES_PER_POLL,
+                "window": UNANSWERED_WINDOW,
             },
         ).fetchall()
         for row in outcomes:
             if row["status"] is None:
-                break  # outcomes are reported in ask order, so the first still open stops them
+                if not row["passed"]:
+                    break  # in ask order, an ask that may still be decided stops the outcomes
+                # No receipt will ever close it, so nothing can be told of it truthfully: it is
+                # passed over, and the outcomes after it, and the grant's end, wait for it no more.
+                position["outcome"] = row["ask_seq"]
+                continue
             frames.append(
                 outcome_frame(
                     ask_seq=row["ask_seq"],
@@ -489,8 +509,6 @@ class ChannelRepository:
             )
             position["outcome"] = row["ask_seq"]
         room = FRAMES_PER_POLL - len(frames)
-        # Whether this poll read every ask after the cursor: only then may it carry the end.
-        every_ask = room > 0
         if room > 0:
             asks = self._connection.execute(
                 "select a.ask_seq, r.document as request, d.request_id as recorded "
@@ -528,13 +546,10 @@ class ChannelRepository:
                 )
                 size = len(canonical_json(frame))
                 if asked_bytes and asked_bytes + size > ASKED_BYTES_MAXIMUM:
-                    every_ask = False
                     break  # the next poll reads on from this ask
                 asked_bytes += size
                 frames.append(frame)
                 position["ask"] = row["ask_seq"]
-            if len(asks) == room:
-                every_ask = False  # there may be more: the next poll reads on
         room = FRAMES_PER_POLL - len(frames)
         if room > 0:
             for row in self._connection.execute(
@@ -565,11 +580,13 @@ class ChannelRepository:
             frames.extend(departed)
             position["departed"] += len(departed)
         ended = grant.ended(now)
+        # The end goes last. A poll that read any ask carries no end, since that ask's outcome is
+        # yet to be told (the outcome rule below), and a poll with no room left read none; so the
+        # end comes only in a poll that read every ask there is and told every outcome.
         if (
             ended is not None
             and not cursor.ended
             and len(frames) < FRAMES_PER_POLL
-            and every_ask
             and position["outcome"] >= position["ask"]
             and self.head(Cursor()).settled(position["departed"])
         ):

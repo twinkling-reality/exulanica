@@ -178,3 +178,27 @@ def bridges_setting(
 
 def bridges(**kwargs: Any) -> BridgeDirectory:
     return load_bridge_directory({"EXULANICA_DOOR_BRIDGES": bridges_setting(**kwargs)})
+
+
+def open_to_visitors(client: Any, world: dict[str, Any]) -> None:
+    """Make a saved world's version hold a society of things, where a grant's visitors arrive and
+    which issuing a grant for them asks for (``world_not_open_to_visitors``), unless the version
+    holds a society already: a well to go to (a society needs a reachable target), then the
+    society."""
+    # A PostgreSQL test's own helpers, imported here so the tests that need no database never load
+    # them.
+    from test_society_things_postgres import _make_society, _place
+
+    binding = world["binding"]
+    held = (
+        world["connection"]
+        .execute(
+            "select 1 from world_society where workspace_id = %s and world_id = %s "
+            "and version_id = %s",
+            (world["workspace"], binding.world_id, binding.version_id),
+        )
+        .fetchone()
+    )
+    if held is None:
+        _place(client, world, "well", "well", 2, -4_000, 2_000)
+        _make_society(client, world)

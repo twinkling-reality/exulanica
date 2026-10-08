@@ -90,9 +90,10 @@ class AccountRepository:
         return active_owned_workspaces(self.connection)
 
     def owned_workspace_active(self, workspace_id: uuid.UUID) -> bool:
-        """Whether one workspace's owner still has that authority: the same rule as
-        :meth:`active_owned_workspaces`, read for one workspace by its key, as a browser session is
-        read by its own."""
+        """Whether one workspace's owner still has that authority, read for that workspace alone
+        by its key, as a browser session is read by its own: an owner membership that stands, of
+        an account and a workspace neither disabled. Unlike :meth:`active_owned_workspaces` it
+        admits no guest membership; the door asks it, and a guest holds no ``door.grant``."""
         row = self.connection.execute(
             "select 1 from account_workspace w "
             "join account_user u on u.user_id=w.owner_user_id "

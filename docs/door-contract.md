@@ -71,7 +71,7 @@ grant names at least one visitor or one thing.
 | Route | Requires | Does |
 | --- | --- | --- |
 | `GET /door/bridges` | `world.read` | The bridges this deployment offers the workspace, in words, with who runs each and whether it is an AI |
-| `POST /door/grants?world_id=` | `world.write`, `door.grant` | Issue a grant: 201 with it, or 200 with the grant an earlier issue under the same `idempotency_key` made; a key reused for another grant is 409 `idempotency_key_reused`; with `channel_credential` true, also its channel credential, shown once |
+| `POST /door/grants?world_id=` | `world.write`, `door.grant` | Issue a grant: 201 with it, or 200 with the grant an earlier issue under the same `idempotency_key` made, for the same world, bridge and scope (its kinds and things in any order); a key reused for another grant is 409 `idempotency_key_reused`; with `channel_credential` true, also its channel credential, shown once, so an issue answered 200 carries none and the first stays live; a grant for visitors only in a version holding a society of things (409 `world_not_open_to_visitors`, see Crossings) |
 | `GET /door/grants?world_id=` | `world.read` | Every grant in a world, newest first, each with its bridge's label, who runs it, whether it is an AI, whether it is connected and what its program declared itself to be |
 | `GET /door/grants/{grant_id}` | `world.read` | One grant as it stands, in the same view |
 | `POST /door/grants/{grant_id}/revoke` | `world.write`, `door.grant` | End it now; revoking twice changes nothing |
@@ -153,17 +153,23 @@ on every request as a browser session is (an account database that cannot be rea
 asked either. A secret's time is stamped when it is stored, whatever the writer says (migration
 0157), and a secret may only gain the time an invite was used and the time it was revoked, each
 once: migration 0149 refuses every other change. A grant is given at most 48 secrets over its life,
-invites and channel credentials together (409 `too_many_secrets`). A revoked secret is a withdrawal
-written once and kept for good: no prune removes it and its trigger refuses its delete, whoever
-asks, so a database that keeps door rows never holds a revocation a later checkpoint lacks. Backup
-sets carry no door secret and no refused redemption (`EPHEMERAL_TABLES` in
-`exulanica/orchestration/installation/backup_set.py`), so a restore voids every invite and channel
-credential and each owner opens their grants again. A secret's revocation is catalogued (kind
-`door_secret`) so that a sealed restore checkpoint refuses it, as it refuses a sign-out. The runtime
-role may update those two columns and deletes nothing: `door_prune`, a function with its owner's
-rights the runtime alone may execute, removes refused redemptions a day old and secrets nobody
-revoked thirty days past their end, a bounded batch at a time, as the door issues and redeems
-(`exulanica/door/retention.py`); the tables' triggers refuse every other delete, whoever asks.
+invites and channel credentials together (409 `too_many_secrets`), and an invite is issued only
+while two more fit, itself and the channel credential its redemption issues (an invite whose room
+direct credentials took meanwhile is refused at redemption, 409 `too_many_secrets`, and its
+requester is not counted). A workspace issues at most 50 grants in any 24 hours (429
+`too_many_grants`, with `retry_after_s`). A revoked secret is a withdrawal written once and kept for
+good: no prune removes it and its trigger refuses its delete, whoever asks, so a database that keeps
+door rows never holds a revocation a later checkpoint lacks. Kept revocations grow by at most 50
+grants a day times 48 secrets, 2,400 rows (about 0.6 MB) a day for a workspace at both bounds, and
+every sealed checkpoint carries them all. Backup sets carry no door secret and no refused redemption
+(`EPHEMERAL_TABLES` in `exulanica/orchestration/installation/backup_set.py`), so a restore voids
+every invite and channel credential and each owner opens their grants again. A secret's revocation
+is catalogued (kind `door_secret`) so that a sealed restore checkpoint refuses it, as it refuses a
+sign-out. The runtime role may update those two columns and deletes nothing: `door_prune`, a
+function with its owner's rights the runtime alone may execute, removes refused redemptions a day
+old and secrets nobody revoked thirty days past their end, a bounded batch at a time, as the door
+issues and redeems (`exulanica/door/retention.py`); the tables' triggers refuse every other delete,
+whoever asks.
 
 ## The channel
 
@@ -190,7 +196,8 @@ who answers now, and only while the deployment still admits its version and mapp
 are a program's own words for a person reading a card: they never enter a society record or any
 model's context. A grant takes at most six hellos a minute in one process (429 `too_many_hellos`,
 `retry_after_s` 60). The answer states the bridge's hold. A bridge polls only after its hello (409
-`hello_first`).
+`hello_first`), except once its grant has ended: then it reads what it was sent without one, so a
+bridge whose version or mapping the deployment no longer admits still reads the end.
 
 **Frames.** `GET /door/channel/frames?after=` answers with frames of `exulanica.door-frame/v1` after
 an opaque cursor, and the cursor after them; a bridge reads only response bodies. One ask is written
@@ -209,25 +216,29 @@ An ask whose turn was decided before the bridge read it is not sent; its outcome
 answer stops adding asked frames once they pass 262,144 bytes (the first always goes), and the next
 poll reads on, so an agent never renders a role's words itself and no answer grows past a bound.
 Every poll checks its grant: under a standing grant it records the poll; once the grant has ended it
-sends the end as soon as nothing else is left to tell (see Crossings for a grant's visitors), and
-once the bridge has read that end its polls and hellos are refused (410 `grant_ended`). A poll is held for at most its bridge's hold with nothing to send.
-While held it keeps no database connection or transaction: its first read records the poll and reads
-the head on one short connection, later reads each open a short connection from a limiter of four
-poller threads per process, and frames are built only when the head says something is new. Within
-the process that wrote an ask the poll wakes at once; otherwise the head is read once a second, and
-a poll whose client went away ends at its next read. One poll is held per grant, a second ending the
-first with nothing to send; a process holds at most 64, a workspace at most four of them and a
-bridge at most half. When the process or a bridge is full, a poll from a workspace holding fewer
-takes the place of the oldest poll of the workspace holding the most there, if that one holds at
-least two more; the poll whose place is taken is answered at once with nothing to send. So the
-places are shared evenly among the workspaces that want them, and only a poll that would not be
-fairer is refused (503 `door_busy`, `retry_after_ms` 1,000). One process therefore serves the
-programs of at most 32 workspaces at a time through one bridge: a listed bridge that more owners use
-at once needs more API processes, or some programs wait, and one left out past its hold and ten
-quiet seconds is reported not connected and its things fall to the routine
-([deployment guide](deployment.md), 5.4, which says what several processes do not share: a kind of
-place being drafted needs each person routed to one of them). The frames route belongs to the
-streams admission class.
+records nothing and sends the end as soon as every ask was read, every outcome reported or passed
+over and nothing else is left to tell (see Crossings for a grant's visitors), and once the bridge
+has read that end its polls and hellos are refused (410 `grant_ended`). Outcomes are reported in ask
+order; an ask whose request no receipt can close any more, past its deadline and the minutes in
+which the host closes a request a stopped process left (the unanswered window), is passed over with
+no outcome, since none was recorded, so nothing after it waits for it. A poll is held for at most
+its bridge's hold with nothing to send. While held it keeps no database connection or transaction:
+its first read records the poll and reads the head on one short connection, later reads each open a
+short connection from a limiter of four poller threads per process, and frames are built only when
+the head says something is new. Within the process that wrote an ask the poll wakes at once;
+otherwise the head is read once a second, and a poll whose client went away ends at its next read.
+One poll is held per grant, a second ending the first with nothing to send; a process holds at most
+64, a workspace at most four of them and a bridge at most half. When the process or a bridge is
+full, a poll from a workspace holding fewer takes the place of the oldest poll of the workspace
+holding the most there, if that one holds at least two more; the poll whose place is taken is
+answered at once with nothing to send. So the places are shared evenly among the workspaces that
+want them, and only a poll that would not be fairer is refused (503 `door_busy`, `retry_after_ms`
+1,000). One process therefore serves the programs of at most 32 workspaces at a time through one
+bridge: a listed bridge that more owners use at once needs more API processes, or some programs
+wait, and one left out past its hold and ten quiet seconds is reported not connected and its things
+fall to the routine ([deployment guide](deployment.md), 5.4, which says what several processes do
+not share: a kind of place being drafted needs each person routed to one of them). The frames route
+belongs to the streams admission class.
 
 **Answers.** `POST /door/channel/answers` names one open ask of the grant (else 404
 `unknown_reference`), its request digest and one of the labels the request offered (else 422

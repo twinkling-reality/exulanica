@@ -47,10 +47,14 @@ that runs out, the first time the decision host meets one of its things (:meth:`
 lapse`). A new world version
 starts its society again, so a binding is a version's, as a model choice is.
 
+A grant that lets visitors in names the world version they arrive in, which must hold a society of
+things (:func:`visitors_society`): issuing refuses one that does not, as every arrival under a grant
+stored without one is refused.
+
 The repository runs on a connection scoped to the owner's workspace and is the one writer of the
 grant tables. Its idempotency: an issue names an ``idempotency_key``, from which the grant's id is
-derived, so a repeated issue answers with the grant it made and a key reused for a different grant
-is refused.
+derived, so a repeated issue answers with the grant it made, its lists in any order, and a key
+reused for a different grant is refused.
 """
 
 from __future__ import annotations
@@ -77,13 +81,16 @@ from exulanica.door.credentials import (
 from exulanica.door.protocol import words_fault
 from exulanica.door.retention import prune
 from exulanica.errors import ExulanicaError
+from exulanica.world.crossings import society_of_version
 from exulanica.world.society_decision_contract import decision_contract, person_role
+from exulanica.world.society_engines import society_engine
 from exulanica.world.society_model_choice_repository import (
     ModelChoiceRefused,
     SocietyModelChoiceRepository,
 )
 
 __all__ = [
+    "GRANTS_PER_DAY_MAXIMUM",
     "GRANT_PROFILE",
     "INVITE_LIFETIME",
     "MINUTES_DEFAULT",
@@ -100,6 +107,7 @@ __all__ = [
     "IssuedSecret",
     "Scope",
     "grant_actor",
+    "visitors_society",
 ]
 
 _LOG = logging.getLogger(__name__)
@@ -119,6 +127,10 @@ SECRETS_WAITING_MAXIMUM: Final = 8
 #: secret is kept for good (migration 0157), so this bounds what one grant adds to the global
 #: secret table, whatever its owner asks.
 SECRETS_ISSUED_MAXIMUM: Final = 48
+#: The most grants one workspace issues in any 24 hours. A grant is given at most
+#: SECRETS_ISSUED_MAXIMUM secrets and a revoked secret is kept for good (migration 0157), so this
+#: bounds how fast a workspace's kept door secrets grow: at most 2,400 rows a day at the cap.
+GRANTS_PER_DAY_MAXIMUM: Final = 50
 #: The most characters in the words an owner gives a grant's bridge to show for the world.
 WORLD_WORDS_MAXIMUM: Final = 80
 #: Grants' ids, derived from the workspace and the issue's idempotency key.
@@ -132,12 +144,14 @@ _PLACED_ID: Final = re.compile(r"[a-z0-9]([a-z0-9:._-]{0,198}[a-z0-9])?")
 
 
 class GrantRefused(ExulanicaError):
-    """A grant cannot be issued, revoked or opened as asked; ``code`` says why."""
+    """A grant cannot be issued, revoked or opened as asked; ``code`` says why, and
+    ``retry_after_s`` when asking again later would be answered."""
 
-    def __init__(self, code: str, detail: str) -> None:
+    def __init__(self, code: str, detail: str, *, retry_after_s: int | None = None) -> None:
         super().__init__(f"{code}: {detail}")
         self.code = code
         self.detail = detail
+        self.retry_after_s = retry_after_s
 
 
 def grant_actor(grant_id: uuid.UUID) -> uuid.UUID:
@@ -147,6 +161,18 @@ def grant_actor(grant_id: uuid.UUID) -> uuid.UUID:
 
 def _utc(value: dt.datetime) -> str:
     return value.astimezone(dt.UTC).isoformat(timespec="microseconds")
+
+
+def visitors_society(
+    connection: psycopg.Connection, workspace_id: uuid.UUID, world_id: str, version_id: str
+) -> dict[str, Any] | None:
+    """The society a world version holds where a grant's visitors arrive, by its id and engine, or
+    None where the version holds no society or its engine holds no things (the engine table
+    decides): the rule a visitors grant is issued under and every arrival under one is taken by."""
+    society = society_of_version(connection, workspace_id, world_id, uuid.UUID(version_id))
+    if society is None or society_engine(society["engine_version"]).state_family != "things":
+        return None
+    return society
 
 
 @dataclass(frozen=True, slots=True)
@@ -406,14 +432,21 @@ class GrantRepository:
         grant's ``lapse``, each by its own chooser): the choice recorded, which a repeat answers
         again, or None when the grant decides for nobody now, as after the other one."""
         assert grant.scope.version_id is not None
-        return self._choices(grant.world_id).release_external_choice(
-            uuid.UUID(grant.scope.version_id),
-            person_role(),
-            request_id=uuid.uuid5(grant.grant_id, why),
-            grant_id=grant.grant_id,
-            chosen_by=self._actor,
-            contract=decision_contract(),
-        )
+        try:
+            return self._choices(grant.world_id).release_external_choice(
+                uuid.UUID(grant.scope.version_id),
+                person_role(),
+                request_id=uuid.uuid5(grant.grant_id, why),
+                grant_id=grant.grant_id,
+                chosen_by=self._actor,
+                contract=decision_contract(),
+            )
+        except ModelChoiceRefused as exc:
+            # The choice record will not hand the things back (one left the world, or its kind
+            # takes no routine): the grant ends all the same, and nothing more is asked under it,
+            # so the refusal is said by name and does not stop a revocation or a lapse.
+            _LOG.warning("A grant's things were not handed back: %s", exc.code)
+            return None
 
     def issue(
         self,
@@ -427,7 +460,10 @@ class GrantRepository:
         """Issue a grant, or answer with the one this key already issued; True when it is new.
 
         The world must be one this workspace registered and the bridge one the deployment offers
-        it. A key reused for a different grant is refused.
+        it; a grant for visitors names a version holding a society of things. The same issue sent
+        again answers with the grant it made: the world, the bridge and the scope's document, whose
+        lists are sorted, are what is compared, so kinds and things in another order are the same
+        grant. A key reused for a different grant is refused.
         """
         if not isinstance(idempotency_key, str) or not _KEY.match(idempotency_key):
             raise GrantRefused("invalid_idempotency_key", "8 to 128 letters, digits or ._:-")
@@ -441,10 +477,10 @@ class GrantRepository:
             self.lock(grant_id)
             existing = self.current(grant_id)
             if existing is not None:
-                if (existing.world_id, existing.bridge, existing.scope) != (
+                if (existing.world_id, existing.bridge, existing.scope.document()) != (
                     world_id,
                     bridge.key,
-                    scope,
+                    scope.document(),
                 ):
                     raise GrantRefused(
                         "idempotency_key_reused", "this key already issued a different grant"
@@ -456,6 +492,11 @@ class GrantRepository:
             ).fetchone()
             if registered is None:
                 raise GrantRefused("unknown_world", "no world with this id is registered here")
+            if scope.visitors_maximum > 0 and self._takes_no_visitors(world_id, scope):
+                raise GrantRefused(
+                    "world_not_open_to_visitors", "this world's version takes no visitors"
+                )
+            self._within_daily_grants()
             self._connection.execute(
                 "insert into door_grant (workspace_id, grant_id, world_id, bridge, issued_by) "
                 "values (%s, %s, %s, %s, %s)",
@@ -487,6 +528,36 @@ class GrantRepository:
             issued = self.current(grant_id)
         assert issued is not None
         return issued, True
+
+    def _takes_no_visitors(self, world_id: str, scope: Scope) -> bool:
+        """Whether the version a visitors grant names holds no society of things to arrive in."""
+        assert scope.version_id is not None  # check_issue
+        society = visitors_society(self._connection, self._workspace_id, world_id, scope.version_id)
+        return society is None
+
+    def _within_daily_grants(self) -> None:
+        """Refuse a new grant past the workspace's daily bound, under the workspace's issuing lock
+        (taken after the grant's, and only here), so two issued at once cannot both take the last
+        place; answered with when the oldest grant of the day leaves the count."""
+        self._connection.execute(
+            "select pg_advisory_xact_lock(hashtextextended(%s, 149003))",
+            (str(self._workspace_id),),
+        )
+        row = self._connection.execute(
+            "select count(*) as issued, "
+            "ceil(extract(epoch from min(issued_at) + interval '1 day' - statement_timestamp())) "
+            "  as wait "
+            "from door_grant where workspace_id = %s "
+            "and issued_at > statement_timestamp() - interval '1 day'",
+            (self._workspace_id,),
+        ).fetchone()
+        assert row is not None
+        if row["issued"] >= GRANTS_PER_DAY_MAXIMUM:
+            raise GrantRefused(
+                "too_many_grants",
+                f"a workspace issues at most {GRANTS_PER_DAY_MAXIMUM} grants a day",
+                retry_after_s=max(1, int(row["wait"])),
+            )
 
     def revoke(self, grant_id: uuid.UUID) -> Grant:
         """End a grant now: nothing more is asked or answered under it, and its invites and
@@ -550,16 +621,17 @@ class GrantRepository:
         return grant
 
     def _secret(
-        self, grant: Grant, *, kind: str, text: str, expires_at: dt.datetime
+        self, grant: Grant, *, kind: str, text: str, expires_at: dt.datetime, room: int = 1
     ) -> IssuedSecret:
-        """Store one new secret of ``grant``, under the grant's lock the caller holds, while the
-        grant has been given fewer than :data:`SECRETS_ISSUED_MAXIMUM`."""
+        """Store one new secret of ``grant``, under the grant's lock the caller holds, while
+        ``room`` more fit under :data:`SECRETS_ISSUED_MAXIMUM`: an invite needs room for itself
+        and for the channel credential its redemption issues."""
         issued = self._connection.execute(
             "select count(*) as issued from door_secret where workspace_id = %s and grant_id = %s",
             (self._workspace_id, grant.grant_id),
         ).fetchone()
         assert issued is not None
-        if issued["issued"] >= SECRETS_ISSUED_MAXIMUM:
+        if issued["issued"] + room > SECRETS_ISSUED_MAXIMUM:
             raise GrantRefused(
                 "too_many_secrets",
                 f"a grant is given at most {SECRETS_ISSUED_MAXIMUM} invites and credentials",
@@ -616,7 +688,7 @@ class GrantRepository:
                 )
             code = new_invite_code()
             expires_at = min(self.now() + INVITE_LIFETIME, grant.expires_at)
-            issued = self._secret(grant, kind="invite", text=code, expires_at=expires_at)
+            issued = self._secret(grant, kind="invite", text=code, expires_at=expires_at, room=2)
         return IssuedSecret(text=format_invite_code(issued.text), expires_at=issued.expires_at)
 
     def direct_channel(self, grant_id: uuid.UUID, bridges: BridgeDirectory) -> IssuedSecret:

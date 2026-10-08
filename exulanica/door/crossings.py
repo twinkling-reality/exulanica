@@ -48,7 +48,7 @@ from psycopg.types.json import Jsonb
 
 from exulanica.canonical import sha256_of_canonical
 from exulanica.door.channel import ChannelRefused
-from exulanica.door.grants import Grant
+from exulanica.door.grants import Grant, visitors_society
 from exulanica.door.manifest import arrival_manifest
 from exulanica.world.crossings import (
     ARRIVAL_PROFILE,
@@ -58,11 +58,9 @@ from exulanica.world.crossings import (
     Crossing,
     check_arrival,
     check_departure,
-    society_of_version,
 )
 from exulanica.world.errors import InvalidThingPlacement
 from exulanica.world.placed_things import named_kind
-from exulanica.world.society_engines import society_engine
 from exulanica.world.thing_library import shipped_looks
 from exulanica.world.thing_looks import (
     ThingLookRefused,
@@ -239,17 +237,15 @@ class Visits:
         return {"w": self.workspace_id, "g": self.grant.grant_id}
 
     def society(self) -> dict[str, Any]:
-        """The society of things the grant's visitors arrive in, or a refusal by name."""
+        """The society of things the grant's visitors arrive in, or a refusal by name: the rule
+        the grant was issued under, read again, so a grant stored before it held is refused too."""
         version = self.grant.scope.version_id
         society = (
             None
             if version is None
-            else society_of_version(
-                self.connection, self.workspace_id, self.grant.world_id, uuid.UUID(version)
-            )
+            else visitors_society(self.connection, self.workspace_id, self.grant.world_id, version)
         )
-        # Visitors arrive only where the engine table says a society holds things.
-        if society is None or society_engine(society["engine_version"]).state_family != "things":
+        if society is None:
             raise ChannelRefused(
                 "world_not_open_to_visitors", 409, "this world's version takes no visitors"
             )

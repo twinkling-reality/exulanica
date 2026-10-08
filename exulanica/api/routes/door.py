@@ -135,6 +135,8 @@ _GRANT_STATUS: Final = {
     "unknown_grant": 404,
     "grant_ended": 409,
     "too_many_secrets": 409,
+    "too_many_grants": 429,
+    "world_not_open_to_visitors": 409,
     **dict.fromkeys(CHOICE_CONFLICTS, 409),
 }
 #: The poller threads every held poll in one process reads with, and so the most connections the
@@ -165,7 +167,8 @@ def _unavailable() -> JSONResponse:
 def _refused(exc: GrantRefused) -> JSONResponse:
     if exc.code in ("unknown_grant",):
         return _problem(404, "unknown_reference", "nothing at this address is available")
-    return _problem(_GRANT_STATUS.get(exc.code, 422), exc.code, exc.detail)
+    extra = {} if exc.retry_after_s is None else {"retry_after_s": exc.retry_after_s}
+    return _problem(_GRANT_STATUS.get(exc.code, 422), exc.code, exc.detail, **extra)
 
 
 def _shown_once(issued: Any) -> dict[str, Any]:
@@ -569,6 +572,8 @@ def redeem(request: Request, body: RedeemBody, bridge: CurrentBridge) -> Any:
         )
     except InviteNotRedeemable:
         return _problem(404, InviteNotRedeemable.code, "this invite opens nothing for this bridge")
+    except GrantRefused as exc:
+        return _refused(exc)
     return JSONResponse(
         status_code=201,
         content={"grant": redeemed.grant.view(), **_shown_once(redeemed.channel)},

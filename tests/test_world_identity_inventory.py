@@ -123,6 +123,10 @@ ALLOWED_WORLDLESS_QUERIES: dict[str, str] = {
         "the GPU allowance is the workspace's, so what its open requests can still cost is summed "
         "over every world it holds"
     ),
+    "exulanica/door/grants.py::GrantRepository._within_daily_grants [door_grant]": (
+        "the bound on how many grants a workspace issues in a day is the workspace's, counted "
+        "across its worlds, since the door secrets it bounds are kept per workspace"
+    ),
 }
 
 #: Routes whose ``world_id`` parameter a caller may omit.

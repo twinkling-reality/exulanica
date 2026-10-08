@@ -6,6 +6,9 @@
     send-away, a revocation and a grant's end all still send the visitors home.
 *   A visitors grant stored before a grant had to name its version is still read, listed, opened
     and revoked; it takes no arrival, and a grant of that shape is no longer issued.
+*   A grant for visitors is issued only for a version holding a society of things: a version with
+    no society, or with a society of people, is refused by name and nothing is issued, while its
+    people may still be handed to a bridge.
 *   A grant takes a bounded number of arrivals in any hour, refused ones included, answered with
     when to try again; a resent arrival is not counted again.
 *   A visitor carries its shipped look's own licence and may be shown where the look may, whatever
@@ -276,6 +279,49 @@ def test_a_visitors_grant_stored_before_grants_named_their_version_is_still_read
         },
     )
     assert (issued.status_code, issued.json()["code"]) == (422, "invalid_scope")
+
+
+def test_a_visitors_grant_is_issued_only_for_a_version_holding_a_society_of_things(door):
+    world = door["world"]
+    client = door["client"]
+    params = {"world_id": world["binding"].world_id}
+    body = {
+        "bridge": "test-bridge",
+        "visitors_maximum": 1,
+        "kinds": ["player"],
+        "version_id": str(world["binding"].version_id),
+    }
+    # The version holds no society: there is nowhere for a visitor to arrive.
+    empty = client.post(
+        "/door/grants",
+        headers=OWNER,
+        params=params,
+        json={**body, "idempotency_key": "nobody-lives-here"},
+    )
+    assert (empty.status_code, empty.json()["code"]) == (409, "world_not_open_to_visitors")
+    # Its society is one of people (exulanica-society/v2), whose engine holds no things.
+    _request, person = _person_request(door)
+    peopled = client.post(
+        "/door/grants",
+        headers=OWNER,
+        params=params,
+        json={**body, "idempotency_key": "people-live-here"},
+    )
+    assert (peopled.status_code, peopled.json()["code"]) == (409, "world_not_open_to_visitors")
+    assert client.get("/door/grants", headers=OWNER, params=params).json()["grants"] == []
+    # Its people may still be handed to the bridge: the rule is the visitors'.
+    named = client.post(
+        "/door/grants",
+        headers=OWNER,
+        params=params,
+        json={
+            "idempotency_key": "one-of-its-people",
+            "bridge": "test-bridge",
+            "things": [person],
+            "version_id": str(world["binding"].version_id),
+        },
+    )
+    assert named.status_code == 201, named.text
 
 
 def test_a_grant_takes_a_bounded_number_of_arrivals_an_hour(door, crossings, monkeypatch):

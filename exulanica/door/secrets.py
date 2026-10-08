@@ -253,6 +253,11 @@ def redeem_invite(
             grant = grants.current(grant_id)
             assert grant is not None
     except (InviteNotRedeemable, GrantRefused) as exc:
+        if isinstance(exc, GrantRefused) and exc.code == "too_many_secrets":
+            # A good invite whose grant has been given every secret it may be, since direct
+            # credentials took the room it was issued with: said so by name, and not counted
+            # against the requester, who presented what the owner gave.
+            raise
         with database.unscoped() as connection:
             _refuse(connection, bridge, requester)
         raise InviteNotRedeemable("this invite opens nothing for this bridge") from exc

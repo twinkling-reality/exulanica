@@ -56,6 +56,7 @@ from exulanica.world.society_decision_contract import person_role
 from exulanica.world.thing_library import shipped_looks
 from fastapi.testclient import TestClient
 
+import door_support
 import test_society_authored_world_postgres as helpers
 import test_society_stay_requests_api as stays
 from agent_support import PACKAGE, AgentError, Body, agent, agents_bridge, app_opener, facade
@@ -137,7 +138,9 @@ def crossings():
 
 def _key(world: dict[str, Any], client: TestClient, **scope: Any) -> tuple[str, str]:
     """A grant letting an agent bring one body of its own, with ``scope`` (such as the gate it comes
-    through) over it, and the key its owner mints for it."""
+    through) over it, and the key its owner mints for it, in a version first made to hold a society
+    of things when it holds none."""
+    door_support.open_to_visitors(client, world)
     issued = client.post(
         "/door/grants",
         headers=OWNER,
@@ -147,7 +150,7 @@ def _key(world: dict[str, Any], client: TestClient, **scope: Any) -> tuple[str, 
             "bridge": "agents",
             "visitors_maximum": 1,
             "kinds": ["agent"],
-            # The version its visitor would arrive in; nothing asks for a society until one does.
+            # The version its visitor would arrive in, which holds a society of things.
             "version_id": str(world["binding"].version_id),
             "channel_credential": True,
             **scope,

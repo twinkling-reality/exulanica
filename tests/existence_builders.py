@@ -837,9 +837,14 @@ def workspace_asset(owner) -> str:
 
 
 def door_grant(owner) -> str:
-    """A grant letting the sweep's test bridge bring one visitor into the owner's world (API)."""
-    registered_world(owner.repository.connection, owner.workspace_id, WORLD, actor=owner.actor)
-    made = _ok(
+    """A grant handing one person of a purposeful society to the sweep's test bridge (API).
+
+    A grant names visitors or things, and visitors arrive only in a version holding a society of
+    things, so this grant names one of a society's people in the version that holds them.
+    """
+    made = _version_with_society(owner, PURPOSEFUL, society_input)
+    person = made["society"]["state"]["inhabitants"][0]["id"]
+    granted = _ok(
         in_world(
             owner,
             "POST",
@@ -847,17 +852,14 @@ def door_grant(owner) -> str:
             json={
                 "idempotency_key": "existence-sweep-grant",
                 "bridge": "test-bridge",
-                "visitors_maximum": 1,
-                "kinds": ["player"],
-                # The version visitors would arrive in; a grant records it and asks for no society
-                # until one crosses.
-                "version_id": "6f2b9b7e-0d5c-5b8e-9a51-3c4d2e1f0a77",
+                "things": [person],
+                "version_id": str(made["version_id"]),
             },
         ),
         200,
         201,
     )
-    return made["grant"]["grant_id"]
+    return granted["grant"]["grant_id"]
 
 
 def world_entry(owner) -> str:

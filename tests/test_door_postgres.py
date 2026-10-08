@@ -4,10 +4,12 @@ Every request goes through the real routes of an application connected as a prov
 role over a saved world, so migration 0149's triggers, row-level security and grants are what
 answer. What is shown:
 
-*   an owner issues a grant, a repeated issue answers with it, and a reused key is refused; who runs
-    a bridge decides how its grants open (invites for a server, a direct credential for a program
-    its owner runs or a server declared for this workspace alone); a grant keeps at most eight
-    invites waiting, and its owner can end every credential without ending the grant;
+*   an owner issues a grant, a repeated issue answers with it, its lists in any order and with no
+    second credential, and a reused key is refused; a grant for visitors is issued only for a
+    version holding a society of things; who runs a bridge decides how its grants open (invites for
+    a server, a direct credential for a program its owner runs or a server declared for this
+    workspace alone); a grant keeps at most eight invites waiting, and its owner can end every
+    credential without ending the grant;
 *   an invite opens its grant once, for its own bridge, and every other redemption gets one
     refusal; a requester past ten failures in a minute is refused unread, and only that requester;
 *   a bridge says hello only under a standing grant, with an adapter version and a mapping the
@@ -46,21 +48,26 @@ from exulanica.api.services import Services
 from exulanica.api.society_runtime import SocietyRuntime
 from exulanica.canonical import sha256_of_canonical
 from exulanica.db.roles import provision_runtime_role
+from exulanica.door import channel as channel_module
 from exulanica.door.asker import DoorAsker
 from exulanica.door.bridges import load_bridge_directory
 from exulanica.door.channel import ChannelRepository
 from exulanica.door.credentials import credential_sha256
 from exulanica.door.grants import (
-    SECRETS_ISSUED_MAXIMUM,
     SECRETS_WAITING_MAXIMUM,
     GrantRepository,
     Scope,
+    grant_actor,
 )
 from exulanica.door.notices import Notices
 from exulanica.door.protocol import DEADLINE_MS_DEFAULT, Cursor
 from exulanica.door.runtime import DoorRuntime
 from exulanica.world.role_decisions import role_request, seal
 from exulanica.world.society_decision_contract import person_role
+from exulanica.world.society_model_choice_repository import (
+    ModelChoiceRefused,
+    SocietyModelChoiceRepository,
+)
 from fastapi.testclient import TestClient
 from psycopg.types.json import Jsonb
 
@@ -148,7 +155,9 @@ def _world_id(door) -> str:
     return door["world"]["binding"].world_id
 
 
-def _issue(door, key: str = "grant-key-0001", **scope: Any) -> Any:
+def _issue(door, key: str = "grant-key-0001", *, opened: bool = True, **scope: Any) -> Any:
+    """Issue a grant through the route: by default one visitor of the test bridge's players, in the
+    world's version, which is first ``opened`` to visitors when it holds no society yet."""
     # Visitors arrive in a version of the world, which a grant that lets them in names.
     body = {
         "idempotency_key": key,
@@ -158,6 +167,8 @@ def _issue(door, key: str = "grant-key-0001", **scope: Any) -> Any:
     }
     body["kinds"] = ["player"]
     body.update(scope)
+    if opened:
+        door_support.open_to_visitors(door["client"], door["world"])
     return door["client"].post(
         "/door/grants", headers=OWNER, params={"world_id": _world_id(door)}, json=body
     )
@@ -213,21 +224,72 @@ def _redeem(door, headers, code: str, requester: str = SOMEONE) -> Any:
 
 
 def test_an_owner_issues_a_grant_and_a_repeat_answers_with_the_same_one(door):
-    issued = _issue(door)
+    issued = _issue(door, kinds=["player", "npc"])
     assert issued.status_code == 201, issued.text
     grant = issued.json()["grant"]
     assert (grant["state"], grant["grant_seq"], grant["bridge"]) == ("active", 1, "test-bridge")
     assert grant["scope"]["visitors_maximum"] == 1 and grant["connected"] is False
-    again = _issue(door)
+    again = _issue(door, kinds=["player", "npc"])
     assert again.status_code == 200 and again.json()["grant"]["grant_id"] == grant["grant_id"]
-    reused = _issue(door, visitors_maximum=2)
+    # The kinds in another order are the same grant.
+    reordered = _issue(door, kinds=["npc", "player"])
+    assert (reordered.status_code, reordered.json()["grant"]["grant_id"]) == (
+        200,
+        grant["grant_id"],
+    )
+    reused = _issue(door, kinds=["player", "npc"], visitors_maximum=2)
     assert (reused.status_code, reused.json()["code"]) == (409, "idempotency_key_reused")
     listed = door["client"].get("/door/grants", headers=OWNER, params={"world_id": _world_id(door)})
     assert [g["grant_id"] for g in listed.json()["grants"]] == [grant["grant_id"]]
 
 
+def test_the_same_issue_sent_again_answers_with_its_grant_and_no_second_credential(door):
+    """As a program sends it again: two of the world's people, named in an order other than the one
+    a grant states them in, with a credential asked for each time."""
+    world = door["world"]
+    [(_request, one), (_other, two)] = _person_requests(door, 2)
+    params = {"world_id": _world_id(door)}
+    body = {
+        "idempotency_key": "people-sent-again",
+        "bridge": "test-bridge",
+        "things": sorted([one, two], reverse=True),
+        "version_id": str(world["binding"].version_id),
+        "minutes": 5,
+        "channel_credential": True,
+    }
+    first = door["client"].post("/door/grants", headers=OWNER, params=params, json=body)
+    assert first.status_code == 201, first.text
+    grant = first.json()["grant"]
+    # The grant states them in an order of its own, not the one sent: what a repeat is held to.
+    assert grant["scope"]["things"] != body["things"]
+    channel = {"Authorization": f"Bearer {first.json()['channel_credential']['credential']}"}
+    again = door["client"].post("/door/grants", headers=OWNER, params=params, json=body)
+    assert again.status_code == 200, again.text
+    assert again.json()["grant"]["grant_id"] == grant["grant_id"]
+    # The credential was shown once, with the grant it opens; the repeat issues none, so the first
+    # still opens the grant.
+    assert "channel_credential" not in again.json()
+    assert _hello(door, channel).status_code == 200
+    sorted_now = door["client"].post(
+        "/door/grants", headers=OWNER, params=params, json={**body, "things": sorted([one, two])}
+    )
+    assert (sorted_now.status_code, sorted_now.json()["grant"]["grant_id"]) == (
+        200,
+        grant["grant_id"],
+    )
+    other = door["client"].post(
+        "/door/grants", headers=OWNER, params=params, json={**body, "may_speak": False}
+    )
+    assert (other.status_code, other.json()["code"]) == (409, "idempotency_key_reused")
+    fewer = door["client"].post(
+        "/door/grants", headers=OWNER, params=params, json={**body, "things": [one]}
+    )
+    assert (fewer.status_code, fewer.json()["code"]) == (409, "idempotency_key_reused")
+
+
 def test_a_grant_names_a_bridge_offered_here_a_registered_world_and_no_unbound_thing(door):
-    unknown = _issue(door, bridge="no-such-bridge")
+    # The version is left holding no society, as a world nobody has opened is.
+    unknown = _issue(door, opened=False, bridge="no-such-bridge")
     assert (unknown.status_code, unknown.json()["code"]) == (422, "bridge_not_offered")
     elsewhere = door["client"].post(
         "/door/grants",
@@ -244,14 +306,17 @@ def test_a_grant_names_a_bridge_offered_here_a_registered_world_and_no_unbound_t
     assert (elsewhere.status_code, elsewhere.json()["code"]) == (404, "unknown_world")
     # A named thing is bound in the version the grant names, so a grant naming one names it, and
     # binds only one of that version's people (the choice record's own refusal).
-    unbound = _issue(door, things=[str(uuid.uuid4())], version_id=None)
+    unbound = _issue(door, opened=False, things=[str(uuid.uuid4())], version_id=None)
     assert (unbound.status_code, unbound.json()["code"]) == (422, "invalid_scope")
     # Visitors arrive in a version too, so a grant letting them in names one.
-    homeless = _issue(door, key="grant-key-0004", version_id=None)
+    homeless = _issue(door, key="grant-key-0004", opened=False, version_id=None)
     assert (homeless.status_code, homeless.json()["code"]) == (422, "invalid_scope")
     stranger = _issue(
         door,
         key="grant-key-0003",
+        opened=False,
+        visitors_maximum=0,
+        kinds=[],
         things=[str(uuid.uuid4())],
         version_id=str(door["world"]["binding"].version_id),
     )
@@ -260,7 +325,7 @@ def test_a_grant_names_a_bridge_offered_here_a_registered_world_and_no_unbound_t
     assert (stranger.status_code, stranger.json()["code"]) == (404, "unknown_reference")
     listed = door["client"].get("/door/grants", headers=OWNER, params={"world_id": _world_id(door)})
     assert all(grant["scope"]["things"] == [] for grant in listed.json()["grants"])
-    nothing = _issue(door, visitors_maximum=0, kinds=[])
+    nothing = _issue(door, opened=False, visitors_maximum=0, kinds=[])
     assert (nothing.status_code, nothing.json()["code"]) == (422, "invalid_scope")
 
 
@@ -647,6 +712,32 @@ def test_no_answer_by_the_deadline_and_a_revoked_grant_each_say_so(door):
     assert Cursor.decode(read["cursor"]).ended is True
 
 
+def test_an_ask_no_receipt_will_close_holds_neither_later_outcomes_nor_the_end(door, monkeypatch):
+    """A host that stopped after writing an ask leaves it without a receipt; past its deadline
+    and the unanswered window none will come. The ask is passed over: no outcome is told of it,
+    and the grant's end, which waits for every outcome, is told."""
+    request, person = _person_request(door)
+    grant_id = _grant_for(door, person)
+    channel = _credential(door, grant_id)
+    _hello(door, channel)
+    external = _store_external(door, request, grant_id)
+    # The host wrote the ask, then stopped before it recorded a receipt.
+    door["runtime"].asker()._write_ask(
+        door["world"]["workspace"], grant_id, uuid.UUID(external["request_id"])
+    )
+    door["client"].post(f"/door/grants/{grant_id}/revoke", headers=OWNER)
+    read = _frames(door, channel).json()
+    # Within its deadline and the window the ask may still be decided, so the end waits.
+    assert [frame["kind"] for frame in read["frames"]] == ["grant", "asked"]
+    assert _frames(door, channel, read["cursor"]).json()["frames"] == []
+    monkeypatch.setattr(channel_module, "UNANSWERED_WINDOW", datetime.timedelta(0))
+    time.sleep(DEADLINE_MS_DEFAULT / 1000 + 0.5)
+    after = _frames(door, channel, read["cursor"]).json()
+    assert [frame["kind"] for frame in after["frames"]] == ["grant_ended"]
+    told = Cursor.decode(after["cursor"])
+    assert (told.ended, told.outcome) == (True, Cursor.decode(read["cursor"]).ask)
+
+
 def test_configuration_names_a_quiet_bridge_a_thing_the_grant_no_longer_names_and_its_end(
     door, monkeypatch
 ):
@@ -691,6 +782,12 @@ def test_configuration_names_a_quiet_bridge_a_thing_the_grant_no_longer_names_an
         "grant_expired"
     )
     assert _choice_of(door, person)["decider"] == {"kind": "routine"}
+    # Handed back by the grant's own actor, as a revocation's release is by its owner's.
+    with door["runtime"].database.session(world["workspace"]) as connection:
+        released = SocietyModelChoiceRepository(
+            connection, world["workspace"], world_id=_world_id(door)
+        ).current(world["binding"].version_id, person_role())[person]
+    assert released["chosen_by"] == str(grant_actor(grant_id))
     # Meeting it again, or revoking it later, hands back nothing more.
     assert asker.configuration(world["workspace"], _world_id(door), person, decider)[1] == (
         "grant_expired"
@@ -1256,8 +1353,9 @@ def test_a_bridge_reads_its_grant_s_end_even_after_its_mapping_is_unpinned(door)
 
 
 def test_a_grant_is_given_a_bounded_number_of_secrets(door):
+    # The contract's bound, written here as the contract states it: 48 over a grant's life.
     grant_id = _issue(door).json()["grant"]["grant_id"]
-    for _ in range(SECRETS_ISSUED_MAXIMUM):
+    for _ in range(48):
         _credential(door, grant_id)
     more = door["client"].post(f"/door/grants/{grant_id}/channel-credentials", headers=OWNER)
     assert (more.status_code, more.json()["code"]) == (409, "too_many_secrets")
@@ -1271,7 +1369,42 @@ def test_a_grant_is_given_a_bounded_number_of_secrets(door):
         .fetchone()
     )
     door["world"]["connection"].commit()
-    assert live == {"live": 1, "given": SECRETS_ISSUED_MAXIMUM}
+    assert live == {"live": 1, "given": 48}
+
+
+def test_an_invite_needs_room_for_the_credential_it_opens(door):
+    """An invite is issued only while two more secrets fit, itself and the credential redeeming it
+    issues; one whose room direct credentials took meanwhile is refused by name at redemption,
+    and the requester is not counted, having presented what the owner gave."""
+    grant_id = _issue(door).json()["grant"]["grant_id"]
+    for _ in range(46):
+        _credential(door, grant_id)
+    invited = door["client"].post(f"/door/grants/{grant_id}/invites", headers=OWNER)
+    assert invited.status_code == 201, invited.text  # the 47th, with the 48th's room
+    _credential(door, grant_id)  # the 48th, taking that room
+    redeemed = _redeem(door, BRIDGE, invited.json()["code"])
+    assert (redeemed.status_code, redeemed.json()["code"]) == (409, "too_many_secrets")
+    with door["world"]["connection"].cursor() as cursor:
+        counted = cursor.execute("select count(*) as n from door_redemption_refusal").fetchone()
+    door["world"]["connection"].commit()
+    assert counted == {"n": 0}
+    # Another grant with one place left: no invite, since redeeming it would need a second.
+    other = _issue(door, key="grant-key-0002").json()["grant"]["grant_id"]
+    for _ in range(47):
+        _credential(door, other)
+    refused = door["client"].post(f"/door/grants/{other}/invites", headers=OWNER)
+    assert (refused.status_code, refused.json()["code"]) == (409, "too_many_secrets")
+
+
+def test_a_workspace_issues_at_most_fifty_grants_a_day(door):
+    for index in range(50):
+        issued = _issue(door, key=f"daily-grant-{index:04d}")
+        assert issued.status_code == 201, issued.text
+    # The same key answers with the grant it issued, which is no new grant.
+    assert _issue(door, key="daily-grant-0000").status_code == 200
+    refused = _issue(door, key="daily-grant-0050")
+    assert (refused.status_code, refused.json()["code"]) == (429, "too_many_grants")
+    assert 0 < refused.json()["retry_after_s"] <= 86_400
 
 
 def test_at_most_six_hellos_a_grant_a_minute(door):
@@ -1447,9 +1580,10 @@ def test_only_door_prune_removes_global_rows_and_never_a_revoked_secret(door):
 
 def test_a_secret_s_time_is_the_door_s_and_door_prune_keeps_its_owner_and_grants(door):
     """A secret's created_at is stamped at insert whatever the writer says, and 0157 replaced
-    door_prune in place: still a SECURITY DEFINER on a pinned search path, owned by the role every
-    definer is handed to where that role exists, executable by the runtime alone, its owner
-    holding exactly select and delete on the two global tables."""
+    door_prune and the secret's trigger in place: door_prune still a SECURITY DEFINER on a pinned
+    search path, executable by the runtime alone, and, where every definer in this schema was
+    handed to the login-less owner, owned by it with exactly select and delete on the two global
+    tables; the trigger on the search path 0149 pinned."""
     grant_id = _issue(door).json()["grant"]["grant_id"]
     world = door["world"]
     admin = world["connection"]
@@ -1482,11 +1616,24 @@ def test_a_secret_s_time_is_the_door_s_and_door_prune_keeps_its_owner_and_grants
     assert function["definer"] is True
     assert function["config"] == ["search_path=pg_catalog, pg_temp"]
     assert (function["runtime_executes"], function["public_executes"]) == (True, False)
-    definer = admin.execute("select 1 from pg_roles where rolname = 'exulanica_definer'").fetchone()
+    trigger = admin.execute(
+        "select p.proconfig = array['search_path=' || current_schema() || ', pg_catalog, pg_temp'] "
+        "  as pinned from pg_proc p where p.proname = 'tg_door_secret_change' "
+        "and p.pronamespace = current_schema()::regnamespace"
+    ).fetchone()
     admin.commit()
-    if definer is not None:
-        # Once every definer is handed to that role: its owner, with the privileges its grant line
-        # states, and no more.
+    assert trigger == {"pinned": True}
+    # Whether the migration handing every definer to the login-less owner ran in this schema: read
+    # from the other definers here, not from the role, which a cluster holds once for every
+    # database on it, migrated or not.
+    handed = admin.execute(
+        "select exists (select 1 from pg_proc p where p.prosecdef "
+        "and p.pronamespace = current_schema()::regnamespace and p.proname <> 'door_prune' "
+        "and pg_get_userbyid(p.proowner) = 'exulanica_definer') as handed"
+    ).fetchone()
+    admin.commit()
+    if handed["handed"]:
+        # Its owner, with the privileges its grant line states, and no more.
         assert function["owner"] == "exulanica_definer"
         privileges = admin.execute(
             "select t, p, has_table_privilege('exulanica_definer', t, p) as held "
@@ -1500,6 +1647,34 @@ def test_a_secret_s_time_is_the_door_s_and_door_prune_keeps_its_owner_and_grants
             ("door_secret", "DELETE"),
             ("door_secret", "SELECT"),
         }
+
+
+def test_a_release_the_choice_record_refuses_ends_the_grant_all_the_same(door, monkeypatch):
+    """When the choice record will not hand a grant's things back (one left the world, or its
+    kind takes no routine), revoking still ends the grant and an expired grant's lapse still
+    answers its turn as ended; the refusal is said by name in the log, not to the owner."""
+    _request, person = _person_request(door)
+    grant_id = _grant_for(door, person)
+
+    def refused(*_args, **_kwargs):
+        raise ModelChoiceRefused("person_not_in_this_world")
+
+    monkeypatch.setattr(SocietyModelChoiceRepository, "release_external_choice", refused)
+    world = door["world"]
+    with door["runtime"].database.session(world["workspace"]) as connection:
+        grant = GrantRepository(connection, world["workspace"], world["session"].actor).current(
+            grant_id
+        )
+    assert grant is not None
+    monkeypatch.setattr(GrantRepository, "now", lambda _self: grant.expires_at)
+    asker = door["runtime"].asker()
+    decider = {"kind": "external", "bridge": "test-bridge", "grant_id": str(grant_id)}
+    assert asker.configuration(world["workspace"], _world_id(door), person, decider)[1] == (
+        "grant_expired"
+    )
+    revoked = door["client"].post(f"/door/grants/{grant_id}/revoke", headers=OWNER)
+    assert revoked.status_code == 200, revoked.text
+    assert revoked.json()["grant"]["state"] == "revoked"
 
 
 def test_a_body_past_its_route_s_bound_is_refused_before_it_is_read(door):

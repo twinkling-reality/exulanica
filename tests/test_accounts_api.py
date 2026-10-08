@@ -292,6 +292,16 @@ def test_worker_workspace_discovery_tracks_owner_authority_not_browser_sessions(
     assert api.runtime.owned_workspace_active(first_workspace) is False
     assert api.runtime.owned_workspace_active(second_workspace) is False
 
+    # A disabled account closes its workspace too, every other fact about it standing.
+    third = api.login("worker-owner-three")
+    third_workspace = uuid.UUID(third["workspace_id"])
+    assert api.runtime.owned_workspace_active(third_workspace) is True
+    with api.runtime.repository() as repo:
+        repo.connection.execute(
+            "update account_user set disabled_at=now() where user_id=%s", (third["user_id"],)
+        )
+    assert api.runtime.owned_workspace_active(third_workspace) is False
+
 
 def test_session_expiry_is_database_authority(account_api):
     api = account_api
