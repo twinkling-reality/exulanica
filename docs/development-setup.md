@@ -173,7 +173,10 @@ in both configurations.
 
 `EXULANICA_REFERENCE_DATABASE_URL` is the one setting that still reaches the shared server:
 `test_frontier_dry_run.py` creates and drops its own schema in `exulanica_inspect_test`. It never
-touches `exulanica_spine_test`, and it provisions no roles there.
+touches `exulanica_spine_test`. Its role must be a superuser (the dry run refuses any other before
+it makes a schema), because migration 0161 creates the server-wide role `exulanica_definer` and
+hands it the definers; a role belongs to the server, so the dry run leaves `exulanica_definer` on
+the shared server after it drops its schema. It provisions no other role there.
 
 #### A serial run on a named database
 

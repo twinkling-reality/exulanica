@@ -63,3 +63,19 @@ def test_a_revoked_column_and_function_leave_the_expectation(entries):
 def test_one_version_given_as_a_string_is_refused():
     with pytest.raises(TypeError):
         expected_grants("0161")
+
+
+def test_a_column_privilege_its_table_holds_is_not_expected_for_the_column(entries):
+    """UPDATE on the table and UPDATE of one column add up to UPDATE on the table, as PostgreSQL
+    holds them; the column keeps only what the table does not give."""
+    entries(
+        {
+            "0001": DefinerGrants(
+                tables={"t": frozenset({"UPDATE"})},
+                columns={"t": {"c": frozenset({"UPDATE", "INSERT"}), "d": frozenset({"UPDATE"})}},
+            ),
+        }
+    )
+    expected = expected_grants(["0001"])
+    assert expected.tables == {"t": frozenset({"UPDATE"})}
+    assert expected.columns == {"t": {"c": frozenset({"INSERT"})}}

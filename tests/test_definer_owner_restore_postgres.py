@@ -151,3 +151,33 @@ def test_a_restore_carrying_a_widened_definer_owner_is_refused(module_machine, s
     restored = cli("restore", "--directory", tmp_path / "restored", backup.dump)
     assert restored.status != 0
     assert "can log in" in restored.err, restored.err
+
+
+def test_a_backup_one_migration_behind_the_code_restores_under_its_own_records(
+    module_machine, servers, tmp_path, monkeypatch
+):
+    """The code ships a later migration whose entry grants the owner SELECT on capture; a backup
+    taken before it records no such migration, so the restore's check expects only what the
+    backup records and passes. Expecting what the code ships would refuse it."""
+    from exulanica.db import definer_role
+
+    database = _init(servers, tmp_path / "database")
+    stopped = cli("stop", "--directory", database.root)
+    assert stopped.status == 0, stopped.err
+    backup = _only_backup(database, "stop")
+    later = "begin;\nselect 1;\ncommit;\n"
+    monkeypatch.setattr(
+        definer_role,
+        "GRANTS_BY_MIGRATION",
+        {
+            **definer_role.GRANTS_BY_MIGRATION,
+            "9001": definer_role.DefinerGrants(tables={"capture": frozenset({"SELECT"})}),
+        },
+    )
+    with migration_files(tmp_path / "later-code", extra={"9001_a_later_grant.sql": later}):
+        assert "9001" in definer_role.shipped_versions()
+        restored = cli("restore", "--directory", tmp_path / "restored", backup.dump)
+    assert restored.status == 0, restored.err
+    copy = servers.track(tmp_path / "restored")
+    with copy.connect(copy.cluster.running_port()) as connection:
+        assert "9001" not in definer_role.applied_migrations(connection)

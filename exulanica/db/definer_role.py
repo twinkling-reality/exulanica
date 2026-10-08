@@ -174,6 +174,8 @@ def expected_grants(applied: Iterable[str]) -> ExpectedGrants:
        ``REVOKE ... ON <table>`` clears the column grants of that privilege.
     3. A migration that drops a listed table or function lists it in its ``revoked_`` fields,
        or the check expects a privilege on an object that no longer exists ("missing").
+    4. A column privilege the same table holds at table level adds nothing, as in PostgreSQL, so
+       it is not expected for the column alone.
 
     When listing what a body needs: ``INSERT ... ON CONFLICT (columns) DO NOTHING`` needs SELECT
     on the table as well as INSERT (with INSERT alone it is refused "permission denied for
@@ -204,6 +206,9 @@ def expected_grants(applied: Iterable[str]) -> ExpectedGrants:
             for column, privileges in by_column.items():
                 columns.setdefault(name, {}).setdefault(column, set()).update(privileges)
         functions |= grants.functions
+    for name, by_column in columns.items():
+        for held in by_column.values():
+            held.difference_update(tables.get(name, set()))
     return ExpectedGrants(
         tables={name: frozenset(held) for name, held in tables.items() if held},
         columns={
@@ -300,8 +305,10 @@ def definer_role_installed(connection: psycopg.Connection) -> bool:
 
 
 def hand_definers_to_owner(connection: psycopg.Connection) -> None:
-    """Hand every SECURITY DEFINER routine in the schema to the owner, as 0161 did. For a restore
-    that loaded a dump without owners, run by a superuser; :func:`assert_definer_role` follows."""
+    """Hand the schema's SECURITY DEFINER routines to the owner, for a restore that loaded a dump
+    without owners, run by a superuser; :func:`assert_definer_role` follows. Unlike 0161's own
+    loop (:data:`MIGRATION_HAND_OVER`), it first refuses any routine another role planted
+    (:data:`HAND_OVER`)."""
     connection.execute(HAND_OVER)
 
 
@@ -400,7 +407,8 @@ def assert_definer_role(
             raise DefinerRoleUnsafe(
                 f"{role} owns "
                 + ", ".join(r["name"] for r in owned)
-                + "; it owns the schema's SECURITY DEFINER routines and nothing else"
+                + "; it owns SECURITY DEFINER routines in this schema or another installation's"
+                + " and nothing else"
             )
         creates = cursor.execute(
             "select has_schema_privilege(%(role)s, %(schema)s, 'CREATE') in_schema, "

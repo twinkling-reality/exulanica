@@ -256,6 +256,31 @@ def test_the_held_view_counts_a_column_grant_as_the_column_alone(admin, monkeypa
     assert _held(admin) == (TABLE_PRIVILEGES, {"embedding": {"embedding_id": {"UPDATE"}}})
 
 
+def test_a_column_grant_beside_its_tables_grant_of_the_same_privilege_passes(admin, monkeypatch):
+    """An entry listing SELECT of embedding.embedding_id beside the table's SELECT on embedding,
+    and both granted: nothing beyond, nothing missing."""
+    import dataclasses
+
+    base = definer_role.GRANTS_BY_MIGRATION[DEFINER_MIGRATION]
+    assert "SELECT" in base.tables["embedding"]
+    monkeypatch.setattr(
+        definer_role,
+        "GRANTS_BY_MIGRATION",
+        {
+            **definer_role.GRANTS_BY_MIGRATION,
+            DEFINER_MIGRATION: dataclasses.replace(
+                base, columns={"embedding": {"embedding_id": frozenset({"SELECT"})}}
+            ),
+        },
+    )
+    admin.execute(
+        sql.SQL("grant select (embedding_id) on embedding to {}").format(
+            sql.Identifier(DEFINER_ROLE)
+        )
+    )
+    assert_definer_role(admin)
+
+
 def test_the_owner_holds_the_privileges_its_bodies_use_and_nothing_else(admin):
     # This file's literal is read from the bodies apart from the module's; the deployment check
     # refuses by the module's, so the two must agree as well as match the database.
