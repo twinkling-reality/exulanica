@@ -88,6 +88,11 @@ def test_durable_spending_without_its_witness_is_refused(tmp_path):
         ({"rules": [{"match": {}}]}, "exactly one of content, body, choose"),
         ({"rules": [{"choose": {"containing": "a", "first": True}}]}, "one containing text"),
         ({"rules": [{"choose": "a"}]}, "one containing text"),
+        ({"rules": [{"choose": {"containing": []}}]}, "one containing text or a list"),
+        ({"rules": [{"choose": {"containing": ["a", 1]}}]}, "one containing text or a list"),
+        ({"rules": [{"content": "a", "line": {"text": "Hi.", "for": "say"}}]}, "on a choose rule"),
+        ({"rules": [{"choose": {"containing": "a"}, "line": "Hi."}]}, "on a choose rule"),
+        ({"rules": [{"choose": {"containing": "a"}, "line": {"text": ""}}]}, "on a choose rule"),
         ({"rules": [{"match": {"role": "vision"}, "content": "a"}]}, "unknown fields"),
         ({"bounds": {"ceiling_usd": "1"}}, "bounds"),
     ],
@@ -187,6 +192,96 @@ def test_a_choose_rule_answers_an_offered_option_the_way_the_request_asks(tmp_pa
     assert offers_nothing.status_code == SCRIPTED.UNMATCHED_STATUS
     calls = [json.loads(line) for line in log.read_text().splitlines()]
     assert [c["chose"] for c in calls] == [options[1], options[1], "stand still", None]
+
+
+def test_a_choose_rule_takes_its_preferences_in_order(tmp_path):
+    # A-122: the knight picks the sword up when offered, else gives it, else waits; the order is
+    # the plan's, never the options'.
+    plan, _ = SCRIPTED.load_plan(
+        _plan(
+            tmp_path,
+            rules=[
+                {
+                    "match": {"model": "m/one"},
+                    "choose": {"containing": ["pick up the sword", "give the sword to", "wait"]},
+                }
+            ],
+        )
+    )
+    transport = SCRIPTED.ScriptedTransport(plan, None, HttpResponse)
+
+    def chose(options: list[str]) -> str:
+        answer = json.loads(
+            transport.post_json("u", headers={}, payload=_choice(options, "tool"), timeout=1).text
+        )
+        return json.loads(
+            answer["choices"][0]["message"]["tool_calls"][0]["function"]["arguments"]
+        )["action"]
+
+    assert chose(
+        ["wait a minute", "give the sword to knight 2", "pick up the sword, 3 m away"]
+    ) == ("pick up the sword, 3 m away")
+    assert chose(["wait a minute", "give the sword to knight 2"]) == "give the sword to knight 2"
+    assert chose(["rest on the bench", "wait a minute"]) == "wait a minute"
+    assert chose(["rest on the bench", "talk to the knight"]) == "rest on the bench"
+
+
+def test_a_choice_that_takes_a_line_is_answered_with_none_said(tmp_path):
+    # A-122: a choice whose options say something requires the line argument, null or a line
+    # (exulanica.models.choice); left out, the product refuses the answer and the routine decides.
+    plan, _ = SCRIPTED.load_plan(
+        _plan(tmp_path, rules=[{"match": {"model": "m/one"}, "choose": {"containing": "wait"}}])
+    )
+    transport = SCRIPTED.ScriptedTransport(plan, None, HttpResponse)
+    for asked in ("tool", "schema"):
+        payload = _choice(["say hello", "wait a minute"], asked)
+        schema = (
+            payload["tools"][0]["function"]["parameters"]
+            if asked == "tool"
+            else payload["response_format"]["json_schema"]["schema"]
+        )
+        schema["properties"]["line"] = {"type": ["string", "null"], "maxLength": 80}
+        schema["required"] = ["action", "line"]
+        answer = json.loads(transport.post_json("u", headers={}, payload=payload, timeout=1).text)
+        message = answer["choices"][0]["message"]
+        arguments = (
+            message["tool_calls"][0]["function"]["arguments"]
+            if asked == "tool"
+            else message["content"]
+        )
+        assert json.loads(arguments) == {"action": "wait a minute", "line": None}
+    # A rule's line is said only beside an option it is for; beside any other the line is null.
+    speaking, _ = SCRIPTED.load_plan(
+        _plan(
+            tmp_path,
+            rules=[
+                {
+                    "match": {"model": "m/one"},
+                    "choose": {"containing": ["say", "wait"]},
+                    "line": {"text": "Good morning.", "for": "say"},
+                }
+            ],
+        )
+    )
+    talker = SCRIPTED.ScriptedTransport(speaking, None, HttpResponse)
+
+    def said(options: list[str]) -> dict:
+        payload = _choice(options, "tool")
+        schema = payload["tools"][0]["function"]["parameters"]
+        schema["properties"]["line"] = {"type": ["string", "null"], "maxLength": 80}
+        schema["required"] = ["action", "line"]
+        answer = json.loads(talker.post_json("u", headers={}, payload=payload, timeout=1).text)
+        return json.loads(answer["choices"][0]["message"]["tool_calls"][0]["function"]["arguments"])
+
+    assert said(["wait a minute", "say hello"]) == {"action": "say hello", "line": "Good morning."}
+    assert said(["wait a minute", "rest"]) == {"action": "wait a minute", "line": None}
+    # A choice that takes no line is answered with its one argument, as before.
+    plain = json.loads(
+        transport.post_json("u", headers={}, payload=_choice(["wait"], "tool"), timeout=1).text
+    )
+    assert json.loads(plain["choices"][0]["message"]["tool_calls"][0]["function"]["arguments"]) == {
+        "action": "wait"
+    }
 
 
 def test_the_transport_declares_no_egress_so_the_client_knows_it_reaches_no_network(tmp_path):

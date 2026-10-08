@@ -24,7 +24,13 @@ the first rule whose every ``match`` field holds: ``model`` equals the payload's
 ``contains`` is a substring of its serialized messages. A rule answers ``content`` wrapped as a
 chat completion, a whole provider ``body``, or ``choose``: one of the options the request itself
 offers, the first whose label contains ``choose.containing`` or else the first offered, answered
-the way the request asks for it (the one forced tool call, or the strict JSON schema's object).
+the way the request asks for it (the one forced tool call, or the strict JSON schema's object),
+with ``line`` null where the request's choice takes a line (it says nothing). ``containing`` may
+instead be a list of texts, preferences taken in order: the first text some offered label contains
+chooses the first such label. A ``choose`` rule may also carry ``line``, ``{"text", "for"}``: where
+the request takes a line and the chosen label contains ``for``, the answer says ``text``, and
+otherwise its line is null, since only the caller knows which options speak and a line beside one
+that does not is refused.
 Each takes an optional ``status``. A request no rule matches, and one a ``choose`` rule matches
 that offers no options, is answered 500, as an unavailable provider would be, so the product's own
 fallback runs. Every request is appended to ``EXULANICA_SCRIPTED_MODEL_LOG`` as one JSON line
@@ -64,6 +70,8 @@ ANSWERS = ("content", "body", "choose")
 #: The one function and argument a product choice is asked by (``exulanica.models.choice``).
 CHOICE_FUNCTION = "act"
 CHOICE_ARGUMENT = "action"
+#: The second argument of a choice some of whose options say something, which a reply must state.
+LINE_ARGUMENT = "line"
 
 
 class Refused(SystemExit):
@@ -100,9 +108,16 @@ def load_plan(path: Path) -> tuple[dict[str, Any], str]:
         if "choose" in rule and (
             not isinstance(rule["choose"], dict)
             or set(rule["choose"]) != {"containing"}
-            or not isinstance(rule["choose"]["containing"], str)
+            or not _preferences(rule["choose"]["containing"])
         ):
-            raise Refused(f"rule {index} must choose by one containing text")
+            raise Refused(f"rule {index} must choose by one containing text or a list of them")
+        if "line" in rule and (
+            "choose" not in rule
+            or not isinstance(rule["line"], dict)
+            or set(rule["line"]) != {"text", "for"}
+            or not all(isinstance(v, str) and v for v in rule["line"].values())
+        ):
+            raise Refused(f"rule {index} must state a line as text and for, on a choose rule")
         unknown = set(rule.get("match", {})) - {"model", "contains"}
         if unknown:
             raise Refused(f"rule {index} matches on unknown fields {sorted(unknown)}")
@@ -147,11 +162,27 @@ def offered(payload: Mapping[str, Any]) -> tuple[list[str], str] | None:
     return None
 
 
-def chosen_completion(option: str, asked: str, model: str) -> dict[str, Any]:
+def takes_line(payload: Mapping[str, Any]) -> bool:
+    """Whether the request's choice also asks for a line, which a reply must state, null or not."""
+    schemas = [
+        ((tool.get("function") or {}).get("parameters") or {})
+        for tool in payload.get("tools") or []
+        if isinstance(tool, Mapping) and (tool.get("function") or {}).get("name") == CHOICE_FUNCTION
+    ]
+    response_format = payload.get("response_format") or {}
+    schemas.append((response_format.get("json_schema") or {}).get("schema") or {})
+    return any(LINE_ARGUMENT in (schema.get("properties") or {}) for schema in schemas)
+
+
+def chosen_completion(
+    option: str, asked: str, model: str, *, line: bool = False, said: str | None = None
+) -> dict[str, Any]:
     """A completion choosing ``option`` the way the request asked: its forced tool call, or the
-    strict schema's object as the message content."""
+    strict schema's object as the message content; where the choice takes a line, with ``said``
+    as the line, or null."""
+    arguments = {CHOICE_ARGUMENT: option, **({LINE_ARGUMENT: said} if line else {})}
     if asked == "schema":
-        return completion(json.dumps({CHOICE_ARGUMENT: option}), model)
+        return completion(json.dumps(arguments), model)
     body = completion("", model)
     choice = body["choices"][0]
     choice["finish_reason"] = "tool_calls"
@@ -164,12 +195,22 @@ def chosen_completion(option: str, asked: str, model: str) -> dict[str, Any]:
                 "type": "function",
                 "function": {
                     "name": CHOICE_FUNCTION,
-                    "arguments": json.dumps({CHOICE_ARGUMENT: option}),
+                    "arguments": json.dumps(arguments),
                 },
             }
         ],
     }
     return body
+
+
+def _preferences(containing: Any) -> list[str]:
+    """A ``choose.containing`` as its preferences in order: one text, or a non-empty list of
+    texts; anything else is no preferences."""
+    if isinstance(containing, str):
+        return [containing]
+    if isinstance(containing, list) and containing and all(isinstance(t, str) for t in containing):
+        return list(containing)
+    return []
 
 
 def choose(rule: Mapping[str, Any], payload: Mapping[str, Any]) -> tuple[str, str] | None:
@@ -178,8 +219,10 @@ def choose(rule: Mapping[str, Any], payload: Mapping[str, Any]) -> tuple[str, st
     if found is None:
         return None
     options, asked = found
-    wanted = rule["choose"]["containing"]
-    return next((o for o in options if wanted in o), options[0]), asked
+    preferred = (
+        o for text in _preferences(rule["choose"]["containing"]) for o in options if text in o
+    )
+    return next(preferred, options[0]), asked
 
 
 class ScriptedTransport:
@@ -244,7 +287,11 @@ class ScriptedTransport:
             return self.response_type(status_code=UNMATCHED_STATUS, text=json.dumps(body))
         rule = self.rules[index]
         if picked is not None:
-            body = chosen_completion(picked[0], picked[1], model)
+            spoken = rule.get("line") or {}
+            said = spoken["text"] if spoken and spoken["for"] in picked[0] else None
+            body = chosen_completion(
+                picked[0], picked[1], model, line=takes_line(payload), said=said
+            )
         elif "body" in rule:
             body = rule["body"]
         else:
