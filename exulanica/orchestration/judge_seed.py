@@ -864,6 +864,32 @@ def _refuse_private_workspace_assets(
         )
 
 
+def _refuse_held_things(connection: psycopg.Connection, workspace_id: uuid.UUID) -> None:
+    """A workspace holding its own looks or thing kinds cannot be seeded.
+
+    A look's container lives in its workspace's own ``looks`` namespace
+    (:mod:`exulanica.world.thing_store`), outside the content store a seed copies from, and a look
+    may be private, restricted or share-alike, which a seed handed to somebody else would carry
+    with no rights check; a drafted kind holds words drafted from a person's. Their rows alone
+    would restore as looks whose bytes are missing, so the export refuses, as it does for a
+    workspace's own admitted assets.
+    """
+    present = connection.execute("select to_regclass('look_version') is not null as present")
+    if not present.fetchone()["present"]:
+        return
+    held = connection.execute(
+        "select (select count(*) from look_version where workspace_id = %(w)s) as looks, "
+        "(select count(*) from thing_kind_version where workspace_id = %(w)s) as kinds",
+        {"w": workspace_id},
+    ).fetchone()
+    if held["looks"] or held["kinds"]:
+        raise SeedRefused(
+            f"workspace {workspace_id} holds {held['looks']} look(s) and {held['kinds']} thing "
+            "kind(s) of its own, kept only in that workspace with the containers its own looks "
+            "namespace holds; a seed cannot carry them"
+        )
+
+
 def export_seed(
     connection: psycopg.Connection,
     store: ContentAddressedStore,
@@ -898,6 +924,7 @@ def export_seed(
         raise SeedRefused(f"{destination} already holds a seed archive; write to a new directory")
     _refuse_private_bakes(connection, workspace_id)
     _refuse_private_workspace_assets(connection, workspace_id)
+    _refuse_held_things(connection, workspace_id)
 
     buckets = classify_tables(connection)
     exported = list(buckets["workspace"]) + list(buckets["reached"])

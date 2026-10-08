@@ -1090,6 +1090,34 @@ def invented_digest() -> str:
     return uuid.uuid4().hex * 2
 
 
+def _held_creature(owner):
+    """A creature drafted in the test fixtures and kept in the owner's own thing store, its sketch's
+    container in the application's looks namespace (domain: the creature route comes later)."""
+    if "held_creature" not in owner.memo:
+        from exulanica.things.creatures import assemble_creature
+        from exulanica.world.thing_store import ThingStore
+
+        from test_creature_bodies import BY, _form, _recipe
+
+        creature = assemble_creature(_form(_recipe("ten_legs"), label="swept ten legs"), by=BY)
+        looks = owner.app.state.services.content_stores.looks.for_workspace(owner.workspace_id)
+        ThingStore(owner.repository.connection, owner.workspace_id, looks).keep_creature(
+            creature, created_by=owner.actor
+        )
+        owner.memo["held_creature"] = creature
+    return owner.memo["held_creature"]
+
+
+def held_look(owner) -> str:
+    """The sketch look of a creature the owner's workspace holds, by its document's digest."""
+    return _held_creature(owner).sketch.sha256
+
+
+def held_kind(owner) -> str:
+    """The kind of a creature the owner's workspace holds, by its document's digest."""
+    return _held_creature(owner).kind.sha256
+
+
 def district_version(owner) -> uuid.UUID:
     """A version whose district the host registered over two admitted city sources (domain).
 

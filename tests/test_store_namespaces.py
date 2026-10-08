@@ -36,6 +36,7 @@ STABLE = {
     "tiles": "shared",
     "materials": "per-workspace",
     "workspace-assets": "per-workspace",
+    "looks": "per-workspace",
 }
 
 

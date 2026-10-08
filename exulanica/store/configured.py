@@ -59,6 +59,7 @@ from exulanica.store.base import ContentAddressedStore
 from exulanica.store.local import LocalContentAddressedStore
 from exulanica.store.namespaces import (
     BLOB_NAMESPACE,
+    LOOK_NAMESPACE,
     MATERIAL_NAMESPACE,
     SHARED_NAMESPACES,
     TILE_NAMESPACE,
@@ -216,6 +217,10 @@ class ContentStores:
     @property
     def workspace_assets(self) -> WorkspaceStores:
         return self.per_workspace(WORKSPACE_ASSET_NAMESPACE)
+
+    @property
+    def looks(self) -> WorkspaceStores:
+        return self.per_workspace(LOOK_NAMESPACE)
 
     @property
     def tiles(self) -> ContentAddressedStore:

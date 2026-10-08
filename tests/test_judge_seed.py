@@ -64,6 +64,7 @@ from exulanica.orchestration.judge_seed import (
 )
 from exulanica.store.local import LocalContentAddressedStore
 from psycopg.rows import dict_row
+from psycopg.types.json import Jsonb
 
 from pg_harness import migrated_schema
 
@@ -304,6 +305,66 @@ def test_an_incomplete_source_is_refused_unless_the_caller_says_otherwise(seeded
     _destination, manifest = _exported(seeded, empty, tmp_path / "permitted", allow_absent=True)
     assert manifest.absent
     assert all(value["referenced_by"] == "blob" for value in manifest.absent.values())
+
+
+_HELD = {
+    # The least each table's checks admit: a static look naming its container, and a kind of a
+    # shipped plan. The store's own readers are not asked; only the export's refusal is.
+    "look_version": (
+        "insert into look_version (workspace_id, key, version, sha256, document, "
+        "container_profile, admission, created_by) values (%s, 'held', 1, %s, %s, "
+        "'exulanica.static-glb/v1', '{}', %s)",
+        {
+            "profile": "exulanica.look/v1",
+            "look": "held",
+            "version": 1,
+            "look_kind": "static",
+            "container": {"sha256": "c" * 64, "bytes": 1},
+            "origin": {
+                "class": "generated",
+                "distribution": "private",
+                "licence": {"spdx": "CC0-1.0", "share_alike": False},
+            },
+        },
+    ),
+    "thing_kind_version": (
+        "insert into thing_kind_version (workspace_id, key, version, sha256, document, plan, "
+        "created_by) values (%s, 'held', 1, %s, %s, 'rigid/v1', %s)",
+        {
+            "profile": "exulanica.thing-kind/v1",
+            "kind": "held",
+            "version": 1,
+            "body": {"plan": "rigid/v1"},
+        },
+    ),
+}
+
+
+@pytest.mark.parametrize("table", sorted(_HELD))
+def test_a_workspace_holding_its_own_looks_or_kinds_is_refused(seeded, store, tmp_path, table):
+    """A workspace's own looks keep their containers in its own looks namespace, which a seed
+    does not copy, and its kinds hold words drafted from a person's: either refuses the export.
+
+    The rows cannot be deleted, so each is written for a new workspace inside a savepoint that is
+    rolled back, and the shared schema keeps none of them.
+    """
+    statement, document = _HELD[table]
+    holder = uuid.uuid4()
+    admin = seeded.connection
+    with admin.transaction():
+        admin.execute("select set_config('exulanica.workspace_id', %s, true)", (str(holder),))
+        admin.execute(statement, (holder, "d" * 64, Jsonb(document), holder))
+        with pytest.raises(SeedRefused, match="of its own"):
+            export_seed(
+                admin,
+                store,
+                workspace_id=holder,
+                destination=tmp_path / "refused",
+                created_at=_CREATED_AT,
+            )
+        assert not (tmp_path / "refused").exists()
+        raise psycopg.Rollback()
+    assert not admin.execute(f"select 1 from {table} where workspace_id = %s", (holder,)).fetchall()
 
 
 # -- the archive verifies against its own manifest ---------------------------------------------

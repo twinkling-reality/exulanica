@@ -39,6 +39,7 @@ records the choice and the alternatives it rejected.
 - [Lines](#lines)
 - [The kinds and looks this repository ships](#the-kinds-and-looks-this-repository-ships)
 - [Creatures: bodies drafted from words](#creatures-bodies-drafted-from-words)
+- [A workspace's own things](#a-workspaces-own-things)
 - [Drawing](#drawing)
 - [What is not built](#what-is-not-built)
 - [Implementation and evidence](#implementation-and-evidence)
@@ -568,6 +569,87 @@ creature and assembles its answer:
   that answered, the prompt's version and the digests of the instructions and the words, never the
   words.
 
+## A workspace's own things
+
+A workspace keeps the things it made or admitted as the documents they were read as
+([`thing_store.py`](../exulanica/world/thing_store.py), migration 0159): body recipes, the body plans
+built from them, thing kinds and looks, each version appended once and never changed or removed (an
+edit is a new version), each row inside its workspace by row-level security. Each document is read by
+its own reader before it is kept and again when it is read back, at the digest its row states. A
+recipe keeps the digest of the words it was drafted from, never the words. The things the product
+ships stay files and are never rows here, and no row takes a shipped key: a shipped kind, plan or
+look resolves first, so a row shadowing one would never be reached. A workspace keeps at most 128
+kind versions and 256 look versions.
+
+A look's container is held by digest in the workspace's own `looks` namespace of the
+content-addressed store, and its row states what the container's reader measured: the static
+container profile's admission for a `rigid_on_bones` or `static` look, the skinned reader against the
+plan's own tree for a `skinned` one. A look whose kind draws no file is not kept here. Its licence
+columns are read from the document's origin record, one source, and a share-alike look is kept only
+with the credit its licence asks: its attribution, its authors and its licence's address, which the
+store and the table both require.
+
+Each intake checks everything before it writes anything: the documents and the container first,
+then, under the workspace's lock, the caps and the versions already held. Only then are the
+container's bytes written, and the rows naming them in the same transaction.
+
+| Path | What it keeps |
+| --- | --- |
+| `keep_creature` | A creature drafted from words: its recipe, plan, sketch with its container, and kind, in one transaction |
+| `admit_look` | A look made elsewhere (generated, imported or uploaded) with its container, read by `read_admission` and then by its intake's own check. `read_admission` makes every check that needs no database: the look's reader, a shipped key, a container that is not the look's or that its reader refuses, the line rule on the label and on the origin's words (attribution, the licence's address, authors, source references and revisions, the maker's provider, model, prompt version and bridge), and a share-alike look's credit |
+| `withdraw_look` | A withdrawal of one of the workspace's own looks, once, with a reason in one line, naming the version and the digest it was kept at. The look stays held and is never admitted again; a choice naming it stays, as choices are appended. A restore carries the withdrawal ([withdrawal catalog](../exulanica/deletion/withdrawals.v2.json)), so a restore from an older backup never admits the look again |
+
+Every read passes a withdrawn look by unless it asks for withdrawn looks. A kind naming a withdrawn
+look still reads, as it stays what it is, so a creature whose one look, its sketch, was withdrawn
+reads with no look to draw.
+
+A traveller who crosses in from an outside game arrives looking like itself only when its
+workspace holds that look. A deployment builds the look from its own copy of the game's figure
+(the bridge's look builder writes the document and its container, never committed), and the
+operator admits the pair into each workspace that grants such travellers with
+[`thing_store_command.py`](../exulanica/api/thing_store_command.py) (`admit-look`, `withdraw-look`
+and `list`). `admit-look` reads the bridge's mapping file: its digest must be one that a bridge the
+deployment declares pins (`EXULANICA_DOOR_BRIDGES`), and the door's mapping check reads it. The look
+is admitted only when one of the mapping's looks names the look document's digest, and that entry's
+source digest is among the look's ingredients, its SPDX identifier is the look's and its share-alike
+mark is the look's. A document relabelled under another licence has another digest, and no mapping
+names it. Without `--apply` each command makes every check that needs no database and writes
+nothing: `admit-look` the look's, its container's and the mapping's (a look drawn on a plan the
+workspace drafted is read only with `--apply`), `withdraw-look` its reason's.
+
+A judge seed refuses a workspace that holds looks or thing kinds of its own: a look's container is
+not in the store a seed copies from, and a drafted kind holds words drafted from a person's.
+
+A workspace's own looks and kinds are served beside the shipped library
+([`thing_store.py`](../exulanica/api/routes/thing_store.py)), each needing `world.read` and reading
+only the requester's own workspace:
+
+| Route | Answers |
+| --- | --- |
+| `GET /things/looks/{look_sha256}` | The look document held at that digest, its canonical bytes as the library serves its own, never cached |
+| `GET /things/looks/{look_sha256}/container` | That look's container, verified against the digest the look names, tagged with the look's digest and revalidated before each use (`no-cache`): a revalidation is answered 304 while the look is held and 404 once it is withdrawn |
+| `GET /things/kinds/{kind_sha256}` | The kind held at that digest, read again with its looks and plan resolved in the store, never cached |
+
+Another workspace's look or kind, a withdrawn look and an absent digest all answer 404
+`unknown_reference` alike, and a renderer then draws the kind's first look. The container is
+addressed by its look's digest, never its own, so only a held look's container is served, and
+withdrawing the look stops it, in a browser's cache as well.
+
+`admitted_look` answers the look a workspace holds at exactly the key, version and digest asked,
+read again on the caller's connection, or nothing: no such row, another digest, withdrawn, a
+document the reader now refuses, or another workspace's. `admitted_look_by_digest` answers the same
+for a digest alone, which is how a world names a workspace's own look: never by a key a person's
+words made. Neither takes a lock.
+
+Refusals, by code: `thing_key_shipped`, `thing_version_exists`, `thing_cap_reached`, `look_refused`
+(the look reader's own sentence), `look_without_container` (a look whose kind draws no file),
+`look_container_mismatch` (bytes that are not the container the look names),
+`look_container_refused` (the container profile's reader refused it), `look_text_refused` (a label
+or an origin word that is not one plain line), `look_credit_missing`, `look_not_admitted` (the
+intake's own check), `look_unknown` and `withdrawal_reason_refused`. Each refuses before anything is
+written. The command's own are `mapping_refused` (a file that is not a mapping) and
+`mapping_not_admitted` (no declared bridge pins it).
+
 ## Drawing
 
 The browser draws a thing from its look, never from what it is
@@ -649,9 +731,10 @@ These are material limits of the boundary above, not partial behaviour:
   built. The routine says nothing; only a model chosen for a being, or a visitor's own program, does.
   A visitor the world decides for takes no person's direct request yet, and nobody in the app can
   take a being over and play it.
-- No store holds a workspace's own kinds or looks: the library serves the shipped ones only, a
-  placed thing names a shipped kind and a thing wears a shipped look. The world's owner has no
-  route to choose a look, and a look is recorded only where a door records its crossing's.
+- A workspace's own kinds and looks are kept and served, but no route writes them (the operator's
+  command admits a look), a placed thing names a shipped kind, and a thing wears a shipped look.
+  The world's owner has no route to choose a look, and a look is recorded only where a door records
+  its crossing's.
 - The browser draws no hand-over between two people as it happens (a thing is drawn in the hand
   the state names at each minute), no line a person says (the bubble that draws one, opening with
   its speaker's pill, is built; nothing carries lines to it). An outside agent's pill says `agent`
@@ -687,6 +770,7 @@ These are material limits of the boundary above, not partial behaviour:
 | The society of things | [`society_things.py`](../exulanica/world/society_things.py), [`society_thing_inputs.py`](../exulanica/world/society_thing_inputs.py), [`crossings.py`](../exulanica/world/crossings.py), the things composition in [`society_authored_ground.py`](../exulanica/world/society_authored_ground.py), migration 0151 | `tests/test_society_things.py` (genesis, a minute equal to the planner's, placed beings, crossings, the state check), `tests/test_society_thing_inputs.py` (the composition and its shape), `tests/test_society_things_postgres.py` (through the routes: made by name, an edit reaching it, a visitor crossing in and out, replay), `tests/test_outside_deciders_postgres.py` (a visitor decided for by its own program), `tests/test_traveller_choices_postgres.py` (a visitor the world decides for, by its gate's travellers' choice), `tests/test_society_request_rule_parity.py` |
 | Creatures: recipes, plans, sketches, assembly | [`bodies.py`](../exulanica/things/bodies.py), [`sketch.py`](../exulanica/things/sketch.py), [`creatures.py`](../exulanica/things/creatures.py), [`body-grammar.v1.json`](../assets/catalogs/things/body-grammar.v1.json) | `tests/test_creature_bodies.py` (thirteen hand-written creatures: each body where its recipe says, a left limb the mirror of its right, each limb of a lying body hung from the stretch of spine beside it, the bone count the recipe's own sum, each refusal by name, the sketch read back from its bytes) |
 | The creature drafter | [`creature_drafting.py`](../exulanica/selection/creature_drafting.py), [`creature-drafting.v1.json`](../exulanica/selection/creature-drafting.v1.json) | `tests/test_creature_drafting.py` (scripted replies: a pass with its provenance, a refusal repaired with its check's sentence, two refusals, a form outside the schema, a reply cut off in blank space), `tests/test_hosted_boundary.py` (its request carries no saved name) |
+| A workspace's own things | [`thing_store.py`](../exulanica/world/thing_store.py), [`thing_store_command.py`](../exulanica/api/thing_store_command.py), the routes in [`thing_store.py`](../exulanica/api/routes/thing_store.py), migration 0159, the `looks` namespace in [`namespaces.py`](../exulanica/store/namespaces.py), the seed's refusal in [`judge_seed.py`](../exulanica/orchestration/judge_seed.py) | `tests/test_thing_store_admission.py` (with no database: a static and a skinned look read by their containers' readers, a broken rig refused; a look the reader refuses, a shipped key, a look that draws no file and another container each refused by name; the line rule on the label and each word of the origin, its licence's address included, the field named; a share-alike look refused without its attribution, its authors or its licence's address), `tests/test_thing_store_postgres.py` (as the deployed writer: a drafted creature kept whole and read back at its assembly's digests; no update or delete, even by the table's owner (the owner's TRUNCATE is not refused: no truncate guard like 0013's is attached); another workspace reads none of it and keeps its own; each table's row written only in its own workspace's context, even by a superuser; a shipped kind, plan or look key, another container, a held version drawn from other bytes and a full library of kinds or of looks each refused with nothing written, bytes included; a look kept only after its intake's own check, with its licence as columns; the table's own checks on a share-alike look's credit, a container profile and its look kind, a kind's plan digest and a withdrawal's digest; a withdrawn look passed by unless asked for, its kind still read, and a look the reader refuses withdrawn by its row), `tests/test_restore_replay_withdrawals.py` (a look withdrawn after a backup stays withdrawn through a real restore), `tests/test_thing_store_command.py` (a mapping admitted only when a declared bridge pins it and the door's check reads it; the intake's check on the entry's digest, source, SPDX identifier and share-alike mark and on the look being imported; a look document that is not JSON and a withdrawal reason that is not one line refused by the dry runs; against PostgreSQL, a dry run that writes nothing, a copy relabelled CC0 and public and an unpinned mapping refused with nothing written, the positive control, once only, a listing and a withdrawal), `tests/test_thing_store_routes.py` (as a deployment serves them: the document's bytes hash to the URL's digest; the container's bytes, tag and `no-cache`, a revalidation answered 304 with no body; a kind; another workspace's, a withdrawn, a revalidated withdrawn and an absent one all 404 alike, and missing bytes too; 503 without a look store; a session required), `tests/test_judge_seed.py` (a workspace holding a look or a kind of its own is not seeded), `tests/test_existence_oracle.py` (a stranger cannot tell a held look or kind from an invented digest) |
 | The skinned container | [`skinned.py`](../exulanica_pieces/skinned.py) | `tests/test_skinned_glb.py` (containers built in the test from struct packing: a positive control, then each rule broken alone and refused by name) |
 | A creature's look request and its sculpted look | [`creature_looks.py`](../exulanica/things/creature_looks.py), `ml/appearance/exulanica_appearance/creatures/` | `tests/test_creature_sculpt.py` (each development creature's sketch filled, rigged, written and read back against its plan's tree; the creature job end to end with stand-in models, a body that is not its plan's refused by the rig with its measures in the receipt), `ml/appearance/tests/test_creature_rig.py` and `test_creature_route.py` (a box figure: every check against a positive control, fused legs refused with every measure, a missing leg, a turn undone to the degree, a stretched body refused with the fit it refused; the all-at-once rasteriser equal to the loop; the camera on each plan's front left; the sketch's voxels in TRELLIS's frame), `ml/appearance/tests/test_trellis_second_stage.py` (the second stage's call order, and each refusal of a structure and of a pipeline's signatures alone); the two rig trials on Nebius AI Cloud, [first record](evaluation/2026-10-07-creature-rig-trial.json) and [second record](evaluation/2026-10-07-creature-rig-trial-2.json), each held equal to what its script builds from its evidence (`tests/test_creature_rig_trial_record.py`, `tests/test_creature_rig_trial_2_record.py`) |
 | No creature in code | | `tests/test_no_creature_code.py` (with a planted name the scan finds) |

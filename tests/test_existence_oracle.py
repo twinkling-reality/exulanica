@@ -61,6 +61,7 @@ from exulanica.api.routes.character_appearance import CharacterAppearanceRuntime
 from exulanica.api.services import Services
 from exulanica.db.roles import provision_runtime_role
 from exulanica.door.runtime import DoorRuntime
+from exulanica.store.configured import local_content_stores
 from exulanica.store.local import LocalContentAddressedStore
 from exulanica.store.namespaces import LocalWorkspaceStores, tile_store
 from exulanica.world import TopologyContract, WorldStyleRepository
@@ -306,6 +307,7 @@ def existence(tmp_path, photo_dir, repository, spine_schema):
             stores=LocalWorkspaceStores(tmp_path / "workspace-assets")
         ),
         door=DoorRuntime(database=database, bridges=door_support.bridges()),
+        content_stores=local_content_stores(tmp_path / "data"),
     )
     app = create_app(services, verify=False)
     # A 500 is an answer to compare, not an exception to stop at: a foreign id that makes the

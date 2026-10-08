@@ -10848,6 +10848,184 @@
     }
    }
   },
+  "/things/looks/{look_sha256}": {
+   "get": {
+    "tags": [
+     "things"
+    ],
+    "summary": "A look this workspace holds, by the SHA-256 of its document.",
+    "operationId": "held_look_things_looks__look_sha256__get",
+    "parameters": [
+     {
+      "name": "look_sha256",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "pattern": "^[0-9a-f]{64}$",
+       "title": "Look Sha256"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Held Look Things Looks  Look Sha256  Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/things/looks/{look_sha256}/container": {
+   "get": {
+    "tags": [
+     "things"
+    ],
+    "summary": "The container of a look this workspace holds, by the SHA-256 of the look.",
+    "operationId": "held_look_container_things_looks__look_sha256__container_get",
+    "parameters": [
+     {
+      "name": "look_sha256",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "pattern": "^[0-9a-f]{64}$",
+       "title": "Look Sha256"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Held Look Container Things Looks  Look Sha256  Container Get"
+        }
+       },
+       "model/gltf-binary": {}
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/things/kinds/{kind_sha256}": {
+   "get": {
+    "tags": [
+     "things"
+    ],
+    "summary": "A thing kind this workspace holds, by the SHA-256 of its document.",
+    "operationId": "held_kind_things_kinds__kind_sha256__get",
+    "parameters": [
+     {
+      "name": "kind_sha256",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "pattern": "^[0-9a-f]{64}$",
+       "title": "Kind Sha256"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Held Kind Things Kinds  Kind Sha256  Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/world/behaviours": {
    "get": {
     "tags": [

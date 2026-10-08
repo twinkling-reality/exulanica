@@ -181,6 +181,9 @@ With `EXULANICA_STORE_KIND` unset or `local`, the store is directories under `EX
 - `materials/<workspace>/`: each workspace's material bakes.
 - `workspace-assets/<workspace>/`: each workspace's own admitted 3D assets and their prepared
   outputs (migration 0126); never shared between workspaces, and erased only with the workspace.
+- `looks/<workspace>/`: the containers of each workspace's own looks, a drafted creature's sketch
+  or a traveller's admitted look (`exulanica/world/thing_store.py`); never shared between
+  workspaces, and served only through a look the workspace holds.
 
 `<workspace>` is the workspace id as 32 lower-case hex digits. These names are stable: each is a
 directory here, a segment of every object key in 4.2 and the name a backup set records, so renaming

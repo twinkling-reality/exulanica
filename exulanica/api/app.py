@@ -120,6 +120,7 @@ from exulanica.api.routes import (
     society_models,
     spending,
     style_packs,
+    thing_store,
     things,
     tiles,
     workspace_assets,
@@ -474,10 +475,12 @@ def create_app(services: Services | None = None, *, verify: bool = True) -> Fast
     app.include_router(world.router)
     # The authored world under /world, in matching order: reviewed assets, the committed style pack
     # library and behaviours, versions, environment instances, objects, compositions, arrangements.
-    # tests/snapshots/api-routes.json records it. The shipped thing library is under /things.
+    # tests/snapshots/api-routes.json records it. The shipped thing library is under /things, and
+    # a workspace's own looks and kinds beside it.
     app.include_router(world_assets.router)
     app.include_router(style_packs.router)
     app.include_router(things.router)
+    app.include_router(thing_store.router)
     app.include_router(world_behaviours.router)
     app.include_router(world_versions.router)
     app.include_router(world_environments.router)

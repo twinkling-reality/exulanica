@@ -812,12 +812,14 @@ EXISTENCE_BUILDERS: Final[Mapping[str, Owned | Shared]] = {
     "/scene-geometry/{artifact_id}": Owned(build.trained_scene),
     "/scene-segments/{scene_id}": Owned(build.reconstruction_scene),
     "/selection/place-bridges/{decision_id}": Owned(build.place_bridge),
+    "/things/kinds/{kind_sha256}": Owned(build.held_kind, build.invented_digest),
     "/things/library/{content_sha256}": Shared(
         build.thing_library_content,
         "the shipped thing library is read from the host's tree when it starts, the same bytes "
         "for every workspace, each addressed by its own digest",
         build.invented_digest,
     ),
+    "/things/looks/{look_sha256}": Owned(build.held_look, build.invented_digest),
     "/tiles/{baked_tile_id}": Shared(
         build.baked_tile,
         "migration 0072 keeps baked tiles outside every workspace: an offline bake of a city seed "

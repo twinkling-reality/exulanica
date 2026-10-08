@@ -36,6 +36,7 @@ from exulanica.store.local import LocalContentAddressedStore
 
 __all__ = [
     "BLOB_NAMESPACE",
+    "LOOK_NAMESPACE",
     "MATERIAL_NAMESPACE",
     "SHARED_NAMESPACES",
     "TILE_NAMESPACE",
@@ -60,11 +61,19 @@ TILE_NAMESPACE: Final = "tiles"
 #: One namespace per workspace, like the material bakes, so erasing a workspace's assets is a
 #: question about its own rows and never about anyone else's.
 WORKSPACE_ASSET_NAMESPACE: Final = "workspace-assets"
+#: Where each workspace's own looks keep their containers, by digest (migration 0159): a creature's
+#: sketch, a sculpted look and an imported traveller's look. One namespace per workspace, so a
+#: look is served only to the workspace that holds its row.
+LOOK_NAMESPACE: Final = "looks"
 
 #: The namespaces holding one store for every workspace, in the order they are listed.
 SHARED_NAMESPACES: Final[tuple[str, ...]] = (BLOB_NAMESPACE, TILE_NAMESPACE)
 #: The namespaces holding one store per workspace, each under ``<name>/<workspace hex>``.
-WORKSPACE_NAMESPACES: Final[tuple[str, ...]] = (MATERIAL_NAMESPACE, WORKSPACE_ASSET_NAMESPACE)
+WORKSPACE_NAMESPACES: Final[tuple[str, ...]] = (
+    MATERIAL_NAMESPACE,
+    WORKSPACE_ASSET_NAMESPACE,
+    LOOK_NAMESPACE,
+)
 
 
 class WorkspaceStores(abc.ABC):

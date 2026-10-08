@@ -288,6 +288,14 @@ INSERT_ONLY_TABLES: Final = (
     # Migration 0156 appends the look each thing of a version wears and refuses every update and
     # delete of one.
     "world_thing_look",
+    # Migration 0159 appends each version of a workspace's own body recipes, body plans, thing
+    # kinds and looks, and each withdrawal of one of its looks, and refuses every update and delete
+    # of each.
+    "body_recipe_version",
+    "body_plan_version",
+    "thing_kind_version",
+    "look_version",
+    "look_withdrawal",
 )
 
 #: Tables the runtime may change only in the named columns: provisioning takes the table's UPDATE

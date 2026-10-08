@@ -180,6 +180,17 @@
       "order": null
     },
     {
+      "kind": "look",
+      "table": "look_withdrawal",
+      "shape": "event",
+      "note": "A workspace withdrawing one of its own looks (exulanica/world/thing_store.py): a choice naming it finds none, and its container is no longer served. The row is the whole withdrawal, and nothing else a restore could bring back serves the look again.",
+      "identity": ["workspace_id", "key", "version"],
+      "withdrawn": {"column": "withdrawn_at", "is": "not null"},
+      "workspace": "workspace_id",
+      "ends": {"table": "look_version", "columns": ["workspace_id", "key", "version"]},
+      "order": null
+    },
+    {
       "kind": "retraction",
       "table": "retraction",
       "shape": "event",

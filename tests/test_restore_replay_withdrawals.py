@@ -35,6 +35,7 @@ from exulanica.ingest.training_rights import grant_training_right, withdraw_trai
 from exulanica.models.manifest import Role
 from exulanica.orchestration.restore import main as restore_command
 from exulanica.store.local import LocalContentAddressedStore
+from exulanica.things.creatures import assemble_creature
 from exulanica.world.character_catalog_publication import (
     catalog_documents,
     catalog_imports,
@@ -43,9 +44,11 @@ from exulanica.world.character_catalog_publication import (
 )
 from exulanica.world.character_catalogs import CatalogRegistry, read_publication_document
 from exulanica.world.companion_memory import AnswerCitation, CompanionMemoryRepository
+from exulanica.world.thing_store import ThingStore, admitted_look
 from exulanica.world_package.training_store import record_training_decision
 
 from test_companion_memory import _answer
+from test_creature_bodies import BY, _form, _recipe
 from test_material_recipes import BRICK, _small
 from test_material_recipes import materials as materials
 from test_place_name_rights import _events as _place_name_events
@@ -310,6 +313,30 @@ def test_a_recipe_withdrawn_after_the_backup_stays_withdrawn(materials, commands
         withdraw=lambda: materials.repository().withdraw_recipe(record.recipe_id),
         current=current,
     )
+
+
+def test_a_look_withdrawn_after_the_backup_stays_withdrawn(purged, commands, tmp_path):
+    """A workspace's withdrawal of its own look (migration 0159) is final, so a restore may not
+    admit it again."""
+    creature = assemble_creature(_form(_recipe("ten_legs"), label="restored ten legs"), by=BY)
+    actor = uuid.uuid4()
+    with purged.database().session(purged.workspace_id) as connection:
+        ThingStore(
+            connection, purged.workspace_id, LocalContentAddressedStore(tmp_path / "looks")
+        ).keep_creature(creature, created_by=actor)
+
+    def current() -> bool:
+        with purged.database().session(purged.workspace_id) as connection:
+            found = admitted_look(connection, purged.workspace_id, creature.sketch.reference())
+        return found is not None
+
+    def withdraw() -> None:
+        with purged.database().session(purged.workspace_id) as connection:
+            ThingStore(connection, purged.workspace_id, None).withdraw_look(
+                creature.sketch.look, creature.sketch.version, "no longer worn", withdrawn_by=actor
+            )
+
+    assert not _through_a_restore(purged, tmp_path, withdraw=withdraw, current=current)
 
 
 def test_a_character_catalog_withdrawn_after_the_backup_stays_withdrawn(purged, commands, tmp_path):
