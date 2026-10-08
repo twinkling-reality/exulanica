@@ -104,6 +104,17 @@ export function outsideWords(entry: OutsideDecider): string {
   return `Decided from outside by ${agent}, through ${entry.bridgeLabel}.${quiet}`;
 }
 
+/**
+ * What became of the outside program's latest answer for them, in a sentence, where it was not
+ * taken (`latest` on the read's entry): "Lately: <why, in the catalog's words>, so their own routine
+ * decided." Null while the latest was taken, or where the read counts none.
+ */
+export function outsideLatestWords(entry: OutsideDecider): string | null {
+  const latest = entry.latest ?? null;
+  if (latest === null || latest.status === 'accepted') return null;
+  return `Lately: ${decisionWords(latest.reason)}, so their own routine decided.`;
+}
+
 /** The fewest words that name who runs them from outside: what the program calls itself, else its bridge. */
 export function outsideShort(entry: OutsideDecider): string {
   return entry.declared?.name ?? entry.bridgeLabel ?? 'outside';
@@ -483,7 +494,8 @@ export function buildSocietyModels(handlers: {
     // Somebody an outside program decides for is listed with who that is, and cannot be ticked.
     for (const entry of view.outside ?? []) checked.delete(entry.subjectId);
     replace(peopleList, people.map((person) => {
-      const outside = outsideOf(view, person.id) !== undefined;
+      const outsideOfPerson = outsideOf(view, person.id);
+      const outside = outsideOfPerson !== undefined;
       const box = el('input', { type: 'checkbox', value: person.id }) as HTMLInputElement;
       box.checked = checked.has(person.id);
       box.disabled = busy || outside;
@@ -491,10 +503,12 @@ export function buildSocietyModels(handlers: {
         if (box.checked) checked.add(person.id); else checked.delete(person.id);
         reflectChoose();
       });
+      const lately = outsideOfPerson === undefined ? null : outsideLatestWords(outsideOfPerson);
       const label = el('label', {}, [
         box,
         el('span', { class: 'society-models-person-name', text: person.name }),
         el('span', { class: 'society-models-person-decider', text: choiceWords(view, person.id, paused) }),
+        ...(lately === null ? [] : [el('span', { class: 'society-models-person-lately', text: lately })]),
       ]);
       label.dataset['subjectId'] = person.id;
       if (outside) label.dataset['outside'] = 'true';

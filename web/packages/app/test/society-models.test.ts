@@ -18,6 +18,7 @@ import {
   latestDecisionWords,
   modelLine,
   OVER_BOUND_WORDS,
+  outsideLatestWords,
   outsideShort,
   outsideWords,
   peopleRoleWords,
@@ -615,5 +616,43 @@ describe('who outside programs decide for', () => {
     expect([...mounted.runningModels().keys()]).toEqual(['ada']);
     expect([...mounted.outsideDeciders().keys()]).toEqual(['grace']);
     mounted.dispose();
+  });
+});
+
+describe('what became of an outside program\'s latest answer', () => {
+  const ENTRY = {
+    subject_id: 'grace', came: 'crossed', grant_id: 'grant-1', bridge: 'blocks', bridge_label: 'Block Game',
+    run_by: 'server', ai: false, connected: true, declared: null,
+  };
+  const receipt = (status: string, reason: string) => ({ decision_seq: 4, base_tick: 7, consumed_tick: null, status, reason });
+
+  it('reads the latest receipt, none, or nothing from a server that predates it', () => {
+    const read1 = parseSocietyModels(read({ outside: [{ ...ENTRY, latest: receipt('unavailable', 'no_answer_in_time') }] }));
+    expect(read1.outside![0]!.latest).toEqual({ decisionSeq: 4, baseTick: 7, consumedTick: null, status: 'unavailable', reason: 'no_answer_in_time' });
+    expect(parseSocietyModels(read({ outside: [{ ...ENTRY, latest: null }] })).outside![0]!.latest).toBeNull();
+    expect(parseSocietyModels(read({ outside: [ENTRY] })).outside![0]).not.toHaveProperty('latest');
+    expect(parseSocietyModels(read({ outside: [{ ...ENTRY, latest: receipt('stale', 'decision_context_changed') }] })).outside![0]!.latest!.status).toBe('stale');
+    expect(() => parseSocietyModels(read({ outside: [{ ...ENTRY, latest: receipt('lost', 'no_answer_in_time') }] }))).toThrow();
+  });
+
+  it('says why their routine decided when the latest answer was not taken, and nothing when it was', () => {
+    const entry = (latest: unknown) => parseSocietyModels(read({ outside: [{ ...ENTRY, latest }] })).outside![0]!;
+    expect(outsideLatestWords(entry(receipt('unavailable', 'no_answer_in_time')))).toBe(
+      'Lately: the program that decides for them did not answer in time, so their own routine decided.');
+    expect(outsideLatestWords(entry(receipt('accepted', 'validated_choice')))).toBeNull();
+    expect(outsideLatestWords(entry(null))).toBeNull();
+    expect(outsideLatestWords(parseSocietyModels(read({ outside: [ENTRY] })).outside![0]!)).toBeNull();
+  });
+
+  it('shows it under who decides on their row, and nothing for one whose latest answer was taken', () => {
+    const section = buildSocietyModels({ onChoose: () => undefined });
+    const people = [{ id: 'grace', name: 'Grace' }, { id: 'bea', name: 'Bea' }];
+    section.render({ view: parseSocietyModels(read({ outside: [
+      { ...ENTRY, latest: receipt('unavailable', 'no_answer_in_time') },
+      { ...ENTRY, subject_id: 'bea', latest: receipt('accepted', 'validated_choice') },
+    ] })), people, busy: false, message: '' });
+    const lately = (id: string) => section.root.querySelector(`[data-subject-id="${id}"] .society-models-person-lately`);
+    expect(lately('grace')!.textContent).toBe('Lately: the program that decides for them did not answer in time, so their own routine decided.');
+    expect(lately('bea')).toBeNull();
   });
 });

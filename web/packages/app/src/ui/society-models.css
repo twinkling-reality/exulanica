@@ -112,6 +112,8 @@
 #shell .society-models-people-list input { margin: 2px 0 0; grid-row: 1 / span 2; }
 #shell .society-models-person-name { color: var(--color-text); }
 #shell .society-models-person-decider { grid-column: 2; color: var(--color-text-muted); font-size: 12px; }
+/* What became of an outside program's latest answer, under who decides: muted, never an alert. */
+#shell .society-models-person-lately { grid-column: 2; color: var(--color-text-muted); font-size: 12px; }
 #shell .world-panel .society-models .society-models-people > button.society-models-everyone {
   justify-self: start;
   margin: 0;

@@ -127,6 +127,22 @@ export interface OutsideDecider {
   readonly connected: boolean;
   /** What the program declared itself to be, in its own words, or null where it declared nothing. */
   readonly declared: { readonly name: string; readonly maker: string; readonly mind: string | null } | null;
+  /**
+   * The subject's latest receipt under this grant (among those the read counts): whether the
+   * program's answer was taken and why not; null where none is counted, absent from an older server.
+   */
+  readonly latest?: OutsideReceipt | null;
+}
+
+/** One receipt of an outside program's answer, as the models read's outside entry gives it. */
+export interface OutsideReceipt {
+  readonly decisionSeq: number;
+  readonly baseTick: number;
+  /** The minute that took it up, or null while none has. */
+  readonly consumedTick: number | null;
+  readonly status: 'accepted' | 'rejected' | 'unavailable' | 'stale';
+  /** The receipt's own reason code (`DECISION_REASONS`). */
+  readonly reason: string;
 }
 
 export interface SocietyModels {
@@ -181,7 +197,18 @@ function outsideDecider(value: unknown): OutsideDecider {
     const said = object(entry);
     return { name: text(said['name']), maker: text(said['maker']), mind: said['mind'] === undefined ? null : maybe(said['mind'], text) };
   });
-  return {
+  const latest: OutsideReceipt | null | undefined = held['latest'] === undefined ? undefined : maybe(held['latest'], (entry): OutsideReceipt => {
+    const receipt = object(entry);
+    const state = receipt['status'];
+    return {
+      decisionSeq: count(receipt['decision_seq']),
+      baseTick: count(receipt['base_tick']),
+      consumedTick: maybe(receipt['consumed_tick'], count),
+      status: state === 'accepted' || state === 'rejected' || state === 'unavailable' || state === 'stale' ? state : invalid(),
+      reason: text(receipt['reason']),
+    };
+  });
+  const base: OutsideDecider = {
     subjectId: text(held['subject_id']),
     came,
     grantId: text(held['grant_id']),
@@ -192,6 +219,8 @@ function outsideDecider(value: unknown): OutsideDecider {
     connected: flag(held['connected']),
     declared,
   };
+  // Present only where the server says it, so a read that predates the field reads as before.
+  return latest === undefined ? base : { ...base, latest };
 }
 
 const SOURCES: readonly ChoiceSource[] = ['choice', 'choice_over_bound', 'travellers', 'travellers_over_bound'];

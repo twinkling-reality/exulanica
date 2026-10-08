@@ -212,6 +212,10 @@ them ("2 from outside"). The words say only what the grant view says: "Decided f
 (Acme), an AI agent, through Outside agents." where the bridge says an AI runs it, "Decided from
 outside, through" its bridge's label where it says no AI does (claiming no person, since nothing says
 one plays), "Decided from outside this world." for a bridge the door does not list, and "Its program is not connected now." while it is not.
+Where the program's latest answer for them was not taken (the entry's `latest` receipt), the row
+says why under who decides, in the words catalog's own reason ("Lately: the program that decides for
+them did not answer in time, so their own routine decided.", `outsideLatestWords`), and nothing
+while its latest answer was taken.
 `outsideWords`, `outsideShort` and `cameWords` in `ui/society-models.ts` are the one source of these
 words for the card and the marks, which read the entry through `PersonMind.outside`. A visitor the
 world decides for is named by the mind given travellers through its gate ("Nemotron 3 Nano 30B, the
