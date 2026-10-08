@@ -335,3 +335,11 @@ def test_stopping_the_composer_right_refuses_the_next_answer_by_name(upload):
     listed = _source(upload, receipt["capture_id"])["model_rights"]
     assert {r["state"] for r in listed if r["model"]["role"] == "reasoning_cheap"} == {"ended"}
     assert {r["state"] for r in listed if r["model"]["role"] != "reasoning_cheap"} == {"current"}
+
+
+def test_the_picture_use_s_words_say_its_notes_are_withdrawn():
+    """The stop withdraws the reference notes made with a picture (the withdrawal migrations, tested
+    in tests/test_reference_withdrawal.py); the words a person grants and stops against say so."""
+    (use,) = [use for use in _raw()["uses"] if use["role"] in REFERENCE_PICTURE_ROLES]
+    for sentence in (use["kept"], use["stop"]):
+        assert "withdrawn" in sentence and "stay" not in sentence

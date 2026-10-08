@@ -11,6 +11,7 @@ import json
 import uuid
 from decimal import Decimal
 
+import psycopg
 import pytest
 from exulanica.epistemics.hosted_requests import (
     WorkspaceRequestPolicy,
@@ -28,6 +29,7 @@ from exulanica.references.pictures import PictureUnavailable, ReferencePicture
 from exulanica.references.worker import ReferenceWorker
 
 from model_fakes import FakeTransport, RecordingPolicy, chat_body
+from test_companion_saved_names import named as named
 from test_reference_worker import ACTOR, _Database, _Gate, _Spending
 
 pytestmark = pytest.mark.postgres
@@ -38,6 +40,11 @@ RIGHT = uuid.UUID("3f6c1a2b-9d8e-4f70-8a61-52b3c4d5e6b1")
 #: A picture whose bytes cannot be read, and one the product already found a person in.
 BROKEN = uuid.UUID("3f6c1a2b-9d8e-4f70-8a61-52b3c4d5e6a3")
 PEOPLED = uuid.UUID("3f6c1a2b-9d8e-4f70-8a61-52b3c4d5e6a4")
+#: Pictures admitted, whose right stopped, or in which a person was found, as the reading was sent.
+STOPPED = uuid.UUID("3f6c1a2b-9d8e-4f70-8a61-52b3c4d5e6a5")
+FOUND_LATE = uuid.UUID("3f6c1a2b-9d8e-4f70-8a61-52b3c4d5e6a6")
+#: A picture whose send-time check cannot reach the database.
+CHECK_FAILS = uuid.UUID("3f6c1a2b-9d8e-4f70-8a61-52b3c4d5e6a7")
 IMAGE = b"\xff\xd8 a rendition's bytes"
 READER = load_manifest()[Role.REFERENCE_VISION].primary.model_id
 
@@ -74,17 +81,31 @@ def scene(repository):
         policy=RecordingPolicy(),
     )
 
-    def source(workspace, capture, requester):
+    #: When each picture's request was made, as the source was told.
+    seen_asked_at: list[tuple[uuid.UUID, object]] = []
+
+    def source(workspace, capture, requester, asked_at):
         assert (workspace, requester) == (workspace_id, ACTOR)
+        seen_asked_at.append((capture, asked_at))
         if capture == OTHER:
             raise PictureUnavailable("picture_not_admitted")
         if capture == PEOPLED:
             raise PictureUnavailable("shows_people")
         if capture == BROKEN:
             raise OSError("the rendition's bytes are gone")
-        return ReferencePicture(IMAGE, (RIGHT,))
+        if capture == STOPPED:
+            return ReferencePicture(IMAGE, (RIGHT,), lambda: "picture_not_admitted")
+        if capture == FOUND_LATE:
+            return ReferencePicture(IMAGE, (RIGHT,), lambda: "shows_people")
+        if capture == CHECK_FAILS:
 
-    def worker(**changes):
+            def unreachable() -> str | None:
+                raise psycopg.OperationalError("the database went away")
+
+            return ReferencePicture(IMAGE, (RIGHT,), unreachable)
+        return ReferencePicture(IMAGE, (RIGHT,), lambda: None)
+
+    def worker(database=None, **changes):
         arguments = dict(
             client=client,
             policy_for=policy_for,
@@ -94,7 +115,7 @@ def scene(repository):
             picture_source=source,
         )
         arguments.update(changes)
-        return ReferenceWorker(_Database(repository), **arguments)
+        return ReferenceWorker(database or _Database(repository), **arguments)
 
     def request(*pictures: uuid.UUID):
         made, _ = store.create_request(
@@ -114,6 +135,7 @@ def scene(repository):
     def finished(made):
         return store.read_request(connection, workspace_id, made.reference_id)
 
+    worker.seen_asked_at = seen_asked_at  # type: ignore[attr-defined]
     return workspace_id, models, asked, refuse_right, worker, request, finished
 
 
@@ -268,3 +290,112 @@ def test_a_picture_the_product_found_a_person_in_is_refused_before_sending(scene
     assert (step["state"], step["reason"]) == ("refused", "shows_people")
     assert models.requests == [] and asked == []
     assert read_bundle(done.bundle).pictures == ()
+
+
+@pytest.mark.parametrize(
+    ("capture", "state", "reason"),
+    [(STOPPED, "missed", "picture_not_admitted"), (FOUND_LATE, "refused", "shows_people")],
+)
+def test_a_picture_that_may_no_longer_be_read_as_it_is_sent_is_not_sent(
+    scene, capture, state, reason
+) -> None:
+    workspace_id, models, asked, _refuse, worker, request, finished = scene
+    made = request(capture)
+    worker().run_once(workspace_id)
+    done = finished(made)
+    (step,) = [item for item in done.steps if item["step"] == "read_picture"]
+    assert (step["state"], step["reason"]) == (state, reason)
+    # The workspace's policy was asked, then the picture's own check refused before sending.
+    assert asked == [(frozenset({capture}), "reference_vision")]
+    assert models.requests == []
+    assert read_bundle(done.bundle).pictures == ()
+
+
+def test_the_workspace_s_saved_names_are_read_from_its_database(scene, named) -> None:
+    workspace_id, models, _asked, _refuse, worker, request, finished = scene
+    models.default = _reading(
+        {
+            "refuse": None,
+            "notes": [
+                {"aspect": "buildings", "text": "white cube houses with blue doors"},
+                {"aspect": "buildings", "text": "Maria keeps a blue gate by the well"},
+            ],
+        }
+    )
+    made = request(PICTURE)
+    assert worker().run_once(workspace_id) == "complete"
+    assert [note.text for note in read_bundle(finished(made).bundle).notes] == [
+        "white cube houses with blue doors"
+    ]
+
+
+def test_saved_names_that_cannot_be_read_send_no_picture(scene, monkeypatch) -> None:
+    import psycopg
+    from exulanica.references import worker as worker_module
+
+    def unreadable(connection, workspace):
+        raise psycopg.OperationalError("the database went away")
+
+    monkeypatch.setattr(worker_module, "saved_names", unreadable)
+    workspace_id, models, asked, _refuse, worker, request, finished = scene
+    made = request(PICTURE)
+    assert worker().run_once(workspace_id) == "partial"
+    (step,) = [item for item in finished(made).steps if item["step"] == "read_picture"]
+    assert (step["state"], step["reason"]) == ("missed", "saved_names_unread")
+    assert models.requests == [] and asked == []
+
+
+def test_the_source_is_told_when_the_request_was_made(scene) -> None:
+    # So a picture whose requester stopped a reading right on it since then is not read.
+    workspace_id, models, _asked, _refuse, worker, request, finished = scene
+    models.default = _reading({"refuse": None, "notes": []})
+    made = request(PICTURE)
+    running = worker()
+    running.run_once(workspace_id)
+    assert worker.seen_asked_at == [(PICTURE, finished(made).created_at)]
+
+
+def test_a_send_time_check_that_cannot_be_asked_is_a_missed_step(scene) -> None:
+    workspace_id, models, _asked, _refuse, worker, request, finished = scene
+    made = request(CHECK_FAILS)
+    assert worker().run_once(workspace_id) == "partial"
+    done = finished(made)
+    (step,) = [item for item in done.steps if item["step"] == "read_picture"]
+    assert (step["state"], step["reason"]) == ("missed", "picture_unreadable")
+    assert models.requests == []
+    assert read_bundle(done.bundle).pictures == ()
+
+
+def test_the_saved_names_are_read_as_the_runtime_role_under_row_security(
+    scene, named, repository, spine_schema
+) -> None:
+    from exulanica.db.roles import provision_runtime_role
+
+    from conftest import scratch_role_database
+
+    workspace_id, models, _asked, _refuse, worker, request, finished = scene
+    _psycopg, scratch = spine_schema
+    role = "exulanica_reference_pictures_runtime_suite"
+    provision_runtime_role(repository.connection, role=role)
+    repository.connection.commit()
+    runtime = scratch_role_database(scratch, role)
+    with runtime.session(workspace_id) as connection:
+        who = connection.execute(
+            "select rolsuper, rolbypassrls from pg_roles where rolname = current_user"
+        ).fetchone()
+        assert who == {"rolsuper": False, "rolbypassrls": False}, who
+    models.default = _reading(
+        {
+            "refuse": None,
+            "notes": [
+                {"aspect": "buildings", "text": "white cube houses with blue doors"},
+                {"aspect": "buildings", "text": "Maria keeps a blue gate by the well"},
+            ],
+        }
+    )
+    made = request(PICTURE)
+    repository.connection.commit()
+    assert worker(database=runtime).run_once(workspace_id) == "complete"
+    assert [note.text for note in read_bundle(finished(made).bundle).notes] == [
+        "white cube houses with blue doors"
+    ]

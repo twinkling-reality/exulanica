@@ -236,3 +236,12 @@ def test_pictures_are_never_offered_on_a_public_installation(tmp_path, monkeypat
     assert _services(tmp_path, reference_pictures=True, installation=private).pictures_offered_to(
         WORKSPACE
     )
+
+
+def test_a_public_installation_s_worker_has_no_picture_source(tmp_path, monkeypatch) -> None:
+    from types import SimpleNamespace
+
+    monkeypatch.setattr(Services, "references_offered_here", lambda self: True)
+    public = SimpleNamespace(profile=SimpleNamespace(id="public"))
+    worker = _services(tmp_path, reference_pictures=True, installation=public)
+    assert worker.build_reference_worker()._picture_source is None

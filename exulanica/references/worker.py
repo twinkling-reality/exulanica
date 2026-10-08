@@ -48,12 +48,13 @@ import time
 import uuid
 from collections.abc import Callable, Iterable, Sequence
 from contextlib import AbstractContextManager
+from datetime import datetime
 from decimal import Decimal
 from typing import Any, Final, Protocol
 
 import psycopg
 
-from exulanica.epistemics.saved_names import saved_names
+from exulanica.epistemics.saved_names import SavedName, saved_names
 from exulanica.errors import ExulanicaError
 from exulanica.models.client import ModelClient
 from exulanica.models.errors import ModelError
@@ -143,11 +144,16 @@ class _Stopped(ExulanicaError):
 
 
 class _Admitted:
-    """The workspace's request policy, noting whether it let a request carrying the picture
-    through, so a picture is named in the bundle even when no answer came back."""
+    """The workspace's request policy for one picture's reading. As the reading is sent it also asks
+    the picture's own re-check (exactly the rights it was read under still current, no person found
+    since), and it notes whether the request carrying the picture went through, so a picture is
+    named in the bundle even when no answer came back."""
 
-    def __init__(self, policy: HostedRequestPolicy, capture_id: uuid.UUID) -> None:
+    def __init__(
+        self, policy: HostedRequestPolicy, picture: ReferencePicture, capture_id: uuid.UUID
+    ) -> None:
         self._policy = policy
+        self._picture = picture
         self._capture_id = capture_id
         self.workspace_id = getattr(policy, "workspace_id", None)
         self.admitted = False
@@ -155,6 +161,14 @@ class _Admitted:
     def admit(self, request: HostedRequest) -> Sequence[str]:
         texts = self._policy.admit(request)
         if self._capture_id in request.photographs:
+            try:
+                reason = self._picture.recheck()
+            except (psycopg.Error, OSError) as failure:
+                # The check could not be asked: nothing is sent, and the step is missed.
+                _LOG.warning("a picture's send-time check failed: %s", type(failure).__name__)
+                reason = "picture_unreadable"
+            if reason is not None:
+                raise PictureUnavailable(reason)
             self.admitted = True
         return texts
 
@@ -267,7 +281,8 @@ class ReferenceWorker:
         spending: SpendingSource | None,
         adapter_for: Callable[[ReferenceSource], ReferenceAdapter],
         workspaces: Callable[[], Iterable[uuid.UUID]],
-        picture_source: Callable[[uuid.UUID, uuid.UUID], ReferencePicture] | None = None,
+        picture_source: Callable[[uuid.UUID, uuid.UUID, uuid.UUID, datetime], ReferencePicture]
+        | None = None,
         worker: str = "references",
         deadline_seconds: float = DEADLINE_SECONDS,
         clock: Callable[[], float] = time.monotonic,
@@ -341,8 +356,9 @@ class ReferenceWorker:
         lookups: list[uuid.UUID] = []
         pictures: list[BundlePicture] = []
         try:
+            names = self._saved_names(claimed)
             for capture_id in claimed.pictures:
-                self._picture(claimed, steps, calls, notes, pictures, started, capture_id)
+                self._picture(claimed, steps, calls, notes, pictures, started, capture_id, names)
             if request.web:
                 self._web(claimed, steps, calls, notes, lookups, started)
         except _Stopped as stopped:
@@ -383,11 +399,16 @@ class ReferenceWorker:
         pictures: list[BundlePicture],
         started: float,
         capture_id: uuid.UUID,
+        names: tuple[SavedName, ...] | None,
     ) -> None:
-        """Read one of the person's own pictures into notes, or say why not."""
+        """Read one of the person's own pictures into notes, or say why not. ``names`` are the
+        workspace's saved names, read before any picture is sent; None when they could not be."""
         self._check(claimed, steps, started)
         if self._picture_source is None:
             steps.picture(capture_id, "missed", reason="pictures_not_read_here")
+            return
+        if names is None:
+            steps.picture(capture_id, "missed", reason="saved_names_unread")
             return
         if not self._process_has_room():
             steps.picture(capture_id, "missed", reason="process_budget_spent")
@@ -395,7 +416,10 @@ class ReferenceWorker:
         steps.picture(capture_id, "running")
         try:
             picture = self._picture_source(
-                claimed.workspace_id, capture_id, claimed.request.owner_actor_id
+                claimed.workspace_id,
+                capture_id,
+                claimed.request.owner_actor_id,
+                claimed.request.created_at,
             )
         except PictureUnavailable as unavailable:
             # A person the product already found is the reader's own refusal, made before sending.
@@ -406,12 +430,17 @@ class ReferenceWorker:
             _LOG.warning("a picture could not be read: %s", type(failure).__name__)
             steps.picture(capture_id, "missed", reason="picture_unreadable")
             return
-        policy = _Admitted(self._policy_for(claimed.workspace_id), capture_id)
+        policy = _Admitted(self._policy_for(claimed.workspace_id), picture, capture_id)
         client = self._client.with_policy(policy)
         try:
             read = read_picture(
                 client, picture.image, capture_id=capture_id, deadline_s=self._remaining(started)
             )
+        except PictureUnavailable as unavailable:
+            # Refused as it was being sent: nothing went, so the bundle does not name it.
+            state = "refused" if unavailable.reason in REFUSALS else "missed"
+            steps.picture(capture_id, state, reason=unavailable.reason)
+            return
         except (ModelError, SpendingRefused, ExulanicaError) as failure:
             read = PictureRead(refused=_reason(failure))
         if read.call is not None:
@@ -431,8 +460,6 @@ class ReferenceWorker:
         if read.refused is not None:
             steps.picture(capture_id, "missed", reason=read.refused)
             return
-        with self._database.session(claimed.workspace_id) as connection:
-            names = saved_names(connection, claimed.workspace_id)
         screened = screen_picture_notes(
             read.notes, withheld_words=claimed.withheld_words, saved=names
         )
@@ -442,6 +469,18 @@ class ReferenceWorker:
         steps.picture(
             capture_id, "done", kept=len(screened.kept), dropped=sum(screened.dropped.values())
         )
+
+    def _saved_names(self, claimed: store.ClaimedRequest) -> tuple[SavedName, ...] | None:
+        """The workspace's saved names, read once before any picture is sent, or None when they
+        could not be read (each picture is then a missed step, and nothing is sent)."""
+        if not claimed.pictures or self._picture_source is None:
+            return ()
+        try:
+            with self._database.session(claimed.workspace_id) as connection:
+                return saved_names(connection, claimed.workspace_id)
+        except (psycopg.Error, OSError) as failure:
+            _LOG.warning("saved names could not be read: %s", type(failure).__name__)
+            return None
 
     def _picture_model(self) -> tuple[str, str, str]:
         """The picture role's model as the manifest names it: the provider and its primary."""

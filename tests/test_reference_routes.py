@@ -563,3 +563,36 @@ def test_a_request_without_pictures_keeps_the_digest_it_had_before_pictures() ->
     body = references_route.ReferenceBody(purpose="kind", description="a quay", web=True)
     written = '{"description":"a quay","purpose":"kind","web":true}'
     assert references_route._request_sha256(body) == hashlib.sha256(written.encode()).hexdigest()
+
+
+def test_a_caller_holding_a_picture_right_is_served_its_words_while_pictures_are_off(
+    api, monkeypatch
+) -> None:
+    # So the right can be stopped from the app whatever the offer's state.
+    monkeypatch.setattr(references_route, "_holds_picture_right", lambda c, w, a: True)
+    pictures = _get(api[0](), "/worlds/references").json()["pictures"]
+    assert (pictures["offered"], pictures["code"]) == (False, "reference_pictures_not_offered")
+    assert [use["role"] for use in pictures["consent"]["uses"]] == ["reference_vision"]
+    assert all(use["stop"] and use["stop_action"] for use in pictures["consent"]["uses"])
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {},
+        {"reference_workspaces": ()},
+        {"reference_pictures": True, "reference_workspaces": ()},
+        {"reference_pictures": True, "alive": False},
+        {"reference_pictures": True, "spending": None},
+        {"reference_pictures": True, "runs_reference_worker": False},
+    ],
+)
+def test_a_request_naming_a_picture_is_refused_with_the_code_the_list_states(api, changes) -> None:
+    client, repository = api
+    stated = _get(client(**changes), "/worlds/references").json()["pictures"]
+    assert stated["offered"] is False and stated["code"] is not None
+    refused = _post(client(**changes), web=False, pictures=[str(PICTURE)])
+    assert (refused.status_code, refused.json()["code"]) == (409, stated["code"])
+    with_web = _post(client(**changes), pictures=[str(PICTURE)])
+    assert (with_web.status_code, with_web.json()["code"]) == (409, stated["code"])
+    assert _requests(repository) == 0

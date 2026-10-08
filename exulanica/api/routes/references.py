@@ -61,6 +61,7 @@ from exulanica.references.adapters import ReferenceSourceUnavailable
 from exulanica.references.bundle import read_bundle
 from exulanica.references.catalogs import web_source
 from exulanica.references.drafting import reference_prompts
+from exulanica.references.pictures import PICTURE_ROLE
 from exulanica.selection.world_drafting import sendable
 from exulanica.spending.status import workspace_status
 
@@ -249,26 +250,49 @@ def _request_sha256(body: ReferenceBody) -> str:
     return hashlib.sha256(canonical).hexdigest()
 
 
-def _pictures(services: Services, workspace_id: uuid.UUID, *, running: bool) -> dict[str, Any]:
+def pictures_unavailable_because(
+    services: Services, workspace_id: uuid.UUID, *, running: bool
+) -> str | None:
+    """Why this workspace may not name its own pictures here, or None: the one code the list states
+    and a request naming a picture is refused with."""
+    if not services.pictures_offered_to(workspace_id):
+        return "reference_pictures_not_offered"
+    return unavailable_because(services, workspace_id, running=running, web=False)
+
+
+def _pictures(
+    services: Services, workspace_id: uuid.UUID, *, running: bool, holds_right: bool
+) -> dict[str, Any]:
     """Whether this workspace may name its own pictures here, and the uses a person grants for
-    them; the code says why not, for logs and tests, and the page shows nothing while it is set."""
-    code = (
-        unavailable_because(services, workspace_id, running=running, web=False)
-        if services.pictures_offered_to(workspace_id)
-        else "reference_pictures_not_offered"
-    )
+    them; the code says why not, for logs and tests. The uses, stop words included, are served
+    while pictures are offered and whenever the caller still holds a current picture right, so a
+    page can always offer the stop."""
+    code = pictures_unavailable_because(services, workspace_id, running=running)
     pictures: dict[str, Any] = {
         "offered": code is None,
         "code": code,
         "maximum": store.MAX_PICTURES,
     }
-    if code is None:
+    if code is None or holds_right:
         pictures["consent"] = {
             "uses": [
                 offer.as_record() for offer in model_right_offers(offered_on="reference_pictures")
             ]
         }
     return pictures
+
+
+def _holds_picture_right(connection: Any, workspace_id: uuid.UUID, actor: uuid.UUID) -> bool:
+    """Whether ``actor`` granted a reading right on a picture that is current now."""
+    with connection.cursor(row_factory=dict_row) as cursor:
+        row = cursor.execute(
+            "select exists (select 1 from personal_model_right where workspace_id=%s "
+            "and granted_by=%s and model_role=%s and personal_model_right_allows(workspace_id,"
+            "right_id,capture_id,model_provider,model_role,model_id,model_revision,destination,"
+            "clock_timestamp())) as holds",
+            (workspace_id, actor, str(PICTURE_ROLE)),
+        ).fetchone()
+    return bool(row and row["holds"])
 
 
 def _picture_refused(
@@ -314,6 +338,7 @@ def list_references(
             )
     _sweep(services, session.workspace_id)
     running = _running(request)
+    holds_right = _holds_picture_right(connection, session.workspace_id, session.actor)
     operation = reference_operation(
         unavailable_because(services, session.workspace_id, running=running)
     )
@@ -323,7 +348,9 @@ def list_references(
             "capabilities": [
                 describe(operation, surface(request.app), held, installation_facts_of(services))
             ],
-            "pictures": _pictures(services, session.workspace_id, running=running),
+            "pictures": _pictures(
+                services, session.workspace_id, running=running, holds_right=holds_right
+            ),
         }
     )
 
@@ -348,14 +375,16 @@ def request_reference(
     if len(set(pictures)) != len(pictures):
         return _refusal(422, "pictures_repeated", "each picture is named once")
     _sweep(services, session.workspace_id)
-    code = unavailable_because(
-        services, session.workspace_id, running=_running(request), web=body.web
-    )
+    running = _running(request)
+    if pictures:
+        # The code the list states for pictures, before anything about web notes.
+        code = pictures_unavailable_because(services, session.workspace_id, running=running)
+        if code is not None:
+            return _refusal(409, code, "pictures are not offered to this workspace here")
+    code = unavailable_because(services, session.workspace_id, running=running, web=body.web)
     if code is not None:
         return _refusal(409, code, "references are not offered to this workspace here")
     if pictures:
-        if not services.pictures_offered_to(session.workspace_id):
-            return _refusal(409, "reference_pictures_not_offered", "pictures are not offered here")
         refused = _picture_refused(services, session.workspace_id, session.actor, pictures)
         if refused is not None:
             return refused

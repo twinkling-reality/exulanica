@@ -24,7 +24,7 @@ import itertools
 import re
 import uuid
 from collections import Counter
-from collections.abc import Iterable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import Final, Literal
@@ -70,11 +70,13 @@ _SENTENCE_ENDS: Final = (".", "!", "?", ":", ";")
 
 @dataclass(frozen=True, slots=True)
 class ReferencePicture:
-    """A person's own picture as a reference job reads it: its rendition's bytes, and the rights it
-    may be read under, one per model of the picture role's chain, checked just now."""
+    """A person's own picture as a reference job reads it: its rendition's bytes, the rights it may
+    be read under, one per model of the picture role's chain, checked just now, and ``recheck``,
+    asked again as the reading is sent: why the picture may no longer be read, or None."""
 
     image: bytes = field(repr=False)
     right_ids: tuple[uuid.UUID, ...]
+    recheck: Callable[[], str | None] = field(repr=False, compare=False)
 
 
 class PictureUnavailable(ExulanicaError):
@@ -156,6 +158,8 @@ def read_picture(
             max_tokens=PICTURE_MAX_TOKENS,
             image_prompt_tokens=client.manifest[PICTURE_ROLE].image_reservation(1),
             photographs=(capture_id,),
+            # A person's picture is read afresh each time, never answered from a cache.
+            use_cache=False,
             arrays_last=True,
             deadline_s=_within(client, deadline_s),
         )

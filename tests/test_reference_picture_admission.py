@@ -8,6 +8,7 @@ product's; the vision stage is the counting double the admission tests use, and 
 
 from __future__ import annotations
 
+import datetime as dt
 import uuid
 
 import pytest
@@ -32,6 +33,10 @@ def _admitted(upload, roles: tuple[str, ...]) -> uuid.UUID:
     response = post(upload, "/personal-admission", body)
     assert response.status_code == 202, response.text
     return uuid.UUID(body["members"][0]["capture_id"])
+
+
+def _now(upload) -> dt.datetime:
+    return upload.repository.connection.execute("select clock_timestamp() as at").fetchone()["at"]
 
 
 def _granted_by(upload, capture_id) -> uuid.UUID:
@@ -74,7 +79,7 @@ def test_an_admitted_picture_is_handed_over_as_its_rendition_with_its_rights(upl
     )
     assert rendition.content_sha256 == bytes(row["content_sha256"])
     picture = reference_picture_source(upload.database.session, upload.store)(
-        upload.workspace_id, capture_id, _granted_by(upload, capture_id)
+        upload.workspace_id, capture_id, _granted_by(upload, capture_id), _now(upload)
     )
     assert picture.image == upload.store.get(BlobId(rendition.content_sha256))
     (original,) = upload.rows("select blob_sha256 from capture where capture_id = %s", capture_id)
@@ -88,7 +93,7 @@ def test_a_picture_without_a_right_for_the_picture_role_is_not_admitted(upload) 
     assert _refusal(upload, capture_id) == ("picture_not_admitted", None, ())
     with pytest.raises(PictureUnavailable) as refused:
         reference_picture_source(upload.database.session, upload.store)(
-            upload.workspace_id, capture_id, _granted_by(upload, capture_id)
+            upload.workspace_id, capture_id, _granted_by(upload, capture_id), _now(upload)
         )
     assert refused.value.reason == "picture_not_admitted"
 
@@ -141,3 +146,105 @@ def test_a_picture_the_product_found_a_person_in_is_refused_as_showing_people(up
         ],
     )
     assert _refusal(upload, capture_id, holder) == ("shows_people", None, ())
+
+
+def test_the_send_time_check_reads_exactly_the_rights_the_picture_was_admitted_under(
+    upload,
+) -> None:
+    from exulanica.ingest.model_rights import withdraw_model_right
+    from exulanica.ingest.person_review import record_region_edits
+    from exulanica.ingest.repository import IngestRepository
+
+    capture_id = _admitted(upload, ("reference_vision",))
+    upload.drain(screened=False)
+    holder = _granted_by(upload, capture_id)
+    source = reference_picture_source(upload.database.session, upload.store)
+    # Asked later than the stop below, so only the check on exactly these rights can refuse.
+    later = _now(upload) + dt.timedelta(hours=1)
+    picture = source(upload.workspace_id, capture_id, holder, later)
+    assert picture.recheck() is None
+    (right_id,) = picture.right_ids
+    repository = IngestRepository(upload.repository.connection, upload.workspace_id)
+    withdraw_model_right(repository, right_id=right_id, withdrawn_by=holder)
+    regranted = _admitted_again(upload, capture_id)
+    # A current right stands for the picture again, but not the one this reading was admitted
+    # under: the reading already in flight may not go.
+    assert picture.recheck() == "picture_not_admitted"
+    fresh = source(upload.workspace_id, capture_id, holder, later)
+    assert fresh.right_ids == regranted and fresh.recheck() is None
+    record_region_edits(
+        upload.repository,
+        capture_id=capture_id,
+        actor=holder,
+        edits=[
+            {
+                "action": "add",
+                "region_key": "dd" * 32,
+                "silhouette": {
+                    "kind": "polygon",
+                    "points": [[0, 0], [400000, 0], [400000, 400000], [0, 400000]],
+                },
+            }
+        ],
+    )
+    assert fresh.recheck() == "shows_people"
+
+
+def _admitted_again(upload, capture_id) -> tuple[uuid.UUID, ...]:
+    """A new picture right on the same picture, under the authority and grantor of the first."""
+    from exulanica.ingest.model_rights import grant_model_right
+    from exulanica.ingest.personal_admission import role_handoff
+    from exulanica.ingest.repository import IngestRepository
+
+    (first,) = upload.rows(
+        "select authorization_id, granted_by, purpose from personal_model_right "
+        "where capture_id = %s order by granted_at limit 1",
+        capture_id,
+    )
+    handoff = role_handoff("reference_vision")
+    repository = IngestRepository(upload.repository.connection, upload.workspace_id)
+    now = upload.repository.connection.execute("select clock_timestamp() as at").fetchone()["at"]
+    return tuple(
+        grant_model_right(
+            repository,
+            capture_id=capture_id,
+            authorization_id=first["authorization_id"],
+            identity=identity,
+            destination=handoff.destination,
+            granted_by=first["granted_by"],
+            purpose=first["purpose"],
+            valid_until=now + dt.timedelta(minutes=30),
+        ).right_id
+        for identity in handoff.identities
+    )
+
+
+def test_a_picture_whose_requester_stopped_a_reading_right_since_asking_is_not_read(upload):
+    from exulanica.ingest.model_rights import withdraw_model_right
+    from exulanica.ingest.repository import IngestRepository
+
+    capture_id = _admitted(upload, ("reference_vision",))
+    upload.drain(screened=False)
+    holder = _granted_by(upload, capture_id)
+    (second,) = _admitted_again(upload, capture_id)
+    asked = _now(upload)
+    source = reference_picture_source(upload.database.session, upload.store)
+    picture = source(upload.workspace_id, capture_id, holder, asked)
+    assert picture.recheck() is None
+    # The person stops one of their two current rights after asking: the other still stands, but
+    # the finish would withdraw whatever is read, so nothing is read.
+    repository = IngestRepository(upload.repository.connection, upload.workspace_id)
+    rights = upload.rows(
+        "select right_id from personal_model_right where capture_id = %s and model_role = %s",
+        capture_id,
+        "reference_vision",
+    )
+    (stopped,) = [row["right_id"] for row in rights if row["right_id"] not in picture.right_ids]
+    assert second in {stopped, *picture.right_ids}
+    withdraw_model_right(repository, right_id=stopped, withdrawn_by=holder)
+    assert picture.recheck() == "picture_not_admitted"
+    with pytest.raises(PictureUnavailable) as refused:
+        source(upload.workspace_id, capture_id, holder, asked)
+    assert refused.value.reason == "picture_not_admitted"
+    # Asked after that stop, the remaining right is read.
+    assert source(upload.workspace_id, capture_id, holder, _now(upload)).recheck() is None

@@ -680,10 +680,13 @@ class Services:
         """Whether this workspace may ask for notes from its own pictures here: references are
         served to it, pictures are turned on, and the installation is not public, whatever the
         web source's catalog entry offers."""
+        return self.picture_reading_here() and self.serves_references_to(workspace_id)
+
+    def picture_reading_here(self) -> bool:
+        """Whether this process reads a person's pictures at all: pictures are turned on and the
+        installation is not public."""
         profile = self.installation.profile if self.installation is not None else None
-        if profile is not None and profile.id == "public":
-            return False
-        return self.reference_pictures and self.serves_references_to(workspace_id)
+        return self.reference_pictures and (profile is None or profile.id != "public")
 
     def sweep_references(self) -> int:
         """End the reference jobs no worker here will take, for every workspace this process knows
@@ -741,7 +744,7 @@ class Services:
             # read-only database as the request policy reads rights.
             picture_source=(
                 reference_picture_source(readonly.session, self.store)
-                if self.reference_pictures
+                if self.picture_reading_here()
                 else None
             ),
         )

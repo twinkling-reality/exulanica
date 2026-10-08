@@ -54,6 +54,7 @@ class Pictured:
         provision_workspace(repository.connection, fixture.workspace_id)
         self.capture_id = fixture.rows("select capture_id from capture")[0]["capture_id"]
         authorization = _authorize(repository, self.capture_id)
+        self.authorization_id = authorization.authorization_id
         manifest = load_manifest()
         self.rights = _grant(
             repository,
@@ -82,9 +83,22 @@ class Pictured:
             notes = (*WEB_NOTES, BundleNote(*_PICTURE_NOTE, self.capture_id))
         return scripted_bundle(self.workspace_id, notes=notes, pictures=named)
 
-    def finished(self, pictures=None) -> uuid.UUID:
+    def finished(self, pictures=None, *, actor: uuid.UUID = REFERENCE_ACTOR) -> uuid.UUID:
         return finished_reference(
-            self.fixture.repository.connection, self.workspace_id, bundle=self.bundle(pictures)
+            self.fixture.repository.connection,
+            self.workspace_id,
+            actor=actor,
+            bundle=self.bundle(pictures),
+        )
+
+    def granted_again(self) -> list:
+        """Another reading right on the picture, granted by the same person (ACCOUNT)."""
+        return _grant(
+            self.fixture.repository,
+            self.capture_id,
+            self.authorization_id,
+            Role.REFERENCE_VISION,
+            load_manifest(),
         )
 
     def request(self, reference_id: uuid.UUID) -> store.ReferenceRequest:
@@ -267,9 +281,9 @@ def test_a_queued_request_is_never_withdrawn(pictured):
 # -- a reading in flight ------------------------------------------------------------------------
 
 
-def _running(pictured: Pictured) -> store.ClaimedRequest:
+def _running(pictured: Pictured, *, actor: uuid.UUID = REFERENCE_ACTOR) -> store.ClaimedRequest:
     connection = pictured.fixture.repository.connection
-    reference_id = queued_reference(connection, pictured.workspace_id)
+    reference_id = queued_reference(connection, pictured.workspace_id, actor=actor)
     claimed = store.claim(connection, pictured.workspace_id, worker="withdrawal-test")
     assert claimed is not None and claimed.request.reference_id == reference_id
     return claimed
@@ -287,14 +301,14 @@ def _finish(connection, pictured: Pictured, claimed: store.ClaimedRequest) -> st
     )
 
 
-@pytest.mark.parametrize("stopped", ["right", "picture"])
+@pytest.mark.parametrize("stopped", ["right", "capture", "interval", "workspace"])
 def test_a_finish_after_a_stop_in_flight_ends_withdrawn(pictured, stopped):
     claimed = _running(pictured)
     with pictured.runtime() as connection:
         if stopped == "right":
             _stop(connection, pictured.workspace_id, pictured.rights[0].right_id)
         else:
-            _delete(connection, pictured.workspace_id, pictured.capture_id)
+            _delete(connection, pictured.workspace_id, pictured.capture_id, stopped)
     with pictured.runtime() as connection:
         assert _finish(connection, pictured, claimed) == "withdrawn"
     assert _withdrawn(pictured.request(claimed.request.reference_id))
@@ -345,10 +359,13 @@ def _blocked_or_done(pictured: Pictured, session: _Session) -> bool:
     return False
 
 
-def test_a_finish_racing_a_stop_it_waited_on_ends_withdrawn(pictured):
-    claimed = _running(pictured)
+@pytest.mark.parametrize("stopped", ["read", "another"])
+def test_a_finish_racing_a_stop_it_waited_on_ends_withdrawn(pictured, stopped):
+    # The right the bundle was read under, or another reading right the same person holds on it.
+    claimed = _running(pictured, actor=ACCOUNT)
+    right = pictured.rights[0] if stopped == "read" else pictured.granted_again()[0]
     with pictured.runtime() as stopping, stopping.transaction():
-        _stop(stopping, pictured.workspace_id, pictured.rights[0].right_id)
+        _stop(stopping, pictured.workspace_id, right.right_id)
         finishing = _Session(pictured, lambda c: _finish(c, pictured, claimed))
         finishing.start()
         assert _blocked_or_done(pictured, finishing), "the finish did not wait on the stop"
@@ -358,10 +375,11 @@ def test_a_finish_racing_a_stop_it_waited_on_ends_withdrawn(pictured):
     assert _withdrawn(pictured.request(claimed.request.reference_id))
 
 
-def test_a_finish_racing_a_deletion_it_waited_on_ends_withdrawn(pictured):
+@pytest.mark.parametrize("scope", ["capture", "interval", "workspace"])
+def test_a_finish_racing_a_deletion_it_waited_on_ends_withdrawn(pictured, scope):
     claimed = _running(pictured)
     with pictured.runtime() as deleting, deleting.transaction():
-        _delete(deleting, pictured.workspace_id, pictured.capture_id)
+        _delete(deleting, pictured.workspace_id, pictured.capture_id, scope)
         finishing = _Session(pictured, lambda c: _finish(c, pictured, claimed))
         finishing.start()
         assert _blocked_or_done(pictured, finishing), "the finish did not wait on the deletion"
@@ -370,15 +388,26 @@ def test_a_finish_racing_a_deletion_it_waited_on_ends_withdrawn(pictured):
     assert finishing.result == "withdrawn"
 
 
-def test_a_stop_racing_a_finish_it_waited_on_withdraws_what_the_finish_kept(pictured):
-    claimed = _running(pictured)
+@pytest.mark.parametrize("stopped", ["read", "another", "granted_during"])
+def test_a_stop_racing_a_finish_it_waited_on_withdraws_what_the_finish_kept(pictured, stopped):
+    # The right the bundle was read under; another reading right its person holds on the picture,
+    # which the finish locks; or one the person grants while the finish is under way, which the
+    # finish never saw and which waits on the lifecycle lock instead.
+    claimed = _running(pictured, actor=ACCOUNT)
+    right = None
+    if stopped == "read":
+        right = pictured.rights[0]
+    elif stopped == "another":
+        (right,) = pictured.granted_again()
     with pictured.runtime() as finishing:
         with finishing.transaction():
             # The finish's own transaction is a savepoint of this one, so its locks stay held.
             assert _finish(finishing, pictured, claimed) == "complete"
+            if right is None:
+                (right,) = pictured.granted_again()
             stopping = _Session(
                 pictured,
-                lambda c: _stop(c, pictured.workspace_id, pictured.rights[0].right_id),
+                lambda c: _stop(c, pictured.workspace_id, right.right_id),
             )
             stopping.start()
             assert _blocked_or_done(pictured, stopping), "the stop did not wait on the finish"
@@ -387,13 +416,14 @@ def test_a_stop_racing_a_finish_it_waited_on_withdraws_what_the_finish_kept(pict
     assert _withdrawn(pictured.request(claimed.request.reference_id))
 
 
-def test_a_deletion_racing_a_finish_it_waited_on_withdraws_what_the_finish_kept(pictured):
+@pytest.mark.parametrize("scope", ["capture", "interval", "workspace"])
+def test_a_deletion_racing_a_finish_it_waited_on_withdraws_what_the_finish_kept(pictured, scope):
     claimed = _running(pictured)
     with pictured.runtime() as finishing:
         with finishing.transaction():
             assert _finish(finishing, pictured, claimed) == "complete"
             deleting = _Session(
-                pictured, lambda c: _delete(c, pictured.workspace_id, pictured.capture_id)
+                pictured, lambda c: _delete(c, pictured.workspace_id, pictured.capture_id, scope)
             )
             deleting.start()
             assert _blocked_or_done(pictured, deleting), "the deletion did not wait on the finish"
@@ -471,3 +501,56 @@ def test_a_writer_that_bypasses_row_security_withdraws_its_own_workspace_s_notes
     finally:
         set_workspace(owner, pictured.workspace_id)
     assert found is not None and found.status == "complete"
+
+
+# -- a stop by the person who asked ---------------------------------------------------------------
+
+
+def test_stopping_any_of_a_person_s_picture_rights_withdraws_every_request_of_theirs_naming_it(
+    pictured,
+):
+    # Read under the first right; the person later grants the picture again and stops that grant,
+    # as when the first right expired. Their request is withdrawn; another person's is not.
+    theirs = pictured.finished(actor=ACCOUNT)
+    another_person = pictured.finished(actor=REFERENCE_ACTOR)
+    (again,) = pictured.granted_again()
+    with pictured.runtime() as connection:
+        _stop(connection, pictured.workspace_id, again.right_id)
+    assert _withdrawn(pictured.request(theirs))
+    assert pictured.request(another_person).status == "complete"
+
+
+def test_a_finish_after_its_person_stopped_another_right_on_the_picture_ends_withdrawn(pictured):
+    connection = pictured.fixture.repository.connection
+    reference_id = queued_reference(connection, pictured.workspace_id, actor=ACCOUNT)
+    claimed = store.claim(connection, pictured.workspace_id, worker="withdrawal-test")
+    assert claimed is not None and claimed.request.reference_id == reference_id
+    (again,) = pictured.granted_again()
+    with pictured.runtime() as stopping:
+        _stop(stopping, pictured.workspace_id, again.right_id)
+    with pictured.runtime() as finishing:
+        assert _finish(finishing, pictured, claimed) == "withdrawn"
+
+
+def test_a_stop_made_before_the_request_was_asked_withdraws_nothing_new(pictured):
+    (again,) = pictured.granted_again()
+    with pictured.runtime() as connection:
+        _stop(connection, pictured.workspace_id, again.right_id)
+    connection = pictured.fixture.repository.connection
+    queued_reference(connection, pictured.workspace_id, actor=ACCOUNT)
+    claimed = store.claim(connection, pictured.workspace_id, worker="withdrawal-test")
+    assert claimed is not None
+    with pictured.runtime() as finishing:
+        assert _finish(finishing, pictured, claimed) == "complete"
+
+
+def test_the_list_knows_whether_the_caller_holds_a_current_picture_right(pictured):
+    from exulanica.api.routes.references import _holds_picture_right
+
+    connection = pictured.fixture.repository.connection
+    assert _holds_picture_right(connection, pictured.workspace_id, ACCOUNT)
+    assert not _holds_picture_right(connection, pictured.workspace_id, uuid.uuid4())
+    with pictured.runtime() as stopping:
+        for right in pictured.rights:
+            _stop(stopping, pictured.workspace_id, right.right_id)
+    assert not _holds_picture_right(connection, pictured.workspace_id, ACCOUNT)

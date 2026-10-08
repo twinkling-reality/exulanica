@@ -465,10 +465,10 @@ def finish(
     """End the request and its job, blanking the person's words and clearing the request's digest;
     the status it ended with, or None when the claim was lost.
 
-    A bundle naming a picture whose right stopped, or which a tombstone blocks, while the job read
-    it is not kept: the request ends withdrawn with no bundle. The database answers that after
-    taking the named rights and the tombstones' lock, before the request's row, the order every
-    withdrawal takes them in (migration 0160).
+    A bundle naming a picture whose right stopped, whose requester stopped a reading right on it
+    since asking, or which a tombstone blocks, is not kept: the request ends withdrawn with no
+    bundle. The database answers under the lifecycle lock every stop and tombstone takes, before the
+    request's row, the order every withdrawal takes them in (reference_bundle_withdrawn).
     """
     if status not in FINISHED:
         raise ValueError(f"a request finishes as one of {FINISHED}")
@@ -477,8 +477,8 @@ def finish(
             return None
         if bundle is not None and bundle.get("pictures"):
             stopped = connection.execute(
-                "select reference_bundle_withdrawn(%s, %s) as stopped",
-                (claimed.workspace_id, Jsonb(dict(bundle))),
+                "select reference_bundle_withdrawn(%s, %s, %s) as stopped",
+                (claimed.workspace_id, claimed.request.reference_id, Jsonb(dict(bundle))),
             ).fetchone()
             if stopped is not None and _first(stopped):
                 status, bundle, bundle_sha256 = "withdrawn", None, None

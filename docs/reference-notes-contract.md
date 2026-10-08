@@ -177,15 +177,20 @@ is in `/readyz` (`references`).
 capture id, or both; one asking for neither is 422 `nothing_to_look_up`, and one naming a picture
 twice is 422 `pictures_repeated`. A request without web notes needs no grant for the source and no
 configured adapter, and still needs durable spending, because reading a picture is a model call.
-Naming pictures where they are not offered is 409 `reference_pictures_not_offered`, and naming one
+Naming pictures where they are not offered is 409 with the code the list's `pictures.code` states
+(`reference_pictures_not_offered`, or why a request without web notes is refused here), answered
+before anything about web notes, and naming one
 that may not be read is 409 `reference_picture_not_admitted` with its reason in the detail
 (section 10); either is refused before anything is queued.
 
 The list's `pictures` is `{offered, code, maximum, consent?}`: `offered` is whether this workspace
 may name pictures here, `code` says why not (`reference_pictures_not_offered`, or the code a request
-without web notes would be refused with), `maximum` is 4, and while pictures are offered `consent`
-holds `uses`, the model right uses offered on this step with the exact words each is granted
-against. A page shows nothing about pictures while `offered` is false.
+without web notes would be refused with), `maximum` is 4, and `consent` holds `uses`, the model
+right uses offered on this step with the exact words each is granted against and stopped with. It
+is served while pictures are offered, and also whenever the caller holds a current picture right,
+so a page can always offer the stop (a right is also stopped by id through
+`POST /personal-admission/model-rights/{right_id}/withdraw`). A page offers no new pictures while
+`offered` is false.
 
 ## 9. Notes for a drafter
 
@@ -253,7 +258,8 @@ A person admits a picture as they admit a photograph (`POST /intake`, then `POST
 `pictures.consent.uses` states. Each use in `exulanica/ingest/model-right-uses.v1.json` says where
 it is offered (`offered_on`: `photos` when absent, or `reference_pictures`); the photograph
 admission screen lists only uses offered on photographs, and the reference picture use is listed
-only on this step, only while pictures are offered.
+only on this step: while pictures are offered, and whenever the caller holds a current picture
+right (section 8).
 
 A picture may be read only while a privacy screening permits looking at it, a current right names
 every model of the `reference_vision` chain for it, every such right was granted by the person
@@ -262,27 +268,36 @@ asking, the product has found no person in it, and its rendition exists
 (a picture of another workspace reads the same), `picture_not_admitted` (no such right, or one
 another person granted, so a request reads only its requester's own pictures), `shows_people` (a
 current person region, so the picture is never sent) or `picture_has_no_rendition`. The route asks
-before queueing; the job asks again, on the read-only database, before each reading, and the request
-policy checks the right once more when the reading is sent. Only the rendition's bytes are handed to
+before queueing; the job asks again, on the read-only database, before each reading, and as the
+reading is sent it asks once more that exactly the rights it was admitted under are still current,
+that its requester has stopped none of their reading rights on it since the request was made, and
+that no person has been found in it since; otherwise the step ends as above and nothing is sent.
+The workspace's saved names are read once, before any picture is sent; if they cannot be read, each
+picture step is missed (`saved_names_unread`). Only the rendition's bytes are handed to
 the reader, never the original. A picture's step ends `done` with how many notes were kept and
 dropped, `refused` with the reader's reason (or `shows_people` found before sending), or `missed`
 with a code (`pictures_not_read_here` where this process reads no pictures, `process_budget_spent`,
 `picture_unreadable` when its bytes or the database could not be read, or a refusal above); a missed
 picture makes the bundle partial. The bundle names each picture the workspace's request policy let
 through, with the rights it was read under and the model that read it (the role's model when no
-answer came back), and each note kept from a picture has basis `own_picture` and names its picture. A drafter is given web notes only unless it asks for
-picture notes (section 9).
+answer came back), and each note kept from a picture has basis `own_picture` and names its picture.
+A drafter is given web notes only unless it asks for picture notes (section 9).
 
 Stopping a picture's reading right, or deleting the picture, withdraws the notes made from it
-(migration 0160). A finished request whose bundle names the stopped right, or names a picture a new
-tombstone blocks (scope `capture` or `interval` naming it, or `workspace`), becomes `withdrawn`: its
+(migration 0160). A finished request whose bundle names the stopped right, or whose requester
+granted the stopped right and whose bundle names its picture (so a right that expired and was
+granted again is no way around a stop), or that names a picture a new tombstone blocks (scope
+`capture` or `interval` naming it, or `workspace`), becomes `withdrawn`: its
 bundle and the bundle's digest are cleared, its web notes go with it, and nothing else about it
 changes. A deletion withdraws when it is asked, whatever its effective time. Database triggers do
 this for every writer of a right's stop or a tombstone, in the writer's own workspace session, and a
 restore that replays the stop or the tombstone withdraws again. A job whose picture is stopped while
-it reads ends `withdrawn` rather than keep the notes: its finish takes the bundle's right rows and
-the tombstones' lock before the request's row, the order every withdrawal takes them in. A drafter
-asking for a withdrawn request's notes is refused `reference_withdrawn`; a document already drafted
+it reads ends `withdrawn` rather than keep the notes: its finish ends withdrawn when a right its
+bundle names was stopped, when its requester stopped any reading right on one of its pictures after
+the request was made, or when a tombstone blocks one of its pictures. It asks under the
+per-workspace lifecycle lock that every stop of a reading right and every tombstone also takes before
+it withdraws, so a stop or deletion made while a finish is under way, of any right, including one
+granted meanwhile, is seen by one of the two. A drafter asking for a withdrawn request's notes is refused `reference_withdrawn`; a document already drafted
 from them keeps only the digest it recorded. An expired right is not a stop and withdraws nothing.
 
 ## 11. Limits
@@ -316,6 +331,10 @@ from them keeps only the digest it recorded. An expired right is not a stop and 
 - **A name nobody saved can open a picture note.** The lettering check drops a capitalised word
   inside a sentence, not the first word of one, so a note beginning with a name read from the
   picture, or one the model supplied, is kept unless it is a saved name.
+- **"Own picture" means a picture the requester granted a right on.** Captures record no uploader,
+  so a person who may admit a workspace's photographs may grant their own picture right on any of
+  them and then name it; a request reads a picture only under rights its requester granted, and
+  another person's right never stands in for it.
 - **A picture is named when the policy let it through.** A later check (the budget, the provider)
   may still stop the call before anything is sent; the bundle then names a picture no model saw,
   which a withdrawal treats like one that was read.
