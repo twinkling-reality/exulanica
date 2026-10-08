@@ -1,0 +1,23 @@
+{
+ "profile": "q10-scripted-model-plan/v1",
+ "bounds": {
+  "ceiling_usd": "0.50",
+  "max_calls": 2000
+ },
+ "rules": [
+  {
+   "match": {
+    "model": "deepseek-ai/DeepSeek-V4-Flash-0731"
+   },
+   "choose": {
+    "containing": "leave"
+   }
+  },
+  {
+   "match": {},
+   "choose": {
+    "containing": "leave"
+   }
+  }
+ ]
+}

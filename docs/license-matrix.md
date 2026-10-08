@@ -709,11 +709,13 @@ needs a new entry here first. The files, sizes and digests are in `THIRD_PARTY_N
 | Item | Licence | Where | Verdict |
 | --- | --- | --- | --- |
 | Minetest Game's player picture, `mods/player_api/models/character.png` (by Jordach, SHA-256 `351626fcb8155d6285315a213ff4ae668a9607a3eda776663512dd799ec8437a`), as the look a Luanti traveller wearing the game's own picture arrives in | CC BY-SA 3.0, as `mods/player_api/license.txt` of ContentDB release 38214 states it (SHA-256 `3726836be696070e5e66c58cc2f00f3ad901fca07dccc651c9df6291fc00da67`, read 2026-10-07) | Built at a deployment from the operator's own copy by `bridges/luanti/tools/build_look.py`, which refuses any other picture or licence file; admitted to a workspace's thing store at the digest the bridge's mapping file names; never committed, never in a shipped image | **SHIP-ATTRIB**, share-alike |
+| Minetest Game's item pictures, the ten `mods/default/textures/*.png` that `bridges/luanti/tools/items.v1.json` names and pins by SHA-256 (a book, paper, a coal lump, steel and gold ingots, a diamond, a mese crystal, a stick, a steel pickaxe, blueberries), as the looks and thing kinds a Luanti player's items cross as | CC BY-SA 3.0, each by the author `mods/default/README.md` of ContentDB release 38214 credits it to (SHA-256 `5165b9590f20d4e2068380177d78c17f4a94bed98c97ddf9cc893818006a55d3`, read 2026-10-08), under `mods/default/license.txt` (SHA-256 `bc382898f83c59701b9ca2ca3e21e82e34b4a9442f6d37332177caea61d32a43`) | Built at a deployment from the operator's own copy by `bridges/luanti/tools/build_items.py`, which refuses any other picture, credit file or licence file and any picture credited under another licence; admitted to a workspace's thing store at the digest a bridge's mapping file names; never committed, never in a shipped image | **SHIP-ATTRIB**, share-alike |
 
-The built look is an adaptation under CC BY-SA 3.0, or a later version with the same license
+Each built look is an adaptation under CC BY-SA 3.0, or a later version with the same license
 elements. Its origin names the author, the source, the licence and its address, sets
-`share_alike`, and states the change: close shades merged, each pixel a coloured face on the
-humanoid/v1 bones. Every display credits it: the thing card, the world's credits and a film's
+`share_alike`, and states the change: for the player picture, close shades merged, each pixel a
+coloured face on the humanoid/v1 bones; for an item picture, each opaque pixel a coloured box one
+pixel deep, and the item's thing kind carries the same origin. Every display credits it: the thing card, the world's credits and a film's
 credits. It is never relicensed and never mixed into the bytes of an Apache-2.0 or CC0 artifact,
 and an export or package refuses a share-alike look whose origin lacks its attribution. A player's
 own custom picture is never used: any other picture arrives in a CC0 look.

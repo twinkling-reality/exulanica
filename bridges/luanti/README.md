@@ -26,6 +26,7 @@ the next, so a deployment that pinned one keeps working: version 1 (profile
 | The world deciding for the character | The gate answers no ask about it; until the door hands a crossed character to a mind the world's owner chose, the world's routine settles each ask |
 | A character in the player's own look (the game's own player picture, built by `tools/build_look.py`) | The world shows it once its thing store holds the built look; until then the character arrives in the CC0 look |
 | Calling a character home from the game (`/comehome`; not `/home`, which Minetest Game's own `sethome` mod names a player's home point) | Works against the stand-in door, where the scripted check plays it; against the door once it publishes `POST /door/channel/home`, which the check then plays too. On a door without the route the player is told the world cannot call characters home yet |
+| A player's items crossing as themselves (a book, a diamond, a steel pickaxe: each its own look and kind, built by `tools/build_items.py` from the operator's copy) | Built and checked against the thing contract's readers; crossing waits for the door to read mapping profile v3, a workspace to admit item kinds, and the crossing's kind check to read them; until then items cross as mapping v2 says (a torch as a lantern, a sword) |
 | Invites (`/cross`, a code pasted into a masked form, for a server whose gate opens only by codes) | Works against the door's invite routes; the scripted check plays it with `--invite`: a code that opens nothing refused in words, the world's code opening the gate for that player, the same code refused the second time, then the crossing |
 
 ## Layout
@@ -36,8 +37,8 @@ the next, so a deployment that pinned one keeps working: version 1 (profile
 | `mod/exulanica_gate/adapter.json` | The adapter's version and the game fields it reads (with every item its mapping lists) |
 | `mod/exulanica_gate/mapping/` | The mapping files for each Luanti game, every published version kept |
 | `check/exulanica_gate_check/` | A test mod that plays a player on a headless server |
-| `run/` | `install.sh` unpacks the engine and the game; `check.py` runs the scripted check on its own stack or one already running (`--api`), or with `--play NAME` serves a world for a person; `serve.sh` and `play.sh` run the demo server and a window joined to it |
-| `tools/` | `build_look.py` builds a player's own look; `cross_once.py` makes one character cross into a running stack exactly as the mod would, with no game (for checking how a world shows it); `fake_door.py` is a stand-in door for checks; `fixtures.py` turns a recorded run into a fixture |
+| `run/` | `install.sh` unpacks the engine and the game; `check.py` runs the scripted check on its own stack or one already running (`--api`), with a scripted model where asked (`--scripted-model`, plans in `run/plans/`), lists the game's items (`--census`), or with `--play NAME` serves a world for a person; `serve.sh` and `play.sh` run the demo server and a window joined to it |
+| `tools/` | `build_look.py` builds a player's own look; `build_items.py` builds, from the hand-written `items.v1.json`, the look and thing kind each listed game item crosses as (see [the licence notes](LICENCE-NOTES.md)); `cross_once.py` makes one character cross into a running stack exactly as the mod would, with no game (for checking how a world shows it); `fake_door.py` is a stand-in door for checks; `fixtures.py` turns a recorded run into a fixture |
 | `fixtures/` | Exchanges recorded from real runs, which the repository's tests read |
 | `LICENCE-NOTES.md` | What the adapter uses of Luanti and Minetest Game, and their licences |
 

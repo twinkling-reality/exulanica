@@ -1,0 +1,211 @@
+{
+  "profile": "exulanica-gate.items/v1",
+  "game": {
+    "content": "Minetest Game",
+    "reference": "Minetest Game (https://content.luanti.org/packages/Minetest/minetest_game/)",
+    "revision": "ContentDB release 38214"
+  },
+  "credits_read_on": "2026-10-08",
+  "licence_file": {
+    "path": "mods/default/license.txt",
+    "sha256": "bc382898f83c59701b9ca2ca3e21e82e34b4a9442f6d37332177caea61d32a43"
+  },
+  "credit_files": {
+    "default": {
+      "path": "mods/default/README.md",
+      "sha256": "5165b9590f20d4e2068380177d78c17f4a94bed98c97ddf9cc893818006a55d3"
+    }
+  },
+  "items": [
+    {
+      "game_item": "default:book",
+      "picture": {
+        "path": "mods/default/textures/default_book.png",
+        "sha256": "7380472aec439e1424cfc9d91f4f9fc979e4b5c4d5501a1616ce5b770356c061"
+      },
+      "credit_file": "default",
+      "kind": "luanti_book",
+      "look": "luanti-book",
+      "label": "book",
+      "summary": "A book with a clasp, held in one hand.",
+      "words": "a book is a book here, and leaves as a book",
+      "mm_per_pixel": 16,
+      "grip": [
+        7,
+        8
+      ],
+      "axis": "+z"
+    },
+    {
+      "game_item": "default:paper",
+      "picture": {
+        "path": "mods/default/textures/default_paper.png",
+        "sha256": "8c1182a86175677b694c84960738e05d9008ae51076cefddfc05f729dffcba77"
+      },
+      "credit_file": "default",
+      "kind": "luanti_paper",
+      "look": "luanti-paper",
+      "label": "paper",
+      "summary": "A sheet of paper, held in one hand.",
+      "words": "paper is paper here, and leaves as paper",
+      "mm_per_pixel": 14,
+      "grip": [
+        8,
+        8
+      ],
+      "axis": "+z"
+    },
+    {
+      "game_item": "default:coal_lump",
+      "picture": {
+        "path": "mods/default/textures/default_coal_lump.png",
+        "sha256": "df88345ddf3c30cc6e9703a973ccc077c0d1a893a160e6e359b4f595db5aefd1"
+      },
+      "credit_file": "default",
+      "kind": "luanti_coal_lump",
+      "look": "luanti-coal-lump",
+      "label": "coal lump",
+      "summary": "A lump of coal, held in one hand.",
+      "words": "a coal lump is a coal lump here, and leaves as one",
+      "mm_per_pixel": 8,
+      "grip": [
+        7,
+        9
+      ],
+      "axis": "+z"
+    },
+    {
+      "game_item": "default:steel_ingot",
+      "picture": {
+        "path": "mods/default/textures/default_steel_ingot.png",
+        "sha256": "cbb71e7f969455c65c2914cda85328e77d82e0842273fbd284dd02401c979586"
+      },
+      "credit_file": "default",
+      "kind": "luanti_steel_ingot",
+      "look": "luanti-steel-ingot",
+      "label": "steel ingot",
+      "summary": "A bar of steel, held in one hand.",
+      "words": "a steel ingot is a steel ingot here, and leaves as one",
+      "mm_per_pixel": 10,
+      "grip": [
+        7,
+        8
+      ],
+      "axis": "+z"
+    },
+    {
+      "game_item": "default:gold_ingot",
+      "picture": {
+        "path": "mods/default/textures/default_gold_ingot.png",
+        "sha256": "484e30dca4bd553dd46172af4177032fd94a022200bff11f9146ee6953249d4b"
+      },
+      "credit_file": "default",
+      "kind": "luanti_gold_ingot",
+      "look": "luanti-gold-ingot",
+      "label": "gold ingot",
+      "summary": "A bar of gold, held in one hand.",
+      "words": "a gold ingot is a gold ingot here, and leaves as one",
+      "mm_per_pixel": 10,
+      "grip": [
+        7,
+        8
+      ],
+      "axis": "+z"
+    },
+    {
+      "game_item": "default:diamond",
+      "picture": {
+        "path": "mods/default/textures/default_diamond.png",
+        "sha256": "4ad77fd27fce83fbb86d468ae159d2befdc007dac2190503c7d12b13bc42cc71"
+      },
+      "credit_file": "default",
+      "kind": "luanti_diamond",
+      "look": "luanti-diamond",
+      "label": "diamond",
+      "summary": "A cut diamond, held in one hand.",
+      "words": "a diamond is a diamond here, and leaves as a diamond",
+      "mm_per_pixel": 4,
+      "grip": [
+        7,
+        8
+      ],
+      "axis": "+z"
+    },
+    {
+      "game_item": "default:mese_crystal",
+      "picture": {
+        "path": "mods/default/textures/default_mese_crystal.png",
+        "sha256": "8b4d0f364f51ca03b0c6eeaa0436193f9fdd708badc2ed5d99ac8ad818b50acf"
+      },
+      "credit_file": "default",
+      "kind": "luanti_mese_crystal",
+      "look": "luanti-mese-crystal",
+      "label": "mese crystal",
+      "summary": "A yellow crystal, held in one hand.",
+      "words": "a mese crystal is a mese crystal here, and leaves as one",
+      "mm_per_pixel": 6,
+      "grip": [
+        7,
+        8
+      ],
+      "axis": "+z"
+    },
+    {
+      "game_item": "default:stick",
+      "picture": {
+        "path": "mods/default/textures/default_stick.png",
+        "sha256": "a0f025ef8d281071815ab3d74d8bcd05fbff9d5c7838782b7860e711b2602420"
+      },
+      "credit_file": "default",
+      "kind": "luanti_stick",
+      "look": "luanti-stick",
+      "label": "stick",
+      "summary": "A wooden stick, held by one end.",
+      "words": "a stick is a stick here, and leaves as a stick",
+      "mm_per_pixel": 26,
+      "grip": [
+        3,
+        12
+      ],
+      "axis": "+z"
+    },
+    {
+      "game_item": "default:pick_steel",
+      "picture": {
+        "path": "mods/default/textures/default_tool_steelpick.png",
+        "sha256": "28d5e8914a75ee34a526b8e1759b3401b76a2b30dea38011939e8dbde4d643eb"
+      },
+      "credit_file": "default",
+      "kind": "luanti_steel_pickaxe",
+      "look": "luanti-steel-pickaxe",
+      "label": "steel pickaxe",
+      "summary": "A steel pickaxe, held by its handle.",
+      "words": "a steel pickaxe is a steel pickaxe here, and leaves as one",
+      "mm_per_pixel": 44,
+      "grip": [
+        2,
+        13
+      ],
+      "axis": "+z"
+    },
+    {
+      "game_item": "default:blueberries",
+      "picture": {
+        "path": "mods/default/textures/default_blueberries.png",
+        "sha256": "7b405740eb132b2c8b1f99014f2158be2e74a864a3f24f58c081329d46ce293e"
+      },
+      "credit_file": "default",
+      "kind": "luanti_blueberries",
+      "look": "luanti-blueberries",
+      "label": "blueberries",
+      "summary": "A handful of blueberries, held in one hand.",
+      "words": "blueberries are blueberries here, and leave as blueberries",
+      "mm_per_pixel": 6,
+      "grip": [
+        8,
+        12
+      ],
+      "axis": "+z"
+    }
+  ]
+}

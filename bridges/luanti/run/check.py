@@ -3,6 +3,7 @@
     <checkout>/.venv/bin/python bridges/luanti/run/check.py [--port-base 19520]
         [--luanti-port 19529] [--minutes-speed 1] [--lives-s 20] [--keep-stack] [--scene FILE]
         [--against stack|fake] [--play NAME [--carry ITEMS]] [--invite] [--traveller-mind]
+        [--scripted-model PLAN]
     <checkout>/.venv/bin/python bridges/luanti/run/check.py --api URL --token-file FILE
         --record FILE [--scene FILE] [--luanti-port 19529] [--minutes-speed 1] [--lives-s 20]
         [--play NAME [--carry ITEMS]] [--traveller-mind]
@@ -33,7 +34,10 @@ What it does, in order, refusing by name at the first thing that is not as expec
     down (``--keep-stack`` leaves the stack up for a look in the browser).
 
 ``--against fake`` runs the same crossing against ``tools/fake_door.py`` instead, with no stack;
-``--play NAME`` serves the world for a person to play in.
+``--play NAME`` serves the world for a person to play in. ``--scripted-model PLAN`` serves the
+stack's API with ``scripts/acceptance/scripted_model.py`` answering every model request from PLAN
+(``run/plans/``: the travellers' mind waits, or leaves), with no provider, key or cost; the run
+keeps what it was asked and chose.
 
 ``--api URL --token-file FILE --record FILE`` joins a stack this check did not start, where a scene
 was built for a take: it starts and stops no stack and builds nothing. That stack was started with
@@ -296,6 +300,21 @@ def play(api: Api, world: dict[str, Any], speed: int) -> dict[str, Any]:
     return {"speed": speed, "played_by_this_check": True}
 
 
+def scripted_record(run_dir: Path, folder: Path) -> dict[str, Any]:
+    """What a scripted model was asked and chose in a run (the model, the rule and the option,
+    never a header or a body), from the launcher's record of the run, which its run directory keeps
+    once the stack is down; the call log is copied into the run folder."""
+    try:
+        scripted = json.loads((run_dir / "state.json").read_text())["scripted_model"]
+    except (OSError, KeyError, ValueError):
+        return {"read": False}
+    asked = Path(scripted["log"])
+    calls = asked.read_text().splitlines() if asked.exists() else []
+    if calls:
+        shutil.copy(asked, folder / "scripted-model-calls.jsonl")
+    return {"plan_sha256": scripted["plan_sha256"], "calls": len(calls)}
+
+
 def close_grant(api: Api, grant_id: str) -> bool:
     """End the grant this check issued, in a world it did not build: revoking twice changes
     nothing. False when the stack did not answer."""
@@ -416,7 +435,7 @@ def start_luanti(
     )
 
 
-def run_luanti(folder: Path, world: Path, port: int, credential: str, limit_s: int) -> int:
+def run_luanti(folder: Path, world: Path, port: int, credential: str | None, limit_s: int) -> int:
     """``luanti --server`` on ``world`` until it stops, at most ``limit_s`` seconds."""
     server = start_luanti(folder, world, port, credential)
     try:
@@ -561,6 +580,36 @@ def against_fake_door(arguments: argparse.Namespace, folder: Path) -> dict[str, 
     return summary
 
 
+def take_census(arguments: argparse.Namespace) -> int:
+    """The check mod's census on a fresh world with no door and no credential: the game's craft
+    items and tools, each with its type, inventory picture, groups and stack size, copied into the
+    run folder (ignored, never committed: it names the game's own pictures)."""
+    folder = CHECKOUT / ".exulanica" / "luanti-checks" / time.strftime("%Y%m%d-%H%M%S-census")
+    folder.mkdir(parents=True)
+    world = luanti_world(folder, arguments.luanti_port, "http://127.0.0.1:1", "census")
+    exit_code = run_luanti(folder, world, arguments.luanti_port, None, 120)
+    written = world / "exulanica_gate_check" / "census.json"
+    if not written.exists():
+        raise Refused("census", f"no census written; see {folder}/server.log")
+    shutil.copy(written, folder / "census.json")
+    items = json.loads(written.read_text())["items"]
+    print(
+        json.dumps(
+            {
+                "run_folder": str(folder),
+                "luanti_exit": exit_code,
+                "items": len(items),
+                "by_type": {
+                    kind: sum(1 for item in items if item["type"] == kind)
+                    for kind in sorted({item["type"] for item in items})
+                },
+            },
+            indent=2,
+        )
+    )
+    return 0
+
+
 def play_until_stopped(
     arguments: argparse.Namespace,
     folder: Path,
@@ -643,6 +692,19 @@ def main(argv: list[str] | None = None) -> int:
         "home, unless the world's minds lead it home first",
     )
     parser.add_argument(
+        "--scripted-model",
+        metavar="PLAN",
+        type=Path,
+        help="serve the stack's API with a scripted model answering from PLAN (no provider, no "
+        "key, no cost): with --traveller-mind, the travellers' mind is asked of it",
+    )
+    parser.add_argument(
+        "--census",
+        action="store_true",
+        help="list the game's items (craft items and tools), for choosing by hand which may cross "
+        "as themselves; starts no stack and no gate",
+    )
+    parser.add_argument(
         "--api",
         metavar="URL",
         help="join a stack this check did not start, at its API's address, with --token-file and "
@@ -660,10 +722,20 @@ def main(argv: list[str] | None = None) -> int:
     joined = arguments.api is not None
     if [arguments.token_file is not None, arguments.record is not None] != [joined, joined]:
         parser.error("--api, --token-file and --record go together")
-    if joined and (arguments.against == "fake" or arguments.keep_stack or arguments.invite):
+    if joined and (
+        arguments.against == "fake"
+        or arguments.keep_stack
+        or arguments.invite
+        or arguments.scripted_model
+    ):
         # An invite is redeemed with the bridge's own credential, which whoever declared the bridge
-        # on that stack holds.
-        parser.error("--api joins a running stack: no --against fake, --keep-stack or --invite")
+        # on that stack holds; the stack's model is whoever started it.
+        parser.error(
+            "--api joins a running stack: no --against fake, --keep-stack, --invite or "
+            "--scripted-model"
+        )
+    if arguments.census:
+        return take_census(arguments)
     if not joined:
         arguments.scene = arguments.scene or newest_demo_scene()
     if arguments.against == "fake":
@@ -724,6 +796,11 @@ def main(argv: list[str] | None = None) -> int:
         ]
         declared = folder / "door-bridges.json"
         declared.write_text(json.dumps(bridges))
+        scripted_api = (
+            ["--scripted-model", str(arguments.scripted_model.resolve())]
+            if arguments.scripted_model
+            else []
+        )
         started = launch(
             "up",
             "--port-base",
@@ -733,6 +810,7 @@ def main(argv: list[str] | None = None) -> int:
             "--door-bridges",
             str(declared),
             "--society-of-things",
+            *scripted_api,
         )
         state = json.loads(started[: started.rindex("}") + 1])
     try:
@@ -883,6 +961,8 @@ def main(argv: list[str] | None = None) -> int:
                 summary["grant_closed"] = close_grant(api, summary["grant_id"])
         elif not arguments.keep_stack:
             launch("down")
+            if arguments.scripted_model:
+                summary["scripted_model"] = scripted_record(Path(state["run_dir"]), folder)
         (folder / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
     checks = summary.get("check", {}).get("checks", [])
     failed = [entry for entry in checks if not entry["ok"]]

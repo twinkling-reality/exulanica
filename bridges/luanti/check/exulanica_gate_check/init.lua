@@ -184,6 +184,36 @@ local lives_s = tonumber(core.settings:get("exulanica_gate_check.lives_s")) or 2
 local adapter_file = assert(io.open(core.get_modpath("exulanica_gate") .. "/adapter.json"))
 local FREE_LOOK = core.parse_json(adapter_file:read("*a")).looks.otherwise
 adapter_file:close()
+
+-- census: no crossing, the game's items, for choosing by hand which may cross as themselves. Each
+-- craft item and tool (a block is a piece of the game's world, not a thing in a hand) with its
+-- type, inventory picture, groups and stack size goes to <world>/exulanica_gate_check/census.json,
+-- and the server stops.
+if scenario == "census" then
+	core.after(0, function()
+		local items = {}
+		for name, definition in pairs(core.registered_items) do
+			if definition.type == "craft" or definition.type == "tool" then
+				local groups = {}
+				for group, value in pairs(definition.groups or {}) do
+					groups[#groups + 1] = group .. "=" .. tostring(value)
+				end
+				table.sort(groups)
+				items[#items + 1] = {name = name, type = definition.type,
+					inventory_image = definition.inventory_image or "", groups = groups,
+					stack_max = definition.stack_max}
+			end
+		end
+		table.sort(items, function(a, b) return a.name < b.name end)
+		local folder = core.get_worldpath() .. "/exulanica_gate_check"
+		core.mkdir(folder)
+		local file = assert(io.open(folder .. "/census.json", "w"))
+		file:write(core.write_json({profile = "exulanica-gate.census/v1", items = items}, true))
+		file:close()
+		core.request_shutdown("census written", false, 0)
+	end)
+	return
+end
 -- Read once, in a check world only; typed into the form as a player pastes it, never logged.
 local invite_code = scenario == "crossing_invite" and os.getenv("EXULANICA_GATE_CHECK_INVITE") or nil
 -- Forms shown before the player walks in (an invite's form): none may be added while away.

@@ -12,6 +12,10 @@ adapter's own code:
     (a player's own picture, built at a deployment and never committed) states its credit and the
     picture's digest the builder pins, and the builder makes a look the thing contract reads from
     any 64 by 32 picture, putting the picture's left on the character's right;
+*   the item builder makes a look and a kind the thing contract reads from any 16 by 16 picture,
+    indexed colour included, crediting it by the game's own media file and refusing an unpinned
+    picture, a picture that file does not credit and any licence but CC BY-SA 3.0; the hand-written
+    item list names each game item, kind and look once, none a key the library ships;
 *   at most one game item per kind travels out, so a departing thing's game item is never a guess;
 *   the mod decides nothing for a character that crossed: in a recorded run it posted only its
     hello, its arrivals and its delivery reports, each valid against the door's own request models,
@@ -294,6 +298,190 @@ def test_the_builder_refuses_any_other_picture(tmp_path):
     (folder / builder.LICENCE_FILE).write_text("a licence file")
     with pytest.raises(SystemExit, match="no other skin is used"):
         builder.build(folder)
+
+
+@functools.cache
+def _items_builder() -> Any:
+    """``bridges/luanti/tools/build_items.py``, the maker of the items' looks and kinds."""
+    spec = importlib.util.spec_from_file_location(
+        "luanti_build_items", ADAPTER / "tools" / "build_items.py"
+    )
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def _indexed_png(
+    width: int, height: int, palette: list[tuple[int, int, int, int]], index: Any
+) -> bytes:
+    """A 4-bit indexed PNG, its palette's alpha in tRNS, row filter Sub on every row."""
+    rows = b""
+    for v in range(height):
+        packed = bytearray()
+        for u in range(0, width, 2):
+            packed.append((index(u, v) << 4) | index(u + 1, v))
+        filtered = bytearray(packed)
+        for i in range(len(packed) - 1, 0, -1):
+            filtered[i] = (packed[i] - packed[i - 1]) & 0xFF
+        rows += b"\x01" + bytes(filtered)
+
+    def chunk(kind: bytes, body: bytes) -> bytes:
+        return (
+            struct.pack(">I", len(body))
+            + kind
+            + body
+            + struct.pack(">I", zlib.crc32(kind + body) & 0xFFFFFFFF)
+        )
+
+    return (
+        b"\x89PNG\r\n\x1a\n"
+        + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 4, 3, 0, 0, 0))
+        + chunk(b"PLTE", b"".join(bytes(colour[:3]) for colour in palette))
+        + chunk(b"tRNS", bytes(colour[3] for colour in palette))
+        + chunk(b"IDAT", zlib.compress(rows))
+        + chunk(b"IEND", b"")
+    )
+
+
+#: A synthetic item: a clear background, a red square two pixels in from each side but the top, and
+#: one green pixel; the palette's first colour is fully transparent.
+ITEM_PALETTE = [(0, 0, 0, 0), (200, 30, 30, 255), (20, 160, 40, 255)]
+
+
+def _item_index(u: int, v: int) -> int:
+    if (u, v) == (5, 13):
+        return 2
+    return 1 if 2 <= u <= 13 and 4 <= v <= 13 else 0
+
+
+def _item_game(folder: Path, credit: str = "Someone (CC BY-SA 3.0):\n\n- `thing.png`\n") -> dict:
+    """A game folder with one picture, a credit file and a licence file, and the item list pinning
+    them, as ``tools/items.v1.json`` pins the operator's copy."""
+    picture = _indexed_png(16, 16, ITEM_PALETTE, _item_index)
+    (folder / "textures").mkdir(parents=True)
+    (folder / "textures" / "thing.png").write_bytes(picture)
+    (folder / "README.md").write_text("# A mod\n\n## Textures\n\n" + credit)
+    (folder / "license.txt").write_text("a licence file")
+
+    def pin(path: str) -> dict:
+        import hashlib
+
+        return {"path": path, "sha256": hashlib.sha256((folder / path).read_bytes()).hexdigest()}
+
+    return {
+        "profile": "exulanica-gate.items/v1",
+        "game": {"content": "A game", "reference": "A game (an address)", "revision": "a release"},
+        "credits_read_on": "2026-10-08",
+        "licence_file": pin("license.txt"),
+        "credit_files": {"mod": pin("README.md")},
+        "items": [
+            {
+                "game_item": "mod:thing",
+                "picture": pin("textures/thing.png"),
+                "credit_file": "mod",
+                "kind": "test_thing",
+                "look": "test-thing",
+                "label": "thing",
+                "summary": "A thing, held in one hand.",
+                "words": "a thing is a thing here, and leaves as a thing",
+                "mm_per_pixel": 10,
+                "grip": [7, 10],
+                "axis": "+z",
+            }
+        ],
+    }
+
+
+def test_the_item_builder_reads_an_indexed_picture_with_its_transparency():
+    builder = _items_builder()
+    width, height, pixels = builder.read_png(_indexed_png(16, 16, ITEM_PALETTE, _item_index))
+    assert (width, height) == (16, 16)
+    assert pixels[0] == (0, 0, 0, 0)
+    assert pixels[4 * 16 + 2] == (200, 30, 30, 255)
+    assert pixels[13 * 16 + 5] == (20, 160, 40, 255)
+
+
+def test_the_item_builder_makes_a_look_and_kind_the_thing_contract_reads(tmp_path):
+    builder = _items_builder()
+    items = _item_game(tmp_path)
+    container, look, kind, entry = builder.build_item(tmp_path, items["items"][0], items)
+    # read_look and read_thing_kind passed inside; the same picture writes the same bytes.
+    assert container == builder.build_item(tmp_path, items["items"][0], items)[0]
+    assert look["look_kind"] == "static" and look["sampling"] == "nearest"
+    # Twelve columns and ten rows of 10 mm, as deep as the contract's thinnest side, held by the
+    # middle of pixel (7, 10): half a pixel left of the square's middle (columns 2 to 13), 35 mm
+    # above its bottom row's foot.
+    assert kind["body"]["box_mm"] == {"width": 120, "depth": 10, "height": 100}
+    grip = kind["offers"][0]["parameters"]["grip"]
+    assert (grip["x_mm"], grip["y_mm"], grip["z_mm"]) == (-5, 0, 35)
+    assert kind["looks"] == [
+        {"look": "test-thing", "version": 1, "sha256": entry["look"]["sha256"]}
+    ]
+    assert entry["kind"]["sha256"] == sha256_of_canonical(kind).hex()
+    assert entry["source_sha256"] == items["items"][0]["picture"]["sha256"]
+    origin = read_origin(look["origin"])
+    assert origin.share_alike and origin.spdx == "CC-BY-SA-3.0"
+    assert look["origin"]["authors"] == ["Someone"]
+    for text in (look["origin"]["licence"]["attribution"], kind["summary"], entry["words"]):
+        assert check_line(text, maximum=200) == text
+
+
+def test_the_item_builder_refuses_an_unpinned_picture(tmp_path):
+    builder = _items_builder()
+    items = _item_game(tmp_path)
+    (tmp_path / "textures" / "thing.png").write_bytes(
+        _indexed_png(16, 16, ITEM_PALETTE, lambda u, v: 1)
+    )
+    with pytest.raises(SystemExit, match="no other is used"):
+        builder.build_item(tmp_path, items["items"][0], items)
+
+
+@pytest.mark.parametrize(
+    ("credit", "refusal"),
+    [
+        ("Someone (CC BY 3.0):\n\n- `thing.png`\n", "not CC BY-SA 3.0"),
+        ("Someone (CC BY-SA 3.0):\n\n- `other.png`\n", "names no author for thing.png"),
+    ],
+    ids=["another licence", "not credited"],
+)
+def test_the_item_builder_takes_author_and_licence_from_the_credit_file(tmp_path, credit, refusal):
+    builder = _items_builder()
+    items = _item_game(tmp_path, credit)
+    with pytest.raises(SystemExit, match=refusal):
+        builder.build_item(tmp_path, items["items"][0], items)
+
+
+def test_a_credit_file_credits_by_pattern_and_by_its_line_for_everything_else():
+    builder = _items_builder()
+    text = (
+        "## Authors of media\n\nEverything not listed in here:\n"
+        "First Author <first@example.org> (CC BY-SA 3.0)\n\n## Textures\n\n"
+        "Second (CC BY-SA 3.0):\n\n- `tool_*.png`\n\nCreated by Third (CC BY 3.0):\n\n"
+        "- `bread.png`\n"
+    )
+    assert builder.credit_of(text, "tool_pick.png") == builder.Credit("Second", "CC BY-SA 3.0", 10)
+    assert builder.credit_of(text, "bread.png") == builder.Credit("Third", "CC BY 3.0", 14)
+    assert builder.credit_of(text, "ingot.png") == builder.Credit("First Author", "CC BY-SA 3.0", 4)
+
+
+def test_the_items_list_names_each_game_item_kind_and_look_once():
+    builder = _items_builder()
+    items = builder.read_items(builder.ITEMS)
+    entries = items["items"]
+    for field in ("game_item", "kind", "look"):
+        assert len({entry[field] for entry in entries}) == len(entries), field
+    shipped_kinds = {path.name.split(".v")[0] for path in KINDS.glob("*.json")}
+    shipped_looks = {path.name.split(".v")[0] for path in LOOKS.glob("*.json")}
+    assert not {entry["kind"] for entry in entries} & shipped_kinds
+    assert not {entry["look"] for entry in entries} & shipped_looks
+    for entry in entries:
+        assert re.fullmatch(r"[0-9a-f]{64}", entry["picture"]["sha256"]), entry["game_item"]
+        assert entry["credit_file"] in items["credit_files"]
+        assert entry["mm_per_pixel"] % 2 == 0 and 0 <= min(entry["grip"]) <= max(entry["grip"]) < 16
+        for text in (entry["label"], entry["summary"], entry["words"]):
+            assert check_line(text, maximum=200) == text
 
 
 def test_the_catalog_check_refuses_a_look_it_does_not_hold():

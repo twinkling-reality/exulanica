@@ -22,3 +22,13 @@ adaptation under CC BY-SA 3.0, credited wherever it is shown, never committed, n
 shipped image and never mixed into an Apache-2.0 or CC0 file ([licence matrix](../../docs/license-matrix.md),
 section 14). A player in any other picture arrives in a CC0 look, and the crossing's manifest says
 why.
+
+A player's items cross as themselves on the same terms. `tools/build_items.py` builds, at a
+deployment, from the operator's own copy, a look and a thing kind for each item the hand-written
+list `tools/items.v1.json` names: its 16 by 16 inventory picture, each opaque pixel a coloured box.
+It refuses any picture, credit file or licence file other than the ones the list pins by SHA-256,
+reads each picture's author and licence from the game's own media credits (`mods/default/README.md`,
+named by digest with the day it was read), and builds nothing from a picture credited under any
+licence but CC BY-SA 3.0. Each look and kind is an adaptation under CC BY-SA 3.0 crediting that
+author, never committed, never part of a shipped image and never mixed into an Apache-2.0 or CC0
+file. The list itself names the game's item identifiers, picture paths and digests as data.
