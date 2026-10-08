@@ -44,9 +44,10 @@ const MOVE_KEY = 'ArrowRight';
 // signing in (N1.k), the journey follows (N1.j), and Your worlds with two worlds and Create a world
 // close it (N1.l), so neither changes the world the journey uses. N1.l's town is then opened in each
 // look (N1.m), its values shown in Create a world (N1.n) and its look chosen in the Look sheet (N1.o);
-// last, what the shell states of the look that Use drew (N1.p), so a failure of it stops nothing else.
+// then what the shell states of the look that Use drew (N1.p) and browsing looks live (N1.q).
 const STEPS = ['worlds-first', 'journey-open', 'journey-stall', 'journey-people', 'journey-bench',
-  'journey-response', 'journey-why', 'worlds-create', 'worlds-look', 'worlds-values', 'worlds-look-sheet', 'worlds-look-stated'];
+  'journey-response', 'journey-why', 'worlds-create', 'worlds-look', 'worlds-values', 'worlds-look-sheet', 'worlds-look-stated',
+  'worlds-look-browse'];
 // The second saved world N1.l makes through the API, so Your worlds lists two.
 const SECOND_WORLD_TITLE = 'Q10 second world';
 const SECOND_WORLD_RECIPE = 'small_town';
@@ -433,6 +434,36 @@ const STEP_HANDLERS = {
     const reopened = await settled(named);
     ctx.observe('stated-after-reopening', sameLook(reopened, named), { stated: reopened, expected: named });
     await ctx.screenshot('look-stated', 'the town opened again in the look it names');
+  },
+  async 'worlds-look-browse'(ctx) {
+    // N1.q (A-81): the town open in cozy (N1.p reopened it); the Look sheet open and live, resting on
+    // the toon card draws the town in toon; Escape closes the sheet and draws the world's own cozy.
+    const town = ctx.facts.town_entry_id;
+    const SHEET = `document.querySelector('section.look-sheet')`;
+    const lookIs = (pack, source) => `(() => { const v = ${WORLD_LOOK}; if (!v) return null;
+      const r = JSON.parse(v); return r.pack === ${JSON.stringify(pack)} && r.source === ${JSON.stringify(source)} && r.drawn ? v : null; })()`;
+    await ctx.page.key('KeyO', 'o', { text: 'o' });
+    await ctx.page.click(ACTION('look.open'), 'Change look');
+    const live = await ctx.page.waitFor(`${SHEET}?.dataset.live ?? null`, SETTLE_MS, 'the Look sheet to say whether it is live');
+    ctx.observe('sheet-is-live', live === 'true', { live });
+    await ctx.page.click(`${SHEET}.querySelector('button.look-sheet-card[data-pack-id="exulanica.toon-town"]')`, 'the toon look');
+    const browsed = await ctx.page.waitFor(lookIs('exulanica.toon-town', 'redraw'), SETTLE_MS * 2, 'the town drawn in toon')
+      .catch(() => null);
+    ctx.observe('resting-draws-the-look', browsed !== null, { stated: browsed === null ? await ctx.page.evaluate(WORLD_LOOK) : JSON.parse(browsed) });
+    await ctx.screenshot('browsing-toon', 'the town drawn in toon behind the Look sheet');
+    await ctx.page.key('Escape', 'Escape');
+    const restored = await ctx.page.waitFor(lookIs('exulanica.cozy-town', 'redraw'), SETTLE_MS * 2, 'the town drawn in its own look again')
+      .catch(() => null);
+    const closed = await ctx.page.evaluate(`!(${SHEET}?.checkVisibility() ?? false)`);
+    ctx.observe('escape-restores-the-world-look', restored !== null && closed,
+      { stated: restored === null ? await ctx.page.evaluate(WORLD_LOOK) : JSON.parse(restored), closed });
+    const entry = (await ctx.api('GET', `/world-entries/${town}`)).body;
+    const query = `?world_id=${encodeURIComponent(entry?.world_id ?? '')}`;
+    const versions = (await ctx.api('GET', `/world/styles/versions${query}`)).body ?? [];
+    const named = versions.find((v) => v.version_id === entry?.style_version_id) ?? null;
+    ctx.observe('entry-still-names-cozy', named?.style_pack?.pack_id === 'exulanica.cozy-town',
+      { style_version_id: entry?.style_version_id ?? null, style_pack: named?.style_pack ?? null });
+    await ctx.screenshot('browse-closed', 'the town in its own look after Escape');
   },
   async 'journey-open'(ctx) {
     await open(ctx);

@@ -9,6 +9,9 @@
     .venv/bin/python scripts/acceptance/domain_rows.py packs       --worktree PATH --out DIR
     .venv/bin/python scripts/acceptance/domain_rows.py kinds       --worktree PATH --out DIR
     .venv/bin/python scripts/acceptance/domain_rows.py references  --worktree PATH --out DIR
+    .venv/bin/python scripts/acceptance/domain_rows.py things      --worktree PATH --out DIR
+    .venv/bin/python scripts/acceptance/domain_rows.py door        --worktree PATH --out DIR
+    .venv/bin/python scripts/acceptance/domain_rows.py guests      --worktree PATH --out DIR
 
 Each subcommand checks rows against the stack ``launch.py up`` started for ``--worktree``,
 restarts that stack's API with ``launch.py restart-api`` where a row needs a fresh process, and
@@ -35,6 +38,17 @@ leaves the stack running:
   --no-derivative-worker``.
 - ``references``: R1 (reference notes where the installation does not offer them). The stack is
   started with ``--workspaces 2 --read-only-token --no-derivative-worker`` and no reference worker.
+- ``things``: T1 (the shipped thing library), T2 (a placed thing) and SC1 (the demo scene built
+  through the public routes). Any stack with two workspaces.
+- ``door``: D1 (the door's grants for an outside program). The stack is started with ``--workspaces
+  2 --read-only-token --no-derivative-worker --door-bridges FILE``, FILE holding AGENTS' example
+  bridge entry as shipped.
+- ``guests``: V1 (a guest enters by the run's code, through the local HTTPS edge, and the model
+  chosen for its people spends from its own allowance). The stack is started with
+  ``--accounts-guest-code --edge-port PORT --tiles --scripted-model
+  scripts/acceptance/plans/comparisons.json --spending durable --society-playback
+  --no-derivative-worker``; the driver trusts the edge's root
+  certificate in its own process only, and never writes the code or a session's CSRF token.
 - ``packs``: S1 (the committed style pack library the host serves, against the committed files)
   and S2 (a world's appearance naming its pack). Any stack with two workspaces.
 - ``kinds``: W1 (a creator's world kind kept in its workspace), W2 (a world of a kind, its site
@@ -64,6 +78,8 @@ import importlib.util
 import json
 import os
 import re
+import secrets
+import ssl
 import struct
 import subprocess
 import sys
@@ -395,6 +411,38 @@ def independent_reader(
     }
 
 
+#: A comparison start's states, in the order the host moves it (A-91).
+START_STATES = ("waiting", "running", "finished")
+
+
+def same_start(first: Any, again: Any) -> bool:
+    """Whether a resent start answered the same comparison: the same document but each start's
+    state, which may have moved on between the two sends (A-91)."""
+
+    def states_and_rest(document: Any) -> tuple[list[Any], Any]:
+        if not isinstance(document, dict):
+            return [], document
+        rest = json.loads(json.dumps(document))
+        states = []
+        for comparison in rest.get("comparisons") or []:
+            start = comparison.get("start") if isinstance(comparison, dict) else None
+            states.append(start.pop("state", None) if isinstance(start, dict) else None)
+        return states, rest
+
+    before, rest_first = states_and_rest(first)
+    after, rest_again = states_and_rest(again)
+    return (
+        rest_first == rest_again
+        and len(before) == len(after)
+        and all(
+            a in START_STATES
+            and b in START_STATES
+            and START_STATES.index(b) >= START_STATES.index(a)
+            for a, b in zip(before, after, strict=True)
+        )
+    )
+
+
 def row_h1(stack: Stack, transcripts: Any, out: Path) -> tuple[Row, dict[str, Any]]:
     row = Row(
         "H1",
@@ -443,7 +491,7 @@ def row_h1(stack: Stack, transcripts: Any, out: Path) -> tuple[Row, dict[str, An
         "H1", "POST", comparisons_path(entry), query=F.world_query(entry), body=body
     )
     row.expect(
-        status_again in (200, 201) and again == start,
+        status_again in (200, 201) and same_start(start, again),
         f"the same start sent again answered {status_again} {F.problem_code(again)}",
     )
     read = played(w1, "H1", entry, comparison)
@@ -4526,6 +4574,882 @@ def references(arguments: argparse.Namespace) -> int:
     return 0 if all(row.status != "failed" for row in rows) else 1
 
 
+# -- T1, T2 and SC1: the thing library, a placed thing, and the demo scene ---------------------------
+
+#: The committed thing library as files (A-77): kinds, looks and the body plans, and where an
+#: imported look's container is committed.
+THING_CATALOGS = Path("assets") / "catalogs" / "things"
+IMPORTED_THINGS = Path("assets") / "things"
+#: The shipped kind T2 places, and the demo scene SC1 builds (A-78, A-79).
+T2_KIND = {"kind": "sword", "version": 3}
+DEMO_SCENE = Path("scripts") / "demo" / "scenes" / "three-strangers.v1.json"
+DEMO_BUILDER = Path("scripts") / "demo" / "build_scene.py"
+
+
+def canonical_document(raw: bytes) -> bytes:
+    """A committed document as the library names it: canonical JSON, keys sorted, no whitespace,
+    UTF-8 (A-77)."""
+    return json.dumps(
+        json.loads(raw), sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    ).encode()
+
+
+def committed_things(worktree: Path) -> dict[str, Any]:
+    """The committed kinds and looks, each with its canonical bytes and document, the body plans'
+    bytes, and every imported container by name."""
+    root = worktree / THING_CATALOGS
+
+    def read(folder: str) -> dict[tuple[str, int], dict[str, Any]]:
+        found = {}
+        for path in sorted((root / folder).glob("*.json")):
+            raw = path.read_bytes()
+            document = json.loads(raw)
+            key = (document.get("kind") or document.get("look"), document.get("version"))
+            found[key] = {"canonical": canonical_document(raw), "document": document}
+        return found
+
+    return {
+        "kinds": read("kinds"),
+        "looks": read("looks"),
+        "body_plans": (root / "body-plans.v1.json").read_bytes(),
+        "imported": {
+            path.name: path.read_bytes()
+            for path in sorted((worktree / IMPORTED_THINGS).rglob("*.glb"))
+        },
+    }
+
+
+def licensed(document: Mapping[str, Any]) -> bool:
+    """Whether a document's origin names a licence by SPDX id and verdict, and either a source or
+    an authored origin (A-77)."""
+    origin = document.get("origin") or {}
+    licence = origin.get("licence") or {}
+    return (
+        bool(licence.get("spdx"))
+        and bool(licence.get("verdict"))
+        and (origin.get("class") == "authored" or bool(origin.get("sources")))
+    )
+
+
+def row_t1(stack: Stack, transcripts: Any, worktree: Path) -> Row:
+    row = Row(
+        "T1",
+        "things.library",
+        "GET /things/library lists exactly the committed kinds and looks by id, version and the "
+        "SHA-256 of their canonical JSON, the same for both workspaces; each is served by that "
+        "digest as those bytes, the body plans as their file, every look's container at the digest "
+        "it pins (an imported one equal to its committed file), marked immutable; an unknown digest "
+        "is 404 unknown_reference; no session is 401; every kind and look names its licence and a "
+        "source or an authored origin; the KayKit knight and sword are imported, CC0-1.0, by Kay "
+        "Lousberg.",
+    )
+    w1 = F.client(stack, transcripts, "w1", "token")
+    w2 = F.client(stack, transcripts, "w2", "token-2")
+    committed = committed_things(worktree)
+    status, listing = w1.call("T1", "GET", "/things/library")
+    _, theirs = w2.call("T1", "GET", "/things/library")
+    row.expect(status == 200 and listing == theirs, f"the listing answered {status}, or differs")
+
+    def keyed(entries: Any, name: str) -> dict[tuple[str, int], str]:
+        return {(e.get(name), e.get("version")): e.get("sha256") for e in entries or []}
+
+    for folder, name in (("kinds", "kind"), ("looks", "look")):
+        listed = keyed(listing.get(folder), name)
+        wanted = {
+            key: hashlib.sha256(item["canonical"]).hexdigest()
+            for key, item in committed[folder].items()
+        }
+        row.expect(listed == wanted, f"the {folder} listed differ from the committed ones")
+    served: list[dict[str, Any]] = []
+
+    def fetch(digest: str) -> tuple[int, str, str, bytes]:
+        status_item, headers, body = raw_call(stack, "token", "GET", f"/things/library/{digest}")
+        named = {k.lower(): v for k, v in headers.items()}
+        return (
+            status_item,
+            named.get("content-type", "").split(";")[0],
+            named.get("cache-control", ""),
+            body,
+        )
+
+    for folder in ("kinds", "looks"):
+        for key, item in committed[folder].items():
+            digest = hashlib.sha256(item["canonical"]).hexdigest()
+            got, kind, cache, body = fetch(digest)
+            ok = got == 200 and body == item["canonical"] and "immutable" in cache
+            row.expect(ok, f"{folder} {key} answered {got}")
+            row.expect(licensed(item["document"]), f"{folder} {key} names no licence and source")
+            served.append({"item": f"{folder} {key}", "status": got, "equal": ok})
+    plans = hashlib.sha256(committed["body_plans"]).hexdigest()
+    got, _, _, body = fetch(plans)
+    row.expect(
+        got == 200
+        and body == committed["body_plans"]
+        and (listing.get("body_plans") or {}).get("sha256") == plans,
+        f"the body plans answered {got}",
+    )
+    containers = 0
+    mutant_fails = None
+    for key, item in committed["looks"].items():
+        container = item["document"].get("container")
+        if not container:
+            continue
+        containers += 1
+        got, kind, _, body = fetch(container["sha256"])
+        row.expect(
+            got == 200
+            and kind == "model/gltf-binary"
+            and hashlib.sha256(body).hexdigest() == container["sha256"],
+            f"look {key}'s container answered {got} {kind}",
+        )
+        if item["document"].get("origin", {}).get("class") == "imported":
+            files = [
+                data
+                for data in committed["imported"].values()
+                if hashlib.sha256(data).hexdigest() == container["sha256"]
+            ]
+            row.expect(
+                len(files) == 1 and body == files[0],
+                f"look {key}'s container is not its committed file",
+            )
+            if mutant_fails is None and files:
+                mutant_fails = body != bytes([files[0][0] ^ 1]) + files[0][1:]
+    row.expect(bool(mutant_fails), "the container check passed with one byte changed")
+    for name in ("kaykit-knight", "kaykit-sword"):
+        document = (committed["looks"].get((name, 1)) or {}).get("document") or {}
+        origin = document.get("origin") or {}
+        row.expect(
+            origin.get("class") == "imported"
+            and (origin.get("licence") or {}).get("spdx") == "CC0-1.0"
+            and "Kay Lousberg" in (origin.get("authors") or []),
+            f"{name} states origin {origin.get('class')} {(origin.get('licence') or {}).get('spdx')}",
+        )
+    unknown = hashlib.sha256(b"q10 t1 no such thing").hexdigest()
+    got, _, _, body = fetch(unknown)
+    code = (json.loads(body or b"{}") if got == 404 else {}).get("code")
+    row.expect(
+        got == 404 and code == "unknown_reference", f"an unknown digest answered {got} {code}"
+    )
+    anonymous = unauthenticated(stack, "/things/library")
+    row.expect(anonymous == 401, f"no session was answered {anonymous}")
+    row.observed = {
+        "kinds": len(committed["kinds"]),
+        "looks": len(committed["looks"]),
+        "served": len(served),
+        "served_equal": sum(item["equal"] for item in served),
+        "containers": containers,
+        "unknown": [got, code],
+        "anonymous": anonymous,
+        "mutant_one_byte_fails": mutant_fails,
+    }
+    return row.close()
+
+
+def thing_pose(where: str) -> dict[str, int]:
+    x, y, z = F.PLACES[where]
+    return {"x_mm": x, "y_mm": y, "z_mm": z, "yaw_microradians": 0}
+
+
+def saved_entry_binding(entry: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        "entry_id": entry["entry_id"],
+        "base_revision": entry["revision"],
+        "authored_state_sha256": entry["authored_state_sha256"],
+        "authored_edit_seq": entry["authored_edit_seq"],
+    }
+
+
+def placed(version: Mapping[str, Any], thing_id: str) -> dict[str, Any] | None:
+    return next((t for t in version.get("things") or [] if t.get("thing_id") == thing_id), None)
+
+
+def stands(thing: Mapping[str, Any] | None, pose: Mapping[str, int] | None) -> bool:
+    """Whether a placed thing stands at a pose: the stored transform's four figures equal the
+    pose's, at the kind's own size (A-78)."""
+    transform = (thing or {}).get("transform") or {}
+    return (
+        pose is not None
+        and all(
+            transform.get(k) == pose.get(k) for k in ("x_mm", "y_mm", "z_mm", "yaw_microradians")
+        )
+        and transform.get("scale_milli") == 1000
+    )
+
+
+def row_t2(stack: Stack, transcripts: Any) -> Row:
+    row = Row(
+        "T2",
+        "things.placed",
+        "The shipped sword kind placed in the starter's authored version with the saved entry's "
+        "binding is 201 and reads back under its id with its kind and pose; move, remove and undo "
+        "each answer with a version showing it; the same id again is 409 invalid_object_state; a "
+        "pose with a scale is refused 422; a stale base is 409 stale_object_base; "
+        "the other workspace is 404; no refusal writes anything.",
+    )
+    w1 = F.client(stack, transcripts, "w1", "token")
+    w2 = F.client(stack, transcripts, "w2", "token-2")
+    status_starter, entry = starter(w1, "T2", "Q10 T2 starter")
+    row.expect(status_starter == 200, f"the starter answered {status_starter}")
+    if status_starter != 200:
+        return row.close()
+    query = F.world_query(entry)
+    things = F.version_path(entry, "/things")
+    base = entry["authored_state_sha256"]
+    pose = thing_pose("bench")
+    body = {
+        "base_state_sha256": base,
+        "saved_entry": saved_entry_binding(entry),
+        "thing_id": "q10-sword",
+        "kind": T2_KIND,
+        "region_id": F.STARTER_REGION,
+        "pose": pose,
+        "origin_role": "fictional",
+    }
+    status_place, version = w1.call("T2", "POST", things, query=query, body=body)
+    found = placed(version, "q10-sword") or {}
+    row.expect(status_place == 201, f"placing answered {status_place} {F.problem_code(version)}")
+    _, read = w1.call("T2", "GET", F.version_path(entry), query=query)
+    stored = placed(read, "q10-sword") or {}
+    row.expect(
+        stored.get("kind", {}).get("kind") == "sword"
+        and stored.get("kind", {}).get("version") == 3
+        and stands(stored, pose)
+        and stored.get("removed") is False,
+        f"the version reads {stored}",
+    )
+    state = read.get("state_sha256")
+
+    def refused(name: str, change: Mapping[str, Any], status: int, code: str | None) -> None:
+        before = w1.call("T2", "GET", F.version_path(entry), query=query)[1].get("state_sha256")
+        got, answer = w1.call("T2", "POST", things, query=query, body={**body, **change})
+        after = w1.call("T2", "GET", F.version_path(entry), query=query)[1].get("state_sha256")
+        row.expect(
+            got == status and F.problem_code(answer) == code and before == after,
+            f"{name} answered {got} {F.problem_code(answer)}",
+        )
+        refusals[name] = [got, F.problem_code(answer)]
+
+    refusals: dict[str, Any] = {}
+    refused(
+        "same id", {"base_state_sha256": state, "saved_entry": None}, 409, "invalid_object_state"
+    )
+    refused(
+        "scale",
+        {
+            "thing_id": "q10-sword-2",
+            "base_state_sha256": state,
+            "saved_entry": None,
+            "pose": {**pose, "scale_milli": 2000},
+        },
+        422,
+        None,
+    )
+    refused(
+        "stale base", {"thing_id": "q10-sword-3", "saved_entry": None}, 409, "stale_object_base"
+    )
+    moved_pose = thing_pose("stall")
+    status_move, moved = w1.call(
+        "T2",
+        "POST",
+        f"{things}/q10-sword/move",
+        query=query,
+        body={"base_state_sha256": state, "pose": moved_pose},
+    )
+    row.expect(
+        status_move == 200 and stands(placed(moved, "q10-sword"), moved_pose),
+        f"moving answered {status_move} {F.problem_code(moved)}",
+    )
+    status_remove, removed = w1.call(
+        "T2",
+        "POST",
+        f"{things}/q10-sword/remove",
+        query=query,
+        body={"base_state_sha256": moved.get("state_sha256")},
+    )
+    row.expect(
+        status_remove == 200 and (placed(removed, "q10-sword") or {}).get("removed") is True,
+        f"removing answered {status_remove} {F.problem_code(removed)}",
+    )
+    status_undo, undone = w1.call(
+        "T2",
+        "POST",
+        f"{things}/undo",
+        query=query,
+        body={"base_state_sha256": removed.get("state_sha256")},
+    )
+    row.expect(
+        status_undo == 200 and (placed(undone, "q10-sword") or {}).get("removed") is False,
+        f"undo answered {status_undo} {F.problem_code(undone)}",
+    )
+    status_stranger, _ = w2.call("T2", "GET", F.version_path(entry), query=query)
+    row.expect(status_stranger == 404, f"the other workspace was answered {status_stranger}")
+    row.observed = {
+        "placed": [status_place, found.get("thing_id")],
+        "stored": stored,
+        "schema_version": read.get("schema_version"),
+        "refusals": refusals,
+        "move": status_move,
+        "remove": status_remove,
+        "undo": status_undo,
+        "stranger": status_stranger,
+    }
+    return row.close()
+
+
+def build_scene(stack: Stack, worktree: Path, record: Path) -> subprocess.CompletedProcess[str]:
+    """The demo scene builder, as workspace 2's account runs it; the token is handed to it in its
+    environment only (A-79)."""
+    return subprocess.run(
+        [
+            str(worktree / ".venv" / "bin" / "python"),
+            str(worktree / DEMO_BUILDER),
+            str(worktree / DEMO_SCENE),
+            "--base-url",
+            stack.base_url,
+            "--record",
+            str(record),
+        ],
+        cwd=worktree,
+        env={
+            **LAUNCH.clean_environment(),
+            "EXULANICA_TOKEN": stack.token_file("token-2").read_text().strip(),
+        },
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=600,
+    )
+
+
+def row_sc1(stack: Stack, transcripts: Any, worktree: Path, out: Path) -> Row:
+    row = Row(
+        "SC1",
+        "demo.scene_built",
+        "build_scene.py with the three-strangers scene, as workspace 2, writes its record; the "
+        "record's entry, version, state digest and edit sequence equal the entry's; every thing the "
+        "scene names is in that version with the kind the scene states and the pose the record "
+        "states; a second run adds nothing and names the same version; the entry reopened reads it.",
+    )
+    w2 = F.client(stack, transcripts, "w2", "token-2")
+    scene = json.loads((worktree / DEMO_SCENE).read_text())
+    first, second = out / "evidence" / "scene-build-1.json", out / "evidence" / "scene-build-2.json"
+    run_one = build_scene(stack, worktree, first)
+    (out / "evidence" / "scene-build-1.txt").write_text(run_one.stdout + run_one.stderr)
+    row.expect(
+        run_one.returncode == 0 and first.exists(), f"the builder exited {run_one.returncode}"
+    )
+    if not first.exists():
+        return row.close()
+    record = json.loads(first.read_text())
+    entry = F.read_entry(w2, "SC1", record["entry_id"])
+    row.expect(
+        (
+            entry.get("authored_version_id"),
+            entry.get("authored_state_sha256"),
+            entry.get("authored_edit_seq"),
+        )
+        == (record.get("version_id"), record.get("state_sha256"), record.get("edit_seq")),
+        "the record differs from the entry",
+    )
+    _, version = w2.call("SC1", "GET", F.version_path(entry), query=F.world_query(entry))
+    recorded = {t["thing_id"]: t for t in record.get("things") or []}
+    for wanted in scene.get("things") or []:
+        stored = placed(version, wanted["thing_id"]) or {}
+        kind = stored.get("kind") or {}
+        row.expect(
+            (kind.get("kind"), kind.get("version"))
+            == (wanted["kind"]["kind"], wanted["kind"]["version"])
+            and stands(stored, (recorded.get(wanted["thing_id"]) or {}).get("pose")),
+            f"{wanted['thing_id']} reads {kind} at {stored.get('transform')}",
+        )
+    run_two = build_scene(stack, worktree, second)
+    (out / "evidence" / "scene-build-2.txt").write_text(run_two.stdout + run_two.stderr)
+    again = json.loads(second.read_text()) if second.exists() else {}
+    row.expect(
+        run_two.returncode == 0
+        and again.get("things_added") == 0
+        and again.get("version_id") == record.get("version_id"),
+        f"a second run exited {run_two.returncode} adding {again.get('things_added')}",
+    )
+    reopened = F.read_entry(w2, "SC1", record["entry_id"])
+    row.expect(
+        reopened.get("authored_version_id") == record.get("version_id"),
+        "the entry reopened reads another version",
+    )
+    row.observed = {
+        "scene": record.get("scene"),
+        "entry_id": record.get("entry_id"),
+        "version_id": record.get("version_id"),
+        "things": sorted(recorded),
+        "things_added": [record.get("things_added"), again.get("things_added")],
+    }
+    return row.close()
+
+
+def things(arguments: argparse.Namespace) -> int:
+    worktree = LAUNCH.checkout(arguments.worktree)
+    stack = Stack.read(worktree)
+    if len(workspace_ids(stack)) < 2:
+        raise SystemExit("things needs a stack started with --workspaces 2")
+    out = Path(arguments.out).resolve()
+    (out / "evidence").mkdir(parents=True, exist_ok=True)
+    transcripts = Transcripts(out / "transcripts")
+    started = dt.datetime.now(dt.UTC).isoformat()
+    rows = [
+        row_t1(stack, transcripts, worktree),
+        row_t2(stack, transcripts),
+        row_sc1(stack, transcripts, worktree, out),
+    ]
+    write_results(out, stack, rows, started, sys.argv[1:])
+    return 0 if all(row.status != "failed" for row in rows) else 1
+
+
+# -- D1: the door's grants --------------------------------------------------------------------------
+
+#: The outside program D1's stack declares: AGENTS' example entry as shipped (A-80), the mapping
+#: document its hello sends, and the reads AGENTS' body states (bridges/agents/exulanica_agent/body.py).
+DOOR_BRIDGE_ENTRY = Path("bridges") / "agents" / "examples" / "bridge-entry.json"
+DOOR_MAPPING = Path("bridges") / "agents" / "exulanica_agent" / "outside-agents.v1.json"
+DOOR_READS = ("action", "line", "declared name", "declared maker", "declared mind")
+
+
+def door_call(
+    stack: Stack, credential: str | None, method: str, path: str, body: Any = None
+) -> tuple[int, Any]:
+    """A request with a door credential (or none), outside the JSON clients' tokens."""
+    request = urllib.request.Request(
+        f"{stack.base_url}{path}",
+        data=None if body is None else json.dumps(body).encode(),
+        method=method,
+        headers={
+            "Content-Type": "application/json",
+            **({} if credential is None else {"Authorization": f"Bearer {credential}"}),
+        },
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=60) as response:
+            return response.status, json.loads(response.read() or b"null")
+    except urllib.error.HTTPError as refused:
+        raw = refused.read()
+        try:
+            return refused.code, json.loads(raw or b"null")
+        except ValueError:
+            return refused.code, raw.decode(errors="replace")
+
+
+def row_d1(stack: Stack, transcripts: Any, worktree: Path) -> Row:
+    row = Row(
+        "D1",
+        "door.grants",
+        "With AGENTS' example bridge declared: GET /door/bridges lists it; a grant admitting the "
+        "visitor kind for one visitor is 201 and the same request again 200 with the same grant; a "
+        "grant naming a world's thing is 409 named_things_unavailable; an unknown bridge is 422 "
+        "bridge_not_offered; the read-only grant is refused 403; the other workspace reads no grant "
+        "of workspace 1's (404); a channel hello on the grant's credential is accepted, and after "
+        "the grant is revoked it reads ended and the same hello is refused.",
+    )
+    w1 = F.client(stack, transcripts, "w1", "token")
+    w2 = F.client(stack, transcripts, "w2", "token-2")
+    read_only = F.client(stack, transcripts, "read-only", "token-read")
+    declared = json.loads((worktree / DOOR_BRIDGE_ENTRY).read_text())
+    _, listed = w1.call("D1", "GET", "/door/bridges")
+    row.expect(
+        any(b.get("bridge") == declared["bridge"] for b in (listed or {}).get("bridges") or []),
+        f"the bridges listed are {listed}",
+    )
+    status_starter, entry = starter(w1, "D1", "Q10 D1 starter")
+    row.expect(status_starter == 200, f"the starter answered {status_starter}")
+    if status_starter != 200:
+        return row.close()
+    query = F.world_query(entry)
+    body = {
+        "idempotency_key": str(uuid.uuid4()),
+        "bridge": declared["bridge"],
+        "visitors_maximum": 1,
+        "kinds": ["visitor"],
+        "minutes": 5,
+        "channel_credential": True,
+    }
+    status_issue, issued = w1.call("D1", "POST", "/door/grants", query=query, body=body)
+    status_again, again = w1.call("D1", "POST", "/door/grants", query=query, body=body)
+    grant = (issued or {}).get("grant") or {}
+    grant_id = grant.get("grant_id")
+    row.expect(
+        status_issue == 201 and grant_id,
+        f"the grant answered {status_issue} {F.problem_code(issued)}",
+    )
+    row.expect(
+        status_again == 200 and ((again or {}).get("grant") or {}).get("grant_id") == grant_id,
+        f"the same request again answered {status_again}",
+    )
+    refusals = {}
+    for name, change, client, status, code in (
+        ("named thing", {"things": [str(uuid.uuid4())]}, w1, 409, "named_things_unavailable"),
+        ("unknown bridge", {"bridge": "q10-nobody"}, w1, 422, "bridge_not_offered"),
+        ("read-only", {}, read_only, 403, None),
+    ):
+        got, answer = client.call(
+            "D1",
+            "POST",
+            "/door/grants",
+            query=query,
+            body={**body, **change, "idempotency_key": str(uuid.uuid4())},
+        )
+        refusals[name] = [got, F.problem_code(answer)]
+        row.expect(
+            got == status and (code is None or F.problem_code(answer) == code),
+            f"{name} answered {got} {F.problem_code(answer)}",
+        )
+    status_stranger, _ = w2.call("D1", "GET", f"/door/grants/{grant_id}", query=query)
+    row.expect(status_stranger == 404, f"the other workspace was answered {status_stranger}")
+    status_credential, issued_credential = w1.call(
+        "D1", "POST", f"/door/grants/{grant_id}/channel-credentials", query=query, body={}
+    )
+    credential = (issued_credential or {}).get("credential")
+    row.expect(
+        status_credential == 201 and credential,
+        f"the channel credential answered {status_credential}",
+    )
+    hello = {
+        "adapter_version": declared["adapter_versions"][0],
+        "mapping": json.loads((worktree / DOOR_MAPPING).read_text()),
+        "reads": list(DOOR_READS),
+    }
+    status_hello, said = door_call(stack, credential, "POST", "/door/channel/hello", hello)
+    row.expect(status_hello == 200, f"the hello answered {status_hello} {F.problem_code(said)}")
+    status_revoke, _ = w1.call(
+        "D1", "POST", f"/door/grants/{grant_id}/revoke", query=query, body={}
+    )
+    _, read = w1.call("D1", "GET", f"/door/grants/{grant_id}", query=query)
+    ended = ((read or {}).get("grant") or read or {}).get("ended")
+    row.expect(
+        status_revoke == 200 and ended, f"the revoke answered {status_revoke}; ended {ended}"
+    )
+    status_after, after = door_call(stack, credential, "POST", "/door/channel/hello", hello)
+    row.expect(400 <= status_after < 500, f"the hello after the revoke answered {status_after}")
+    row.observed = {
+        "bridge": declared["bridge"],
+        "grant": [status_issue, grant_id, grant.get("scope")],
+        "again": status_again,
+        "refusals": refusals,
+        "stranger": status_stranger,
+        "credential": status_credential,
+        "hello": [status_hello, F.problem_code(said)],
+        "revoke": [status_revoke, ended],
+        "hello_after_revoke": [status_after, F.problem_code(after)],
+    }
+    return row.close()
+
+
+def door(arguments: argparse.Namespace) -> int:
+    worktree = LAUNCH.checkout(arguments.worktree)
+    stack = Stack.read(worktree)
+    if not stack.token_file("token-read").exists() or len(workspace_ids(stack)) < 2:
+        raise SystemExit(
+            "door needs a stack started with --workspaces 2 --read-only-token --door-bridges"
+        )
+    out = Path(arguments.out).resolve()
+    (out / "evidence").mkdir(parents=True, exist_ok=True)
+    transcripts = Transcripts(out / "transcripts")
+    started = dt.datetime.now(dt.UTC).isoformat()
+    rows = [row_d1(stack, transcripts, worktree)]
+    write_results(out, stack, rows, started, sys.argv[1:])
+    return 0 if all(row.status != "failed" for row in rows) else 1
+
+
+# -- V1: a guest enters by code, through the local HTTPS edge ----------------------------------------
+
+#: Answer fields that are credentials: a transcript holds a placeholder instead.
+GUEST_CREDENTIAL_FIELDS = frozenset({"csrf_token"})
+GUEST_CODE_PLACEHOLDER = "[the run's guest code]"
+GUEST_WRONG_DETAIL = "that code does not open this server"
+
+
+def redacted(document: Any) -> Any:
+    """``document`` with every credential field's value replaced, at any depth."""
+    if isinstance(document, dict):
+        return {
+            k: "[redacted]" if k in GUEST_CREDENTIAL_FIELDS else redacted(v)
+            for k, v in document.items()
+        }
+    if isinstance(document, list):
+        return [redacted(v) for v in document]
+    return document
+
+
+class GuestClient:
+    """A browser's requests to the accounts host without a browser: the edge's HTTPS origin, its
+    root certificate trusted in this process only, the session cookie the entry set kept as a
+    browser keeps it, and on a write the page's Origin and the session's CSRF token. Its transcript
+    holds neither the cookie nor the token nor the run's code."""
+
+    def __init__(self, stack: Stack, transcripts: Any, name: str) -> None:
+        edge = stack.state["edge"]
+        self.origin = str(edge["origin"])
+        self.context = ssl.create_default_context(cafile=str(edge["root_certificate"]))
+        self.cookie: str | None = None
+        self.csrf: str | None = None
+        self.set_cookie: str | None = None
+        self.step = "start"
+        self.record = transcripts.recorder(name, lambda: self.step)
+
+    def call(
+        self,
+        step: str,
+        method: str,
+        path: str,
+        *,
+        query: Mapping[str, str] | None = None,
+        body: Any = None,
+        recorded_body: Any = None,
+    ) -> tuple[int, Any]:
+        self.step = step
+        query = dict(query or {})
+        url = self.origin + path + (f"?{urllib.parse.urlencode(query)}" if query else "")
+        headers = {"Accept": "application/json", "Origin": self.origin}
+        data = None if body is None else json.dumps(body).encode()
+        if data is not None:
+            headers["Content-Type"] = "application/json"
+        if self.cookie is not None:
+            headers["Cookie"] = self.cookie
+        if self.csrf is not None and method not in ("GET", "HEAD"):
+            headers["X-CSRF-Token"] = self.csrf
+        request = urllib.request.Request(url, data=data, headers=headers, method=method)
+        try:
+            with urllib.request.urlopen(request, timeout=60, context=self.context) as response:
+                status, raw, answer_headers = response.status, response.read(), response.headers
+        except urllib.error.HTTPError as refused:
+            status, raw, answer_headers = refused.code, refused.read(), refused.headers
+        self.set_cookie = answer_headers.get("Set-Cookie")
+        try:
+            answer = json.loads(raw or b"null")
+        except ValueError:
+            answer = raw.decode(errors="replace")
+        self.record(
+            F.Exchange(
+                method,
+                path,
+                query,
+                status,
+                redacted(body if recorded_body is None else recorded_body),
+                redacted(answer),
+            )
+        )
+        return status, answer
+
+    def keep_session(self, answer: Mapping[str, Any]) -> bool:
+        """Keep the session the last answer set, as a browser keeps its cookie."""
+        if not self.set_cookie:
+            return False
+        self.cookie = self.set_cookie.split(";", 1)[0]
+        self.csrf = answer.get("csrf_token")
+        return True
+
+
+def allowance_figures(allowance: Any) -> dict[str, tuple[Decimal | None, int | None]]:
+    """Each provider's available money and calls, as numbers."""
+    figures = {}
+    for entry in allowance or []:
+        usd, calls = entry.get("available_usd"), entry.get("available_calls")
+        figures[str(entry.get("provider"))] = (
+            None if usd is None else Decimal(str(usd)),
+            None if calls is None else int(calls),
+        )
+    return figures
+
+
+def issued_providers(stack: Stack) -> list[str]:
+    """An evidence read: the providers the launcher issued an authority and guest policy for."""
+    issued = json.loads((stack.run_dir / "logs" / "guest-policy.txt").read_text())
+    return sorted(str(entry["provider"]) for entry in issued)
+
+
+def row_v1(stack: Stack, transcripts: Any) -> Row:
+    accounts = stack.state["accounts"]
+    policy = accounts["guest_policy"]
+    ceiling, most_calls = Decimal(str(policy["ceiling_usd"])), int(policy["max_calls"])
+    row = Row(
+        "V1",
+        "accounts.guest_by_code",
+        "Through the local HTTPS edge (the browser origin https://localhost:<edge port>): a wrong "
+        f'code is refused 403 guest_entry_code_wrong with the words "{GUEST_WRONG_DETAIL}" and '
+        "no session; the run's code enters (201) with role guest, a workspace of its own, an "
+        "allowance on every provider the guest policy names with money and calls available and no "
+        "more than the policy grants, and no incomplete step; GET /auth/session reads the same "
+        "allowance; the guest makes a town of its own through Create a world (201); in the "
+        "arrival world its entry made, the "
+        "people it chooses a model for are decided by that model once the society plays; the "
+        "allowance "
+        "read afterwards has fewer calls or less money available than before.",
+    )
+    providers = issued_providers(stack)
+    code = Path(accounts["code_file"]).read_text().strip()
+    stranger = GuestClient(stack, transcripts, "wrong-code")
+    status_wrong, wrong = stranger.call(
+        "V1 wrong code", "POST", "/auth/guest", body={"code": f"q10-{secrets.token_urlsafe(12)}"}
+    )
+    row.expect(
+        status_wrong == 403
+        and F.problem_code(wrong) == "guest_entry_code_wrong"
+        and (wrong or {}).get("detail") == GUEST_WRONG_DETAIL,
+        f"the wrong code answered {status_wrong} {F.problem_code(wrong)}",
+    )
+    row.expect(not stranger.set_cookie, "the wrong code's answer set a cookie")
+    guest = GuestClient(stack, transcripts, "guest")
+    status_in, entered = guest.call(
+        "V1 enter",
+        "POST",
+        "/auth/guest",
+        body={"code": code},
+        recorded_body={"code": GUEST_CODE_PLACEHOLDER},
+    )
+    entered = entered if isinstance(entered, dict) else {}
+    kept = guest.keep_session(entered)
+    synthetic = {
+        stack.state.get("workspace_id"),
+        *(w.get("workspace_id") for w in stack.state.get("other_workspaces") or []),
+    }
+    granted = allowance_figures(entered.get("allowance"))
+    row.expect(
+        status_in == 201 and kept and bool(guest.csrf),
+        f"the code answered {status_in} {F.problem_code(entered)}; session kept {kept}",
+    )
+    row.expect(entered.get("role") == "guest", f"the entry's role is {entered.get('role')}")
+    row.expect(
+        bool(entered.get("workspace_id")) and entered.get("workspace_id") not in synthetic,
+        "the guest's workspace is not its own",
+    )
+    row.expect(
+        entered.get("incomplete") == [], f"the entry left incomplete {entered.get('incomplete')}"
+    )
+    row.expect(
+        sorted(granted) == providers
+        and all(
+            usd is not None and calls is not None and 0 < usd <= ceiling and 0 < calls <= most_calls
+            for usd, calls in granted.values()
+        ),
+        f"the allowance is {entered.get('allowance')} for providers {providers}",
+    )
+    status_session, session = guest.call("V1 session", "GET", "/auth/session")
+    row.expect(
+        status_session == 200 and allowance_figures((session or {}).get("allowance")) == granted,
+        f"the session read answered {status_session} with another allowance",
+    )
+    if not kept:
+        return row.close()
+    # A guest's workspace holds its arrival world, so its own world is made as a person makes one,
+    # through Create a world; the starter is only a workspace's first world (A-85).
+    status_own, own = guest.call(
+        "V1 own world",
+        "POST",
+        "/worlds/generated",
+        body={"recipe": "small_town", "title": "Q10 V1 own town"},
+    )
+    row.expect(
+        status_own == 201 and bool((own or {}).get("entry_id")),
+        f"Create a world answered {status_own} {F.problem_code(own)}",
+    )
+    # The people are the arrival world's: an empty starter has nowhere for anyone to go (A-84).
+    arrival = entered.get("arrival") or {}
+    if not arrival.get("entry_id"):
+        return row.close()
+    entry = F.read_entry(guest, "V1 people", arrival["entry_id"])
+    status_society, society = F.society(guest, "V1 people", entry)
+    if status_society == 404:
+        status_society, _ = guest.call(
+            "V1 people",
+            "POST",
+            F.version_path(entry, "/society"),
+            query=F.world_query(entry),
+            body={"region_id": TOWN_REGION, "profile": TOWN_ENGINE},
+        )
+        entry = F.read_entry(guest, "V1 people", entry["entry_id"])
+        _, society = F.society(guest, "V1 people", entry)
+    row.expect(status_society == 200, f"the arrival world's people answered {status_society}")
+    inhabitants = [
+        p.get("id") for p in ((society or {}).get("state") or {}).get("inhabitants") or []
+    ]
+    person = roles_read(guest, "V1 choose", entry).get(PERSON_ROLE) or {}
+    most = person.get("model_subjects_maximum") or PEOPLE_CHOSEN_MOST
+    chosen = inhabitants[: min(int(most), PEOPLE_CHOSEN_MOST)]
+    status_choice, _ = choose_model(guest, "V1 choose", entry, PERSON_ROLE, chosen, GOING_MODEL)
+    row.expect(
+        bool(chosen) and status_choice == 200,
+        f"choosing a model for {len(chosen)} people answered {status_choice}",
+    )
+    calls_before = len(scripted_log(stack))
+    status_play, _ = control(guest, "V1 play", entry, "playing")
+    row.expect(status_play == 200, f"playing the society answered {status_play}")
+    deadline = time.monotonic() + PERSON_DECISION_SECONDS
+    latest: list[dict[str, Any]] = []
+    while time.monotonic() < deadline:
+        view = (roles_read(guest, "V1 play", entry).get(PERSON_ROLE) or {}).get("view") or {}
+        latest = [
+            d for d in view.get("latest") or [] if d.get("model_id") == GOING_MODEL["model_id"]
+        ]
+        if latest:
+            break
+        time.sleep(3)
+    status_pause, _ = control(guest, "V1 pause", entry, "paused")
+    row.expect(status_pause == 200, f"pausing the society answered {status_pause}")
+    row.expect(bool(latest), "no person decision by the chosen model was read")
+    calls_after = len(scripted_log(stack))
+    status_after, after = guest.call("V1 allowance after", "GET", "/auth/session")
+    spent = allowance_figures((after or {}).get("allowance"))
+    row.expect(
+        status_after == 200
+        and sorted(spent) == providers
+        and any(
+            spent[p][0] is not None
+            and spent[p][1] is not None
+            and (spent[p][1] < granted[p][1] or spent[p][0] < granted[p][0])
+            for p in providers
+            if p in granted and None not in granted[p]
+        ),
+        f"the allowance after reads {(after or {}).get('allowance')}",
+    )
+    row.observed = {
+        "origin": guest.origin,
+        "wrong_code": [status_wrong, F.problem_code(wrong), bool(stranger.set_cookie)],
+        "entry": [status_in, entered.get("role"), entered.get("incomplete")],
+        "own_workspace": entered.get("workspace_id") not in synthetic,
+        "arrival": entered.get("arrival"),
+        "policy": {"ceiling_usd": str(ceiling), "max_calls": most_calls, "providers": providers},
+        "allowance_at_entry": {p: [str(u), c] for p, (u, c) in granted.items()},
+        "allowance_after": {p: [str(u), c] for p, (u, c) in spent.items()},
+        "session": status_session,
+        "own_world": [status_own, (own or {}).get("entry_id")],
+        "people_world": entry.get("entry_id"),
+        "people": [status_society, len(inhabitants), len(chosen), status_choice],
+        "decisions_by_chosen_model": len(latest),
+        "scripted_calls_while_playing": calls_after - calls_before,
+    }
+    return row.close()
+
+
+def guests(arguments: argparse.Namespace) -> int:
+    worktree = LAUNCH.checkout(arguments.worktree)
+    stack = Stack.read(worktree)
+    served = (stack.state.get("scripted_model") or {}).get("plan_sha256")
+    if (
+        "accounts" not in stack.state
+        or "edge" not in stack.state
+        or served != hashlib.sha256(COMPARISONS_PLAN.read_bytes()).hexdigest()
+    ):
+        raise SystemExit(
+            "guests needs a stack started with --accounts-guest-code --edge-port PORT --tiles "
+            "--scripted-model scripts/acceptance/plans/comparisons.json --spending durable "
+            "--society-playback --no-derivative-worker"
+        )
+    out = Path(arguments.out).resolve()
+    (out / "evidence").mkdir(parents=True, exist_ok=True)
+    transcripts = Transcripts(out / "transcripts")
+    started = dt.datetime.now(dt.UTC).isoformat()
+    rows = [row_v1(stack, transcripts)]
+    write_results(out, stack, rows, started, sys.argv[1:])
+    return 0 if all(row.status != "failed" for row in rows) else 1
+
+
 def comparisons(arguments: argparse.Namespace) -> int:
     worktree = LAUNCH.checkout(arguments.worktree)
     stack = Stack.read(worktree)
@@ -4587,6 +5511,15 @@ def build_parser() -> argparse.ArgumentParser:
     kept = commands.add_parser("kinds")
     kept.add_argument("--worktree", required=True)
     kept.add_argument("--out", required=True)
+    opened = commands.add_parser("door")
+    opened.add_argument("--worktree", required=True)
+    opened.add_argument("--out", required=True)
+    shipped = commands.add_parser("things")
+    shipped.add_argument("--worktree", required=True)
+    shipped.add_argument("--out", required=True)
+    entered = commands.add_parser("guests")
+    entered.add_argument("--worktree", required=True)
+    entered.add_argument("--out", required=True)
     asked = commands.add_parser("references")
     asked.add_argument("--worktree", required=True)
     asked.add_argument("--out", required=True)
@@ -4607,6 +5540,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         "packs": packs,
         "kinds": kinds,
         "references": references,
+        "things": things,
+        "door": door,
+        "guests": guests,
     }
     return commands[arguments.command](arguments)
 

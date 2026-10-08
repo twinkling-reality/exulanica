@@ -3977,7 +3977,16 @@ WORLDS_ROWS = (
         "worlds-look-stated",
         "After N1.o's Use, within 30 s and on the same page, the shell's data-world-look states the "
         "cozy pack drawn by the redraw; once the town is opened again it states the cozy pack "
-        "drawn, chosen by the world (A-76); the last step of the session.",
+        "drawn, chosen by the world (A-76).",
+    ),
+    (
+        "N1.q",
+        "worlds.look_browse",
+        "worlds-look-browse",
+        "With the Look sheet open over N1.l's town and live, resting on the toon card draws the "
+        "town in toon (data-world-look: toon, drawn, by the redraw); Escape closes the sheet and "
+        "draws the world's own cozy pack again (by the redraw); the saved entry still names a "
+        "style version whose pack is cozy (A-81). Functional only.",
     ),
 )
 

@@ -82,6 +82,22 @@ starts exactly what it always did:
   is set for the API process alone, after the scrub of the shell's ``EXULANICA_`` variables, and
   recorded in the run state, so a restarted API offers it too. For rehearsal stacks on fresh
   acceptance databases only.
+- ``--accounts-guest-code``, with ``--edge-port``, ``--tiles``, ``--scripted-model``,
+  ``--spending durable`` and ``--society-playback``, also serves browser accounts with guest entry
+  by code, Google sign-in unset, as a hosted server serves its judges: a code is drawn for the run
+  into ``guest-code`` in the run directory (mode 0600) and only its SHA-256 reaches the API; the
+  accounts role is given its tables; an authority and a guest policy are issued for every provider
+  the manifest names before the API starts; and playback also plays every account's own workspace
+  (``EXULANICA_SOCIETY_CONTROL_WORKER``), so a guest's world is played (by its routine: the host
+  asks models only for the workspaces its environment lists).
+  Accounts are served only over HTTPS, so the run also starts the deployment's edge shape
+  (``deploy/acceptance/Caddyfile``, Caddy's own local authority for the name ``localhost``, in the
+  pinned image already present: never pulled) on ``127.0.0.1:<edge port>`` in front of the API;
+  the one browser origin is ``https://localhost:<edge port>``. Before the edge opens, the arrival
+  worlds are made once in the run's own workspace and the run waits until their tiles are baked,
+  as an installation prepares them before it admits guests; and a client trusts the edge's root
+  certificate (``edge.root_certificate`` in the state) in its own process only, never in a system
+  store. ``down`` removes the container it recorded.
 - ``--peer-token`` adds ``token-peer``: a second actor in the first workspace with the same
   permissions, so a client can be shown what one actor's private work looks like to another.
 - ``--depth-worker``, with ``--no-derivative-worker``, runs the production derivative worker
@@ -122,6 +138,7 @@ import secrets
 import shlex
 import shutil
 import signal
+import ssl
 import subprocess
 import sys
 import tempfile
@@ -256,6 +273,12 @@ REFUSALS = {
     "api-origin": "the API did not confirm it imported exulanica from the checkout",
     "token-refused": "the API did not accept the synthetic token",
     "door-bridges-file": "--door-bridges names a file holding one JSON array of bridge objects",
+    "accounts-shape": "--accounts-guest-code needs --edge-port, --tiles, --scripted-model, "
+    "--spending durable and --society-playback",
+    "arrival-not-baked": "the arrival worlds' tiles were not baked in time",
+    "edge-failed": "the local HTTPS edge in front of the API did not start or did not answer",
+    "accounts-provision": "the accounts role could not be given its tables",
+    "guest-policy": "an authority or guest policy for the guest entry could not be issued",
     "no-answer": "a service did not answer in time",
     "build-failed": "vite build failed",
     "build-token": "the production build environment carries a VITE_ variable",
@@ -465,10 +488,11 @@ def society_playback_environment(
     return environment
 
 
-def society_playback_readiness(readyz: bytes) -> dict[str, object]:
+def society_playback_readiness(readyz: bytes, accounts: bool = False) -> dict[str, object]:
     """The playback readiness check of a ``--society-playback`` run, or a refusal saying why not.
 
-    The run plays one workspace, its own, and never discovers accounts."""
+    The run plays one workspace, its own, and discovers accounts' workspaces only with
+    ``--accounts-guest-code``."""
     try:
         check = json.loads(readyz)["checks"]["society_playback"]
     except (ValueError, KeyError, TypeError):
@@ -476,7 +500,7 @@ def society_playback_readiness(readyz: bytes) -> dict[str, object]:
     if not (
         check.get("running") is True
         and check.get("listed_workspaces") == 1
-        and check.get("account_discovery") is False
+        and check.get("account_discovery") is accounts
     ):
         refuse("society-playback-not-running", json.dumps(check)[:REFUSAL_EXCERPT_CHARACTERS])
     return check
@@ -507,6 +531,216 @@ def door_bridges_setting(path: Path, workspace_ids: Sequence[str]) -> str:
     )
 
 
+#: The file in the run directory holding the run's guest code (mode 0600), and the entries a day
+#: its guest entry admits.
+GUEST_CODE_NAME = "guest-code"
+GUEST_ENTRIES_PER_DAY = 50
+#: What each guest is granted per provider by the run's guest policy (recorded in the state, so a
+#: row can hold an allowance to what was issued).
+GUEST_POLICY_CEILING_USD = "0.05"
+GUEST_POLICY_MAX_CALLS = 200
+#: Give the accounts role its tables as the owner, as an installation's administration does.
+PROVISION_ACCOUNTS = r"""
+import sys, psycopg
+from exulanica.db.account_roles import ACCOUNT_ROLE, provision_account_role
+with psycopg.connect(sys.argv[1], autocommit=True) as connection:
+    provision_account_role(connection)
+print(ACCOUNT_ROLE)
+"""
+#: The manifest's providers, one an authority and a guest policy are issued for each.
+MANIFEST_PROVIDERS = r"""
+import json
+from exulanica.models.manifest import load_manifest
+print(json.dumps(sorted(load_manifest().providers)))
+"""
+
+
+#: The local HTTPS edge ``--accounts-guest-code`` starts: the deployment edge's shape for the name
+#: ``localhost`` in the pinned image this machine already holds (never pulled), its configuration in
+#: the checkout, and where Caddy's local authority writes its root certificate in the data volume.
+EDGE_IMAGE = "caddy:2.11.4-alpine"
+EDGE_CADDYFILE = Path("deploy") / "acceptance" / "Caddyfile"
+EDGE_ROOT_CERTIFICATE = Path("caddy") / "pki" / "authorities" / "local" / "root.crt"
+EDGE_START_SECONDS = 30
+
+
+def edge_origin(edge_port: int) -> str:
+    """The one browser origin of a run's accounts: the edge's HTTPS name and port."""
+    return f"https://localhost:{edge_port}"
+
+
+def edge_command(
+    name: str, edge_port: int, api_port: int, caddyfile: Path, data: Path, config: Path
+) -> list[str]:
+    """The ``docker run`` starting a run's edge: loopback only, the API reached from the container
+    as ``host.docker.internal``, and the pinned image used as present."""
+    return [
+        "docker",
+        "run",
+        "--detach",
+        "--name",
+        name,
+        "--pull",
+        "never",
+        "--publish",
+        f"127.0.0.1:{edge_port}:443",
+        "--env",
+        f"EXULANICA_EDGE_UPSTREAM=host.docker.internal:{api_port}",
+        "--volume",
+        f"{caddyfile}:/etc/caddy/Caddyfile:ro",
+        "--volume",
+        f"{data}:/data",
+        "--volume",
+        f"{config}:/config",
+        EDGE_IMAGE,
+    ]
+
+
+def start_edge(
+    worktree: Path, run_dir: Path, edge_port: int, api_port: int, state: dict, state_file: Path
+) -> None:
+    """Start the run's edge, record its container before checking it (so ``down`` removes it
+    whatever follows), then wait for its root certificate and the API's health through it."""
+    data, config = run_dir / "edge" / "data", run_dir / "edge" / "config"
+    data.mkdir(parents=True, exist_ok=True)
+    config.mkdir(parents=True, exist_ok=True)
+    name = f"exulanica-acceptance-edge-{edge_port}"
+    started = subprocess.run(
+        edge_command(name, edge_port, api_port, worktree / EDGE_CADDYFILE, data, config),
+        cwd=worktree,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if started.returncode != 0:
+        refuse("edge-failed", started.stderr.strip()[-REFUSAL_EXCERPT_CHARACTERS:])
+    certificate = data / EDGE_ROOT_CERTIFICATE
+    state["edge"] = {
+        "container": started.stdout.strip(),
+        "name": name,
+        "image": EDGE_IMAGE,
+        "port": edge_port,
+        "origin": edge_origin(edge_port),
+        "upstream_api_port": api_port,
+        "root_certificate": str(certificate),
+    }
+    write_state(state_file, state)
+    deadline = time.monotonic() + EDGE_START_SECONDS
+    last = "no root certificate yet"
+    while time.monotonic() < deadline:
+        if certificate.exists():
+            context = ssl.create_default_context(cafile=str(certificate))
+            try:
+                with urllib.request.urlopen(
+                    f"{edge_origin(edge_port)}/healthz", timeout=5, context=context
+                ) as response:
+                    if response.status == 200:
+                        state["edge"]["healthz"] = response.status
+                        write_state(state_file, state)
+                        return
+                    last = f"healthz {response.status}"
+            except (urllib.error.URLError, ConnectionError, TimeoutError, OSError) as error:
+                last = str(error)
+        time.sleep(0.5)
+    refuse(
+        "edge-failed", f"{edge_origin(edge_port)}/healthz within {EDGE_START_SECONDS} s ({last})"
+    )
+
+
+def stop_edge(state: Mapping[str, object], logs: Path) -> None:
+    """Remove the edge container this run recorded, after checking the id still names it; its log
+    is kept beside the run's others."""
+    edge = state["edge"]
+    assert isinstance(edge, Mapping)
+    container, name = str(edge["container"]), str(edge["name"])
+    found = subprocess.run(
+        ["docker", "inspect", "--format", "{{.Id}} {{.Name}}", container],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if found.returncode != 0:
+        print(f"edge: container {container[:12]} is already gone")
+        return
+    if found.stdout.split() != [container, f"/{name}"]:
+        refuse("edge-failed", f"container {container[:12]} is not the recorded {name}")
+    log = subprocess.run(["docker", "logs", container], capture_output=True, text=True, check=False)
+    if logs.is_dir():
+        (logs / "edge.log").write_text(log.stdout + log.stderr)
+    subprocess.run(["docker", "rm", "--force", container], capture_output=True, check=False)
+    print(f"edge: removed {name}")
+
+
+#: Whether every arrival world's tiles are baked and servable, as a guest's entry will ask.
+ARRIVAL_BAKED = r"""
+import sys, uuid
+from exulanica.db.session import Database
+from exulanica.world.arrival_worlds import arrival_tiles_baked, load_arrival_worlds
+with Database.from_env().session(uuid.UUID(sys.argv[1])) as connection:
+    print(all(arrival_tiles_baked(connection, world) for world in load_arrival_worlds()))
+"""
+ARRIVAL_BAKE_SECONDS = 900
+
+
+def prepare_arrival_worlds(
+    python: Path,
+    worktree: Path,
+    exports: Mapping[str, str],
+    data_dir: Path,
+    workspace_id: str,
+    logs: Path,
+    state: dict,
+    state_file: Path,
+) -> None:
+    """Make the arrival worlds once in the run's own workspace, as an installation does before it
+    admits guests (``deploy/public/public.sh prepare-towns``), and wait until the tile worker has
+    baked them, so a guest's entry makes its arrival world at once."""
+    environment = {
+        **clean_environment(),
+        "EXULANICA_DATABASE_URL": exports["EXULANICA_DATABASE_URL"],
+        "EXULANICA_DATA_DIR": str(data_dir),
+    }
+    program = worktree / ".venv" / "bin" / "exulanica-arrival-worlds"
+    if not program.exists():
+        refuse("toolchain-missing", f"the checkout lacks {program}")
+    started = time.monotonic()
+    prepared = run([str(program), "prepare", "--workspace", workspace_id], worktree, environment)
+    (logs / "arrival-worlds.txt").write_text(prepared)
+    deadline = started + ARRIVAL_BAKE_SECONDS
+    while time.monotonic() < deadline:
+        baked = run([str(python), "-c", ARRIVAL_BAKED, workspace_id], worktree, environment)
+        if baked.strip().splitlines()[-1] == "True":
+            state["arrival_worlds"] = {
+                "prepared_in": workspace_id,
+                "baked_after_seconds": round(time.monotonic() - started),
+            }
+            write_state(state_file, state)
+            return
+        time.sleep(5)
+    refuse(
+        "arrival-not-baked", f"the arrival worlds were not baked within {ARRIVAL_BAKE_SECONDS} s"
+    )
+
+
+def role_url(url: str, role: str) -> str:
+    """A lane server's connection URL for ``role``: the same server and database, another user."""
+    scheme, rest = url.split("://", 1)
+    return f"{scheme}://{role}@{rest.split('@', 1)[1] if '@' in rest else rest}"
+
+
+def accounts_environment(account_url: str, origin: str, code_sha256: str) -> dict[str, str]:
+    """What ``--accounts-guest-code`` hands the API: the accounts role, the one browser origin, guest
+    entry by the code's digest only, and playback of every account's own workspace."""
+    return {
+        "EXULANICA_ACCOUNT_DATABASE_URL": account_url,
+        "EXULANICA_ACCOUNT_BROWSER_ORIGINS": json.dumps([origin]),
+        "EXULANICA_GUEST_ENTRY": "code",
+        "EXULANICA_GUEST_ENTRY_CODE_SHA256": code_sha256,
+        "EXULANICA_GUEST_ENTRIES_PER_DAY": str(GUEST_ENTRIES_PER_DAY),
+        "EXULANICA_SOCIETY_CONTROL_WORKER": "on",
+    }
+
+
 def api_environment(
     *,
     exports: Mapping[str, str],
@@ -517,6 +751,7 @@ def api_environment(
     society_playback: Mapping[str, str],
     door_bridges: str | None = None,
     society_of_things: bool = False,
+    accounts: Mapping[str, str] | None = None,
     environ: Mapping[str, str] | None = None,
 ) -> dict[str, str]:
     environment = clean_environment(environ)
@@ -539,6 +774,8 @@ def api_environment(
         environment["EXULANICA_DOOR_BRIDGES"] = door_bridges
     if society_of_things:
         environment["EXULANICA_SOCIETY_OF_THINGS"] = "on"
+    if accounts is not None:
+        environment.update(accounts)
     return environment
 
 
@@ -1051,6 +1288,103 @@ def write_state(state_file: Path, state: Mapping[str, object]) -> None:
     state_file.write_text(json.dumps(state, indent=2))
 
 
+def guest_entry(
+    python: Path, worktree: Path, exports: Mapping[str, str], run_dir: Path, logs: Path, origin: str
+) -> dict[str, str]:
+    """The accounts host ``--accounts-guest-code`` starts: the accounts role given its tables, the
+    run's code drawn into a file only this user reads, and an authority and guest policy issued for
+    every provider before any guest can enter. The code is never printed or logged."""
+    provisioned = subprocess.run(
+        [str(python), "-c", PROVISION_ACCOUNTS, exports["OWNER_URL"]],
+        cwd=worktree,
+        env=clean_environment(),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if provisioned.returncode != 0:
+        refuse("accounts-provision", provisioned.stderr.strip()[-REFUSAL_EXCERPT_CHARACTERS:])
+    role = provisioned.stdout.strip().splitlines()[-1]
+    code = secrets.token_urlsafe(18)
+    code_file = run_dir / GUEST_CODE_NAME
+    code_file.write_text(code)
+    code_file.chmod(0o600)
+    providers = json.loads(run([str(python), "-c", MANIFEST_PROVIDERS], worktree))
+    operator_environment = {
+        **clean_environment(),
+        "EXULANICA_DATABASE_URL": exports["OWNER_URL"],
+        "EXULANICA_SPENDING_WITNESS_DIR": str(run_dir / SPENDING_WITNESS_NAME),
+    }
+    issued = []
+    for provider in providers:
+        authority = subprocess.run(
+            [
+                str(python),
+                "-m",
+                "exulanica.spending",
+                "issue",
+                "--provider",
+                provider,
+                "--ceiling-usd",
+                "1.00",
+                "--max-calls",
+                "1000",
+                "--valid-until",
+                "2027-01-01T00:00:00Z",
+                "--operator",
+                "acceptance",
+                "--reason",
+                "acceptance guest entry",
+            ],
+            cwd=worktree,
+            env=operator_environment,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if authority.returncode != 0:
+            refuse("guest-policy", authority.stderr.strip()[-REFUSAL_EXCERPT_CHARACTERS:])
+        authority_id = json.loads(authority.stdout)["authority_id"]
+        policy = subprocess.run(
+            [
+                str(python),
+                "-m",
+                "exulanica.spending",
+                "guest-policy",
+                "--authority",
+                authority_id,
+                "--ceiling-usd",
+                GUEST_POLICY_CEILING_USD,
+                "--max-calls",
+                str(GUEST_POLICY_MAX_CALLS),
+                "--valid-for-days",
+                "7",
+                "--grants-per-day",
+                "100",
+                "--operator",
+                "acceptance",
+                "--reason",
+                "acceptance guest entry",
+            ],
+            cwd=worktree,
+            env=operator_environment,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if policy.returncode != 0:
+            refuse("guest-policy", policy.stderr.strip()[-REFUSAL_EXCERPT_CHARACTERS:])
+        issued.append(
+            {"provider": provider, "authority": authority.stdout, "policy": policy.stdout}
+        )
+    (logs / "guest-policy.txt").write_text(json.dumps(issued, indent=2))
+    return accounts_environment(
+        role_url(exports["EXULANICA_DATABASE_URL"], role),
+        origin,
+        hashlib.sha256(code.encode()).hexdigest(),
+    )
+
+
 def up(arguments: argparse.Namespace) -> None:
     worktree = checkout(arguments.worktree)
     python = check_toolchain(worktree)
@@ -1069,6 +1403,14 @@ def up(arguments: argparse.Namespace) -> None:
         society_playback_environment(None, arguments.society_tick_interval_ms)  # likewise
     if arguments.door_bridges is not None:
         door_bridges_setting(arguments.door_bridges, [])  # likewise
+    if arguments.accounts_guest_code and (
+        arguments.edge_port is None
+        or not arguments.tiles
+        or arguments.scripted_model is None
+        or arguments.spending != "durable"
+        or not arguments.society_playback
+    ):
+        refuse("accounts-shape", REFUSALS["accounts-shape"])
     directory = state_dir(worktree)
     state_file = directory / "state.json"
     if state_file.exists():
@@ -1079,6 +1421,11 @@ def up(arguments: argparse.Namespace) -> None:
     for role in ("api", "vite", "browser", *(("spare",) if spare else ())):
         if listening(chosen[role]):
             refuse("port-in-use", f"port {chosen[role]} ({role})")
+    if arguments.accounts_guest_code:
+        if arguments.edge_port in chosen.values():
+            refuse("port-in-use", f"port {arguments.edge_port} (edge) is one of the slot's roles")
+        if listening(arguments.edge_port):
+            refuse("port-in-use", f"port {arguments.edge_port} (edge)")
 
     resolved = run(
         [
@@ -1265,6 +1612,21 @@ def up(arguments: argparse.Namespace) -> None:
     if arguments.society_of_things:
         state["society_of_things"] = True
 
+    accounts = None
+    if arguments.accounts_guest_code:
+        accounts = guest_entry(
+            python, worktree, exports, run_dir, logs, edge_origin(arguments.edge_port)
+        )
+        state["accounts"] = {
+            "code_file": str(run_dir / GUEST_CODE_NAME),
+            "origin": edge_origin(arguments.edge_port),
+            "guest_policy": {
+                "ceiling_usd": GUEST_POLICY_CEILING_USD,
+                "max_calls": GUEST_POLICY_MAX_CALLS,
+            },
+            "environment": accounts,
+        }
+
     # People are drawn only from published catalogs (migration 0131), so a run publishes before
     # its API starts, exactly as a deployment must.
     published = run(
@@ -1294,6 +1656,7 @@ def up(arguments: argparse.Namespace) -> None:
         ),
         door_bridges=door_bridges,
         society_of_things=arguments.society_of_things,
+        accounts=accounts,
     )
     environment.update(model_witness_environment(environment, run_dir))
     plan = None
@@ -1350,7 +1713,7 @@ def up(arguments: argparse.Namespace) -> None:
         "readyz": [ready_status, ready_body.decode(errors="replace")],
     }
     if arguments.society_playback:
-        check = society_playback_readiness(ready_body)
+        check = society_playback_readiness(ready_body, accounts=accounts is not None)
         state["society_playback"] = {
             "workspace_id": workspace_id,
             "base_tick_interval_ms": check.get("base_tick_interval_ms"),
@@ -1358,6 +1721,10 @@ def up(arguments: argparse.Namespace) -> None:
         }
         write_state(state_file, state)
     start_tile_worker(worktree, exports, data_dir, workspace_id, logs, state, state_file)
+    if accounts is not None:
+        prepare_arrival_worlds(
+            python, worktree, exports, data_dir, workspace_id, logs, state, state_file
+        )
     if arguments.depth_worker:
         start_depth_worker(
             worktree,
@@ -1398,6 +1765,9 @@ def up(arguments: argparse.Namespace) -> None:
         if second_status != 200:
             refuse("token-refused", f"the second API answered {second_status}")
 
+    if accounts is not None:
+        start_edge(worktree, run_dir, arguments.edge_port, chosen["api"], state, state_file)
+
     if arguments.production:
         serve_production(worktree, run_dir, chosen, logs, state, state_file)
     else:
@@ -1406,7 +1776,7 @@ def up(arguments: argparse.Namespace) -> None:
     extra = ("society_playback",) if arguments.society_playback else ()
     extra += tuple(
         key
-        for key in ("other_workspaces", "read_only_token", "peer_token", "second_api")
+        for key in ("other_workspaces", "read_only_token", "peer_token", "second_api", "edge")
         if key in state
     )
     print(json.dumps({key: state[key] for key in (*shown, "api_health", "app", *extra)}, indent=2))
@@ -1605,6 +1975,7 @@ def restart_api(arguments: argparse.Namespace) -> None:
         ),
         door_bridges=state.get("door_bridges"),
         society_of_things=bool(state.get("society_of_things")),
+        accounts=(state.get("accounts") or {}).get("environment"),
     )
     environment.update(model_witness_environment(environment, run_dir))
     scripted = state.get("scripted_model")
@@ -1659,6 +2030,8 @@ def down(arguments: argparse.Namespace) -> None:
     if not state_file.exists():
         refuse("no-state", str(state_file))
     state = json.loads(state_file.read_text())
+    if "edge" in state:
+        stop_edge(state, Path(state["run_dir"]) / "logs")
     if "tile_worker" in state["pids"]:
         stop_tile_worker(state)
     if "latency_proxy" in state["pids"]:
@@ -1810,6 +2183,20 @@ def build_parser() -> argparse.ArgumentParser:
                 action="store_true",
                 help="offer the society of things on the API (EXULANICA_SOCIETY_OF_THINGS=on), "
                 "for rehearsal stacks on fresh acceptance databases only (default: not offered)",
+            )
+            command.add_argument(
+                "--accounts-guest-code",
+                action="store_true",
+                help="also serve browser accounts with guest entry by a code drawn for the run "
+                "(its SHA-256 only reaches the API), an authority and guest policy per provider, "
+                "and playback of accounts' own workspaces; needs --edge-port, --tiles, "
+                "--scripted-model, --spending durable and --society-playback (default: no accounts)",
+            )
+            command.add_argument(
+                "--edge-port",
+                type=int,
+                help="with --accounts-guest-code, the loopback port of the local HTTPS edge in "
+                "front of the API; the browser origin is https://localhost:<port> (default: none)",
             )
             command.add_argument(
                 "--society-tick-interval-ms",

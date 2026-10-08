@@ -1,0 +1,37 @@
+# A local HTTPS edge for an acceptance slot, as deploy/public/Caddyfile serves the public server:
+# Caddy's own local authority (tls internal) for the name localhost, the original Host passed
+# through, X-Forwarded-For, -Proto and -Host set by Caddy (it trusts none it receives). Started in
+# the pinned image with the slot's ports; nothing here is a test-only allowance in the API.
+#
+# EXULANICA_EDGE_UPSTREAM is what the browser's page and calls reach behind the edge, as
+# host.docker.internal:<port> from the container (the slot's web server, which proxies the API, or
+# the API itself).
+{
+	admin off
+	# The local authority's root is not installed into any system store; the driver trusts
+	# <data>/caddy/pki/authorities/local/root.crt in its own profile only.
+	skip_install_trust
+	# The container's 443 is published on another host port, so a redirect to 443 would be wrong.
+	auto_https disable_redirects
+}
+
+localhost {
+	tls internal
+	request_body {
+		max_size 8MiB
+	}
+	reverse_proxy {$EXULANICA_EDGE_UPSTREAM} {
+		transport http {
+			read_timeout 300s
+		}
+	}
+	log {
+		output stdout
+		format filter {
+			wrap json
+			fields {
+				request>headers>X-Csrf-Token delete
+			}
+		}
+	}
+}

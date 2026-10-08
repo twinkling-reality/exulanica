@@ -362,3 +362,96 @@ def test_w3_reads_a_plan_position_inside_a_site_by_its_drawings_frame():
     assert not DRIVE.inside_site([43_600, 54_750], extent)
     assert not DRIVE.inside_site([43_600, -54_750], extent, 0.1)
     assert DRIVE.inside_site([48_000, -64_000], extent, 0.1)
+
+
+def test_v1_replaces_a_csrf_token_at_any_depth_and_nothing_else():
+    answer = {"csrf_token": "t", "role": "guest", "nested": [{"csrf_token": "u", "n": 1}]}
+    assert DRIVE.redacted(answer) == {
+        "csrf_token": "[redacted]",
+        "role": "guest",
+        "nested": [{"csrf_token": "[redacted]", "n": 1}],
+    }
+    assert answer["csrf_token"] == "t"
+
+
+def test_v1_reads_an_allowance_as_numbers_by_provider():
+    figures = DRIVE.allowance_figures(
+        [
+            {"provider": "p", "available_usd": "0.05000000", "available_calls": 200},
+            {"provider": "q", "available_usd": None, "available_calls": None},
+        ]
+    )
+    assert figures == {"p": (DRIVE.Decimal("0.05"), 200), "q": (None, None)}
+    assert DRIVE.allowance_figures(None) == {}
+
+
+class _Answer:
+    status = 201
+
+    def __init__(self, body: bytes, cookie: str) -> None:
+        self.body, self.headers = body, {"Set-Cookie": cookie}
+
+    def read(self) -> bytes:
+        return self.body
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc) -> None:
+        return None
+
+
+def test_v1_keeps_a_session_as_a_browser_does_and_records_no_credential(tmp_path, monkeypatch):
+    code, token, cookie = "the-run-code", "the-csrf-token", "__Host-session=secret-value"
+    sent: list[object] = []
+
+    def urlopen(request, timeout, context):
+        sent.append(request)
+        body = json.dumps({"csrf_token": token, "role": "guest"}).encode()
+        return _Answer(body, f"{cookie}; Path=/; Secure; HttpOnly; SameSite=lax")
+
+    monkeypatch.setattr(DRIVE.urllib.request, "urlopen", urlopen)
+    guest = DRIVE.GuestClient.__new__(DRIVE.GuestClient)
+    guest.origin, guest.context, guest.step = "https://localhost:4443", None, "start"
+    guest.cookie = guest.csrf = guest.set_cookie = None
+    guest.record = DRIVE.Transcripts(tmp_path).recorder("guest", lambda: guest.step)
+
+    status, answer = guest.call(
+        "enter",
+        "POST",
+        "/auth/guest",
+        body={"code": code},
+        recorded_body={"code": DRIVE.GUEST_CODE_PLACEHOLDER},
+    )
+    assert status == 201 and guest.keep_session(answer)
+    assert guest.cookie == cookie and guest.csrf == token
+    guest.call("write", "POST", "/worlds/generated", body={"recipe": "small_town"})
+    guest.call("read", "GET", "/auth/session")
+
+    first, write, read = sent
+    assert json.loads(first.data) == {"code": code}
+    assert write.get_header("Cookie") == cookie
+    assert write.get_header("X-csrf-token") == token
+    assert write.get_header("Origin") == "https://localhost:4443"
+    # A read carries the session, never the token a write carries.
+    assert read.get_header("Cookie") == cookie and read.get_header("X-csrf-token") is None
+    recorded = (tmp_path / "guest.jsonl").read_text()
+    for credential in (code, token, "secret-value"):
+        assert credential not in recorded
+    assert DRIVE.GUEST_CODE_PLACEHOLDER in recorded
+
+
+def test_h1_takes_a_resent_start_whose_state_moved_on_and_nothing_else():
+    def answer(state: str, comparison: str = "c1") -> dict:
+        return {
+            "comparisons": [{"comparison_id": comparison, "start": {"state": state, "seeds": 3}}]
+        }
+
+    assert DRIVE.same_start(answer("waiting"), answer("waiting"))
+    assert DRIVE.same_start(answer("waiting"), answer("running"))
+    assert DRIVE.same_start(answer("running"), answer("finished"))
+    # A state never moves back, an unknown state is none, and another comparison is not this one.
+    assert not DRIVE.same_start(answer("running"), answer("waiting"))
+    assert not DRIVE.same_start(answer("waiting"), answer("lost"))
+    assert not DRIVE.same_start(answer("waiting"), answer("waiting", "c2"))
+    assert not DRIVE.same_start(answer("waiting"), {"comparisons": []})

@@ -913,3 +913,120 @@ def test_the_society_of_things_is_offered_only_when_asked_and_to_the_api_alone(t
     parser = LAUNCH.build_parser()
     assert parser.parse_args(["up", "--worktree", "w"]).society_of_things is False
     assert parser.parse_args(["up", "--worktree", "w", "--society-of-things"]).society_of_things
+
+
+# -- a guest entry behind the local HTTPS edge ----------------------------------------------------
+
+
+def test_the_guest_entry_hands_the_api_the_codes_digest_and_one_https_origin_alone():
+    code = "a code for this run"
+    environment = LAUNCH.accounts_environment(
+        "postgresql://exulanica_accounts@127.0.0.1:1/db",
+        LAUNCH.edge_origin(4443),
+        hashlib.sha256(code.encode()).hexdigest(),
+    )
+    assert code not in json.dumps(environment)
+    assert environment["EXULANICA_GUEST_ENTRY"] == "code"
+    # The digest of "a code for this run", computed apart from the launcher.
+    assert environment["EXULANICA_GUEST_ENTRY_CODE_SHA256"] == (
+        "88213d2257b17712271e4fe791d59783bfa71d202843cbc73f66ed2805280723"
+    )
+    assert json.loads(environment["EXULANICA_ACCOUNT_BROWSER_ORIGINS"]) == [
+        "https://localhost:4443"
+    ]
+    assert int(environment["EXULANICA_GUEST_ENTRIES_PER_DAY"]) > 0
+    assert environment["EXULANICA_SOCIETY_CONTROL_WORKER"] == "on"
+    assert not [name for name in environment if name.startswith("EXULANICA_GOOGLE_")]
+
+
+def test_the_accounts_role_url_keeps_the_server_and_database_and_names_the_role_alone():
+    assert (
+        LAUNCH.role_url("postgresql://exulanica_app@127.0.0.1:5/lane?x=1", "exulanica_accounts")
+        == "postgresql://exulanica_accounts@127.0.0.1:5/lane?x=1"
+    )
+    assert (
+        LAUNCH.role_url("postgresql://127.0.0.1:5/lane", "exulanica_accounts")
+        == "postgresql://exulanica_accounts@127.0.0.1:5/lane"
+    )
+
+
+def test_the_edge_runs_the_present_pinned_image_on_loopback_in_front_of_the_api(tmp_path):
+    caddyfile = ROOT / LAUNCH.EDGE_CADDYFILE
+    command = LAUNCH.edge_command(
+        "edge-x", 4443, 4001, caddyfile, tmp_path / "data", tmp_path / "config"
+    )
+    assert command[:3] == ["docker", "run", "--detach"]
+    assert command[command.index("--pull") + 1] == "never"
+    assert command[command.index("--publish") + 1] == "127.0.0.1:4443:443"
+    assert (
+        command[command.index("--env") + 1] == "EXULANICA_EDGE_UPSTREAM=host.docker.internal:4001"
+    )
+    assert f"{caddyfile}:/etc/caddy/Caddyfile:ro" in command
+    assert command[-1] == LAUNCH.EDGE_IMAGE
+    # A tag with a version, never a moving one.
+    assert re.fullmatch(r"caddy:\d+\.\d+\.\d+-alpine", LAUNCH.EDGE_IMAGE)
+    served = caddyfile.read_text()
+    assert "tls internal" in served and "skip_install_trust" in served
+    assert "{$EXULANICA_EDGE_UPSTREAM}" in served
+
+
+def test_a_guest_entry_is_refused_without_its_edge_tiles_scripted_model_or_durable_spending(
+    tmp_path, temporary
+):
+    worktree = _checkout(tmp_path / "checkout")
+    plan = tmp_path / "plan.json"
+    plan.write_text("{}")
+    full = [
+        "up",
+        "--worktree",
+        str(worktree),
+        "--accounts-guest-code",
+        "--edge-port",
+        "4443",
+        "--tiles",
+        "--scripted-model",
+        str(plan),
+        "--spending",
+        "durable",
+        "--society-playback",
+    ]
+    parser = LAUNCH.build_parser()
+    for dropped in (["--edge-port", "4443"], ["--tiles"], ["--scripted-model", str(plan)]):
+        kept = [a for i, a in enumerate(full) if not _within(full, dropped, i)]
+        assert _refusal(LAUNCH.up, parser.parse_args(kept)) == "accounts-shape", dropped
+    durable = full.index("durable")
+    process = [*full[:durable], "process", *full[durable + 1 :]]
+    assert _refusal(LAUNCH.up, parser.parse_args(process)) == "accounts-shape"
+    no_playback = [a for a in full if a != "--society-playback"]
+    assert _refusal(LAUNCH.up, parser.parse_args(no_playback)) == "accounts-shape"
+    assert not list(temporary.iterdir())
+
+
+def _within(arguments: list[str], dropped: list[str], index: int) -> bool:
+    """Whether ``arguments[index]`` is part of the first run of ``dropped`` in ``arguments``."""
+    start = next(i for i in range(len(arguments)) if arguments[i : i + len(dropped)] == dropped)
+    return start <= index < start + len(dropped)
+
+
+def test_a_playback_run_with_accounts_needs_readiness_to_report_account_discovery():
+    played = {
+        "ok": True,
+        "configured": True,
+        "running": True,
+        "base_tick_interval_ms": 8000,
+        "listed_workspaces": 1,
+        "account_discovery": True,
+    }
+    assert LAUNCH.society_playback_readiness(_readyz(**played), accounts=True) == played
+    assert (
+        _refusal(LAUNCH.society_playback_readiness, _readyz(**played))
+        == "society-playback-not-running"
+    )
+    assert (
+        _refusal(
+            LAUNCH.society_playback_readiness,
+            _readyz(**{**played, "account_discovery": False}),
+            accounts=True,
+        )
+        == "society-playback-not-running"
+    )
