@@ -99,6 +99,7 @@ import { AttachedMarks, type MarkedSubject } from '@exulanica/atlas-react/things
 import { markLabel, markOf, type MarkInput } from './thing-marks.js';
 import { LineWatch, thingLine } from './thing-lines.js';
 import { DoorBridgesClient, type DoorBridge } from '../door-bridges-api.js';
+import { DoorGrantsClient, type DoorGrant } from '../door-grants-api.js';
 import { ThingLooksClient, type ThingLookChoice } from '../thing-looks-api.js';
 import { kindDocumentLabel, kindKey, noticeKinds, visitorNotice, VisitorNoticeWatch, type FreshEvent, type KindReference } from './visitor-notices.js';
 import { heardBy, saidBy, type BeingLine } from './being-lines.js';
@@ -554,6 +555,9 @@ export function mountEnvironmentSelection(
   let bridges: ReadonlyMap<string, DoorBridge> | null = null;
   /** When the bridges were last asked for, so a bridge the door does not list is asked at most once a minute. */
   let bridgesAskedAt = Number.NEGATIVE_INFINITY;
+  /** The world's grants by id, for what each program let in says it is; null before any read, and when one was asked. */
+  let grants: ReadonlyMap<string, DoorGrant> | null = null;
+  let grantsAskedAt = Number.NEGATIVE_INFINITY;
   /** Whether the looks chosen for the society's things have been read, the things a read covered, and when one was asked. */
   let looksRead = false;
   const looksSeen = new Set<string>();
@@ -1980,9 +1984,13 @@ export function mountEnvironmentSelection(
     const kinds = things?.layer.maker.library.list.kinds ?? [];
     const subjects = new Map<string, MarkedSubject>();
     let unknownBridge = false;
+    let unnamedAgent = false;
     for (const person of people) {
       const crossing = person.came_by === 'crossed' ? person.crossing ?? null : null;
       if (crossing !== null && bridges?.get(crossing.bridge) == null) unknownBridge = true;
+      // An outside agent its own program runs is named in its own words once its grant is read.
+      if (crossing !== null && crossing.decided_by !== 'world' && bridges?.get(crossing.bridge)?.ai === true
+        && grants?.get(crossing.grant_id)?.declared == null) unnamedAgent = true;
       const mark = markOf(markInputFor(person, running));
       if (mark === null) continue;
       const kind = person.kind;
@@ -1993,6 +2001,7 @@ export function mountEnvironmentSelection(
     marks.set(subjects);
     if (deps.env.canvas) deps.env.canvas.dataset['thingMarks'] = String(subjects.size);
     if (unknownBridge) readBridges();
+    if (unnamedAgent) readGrants();
   }
 
   /** What decides who runs a person (`markOf`'s input), from the models read and the door's bridges. */
@@ -2002,7 +2011,8 @@ export function mountEnvironmentSelection(
   ): MarkInput {
     const crossing = person.came_by === 'crossed' ? person.crossing ?? null : null;
     const bridge = crossing === null ? null : bridges?.get(crossing.bridge) ?? null;
-    return { running: running.get(person.id) ?? null, crossing, bridge, declared: null };
+    const declared = crossing === null ? null : grants?.get(crossing.grant_id)?.declared ?? null;
+    return { running: running.get(person.id) ?? null, crossing, bridge, declared };
   }
 
   /**
@@ -2075,6 +2085,24 @@ export function mountEnvironmentSelection(
       // A door that answers nothing names no bridge: such visitors stay marked as from outside.
       bridges ??= new Map();
       tellVisitors();
+    });
+  }
+
+  /**
+   * Read what the programs let into this world say they are, at most once a minute while an outside
+   * agent is drawn whose grant names nobody yet: its program may say who it is at a later hello.
+   */
+  function readGrants(): void {
+    const world = savedWorld;
+    const now = performance.now();
+    if (world === null || now - grantsAskedAt < 60_000) return;
+    grantsAskedAt = now;
+    void new DoorGrantsClient({ ...deps.credentials, worldId: world.worldId }).read().then((read) => {
+      if ((phase as string) === 'disposed') return;
+      grants = read;
+      refreshMarks();
+    }, () => {
+      // A door that answers nothing names nobody: such agents keep the pill that says agent.
     });
   }
 
@@ -2727,6 +2755,8 @@ export function mountEnvironmentSelection(
       marks?.destroy();
       marks = null;
       bridges = null;
+      grants = null;
+      grantsAskedAt = Number.NEGATIVE_INFINITY;
       looksRead = false;
       looksSeen.clear();
       looksAskedAt = Number.NEGATIVE_INFINITY;

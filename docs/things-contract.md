@@ -755,11 +755,15 @@ person whose model is asked (chosen for them, and refused neither by the host no
 `AI` pill with the first word of the model's served name; a visitor its own program decides for
 wears its bridge's mark as the door lists it here, `from` and the bridge's label for a game a person
 plays, an outlined `AI` pill for an outside agent, and `from outside` for a bridge the door does not
-list. A visitor the world decides for (its arrival's `decided_by` is `world`) is marked by who decides
-here: the `AI` pill naming the model asked, followed in the same pill by `· from` and its bridge's
-label, or, while its routine runs it, `from` and the label alone, read as run by this world.
-Everyone else, and every object, wears none. The pills are part of the page, not the picture: a fixed pool of nodes placed each
-frame over the box a person is drawn and picked by, read by a screen reader in the card's words and
+list. An outside agent's pill names it in its own words, as its program last said them at the door
+(the world's grants, `GET /door/grants`, read at most once a minute while such an agent is drawn
+without a name; set as text only, a long name cut short on the pill and read whole), and says
+`agent` until its program says. A visitor the world decides for (its arrival's `decided_by` is
+`world`) is marked by who decides here: the `AI` pill naming the model asked, followed in the same
+pill by `· from` and its bridge's label, or, while its routine runs it, `from` and the label alone,
+read as run by this world. Everyone else, and every object, wears none. The pills are part of the
+page, not the picture: a fixed pool of nodes placed each frame over the box a person is drawn and
+picked by, read by a screen reader in the card's words and
 picked by a click as by aiming. The model's short name and the person's kind show over the selected
 person, a speaking one and the three nearest marked people within 12 m drawn on screen; no pill is
 drawn beyond 60 m.
@@ -799,9 +803,8 @@ These are material limits of the boundary above, not partial behaviour:
   its crossing's.
 - The browser draws no hand-over between two people as it happens (a thing is drawn in the hand
   the state names at each minute). A model's line names no model until the said event records the
-  model that wrote it; it says `an AI model`. An outside agent's pill says `agent` rather than the
-  name it gives itself, which no read serves the page yet, and a person in flight wears no pill:
-  the flock draws them, not the crowd.
+  model that wrote it; it says `an AI model`. A person in flight wears no pill: the flock draws
+  them, not the crowd.
 - No route drafts a creature or keeps its documents. The drafter is measured and bound to its own
   manifest role, `creature_drafter` (see [model and service selection](model-and-service-selection.md)),
   and is reached by tests and the measurement only.
@@ -839,4 +842,4 @@ These are material limits of the boundary above, not partial behaviour:
 | Scenes and their dressing | [`scenes.py`](../exulanica/world/scenes.py), [`scene_dressing.py`](../exulanica/api/scene_dressing.py), [`assets/catalogs/scenes`](../assets/catalogs/scenes) | `tests/test_scenes.py` (every shipped scene locked at its digest; each refusal by name against the shipped scene; poses equal to the demo builder's, which shares no code with it, and a turned arrival's worked by hand), `tests/test_scene_dressing_postgres.py` (a starter dressed through the application: its things bound to the saved entry where the builder would place them, in the arrival's region, authored as fictional and placed by the owner, the society and each mind read back, a second dressing changing nothing, a thing placed as another kind refused, the owner's moves, removals and undos standing, a host without the engine, a society with no first input, a model the role refuses for one being alone, another workspace and a busy connection refused), `tests/test_demo_scene.py` |
 | No creature in code | | `tests/test_no_creature_code.py` (with a planted name the scan finds) |
 | Purity | The import contract "Things are pure data" in `pyproject.toml`: no database, store, evidence, pipeline, world, traffic, movement step, model or numeric stack | `lint-imports` |
-| Drawing | [`things/`](../web/packages/atlas-react/src/playcanvas/things), [`composition/things.ts`](../web/packages/app/src/composition/things.ts), [`things-library.ts`](../web/packages/app/src/things-library.ts) | `web/packages/atlas-react/test/things-*.test.ts` (the shipped documents read, digests refused, skeletons read by shape with a ten-legged plan, planted feet, placement, misses, picking, a society's things through the crowd, a held thing in its holder's hand, the marks and lines overlay), `web/packages/atlas-react/test/society-crowd-things.test.ts`, `web/packages/atlas-react/test/society-crowd-anchors.test.ts`, `web/packages/atlas-react/test/society-crowd-refresh.test.ts`, `web/packages/atlas-react/test/things-placed-facing.test.ts`, `web/packages/app/test/things-composition.test.ts`, `web/packages/app/test/environment-selection-things.test.ts`, `web/packages/app/test/environment-selection-marks.test.ts`, `web/packages/app/test/thing-marks.test.ts`, `web/packages/app/test/thing-lines.test.ts`, `web/packages/app/test/environment-selection-lines.test.ts`, `web/packages/app/test/door-bridges-api.test.ts`, `web/packages/app/test/thing-looks-api.test.ts`, `web/packages/app/test/things-composition-looks.test.ts`, `web/packages/app/test/environment-selection-looks.test.ts`, `web/packages/app/test/things-composition-facing.test.ts`, `web/packages/app/test/things-library-held.test.ts` |
+| Drawing | [`things/`](../web/packages/atlas-react/src/playcanvas/things), [`composition/things.ts`](../web/packages/app/src/composition/things.ts), [`things-library.ts`](../web/packages/app/src/things-library.ts) | `web/packages/atlas-react/test/things-*.test.ts` (the shipped documents read, digests refused, skeletons read by shape with a ten-legged plan, planted feet, placement, misses, picking, a society's things through the crowd, a held thing in its holder's hand, the marks and lines overlay), `web/packages/atlas-react/test/society-crowd-things.test.ts`, `web/packages/atlas-react/test/society-crowd-anchors.test.ts`, `web/packages/atlas-react/test/society-crowd-refresh.test.ts`, `web/packages/atlas-react/test/things-placed-facing.test.ts`, `web/packages/app/test/things-composition.test.ts`, `web/packages/app/test/environment-selection-things.test.ts`, `web/packages/app/test/environment-selection-marks.test.ts`, `web/packages/app/test/thing-marks.test.ts`, `web/packages/app/test/door-grants-api.test.ts`, `web/packages/app/test/environment-selection-agents.test.ts`, `web/packages/app/test/thing-lines.test.ts`, `web/packages/app/test/environment-selection-lines.test.ts`, `web/packages/app/test/door-bridges-api.test.ts`, `web/packages/app/test/thing-looks-api.test.ts`, `web/packages/app/test/things-composition-looks.test.ts`, `web/packages/app/test/environment-selection-looks.test.ts`, `web/packages/app/test/things-composition-facing.test.ts`, `web/packages/app/test/things-library-held.test.ts` |

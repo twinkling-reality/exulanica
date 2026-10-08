@@ -49,6 +49,13 @@
 .thing-mark-name {
   font-weight: 500;
   letter-spacing: 0;
+  /* An outside agent names itself, up to 60 characters: the pill shows the start, a reader the whole. */
+  display: inline-block;
+  max-width: 12em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
 }
 
 /* Where a visitor this world's model runs came from, after its name. */
