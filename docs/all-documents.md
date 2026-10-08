@@ -7,7 +7,7 @@ Start from the [documentation hub](README.md). Each document has one subject hom
 an explicit responsibility. A role describes how to use a document, not whether a feature
 is implemented. Contracts and scoped evidence establish capability claims.
 
-**109 documents** in the public catalog.
+**110 documents** in the public catalog.
 
 - [Product and architecture](#orientation)
 - [Capability guides](#capabilities)
@@ -60,6 +60,7 @@ How a world's people live, how open models decide for them, how runs are compare
 | --- | --- | --- |
 | [Synthetic society contract](synthetic-society-contract.md) | contract | Society engines, inputs, identity, persistence, playback, directed actions and replay |
 | [Decision roles and model decisions](decision-roles-contract.md) | contract | Decision roles, the owner's model choice, the person's decision contract, host asking and spend bounds, dispositions and replay |
+| [Minds contract: what a being notices and what it remembers](minds-contract.md) | contract | What a being of a society of things notices and remembers: the surroundings and memory blocks a decider is shown, and the rules and bounds that build them |
 | [The door for outside programs](door-contract.md) | contract | The door for outside programs: admitted bridges, owners' grants and their secrets, the channel a bridge reads and answers on, the external asker and mapping files |
 | [Society experiments](society-experiments.md) | contract | Comparisons of the models that decide for a world's people, and intervention experiments over a living society |
 | [Movement modules contract](movement-modules-contract.md) | contract | Movement modules and their dispatch: walking, flight through a world's air, flying kinds and roads |
