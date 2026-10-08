@@ -715,6 +715,19 @@ picked by a click as by aiming. The model's short name and the person's kind sho
 person, a speaking one and the three nearest marked people within 12 m drawn on screen; no pill is
 drawn beyond 60 m.
 
+Each line a being says is drawn over it as it is said, from the society's `said` events read with
+each minute: only lines said after the page first read the society, each once, oldest first, at most
+four bubbles at once and one per speaker, each shown for two to nine seconds by its length. A line's
+words are set as text only. The bubble opens with the line's own mark, decided from the line's record
+by one function the thing card shares (`lineMarkOf` in
+[`composition/thing-marks.ts`](../web/packages/app/src/composition/thing-marks.ts)): a model's line is
+always an AI's, naming the model only where its event names it, so the speaker's model now is never
+claimed for an older line, and keeping where a visitor the world runs came from; an outside
+program's line wears its speaker's mark. Its header says who said it to whom by the library's kind
+labels, numbered only where more than one of a kind is drawn, then the model where named
+([`composition/thing-lines.ts`](../web/packages/app/src/composition/thing-lines.ts)). Lines cost no
+request of their own: the events are read with the minute.
+
 Aiming and pressing E picks the nearest drawn thing or person along the ray. A picked thing raises
 one event on the shell, `exulanica:thing-pick`, whose detail names it by the version's id, the
 society's thing id and its person id where each exists, and how it was picked; the same event with
@@ -736,10 +749,10 @@ These are material limits of the boundary above, not partial behaviour:
   The world's owner has no route to choose a look, and a look is recorded only where a door records
   its crossing's.
 - The browser draws no hand-over between two people as it happens (a thing is drawn in the hand
-  the state names at each minute), no line a person says (the bubble that draws one, opening with
-  its speaker's pill, is built; nothing carries lines to it). An outside agent's pill says `agent`
-  rather than the name it gives itself, which no read serves the page yet, and a person in flight
-  wears no pill: the flock draws them, not the crowd.
+  the state names at each minute). A model's line names no model until the said event records the
+  model that wrote it; it says `an AI model`. An outside agent's pill says `agent` rather than the
+  name it gives itself, which no read serves the page yet, and a person in flight wears no pill:
+  the flock draws them, not the crowd.
 - No crossing writes a translation manifest yet; the look importer writes one for each look it
   makes.
 - No route drafts a creature or keeps its documents. The drafter is measured and bound to its own
@@ -775,4 +788,4 @@ These are material limits of the boundary above, not partial behaviour:
 | A creature's look request and its sculpted look | [`creature_looks.py`](../exulanica/things/creature_looks.py), `ml/appearance/exulanica_appearance/creatures/` | `tests/test_creature_sculpt.py` (each development creature's sketch filled, rigged, written and read back against its plan's tree; the creature job end to end with stand-in models, a body that is not its plan's refused by the rig with its measures in the receipt), `ml/appearance/tests/test_creature_rig.py` and `test_creature_route.py` (a box figure: every check against a positive control, fused legs refused with every measure, a missing leg, a turn undone to the degree, a stretched body refused with the fit it refused; the all-at-once rasteriser equal to the loop; the camera on each plan's front left; the sketch's voxels in TRELLIS's frame), `ml/appearance/tests/test_trellis_second_stage.py` (the second stage's call order, and each refusal of a structure and of a pipeline's signatures alone); the two rig trials on Nebius AI Cloud, [first record](evaluation/2026-10-07-creature-rig-trial.json) and [second record](evaluation/2026-10-07-creature-rig-trial-2.json), each held equal to what its script builds from its evidence (`tests/test_creature_rig_trial_record.py`, `tests/test_creature_rig_trial_2_record.py`) |
 | No creature in code | | `tests/test_no_creature_code.py` (with a planted name the scan finds) |
 | Purity | The import contract "Things are pure data" in `pyproject.toml`: no database, store, evidence, pipeline, world, traffic, movement step, model or numeric stack | `lint-imports` |
-| Drawing | [`things/`](../web/packages/atlas-react/src/playcanvas/things), [`composition/things.ts`](../web/packages/app/src/composition/things.ts), [`things-library.ts`](../web/packages/app/src/things-library.ts) | `web/packages/atlas-react/test/things-*.test.ts` (the shipped documents read, digests refused, skeletons read by shape with a ten-legged plan, planted feet, placement, misses, picking, a society's things through the crowd, a held thing in its holder's hand, the marks and lines overlay), `web/packages/atlas-react/test/society-crowd-things.test.ts`, `web/packages/atlas-react/test/society-crowd-anchors.test.ts`, `web/packages/atlas-react/test/society-crowd-refresh.test.ts`, `web/packages/atlas-react/test/things-placed-facing.test.ts`, `web/packages/app/test/things-composition.test.ts`, `web/packages/app/test/environment-selection-things.test.ts`, `web/packages/app/test/environment-selection-marks.test.ts`, `web/packages/app/test/thing-marks.test.ts`, `web/packages/app/test/door-bridges-api.test.ts`, `web/packages/app/test/thing-looks-api.test.ts`, `web/packages/app/test/things-composition-looks.test.ts`, `web/packages/app/test/environment-selection-looks.test.ts`, `web/packages/app/test/things-composition-facing.test.ts` |
+| Drawing | [`things/`](../web/packages/atlas-react/src/playcanvas/things), [`composition/things.ts`](../web/packages/app/src/composition/things.ts), [`things-library.ts`](../web/packages/app/src/things-library.ts) | `web/packages/atlas-react/test/things-*.test.ts` (the shipped documents read, digests refused, skeletons read by shape with a ten-legged plan, planted feet, placement, misses, picking, a society's things through the crowd, a held thing in its holder's hand, the marks and lines overlay), `web/packages/atlas-react/test/society-crowd-things.test.ts`, `web/packages/atlas-react/test/society-crowd-anchors.test.ts`, `web/packages/atlas-react/test/society-crowd-refresh.test.ts`, `web/packages/atlas-react/test/things-placed-facing.test.ts`, `web/packages/app/test/things-composition.test.ts`, `web/packages/app/test/environment-selection-things.test.ts`, `web/packages/app/test/environment-selection-marks.test.ts`, `web/packages/app/test/thing-marks.test.ts`, `web/packages/app/test/thing-lines.test.ts`, `web/packages/app/test/environment-selection-lines.test.ts`, `web/packages/app/test/door-bridges-api.test.ts`, `web/packages/app/test/thing-looks-api.test.ts`, `web/packages/app/test/things-composition-looks.test.ts`, `web/packages/app/test/environment-selection-looks.test.ts`, `web/packages/app/test/things-composition-facing.test.ts` |

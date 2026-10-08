@@ -31,6 +31,7 @@ import {
 import {
   SocietyClient,
   type SocietyActionRecord,
+  type SocietyEvent,
   type SocietySnapshot,
 } from '../society-api.js';
 import {
@@ -43,7 +44,7 @@ import { createLiveSociety, type LiveSociety, type LiveSocietyView } from './liv
 import {
   mountSocietyModels, type ChoiceOutcome, type DecidesTarget, type MountedSocietyModels, type PersonMind,
 } from './society-models-mount.js';
-import type { ModelRef, SocietyModel, SocietyModelsClient } from '../society-models-api.js';
+import type { ModelRef, NamedModelRef, SocietyModel, SocietyModelsClient } from '../society-models-api.js';
 import { unreadMinutes } from './society-unread-minutes.js';
 import { SocietyDistrictClient, type SocietyDistrictPlacement, type SocietyDistrictView } from '../society-district-api.js';
 import {
@@ -94,7 +95,8 @@ import { engineCreatedOver, societyEngine } from '../society-engines.js';
 import type { SavedWorldFlight, SavedWorldFlightStatus } from './saved-world-flight.js';
 import { looksReadDue, mountThings, THING_PICK_EVENT, type MountedThings, type ThingPickDetail, type ThingPickVia, type ThingsDependencies } from './things.js';
 import { AttachedMarks, type MarkedSubject } from '@exulanica/atlas-react/things';
-import { markLabel, markOf } from './thing-marks.js';
+import { markLabel, markOf, type MarkInput } from './thing-marks.js';
+import { LineWatch, thingLine } from './thing-lines.js';
 import { DoorBridgesClient, type DoorBridge } from '../door-bridges-api.js';
 import { ThingLooksClient, type ThingLookChoice } from '../thing-looks-api.js';
 import { visitorNotice, VisitorNoticeWatch, type FreshEvent, type KindReference } from './visitor-notices.js';
@@ -554,6 +556,8 @@ export function mountEnvironmentSelection(
   let bridgesReading = false;
   /** Which of a society's events are new, and the bridge each visitor crossed through. */
   const visitorWatch = new VisitorNoticeWatch();
+  /** The lines said since the page first read the society. */
+  const lineWatch = new LineWatch();
   /** Crossings read but not yet told, while the door says which bridge they came through. */
   let heldNotices: readonly FreshEvent[] = [];
   let authoredWorldFailure: string | null = null;
@@ -1915,6 +1919,7 @@ export function mountEnvironmentSelection(
       if (view.eventsAvailable) {
         heldNotices = [...heldNotices, ...visitorWatch.take(society.societyId, view.events)];
         tellVisitors();
+        showLines(society.societyId, view.events, society.state);
       }
       canvas.dataset.societyPopulation = String(society.populationSize);
       canvas.dataset.societyRendered = String(runtime.drawnInhabitantCount);
@@ -1966,9 +1971,8 @@ export function mountEnvironmentSelection(
     let unknownBridge = false;
     for (const person of people) {
       const crossing = person.came_by === 'crossed' ? person.crossing ?? null : null;
-      const bridge = crossing === null ? null : bridges?.get(crossing.bridge) ?? null;
-      if (crossing !== null && bridge === null) unknownBridge = true;
-      const mark = markOf({ running: running.get(person.id) ?? null, crossing, bridge, declared: null });
+      if (crossing !== null && bridges?.get(crossing.bridge) == null) unknownBridge = true;
+      const mark = markOf(markInputFor(person, running));
       if (mark === null) continue;
       const kind = person.kind;
       const label = kind === undefined ? null
@@ -1978,6 +1982,40 @@ export function mountEnvironmentSelection(
     marks.set(subjects);
     if (deps.env.canvas) deps.env.canvas.dataset['thingMarks'] = String(subjects.size);
     if (unknownBridge) readBridges();
+  }
+
+  /** What decides who runs a person (`markOf`'s input), from the models read and the door's bridges. */
+  function markInputFor(
+    person: OwnedSocietyState['inhabitants'][number],
+    running: ReadonlyMap<string, NamedModelRef> = societyModels?.runningModels() ?? new Map(),
+  ): MarkInput {
+    const crossing = person.came_by === 'crossed' ? person.crossing ?? null : null;
+    const bridge = crossing === null ? null : bridges?.get(crossing.bridge) ?? null;
+    return { running: running.get(person.id) ?? null, crossing, bridge, declared: null };
+  }
+
+  /**
+   * Draw each line said since the page first read the society over its speaker, opening with the
+   * line's own mark (`thingLine`), oldest first; a speaker no longer drawn shows no bubble.
+   */
+  function showLines(societyId: string, events: readonly SocietyEvent[], state: OwnedSocietyState): void {
+    const lines = lineWatch.take(societyId, events);
+    if (marks === null || lines.length === 0) return;
+    const kinds = things?.layer.maker.library.list.kinds ?? [];
+    const people = new Map(state.inhabitants.map((person) => [person.id, person]));
+    const words = {
+      kindLabel: (kind: { kind: string; version: number; sha256: string }) =>
+        kinds.find((one) => one.kind === kind.kind && one.version === kind.version && one.sha256 === kind.sha256)?.label ?? null,
+      countOf: (kind: { kind: string; version: number; sha256: string }) =>
+        state.inhabitants.filter((person) => person.kind?.kind === kind.kind && person.kind.version === kind.version && person.kind.sha256 === kind.sha256).length,
+      modelName: (model: ModelRef) =>
+        societyModels?.models()?.find((one) => one.provider === model.provider && one.modelId === model.modelId) ?? null,
+    };
+    for (const line of lines) {
+      const speaker = people.get(line.speakerId);
+      marks.showLine(thingLine(line, speaker === undefined ? null : markInputFor(speaker), words));
+    }
+    if (deps.env.canvas) deps.env.canvas.dataset['thingLinesSaid'] = String(Number(deps.env.canvas.dataset['thingLinesSaid'] ?? '0') + lines.length);
   }
 
   /**
@@ -2637,6 +2675,7 @@ export function mountEnvironmentSelection(
       looksSeen.clear();
       looksAskedAt = Number.NEGATIVE_INFINITY;
       visitorWatch.reset();
+      lineWatch.reset();
       heldNotices = [];
       if (deps.env.canvas) delete deps.env.canvas.dataset['thingMarks'];
       if (deps.env.canvas) for (const key of ['thingsDrawn', 'thingsMissed', 'thingsFailure']) delete deps.env.canvas.dataset[key];

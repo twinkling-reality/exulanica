@@ -3,7 +3,7 @@
 // first word; a person playing a game: "from" its game; an outside agent: AI in its own name;
 // a bridge the door does not list: "from outside"; a routine being or an object: nothing).
 import { describe, expect, it } from 'vitest';
-import { markLabel, markOf } from '../src/composition/thing-marks.js';
+import { AN_AI_MODEL, lineMarkOf, markLabel, markOf } from '../src/composition/thing-marks.js';
 
 const QWEN = { provider: 'nebius', modelId: 'Qwen/Qwen3-235B-A22B-Instruct-2507', name: 'Qwen3 235B Instruct' };
 
@@ -59,5 +59,31 @@ describe('markOf', () => {
       .toBe('From Block Game, run by this world');
     expect(markLabel({ kind: 'ai', short: 'Qwen3', full: 'Qwen3 235B Instruct' })).toBe('run by an AI model, Qwen3 235B Instruct');
     expect(markLabel({ kind: 'from', label: 'from Block Game', full: 'A person playing Block Game' })).toBe('A person playing Block Game');
+  });
+});
+
+describe('lineMarkOf', () => {
+  const game = { label: 'Block Game', ai: false };
+  it('marks a model\'s line AI, naming only the model its record names', () => {
+    expect(lineMarkOf({ decider: 'model', model: QWEN })).toEqual({ kind: 'ai', short: 'Qwen3', full: 'Qwen3 235B Instruct' });
+    // The speaker's model now is not evidence for an older line: no model on the record, none named.
+    expect(lineMarkOf({ decider: 'model', model: null, speaker: { running: QWEN } })).toBe(AN_AI_MODEL);
+    expect(markLabel(AN_AI_MODEL)).toBe('run by an AI model');
+    expect(markLabel({ ...AN_AI_MODEL, from: 'Block Game' } as typeof AN_AI_MODEL)).toBe('run by an AI model, from Block Game');
+  });
+
+  it('keeps where a visitor the world runs came from on its model\'s line', () => {
+    const speaker = { running: QWEN, crossing: { bridge: 'blockgame', decided_by: 'world' as const }, bridge: game };
+    expect(lineMarkOf({ decider: 'model', model: QWEN, speaker }))
+      .toEqual({ kind: 'ai', short: 'Qwen3', full: 'Qwen3 235B Instruct', from: 'Block Game' });
+    expect(lineMarkOf({ decider: 'model', speaker })).toEqual({ kind: 'ai', short: 'AI', full: 'an AI model', from: 'Block Game' });
+  });
+
+  it('marks an outside program\'s line by its speaker, from outside when the speaker is gone, and no line no event decides', () => {
+    expect(lineMarkOf({ decider: 'external', speaker: { running: null, crossing: { bridge: 'blockgame' }, bridge: game } }))
+      .toEqual({ kind: 'from', label: 'from Block Game', full: 'A person playing Block Game' });
+    expect(lineMarkOf({ decider: 'external', speaker: null }))
+      .toEqual({ kind: 'from', label: 'from outside', full: 'Someone from outside this world' });
+    expect(lineMarkOf({ decider: null, model: QWEN })).toBeNull();
   });
 });
