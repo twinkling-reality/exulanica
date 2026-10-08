@@ -51,6 +51,13 @@
   letter-spacing: 0;
 }
 
+/* Where a visitor this world's model runs came from, after its name. */
+.thing-mark-origin {
+  font-weight: 400;
+  letter-spacing: 0;
+  opacity: 0.78;
+}
+
 .thing-mark-label {
   font: 500 0.66rem / 1.1 var(--font-ui);
   color: var(--color-world-mark-ink);

@@ -59,10 +59,12 @@ function shown(stage: HTMLElement) {
       const pill = node.querySelector<HTMLButtonElement>('.thing-mark-pill')!;
       const name = node.querySelector<HTMLElement>('.thing-mark-name')!;
       const label = node.querySelector<HTMLElement>('.thing-mark-label')!;
+      const origin = node.querySelector<HTMLElement>('.thing-mark-origin')!;
       return {
         subject: pill.dataset['subject'],
         word: node.querySelector('.thing-mark-word')!.textContent,
         name: name.hidden ? null : name.textContent,
+        origin: origin.hidden ? null : origin.textContent,
         label: label.hidden ? null : label.textContent,
         classes: pill.className,
         aria: pill.getAttribute('aria-label'),
@@ -114,6 +116,33 @@ describe('marks over the beings a model or someone outside runs', () => {
     expect(named).toEqual(['a', 'b', 'c', 'e', 'f']);
     expect(marks.find((one) => one.subject === 'a')).toMatchObject({ name: 'Qwen3', label: 'kind a' });
     expect(marks.find((one) => one.subject === 'd')).toMatchObject({ name: null, label: null });
+  });
+
+  it('draws where a visitor the world\'s model runs came from inside its AI pill, near or far, and nowhere else', () => {
+    const { camera, stage } = setup();
+    const overlay = new ThingMarks(stage, () => undefined);
+    const RUN_HERE: ThingMark = { kind: 'ai', short: 'Qwen3', full: 'Qwen3 235B Instruct', from: 'Block Game' };
+    overlay.setMarks(marked([['near', RUN_HERE, null], ['far', RUN_HERE, null], ['knight', AI, null], ['player', BLOCK_GAME, null]]));
+    const anchors = new Map([
+      ['near', new pc.Vec3(0, 1, -4)], ['far', new pc.Vec3(0, 1, -30)],
+      ['knight', new pc.Vec3(1, 1, -5)], ['player', new pc.Vec3(-1, 1, -5)],
+    ]);
+    overlay.update(camera, anchors, null, 0);
+    const marks = shown(stage);
+    // One pill: AI, the model's short name where names show, then where it came from, always.
+    expect(marks.find((one) => one.subject === 'near')).toMatchObject({ word: 'AI', name: 'Qwen3', origin: '· from Block Game' });
+    expect(marks.find((one) => one.subject === 'far')).toMatchObject({ word: 'AI', name: null, origin: '· from Block Game' });
+    expect(marks.find((one) => one.subject === 'knight')).toMatchObject({ origin: null });
+    expect(marks.find((one) => one.subject === 'player')).toMatchObject({ word: 'from Block Game', origin: null });
+    // A node marked again keeps nothing of its last origin, whichever mark it now wears.
+    overlay.setMarks(marked([['near', AI, null]]));
+    overlay.update(camera, anchors, null, 0);
+    expect(shown(stage).find((one) => one.subject === 'near')).toMatchObject({ origin: null });
+    overlay.setMarks(marked([['near', RUN_HERE, null]]));
+    overlay.update(camera, anchors, null, 0);
+    overlay.setMarks(marked([['near', BLOCK_GAME, null]]));
+    overlay.update(camera, anchors, null, 0);
+    expect(shown(stage).find((one) => one.subject === 'near')).toMatchObject({ word: 'from Block Game', origin: null });
   });
 
   it('outlines an outside agent\'s AI pill and picks a being when its pill is clicked', () => {

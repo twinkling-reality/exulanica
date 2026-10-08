@@ -32,7 +32,31 @@ describe('markOf', () => {
       .toEqual({ kind: 'from', label: 'from outside', full: 'Someone from outside this world' });
   });
 
+  it('marks a visitor the world decides for by who decides here: its model, with where it came from', () => {
+    const crossing = { bridge: 'blockgame', decided_by: 'world' as const };
+    const game = { label: 'Block Game', ai: false };
+    expect(markOf({ running: QWEN, crossing, bridge: game }))
+      .toEqual({ kind: 'ai', short: 'Qwen3', full: 'Qwen3 235B Instruct', from: 'Block Game' });
+    // Its routine runs it while no model is asked: from where it came, run by this world, never a person playing.
+    expect(markOf({ running: null, crossing, bridge: game }))
+      .toEqual({ kind: 'from', label: 'from Block Game', full: 'From Block Game, run by this world' });
+    // A bridge the door does not list here: from outside, still the world's to run.
+    expect(markOf({ running: QWEN, crossing, bridge: null }))
+      .toEqual({ kind: 'ai', short: 'Qwen3', full: 'Qwen3 235B Instruct', from: 'outside' });
+  });
+
+  it('marks a visitor its own program decides for as before, said or not', () => {
+    const game = { label: 'Block Game', ai: false };
+    const playing = { kind: 'from', label: 'from Block Game', full: 'A person playing Block Game' };
+    expect(markOf({ running: QWEN, crossing: { bridge: 'blockgame', decided_by: 'program' }, bridge: game })).toEqual(playing);
+    expect(markOf({ running: QWEN, crossing: { bridge: 'blockgame' }, bridge: game })).toEqual(playing);
+  });
+
   it('says who runs it to a screen reader', () => {
+    expect(markLabel({ kind: 'ai', short: 'Qwen3', full: 'Qwen3 235B Instruct', from: 'Block Game' }))
+      .toBe('run by an AI model, Qwen3 235B Instruct, from Block Game');
+    expect(markLabel({ kind: 'from', label: 'from Block Game', full: 'From Block Game, run by this world' }))
+      .toBe('From Block Game, run by this world');
     expect(markLabel({ kind: 'ai', short: 'Qwen3', full: 'Qwen3 235B Instruct' })).toBe('run by an AI model, Qwen3 235B Instruct');
     expect(markLabel({ kind: 'from', label: 'from Block Game', full: 'A person playing Block Game' })).toBe('A person playing Block Game');
   });

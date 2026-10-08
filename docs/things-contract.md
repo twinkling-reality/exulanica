@@ -621,10 +621,13 @@ else is.
 Who runs each person of a saved world's society is marked over them, by one decision the thing card
 makes too ([`composition/thing-marks.ts`](../web/packages/app/src/composition/thing-marks.ts)): a
 person whose model is asked (chosen for them, and refused neither by the host nor for them) wears an
-`AI` pill with the first word of the model's served name; a visitor wears its bridge's mark as the
-door lists it here, `from` and the bridge's label for a game a person plays, an outlined `AI` pill
-for an outside agent, and `from outside` for a bridge the door does not list; everyone else, and every
-object, wears none. The pills are part of the page, not the picture: a fixed pool of nodes placed each
+`AI` pill with the first word of the model's served name; a visitor its own program decides for
+wears its bridge's mark as the door lists it here, `from` and the bridge's label for a game a person
+plays, an outlined `AI` pill for an outside agent, and `from outside` for a bridge the door does not
+list. A visitor the world decides for (its arrival's `decided_by` is `world`) is marked by who decides
+here: the `AI` pill naming the model asked, followed in the same pill by `· from` and its bridge's
+label, or, while its routine runs it, `from` and the label alone, read as run by this world.
+Everyone else, and every object, wears none. The pills are part of the page, not the picture: a fixed pool of nodes placed each
 frame over the box a person is drawn and picked by, read by a screen reader in the card's words and
 picked by a click as by aiming. The model's short name and the person's kind show over the selected
 person, a speaking one and the three nearest marked people within 12 m drawn on screen; no pill is

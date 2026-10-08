@@ -4,7 +4,9 @@
  * Every being a model runs wears a small "AI" pill over its head, and every line a model writes is
  * drawn in a bubble that starts with the same pill; an outside AI agent wears the AI pill outlined
  * as a visitor's, with the name it gave; a being a person runs from outside (a game's player)
- * wears that game's pill instead ("from Block Game"); everyone else wears nothing. What each mark says
+ * wears that game's pill instead ("from Block Game"), and a visitor the world's own model runs wears
+ * the AI pill with where it came from after the name, quieter ("AI Qwen3 · from Block Game");
+ * everyone else wears nothing. What each mark says
  * is the page's to decide, from each being's decider, in the one function the card shares; this
  * overlay only draws what it is given (`setMarks`), so the world and the card never disagree.
  *
@@ -21,10 +23,11 @@ import * as pc from 'playcanvas';
 
 /**
  * What a being's mark says, as the page decided it. `full` is the mark's words for a screen
- * reader; `outside` is an AI agent from outside the world, `short` its name for itself.
+ * reader; `outside` is an AI agent from outside the world, `short` its name for itself; `from` is
+ * where a visitor this world's model runs came from (a bridge's label).
  */
 export type ThingMark =
-  | { readonly kind: 'ai'; readonly short: string; readonly full: string; readonly outside?: true }
+  | { readonly kind: 'ai'; readonly short: string; readonly full: string; readonly outside?: true; readonly from?: string }
   | { readonly kind: 'from'; readonly label: string; readonly full: string };
 
 export interface MarkedSubject {
@@ -67,6 +70,8 @@ interface MarkNode {
   readonly pill: HTMLButtonElement;
   readonly pillWord: HTMLSpanElement;
   readonly pillName: HTMLSpanElement;
+  /** Where a visitor a model runs came from, after the name, in the quieter weight. */
+  readonly pillFrom: HTMLSpanElement;
   readonly label: HTMLSpanElement;
   subject: string | null;
   visible: boolean;
@@ -247,10 +252,14 @@ export class ThingMarks {
       node.pillWord.textContent = 'AI';
       node.pillName.textContent = withName ? mark.short : '';
       node.pillName.hidden = !withName;
+      node.pillFrom.textContent = mark.from === undefined ? '' : `· from ${mark.from}`;
+      node.pillFrom.hidden = mark.from === undefined;
     } else {
       node.pillWord.textContent = mark.label;
       node.pillName.textContent = '';
       node.pillName.hidden = true;
+      node.pillFrom.textContent = '';
+      node.pillFrom.hidden = true;
     }
     const spoken = subject.spoken ?? mark.full;
     node.pill.setAttribute('aria-label', subject.label === null ? spoken : `${subject.label}: ${spoken}`);
@@ -271,11 +280,14 @@ export class ThingMarks {
     pillWord.className = 'thing-mark-word';
     const pillName = document.createElement('span');
     pillName.className = 'thing-mark-name';
-    pill.append(pillWord, pillName);
+    const pillFrom = document.createElement('span');
+    pillFrom.className = 'thing-mark-origin';
+    pillFrom.hidden = true;
+    pill.append(pillWord, pillName, pillFrom);
     const label = document.createElement('span');
     label.className = 'thing-mark-label';
     root.append(pill, label);
-    const node: MarkNode = { root, pill, pillWord, pillName, label, subject: null, visible: false, at: '' };
+    const node: MarkNode = { root, pill, pillWord, pillName, pillFrom, label, subject: null, visible: false, at: '' };
     pill.addEventListener('click', () => {
       if (node.subject !== null) this.onPick(node.subject);
     });
