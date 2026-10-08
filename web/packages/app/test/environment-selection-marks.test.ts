@@ -175,7 +175,7 @@ describe('marks over the people of a saved world\'s society', () => {
     const subjects = marks.sets.at(-1)!;
     expect(Object.fromEntries(subjects)).toEqual({
       'knight-0': { mark: { kind: 'ai', short: 'Qwen3', full: 'Qwen3 235B Instruct' }, label: 'knight', spoken: 'run by an AI model, Qwen3 235B Instruct' },
-      'player-0': { mark: { kind: 'from', label: 'from Block Game', full: 'A person playing Block Game' }, label: null, spoken: 'A person playing Block Game' },
+      'player-0': { mark: { kind: 'from', label: 'from Block Game', full: 'From Block Game, decided from outside' }, label: null, spoken: 'From Block Game, decided from outside' },
       'stranger-0': { mark: { kind: 'from', label: 'from outside', full: 'Someone from outside this world' }, label: null, spoken: 'Someone from outside this world' },
     });
     expect(canvas.dataset['thingMarks']).toBe('3');

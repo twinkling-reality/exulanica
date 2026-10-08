@@ -2,8 +2,9 @@
  * The mark a being wears in the world, on its card and before every line it says: one decision,
  * made here only, so the card and the world can never disagree about who runs something.
  *
- * Anything a model runs wears the AI mark; a visitor a person runs from a game wears where it came
- * from instead; a being its own routine runs, and every object, wears nothing. A visitor the world
+ * Anything a model runs wears the AI mark; a visitor a game's program decides for wears where it came
+ * from instead, and is never said to be a person, which nothing it sends shows; a being its own routine
+ * runs, and every object, wears nothing. A visitor the world
  * decides for (its arrival said so) is marked by who decides here: the AI mark naming the model asked,
  * with where it came from, or where it came from alone while its routine runs it.
  */
@@ -21,7 +22,7 @@ export type ThingMark =
 /** An outside program's entry as the door lists it for this workspace. */
 export interface MarkBridge {
   readonly label: string;
-  /** Whether what it brings in is run by an AI (an agent) rather than a person playing a game. */
+  /** Whether what it brings in is run by an AI (an agent) rather than by a game's program. */
   readonly ai: boolean;
 }
 
@@ -53,7 +54,7 @@ export function markOf(input: MarkInput): ThingMark | null {
   if (input.crossing != null) {
     const bridge = input.bridge ?? null;
     if (bridge === null) return { kind: 'from', label: 'from outside', full: 'Someone from outside this world' };
-    if (!bridge.ai) return { kind: 'from', label: `from ${bridge.label}`, full: `A person playing ${bridge.label}` };
+    if (!bridge.ai) return { kind: 'from', label: `from ${bridge.label}`, full: `From ${bridge.label}, decided from outside` };
     const name = input.declared?.name ?? null;
     return {
       kind: 'ai',

@@ -1,6 +1,6 @@
 // The mark: one decision for the card, the world and every line. Expected marks are the ones
 // agreed with the drawing lane and the outside agents' card (a model asked: "AI" and the model's
-// first word; a person playing a game: "from" its game; an outside agent: AI in its own name;
+// first word; a game's visitor: "from" its game, never said to be a person; an outside agent: AI in its own name;
 // a bridge the door does not list: "from outside"; a routine being or an object: nothing).
 import { describe, expect, it } from 'vitest';
 import { AN_AI_MODEL, lineMarkOf, markLabel, markOf } from '../src/composition/thing-marks.js';
@@ -16,9 +16,9 @@ describe('markOf', () => {
     expect(markOf({ running: null })).toBeNull();
   });
 
-  it('marks a visitor a person plays from a game by where it came from, never as AI', () => {
+  it('marks a visitor a game\'s program decides for by where it came from, never as AI and never as a person', () => {
     expect(markOf({ running: null, crossing: { bridge: 'blockgame' }, bridge: { label: 'Block Game', ai: false } }))
-      .toEqual({ kind: 'from', label: 'from Block Game', full: 'A person playing Block Game' });
+      .toEqual({ kind: 'from', label: 'from Block Game', full: 'From Block Game, decided from outside' });
   });
 
   it('marks an outside agent as AI from outside, in its own name', () => {
@@ -37,7 +37,7 @@ describe('markOf', () => {
     const game = { label: 'Block Game', ai: false };
     expect(markOf({ running: QWEN, crossing, bridge: game }))
       .toEqual({ kind: 'ai', short: 'Qwen3', full: 'Qwen3 235B Instruct', from: 'Block Game' });
-    // Its routine runs it while no model is asked: from where it came, run by this world, never a person playing.
+    // Its routine runs it while no model is asked: from where it came, run by this world, never said to be a person.
     expect(markOf({ running: null, crossing, bridge: game }))
       .toEqual({ kind: 'from', label: 'from Block Game', full: 'From Block Game, run by this world' });
     // A bridge the door does not list here: from outside, still the world's to run.
@@ -47,7 +47,7 @@ describe('markOf', () => {
 
   it('marks a visitor its own program decides for as before, said or not', () => {
     const game = { label: 'Block Game', ai: false };
-    const playing = { kind: 'from', label: 'from Block Game', full: 'A person playing Block Game' };
+    const playing = { kind: 'from', label: 'from Block Game', full: 'From Block Game, decided from outside' };
     expect(markOf({ running: QWEN, crossing: { bridge: 'blockgame', decided_by: 'program' }, bridge: game })).toEqual(playing);
     expect(markOf({ running: QWEN, crossing: { bridge: 'blockgame' }, bridge: game })).toEqual(playing);
   });
@@ -58,7 +58,7 @@ describe('markOf', () => {
     expect(markLabel({ kind: 'from', label: 'from Block Game', full: 'From Block Game, run by this world' }))
       .toBe('From Block Game, run by this world');
     expect(markLabel({ kind: 'ai', short: 'Qwen3', full: 'Qwen3 235B Instruct' })).toBe('run by an AI model, Qwen3 235B Instruct');
-    expect(markLabel({ kind: 'from', label: 'from Block Game', full: 'A person playing Block Game' })).toBe('A person playing Block Game');
+    expect(markLabel({ kind: 'from', label: 'from Block Game', full: 'From Block Game, decided from outside' })).toBe('From Block Game, decided from outside');
   });
 });
 
@@ -81,7 +81,7 @@ describe('lineMarkOf', () => {
 
   it('marks an outside program\'s line by its speaker, from outside when the speaker is gone, and no line no event decides', () => {
     expect(lineMarkOf({ decider: 'external', speaker: { running: null, crossing: { bridge: 'blockgame' }, bridge: game } }))
-      .toEqual({ kind: 'from', label: 'from Block Game', full: 'A person playing Block Game' });
+      .toEqual({ kind: 'from', label: 'from Block Game', full: 'From Block Game, decided from outside' });
     expect(lineMarkOf({ decider: 'external', speaker: null }))
       .toEqual({ kind: 'from', label: 'from outside', full: 'Someone from outside this world' });
     expect(lineMarkOf({ decider: null, model: QWEN })).toBeNull();

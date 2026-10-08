@@ -208,7 +208,7 @@ describe('an outside agent in a saved world', () => {
     expect(last().get('agent-0')!.mark).toEqual({ kind: 'ai', short: 'Scout', full: 'An outside AI agent, Scout', outside: true });
     expect(last().get('agent-0')!.spoken).toBe('An outside AI agent, Scout');
     // A game's player is marked by its game as before; its grant's silence changes nothing.
-    expect(last().get('player-0')!.mark).toEqual({ kind: 'from', label: 'from Block Game', full: 'A person playing Block Game' });
+    expect(last().get('player-0')!.mark).toEqual({ kind: 'from', label: 'from Block Game', full: 'From Block Game, decided from outside' });
     // Before the grants answered, the agent's pill said only that it is an agent.
     const before = marks.sets.find((set) => set.get('agent-0')?.mark?.kind === 'ai' && (set.get('agent-0')!.mark as { short: string }).short === 'agent');
     expect(before).toBeDefined();

@@ -63,8 +63,8 @@ const facts = (look: string | null, holding: string | null = null) => ({
 describe('a person of a society of things, on the card', () => {
   it('a visitor a person plays: marked by its game, decided from outside, with no Change', () => {
     const card = personCard('visitor-1', about(being({ cameBy: 'crossed', placedId: null, crossing: { bridge: 'blockgame', entry: GAME, arrivalId: 'arrival-blockgame' } })), null, facts(null, 'a sword'));
-    expect(card.mark).toEqual({ kind: 'from', text: 'from Block Game', label: 'A person playing Block Game' });
-    expect(card.mind).toMatchObject({ name: 'A person playing Block Game', line: 'Decided from outside, through Block Game. It is not an AI.', choices: [] });
+    expect(card.mark).toEqual({ kind: 'from', text: 'from Block Game', label: 'From Block Game, decided from outside' });
+    expect(card.mind).toMatchObject({ name: 'From Block Game, decided from outside', line: 'Decided from outside, through Block Game. It is not an AI.', choices: [] });
     expect(card.summary).toBe(KINDS['knight']!['summary']);
     expect(card.holding).toBe('a sword');
     expect(card.cameFrom).toBe('Came in from Block Game.');

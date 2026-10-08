@@ -230,7 +230,7 @@ describe('lines said in a saved world', () => {
     expect(knight!.header).toBe('knight 1 to knight 2 · Qwen3 235B Instruct');
     expect(knight!.spoken).toBe('run by an AI model, Qwen3 235B Instruct');
     // A game player's line wears the game's mark, as the door names it.
-    expect(player!.mark).toEqual({ kind: 'from', label: 'from Block Game', full: 'A person playing Block Game' });
+    expect(player!.mark).toEqual({ kind: 'from', label: 'from Block Game', full: 'From Block Game, decided from outside' });
     expect(player!.header).toBe('knight 2 to knight 1');
     // Read again with nothing new: nothing drawn twice.
     await refresh();

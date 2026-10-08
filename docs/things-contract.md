@@ -753,9 +753,9 @@ Who runs each person of a saved world's society is marked over them, by one deci
 makes too ([`composition/thing-marks.ts`](../web/packages/app/src/composition/thing-marks.ts)): a
 person whose model is asked (chosen for them, and refused neither by the host nor for them) wears an
 `AI` pill with the first word of the model's served name; a visitor its own program decides for
-wears its bridge's mark as the door lists it here, `from` and the bridge's label for a game a person
-plays, an outlined `AI` pill for an outside agent, and `from outside` for a bridge the door does not
-list. An outside agent's pill names it in its own words, as its program last said them at the door
+wears its bridge's mark as the door lists it here: `from` and the bridge's label for a game, read as
+decided from outside (no person is claimed, which nothing a game sends shows), an outlined `AI`
+pill for an outside agent, and `from outside` for a bridge the door does not list. An outside agent's pill names it in its own words, as its program last said them at the door
 (the world's grants, `GET /door/grants`, read at most once a minute while such an agent is drawn
 without a name; set as text only, a long name cut short on the pill and read whole), and says
 `agent` until its program says. A visitor the world decides for (its arrival's `decided_by` is
