@@ -205,6 +205,21 @@ at once) is said in the page's own words too, beside Use Next minute. The page h
 code (`HOST_PLAYBACK_WORDS` and `MODEL_MINDS_WORDS` in `ui/world-inhabitants.ts`), held to the
 server's codes by a parity test, and says the server's sentence only for a code it has no words for.
 
+Somebody an outside program decides for under a door grant that stands (the read's `outside`: one
+of the world's own people a grant names, or a visitor that crossed in) is listed with who that is
+and cannot be ticked, by a person, by Choose everyone or from another surface; the People card counts
+them ("2 from outside"). The words say only what the grant view says: "Decided from outside by Scout
+(Acme), an AI agent, through Outside agents." where the bridge says an AI runs it, "Decided from
+outside by a person playing" its bridge's label where it says no AI does, "Decided from outside this
+world." for a bridge the door does not list, and "Its program is not connected now." while it is not.
+`outsideWords`, `outsideShort` and `cameWords` in `ui/society-models.ts` are the one source of these
+words for the card and the marks, which read the entry through `PersonMind.outside`. A visitor the
+world decides for is named by the mind given travellers through its gate ("Nemotron 3 Nano 30B, the
+mind you named for travellers through their gate."), and a person whose model, or whose gate's mind,
+waits because the world already runs as many minds as it may (a choice's `from` ending
+`_over_bound`) reads "Their own routine for now: this world already runs as many minds as it may, so
+their model waits." (`OVER_BOUND_WORDS`).
+
 ### The thing card
 
 The thing card (`web/packages/app/src/ui/thing-card.ts`, `ui/thing-card.css`, mounted by

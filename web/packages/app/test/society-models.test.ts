@@ -10,12 +10,16 @@ import {
   HOST_REFUSAL_WORDS,
   MODEL_REFUSAL_WORDS,
   buildSocietyModels,
+  cameWords,
   chooseWords,
   choiceWords,
   costWords,
   hostWords,
   latestDecisionWords,
   modelLine,
+  OVER_BOUND_WORDS,
+  outsideShort,
+  outsideWords,
   peopleRoleWords,
   summaryWords,
 } from '../src/ui/society-models.js';
@@ -62,12 +66,28 @@ describe('reading who decides', () => {
     expect(() => parseSocietyModels(read({ latest: [{ ...read().latest[0], name: undefined }] }))).toThrow();
   });
 
-  it('reads a view that also names who outside programs decide for, as a reader that predates it does', () => {
-    const outside = [{
-      subject_id: 'grace', came: 'run', grant_id: 'grant', bridge: 'agents', bridge_label: 'Outside agents',
-      run_by: 'owner', ai: true, connected: true, declared: { name: 'Scout', maker: 'Acme', mind: null },
-    }];
-    expect(parseSocietyModels(read({ outside }))).toEqual(parseSocietyModels(read()));
+  it('reads where each choice comes from and each gate\'s traveller mind, and nothing from a server that predates them', () => {
+    const view = parseSocietyModels(read({
+      choices: [{ ...read().choices[0], from: 'travellers' }, { ...read().choices[0], subject_id: 'bea', model: null, from: 'travellers_over_bound' }],
+      travellers: [{ grant_id: 'grant-1', choice_seq: 4, decider: { kind: 'model', provider: 'nebius_token_factory', model_id: MODEL },
+        model: { provider: 'nebius_token_factory', model_id: MODEL, name: 'Nemotron 3 Nano 30B' } }],
+    }));
+    expect(view.choices.map((choice) => choice.from)).toEqual(['travellers', 'travellers_over_bound']);
+    expect(view.travellers).toEqual([{ grantId: 'grant-1', choiceSeq: 4, deciderKind: 'model',
+      model: { provider: 'nebius_token_factory', modelId: MODEL, name: 'Nemotron 3 Nano 30B' } }]);
+    expect(parseSocietyModels(read()).choices[0]!.from).toBeNull();
+    expect(parseSocietyModels(read()).travellers).toEqual([]);
+    expect(() => parseSocietyModels(read({ choices: [{ ...read().choices[0], from: 'elsewhere' }] }))).toThrow();
+  });
+
+  it('says a gate\'s traveller mind decides for a visitor, and that a model waits past the world\'s bound', () => {
+    const view = parseSocietyModels(read({
+      choices: [{ ...read().choices[0], from: 'travellers' }, { ...read().choices[0], subject_id: 'bea', model: null, from: 'travellers_over_bound' }],
+    }));
+    expect(choiceWords(view, 'ada')).toBe('Nemotron 3 Nano 30B, the mind you named for travellers through their gate.');
+    expect(choiceWords(view, 'bea')).toBe(OVER_BOUND_WORDS);
+    expect(choiceWords(view, 'ada', 'the allowance for open models on this visit is used up')).toBe(
+      'Their own routine for now, because the allowance for open models on this visit is used up. You named Nemotron 3 Nano 30B for travellers.');
   });
 
   it('reads the route exactly, and refuses a read that is not one', () => {
@@ -518,5 +538,80 @@ describe('Who decides opened for chosen subjects', () => {
     section.showRole('signals');
     expect(signals.parentElement!.hidden).toBe(false);
     expect(section.root.querySelector<HTMLElement>('.society-models-people-group')!.hidden).toBe(true);
+  });
+});
+
+describe('who outside programs decide for', () => {
+  const AGENT = {
+    subject_id: 'grace', came: 'run', grant_id: 'grant-1', bridge: 'agents', bridge_label: 'Outside agents',
+    run_by: 'owner', ai: true, connected: true, declared: { name: 'Scout', maker: 'Acme', mind: null },
+  };
+  const VISITOR = {
+    subject_id: 'visitor-4', came: 'crossed', grant_id: 'grant-2', bridge: 'blocks', bridge_label: 'Block Game',
+    run_by: 'server', ai: false, connected: false, declared: null,
+  };
+  const UNLISTED = { ...VISITOR, subject_id: 'visitor-5', bridge: 'gone', bridge_label: null, run_by: null, ai: null };
+  const view = () => parseSocietyModels(read({ outside: [AGENT, VISITOR, UNLISTED] }));
+  const people = [{ id: 'ada', name: 'Ada' }, { id: 'grace', name: 'Grace' }, { id: 'visitor-4', name: 'Visitor 4' }];
+
+  it('reads who outside programs decide for, and nobody from a server that predates the field', () => {
+    expect(view().outside!.map((entry) => [entry.subjectId, entry.came, entry.ai, entry.bridgeLabel])).toEqual([
+      ['grace', 'run', true, 'Outside agents'], ['visitor-4', 'crossed', false, 'Block Game'], ['visitor-5', 'crossed', null, null],
+    ]);
+    expect(view().outside![0]!.declared).toEqual({ name: 'Scout', maker: 'Acme', mind: null });
+    expect(parseSocietyModels(read()).outside).toEqual([]);
+    expect(() => parseSocietyModels(read({ outside: [{ ...AGENT, came: 'walked' }] }))).toThrow();
+    expect(() => parseSocietyModels(read({ outside: [{ ...AGENT, connected: 'yes' }] }))).toThrow();
+  });
+
+  it('says who runs them from outside, claiming an AI only where the door says so and nothing for a bridge it does not list', () => {
+    const [agent, visitor, unlisted] = view().outside!;
+    expect(outsideWords(agent!)).toBe('Decided from outside by Scout (Acme), an AI agent, through Outside agents.');
+    expect(outsideWords({ ...agent!, declared: null })).toBe('Decided from outside by an AI agent, through Outside agents.');
+    expect(outsideWords(visitor!)).toBe('Decided from outside by a person playing Block Game. Its program is not connected now.');
+    expect(outsideWords(unlisted!)).toBe('Decided from outside this world. Its program is not connected now.');
+    expect(outsideWords(unlisted!)).not.toMatch(/AI|person/u);
+    expect([outsideShort(agent!), outsideShort(visitor!), outsideShort(unlisted!)]).toEqual(['Scout', 'Block Game', 'outside']);
+    expect(cameWords(visitor!)).toBe('Came in from Block Game.');
+    expect(cameWords(unlisted!)).toBe('Came in from outside this world.');
+    expect(cameWords(agent!)).toBe('One of this world\'s own people, run from outside through Outside agents.');
+  });
+
+  it('names the outside program as who decides, even where the choice record names no model', () => {
+    const held = parseSocietyModels(read({ outside: [AGENT], choices: [...read().choices, { ...read().choices[0], subject_id: 'grace', model: null }] }));
+    expect(choiceWords(held, 'grace')).toBe('Decided from outside by Scout (Acme), an AI agent, through Outside agents.');
+    expect(choiceWords(held, 'ada')).toBe('Nemotron 3 Nano 30B, which you chose.');
+    expect(peopleRoleWords(held, people)).toBe('1 by Nemotron 3 Nano 30B · 1 from outside');
+    expect(peopleRoleWords(parseSocietyModels(read({ choices: [], outside: [AGENT, VISITOR] })), people)).toBe('2 from outside');
+  });
+
+  it('lists them with who decides, and never ticks them: not by a person, Choose everyone or another surface', () => {
+    const onChoose = vi.fn();
+    const section = buildSocietyModels({ onChoose });
+    section.render({ view: view(), people, busy: false, message: '' });
+    const row = (id: string) => section.root.querySelector<HTMLElement>(`[data-subject-id="${id}"]`)!;
+    expect(row('grace').dataset['outside']).toBe('true');
+    expect(row('grace').querySelector<HTMLInputElement>('input')!.disabled).toBe(true);
+    expect(row('grace').textContent).toContain('Decided from outside by Scout (Acme)');
+    expect(row('ada').dataset['outside']).toBeUndefined();
+    section.root.querySelector<HTMLButtonElement>('[data-action="people.decides.everyone"]')!.click();
+    section.model.value = `nebius_token_factory ${MODEL}`;
+    section.choose.click();
+    expect(onChoose).toHaveBeenLastCalledWith(['ada'], { provider: 'nebius_token_factory', modelId: MODEL });
+    expect(section.chooseFor(['grace', 'visitor-4'])).toBe(0);
+    expect(section.choose.disabled).toBe(true);
+  });
+
+  it('hands the card and the marks the outside program, and never a model, for them', async () => {
+    const answer = (body: unknown) => new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
+    const fetcher = vi.fn(async () => answer(read({ outside: [AGENT], choices: [...read().choices, { ...read().choices[0], subject_id: 'grace' }] })));
+    const client = new SocietyModelsClient({ baseUrl: 'https://example.test', token: 't', worldId: 'w', fetch: fetcher as typeof fetch });
+    const mounted = mountSocietyModels({ credentials: { baseUrl: 'https://example.test', token: 't' }, world: { worldId: 'w', versionId: 'version' }, client });
+    await mounted.refresh(1, people);
+    expect(mounted.mindOf('grace')).toMatchObject({ running: null, outside: { subjectId: 'grace', declared: { name: 'Scout' } } });
+    expect(mounted.mindOf('ada')).not.toHaveProperty('outside');
+    expect([...mounted.runningModels().keys()]).toEqual(['ada']);
+    expect([...mounted.outsideDeciders().keys()]).toEqual(['grace']);
+    mounted.dispose();
   });
 });

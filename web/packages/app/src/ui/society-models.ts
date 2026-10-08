@@ -12,6 +12,7 @@ import type {
   ModelDecisionSummary,
   ModelRef,
   NamedModelRef,
+  OutsideDecider,
   PersonDecision,
   SocietyModel,
   SocietyModels,
@@ -56,7 +57,7 @@ export const CHOICE_REFUSAL_WORDS: Readonly<Record<string, string>> = {
   too_many_model_people: 'That would put more people under models than this world allows.',
   choice_key_reused: 'That choice was already sent with different people. Choose again.',
   subject_chosen_under_another_role: 'That subject is already assigned to a model under another kind of decision.',
-  decided_from_outside: 'Someone you chose came into this world from outside, and the program they came with decides for them.',
+  decided_from_outside: 'Someone you chose is decided for from outside this world, by a program a door grant lets in, so no model can be chosen for them until that grant ends.',
   decider_not_allowed: 'Someone you chose is a kind of being that this kind of decider may not decide for.',
   engine_takes_no_traveller_choice: 'Only a society of things takes visitors, so only it takes a mind for a gate\'s travellers.',
 };
@@ -79,17 +80,58 @@ export function hostWords(refusal: string | null): string {
 }
 
 /**
- * Who decides for a person now, in words: the model chosen for them while this host asks it, and
- * otherwise their own routine, for now and why, whenever their model is not asked here.
+ * A person whose model, or whose gate's traveller mind, waits because the world already runs as many
+ * minds as it may (`from` `choice_over_bound` or `travellers_over_bound`): their routine decides.
+ */
+export const OVER_BOUND_WORDS = 'Their own routine for now: this world already runs as many minds as it may, so their model waits.';
+
+/** Who an outside program decides for, by subject: the read's entry, or undefined for anybody else. */
+export function outsideOf(view: SocietyModels, subjectId: string): OutsideDecider | undefined {
+  return (view.outside ?? []).find((entry) => entry.subjectId === subjectId);
+}
+
+/**
+ * Who decides for somebody an outside program runs, in a sentence, saying only what the door's
+ * grant view says: an AI agent only where its bridge says an AI runs it, and nothing either way
+ * for a bridge the door does not list.
+ */
+export function outsideWords(entry: OutsideDecider): string {
+  const quiet = entry.connected ? '' : ' Its program is not connected now.';
+  if (entry.ai === null || entry.bridgeLabel === null) return `Decided from outside this world.${quiet}`;
+  if (!entry.ai) return `Decided from outside by a person playing ${entry.bridgeLabel}.${quiet}`;
+  const agent = entry.declared === null ? 'an AI agent' : `${entry.declared.name} (${entry.declared.maker}), an AI agent`;
+  return `Decided from outside by ${agent}, through ${entry.bridgeLabel}.${quiet}`;
+}
+
+/** The fewest words that name who runs them from outside: what the program calls itself, else its bridge. */
+export function outsideShort(entry: OutsideDecider): string {
+  return entry.declared?.name ?? entry.bridgeLabel ?? 'outside';
+}
+
+/** How somebody an outside program runs came to be here: through the door, or one of the world's own people. */
+export function cameWords(entry: OutsideDecider): string {
+  if (entry.came === 'crossed') return `Came in from ${entry.bridgeLabel ?? 'outside this world'}.`;
+  return entry.bridgeLabel === null ? 'One of this world\'s own people, run from outside.' : `One of this world's own people, run from outside through ${entry.bridgeLabel}.`;
+}
+
+/**
+ * Who decides for a person now, in words: an outside program where a grant lets one, the model
+ * chosen for them while this host asks it, and otherwise their own routine, for now and why,
+ * whenever their model is not asked here.
  */
 export function choiceWords(view: SocietyModels, subjectId: string, paused: string | null = null): string {
+  const outside = outsideOf(view, subjectId);
+  if (outside !== undefined) return outsideWords(outside);
   const choice = view.choices.find((held) => held.subjectId === subjectId);
+  if (choice?.from === 'choice_over_bound' || choice?.from === 'travellers_over_bound') return OVER_BOUND_WORDS;
   if (choice === undefined || choice.model === null) return 'Their own routine.';
   const { name } = choice.model;
   const why = hostReason(view.hostRefusal) ?? paused ?? (choice.refusal === null
     ? null
     : MODEL_REFUSAL_WORDS[choice.refusal] ?? `the model you chose is not asked here (${choice.refusal})`);
-  return why === null ? `${name}, which you chose.` : `Their own routine for now, because ${why}. You chose ${name}.`;
+  // A gate's traveller mind decides for a visitor the world decides for: named, not "you chose".
+  const chosen = choice.from === 'travellers' ? `${name}, the mind you named for travellers through their gate.` : `${name}, which you chose.`;
+  return why === null ? chosen : `Their own routine for now, because ${why}. ${choice.from === 'travellers' ? `You named ${name} for travellers.` : `You chose ${name}.`}`;
 }
 
 /**
@@ -263,12 +305,15 @@ export function peopleRoleWords(view: SocietyModels, people: readonly ChoosableP
     const held = byModel.get(key) ?? { name: choice.model.name, n: 0 };
     byModel.set(key, { ...held, n: held.n + 1 });
   }
-  if (byModel.size === 0) return 'Their own routine';
+  const fromOutside = (view.outside ?? []).filter((entry) => present.has(entry.subjectId)).length;
+  const outside = fromOutside === 0 ? [] : [`${fromOutside} from outside`];
+  if (byModel.size === 0) return outside.length === 0 ? 'Their own routine' : outside[0]!;
   // Chosen but not asked now, by this host or for open models here: their routines decide.
-  if (view.hostRefusal !== null || paused !== null) return 'Their own routine for now';
+  if (view.hostRefusal !== null || paused !== null) return ['Their own routine for now', ...outside].join(' · ');
   const counted = [...byModel.values()];
   const decided = counted.reduce((sum, held) => sum + held.n, 0);
-  return counted.length === 1 ? `${decided} by ${counted[0]!.name}` : `${decided} by ${counted.length} models`;
+  const models = counted.length === 1 ? `${decided} by ${counted[0]!.name}` : `${decided} by ${counted.length} models`;
+  return [models, ...outside].join(' · ');
 }
 
 export function buildSocietyModels(handlers: {
@@ -356,6 +401,7 @@ export function buildSocietyModels(handlers: {
   };
   everyone.addEventListener('click', () => {
     for (const box of peopleList.querySelectorAll<HTMLInputElement>('input[type=checkbox]')) {
+      if (box.closest('[data-outside]') !== null) continue;
       box.checked = true;
       checked.add(box.value);
     }
@@ -433,10 +479,13 @@ export function buildSocietyModels(handlers: {
     shown = view;
     const present = new Set(people.map((person) => person.id));
     for (const id of [...checked]) if (!present.has(id)) checked.delete(id);
+    // Somebody an outside program decides for is listed with who that is, and cannot be ticked.
+    for (const entry of view.outside ?? []) checked.delete(entry.subjectId);
     replace(peopleList, people.map((person) => {
+      const outside = outsideOf(view, person.id) !== undefined;
       const box = el('input', { type: 'checkbox', value: person.id }) as HTMLInputElement;
       box.checked = checked.has(person.id);
-      box.disabled = busy;
+      box.disabled = busy || outside;
       box.addEventListener('change', () => {
         if (box.checked) checked.add(person.id); else checked.delete(person.id);
         reflectChoose();
@@ -447,6 +496,7 @@ export function buildSocietyModels(handlers: {
         el('span', { class: 'society-models-person-decider', text: choiceWords(view, person.id, paused) }),
       ]);
       label.dataset['subjectId'] = person.id;
+      if (outside) label.dataset['outside'] = 'true';
       return label;
     }));
     if (wanted !== null) { const asked = wanted; wanted = null; tick(asked); }
@@ -484,7 +534,7 @@ export function buildSocietyModels(handlers: {
     const boxes = [...peopleList.querySelectorAll<HTMLInputElement>('input[type=checkbox]')];
     checked.clear();
     for (const box of boxes) {
-      box.checked = subjectIds.includes(box.value);
+      box.checked = subjectIds.includes(box.value) && box.closest('[data-outside]') === null;
       if (box.checked) checked.add(box.value);
     }
     reflectChoose();

@@ -47,6 +47,13 @@ export interface ModelPrice {
   readonly output: string;
 }
 
+/**
+ * Where a person's current choice comes from (`from`): their own (`choice`), or the mind named for a
+ * gate's travellers (`travellers`); `_over_bound` where the world already runs as many minds as it
+ * may, so their routine decides. Null from a server that predates the field.
+ */
+export type ChoiceSource = 'choice' | 'choice_over_bound' | 'travellers' | 'travellers_over_bound';
+
 /** A person's current choice: a model, or null for their own routine. */
 export interface PersonModelChoice {
   readonly subjectId: string;
@@ -54,6 +61,17 @@ export interface PersonModelChoice {
   readonly choiceSeq: number;
   /** Why their model is not asked here while this host asks others, by code, or null. */
   readonly refusal: string | null;
+  /** Where the choice comes from, or null where the read does not say. */
+  readonly from?: ChoiceSource | null;
+}
+
+/** The mind a gate's travellers get when their arrival says the world decides for them. */
+export interface TravellerChoice {
+  readonly grantId: string;
+  readonly choiceSeq: number;
+  /** The decider's kind as recorded: `model` or `routine`. */
+  readonly deciderKind: string;
+  readonly model: NamedModelRef | null;
 }
 
 /** A person's latest decision, and what the minute that consumed it did with it. */
@@ -90,6 +108,27 @@ export interface ModelDecisionSummary extends NamedModelRef {
   readonly costKnown: boolean;
 }
 
+/**
+ * Somebody an outside program decides for now, under a door grant that stands, with what the grant
+ * view says of that program. Such a person is never also run by a model, and a model chosen for
+ * them is refused (`decided_from_outside`) until the grant ends.
+ */
+export interface OutsideDecider {
+  readonly subjectId: string;
+  /** `run`: one of the world's own people a grant names; `crossed`: a visitor that came in through the door. */
+  readonly came: 'run' | 'crossed';
+  readonly grantId: string;
+  readonly bridge: string;
+  /** The bridge's label, who runs its program and whether an AI does, or null where the door does not list it. */
+  readonly bridgeLabel: string | null;
+  readonly runBy: string | null;
+  readonly ai: boolean | null;
+  /** Whether its program is connected to the door now. */
+  readonly connected: boolean;
+  /** What the program declared itself to be, in its own words, or null where it declared nothing. */
+  readonly declared: { readonly name: string; readonly maker: string; readonly mind: string | null } | null;
+}
+
 export interface SocietyModels {
   readonly societyId: string;
   /** Only a purposeful society's people are run by chosen models. */
@@ -104,6 +143,10 @@ export interface SocietyModels {
   /** How many of the latest decisions the summaries count, and the most one read counts. */
   readonly decisionsCounted: number;
   readonly decisionsMaximum: number;
+  /** Everyone an outside program decides for now; empty or absent where nobody is. */
+  readonly outside?: readonly OutsideDecider[];
+  /** Each gate's traveller mind; empty or absent where no gate names one. */
+  readonly travellers?: readonly TravellerChoice[];
 }
 
 const invalid = (): never => { throw new Error('Invalid society models response'); };
@@ -129,6 +172,32 @@ function price(value: unknown): ModelPrice {
 
 function mechanism(value: unknown): AnsweringMechanism {
   return value === 'tool_call' || value === 'json_schema' ? value : invalid();
+}
+
+function outsideDecider(value: unknown): OutsideDecider {
+  const held = object(value);
+  const came = held['came'] === 'run' || held['came'] === 'crossed' ? held['came'] : invalid();
+  const declared = maybe(held['declared'], (entry) => {
+    const said = object(entry);
+    return { name: text(said['name']), maker: text(said['maker']), mind: said['mind'] === undefined ? null : maybe(said['mind'], text) };
+  });
+  return {
+    subjectId: text(held['subject_id']),
+    came,
+    grantId: text(held['grant_id']),
+    bridge: text(held['bridge']),
+    bridgeLabel: maybe(held['bridge_label'], text),
+    runBy: maybe(held['run_by'], text),
+    ai: maybe(held['ai'], flag),
+    connected: flag(held['connected']),
+    declared,
+  };
+}
+
+const SOURCES: readonly ChoiceSource[] = ['choice', 'choice_over_bound', 'travellers', 'travellers_over_bound'];
+function source(value: unknown): ChoiceSource | null {
+  if (value === undefined || value === null) return null;
+  return (SOURCES as readonly unknown[]).includes(value) ? value as ChoiceSource : invalid();
 }
 
 function status(value: unknown): PersonDecision['status'] {
@@ -163,6 +232,7 @@ export function parseSocietyModels(value: unknown): SocietyModels {
         model: maybe(held['model'], modelRef),
         choiceSeq: count(held['choice_seq']),
         refusal: maybe(held['refusal'], text),
+        from: source(held['from']),
       };
     }),
     latest: list(row['latest']).map((entry) => {
@@ -202,6 +272,17 @@ export function parseSocietyModels(value: unknown): SocietyModels {
     }),
     decisionsCounted: count(window['counted']),
     decisionsMaximum: count(window['maximum']),
+    // Added to the profile as an optional field: absent means nobody.
+    outside: row['outside'] === undefined ? [] : list(row['outside']).map(outsideDecider),
+    travellers: row['travellers'] === undefined ? [] : list(row['travellers']).map((entry) => {
+      const held = object(entry);
+      return {
+        grantId: text(held['grant_id']),
+        choiceSeq: count(held['choice_seq']),
+        deciderKind: text(object(held['decider'])['kind']),
+        model: maybe(held['model'], modelRef),
+      };
+    }),
   });
 }
 
