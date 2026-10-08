@@ -23,6 +23,12 @@ import type { OwnedSocietyState, SocietyThingSnapshot } from '../society/types.j
  * socket (`socket`, set exactly while `held_by` is), and its `position_mm` is null while it is held.
  */
 type HeldThing = SocietyThingSnapshot & { readonly socket?: string | null };
+
+/** A society thing's key here: the author's id for a placed thing, else its society id. */
+const thingKey = (thing: { readonly id: string; readonly placed_id: string | null }): string => thing.placed_id ?? `carried:${thing.id}`;
+
+/** Who holds a thing and in which socket, or null for a thing on the ground. */
+const holderOf = (thing: HeldThing): string | null => (thing.held_by == null ? null : `${thing.held_by}|${thing.socket ?? ''}`);
 import type { ThingCrowdFigures } from './crowd-figures.js';
 import type { Grip, LookDrawing } from './documents.js';
 import type { InstancedContainer } from './dispatch.js';
@@ -278,17 +284,60 @@ export class ThingLayer {
    * not drawn; each object stands where the state puts it, or is held in its holder's socket, and
    * one the state does not list (carried away) is not drawn. A state from before v7 lists no things
    * and changes nothing here.
+   *
+   * A thing that changes hands, or is picked up or put down, moves when the people it passes between
+   * have walked to where the state ends their walks (`walkEnded`, the crowd's): the later of the two
+   * walks for a hand-over, the actor's own for a pick up or put down. Until then it is drawn where it
+   * was, in the giver's socket or on the ground; a pair already in reach exchanges at once.
    */
-  setSociety(state: OwnedSocietyState | null, figures: ThingCrowdFigures | null): void {
-    this.society = state?.things === undefined ? null : {
-      things: new Map(state.things.map((thing) => [thing.placed_id ?? `carried:${thing.id}`, thing])),
-      figures,
-    };
+  setSociety(state: OwnedSocietyState | null, figures: ThingCrowdFigures | null, walkEnded: (subjectId: string) => boolean = () => true): void {
+    if (state?.things === undefined) {
+      this.society = null;
+      this.shown.clear();
+      this.pending.clear();
+    } else {
+      const target = new Map(state.things.map((thing) => [thingKey(thing), thing as HeldThing]));
+      this.society = { things: target, figures, walkEnded };
+      for (const [key, thing] of target) {
+        const shown = this.shown.get(key);
+        if (shown === undefined || holderOf(shown) === holderOf(thing)) {
+          this.shown.set(key, thing);
+          this.pending.delete(key);
+        } else {
+          this.pending.set(key, [...new Set([shown.held_by, thing.held_by].filter((id): id is string => id != null))]);
+        }
+      }
+      for (const key of [...this.shown.keys()]) {
+        if (target.has(key)) continue;
+        this.shown.delete(key);
+        this.pending.delete(key);
+      }
+      this.settle();
+    }
     this.applySociety();
     this.options.invalidate?.();
   }
 
-  private society: { readonly things: ReadonlyMap<string, HeldThing>; readonly figures: ThingCrowdFigures | null } | null = null;
+  private society: {
+    readonly things: ReadonlyMap<string, HeldThing>;
+    readonly figures: ThingCrowdFigures | null;
+    readonly walkEnded: (subjectId: string) => boolean;
+  } | null = null;
+  /** Each society thing as it is drawn now: the state's, or the last before a move still waiting on a walk. */
+  private readonly shown = new Map<string, HeldThing>();
+  /** Things whose move waits for these people's walks to end. */
+  private readonly pending = new Map<string, readonly string[]>();
+
+  /** Move each waiting thing whose people have all walked to where the state ends their walks. */
+  private settle(): void {
+    const society = this.society;
+    if (society === null) return;
+    for (const [key, parties] of this.pending) {
+      if (!parties.every((id) => society.walkEnded(id))) continue;
+      this.shown.set(key, society.things.get(key)!);
+      this.pending.delete(key);
+    }
+  }
   /** The people who held something at the last look, so a hand emptied is told so. */
   private holdersSeen = new Set<string>();
 
@@ -298,7 +347,7 @@ export class ThingLayer {
     const society = this.society;
     if (society?.figures != null) {
       const holding = new Map<string, Set<string>>();
-      for (const thing of society.things.values()) {
+      for (const thing of this.shown.values()) {
         if (thing.held_by == null || thing.socket == null) continue;
         let sockets = holding.get(thing.held_by);
         if (sockets === undefined) holding.set(thing.held_by, sockets = new Set());
@@ -313,7 +362,7 @@ export class ThingLayer {
       const figure = entry.figure;
       if (figure === null) continue;
       const society = this.society;
-      const thing = society === null ? undefined : society.things.get(entry.record.thingId);
+      const thing = society === null ? undefined : this.shown.get(entry.record.thingId);
       const holder = thing?.held_by == null || thing.socket == null ? null : { subjectId: thing.held_by, socket: thing.socket };
       const holderFigure = holder === null ? null : society?.figures?.figureOf(holder.subjectId) ?? null;
       const holding = holder !== null && holderFigure?.hold !== undefined && entry.grip !== null;
@@ -353,7 +402,10 @@ export class ThingLayer {
   private step(dt: number): void {
     if (this.destroyed) return;
     const reduced = this.options.reducedMotion?.() === true;
-    if (this.society !== null) this.applySociety();
+    if (this.society !== null) {
+      this.settle();
+      this.applySociety();
+    }
     for (const entry of this.entries.values()) this.poseOne(entry, dt, reduced);
     const camera = this.options.camera.getPosition();
     for (const entry of this.entries.values()) {
@@ -372,7 +424,7 @@ export class ThingLayer {
     if (figure === null || entry.heldBy !== null) return;
     const t = entry.record.transform;
     // Where a society runs, an object stands at the state's plan point, turned by the state's yaw.
-    const thing = this.society?.things.get(entry.record.thingId);
+    const thing = this.society === null ? undefined : this.shown.get(entry.record.thingId);
     figure.pose({
       position: thing?.position_mm == null
         ? [t.xMm / 1000, t.yMm / 1000, t.zMm / 1000]

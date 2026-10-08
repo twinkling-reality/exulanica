@@ -2437,6 +2437,7 @@ export function mountEnvironmentSelection(
           : atlas.regionRoots.get(id as IslandId) ?? null),
         invalidate: () => atlas.invalidate(),
         reducedMotion: () => deps.env.systemReducedMotion.matches,
+        walkEnded: (id) => atlas.authoredSociety?.walkEnded(id) ?? true,
       });
       if ((phase as string) === 'disposed') { things.destroy(); things = null; return; }
       await things.setPlaced(placed);

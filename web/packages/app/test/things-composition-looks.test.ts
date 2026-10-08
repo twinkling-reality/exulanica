@@ -18,7 +18,8 @@ const { FakeLayer, layers } = vi.hoisted(() => {
     readonly maker = { library: { list: { kinds: [], looks: [] } } };
     constructor(readonly options: ThingLayerOptions) { made.push(this); }
     async setLook(placedId: string, look: Named | null) { this.looks.push([placedId, look]); }
-    setSociety() {}
+    walkEnded: unknown = null;
+    setSociety(_state: unknown, _figures: unknown, walkEnded: unknown) { this.walkEnded = walkEnded; }
     async setPlaced() {}
     setPicked() {}
     get misses() { return []; }
@@ -35,12 +36,13 @@ const LOOK = (key: string): Named => ({ key, version: 1, sha256: 'd'.repeat(64) 
 const choice = (thingId: string, placedId: string | null, key: string): ThingLookChoice =>
   ({ thingId, placedId, look: LOOK(key), chosenBy: placedId === null ? 'crossing' : 'owner', chosenAt: '2026-10-09T14:03:11.123456Z' });
 
-async function mount() {
+async function mount(walkEnded?: (subjectId: string) => boolean) {
   const shell = document.createElement('div');
   const things = await mountThings({
     app: {} as never, camera: {} as never, shell, credentials: { baseUrl: 'https://host.test', token: 'token' },
     regionRoot: () => null, invalidate: () => undefined, reducedMotion: () => false,
     library: async () => ({ list: { kinds: [], looks: [] } }) as never,
+    ...(walkEnded === undefined ? {} : { walkEnded }),
   });
   return { things, layer: layers.at(-1)! };
 }
@@ -73,5 +75,12 @@ describe('the looks chosen for a society\'s things', () => {
     expect(looksReadDue(1000, 1000 + LOOKS_READ_INTERVAL_MS)).toBe(true);
     // One private read a minute per open world page.
     expect(LOOKS_READ_INTERVAL_MS).toBe(60_000);
+  });
+
+  it('hands the layer the crowd\'s word on whose walk has ended, which a thing changing hands waits for', async () => {
+    const walkEnded = (id: string) => id === 'arrived';
+    const { things, layer } = await mount(walkEnded);
+    things.setSociety({ profile: 'exulanica-society/v7', tick: 1, inhabitants: [], things: [] });
+    expect(layer.walkEnded).toBe(walkEnded);
   });
 });

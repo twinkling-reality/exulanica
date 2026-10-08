@@ -648,6 +648,15 @@ export class SocietyCrowd {
   }
 
   /**
+   * Whether a person's drawn walk for the latest state has reached its end, as a hand-over waits for:
+   * a thing changes hands when the later of the two parties' walks ends. Someone this crowd does
+   * not walk has nothing to wait for.
+   */
+  walkEnded(id: string): boolean {
+    return this.walkers.get(id)?.arrived ?? true;
+  }
+
+  /**
    * Where a mark over an inhabitant hangs, in world space: just over the top of the box they are
    * drawn and picked by, written into `out`. False when they are not drawn outdoors now.
    */

@@ -59,6 +59,11 @@ export interface ThingsDependencies {
   readonly reducedMotion: () => boolean;
   /** The library to read from; the host's, read with the credentials, when left out. */
   readonly library?: () => Promise<ThingLibrary>;
+  /**
+   * Whether a person's drawn walk for the latest state has ended (the society's crowd), which a
+   * thing changing hands waits for; everyone's has, when left out.
+   */
+  readonly walkEnded?: (subjectId: string) => boolean;
 }
 
 export interface MountedThings {
@@ -164,7 +169,7 @@ export async function mountThings(deps: ThingsDependencies): Promise<MountedThin
       await layer.setPlaced(things.map(placedThingRecord));
     },
     setSociety(state) {
-      if (!destroyed) layer.setSociety(state, state === null ? null : crowdFigures);
+      if (!destroyed) layer.setSociety(state, state === null ? null : crowdFigures, deps.walkEnded ?? (() => true));
     },
     crowdFigures,
     setLooks(choices) {

@@ -126,6 +126,11 @@ export class AuthoredRegionSociety {
     this.crowd.setFigures(figures);
   }
 
+  /** Whether a person's drawn walk for the latest state has ended (`SocietyCrowd.walkEnded`). */
+  walkEnded(id: string): boolean {
+    return this.crowd.walkEnded(id);
+  }
+
   /** Ask the things' figures again, as after the looks chosen for them change (`SocietyCrowd.refreshFigures`). */
   refreshFigures(): void {
     this.crowd.refreshFigures();
