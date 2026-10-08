@@ -1,0 +1,37 @@
+{
+ "profile": "exulanica.digest-bound-record/v1",
+ "record": {
+  "kind": "exulanica.kind-drafter-timings/v1",
+  "measured": {
+   "roles": {
+    "kind_drafter": {
+     "primary": "deepseek-ai/DeepSeek-V4-Flash-0731",
+     "primary_measured": {
+      "longest_ms": 72565,
+      "p50_ms": 32617,
+      "p99_ms": 72565,
+      "rows": 9
+     }
+    }
+   }
+  },
+  "note": "The kind drafter's primary's own calls when its pre-registered measurement asked six held-out descriptions at the 32,768-token completion ceiling and prompt kind-drafting-5: rows are its calls, a brief and up to two repairs where one was asked. Nothing of any other model is published here.",
+  "provider": "Nebius Token Factory",
+  "run_sha256": "9f9493647ffb5f75140e8095afd47146c327de4b7b11fda15f48c39b19d78a60",
+  "script_sha256": "2a03a4f80ebd1453a7cdf2c2759e7cde4d7fb1b17a4175a49919cb70bbca383d",
+  "tree": {
+   "diff_head_sha256": "af578e76db6e240ffff21ebc62f8349e5df9487e1f7de29c5ae5c9b023ad0582",
+   "head": "647b4caa987e57f3a0005914d6d4b6f6c6328a61",
+   "untracked_sha256": {
+    "docs/evaluation/2026-10-07-kind-drafter-timings.json": "df968e20d21ef95c8994b76ba0b24ab2ed40b1ba0a7b8209d7a23f14f89137a8",
+    "exulanica/selection/kind-drafting.v5.json": "27d594d13d433abe9c459e1a3b9c686c8c03504960ee27acf7abe6dabb4dd95c",
+    "tests/test_hosted_closed_fields.py": "3ffb5f15f480daff6dfbd161307cdffaf295a39216cb89270471462628c9010d"
+   }
+  },
+  "window": {
+   "ended": "2026-10-07T21:40:25-0400",
+   "started": "2026-10-07T21:33:28-0400"
+  }
+ },
+ "record_sha256": "ee73bdb04800eb0a1ca30b12b8f61315f5e28d25dccb0f8ba399807d31ba3433"
+}

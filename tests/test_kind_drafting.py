@@ -112,7 +112,7 @@ def test_a_kind_that_passes_is_drafted_once_with_its_provenance():
     provenance = outcome.document["provenance"]
     assert provenance["words_sha256"] == hashlib.sha256(DESCRIPTION.encode()).hexdigest()
     assert provenance["prompt_sha256"] == hashlib.sha256(instructions.encode()).hexdigest()
-    assert provenance["prompt_version"] == "kind-drafting-4"
+    assert provenance["prompt_version"] == "kind-drafting-5"
     assert (outcome.document["origin"], provenance["model"]) == ("drafted", MODEL)
     assert outcome.report["verdict"] == "passed"
     assert [(step["outcome"], step["sizing"]) for step in outcome.trail] == [("passed", [])]
@@ -186,6 +186,8 @@ def test_the_instructions_are_the_prompt_file_s_words_and_the_catalogs_vocabular
     prompt = kind_drafting_prompt()
     catalogs = load_kind_catalogs()
     rendered = render_instructions(prompt, catalogs, town_routine())
+    # A workplace that serves the public says who comes: the visitors a kind's checks count.
+    assert "a workplace people come to be served at" in rendered
     assert rendered.startswith(prompt.instructions)
     for key in ("zones", "holdings", "parts", "use_classes", "placed_things", "residents"):
         low, high = catalogs.bound(key)

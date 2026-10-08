@@ -173,3 +173,16 @@ def test_the_measured_run_writes_each_draft_before_asking_the_next(
     assert [held for _, _, held in asked] == list(range(len(measure._order())))
     written = [json.loads(line) for line in sink.read_text("utf-8").splitlines()]
     assert [(w["description"], w["model_id"]) for w in written] == measure._order()
+
+
+def test_the_measured_run_stops_after_two_descriptions_in_a_row_with_no_valid_kind(
+    measure: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(measure, "CANDIDATES", (QWEN,))
+    sink = tmp_path / "run-asks.jsonl"
+    answers = {(number, QWEN): number == 2 for number in range(1, 7)}
+    asked = _scripted_asks(monkeypatch, measure, sink, answers)
+    _, ended_as = measure._asks(lambda model_id: model_id, (QWEN,), sink)
+    # One failure (description 1) does not stop it; 3 then 4 failing in a row does.
+    assert [number for number, _, _ in asked] == [1, 2, 3, 4]
+    assert ended_as == "stopped: 2 descriptions in a row with no valid kind, at description 4"

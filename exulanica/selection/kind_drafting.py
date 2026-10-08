@@ -29,7 +29,7 @@ anything is kept or made:
     words with the vocabulary the catalogs state) and the SHA-256 of the words sent, never the
     words.
 
-The words the model is asked with are data (``kind-drafting.v4.json`` beside this module). Pure
+The words the model is asked with are data (``kind-drafting.v5.json`` beside this module). Pure
 apart from the model client: nothing is read from a connection and nothing is written.
 """
 
@@ -86,7 +86,7 @@ __all__ = [
     "render_instructions",
 ]
 
-PROMPT_PATH: Final = Path(__file__).with_name("kind-drafting.v4.json")
+PROMPT_PATH: Final = Path(__file__).with_name("kind-drafting.v5.json")
 #: The manifest role a kind is drafted under, bound to the model the drafter's pre-registered
 #: measurement chose (docs/evaluation/2026-10-07-kind-drafter-timings.json).
 DRAFTER_ROLE: Final = Role.KIND_DRAFTER

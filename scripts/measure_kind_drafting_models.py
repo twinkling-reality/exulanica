@@ -69,29 +69,22 @@ COMPILER: Final = "exulanica/selection/kind_brief.py"
 BUDGET_VARIABLE: Final = "EXULANICA_BUDGET_USD"
 CALLS_VARIABLE: Final = "EXULANICA_BUDGET_MAX_CALLS"
 KEY_VARIABLE: Final = "NEBIUS_API_KEY"
-#: The open models root's v3.3 ruling approves from the manifest's catalog on Nebius Token Factory,
-#: each with a SHIP licence verdict in docs/license-matrix.md: Nemotron 3.5 Lightning
-#: (OpenMDW-1.1), Nemotron 3 Super (the NVIDIA open model licence; the specification drafter's
-#: primary), DeepSeek V4 Flash (MIT) and Qwen3 235B Instruct (Apache-2.0; its fallback). Nano 30B
-#: ran on in blank space to the token ceiling on 17 of its 18 calls in the v3 run; MiniMax M3's
-#: licence is conditional; Nemotron 3 Ultra's is read from the catalog only.
-CANDIDATES: Final = (
-    "nvidia/Nemotron-3_5-Lightning",
-    "nvidia/nemotron-3-super-120b-a12b",
-    "deepseek-ai/DeepSeek-V4-Flash-0731",
-    "Qwen/Qwen3-235B-A22B-Instruct-2507",
-)
+#: Root's v3.4 ruling: the kind drafter's primary alone, DeepSeek V4 Flash (MIT), chosen by the v3.3
+#: measurement (record 07848157), measured again at the higher completion ceiling and prompt
+#: kind-drafting-5 before either is the role's. v3.3's candidates were Nemotron 3.5 Lightning,
+#: Nemotron 3 Super, DeepSeek V4 Flash and Qwen3 235B Instruct.
+CANDIDATES: Final = ("deepseek-ai/DeepSeek-V4-Flash-0731",)
 #: The most this measurement may spend, on Nebius Token Factory, under root's allocation
-#: KINDS-V3.3: every draft at three attempts, each at the budget guard's own worst-case reservation
-#: (the 16,384-token ceiling and the longest repairs), USD 0.64243464 over the six descriptions and
-#: four candidates, so the bound never cuts the registered order short. The v3 run spent USD
-#: 0.0040 a call on Super and 0.0061 on Qwen3 235B.
-BOUND_USD: Final = Decimal("0.643")
-#: Six descriptions, four candidates and three attempts.
-MAX_CALLS: Final = 72
-#: The completion ceiling every candidate is asked with, one for all so none is truncated by a
-#: choice made for another: the specification drafter's.
-MAX_TOKENS: Final = 16384
+#: KINDS-V3.4: six descriptions at three attempts each, every call at the budget guard's
+#: reservation at the 32,768-token ceiling (about USD 0.0097), rounded up.
+BOUND_USD: Final = Decimal("0.18")
+#: Six descriptions and three attempts.
+MAX_CALLS: Final = 18
+#: The completion ceiling every candidate is asked with. Root's v3.4 ruling: twice the
+#: specification drafter's 16,384, since DeepSeek V4 Flash's reasoning filled 16,384 tokens before
+#: any brief on 8 of 18 development calls (KINDS-DEV-6 sweep 1) and on none of 6 at 32,768 that
+#: answered a first brief (sweep 2).
+MAX_TOKENS: Final = 32768
 #: How long one call may take before it is abandoned, the same for every candidate: a brief is
 #: several thousand tokens of JSON after a model's own reasoning. Root's v3.1 ruling: 240 s, since
 #: Qwen3 235B timed out at 180 s on three of six in the v3 run and answered the others in 15 to
@@ -101,6 +94,10 @@ CALL_TIMEOUT_SECONDS: Final = 240
 #: candidate: a brief or an instruction every model fails is a defect to
 #: fix before more is spent, not a model's skill.
 REFUSED_IN_A_ROW: Final = len(CANDIDATES)
+#: The measured run stops after this many descriptions in a row gave no valid kind from any
+#: candidate: two, so one candidate's single failure does not stop it, and a brief or an
+#: instruction that fails description after description does.
+FAILED_DESCRIPTIONS_IN_A_ROW: Final = 2
 
 #: The fixed descriptions, written for this measurement as a person might type them, with the
 #: checks a drafted kind must pass to count as matching its words: what any kind true to the words
@@ -117,6 +114,61 @@ CHECKS: Final = {
     "not empty)",
 }
 DESCRIPTIONS: Final = (
+    {
+        "description": (
+            "The inside of a small post office: a counter with two windows, a queue rail, a table "
+            "for filling in forms and a sorting room at the back."
+        ),
+        "checks": [{"enclosure": "indoor"}, {"role": "workplace"}, {"visitors": True}],
+    },
+    {
+        "description": (
+            "The inside of a dentist's practice: a waiting room with chairs and a play corner, a "
+            "reception desk and two treatment rooms."
+        ),
+        "checks": [
+            {"enclosure": "indoor"},
+            {"role": "seat"},
+            {"role": "workplace"},
+            {"visitors": True},
+        ],
+    },
+    {
+        "description": (
+            "A petting farm with goat and pig pens, a barn where children feed the animals, a "
+            "picnic area and a gift shop."
+        ),
+        "checks": [
+            {"role": "shop"},
+            {"role": ["field", "ground"], "form": "area"},
+            {"visitors": True},
+        ],
+    },
+    {
+        "description": (
+            "A canal lock with the lock keeper's cottage, a tea room for passing boaters and "
+            "moorings along the towpath."
+        ),
+        "checks": [{"role": "water"}, {"role": "home"}, {"visitors": True}],
+    },
+    {
+        "description": (
+            "A forest sawmill with a log yard, a saw shed, a drying kiln and a canteen for the "
+            "workers."
+        ),
+        "checks": [{"role": "workplace", "form": "structure"}, {"people": True}],
+    },
+    {
+        "description": (
+            "A lighthouse on a headland with the keeper's house, a visitor centre and a small car "
+            "park."
+        ),
+        "checks": [{"role": "home"}, {"role": "parking", "form": "area"}, {"visitors": True}],
+    },
+)
+#: The v3.3 run's six held-out descriptions (pre-registration 2cae5468), asked and read, so spent:
+#: they join the development set.
+SPENT_V33: Final = (
     {
         "description": (
             "A summer camp in a forest clearing with wooden cabins, a dining hall, a campfire "
@@ -409,7 +461,10 @@ def _registration() -> dict[str, Any]:
             "share matching the words by rule, draft time, and cost"
         ),
         "candidates": list(CANDIDATES),
-        "candidates_rule": "the open models root's v3.3 ruling approves, NVIDIA models first",
+        "candidates_rule": (
+            "the kind drafter's primary alone (root's v3.4 ruling): it keeps the role at this "
+            "ceiling and prompt when eligible by the rule; otherwise the role keeps v3.3's"
+        ),
         "descriptions": [dict(entry) for entry in DESCRIPTIONS],
         "checks_meaning": dict(CHECKS),
         "rule": dict(RULE),
@@ -427,8 +482,8 @@ def _registration() -> dict[str, Any]:
         "stop_rules": [
             f"the bound, USD {BOUND_USD}: a call whose reservation would pass it is not sent",
             f"{MAX_CALLS} calls",
-            f"{REFUSED_IN_A_ROW} drafts in a row for one description without a valid kind (every "
-            "candidate); a draft is one candidate's brief and its repairs",
+            f"{FAILED_DESCRIPTIONS_IN_A_ROW} descriptions in a row with no valid kind from any "
+            "candidate; a draft is one candidate's brief and its repairs",
             "a run that stops is recorded as stopped, with every call made, and chooses nothing",
         ],
         "call_timeout_seconds": CALL_TIMEOUT_SECONDS,
@@ -549,7 +604,12 @@ def _checked(document: dict[str, Any]) -> Any:
         return KindVerdict(False, code=refused.code, where=refused.where, detail=refused.detail)
 
 
-def _ask(client: Any, entry: Mapping[str, Any]) -> dict[str, Any]:
+def _ask(
+    client: Any,
+    entry: Mapping[str, Any],
+    *,
+    max_tokens: int = MAX_TOKENS,
+) -> dict[str, Any]:
     from exulanica.models.errors import BudgetExceededError, ModelError
     from exulanica.selection.calls import CallLog
     from exulanica.selection.kind_drafting import draft_kind
@@ -567,7 +627,7 @@ def _ask(client: Any, entry: Mapping[str, Any]) -> dict[str, Any]:
             role=DRAFTER_ROLE,
             check=_checked,
             log=CallLog(),
-            max_tokens=MAX_TOKENS,
+            max_tokens=max_tokens,
             trail=trail,
         )
     except BudgetExceededError:
@@ -637,8 +697,9 @@ def _asks(
     """Every description asked of every candidate in turn; each result appended to ``sink`` as
     it ends, so a run cut off from outside keeps every draft it saw."""
     asks: list[dict[str, Any]] = []
+    failed_in_a_row = 0
     for number, entry in enumerate(DESCRIPTIONS, 1):
-        refused_in_a_row = 0
+        valid_here = False
         for model_id in candidates:
             started = time.monotonic()
             asked = _ask(client_for(model_id), entry)
@@ -659,13 +720,14 @@ def _asks(
             )
             if asked["unanswered"] == "over_bound":
                 return asks, f"stopped: the bound or the call count, at description {number}"
-            refused_in_a_row = 0 if asked["valid"] else refused_in_a_row + 1
-            if refused_in_a_row >= REFUSED_IN_A_ROW:
-                return (
-                    asks,
-                    f"stopped: {refused_in_a_row} drafts in a row without a valid kind for "
-                    f"description {number}",
-                )
+            valid_here = valid_here or asked["valid"]
+        failed_in_a_row = 0 if valid_here else failed_in_a_row + 1
+        if failed_in_a_row >= FAILED_DESCRIPTIONS_IN_A_ROW:
+            return (
+                asks,
+                f"stopped: {failed_in_a_row} descriptions in a row with no valid kind, at "
+                f"description {number}",
+            )
     return asks, "complete"
 
 
@@ -1396,7 +1458,7 @@ def continue_run(out: Path, as_run: bytes, env_file: Path | None) -> None:
 #: The record the manifest's timeout basis quotes: the chosen primary's own timings and nothing
 #: else. The candidates' comparison stays out of the repository until the provider's terms are
 #: confirmed.
-TIMINGS: Final = ROOT / "docs/evaluation/2026-10-07-kind-drafter-timings.json"
+TIMINGS: Final = ROOT / "docs/evaluation/2026-10-07-kind-drafter-timings-32768.json"
 
 
 def timings(out: Path) -> None:
@@ -1432,8 +1494,9 @@ def timings(out: Path) -> None:
         "window": record["window"],
         "note": (
             "The kind drafter's primary's own calls when its pre-registered measurement asked six "
-            "held-out descriptions: rows are its calls, a brief and up to two repairs where one "
-            "was asked. Nothing of any other model is published here."
+            "held-out descriptions at the 32,768-token completion ceiling and prompt "
+            "kind-drafting-5: rows are its calls, a brief and up to two repairs where one was "
+            "asked. Nothing of any other model is published here."
         ),
     }
     document = {
@@ -1460,14 +1523,22 @@ DEVELOPMENT: Final = (
     *(entry["description"] for entry in SPENT_DESCRIPTIONS),
     *(entry["description"] for entry in SPENT_V31),
     *(entry["description"] for entry in SPENT_V32),
+    *(entry["description"] for entry in SPENT_V33),
 )
-#: Root's development allocation for the brief drafter, KINDS-5-DEV, on Nebius Token Factory,
-#: over every development run that names it (KINDS-4-DEV's runs, of the earlier drafters, are not
-#: counted against it). Development stops at either bound or once 6 of the 8 descriptions have
-#: drafted a valid kind on the drafter as it stands.
-DEVELOPMENT_ALLOCATION: Final = "KINDS-5-DEV"
+#: The checks a development description was measured with, where it was a held-out one: a
+#: development run reports whether a kind drafted from it matches them, as the measurement did.
+DEVELOPMENT_CHECKS: Final = {
+    entry["description"]: entry["checks"]
+    for entry in (*SPENT_DESCRIPTIONS, *SPENT_V31, *SPENT_V32, *SPENT_V33)
+}
+#: Root's development allocation KINDS-DEV-6, on Nebius Token Factory, for a workplace that serves
+#: the public, over every development run that names it (earlier allocations' runs are not counted
+#: against it): a runaway bound of USD 0.30, and a call count that catches a loop. Development
+#: stops at either bound, or once 6 of the descriptions asked have drafted a valid kind on the
+#: drafter as it stands unless every description named is to be asked.
+DEVELOPMENT_ALLOCATION: Final = "KINDS-DEV-6"
 DEVELOPMENT_USD: Final = Decimal("0.30")
-DEVELOPMENT_CALLS: Final = 40
+DEVELOPMENT_CALLS: Final = 60
 DEVELOPMENT_ENOUGH: Final = 6
 
 
@@ -1487,6 +1558,7 @@ def develop(
     descriptions: Sequence[int],
     *,
     confirm: bool = False,
+    max_tokens: int = MAX_TOKENS,
 ) -> None:
     """Ask ``models`` the development descriptions numbered ``descriptions``, recording every
     attempt; within what is left of the development allocation after the runs already in ``out``.
@@ -1546,9 +1618,10 @@ def develop(
     asks = []
     ended_as = "complete"
     for number in descriptions:
-        entry = {"description": DEVELOPMENT[number - 1], "checks": []}
+        text = DEVELOPMENT[number - 1]
+        entry = {"description": text, "checks": DEVELOPMENT_CHECKS.get(text, [])}
         for model_id in models:
-            asked_one = _ask(clients[model_id], entry)
+            asked_one = _ask(clients[model_id], entry, max_tokens=max_tokens)
             asked_one.update(description=number, model_id=model_id)
             asks.append(asked_one)
             if asked_one["valid"]:
@@ -1556,6 +1629,8 @@ def develop(
             last = asked_one["trail"][-1] if asked_one["trail"] else {}
             print(
                 f"dev{number} {model_id}: valid={asked_one['valid']} "
+                f"matched={asked_one['matched'] if entry['checks'] else None} "
+                f"checks={asked_one['checks']} "
                 f"outcomes={asked_one['outcomes']} unanswered={asked_one['unanswered']} "
                 f"{last.get('where', '')} {last.get('detail', '')[:160]}",
                 flush=True,
@@ -1581,6 +1656,7 @@ def develop(
         "drafter_sha256": digests[1],
         "compiler_sha256": digests[2],
         "models": list(models),
+        "max_tokens": max_tokens,
         "descriptions": {str(number): DEVELOPMENT[number - 1] for number in descriptions},
         "asks": asks,
         "calls": sum(len(ask["attempts"]) for ask in asks),
@@ -1620,10 +1696,13 @@ def main() -> None:
     parser.add_argument("--env-file", type=Path, help="run: the .env file the key is read from")
     parser.add_argument("--models", nargs="*", default=list(CANDIDATES), help="develop: models")
     parser.add_argument(
-        "--descriptions", nargs="*", type=int, default=[], help="develop: numbers, 1 to 22"
+        "--descriptions", nargs="*", type=int, default=[], help="develop: numbers, 1 to 28"
     )
     parser.add_argument(
         "--confirm", action="store_true", help="develop: ask every description named"
+    )
+    parser.add_argument(
+        "--max-tokens", type=int, default=MAX_TOKENS, help="develop: the completion ceiling"
     )
     parser.add_argument("--bound-usd", type=Decimal, help="amend: the continuation's bound")
     parser.add_argument("--bound-calls", type=int, help="amend: the continuation's calls")
@@ -1653,7 +1732,14 @@ def main() -> None:
         timings(out)
     elif arguments.step == "develop":
         numbers = arguments.descriptions or list(range(1, len(DEVELOPMENT) + 1))
-        develop(out, arguments.env_file, arguments.models, numbers, confirm=arguments.confirm)
+        develop(
+            out,
+            arguments.env_file,
+            arguments.models,
+            numbers,
+            confirm=arguments.confirm,
+            max_tokens=arguments.max_tokens,
+        )
     else:
         run(out, as_run, arguments.env_file)
 
