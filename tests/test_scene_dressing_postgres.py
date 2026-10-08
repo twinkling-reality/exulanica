@@ -19,7 +19,9 @@ What is shown, with the application a deployment runs and as the world's owner:
     world reopens with what was placed before it;
 *   a society refusal keeps the things and comes back by its code: a host that does not offer the
     engine, and one with no adapter for a society's first input;
-*   a model the people role does not take is refused for that being alone; the others are chosen;
+*   a model the people role does not take is refused for that being alone, and so is one the
+    manifest does not offer for a choice that takes a line, as a society of things asks its people;
+    the others are chosen;
 *   another workspace's session cannot reach the owner's world, and a connection already inside a
     transaction is refused before anything is read.
 """
@@ -36,6 +38,7 @@ from pathlib import Path
 import pytest
 from exulanica.api.scene_dressing import dress_saved_world
 from exulanica.api.society_making import SocietyHooks
+from exulanica.models.manifest import load_manifest
 from exulanica.selection.validation import Session
 from exulanica.world import object_repository
 from exulanica.world.scenes import SceneRefused, read_scene, shipped_scenes
@@ -391,6 +394,25 @@ def test_a_model_the_role_does_not_take_is_refused_for_that_being_alone(made):
     by_thing = {mind["thing_id"]: mind for mind in dressed.minds}
     first = document["minds"][0]["thing_id"]
     assert by_thing[first]["refused"] == "model_not_offered"
+    assert all(by_thing[m["thing_id"]]["refused"] is None for m in document["minds"][1:])
+
+
+def test_a_model_not_offered_for_lines_is_refused_for_that_being_alone(made):
+    api = made
+    _offer(api)
+    # Offered to people elsewhere, but not for a choice that takes a line, which a society of
+    # things asks its people; the manifest says which models.
+    unfit = [
+        spec for _, spec in sorted(load_manifest().models.items()) if spec.not_offered_for_lines
+    ]
+    assert unfit, "the positive control: the manifest names a model not offered for lines"
+    document = copy.deepcopy(dict(_scene().document))
+    document["minds"][0]["decider"].update(provider=unfit[0].provider, model_id=unfit[0].model_id)
+    scene = read_scene(document)
+    dressed = _dress(api, _starter(api), scene)
+    by_thing = {mind["thing_id"]: mind for mind in dressed.minds}
+    first = document["minds"][0]["thing_id"]
+    assert by_thing[first]["refused"] == "model_not_askable"
     assert all(by_thing[m["thing_id"]]["refused"] is None for m in document["minds"][1:])
 
 
