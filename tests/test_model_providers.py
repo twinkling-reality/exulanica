@@ -195,6 +195,20 @@ def test_an_answering_mechanism_names_a_known_mechanism_and_its_record(answering
         parse_manifest(document)
 
 
+@pytest.mark.parametrize("reason", ["", "two\nlines", 7], ids=["empty", "two-lines", "not-text"])
+def test_why_a_model_is_not_offered_for_lines_is_one_plain_sentence(reason):
+    document = _document()
+    model = _a_chat_model(document)
+    document["models"][model]["not_offered_for_lines"] = reason
+    with pytest.raises(ManifestError, match="not_offered_for_lines says why"):
+        parse_manifest(document)
+    # The positive control: a sentence is read, and leaving it out offers the model for lines.
+    document["models"][model]["not_offered_for_lines"] = "Not offered for lines, for a reason."
+    assert parse_manifest(document).spec(model).not_offered_for_lines is not None
+    del document["models"][model]["not_offered_for_lines"]
+    assert parse_manifest(document).spec(model).not_offered_for_lines is None
+
+
 def test_every_verified_mechanism_names_a_probe_record_whose_verdict_verified_it():
     """What the shipped manifest offers a chosen role is what a recorded probe verified.
 

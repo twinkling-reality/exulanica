@@ -440,6 +440,12 @@ the prompt `society-person-choice/v2`. Version 3 keeps version 2's actions and b
 A contract stating any of these four outside its range is refused when it loads: 1,000 to 50,000 mm,
 1 to 200 characters, 1 to 64 lines and 2 to 16 ways (`POLICY_RANGES`).
 
+**Which models they are offered.** Every model offered to the person role that answers a choice
+taking a line: a model whose manifest entry says it is not offered for lines
+([model selection](model-and-service-selection.md)) is not listed in a society of things' models
+read, and choosing it for one of its people is refused `model_not_askable`. Nemotron 3.5 Lightning
+is not offered for lines; it stays offered to the people of every other society.
+
 **When they are asked.** At the routine's own choice point, as every person; and also the minute
 after a line was said to them, whatever is under way. A being an outside program decides for is
 asked every minute.

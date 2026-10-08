@@ -20,6 +20,7 @@
       "provider": "nebius_token_factory",
       "description": "Nemotron 3.5 Lightning, an open reasoning model from NVIDIA.",
       "answering": {"json_schema": "docs/evaluation/2026-09-25-society-person-models-probe.json", "tool_call": "docs/evaluation/2026-09-25-society-person-models-probe.json"},
+      "not_offered_for_lines": "Not offered for a choice that takes a line: asked by a function, its replies carry two calls where one is asked, and under a schema they run past its answer bound.",
       "input_usd_per_mtok": 0.06,
       "output_usd_per_mtok": 0.24,
       "context_window_tokens": 1048576,

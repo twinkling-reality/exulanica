@@ -809,6 +809,35 @@ def test_a_contract_stating_a_line_bound_outside_its_range_is_refused_when_it_lo
         fresh.contract(versions)
 
 
+def test_a_choice_that_takes_a_line_is_offered_only_to_models_that_answer_one():
+    # Nemotron 3.5 Lightning's answers to the choice with a line did not answer it by either
+    # mechanism, so the manifest says it is not offered for lines: a society of things' people,
+    # whose contract takes lines, are never offered it, and every other person still is.
+    manifest = load_manifest()
+    person = decision_roles().role("society_decision")
+    lightning = "nvidia/Nemotron-3_5-Lightning"
+    assert manifest.spec(lightning).not_offered_for_lines is not None
+
+    def offered(contract):
+        return {
+            spec.model_id
+            for spec in manifest.offered_models(person.chosen)
+            if contract.mechanism_for(spec) is not None
+        }
+
+    lines = person.contract(person.terms(THINGS).versions)
+    assert lines.takes_lines
+    assert lightning not in offered(lines)
+    assert {
+        "Qwen/Qwen3-235B-A22B-Instruct-2507",
+        "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+    } <= offered(lines)
+    # The positive control: a contract with no line offers it as before.
+    own = person.contract()
+    assert not own.takes_lines and lightning in offered(own)
+
+
 def test_only_the_description_of_the_engine_asked_is_judged():
     # A rule that changes a word only the society of things' description uses stops none of
     # another engine's asks, and still stops the society of things' own.

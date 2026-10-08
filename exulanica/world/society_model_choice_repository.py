@@ -85,7 +85,10 @@ CHOICE_REFUSALS: Final = {
         "the model is not offered to a person's decisions: it is not a chat model a probe verified "
         "to answer a choice"
     ),
-    "model_not_askable": "the decision contract accepts no mechanism the model was verified for",
+    "model_not_askable": (
+        "the contract this society's engine asks by accepts no mechanism the model was verified "
+        "for, or the model is not offered for a choice that takes a line"
+    ),
     "too_many_model_people": "the choice would run more people by models than the contract allows",
     "choice_key_reused": "this idempotency key already names another choice",
     "subject_chosen_under_another_role": (
@@ -297,6 +300,17 @@ class SocietyModelChoiceRepository:
             if decides_at(choice["ends_at"], now)
         }
 
+    def _asked(self, version_id: uuid.UUID, role: DecisionRole) -> DecisionContract:
+        """The contract the society's engine asks ``role`` under, which a chosen model is checked
+        against whatever contract a caller records the choice under: a model it cannot ask, as
+        one not offered for the lines a society of things' people say, is refused
+        ``model_not_askable`` for every caller alike."""
+        return role.contract(role.terms(self.engine(version_id)).versions)
+
+    def engine(self, version_id: uuid.UUID) -> str:
+        """The engine of the society ``version_id`` holds: its people are asked under its terms."""
+        return str(self._society(version_id, lock=False)["engine_version"])
+
     def deciding(
         self, version_id: uuid.UUID, role: DecisionRole, contract: DecisionContract
     ) -> dict[str, dict[str, Any]]:
@@ -391,7 +405,7 @@ class SocietyModelChoiceRepository:
         """
 
         def described() -> dict[str, Any]:
-            return of_model(_model_record(role, manifest, contract, model))
+            return of_model(_model_record(role, manifest, self._asked(version_id, role), model))
 
         recorded = self._record(
             version_id,
@@ -460,7 +474,7 @@ class SocietyModelChoiceRepository:
         reserved, and an owner's own choice naming a visitor is not ended by it."""
 
         def described() -> dict[str, Any]:
-            return of_model(_model_record(role, manifest, contract, model))
+            return of_model(_model_record(role, manifest, self._asked(version_id, role), model))
 
         if ends_at.tzinfo is None or ends_at.utcoffset() != timedelta(0):
             raise ValueError("a gate's choice ends at an instant stated in UTC")

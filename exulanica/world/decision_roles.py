@@ -315,6 +315,8 @@ class DecisionContract:
     sha256: str
     #: Whether a model is asked in its own measured answering order before the policy's.
     asks_in_a_models_own_order: bool = False
+    #: Whether an option this contract states says something, so an answer may carry a line.
+    takes_lines: bool = False
 
     def binding(self) -> dict[str, object]:
         """What a decision request records about the contract it was asked under."""
@@ -346,7 +348,10 @@ class DecisionContract:
         """The accepted mechanisms ``spec``'s manifest entry verifies, in the order it is asked
         by: the answering order its entry states when it states one this contract accepts (a
         measured order for that model) and this contract's version asks in it, and otherwise
-        this contract's order. Empty: this contract cannot ask it."""
+        this contract's order. Empty: this contract cannot ask it, as for a contract that takes
+        lines and a model its entry says is not offered for them."""
+        if self.takes_lines and spec.not_offered_for_lines is not None:
+            return ()
         return tuple(
             m for m in self._own_order(spec) or self.mechanism_order if m in spec.answering
         )
@@ -986,4 +991,5 @@ def _contract(role: DecisionRole, versions: Mapping[str, int]) -> DecisionContra
         asks_in_a_models_own_order=(
             versions[role.policy_catalog] >= role.own_order_from_policy_version
         ),
+        takes_lines=bool(set(words) & set(getattr(role.adapter, "LINE_KINDS", ()))),
     )

@@ -222,6 +222,10 @@ class ModelSpec:
     answering_order: tuple[AnsweringMechanism, ...] = ()
     answering_order_record: str | None = None
     answering_order_reason: str | None = None
+    #: Why this model is not offered for a choice that takes a line (where an option says
+    #: something, so the answer carries the line as a second argument), in a plain sentence; None
+    #: where it is offered for every choice it is verified to answer.
+    not_offered_for_lines: str | None = None
     #: Each judgement a policy may admit this model to make, with the record of the probe that
     #: measured it: ``sign_completeness`` is the place-proposal policy's sign judgement
     #: (``exulanica.ingest.place_proposal``). Empty for a model admitted to judge nothing. Left
@@ -594,6 +598,16 @@ def _answering(model_id: str, raw: Any) -> Mapping[AnsweringMechanism, str]:
     return MappingProxyType(answering)
 
 
+def _not_offered_for_lines(model_id: str, raw: Any) -> str | None:
+    if raw is None:
+        return None
+    if not isinstance(raw, str) or not raw.strip() or "\n" in raw:
+        raise ManifestError(
+            f"{model_id}: not_offered_for_lines says why in one plain sentence, or is left out"
+        )
+    return raw
+
+
 def _judging(model_id: str, raw: Any) -> Mapping[str, str]:
     if raw is None:
         return MappingProxyType({})
@@ -715,6 +729,7 @@ def _spec_from(
         answering_order_record=order_record,
         answering_order_reason=order_reason,
         judging=_judging(model_id, raw.get("judging")),
+        not_offered_for_lines=_not_offered_for_lines(model_id, raw.get("not_offered_for_lines")),
     )
 
 

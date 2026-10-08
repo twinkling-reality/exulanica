@@ -169,7 +169,12 @@ measurement found it answers better that way than in the order the decision cont
 with the record that measured it and why; from the decision policy's second version the contract
 asks it by the first mechanism of that order it accepts, and every other model in the policy's
 order, while a request asked under the first version keeps the mechanism it recorded
-(`DecisionContract.mechanism_for` in `exulanica/world/decision_roles.py`). A chosen model has no
+(`DecisionContract.mechanism_for` in `exulanica/world/decision_roles.py`). An entry may also say,
+in one plain sentence, that the model is not offered for a choice that takes a line
+(`not_offered_for_lines`): a contract one of whose actions says something then cannot ask it by
+any mechanism, so it is neither listed nor accepted for such a choice and stays offered for every
+other. Nemotron 3.5 Lightning is not offered for lines: asked by a function, its replies carry two
+calls where one is asked, and under a schema they run past its answer bound. A chosen model has no
 fallback, because a choice names one model, and no manifest timeout: its role's contract bounds each
 ask, the person's at 20 seconds, inside the playback lease. The host asks each model with its own
 default token bound, never below its floor, so a reasoning model has room to reason before it

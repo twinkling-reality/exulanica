@@ -35,7 +35,12 @@ from exulanica.api.world_scope import WorldId
 from exulanica.door.outside import outside_deciders
 from exulanica.models.manifest import load_manifest
 from exulanica.models.usage import usd_string
-from exulanica.world.decision_roles import DecisionRole, RoleRefused, decision_roles
+from exulanica.world.decision_roles import (
+    DecisionContract,
+    DecisionRole,
+    RoleRefused,
+    decision_roles,
+)
 from exulanica.world.society import UnavailableSocietyInput
 from exulanica.world.society_decision_repository import SocietyDecisionRepository
 from exulanica.world.society_engines import society_engine
@@ -198,12 +203,15 @@ def society_models(
         return _role_refused(exc)
 
 
-def offered_models(role: DecisionRole, services: Services) -> list[dict[str, Any]]:
-    """Every model the manifest offers ``role`` that its contract can ask, each in the words a
-    read names it by and with why this process asks nothing its provider serves, if it asks
-    nothing. The world's own models read names every role's models this way."""
+def offered_models(
+    role: DecisionRole, services: Services, contract: DecisionContract | None = None
+) -> list[dict[str, Any]]:
+    """Every model the manifest offers ``role`` that ``contract`` can ask (the role's own where
+    none is given), each in the words a read names it by and with why this process asks nothing
+    its provider serves, if it asks nothing. The world's own models read names every role's models
+    this way; a society's read names them under the contract its engine is asked under."""
     manifest = load_manifest()
-    contract = role.contract()
+    contract = role.contract() if contract is None else contract
     models = []
     for spec in manifest.offered_models(role.chosen):
         mechanism = contract.mechanism_for(spec)
@@ -247,9 +255,8 @@ def society_models_view(
     # Each person a choice decides for, with where it comes from: their own choice, or the group
     # choice of the gate a visitor came through (within the bound of the contract the society's
     # engine is asked under, as the host reads it).
-    choices = repository.deciding(
-        version_id, role, role.contract(role.terms(snapshot["profile"]).versions)
-    )
+    asked = role.contract(role.terms(snapshot["profile"]).versions)
+    choices = repository.deciding(version_id, role, asked)
     travellers = repository.traveller_choices(version_id, role)
     decisions = (
         SocietyDecisionRepository(society).role_decisions(
@@ -268,7 +275,7 @@ def society_models_view(
             refusals[key] = services.choice_refusal(role, model, connection, session.workspace_id)
         return refusals[key]
 
-    models = offered_models(role, services)
+    models = offered_models(role, services, asked)
     # What models decided: an outside program's decisions name no model, and are read by its own
     # door's routes, not summarised here among the models'.
     asked_models = [decision for decision in decisions if decision["decider"]["kind"] == "model"]
@@ -377,7 +384,9 @@ def choose_society_model(
             model=None if body.model is None else body.model.model_dump(),
             chosen_by=session.actor,
             manifest=load_manifest(),
-            contract=role.contract(),
+            # The contract the society's engine asks its people under: a model it cannot ask, as
+            # one not offered for the lines a society of things says, is refused here.
+            contract=role.contract(role.terms(repository.engine(version_id)).versions),
         )
     except ModelChoiceRefused as exc:
         return JSONResponse(
