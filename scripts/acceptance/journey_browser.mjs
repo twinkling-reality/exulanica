@@ -55,6 +55,9 @@ const PEOPLE_STEPS = ['people-card', 'people-marks'];
 // The things session (A-108): the lines a being said and heard, on its card, in a scene the driver
 // prepared (its facts name the world, the speaker, the line and a hearer).
 const THINGS_STEPS = ['things-lines'];
+// The outside session (A-116): people an outside AI agent decides for, in Who decides and over their
+// heads, while the agent is connected (the driver's facts name the world, the people and the name).
+const OUTSIDE_STEPS = ['outside-deciders'];
 // The world the people session opens: the workspace's starter with a stall placed, so its people
 // have somewhere to go and stand near where a person arrives (as N1.h prepares it; A-101).
 const PEOPLE_STARTER = { title: 'Q10 people' };
@@ -662,6 +665,55 @@ const STEP_HANDLERS = {
     ctx.observe('heard-on-a-hearers-card', Array.isArray(heard) && heard.includes(line), { hearer, heard, line });
     await ctx.screenshot('heard', "a hearer's card with the line it heard");
     ctx.note(`data-thing-lines-said ${await ctx.page.evaluate(`document.querySelector('[data-thing-lines-said]')?.dataset.thingLinesSaid ?? null`)}`);
+  },
+  async 'outside-deciders'(ctx) {
+    // N1.w (A-116): Who decides marks the two people outside, disabled and left out of Choose
+    // everyone, counts them, names the agent; over each of them the outside pill reads its name.
+    const { outside_world: world, outside_people: people, outside_name: name } = ctx.facts;
+    await enter(ctx, () => ctx.page.navigate(ctx.runtime.app_url), world);
+    await openPeopleNearby(ctx.page);
+    if (!await ctx.page.evaluate(`document.querySelector('#world-panel-decides')?.checkVisibility() ?? false`)) {
+      await ctx.page.click(ACTION('people.decides'), 'Who decides');
+    }
+    const PANEL = `document.querySelector('section.society-models')`;
+    await ctx.page.waitFor(`${PANEL}?.querySelectorAll('label[data-subject-id]').length > 0 ? true : null`, SETTLE_MS, 'Who decides to list people');
+    const rows = () => ctx.page.evaluate(`[...${PANEL}.querySelectorAll('label[data-subject-id]')].map(l => ({ id: l.dataset.subjectId,
+      outside: l.dataset.outside === 'true', disabled: !!l.querySelector('input[type=checkbox]')?.disabled,
+      checked: !!l.querySelector('input[type=checkbox]')?.checked, text: l.textContent.trim().slice(0, 240) }))`);
+    const listed = await ctx.page.waitFor(`(() => { const o = [...${PANEL}.querySelectorAll('label[data-outside="true"]')].map(l => l.dataset.subjectId);
+      return o.length >= ${people.length} ? o : null; })()`, SETTLE_MS * 2, 'the outside rows').catch(() => []);
+    const before = await rows();
+    const marked = people.map((id) => before.find((r) => r.id === id) ?? null);
+    ctx.observe('outside-rows-marked-and-disabled', marked.every((r) => r && r.outside && r.disabled), { people, marked, listed });
+    await ctx.page.click(`${PANEL}.querySelector('[data-action="people.decides.everyone"]')`, 'Choose everyone');
+    await sleep(PAGE_SETTLE_MS);
+    // A-117: every row marked outside stays unchosen; the others are chosen up to the number one
+    // model may decide for at once, as the panel states it.
+    const after = await rows();
+    const most = await ctx.page.evaluate(`(() => { const m = (${PANEL}.textContent.match(/at most (\\d+) people/) ?? [])[1];
+      return m ? Number(m) : null; })()`);
+    const outsideRows = after.filter((r) => r.outside);
+    const others = after.filter((r) => !r.outside);
+    const chosen = others.filter((r) => r.checked).length;
+    ctx.observe('choose-everyone-leaves-them-out', people.every((id) => outsideRows.some((r) => r.id === id))
+      && outsideRows.every((r) => !r.checked) && others.length > 0 && most !== null
+      && chosen === Math.min(most, others.length),
+    { outside: outsideRows.length, others: others.length, chosen, most });
+    const text = await ctx.page.evaluate(`document.querySelector('#world-panel-decides')?.textContent ?? ${PANEL}.textContent`);
+    // The two named people, and the agent's own visitor when it has arrived, are decided from outside.
+    const counted = [people.length, people.length + 1].find((n) => text.includes(`${n} from outside`)) ?? null;
+    ctx.observe('counted-and-named', counted !== null && text.includes(name), { counted, named: text.includes(name) });
+    await ctx.screenshot('who-decides', 'Who decides with two people decided from outside');
+    // The agent's own body, come in through its visitor grant, wears the outside pill in its words.
+    const outsidePills = `[...document.querySelectorAll('.thing-mark-pill.thing-mark-outside')].map(p => ({
+      subject: p.dataset.subject ?? null, name: p.querySelector('.thing-mark-name')?.textContent ?? null }))`;
+    const pills = await ctx.page.waitFor(`(() => { const got = ${outsidePills};
+      return got.some(p => p.name === ${JSON.stringify(name)}) ? got : null; })()`, 90_000, "the agent's visitor's pill")
+      .catch(async () => ctx.page.evaluate(outsidePills));
+    // Observed, not judged, on this candidate (A-116's second clarification): where the visitor
+    // stands and when the page draws its pill are not yet pinned down.
+    ctx.note(`outside pills: ${JSON.stringify(pills)} (wanted ${name})`);
+    await ctx.screenshot('pills', "the agent's visitor with its outside pill");
   },
   async 'journey-open'(ctx) {
     await open(ctx);

@@ -4047,8 +4047,18 @@ THINGS_ROWS = (
         "Scripted agent; functional only.",
     ),
 )
+
+
 #: The scene, the being the agent decides for, the line it says, and the agent's bounds.
-THINGS_SCENE = Path("assets") / "catalogs" / "scenes" / "three-strangers.v3.json"
+def _newest_scene(name: str) -> Path:
+    """The newest version of ``name`` the committed scene lock ships (A-118)."""
+    catalog = Path("assets") / "catalogs" / "scenes"
+    locked = json.loads((REPOSITORY / catalog / "scenes.lock.json").read_text())["scenes"]
+    version = max(int(s["version"]) for s in locked if s["scene"] == name)
+    return catalog / f"{name}.v{version}.json"
+
+
+THINGS_SCENE = _newest_scene("three-strangers")
 THINGS_BUILDER = Path("scripts") / "demo" / "build_scene.py"
 THINGS_SPEAKER, THINGS_LINE = "knight", "Good evening, traveller."
 THINGS_ENGINE = "exulanica-society/v7"
@@ -4092,6 +4102,178 @@ seen["answers"], seen["happened"] = seen["answers"][-12:], seen["happened"][-20:
 print(json.dumps(seen))
 """
 SPEAKING_TURN_SECONDS, SPEAKING_OUTCOME_SECONDS = 420, 180
+
+#: The outside session's row (A-116): two people an outside AI agent decides for, in Who decides
+#: and over their heads, while the agent is connected under its declared name.
+OUTSIDE_ROWS = (
+    (
+        "N1.w",
+        "people.decided_from_outside",
+        "outside-deciders",
+        "In the demo scene's society of things, with AGENTS' AI bridge granted the knight and the "
+        "lantern spirit and the shipped agent library connected under the declared name Q10 Scout: "
+        "Who decides lists those two people as decided from outside (their rows marked outside, "
+        "their boxes disabled), Choose everyone leaves them unchosen, the panel counts them from "
+        "outside and names Q10 Scout as an AI agent deciding (A-116 as clarified); the outside "
+        "pill over the agent's own visitor is recorded, not judged. Scripted agent; functional "
+        "only.",
+    ),
+)
+OUTSIDE_NAME, OUTSIDE_MAKER = "Q10 Scout", "acceptance"
+OUTSIDE_PEOPLE = ("knight", "lantern-spirit")
+#: The game type AGENTS' mapping brings an agent's own body in as (outside-agents.v1.json).
+OUTSIDE_VISITOR_TYPE = "agent"
+#: The agent the outside session keeps connected while the page reads: it says hello under its
+#: declared name and polls, answering nothing (the world's routine decides missed turns).
+WAITING_AGENT = r"""
+import sys, time
+from exulanica_agent import Body
+body = Body.connect(name=sys.argv[1], maker=sys.argv[2], mind="answers nothing")
+try:
+    if sys.argv[4:] == ["enter"]:
+        answer = body.enter()
+        print("entered" if answer.received else f"not entered: {answer.refusal}", file=sys.stderr, flush=True)
+    time.sleep(float(sys.argv[3]))
+finally:
+    body.close(wait_seconds=5)
+"""
+OUTSIDE_AGENT_SECONDS = 1200
+
+
+def prepare_outside(stack: Stack, out: Path) -> tuple[dict[str, Any], list[subprocess.Popen[str]]]:
+    """The outside session's world (A-116): the demo scene built in workspace 1, its society of
+    things started, AGENTS' AI bridge granted two of its beings, and the agent connected (the
+    process is returned so the session can end it)."""
+    transcripts = Transcripts(out / "transcripts")
+    c = client(stack, transcripts, "w1", "token")
+    record_path = out / "evidence" / "outside-scene.json"
+    record_path.parent.mkdir(parents=True, exist_ok=True)
+    built = subprocess.run(
+        [
+            str(stack.worktree / ".venv" / "bin" / "python"),
+            str(stack.worktree / THINGS_BUILDER),
+            str(stack.worktree / THINGS_SCENE),
+            "--base-url",
+            stack.base_url,
+            "--record",
+            str(record_path),
+        ],
+        cwd=stack.worktree,
+        env={
+            **LAUNCH.clean_environment(),
+            "EXULANICA_TOKEN": stack.token_file("token").read_text().strip(),
+        },
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=600,
+    )
+    (out / "evidence" / "outside-scene.txt").write_text(built.stdout + built.stderr)
+    if not record_path.exists():
+        return {"ready": False, "why": f"the scene build exited {built.returncode}"}, []
+    record = json.loads(record_path.read_text())
+    entry = read_entry(c, "outside", record["entry_id"])
+    query = world_query(entry)
+    status, started = c.call(
+        "outside",
+        "POST",
+        version_path(entry, "/society"),
+        query=query,
+        body={"region_id": record["arrival"]["region_id"], "profile": THINGS_ENGINE},
+    )
+    people = {
+        p.get("placed_id"): p.get("id")
+        for p in ((started or {}).get("state") or {}).get("inhabitants") or []
+        if p.get("came_by") == "placed"
+    }
+    chosen = [people.get(name) for name in OUTSIDE_PEOPLE]
+    if status != 200 or None in chosen:
+        return {"ready": False, "why": f"the society answered {status}; people {chosen}"}, []
+    declared = json.loads(stack.state["door_bridges"])
+    bridge = next(b for b in declared if b.get("ai"))
+    _, granted = c.call(
+        "outside",
+        "POST",
+        "/door/grants",
+        query=query,
+        body={
+            "idempotency_key": str(uuid.uuid4()),
+            "bridge": bridge["bridge"],
+            "things": chosen,
+            "version_id": entry["authored_version_id"],
+            "minutes": 60,
+        },
+    )
+    grant_id = ((granted or {}).get("grant") or {}).get("grant_id")
+    _, issued = c.call(
+        "outside", "POST", f"/door/grants/{grant_id}/channel-credentials", query=query, body={}
+    )
+    # A second grant lets the same agent bring its own body in as a visitor (A-116 as clarified).
+    _, visiting = c.call(
+        "outside",
+        "POST",
+        "/door/grants",
+        query=query,
+        body={
+            "idempotency_key": str(uuid.uuid4()),
+            "bridge": bridge["bridge"],
+            "visitors_maximum": 1,
+            "kinds": [OUTSIDE_VISITOR_TYPE],
+            "version_id": entry["authored_version_id"],
+            "minutes": 60,
+        },
+    )
+    visiting_id = ((visiting or {}).get("grant") or {}).get("grant_id")
+    _, visiting_key = c.call(
+        "outside", "POST", f"/door/grants/{visiting_id}/channel-credentials", query=query, body={}
+    )
+    path = version_path(entry, "/society/control")
+    _, control = c.call("outside", "GET", path, query=query)
+    c.call(
+        "outside",
+        "PUT",
+        path,
+        query=query,
+        body={"base_revision": (control or {}).get("revision", 0), "mode": "playing", "speed": 1},
+    )
+
+    def connected(key: str, log: str, *extra: str) -> subprocess.Popen[str]:
+        return subprocess.Popen(
+            [
+                str(stack.worktree / ".venv" / "bin" / "python"),
+                "-c",
+                WAITING_AGENT,
+                OUTSIDE_NAME,
+                OUTSIDE_MAKER,
+                str(OUTSIDE_AGENT_SECONDS),
+                *extra,
+            ],
+            cwd=stack.worktree,
+            env={
+                **LAUNCH.clean_environment(),
+                "PYTHONPATH": str(stack.worktree / "bridges" / "agents"),
+                "EXULANICA_URL": stack.base_url,
+                "EXULANICA_AGENT_KEY": key,
+            },
+            stdout=subprocess.DEVNULL,
+            stderr=(out / "evidence" / log).open("w"),
+            text=True,
+        )
+
+    agent = connected((issued or {}).get("credential") or "", "outside-agent.txt")
+    visitor = connected(
+        (visiting_key or {}).get("credential") or "", "outside-visitor.txt", "enter"
+    )
+    time.sleep(30)  # the visitor arrives at the next world minute
+    alive = agent.poll() is None and visitor.poll() is None
+    return {
+        "ready": alive,
+        "why": None if alive else "an agent did not stay connected",
+        "outside_world": entry["entry_id"],
+        "outside_people": chosen,
+        "outside_name": OUTSIDE_NAME,
+        "bridge_label": bridge.get("label"),
+    }, [agent, visitor]
 
 
 def prepare_things(stack: Stack, out: Path) -> dict[str, Any]:
@@ -4249,31 +4431,50 @@ def browser(arguments: argparse.Namespace) -> int:
         )
     people = arguments.session == "people"
     things = arguments.session == "things"
+    outside = arguments.session == "outside"
     served = (stack.state.get("scripted_model") or {}).get("plan_sha256")
     scripted = served == hashlib.sha256((REPOSITORY / PEOPLE_PLAN).read_bytes()).hexdigest()
-    if (people or things) != scripted:
+    if (people or things or outside) != scripted:
         raise SystemExit(
             "the people and things sessions need --scripted-model "
             "scripts/acceptance/plans/comparisons.json --spending process on their stack, and the "
             "main session needs no scripted model"
         )
-    if things and not (stack.state.get("society_of_things") and stack.state.get("door_bridges")):
-        raise SystemExit("the things session needs --society-of-things and --door-bridges FILE")
+    if (things or outside) and not (
+        stack.state.get("society_of_things") and stack.state.get("door_bridges")
+    ):
+        raise SystemExit(
+            "the things and outside sessions need --society-of-things and --door-bridges FILE"
+        )
     rehearse = _rehearsal()
     steps = json.loads((REPOSITORY / "scripts" / "rehearsal" / "steps.json").read_text())
     out = Path(arguments.out).resolve()
     session_dir = out / "session"
     session_dir.mkdir(parents=True, exist_ok=True)
     started = dt.datetime.now(dt.UTC).isoformat()
-    facts = prepare_things(stack, out) if things else {}
-    listed = PEOPLE_ROWS if people else THINGS_ROWS if things else WORLDS_ROWS
+    agent = None
+    if outside:
+        facts, agent = prepare_outside(stack, out)
+        facts["said"] = facts.get("ready")
+    else:
+        facts = prepare_things(stack, out) if things else {}
+    staged = things or outside
+    listed = (
+        PEOPLE_ROWS
+        if people
+        else THINGS_ROWS
+        if things
+        else OUTSIDE_ROWS
+        if outside
+        else WORLDS_ROWS
+    )
     ports = stack.state["ports"]
     plan = {
         "session": {
-            "id": "n1s" if people else "n1v" if things else "n1j",
+            "id": "n1s" if people else "n1v" if things else "n1w" if outside else "n1j",
             "budget_seconds": JOURNEY_BUDGET_SECONDS,
-            **({"steps": [step for _, _, step, _ in listed]} if people or things else {}),
-            **({"facts": facts} if things else {}),
+            **({"steps": [step for _, _, step, _ in listed]} if people or staged else {}),
+            **({"facts": facts} if staged else {}),
         },
         "out": str(session_dir),
         "runtime": {
@@ -4296,8 +4497,9 @@ def browser(arguments: argparse.Namespace) -> int:
         quiet if quiet.exists() else None,
         ["node", str(JOURNEY_RUNNER), str(plan_file)],
     )
-    if things and not facts.get("said"):
-        # Nothing was said, so there is nothing for a card to show: no page session (A-108).
+    if staged and not facts.get("said"):
+        # Nothing was said (or the agent is not there), so there is nothing to show: no page
+        # session (A-108, A-116).
         completed = subprocess.CompletedProcess(command, None, "", f"not run: {facts.get('why')}")
     else:
         completed = subprocess.run(
@@ -4310,6 +4512,12 @@ def browser(arguments: argparse.Namespace) -> int:
             timeout=JOURNEY_BUDGET_SECONDS + rehearse.GPU_SLOT_WAIT_SECONDS + 120,
         )
     (out / "runner.txt").write_text(completed.stdout + completed.stderr)
+    for one in agent or []:
+        one.terminate()
+        try:
+            one.wait(timeout=30)
+        except subprocess.TimeoutExpired:
+            one.kill()
     session = (
         json.loads((session_dir / "session.json").read_text())
         if (session_dir / "session.json").exists()
@@ -4361,13 +4569,13 @@ def browser(arguments: argparse.Namespace) -> int:
         worlds_rows.append(worlds_row.close())
     # The people and things sessions drive only their own steps, so they state no journey row; a
     # things session whose agent said no line is blocked, not failed (A-108).
-    if things and not facts.get("said"):
+    if staged and not facts.get("said"):
         for blocked in worlds_rows:
             blocked.blocked_by.append(str(facts.get("why")))
             blocked.close()
-    for one in worlds_rows if things else []:
+    for one in worlds_rows if staged else []:
         one.observed["facts"] = facts
-    rows = worlds_rows if people or things else [row, *worlds_rows]
+    rows = worlds_rows if people or staged else [row, *worlds_rows]
     results = {
         "profile": "q10-foundation-acceptance-results/v1",
         "candidate": stack.state["tree"],
@@ -4430,7 +4638,7 @@ def build_parser() -> argparse.ArgumentParser:
     page.add_argument("--out", required=True)
     page.add_argument(
         "--session",
-        choices=("main", "people", "things"),
+        choices=("main", "people", "things", "outside"),
         default="main",
         help="main: the journey and Your worlds rows; people: a person's card and marks, on a "
         "stack with the scripted comparisons plan; things: said and heard lines on cards, on such "

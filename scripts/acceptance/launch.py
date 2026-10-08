@@ -728,10 +728,19 @@ def role_url(url: str, role: str) -> str:
     return f"{scheme}://{role}@{rest.split('@', 1)[1] if '@' in rest else rest}"
 
 
-def accounts_environment(account_url: str, origin: str, code_sha256: str) -> dict[str, str]:
+def accounts_environment(
+    account_url: str,
+    origin: str,
+    code_sha256: str,
+    *,
+    playing_maximum: int | None = None,
+    play_seconds: int | None = None,
+) -> dict[str, str]:
     """What ``--accounts-guest-code`` hands the API: the accounts role, the one browser origin, guest
-    entry by the code's digest only, and playback of every account's own workspace."""
-    return {
+    entry by the code's digest only, and playback of every account's own workspace; and, when stated,
+    how many guests' towns play at once and how long a guest counts as there (the deployment's own
+    settings, docs/deployment.md)."""
+    environment = {
         "EXULANICA_ACCOUNT_DATABASE_URL": account_url,
         "EXULANICA_ACCOUNT_BROWSER_ORIGINS": json.dumps([origin]),
         "EXULANICA_GUEST_ENTRY": "code",
@@ -739,6 +748,11 @@ def accounts_environment(account_url: str, origin: str, code_sha256: str) -> dic
         "EXULANICA_GUEST_ENTRIES_PER_DAY": str(GUEST_ENTRIES_PER_DAY),
         "EXULANICA_SOCIETY_CONTROL_WORKER": "on",
     }
+    if playing_maximum is not None:
+        environment["EXULANICA_GUEST_PLAYING_MAXIMUM"] = str(playing_maximum)
+    if play_seconds is not None:
+        environment["EXULANICA_GUEST_PLAY_SECONDS"] = str(play_seconds)
+    return environment
 
 
 def api_environment(
@@ -1289,7 +1303,16 @@ def write_state(state_file: Path, state: Mapping[str, object]) -> None:
 
 
 def guest_entry(
-    python: Path, worktree: Path, exports: Mapping[str, str], run_dir: Path, logs: Path, origin: str
+    python: Path,
+    worktree: Path,
+    exports: Mapping[str, str],
+    run_dir: Path,
+    logs: Path,
+    origin: str,
+    *,
+    ceiling_usd: str = GUEST_POLICY_CEILING_USD,
+    playing_maximum: int | None = None,
+    play_seconds: int | None = None,
 ) -> dict[str, str]:
     """The accounts host ``--accounts-guest-code`` starts: the accounts role given its tables, the
     run's code drawn into a file only this user reads, and an authority and guest policy issued for
@@ -1354,7 +1377,7 @@ def guest_entry(
                 "--authority",
                 authority_id,
                 "--ceiling-usd",
-                GUEST_POLICY_CEILING_USD,
+                ceiling_usd,
                 "--max-calls",
                 str(GUEST_POLICY_MAX_CALLS),
                 "--valid-for-days",
@@ -1382,6 +1405,8 @@ def guest_entry(
         role_url(exports["EXULANICA_DATABASE_URL"], role),
         origin,
         hashlib.sha256(code.encode()).hexdigest(),
+        playing_maximum=playing_maximum,
+        play_seconds=play_seconds,
     )
 
 
@@ -1403,6 +1428,12 @@ def up(arguments: argparse.Namespace) -> None:
         society_playback_environment(None, arguments.society_tick_interval_ms)  # likewise
     if arguments.door_bridges is not None:
         door_bridges_setting(arguments.door_bridges, [])  # likewise
+    if not arguments.accounts_guest_code and (
+        arguments.guest_playing_maximum is not None
+        or arguments.guest_play_seconds is not None
+        or arguments.guest_ceiling_usd is not None
+    ):
+        refuse("accounts-shape", REFUSALS["accounts-shape"])
     if arguments.accounts_guest_code and (
         arguments.edge_port is None
         or not arguments.tiles
@@ -1614,16 +1645,24 @@ def up(arguments: argparse.Namespace) -> None:
 
     accounts = None
     if arguments.accounts_guest_code:
+        ceiling = arguments.guest_ceiling_usd or GUEST_POLICY_CEILING_USD
         accounts = guest_entry(
-            python, worktree, exports, run_dir, logs, edge_origin(arguments.edge_port)
+            python,
+            worktree,
+            exports,
+            run_dir,
+            logs,
+            edge_origin(arguments.edge_port),
+            ceiling_usd=ceiling,
+            playing_maximum=arguments.guest_playing_maximum,
+            play_seconds=arguments.guest_play_seconds,
         )
         state["accounts"] = {
             "code_file": str(run_dir / GUEST_CODE_NAME),
             "origin": edge_origin(arguments.edge_port),
-            "guest_policy": {
-                "ceiling_usd": GUEST_POLICY_CEILING_USD,
-                "max_calls": GUEST_POLICY_MAX_CALLS,
-            },
+            "guest_policy": {"ceiling_usd": ceiling, "max_calls": GUEST_POLICY_MAX_CALLS},
+            "playing_maximum": arguments.guest_playing_maximum,
+            "play_seconds": arguments.guest_play_seconds,
             "environment": accounts,
         }
 
@@ -2197,6 +2236,23 @@ def build_parser() -> argparse.ArgumentParser:
                 type=int,
                 help="with --accounts-guest-code, the loopback port of the local HTTPS edge in "
                 "front of the API; the browser origin is https://localhost:<port> (default: none)",
+            )
+            command.add_argument(
+                "--guest-playing-maximum",
+                type=int,
+                help="with --accounts-guest-code, how many guests' towns play at once "
+                "(EXULANICA_GUEST_PLAYING_MAXIMUM; default: the API's own)",
+            )
+            command.add_argument(
+                "--guest-play-seconds",
+                type=int,
+                help="with --accounts-guest-code, how long after a guest's last request their town "
+                "keeps playing (EXULANICA_GUEST_PLAY_SECONDS; default: the API's own)",
+            )
+            command.add_argument(
+                "--guest-ceiling-usd",
+                help="with --accounts-guest-code, each guest's allowance per provider in USD "
+                f"(default: {GUEST_POLICY_CEILING_USD})",
             )
             command.add_argument(
                 "--society-tick-interval-ms",

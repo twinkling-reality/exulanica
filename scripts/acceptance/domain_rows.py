@@ -4745,8 +4745,19 @@ THING_CATALOGS = Path("assets") / "catalogs" / "things"
 IMPORTED_THINGS = Path("assets") / "things"
 #: The shipped kind T2 places, and the demo scene SC1 builds (A-78, A-79).
 T2_KIND = {"kind": "sword", "version": 3}
-#: The demo scene as the catalog ships it (A-102): profile exulanica.scene/v1, engine v7, a gate.
-DEMO_SCENE = Path("assets") / "catalogs" / "scenes" / "three-strangers.v3.json"
+#: The demo scene as the catalog ships it (A-102, A-118): the newest three-strangers version the
+#: scene lock ships, profile exulanica.scene/v1, engine v7, a gate.
+SCENE_CATALOG = Path("assets") / "catalogs" / "scenes"
+
+
+def newest_scene(name: str, root: Path = HERE.parents[1]) -> Path:
+    """The newest version of ``name`` that the committed scene lock ships."""
+    locked = json.loads((root / SCENE_CATALOG / "scenes.lock.json").read_text())["scenes"]
+    version = max(int(s["version"]) for s in locked if s["scene"] == name)
+    return SCENE_CATALOG / f"{name}.v{version}.json"
+
+
+DEMO_SCENE = newest_scene("three-strangers")
 DEMO_BUILDER = Path("scripts") / "demo" / "build_scene.py"
 
 
@@ -5159,6 +5170,100 @@ def row_sc1(stack: Stack, transcripts: Any, worktree: Path, out: Path) -> Row:
 
 
 LOOK_CHOICES = "exulanica.thing-look-choices/v1"
+
+
+#: The catalog scene laid out for a generated town (2160898c), dressed into a town named by --entry.
+TOWN_SCENE = Path("assets") / "catalogs" / "scenes" / "three-strangers-in-town.v1.json"
+
+
+def run_builder(
+    stack: Stack, worktree: Path, scene: Path, record: Path, *extra: str
+) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [
+            str(worktree / ".venv" / "bin" / "python"),
+            str(worktree / DEMO_BUILDER),
+            str(worktree / scene),
+            "--base-url",
+            stack.base_url,
+            "--record",
+            str(record),
+            *extra,
+        ],
+        cwd=worktree,
+        env={
+            **LAUNCH.clean_environment(),
+            "EXULANICA_TOKEN": stack.token_file("token-2").read_text().strip(),
+        },
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=600,
+    )
+
+
+def row_sc2(stack: Stack, transcripts: Any, worktree: Path, out: Path) -> Row:
+    row = Row(
+        "SC2",
+        "demo.scene_in_a_town",
+        "The catalog scene laid out for a town (three-strangers-in-town v1) is dressed by "
+        "build_scene.py into a small town workspace 2 makes through Create a world (A-115): without "
+        "--entry the builder refuses and places nothing; with --entry every thing the scene names "
+        "stands in the town's version with the kind the scene states and the pose the record "
+        "states; a second build adds nothing. No society is started (none is offered on a town's "
+        "ground here; root's note).",
+    )
+    w2 = F.client(stack, transcripts, "w2", "token-2")
+    scene = json.loads((worktree / TOWN_SCENE).read_text())
+    status_town, town = w2.call(
+        "SC2", "POST", "/worlds/generated", body={"recipe": "small_town", "title": "Q10 SC2 town"}
+    )
+    row.expect(status_town == 201, f"the town answered {status_town} {F.problem_code(town)}")
+    if status_town != 201:
+        return row.close()
+    bare = run_builder(stack, worktree, TOWN_SCENE, out / "evidence" / "sc2-no-entry.json")
+    (out / "evidence" / "sc2-no-entry.txt").write_text(bare.stdout + bare.stderr)
+    row.expect(
+        bare.returncode != 0 and "--entry" in (bare.stdout + bare.stderr),
+        f"without --entry the builder exited {bare.returncode}",
+    )
+    first_record = out / "evidence" / "sc2-build-1.json"
+    first = run_builder(stack, worktree, TOWN_SCENE, first_record, "--entry", town["entry_id"])
+    (out / "evidence" / "sc2-build-1.txt").write_text(first.stdout + first.stderr)
+    row.expect(
+        first.returncode == 0 and first_record.exists(), f"the build exited {first.returncode}"
+    )
+    if not first_record.exists():
+        return row.close()
+    record = json.loads(first_record.read_text())
+    entry = F.read_entry(w2, "SC2", town["entry_id"])
+    _, version = w2.call("SC2", "GET", F.version_path(entry), query=F.world_query(entry))
+    recorded = {t["thing_id"]: t for t in record.get("things") or []}
+    for wanted in scene.get("things") or []:
+        stored = placed(version, wanted["thing_id"]) or {}
+        kind = stored.get("kind") or {}
+        row.expect(
+            (kind.get("kind"), kind.get("version"))
+            == (wanted["kind"]["kind"], wanted["kind"]["version"])
+            and stands(stored, (recorded.get(wanted["thing_id"]) or {}).get("pose")),
+            f"{wanted['thing_id']} reads {kind} at {stored.get('transform')}",
+        )
+    second_record = out / "evidence" / "sc2-build-2.json"
+    second = run_builder(stack, worktree, TOWN_SCENE, second_record, "--entry", town["entry_id"])
+    (out / "evidence" / "sc2-build-2.txt").write_text(second.stdout + second.stderr)
+    again = json.loads(second_record.read_text()) if second_record.exists() else {}
+    row.expect(
+        second.returncode == 0 and again.get("things_added") == 0,
+        f"a second build exited {second.returncode} adding {again.get('things_added')}",
+    )
+    row.observed = {
+        "scene": record.get("scene"),
+        "town": town.get("entry_id"),
+        "no_entry_exit": bare.returncode,
+        "things": sorted(recorded),
+        "things_added": [record.get("things_added"), again.get("things_added")],
+    }
+    return row.close()
 
 
 def row_s4(stack: Stack, transcripts: Any) -> Row:
@@ -5900,6 +6005,133 @@ def row_df1(stack: Stack, transcripts: Any) -> Row:
     return row.close()
 
 
+def row_v6(stack: Stack, transcripts: Any, worktree: Path, credential: str | None) -> Row:
+    row = Row(
+        "V6",
+        "door.invite_redeemed",
+        "A player's invite redeemed against the door itself (A-114): the owner's invite to a "
+        "visitor grant of the Luanti bridge is 201 with a code shown once; the bridge, presenting "
+        "its own declared credential, redeems it with a requester digest, 201 with the grant and a "
+        "channel credential; the same code again, and a made-up code, are 404 "
+        "invite_not_redeemable; the channel credential's hello is 200.",
+    )
+    if credential is None:
+        row.blocked_by.append("no bridge credential was given (--bridge-credential)")
+        return row.close()
+    w1 = F.client(stack, transcripts, "w1", "token")
+    _, entries = w1.call("V6", "GET", "/world-entries")
+    held = next((e for e in entries or [] if not e.get("generated_ground")), None)
+    if held is None:
+        row.blocked_by.append("V2 left no scene world to grant")
+        return row.close()
+    entry = F.read_entry(w1, "V6", held["entry_id"])
+    query = F.world_query(entry)
+    _, version = w1.call("V6", "GET", F.version_path(entry), query=query)
+    gate = next(
+        (
+            t.get("thing_id")
+            for t in (version or {}).get("things") or []
+            if (t.get("kind") or {}).get("kind") == "gate"
+        ),
+        None,
+    )
+    status_grant, granted = w1.call(
+        "V6",
+        "POST",
+        "/door/grants",
+        query=query,
+        body={
+            "idempotency_key": str(uuid.uuid4()),
+            "bridge": "luanti",
+            "version_id": entry["authored_version_id"],
+            "minutes": 30,
+            "visitors_maximum": 1,
+            "kinds": [CROSSING_TYPE],
+            **({"gate": gate} if gate else {}),
+        },
+    )
+    grant_id = ((granted or {}).get("grant") or {}).get("grant_id")
+    status_invite, invited = w1.call(
+        "V6", "POST", f"/door/grants/{grant_id}/invites", query=query, body={}
+    )
+    code = (invited or {}).get("code")
+    row.expect(
+        status_grant == 201
+        and status_invite == 201
+        and code
+        and (invited or {}).get("shown") == "once",
+        f"the grant answered {status_grant}, the invite {status_invite}",
+    )
+    requester = hashlib.sha256(f"q10-v6-{uuid.uuid4()}".encode()).hexdigest()
+    redeem = {"code": code or "", "requester": requester}
+    status_redeem, redeemed = door_call(stack, credential, "POST", "/door/invites/redeem", redeem)
+    channel_credential = (redeemed or {}).get("credential")
+    row.expect(
+        status_redeem == 201
+        and ((redeemed or {}).get("grant") or {}).get("grant_id") == grant_id
+        and channel_credential,
+        f"the redemption answered {status_redeem} {F.problem_code(redeemed)}",
+    )
+    status_again, again = door_call(stack, credential, "POST", "/door/invites/redeem", redeem)
+    status_made_up, made_up = door_call(
+        stack, credential, "POST", "/door/invites/redeem", {**redeem, "code": "Q10MADEUPCODE"}
+    )
+    row.expect(
+        status_again == 404 and F.problem_code(again) == "invite_not_redeemable",
+        f"the same code again answered {status_again} {F.problem_code(again)}",
+    )
+    row.expect(
+        status_made_up == 404 and F.problem_code(made_up) == "invite_not_redeemable",
+        f"a made-up code answered {status_made_up} {F.problem_code(made_up)}",
+    )
+    status_hello, said = channel(
+        stack, channel_credential or "", "POST", "/door/channel/hello", raw=luanti_hello(worktree)
+    )
+    row.expect(status_hello == 200, f"the hello answered {status_hello} {F.problem_code(said)}")
+    w1.call("V6", "POST", f"/door/grants/{grant_id}/revoke", query=query, body={})
+    row.observed = {
+        "grant": [status_grant, grant_id],
+        "invite": [status_invite, (invited or {}).get("shown")],
+        "redeem": [status_redeem, F.problem_code(redeemed)],
+        "again": [status_again, F.problem_code(again)],
+        "made_up": [status_made_up, F.problem_code(made_up)],
+        "hello": status_hello,
+    }
+    return row.close()
+
+
+def declare_luanti(arguments: argparse.Namespace) -> int:
+    """The Luanti bridge as the stand-in declares it, with a credential this driver draws: only its
+    digest goes in the file the stack reads; the credential itself goes in ``OUT.credential``, mode
+    0600, for V6's redemption, and is never printed."""
+    worktree = LAUNCH.checkout(arguments.worktree)
+    out = Path(arguments.out).resolve()
+    declared = subprocess.run(
+        [
+            str(worktree / ".venv" / "bin" / "python"),
+            str(worktree / LUANTI_STANDIN),
+            "declare",
+            str(out),
+        ],
+        cwd=worktree,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if declared.returncode != 0:
+        raise SystemExit(f"the stand-in did not declare: {declared.stderr.strip()[:300]}")
+    entries = json.loads(out.read_text())
+    secret = secrets.token_urlsafe(32)
+    for entry in entries:
+        entry["credential_sha256"] = hashlib.sha256(secret.encode()).hexdigest()
+    out.write_text(json.dumps(entries, indent=2) + "\n")
+    held = out.with_name(out.name + ".credential")
+    held.write_text(secret)
+    held.chmod(0o600)
+    print(f"{out}: bridge luanti with a driver-held credential")
+    return 0
+
+
 def crossings(arguments: argparse.Namespace) -> int:
     worktree = LAUNCH.checkout(arguments.worktree)
     stack = Stack.read(worktree)
@@ -5913,10 +6145,16 @@ def crossings(arguments: argparse.Namespace) -> int:
     (out / "evidence").mkdir(parents=True, exist_ok=True)
     transcripts = Transcripts(out / "transcripts")
     started = dt.datetime.now(dt.UTC).isoformat()
+    credential = (
+        Path(arguments.bridge_credential).read_text().strip()
+        if arguments.bridge_credential
+        else None
+    )
     rows = [
         row_df1(stack, transcripts),
         row_v2(stack, transcripts, worktree, out),
         row_v3(stack, transcripts, worktree, out),
+        row_v6(stack, transcripts, worktree, credential),
     ]
     write_results(out, stack, rows, started, sys.argv[1:])
     return 0 if all(row.status != "failed" for row in rows) else 1
@@ -5955,6 +6193,7 @@ def things(arguments: argparse.Namespace) -> int:
         row_t3(stack, transcripts, sc1.observed),
         row_t4a(stack, transcripts, sc1.observed, worktree),
         row_s4(stack, transcripts),
+        row_sc2(stack, transcripts, worktree, out),
     ]
     write_results(out, stack, rows, started, sys.argv[1:])
     return 0 if all(row.status != "failed" for row in rows) else 1
@@ -6010,7 +6249,7 @@ def deciders(c: Any, step: str, entry: Mapping[str, Any], people: Sequence[str])
 
 def row_d1(stack: Stack, transcripts: Any, worktree: Path) -> Row:
     row = Row(
-        "D1",
+        "DR1",
         "door.grants",
         "With AGENTS' example bridge declared: GET /door/bridges lists it; on the starter a visitor "
         "grant naming no version is 422 invalid_scope and one naming the starter's version, whose "
@@ -6638,6 +6877,316 @@ def row_v1(stack: Stack, transcripts: Any) -> Row:
     return row.close()
 
 
+# -- V4, V5: guests' places and a guest's allowance used up ---------------------------------------
+
+#: How often a waiting guest's page reads its control (a guest counts as there while it is used),
+#: and how long past the play window the rotation may take (the host rereads every 5 s).
+GUEST_READ_SECONDS = 20
+GUEST_ROTATION_GRACE_SECONDS = 60
+GUEST_START_SECONDS = 60
+
+
+def enter_guest(stack: Stack, transcripts: Any, name: str) -> tuple[GuestClient, dict[str, Any]]:
+    """A guest entered by the run's code, its session kept, and the arrival town it was given."""
+    guest = GuestClient(stack, transcripts, name)
+    code = Path(stack.state["accounts"]["code_file"]).read_text().strip()
+    status, entered = guest.call(
+        f"{name} enter",
+        "POST",
+        "/auth/guest",
+        body={"code": code},
+        recorded_body={"code": GUEST_CODE_PLACEHOLDER},
+    )
+    entered = entered if isinstance(entered, dict) else {}
+    guest.keep_session(entered)
+    entered["status"] = status
+    return guest, entered
+
+
+def playing_town(
+    guest: GuestClient, label: str, entered: Mapping[str, Any]
+) -> dict[str, Any] | None:
+    """The guest's arrival town with people brought in and set playing, or None."""
+    arrival = entered.get("arrival") or {}
+    if not arrival.get("entry_id"):
+        return None
+    entry = F.read_entry(guest, label, arrival["entry_id"])
+    if F.society(guest, label, entry)[0] == 404:
+        guest.call(
+            label,
+            "POST",
+            F.version_path(entry, "/society"),
+            query=F.world_query(entry),
+            body={"region_id": TOWN_REGION, "profile": TOWN_ENGINE},
+        )
+        entry = F.read_entry(guest, label, entry["entry_id"])
+    status, _ = control(guest, label, entry, "playing")
+    return entry if status == 200 else None
+
+
+def control_read(guest: GuestClient, label: str, entry: Mapping[str, Any]) -> dict[str, Any]:
+    _, read = guest.call(
+        label, "GET", F.version_path(entry, "/society/control"), query=F.world_query(entry)
+    )
+    read = read if isinstance(read, dict) else {}
+    return {
+        "running": (read.get("host_playback") or {}).get("running"),
+        "code": read.get("host_playback_code"),
+        "minds": read.get("model_minds_code"),
+        "minds_reason": read.get("model_minds_reason"),
+    }
+
+
+def plays(reading: Mapping[str, Any]) -> bool:
+    return reading.get("running") is True and reading.get("code") is None
+
+
+def waits(reading: Mapping[str, Any]) -> bool:
+    return reading.get("code") == "guest_towns_full"
+
+
+def row_v4(stack: Stack, transcripts: Any) -> Row:
+    accounts = stack.state["accounts"]
+    window = int(accounts["play_seconds"])
+    row = Row(
+        "V4",
+        "accounts.guest_places",
+        f"With one guest's town playing at a time and a play window of {window} s (A-111 as "
+        "clarified): guest A's town plays; guest B's town then reads guest_towns_full (not "
+        "running); with both kept there, within the window and a minute A reads guest_towns_full "
+        "and B's town plays; then, A no longer there, B alone keeps its place through a whole "
+        "window.",
+    )
+    a, entered_a = enter_guest(stack, transcripts, "guest-a")
+    town_a = playing_town(a, "V4 A", entered_a)
+    row.expect(entered_a.get("status") == 201 and town_a is not None, "guest A has no playing town")
+    if town_a is None:
+        return row.close()
+    timeline: list[dict[str, Any]] = []
+    deadline = time.monotonic() + GUEST_START_SECONDS
+    reading = control_read(a, "V4 A", town_a)
+    while not plays(reading) and time.monotonic() < deadline:
+        time.sleep(3)
+        reading = control_read(a, "V4 A", town_a)
+    row.expect(plays(reading), f"guest A's town reads {reading}")
+    b, entered_b = enter_guest(stack, transcripts, "guest-b")
+    town_b = playing_town(b, "V4 B", entered_b)
+    row.expect(entered_b.get("status") == 201 and town_b is not None, "guest B has no playing town")
+    if town_b is None:
+        return row.close()
+    deadline_b = time.monotonic() + GUEST_START_SECONDS
+    first_b = control_read(b, "V4 B", town_b)
+    while not waits(first_b) and time.monotonic() < deadline_b:
+        time.sleep(3)
+        first_b = control_read(b, "V4 B", town_b)
+    row.expect(
+        waits(first_b) and first_b.get("running") is not True,
+        f"guest B's town first reads {first_b}",
+    )
+    started = time.monotonic()
+    rotated = None
+    while time.monotonic() < started + window + GUEST_ROTATION_GRACE_SECONDS:
+        time.sleep(GUEST_READ_SECONDS)
+        read_a, read_b = control_read(a, "V4 both", town_a), control_read(b, "V4 both", town_b)
+        timeline.append({"t": round(time.monotonic() - started), "a": read_a, "b": read_b})
+        if waits(read_a) and plays(read_b):
+            rotated = round(time.monotonic() - started)
+            break
+    row.expect(rotated is not None, "the places did not rotate within the window and a minute")
+    # The control: A no longer reads (it leaves); B, alone, keeps its place through a whole window.
+    alone_until = time.monotonic() + window + 30
+    kept = rotated is not None
+    while rotated is not None and time.monotonic() < alone_until:
+        time.sleep(GUEST_READ_SECONDS)
+        reading = control_read(b, "V4 B alone", town_b)
+        timeline.append({"t": round(time.monotonic() - started), "b": reading})
+        kept = kept and plays(reading)
+    row.expect(kept, "guest B gave up its place with nobody waiting")
+    row.observed = {
+        "window_seconds": window,
+        "maximum": accounts.get("playing_maximum"),
+        "b_first": first_b,
+        "rotated_after_seconds": rotated,
+        "b_alone_kept": kept,
+        "timeline": timeline[-14:],
+    }
+    return row.close()
+
+
+def row_v5(stack: Stack, transcripts: Any) -> Row:
+    ceiling = stack.state["accounts"]["guest_policy"]["ceiling_usd"]
+    row = Row(
+        "V5",
+        "accounts.allowance_used_up",
+        f"A guest whose allowance (USD {ceiling} per provider) is below the smallest ask any offered "
+        "model reserves (A-112): its people given a model, its town plays on, the control read "
+        "states model_minds_code spending_cap_reached with a sentence, and no model is asked.",
+    )
+    guest, entered = enter_guest(stack, transcripts, "guest")
+    town = playing_town(guest, "V5", entered)
+    row.expect(entered.get("status") == 201 and town is not None, "the guest has no playing town")
+    if town is None:
+        return row.close()
+    _, society = F.society(guest, "V5", town)
+    people = [p.get("id") for p in ((society or {}).get("state") or {}).get("inhabitants") or []][
+        :4
+    ]
+    status_choice, choice = choose_model(guest, "V5", town, PERSON_ROLE, people, GOING_MODEL)
+    calls_before = len(scripted_log(stack))
+    deadline = time.monotonic() + PERSON_DECISION_SECONDS
+    reading = control_read(guest, "V5", town)
+    while reading.get("minds") != "spending_cap_reached" and time.monotonic() < deadline:
+        time.sleep(5)
+        reading = control_read(guest, "V5", town)
+    time.sleep(GUEST_READ_SECONDS)
+    after = control_read(guest, "V5", town)
+    calls_after = len(scripted_log(stack))
+    row.expect(
+        status_choice == 200 or F.problem_code(choice) is not None,
+        f"choosing the model answered {status_choice} {F.problem_code(choice)}",
+    )
+    row.expect(
+        reading.get("minds") == "spending_cap_reached" and bool(reading.get("minds_reason")),
+        f"the control read states {reading}",
+    )
+    row.expect(plays(after), f"the town no longer plays: {after}")
+    row.expect(calls_after == calls_before, f"{calls_after - calls_before} models were asked")
+    row.observed = {
+        "ceiling_usd": ceiling,
+        "choice": [status_choice, F.problem_code(choice)],
+        "reading": reading,
+        "after": after,
+        "calls": calls_after - calls_before,
+    }
+    return row.close()
+
+
+def guest_places(arguments: argparse.Namespace) -> int:
+    worktree = LAUNCH.checkout(arguments.worktree)
+    stack = Stack.read(worktree)
+    accounts = stack.state.get("accounts") or {}
+    if accounts.get("playing_maximum") != 1 or not accounts.get("play_seconds"):
+        raise SystemExit(
+            "guest-places needs --accounts-guest-code --guest-playing-maximum 1 "
+            "--guest-play-seconds S on its stack"
+        )
+    out = Path(arguments.out).resolve()
+    (out / "evidence").mkdir(parents=True, exist_ok=True)
+    started = dt.datetime.now(dt.UTC).isoformat()
+    rows = [row_v4(stack, Transcripts(out / "transcripts"))]
+    write_results(out, stack, rows, started, sys.argv[1:])
+    return 0 if all(row.status != "failed" for row in rows) else 1
+
+
+def guest_allowance(arguments: argparse.Namespace) -> int:
+    worktree = LAUNCH.checkout(arguments.worktree)
+    stack = Stack.read(worktree)
+    if "accounts" not in stack.state or "scripted_model" not in stack.state:
+        raise SystemExit(
+            "guest-allowance needs --accounts-guest-code --guest-ceiling-usd X with the scripted "
+            "comparisons plan on its stack"
+        )
+    out = Path(arguments.out).resolve()
+    (out / "evidence").mkdir(parents=True, exist_ok=True)
+    started = dt.datetime.now(dt.UTC).isoformat()
+    rows = [row_v5(stack, Transcripts(out / "transcripts"))]
+    write_results(out, stack, rows, started, sys.argv[1:])
+    return 0 if all(row.status != "failed" for row in rows) else 1
+
+
+# -- LK1: a look offered after a world is drafted ---------------------------------------------------
+
+#: The plan LK1's stack is served by: the drafter always drafts a small town, and the look chooser
+#: answers by description (offered, none, an unlisted look, a failure from every model).
+LOOK_OFFER_PLAN = HERE / "plans" / "look-offer.json"
+LOOK_OFFER_CASES = (
+    ("offered", "offered", None),
+    ("none", "none", None),
+    ("refused", "none", "answer_refused"),
+    ("failed", "unavailable", "failed"),
+)
+
+
+def row_lk1(stack: Stack, transcripts: Any) -> Row:
+    plan = json.loads(LOOK_OFFER_PLAN.read_text())
+    descriptions = plan["descriptions"]
+    row = Row(
+        "LK1",
+        "worlds.look_offer",
+        "A world drafted from words carries a look offer (A-113): for a description the chooser "
+        "answers with a listed look and copied words, offered with that pack as the library lists "
+        "it and those words; for one it answers no look, none; for one it names an unlisted look "
+        "twice, none with reason answer_refused; for one every model fails, unavailable with "
+        "reason failed. Each draft still proposes the drafter's small town.",
+    )
+    w1 = F.client(stack, transcripts, "w1", "token")
+    listing = {
+        p.get("pack_id"): p
+        for p in (w1.call("LK1", "GET", "/world/style-packs")[1] or {}).get("packs") or []
+    }
+    offers = {}
+    for key, state, reason in LOOK_OFFER_CASES:
+        status, drafted = w1.call(
+            f"LK1 {key}",
+            "POST",
+            "/worlds/specification/drafts",
+            body={"description": descriptions[key]},
+        )
+        offer = (drafted or {}).get("look_offer") or {}
+        preset = ((drafted or {}).get("proposal") or {}).get("preset")
+        offers[key] = {
+            "status": status,
+            "preset": preset,
+            **{
+                k: offer.get(k)
+                for k in ("state", "reason", "pack_id", "version", "look_words", "prompt_version")
+            },
+        }
+        row.expect(
+            status == 200 and preset == "small_town",
+            f"{key}: the draft answered {status} {F.problem_code(drafted)} proposing {preset}",
+        )
+        row.expect(
+            offer.get("state") == state and offer.get("reason") == reason,
+            f"{key}: the offer reads {offer.get('state')} {offer.get('reason')}",
+        )
+        if key == "offered":
+            listed = listing.get("exulanica.cozy-town") or {}
+            row.expect(
+                offer.get("pack_id") == "exulanica.cozy-town"
+                and offer.get("version") == listed.get("version")
+                and offer.get("manifest_sha256") == listed.get("manifest_sha256")
+                and offer.get("look_words") == ["cozy"],
+                f"the offer names {offer.get('pack_id')} {offer.get('version')} with {offer.get('look_words')}",
+            )
+        else:
+            row.expect(
+                offer.get("pack_id") is None, f"{key}: the offer names {offer.get('pack_id')}"
+            )
+    row.observed = {
+        "plan_sha256": hashlib.sha256(LOOK_OFFER_PLAN.read_bytes()).hexdigest(),
+        "offers": offers,
+    }
+    return row.close()
+
+
+def drafts(arguments: argparse.Namespace) -> int:
+    worktree = LAUNCH.checkout(arguments.worktree)
+    stack = Stack.read(worktree)
+    served = (stack.state.get("scripted_model") or {}).get("plan_sha256")
+    if served != hashlib.sha256(LOOK_OFFER_PLAN.read_bytes()).hexdigest():
+        raise SystemExit(
+            "drafts needs a stack started with --scripted-model scripts/acceptance/plans/look-offer.json "
+            "--spending process"
+        )
+    out = Path(arguments.out).resolve()
+    (out / "evidence").mkdir(parents=True, exist_ok=True)
+    started = dt.datetime.now(dt.UTC).isoformat()
+    rows = [row_lk1(stack, Transcripts(out / "transcripts"))]
+    write_results(out, stack, rows, started, sys.argv[1:])
+    return 0 if all(row.status != "failed" for row in rows) else 1
+
+
 def guests(arguments: argparse.Namespace) -> int:
     worktree = LAUNCH.checkout(arguments.worktree)
     stack = Stack.read(worktree)
@@ -6731,9 +7280,17 @@ def build_parser() -> argparse.ArgumentParser:
     crossed = commands.add_parser("crossings")
     crossed.add_argument("--worktree", required=True)
     crossed.add_argument("--out", required=True)
+    crossed.add_argument("--bridge-credential", help="the file declare-luanti wrote beside its out")
+    declaring = commands.add_parser("declare-luanti")
+    declaring.add_argument("--worktree", required=True)
+    declaring.add_argument("--out", required=True)
     lived = commands.add_parser("society-of-things")
     lived.add_argument("--worktree", required=True)
     lived.add_argument("--out", required=True)
+    for name in ("guest-places", "guest-allowance", "drafts"):
+        guested = commands.add_parser(name)
+        guested.add_argument("--worktree", required=True)
+        guested.add_argument("--out", required=True)
     entered = commands.add_parser("guests")
     entered.add_argument("--worktree", required=True)
     entered.add_argument("--out", required=True)
@@ -6762,6 +7319,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         "guests": guests,
         "society-of-things": society_of_things,
         "crossings": crossings,
+        "guest-places": guest_places,
+        "guest-allowance": guest_allowance,
+        "drafts": drafts,
+        "declare-luanti": declare_luanti,
     }
     return commands[arguments.command](arguments)
 

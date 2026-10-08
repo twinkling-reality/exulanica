@@ -507,3 +507,13 @@ def test_v2_says_hello_as_the_gate_mod_does():
     assert sent["mapping"] == mapping
     assert sent["reads"] == [*adapter["reads"], *(item["game_item"] for item in mapping["items"])]
     assert DRIVE.CROSSING_ITEM in sent["reads"]
+
+
+def test_lk1s_drafted_form_fills_every_value_the_served_specification_lets_a_draft_set():
+    from exulanica.world.specification_source import served_document
+
+    plan = json.loads(DRIVE.LOOK_OFFER_PLAN.read_text())
+    form = json.loads(plan["rules"][-1]["content"])
+    adjustable = {e["key"] for e in served_document()["values"] if e.get("adjustable") is True}
+    assert set(form) == {"preset", "fit", "not_supported", *adjustable}
+    assert form["preset"] in {p["key"] for p in served_document()["presets"]}

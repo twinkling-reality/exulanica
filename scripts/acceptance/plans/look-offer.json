@@ -1,0 +1,51 @@
+{
+ "profile": "q10-scripted-model-plan/v1",
+ "note": "LK1 (A-113): the specification drafter always drafts a small town (every adjustable value null, so the preset's are kept); the look chooser answers by description: a listed look with copied words, no look, an unlisted look (twice, so the repair is refused too), and a failure from every model.",
+ "bounds": {
+  "ceiling_usd": "0.50",
+  "max_calls": 200
+ },
+ "descriptions": {
+  "offered": "a cozy little town with warm lamps",
+  "none": "a small town by a river",
+  "refused": "a town of bright painted walls",
+  "failed": "a quiet market town"
+ },
+ "rules": [
+  {
+   "match": {
+    "contains": "The person's description:\\na cozy little town with warm lamps\\n\\nThe looks:"
+   },
+   "content": "{\"look\": \"exulanica.cozy-town\", \"look_words\": [\"cozy\"]}"
+  },
+  {
+   "match": {
+    "contains": "The person's description:\\na small town by a river\\n\\nThe looks:"
+   },
+   "content": "{\"look\": null, \"look_words\": []}"
+  },
+  {
+   "match": {
+    "contains": "The person's description:\\na town of bright painted walls\\n\\nThe looks:"
+   },
+   "content": "{\"look\": \"exulanica.nowhere-town\", \"look_words\": [\"bright painted walls\"]}"
+  },
+  {
+   "match": {
+    "contains": "The person's description:\\na quiet market town\\n\\nThe looks:"
+   },
+   "status": 500,
+   "body": {
+    "error": {
+     "message": "scripted failure for the look step"
+    }
+   }
+  },
+  {
+   "match": {
+    "model": "nvidia/nemotron-3-super-120b-a12b"
+   },
+   "content": "{\"preset\": \"small_town\", \"fit\": \"all\", \"not_supported\": [], \"city_extent_x_mm\": null, \"block_length_mm\": null, \"storey_band_low\": null, \"storey_band_high\": null, \"high_street_count\": null, \"cross_street_hierarchy\": null, \"typology_weight_apartment_block_permille\": null, \"typology_weight_loft_building_permille\": null, \"typology_weight_mansion_block_permille\": null, \"typology_weight_rowhouse_permille\": null, \"typology_weight_shophouse_permille\": null, \"ground_floor_use_weight_bakery_permille\": null, \"ground_floor_use_weight_bookshop_permille\": null, \"ground_floor_use_weight_cafe_permille\": null, \"ground_floor_use_weight_grocery_permille\": null, \"ground_floor_use_weight_office_permille\": null, \"ground_floor_use_weight_pharmacy_permille\": null, \"ground_floor_use_weight_restaurant_permille\": null, \"ground_floor_use_weight_workshop_permille\": null}"
+  }
+ ]
+}
