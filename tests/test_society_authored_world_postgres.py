@@ -100,13 +100,13 @@ def make_starter(connection, workspace, actor, world_id, module_version):
     params=[AUTHORED_GROUND_V1_MODULE_VERSION, AUTHORED_GROUND_MODULE_VERSION],
     ids=["bounded-ground-v1", "endless-ground-v2"],
 )
-def saved_world(repository, tmp_path, request):
+def saved_world(repository, tmp_path, request, saved_world_id):
     connection = repository.connection
     workspace = repository.workspace_id
     session = Session(workspace_id=workspace, actor=uuid.uuid4())
     store = LocalContentAddressedStore(tmp_path / "blobs")
     seed_reviewed_assets(store)
-    world_id = f"world:authored:{uuid.uuid4()}"
+    world_id = saved_world_id
     with connection.transaction():
         snapshot_id, version_id = make_starter(
             connection, workspace, session.actor, world_id, request.param

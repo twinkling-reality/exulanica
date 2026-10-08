@@ -298,6 +298,14 @@ def workspace_id() -> uuid.UUID:
     return uuid.uuid4()
 
 
+@pytest.fixture
+def saved_world_id() -> str:
+    """The id of ``saved_world``'s world: a fresh one, unless a test pins it (with
+    ``workspace_id``, which together name the world's society seed) by parametrizing both
+    directly."""
+    return f"world:authored:{uuid.uuid4()}"
+
+
 # ---------------------------------------------------------------------------------------
 # The spine. One migrated throwaway schema per session, wiped between tests.
 #

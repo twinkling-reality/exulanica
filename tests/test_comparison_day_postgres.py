@@ -771,28 +771,42 @@ def test_a_day_whose_inputs_lose_their_rights_fails_at_the_end_of_that_hour(town
     assert (overview["status"], overview["hours_sealed"]) == ("failed", sealed)
 
 
-def test_a_cancelled_day_keeps_the_hours_it_sealed_and_they_stay_readable(town):
+def test_a_cancelled_day_keeps_the_hours_it_sealed_and_they_stay_readable(town, monkeypatch):
     comparison_id = _start(town)
     api = town["api"]
     cancelled: dict[str, Any] = {}
     services = town["api"].client.app.state.services
+    sealing = runner_module.SocietyComparisonRunner._seal_hour
 
-    def cancel_after_an_hour(asks: int) -> None:
-        if cancelled:
-            return
-        with services.database.session(town["workspace"]) as connection:
-            sealed = connection.execute(
-                "select count(*) as n from society_comparison_hour h join society_comparison_run "
-                "r on r.run_id=h.run_id where r.comparison_id=%s and r.arm='model_a'",
-                (uuid.UUID(comparison_id),),
-            ).fetchone()["n"]
-        if sealed >= 1:
+    def cancel_once_an_hour_is_sealed(self, comparison, run, plan, definition, arm, *rest):
+        # The cancel follows the model's first sealed hour as its owner's would, from the host's
+        # own point rather than from inside an ask, so it does not depend on an ask coming after.
+        sealing(self, comparison, run, plan, definition, arm, *rest)
+        if arm == "model_a" and not cancelled:
             cancelled["answer"] = api.post(
                 f"{town['comparisons']}/{comparison_id}/cancel{town['scope']}", {}
             )
 
-    town["transport"].on_ask = cancel_after_an_hour
+    monkeypatch.setattr(
+        runner_module.SocietyComparisonRunner, "_seal_hour", cancel_once_an_hour_is_sealed
+    )
     assert _worker(town).run_once(town["workspace"]) is True
+    if "answer" not in cancelled:
+        # The test's own precondition did not hold: name what the model's run did instead.
+        with services.database.session(town["workspace"]) as connection:
+            receipts = connection.execute(
+                "select d.receipt->>'status' as status, d.receipt->>'reason' as reason, "
+                "count(*) as n from society_comparison_decision d join society_comparison_run r "
+                "on r.run_id=d.run_id where r.comparison_id=%s and r.arm='model_a' "
+                "group by 1, 2 order by 3 desc",
+                (uuid.UUID(comparison_id),),
+            ).fetchall()
+        model_run = _result(town, comparison_id)["seeds"][0]["runs"]["model_a"]
+        pytest.fail(
+            f"the model's run sealed no hour: {len(town['transport'].requests)} asks; the run "
+            f"{model_run['status']} ({model_run.get('failure')}); its receipts "
+            f"{[dict(r) for r in receipts]}"
+        )
     assert cancelled["answer"].status_code == 200, cancelled["answer"].text
     result = _result(town, comparison_id)
     (seed,) = result["seeds"]
