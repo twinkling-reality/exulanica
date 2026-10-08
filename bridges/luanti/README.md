@@ -55,9 +55,13 @@ the next, so a deployment that pinned one keeps working: version 1 (profile
 ## The scripted check
 
 `<checkout>/.venv/bin/python bridges/luanti/run/check.py` starts this checkout's stack on one port
-slot with a society of things, builds a scene (the demo's by default, `scripts/demo/build_scene.py`,
-every being on its routine, no model called) and grants the `luanti` bridge one traveller through
-the scene's gate, carrying things both ways. A headless Luanti server's check mod then walks a
+slot with a society of things, builds a scene (by default the demo's, at the newest version the
+scene catalog's lock names, `assets/catalogs/scenes`; built by `scripts/demo/build_scene.py`, every
+being on its routine, no model called) and grants the `luanti` bridge one traveller through the
+scene's gate, carrying things both ways. For a scene that names its travellers (the gate they come
+through and the mind the world gives them), the grant opens that gate and, where the door's grants
+can say so, says the world decides for them; their paid mind is named only with `--traveller-mind`,
+under an allocation. The check then expects no ask about the character to reach the gate. A headless Luanti server's check mod then walks a
 stand-in player into the gate with torches through the same handlers a person's actions reach,
 while the check acts as the world's owner from the mod's recording: it sends the character home
 after it has lived in the world for a while, and closes the gate once its player has left the game

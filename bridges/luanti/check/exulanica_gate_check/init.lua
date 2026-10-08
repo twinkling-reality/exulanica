@@ -177,6 +177,7 @@ step("the server's channel said hello and polls", 90, function()
 		result.timings.channel_ready_ms = now_ms()
 		result.grant_visitors = tonumber(state.grant.scope.visitors_maximum) or 0
 		result.world_words = state.world_words
+		result.visitors_decided_by = state.grant.scope.visitors_decided_by or "program"
 		verdict("the server's channel said hello and polls", true,
 			"hold " .. state.hold_seconds .. " s")
 		return true
@@ -272,15 +273,28 @@ step("the character arrives carrying a lantern, and the player is told once", 60
 	return true
 end)
 
-step("the world's asks about the character are left to the world", 120, function()
-	local asked = mark_since(0, "frame_ignored", function(details)
-		return details.kind == "asked"
-	end)
-	if not asked then
+-- Who decides for the character is the world's: where the grant says so, no ask about it reaches the
+-- gate at all; where the door still names the bridge, the asks come and the gate leaves them alone.
+local asked_frame = function(details)
+	return details.kind == "asked"
+end
+step("the world decides for the character: the gate answers no ask about it", 120, function()
+	if result.visitors_decided_by == "world" then
+		local arrived = mark_since(0, "arrived")
+		if not arrived or now_ms() - arrived.at_ms < 20000 then
+			return false
+		end
+		verdict("the world decides for the character: the gate answers no ask about it",
+			mark_since(0, "frame_ignored", asked_frame) == nil and #player.forms == 0,
+			"the world decides; no ask reached the gate")
+		return true
+	end
+	if not mark_since(0, "frame_ignored", asked_frame) then
 		return false
 	end
-	verdict("the world's asks about the character are left to the world",
-		mark_since(0, "answered") == nil and #player.forms == 0)
+	verdict("the world decides for the character: the gate answers no ask about it",
+		mark_since(0, "answered") == nil and #player.forms == 0,
+		"the door named the gate; its asks were left to the world")
 	return true
 end)
 

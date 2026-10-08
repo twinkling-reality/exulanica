@@ -42,7 +42,32 @@ CHECKOUT = HERE.parents[3]
 MOD = BRIDGE / "mod" / "exulanica_gate"
 MAPPING_FILE = "luanti-minetest-game.v2.json"
 BUILD_SCENE = CHECKOUT / "scripts" / "demo" / "build_scene.py"
-DEMO_SCENE = CHECKOUT / "scripts" / "demo" / "scenes" / "three-strangers.v2.json"
+#: The scene a check builds unless ``--scene`` names another: the demo's, at the newest version the
+#: scene catalog's lock names.
+DEMO_SCENE_KEY = "three-strangers"
+
+
+def newest_demo_scene() -> Path:
+    """The demo's scene file at the newest version the scene catalog's lock names that dresses a
+    starter world, read and checked against the lock by the product's own scene reader."""
+    sys.path.insert(0, str(CHECKOUT))
+    from exulanica.world.scenes import SCENES_DIRECTORY, read_scene_lock, shipped_scene
+
+    locked = read_scene_lock()
+    versions = sorted(
+        (version for scene, version in locked if scene == DEMO_SCENE_KEY), reverse=True
+    )
+    for version in versions:
+        # The scene builder makes a starter world when given no saved one, so the check builds the
+        # newest version that dresses a starter; a version for a generated world needs its entry.
+        if (
+            shipped_scene(DEMO_SCENE_KEY, version, locked[(DEMO_SCENE_KEY, version)]).ground
+            == "starter"
+        ):
+            return SCENES_DIRECTORY / f"{DEMO_SCENE_KEY}.v{version}.json"
+    raise SystemExit(f"the scene catalog's lock names no {DEMO_SCENE_KEY} that dresses a starter")
+
+
 SOCIETY_OF_THINGS = "exulanica-society/v7"
 
 
@@ -110,6 +135,23 @@ def _call(
     return json.loads(text or b"{}")
 
 
+def opened_to_travellers(travellers: dict[str, Any], base: str, with_mind: bool) -> dict[str, Any]:
+    """The grant's additions for a scene that names its travellers, as run/check.py makes them: the
+    world decides where the door's published grant body offers it, with the scene's mind only when
+    asked for."""
+    if not travellers:
+        return {}
+    with urllib.request.urlopen(base + "/openapi.json", timeout=60) as response:
+        schema = json.loads(response.read())
+    body = schema.get("components", {}).get("schemas", {}).get("IssueBody", {})
+    if "visitors_decided_by" not in body.get("properties", {}):
+        return {}
+    opened: dict[str, Any] = {"visitors_decided_by": "world"}
+    if with_mind and travellers.get("model"):
+        opened["traveller"] = travellers["model"]
+    return opened
+
+
 def cross(arguments: argparse.Namespace) -> None:
     base = arguments.api.rstrip("/")
     token = arguments.token_file.read_text().strip()
@@ -135,7 +177,12 @@ def cross(arguments: argparse.Namespace) -> None:
     record.unlink()
     scope = {"world_id": placed["world_id"]}
     society = f"/world/versions/{placed['version_id']}/society"
-    gate = next(thing["thing_id"] for thing in placed["things"] if thing["kind"]["kind"] == "gate")
+    travellers = placed.get("travellers") or {}
+    gate = travellers.get("gate") or next(
+        thing["thing_id"] for thing in placed["things"] if thing["kind"]["kind"] == "gate"
+    )
+    if gate not in {thing["thing_id"] for thing in placed["things"]}:
+        raise SystemExit(f"travellers come through {gate}, which the scene did not place")
     _call(
         base,
         "POST",
@@ -171,6 +218,9 @@ def cross(arguments: argparse.Namespace) -> None:
             "may_carry_in": True,
             "may_carry_out": True,
             "world_words": json.loads(arguments.scene.read_text())["title"],
+            # A scene that names its travellers has the world decide for them where this door lets
+            # it; their paid mind only when asked for.
+            **opened_to_travellers(travellers, base, arguments.traveller_mind),
         },
     )
     del token
@@ -243,11 +293,18 @@ def main(argv: list[str] | None = None) -> int:
     crossing = commands.add_parser("cross", help="make one character cross into a running stack")
     crossing.add_argument("--api", required=True, help="the stack's API, http://127.0.0.1:PORT")
     crossing.add_argument("--token-file", type=Path, required=True)
-    crossing.add_argument("--scene", type=Path, default=DEMO_SCENE)
+    crossing.add_argument("--scene", type=Path, default=None)
+    crossing.add_argument(
+        "--traveller-mind",
+        action="store_true",
+        help="give the traveller the mind the scene names (paid calls: only under an allocation)",
+    )
     crossing.add_argument("--look", default="cc0-traveller")
     crossing.add_argument("--carry", default="default:torch")
     crossing.add_argument("--stay-s", type=int, default=120)
     arguments = parser.parse_args(argv)
+    if arguments.command == "cross":
+        arguments.scene = arguments.scene or newest_demo_scene()
     if arguments.command == "declare":
         declare(arguments.out)
     else:

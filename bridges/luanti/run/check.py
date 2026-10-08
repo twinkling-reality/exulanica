@@ -59,8 +59,32 @@ CHECK_MOD = BRIDGE / "check"
 INSTALL = CHECKOUT / ".exulanica" / "luanti"
 LAUNCH = CHECKOUT / "scripts" / "acceptance" / "launch.py"
 BUILD_SCENE = CHECKOUT / "scripts" / "demo" / "build_scene.py"
-#: The scene the check builds unless ``--scene`` names another.
-DEMO_SCENE = CHECKOUT / "scripts" / "demo" / "scenes" / "three-strangers.v2.json"
+#: The scene a check builds unless ``--scene`` names another: the demo's, at the newest version the
+#: scene catalog's lock names.
+DEMO_SCENE_KEY = "three-strangers"
+
+
+def newest_demo_scene() -> Path:
+    """The demo's scene file at the newest version the scene catalog's lock names that dresses a
+    starter world, read and checked against the lock by the product's own scene reader."""
+    sys.path.insert(0, str(CHECKOUT))
+    from exulanica.world.scenes import SCENES_DIRECTORY, read_scene_lock, shipped_scene
+
+    locked = read_scene_lock()
+    versions = sorted(
+        (version for scene, version in locked if scene == DEMO_SCENE_KEY), reverse=True
+    )
+    for version in versions:
+        # The scene builder makes a starter world when given no saved one, so the check builds the
+        # newest version that dresses a starter; a version for a generated world needs its entry.
+        if (
+            shipped_scene(DEMO_SCENE_KEY, version, locked[(DEMO_SCENE_KEY, version)]).ground
+            == "starter"
+        ):
+            return SCENES_DIRECTORY / f"{DEMO_SCENE_KEY}.v{version}.json"
+    raise SystemExit(f"the scene catalog's lock names no {DEMO_SCENE_KEY} that dresses a starter")
+
+
 #: The mapping file the server loads and the deployment pins: the game's newest.
 MAPPING_FILE = "luanti-minetest-game.v2.json"
 SOCIETY_OF_THINGS = "exulanica-society/v7"
@@ -150,12 +174,21 @@ def make_crossing_world(api: Api, folder: Path, token: str, scene: Path) -> dict
     gates = [thing["thing_id"] for thing in placed["things"] if thing["kind"]["kind"] == "gate"]
     if not gates:
         raise Refused("scene", "the scene placed no gate for travellers to come through")
+    # A scene may say which gate travellers come through and the mind the world gives them; the
+    # scene builder copies that into its record and opens no gate itself.
+    travellers = placed.get("travellers") or {}
+    placed_ids = {thing["thing_id"] for thing in placed["things"]}
+    if travellers.get("gate") and travellers["gate"] not in placed_ids:
+        raise Refused(
+            "scene", f"travellers come through {travellers['gate']}, which was not placed"
+        )
     world = {
         "version": placed["version_id"],
         "scope": {"world_id": placed["world_id"]},
         "region": placed["arrival"]["region_id"],
         "society": f"/world/versions/{placed['version_id']}/society",
-        "gate": gates[0],
+        "gate": travellers.get("gate") or gates[0],
+        "travellers": travellers,
         "words": json.loads(scene.read_text())["title"],
     }
     started = api(
@@ -167,6 +200,29 @@ def make_crossing_world(api: Api, folder: Path, token: str, scene: Path) -> dict
     if started.get("profile") != SOCIETY_OF_THINGS:
         raise Refused("society", f"the version's society runs {started.get('profile')}")
     return world
+
+
+def world_may_decide(api: Api) -> bool:
+    """Whether this door's grants may say the world decides for their visitors: its published grant
+    body names the field (``GET /openapi.json`` is public)."""
+    schema = api("GET", "/openapi.json")
+    body = schema.get("components", {}).get("schemas", {}).get("IssueBody", {})
+    return "visitors_decided_by" in body.get("properties", {})
+
+
+def opened_to_travellers(
+    travellers: dict[str, Any], world_decides: bool, with_mind: bool
+) -> dict[str, Any]:
+    """What a grant adds for a scene that names its travellers, where the door lets the world decide
+    for visitors: the world decides, and only with ``with_mind`` the mind the scene gives them (a
+    model the manifest offers, whose calls are paid for), else the world's routine. Elsewhere the
+    grant is as it was: the door names the bridge, and the world's routine settles its asks."""
+    if not (travellers and world_decides):
+        return {}
+    opened: dict[str, Any] = {"visitors_decided_by": "world"}
+    if with_mind and travellers.get("model"):
+        opened["traveller"] = travellers["model"]
+    return opened
 
 
 def play(api: Api, world: dict[str, Any], speed: int) -> None:
@@ -451,8 +507,15 @@ def main(argv: list[str] | None = None) -> int:
         metavar="ITEMS",
         help="with --play: what the person starts holding, as the game names its items",
     )
-    parser.add_argument("--scene", type=Path, default=DEMO_SCENE, help="the scene to build")
+    parser.add_argument("--scene", type=Path, default=None, help="the scene to build")
+    parser.add_argument(
+        "--traveller-mind",
+        action="store_true",
+        help="give travellers the mind the scene names (its model calls are paid for: only under "
+        "an allocation)",
+    )
     arguments = parser.parse_args(argv)
+    arguments.scene = arguments.scene or newest_demo_scene()
     if arguments.against == "fake":
         folder = CHECKOUT / ".exulanica" / "luanti-checks" / time.strftime("%Y%m%d-%H%M%S-fake")
         folder.mkdir(parents=True)
@@ -509,9 +572,13 @@ def main(argv: list[str] | None = None) -> int:
         token = (Path(state["run_dir"]) / "token").read_text().strip()
         api = Api(f"http://127.0.0.1:{state['ports']['api']}", token)
         world = make_crossing_world(api, folder, token, arguments.scene)
+        from exulanica.canonical import sha256_of_canonical
+
         summary["scene"] = {
             "file": arguments.scene.name,
-            "sha256": hashlib.sha256(arguments.scene.read_bytes()).hexdigest(),
+            # The digest a scene lock names: the document's canonical form, not its file's bytes.
+            "sha256": sha256_of_canonical(json.loads(arguments.scene.read_text())).hex(),
+            "travellers": world["travellers"],
         }
         play(api, world, arguments.minutes_speed)
         grant = {
@@ -521,6 +588,9 @@ def main(argv: list[str] | None = None) -> int:
             "may_carry_in": True,
             "may_carry_out": True,
             "world_words": world["words"],
+            **opened_to_travellers(
+                world["travellers"], world_may_decide(api), arguments.traveller_mind
+            ),
         }
         del token
         issued = api(
