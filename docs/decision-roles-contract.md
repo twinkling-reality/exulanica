@@ -224,8 +224,10 @@ does not touch the owner's own choice naming one of those visitors, which decide
 changes it or the visitor leaves. Who decides for such a visitor is, in order: a choice naming
 it, the latest group choice of its grant where its kind allows that decider, and the routine. The
 bound on the people models run counts, in a society of things, only the beings still in it, and
-applies to a group's visitors when a minute asks, in the order they came; past it the routine
-decides for the rest (`travellers_over_bound`). The host and the Companion's plan read who decides
+holds when a minute asks: for own choices of a model, in the order they were made, past it the
+routine deciding for the latest (`choice_over_bound`, as for a placed being an edit removed and an
+undo restored by its id), then for a group's visitors, in the order they came, past it the routine
+deciding for the rest (`travellers_over_bound`). The host and the Companion's plan read who decides
 by `SocietyModelChoiceRepository.deciding`, under the contract the society's engine is asked under,
 and the visitor's program is never asked. No visitor, whoever decides for it, may be handed to
 another outside program (`decided_from_outside`).
@@ -248,8 +250,9 @@ words with whether this process can ask each; whether this host asks models for 
 and why not (`host_refusal`: `models_not_run_here`, `provider_credential_absent`,
 `process_budget_spent` or `process_share_spent`); each person's choice with its decider, and why its
 model is not asked here when it is not (`refusal`, one of `MODEL_REFUSALS`) and where the decider
-comes from (`from`: `choice`, `travellers` or `travellers_over_bound`); each gate's travellers' mind
-(`travellers`: `{grant_id, choice_seq, decider, model}`); each person's latest model decision;
+comes from (`from`: `choice`, `choice_over_bound`, `travellers` or `travellers_over_bound`); each
+gate's travellers' mind (`travellers`: `{grant_id, choice_seq, decider, model}`); each person's latest
+model decision;
 per model the decisions asked, accepted and applied, why the rest were not acted on, latency and
 cost, over the society's latest 2,000 decisions (`DECISIONS_READ`); and every subject an outside
 program decides for under a grant that stands (`outside`), with what the grant view says of its
@@ -481,7 +484,8 @@ line is said composed (Unicode NFC) whatever form it came in, and a line carryin
 account holder saved is refused `line_refused_by_rules` whatever right releases that name to the
 model, since every later decider, an outside program among them, reads what was said. An outside
 program's answer carries the line in its proposal too, held to the same rule: an offered say option
-answered with no line, or another option with one, or a line that breaks the rule, is recorded
+answered with no line, or another option with one, or a line that breaks the rule, a line not in
+Unicode NFC among them (a program's line is never recomposed for it, as a model's is), is recorded
 rejected `line_out_of_bounds` (the program's answer, never a quiet minute), and a line naming a name
 the account holder saved is refused `line_refused_by_rules`. An outside program is never shown a
 heard line that now carries a saved name (one saved after it was said): the request leaves that line
@@ -515,10 +519,9 @@ In order:
 3. **Let the workspace's rules judge the question.** Once a minute, with no lock held, the
    workspace's rules judge the fixed choice description the society's engine asks by (its terms'
    own, or the role's) and every label anybody due could be offered, in one pass for each chosen
-   model; a description only another engine asks by is not judged here, so a saved name matching a
-   word of the society of things' description stops no other engine's asks in the host. The models
-   route and a comparison's start still judge every description the role states, so there such a
-   name reports `question_changed_by_rules`, or refuses the start, for any engine. A description
+   model; a description only another engine asks by is not judged, so a saved name matching a word
+   of the society of things' description stops no other engine's asks. The models route and a
+   comparison's start judge a model's question the same way, by the society's engine. A description
    the rules would change, as a saved
    name one of whose parts is a word of it would, asks nobody of that model and writes nothing
    (`question_changed_by_rules` on the models route). A label they would change, a place a saved
@@ -573,9 +576,11 @@ models route and, where the host asks models for any workspace, `/readyz` say so
 (`process_share_spent`, or `process_budget_spent` when the whole budget does not fit). Spending only
 grows while the process runs, so either holds until it restarts. A person whose own model needs more
 for one ask than is left is not asked, while a cheaper model may still be asked for others. An ask's
-need is its bound (`ask_bound_usd`): every answer the contract allows, each reserved for the role's
-instruction, its `not_offered` note and twice the largest situation a request may carry, at the
-model's own answer bound. A call under way can still leave one ask no room for its reservation,
+need is its bound (`ask_bound_usd`): every answer the contract allows, each reserved for the
+instruction of the terms asked under that contract (an engine's own terms where it states them, so
+one engine's longer prompt raises no other's bound), its `not_offered` note and twice the largest
+situation a request may carry, at the model's own answer bound. The models reads judge it the same
+way, under the contract the society's engine is asked under. A call under way can still leave one ask no room for its reservation,
 which that ask's receipt names.
 
 The recorded choice is what authorises this spending: a caller who may play the world

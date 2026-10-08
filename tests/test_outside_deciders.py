@@ -592,3 +592,21 @@ def test_an_outside_program_is_never_shown_a_heard_line_carrying_a_saved_name():
     assert [line["line"] for line in kept["heard"]] == ["Good morning.", "Ask Hazel."]
     # The positive control: with nothing saved that any of it carries, everything is shown.
     assert without_named_lines((SavedName(uuid.UUID(int=5), "person", "Bo"),))(context) == context
+
+
+def test_an_outside_program_is_never_shown_a_line_it_or_others_said_carrying_a_saved_name():
+    # The lines a being said itself are screened as the lines it heard are: by the line, and by
+    # the one it was said to; with none left, the being is shown no lines of its own at all.
+    said = [
+        {"to": None, "line": "Good evening, all.", "minutes_ago": 3},
+        {"to": "Hazel Moss (a villager)", "line": "Well met.", "minutes_ago": 2},
+        {"to": None, "line": "Ask Hazel.", "minutes_ago": 1},
+    ]
+    context = {"options": [], "heard": [], "said": said}
+    hazel = SavedName(uuid.UUID(int=3), "person", "Hazel Moss")
+    kept = without_named_lines((hazel,))(dict(context))
+    assert [line["line"] for line in kept["said"]] == ["Good evening, all."]
+    only = {"options": [], "heard": [], "said": said[2:]}
+    assert "said" not in without_named_lines((hazel,))(only)
+    # The positive control: with nothing saved that any of it carries, everything is shown.
+    assert without_named_lines((SavedName(uuid.UUID(int=5), "person", "Bo"),))(context) == context

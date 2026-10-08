@@ -1,0 +1,156 @@
+{
+  "profile": "exulanica.ability-modules/v1",
+  "modules": [
+    {
+      "module": "exulanica-ability/purposeful/v1",
+      "abilities": [
+        "wait",
+        "stand",
+        "talk",
+        "rest",
+        "visit"
+      ],
+      "parameters": [],
+      "events": [],
+      "status": "built",
+      "refusal": null,
+      "reason": "The purposeful planner's own choices, hosted by the planner: waiting, standing a while, stopping to talk, and going to rest at or visit a place, by the routine catalog's rules and draws, byte for byte as every purposeful society runs them. Its events are the planner's own."
+    },
+    {
+      "module": "exulanica-ability/say/v1",
+      "abilities": [
+        "say"
+      ],
+      "parameters": [
+        {
+          "name": "hearing_reach_mm",
+          "value": 8000,
+          "minimum": 1000,
+          "maximum": 50000,
+          "unit": "mm",
+          "reason": "How far a line carries: every being within it whose kind offers hearing hears it, the routine's own reach for two people stopping to talk."
+        },
+        {
+          "name": "lines_heard_maximum",
+          "value": 8,
+          "minimum": 1,
+          "maximum": 64,
+          "unit": "lines",
+          "reason": "How many lines each being keeps, the oldest dropped first, so what it is shown of a conversation stays bounded however long the world talks."
+        },
+        {
+          "name": "line_characters_maximum",
+          "value": 200,
+          "minimum": 1,
+          "maximum": 1000,
+          "unit": "characters",
+          "reason": "The most characters of one line, as the line rule counts them, at which a decider's line is checked before it is said."
+        }
+      ],
+      "events": [
+        "said"
+      ],
+      "status": "built",
+      "refusal": null,
+      "reason": "A line a being's decider chose to say, a model chosen for it or the outside program that sent it, said where the being stood as the minute began, heard within reach and kept by each hearer. The routine never says anything."
+    },
+    {
+      "module": "exulanica-ability/crossing/v1",
+      "abilities": [
+        "leave"
+      ],
+      "parameters": [
+        {
+          "name": "quiet_minutes",
+          "value": null,
+          "minimum": 1,
+          "maximum": 60,
+          "unit": "minutes",
+          "reason": "How many minutes in a row a visitor's program may leave unanswered (no live connection, or no answer in time) before the visitor goes home; each kind states its own."
+        }
+      ],
+      "events": [
+        "thing_departed"
+      ],
+      "status": "built",
+      "refusal": null,
+      "reason": "A visitor from another program going home: by its decider's choice, or when its program stays quiet for as many minutes as its kind waits, taking what it holds."
+    },
+    {
+      "module": "exulanica-ability/hands/v1",
+      "abilities": [
+        "pick_up",
+        "put_down",
+        "give",
+        "take"
+      ],
+      "parameters": [
+        {
+          "name": "reach_mm",
+          "value": 1500,
+          "minimum": 500,
+          "maximum": 5000,
+          "unit": "mm",
+          "reason": "How near a being stands to a thing it picks up: a person's reach, the society's object reach. Two beings hand a thing over within it or within the walking graph's longest step between two joined nodes, whichever is farther, so beings on neighbouring nodes can always hand over."
+        },
+        {
+          "name": "approach_mm",
+          "value": 8000,
+          "minimum": 1500,
+          "maximum": 50000,
+          "unit": "mm",
+          "reason": "How far a thing, or a being a thing is handed to or taken from, may be for a hands act to be offered: the being walks to stand within reach first. The society's hearing reach, so whoever can be spoken to can be walked to."
+        },
+        {
+          "name": "walk_minutes_maximum",
+          "value": 3,
+          "minimum": 1,
+          "maximum": 30,
+          "unit": "minutes",
+          "reason": "How many minutes a being may walk toward what its hands act is for before the act is dropped, named out_of_reach: a thing carried away or a being that keeps moving is not chased for ever."
+        }
+      ],
+      "events": [
+        "picked_up",
+        "put_down",
+        "gave",
+        "took",
+        "hands_missed"
+      ],
+      "status": "built",
+      "refusal": null,
+      "reason": "Picking a holdable thing up into a free socket that fits it, putting it down where the being stands, handing it to a being that offers to receive it, and taking it from one that lets it be taken: a being chosen to act walks to stand within reach first, and acts in the minute it arrives."
+    },
+    {
+      "module": "exulanica-ability/follow/v1",
+      "abilities": [
+        "follow"
+      ],
+      "parameters": [
+        {
+          "name": "follow_distance_mm",
+          "value": 2000,
+          "minimum": 500,
+          "maximum": 20000,
+          "unit": "mm",
+          "reason": "How near a follower keeps to the one it follows."
+        },
+        {
+          "name": "lost_after_minutes",
+          "value": 3,
+          "minimum": 1,
+          "maximum": 60,
+          "unit": "minutes",
+          "reason": "How many minutes the one followed may stay out of reach before the follower stops."
+        }
+      ],
+      "events": [
+        "followed",
+        "stopped_following"
+      ],
+      "status": "not_connected",
+      "refusal": "follow_not_built",
+      "reason": "Keeping near another being that offers to be followed, re-planned each minute, until the follower chooses anything else or loses it."
+    }
+  ]
+}

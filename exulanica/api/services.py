@@ -118,7 +118,7 @@ from exulanica.spending.status import SpendingRefusals, read_spending_refusals
 from exulanica.store.base import ContentAddressedStore
 from exulanica.store.configured import ContentStores, content_stores
 from exulanica.store.namespaces import WorkspaceStores
-from exulanica.world.decision_roles import DecisionRole, decision_roles
+from exulanica.world.decision_roles import DecisionContract, DecisionRole, decision_roles
 from exulanica.world.material_recipes import MaterialRuntime
 from exulanica.world.society import world_society_seed
 from exulanica.world.society_catalogs import ComparisonCatalogs, load_comparison_catalogs
@@ -753,17 +753,20 @@ class Services:
             ),
         )
 
-    def model_host_refusal(self, workspace_id: uuid.UUID, role: DecisionRole) -> str | None:
+    def model_host_refusal(
+        self, workspace_id: uuid.UUID, role: DecisionRole, engine: str | None = None
+    ) -> str | None:
         """Why this host asks no model for a workspace's subjects of ``role``, or None when it
         asks them.
 
         The facts :meth:`decision_host` acts on: the workspaces it asks models for
         (:meth:`asks_models_for`), the process's client, and what is left of its budget and of the
-        share the role's decisions may spend. A code from ``HOST_REFUSALS``.
+        share the role's decisions may spend, under the contract a society's ``engine`` is asked
+        under (the role's own with none). A code from ``HOST_REFUSALS``.
         """
         if not self.asks_models_for(workspace_id):
             return "models_not_run_here"
-        return host_refusal(role, self.model_client, load_manifest(), role.contract())
+        return host_refusal(role, self.model_client, load_manifest(), _asked(role, engine))
 
     def provider_refusal(self, provider: str) -> str | None:
         """Why this process asks no model a provider serves, or None when it may ask them."""
@@ -847,13 +850,16 @@ class Services:
         model: Mapping[str, str],
         connection: psycopg.Connection,
         workspace_id: uuid.UUID,
+        engine: str | None = None,
     ) -> str | None:
         """Why a subject's chosen model is not asked here, or None: a code from MODEL_REFUSALS.
 
         The question is judged by the workspace's rules as the host judges it, on ``connection``,
-        which the caller lends idle.
+        which the caller lends idle: for a society's ``engine``, that engine's description alone.
         """
-        refusal = model_refusal(role, self.model_client, load_manifest(), role.contract(), model)
+        refusal = model_refusal(
+            role, self.model_client, load_manifest(), _asked(role, engine), model
+        )
         if refusal is not None or self.model_client is None:
             return refusal
         return question_refusal(
@@ -864,6 +870,7 @@ class Services:
                 )
             ),
             model["model_id"],
+            engine,
         )
 
     def build_society_control_worker(self) -> SocietyControlWorker | None:
@@ -1492,3 +1499,9 @@ def describe_configuration(environ: Mapping[str, str] | None = None) -> dict[str
         )
         for name in names
     }
+
+
+def _asked(role: DecisionRole, engine: str | None) -> DecisionContract:
+    """The contract ``engine``'s subjects of ``role`` are asked under, as the host asks them; the
+    role's own where no engine is named."""
+    return role.contract() if engine is None else role.contract(role.terms(engine).versions)

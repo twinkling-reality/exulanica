@@ -444,6 +444,66 @@ def test_a_visitor_that_has_left_frees_its_model_place(app):
 
 
 @pytest.mark.parametrize("saved_world", [2], indirect=True)
+def test_a_placed_being_restored_past_the_bound_leaves_the_latest_choice_to_the_routine(app):
+    # Only beings still here count toward the bound, so a placed being removed by an edit and
+    # restored by an undo comes back by its id with its choice: the bound still holds, the
+    # earliest own choice keeping its model and the latest going to the routine.
+    world, client = app
+    client.app.state.services = dataclasses.replace(
+        client.app.state.services, societies_of_things=True
+    )
+    services = decisions._services(client)
+    manifest, model_id = decisions._offered()
+    model = {"provider": manifest.spec(model_id).provider, "model_id": model_id}
+    role, version, actor = person_role(), world["binding"].version_id, world["session"].actor
+    scope, root, _ = routes(world)
+    things_api._place(client, world, "well", "well", 2, -4_000, 2_000)
+    things_api._place(client, world, "knight", "knight", 1, 3_000, 3_000)
+    snapshot = things_api._make_society(client, world)
+    knight = next(p for p in snapshot["state"]["inhabitants"] if p["came_by"] == "placed")
+    villager = next(p for p in snapshot["state"]["inhabitants"] if p["came_by"] == "populated")
+
+    def choose(subject):
+        with services.database.session(world["workspace"]) as connection:
+            return _repository(connection, world).record_choice(
+                version,
+                role,
+                request_id=uuid.uuid4(),
+                subjects=[subject],
+                model=model,
+                chosen_by=actor,
+                manifest=manifest,
+                contract=_Bound(1),
+            )
+
+    def edit(path):
+        base = client.get(root, headers=OWNER, params=scope).json()["state_sha256"]
+        done = client.post(
+            root + path, headers=OWNER, params=scope, json={"base_state_sha256": base}
+        )
+        assert done.status_code == 200, done.text
+
+    choose(knight["id"])
+    edit("/things/knight/remove")
+    snapshot = stays._step(world, client, snapshot)
+    assert knight["id"] not in {p["id"] for p in snapshot["state"]["inhabitants"]}
+    choose(villager["id"])
+    edit("/things/undo")
+    snapshot = stays._step(world, client, snapshot)
+    assert knight["id"] in {p["id"] for p in snapshot["state"]["inhabitants"]}
+    with services.database.session(world["workspace"]) as connection:
+        deciding = _repository(connection, world).deciding(version, role, _Bound(1))
+    assert (deciding[knight["id"]]["decider"]["kind"], deciding[knight["id"]]["from"]) == (
+        "model",
+        "choice",
+    )
+    assert (deciding[villager["id"]]["decider"]["kind"], deciding[villager["id"]]["from"]) == (
+        "routine",
+        "choice_over_bound",
+    )
+
+
+@pytest.mark.parametrize("saved_world", [2], indirect=True)
 def test_a_gate_s_choice_decides_strictly_before_its_end(app):
     world, client = app
     services = decisions._services(client)

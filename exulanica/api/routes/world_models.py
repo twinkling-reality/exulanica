@@ -52,6 +52,7 @@ from exulanica.api.role_hosts import (
     RoleChoiceRefused,
     RoleContext,
     choice_status,
+    version_engine,
 )
 from exulanica.api.world_scope import WorldId
 from exulanica.models.manifest import load_manifest
@@ -135,6 +136,7 @@ def role_operations(
     is what the read found of the workspace's durable allowance
     (``Services.spending_refusals``)."""
     services = get_services(context.request)
+    engine = version_engine(context)
     found = []
     for role in decision_roles():
         host = ROLE_HOSTS.get(role.subject)
@@ -148,7 +150,9 @@ def role_operations(
                 context,
                 role,
                 state,
-                services.model_host_refusal(context.session.workspace_id, role),
+                services.model_host_refusal(
+                    context.session.workspace_id, role, _hosting(engine, role)
+                ),
                 _spent(role, spending),
             )
         )
@@ -177,10 +181,13 @@ def world_models(
     routes = surface(request.app)
     spending = services.spending_refusals(connection, session.workspace_id)
     facts = installation_facts_of(services)
+    engine = version_engine(context)
     roles = []
     for role in decision_roles():
         host = ROLE_HOSTS.get(role.subject)
-        host_refusal = services.model_host_refusal(session.workspace_id, role)
+        host_refusal = services.model_host_refusal(
+            session.workspace_id, role, _hosting(engine, role)
+        )
         if host is None:
             state = unsupported(ROLE_SUBJECT_UNSUPPORTED)
             fields: dict[str, Any] = {"available": False, "reason": ROLE_SUBJECT_UNSUPPORTED}
@@ -253,3 +260,9 @@ def choose_world_model(
         return JSONResponse(
             status_code=choice_status(exc.code), content={"code": exc.code, "detail": exc.detail}
         )
+
+
+def _hosting(engine: str | None, role: DecisionRole) -> str | None:
+    """The version's society ``engine`` where it asks ``role``'s subjects, so their budget is judged
+    under the contract it asks them under; else None (the role's own contract)."""
+    return engine if engine is not None and role.hosted_by(engine) else None

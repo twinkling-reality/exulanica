@@ -164,7 +164,7 @@ def test_a_said_line_is_accepted_beside_its_option_and_bound_by_the_receipt():
         "option": say.as_record(),
         "line": "Good morning.",
     }
-    assert result["provider"]["prompt_version"] == "society-person-choice/v2"
+    assert result["provider"]["prompt_version"] == "society-person-choice/v3"
     validate_decision_receipt(receipt_for(request, 1, result), request)
     # Asked under the engine's own terms: a choice with a line, and its instruction.
     (sent,) = transport.requests
@@ -219,15 +219,16 @@ def test_a_line_that_breaks_the_rule_or_would_be_changed_by_the_rules_is_never_s
     assert result["proposal"]["line"] == "Say hello to everyone."
 
 
-#: The SHA-256 of the canonical bytes of what the second prompt sends for the knight's request, by
-#: mechanism; ``EXULANICA_LINE_GOLDENS=print`` prints what this tree produces.
+#: The SHA-256 of the canonical bytes of what the third prompt sends for the knight's request, by
+#: mechanism; ``EXULANICA_LINE_GOLDENS=print`` prints what this tree produces. The second prompt's
+#: were a2bf2255 and 72d2fa95; its instruction stays in the registry's fifth version.
 MESSAGES_SHA256 = {
-    "tool_call": "a2bf22558cc35aa52e28fadc81130f37e476cc05e12e213fe0183dc6249b616e",
-    "json_schema": "72d2fa95af73c191731df8faa659a70bfe81b848dfd8f3760315d7a3eee5df3a",
+    "tool_call": "d015cedbaf5bd133f57cbcb9ed58356f7f7f6f7348797e597990f95bb01cfb7b",
+    "json_schema": "5d6c8ed5102216b06ab5e9b341a238ebb586d11ce5244acb8d22c3e4bab1aaed",
 }
 
 
-def test_the_second_prompt_is_kept_as_bytes():
+def test_the_third_prompt_is_kept_as_bytes():
     state, document, knight, contract, options = _asked()
     request = _request(state, document, knight["id"], options, contract, model="example/model")
     role = person_role()

@@ -1,0 +1,557 @@
+{
+ "input_sha256": "75b0f68a1e3c15a5d7761145281b96e108436f5b559cef5fb8e04fb0a95831a8",
+ "minutes": [
+  {
+   "crossings": [],
+   "decisions": [
+    {
+     "disposition": {
+      "decision_seq": 1,
+      "decision_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "disposition": "applied",
+      "reason": "validated_choice",
+      "request_id": "320aa071-f19f-59dd-97ee-ed3ba0a5be1a",
+      "subject_id": "6d5c550a-91cd-570a-9952-ad2d66901f8b"
+     },
+     "receipt": {
+      "proposal": {
+       "label": "say something to the villager (person 1), 3 m away",
+       "line": "line 1",
+       "option": {
+        "action": "say_to",
+        "activity": null,
+        "addressee_id": "638b0e11-1236-5a5b-81e5-db97257c2aaa",
+        "kind": "say_to",
+        "label": "say something to the villager (person 1), 3 m away",
+        "target_id": null,
+        "walk_mm": null
+       }
+      },
+      "provider": {
+       "model_id": "m",
+       "provider": "test"
+      },
+      "reason": "validated_choice",
+      "request_id": "320aa071-f19f-59dd-97ee-ed3ba0a5be1a",
+      "status": "accepted",
+      "subject_id": "6d5c550a-91cd-570a-9952-ad2d66901f8b"
+     }
+    }
+   ],
+   "events_sha256": "079cef83771ff7295baeeff89b768317e691f798cebb63684f35b47867a20d05",
+   "said": 1,
+   "state_sha256": "eeeaa9197e083b7129dd2d01120c2fe1059165f2ca7694d47077ec59846d01db",
+   "tick": 1
+  },
+  {
+   "crossings": [],
+   "decisions": [
+    {
+     "disposition": {
+      "decision_seq": 2,
+      "decision_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "disposition": "applied",
+      "reason": "validated_choice",
+      "request_id": "7a1f087b-74a4-5b53-a6a9-b53b743a8fc5",
+      "subject_id": "6d5c550a-91cd-570a-9952-ad2d66901f8b"
+     },
+     "receipt": {
+      "proposal": {
+       "label": "say something to the villager (person 1), 6 m away",
+       "line": "line 2",
+       "option": {
+        "action": "say_to",
+        "activity": null,
+        "addressee_id": "638b0e11-1236-5a5b-81e5-db97257c2aaa",
+        "kind": "say_to",
+        "label": "say something to the villager (person 1), 6 m away",
+        "target_id": null,
+        "walk_mm": null
+       }
+      },
+      "provider": {
+       "model_id": "m",
+       "provider": "test"
+      },
+      "reason": "validated_choice",
+      "request_id": "7a1f087b-74a4-5b53-a6a9-b53b743a8fc5",
+      "status": "accepted",
+      "subject_id": "6d5c550a-91cd-570a-9952-ad2d66901f8b"
+     }
+    }
+   ],
+   "events_sha256": "34cf8aa45f0f4a1a5bccc215ecf0cdc41c8ba7b0064859e95167b4ce2e84ba5a",
+   "said": 1,
+   "state_sha256": "4e983ce7e34564daca485660fdac1406b84f800a6c25a95d309bdf04d4934a3a",
+   "tick": 2
+  },
+  {
+   "crossings": [
+    {
+     "crossing_id": "270f6fea-3565-5a1b-a23c-52d2a454899e",
+     "document": {
+      "arrival_id": "270f6fea-3565-5a1b-a23c-52d2a454899e",
+      "carried": [],
+      "gate": null,
+      "grant_id": "00000000-0000-0000-0000-00000000009a",
+      "kind": {
+       "kind": "visitor",
+       "sha256": "97be94be55a6290a75b8865e2cf589970ea465c8ff7ee9eb5910e2070f935df8",
+       "version": 1
+      },
+      "origin": {
+       "authors": [],
+       "by": {
+        "adapter_version": "0.1.0",
+        "bridge": "testbridge",
+        "grant_id": "00000000-0000-0000-0000-00000000009a",
+        "kind": "program",
+        "mapping_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+       },
+       "class": "crossed",
+       "distribution": "public",
+       "licence": {
+        "attribution": null,
+        "licence_text_sha256": null,
+        "licence_url": null,
+        "share_alike": false,
+        "spdx": "CC0-1.0",
+        "verdict": "SHIP"
+       },
+       "lineage": {
+        "ingredients": [],
+        "receipts": [],
+        "translation_manifest_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+       },
+       "profile": "exulanica.origin/v1",
+       "sources": []
+      },
+      "profile": "exulanica.thing-arrival/v1",
+      "thing_id": "492d5f58-bc31-5c5b-ae6c-e849fc847b42",
+      "translation_manifest_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+     }
+    }
+   ],
+   "decisions": [
+    {
+     "disposition": {
+      "decision_seq": 3,
+      "decision_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "disposition": "applied",
+      "reason": "validated_choice",
+      "request_id": "161bf4dd-3987-58ee-9b6a-1d4815d946e7",
+      "subject_id": "6d5c550a-91cd-570a-9952-ad2d66901f8b"
+     },
+     "receipt": {
+      "proposal": {
+       "label": "say something to the villager (person 5), 3 m away",
+       "line": "line 3",
+       "option": {
+        "action": "say_to",
+        "activity": null,
+        "addressee_id": "7476b7ad-ebb3-5d47-826b-3b5109d35efe",
+        "kind": "say_to",
+        "label": "say something to the villager (person 5), 3 m away",
+        "target_id": null,
+        "walk_mm": null
+       }
+      },
+      "provider": {
+       "model_id": "m",
+       "provider": "test"
+      },
+      "reason": "validated_choice",
+      "request_id": "161bf4dd-3987-58ee-9b6a-1d4815d946e7",
+      "status": "accepted",
+      "subject_id": "6d5c550a-91cd-570a-9952-ad2d66901f8b"
+     }
+    }
+   ],
+   "events_sha256": "caffc89ff830a17a8939160ea5809ab67d71f4f310b37b4cb1ffe1a1298488e7",
+   "said": 1,
+   "state_sha256": "7460b588621f90ab76f5d21b7879e03a38189edcf4f5b689e7260d75f85854c0",
+   "tick": 3
+  },
+  {
+   "crossings": [],
+   "decisions": [
+    {
+     "disposition": {
+      "decision_seq": 4,
+      "decision_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "disposition": "applied",
+      "reason": "validated_choice",
+      "request_id": "f75a3eb8-76b0-5d82-8398-a2df8ea5a67b",
+      "subject_id": "6d5c550a-91cd-570a-9952-ad2d66901f8b"
+     },
+     "receipt": {
+      "proposal": {
+       "label": "say something to the villager (person 3), 8 m away",
+       "line": "line 4",
+       "option": {
+        "action": "say_to",
+        "activity": null,
+        "addressee_id": "ee0bb89e-aefb-5e54-bb09-5b71ab6810bc",
+        "kind": "say_to",
+        "label": "say something to the villager (person 3), 8 m away",
+        "target_id": null,
+        "walk_mm": null
+       }
+      },
+      "provider": {
+       "model_id": "m",
+       "provider": "test"
+      },
+      "reason": "validated_choice",
+      "request_id": "f75a3eb8-76b0-5d82-8398-a2df8ea5a67b",
+      "status": "accepted",
+      "subject_id": "6d5c550a-91cd-570a-9952-ad2d66901f8b"
+     }
+    }
+   ],
+   "events_sha256": "94842a3cda1a2e04d6e943e712997e5f0698035ac45455dc52d17f8e02d20bae",
+   "said": 1,
+   "state_sha256": "086d31a536f35bc723c2dce63f03222bbab5f02381446694752b5e4b1678a737",
+   "tick": 4
+  },
+  {
+   "crossings": [],
+   "decisions": [
+    {
+     "disposition": {
+      "decision_seq": 5,
+      "decision_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "disposition": "applied",
+      "reason": "validated_choice",
+      "request_id": "394512cf-1cb5-573c-a814-86c25673e7d5",
+      "subject_id": "6d5c550a-91cd-570a-9952-ad2d66901f8b"
+     },
+     "receipt": {
+      "proposal": {
+       "label": "say something to the villager (person 5), 3 m away",
+       "line": "line 5",
+       "option": {
+        "action": "say_to",
+        "activity": null,
+        "addressee_id": "7476b7ad-ebb3-5d47-826b-3b5109d35efe",
+        "kind": "say_to",
+        "label": "say something to the villager (person 5), 3 m away",
+        "target_id": null,
+        "walk_mm": null
+       }
+      },
+      "provider": {
+       "model_id": "m",
+       "provider": "test"
+      },
+      "reason": "validated_choice",
+      "request_id": "394512cf-1cb5-573c-a814-86c25673e7d5",
+      "status": "accepted",
+      "subject_id": "6d5c550a-91cd-570a-9952-ad2d66901f8b"
+     }
+    }
+   ],
+   "events_sha256": "37bdf78cd6b7093897e3f83b78cb3d9b7e9764c1edd0e246a2067a42c8ea83a2",
+   "said": 1,
+   "state_sha256": "4ed36f9891af7f66b591d07e8ab59511af7055e335592b7b6e8115b54c885db9",
+   "tick": 5
+  },
+  {
+   "crossings": [],
+   "decisions": [
+    {
+     "disposition": {
+      "decision_seq": 6,
+      "decision_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "disposition": "applied",
+      "reason": "validated_choice",
+      "request_id": "e6d27d28-a45d-54cf-8ada-52c209cbfcfd",
+      "subject_id": "6d5c550a-91cd-570a-9952-ad2d66901f8b"
+     },
+     "receipt": {
+      "proposal": {
+       "label": "say something to the villager (person 3), 8 m away",
+       "line": "line 6",
+       "option": {
+        "action": "say_to",
+        "activity": null,
+        "addressee_id": "ee0bb89e-aefb-5e54-bb09-5b71ab6810bc",
+        "kind": "say_to",
+        "label": "say something to the villager (person 3), 8 m away",
+        "target_id": null,
+        "walk_mm": null
+       }
+      },
+      "provider": {
+       "model_id": "m",
+       "provider": "test"
+      },
+      "reason": "validated_choice",
+      "request_id": "e6d27d28-a45d-54cf-8ada-52c209cbfcfd",
+      "status": "accepted",
+      "subject_id": "6d5c550a-91cd-570a-9952-ad2d66901f8b"
+     }
+    }
+   ],
+   "events_sha256": "abbff3aef098b8e41376bc65227e75eaab81f82a6b27c87c16677ac6dcfd295f",
+   "said": 1,
+   "state_sha256": "f2a49e83bc3847b135e4729430f7655dfd8a243f7f76a769f86b859525da04fb",
+   "tick": 6
+  },
+  {
+   "crossings": [],
+   "decisions": [
+    {
+     "disposition": {
+      "decision_seq": 7,
+      "decision_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "disposition": "applied",
+      "reason": "validated_choice",
+      "request_id": "5ec11bce-32ea-5278-b3a6-0ce1bacb4a18",
+      "subject_id": "6d5c550a-91cd-570a-9952-ad2d66901f8b"
+     },
+     "receipt": {
+      "proposal": {
+       "label": "say something to everyone near you",
+       "line": "line 7",
+       "option": {
+        "action": "say_all",
+        "activity": null,
+        "kind": "say_all",
+        "label": "say something to everyone near you",
+        "target_id": null,
+        "walk_mm": null
+       }
+      },
+      "provider": {
+       "model_id": "m",
+       "provider": "test"
+      },
+      "reason": "validated_choice",
+      "request_id": "5ec11bce-32ea-5278-b3a6-0ce1bacb4a18",
+      "status": "accepted",
+      "subject_id": "6d5c550a-91cd-570a-9952-ad2d66901f8b"
+     }
+    }
+   ],
+   "events_sha256": "ebc9c1de0ce536979e22ef25606e072cde909ebb5c344459d1e9bc4be6aafe08",
+   "said": 1,
+   "state_sha256": "f26fc11fb6c4ad32140cb5cbd0aba3a31c8892d9c674025a481a7587a3ddd89d",
+   "tick": 7
+  },
+  {
+   "crossings": [],
+   "decisions": [
+    {
+     "disposition": {
+      "decision_seq": 8,
+      "decision_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "disposition": "applied",
+      "reason": "validated_choice",
+      "request_id": "2a30ae44-31bd-5d11-a61a-e0d9f059bb11",
+      "subject_id": "6d5c550a-91cd-570a-9952-ad2d66901f8b"
+     },
+     "receipt": {
+      "proposal": {
+       "label": "say something to the villager (person 4), 3 m away",
+       "line": "line 8",
+       "option": {
+        "action": "say_to",
+        "activity": null,
+        "addressee_id": "6dc4e300-40dd-506a-b719-b9df96670e7e",
+        "kind": "say_to",
+        "label": "say something to the villager (person 4), 3 m away",
+        "target_id": null,
+        "walk_mm": null
+       }
+      },
+      "provider": {
+       "model_id": "m",
+       "provider": "test"
+      },
+      "reason": "validated_choice",
+      "request_id": "2a30ae44-31bd-5d11-a61a-e0d9f059bb11",
+      "status": "accepted",
+      "subject_id": "6d5c550a-91cd-570a-9952-ad2d66901f8b"
+     }
+    }
+   ],
+   "events_sha256": "609fe532a75d3025f3f0e821948e7cc9ff25b0a2f215fefea780e6632afa2655",
+   "said": 1,
+   "state_sha256": "88a720c1574472e39f8f24880442c1d5def586549d2f1e62491dd3de801b1f6c",
+   "tick": 8
+  },
+  {
+   "crossings": [],
+   "decisions": [
+    {
+     "disposition": {
+      "decision_seq": 9,
+      "decision_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "disposition": "applied",
+      "reason": "validated_choice",
+      "request_id": "d2531ef0-d716-5b5c-9381-55407e20443a",
+      "subject_id": "6d5c550a-91cd-570a-9952-ad2d66901f8b"
+     },
+     "receipt": {
+      "proposal": {
+       "label": "say something to the villager (person 5), 3 m away",
+       "line": "line 9",
+       "option": {
+        "action": "say_to",
+        "activity": null,
+        "addressee_id": "7476b7ad-ebb3-5d47-826b-3b5109d35efe",
+        "kind": "say_to",
+        "label": "say something to the villager (person 5), 3 m away",
+        "target_id": null,
+        "walk_mm": null
+       }
+      },
+      "provider": {
+       "model_id": "m",
+       "provider": "test"
+      },
+      "reason": "validated_choice",
+      "request_id": "d2531ef0-d716-5b5c-9381-55407e20443a",
+      "status": "accepted",
+      "subject_id": "6d5c550a-91cd-570a-9952-ad2d66901f8b"
+     }
+    }
+   ],
+   "events_sha256": "b50758e0d5a1fa925d7d4bf790a3672c804ed85a7209a7d1a9348d1c8a21cb84",
+   "said": 1,
+   "state_sha256": "a0d5fe08238a2d7ba5c82bc8250cdbfeb21c7cfbfd41da7d3615a6db0bda61c6",
+   "tick": 9
+  },
+  {
+   "crossings": [],
+   "decisions": [
+    {
+     "disposition": {
+      "decision_seq": 10,
+      "decision_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "disposition": "applied",
+      "reason": "validated_choice",
+      "request_id": "48292166-cbcc-5e73-8b70-1055f31f5a8c",
+      "subject_id": "6d5c550a-91cd-570a-9952-ad2d66901f8b"
+     },
+     "receipt": {
+      "proposal": {
+       "label": "say something to the villager (person 1), 1 m away",
+       "line": "line 10",
+       "option": {
+        "action": "say_to",
+        "activity": null,
+        "addressee_id": "638b0e11-1236-5a5b-81e5-db97257c2aaa",
+        "kind": "say_to",
+        "label": "say something to the villager (person 1), 1 m away",
+        "target_id": null,
+        "walk_mm": null
+       }
+      },
+      "provider": {
+       "model_id": "m",
+       "provider": "test"
+      },
+      "reason": "validated_choice",
+      "request_id": "48292166-cbcc-5e73-8b70-1055f31f5a8c",
+      "status": "accepted",
+      "subject_id": "6d5c550a-91cd-570a-9952-ad2d66901f8b"
+     }
+    }
+   ],
+   "events_sha256": "a989a829567ea3208bffaaf409ceae42fba3e42dd5ef1e2f3b25cc792c1b7298",
+   "said": 1,
+   "state_sha256": "9cc8dde4ae8fdaa07f361d15d7f970cdd456cb53dfe80bea8bef8c952442a60d",
+   "tick": 10
+  },
+  {
+   "crossings": [],
+   "decisions": [
+    {
+     "disposition": {
+      "decision_seq": 11,
+      "decision_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "disposition": "applied",
+      "reason": "validated_choice",
+      "request_id": "8d50aca2-c971-5dc1-b00c-c00d73d88b16",
+      "subject_id": "6d5c550a-91cd-570a-9952-ad2d66901f8b"
+     },
+     "receipt": {
+      "proposal": {
+       "label": "say something to the villager (person 1), 1 m away",
+       "line": "line 11",
+       "option": {
+        "action": "say_to",
+        "activity": null,
+        "addressee_id": "638b0e11-1236-5a5b-81e5-db97257c2aaa",
+        "kind": "say_to",
+        "label": "say something to the villager (person 1), 1 m away",
+        "target_id": null,
+        "walk_mm": null
+       }
+      },
+      "provider": {
+       "model_id": "m",
+       "provider": "test"
+      },
+      "reason": "validated_choice",
+      "request_id": "8d50aca2-c971-5dc1-b00c-c00d73d88b16",
+      "status": "accepted",
+      "subject_id": "6d5c550a-91cd-570a-9952-ad2d66901f8b"
+     }
+    }
+   ],
+   "events_sha256": "74dde51cacadbb5680580e4ede911625da09392a9c8cf5125a322f0067389870",
+   "said": 1,
+   "state_sha256": "9ee3147c58e33c79642ee9cca1d5f6d99070c8b9613d9edcc4abbdd10a6a15a2",
+   "tick": 11
+  },
+  {
+   "crossings": [],
+   "decisions": [
+    {
+     "disposition": {
+      "decision_seq": 12,
+      "decision_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "disposition": "applied",
+      "reason": "validated_choice",
+      "request_id": "3387cd90-18f2-52f3-8d86-e92c0f65000f",
+      "subject_id": "6d5c550a-91cd-570a-9952-ad2d66901f8b"
+     },
+     "receipt": {
+      "proposal": {
+       "label": "say something to the villager (person 3), 8 m away",
+       "line": "line 12",
+       "option": {
+        "action": "say_to",
+        "activity": null,
+        "addressee_id": "ee0bb89e-aefb-5e54-bb09-5b71ab6810bc",
+        "kind": "say_to",
+        "label": "say something to the villager (person 3), 8 m away",
+        "target_id": null,
+        "walk_mm": null
+       }
+      },
+      "provider": {
+       "model_id": "m",
+       "provider": "test"
+      },
+      "reason": "validated_choice",
+      "request_id": "3387cd90-18f2-52f3-8d86-e92c0f65000f",
+      "status": "accepted",
+      "subject_id": "6d5c550a-91cd-570a-9952-ad2d66901f8b"
+     }
+    }
+   ],
+   "events_sha256": "0e1859217eeb4219e35f5279598f3d56a382c9bc0c84a2081d928018a81c4e22",
+   "said": 1,
+   "state_sha256": "ba78fa53e82c0f4db7a773b6ae8d195be9ef76777a2f390662b12a7b0d51a3ec",
+   "tick": 12
+  }
+ ],
+ "population": 6,
+ "recorded_by": "THINGS 3a3.2 re-cut (tree 1288eb3af287c37d141c0212c70243929bce3147), before societies of things recorded their ability modules",
+ "seed": "7777777777777777777777777777777777777777777777777777777777777777",
+ "society_id": "dae453f0-82b4-583c-b056-7150f5217e08"
+}

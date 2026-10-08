@@ -149,6 +149,16 @@ served by one ability module, with what it needs of the body and what its target
 The purposeful abilities are the purposeful routine's actions with exactly its rules, and talking
 stays wordless: words are said. A line is written only by a decider, never by the routine.
 
+[`ability-modules.v1.json`](../exulanica/abilities/ability-modules.v1.json) states each module once,
+by version, read by [`registry.py`](../exulanica/abilities/registry.py): the abilities it serves,
+its bounded parameters (a figure the module uses itself, or a range a kind states within), the
+event kinds its minute records, and whether it is built. Purposeful, say, crossing and hands
+(`reach_mm` 1,500, `approach_mm` 8,000, `walk_minutes_maximum` 3) are built; follow is not
+connected and is refused by name (`follow_not_built`). A society of things records the modules it
+runs in its first input and runs exactly those for its whole life
+([society contract](synthetic-society-contract.md#the-society-of-things-v7)), so a module version
+stays in the table while any stored society names it, and a new version is a new row.
+
 [`offers.v1.json`](../assets/catalogs/things/offers.v1.json) states what a thing lets others do to
 it, and the parameters a kind states for each:
 
@@ -172,6 +182,8 @@ from it (`+y`), so a visitor steps out of the gate into the world.
 The world object catalog's uses map onto offers: `rest` to `rest_at` with its places and seats,
 `visit` to `visit`, perches to `perch` and hosted flyers to `host`. A kind's routine draws among
 `wait`, `stand`, `talk`, `rest`, `visit`, the hands abilities and `follow`, by the kind's weights.
+No society reads these weights yet: the society of things' routine is the purposeful planner's, and
+only a decider uses a being's hands.
 
 ## Looks
 
@@ -791,10 +803,10 @@ no detail clears the pick. The picked thing wears a ring in the design tokens' s
 These are material limits of the boundary above, not partial behaviour:
 
 - The society of things ([society contract](synthetic-society-contract.md#the-society-of-things-v7))
-  reads a placed thing's kind, places its beings, lets visitors cross in and leave, and says the lines
-  its beings' deciders choose, but no ability module runs: its people walk, choose, stay and talk by
-  the purposeful planner's rules, and the hands and following the abilities catalog names are not
-  built. The routine says nothing; only a model chosen for a being, or a visitor's own program, does.
+  reads a placed thing's kind, places its beings, lets visitors cross in and leave, says the lines
+  its beings' deciders choose and does the hands acts they choose, but following is not built. The
+  routine says nothing and uses no hands; only a model chosen for a being, or a visitor's own
+  program, does.
   A visitor the world decides for takes no person's direct request yet, and nobody in the app can
   take a being over and play it.
 - A workspace's own kinds and looks are kept and served, but no route writes them (the operator's
@@ -841,5 +853,9 @@ These are material limits of the boundary above, not partial behaviour:
 | A creature's look request and its sculpted look | [`creature_looks.py`](../exulanica/things/creature_looks.py), `ml/appearance/exulanica_appearance/creatures/` | `tests/test_creature_sculpt.py` (each development creature's sketch filled, rigged, written and read back against its plan's tree; the creature job end to end with stand-in models, a body that is not its plan's refused by the rig with its measures in the receipt), `ml/appearance/tests/test_creature_rig.py` and `test_creature_route.py` (a box figure: every check against a positive control, fused legs refused with every measure, a missing leg, a turn undone to the degree, a stretched body refused with the fit it refused; the all-at-once rasteriser equal to the loop; the camera on each plan's front left; the sketch's voxels in TRELLIS's frame), `ml/appearance/tests/test_trellis_second_stage.py` (the second stage's call order, and each refusal of a structure and of a pipeline's signatures alone); the two rig trials on Nebius AI Cloud, [first record](evaluation/2026-10-07-creature-rig-trial.json) and [second record](evaluation/2026-10-07-creature-rig-trial-2.json), each held equal to what its script builds from its evidence (`tests/test_creature_rig_trial_record.py`, `tests/test_creature_rig_trial_2_record.py`) |
 | Scenes and their dressing | [`scenes.py`](../exulanica/world/scenes.py), [`scene_dressing.py`](../exulanica/api/scene_dressing.py), [`assets/catalogs/scenes`](../assets/catalogs/scenes) | `tests/test_scenes.py` (every shipped scene locked at its digest; each refusal by name against the shipped scene; poses equal to the demo builder's, which shares no code with it, and a turned arrival's worked by hand), `tests/test_scene_dressing_postgres.py` (a starter dressed through the application: its things bound to the saved entry where the builder would place them, in the arrival's region, authored as fictional and placed by the owner, the society and each mind read back, a second dressing changing nothing, a thing placed as another kind refused, the owner's moves, removals and undos standing, a host without the engine, a society with no first input, a model the role refuses for one being alone, another workspace and a busy connection refused), `tests/test_demo_scene.py` |
 | No creature in code | | `tests/test_no_creature_code.py` (with a planted name the scan finds) |
+| Ability modules | [`registry.py`](../exulanica/abilities/registry.py), [`ability-modules.v1.json`](../exulanica/abilities/ability-modules.v1.json) | `tests/test_ability_modules.py` (every module the abilities catalog names a row serving exactly its abilities, the figures a module's requests are asked under, a society running what its first input records or what every society ran before, a table breaking a rule refused by name) |
+| Hands | [`society_hands.py`](../exulanica/world/society_hands.py), the hands step in [`society_things.py`](../exulanica/world/society_things.py), migration 0166 | `tests/test_society_hands.py` (picking up into a socket that fits, an author's move or removal taking a thing out of a hand, no giving to a kind that does not receive, a visitor leaving the world's things behind and taking what it brought, a removed being putting
+down what it holds, two things of one kind offered apart, an author's turn applying to a thing
+nobody moved, beings on neighbouring nodes handing over, the data hands replay by pinned), `tests/test_society_hands_postgres.py` (through the decision host: a knight walks, picks a sword up and gives it to another knight; replay asks no model) |
 | Purity | The import contract "Things are pure data" in `pyproject.toml`: no database, store, evidence, pipeline, world, traffic, movement step, model or numeric stack | `lint-imports` |
 | Drawing | [`things/`](../web/packages/atlas-react/src/playcanvas/things), [`composition/things.ts`](../web/packages/app/src/composition/things.ts), [`things-library.ts`](../web/packages/app/src/things-library.ts) | `web/packages/atlas-react/test/things-*.test.ts` (the shipped documents read, digests refused, skeletons read by shape with a ten-legged plan, planted feet, placement, misses, picking, a society's things through the crowd, a held thing in its holder's hand, the marks and lines overlay), `web/packages/atlas-react/test/society-crowd-things.test.ts`, `web/packages/atlas-react/test/society-crowd-anchors.test.ts`, `web/packages/atlas-react/test/society-crowd-refresh.test.ts`, `web/packages/atlas-react/test/things-placed-facing.test.ts`, `web/packages/app/test/things-composition.test.ts`, `web/packages/app/test/environment-selection-things.test.ts`, `web/packages/app/test/environment-selection-marks.test.ts`, `web/packages/app/test/thing-marks.test.ts`, `web/packages/app/test/door-grants-api.test.ts`, `web/packages/app/test/environment-selection-agents.test.ts`, `web/packages/app/test/thing-lines.test.ts`, `web/packages/app/test/environment-selection-lines.test.ts`, `web/packages/app/test/door-bridges-api.test.ts`, `web/packages/app/test/thing-looks-api.test.ts`, `web/packages/app/test/things-composition-looks.test.ts`, `web/packages/app/test/environment-selection-looks.test.ts`, `web/packages/app/test/things-composition-facing.test.ts`, `web/packages/app/test/things-library-held.test.ts` |

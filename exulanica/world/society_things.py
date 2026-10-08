@@ -35,10 +35,12 @@ returned for the caller to bind.
 
 from __future__ import annotations
 
+import math
 import re
 import uuid
 from collections.abc import Mapping, Sequence
 from copy import deepcopy
+from itertools import pairwise
 from typing import Any, Final
 
 from exulanica.things.kinds import ThingKind
@@ -106,6 +108,12 @@ THING_EVENT_KINDS: Final = (
     "arrival_refused",
     "departure_refused",
     "said",
+    # Where the society records the hands module: a hands act done, or one dropped.
+    "picked_up",
+    "put_down",
+    "gave",
+    "took",
+    "hands_missed",
 )
 #: Every reason the things phase records, stated once: the browser has words for exactly these.
 THING_REASONS: Final = frozenset(
@@ -132,6 +140,15 @@ THING_REASONS: Final = frozenset(
         "chose_to_say",
         "chose_to_leave",
         "decider_lost",
+        # A being's decider chose a hands act, done in the minute the being stood within reach,
+        # or dropped: the thing or the other being was gone, or never came within reach in the
+        # minutes the module walks.
+        "chose_to_pick_up",
+        "chose_to_put_down",
+        "chose_to_give",
+        "chose_to_take",
+        "thing_gone",
+        "out_of_reach",
     }
 )
 #: Every outcome the things phase records, stated once: the browser has words for exactly these.
@@ -143,6 +160,11 @@ THING_OUTCOMES: Final = (
     "departed",
     "not_departed",
     "said",
+    "picked_up",
+    "put_down",
+    "gave",
+    "took",
+    "not_done",
 )
 #: The reasons an outside program's request ends with for a visitor, counted as a quiet minute: it
 #: had no live connection, it did not answer in time, or the grant it came under was revoked or
@@ -153,6 +175,13 @@ QUIET_REASONS: Final = frozenset(
 )
 #: The kinds of a decision whose minute the things phase carries out: a line said, or leaving.
 _SPOKEN_KINDS: Final = frozenset({"say_to", "say_all"})
+#: The kinds of a decision the hands step carries out, each by the event it records.
+_HANDS_ACTS: Final = {
+    "pick_up": "picked_up",
+    "put_down": "put_down",
+    "give": "gave",
+    "take": "took",
+}
 #: Why a visitor left, by the reason its departure states: the program that sent it called it
 #: back, or the grant it came under ended. Named apart from the world's owner sending everyone
 #: away, which is another engine's.
@@ -170,7 +199,10 @@ _THING_FIELDS: Final = frozenset(
 #: minute ended with, which its next minute starts from (``velocity_mm_s``), and the size class it
 #: walks or flies by where it is not the people's (``size_class_mm``).
 MODES: Final = ("walking", "flight")
-_THING_MAY: Final = frozenset({"height_mm"})
+#: A thing of a society running the hands module also states where its author placed it
+#: (``placed_at_mm``, for a placed thing), so an author's move is told from a being's, and the
+#: socket a being holds it in (``socket``, while held).
+_THING_MAY: Final = frozenset({"height_mm", "placed_at_mm", "socket"})
 #: A flyer's velocity, whole millimetres a second: x and y along the ground (``position_mm``'s
 #: two axes), z up (the rate of ``height_mm``), each within this bound.
 _VELOCITY_MM_S: Final = 100_000
@@ -209,8 +241,9 @@ def _name(people: Sequence[Mapping[str, Any]], label: str) -> str:
     return f"{label} {number}"
 
 
-def _things_of(document: Mapping[str, Any]) -> list[dict[str, Any]]:
-    """The society's things the input places: every object the author placed, in id order."""
+def _things_of(document: Mapping[str, Any], *, hands: bool = False) -> list[dict[str, Any]]:
+    """The society's things the input places: every object the author placed, in id order, each
+    where it was placed, and, in a society running the hands module, stating that placement."""
     return [
         {
             "id": _thing_id(document["world_id"], entry["placed_id"]),
@@ -220,9 +253,50 @@ def _things_of(document: Mapping[str, Any]) -> list[dict[str, Any]]:
             "yaw_microradians": entry["yaw_microradians"],
             "held_by": None,
             **({"height_mm": entry["height_mm"]} if "height_mm" in entry else {}),
+            **({"placed_at_mm": list(entry["position_mm"])} if hands else {}),
         }
         for entry in placed_objects(document)
     ]
+
+
+def _records_modules(state: Mapping[str, Any]) -> bool:
+    """Whether a society's first input recorded the modules it runs: every society of things made
+    since they were. One made before keeps recording its minutes as it did, so they replay."""
+    return "modules" in state
+
+
+def _runs_hands(state: Mapping[str, Any]) -> bool:
+    """Whether a society's first input recorded the hands module, which its minutes then run."""
+    from exulanica.abilities.registry import HANDS
+
+    return HANDS in state.get("modules", ())
+
+
+def _moved_things(state: Mapping[str, Any], document: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """A hands society's things as the latest input places them: a placed thing the author left
+    where it was stays as the society has it (held, or where a being put it down), and one nobody
+    moved from its place takes the author's turn and height; one the author moved or changed is
+    where the author put it, out of any hand; one the author removed is gone, from any hand; a new
+    one is where it was placed; and a thing nobody placed (carried in) stays as it is."""
+    current = {t["placed_id"]: t for t in state["things"] if t["placed_id"] is not None}
+    kept = []
+    for entry in _things_of(document, hands=True):
+        found = current.get(entry["placed_id"])
+        if (
+            found is None
+            or found["kind"] != entry["kind"]
+            or found["placed_at_mm"] != entry["placed_at_mm"]
+        ):
+            kept.append(entry)
+            continue
+        if found["held_by"] is None and found["position_mm"] == entry["position_mm"]:
+            # Still where its author placed it: an edit's new turn or height applies to it.
+            found = {key: value for key, value in found.items() if key != "height_mm"}
+            found["yaw_microradians"] = entry["yaw_microradians"]
+            if "height_mm" in entry:
+                found["height_mm"] = entry["height_mm"]
+        kept.append(found)
+    return [*kept, *(thing for thing in state["things"] if thing["placed_id"] is None)]
 
 
 def _newcomer(
@@ -313,6 +387,7 @@ class _Minute:
         person: dict[str, Any] | None,
         name: str,
         details: Mapping[str, Any],
+        at_ms: int = 0,
     ) -> SocietyEvent:
         order = len(self.events)
         summary = f"{name} (simulated): {outcome.replace('_', ' ')}; {reason.replace('_', ' ')}."
@@ -336,9 +411,10 @@ class _Minute:
             "previous_state_sha256": self.previous_digest,
             "seed_sha256": self.seed,
             "thing": dict(details),
-            # The things phase takes effect as the minute begins: edits and crossings handed over
-            # during the minute before it.
-            "at_ms": 0,
+            # The things phase takes effect as the minute begins (edits and crossings handed over
+            # during the minute before it), but for a hands act, done the moment the later of its
+            # parties' walks ends.
+            "at_ms": at_ms,
         }
         identity = uuid.uuid5(
             SOCIETY_NAMESPACE,
@@ -357,10 +433,26 @@ class _Minute:
     def leave(
         self, person: dict[str, Any], reason: str, extra: Mapping[str, Any] | None = None
     ) -> SocietyEvent:
-        """``person`` leaves the society, and whatever it holds leaves with it."""
-        carried = [thing for thing in self.state["things"] if thing["held_by"] == person["id"]]
+        """``person`` leaves the society. In a society running hands, what belongs to the world
+        stays: a placed thing it holds is put down where it stood (no arrival records a right to
+        carry the world's things out), and so is everything a being of the world holds; only what
+        a visitor carried in leaves with it. In a society without hands, whatever it holds leaves
+        with it."""
+        held = [thing for thing in self.state["things"] if thing["held_by"] == person["id"]]
+        left: list[dict[str, Any]] = []
+        if _runs_hands(self.state):
+            left = [
+                thing
+                for thing in held
+                if thing["placed_id"] is not None or person["came_by"] != "crossed"
+            ]
+            for thing in left:
+                thing["held_by"] = None
+                thing.pop("socket", None)
+                thing["position_mm"] = list(person["position_mm"])
+        carried = [thing for thing in held if thing not in left]
         self.state["things"] = [
-            thing for thing in self.state["things"] if thing["held_by"] != person["id"]
+            thing for thing in self.state["things"] if not any(thing is c for c in carried)
         ]
         self.state["inhabitants"] = [
             other for other in self.state["inhabitants"] if other is not person
@@ -377,6 +469,8 @@ class _Minute:
                 "came_by": person["came_by"],
                 "placed_id": person["placed_id"],
                 "carried": [{"id": thing["id"], "kind": thing["kind"]} for thing in carried],
+                # What stayed, put down where it stood: stated only where something did.
+                **({"left": [thing["id"] for thing in left]} if left else {}),
                 **(extra or {}),
             },
         )
@@ -556,6 +650,9 @@ def _reconcile(minute: _Minute) -> None:
         == {name: held[name] for name in ("placed_id", "kind", "placed_at_mm")}
     ]
     _place_beings(minute, record=True)
+    if _runs_hands(state):
+        state["things"] = _moved_things(state, document)
+        return
     state["things"] = [
         *_things_of(document),
         *(thing for thing in state["things"] if thing["held_by"] is not None),
@@ -656,6 +753,8 @@ def _arrive(minute: _Minute, crossing: Crossing, document: Mapping[str, Any]) ->
                 "position_mm": None,
                 "yaw_microradians": None,
                 "held_by": identity,
+                # With hands, the socket it is in, found from its holder's plan when first used.
+                **({"socket": None} if _runs_hands(state) else {}),
             }
         )
     event = minute.emit(
@@ -764,8 +863,11 @@ def initial_things_society(
             crossing=None,
         )
     state["next_ordinal"] = len(state["inhabitants"])
-    state["things"] = _things_of(document)
     state["refused_placements"] = []
+    if "modules" in document:
+        # The modules its first input records, which its minutes run for its whole life.
+        state["modules"] = list(document["modules"])
+    state["things"] = _things_of(document, hands=_runs_hands(state))
     minute = _Minute(state, state, seed, document, ())
     # The author's beings first, where they were put; then the population steps aside from them.
     _place_beings(minute, record=False, before_population=True)
@@ -821,7 +923,9 @@ def advance_things(
     its directed requests' and its decisions'), ``previous`` the state it began from and
     ``document`` the input it consumed last. ``decisions`` are the receipts the minute consumed,
     each with what the minute did with it: an applied line is said, an applied leaving is carried
-    out, and a visitor whose program stays quiet for as many minutes as its kind waits is sent home.
+    out, an applied hands act is done by the hands step once the being stands within reach (where
+    the society runs the hands module), and a visitor whose program stays quiet for as many minutes
+    as its kind waits is sent home.
     Answers the state, every event of the minute, and what became of each crossing, in the order
     they were handed over."""
     _require(state["profile"] == THINGS_PROFILE, "the things phase is a society of things'")
@@ -841,6 +945,8 @@ def advance_things(
         else:
             bound.append(_depart(minute, crossing, checked))
     _decided(minute, previous, decisions)
+    if _runs_hands(result):
+        _hands(minute, previous)
     validate_things_state(result)
     return result, tuple(minute.events), tuple(bound)
 
@@ -906,6 +1012,15 @@ def _decided(
         if disposition.disposition != "applied" or receipt["proposal"] is None:
             continue
         option = receipt["proposal"]["option"]
+        if option["kind"] in _HANDS_ACTS and _runs_hands(minute.state):
+            # What its hands do, done by the hands step in the minute it stands within reach.
+            person["hands"] = {
+                "ability": option["kind"],
+                "thing": option["target_id"],
+                "with": option.get("addressee_id"),
+                "since": minute.state["tick"],
+            }
+            continue
         if option["kind"] == "leave" and person["came_by"] == "crossed":
             minute.leave(person, "chose_to_leave")
         elif option["kind"] in _SPOKEN_KINDS:
@@ -920,6 +1035,11 @@ def _decided(
                     {"inhabitants": [p for i, p in began.items() if i in here]}, origin, reach
                 )
             ]
+            # A society made since modules were recorded also keeps the model behind a line, the
+            # speaker's name as the page showed it, and what each being said; one made before keeps
+            # exactly what its stored minutes recorded, so they replay.
+            keeps = _records_modules(minute.state)
+            said_by = _model_of(receipt) if keeps else None
             # The speaker and the one it was said to, by kind and number as the minute began, so
             # the event alone names both, whoever has left since. The option was offered over the
             # state the minute began from, so the one it names was there.
@@ -941,6 +1061,8 @@ def _decided(
                     "from_number": person["ordinal"] + 1,
                     "heard_by": heard_by,
                     "decider": "external" if receipt_from_outside(receipt) else "model",
+                    # The model a line's decider asked, where a model decided it.
+                    **({"model": said_by} if said_by is not None else {}),
                 },
             )
             heard = {
@@ -948,16 +1070,155 @@ def _decided(
                 "from": person["id"],
                 "from_kind": dict(person["kind"]),
                 "from_number": person["ordinal"] + 1,
+                # The name the page shows for the speaker as it said it.
+                **({"from_name": person["display_name"]} if keeps else {}),
                 "to": to,
                 "line": line,
+                **({"model": dict(said_by)} if said_by is not None else {}),
             }
             for hearer in minute.state["inhabitants"]:
                 if hearer["id"] in heard_by:
                     hearer["heard"] = [*hearer.get("heard", ()), dict(heard)][-kept:]
+            # The speaker keeps what it said as many as a being keeps of what it heard, so its
+            # decider is shown what it already said.
+            said = {
+                "tick": minute.state["tick"],
+                "to": to,
+                "to_name": None if addressee is None else addressee["display_name"],
+                "to_kind": None if addressee is None else dict(addressee["kind"]),
+                "line": line,
+            }
+            if keeps:
+                person["said"] = [*person.get("said", ()), said][-kept:]
     for person in list(minute.state["inhabitants"]):
         limit = _quiet_limit(person) if _program_decides(person) else None
         if limit is not None and person.get("quiet_minutes", 0) >= limit:
             minute.leave(person, "decider_lost")
+
+
+def _model_of(receipt: Mapping[str, Any]) -> dict[str, str] | None:
+    """The model a receipt's request asked, by provider and identifier, where a model answered it;
+    None for an outside program's answer."""
+    provider = receipt.get("provider")
+    if not isinstance(provider, Mapping) or provider.get("kind") == "external":
+        return None
+    named = (provider.get("provider"), provider.get("model_id"))
+    if not all(isinstance(value, str) for value in named):
+        return None
+    return {"provider": provider["provider"], "model_id": provider["model_id"]}
+
+
+def _walked_mm(person: Mapping[str, Any]) -> int:
+    """How far a being walked this minute, along the path its minute drew."""
+    path = person["motion_path_mm"]
+    return sum(math.isqrt((b[0] - a[0]) ** 2 + (b[1] - a[1]) ** 2) for a, b in pairwise(path))
+
+
+def _hands(minute: _Minute, previous: Mapping[str, Any]) -> None:
+    """Each hands act a being's decider chose, in the order of the beings' numbers: done in the
+    minute the being stands within the module's reach of the thing, or within the hand-over
+    distance (``hand_over_mm``) of the being it gives to or takes from, where the minute's walks
+    ended; dropped, by name, when the thing or the other
+    being is gone (``thing_gone``) or the module's minutes of walking pass first
+    (``out_of_reach``). An act done names the moment within the minute (``at_ms``) the later of
+    its parties' walks ended, at the society's recorded pace: 0 where both stood within reach as
+    the minute began (the hand-over rule agreed with the renderer)."""
+    from exulanica.world.society_hands import (
+        acts_open,
+        carry_out,
+        hand_over_mm,
+        reach_mm,
+        walk_minutes_maximum,
+    )
+
+    state = minute.state
+    began = {person["id"]: person for person in previous["inhabitants"]}
+    budget = state["movement_budget_mm_per_tick"]
+    taken: set[str] = set()
+    for person in sorted(state["inhabitants"], key=lambda p: p["ordinal"]):
+        intent = person.get("hands")
+        if intent is None:
+            continue
+        found = next(
+            (
+                act
+                for act in acts_open(state, person, minute.document, taken=frozenset(taken))
+                if (act.ability, act.thing_id, act.other_id)
+                == (intent["ability"], intent["thing"], intent["with"])
+            ),
+            None,
+        )
+        reason = "chose_to_" + intent["ability"]
+        if found is None:
+            things = {thing["id"] for thing in state["things"]}
+            here = {other["id"] for other in state["inhabitants"]}
+            gone = intent["thing"] not in things or (
+                intent["with"] is not None and intent["with"] not in here
+            )
+            if not gone and state["tick"] - intent["since"] < walk_minutes_maximum():
+                continue
+            person.pop("hands")
+            minute.emit(
+                "hands_missed",
+                person["id"],
+                "thing_gone" if gone else "out_of_reach",
+                "not_done",
+                person=person,
+                name=person["display_name"],
+                details={
+                    "ability": intent["ability"],
+                    "thing": intent["thing"],
+                    "with": intent["with"],
+                },
+            )
+            continue
+        parties = [person] + [
+            other for other in state["inhabitants"] if other["id"] == found.other_id
+        ]
+        started = began.get(person["id"], person)
+        already = found.other_id is None or all(p["id"] in began for p in parties)
+        at_ms = 0
+        within = reach_mm() if found.other_id is None else hand_over_mm(minute.document)
+        if not (
+            already
+            and _distance_mm(started["position_mm"], _target_point(previous, found)) <= within
+        ):
+            walked = max(_walked_mm(party) for party in parties)
+            at_ms = min(59_999, -(-walked * 60_000 // budget)) if budget > 0 else 0
+        details = carry_out(state, found, at=person["position_mm"])
+        taken.add(found.thing_id)
+        person.pop("hands")
+        minute.emit(
+            _HANDS_ACTS[found.ability],
+            person["id"],
+            reason,
+            _HANDS_ACTS[found.ability],
+            person=person,
+            name=person["display_name"],
+            details={"ability": found.ability, **details},
+            at_ms=at_ms,
+        )
+
+
+def _distance_mm(a: Sequence[int] | None, b: Sequence[int] | None) -> int:
+    if a is None or b is None:
+        return 1 << 62
+    return math.isqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2)
+
+
+def _target_point(state: Mapping[str, Any], act: Any) -> Sequence[int] | None:
+    """Where what an act is for stood in ``state``: the other being, or the thing on the ground;
+    the actor's own place for putting down."""
+    target = act.other_id if act.other_id is not None else act.thing_id
+    if act.ability == "put_down":
+        target = act.actor_id
+    for person in state["inhabitants"]:
+        if person["id"] == target:
+            return person["position_mm"]
+    for thing in state["things"]:
+        if thing["id"] == target:
+            return thing["position_mm"]
+    return None
 
 
 #: Why a placed being is not in the society: it is full, no node is open where it was put, or the
@@ -981,11 +1242,18 @@ def _reference_shape(value: Any) -> bool:
 
 
 _HEARD_FIELDS: Final = frozenset({"tick", "from", "from_kind", "from_number", "to", "line"})
+#: What a heard line may state beside those: the model that wrote it, and the name the page showed
+#: for its speaker as it was said.
+_HEARD_MAY: Final = frozenset({"model", "from_name"})
+_SAID_FIELDS: Final = frozenset({"tick", "to", "to_name", "to_kind", "line"})
+#: The longest name a heard or said line keeps for a being: a kind's label and a number.
+_NAME_MAXIMUM: Final = 120
 
 
 def _optional_lines(person: Mapping[str, Any]) -> None:
     """The lines a being heard, stated only once it heard one (oldest first, each with when, who
-    said it, by kind and number, to whom and the line itself), and a visitor's quiet minutes,
+    said it, by kind and number, to whom and the line itself), the lines it said, stated only once
+    it said one (oldest first, each with when, to whom and the line), and a visitor's quiet minutes,
     stated only while its program has been quiet."""
     from exulanica.things.lines import LineRefused, check_line
 
@@ -999,7 +1267,22 @@ def _optional_lines(person: Mapping[str, Any]) -> None:
         for entry in heard:
             _require(
                 isinstance(entry, dict)
-                and set(entry) == _HEARD_FIELDS
+                and set(entry) - _HEARD_MAY == _HEARD_FIELDS
+                and (
+                    "from_name" not in entry
+                    or (
+                        isinstance(entry["from_name"], str)
+                        and 1 <= len(entry["from_name"]) <= _NAME_MAXIMUM
+                    )
+                )
+                and (
+                    "model" not in entry
+                    or (
+                        isinstance(entry["model"], dict)
+                        and set(entry["model"]) == {"provider", "model_id"}
+                        and all(isinstance(v, str) and v for v in entry["model"].values())
+                    )
+                )
                 and type(entry["tick"]) is int
                 and isinstance(entry["from"], str)
                 and _reference_shape(entry["from_kind"])
@@ -1013,6 +1296,36 @@ def _optional_lines(person: Mapping[str, Any]) -> None:
             except LineRefused as exc:
                 raise ValueError("a heard line is held to the line rule") from exc
         _require(ticks == sorted(ticks), "a being's heard lines are oldest first")
+    said = person.get("said")
+    if said is not None:
+        _require(
+            isinstance(said, list) and 1 <= len(said) <= HEARD_LINES_MAXIMUM,
+            "a being states the lines it said only once it said one",
+        )
+        for entry in said:
+            _require(
+                isinstance(entry, dict)
+                and set(entry) == _SAID_FIELDS
+                and type(entry["tick"]) is int
+                and (entry["to"] is None) == (entry["to_name"] is None)
+                and (entry["to"] is None) == (entry["to_kind"] is None)
+                and (entry["to_kind"] is None or _reference_shape(entry["to_kind"]))
+                and (entry["to"] is None or isinstance(entry["to"], str))
+                and (
+                    entry["to_name"] is None
+                    or (
+                        isinstance(entry["to_name"], str)
+                        and 1 <= len(entry["to_name"]) <= _NAME_MAXIMUM
+                    )
+                ),
+                "invalid said line",
+            )
+            try:
+                check_line(entry["line"])
+            except LineRefused as exc:
+                raise ValueError("a said line is held to the line rule") from exc
+        said_ticks = [entry["tick"] for entry in said]
+        _require(said_ticks == sorted(said_ticks), "a being's said lines are oldest first")
     quiet = person.get("quiet_minutes")
     if quiet is not None:
         _require(
@@ -1061,6 +1374,18 @@ def validate_things_state(state: Mapping[str, Any]) -> None:
     """A society of things' state, held to its own fields beside the purposeful planner's: every
     person a thing of a kind, by how it came, every thing once, and nothing held by nobody here."""
     _require(state.get("profile") == THINGS_PROFILE, "unsupported society of things profile")
+    if "modules" in state:
+        from exulanica.abilities.registry import AbilityError, recorded_modules
+
+        modules = state["modules"]
+        _require(
+            isinstance(modules, list) and bool(modules) and modules == sorted(set(modules)),
+            "a society of things states the modules it runs once each, sorted",
+        )
+        try:
+            recorded_modules(state)
+        except AbilityError as exc:
+            raise ValueError(f"a society of things runs built modules only: {exc}") from exc
     people = state["inhabitants"]
     ids = [person["id"] for person in people]
     _require(len(ids) == len(set(ids)), "a person is in a society once")
@@ -1076,6 +1401,21 @@ def validate_things_state(state: Mapping[str, Any]) -> None:
         _require(_reference_shape(person["kind"]), "a person names its kind")
         _optional_movement(person)
         _optional_lines(person)
+        intent = person.get("hands")
+        _require(
+            intent is None
+            or (
+                _runs_hands(state)
+                and isinstance(intent, dict)
+                and set(intent) == {"ability", "thing", "with", "since"}
+                and intent["ability"] in _HANDS_ACTS
+                and isinstance(intent["thing"], str)
+                and (intent["with"] is None or isinstance(intent["with"], str))
+                and type(intent["since"]) is int
+                and 0 <= intent["since"] <= state["tick"]
+            ),
+            "a being states a hands act it was chosen to do only in a society running hands",
+        )
         came_by = person["came_by"]
         _require(came_by in CAME_BY, "a person came by a stated way")
         _require(
@@ -1095,6 +1435,7 @@ def validate_things_state(state: Mapping[str, Any]) -> None:
             "a visitor's crossing names its arrival, bridge and grant, and who decides for it",
         )
     things = state["things"]
+    hands = _runs_hands(state)
     _require(isinstance(things, list), "a society of things holds a list of things")
     thing_ids = [thing["id"] for thing in things]
     _require(len(thing_ids) == len(set(thing_ids)), "a thing is in a society once")
@@ -1115,9 +1456,34 @@ def validate_things_state(state: Mapping[str, Any]) -> None:
             thing["held_by"] is None or thing["held_by"] in present,
             "a thing is held by somebody here, or by nobody",
         )
+        if not hands:
+            _require(
+                "placed_at_mm" not in thing and "socket" not in thing,
+                "only a society running the hands module states placements and sockets",
+            )
+            _require(
+                (thing["placed_id"] is None) == (thing["held_by"] is not None),
+                "a thing stands where it was placed until somebody holds it",
+            )
+            continue
+        # With hands, a thing is held or on the ground, a placed one states where its author put
+        # it, and a held one the socket it is in.
         _require(
-            (thing["placed_id"] is None) == (thing["held_by"] is not None),
-            "a thing stands where it was placed until somebody holds it",
+            ("placed_at_mm" in thing) == (thing["placed_id"] is not None)
+            and ("placed_at_mm" not in thing or _point_shape(thing["placed_at_mm"])),
+            "a placed thing states where its author put it, and nothing else does",
+        )
+        _require(
+            (thing["position_mm"] is None) == (thing["held_by"] is not None)
+            and (thing["position_mm"] is None or _point_shape(thing["position_mm"])),
+            "a thing is held by somebody or stands on the ground",
+        )
+        _require(
+            ("socket" in thing) == (thing["held_by"] is not None)
+            and (
+                "socket" not in thing or thing["socket"] is None or isinstance(thing["socket"], str)
+            ),
+            "a held thing states the socket it is in",
         )
     refused = state["refused_placements"]
     _require(isinstance(refused, list), "refused placements are a list")

@@ -123,6 +123,21 @@ def validate_input_things(document: Mapping[str, Any]) -> None:
     with its kind's semantics, a ground position, a yaw within one turn, and an arrival point
     exactly where its kind offers arrival through it. An unavailable input carries none."""
     _check_reference(document["population_kind"], "the kind a things input's population is made of")
+    if "modules" in document:
+        from exulanica.abilities.registry import AbilityError, recorded_modules
+
+        modules = document["modules"]
+        if (
+            document["input_seq"] != 1
+            or not isinstance(modules, list)
+            or not modules
+            or modules != sorted(set(modules))
+        ):
+            raise ValueError("a society's first input alone records its modules, each once, sorted")
+        try:
+            recorded_modules(document)
+        except AbilityError as exc:
+            raise ValueError(f"a things input records built modules only: {exc}") from exc
     things = document["things"]
     if not isinstance(things, list) or len(things) > THINGS_BOUND:
         raise ValueError("thing bound exceeded")

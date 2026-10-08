@@ -38,6 +38,7 @@ from exulanica.world.society_decision_contract import (
     hearers,
     observed_context,
     person_role,
+    situation,
 )
 from exulanica.world.society_planner import (
     advance_purposeful_society,
@@ -560,8 +561,10 @@ def test_a_being_that_can_say_something_is_offered_to_say_it_to_whoever_hears_it
         p["id"] for _d, p in near[: contract.value("say_options_maximum") - 1]
     ]
     for option, (distance, other) in zip(said, near, strict=False):
+        # Named as the page names it, so a line that copies the words names somebody a viewer
+        # can find.
         assert option.label == (
-            f"say something to the villager (person {other['ordinal'] + 1}), "
+            f"say something to {other['display_name'].lower()} (a villager), "
             f"{round(distance / 1000)} m away"
         )
     assert "say_all" in {o.kind for o in options}
@@ -613,8 +616,10 @@ def test_a_line_is_heard_within_reach_and_makes_the_one_it_was_said_to_due():
     after, events, _ = _decided_minute(state, document, [spoken])
     [said] = [e for e in events if e.kind == "said"]
     assert said.document["thing"]["line"] == "good morning"
-    # It names the request the line answered, so a reader joins it to its receipt by id.
+    # It names the request the line answered, so a reader joins it to its receipt by id, and the
+    # model that request asked, so a reader names the line's model without the receipt.
     assert said.document["thing"]["request_id"] == spoken[0]["request_id"]
+    assert said.document["thing"]["model"] == {"provider": "test", "model_id": "m"}
     assert said.document["thing"]["to"] == near["id"]
     assert near["id"] in said.document["thing"]["heard_by"]
     assert far["id"] not in said.document["thing"]["heard_by"]
@@ -644,10 +649,28 @@ def test_a_line_is_heard_within_reach_and_makes_the_one_it_was_said_to_due():
         "from": knight["id"],
         "from_kind": knight["kind"],
         "from_number": knight["ordinal"] + 1,
+        "from_name": knight["display_name"],
         "to": near["id"],
         "line": "good morning",
+        "model": {"provider": "test", "model_id": "m"},
     }
     assert "heard" not in _person(after, id=far["id"])
+    # The speaker keeps what it said, so its decider is shown it.
+    assert _person(after, id=knight["id"])["said"] == [
+        {
+            "tick": after["tick"],
+            "to": near["id"],
+            "to_name": near["display_name"],
+            "to_kind": near["kind"],
+            "line": "good morning",
+        }
+    ]
+    # And its next request shows it, by whom it was said to and how long ago, as not to repeat.
+    shown = observed_context(after, document, knight["id"], (), profile="p")
+    assert shown["said"] == [
+        {"to": f"{near['display_name']} (a villager)", "line": "good morning", "minutes_ago": 0}
+    ]
+    assert "Lines you said lately (do not repeat them):" in situation(shown)
     validate_things_state(after)
     # The one it was said to is asked the next minute, whatever is under way for them.
     busy = _under_way(after, near["id"])
@@ -666,10 +689,17 @@ def test_a_line_is_heard_within_reach_and_makes_the_one_it_was_said_to_due():
     # The positive control: somebody busy that nobody spoke to is not.
     other = next(p for p in villagers if p["id"] not in (near["id"], far["id"]))
     assert not person_adapter.due(_under_way(after, other["id"]), other["id"])
-    # What they heard is in their next request's context, quoted, and named by kind and number.
+    # What they heard is in their next request's context, quoted, and named as the page named the
+    # speaker, with its kind, and how many minutes ago.
     seen = observed_context(busy, document, near["id"], (), profile="p")["heard"]
+    assert seen[-1]["from"] == "the knight"
+    assert (seen[-1]["to_you"], seen[-1]["minutes_ago"]) == (True, 0)
+    # A line heard before names were kept still reads as the second prompt read it.
+    older = copy.deepcopy(busy)
+    for entry in _person(older, id=near["id"])["heard"]:
+        entry.pop("from_name")
+    seen = observed_context(older, document, near["id"], (), profile="p")["heard"]
     assert seen[-1]["from"] == f"the knight (person {knight['ordinal'] + 1})"
-    assert seen[-1]["to_you"] is True
 
 
 def test_a_visitor_leaves_when_it_chooses_and_when_its_program_stays_quiet():
@@ -811,6 +841,17 @@ def test_a_minute_reads_how_far_a_line_carries_from_the_contract_lines_were_firs
     after = _decided_minute(state, document, spoken)
     assert society_state_sha256(after[0]) == society_state_sha256(before[0])
     assert [e.document for e in after[1]] == [e.document for e in before[1]]
+
+
+def test_the_terms_v7_is_asked_under_keep_the_lines_contract_s_reach_and_keeping():
+    # The options to say something are offered by the terms a request is asked under, and the
+    # minute hears by the lines contract: the two must agree, or a minute would say a being did
+    # not hear what it was offered to be told.
+    role = person_role()
+    lines = role.contract(society_things.LINES_CONTRACT)
+    asked = role.contract(role.terms(THINGS_PROFILE).versions)
+    for key in ("hearing_reach_mm", "lines_heard_maximum"):
+        assert asked.value(key) == lines.value(key), key
 
 
 @pytest.mark.parametrize("reason", ["grant_revoked", "grant_expired"])

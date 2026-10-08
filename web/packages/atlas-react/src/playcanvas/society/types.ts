@@ -29,6 +29,10 @@ export interface SocietyThingSnapshot {
   readonly held_by: string | null;
   /** Only for a thing that does not rest on the ground: millimetres above its elevation. */
   readonly height_mm?: number;
+  /** Where its author placed it, in a society whose beings have hands (`exulanica-ability/hands/v1`). */
+  readonly placed_at_mm?: readonly [number, number];
+  /** While held there: the holder's socket it is in, such as `hand.right`; absent (or null) otherwise. */
+  readonly socket?: string | null;
 }
 
 /**
@@ -62,6 +66,8 @@ export interface SocietyHeardLine {
   /** The one it was said to, or null for everyone near. */
   readonly to: string | null;
   readonly line: string;
+  /** The model that wrote the line, where a model decided it; absent for an outside program's. */
+  readonly model?: { readonly provider: string; readonly model_id: string };
 }
 
 export interface SocietyInhabitantSnapshot {
@@ -156,6 +162,8 @@ export interface OwnedSocietyState {
   readonly inhabitants: readonly SocietyInhabitantSnapshot[];
   /** v7: the society's things. */
   readonly things?: readonly SocietyThingSnapshot[];
+  /** v7: the ability modules its first input recorded, such as `exulanica-ability/hands/v1`. */
+  readonly modules?: readonly string[];
 }
 
 export type CrowdDetail = 'near' | 'far';

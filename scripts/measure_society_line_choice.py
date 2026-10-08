@@ -46,6 +46,8 @@ from pathlib import Path
 from typing import Any, Final
 
 ROOT: Final = Path(__file__).resolve().parents[1]
+# The tree this script measures, ahead of any installed copy of the package.
+sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "scripts"))
 sys.path.insert(0, str(ROOT / "tests"))
 
@@ -76,9 +78,21 @@ SCRIPT_AS_RUN: Final = f"{ARTIFACTS}/measure_society_line_choice-as-run.py.txt"
 ENGINE: Final = "exulanica-society/v7"
 CASES: Final = 16
 BOUND_USD: Final = Decimal("0.25")
-MAX_CALLS: Final = 600
+#: One call for each of the 16 cases by each mechanism of each of the four offered models.
+MAX_CALLS: Final = 128
 #: A provider refusing the schema this many times for one model and mechanism stops that pair.
 SCHEMA_REFUSALS_STOP: Final = 2
+#: The committed files the probe reads beside the package's code, bound by digest in the
+#: pre-registration so a reader without this tree can check them.
+READS: Final = (
+    SCRIPT,
+    "scripts/measure_society_person_models.py",
+    "assets/catalogs/roles/decision-roles.v6.json",
+    "assets/catalogs/society/society-decision-action.v4.json",
+    "assets/catalogs/society/society-decision-policy.v4.json",
+    "exulanica/models/models.manifest.json",
+    "tests/things_society_support.py",
+)
 BENCHMARK_REASON: Final = (
     "A recorded measurement asks each offered model a fixed set of synthetic requests built from "
     "the tests' own starter square; no person's data is in them."
@@ -186,6 +200,8 @@ def preregister() -> None:
             "contract": contract.binding(),
             "manifest_sha256": _manifest_sha256(),
             "tree": _tree(),
+            "files_sha256": {path: _sha256((ROOT / path).read_bytes()) for path in READS},
+            "max_calls": MAX_CALLS,
             "record": RECORD,
             "not_covered": [
                 f"{CASES} synthetic requests of one square, asked once each by each mechanism: how "
@@ -239,8 +255,11 @@ def probe(as_run: bytes) -> None:
     registered = _read_record(PREREGISTRATION)
     if _measured(tree) != _measured(registered["tree"]):
         raise SystemExit("the tree is not the pre-registered one")
-    if _sha256(as_run) != tree["files_sha256"].get(SCRIPT, _sha256((ROOT / SCRIPT).read_bytes())):
-        raise SystemExit("the bytes running are not this script")
+    if _sha256(as_run) != registered["files_sha256"][SCRIPT]:
+        raise SystemExit("the bytes running are not the pre-registered script")
+    for path, digest in registered["files_sha256"].items():
+        if _sha256((ROOT / path).read_bytes()) != digest:
+            raise SystemExit(f"{path} is not the pre-registered file")
     if (ROOT / RECORD).exists():
         raise SystemExit(f"{RECORD} exists")
     context_bytes = (ROOT / CONTEXTS).read_bytes()
@@ -287,8 +306,15 @@ def probe(as_run: bytes) -> None:
                     )
                 except BudgetExceededError:
                     raise SystemExit("the probe reached its bound; nothing is written") from None
-                except ChoiceRefused:
-                    entry.update(outcome="answer_not_a_choice")
+                except ChoiceRefused as exc:
+                    # Why, in the client's words: which argument the reply got wrong. The cases are
+                    # synthetic, so the words quote nothing of anybody's.
+                    cause = exc.__cause__
+                    entry.update(
+                        outcome="answer_not_a_choice",
+                        detail=str(exc)[:400],
+                        **({"cause": str(cause)[:400]} if cause is not None else {}),
+                    )
                 except ProviderRefused as exc:
                     # Refused before anything was sent: this process may not reach the provider.
                     raise SystemExit(

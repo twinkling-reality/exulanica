@@ -897,6 +897,7 @@ def _prepare(
             {"provider": arm.provider, "model_id": arm.model_id},
             connection,
             session.workspace_id,
+            engine,
         )
         if refused is not None:
             raise StartRefused("model_not_askable_here", f"{arm.model_id}: {refused}")
@@ -1010,6 +1011,7 @@ def _choices(
                     {"provider": spec.provider, "model_id": spec.model_id},
                     connection,
                     session.workspace_id,
+                    str(society["engine_version"]),
                 ),
                 "typical_usd_per_person_hour": None
                 if spec.model_id not in typical

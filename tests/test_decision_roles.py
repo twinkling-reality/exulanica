@@ -34,6 +34,7 @@ from exulanica.api.decision_host import (
     ask_bound_usd,
     host_refusal,
     hour_refusal,
+    question_refusal,
     sendable_labels,
 )
 from exulanica.grammar.errors import CatalogError
@@ -701,6 +702,7 @@ PUBLISHED_REGISTRIES = {
     "decision-roles.v3.json": "3c67b327a7113b0b095235fd9be418656c45fe6fdd810fff5fba116fd09cec80",
     "decision-roles.v4.json": "a516686bf682a8be9eee0e5d61357fad1336a52b1dddef0a5085931954cad134",
     "decision-roles.v5.json": "97fcf977330c6043c1181c7d18302c1a09fa942193f368c2d2fba50713052f31",
+    "decision-roles.v6.json": "032d55a2b260d8aeb5f17e73c771c649608ac9f62c8db86ac07a02d8c267ad57",
 }
 
 
@@ -717,15 +719,17 @@ def test_a_society_of_things_people_are_asked_under_their_engine_s_own_terms():
     own, things = person.terms(), person.terms(THINGS)
     assert own == person.terms("exulanica-society/v2") == person.terms("exulanica-society/v5")
     assert own.versions == {"society-decision-action": 2, "society-decision-policy": 2}
-    assert things.versions == {"society-decision-action": 3, "society-decision-policy": 3}
+    assert things.versions == {"society-decision-action": 4, "society-decision-policy": 4}
     assert (own.prompt_version, things.prompt_version) == (
         "society-person-choice/v1",
-        "society-person-choice/v2",
+        "society-person-choice/v3",
     )
     contract = person.contract(things.versions)
     assert {"carry_on", "say_to", "say_all", "leave"} <= set(contract.words)
+    assert {"pick_up", "put_down", "give", "take"} <= set(contract.words)
     assert contract.value("line_characters_maximum") == 200
-    # The role's own contract keeps exactly its keys: the line bounds are the third policy's.
+    # The role's own contract keeps exactly its keys: the line bounds are the third policy's and
+    # the bound on hands options the fourth's.
     assert "line_characters_maximum" not in person.contract().policy
     # A request names the engine it was asked under in its context and is asked by its terms.
     assert person.terms_of({"engine": THINGS, "options": []}) == things
@@ -861,5 +865,10 @@ def test_only_the_description_of_the_engine_asked_is_judged():
     labels = ["wait here a minute", "stand a while nearby"]
     assert sendable_labels(person, client, MODEL_ID, labels, "exulanica-society/v2") == set(labels)
     assert sendable_labels(person, client, MODEL_ID, labels, THINGS) is None
-    # With no engine named, as the models route judges a role, every description is judged.
+    # With no engine named, as for a role no society hosts, every description is judged.
     assert sendable_labels(person, client, MODEL_ID, labels) is None
+    # The models read and a comparison's start judge a model's question as the host does: by the
+    # society's engine.
+    assert question_refusal(person, client, MODEL_ID, "exulanica-society/v2") is None
+    assert question_refusal(person, client, MODEL_ID, THINGS) == "question_changed_by_rules"
+    assert question_refusal(person, client, MODEL_ID) == "question_changed_by_rules"

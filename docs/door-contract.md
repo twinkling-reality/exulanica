@@ -404,10 +404,11 @@ Migration 0163 holds the crossings (`door_crossing`), their bindings, manifests,
 never changed, kept to its workspace, and inserted by the runtime only, and indexes a society's
 departures by the thing that left, which is how the door finds a visitor's. Not built yet: the
 lines and events a visitor hears, as frames. Whether a grant's visitors may speak (`may_speak`) is
-recorded and shown; no line crosses the door yet, so nothing reads it. No visitor can take hold of a
-thing of the world yet, so `may_carry_out` names no game item yet either; and a thing of the world a
-visitor held would leave the world with it, game item or none, until the society keeps such a thing
-behind. The adapters that send visitors live in the repository's
+recorded and shown; no line crosses the door yet, so nothing reads it. A visitor whose kind has
+hands may take hold of a thing of the world in a society running hands, but no arrival records its
+grant's `may_carry_out`, so the society keeps every such thing behind: a visitor going home puts a
+thing of the world down where it stood and takes only what it carried in, and `may_carry_out` names
+no game item yet. The adapters that send visitors live in the repository's
 `bridges/` folder, outside the product, each with its own licence notes.
 
 ## Implementation and evidence

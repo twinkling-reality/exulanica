@@ -27,6 +27,7 @@ from exulanica.world.role_decisions import written_messages
 from exulanica.world.society_decision_contract import (
     ACTION_FIELDS,
     LINE_KINDS,
+    NAMED_FIELDS,
     PERSON_REASONS,
     POLICY_KEYS_FROM,
     POLICY_RANGES,
@@ -53,6 +54,7 @@ __all__ = [
     "IDLE_KINDS",
     "KINDS",
     "LINE_KINDS",
+    "NAMED_KINDS",
     "POLICY_KEYS_FROM",
     "POLICY_RANGES",
     "REASONS",
@@ -72,6 +74,8 @@ __all__ = [
 #: The role this module serves: the key every stored call record of a person's decision carries.
 ROLE: Final = "society_decision"
 KINDS: Final = ACTION_FIELDS
+#: The placeholders a kind's words may name instead: the being by the name the page shows.
+NAMED_KINDS: Final = NAMED_FIELDS
 #: Waiting a minute changes nothing: it is offered only beside something else.
 IDLE_KIND: Final = "wait"
 #: What changes nothing, first preferred first: going on with what is under way, where it is

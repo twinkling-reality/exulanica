@@ -28,6 +28,7 @@ from exulanica.identity import IdentityRepository, rename_entity
 from exulanica.models.transport import HttpResponse
 from exulanica.world.crossings import register_crossing_stream
 from exulanica.world.society_controls import LEASE_SECONDS
+from exulanica.world.society_decision_contract import person_role
 
 import test_outside_deciders_postgres as outside
 import test_society_person_decisions_postgres as decisions
@@ -51,7 +52,9 @@ class _Speaker(FakeTransport):
         properties = payload["tools"][0]["function"]["parameters"]["properties"]
         labels = properties["action"]["enum"]
         say = next(
-            (label for label in labels if label.startswith("say something to the knight")), None
+            # The other knight, named as the page names it: "knight 2".
+            (label for label in labels if label.startswith("say something to knight")),
+            None,
         )
         if say is not None:
             arguments = {"action": say, "line": LINE}
@@ -102,7 +105,11 @@ def test_a_line_a_model_chose_is_said_heard_and_replayed_without_asking(app):
     else:
         raise AssertionError("the knight's model was never offered to say something in ten minutes")
     [receipt] = said
-    assert receipt["provider"]["prompt_version"] == "society-person-choice/v2"
+    # Asked under the terms the registry states for the society of things.
+    assert (
+        receipt["provider"]["prompt_version"]
+        == person_role().terms("exulanica-society/v7").prompt_version
+    )
     assert receipt["proposal"]["line"] == LINE
     assert receipt["proposal"]["option"]["addressee_id"] == listener["id"]
     (tool,) = transport.requests[-1]["payload"]["tools"]
@@ -275,12 +282,13 @@ def test_a_heard_line_carrying_a_name_saved_later_is_left_out_of_an_outside_ask(
             person = next(p for p in snapshot["state"]["inhabitants"] if p["id"] == visitor["id"])
             return [line["line"] for line in person.get("heard", ())]
 
-        for _ in range(10):
+        # Each test's town is drawn anew, so when the knight is next at a choice point varies.
+        for _ in range(20):
             snapshot = minute(snapshot)
             if HEARD in heard(snapshot):
                 break
         else:
-            raise AssertionError("the visitor never heard the knight in ten minutes")
+            raise AssertionError("the visitor never heard the knight in twenty minutes")
         # The positive control: asked now, its program is shown the line it heard.
         door.asked.clear()
         snapshot = minute(snapshot)

@@ -265,6 +265,9 @@ def _validate_society_input(document: dict[str, Any]) -> None:
         fields.add("arrival")
     if document.get("profile") in THING_INPUTS:
         fields.update(("things", "population_kind"))
+        # The modules a society runs: recorded by its first input alone, absent before they were.
+        if "modules" in document:
+            fields.add("modules")
     _require(set(document) == fields, "invalid society input fields")
     profile = document["profile"]
     _require(profile in NAVIGATION_PROFILES, "unsupported society input profile")

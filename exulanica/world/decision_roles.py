@@ -954,7 +954,8 @@ def _contract(role: DecisionRole, versions: Mapping[str, int]) -> DecisionContra
         values = dict(entry.values)
         kind, text = str(values["kind"]), str(values["words"])
         named = frozenset(_PLACEHOLDER.findall(text))
-        if named != accepted[kind] or text != text.lower():
+        alternative = getattr(role.adapter, "NAMED_KINDS", {}).get(kind)
+        if named not in (accepted[kind], alternative) or text != text.lower():
             raise ContractError(
                 f"action {entry.key}'s words name {sorted(named)}; a {kind} action names "
                 f"{sorted(accepted[kind])}, in lowercase words"

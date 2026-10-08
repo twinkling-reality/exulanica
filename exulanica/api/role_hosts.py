@@ -66,6 +66,7 @@ __all__ = [
     "RoleHost",
     "RoleRead",
     "choice_status",
+    "version_engine",
 ]
 
 #: A registered role whose subject no host here serves: listed as unsupported, never chosen.
@@ -149,18 +150,23 @@ def _named(model: Mapping[str, str]) -> dict[str, str]:
     return {**model, "name": load_manifest().model_name(model["model_id"])}
 
 
+def version_engine(context: RoleContext) -> str | None:
+    """The engine of the version's society, or None where the version holds no society."""
+    row = context.connection.execute(
+        "select engine_version from world_society where workspace_id=%s and world_id=%s "
+        "and version_id=%s",
+        (context.session.workspace_id, context.world_id, context.version_id),
+    ).fetchone()
+    return None if row is None else str(row["engine_version"])
+
+
 class _People:
     """A society's people, whose chosen models the society playback host asks."""
 
     subject: Final = "person"
 
     def _engine(self, context: RoleContext) -> str | None:
-        row = context.connection.execute(
-            "select engine_version from world_society where workspace_id=%s and world_id=%s "
-            "and version_id=%s",
-            (context.session.workspace_id, context.world_id, context.version_id),
-        ).fetchone()
-        return None if row is None else str(row["engine_version"])
+        return version_engine(context)
 
     def availability(self, context: RoleContext, role: DecisionRole) -> Availability:
         # The checks a choice makes before its body: a society in the version, whose engine hosts

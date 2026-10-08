@@ -77,11 +77,21 @@ class _NoRows:
         return []
 
 
+class _SocietyRow(_NoRows):
+    """A connection whose every query finds one society, of ``engine``."""
+
+    def __init__(self, engine: str) -> None:
+        self.engine = engine
+
+    def fetchone(self) -> dict[str, Any]:
+        return {"engine_version": self.engine}
+
+
 def _services(**changes: Any) -> SimpleNamespace:
     values: dict[str, Any] = {
         "store": None,
         "character_appearance": object(),
-        "model_host_refusal": lambda _workspace, _role: "models_not_run_here",
+        "model_host_refusal": lambda _workspace, _role, _engine=None: "models_not_run_here",
         "comparison_refusal": lambda _workspace: "comparisons_not_set_up",
         # A process no durable spending authority admits.
         "spending_refusals": lambda _connection, _workspace: None,
@@ -634,3 +644,34 @@ def test_no_operation_is_listed_twice_for_one_subject():
         described = _described(_context(ground, society=society))
         keys = [(d["operation"], tuple(sorted(d["bind"].items()))) for d in described]
         assert len(keys) == len(set(keys)), (ground, society)
+
+
+@pytest.mark.parametrize("engine", [None, "exulanica-society/v7", "exulanica-society/v2"])
+def test_the_models_read_judges_each_role_s_budget_under_the_engine_that_asks_it(
+    monkeypatch, engine
+):
+    # The process's fuse is judged under the contract the version's society asks a role's
+    # subjects under: its engine where that engine hosts the role, else the role's own.
+    asked: dict[str, str | None] = {}
+
+    def host_refusal(_workspace: Any, role: Any, engine: str | None = None) -> None:
+        asked[role.key] = engine
+
+    services = _services(model_host_refusal=host_refusal)
+    request = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(services=services)))
+    monkeypatch.setattr(world_models, "ROLE_HOSTS", {})
+    context = RoleContext(
+        _NoRows() if engine is None else _SocietyRow(engine),  # type: ignore[arg-type]
+        Session(uuid.uuid4(), uuid.uuid4()),
+        request,  # type: ignore[arg-type]
+        "world:test:engine",
+        uuid.uuid4(),
+        uuid.uuid4(),
+    )
+    world_models.role_operations(context)
+    assert asked == {
+        role.key: engine if engine is not None and role.hosted_by(engine) else None
+        for role in decision_roles()
+    }
+    if engine == "exulanica-society/v7":
+        assert asked["society_decision"] == engine

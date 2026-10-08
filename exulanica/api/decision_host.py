@@ -200,13 +200,18 @@ def ask_bound_usd(
     """The most one ask of ``spec`` for ``role`` may reserve, whatever the subject's situation.
 
     Every answer the contract allows, each reserved as the client reserves a call, by the prompt's
-    characters and the model's answer bound. The prompt is bounded by the role's instruction, the
+    characters and the model's answer bound. The prompt is bounded by the instruction of the terms
+    asked under this contract (every terms the role states where none names its versions), the
     note a retry adds and twice the largest situation a request may carry, which covers the
     situation's rendering and each message's framing; tests/test_society_person_decisions.py holds
-    the asks the small square makes under it.
+    the asks the small square makes under it. So a longer prompt for one engine's people never
+    raises what an ask of another engine's reserves.
     """
+    asked = [
+        terms for terms in role.every_terms() if dict(terms.versions) == dict(contract.versions)
+    ] or list(role.every_terms())
     prompt_chars = max(
-        len(terms.instruction) + len(terms.not_offered) for terms in role.every_terms()
+        len(terms.instruction) + len(terms.not_offered) for terms in asked
     ) + 2 * contract.value("context_bytes_maximum")
     return contract.value("answer_attempts_maximum") * budget.estimate_usd(
         spec, prompt_chars=prompt_chars, max_tokens=answer_tokens(spec) or 0
@@ -343,15 +348,19 @@ def _descriptions(role: DecisionRole, engine: str | None = None) -> list[str]:
     return [terms.choice_description for terms in role.every_terms()]
 
 
-def question_refusal(role: DecisionRole, client: ModelClient, model_id: str) -> str | None:
+def question_refusal(
+    role: DecisionRole, client: ModelClient, model_id: str, engine: str | None = None
+) -> str | None:
     """``question_changed_by_rules`` when the client's rules would change a question a subject
     asked of ``model_id`` is sent, one of the role's fixed choice descriptions; else None.
+    ``engine`` names the society's engine, whose description alone is judged, as the host judges
+    it; with none (a role no society hosts, such as a signal's controller), every description.
 
     A saved name one of whose parts is a word of a description would, and every ask would then be
     refused as it left, every minute: so nobody is asked, nothing is written, and the models route
     names it for each choice of that model.
     """
-    descriptions = _descriptions(role)
+    descriptions = _descriptions(role, engine)
     kept = client.unchanged_by_policies(role.chosen, model_id, descriptions)
     return None if all(kept) else "question_changed_by_rules"
 
@@ -437,21 +446,36 @@ def without_named_lines(
     names: Sequence[SavedName],
 ) -> Callable[[dict[str, Any]], dict[str, Any]]:
     """An observation for an outside program without the heard lines that carry a name the account
-    holder saved, in the line or in who said it: a name saved after a line was said, or one a
+    holder saved, in the line or in who said it, nor the lines the being said that carry one, in
+    the line or in whom it was said to: a name saved after a line was said, or one a
     right released to the speaker's model, never reaches a program outside the policy boundary,
     and one such line no longer stops the program being asked."""
 
     def withhold(context: dict[str, Any]) -> dict[str, Any]:
-        heard = context.get("heard")
-        if not heard:
-            return context
+        heard = context.get("heard") or []
+        said = context.get("said") or []
         kept = [
             line
             for line in heard
             if not recognised_spans(line["line"], names)
             and not recognised_spans(line["from"], names)
         ]
-        return context if len(kept) == len(heard) else {**context, "heard": kept}
+        # And the lines the being said itself, by the line or the one it was said to.
+        own = [
+            line
+            for line in said
+            if not recognised_spans(line["line"], names)
+            and not (line["to"] is not None and recognised_spans(line["to"], names))
+        ]
+        if len(kept) == len(heard) and len(own) == len(said):
+            return context
+        withheld = {**context, "heard": kept}
+        if "said" in context:
+            if own:
+                withheld["said"] = own
+            else:
+                withheld.pop("said")
+        return withheld
 
     return withhold
 
@@ -1079,6 +1103,12 @@ class DecisionHost:
                                 raise _NotSendable
                     except _NotSendable:
                         continue
+                    except ValueError as exc:
+                        # A request that fails its own check is undone alone; the rest are asked.
+                        _LOG.error(
+                            "A %s outside request was not reserved: %s", role.key, _error_class(exc)
+                        )
+                        continue
                     if not fresh or request is None:
                         continue
                     request_id = uuid.UUID(request["request_id"])
@@ -1259,8 +1289,15 @@ class DecisionHost:
         refused: list[tuple[uuid.UUID, dict[str, Any]]] = []
         attempts = contract.value("answer_attempts_maximum")
         asked, spent = world_hour(connection, claim.workspace_id, claim.world_id, role)
-        # The names no line may carry, read once for the role's asks of this minute.
-        names = tuple(saved_names(connection, claim.workspace_id))
+        # The names no line may carry, read once for the role's asks of this minute, and only when
+        # some request takes a line.
+        held: list[tuple[SavedName, ...]] = []
+
+        def line_names() -> tuple[SavedName, ...]:
+            if not held:
+                held.append(tuple(saved_names(connection, claim.workspace_id)))
+            return held[0]
+
         with connection.transaction():
             for subject, choice, spec, mechanism in due:
                 model = choice["model"]
@@ -1268,29 +1305,36 @@ class DecisionHost:
                 if offered is None:
                     # The rules would change the question itself: nobody is asked it.
                     continue
-                reserved, fresh = decisions.prepare_role(
-                    role,
-                    claim.version_id,
-                    request_id=uuid.uuid5(
-                        claim.society_id,
-                        f"{role.subject}-decision:{subject}:{row['current_tick']}",
-                    ),
-                    subject_id=uuid.UUID(subject),
-                    base_tick=row["current_tick"],
-                    base_state_sha256=row["state_sha256"],
-                    contract=contract,
-                    provider_config={
-                        "provider": model["provider"],
-                        "model_id": model["model_id"],
-                        "mechanism": mechanism.value,
-                        "choice_seq": choice["choice_seq"],
-                        "manifest_sha256": self.manifest_sha256,
-                        "prompt_version": role.terms(row["engine_version"]).prompt_version,
-                        "contract": contract.binding(),
-                        "deadline_ms": contract.value("decision_deadline_ms"),
-                    },
-                    offer=_only(offered),
-                )
+                try:
+                    # A savepoint: a request that fails its own check is undone alone, and the
+                    # rest of the minute's asks are still reserved.
+                    with connection.transaction():
+                        reserved, fresh = decisions.prepare_role(
+                            role,
+                            claim.version_id,
+                            request_id=uuid.uuid5(
+                                claim.society_id,
+                                f"{role.subject}-decision:{subject}:{row['current_tick']}",
+                            ),
+                            subject_id=uuid.UUID(subject),
+                            base_tick=row["current_tick"],
+                            base_state_sha256=row["state_sha256"],
+                            contract=contract,
+                            provider_config={
+                                "provider": model["provider"],
+                                "model_id": model["model_id"],
+                                "mechanism": mechanism.value,
+                                "choice_seq": choice["choice_seq"],
+                                "manifest_sha256": self.manifest_sha256,
+                                "prompt_version": role.terms(row["engine_version"]).prompt_version,
+                                "contract": contract.binding(),
+                                "deadline_ms": contract.value("decision_deadline_ms"),
+                            },
+                            offer=_only(offered),
+                        )
+                except ValueError as exc:
+                    _LOG.error("A %s request was not reserved: %s", role.key, _error_class(exc))
+                    continue
                 if not fresh or reserved["request"] is None:
                     continue
                 request = reserved["request"]
@@ -1313,7 +1357,7 @@ class DecisionHost:
                         request,
                         spec,
                         mechanism,
-                        names if role.takes_line(request["context"]) else (),
+                        line_names() if role.takes_line(request["context"]) else (),
                     )
                 )
         return asks, refused

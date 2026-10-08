@@ -1472,9 +1472,9 @@ everybody is a thing of a stated kind ([things contract](things-contract.md)). A
 with it by name over a saved world's own lattice ground, a starter or a world made from photographs
 (`creates` does not name it, so a new world's society stays v2 unless asked for). The route makes
 one only on a host that sets `EXULANICA_SOCIETY_OF_THINGS` on, and refuses it by name elsewhere
-(`society_engine_not_offered`): its people do not yet pick things up, hand them over or follow
-anybody. Its people walk, choose, stay and talk by the purposeful planner's rules, and each of them
-names its kind by key, version and digest, and how it came: `populated` (the people its ground's
+(`society_engine_not_offered`). Its people walk, choose, stay and talk by the purposeful planner's
+rules, use their hands where a decider chooses (below) and follow nobody yet. Each of them names its
+kind by key, version and digest, and how it came: `populated` (the people its ground's
 population brings, the purposeful genesis's own people with the same names and draws, of the kind
 the ground's catalog entry names, `population_kind`), `placed` (a being the world's author placed in
 the version) or `crossed` (a visitor from an outside program). At genesis the author's beings are
@@ -1500,6 +1500,18 @@ authored object's id can hold, so they never meet an authored object's. Every pl
 not shipped at the digest it names makes the input unavailable (`unknown_thing_kind:<placed id>`). A society's inputs keep its arrival
 for its whole life and may move on to a later things composition, never back.
 
+**The modules it runs.** A society's first input records the ability modules it runs, by version
+(`modules`: sorted, each once, each a built row of
+[`ability-modules.v1.json`](../exulanica/abilities/ability-modules.v1.json)), and its minutes run
+exactly those for its whole life, whatever a later table adds; no later input states them. A new
+society records every built module at its newest version: today purposeful, say, crossing and hands
+(`exulanica-ability/hands/v1`). A society whose first input names none, made before modules were
+recorded, runs purposeful, say and crossing (`BEFORE_RECORDED`), so its people never use their
+hands and its things never move, and records every minute as it did then: a line's event and its
+hearers keep no model and no speaker's name, and nobody keeps what it said. Its stored minutes
+replay byte for byte (`tests/test_society_things_before_modules.py`, a history recorded before
+modules were).
+
 **A minute.** The planner's minute, the person's direct requests and the people's decisions come
 first, unchanged, and every event they record names v7; then the things phase:
 
@@ -1523,26 +1535,40 @@ first, unchanged, and every event they record names v7; then the things phase:
   (`malformed_crossing`), with an event naming the crossing and nothing from the document, so no
   crossing ever stops a society's minutes;
 * what the minute's decisions do beside the planner's goals, in decision order: a line a decider
-  chose to say is said (`said`, `chose_to_say`), with the request it answered, the line, whom it was
-  said to, or none for everyone near, the speaker and that one each by kind and number as the minute
-  began (so the event alone names both), the decider kind (a model or an outside program) and who
-  heard it: every being within the hearing reach of the society of things' contract (8 m) of where
-  the speaker stood as the minute began, whose kind offers hearing and who is still here; each
-  hearer keeps it among the last lines it heard (at most the contract's `lines_heard_maximum`, the
-  oldest dropped first), with when, who said it by kind and number, and to whom. How far a line
-  carries and how many a being keeps are read from the contract a society of things' lines were
-  first said under (version 3 of the person's catalogs, `LINES_CONTRACT`), never from whatever terms
-  the registry states later, so every stored minute replays as it ran. A visitor that chose to leave
-  departs (`thing_departed`, `chose_to_leave`), taking what it holds, as every departing visitor
-  does. A visitor whose program had no live connection, gave no answer in time or whose grant was
-  revoked or has expired counts that minute as quiet, and any other answer or a pass ends the count;
-  one quiet for as many minutes in a row as its kind's leave ability waits (a visitor of `visitor`
-  version 1: five) departs (`thing_departed`, `decider_lost`), taking what it holds home to the
-  program that sent it. A program's answer refused for its line (`line_out_of_bounds`) is an answer,
-  never a quiet minute.
+  chose to say is said (`said`, `chose_to_say`), with the request it answered, the model that
+  request asked where a model decided it (`model`, in a society that records its modules), the line, whom it was said to, or none for
+  everyone near, the speaker and that one each by kind and number as the minute began (so the event
+  alone names both), the decider kind (a model or an outside program) and who heard it: every being
+  within the hearing reach of the society of things' contract (8 m) of where the speaker stood as
+  the minute began, whose kind offers hearing and who is still here; each hearer keeps it among the
+  last lines it heard (at most the contract's `lines_heard_maximum`, the oldest dropped first), with
+  when, who said it by kind and number, and to whom. How far a line carries and how many a being
+  keeps are read from the contract a society of things' lines were first said under (version 3 of
+  the person's catalogs, `LINES_CONTRACT`), never from whatever terms the registry states later, so
+  every stored minute replays as it ran. A visitor that chose to leave departs (`thing_departed`,
+  `chose_to_leave`), taking what it holds, as every departing visitor does. A visitor whose program
+  had no live connection, gave no answer in time or whose grant was revoked or has expired counts
+  that minute as quiet, and any other answer or a pass ends the count; one quiet for as many minutes
+  in a row as its kind's leave ability waits (a visitor of `visitor` version 1: five) departs
+  (`thing_departed`, `decider_lost`), taking what it holds home to the program that sent it. A
+  program's answer refused for its line (`line_out_of_bounds`) is an answer, never a quiet minute;
+* where the society runs the hands module, what each being's hands do, in the order of the beings'
+  numbers. A hands act a decider chose (picking a thing up, putting it down, giving it to a being,
+  taking it from one) is done in the minute the being stands within the module's reach (1,500 mm)
+  of the thing, or within the hand-over distance of the other being: the reach, or the walking
+  graph's longest step between two joined nodes where that is farther (2,000 mm on the lattice), so
+  beings on neighbouring nodes can always hand over. A thing picked up or taken goes into the
+  actor's free socket that fits it, one given into the other being's, and one put down rests where
+  the actor stands. Each is recorded (`picked_up`, `put_down`, `gave`, `took`, reason
+  `chose_to_<ability>`) naming the thing, the other being and the socket. An act is dropped
+  (`hands_missed`) when the thing or the other being is gone (`thing_gone`) or the module's three
+  minutes of walking pass first (`out_of_reach`). A hands act takes no line, and the routine never
+  chooses one.
 
 Each event of the things phase carries `at_ms` 0: it takes effect as the minute begins (`at_ms`
-is the moment within the minute, 0 to 59,999). A minute with nothing to reconcile and no crossing
+is the moment within the minute, 0 to 59,999). A hands act done after a walk is the exception: it
+names the moment the later of its parties' walks ended, the length walked over the society's
+recorded pace, and 0 where both stood within reach as the minute began. A minute with nothing to reconcile and no crossing
 records the planner's events alone, the same documents a purposeful society records but for the
 engine they name.
 
@@ -1570,6 +1596,26 @@ breaks the rule or the workspace's rules would change it
 to is asked the minute after, whatever is under way for it, and every being reads the lines it
 heard, quoted, in its next request.
 
+**Hands.** The hands module (`exulanica-ability/hands/v1`) offers a being whose kind has the
+ability each act within its approach distance (8,000 mm), nearest first: picking up a thing whose
+kind offers `holdable` into a free socket that fits it, putting down what it holds, giving what it
+holds to a being whose kind offers `receive` and has a free socket for it, and taking a thing from
+a being whose kind offers `let_take`. A being is told what it holds. An act out of reach is offered
+when an open node within reach of the thing or the other being remains; choosing it sends the
+being to stand a while at that node, as a chosen stand does, and the act is done on arrival; an act
+within reach makes it wait where it stands that minute. Such a decision is rejected `thing_gone` or
+`out_of_reach` when what it was for is gone or no open node within reach is left.
+
+**Things that move.** In a society running the hands module a placed thing states where its
+author placed it (`placed_at_mm`) and, while held, the socket it is in (`socket`; its `position_mm`
+is null). A placed thing its author leaves where it was stays as the society has it, held or where
+a being put it down, and one nobody moved from its place takes the author's new turn or height; one
+the author moves or changes is where the author put it, out of any hand; one the author removes is
+gone, from any hand. What belongs to the world stays in it: a visitor going home puts down a placed
+thing it holds where it stood, since no arrival records a right to carry the world's things out,
+and takes only what it carried in; a being of the world that leaves (an author's edit removing a
+placed being) puts down everything it holds. The departure names what stayed (`left`).
+
 **Who decides.** The world's owner may choose a model for a person as in a purposeful society, but
 only a decider the person's kind allows (`decider_not_allowed`, the kind's `deciders.allowed`), and
 an author places no being only an outside program may decide for ([world objects
@@ -1593,9 +1639,14 @@ within 100,000 either way: x and y along the ground (`position_mm`'s two axes) a
 `height_mm`). The next minute's flight starts from it. The state check admits them from the first
 state, so a stored society of walkers needs nothing rewritten when another movement module lands.
 The things composition states one walking lattice, the people's. A being states `heard` only once it
-heard a line (oldest first, each `{tick, from, from_kind, from_number, to, line}`, the line held to
-the line rule), and a visitor its program decides for states `quiet_minutes` only while that program
-has been quiet.
+heard a line (oldest first, each `{tick, from, from_kind, from_number, to, line}` and, in a society
+that records its modules, the speaker's name as the page showed it, `from_name`, and, where a model
+wrote it, its `model`, the line held to the line rule); in such a society a being also states `said`
+once it said a line (the last as many as it keeps of what it heard, each `{tick, to, to_name,
+to_kind, line}`), so its decider is shown what it already said. A visitor its program decides for states
+`quiet_minutes` only while that program has been quiet, and a being states `hands` only while a
+hands act its decider chose waits to be done (`{ability, thing, with, since}`). A society states
+`modules` only where its first input recorded them.
 
 It runs no comparison of models and no experiment, and its people are not sent away. A placed
 thing's footprint is its kind's whole box, so a kind whose box overhangs its base (a tree's

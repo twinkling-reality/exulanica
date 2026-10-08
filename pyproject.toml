@@ -428,6 +428,9 @@ layers = [
   # input and passes it down, so it sits directly under `world`; the forbidden contract below keeps
   # it pure, so its integer steps replay the same on any machine with no database or store.
   "movement",
+  # Ability modules: the table of what a thing can do, by version, which a society of things
+  # records and runs. Under movement, which never reads it, and over the things it reads.
+  "abilities",
   # Things: thing kinds, body plans, abilities, offers, looks, the one origin record and
   # translation manifests, data the world and its engine modules read and nothing below them
   # knows. Under movement, so an engine module may read a kind's semantics and nothing here can
@@ -673,6 +676,34 @@ forbidden_modules = [
   "exulanica.api",
   "numpy",
   "torch",
+]
+
+[[tool.importlinter.contracts]]
+# The ability modules' table is data a society of things records by version and replays by: it
+# cannot open the database or the store, reach the world that composes a society's input, call a
+# model, or load the numeric stack, so what a recorded module version means never depends on
+# anything but the table and the things catalogs it is read beside.
+name = "Ability modules are pure: no database, store, world, traffic or model"
+type = "forbidden"
+source_modules = ["exulanica.abilities"]
+forbidden_modules = [
+  "psycopg",
+  "exulanica.db",
+  "exulanica.store",
+  "exulanica.evidence",
+  "exulanica.ingest",
+  "exulanica.migrations",
+  "exulanica.identity",
+  "exulanica.selection",
+  "exulanica.reconstruction",
+  "exulanica.capture",
+  "exulanica.world",
+  "exulanica.traffic",
+  "exulanica.models",
+  "exulanica.api",
+  "numpy",
+  "torch",
+  "exulanica.env",
 ]
 
 [[tool.importlinter.contracts]]

@@ -43,6 +43,7 @@ from exulanica.world.deciders import receipt_from_outside
 from exulanica.world.role_decisions import DecisionDisposition
 from exulanica.world.society import SOCIETY_NAMESPACE, SocietyEvent, society_state_sha256
 from exulanica.world.society_decision_contract import (
+    HANDS_KINDS,
     THINGS_KINDS,
     DecisionOption,
     TalkPromise,
@@ -57,6 +58,7 @@ __all__ = [
     "DECISION_EVENT_KIND",
     "DecisionDisposition",
     "append_decision_events",
+    "hands_goal_policy",
     "model_goal_policies",
 ]
 
@@ -134,6 +136,20 @@ def model_goal_policies(
                 disposition = "applied"
                 applied.add(subject)
                 settled[index] = (disposition, reason)
+                continue
+            if option.kind in HANDS_KINDS:
+                # A hands act: the being waits this minute where it stands within reach, or walks
+                # to the open node within reach of what the act is for; the things phase does it
+                # in the minute the being stands within reach.
+                policy = hands_goal_policy(state, document, subject, option, promised)
+                if isinstance(policy, str):
+                    settled[index] = ("rejected", policy)
+                    continue
+                applied.add(subject)
+                policies[subject] = policy
+                if "place_node_id" in policy:
+                    promised.add(policy["place_node_id"])
+                settled[index] = ("applied", reason)
                 continue
             if option.kind == "talk":
                 # Checked once every other choice of the minute is known.
@@ -268,3 +284,46 @@ def append_decision_events(
             )
         )
     return tuple(result)
+
+
+def hands_goal_policy(
+    state: Mapping[str, Any],
+    document: Mapping[str, Any],
+    subject: str,
+    option: DecisionOption,
+    promised: set[str],
+) -> dict[str, Any] | str:
+    """The planner's goal policy for an applied hands act, or why it no longer holds: waiting
+    where the being stands when what the act is for is within reach, else standing a while at the
+    open node within reach of it, as a chosen stand does; ``thing_gone`` when the thing or the
+    other being is no longer here, ``out_of_reach`` when no open node within reach of it is left."""
+    from exulanica.world.society_decision_contract import CHOSEN_BY_MODEL, stand_activity
+    from exulanica.world.society_hands import acts_open, approach_node
+
+    person = next((p for p in state["inhabitants"] if p["id"] == subject), None)
+    if person is None:
+        return "thing_gone"
+    things = {thing["id"] for thing in state["things"]}
+    here = {p["id"] for p in state["inhabitants"]}
+    if option.target_id not in things or (
+        option.addressee_id is not None and option.addressee_id not in here
+    ):
+        return "thing_gone"
+    if any(
+        (act.ability, act.thing_id, act.other_id)
+        == (option.kind, option.target_id, option.addressee_id)
+        for act in acts_open(state, person, document)
+    ):
+        return {"allowed_target_ids": [], "wait": True}
+    target = option.addressee_id if option.kind in ("give", "take") else option.target_id
+    assert target is not None
+    node = approach_node(state, document, person, target)
+    stand = stand_activity(document)
+    if node is None or node in promised or stand is None:
+        return "out_of_reach"
+    return {
+        "allowed_target_ids": [],
+        "activity": stand.key,
+        "place_node_id": node,
+        "chosen_by": CHOSEN_BY_MODEL,
+    }

@@ -298,7 +298,9 @@ def society_models_view(
         """Each chosen model's refusal, judged once for however many people it runs."""
         key = (model["provider"], model["model_id"])
         if key not in refusals:
-            refusals[key] = services.choice_refusal(role, model, connection, session.workspace_id)
+            refusals[key] = services.choice_refusal(
+                role, model, connection, session.workspace_id, snapshot["profile"]
+            )
         return refusals[key]
 
     models = offered_models(role, services, asked)
@@ -313,7 +315,9 @@ def society_models_view(
         "society_id": str(snapshot["society_id"]),
         "engine": snapshot["profile"],
         "takes_model_choices": engine.owner_model_choice,
-        "host_refusal": services.model_host_refusal(session.workspace_id, role),
+        "host_refusal": services.model_host_refusal(
+            session.workspace_id, role, snapshot["profile"]
+        ),
         "contract": {
             **contract.binding(),
             "model_people_maximum": contract.value(role.subjects_bound),

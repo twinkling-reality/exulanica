@@ -1129,6 +1129,20 @@
       "reason": "Authored: why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py), in the words the People panel uses."
     },
     {
+      "key": "decision_reason.thing_gone",
+      "kind": "decision_reason",
+      "code": "thing_gone",
+      "words": "what its hands were to act on was gone",
+      "reason": "Authored: why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py), in the words the People panel uses."
+    },
+    {
+      "key": "decision_reason.out_of_reach",
+      "kind": "decision_reason",
+      "code": "out_of_reach",
+      "words": "no open place within reach of it was left",
+      "reason": "Authored: why a person's model was or was not followed, said after 'because' of the reason code a decision receipt or the minute that consumed it records (DECISION_REASONS in exulanica/world/society_decision_contract.py), in the words the People panel uses."
+    },
+    {
       "key": "decision_reason.spending_not_granted",
       "kind": "decision_reason",
       "code": "spending_not_granted",
@@ -1477,6 +1491,83 @@
       "code": "living_heading_unknown@generated_site",
       "words": "walking {around}",
       "reason": "Words for a living resident travelling to a selected activity, before performing it. For a world made from a world kind (the society ground generated_site): where they walk is the kind's own words ({around})."
+    },
+    {
+      "key": "event_reason.chose_to_pick_up",
+      "kind": "event_reason",
+      "code": "chose_to_pick_up",
+      "words": "it chose to pick it up",
+      "reason": "Authored: why a society of things recorded what a being's hands did, or a hands act it dropped: the decider's choice, or what stopped it, said after 'because'."
+    },
+    {
+      "key": "event_reason.chose_to_put_down",
+      "kind": "event_reason",
+      "code": "chose_to_put_down",
+      "words": "it chose to put it down",
+      "reason": "Authored: why a society of things recorded what a being's hands did, or a hands act it dropped: the decider's choice, or what stopped it, said after 'because'."
+    },
+    {
+      "key": "event_reason.chose_to_give",
+      "kind": "event_reason",
+      "code": "chose_to_give",
+      "words": "it chose to give it away",
+      "reason": "Authored: why a society of things recorded what a being's hands did, or a hands act it dropped: the decider's choice, or what stopped it, said after 'because'."
+    },
+    {
+      "key": "event_reason.chose_to_take",
+      "kind": "event_reason",
+      "code": "chose_to_take",
+      "words": "it chose to take it",
+      "reason": "Authored: why a society of things recorded what a being's hands did, or a hands act it dropped: the decider's choice, or what stopped it, said after 'because'."
+    },
+    {
+      "key": "event_reason.thing_gone",
+      "kind": "event_reason",
+      "code": "thing_gone",
+      "words": "what it was for was gone",
+      "reason": "Authored: why a society of things recorded what a being's hands did, or a hands act it dropped: the decider's choice, or what stopped it, said after 'because'."
+    },
+    {
+      "key": "event_reason.out_of_reach",
+      "kind": "event_reason",
+      "code": "out_of_reach",
+      "words": "it never came within reach",
+      "reason": "Authored: why a society of things recorded what a being's hands did, or a hands act it dropped: the decider's choice, or what stopped it, said after 'because'."
+    },
+    {
+      "key": "outcome.picked_up",
+      "kind": "outcome",
+      "code": "picked_up",
+      "words": "picked something up",
+      "reason": "Authored: what a society of things recorded a being's hands doing, by the outcome the event records; the thing and the other being are named in the event."
+    },
+    {
+      "key": "outcome.put_down",
+      "kind": "outcome",
+      "code": "put_down",
+      "words": "put something down",
+      "reason": "Authored: what a society of things recorded a being's hands doing, by the outcome the event records; the thing and the other being are named in the event."
+    },
+    {
+      "key": "outcome.gave",
+      "kind": "outcome",
+      "code": "gave",
+      "words": "gave something away",
+      "reason": "Authored: what a society of things recorded a being's hands doing, by the outcome the event records; the thing and the other being are named in the event."
+    },
+    {
+      "key": "outcome.took",
+      "kind": "outcome",
+      "code": "took",
+      "words": "took something",
+      "reason": "Authored: what a society of things recorded a being's hands doing, by the outcome the event records; the thing and the other being are named in the event."
+    },
+    {
+      "key": "outcome.not_done",
+      "kind": "outcome",
+      "code": "not_done",
+      "words": "did not do it",
+      "reason": "Authored: what a society of things recorded a being's hands doing, by the outcome the event records; the thing and the other being are named in the event."
     }
   ]
 }

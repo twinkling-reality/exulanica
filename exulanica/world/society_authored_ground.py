@@ -1232,6 +1232,12 @@ def _authored_ground_with_routine(
         if kind is None:
             raise ValueError("the ground's catalog entry names no kind its population is made of")
         document["population_kind"] = dict(kind)
+        if input_seq == 1:
+            # A society's first input records the ability modules it runs, by version, and its
+            # minute runs exactly those for its whole life, whatever a later table adds.
+            from exulanica.abilities.registry import current_modules
+
+            document["modules"] = list(current_modules())
     document["document_sha256"] = input_sha256(document)
     validate_society_input(document)
     return document

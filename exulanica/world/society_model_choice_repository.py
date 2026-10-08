@@ -292,11 +292,15 @@ class SocietyModelChoiceRepository:
         self, role: DecisionRole, rows: Sequence[Mapping[str, Any]]
     ) -> dict[str, dict[str, Any]]:
         """Each grant's latest group choice that decides now: strictly before its end, as the
-        database's clock reads it, or with no end."""
+        database's clock reads it, or with no end; the clock is read only where a group is
+        chosen."""
+        groups = self._groups(role, rows)
+        if not groups:
+            return {}
         now = self.connection.execute("select statement_timestamp() as now").fetchone()["now"]
         return {
             grant_id: choice
-            for grant_id, choice in self._groups(role, rows).items()
+            for grant_id, choice in groups.items()
             if decides_at(choice["ends_at"], now)
         }
 
@@ -319,20 +323,46 @@ class SocietyModelChoiceRepository:
         group of arrivals under its grant (``from``: ``choice`` or ``travellers``), where its kind
         allows that kind of decider. A group's model runs a visitor only while the subjects models
         run stay within the contract's bound, in the order the visitors came; past it the routine
-        decides for the rest (``travellers_over_bound``). A subject no choice names is absent, as
-        from :meth:`current`."""
+        decides for the rest (``travellers_over_bound``). In a society of things the bound holds
+        for own choices too: past it, the latest own choices of a model go to the routine
+        (``choice_over_bound``). A subject no choice names is absent, as from :meth:`current`."""
         society = self._society(version_id, lock=False)
         rows = self._rows(society["society_id"])
         found = {
             subject: {**choice, "from": "choice"}
             for subject, choice in self._current(role, rows).items()
         }
+        state = society["state"]
+        bound = contract.value(role.subjects_bound)
+        if society_engine(str(society["engine_version"])).state_family == "things":
+            # Only beings still here count toward the bound, so one that leaves and comes back
+            # by the same id (a placed being an edit removed and an undo restored) could take a
+            # place chosen meanwhile: past the bound, the latest own choices of a model go to the
+            # routine (``choice_over_bound``), the earliest keeping theirs.
+            here = set(role.adapter.subjects(state))
+            chosen = sorted(
+                (
+                    subject
+                    for subject, choice in found.items()
+                    if subject in here and choice["decider"]["kind"] == "model"
+                ),
+                key=lambda subject: (found[subject]["choice_seq"], subject),
+            )
+            for subject in chosen[bound:]:
+                if not kind_allows(state, subject, "routine"):
+                    del found[subject]
+                    continue
+                found[subject] = {
+                    **found[subject],
+                    "decider": {"kind": "routine"},
+                    "model": None,
+                    "from": "choice_over_bound",
+                }
         # A gate's choice decides strictly before its end, as the database's clock reads it.
         groups = self._deciding_groups(role, rows)
         if not groups:
             return found
-        state = society["state"]
-        room = contract.value(role.subjects_bound) - sum(
+        room = bound - sum(
             1
             for subject in _counted(society, role, found)
             if found[subject]["decider"]["kind"] == "model"
