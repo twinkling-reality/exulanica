@@ -568,7 +568,9 @@ describe('who outside programs decide for', () => {
     const [agent, visitor, unlisted] = view().outside!;
     expect(outsideWords(agent!)).toBe('Decided from outside by Scout (Acme), an AI agent, through Outside agents.');
     expect(outsideWords({ ...agent!, declared: null })).toBe('Decided from outside by an AI agent, through Outside agents.');
-    expect(outsideWords(visitor!)).toBe('Decided from outside by a person playing Block Game. Its program is not connected now.');
+    // No AI runs its bridge, and nothing says a person plays: no person is claimed.
+    expect(outsideWords(visitor!)).toBe('Decided from outside, through Block Game. Its program is not connected now.');
+    expect(outsideWords(visitor!)).not.toMatch(/person|AI/u);
     expect(outsideWords(unlisted!)).toBe('Decided from outside this world. Its program is not connected now.');
     expect(outsideWords(unlisted!)).not.toMatch(/AI|person/u);
     expect([outsideShort(agent!), outsideShort(visitor!), outsideShort(unlisted!)]).toEqual(['Scout', 'Block Game', 'outside']);

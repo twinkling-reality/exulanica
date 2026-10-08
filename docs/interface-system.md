@@ -210,8 +210,8 @@ of the world's own people a grant names, or a visitor that crossed in) is listed
 and cannot be ticked, by a person, by Choose everyone or from another surface; the People card counts
 them ("2 from outside"). The words say only what the grant view says: "Decided from outside by Scout
 (Acme), an AI agent, through Outside agents." where the bridge says an AI runs it, "Decided from
-outside by a person playing" its bridge's label where it says no AI does, "Decided from outside this
-world." for a bridge the door does not list, and "Its program is not connected now." while it is not.
+outside, through" its bridge's label where it says no AI does (claiming no person, since nothing says
+one plays), "Decided from outside this world." for a bridge the door does not list, and "Its program is not connected now." while it is not.
 `outsideWords`, `outsideShort` and `cameWords` in `ui/society-models.ts` are the one source of these
 words for the card and the marks, which read the entry through `PersonMind.outside`. A visitor the
 world decides for is named by the mind given travellers through its gate ("Nemotron 3 Nano 30B, the

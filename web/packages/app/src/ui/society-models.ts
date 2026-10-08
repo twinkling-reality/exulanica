@@ -93,12 +93,13 @@ export function outsideOf(view: SocietyModels, subjectId: string): OutsideDecide
 /**
  * Who decides for somebody an outside program runs, in a sentence, saying only what the door's
  * grant view says: an AI agent only where its bridge says an AI runs it, and nothing either way
- * for a bridge the door does not list.
+ * for a bridge the door does not list. A bridge that says no AI runs it names no person either: it
+ * does not say a person is playing, and its program may answer nothing.
  */
 export function outsideWords(entry: OutsideDecider): string {
   const quiet = entry.connected ? '' : ' Its program is not connected now.';
   if (entry.ai === null || entry.bridgeLabel === null) return `Decided from outside this world.${quiet}`;
-  if (!entry.ai) return `Decided from outside by a person playing ${entry.bridgeLabel}.${quiet}`;
+  if (!entry.ai) return `Decided from outside, through ${entry.bridgeLabel}.${quiet}`;
   const agent = entry.declared === null ? 'an AI agent' : `${entry.declared.name} (${entry.declared.maker}), an AI agent`;
   return `Decided from outside by ${agent}, through ${entry.bridgeLabel}.${quiet}`;
 }
