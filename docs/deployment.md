@@ -1323,8 +1323,11 @@ The public server is the installation composition instead (`compose.yaml`, profi
   model attempt is admitted by the spending authority as well as the process fuse. The fuse
   (`EXULANICA_BUDGET_USD`, `EXULANICA_BUDGET_MAX_CALLS`) has no default here.
 - **Images.** It names one image per recipe: `exulanica-public-backend`,
-  `exulanica-public-maintenance`, `exulanica-public-client` and `exulanica-public-tiles`. A host
-  therefore loads four images.
+  `exulanica-public-maintenance`, `exulanica-public-client` and `exulanica-public-tiles`, and runs
+  the database and the edge as `exulanica-public-postgres` and `exulanica-public-edge`: the
+  published pgvector and Caddy versions, which `build` pulls by their index digests (named in
+  `public.sh`) for the build platform. A host therefore loads six images. Every service has
+  `pull_policy: never` and `up` passes `--pull never`, so the server never resolves a tag.
 - **The tile worker.** `public.sh` selects the `public` installation profile and the `tiles` compose
   profile, so the generated-tile worker runs and publishes only as `exulanica_tiles` (9.1).
 - **Logs.** It bounds every long-running service's logs to ten 10 MB files.
@@ -1356,8 +1359,8 @@ secrets directory `EXULANICA_DEPLOY_DIR`:
 
 | Command | What it does |
 | --- | --- |
-| `build` | On the build host, from a clean checkout: builds the client bundle with no `VITE_` setting and compiles the tessellator (`tsc --build`), then builds the four images for `EXULANICA_BUILD_PLATFORM` (default `linux/amd64`), and prints their IDs. `EXULANICA_REHEARSAL_BUILD=1` allows a working tree with changes, for a rehearsal only |
-| `images`, `save <file>` | Print the image IDs; write the four images to one gzip archive and print its sha256 |
+| `build` | On the build host, from a clean checkout: builds the client bundle with no `VITE_` setting and compiles the tessellator (`tsc --build`), then builds the four images for `EXULANICA_BUILD_PLATFORM` (default `linux/amd64`), pulls the database and edge images for the same platform, each by the digest of that platform's manifest read from the pinned index, names them, and prints the six IDs. `EXULANICA_REHEARSAL_BUILD=1` allows a working tree with changes, for a rehearsal only |
+| `images`, `save <file>` | Print each of the six images' ID and architecture; write the six images to one gzip archive and print its sha256 |
 | `init` | Writes `public.env` (mode 0600, in a directory created 0700). It holds seven generated role passwords, the `public` profile, the host, issuer, edge address and ports, the backup and custody directories, and the model endpoint's allowlist. It also writes the operator's token, whose grant holds `operations.read` alone. Custody inside the backup directory is refused. The fuse is left empty |
 | `mint <label>`, `revoke <label>` | Add or remove a token for a workspace of its own, minted by the image's `exulanica-seed token` with the reviewer's permissions. The next `up` serves the change and plays those workspaces |
 | `up` | Starts the server from loaded images, never building. It refuses until the fuse is filled in, and refuses when the merged Compose configuration publishes a port for `api` or `client`: only the edge may. The overlay gives the network a fixed range and the edge and the client proxy fixed addresses: the client proxy trusts `X-Forwarded-For` from the edge's address alone and the API trusts forwarded headers from the client proxy's alone, so a process on the host, which reaches every container at its bridge address from the network's gateway, names neither its counted address nor its scheme. A host that already uses that range changes the four places `deploy/public/public.yaml` names. `restore-marker`, `migrate` and `catalogs` run to completion on every start |
@@ -1385,7 +1388,13 @@ a second disk for backups. The layout the systemd units name:
    Copy the archive, `compose.yaml` and `deploy/public/` to the host. Then
    `gunzip -c public-images.tar.gz | docker load` and `deploy/public/public.sh images`; the IDs
    must equal the build host's.
-2. Run `init` with `EXULANICA_PUBLIC_HOST`, `EXULANICA_TLS` (the certificate contact email),
+2. Run `init` with `EXULANICA_PUBLIC_HOST`, a public DNS name in lower case (the server's own
+   name, or its sslip.io name, never its bare address), `EXULANICA_TLS` (`acme` for a certificate
+   from a public authority with no contact, or a contact email; `internal`, Caddy's local
+   authority, is accepted only with a loopback edge address, for a rehearsal; `init` refuses
+   anything else, and a public authority for a name it cannot certify, because Caddy would fall
+   back to its local authority without saying so; every compose call derives the edge's
+   certificate line from `EXULANICA_TLS` again with the same checks, so a hand edit is checked too),
    `EXULANICA_EDGE_ADDRESS=0.0.0.0`, `EXULANICA_BACKUP_PATH`, `EXULANICA_CUSTODY_PATH` and the
    guest entry (`EXULANICA_GUEST_ENTRY`, `EXULANICA_GUEST_ENTRY_CODE` for `code`,
    `EXULANICA_GUEST_ENTRIES_PER_DAY`, and optionally `EXULANICA_GUEST_PLAY_SECONDS` and

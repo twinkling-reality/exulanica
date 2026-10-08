@@ -5,9 +5,10 @@
 #   EXULANICA_DEPLOY_DIR=<secrets directory> deploy/public/public.sh <command>
 #
 #   build             on the build host: the client bundle and the compiled tessellator, then the four
-#                     images, from a clean checkout
-#   images            print each image's ID and the commit it was built from
-#   save <file>       write the four images to one gzip archive and print its sha256
+#                     built images, from a clean checkout, and the database and edge images pulled
+#                     by digest, six in all
+#   images            print each image's ID and platform
+#   save <file>       write the six images to one gzip archive and print its sha256
 #   init              write <dir>/public.env: generated passwords, the operator's token, the values below
 #   mint <label>      a rehearsal visitor: a token for a workspace of its own
 #   revoke <label>    delete that rehearsal token; `up` then serves without it
@@ -26,7 +27,8 @@
 #   down              stop the server and keep its volumes
 #   destroy           stop the server and delete its volumes, database, store and witness included
 #
-# `init` reads EXULANICA_PUBLIC_HOST, EXULANICA_TLS, EXULANICA_EDGE_ADDRESS, EXULANICA_BACKUP_PATH,
+# `init` reads EXULANICA_PUBLIC_HOST, EXULANICA_TLS (internal for a rehearsal, acme for a public
+# certificate authority with no contact, or a contact email), EXULANICA_EDGE_ADDRESS, EXULANICA_BACKUP_PATH,
 # EXULANICA_CUSTODY_PATH and EXULANICA_GUEST_ENTRY (off, open or code, with
 # EXULANICA_GUEST_ENTRY_CODE, at least 20 characters, and EXULANICA_GUEST_ENTRIES_PER_DAY) from the
 # environment, and optionally the port settings. The entry code itself is never written: only its
@@ -37,8 +39,8 @@
 # created mode 0700. The model credential is never written to a file: `up` passes NEBIUS_API_KEY
 # through from the calling shell, and without it every route that asks a model says so.
 #
-# The server never builds: `up` runs images loaded by name and refuses when one is missing, so what
-# serves is what was built and checked on the build host.
+# The server never builds or pulls: `up` runs images loaded by name and refuses when one is
+# missing, so what serves is what was built, pulled and checked on the build host.
 
 set -euo pipefail
 
@@ -49,7 +51,17 @@ backend_image="exulanica-public-backend"
 maintenance_image="exulanica-public-maintenance"
 client_image="exulanica-public-client"
 tiles_image="exulanica-public-tiles"
-images="$backend_image $maintenance_image $client_image $tiles_image"
+postgres_image="exulanica-public-postgres"
+edge_image="exulanica-public-edge"
+images="$backend_image $maintenance_image $client_image $tiles_image $postgres_image $edge_image"
+# The two images the server runs as published: compose.yaml's PostgreSQL and the reviewer edge's
+# Caddy, each its version's multi-platform index by digest. The build pulls the build platform's
+# image from it and names it as above, so a host never resolves a tag and the local tags other
+# stacks on the build host use are left as they are.
+postgres_source="pgvector/pgvector:0.8.6-pg18"
+postgres_digest="sha256:2ba9ca5f2e7daa0f0e7723cba1ee9167bab54efd3640516a44ac1a928dd67e7a"
+edge_source="caddy:2.11.4-alpine"
+edge_digest="sha256:6aeddd44c3078b0f9a35206472a11420648a79c184603ef95957d0a20044cb2b"
 
 case "${1:-}" in
   "" | build | images | save) deploy_dir="" ;;
@@ -64,6 +76,44 @@ watch_state="$deploy_dir/watch-failures"
 refuse() {
   echo "public.sh: $*" >&2
   exit 2
+}
+
+# Whether a host name is one a public certificate authority can certify: lower-case DNS labels
+# ending in a letter top-level label (so no IP literal), with no scheme, port or whitespace, and
+# not a name only a private network resolves.
+public_dns_name() {
+  printf '%s' "$1" | grep -Eq '^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?[.])+[a-z]{2,63}$' || return 1
+  case "$1" in
+    *.localhost | *.local | *.internal | *.test | *.invalid | *.example | *.home.arpa) return 1 ;;
+  esac
+}
+
+# The edge's certificate line (deploy/public/Caddyfile) for EXULANICA_TLS, checked against the
+# host it is for and the edge's address: `tls internal` only on a loopback edge, since no browser
+# trusts Caddy's local authority; a public authority (acme, with no contact, or a contact email)
+# only for a public DNS name, since Caddy would otherwise fall back to its local authority without
+# saying so. Called by init and by every compose call, so a hand edit of public.env is checked too;
+# a placeholder in the Caddyfile stands for a whole line, so nothing else gets through.
+tls_directive() {
+  local tls="$1" host="$2" address="$3"
+  case "$tls" in
+    "" | *[[:space:]]*) refuse "EXULANICA_TLS is internal, acme or a contact email" ;;
+    internal)
+      case "$address" in
+        127.0.0.1 | ::1 | localhost) printf 'tls internal' ;;
+        *) refuse "EXULANICA_TLS=internal is Caddy's local authority, which no browser trusts: only for an edge on a loopback address, not $address" ;;
+      esac
+      ;;
+    *)
+      if [ "$tls" != acme ]; then
+        printf '%s' "$tls" | grep -Eq '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+[.][A-Za-z]{2,}$' \
+          || refuse "EXULANICA_TLS is internal, acme or a contact email"
+      fi
+      public_dns_name "$host" \
+        || refuse "EXULANICA_TLS=$tls asks a public certificate authority, which certifies only a public DNS name in lower case; $host is not one (use the server's sslip.io name, never its bare address)"
+      [ "$tls" = acme ] || printf 'tls %s' "$tls"
+      ;;
+  esac
 }
 
 need_env_file() {
@@ -106,6 +156,11 @@ compose() {
     EXULANICA_WORKSPACE_IDS="00000000-0000-0000-0000-000000000000"
   fi
   export EXULANICA_API_TOKENS EXULANICA_SOCIETY_CONTROL_WORKSPACES EXULANICA_WORKSPACE_IDS
+  # The certificate line is derived here on every call, never stored, so it always follows
+  # EXULANICA_TLS as written now and passes init's checks.
+  EXULANICA_TLS_DIRECTIVE="$(tls_directive "$(env_value EXULANICA_TLS)" \
+    "$(env_value EXULANICA_PUBLIC_HOST)" "$(env_value EXULANICA_EDGE_ADDRESS)")" || exit 2
+  export EXULANICA_TLS_DIRECTIVE
   # The tile worker's compose profile is always on here: the public profile installs it.
   docker compose -p "$project" --project-directory "$root" --env-file "$env_file" \
     -f "$root/compose.yaml" -f "$here/public.yaml" --profile tiles "$@"
@@ -135,7 +190,7 @@ owner_run() {
   database="$(env_value POSTGRES_DB)"
   user="$(env_value POSTGRES_USER)"
   EXULANICA_DATABASE_URL="postgresql://${user:-exulanica}:${password}@postgres:5432/${database:-exulanica}" \
-    docker run --rm -i --network "${project}_default" \
+    docker run --rm -i --pull never --network "${project}_default" \
     -e EXULANICA_DATABASE_URL \
     -e EXULANICA_SPENDING_WITNESS_DIR=/var/lib/exulanica-spending-witness \
     -v "${project}_spending-witness:/var/lib/exulanica-spending-witness" \
@@ -182,6 +237,7 @@ PY
       EXULANICA_BACKUP_ROLE_PASSWORD="$marker" EXULANICA_API_TOKENS="$marker" \
       EXULANICA_WORKSPACE_IDS="$marker" EXULANICA_BACKUP_PATH="$here" EXULANICA_CUSTODY_PATH="$here" \
       EXULANICA_EDGE_ADDRESS=127.0.0.1 EXULANICA_PUBLIC_HOST="$marker" EXULANICA_TLS=internal \
+      EXULANICA_TLS_DIRECTIVE="tls internal" \
       EXULANICA_PUBLIC_ORIGIN="https://$marker" \
       EXULANICA_BUDGET_USD="$marker" EXULANICA_BUDGET_MAX_CALLS="$marker" \
       EXULANICA_CODE_REVISION="$revision" EXULANICA_CLIENT_TREE_SHA256="$tree_sha256" \
@@ -189,6 +245,25 @@ PY
       DOCKER_DEFAULT_PLATFORM="${EXULANICA_BUILD_PLATFORM:-linux/amd64}" \
       docker compose -p "$project" --project-directory "$root" \
       -f "$root/compose.yaml" -f "$here/public.yaml" --profile tiles build api maintenance client tile-worker
+    platform="${EXULANICA_BUILD_PLATFORM:-linux/amd64}"
+    for pinned in "$postgres_image ${postgres_source%%:*}@$postgres_digest" \
+      "$edge_image ${edge_source%%:*}@$edge_digest"; do
+      name="${pinned%% *}" source="${pinned#* }"
+      # The build platform's own manifest, read from the pinned index (content-addressed, so the
+      # digest inside it is the index's) and pulled by that digest: one store cannot hold two
+      # platforms' images under one index digest.
+      manifest="$(docker buildx imagetools inspect --raw "$source" | python3 -c '
+import json, sys
+os_name, arch = sys.argv[1].split("/")[:2]
+found = [m["digest"] for m in json.load(sys.stdin)["manifests"]
+         if m.get("platform", {}).get("os") == os_name
+         and m.get("platform", {}).get("architecture") == arch]
+print(found[0] if len(found) == 1 else "")
+' "$platform")"
+      [ -n "$manifest" ] || refuse "$source has no single $platform image"
+      docker pull --quiet "${source%@*}@$manifest"
+      docker tag "${source%@*}@$manifest" "$name"
+    done
     "$0" images
     ;;
 
@@ -211,8 +286,11 @@ PY
   init)
     [ -e "$env_file" ] && refuse "$env_file exists; delete it deliberately to start again"
     : "${EXULANICA_PUBLIC_HOST:?set EXULANICA_PUBLIC_HOST to the host name visitors open}"
-    : "${EXULANICA_TLS:?set EXULANICA_TLS to an ACME contact email, or internal for a rehearsal}"
+    : "${EXULANICA_TLS:?set EXULANICA_TLS to internal for a rehearsal, acme for a public authority with no contact, or a contact email}"
     : "${EXULANICA_EDGE_ADDRESS:?set EXULANICA_EDGE_ADDRESS; 0.0.0.0 on a public host, 127.0.0.1 in a rehearsal}"
+    # Checked here and again by every compose call, which derives the line itself.
+    tls_directive "$EXULANICA_TLS" "$EXULANICA_PUBLIC_HOST" "$EXULANICA_EDGE_ADDRESS" >/dev/null \
+      || exit 2
     : "${EXULANICA_BACKUP_PATH:?set EXULANICA_BACKUP_PATH to a directory on storage apart from the database and media}"
     : "${EXULANICA_CUSTODY_PATH:?set EXULANICA_CUSTODY_PATH to a directory apart from the backup directory}"
     for path in "$EXULANICA_BACKUP_PATH" "$EXULANICA_CUSTODY_PATH"; do
@@ -305,7 +383,7 @@ PY
     umask 077
     # The image's own command mints the token, so the grant's permissions come from the one place
     # that declares them. It runs as the calling user so the file it writes is that user's.
-    docker run --rm --user "$(id -u):$(id -g)" -v "$token_dir:/out" "$backend_image" \
+    docker run --rm --pull never --user "$(id -u):$(id -g)" -v "$token_dir:/out" "$backend_image" \
       exulanica-seed token --workspace "$workspace" --out "/out/$label.json" >/dev/null
     merge_tokens
     echo "minted $label for workspace $workspace; run up to serve it"
@@ -352,7 +430,7 @@ print(" ".join(name for name in ("api", "client") if services.get(name, {}).get(
     # restore-marker, migrate and catalogs run to completion on every up, before the API: the
     # first writes the restore marker only on an empty database, the second applies what is new,
     # the third publishes the catalogs the image carries.
-    compose up -d --wait --no-build --pull missing
+    compose up -d --wait --no-build --pull never
     # A service that exits at once can read healthy for a moment before its first restart (an
     # nginx configuration it refuses, for one), so `up` looks again a few seconds later.
     sleep 5
@@ -487,7 +565,7 @@ PY
     echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) healthz=$live readyz=$ready failures=$failures"
     if [ "$failures" -ge 3 ]; then
       echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) recreating api after $failures liveness failures"
-      compose up -d --no-build --no-deps --force-recreate api
+      compose up -d --no-build --pull never --no-deps --force-recreate api
       echo 0 >"$watch_state"
     fi
     ;;
@@ -497,7 +575,7 @@ PY
     # Its allowlist is the catalogs' origins as the image's own manifest declares them, given to
     # this one-shot alone: the API's allowlist stays the model endpoint.
     need_env_file
-    docker run --rm "$backend_image" sh -c 'EXULANICA_EGRESS_ALLOWLIST="$(python -c "
+    docker run --rm --pull never "$backend_image" sh -c 'EXULANICA_EGRESS_ALLOWLIST="$(python -c "
 import json
 from exulanica.models.manifest import load_manifest
 print(json.dumps(sorted({p.catalog_origin for p in load_manifest().providers.values()})))

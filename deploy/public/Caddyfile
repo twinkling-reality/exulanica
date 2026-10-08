@@ -1,9 +1,12 @@
 # The public server's edge. deploy/public/public.yaml mounts this file and supplies the two values
 # it reads from the environment.
 #
-# `tls` takes an email address, which asks a public certificate authority for a certificate
-# through ACME, or the word `internal`, which issues from Caddy's own local authority for a
-# rehearsal. Caddy redirects plain HTTP to HTTPS on its own.
+# The certificate line is EXULANICA_TLS_DIRECTIVE, written by `public.sh init` from EXULANICA_TLS:
+# `tls internal` issues from Caddy's own local authority for a rehearsal; `tls <email>` asks a
+# public certificate authority through ACME with that contact; and an empty line leaves Caddy's
+# automatic HTTPS, which asks a public authority with no contact (Let's Encrypt; Caddy asks ZeroSSL
+# only when given an email). A placeholder can stand for a whole line, and `init` lets only those
+# three shapes through. Caddy redirects plain HTTP to HTTPS on its own.
 #
 # It proxies to `client`, never to `api`: `client` holds the single-origin `/api` prefix strip, the
 # per-address write limit and its own refusals, and an edge that reached `api` directly would
@@ -18,7 +21,7 @@
 }
 
 {$EXULANICA_PUBLIC_HOST} {
-	tls {$EXULANICA_TLS}
+	{$EXULANICA_TLS_DIRECTIVE}
 	# Visitors on this server upload no photographs: the largest body a visitor sends is a question,
 	# a world's description or a picture to draft from. 8 MiB, as the reviewer edge; the client
 	# proxy's own cap (512 MiB) stays the API's.

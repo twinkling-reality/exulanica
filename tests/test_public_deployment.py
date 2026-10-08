@@ -89,19 +89,50 @@ def test_the_edge_reaches_the_client_proxy_and_never_the_api():
     assert "api:" not in conf
 
 
-def test_the_edge_is_the_reviewer_edges_exact_version():
-    """One pinned Caddy across both edges: a moving tag is a proxy that changes under a server."""
+def _script_value(name: str) -> str:
+    match = re.search(rf'^{name}="(\S+)"$', SCRIPT.read_text(encoding="utf-8"), re.M)
+    assert match is not None, name
+    return match.group(1)
+
+
+def test_the_edge_and_the_database_are_the_published_versions_pulled_by_digest():
+    """One pinned Caddy across both edges and compose.yaml's PostgreSQL, each pulled by its index
+    digest on the build host and loaded on the server under a name of its own: a moving tag is a
+    proxy or a database that changes under a server, and a host never resolves one."""
     pinned = re.findall(r"^\s+image: (caddy:\S+)$", _directives(JUDGE_EDGE), re.M)
-    assert re.findall(r"^\s+image: (caddy:\S+)$", OVERLAY_SERVICES["edge"], re.M) == pinned
+    assert [_script_value("edge_source")] == pinned
     assert re.fullmatch(r"caddy:\d+\.\d+\.\d+-alpine", pinned[0])
+    database = re.findall(r"^    image: (\S+)$", BASE_SERVICES["postgres"], re.M)
+    assert [_script_value("postgres_source")] == database
+    for name in ("edge_digest", "postgres_digest"):
+        assert re.fullmatch(r"sha256:[0-9a-f]{64}", _script_value(name)), name
+    assert re.search(r"^    image: exulanica-public-edge$", OVERLAY_SERVICES["edge"], re.M)
+    assert re.search(r"^    image: exulanica-public-postgres$", OVERLAY_SERVICES["postgres"], re.M)
 
 
-def test_the_edge_host_and_issuer_have_no_default():
+def test_no_service_pulls_on_the_server():
+    """Every service runs a loaded image and none is pulled, whatever the merged file names."""
+    for name, block in OVERLAY_SERVICES.items():
+        assert re.search(r"^    pull_policy: never$", block, re.M), name
+    built_or_pulled = {
+        name
+        for name, block in BASE_SERVICES.items()
+        if ("build:" in block or "image:" in block) and 'profiles: ["reconstruction"]' not in block
+    }
+    assert built_or_pulled <= set(OVERLAY_SERVICES), built_or_pulled - set(OVERLAY_SERVICES)
+    script = _directives(SCRIPT.read_text(encoding="utf-8")).replace("\\\n", " ")
+    ups = [line for line in script.splitlines() if re.search(r"\bcompose up\b", line)]
+    assert ups and all("--pull never" in line for line in ups), ups
+
+
+def test_the_edge_host_and_certificate_line_have_no_default():
     edge = OVERLAY_SERVICES["edge"]
     assert "EXULANICA_PUBLIC_HOST: ${EXULANICA_PUBLIC_HOST:?" in edge
-    assert "EXULANICA_TLS: ${EXULANICA_TLS:?" in edge
+    # Set by init, possibly empty (a public authority with no contact); unset is refused.
+    assert "EXULANICA_TLS_DIRECTIVE: ${EXULANICA_TLS_DIRECTIVE?" in edge
     assert re.search(r"^\{\$EXULANICA_PUBLIC_HOST\} \{$", CADDYFILE, re.M)
-    assert re.search(r"^\ttls \{\$EXULANICA_TLS\}$", CADDYFILE, re.M)
+    assert re.search(r"^\t\{\$EXULANICA_TLS_DIRECTIVE\}$", CADDYFILE, re.M)
+    assert "tls {$EXULANICA_TLS}" not in _directives(CADDYFILE)
 
 
 def test_the_server_spends_through_the_durable_authority_within_a_stated_fuse():
@@ -128,12 +159,12 @@ def test_every_long_running_service_keeps_bounded_logs_and_restarts():
 
 
 def test_each_recipe_runs_under_one_image_name_the_script_loads():
-    """A host loads three images by name; a service under any other name would make `up` build
+    """A host loads six images by name; a service under any other name would make `up` build
     or pull something that was never checked."""
     named = {
         name: re.search(r"^    image: (\S+)$", block, re.M).group(1)
         for name, block in OVERLAY_SERVICES.items()
-        if name != "edge" and re.search(r"^    image: ", block, re.M)
+        if re.search(r"^    image: ", block, re.M)
     }
     # The reconstruction workers start only with their compose profile, which this server never
     # names: the seed of every world here is generated, not reconstructed from photographs.
@@ -147,9 +178,30 @@ def test_each_recipe_runs_under_one_image_name_the_script_loads():
     assert "reconstruction" not in _directives(script)
     declared = {
         re.search(rf'^{variable}="(\S+)"$', script, re.M).group(1)
-        for variable in ("backend_image", "maintenance_image", "client_image", "tiles_image")
+        for variable in (
+            "backend_image",
+            "maintenance_image",
+            "client_image",
+            "tiles_image",
+            "postgres_image",
+            "edge_image",
+        )
     }
     assert set(named.values()) == declared
+    # `images` is what `up` checks are loaded and `save` writes: every declared name.
+    listed = re.search(r'^images="([^"]+)"$', script, re.M)
+    assert listed is not None
+    assert set(listed.group(1).split()) == {
+        f"${variable}"
+        for variable in (
+            "backend_image",
+            "maintenance_image",
+            "client_image",
+            "tiles_image",
+            "postgres_image",
+            "edge_image",
+        )
+    }
 
 
 def test_the_server_never_builds_and_only_the_build_step_does():
@@ -464,3 +516,105 @@ def test_init_writes_the_guests_play_window_and_maximum(tmp_path):
         "600",
         "12",
     )
+
+
+#: A host a public certificate authority can certify, as the judges' server's sslip.io name.
+PUBLIC_NAME = "203-0-113-7.sslip.io"
+
+
+def _derived_line(tmp_path, env: dict[str, str]) -> subprocess.CompletedProcess:
+    """Run init, then a compose command against a stand-in docker that writes down the edge's
+    certificate line compose was handed: what the edge would read."""
+    shim = tmp_path / "bin"
+    shim.mkdir(exist_ok=True)
+    seen = tmp_path / "line"
+    (shim / "docker").write_text(
+        f'#!/bin/sh\nprintf "%s" "$EXULANICA_TLS_DIRECTIVE" > "{seen}"\n', encoding="utf-8"
+    )
+    (shim / "docker").chmod(0o755)
+    path = {"PATH": f"{shim}:{os.environ['PATH']}"}
+    created = _script(tmp_path, "init", **{**env, **path})
+    if created.returncode != 0:
+        return created
+    return _script(tmp_path, "down", **path)
+
+
+@needs_shell
+@pytest.mark.parametrize(
+    ("tls", "host", "address", "line"),
+    [
+        ("internal", "public.example", "127.0.0.1", "tls internal"),
+        ("acme", PUBLIC_NAME, "0.0.0.0", ""),
+        ("operator@example.org", PUBLIC_NAME, "0.0.0.0", "tls operator@example.org"),
+        # Caddy's local authority on a public address: no browser trusts it.
+        ("internal", PUBLIC_NAME, "0.0.0.0", None),
+        # A public authority for a name it cannot certify falls back to the local one silently.
+        ("acme", "203.0.113.7", "0.0.0.0", None),
+        ("acme", "server.local", "0.0.0.0", None),
+        ("acme", "box.internal", "0.0.0.0", None),
+        ("acme", "edge.localhost", "0.0.0.0", None),
+        ("acme", "https://judges.example.org", "0.0.0.0", None),
+        ("acme", "judges.example.org:443", "0.0.0.0", None),
+        ("acme", "Judges.Example.Org", "0.0.0.0", None),
+        ("operator@example.org", "203.0.113.7", "0.0.0.0", None),
+        # Not one of the three shapes, with and without whitespace.
+        ("not-an-email", PUBLIC_NAME, "0.0.0.0", None),
+        ("not an email", PUBLIC_NAME, "0.0.0.0", None),
+        ("x@y.example\ntls internal", PUBLIC_NAME, "0.0.0.0", None),
+        ("x@y.example }", PUBLIC_NAME, "0.0.0.0", None),
+    ],
+)
+def test_the_certificate_line_is_derived_for_its_host_and_address_or_refused(
+    tmp_path, tls, host, address, line
+):
+    env = {
+        **_init_env(tmp_path),
+        "EXULANICA_TLS": tls,
+        "EXULANICA_PUBLIC_HOST": host,
+        "EXULANICA_EDGE_ADDRESS": address,
+    }
+    result = _derived_line(tmp_path, env)
+    if line is None:
+        assert result.returncode == 2, result.stderr
+        assert "EXULANICA_TLS" in result.stderr
+        assert not (tmp_path / "deploy" / "public.env").exists()
+        return
+    assert result.returncode == 0, result.stderr
+    assert (tmp_path / "line").read_text(encoding="utf-8") == line
+    # Derived on every call, never stored beside EXULANICA_TLS.
+    stored = (tmp_path / "deploy" / "public.env").read_text(encoding="utf-8")
+    assert "EXULANICA_TLS_DIRECTIVE" not in stored
+
+
+@needs_shell
+def test_a_hand_edit_to_an_unsafe_certificate_shape_stops_every_compose_command(tmp_path):
+    env = {
+        **_init_env(tmp_path),
+        "EXULANICA_TLS": "acme",
+        "EXULANICA_PUBLIC_HOST": PUBLIC_NAME,
+        "EXULANICA_EDGE_ADDRESS": "0.0.0.0",
+    }
+    assert _derived_line(tmp_path, env).returncode == 0
+    env_file = tmp_path / "deploy" / "public.env"
+    env_file.write_text(
+        env_file.read_text(encoding="utf-8").replace(
+            "EXULANICA_TLS=acme", "EXULANICA_TLS=internal"
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / "line").unlink()
+    path = {"PATH": f"{tmp_path / 'bin'}:{os.environ['PATH']}"}
+    refused = _script(tmp_path, "down", **path)
+    assert refused.returncode == 2
+    assert "only for an edge on a loopback address" in refused.stderr
+    assert not (tmp_path / "line").exists(), "docker was reached"
+
+
+def test_every_docker_run_runs_a_loaded_image_and_the_build_pulls_by_the_platforms_digest():
+    script = _directives(SCRIPT.read_text(encoding="utf-8")).replace("\\\n", " ")
+    runs = [line for line in script.splitlines() if re.search(r"\bdocker run\b", line)]
+    assert runs and all("--pull never" in line for line in runs), runs
+    build_step = script.split("\n  build)\n", 1)[1].split("\n    ;;\n", 1)[0]
+    assert "docker buildx imagetools inspect --raw" in build_step
+    pulls = [line for line in build_step.splitlines() if "docker pull" in line]
+    assert pulls and all('@$manifest"' in line for line in pulls), pulls

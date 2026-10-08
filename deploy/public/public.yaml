@@ -7,9 +7,10 @@
 #
 # WHAT IT ADDS TO THE INSTALLATION. A TLS edge in front of the installation's own client proxy, the
 # one way in from outside; the API's published port taken away; durable spending; the process's
-# model ceilings stated by the operator; one image name per recipe, so a host loads four images
-# rather than one per service; the generated-tile worker; bounded logs on every long-running
-# service.
+# model ceilings stated by the operator; one image name per recipe, and the database and edge
+# images under names of their own, so a host loads six images and never pulls one
+# (`pull_policy: never` on every service); the generated-tile worker; bounded logs on every
+# long-running service.
 #
 # WHY THE INSTALLATION AND NOT THE REVIEWER STACK. Visitors make worlds of their own, choose the
 # models that run their people and compare them. The reviewer stack serves one seeded workspace
@@ -24,9 +25,11 @@
 
 services:
   edge:
-    # An exact version, as the reviewer edge pins it: a moving tag is a proxy that changes under a
-    # running server.
-    image: caddy:2.11.4-alpine
+    # The reviewer edge's exact Caddy, pulled by digest on the build host and loaded here under
+    # this name (public.sh, edge_source): a moving tag is a proxy that changes under a running
+    # server, and a pull on the host would run an image nobody compared.
+    image: exulanica-public-edge
+    pull_policy: never
     restart: unless-stopped
     ports:
       # No default for the address. A public host states 0.0.0.0; a rehearsal states 127.0.0.1 and
@@ -35,7 +38,11 @@ services:
       - "${EXULANICA_EDGE_ADDRESS:?set EXULANICA_EDGE_ADDRESS; 0.0.0.0 on a public host, 127.0.0.1 in a rehearsal}:${EXULANICA_EDGE_HTTPS_PORT:-443}:443"
     environment:
       EXULANICA_PUBLIC_HOST: ${EXULANICA_PUBLIC_HOST:?set EXULANICA_PUBLIC_HOST to the host name visitors open}
-      EXULANICA_TLS: ${EXULANICA_TLS:?set EXULANICA_TLS to an ACME contact email, or internal for a rehearsal}
+      # How the edge gets its certificate, as the Caddyfile's one line: `tls internal` for a
+      # rehearsal, `tls <email>` for a public authority with a contact, or empty for a public
+      # authority with none (Caddy's automatic HTTPS). `init` writes it from EXULANICA_TLS, which
+      # it checks is one of those; set but empty is allowed, unset is refused.
+      EXULANICA_TLS_DIRECTIVE: ${EXULANICA_TLS_DIRECTIVE?run public.sh init, which writes EXULANICA_TLS_DIRECTIVE from EXULANICA_TLS}
     volumes:
       # Relative to the project directory, which is the first compose file's: the repository root
       # on the build host and the copied layout on the server alike.
@@ -60,19 +67,27 @@ services:
       - client
 
   postgres:
+    # compose.yaml's pgvector image, pulled by digest on the build host (public.sh,
+    # postgres_source) and loaded under this name.
+    image: exulanica-public-postgres
+    pull_policy: never
     logging: *bounded-logs
 
   restore-marker:
     image: exulanica-public-backend
+    pull_policy: never
 
   migrate:
     image: exulanica-public-backend
+    pull_policy: never
 
   catalogs:
     image: exulanica-public-backend
+    pull_policy: never
 
   api:
     image: exulanica-public-backend
+    pull_policy: never
     # The installation publishes the API's port for a host that puts its own proxy in front. Here
     # the edge is that proxy, and a published API port would be a second way in that skips the
     # client proxy's write limit and body cap. `!reset` removes the base file's list.
@@ -104,23 +119,28 @@ services:
 
   preparation:
     image: exulanica-public-backend
+    pull_policy: never
     logging: *bounded-logs
 
   playback-worker:
     image: exulanica-public-backend
+    pull_policy: never
     environment:
       EXULANICA_SPENDING: durable
     logging: *bounded-logs
 
   maintenance:
     image: exulanica-public-maintenance
+    pull_policy: never
     logging: *bounded-logs
 
   restore:
     image: exulanica-public-maintenance
+    pull_policy: never
 
   client:
     image: exulanica-public-client
+    pull_policy: never
     # The edge reaches the client proxy over the compose network. A published port would be a way
     # in beside the edge, where a local process could write its own X-Forwarded-For and
     # X-Forwarded-Proto, which this proxy trusts from private ranges. `up` checks the merged
@@ -142,6 +162,7 @@ services:
   # where the worker refuses any wider publisher than the tile role.
   tile-worker:
     image: exulanica-public-tiles
+    pull_policy: never
     environment:
       # A visitor's towns are baked too: the workspaces active accounts, guests among them, own.
       EXULANICA_ACCOUNT_DATABASE_URL: postgresql://exulanica_accounts:${EXULANICA_ACCOUNT_ROLE_PASSWORD}@postgres:5432/${POSTGRES_DB:-exulanica}
