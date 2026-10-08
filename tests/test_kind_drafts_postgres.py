@@ -311,6 +311,43 @@ def test_a_spent_allowance_is_named_and_never_read_as_the_model_s_silence(drafts
     assert transport.requests == []
 
 
+def test_a_provider_s_failure_is_named_as_one_and_never_as_the_model_s_silence(drafts):
+    """A provider that answers every attempt with a server error refused the call; the draft says
+    so, in its own words, and not that the model did not answer in time."""
+    app, transport = drafts
+    transport.default = HttpResponse(status_code=500, text='{"error":{"message":"upstream"}}')
+    with app() as client:
+        ended = _ended(client, _start(client, "a small farm").json()["draft_id"])
+    assert ended["state"] == "refused"
+    assert ended["refusal"]["code"] == "kind_draft_model_failed"
+    assert "in time" not in ended["refusal"]["detail"]
+    assert transport.requests
+
+
+@pytest.mark.parametrize(
+    ("failure", "code"),
+    (
+        ({"timed_out": True}, "kind_draft_unanswered"),
+        ({"deadline_ended": True, "reached_provider": False}, "kind_draft_unanswered"),
+        ({"reached_provider": True}, "kind_draft_model_failed"),
+    ),
+)
+def test_only_a_call_that_ran_out_of_time_is_said_as_the_model_s_silence(
+    drafts, monkeypatch, failure, code
+):
+    from exulanica.api import kind_drafts
+    from exulanica.models.errors import TransportError
+
+    def drafting(*_args, **_kwargs):  # type: ignore[no-untyped-def]
+        raise TransportError("the call ended", **failure)
+
+    monkeypatch.setattr(kind_drafts, "draft_kind", drafting)
+    app, _transport = drafts
+    with app() as client:
+        ended = _ended(client, _start(client, "a small farm").json()["draft_id"])
+    assert ended["refusal"]["code"] == code
+
+
 def test_a_person_who_started_as_many_drafts_as_an_hour_allows_is_told_when_to_return(drafts):
     app, transport = drafts
     transport.responses.append(_reply(_farm()))

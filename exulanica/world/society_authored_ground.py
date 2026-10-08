@@ -1046,11 +1046,22 @@ def _thing_kinds(things: Sequence[PlacedThing]) -> tuple[dict[str, ThingKind], s
     return kinds, None
 
 
+def _height_above_plane(ground: SocietyGround) -> Callable[[PlacedThing], int | None]:
+    """How high a thing stands above a ground plane, or None for one resting on it."""
+
+    def height(thing: PlacedThing) -> int | None:
+        above = thing.transform.y_mm - ground.elevation_mm
+        return None if above == 0 else above
+
+    return height
+
+
 def _things_one_by_one(
     things: Sequence[PlacedThing],
     kinds: Mapping[str, ThingKind],
     ground: SocietyGround,
     version_id: uuid.UUID,
+    height_above: Callable[[PlacedThing], int | None] | None = None,
 ) -> tuple[list[_UsableObject], list[Obstacle], list[dict[str, Any]]]:
     """Every placed object's obstacle and activity, decided for that thing alone.
 
@@ -1059,8 +1070,10 @@ def _things_one_by_one(
     (``+y``) is the region's ``-z``, as an authored object's catalog places are, turned by its yaw.
     It blocks walking where its kind says. Its places to rest or visit at are its kind's, turned
     with it, joined to the lattice within the reviewed reach; one that does not rest on the ground
-    plane offers none (``OFF_GROUND``) and still blocks.
+    plane offers none (``OFF_GROUND``) and still blocks. ``height_above`` says how high a thing
+    stands above the surface under it, or None where it rests on it; left out, the ground plane.
     """
+    height = _height_above_plane(ground) if height_above is None else height_above
     usable: list[_UsableObject] = []
     obstacles: list[Obstacle] = []
     records: list[dict[str, Any]] = []
@@ -1102,7 +1115,7 @@ def _things_one_by_one(
         item = _UsableObject(
             _PlacedUse(thing.thing_id, transform), reviewed, centre, half, origin="thing"
         )
-        if transform.y_mm != ground.elevation_mm:
+        if height(thing) is not None:
             records.append(_refused_activity(version_id, item.obj, reviewed, OFF_GROUND, "thing"))
         else:
             usable.append(item)
@@ -1124,10 +1137,15 @@ def _arrival_point(semantics: Mapping[str, Any], thing: PlacedThing) -> list[int
 
 
 def _input_things(
-    things: Sequence[PlacedThing], kinds: Mapping[str, ThingKind], ground: SocietyGround
+    things: Sequence[PlacedThing],
+    kinds: Mapping[str, ThingKind],
+    ground: SocietyGround,
+    height_above: Callable[[PlacedThing], int | None] | None = None,
 ) -> list[dict[str, Any]]:
     """The things list a v5 input states (:mod:`exulanica.world.society_thing_inputs`): a thing
-    off the ground states its height above the ground's elevation."""
+    off the ground states its height above the ground's elevation, or above the surface under it
+    where ``height_above`` says how high that is."""
+    height = _height_above_plane(ground) if height_above is None else height_above
     entries = []
     for thing in things:
         if thing.removed:
@@ -1140,8 +1158,9 @@ def _input_things(
             "yaw_microradians": thing.transform.yaw_microradians,
             "arrival_mm": _arrival_point(semantics, thing),
         }
-        if thing.transform.y_mm != ground.elevation_mm:
-            entry["height_mm"] = thing.transform.y_mm - ground.elevation_mm
+        above = height(thing)
+        if above is not None:
+            entry["height_mm"] = above
         entries.append(entry)
     return entries
 

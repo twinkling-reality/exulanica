@@ -45,7 +45,7 @@ use class the routine does not know is listed as unsupported, never guessed.
 from __future__ import annotations
 
 import math
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from itertools import pairwise
 from typing import Any, Final
@@ -82,7 +82,9 @@ __all__ = [
     "CORNER_TOLERANCE_MM",
     "READ_KINDS",
     "CityNavigation",
+    "CityObstructions",
     "city_navigation",
+    "city_obstructions",
     "city_street_names",
     "place_from_city_documents",
     "place_from_city_records",
@@ -446,6 +448,31 @@ class _Obstructions:
                 return True
         return False
 
+    def blocks_step(self, a: Point, b: Point) -> bool:
+        """Whether a straight step from ``a`` to ``b`` passes within the radius of a low part or of
+        a building's base ring, or starts or ends inside a ring."""
+        if self.blocks_walking(a, b):
+            return True
+        low = (min(a[0], b[0]) - self.radius, min(a[1], b[1]) - self.radius)
+        high = (max(a[0], b[0]) + self.radius, max(a[1], b[1]) + self.radius)
+        seen: set[int] = set()
+        for cell in self._cells(low, high):
+            for ring in self.rings.get(cell, ()):
+                if id(ring) in seen:
+                    continue
+                seen.add(id(ring))
+                if point_in_ring(a, ring) != OUTSIDE or point_in_ring(b, ring) != OUTSIDE:
+                    return True
+                for p, q in zip(ring, ring[1:] + ring[:1], strict=True):
+                    if (
+                        _crosses(a, b, p, q)
+                        or _segment_gap_squared_below(p, a, b, self.radius)
+                        or _segment_gap_squared_below(a, p, q, self.radius)
+                        or _segment_gap_squared_below(b, p, q, self.radius)
+                    ):
+                        return True
+        return False
+
     def blocks_walking(self, a: Point, b: Point) -> bool:
         low = (min(a[0], b[0]), min(a[1], b[1]))
         high = (max(a[0], b[0]), max(a[1], b[1]))
@@ -457,6 +484,66 @@ class _Obstructions:
                     if part.near_segment(a, b, self.radius):
                         return True
         return False
+
+
+def _obstructions_of(
+    by_type: Mapping[type, Sequence[Any]], navigation: CityNavigation
+) -> _Obstructions:
+    """Every low part of a piece of street furniture or a tree, and every building's base ring,
+    the navigation table says obstructs."""
+    obstructions = _Obstructions(navigation.capsule_radius_mm)
+    for kind in (StreetFurnitureRecord, StreetTreeRecord):
+        if navigation.obstruction.get(kind.RECORD_KIND) != "low_parts":
+            continue
+        for record in by_type.get(kind, ()):
+            direction = (
+                (record.facing_dx_mm, record.facing_dy_mm)
+                if kind is StreetFurnitureRecord
+                else (1, 0)
+            )
+            for part in record.parts:
+                if part.offset_z_mm < navigation.capsule_height_mm:
+                    obstructions.add_part(
+                        _LowPart(record.identity, (record.x_mm, record.y_mm), direction, part)
+                    )
+    if navigation.obstruction.get(MassingRecord.RECORD_KIND) == "base_ring":
+        for building in by_type.get(MassingRecord, ()):
+            obstructions.add_ring(building.tiers[0].ring_mm)
+    return obstructions
+
+
+@dataclass(frozen=True, slots=True)
+class CityObstructions:
+    """What a standing capsule keeps clear of in a city's records, in the city's plan frame (east,
+    north): ``stands`` says whether a person may stand at a point, ``steps`` whether a straight
+    step between two points stays clear."""
+
+    stands: Callable[[Point], bool]
+    steps: Callable[[Point, Point], bool]
+
+
+def city_obstructions(
+    records: Sequence[object],
+    navigation: CityNavigation | None = None,
+    *,
+    checked: bool = False,
+) -> CityObstructions:
+    """The obstructions the city place stands its spots clear of (buildings' base rings, and the
+    low parts of street furniture and trees), read from the same records by the same rule.
+    ``checked`` says the records were already held to their shapes, by
+    :func:`place_from_city_records` over the same records, so they are not checked again."""
+    navigation = navigation if navigation is not None else city_navigation()
+    by_type: dict[type, list[Any]] = {
+        kind: [] for kind in (StreetFurnitureRecord, StreetTreeRecord, MassingRecord)
+    }
+    for record in records if checked else _validated(records):
+        if type(record) in by_type:
+            by_type[type(record)].append(record)
+    held = _obstructions_of(by_type, navigation)
+    return CityObstructions(
+        stands=lambda point: not held.blocks_standing(point),
+        steps=lambda a, b: not held.blocks_step(a, b),
+    )
 
 
 def _validated(records: Iterable[object]) -> list[Any]:
@@ -767,24 +854,7 @@ def place_from_city_records(
             }
         )
 
-    obstructions = _Obstructions(navigation.capsule_radius_mm)
-    for kind in (StreetFurnitureRecord, StreetTreeRecord):
-        if navigation.obstruction.get(kind.RECORD_KIND) != "low_parts":
-            continue
-        for record in by_type[kind]:
-            direction = (
-                (record.facing_dx_mm, record.facing_dy_mm)
-                if kind is StreetFurnitureRecord
-                else (1, 0)
-            )
-            for part in record.parts:
-                if part.offset_z_mm < navigation.capsule_height_mm:
-                    obstructions.add_part(
-                        _LowPart(record.identity, (record.x_mm, record.y_mm), direction, part)
-                    )
-    if navigation.obstruction.get(MassingRecord.RECORD_KIND) == "base_ring":
-        for building in by_type[MassingRecord]:
-            obstructions.add_ring(building.tiers[0].ring_mm)
+    obstructions = _obstructions_of(by_type, navigation)
     read = {
         StreetFurnitureRecord.RECORD_KIND: "low_parts",
         StreetTreeRecord.RECORD_KIND: "low_parts",

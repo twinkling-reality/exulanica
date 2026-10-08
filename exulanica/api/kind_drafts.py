@@ -36,7 +36,7 @@ from typing import Any, Final, Literal
 import psycopg
 
 from exulanica.models.client import ModelClient
-from exulanica.models.errors import BudgetExceededError, ModelError
+from exulanica.models.errors import BudgetExceededError, ModelError, TransportError
 from exulanica.models.manifest import load_manifest
 from exulanica.models.spending import SpendingRefused
 from exulanica.selection.calls import CallLog, ModelCall
@@ -117,6 +117,10 @@ KIND_DRAFT_CODES: Final = (
     ("unknown_reference", "This credential may not read drafts here: reading needs world.read."),
     ("kind_not_drafted", "No kind of place people can live, walk and work in was drafted."),
     ("kind_draft_unanswered", "The model did not answer in time."),
+    (
+        "kind_draft_model_failed",
+        "The model's provider failed or refused the call, or could not be reached.",
+    ),
     ("kind_work_unavailable", "The server could not check the drafted kind of place."),
     ("kind_draft_failed", "The draft stopped before a kind of place was made."),
     ("kind_version_exists", "The workspace already keeps this kind of place."),
@@ -494,13 +498,26 @@ def run_draft(
             refusal["spending"] = spent.problem_member()
         refused(refusal)
         return
-    except ModelError:
-        refused(
-            {
-                "code": "kind_draft_unanswered",
-                "detail": "The model did not answer in time. Try again in a moment.",
-            }
-        )
+    except ModelError as failed:
+        if isinstance(failed, TransportError) and (failed.timed_out or failed.deadline_ended):
+            refused(
+                {
+                    "code": "kind_draft_unanswered",
+                    "detail": "The model did not answer in time. Try again in a moment.",
+                }
+            )
+        else:
+            # A provider's error status, a connection that failed, or a call refused before it
+            # was sent: not a model's silence, so not said as one.
+            refused(
+                {
+                    "code": "kind_draft_model_failed",
+                    "detail": (
+                        "The model's provider failed or refused the call, or could not be "
+                        "reached. Try again in a moment."
+                    ),
+                }
+            )
         return
     except _ChecksUnavailable:
         refused(

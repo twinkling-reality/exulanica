@@ -366,13 +366,16 @@ states, which the page says in these words:
 | `refused` | "These words did not draft a kind of place people can live, walk and work in: {sentence} Try describing it another way." ({sentence} the refusal's `detail`: the last check's own sentence, or the drafter's where no check refused) |
 
 A refusal that is not the drafted kind's (`budget_exceeded`, `kind_draft_unanswered`,
-`kind_work_unavailable`, `kind_draft_failed`, `kind_cap_reached`, `kind_version_exists`) is said in
-the closed list's words. Ready and refused carry what the drafting cost, every call made included,
-except a draft ended for running past its deadline, whose calls the server no longer reads. Saved
-names are replaced in the words before the job starts, and the workspace's rules, releasing no
-place's name, are applied again as each request leaves. A draft takes at most the longest its
-client takes for one call of the role and the checks' bound, for each of its three attempts. Making
-a world of the kept kind is `POST /worlds/kinds/{kind}/worlds`.
+`kind_draft_model_failed`, `kind_work_unavailable`, `kind_draft_failed`, `kind_cap_reached`,
+`kind_version_exists`) is said in the closed list's words. A model that did not answer within the
+role's timeout is `kind_draft_unanswered`; a provider's error status, a connection that failed or a
+call refused before it was sent is `kind_draft_model_failed`, never said as the model's silence.
+Ready and refused carry what the drafting cost, every call made included, except a draft ended for
+running past its deadline, whose calls the server no longer reads. Saved names are replaced in the
+words before the job starts, and the workspace's rules, releasing no place's name, are applied again
+as each request leaves. A draft takes at most the longest its client takes for one call of the role
+and the checks' bound, for each of its three attempts. Making a world of the kept kind is
+`POST /worlds/kinds/{kind}/worlds`.
 
 ## The town as a kind
 

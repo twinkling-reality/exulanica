@@ -83,6 +83,7 @@ from exulanica.world.society_authored_ground import (
     read_authored_ground,
 )
 from exulanica.world.society_catalogs import RoutineModel
+from exulanica.world.society_city_place import CityObstructions, city_obstructions
 from exulanica.world.society_composition import (
     build_society_input,
     keep_registry,
@@ -101,6 +102,7 @@ from exulanica.world.society_input_policy import (
     WALKING_SURFACES_BY_FAMILY,
     WALKING_SURFACES_COMPOSITION,
     WALKING_SURFACES_COMPOSITION_V2,
+    WALKING_SURFACES_COMPOSITION_V3,
     input_profile,
     is_authored_ground,
 )
@@ -201,6 +203,9 @@ class _TownRead:
     #: For a world made from a world kind whose place cannot be made, why, by name (such as
     #: ``kind_graph_over_budget``).
     place_refusal: str | None = None
+    #: A town's own buildings, street furniture and trees, read from its records with its place,
+    #: which a society of things keeps its things' places clear of.
+    obstructions: CityObstructions | None = None
 
 
 def _stored_site_place(
@@ -606,7 +611,14 @@ class SocietyRuntime:
             read.towns[key] = _TownRead(None, None, str(exc))
             return
         place = walking_surfaces_place(ground.place_id, generated.records)
-        read.towns[key] = _TownRead(generated.receipt_sha256, place, None, tuple(generated.records))
+        read.towns[key] = _TownRead(
+            generated.receipt_sha256,
+            place,
+            None,
+            tuple(generated.records),
+            # Held to their shapes by the place just made from them.
+            obstructions=city_obstructions(generated.records, checked=True),
+        )
 
     def _transaction_read(self, connection: psycopg.Connection) -> _ReadFirst:
         """What this transaction read before the asset read lock; call inside the transaction.
@@ -1685,7 +1697,11 @@ class SocietyRuntime:
             if digest != town.receipt_sha256:
                 raise UnavailableSocietyInput("the world's receipt changed after it was read")
             chosen = WALKING_SURFACES_COMPOSITION if composition is None else composition
-            if chosen not in (WALKING_SURFACES_COMPOSITION, WALKING_SURFACES_COMPOSITION_V2):
+            if chosen not in (
+                WALKING_SURFACES_COMPOSITION,
+                WALKING_SURFACES_COMPOSITION_V2,
+                WALKING_SURFACES_COMPOSITION_V3,
+            ):
                 raise UnavailableSocietyInput(
                     f"no composition {chosen!r} walks a world's own surfaces"
                 )
@@ -1730,6 +1746,13 @@ class SocietyRuntime:
                 standing=self._standing,
                 living=routine,
                 workspace_obstacles=workspace,
+                # A society of things reads the things placed on the town's surfaces too, and
+                # keeps their places clear of the town's own buildings, furniture and trees.
+                things=chosen == WALKING_SURFACES_COMPOSITION_V3,
+                segment_blocked=segment_blocked,
+                obstructions=town.obstructions
+                if chosen == WALKING_SURFACES_COMPOSITION_V3
+                else None,
             )
         raise UnavailableSocietyInput(
             f"no society composition walks a {ground.navigation_form!r} ground"

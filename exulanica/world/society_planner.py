@@ -48,6 +48,7 @@ from exulanica.world.society_input_policy import (
     UNREAD_PLACEMENT_REASONS,
     WALKING_SURFACES_INPUT,
     WALKING_SURFACES_INPUT_V2,
+    WALKING_SURFACES_INPUT_V3,
     is_authored_ground,
     validate_local_affordances,
     validate_unread_placements,
@@ -89,6 +90,7 @@ NAVIGATION_PROFILES = {
     AUTHORED_GROUND_INPUT_V5: "authored-ground-lattice/v1",
     WALKING_SURFACES_INPUT: "city-walking-surfaces/v1",
     WALKING_SURFACES_INPUT_V2: "city-walking-surfaces/v1",
+    WALKING_SURFACES_INPUT_V3: "city-walking-surfaces/v1",
 }
 #: The frame a walking-surfaces input's positions are in: east and south millimetres about its
 #: region's origin, with no altitude: the surface a person stands on stays in the world's records.
@@ -104,11 +106,13 @@ FRAME_NAMES = {
     AUTHORED_GROUND_INPUT_V5: "authored-ground-local-mm",
     WALKING_SURFACES_INPUT: WALKING_SURFACES_FRAME,
     WALKING_SURFACES_INPUT_V2: WALKING_SURFACES_FRAME,
+    WALKING_SURFACES_INPUT_V3: WALKING_SURFACES_FRAME,
 }
 #: The altitude reference a profile's frame states, where it is not the flat authored ground.
 FRAME_ALTITUDES: Final = {
     WALKING_SURFACES_INPUT: WALKING_SURFACES_ALTITUDE,
     WALKING_SURFACES_INPUT_V2: WALKING_SURFACES_ALTITUDE,
+    WALKING_SURFACES_INPUT_V3: WALKING_SURFACES_ALTITUDE,
 }
 #: The origin each profile's targets may state, besides a district's and a placed object's.
 WORLD_TARGET_ORIGINS: Final = {
@@ -116,6 +120,7 @@ WORLD_TARGET_ORIGINS: Final = {
     WALKING_SURFACES_INPUT_V2: ("premises", "furniture"),
     # A rest or a visit a thing the world's author placed offers, by the thing's id.
     AUTHORED_GROUND_INPUT_V5: ("thing",),
+    WALKING_SURFACES_INPUT_V3: ("premises", "furniture", "thing"),
 }
 #: Input profiles whose activities state the places their occupants stand at. A society advancing
 #: over one keeps each place to one person and keeps people waiting clear of every place.
@@ -125,6 +130,7 @@ PLACE_INPUTS = (
     AUTHORED_GROUND_INPUT_V4,
     WALKING_SURFACES_INPUT,
     WALKING_SURFACES_INPUT_V2,
+    WALKING_SURFACES_INPUT_V3,
     AUTHORED_GROUND_INPUT_V5,
 )
 #: The state families whose minute this planner takes: the purposeful society's own, and the
@@ -723,6 +729,11 @@ def validate_input_successor(previous: dict[str, Any], current: dict[str, Any]) 
                 "a pinned arrival belongs to a new society and keeps its profile",
             )
             _require(previous["arrival"] == current["arrival"], "arrival pin changed")
+        # A society of things reads only things inputs, and no other society reads one.
+        _require(
+            (previous["profile"] in THING_INPUTS) == (current["profile"] in THING_INPUTS),
+            "a society of things reads only its own kind of input",
+        )
         # A society's area is part of what the society is, like its seed. An edit changes what is
         # in the area, never where the area is.
         _require(

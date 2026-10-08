@@ -80,4 +80,7 @@ def test_a_restatement_copied_from_an_older_one_is_found(tmp_path):
     )
     where, absent = missing("world_society_input_profile_check", tmp_path)
     assert where == "9999_a_copied_restatement.sql"
-    assert absent == ["exulanica.society-input/authored-ground-v5"]
+    # Every profile composed since 0151 is named, the things composition's first among them, and
+    # nothing the older restatement already admitted.
+    assert "exulanica.society-input/authored-ground-v5" in absent
+    assert all(profile not in older for profile in absent)

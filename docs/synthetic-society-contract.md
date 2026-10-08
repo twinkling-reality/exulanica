@@ -1469,18 +1469,19 @@ process.
 
 The society of things (`exulanica/world/society_things.py`) is the purposeful society where
 everybody is a thing of a stated kind ([things contract](things-contract.md)). A society is made
-with it by name over a saved world's own lattice ground, a starter or a world made from photographs
-(`creates` does not name it, so a new world's society stays v2 unless asked for). The route makes
+with it by name over a saved world's own lattice ground, a starter, a world made from photographs or
+a generated town (`creates` does not name it, so a new world's society stays v2 unless asked for); a
+world made from a world kind is lived in by the living society only, and refuses it. The route makes
 one only on a host that sets `EXULANICA_SOCIETY_OF_THINGS` on, and refuses it by name elsewhere
 (`society_engine_not_offered`). Its people walk, choose, stay and talk by the purposeful planner's
 rules, use their hands where a decider chooses (below) and follow nobody yet. Each of them names its
-kind by key, version and digest, and how it came: `populated` (the people its ground's
-population brings, the purposeful genesis's own people with the same names and draws, of the kind
-the ground's catalog entry names, `population_kind`), `placed` (a being the world's author placed in
-the version) or `crossed` (a visitor from an outside program). At genesis the author's beings are
-seated first, each at the open node nearest where it was placed, and only then does anybody of the
-population whose starting node one took step to the open node nearest it, so a composed scene holds
-from its first minute.
+kind by key, version and digest, and how it came: `populated` (the people its ground's population
+brings, the purposeful genesis's own people with the same names and draws, of the kind the ground's
+catalog entry names, `population_kind`), `placed` (a being the world's author placed in the version)
+or `crossed` (a visitor from an outside program). At genesis the author's beings are seated first,
+each at the open node nearest where it was placed, and only then does anybody of the population
+whose starting node one took step to the open node nearest it, so a composed scene holds from its
+first minute.
 
 **Its input carries the things its author placed.** It reads
 `exulanica.society-input/authored-ground-v5` (migration 0151): the fourth profile's projection, at
@@ -1511,6 +1512,38 @@ hands and its things never move, and records every minute as it did then: a line
 hearers keep no model and no speaker's name, and nobody keeps what it said. Its stored minutes
 replay byte for byte (`tests/test_society_things_before_modules.py`, a history recorded before
 modules were).
+
+**On a town's ground.** A society of things over a generated town reads
+`exulanica.society-input/walking-surfaces-v3` (migration 0169): the town's walking-surfaces-v1
+input, its surfaces, premises and furniture, its residents and the purposeful routine, with the same
+`things` list and `population_kind` (the town's catalog entry names the villager), and, in a
+society's first input, the `modules` it runs. A town's footways stand on its kerbs, above the
+ground's plane, so a thing rests on the surface when it stands within 200 mm (`RESTS_ON_SURFACE_MM`)
+of the height of the walking line nearest it, read along the town's own edges between their ends'
+support heights; one that does not states its `height_mm` above that line, offers nothing
+(`authored_object_off_ground`) and still blocks. A placed object whose kind blocks walking removes
+every walking-line node within the walking clearance of its box turned with it, and cuts every line
+that passes within that clearance: from each end that stays, the line keeps the part a person walks
+clear of the thing, ending at a node of its own (`cut:`); a premises or a seat left with no node to
+stand at, no place, or only places no longer reached from the rest of the town (a thing cut the
+short way to them from both ends) is recorded `authored_affordance_unreachable`. An object whose
+kind offers somewhere to rest or to visit offers it at its kind's places, turned with it. A place is
+kept where it stands clear of every thing and of the town's own buildings, street furniture and
+trees (the obstructions the town's place stands its spots clear of), a standing spacing from every
+place the town still offers and every place kept before it, and not exactly on a node already there.
+A step keeps a walking clearance from every other thing and the town's obstructions, and at least a
+standing radius from its own thing. Each line offers its one nearest point to the place, within 4 m
+(`PLACE_JOIN_REACH_MM`, the footway station spacing), and the nearest offered point a step reaches
+is the join; where none is, the place steps first to a corner of its thing's box pushed out a
+standing radius along both faces (`round:`) and from there to the nearest point a line offers that
+corner, the shortest such way kept. A join at an end of a line is that end; any other point splits
+the line at a node of its own (`join:`), or at the place itself where the place stands on the line.
+Targets, subjects and places are named as on the authored ground. A being neither blocks nor offers:
+it lives in the society. The dependencies and the unknown-kind refusal are v5's. A town with nothing
+placed in it composes v1's surfaces and targets, and a town's v1 and v2 inputs do not change. A town
+states its arrival (its spawn, `navigation.arrival_mm`), so a v3 input pins no `arrival` of its own;
+a visitor crosses in through a gate placed on the town, at the open node nearest the gate's arrival
+point. A society of things reads only things inputs, and no other society reads one.
 
 **A minute.** The planner's minute, the person's direct requests and the people's decisions come
 first, unchanged, and every event they record names v7; then the things phase:
