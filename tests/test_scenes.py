@@ -335,7 +335,10 @@ def test_a_world_s_arrival_is_read_from_its_entry_and_a_scene_fits_only_its_grou
 
     with pytest.raises(SceneRefused, match="scene_world_has_no_arrival"):
         scene_arrival(Nowhere())
-    scene = next(iter(shipped_scenes().values()))
-    assert scene.ground == "starter"
+    shipped = list(shipped_scenes().values())
+    starter = next(scene for scene in shipped if scene.ground == "starter")
     with pytest.raises(SceneRefused, match="scene_ground_mismatch"):
-        places(scene, town)
+        places(starter, town)
+    # The positive control: a scene laid out for a generated town places every thing there.
+    in_town = next(scene for scene in shipped if scene.ground == "generated")
+    assert len(places(in_town, town)) == len(in_town.document["things"])

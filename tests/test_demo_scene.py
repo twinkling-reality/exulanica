@@ -317,7 +317,12 @@ def test_the_builder_refuses_another_engine_and_a_mind_that_reads_back_as_anothe
 
 def test_the_builder_records_the_travellers_a_scene_names_and_refuses_a_gate_it_lacks(tmp_path):
     builder = _builder()
-    catalogued = next(path for path in _all_scenes() if path.parent == CATALOG)
+    catalogued = next(
+        path
+        for path in _all_scenes()
+        if path.parent == CATALOG
+        and json.loads(path.read_text(encoding="utf-8"))["ground"]["kind"] == "starter"
+    )
     scene = builder.read_scene(catalogued)
     assert "travellers" in scene, "the positive control: the catalog's scene names its travellers"
     # Whoever opens the gate reads them from the record; the builder opens none.
