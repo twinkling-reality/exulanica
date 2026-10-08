@@ -489,7 +489,10 @@ above) ([`tests/test_comparison_day_postgres.py`](../tests/test_comparison_day_p
 
 **Where it runs.** A host's comparison worker (`exulanica/api/society_comparison_worker.py`) plays
 it off the request path, for the workspaces the host asks models for
-(`EXULANICA_SOCIETY_CONTROL_WORKSPACES`), by the lease the playback worker claims a society by: it
+(`EXULANICA_SOCIETY_CONTROL_WORKSPACES`, and under durable spending the watched workspaces every
+round and every account workspace once every five minutes, so a comparison a visitor started
+finishes after they leave;
+[deployment](deployment.md#515-society-playback)), by the lease the playback worker claims a society by: it
 claims the workspace's oldest unfinished start whose lease is free or has run out, for the control's
 30 s lease, renews it before each run and after each simulated minute, and plays the runs without an
 outcome through the runner, the anchors first, with no connection held while a model is asked. Where

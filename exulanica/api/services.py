@@ -30,7 +30,10 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import os
+import threading
+import time
 import uuid
 from collections.abc import Callable, Iterable, Mapping
 from contextlib import AbstractContextManager
@@ -233,6 +236,47 @@ SOCIETY_OF_THINGS_ENV: Final = env_name("SOCIETY_OF_THINGS")
 AUTHORED_WORLDS_PROFILE: Final = "exulanica.society-authored-worlds/v1"
 
 
+_LOG = logging.getLogger(__name__)
+
+#: How long one read of the workspaces a host plays and asks models for is used again, in seconds:
+#: a route's refusal and every model ask's check, and the account role answers at most this often.
+WATCHED_READ_SECONDS: Final = 5.0
+
+#: How long the last good read is still used while reads fail, in seconds; after it, none is
+#: watched, so a stalled account database never keeps a departed visitor's models asked.
+WATCHED_STALE_SECONDS: Final = 60.0
+
+
+class WatchedRead:
+    """The last read of :meth:`AccountRuntime.watched_workspaces`, used again for
+    :data:`WATCHED_READ_SECONDS`. A read that fails is not tried again for that long either, so
+    callers do not queue one after another on a stalled account database; meanwhile the last good
+    read stands for at most :data:`WATCHED_STALE_SECONDS`, and then none. The failure is logged by
+    its class alone."""
+
+    def __init__(self, clock: Callable[[], float] = time.monotonic) -> None:
+        self._clock = clock
+        self._lock = threading.Lock()
+        #: When it was last asked, when it last answered, and that answer.
+        self._asked: float | None = None
+        self._good: tuple[float, frozenset[uuid.UUID]] | None = None
+
+    def get(self, read: Callable[[], frozenset[uuid.UUID]]) -> frozenset[uuid.UUID]:
+        with self._lock:
+            now = self._clock()
+            if self._asked is None or now - self._asked >= WATCHED_READ_SECONDS:
+                self._asked = now
+                try:
+                    self._good = (now, read())
+                except Exception as exc:
+                    _LOG.warning(
+                        "the watched workspaces could not be read: %s", type(exc).__qualname__
+                    )
+            if self._good is None or now - self._good[0] >= WATCHED_STALE_SECONDS:
+                return frozenset()
+            return self._good[1]
+
+
 @dataclass(frozen=True, slots=True)
 class Services:
     """Everything a request might need, and a note about what is not configured."""
@@ -337,10 +381,48 @@ class Services:
     spending_mode: str | None = None
     #: The durable spending authority the model client is composed with, when durable.
     spending: DurableSpending | None = None
+    #: The last read of the workspaces account discovery plays and asks models for.
+    watched: WatchedRead = field(default_factory=WatchedRead, compare=False, repr=False)
 
     @property
     def society_control_enabled(self) -> bool:
         return self.runs_society_control_worker or bool(self.society_control_workspaces)
+
+    @property
+    def discovers_model_workspaces(self) -> bool:
+        """Whether this host asks models for workspaces account discovery finds, beside the ones
+        its environment lists: only where discovery is on and spending is durable, so every ask
+        is admitted against the asking workspace's own grant. Under process spending nothing but
+        the listed workspaces is asked for, since nothing would bound what one visitor spends.
+        A durable authority (``spending``) is composed only under durable spending."""
+        return (
+            self.runs_society_control_worker
+            and self.accounts is not None
+            and self.spending is not None
+        )
+
+    def watched_workspaces(self) -> frozenset[uuid.UUID]:
+        """What account discovery plays and asks models for: every active owner's workspace and
+        the guests' seen within the play window (:meth:`AccountRuntime.watched_workspaces`),
+        read at most every :data:`WATCHED_READ_SECONDS`; empty without accounts."""
+        accounts = self.accounts
+        if accounts is None:
+            return frozenset()
+        return self.watched.get(accounts.watched_workspaces)
+
+    def asks_models_for(self, workspace_id: uuid.UUID) -> bool:
+        """Whether this host asks models for a workspace: one its environment lists, or one
+        account discovery is watching where :attr:`discovers_model_workspaces`."""
+        if workspace_id in self.society_control_workspaces:
+            return True
+        return self.discovers_model_workspaces and workspace_id in self.watched_workspaces()
+
+    def _guest_play(self) -> tuple[int, int] | None:
+        """The guests' play window and playing maximum, where discovery plays guests' towns."""
+        guest = None if self.accounts is None else self.accounts.guest
+        if not self.runs_society_control_worker or guest is None:
+            return None
+        return guest.play_seconds, guest.playing_maximum
 
     def request_policy(
         self,
@@ -387,9 +469,10 @@ class Services:
         """What asks the models a society's owner chose before a minute, for every role its engine
         hosts, or None without a society runtime.
 
-        Only the workspaces this host's environment lists are asked for; a workspace account
-        discovery adds is played by its routine alone. Each ask carries the workspace's rules,
-        with no place's name released: a role's decision is not a use a place-name right offers.
+        The workspaces this host's environment lists are asked for, and, where
+        :attr:`discovers_model_workspaces`, the ones account discovery watches; any other workspace
+        discovery adds is played by its routine alone. Each ask carries the workspace's rules, with
+        no place's name released: a role's decision is not a use a place-name right offers.
         """
         if self.society_runtime is None:
             return None
@@ -402,6 +485,8 @@ class Services:
             manifest=load_manifest(),
             manifest_sha256=hashlib.sha256(MANIFEST_PATH.read_bytes()).hexdigest(),
             external=None if self.door is None else self.door.asker(),
+            discovered=self.watched_workspaces if self.discovers_model_workspaces else None,
+            spending_refusals=self.spending_refusals if self.spending is not None else None,
         )
 
     def person_decision_policy(self, workspace_id: uuid.UUID) -> WorkspaceRequestPolicy:
@@ -454,7 +539,7 @@ class Services:
         same host facts a comparison of people is refused by, its seeds the signal catalog's."""
         if not (self.runs_comparison_worker or self.comparisons_played_elsewhere):
             return "comparisons_not_played"
-        if workspace_id not in self.society_control_workspaces:
+        if not self.asks_models_for(workspace_id):
             return "comparisons_not_run_here"
         if self.model_client is None:
             return PROVIDER_CREDENTIAL_ABSENT
@@ -466,14 +551,15 @@ class Services:
         """Why this server starts no comparison for a workspace, or None when it may: its seed
         catalog commits no development seed's text (``comparisons_not_set_up``), nothing plays the
         comparisons started here (``comparisons_not_played``), it asks no model for the workspace
-        (``comparisons_not_run_here``), it has no model client, or it leaves them to another
-        process the installation does not run (:meth:`comparison_process_absent`), which nothing
-        plays either (``comparisons_not_played``)."""
+        (``comparisons_not_run_here``, :meth:`asks_models_for`), it has no model client, or it
+        leaves them to another process the installation does not run
+        (:meth:`comparison_process_absent`), which nothing plays either
+        (``comparisons_not_played``)."""
         if not self.comparison_seeds:
             return "comparisons_not_set_up"
         if not (self.runs_comparison_worker or self.comparisons_played_elsewhere):
             return "comparisons_not_played"
-        if workspace_id not in self.society_control_workspaces:
+        if not self.asks_models_for(workspace_id):
             return "comparisons_not_run_here"
         if self.model_client is None:
             return PROVIDER_CREDENTIAL_ABSENT
@@ -529,8 +615,17 @@ class Services:
 
     def build_comparison_worker(self, *, keeps_share: bool) -> SocietyComparisonWorker | None:
         """What plays the comparisons started from the application, for the workspaces this host
-        asks models for, or None where it asks models for none or has no society runtime."""
-        if self.society_runtime is None or not self.society_control_workspaces:
+        asks models for, or None where it asks models for none or has no society runtime.
+
+        Where :attr:`discovers_model_workspaces`, the watched workspaces are played every round
+        and every active account workspace once every few minutes
+        (:data:`~exulanica.api.society_comparison_worker.SLOW_SCAN_SECONDS`): a start is made
+        only in a watched workspace, and a comparison a visitor started finishes after they
+        leave, within its own bound and their grant, while visitors who are not there cost no
+        round."""
+        accounts = self.accounts
+        discovers = self.discovers_model_workspaces and accounts is not None
+        if self.society_runtime is None or not (self.society_control_workspaces or discovers):
             return None
         return SocietyComparisonWorker(
             self.database,
@@ -540,6 +635,10 @@ class Services:
             workspaces=self.society_control_workspaces,
             keeps_share=keeps_share,
             signal_runner_for=self.signal_comparison_runner,
+            workspace_source=self.watched_workspaces if discovers else None,
+            slow_source=(
+                accounts.active_owned_workspaces if discovers and accounts is not None else None
+            ),
         )
 
     def references_offered_here(self) -> bool:
@@ -618,11 +717,11 @@ class Services:
         """Why this host asks no model for a workspace's subjects of ``role``, or None when it
         asks them.
 
-        The facts :meth:`decision_host` acts on: the workspaces the environment lists, the
-        process's client, and what is left of its budget and of the share the role's decisions
-        may spend. A code from ``HOST_REFUSALS``.
+        The facts :meth:`decision_host` acts on: the workspaces it asks models for
+        (:meth:`asks_models_for`), the process's client, and what is left of its budget and of the
+        share the role's decisions may spend. A code from ``HOST_REFUSALS``.
         """
-        if workspace_id not in self.society_control_workspaces:
+        if not self.asks_models_for(workspace_id):
             return "models_not_run_here"
         return host_refusal(role, self.model_client, load_manifest(), role.contract())
 
@@ -724,7 +823,7 @@ class Services:
             runtime=self.society_runtime,
             workspaces=self.society_control_workspaces,
             workspace_source=(
-                self.accounts.active_owned_workspaces
+                self.accounts.watched_workspaces
                 if self.runs_society_control_worker and self.accounts is not None
                 else None
             ),
@@ -739,6 +838,7 @@ class Services:
             self.society_control_workspaces,
             account_discovery=self.runs_society_control_worker,
             base_tick_interval_ms=self.society_base_tick_interval_ms,
+            guests=self._guest_play(),
         )
 
     def playback_process(self) -> PlaybackProcess | None:
@@ -752,11 +852,12 @@ class Services:
             workspaces=self.society_control_workspaces,
             account_discovery=self.runs_society_control_worker,
             workspace_source=(
-                self.accounts.active_owned_workspaces
+                self.accounts.watched_workspaces
                 if self.runs_society_control_worker and self.accounts is not None
                 else None
             ),
             base_tick_interval_ms=self.society_base_tick_interval_ms,
+            guests=self._guest_play(),
         )
 
     @property
@@ -775,8 +876,9 @@ class Services:
                 "a question or compose an answer will refuse rather than guess."
             )
         else:
-            # Said only where a playback host asks models for people, which is only for the
-            # workspaces the environment lists: one enabled by account discovery alone asks nobody.
+            # Said only where a playback host asks models for people: for the workspaces the
+            # environment lists, or for the watched ones under durable spending; a host enabled by
+            # account discovery alone under process spending asks nobody.
             spent = (
                 next(
                     (
@@ -791,7 +893,7 @@ class Services:
                     ),
                     None,
                 )
-                if self.society_control_workspaces
+                if self.society_control_workspaces or self.discovers_model_workspaces
                 else None
             )
             if spent == "process_budget_spent":

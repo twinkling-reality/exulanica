@@ -1,7 +1,8 @@
 """The host's playback asking, before a society's minute, the models a world's owner chose.
 
 Every decision role an engine hosts (:mod:`exulanica.world.decision_roles`) is asked the same way,
-by :class:`DecisionHost`: only in a workspace the host's environment lists, within each role's
+by :class:`DecisionHost`: only in a workspace the host's environment lists or, under durable
+spending, one account discovery watches, within each role's
 contract bounds per world and hour, within the share of the process's model budget the role's
 contract lets its decisions spend, and with no connection held while a model is asked. A person
 in a purposeful society is the first such role.
@@ -24,7 +25,7 @@ import logging
 import threading
 import time
 import uuid
-from collections.abc import Callable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Collection, Iterator, Mapping, Sequence
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
 from decimal import Decimal
@@ -56,6 +57,7 @@ from exulanica.models.spending import SpendingRefused
 from exulanica.models.usage import CallUsage, usd_string
 from exulanica.selection.calls import CallLog
 from exulanica.selection.validation import Session
+from exulanica.spending.status import SpendingRefusals
 from exulanica.things.lines import LineRefused, check_line
 from exulanica.world.deciders import arrival_deciders, check_external_config
 from exulanica.world.decision_roles import (
@@ -660,12 +662,19 @@ class DecisionHost:
     """What the host's playback asks before a society's minute, for every role its engine hosts.
 
     ``workspaces`` are the ones the host's environment lists (``EXULANICA_SOCIETY_CONTROL_
-    WORKSPACES``): no other workspace's subjects are asked for, whatever its owner chose.
+    WORKSPACES``), and ``discovered``, where given, reads the ones account discovery adds under
+    durable spending (:meth:`~exulanica.api.services.Services.asks_models_for`): no other
+    workspace's subjects are asked for, whatever its owner chose.
     ``client`` is the process's model client, or ``None`` with no credential, in which case no
     model is asked and nothing is written for a subject a model runs. ``policy_for`` attaches the
     workspace's rules to each ask. ``external`` is the outside programs' door the application
     registers, or ``None``, in which case no outside program is asked and nothing is written for
-    a subject one decides for; it needs no model client. The roles are the registry's
+    a subject one decides for; it needs no model client. Outside programs are asked for the same
+    workspaces as models, discovered ones included; a guest holds no ``door.grant``, so only an
+    owner's grant lets one in. ``spending_refusals``, where given, reads once a claim what the
+    durable authority would answer the workspace's next attempt, by provider: a subject whose
+    model's provider would be refused is not reserved for, and decides by its routine, so a spent
+    allowance takes no admission lock. The roles are the registry's
     (:func:`~exulanica.world.decision_roles.decision_roles`), the one every reader of a role's
     documents asks.
     """
@@ -678,6 +687,10 @@ class DecisionHost:
     manifest: Manifest
     manifest_sha256: str
     external: ExternalAsker | None = None
+    discovered: Callable[[], frozenset[uuid.UUID]] | None = None
+    spending_refusals: Callable[[psycopg.Connection, uuid.UUID], SpendingRefusals | None] | None = (
+        None
+    )
 
     def before_minute(self, claim: ControlClaim, lease_ends: float) -> bool:
         """Ask every chosen subject at a choice point; True when the coming minute runs alone.
@@ -690,7 +703,9 @@ class DecisionHost:
         refusal): the claim advances as it would with no model. A subject an outside program
         decides for is asked through ``external``, beside the models, with no model client.
         """
-        if claim.workspace_id not in self.workspaces:
+        if claim.workspace_id not in self.workspaces and (
+            self.discovered is None or claim.workspace_id not in self.discovered()
+        ):
             return False
         session = Session(workspace_id=claim.workspace_id, actor=claim.actor)
         with self.database.session(claim.workspace_id) as connection:
@@ -756,9 +771,10 @@ class DecisionHost:
             if not asking_roles and not outside_roles:
                 return False
             planned = []
+            spent = self._spent_providers(connection, claim.workspace_id) if asking_roles else ()
             for role, contract, chosen in asking_roles:
                 assert client is not None
-                due = self._due(role, contract, chosen, row["state"], client)
+                due = self._due(role, contract, chosen, row["state"], client, spent)
                 if due:
                     planned.append((role, contract, lease_ends, due))
             outside_planned = []
@@ -1042,12 +1058,16 @@ class DecisionHost:
         chosen: Mapping[str, Mapping[str, Any]],
         state: Mapping[str, Any],
         client: ModelClient,
+        spent: Collection[str] = (),
     ) -> list[tuple[str, Mapping[str, Any], ModelSpec, AnsweringMechanism]]:
-        """Each chosen subject of ``role`` at a choice point whose model this host may ask."""
+        """Each chosen subject of ``role`` at a choice point whose model this host may ask, and
+        whose provider's allowance (``spent``, the providers admission would refuse) remains."""
         present = set(role.adapter.subjects(state))
         due = []
         for subject, choice in sorted(chosen.items()):
             if subject not in present or not role.adapter.due(state, subject):
+                continue
+            if choice["model"]["provider"] in spent:
                 continue
             askable = _askable(role, self.manifest, contract, choice["model"]["model_id"])
             if (
@@ -1057,6 +1077,27 @@ class DecisionHost:
                 continue
             due.append((subject, choice, *askable))
         return due
+
+    def _spent_providers(
+        self, connection: psycopg.Connection, workspace: uuid.UUID
+    ) -> frozenset[str]:
+        """The providers the durable authority would refuse the workspace's next attempt of, read
+        once for the claim; none where nothing reads it or the read fails (admission still
+        refuses each attempt, as before)."""
+        if self.spending_refusals is None:
+            return frozenset()
+        try:
+            with connection.transaction():
+                refusals = self.spending_refusals(connection, workspace)
+        except Exception as exc:
+            # Never the exception's text, which may carry a connection string.
+            _LOG.warning("the spending state could not be read: %s", type(exc).__qualname__)
+            return frozenset()
+        if refusals is None:
+            return frozenset()
+        return frozenset(
+            provider for provider, refused in refusals.by_provider.items() if refused is not None
+        )
 
     @staticmethod
     def _judged(

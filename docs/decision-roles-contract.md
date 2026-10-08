@@ -458,11 +458,14 @@ would, and the society of things carries out the line and the leaving
 
 ## The host's decision phase
 
-Before each minute of a playing purposeful society in a workspace the host's environment lists
-(`EXULANICA_SOCIETY_CONTROL_WORKSPACES`), the playback worker's claim runs the decision phase
-(`DecisionHost.before_minute` in `exulanica/api/decision_host.py`), the one path every role is asked
-by. A workspace the worker plays through account-wide discovery alone is asked nothing
-(`models_not_run_here`). In order:
+Before each minute of a playing purposeful society in a workspace the host asks models for, the
+playback worker's claim runs the decision phase (`DecisionHost.before_minute` in
+`exulanica/api/decision_host.py`), the one path every role is asked by. The host asks models for the
+workspaces its environment lists (`EXULANICA_SOCIETY_CONTROL_WORKSPACES`) and, where spending is
+durable and account discovery is on, for the account workspaces it plays, each ask admitted against
+the workspace's own grant ([deployment](deployment.md#515-society-playback)). A workspace the
+worker plays through discovery under process spending is asked nothing (`models_not_run_here`).
+In order:
 
 1. **Close what an earlier host left open.** A request reserved in the last four minutes with no
    receipt, left by a host that stopped between reserving and recording, is closed as
@@ -517,10 +520,15 @@ authority, which a restart does not refill ([model spending](model-spending-cont
 refusal there is recorded on the receipt by its own reason (`spending_not_granted`,
 `spending_revoked`, `spending_expired`, `spending_limit_reached`, `spending_suspended`,
 `spending_unavailable` or `spending_scope_missing`), and ends a comparison run by that reason.
+The host reads once a claim what the authority would answer the workspace's next attempt, by
+provider; a subject whose model's provider would be refused is not reserved for and decides by its
+routine, so a spent allowance writes no receipt and takes no admission lock. A refusal the spending
+state cannot foresee (a remainder that fits no attempt's reservation) is still asked, refused at
+admission and recorded as above.
 
 The host decides on what the process has spent, whoever spent it, never on what calls under way
 hold. Once what is left, beside the part kept for other work, fits no ask, it asks nobody, and the
-models route and, where the host plays workspaces its environment lists, `/readyz` say so
+models route and, where the host asks models for any workspace, `/readyz` say so
 (`process_share_spent`, or `process_budget_spent` when the whole budget does not fit). Spending only
 grows while the process runs, so either holds until it restarts. A person whose own model needs more
 for one ask than is left is not asked, while a cheaper model may still be asked for others. An ask's

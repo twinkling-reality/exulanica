@@ -437,6 +437,8 @@ def test_the_public_api_starts_in_every_entry_mode(mode, account_role, spine_sch
         "EXULANICA_ACCOUNT_DATABASE_URL": account_role,
         "EXULANICA_ACCOUNT_BROWSER_ORIGINS": f'["{ORIGIN}"]',
         "EXULANICA_GUEST_ENTRY": mode,
+        "EXULANICA_GUEST_PLAY_SECONDS": "120",
+        "EXULANICA_GUEST_PLAYING_MAXIMUM": "3",
     }
     if mode != "off":
         environ["EXULANICA_GUEST_ENTRIES_PER_DAY"] = "10"
@@ -445,6 +447,11 @@ def test_the_public_api_starts_in_every_entry_mode(mode, account_role, spine_sch
     services = build_services(environ)
     assert services.accounts is not None and services.accounts.guest is not None
     assert services.accounts.guest.mode == {"off": "closed"}.get(mode, mode)
+    # A closed entry keeps the play window and maximum, so the guests inside play as before.
+    assert (services.accounts.guest.play_seconds, services.accounts.guest.playing_maximum) == (
+        120,
+        3,
+    )
 
 
 def test_a_closed_entry_admits_nobody_new_and_keeps_the_guests_who_entered(

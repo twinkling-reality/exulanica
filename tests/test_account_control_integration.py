@@ -126,8 +126,14 @@ def test_account_repository_connections_bound_connect_and_statement_time(monkeyp
 def test_worker_discovery_is_role_separated_and_society_requires_explicit_opt_in(
     monkeypatch, tmp_path
 ):
-    token_workspace, account_workspace = uuid.uuid4(), uuid.uuid4()
-    runtime = SimpleNamespace(active_owned_workspaces=lambda: frozenset({account_workspace}))
+    token_workspace, account_workspace, watched = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+    # Queues are drained for every account workspace; playback plays the watched ones (S4: every
+    # owner's, and a guest's while the guest is there).
+    runtime = SimpleNamespace(
+        active_owned_workspaces=lambda: frozenset({account_workspace}),
+        watched_workspaces=lambda: frozenset({watched}),
+        guest=None,
+    )
     token = TokenDirectory(
         sessions={"configured-digest": Session(workspace_id=token_workspace, actor=uuid.uuid4())}
     )
@@ -161,7 +167,7 @@ def test_worker_discovery_is_role_separated_and_society_requires_explicit_opt_in
     dynamic = dataclasses.replace(configured, runs_society_control_worker=True)
     dynamic.build_society_control_worker()
     assert captured["society_static"] == frozenset()
-    assert captured["society_source"]() == frozenset({account_workspace})
+    assert captured["society_source"]() == frozenset({watched})
 
     without_accounts = dataclasses.replace(dynamic, accounts=None)
     with pytest.raises(ValueError, match="configured accounts"):

@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import logging
 import uuid
 from collections.abc import Callable
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Final, Literal
 
+import psycopg
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, StrictInt
@@ -19,6 +21,8 @@ from exulanica.world.society_control_repository import SocietyControlRepository
 from exulanica.world.society_controls import DEFAULT_BASE_TICK_INTERVAL_MS, effective_interval_ms
 from exulanica.world.world_clock import ClockRefused
 from exulanica.world.worlds import require_world
+
+_LOG = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/world/versions/{version_id}/society/control", tags=["society"])
 
@@ -94,8 +98,88 @@ class ControlRead(BaseModel):
     #: Why this host does not play the world, by code (the key of ``HOST_PLAYBACK_REFUSALS``), or
     #: null while it does. ``host_playback.reason`` keeps the sentence.
     host_playback_code: (
-        Literal["no_playback_worker", "playback_worker_stopped", "workspace_not_played"] | None
+        Literal[
+            "no_playback_worker",
+            "playback_worker_stopped",
+            "workspace_not_played",
+            "guest_towns_full",
+        ]
+        | None
     )
+    #: Why people here who would ask an open model decide by their routines instead, by code, or
+    #: null while their models may be asked. The world keeps playing either way.
+    model_minds_code: Literal["spending_cap_reached"] | None
+    #: The sentence for ``model_minds_code``, or null.
+    model_minds_reason: str | None
+
+
+#: What a reader is told when the allowance for open models is spent: the world plays on.
+MODEL_MINDS_REASONS: Final = {
+    "spending_cap_reached": (
+        "The allowance for open models on this visit is used up, so people here now follow "
+        "their own routines. The world keeps playing."
+    ),
+}
+
+
+def model_minds_code(
+    request: Request,
+    connection: psycopg.Connection,
+    workspace: uuid.UUID,
+    society_id: str | None = None,
+) -> str | None:
+    """``spending_cap_reached`` when this workspace's allowance for open models is used up: the
+    workspace's own grant, or the authority every guest shares. None while it remains, or where no
+    durable authority admits (the process fuse is its own refusal, at call time).
+
+    Said when either holds:
+
+    *   the durable authority would refuse the next attempt of every provider the workspace
+        holds an allowance for (each refusal ``spending_limit_reached``; a provider never
+        granted is not the workspace's allowance); or
+    *   the society's latest receipt was refused ``spending_limit_reached``: admission refuses
+        once the remainder is below one attempt's reservation, which the spending state cannot
+        foresee, so a USD allowance usually ends this way, before its calls do.
+    """
+    services = getattr(request.app.state, "services", None)
+    if services is None:
+        return None
+    try:
+        # A savepoint, so a failed read leaves the request's transaction usable: the control read,
+        # a PUT and an already committed step answer as before, without the cap's words.
+        with connection.transaction():
+            refusals = services.spending_refusals(connection, workspace)
+            if refusals is None:
+                return None
+            latest = (
+                None
+                if society_id is None
+                else connection.execute(
+                    "select document->>'reason' as reason from world_society_decision "
+                    "where workspace_id = %s and society_id = %s "
+                    "order by decision_seq desc limit 1",
+                    (workspace, uuid.UUID(society_id)),
+                ).fetchone()
+            )
+    except Exception as exc:
+        # Never the exception's text, which may carry a connection string.
+        _LOG.warning("the spending state could not be read: %s", type(exc).__qualname__)
+        return None
+    granted = [
+        refused
+        for refused in refusals.by_provider.values()
+        if refused is None or refused.reason != "spending_not_granted"
+    ]
+    every_spent = bool(granted) and all(
+        refused is not None and refused.reason == "spending_limit_reached" for refused in granted
+    )
+    refused_last = latest is not None and _row_value(latest, "reason") == "spending_limit_reached"
+    return "spending_cap_reached" if every_spent or refused_last else None
+
+
+def _row_value(row: Any, key: str) -> Any:
+    """A column of a row read as a mapping or a tuple (the scoped connection's row factory)."""
+    return row[key] if isinstance(row, dict) else row[0]
 
 
 def host_base_tick_interval_ms(request: Request) -> int:
@@ -104,9 +188,13 @@ def host_base_tick_interval_ms(request: Request) -> int:
     )
 
 
-def with_host_playback(control: dict, request: Request, workspace: uuid.UUID) -> dict:
+def with_host_playback(
+    control: dict, request: Request, workspace: uuid.UUID, connection: psycopg.Connection
+) -> dict:
     """The control read with whether this host plays it: from the process's own worker, or from
-    the playback process this one leaves playback to."""
+    the playback process this one leaves playback to; and whether its people's open models may
+    still be asked (:func:`model_minds_code`)."""
+    minds = model_minds_code(request, connection, workspace, control.get("society_id"))
     refusal = host_playback_refusal(
         getattr(request.app.state, "society_control_worker", None),
         getattr(request.app.state, "society_control_thread", None),
@@ -128,6 +216,8 @@ def with_host_playback(control: dict, request: Request, workspace: uuid.UUID) ->
         # The stable code beside the sentence, for a client to branch on. Beside, not inside:
         # the browser's reader of host_playback refuses a key it does not know.
         "host_playback_code": refusal,
+        "model_minds_code": minds,
+        "model_minds_reason": None if minds is None else MODEL_MINDS_REASONS[minds],
     }
 
 
@@ -181,6 +271,7 @@ def read_control(
             repository(connection, session, request, world_id).read(version_id),
             request,
             session.workspace_id,
+            connection,
         )
     )
 
@@ -201,6 +292,7 @@ def configure_control(
             ),
             request,
             session.workspace_id,
+            connection,
         )
     )
 
@@ -220,7 +312,9 @@ def manual_step(
         )
         return {
             **result,
-            "control": with_host_playback(result["control"], request, session.workspace_id),
+            "control": with_host_playback(
+                result["control"], request, session.workspace_id, connection
+            ),
             # The society is served as the society routes serve it: never its seed.
             "society": served_snapshot(result["society"]),
         }

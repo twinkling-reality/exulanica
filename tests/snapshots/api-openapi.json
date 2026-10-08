@@ -23729,7 +23729,8 @@
         "enum": [
          "no_playback_worker",
          "playback_worker_stopped",
-         "workspace_not_played"
+         "workspace_not_played",
+         "guest_towns_full"
         ]
        },
        {
@@ -23737,6 +23738,29 @@
        }
       ],
       "title": "Host Playback Code"
+     },
+     "model_minds_code": {
+      "anyOf": [
+       {
+        "type": "string",
+        "const": "spending_cap_reached"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Model Minds Code"
+     },
+     "model_minds_reason": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Model Minds Reason"
      }
     },
     "additionalProperties": false,
@@ -23764,7 +23788,9 @@
      "play_ineligible_reason",
      "play_eligible",
      "host_playback",
-     "host_playback_code"
+     "host_playback_code",
+     "model_minds_code",
+     "model_minds_reason"
     ],
     "title": "ControlRead",
     "description": "``exulanica.society-control/v1`` as the routes return it. Undeclared keys fail loudly."

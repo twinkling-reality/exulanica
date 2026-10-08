@@ -516,11 +516,42 @@ stops startup on a malformed value, with a named code from `SOCIETY_SETTING_REFU
 | --- | --- |
 | `EXULANICA_SOCIETY_CONTROL_WORKSPACES` | A JSON array of workspace ids whose playing societies this instance advances, with no accounts needed. Absent or `[]` plays none; a malformed or repeated id is refused |
 | `EXULANICA_SOCIETY_TICK_INTERVAL_MS` | The base wait between simulated minutes, in whole milliseconds: 1,000 to 60,000 and divisible by 4, so every speed divides it exactly. Absent means the declared default, 8,000 |
-| `EXULANICA_SOCIETY_CONTROL_WORKER` | Account-wide discovery. Absent or `off` disables it; `true`, `yes`, `on` or `1` also plays every current account-owned workspace, and needs accounts configured |
+| `EXULANICA_SOCIETY_CONTROL_WORKER` | Account-wide discovery. Absent or `off` disables it; `true`, `yes`, `on` or `1` also plays every current account owner's workspace and, where guests enter (5.1.4), each guest's while the guest is there (below), and needs accounts configured |
+| `EXULANICA_GUEST_PLAY_SECONDS` | How long after a guest's last request their town keeps playing: 60 to 86,400 seconds, default 900. A session's last use is written at most once a minute |
+| `EXULANICA_GUEST_PLAYING_MAXIMUM` | How many guests' towns play at once: 0 to 1,000, default 24. A playing town keeps its place while its guest is there; a freed place goes to the guest who entered first among those waiting |
 | `EXULANICA_PLAYBACK_WORKER` | Who plays the listed and discovered workspaces' societies and seals their coupled traffic. Absent or `on`, this process, in threads; `process`, a process of its own (`exulanica-playback-worker`, 5.2.12), and this one serves the playback controls without playing or sealing; `off`, nothing, and a society advances only a minute at a time when somebody advances it. Any other value stops startup (`playback_worker_not_recognised`) |
-| `EXULANICA_COMPARISON_WORKER` | Who plays the comparisons started from the application for the listed workspaces. Absent, this process, in a thread; `process`, a process of its own (5.2.12), and this one only serves starts, refusing them as `comparisons_not_played` where the installation's profile declares the `comparison` component not installed or unavailable (9.1); `off`, nothing, and every start is refused as `comparisons_not_played`. Any other value stops startup (`comparison_worker_not_recognised`) |
+| `EXULANICA_COMPARISON_WORKER` | Who plays the comparisons started from the application for the workspaces this host asks models for (below). Absent, this process, in a thread; `process`, a process of its own (5.2.12), and this one only serves starts, refusing them as `comparisons_not_played` where the installation's profile declares the `comparison` component not installed or unavailable (9.1); `off`, nothing, and every start is refused as `comparisons_not_played`. Any other value stops startup (`comparison_worker_not_recognised`) |
 
-Listed and discovered workspaces are played together. A person's saved world needs no host
+Listed and discovered workspaces are played together. A guest's workspace is discovered while one
+of its browser sessions, unrevoked and unexpired, was used within `EXULANICA_GUEST_PLAY_SECONDS`.
+At most `EXULANICA_GUEST_PLAYING_MAXIMUM` guests' towns play: a playing town keeps its place while
+its guest is there (the process remembers which it played last), a freed place goes to the waiting
+guest who entered first, and a waiting world's `host_playback_code` is `guest_towns_full`, whose
+sentence says it waits until another stops. With a maximum of 0, or no guest entry configured, no
+guest's town plays and none is told it waits: its code is `workspace_not_played`. A guest who leaves
+stops being played within the window, so a town whose people a model runs spends nothing after
+them. When a guest's allowance, or the authority all guests share, is spent, the town keeps playing
+and its people decide by their routines, and the host reserves nothing for them; the control read
+says so with `model_minds_code` `spending_cap_reached` and a sentence (synthetic society contract).
+Guests' towns are played in the API's own process (`EXULANICA_PLAYBACK_WORKER`
+on, as the public overlay sets it, 8.2): the separate playback process is not given the guest
+entry's settings, so a host with guests does not use it.
+
+Which workspaces are asked for models. The decision host, comparison starts and model choices ask
+models for the listed workspaces, and, only where spending is durable (5.1) and discovery is on,
+for the discovered ones (every owner's and the guests' being played), read through the account role
+at most every 5 seconds, a failed read tried again no sooner and the last good read used for at
+most 60 seconds: each ask is then admitted against the asking workspace's own grant. The door's
+outside programs are asked for the same workspaces; a guest holds no `door.grant`, so only an
+owner's grant lets one in. Under
+`process` spending a discovered workspace is played by its routine alone and its model choices
+read `models_not_run_here`, because nothing but a grant bounds what one visitor spends. The
+comparison worker visits the watched workspaces every round and every active account workspace once
+every five minutes under durable spending: a start is made only while its visitor is watched, and a
+comparison a visitor started finishes after they leave, within its own bound and their grant, while
+visitors who are not there cost no round.
+
+A person's saved world needs no host
 registration, because its society binds a place derived from the world itself. The default base
 wait is measured: at it, a person in a saved world walks at an ordinary pace
 ([record](evaluation/2026-09-24-living-world-pace.json)). The API starts the playback worker only
@@ -533,7 +564,8 @@ rate. Playback controls, speeds, the `host_playback` field and recovery are the
 With `EXULANICA_PLAYBACK_WORKER=process` the API plays no society and seals no traffic, so no round
 and no traffic minute runs on its interpreter; `exulanica-playback-worker`, started with the same
 settings, does both. While it runs that process holds a shared session advisory lock keyed by the
-digest of its playback configuration (the listed workspaces, account discovery and the base wait),
+digest of its playback configuration (the listed workspaces, account discovery, the base wait and,
+where guests are played, their play window and maximum),
 and the API reads `pg_locks` for its own configuration's key, at most every 5 seconds, to answer a
 world's `host_playback`: no such lock reads as `playback_worker_stopped`. A process that died holds
 no lock; a process whose loop hangs still holds it and reads as running. Readiness stays ready and
@@ -724,8 +756,10 @@ its own role. The [local database](local-database.md) guide owns its steps.
   refuses to start without `EXULANICA_BUDGET_USD`, which bounds that comparison;
   [society experiments](society-experiments.md#comparisons-of-models) owns it.
 - `python -m exulanica.orchestration.comparison_worker` plays the comparisons started from the
-  application for the workspaces `EXULANICA_SOCIETY_CONTROL_WORKSPACES` lists, from the settings in
-  5.1, when the API runs with `EXULANICA_COMPARISON_WORKER=process`; each plays within the bound its
+  application for the workspaces `EXULANICA_SOCIETY_CONTROL_WORKSPACES` lists (and, where account
+  discovery is on under durable spending, the watched workspaces every round and every account
+  workspace once every five minutes), from the settings in 5.1, when the API runs with
+  `EXULANICA_COMPARISON_WORKER=process`; each plays within the bound its
   owner stated ([running a comparison](society-experiments.md#running-a-comparison)). Before it
   claims any, it checks the database's recorded migrations against its own and its role as the API
   does (5.1.3).
@@ -1294,9 +1328,10 @@ workspaces names many worlds, each its workspace's own.
   host's health and preflight timers.
 - Built: a visitor's own entry (5.1.4): one request makes a guest's workspace, gives it its
   allowance under the guest policy and its first world from the arrival list.
-- Not built: models for workspaces found through accounts, and playing a visitor's town only while
-  it is watched. Until they are, a guest's town opens with its people on their routines, and the
-  operator's minted tokens (`mint`) remain the way to a town whose people models decide.
+- Built: a visitor's town plays, and asks the models its people were given, while the visitor is
+  there, paid from their own grant (5.1.5): the overlay turns account discovery on and plays in the
+  API's process. At most `EXULANICA_GUEST_PLAYING_MAXIMUM` guests' towns play at once; another
+  waits, and its page says so.
 
 `deploy/public/public.sh` runs every step. Every step but `build`, `images` and `save` reads the
 secrets directory `EXULANICA_DEPLOY_DIR`:
@@ -1335,7 +1370,8 @@ a second disk for backups. The layout the systemd units name:
 2. Run `init` with `EXULANICA_PUBLIC_HOST`, `EXULANICA_TLS` (the certificate contact email),
    `EXULANICA_EDGE_ADDRESS=0.0.0.0`, `EXULANICA_BACKUP_PATH`, `EXULANICA_CUSTODY_PATH` and the
    guest entry (`EXULANICA_GUEST_ENTRY`, `EXULANICA_GUEST_ENTRY_CODE` for `code`,
-   `EXULANICA_GUEST_ENTRIES_PER_DAY`), a code of at least 20 characters; only the code's SHA-256
+   `EXULANICA_GUEST_ENTRIES_PER_DAY`, and optionally `EXULANICA_GUEST_PLAY_SECONDS` and
+   `EXULANICA_GUEST_PLAYING_MAXIMUM`), a code of at least 20 characters; only the code's SHA-256
    is written. Then fill in the fuse in
    `public.env`.
 3. `read -rs NEBIUS_API_KEY && export NEBIUS_API_KEY`, then `up`, then `issue-authority` with the

@@ -274,6 +274,10 @@ EXULANICA_GUEST_ENTRY=$EXULANICA_GUEST_ENTRY
 EXULANICA_GUEST_ENTRY_CODE_SHA256=$guest_code_sha256
 EXULANICA_GUEST_ENTRIES_PER_DAY=${EXULANICA_GUEST_ENTRIES_PER_DAY:-}
 EXULANICA_GUEST_SESSION_SECONDS=${EXULANICA_GUEST_SESSION_SECONDS:-}
+# How long after a guest's last request their town plays, and how many guests' towns play at once;
+# empty takes the defaults (fifteen minutes, 24).
+EXULANICA_GUEST_PLAY_SECONDS=${EXULANICA_GUEST_PLAY_SECONDS:-}
+EXULANICA_GUEST_PLAYING_MAXIMUM=${EXULANICA_GUEST_PLAYING_MAXIMUM:-}
 ENV
     # The operator's own token: a workspace of its own and operations.read alone, for the
     # installation facts, capacity and spending reads. It makes no world and asks no model.

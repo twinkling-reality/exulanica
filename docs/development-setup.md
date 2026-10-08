@@ -299,8 +299,9 @@ pose recovery and removes sensitive work after every terminal outcome. See
 ### Seeing people and models locally
 
 A world's people move when playback advances their society. The API instance advances the playing
-societies of the workspaces `EXULANICA_SOCIETY_CONTROL_WORKSPACES` lists, or of every
-account-owned workspace when `EXULANICA_SOCIETY_CONTROL_WORKER` is on ([deployment](deployment.md)).
+societies of the workspaces `EXULANICA_SOCIETY_CONTROL_WORKSPACES` lists, or, when
+`EXULANICA_SOCIETY_CONTROL_WORKER` is on, of every active owner's workspace and the guests' who
+are there and hold a playing place ([deployment](deployment.md)).
 For a model to decide for a person, the owner's token needs `model.invoke`, and the API needs
 `NEBIUS_API_KEY` and the egress allowlist above; the owner then chooses the model in the
 application's Who decides panel. A comparison of models runs from

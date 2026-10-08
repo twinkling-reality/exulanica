@@ -57,6 +57,10 @@ HOST_PLAYBACK_REFUSALS = {
         "This server advances other worlds on their own, not this one. Advance one simulated "
         "minute at a time."
     ),
+    "guest_towns_full": (
+        "Many visitors' worlds are playing on this server right now, so yours waits until one of "
+        "them stops. Advance one simulated minute at a time meanwhile."
+    ),
 }
 
 
@@ -80,7 +84,7 @@ def host_playback_refusal(
     if thread is None or not thread.is_alive():
         return "playback_worker_stopped"
     if workspace not in worker.workspaces:
-        return "workspace_not_played"
+        return "guest_towns_full" if workspace in worker.waiting else "workspace_not_played"
     return None
 
 
@@ -99,21 +103,25 @@ _PRESENCE: Final = (
 
 
 def playback_configuration_sha256(
-    workspaces: Iterable[uuid.UUID], *, account_discovery: bool, base_tick_interval_ms: int
+    workspaces: Iterable[uuid.UUID],
+    *,
+    account_discovery: bool,
+    base_tick_interval_ms: int,
+    guests: tuple[int, int] | None = None,
 ) -> str:
     """The digest of what a playback host plays: the workspaces it lists, whether it also plays
-    every active account-owned workspace, and its base wait. A playback process and the API that
-    leaves playback to it compute it from the same settings."""
-    return hashlib.sha256(
-        canonical_json(
-            {
-                "profile": PLAYBACK_CONFIGURATION_PROFILE,
-                "workspaces": sorted(str(workspace) for workspace in workspaces),
-                "account_discovery": account_discovery,
-                "base_tick_interval_ms": base_tick_interval_ms,
-            }
-        )
-    ).hexdigest()
+    the active account workspaces, and its base wait; with guests, how long after a visit their
+    towns play and how many at once (``guests``, seconds and the maximum). A playback process and
+    the API that leaves playback to it compute it from the same settings."""
+    document: dict[str, object] = {
+        "profile": PLAYBACK_CONFIGURATION_PROFILE,
+        "workspaces": sorted(str(workspace) for workspace in workspaces),
+        "account_discovery": account_discovery,
+        "base_tick_interval_ms": base_tick_interval_ms,
+    }
+    if guests is not None:
+        document["guests"] = {"play_seconds": guests[0], "playing_maximum": guests[1]}
+    return hashlib.sha256(canonical_json(document)).hexdigest()
 
 
 def playback_host_key(configuration_sha256: str) -> str:
@@ -164,6 +172,7 @@ class PlaybackProcess:
         account_discovery: bool,
         workspace_source: Callable[[], Iterable[uuid.UUID]] | None,
         base_tick_interval_ms: int,
+        guests: tuple[int, int] | None = None,
         clock: Callable[[], float] = time.monotonic,
     ) -> None:
         self._database = database
@@ -173,30 +182,31 @@ class PlaybackProcess:
             self._listed,
             account_discovery=account_discovery,
             base_tick_interval_ms=base_tick_interval_ms,
+            guests=guests,
         )
         self._clock = clock
         self._lock = threading.Lock()
-        self._read: tuple[float, bool, frozenset[uuid.UUID]] | None = None
+        self._read: tuple[float, bool, frozenset[uuid.UUID], frozenset[uuid.UUID]] | None = None
 
     def refusal(self, workspace: uuid.UUID) -> str | None:
-        """``playback_worker_stopped``, ``workspace_not_played`` or None, as a thread's host
-        answers (:func:`host_playback_refusal`)."""
-        alive, played = self._state()
+        """``playback_worker_stopped``, ``guest_towns_full``, ``workspace_not_played`` or None, as
+        a thread's host answers (:func:`host_playback_refusal`)."""
+        alive, played, waiting = self._state()
         if not alive:
             return "playback_worker_stopped"
         if workspace not in played:
-            return "workspace_not_played"
+            return "guest_towns_full" if workspace in waiting else "workspace_not_played"
         return None
 
     @property
     def alive(self) -> bool:
         return self._state()[0]
 
-    def _state(self) -> tuple[bool, frozenset[uuid.UUID]]:
+    def _state(self) -> tuple[bool, frozenset[uuid.UUID], frozenset[uuid.UUID]]:
         now = self._clock()
         with self._lock:
             if self._read is not None and now - self._read[0] < PRESENCE_SECONDS:
-                return self._read[1], self._read[2]
+                return self._read[1], self._read[2], self._read[3]
         with self._database.unscoped() as connection:
             alive = bool(
                 connection.execute(
@@ -205,9 +215,10 @@ class PlaybackProcess:
             )
         discovered = () if self._workspace_source is None else self._workspace_source()
         played = self._listed | frozenset(discovered)
+        waiting = frozenset(getattr(discovered, "waiting", ())) - played
         with self._lock:
-            self._read = (now, alive, played)
-        return alive, played
+            self._read = (now, alive, played, waiting)
+        return alive, played, waiting
 
 
 class SocietyControlWorker:
@@ -230,6 +241,7 @@ class SocietyControlWorker:
         self._workspace_source = workspace_source
         self._workspace_lock = threading.Lock()
         self._current_workspaces = self._configured_workspaces
+        self._waiting_workspaces: frozenset[uuid.UUID] = frozenset()
         self._round_authority = threading.local()
         self.base_tick_interval_ms = base_tick_interval_ms
         self._health_lock = threading.Lock()
@@ -260,13 +272,22 @@ class SocietyControlWorker:
         with self._workspace_lock:
             return tuple(sorted(self._current_workspaces, key=str))
 
+    @property
+    def waiting(self) -> frozenset[uuid.UUID]:
+        """The workspaces the last snapshot found there but left unplayed: guests' towns past the
+        playing maximum (:class:`~exulanica.db.account_workspaces.WatchedWorkspaces`)."""
+        with self._workspace_lock:
+            return self._waiting_workspaces
+
     def _workspace_snapshot(self) -> tuple[uuid.UUID, ...]:
         discovered = () if self._workspace_source is None else self._workspace_source()
         resolved = self._configured_workspaces | frozenset(discovered)
         if any(type(workspace) is not uuid.UUID for workspace in resolved):
             raise TypeError("society workspace discovery must return UUIDs")
+        waiting = frozenset(getattr(discovered, "waiting", ())) - resolved
         with self._workspace_lock:
             self._current_workspaces = resolved
+            self._waiting_workspaces = waiting
         return tuple(sorted(resolved, key=str))
 
     def _authorizer(

@@ -54,6 +54,7 @@ from exulanica.api.authorisation import TokenNotAccepted
 from exulanica.db.account_workspaces import (
     AccountWorkspaceSource,
     AccountWorkspaceUnavailable,
+    WatchedWorkspaces,
 )
 from exulanica.env import env_get
 from exulanica.models.egress import (
@@ -147,6 +148,12 @@ class GuestEntryOff(AccountUnavailable):
     """This server is configured without a guest entry, as against one whose database failed."""
 
 
+#: The defaults of how long a guest's town plays after their last request, and how many play at
+#: once. Every guest's town plays in the API's one process, so the second is a stated bound on what
+#: that process plays beside the requests it serves; a host measures it again before raising it.
+GUEST_PLAY_SECONDS_DEFAULT = 15 * 60
+GUEST_PLAYING_MAXIMUM_DEFAULT = 24
+
 #: The guest entry's modes: ``open`` admits anyone who asks, ``code`` anyone who also sends the code
 #: whose SHA-256 the server is configured with. ``closed`` admits nobody new while the guests who
 #: entered keep their sessions and towns: an explicit ``off`` on a server with an account database
@@ -163,6 +170,13 @@ class GuestEntryConfig:
     entries_per_day: int
     session_seconds: int = 7 * 24 * 60 * 60
     code_sha256: str | None = field(default=None, repr=False)
+    #: How long after a guest's last request their town keeps playing and asking its models
+    #: (``EXULANICA_GUEST_PLAY_SECONDS``): a session's ``seen_at`` moves at most once a minute.
+    play_seconds: int = GUEST_PLAY_SECONDS_DEFAULT
+    #: How many guests' towns play at once (``EXULANICA_GUEST_PLAYING_MAXIMUM``): a playing town
+    #: keeps its place while its visitor is there, and a freed place goes to the visitor waiting
+    #: longest; 0 plays none of them.
+    playing_maximum: int = GUEST_PLAYING_MAXIMUM_DEFAULT
 
     def __post_init__(self) -> None:
         if self.mode not in GUEST_ENTRY_MODES:
@@ -188,6 +202,10 @@ class GuestEntryConfig:
             or not 60 <= self.session_seconds <= GUEST_SESSION_SECONDS_MAXIMUM
         ):
             raise ValueError("a guest session lasts between one minute and thirty days")
+        if type(self.play_seconds) is not int or not 60 <= self.play_seconds <= 86_400:
+            raise ValueError("a guest's town plays between one minute and a day after their visit")
+        if type(self.playing_maximum) is not int or not 0 <= self.playing_maximum <= 1_000:
+            raise ValueError("between none and a thousand guests' towns play at once")
 
     def admits(self, code: str | None) -> bool:
         """Whether ``code`` opens the entry: always in ``open``; in ``code``, its digest compared
@@ -372,6 +390,16 @@ class GoogleOIDCProvider:
             raise AccountRejected("provider response was not accepted") from exc
 
 
+class _GuestPlaces:
+    """The guests' workspaces this process played at its last read, so a playing town keeps its
+    place from one read to the next (:func:`~exulanica.db.account_workspaces.watched_workspaces`).
+    Every reader in the process (the playback rounds, the routes' refusals) shares it."""
+
+    def __init__(self) -> None:
+        self.lock = threading.Lock()
+        self.playing: frozenset[uuid.UUID] = frozenset()
+
+
 @dataclass(frozen=True)
 class AccountRuntime:
     """Browser accounts: Google sign-in, the guest entry, or both, on one account database.
@@ -384,6 +412,9 @@ class AccountRuntime:
     database_url: str = field(repr=False)
     provider: GoogleOIDCProvider | None
     guest: GuestEntryConfig | None = None
+    _guest_places: _GuestPlaces = field(
+        default_factory=_GuestPlaces, compare=False, repr=False, init=False
+    )
 
     def __post_init__(self) -> None:
         if (self.config is None) != (self.provider is None):
@@ -446,6 +477,22 @@ class AccountRuntime:
         """Whether one workspace is open, read for it alone through the account role."""
         with self.repository() as repository:
             return repository.owned_workspace_active(workspace_id)
+
+    def watched_workspaces(self) -> WatchedWorkspaces:
+        """What this host plays and asks models for: every active owner's workspace, and, where
+        guests enter, the guests' seen within the play window, at most the playing maximum."""
+        guest = self.guest
+        places = self._guest_places
+        with places.lock, self.repository() as repository:
+            # With no guest entry configured, no guest's town plays, whatever memberships remain.
+            watched = repository.watched_workspaces(
+                guest_seconds=guest.play_seconds if guest else GUEST_PLAY_SECONDS_DEFAULT,
+                guests_at_most=guest.playing_maximum if guest else 0,
+                playing=places.playing,
+            )
+            # Owners are in the set too; keeping them is harmless, since only guests are ranked.
+            places.playing = frozenset(watched)
+            return watched
 
     def start(self, return_uri: str | None = None) -> tuple[str, str]:
         config, provider = self._google()
@@ -552,7 +599,8 @@ def load_guest_entry(environ: Mapping[str, str]) -> GuestEntryConfig | None:
     ``open`` and ``code`` need ``EXULANICA_GUEST_ENTRIES_PER_DAY`` (no default: the figure is the
     operator's), ``EXULANICA_ACCOUNT_BROWSER_ORIGINS`` and ``EXULANICA_ACCOUNT_DATABASE_URL``;
     ``code`` needs ``EXULANICA_GUEST_ENTRY_CODE_SHA256``. ``EXULANICA_GUEST_SESSION_SECONDS``
-    defaults to seven days. A malformed or partial setting stops startup.
+    defaults to seven days, ``EXULANICA_GUEST_PLAY_SECONDS`` to fifteen minutes and
+    ``EXULANICA_GUEST_PLAYING_MAXIMUM`` to 24. A malformed or partial setting stops startup.
     """
     mode = (environ.get("EXULANICA_GUEST_ENTRY") or "off").strip()
     if mode == "off":
@@ -565,12 +613,16 @@ def load_guest_entry(environ: Mapping[str, str]) -> GuestEntryConfig | None:
         if not origins or not environ.get("EXULANICA_ACCOUNT_DATABASE_URL"):
             raise ValueError("a guest entry needs the account database and the browser origins")
         seconds = environ.get("EXULANICA_GUEST_SESSION_SECONDS")
+        play = environ.get("EXULANICA_GUEST_PLAY_SECONDS")
+        playing = environ.get("EXULANICA_GUEST_PLAYING_MAXIMUM")
         return GuestEntryConfig(
             mode=mode,
             browser_origins=_json_strings(origins, "EXULANICA_ACCOUNT_BROWSER_ORIGINS"),
             entries_per_day=int(per_day),
             session_seconds=int(seconds) if seconds else 7 * 24 * 60 * 60,
             code_sha256=environ.get("EXULANICA_GUEST_ENTRY_CODE_SHA256") or None,
+            play_seconds=int(play) if play else GUEST_PLAY_SECONDS_DEFAULT,
+            playing_maximum=int(playing) if playing else GUEST_PLAYING_MAXIMUM_DEFAULT,
         )
     except (ValueError, TypeError) as exc:
         raise AccountUnavailable(f"guest entry configuration is invalid: {exc}") from exc
@@ -583,9 +635,12 @@ def _closed_entry(environ: Mapping[str, str], shared: tuple[str, ...]) -> bool:
 
 
 def _closed(environ: Mapping[str, str]) -> GuestEntryConfig:
-    """A closed guest entry: the browser origins and session length the open one had, no entry."""
+    """A closed guest entry: the browser origins, session length and play settings the open one
+    had, no entry. The guests who entered keep playing under the same window and maximum."""
     try:
         seconds = environ.get("EXULANICA_GUEST_SESSION_SECONDS")
+        play = environ.get("EXULANICA_GUEST_PLAY_SECONDS")
+        playing = environ.get("EXULANICA_GUEST_PLAYING_MAXIMUM")
         return GuestEntryConfig(
             mode="closed",
             browser_origins=_json_strings(
@@ -593,6 +648,8 @@ def _closed(environ: Mapping[str, str]) -> GuestEntryConfig:
             ),
             entries_per_day=0,
             session_seconds=int(seconds) if seconds else 7 * 24 * 60 * 60,
+            play_seconds=int(play) if play else GUEST_PLAY_SECONDS_DEFAULT,
+            playing_maximum=int(playing) if playing else GUEST_PLAYING_MAXIMUM_DEFAULT,
         )
     except (ValueError, TypeError) as exc:
         raise AccountUnavailable(f"guest entry configuration is invalid: {exc}") from exc

@@ -436,3 +436,31 @@ def test_up_refuses_a_service_that_keeps_restarting():
     check = up.index("compose ps --status restarting --services")
     assert started < check
     assert "refuse" in up[check:]
+
+
+def test_guests_towns_play_in_the_api_with_their_settings_from_init():
+    """Account discovery plays the guests' towns and asks their models (S4) only in a process that
+    reads the guest entry: the API. The overlay turns discovery on and keeps playback in the API,
+    and the base composition hands the API the two guest playback settings."""
+    api = OVERLAY_SERVICES["api"]
+    assert re.search(r'^      EXULANICA_SOCIETY_CONTROL_WORKER: "on"$', api, re.M)
+    assert re.search(r'^      EXULANICA_PLAYBACK_WORKER: "on"$', api, re.M)
+    base_api = BASE_SERVICES["api"]
+    for name in ("EXULANICA_GUEST_PLAY_SECONDS", "EXULANICA_GUEST_PLAYING_MAXIMUM"):
+        assert f"{name}: ${{{name}:-}}" in base_api
+
+
+@needs_shell
+def test_init_writes_the_guests_play_window_and_maximum(tmp_path):
+    env = {
+        **_init_env(tmp_path),
+        "EXULANICA_GUEST_PLAY_SECONDS": "600",
+        "EXULANICA_GUEST_PLAYING_MAXIMUM": "12",
+    }
+    result = _script(tmp_path, "init", **env)
+    assert result.returncode == 0, result.stderr
+    lines = _env_lines(tmp_path / "deploy" / "public.env")
+    assert (lines["EXULANICA_GUEST_PLAY_SECONDS"], lines["EXULANICA_GUEST_PLAYING_MAXIMUM"]) == (
+        "600",
+        "12",
+    )

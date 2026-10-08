@@ -94,6 +94,12 @@ services:
       # on the host that reaches the API at its bridge address comes from the network's gateway and
       # is taken as it is, plain http from that address.
       FORWARDED_ALLOW_IPS: "10.231.89.20"
+      # Every account workspace plays, and its people's chosen models are asked under its own
+      # grant: the owners', and the guests' while they are there (docs/deployment.md 5.1.5). This
+      # process plays them (EXULANICA_PLAYBACK_WORKER stays on), so the guests' settings above
+      # reach the player.
+      EXULANICA_SOCIETY_CONTROL_WORKER: "on"
+      EXULANICA_PLAYBACK_WORKER: "on"
     logging: *bounded-logs
 
   preparation:

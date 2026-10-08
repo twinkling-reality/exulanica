@@ -60,6 +60,7 @@ from __future__ import annotations
 import dataclasses
 import logging
 import threading
+import time
 import uuid
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from decimal import Decimal
@@ -108,6 +109,16 @@ from exulanica.world.society_comparison_verdict import protocol_value
 __all__ = ["CANCELLED_REASON", "CLOSED_REASONS", "SocietyComparisonWorker"]
 
 _LOG = logging.getLogger(__name__)
+
+#: How often a worker with a workspace source reads it again, in seconds.
+SOURCE_READ_SECONDS = 5.0
+
+#: How often a worker with a slow source also visits every workspace it names, in seconds. Each
+#: visit opens two sessions, so the account workspaces a server has ever admitted are visited this
+#: rarely: a start is made only in a watched workspace, and the slow scan finds those whose
+#: visitor left before the start was claimed, or while a claim lapsed.
+SLOW_SCAN_SECONDS = 300.0
+
 #: Why a host closed a start before every run was played, by name: hosts that claimed it kept
 #: stopping, what was left of its bound did not hold the next seed's typical cost and what its runs
 #: can hold reserved, so it stopped between seeds, its bound was spent, or this process's model
@@ -147,6 +158,9 @@ class SocietyComparisonWorker:
         keeps_share: bool,
         signal_runner_for: Callable[[uuid.UUID, str, uuid.UUID], SignalComparisonRunner]
         | None = None,
+        workspace_source: Callable[[], Iterable[uuid.UUID]] | None = None,
+        slow_source: Callable[[], Iterable[uuid.UUID]] | None = None,
+        clock: Callable[[], float] = time.monotonic,
     ) -> None:
         self.database = database
         #: The runner of a workspace and world, as the actor who started the comparison.
@@ -157,17 +171,56 @@ class SocietyComparisonWorker:
         self.client = client
         self.manifest = manifest
         self.workspaces = tuple(sorted(frozenset(workspaces), key=str))
+        #: Account discovery's watched workspaces, played every round beside the listed ones
+        #: (where a host asks models for discovered workspaces under durable spending); read at
+        #: most every :data:`SOURCE_READ_SECONDS`, and a failed read keeps the last one.
+        self._workspace_source = workspace_source
+        #: Every account workspace, visited once every :data:`SLOW_SCAN_SECONDS`: a comparison a
+        #: visitor started finishes after they leave, within its own bound and their grant.
+        self._slow_source = slow_source
+        self._clock = clock
+        self._sourced: tuple[float, tuple[uuid.UUID, ...]] | None = None
+        self._scanned_at: float | None = None
         #: Whether its asks leave the contract's share of this process's budget for other work:
         #: in the API's process, which serves the Companion and the live world too; not in a
         #: process of its own, which does nothing else.
         self.keeps_share = keeps_share
+
+    def played_workspaces(self) -> tuple[uuid.UUID, ...]:
+        """This round's workspaces: the listed ones, the watched ones the source last named, and,
+        once every :data:`SLOW_SCAN_SECONDS`, every one the slow source names."""
+        played = frozenset(self.workspaces)
+        now = self._clock()
+        if self._workspace_source is not None:
+            if self._sourced is None or now - self._sourced[0] >= SOURCE_READ_SECONDS:
+                found = self._read(self._workspace_source)
+                if found is None:
+                    found = () if self._sourced is None else self._sourced[1]
+                self._sourced = (now, found)
+            played |= frozenset(self._sourced[1])
+        if self._slow_source is not None and (
+            self._scanned_at is None or now - self._scanned_at >= SLOW_SCAN_SECONDS
+        ):
+            # A failed scan waits for the next one rather than asking again every round.
+            self._scanned_at = now
+            played |= frozenset(self._read(self._slow_source) or ())
+        return tuple(sorted(played, key=str))
+
+    @staticmethod
+    def _read(source: Callable[[], Iterable[uuid.UUID]]) -> tuple[uuid.UUID, ...] | None:
+        try:
+            return tuple(source())
+        except Exception as exc:
+            # Never the exception's text, which may carry a connection string.
+            _LOG.error("Comparison workspaces could not be read: %s", type(exc).__qualname__)
+            return None
 
     def run(self, stop: threading.Event, *, poll_seconds: float = 1.0) -> None:
         """Play the workspaces' starts until ``stop`` is set; wait ``poll_seconds`` between
         rounds in which nothing was claimed."""
         while not stop.is_set():
             played = False
-            for workspace in self.workspaces:
+            for workspace in self.played_workspaces():
                 if stop.is_set():
                     break
                 try:

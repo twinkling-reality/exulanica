@@ -15,7 +15,11 @@ from datetime import datetime
 
 import psycopg
 
-from exulanica.db.account_workspaces import active_owned_workspaces
+from exulanica.db.account_workspaces import (
+    WatchedWorkspaces,
+    active_owned_workspaces,
+    watched_workspaces,
+)
 from exulanica.selection.validation import Session
 
 ISSUER = "https://accounts.google.com"
@@ -99,6 +103,22 @@ class AccountRepository:
             (workspace_id,),
         ).fetchone()
         return row is not None
+
+    def watched_workspaces(
+        self,
+        *,
+        guest_seconds: int,
+        guests_at_most: int,
+        playing: frozenset[uuid.UUID] = frozenset(),
+    ) -> WatchedWorkspaces:
+        """Every active owner's workspace and the guests' seen lately, through the account role
+        (:func:`~exulanica.db.account_workspaces.watched_workspaces`)."""
+        return watched_workspaces(
+            self.connection,
+            guest_seconds=guest_seconds,
+            guests_at_most=guests_at_most,
+            playing=playing,
+        )
 
     def begin_login(
         self,

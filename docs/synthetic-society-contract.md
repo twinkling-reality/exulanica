@@ -78,8 +78,9 @@ apart from personal evidence
 
 A society advances one simulated minute at a time: when somebody steps it, or when a host runs the
 API's playback worker, which advances a saved playing society whose engine the table below lets it
-play, for the workspaces its environment lists or, with accounts, for every account-owned
-workspace, under the bounded lease policy below. Persistence alone starts no worker.
+play, for the workspaces its environment lists or, with account discovery, for every account
+owner's workspace and each guest's while the guest is there
+([deployment](deployment.md#515-society-playback)), under the bounded lease policy below. Persistence alone starts no worker.
 
 Implementation:
 
@@ -1047,8 +1048,10 @@ refusals. With `EXULANICA_PLAYBACK_WORKER=process` the API starts none, and
 `exulanica-playback-worker` plays those workspaces in a process of its own. Account-wide discovery is off by default and refuses startup without configured
 accounts and the reviewed current-input runtime. The worker asks a model only in the decision
 phase before a minute of a purposeful society whose owner chose one for someone, and only for a
-workspace its environment lists
-([the host's decision phase](decision-roles-contract.md#the-hosts-decision-phase)).
+workspace its environment lists or, where discovery is on and spending is durable, one discovery
+watches: an owner's, or a guest's while the guest is there and holds a playing place
+([the host's decision phase](decision-roles-contract.md#the-hosts-decision-phase)). Each ask is
+admitted against that workspace's own grant.
 
 The authenticated base route is `/world/versions/{version_id}/society/control`:
 
@@ -1070,8 +1073,20 @@ The authenticated base route is `/world/versions/{version_id}/society/control`:
   workspace; a process whose loop hangs still holds it, so it reads true. `interval_ms` is the
   saved base divided by the speed while playing and the host's current base divided by the speed
   while paused, which is what Play adopts; `reason` is null while running and otherwise one of the
-  sentences in `HOST_PLAYBACK_REFUSALS` (`exulanica/api/society_control_worker.py`). The `PUT`
-  answer and the `control` inside a step answer carry it too.
+  sentences in `HOST_PLAYBACK_REFUSALS` (`exulanica/api/society_control_worker.py`), whose code is
+  `host_playback_code` beside it: `guest_towns_full` for a guest's world waiting for one of the
+  playing guests' worlds to stop, `workspace_not_played` for one this host does not play (a
+  guest's world on a host that plays no guest's world among them). The `PUT` answer and the
+  `control` inside a step answer carry it too. `model_minds_code` is `spending_cap_reached` when
+  the workspace's allowance for open models is used up (its own grant, or the authority every guest
+  shares): the durable spending authority would refuse the next attempt of every provider the
+  workspace holds an allowance for, or the society's latest decision receipt was refused
+  `spending_limit_reached` (admission refuses once the remainder fits no attempt's reservation,
+  which the spending state cannot foresee); null otherwise, and null when the spending state cannot
+  be read, which leaves the rest of the read as it is; `model_minds_reason` is its sentence
+  (`MODEL_MINDS_REASONS`, `exulanica/api/routes/society_control.py`). It is not a playback refusal:
+  the world keeps playing, and each person whose model is refused decides by their routine, as any
+  refused ask does.
 - `PUT` accepts only `{base_revision, mode: "playing" | "paused", speed: 1 | 2 | 4}`. Successful
   configuration increments the control revision and cancels any pending claim. Stale revision
   returns 409. Unknown/foreign branches are indistinguishable 404s. Invalid input types are 422;

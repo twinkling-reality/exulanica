@@ -122,6 +122,10 @@ services:
       EXULANICA_GUEST_ENTRY_CODE_SHA256: ${EXULANICA_GUEST_ENTRY_CODE_SHA256:-}
       EXULANICA_GUEST_ENTRIES_PER_DAY: ${EXULANICA_GUEST_ENTRIES_PER_DAY:-}
       EXULANICA_GUEST_SESSION_SECONDS: ${EXULANICA_GUEST_SESSION_SECONDS:-}
+      # How long after a guest's last request their town plays, and how many play at once
+      # (docs/deployment.md 5.1.5); empty takes the defaults. Guests' towns play in this process.
+      EXULANICA_GUEST_PLAY_SECONDS: ${EXULANICA_GUEST_PLAY_SECONDS:-}
+      EXULANICA_GUEST_PLAYING_MAXIMUM: ${EXULANICA_GUEST_PLAYING_MAXIMUM:-}
       <<: *society-playback
       # Who plays: "on" (the default), this process in threads; "process", the playback-worker
       # service below, started with `--profile playback`, and this process plays nothing.

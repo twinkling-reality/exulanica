@@ -16,7 +16,9 @@ __all__ = [
     "ACCOUNT_DATABASE_URL_ENV",
     "AccountWorkspaceSource",
     "AccountWorkspaceUnavailable",
+    "WatchedWorkspaces",
     "active_owned_workspaces",
+    "watched_workspaces",
 ]
 
 ACCOUNT_DATABASE_URL_ENV: Final = "EXULANICA_ACCOUNT_DATABASE_URL"
@@ -42,6 +44,70 @@ def active_owned_workspaces(connection: psycopg.Connection) -> frozenset[uuid.UU
         "order by w.workspace_id"
     ).fetchall()
     return frozenset(row["workspace_id"] for row in rows)
+
+
+class WatchedWorkspaces(frozenset):
+    """The workspaces a host plays and asks models for, with :attr:`waiting`, the guests'
+    workspaces whose visitor is there but that the playing maximum leaves unplayed."""
+
+    waiting: frozenset[uuid.UUID]
+
+    def __new__(
+        cls, played: frozenset[uuid.UUID], waiting: frozenset[uuid.UUID] = frozenset()
+    ) -> WatchedWorkspaces:
+        watched = super().__new__(cls, played)
+        watched.waiting = frozenset(waiting)
+        return watched
+
+
+def watched_workspaces(
+    connection: psycopg.Connection,
+    *,
+    guest_seconds: int,
+    guests_at_most: int,
+    playing: frozenset[uuid.UUID] = frozenset(),
+) -> WatchedWorkspaces:
+    """The workspaces a host plays and asks models for: every active owner's, and the guests'
+    whose visitor was there lately.
+
+    A guest's workspace is there while one of its browser sessions, unrevoked and unexpired, was
+    used within ``guest_seconds`` (its ``seen_at``, migration 0139). At most ``guests_at_most``
+    are played. A guest in ``playing``, the set the caller played last, keeps its place while it
+    is there; the free places go to the others in the order they entered (their first session's
+    ``created_at``), and the rest wait (:attr:`WatchedWorkspaces.waiting`) until a place frees.
+    With no place at all (``guests_at_most`` 0) none waits: no guest's town plays here, which a
+    reader says as it says any workspace this host does not play. A visitor who left stops being
+    played, so a town whose people a model runs spends nothing after them."""
+    owners = connection.execute(
+        "select w.workspace_id from account_workspace w "
+        "join account_user u on u.user_id=w.owner_user_id "
+        "join account_membership m on m.workspace_id=w.workspace_id "
+        "and m.user_id=w.owner_user_id "
+        "where u.disabled_at is null and w.disabled_at is null "
+        "and m.revoked_at is null and m.membership_role='owner'"
+    ).fetchall()
+    guests = connection.execute(
+        "select w.workspace_id from account_workspace w "
+        "join account_user u on u.user_id=w.owner_user_id "
+        "join account_membership m on m.workspace_id=w.workspace_id "
+        "and m.user_id=w.owner_user_id "
+        "join account_browser_session s on s.workspace_id=w.workspace_id "
+        "and s.user_id=w.owner_user_id "
+        "where u.disabled_at is null and w.disabled_at is null "
+        "and m.revoked_at is null and m.membership_role='guest' "
+        "and s.revoked_at is null and s.expires_at > now() "
+        "and s.seen_at >= now() - make_interval(secs => %s) "
+        "group by w.workspace_id order by min(s.created_at), w.workspace_id",
+        (guest_seconds,),
+    ).fetchall()
+    there = [row["workspace_id"] for row in guests]
+    kept = [workspace for workspace in there if workspace in playing][:guests_at_most]
+    entered = [workspace for workspace in there if workspace not in kept]
+    played = kept + entered[: guests_at_most - len(kept)]
+    return WatchedWorkspaces(
+        frozenset(row["workspace_id"] for row in owners) | frozenset(played),
+        frozenset(entered[guests_at_most - len(kept) :]) if guests_at_most else frozenset(),
+    )
 
 
 def _prepare(connection: psycopg.Connection) -> None:
