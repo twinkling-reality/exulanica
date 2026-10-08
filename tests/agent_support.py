@@ -126,6 +126,29 @@ def with_a_line(frame: dict[str, Any], label: str, maximum: int = 200) -> dict[s
     return frame
 
 
+def with_stated_lines(frame: dict[str, Any], label: str, maximum: int = 200) -> dict[str, Any]:
+    """``frame`` with one more option that says something, as a door states lines on the frame
+    (``line_labels`` and ``line_characters_maximum``) over a society of things that records each
+    option's kind and keeps the bound in the request's context, not on the option."""
+    frame = json.loads(json.dumps(frame))
+    frame["context"]["options"].append({"label": label, "kind": "say_all"})
+    parameters = frame["act"]["function"]["parameters"]
+    parameters["properties"]["action"]["enum"].append(label)
+    parameters["properties"]["line"] = {"type": ["string", "null"], "maxLength": maximum}
+    frame["line_labels"] = [label]
+    frame["line_characters_maximum"] = maximum
+    return frame
+
+
+def with_leaving(frame: dict[str, Any], label: str = "leave this world") -> dict[str, Any]:
+    """``frame`` with one more option a visitor's body may take to leave the world, recorded with
+    its kind as a society of things records it."""
+    frame = json.loads(json.dumps(frame))
+    frame["context"]["options"].append({"label": label, "kind": "leave"})
+    frame["act"]["function"]["parameters"]["properties"]["action"]["enum"].append(label)
+    return frame
+
+
 class FakeDoor:
     """The channel routes of one grant, answered in the door contract's shapes. Every request is
     recorded with its method, path, query, body and whether it carried the key."""

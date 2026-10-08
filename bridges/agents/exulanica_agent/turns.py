@@ -41,11 +41,13 @@ class FrameRefused(ValueError):
 @dataclass(frozen=True, slots=True)
 class Option:
     """One action a turn offers: its words, exactly as an answer must repeat them, and whether it
-    says something, with the longest line it takes."""
+    says something, with the longest line it takes. ``kind`` is the kind of action the world's
+    request records for it (such as ``leave``), where it records one."""
 
     action: str
     says_line: bool
     line_characters_maximum: int | None
+    kind: str | None = None
 
     def as_dict(self) -> dict[str, Any]:
         document: dict[str, Any] = {"action": self.action, "says_line": self.says_line}
@@ -121,10 +123,42 @@ def _offered(act: object) -> tuple[str, list[str], bool]:
     return name, list(labels), "line" in properties
 
 
-def _options(context: object, labels: list[str], takes_line: bool) -> tuple[Option, ...]:
+def _stated_lines(
+    frame: Mapping[str, Any], labels: list[str], takes_line: bool
+) -> tuple[frozenset[str], int | None] | None:
+    """The actions whose answer carries a line, and the longest line, as the door states them on
+    the frame (``line_labels`` and ``line_characters_maximum``); None from a door that states a
+    line's bound on each option instead."""
+    if "line_labels" not in frame:
+        return None
+    named = frame.get("line_labels")
+    if (
+        not isinstance(named, list)
+        or not all(isinstance(label, str) for label in named)
+        or len(set(named)) != len(named)
+        or not set(named) <= set(labels)
+    ):
+        raise FrameRefused("an asked frame names the actions that say something among its offers")
+    if not named:
+        return frozenset(), None
+    maximum = frame.get("line_characters_maximum")
+    if type(maximum) is not int or maximum < 1:
+        raise FrameRefused("an asked frame bounds its lines by a whole number of characters")
+    if not takes_line:
+        raise FrameRefused("an option says something, but the function takes no line")
+    return frozenset(named), maximum
+
+
+def _options(
+    context: object,
+    labels: list[str],
+    takes_line: bool,
+    stated: tuple[frozenset[str], int | None] | None = None,
+) -> tuple[Option, ...]:
     """The offered actions, from the request's own option records, which must offer exactly what
-    the function offers and in its order; an option says something when its record bounds a
-    line."""
+    the function offers and in its order. An option says something when the frame names it among
+    the actions that carry a line, or, from a door that does not name them, when its record
+    bounds a line."""
     records = context.get("options") if isinstance(context, Mapping) else None
     if (
         not isinstance(records, list)
@@ -134,16 +168,22 @@ def _options(context: object, labels: list[str], takes_line: bool) -> tuple[Opti
         raise FrameRefused("an asked frame's function and its options offer different actions")
     options = []
     for record in records:
-        maximum = record.get("line_characters_maximum")
-        if maximum is not None and (type(maximum) is not int or maximum < 1):
-            raise FrameRefused("an option bounds its line by a whole number of characters")
-        if maximum is not None and not takes_line:
-            raise FrameRefused("an option says something, but the function takes no line")
+        if stated is not None:
+            named, bound = stated
+            maximum = bound if record["label"] in named else None
+        else:
+            maximum = record.get("line_characters_maximum")
+            if maximum is not None and (type(maximum) is not int or maximum < 1):
+                raise FrameRefused("an option bounds its line by a whole number of characters")
+            if maximum is not None and not takes_line:
+                raise FrameRefused("an option says something, but the function takes no line")
+        kind = record.get("kind")
         options.append(
             Option(
                 action=record["label"],
                 says_line=maximum is not None,
                 line_characters_maximum=maximum,
+                kind=kind if isinstance(kind, str) else None,
             )
         )
     return tuple(options)
@@ -177,7 +217,9 @@ class Turn:
         name, labels, takes_line = _offered(frame.get("act"))
         self._tool = copy.deepcopy(dict(frame["act"]))
         self._tool_name = name
-        self.options = _options(frame.get("context"), labels, takes_line)
+        self.options = _options(
+            frame.get("context"), labels, takes_line, _stated_lines(frame, labels, takes_line)
+        )
         self.received_at = received_at
         self._answer = answer
         self._clock = clock

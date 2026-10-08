@@ -8,10 +8,12 @@
 ``exulanica-agent check``
     Says hello with the same settings and prints what the agent may do here and the world's rules;
     a way to see a setup works before starting a mind.
-``exulanica-agent grant --world <id> [--thing <id> --version <id>] [--visitors 1] --key-file <f>``
+``exulanica-agent grant --world <id> --version <id> [--thing <id>] [--visitors 1] --key-file <f>``
     For a world's owner, with an API token that may issue grants (``EXULANICA_TOKEN``): issues a
-    grant for the agents' door and writes the agent key, shown once, to a new file only its owner
-    may read. The key is never printed.
+    grant for the agents' door, deciding for the world's things it names in that version or
+    bringing bodies of the agent's own into it, through the gate ``--gate <id>`` names or else one
+    of the version's gates, and writes the agent key, shown once, to a new file only its owner may
+    read. The key is never printed.
 ``exulanica-agent key --grant <id> --key-file <f>``
     For a world's owner: a new agent key for a grant, written the same way. A grant has one key at
     a time, so the earlier key stops working at once, and an agent still holding it reads why.
@@ -46,8 +48,9 @@ def _parser() -> argparse.ArgumentParser:
     grant = commands.add_parser("grant", help="let an agent into a world you own")
     grant.add_argument("--world", required=True, help="the world's id")
     grant.add_argument("--thing", action="append", default=[], help="a thing it decides for")
-    grant.add_argument("--version", help="the world version the named things are in")
+    grant.add_argument("--version", help="the world version its things are in, or it arrives in")
     grant.add_argument("--visitors", type=int, default=0, help="bodies of its own, 0 to 4")
+    grant.add_argument("--gate", help="the gate its bodies come through, by its placed id")
     grant.add_argument("--minutes", type=int, default=120, help="how long, at most 1440")
     grant.add_argument("--quiet", action="store_true", help="its things may not speak")
     grant.add_argument("--key-file", required=True, type=Path, help="a new file for the key")
@@ -97,8 +100,14 @@ def _grant(arguments: argparse.Namespace) -> int:
     door = _owner_door(arguments.key_file)
     if door is None:
         return 2
-    if arguments.thing and not arguments.version:
-        print("naming things needs --version, the world version they are in", file=sys.stderr)
+    if (arguments.thing or arguments.visitors) and not arguments.version:
+        print(
+            "naming things or bringing bodies needs --version, the world version they are in",
+            file=sys.stderr,
+        )
+        return 2
+    if arguments.gate and not arguments.visitors:
+        print("--gate is where bodies come in: it needs --visitors", file=sys.stderr)
         return 2
     body: dict[str, object] = {
         "idempotency_key": f"exulanica-agent:{uuid.uuid4()}",
@@ -112,6 +121,8 @@ def _grant(arguments: argparse.Namespace) -> int:
     }
     if arguments.version:
         body["version_id"] = arguments.version
+    if arguments.gate:
+        body["gate"] = arguments.gate
     answer = _owner_call(door, "/door/grants", body, world_id=arguments.world)
     if not answer:
         return 1

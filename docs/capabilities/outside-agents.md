@@ -16,7 +16,7 @@ client, and examples. The product never imports, depends on or packages it
 
 | Who | Does | Time |
 | --- | --- | --- |
-| The world's owner | Issues a grant to the agents' bridge naming one of the world's own things, with a direct channel credential (`POST /door/grants`, `channel_credential` true), and hands the key to whoever runs the agent | under a minute |
+| The world's owner | Issues a grant to the agents' bridge naming a world version and either one of its own things or a body of the agent's own, with a direct channel credential (`exulanica-agent grant`, or `POST /door/grants` with `channel_credential` true), and hands the key to whoever runs the agent | under a minute |
 | The agent's developer | Installs `exulanica-agent`, sets the world's address and the key, starts the quickstart or adds the facade to an MCP client | a few minutes |
 | The world | Asks the agent at its thing's next turn and carries on whether or not it answers | one or two world minutes (8 seconds each at normal speed) |
 
@@ -35,8 +35,8 @@ A deployment admits outside agents with one entry in `EXULANICA_DOOR_BRIDGES`
 | --- | --- | --- |
 | `run_by` | `owner` | Each world's owner mints the agent's key for their own grant; no shared bridge credential or invite exists |
 | `ai` | `true` | Every thing an outside agent decides for, and every line it says, is shown as run by AI |
-| `mapping_sha256` | the digest of the mapping file the library presents | What an agent's side reads, and what never enters a world, is pinned by the deployment |
-| `adapter_versions` | the library versions admitted | A receipt names the version that answered |
+| `mapping_sha256` | the digests of the mapping files the admitted library versions present | What an agent's side reads, and what never enters a world, is pinned by the deployment |
+| `adapter_versions` | every published library version | A receipt names the version that answered, and an agent built on an earlier version keeps its door |
 | `deadline_ms` | 15,000 | Room for one model call per turn, within the person role's `decision_deadline_ms` |
 
 ## Bringing an agent in
@@ -72,6 +72,29 @@ refusal or a quiet spell, so an agent that stays is started again whenever it en
 example's loop pauses between runs to keep within the door's six hellos a minute). The quickstart
 and MCP clients stay connected for as long as they run.
 
+## A body of its own
+
+When its grant allows a visitor, an agent brings a body of its own in through a gate
+(`body.enter()`, or the `enter_world` tool). The grant names the world version the body arrives in,
+which holds a society of things, and may name the gate. The body arrives at the next world minute as
+a thing of the `visitor` kind, wearing the first look the agents' mapping offers (the thing
+library's two-tone mannequin, `kaykit-mannequin` version 1) unless the agent asks for another it
+offers (`plain`, the library's `people-catalog` look). From then on its turns reach the agent like
+any thing's, and the world's models read lists it as decided from outside, with the bridge's label
+and the name, maker and mind the agent declared. When the agent's program stops, the body stays and
+the world's routine decides for it; a program that says hello again with the same key takes its
+turns again, as a toolkit's restarted run does (the library knows a turn for a thing its grant does
+not name as its own body's). It leaves when the world's owner sends it home or ends the grant, and
+the agent reads why; `body.leave()` tells the door the agent has gone for good, so the door stops
+asking the body. The crossing, the look it wore and every answer are stored, so the world replays
+the body's visit with no agent running.
+
+Each library version presents its own mapping file, and a deployment admits every published one:
+version 0.1.0 presents `outside-agents.v1.json` (profile `exulanica.bridge-mapping/v1`, one look
+named by digest), version 0.2.0 `outside-agents.v2.json` (profile `exulanica.bridge-mapping/v2`,
+looks named by the thing library's key, version and digest; [door contract](../door-contract.md),
+Mapping files).
+
 ## What an agent is shown and may answer
 
 Each turn is one ask of the door: the request the decision host reserved for the thing, with the
@@ -102,8 +125,13 @@ record and no model's context carries it.
 
 ## Limits
 
-- A body of the agent's own needs a door that takes visitors through a gate; until a world's door
-  does, `enter_world` answers that it does not take visitors yet.
+- A body of the agent's own comes only into a world version that holds a society of things, through
+  a gate placed there; a door that takes no visitors answers `enter_world` that it does not take
+  them yet.
+- A body of the agent's own hears nothing said around it, and says nothing: the lines and events a
+  visitor hears do not yet reach its bridge, and an ask does not yet name which of its offered
+  actions carry a line, so an answer choosing one of them is not taken (both planned,
+  [door contract](../door-contract.md)). Its other actions are taken as any thing's.
 - Comparing an outside agent beside a model on the same thing is not provided: a comparison runs a
   thing an outside program decides for by its routine in every arm.
 - A turn waits up to the agents' bridge's declared deadline, so a world with an outside agent can
@@ -118,7 +146,7 @@ record and no model's context carries it.
 | The client library | `bridges/agents/exulanica_agent/` (`body.py`, `turns.py`, `transport.py`, `happenings.py`, `rules.py`) | `tests/test_agent_library.py` |
 | The MCP facade | `bridges/agents/exulanica_agent/facade.py`, `mcp_server.py` | `tests/test_agent_facade.py`; `bridges/agents/checks/mcp_stdio.py` and `mcp_http.py` with the MCP SDK installed |
 | The examples | `bridges/agents/examples/` | the quickstart in `tests/test_agent_library.py`; `bridges/agents/checks/nat_check.py` for the toolkit, and `nat_run.py` for a recorded run in a real world |
-| Outside the product | `bridges/agents/exulanica_agent/outside-agents.v1.json`, `examples/bridge-entry.json` | `tests/test_agent_outside_product.py` |
-| Through the real door | the library and the tools against the door's routes, migration 0149 and the decision host: hello and declaration, a new key ending the earlier, revocation, and a person's turn decided by the agent and replayed without it | `tests/test_agent_door_postgres.py` |
+| Outside the product | `bridges/agents/exulanica_agent/outside-agents.v1.json` and `outside-agents.v2.json`, `examples/bridge-entry.json` | `tests/test_agent_outside_product.py` (each published mapping read by the door's own checker and pinned) |
+| Through the real door | the library and the tools against the door's routes, migrations 0149 and 0153 and the decision host: hello and declaration, a new key ending the earlier, revocation, a person's turn decided by the agent and replayed without it, and a body of the agent's own crossing in through a gate, wearing its look, taking its turns and sent home | `tests/test_agent_door_postgres.py` |
 
 Decision record: [ADR-0032](../adr/0032-an-outside-ai-agent-enters-through-the-same-door-as-a-game.md).

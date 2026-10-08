@@ -16,6 +16,7 @@ import tomllib
 from pathlib import Path
 
 from exulanica.canonical import sha256_of_canonical
+from exulanica.door.mapping import check_mapping
 from exulanica.things.kinds import shipped_thing_kinds
 from exulanica.things.looks import read_look
 from exulanica.world.society_decision_contract import decision_contract
@@ -26,6 +27,14 @@ ROOT = Path(__file__).resolve().parents[1]
 PRODUCT_PACKAGES = ("exulanica", "exulanica_pieces")
 #: Modules only an outside agent's side may load: the MCP SDK and the agent library itself.
 OUTSIDE_ONLY = frozenset({"mcp", "mcp_types", "exulanica_agent"})
+#: Every library version published, with the mapping file it presents at hello, oldest first. A
+#: deployment keeps admitting each, so an agent built on an earlier version keeps its door; a new
+#: version adds a row and never removes one.
+PUBLISHED = (("0.1.0", "outside-agents.v1.json"), ("0.2.0", "outside-agents.v2.json"))
+
+
+def _packaged(name: str) -> dict:
+    return json.loads((PACKAGE / name).read_text(encoding="utf-8"))
 
 
 def _imported_roots(source: Path) -> set[str]:
@@ -85,9 +94,17 @@ def test_the_product_neither_depends_on_nor_packages_the_agents_side():
 
 def test_the_example_bridge_entry_pins_what_the_library_ships():
     entry = json.loads((AGENTS_ROOT / "examples" / "bridge-entry.json").read_text())
-    packaged = json.loads((PACKAGE / "outside-agents.v1.json").read_text(encoding="utf-8"))
-    assert entry["mapping_sha256"] == [sha256_of_canonical(packaged).hex()]
-    assert entry["adapter_versions"] == [agent.VERSION]
+    assert entry["mapping_sha256"] == [
+        sha256_of_canonical(_packaged(name)).hex() for _version, name in PUBLISHED
+    ]
+    assert entry["adapter_versions"] == [version for version, _name in PUBLISHED]
+    # The library is the newest published version and presents its mapping.
+    version, name = PUBLISHED[-1]
+    assert version == agent.VERSION
+    assert agent.mapping() == _packaged(name)
+    assert sorted(path.name for path in PACKAGE.glob("outside-agents.v*.json")) == sorted(
+        name for _version, name in PUBLISHED
+    )
     assert (entry["run_by"], entry["ai"]) == ("owner", True)
     assert "credential_sha256" not in entry
     # An agent needs one model call a turn; the door bounds a bridge's wait by the role contract.
@@ -95,18 +112,39 @@ def test_the_example_bridge_entry_pins_what_the_library_ships():
     assert 1 <= entry["hold_seconds"] <= 25
 
 
+def test_every_published_mapping_passes_the_doors_own_reader():
+    for _version, name in PUBLISHED:
+        assert check_mapping(_packaged(name))["key"] == "outside-agents", name
+
+
+def _shipped_look(entry: dict, looks: dict) -> object:
+    """The catalog look a mapping's look entry names: by digest in profile v1, by the thing
+    library's key, version and digest in profile v2."""
+    named = entry["look"]
+    if isinstance(named, str):
+        return looks[named.removeprefix("sha256:")]
+    look = looks[named["sha256"]]
+    assert (look.document["look"], look.document["version"]) == (named["look"], named["version"])
+    return look
+
+
 def test_an_agents_own_body_is_a_shipped_kind_in_a_free_look():
-    packaged = json.loads((PACKAGE / "outside-agents.v1.json").read_text(encoding="utf-8"))
     kinds = shipped_thing_kinds()
     looks = {}
     for path in sorted((ROOT / "assets" / "catalogs" / "things" / "looks").glob("*.json")):
         look = read_look(json.loads(path.read_text(encoding="utf-8")))
         looks[look.sha256] = look
-    for visitor in packaged["visitors"]:
-        kind = kinds[(visitor["kind"]["key"], visitor["kind"]["version"])]
-        assert kind.kind == "visitor"
-        for entry in visitor["looks"]:
-            look = looks[entry["look"].removeprefix("sha256:")]
-            assert look.body_plan == kind.plan
-            assert look.document["origin"]["licence"]["spdx"] == entry["licence"]["spdx"]
-            assert entry["licence"]["spdx"] == "CC0-1.0"
+    for _version, name in PUBLISHED:
+        for visitor in _packaged(name)["visitors"]:
+            kind = kinds[(visitor["kind"]["key"], visitor["kind"]["version"])]
+            assert kind.kind == "visitor"
+            for entry in visitor["looks"]:
+                look = _shipped_look(entry, looks)
+                assert look.body_plan == kind.plan
+                assert look.document["origin"]["licence"]["spdx"] == entry["licence"]["spdx"]
+                assert entry["licence"]["spdx"] == "CC0-1.0"
+    # An agent's body arrives in the two-tone mannequin unless it asks for another look.
+    [visitor] = _packaged(PUBLISHED[-1][1])["visitors"]
+    first = _shipped_look(visitor["looks"][0], looks)
+    assert first.document["look"] == "kaykit-mannequin"
+    assert first.document["label"] == "two-tone mannequin"

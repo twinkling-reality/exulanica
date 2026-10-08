@@ -17,7 +17,6 @@ anywhere but the one header of each request (:mod:`exulanica_agent.transport`).
 from __future__ import annotations
 
 import collections
-import contextlib
 import json
 import os
 import threading
@@ -69,8 +68,9 @@ ENV_KEY_FILE: Final = "EXULANICA_AGENT_KEY_FILE"
 ENV_NAME: Final = "EXULANICA_AGENT_NAME"
 ENV_MAKER: Final = "EXULANICA_AGENT_MAKER"
 ENV_MIND: Final = "EXULANICA_AGENT_MIND"
-#: The agents' mapping file, shipped inside this package: a deployment pins its digest.
-MAPPING_FILE: Final = "outside-agents.v1.json"
+#: The agents' mapping file this version presents, shipped inside this package: a deployment pins
+#: its digest. Earlier versions' files stay beside it, each still pinned where it is admitted.
+MAPPING_FILE: Final = "outside-agents.v2.json"
 #: What this adapter reads from the agent it carries; the mapping accounts for each.
 READS: Final = ("action", "line", "declared name", "declared maker", "declared mind")
 #: How many happenings a body keeps for anyone who asks what happened lately.
@@ -118,6 +118,32 @@ _HELLO_WORDS: Final = {
 
 #: Hello refusals a body says hello again after, once the door's wait has passed.
 _HELLO_AGAIN: Final = frozenset({"too_many_hellos", "door_busy", "500", "502", "503", "504"})
+
+
+def _route_missing(refusal: DoorRefusal) -> bool:
+    """The door has no such route, as opposed to refusing a request on it: it answers 404 or 405
+    without a code of its own, being older than this library or built without that part."""
+    return refusal.status in (404, 405) and not refusal.code
+
+
+def _not_told(refusal: DoorRefusal, route: str, what: str, thing: str | None = None) -> Happening:
+    """What became of telling the door ``what`` when it refused, a missing route named as such so
+    a door older than the library shows."""
+    if _route_missing(refusal):
+        return Happening(
+            "door_route_missing",
+            f"This world's door has no route ({route}) for {what}: it is older than this library "
+            "or was built without it.",
+            thing=thing,
+            reason="route_missing",
+        )
+    code = refusal.code or str(refusal.status)
+    return Happening(
+        "not_told",
+        f"The world's door refused {what} ({code}: {refusal.detail}).",
+        thing=thing,
+        reason=code,
+    )
 
 
 class HelloRefused(AgentError):
@@ -260,20 +286,60 @@ class Body:
 
     def close(self, wait_seconds: float = 0.0) -> None:
         """Stop polling; the current poll ends within the door's hold. A body of the agent's own
-        still in the world is reported gone, so the world stops waiting for its answers at once.
-        With ``wait_seconds``, wait up to that long for the poll to end."""
-        with self._lock:
-            bodies = sorted(self._bodies)
-        for thing_id in bodies:
-            # Best effort: the world departs a silent body after its quiet minutes anyway.
-            with contextlib.suppress(AgentError, DoorRefusal):
-                self._door.call("POST", "/door/channel/gone", {"thing_id": thing_id}, timeout=5.0)
+        stays in the world: the world's routine decides for it while no program answers, and a
+        program that says hello again with the key takes its turns again, as a toolkit's restarted
+        run does. :meth:`leave` takes it out. With ``wait_seconds``, wait up to that long for the
+        poll to end."""
         self._closing.set()
         with self._lock:
             self._lock.notify_all()
         thread = self._thread
         if wait_seconds > 0 and thread is not None and thread is not threading.current_thread():
             thread.join(wait_seconds)
+
+    def leave(self) -> list[str]:
+        """Take the agent's own bodies out of the world for good: each open turn that offers its
+        body a way to leave is answered with it, so the body leaves at the next minute, and the
+        door is told the agent has gone, so it stops asking for each body, which the world sends
+        home once its quiet minutes pass, where the world does that. The bodies told about, by
+        thing id."""
+        with self._lock:
+            bodies = sorted(self._bodies)
+            leaving = [
+                (turn, option.action)
+                for handle, turn in sorted(self._open.items())
+                if turn.thing in self._bodies
+                and handle not in self._answered
+                and turn.seconds_left > 0
+                for option in turn.options
+                if option.kind == "leave"
+            ]
+        for turn, action in leaving:
+            self._answer(turn, action, None)
+        told = []
+        for thing_id in bodies:
+            try:
+                self._door.call("POST", "/door/channel/gone", {"thing_id": thing_id}, timeout=5.0)
+            except DoorRefusal as refusal:
+                with self._lock:
+                    self._note(
+                        _not_told(
+                            refusal, "POST /door/channel/gone", "being told you left", thing_id
+                        )
+                    )
+                continue
+            except AgentError as error:
+                with self._lock:
+                    self._note(
+                        Happening(
+                            "not_told",
+                            f"The world could not be told that you left: {error}.",
+                            thing=thing_id,
+                        )
+                    )
+                continue
+            told.append(thing_id)
+        return told
 
     def __enter__(self) -> Body:
         return self
@@ -409,11 +475,19 @@ class Body:
                 for item in held
             ],
         }
+        route = f"/door/channel/departures/{departure}/delivered"
         try:
-            self._door.call("POST", f"/door/channel/departures/{departure}/delivered", body)
-        except (AgentError, DoorRefusal):
+            self._door.call("POST", route, body)
+        except DoorRefusal as refusal:
             with self._lock:
-                self._reported.discard(departure)  # reported again when the frame repeats
+                if _route_missing(refusal):
+                    # Asking again would meet the same door: say so once and stop.
+                    self._note(_not_told(refusal, f"POST {route}", "a departure's receipt"))
+                else:
+                    self._reported.discard(departure)  # reported again when the frame repeats
+        except AgentError:
+            with self._lock:
+                self._reported.discard(departure)
 
     def _note(self, happening: Happening) -> None:
         self._recent.append(happening)
@@ -432,6 +506,10 @@ class Body:
                 return
             self._open[turn.turn] = turn
             self._known[turn.turn] = turn
+            if self._summary is not None and turn.thing not in self._summary["things"]:
+                # A turn for a thing the grant does not name is one of the agent's own bodies: a
+                # restarted program learns of a body that came in before it started.
+                self._bodies.add(turn.thing)
             self._last_deadline_ms = turn.deadline_ms
             self._last_instruction = turn.instruction
             self._line_maxima.update(
@@ -638,6 +716,14 @@ class Body:
                 False,
                 "no_visitors_allowed",
                 "Your permission lets you decide for things here, not bring a body of your own.",
+            )
+        with self._lock:
+            here = len(self._bodies)
+        if summary is not None and here >= summary["visitors_maximum"]:
+            return Answer(
+                False,
+                "already_here",
+                "Your body is already in the world: wait for its turns.",
             )
         looks = [entry["look_key"] for entry in self._mapping["visitors"][0]["looks"]]
         if look is not None and look not in looks:

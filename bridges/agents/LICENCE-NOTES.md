@@ -18,8 +18,10 @@
   v1.9.0); with its `mcp` and `langchain[openai]` parts it resolves to 122 packages, every one under
   MIT, MIT-0, Apache-2.0, BSD-2-Clause, BSD-3-Clause, 0BSD, Zlib, PSF-2.0, CNRI-Python or CC0,
   except `certifi` (MPL-2.0) and `orjson` (MPL-2.0 and Apache-2.0 or MIT), used unmodified.
-- The agents' mapping file names one look for an agent's own body, `people-catalog` version 1 from
-  the product's thing catalogs, CC0-1.0.
+- The agents' mapping files name looks for an agent's own body from the product's thing catalogs,
+  each CC0-1.0, whose origin records state their sources: version 2 names `kaykit-mannequin`
+  version 1 (the mannequin of KayKit Character Animations 1.1 by Kay Lousberg) first and
+  `people-catalog` version 1 second; version 1 names `people-catalog` version 1.
 - The quickstart's mind is a model the developer calls with their own Nebius Token Factory account,
   under that service's terms and the model's licence (Qwen3 235B Instruct: Apache-2.0; Nemotron 3
   Nano: the NVIDIA Open Model License).

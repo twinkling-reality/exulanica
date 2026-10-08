@@ -19,7 +19,13 @@ are what answer. What is shown:
     exactly the messages and the function one of the world's own models is shown for the stored
     request, the host's receipt names the agents' bridge, the library's version, the grant and
     the mapping, the door keeps which declaration answered, the agent reads that its answer was
-    taken, and the world replays with the agent gone.
+    taken, and the world replays with the agent gone;
+*   an agent brings a body of its own in through a society of things' gate with the MCP tool: it
+    arrives at the next minute wearing the first look the agents' mapping offers, the agent takes
+    its body's turns, and when its program stops and starts again with the same key the body stays
+    and its turns come to the new program; the world's models read names it as decided from
+    outside by what the agent declared, and when its owner sends it home the agent reads why and
+    acknowledges the departure once; the world replays with the agent gone.
 """
 
 from __future__ import annotations
@@ -36,21 +42,28 @@ from exulanica.api.app import create_app
 from exulanica.api.authorisation import load_token_directory
 from exulanica.api.services import Services
 from exulanica.api.society_runtime import SocietyRuntime
+from exulanica.canonical import sha256_of_canonical
 from exulanica.db.roles import provision_runtime_role
 from exulanica.door.bridges import load_bridge_directory
 from exulanica.door.channel import declared_sha256
+from exulanica.door.crossings import DoorCrossings
 from exulanica.door.runtime import DoorRuntime
 from exulanica.models.manifest import AnsweringMechanism
+from exulanica.world.crossings import register_crossing_stream
+from exulanica.world.roles.person import LINE_KINDS
 from exulanica.world.society_controls import LEASE_SECONDS
 from exulanica.world.society_decision_contract import person_role
+from exulanica.world.thing_library import shipped_looks
 from fastapi.testclient import TestClient
 
 import test_society_authored_world_postgres as helpers
 import test_society_stay_requests_api as stays
-from agent_support import AgentError, Body, agent, agents_bridge, app_opener, facade
+from agent_support import PACKAGE, AgentError, Body, agent, agents_bridge, app_opener, facade
 from conftest import scratch_role_database
 from test_society_person_decisions_postgres import _claim, _decisions
 from test_society_saved_world_api import OWNER, TOKEN, routes
+from test_society_things_postgres import _make_society, _place, _replayed
+from test_society_things_postgres import _step as _minute
 from tests_support_api import EVERY_PERMISSION
 
 saved_world = helpers.saved_world
@@ -104,13 +117,27 @@ def door(saved_world, spine_schema, monkeypatch):
         ),
         society_control_workspaces=(world["workspace"],),
         door=DoorRuntime(database=database, bridges=bridges),
+        # A body of the agent's own crosses into a society of things, which a host makes only when
+        # it offers them.
+        societies_of_things=True,
     )
     with TestClient(create_app(services, verify=False), raise_server_exceptions=False) as client:
         yield world, client, database, services
 
 
-def _key(world: dict[str, Any], client: TestClient) -> tuple[str, str]:
-    """A grant letting an agent bring one body of its own, and the key its owner mints for it."""
+@pytest.fixture
+def crossings():
+    """The door's crossings handed to every society of things this process plays."""
+    register_crossing_stream(DoorCrossings())
+    try:
+        yield
+    finally:
+        register_crossing_stream(None)
+
+
+def _key(world: dict[str, Any], client: TestClient, **scope: Any) -> tuple[str, str]:
+    """A grant letting an agent bring one body of its own, with ``scope`` (such as the gate it comes
+    through) over it, and the key its owner mints for it."""
     issued = client.post(
         "/door/grants",
         headers=OWNER,
@@ -123,6 +150,7 @@ def _key(world: dict[str, Any], client: TestClient) -> tuple[str, str]:
             # The version its visitor would arrive in; nothing asks for a society until one does.
             "version_id": str(world["binding"].version_id),
             "channel_credential": True,
+            **scope,
         },
     )
     assert issued.status_code == 201, issued.text
@@ -308,7 +336,10 @@ def test_an_agent_decides_for_a_person_and_the_world_replays_without_it(door):
         agent.VERSION,
         grant_id,
     )
-    assert record["mapping_sha256"] == agents_bridge()["mapping_sha256"][0]
+    # The mapping this library version presents, pinned by the agents' bridge.
+    presented = json.loads((PACKAGE / "outside-agents.v2.json").read_text(encoding="utf-8"))
+    assert record["mapping_sha256"] == sha256_of_canonical(presented).hex()
+    assert record["mapping_sha256"] in agents_bridge()["mapping_sha256"]
     assert "cost_usd" not in record
     assert answer["declared_sha256"] == declared_sha256(DECLARED)
     [taken] = [h for h in body.recent() if h.what == "answer_taken"]
@@ -353,3 +384,127 @@ def test_an_agents_tools_decide_a_persons_turn_over_the_real_door(door):
     [receipt] = _decisions(services, world, snapshot)
     assert (receipt["status"], receipt["reason"]) == ("accepted", "validated_choice")
     assert receipt["subject_id"] == person and receipt["proposal"]["label"] == action
+
+
+def test_an_agents_own_body_comes_in_takes_its_turns_and_goes_home(door, crossings):
+    world, client, database, services = door
+    # A society of things needs somewhere to go (a well) and a gate its visitors come through.
+    _place(client, world, "well", "well", 2, -4_000, 2_000)
+    _place(client, world, "gate", "gate", 1, 0, 6_000)
+    society = _make_society(client, world)
+    grant_id, key = _key(world, client, gate="gate")
+    body = _connect(client, key)
+    seen: list[Any] = []
+
+    def mind() -> None:
+        # A scripted mind: for whatever turn comes, the first action that says nothing and does
+        # not take the body out of the world. Which kinds speak is the person role's own word,
+        # for a door that does not yet name the actions carrying a line on the frame.
+        for turn in body.turns():
+            seen.append(turn)
+            quiet = [
+                o
+                for o in turn.options
+                if not o.says_line and o.kind != "leave" and o.kind not in LINE_KINDS
+            ]
+            turn.act(quiet[0].action)
+
+    thread = threading.Thread(target=mind, daemon=True)
+    thread.start()
+    host = services.decision_host()
+
+    def minute(society: dict[str, Any]) -> dict[str, Any]:
+        assert host.before_minute(_claim(world, society), time.monotonic() + LEASE_SECONDS)
+        return _minute(client, world, society)
+
+    def answered(society: dict[str, Any]) -> dict[str, Any]:
+        for _ in range(10):
+            if any(h.what == "answer_taken" for h in body.recent()):
+                break
+            society = minute(society)
+        assert until(lambda: any(h.what == "answer_taken" for h in body.recent()))
+        return society
+
+    try:
+        entered = facade.Facade(body).call("enter_world", {})
+        assert not entered.is_error, entered.text
+        society = _minute(client, world, society)
+        [visitor] = [p for p in society["state"]["inhabitants"] if p["came_by"] == "crossed"]
+        assert until(lambda: any(h.what == "arrived" for h in body.recent()))
+        [arrived] = [h for h in body.recent() if h.what == "arrived"]
+        assert arrived.thing == visitor["id"]
+        # The agent takes its own body's turns, as one of the world's models would.
+        society = answered(society)
+        [taken, *_] = [h for h in body.recent() if h.what == "answer_taken"]
+        assert taken.thing == visitor["id"] and seen[0].thing == visitor["id"]
+        # Its program stops and starts again with the same key, as a toolkit's run does: the body
+        # stays, its turns come to the new program, which knows it as its own.
+        body.close(wait_seconds=5)
+        thread.join(5)
+        body = _connect(client, key)
+        seen.clear()
+        thread = threading.Thread(target=mind, daemon=True)
+        thread.start()
+        society = answered(society)
+        assert seen[0].thing == visitor["id"]
+        again = facade.Facade(body).call("enter_world", {})
+        assert again.is_error and "already in the world" in again.text
+        [receipt, *_] = _decisions(services, world, society)
+        assert (receipt["subject_id"], receipt["status"]) == (visitor["id"], "accepted")
+        assert (receipt["provider"]["bridge"], receipt["provider"]["grant_id"]) == (
+            "agents",
+            grant_id,
+        )
+        # It wears the first look the agents' mapping offers: the thing library's mannequin.
+        mannequin = shipped_looks()[("kaykit-mannequin", 1)]
+        looks = client.get(
+            f"/world/versions/{world['binding'].version_id}/thing-looks",
+            headers=OWNER,
+            params={"world_id": world["binding"].world_id},
+        ).json()["looks"]
+        [worn] = [look for look in looks if look["thing_id"] == visitor["id"]]
+        assert (worn["chosen_by"], worn["look"]) == (
+            "crossing",
+            {"look": mannequin.look, "version": mannequin.version, "sha256": mannequin.sha256},
+        )
+        # Who decides for it, as its card reads it: an outside agent, by what the agent declared.
+        scope, _, society_route = routes(world)
+        models = client.get(society_route + "/models", headers=OWNER, params=scope).json()
+        assert models["outside"] == [
+            {
+                "subject_id": visitor["id"],
+                "came": "crossed",
+                "grant_id": grant_id,
+                "bridge": "agents",
+                "bridge_label": agents_bridge()["label"],
+                "run_by": "owner",
+                "ai": True,
+                "connected": True,
+                "declared": DECLARED,
+            }
+        ]
+        # Its owner sends it home: the agent reads why and acknowledges the departure once.
+        sent = client.post(
+            f"/door/grants/{grant_id}/send-away", headers=OWNER, json={"thing_id": visitor["id"]}
+        )
+        assert sent.status_code == 202, sent.text
+        society = minute(society)
+        assert until(lambda: any(h.what == "left" for h in body.recent()))
+        [left] = [h for h in body.recent() if h.what == "left"]
+        assert left.thing == visitor["id"]
+        assert "the world's owner sent your body home" in left.words
+
+        def acknowledged() -> list[Any]:
+            with database.session(world["workspace"]) as connection:
+                return connection.execute(
+                    "select thing_id from door_delivery where workspace_id = %s and grant_id = %s",
+                    (world["workspace"], uuid.UUID(grant_id)),
+                ).fetchall()
+
+        assert until(lambda: len(acknowledged()) == 1)
+        assert [str(row["thing_id"]) for row in acknowledged()] == [visitor["id"]]
+    finally:
+        body.close(wait_seconds=5)
+        thread.join(5)
+    # The world replays with the agent gone.
+    assert _replayed(client, world)

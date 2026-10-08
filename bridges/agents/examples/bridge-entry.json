@@ -4,8 +4,11 @@
   "game": "AI agents, through MCP or the agent library",
   "run_by": "owner",
   "ai": true,
-  "mapping_sha256": ["405483447574d9b095699783bbbc03e2befde93ea021e943be71588d8adb2b48"],
-  "adapter_versions": ["0.1.0"],
+  "mapping_sha256": [
+    "405483447574d9b095699783bbbc03e2befde93ea021e943be71588d8adb2b48",
+    "05ada0f1e55ffbe9fa07110a0ee496a91078e3bc00939df23153dec95296fefd"
+  ],
+  "adapter_versions": ["0.1.0", "0.2.0"],
   "listed": true,
   "hold_seconds": 15,
   "deadline_ms": 15000

@@ -56,9 +56,10 @@ _STOPPED_WORDS: Final = {
 #: Why a body could not come in, as the door or the world's engine names it.
 _REFUSED_WORDS: Final = {
     "no_arrival_place": "this world has no gate to come in through",
-    "visitor_limit": "this world has as many visitors as your permission allows",
+    "visitor_limit": "this world holds as many visitors as it takes",
     "already_here": "your body is already here",
     "unknown_kind": "this world does not know the kind of body you would arrive as",
+    "malformed_crossing": "the world could not read your body's crossing",
     "world_not_open_to_visitors": "this world does not take visitors",
 }
 #: Why a body left, as the world's engine or the door records it.
@@ -66,6 +67,7 @@ _LEFT_WORDS: Final = {
     "chose_to_leave": "you chose to leave",
     "decider_lost": "you were silent too long",
     "sent_away": "the world's owner sent your body away",
+    "sent_home": "the world's owner sent your body home",
     "grant_ended": "your permission ended",
     "world_changed": "the world was changed, so its visitors were sent home",
 }

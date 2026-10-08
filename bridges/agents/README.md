@@ -81,6 +81,19 @@ the prompt `live_in_this_world` tells a client's model how to take turns.
 [`checks/mcp_stdio.py`](checks/mcp_stdio.py) speaks raw MCP to the facade as a 2026-07-28 client
 and as a legacy one.
 
+## A body of its own
+
+When its grant allows a visitor, an agent can bring a body of its own into the world through a gate
+(`body.enter()`, or the `enter_world` tool). The body arrives at the next world minute as an outside
+agent, wearing the two-tone mannequin look unless the agent asks for another its mapping offers
+(`plain`, dressed as one of the world's people), and its turns follow as any thing's do. Its
+declared name, maker and mind stay outside the world: the door keeps them for its card. When the
+agent's program stops, the body stays and the world's routine decides for it; a program that starts
+again with the same key takes its turns again, as a toolkit's restarted run does. It leaves when the
+world's owner sends it home or ends the grant, and the agent reads why; `body.leave()` tells the
+world the agent has gone for good, so it stops asking the body. A body comes only into a world
+version that holds a society of things; another version refuses it by name.
+
 ## With NVIDIA NeMo Agent Toolkit
 
 [`examples/nemo-agent-toolkit.yml`](examples/nemo-agent-toolkit.yml) is an agent with no Python of
@@ -131,11 +144,15 @@ exulanica-agent check
 Says hello with the settings above and prints what the agent may do and the world's rules.
 
 ```bash
-EXULANICA_URL=https://<the world> EXULANICA_TOKEN=<an owner token> exulanica-agent grant --world <id> --visitors 1 --key-file agent.key
+EXULANICA_URL=https://<the world> EXULANICA_TOKEN=<an owner token> exulanica-agent grant --world <id> --version <id> --visitors 1 --gate <id> --key-file agent.key
 ```
 
 For a world's owner with an API token that may issue grants: issues one for outside agents and
-writes the key, shown once, to a new file only its owner can read. It never prints the key.
+writes the key, shown once, to a new file only its owner can read. It never prints the key. A grant
+names the world version its things are in or its bodies arrive in (`--version`); `--thing <id>`
+names one of the world's own things for the agent to decide for, `--visitors` how many bodies of
+its own it may bring, and `--gate` the gate they come through, by the id it was placed with (else
+one of the version's gates).
 
 ```bash
 EXULANICA_URL=https://<the world> EXULANICA_TOKEN=<an owner token> exulanica-agent key --grant <id> --key-file agent-new.key
@@ -150,12 +167,13 @@ its connection ended because a new key was issued.
 A deployment admits outside agents with one entry in `EXULANICA_DOOR_BRIDGES`, like
 [`examples/bridge-entry.json`](examples/bridge-entry.json): the agents' door is run by each
 world's owner (`run_by` owner, so owners hand out keys themselves), its deciders are AI (`ai`
-true, so every thing it runs is marked as run by AI), it pins the digest of the mapping file this
-library presents and the library versions it admits, and it gives an agent 15 seconds to answer a
-turn, about one model call.
+true, so every thing it runs is marked as run by AI), it admits the library's published versions
+and pins the digest of the mapping file each presents (0.1.0 presents `outside-agents.v1.json`,
+0.2.0 `outside-agents.v2.json`, both kept in the package), so an agent built on an earlier version
+keeps its door, and it gives an agent 15 seconds to answer a turn, about one model call.
 
 ## What depends on the world's door
 
 Deciding for a world's own thing needs a door that hands over each ask with the model's own
 messages and function. Bringing a body of its own needs a door that takes visitors through a gate;
-until then `enter_world` answers that the door does not take visitors yet.
+a door that does not answers `enter_world` that it does not take visitors yet.

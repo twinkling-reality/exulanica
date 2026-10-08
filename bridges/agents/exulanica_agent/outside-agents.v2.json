@@ -1,0 +1,75 @@
+{
+  "profile": "exulanica.bridge-mapping/v2",
+  "key": "outside-agents",
+  "version": 2,
+  "game": {
+    "label": "Outside AI agents",
+    "content": "Any agent program, through MCP or the agent library"
+  },
+  "visitors": [
+    {
+      "game_type": "agent",
+      "kind": {"key": "visitor", "version": 1},
+      "label": "outside agent",
+      "words": "An outside AI agent's own body, which comes in as a visitor",
+      "outcome": "exact",
+      "looks": [
+        {
+          "look_key": "mannequin",
+          "look": {
+            "look": "kaykit-mannequin",
+            "version": 1,
+            "sha256": "5ac3b94acbf8f770c9c68ab488b6aae695f1ecd6be65fc5c7ad16716a7f2f0bd"
+          },
+          "licence": {"spdx": "CC0-1.0"}
+        },
+        {
+          "look_key": "plain",
+          "look": {
+            "look": "people-catalog",
+            "version": 1,
+            "sha256": "188e6de0561b3617f6c6f0f8495e7ea3f7c6a2dd5fcf43f39feecd2ffea3c24d"
+          },
+          "licence": {"spdx": "CC0-1.0"}
+        }
+      ]
+    }
+  ],
+  "items": [],
+  "actions": [
+    {
+      "game_action": "action",
+      "ability": "any offered",
+      "words": "The action the agent chooses, one of those its turn offers",
+      "outcome": "exact"
+    },
+    {
+      "game_action": "line",
+      "ability": "say",
+      "words": "A line the agent says, when the action it chose says something",
+      "outcome": "exact"
+    }
+  ],
+  "never_crosses": [
+    {
+      "field": "player name",
+      "words": "The name of whoever runs the agent",
+      "reason_words": "No person's name enters a world"
+    },
+    {
+      "field": "declared name",
+      "words": "The name the agent gives itself",
+      "reason_words": "It is shown on its card only, never inside the world or to a model"
+    },
+    {
+      "field": "declared maker",
+      "words": "Who made the agent, in its own words",
+      "reason_words": "It is shown on its card only, never inside the world or to a model"
+    },
+    {
+      "field": "declared mind",
+      "words": "The model the agent says it thinks with",
+      "reason_words": "It is shown on its card only; this world does not run that model"
+    }
+  ]
+}

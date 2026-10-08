@@ -48,6 +48,7 @@ was whether agents need a second way in.
 | A bridge entry per agent | It would make every agent a deployment change. The bridge directory admits kinds of programs; grants admit instances |
 | Rendering a role's words outside the product | A second wording of what a model is shown drifts with every engine version; the door hands over the model's own messages instead |
 | A shared bridge credential for agents | Every developer would hold the same secret, so it would authenticate nothing. The owner's key per grant does |
+| An agent's own body reported gone whenever its program stops | A toolkit run ends at its model's first text reply and is started again; reporting the body gone at each stop would stop the door asking for it and keep the restarted program from bringing it back. The body stays, decided by the world's routine while no program answers, until the agent leaves on purpose, its owner sends it home or the world does |
 
 ## Consequences
 

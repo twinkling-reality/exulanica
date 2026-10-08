@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import ast
 import http.server
+import importlib
 import json
 import runpy
 import stat
@@ -28,6 +29,7 @@ from collections.abc import Callable, Iterator
 
 import pytest
 from exulanica.models.choice import ChoiceRequest
+from exulanica.world.crossings import ARRIVAL_REFUSALS
 from exulanica.world.deciders import ADAPTER_VERSION
 
 from agent_support import (
@@ -46,9 +48,12 @@ from agent_support import (
     person_ask,
     served,
     with_a_line,
+    with_leaving,
+    with_stated_lines,
 )
 
-MAPPING_FILE = PACKAGE / "outside-agents.v1.json"
+#: The mapping file this library version presents, named here rather than read from the library.
+MAPPING_FILE = PACKAGE / "outside-agents.v2.json"
 QUICKSTART = AGENTS_ROOT / "examples" / "quickstart.py"
 
 
@@ -453,16 +458,125 @@ def test_a_body_of_its_own_arrives_hears_and_leaves_in_words():
         body.close(wait_seconds=5)
 
 
-def test_closing_reports_a_body_still_in_the_world_gone():
+def test_closing_keeps_a_body_in_the_world_and_leaving_reports_it_gone():
     door = FakeDoor(grant=grant_view(visitors=1))
     body = Body.connect("http://127.0.0.1:9", KEY, name="Scout", maker="Acme", opener=door.opener)
     thing = "1a2b3c4d-5e6f-4a1b-8c2d-3e4f5a6b7c8d"
-    door.push({"kind": "arrived", "arrival_id": "a1", "thing_id": thing, "carried": []})
-    assert until(lambda: any(h.what == "arrived" for h in body.recent()))
-    door.release()
-    body.close(wait_seconds=5)
-    [gone] = door.requests_to("/door/channel/gone")
-    assert gone["body"] == {"thing_id": thing} and gone["keyed"]
+    try:
+        door.push({"kind": "arrived", "arrival_id": "a1", "thing_id": thing, "carried": []})
+        assert until(lambda: any(h.what == "arrived" for h in body.recent()))
+        # Leaving for good tells the door the agent has gone (door contract, Crossings).
+        assert body.leave() == [thing]
+        [gone] = door.requests_to("/door/channel/gone")
+        assert gone["body"] == {"thing_id": thing} and gone["keyed"]
+    finally:
+        door.release()
+        body.close(wait_seconds=5)
+    # Stopping alone reports nothing: a restarted program takes the body's turns again.
+    assert len(door.requests_to("/door/channel/gone")) == 1
+
+
+def test_a_door_without_the_route_to_be_told_an_agent_left_is_named_as_such():
+    door = FakeDoor(grant=grant_view(visitors=1))
+    body = Body.connect("http://127.0.0.1:9", KEY, name="Scout", maker="Acme", opener=door.opener)
+    thing = "4d5e6f7a-8b9c-4d4e-9f5a-6b7c8d9e0f1a"
+    try:
+        door.push({"kind": "arrived", "arrival_id": "a1", "thing_id": thing, "carried": []})
+        assert until(lambda: any(h.what == "arrived" for h in body.recent()))
+        # A door older than the crossings answers a route it lacks with a bare 404, no code.
+        door.refusals["/door/channel/gone"] = [(404, {"detail": "Not Found"})]
+        assert body.leave() == []
+        [missing] = [h for h in body.recent() if h.what == "door_route_missing"]
+        assert "/door/channel/gone" in missing.words and missing.thing == thing
+        # A refusal the door words itself is a refusal, not a missing route.
+        door.refuse("/door/channel/gone", 409, "hello_first")
+        assert body.leave() == []
+        [refused] = [h for h in body.recent() if h.what == "not_told"]
+        assert refused.reason == "hello_first"
+    finally:
+        door.release()
+        body.close(wait_seconds=5)
+
+
+def test_a_door_without_the_delivery_route_is_named_once_and_not_asked_again():
+    door = FakeDoor(grant=grant_view(visitors=1))
+    body = Body.connect("http://127.0.0.1:9", KEY, name="Scout", maker="Acme", opener=door.opener)
+    route = "/door/channel/departures/d1/delivered"
+    door.refusals[route] = [(404, {"detail": "Not Found"})] * 3
+    departed = {"kind": "departed", "departure_id": "d1", "thing_id": "t1", "why": "sent_home"}
+    try:
+        door.push({**departed, "carried": []})
+        assert until(lambda: any(h.what == "door_route_missing" for h in body.recent()))
+        door.push({**departed, "carried": []})
+        assert until(lambda: len(door.requests_to("/door/channel/frames")) >= 3)
+    finally:
+        door.release()
+        body.close(wait_seconds=5)
+    assert len(door.requests_to(route)) == 1
+    assert [h.what for h in body.recent()].count("door_route_missing") == 1
+
+
+def test_a_door_that_names_the_actions_carrying_a_line_is_read_from_the_frame(door, body):
+    # A door states which offered actions carry a line, and their bound, on the asked frame
+    # (door contract, Frames), where a society of things records no bound on its options.
+    door.push(with_stated_lines(person_ask(), "say something to everyone near you", 120))
+    turn = body.next_turn(5)
+    assert turn is not None
+    said = turn.offered("say something to everyone near you")
+    assert (said.says_line, said.line_characters_maximum, said.kind) == (True, 120, "say_all")
+    assert not any(option.says_line for option in turn.options if option is not said)
+    assert turn.act("say something to everyone near you").refusal == "line_missing"
+    assert turn.act("say something to everyone near you", "x" * 121).refusal == (
+        "line_out_of_bounds"
+    )
+    assert turn.act("say something to everyone near you", "Good evening, all.").received
+    [answer] = door.requests_to("/door/channel/answers")
+    assert answer["body"]["line"] == "Good evening, all."
+
+
+def test_a_frame_naming_a_line_for_an_action_it_does_not_offer_is_not_a_turn(door, body):
+    frame = with_stated_lines(person_ask(), "say something to everyone near you")
+    frame["line_labels"] = ["sing to the moon"]
+    door.push(frame)
+    assert until(lambda: any(h.what == "turn_unreadable" for h in body.recent()))
+    assert body.next_turn(0.2) is None
+
+
+def test_leaving_answers_a_bodys_way_out_then_tells_the_door_it_has_gone():
+    door = FakeDoor(grant=grant_view(visitors=1))
+    body = Body.connect("http://127.0.0.1:9", KEY, name="Scout", maker="Acme", opener=door.opener)
+    thing = "3c4d5e6f-7a8b-4c3d-8e4f-5a6b7c8d9e0f"
+    try:
+        door.push(with_leaving(person_ask(subject_id=thing)))
+        turn = body.next_turn(5)
+        assert turn is not None and turn.offered("leave this world").kind == "leave"
+        assert body.leave() == [thing]
+        [answer] = door.requests_to("/door/channel/answers")
+        assert (answer["body"]["label"], "line" in answer["body"]) == ("leave this world", False)
+        # The way out is answered before the door is told the agent has gone.
+        paths = [request["path"] for request in door.requests]
+        assert paths.index("/door/channel/answers") < paths.index("/door/channel/gone")
+    finally:
+        door.release()
+        body.close(wait_seconds=5)
+
+
+def test_a_restarted_program_knows_its_body_from_its_turns_and_does_not_enter_twice():
+    # A program that starts after its body came in learns of it from a turn for a thing its grant
+    # does not name, which can only be one of its own bodies.
+    door = FakeDoor(grant=grant_view(visitors=1))
+    body = Body.connect("http://127.0.0.1:9", KEY, name="Scout", maker="Acme", opener=door.opener)
+    thing = "2b3c4d5e-6f7a-4b2c-9d3e-4f5a6b7c8d9e"
+    try:
+        door.push(person_ask(subject_id=thing))
+        assert body.next_turn(5) is not None
+        entered = body.enter()
+        assert (entered.received, entered.refusal) == (False, "already_here")
+        assert door.requests_to("/door/channel/arrivals") == []
+        assert body.leave() == [thing]
+    finally:
+        door.release()
+        body.close(wait_seconds=5)
 
 
 @pytest.mark.parametrize(
@@ -479,6 +593,14 @@ def test_a_refused_arrival_says_why(door, body, reason, words):
     assert until(lambda: any(h.what == "could_not_arrive" for h in body.recent()))
     [refused] = [h for h in body.recent() if h.what == "could_not_arrive"]
     assert words in refused.words and refused.reason == reason
+
+
+def test_every_reason_a_world_refuses_an_arrival_for_has_its_own_words():
+    happenings = importlib.import_module("exulanica_agent.happenings")
+    # The society's own list of why it refuses an arrival, not the library's.
+    for reason in ARRIVAL_REFUSALS:
+        words = happenings.from_arrival_refused({"reason": reason}).words
+        assert reason not in words, words
 
 
 def test_the_rules_carry_the_owners_words_for_the_world():
@@ -501,9 +623,9 @@ def test_an_owner_lets_an_agent_in_and_replaces_its_key_without_printing_either(
     first, second = tmp_path / "agent.key", tmp_path / "agent-new.key"
     with served(door) as url:
         monkeypatch.setenv("EXULANICA_URL", url)
-        world = str(uuid.uuid4())
-        argv = ["grant", "--world", world, "--visitors", "1", "--key-file", str(first)]
-        assert command.main(argv) == 0
+        world, version = str(uuid.uuid4()), str(uuid.uuid4())
+        argv = ["grant", "--world", world, "--version", version, "--visitors", "1"]
+        assert command.main([*argv, "--gate", "gate:north", "--key-file", str(first)]) == 0
         outputs = [capsys.readouterr()]
         granted = json.loads(outputs[-1].out)
         assert command.main(["key", "--grant", granted["grant_id"], "--key-file", str(second)]) == 0
@@ -526,8 +648,31 @@ def test_an_owner_lets_an_agent_in_and_replaces_its_key_without_printing_either(
     [issue] = door.requests_to("/door/grants")
     assert issue["owner"] and issue["query"] == {"world_id": world}
     assert issue["body"]["channel_credential"] is True and issue["body"]["kinds"] == ["agent"]
+    assert (issue["body"]["version_id"], issue["body"]["gate"]) == (version, "gate:north")
     [renew] = door.requests_to(f"/door/grants/{GRANT_ID}/channel-credentials")
     assert renew["owner"] and renew["body"] is None
+
+
+@pytest.mark.parametrize(
+    ("argv", "words"),
+    [
+        (["--visitors", "1"], "needs --version"),
+        (["--thing", "person-4"], "needs --version"),
+        (["--version", "v", "--thing", "person-4", "--gate", "gate"], "needs --visitors"),
+    ],
+)
+def test_a_grant_names_the_version_its_things_are_in_and_a_gate_only_for_bodies(
+    door, monkeypatch, tmp_path, capsys, argv, words
+):
+    # The door refuses a grant for things or visitors that names no version (door contract,
+    # Grants), and a gate with no visitor; the command says so before asking.
+    monkeypatch.setenv("EXULANICA_TOKEN", OWNER_TOKEN)
+    target = tmp_path / "agent.key"
+    with served(door) as url:
+        monkeypatch.setenv("EXULANICA_URL", url)
+        assert command.main(["grant", "--world", "w", *argv, "--key-file", str(target)]) == 2
+    assert words in capsys.readouterr().err
+    assert door.requests_to("/door/grants") == [] and not target.exists()
 
 
 def test_a_new_key_needs_a_grants_id(monkeypatch, tmp_path):

@@ -3,4 +3,4 @@
 from typing import Final
 
 #: One to four whole numbers joined by dots, as the door admits adapter versions.
-VERSION: Final = "0.1.0"
+VERSION: Final = "0.2.0"

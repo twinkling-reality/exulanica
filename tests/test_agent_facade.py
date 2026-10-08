@@ -268,7 +268,7 @@ def test_enter_world_asks_the_door_to_let_the_agents_body_in():
         assert not result.is_error, result.text
         _valid("enter_world", result.structured)
         [arrival] = door.requests_to("/door/channel/arrivals")
-        mapping = json.loads((PACKAGE / "outside-agents.v1.json").read_text(encoding="utf-8"))
+        mapping = json.loads((PACKAGE / "outside-agents.v2.json").read_text(encoding="utf-8"))
         visitor = mapping["visitors"][0]
         assert set(arrival["body"]) == {"arrival_id", "game_type", "look_key", "carried"}
         assert arrival["body"]["game_type"] == visitor["game_type"]
