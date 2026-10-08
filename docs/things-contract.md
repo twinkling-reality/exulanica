@@ -811,8 +811,12 @@ A thing wears the look chosen for it where one is, from the looks chosen for its
 (`GET /world/versions/{version_id}/thing-looks`): a person in the crowd, a placed thing in the layer; a
 thing with none wears its kind's first look. The choices are read when a society of things is first
 drawn and then once a minute while it is drawn, playing or paused: one private read a minute for each
-open world page. A visitor whose look its crossing chose is dressed within a minute of arriving, a
-choice made in another browser arrives, and a choice the read no longer lists (one naming a look the
+open world page. A look chosen on the page is read at once: once its look route answers, the chooser
+raises `exulanica:thing-look-chosen` on the shell, naming the thing by its id in the society, and the
+page reads the choices outside the minute (looks chosen while a read is under way are read once more
+after it) and draws what the read lists, not what was sent. A visitor whose look its crossing chose
+is dressed within a minute of arriving, a choice made in another browser arrives, and a choice the
+read no longer lists (one naming a look the
 workspace withdrew) leaves, the thing returning to its kind's first look. A thing wearing a look its
 workspace keeps is listed apart (`workspace_looks`) by the look's digest alone; its key and version
 are its own document's, read by that digest and held to it, and one no longer held is left out. A

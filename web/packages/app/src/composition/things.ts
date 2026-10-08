@@ -1,6 +1,7 @@
 /**
- * The things an open saved world's version places, drawn by their looks, and the one event a pick
- * of a drawn thing raises.
+ * The things an open saved world's version places, drawn by their looks, and the two events the
+ * drawing shares with a thing's card: the one a pick of a drawn thing raises, and the one a look
+ * chosen for a thing raises.
  *
  * The layer (`@exulanica/atlas-react/things`) stands each placed thing where the version puts it, in
  * the frame its region is drawn in, wearing its kind's look as the host's thing library serves it.
@@ -8,6 +9,10 @@
  * shell, `exulanica:thing-pick`, whose detail names the thing by every id the drawing knows and how
  * it was picked; the thing's card opens from that event. Dispatching the same event with a null
  * detail takes the ring away, as a card does when it closes.
+ *
+ * A look chosen for a thing on the page (its look route answered) is told by one event on the shell,
+ * `exulanica:thing-look-chosen`, whose detail names the thing by its id in the society; the world
+ * page then reads the looks chosen at once and draws what the read lists, not what was sent.
  */
 import {
   ThingCrowdFigures,
@@ -31,6 +36,17 @@ export type ThingPickVia = 'aim' | 'pointer' | 'mark';
 
 /** The event's detail: what was picked, and how; null when nothing is picked any more. */
 export type ThingPickDetail = (ThingPick & { readonly via: ThingPickVia }) | null;
+
+/**
+ * Raised on the shell, bubbling, once a look chosen for a thing is recorded (its look route
+ * answered 200): the world page reads the looks chosen at once, outside the minute's read.
+ */
+export const THING_LOOK_CHOSEN_EVENT = 'exulanica:thing-look-chosen';
+
+/** The look chosen event's detail: the thing whose look was chosen, by its id in the society. */
+export interface ThingLookChosenDetail {
+  readonly thingId: string;
+}
 
 export interface ThingsDependencies {
   readonly app: ThingLayerOptions['app'];

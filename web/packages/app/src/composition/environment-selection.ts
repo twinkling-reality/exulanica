@@ -94,7 +94,7 @@ import { pointerRay, type SeatingLayout } from '@exulanica/atlas-react/playcanva
 import type { SocietyPlaces } from '../society-api.js';
 import { engineCreatedOver, societyEngine } from '../society-engines.js';
 import type { SavedWorldFlight, SavedWorldFlightStatus } from './saved-world-flight.js';
-import { LOOKS_READ_INTERVAL_MS, looksReadDue, mountThings, THING_PICK_EVENT, type MountedThings, type ThingPickDetail, type ThingPickVia, type ThingsDependencies } from './things.js';
+import { LOOKS_READ_INTERVAL_MS, looksReadDue, mountThings, THING_LOOK_CHOSEN_EVENT, THING_PICK_EVENT, type MountedThings, type ThingLookChosenDetail, type ThingPickDetail, type ThingPickVia, type ThingsDependencies } from './things.js';
 import { AttachedMarks, type MarkedSubject } from '@exulanica/atlas-react/things';
 import { markLabel, markOf, type MarkInput } from './thing-marks.js';
 import { LineWatch, thingLine } from './thing-lines.js';
@@ -569,6 +569,9 @@ export function mountEnvironmentSelection(
   /** When the looks chosen for the society's things were last asked for, and the timer for the next read. */
   let looksAskedAt = Number.NEGATIVE_INFINITY;
   let looksTimer: number | null = null;
+  /** Whether a looks read is under way, and whether a look chosen meanwhile asks for one after it. */
+  let looksReading = false;
+  let looksAgain = false;
   let bridgesReading = false;
   /** Which of a society's events are new, and the bridge each visitor crossed through. */
   const visitorWatch = new VisitorNoticeWatch();
@@ -944,6 +947,15 @@ export function mountEnvironmentSelection(
   }
   // The pick event is raised on the shell and bubbles; listening at the document hears it from any surface.
   document.addEventListener(THING_PICK_EVENT, onThingPick);
+  /** A look chosen for a thing was recorded: read the looks chosen at once, as the minute's read draws them. */
+  function onThingLookChosen(event: Event): void {
+    const detail = (event as CustomEvent<ThingLookChosenDetail | null>).detail;
+    if (typeof detail?.thingId !== 'string') return;
+    // The looks chosen are a society of things': read only while one is drawn, as each minute's read is.
+    if (renderedSnapshot?.state.things === undefined) return;
+    readLooks('chosen');
+  }
+  document.addEventListener(THING_LOOK_CHOSEN_EVENT, onThingLookChosen);
 
   /** On a selected inhabitant of a saved world: ask the Companion who they are, what and why. */
   function addAskActions(): void {
@@ -2055,28 +2067,48 @@ export function mountEnvironmentSelection(
    * minute while it is drawn, playing or paused (`looksReadDue`): a choice made elsewhere arrives and
    * one the store no longer lists (a withdrawn look's) leaves; then draw them
    * (`MountedThings.setLooks`) and ask the crowd again, which makes again only a thing whose look changed.
+   * A look chosen on the page (`THING_LOOK_CHOSEN_EVENT`) is read at once, outside the minute; looks
+   * chosen while a read is under way are read once more after it, so the read that draws them starts
+   * after every one of them was recorded.
    */
-  function readLooks(): void {
+  function readLooks(reason: 'minute' | 'chosen' = 'minute'): void {
     const world = savedWorld;
     if (things === null || world === null) return;
+    if (looksReading) {
+      if (reason === 'chosen') looksAgain = true;
+      return;
+    }
     const now = performance.now();
-    if (!looksReadDue(looksAskedAt, now)) return;
+    if (reason === 'minute' && !looksReadDue(looksAskedAt, now)) return;
     looksAskedAt = now;
+    looksReading = true;
     stopLooksTimer();
     const client = deps.thingLooksClient ?? new ThingLooksClient({ ...deps.credentials, worldId: world.worldId });
     // A look the workspace keeps is named by digest alone: the library reads its own key and version.
     const library = things.layer.maker.library;
     void client.read(world.versionId, (sha256) => library.heldLook(sha256)).then((read) => {
+      looksReading = false;
       if ((phase as string) === 'disposed' || things === null) return;
       things.setLooks(read);
       deps.state.atlas?.binding.authoredSociety?.refreshFigures();
       if (deps.env.canvas) deps.env.canvas.dataset['thingLooksChosen'] = String(read.size);
-      scheduleLooksRead();
+      afterLooksRead();
     }, (error: unknown) => {
+      looksReading = false;
       if ((phase as string) === 'disposed') return;
       if (deps.env.canvas) deps.env.canvas.dataset['thingLooksFailure'] = error instanceof Error ? error.message : String(error);
-      scheduleLooksRead();
+      afterLooksRead();
     });
+  }
+
+  /** After a looks read: the one a look chosen meanwhile asked for, else the next minute's. */
+  function afterLooksRead(): void {
+    if (looksAgain) {
+      looksAgain = false;
+      readLooks('chosen');
+      return;
+    }
+    scheduleLooksRead();
   }
 
   /** The next minute's looks read while a society of things is drawn, whether or not a new minute is. */
@@ -2809,6 +2841,7 @@ export function mountEnvironmentSelection(
         attachedControls.onPointerPick = priorPointerPick;
       }
       document.removeEventListener(THING_PICK_EVENT, onThingPick);
+      document.removeEventListener(THING_LOOK_CHOSEN_EVENT, onThingLookChosen);
       installedInteract = null;
       priorInteract = null;
       installedPointerPick = null;

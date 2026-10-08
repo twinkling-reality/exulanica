@@ -5,6 +5,7 @@ import { ApiError } from '@exulanica/graph-client';
 import type { AtlasScene } from '@exulanica/atlas-core';
 import type { PlacedThingRecord, ThingLayerOptions, ThingPick } from '@exulanica/atlas-react/things';
 import { mountEnvironmentSelection } from '../src/composition/environment-selection.js';
+import { THING_LOOK_CHOSEN_EVENT } from '../src/composition/things.js';
 import { parseSociety, type SocietySnapshot } from '../src/society-api.js';
 import { parseSocietyControl } from '../src/society-control-api.js';
 import type { AlternateVersion } from '../src/world-objects-api.js';
@@ -243,5 +244,112 @@ describe('the looks chosen for a society of things\' things', () => {
     expect(crowd.refreshFigures).not.toHaveBeenCalled();
     expect(layers.at(-1)!.looks).toEqual([]);
     mounted.dispose();
+  });
+});
+
+/*
+ * A look chosen on a thing's card is read at once: the card raises THING_LOOK_CHOSEN_EVENT on the
+ * shell once the store has recorded the choice, and the page reads the choices outside the minute,
+ * then draws what the read lists, not what the card sent.
+ */
+describe('a look chosen on a thing\'s card', () => {
+  const BLOCKY = { key: 'blocky-traveller', version: 1, sha256: 'f'.repeat(64) };
+  const knightIn = (look: typeof MANNEQUIN): ReadonlyMap<string, ThingLookChoice> => new Map([
+    ['person-0', { thingId: 'person-0', placedId: 'knight-1', look, chosenBy: 'owner', chosenAt: '2026-10-09T14:00:00.000000Z' }],
+  ]);
+  const raise = (shell: HTMLElement, detail: unknown) => shell.dispatchEvent(new CustomEvent(THING_LOOK_CHOSEN_EVENT, { detail, bubbles: true }));
+
+  it('is read at once, inside the minute, and the thing is drawn in the look the read lists', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
+    try {
+      let choices = knightIn(MANNEQUIN);
+      const looksClient = { read: vi.fn(async (_versionId: string) => choices) };
+      const { mounted, crowd, shell } = mount(true, looksClient);
+      document.body.append(shell);
+      await mounted.begin();
+      await vi.advanceTimersByTimeAsync(10);
+      expect(looksClient.read).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(5_000);
+      // The owner gives the knight another look on its card; the store records it, the card says so.
+      choices = knightIn(BLOCKY);
+      raise(shell, { thingId: 'person-0' });
+      await vi.advanceTimersByTimeAsync(10);
+      expect(looksClient.read).toHaveBeenCalledTimes(2);
+      expect(layers.at(-1)!.looks).toEqual([['knight-1', MANNEQUIN], ['knight-1', BLOCKY]]);
+      expect(crowd.refreshFigures).toHaveBeenCalledTimes(2);
+      const figures = crowd.setFigures.mock.calls[0]![0] as { figureFor(person: unknown): { key: string } | null };
+      expect(figures.figureFor(thingsSociety().state.inhabitants[0]!)!.key).toContain(`|blocky-traveller/1/${'f'.repeat(64)}`);
+      // The minute starts again from that read: nothing more within it, the next read a minute on.
+      await vi.advanceTimersByTimeAsync(59_000);
+      expect(looksClient.read).toHaveBeenCalledTimes(2);
+      await vi.advanceTimersByTimeAsync(1_100);
+      expect(looksClient.read).toHaveBeenCalledTimes(3);
+      mounted.dispose();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('chosen while a read is under way, is read once more after it, however many are chosen', async () => {
+    const answers: ((choices: ReadonlyMap<string, ThingLookChoice>) => void)[] = [];
+    const looksClient = { read: vi.fn((_versionId: string) => new Promise<ReadonlyMap<string, ThingLookChoice>>((resolve) => { answers.push(resolve); })) };
+    const { mounted, shell } = mount(true, looksClient);
+    document.body.append(shell);
+    await mounted.begin();
+    await settle();
+    // The first read is under way when two looks are chosen on cards.
+    expect(looksClient.read).toHaveBeenCalledTimes(1);
+    raise(shell, { thingId: 'person-0' });
+    raise(shell, { thingId: 't-well' });
+    await settle();
+    expect(looksClient.read).toHaveBeenCalledTimes(1);
+    // It answers from before the choices: one more read starts after it, and only one.
+    answers[0]!(knightIn(MANNEQUIN));
+    await settle();
+    expect(looksClient.read).toHaveBeenCalledTimes(2);
+    answers[1]!(knightIn(BLOCKY));
+    await settle();
+    expect(looksClient.read).toHaveBeenCalledTimes(2);
+    expect(layers.at(-1)!.looks).toEqual([['knight-1', MANNEQUIN], ['knight-1', BLOCKY]]);
+    // With no read under way, a look chosen is read at once.
+    raise(shell, { thingId: 'person-0' });
+    await settle();
+    expect(looksClient.read).toHaveBeenCalledTimes(3);
+    answers[2]!(knightIn(BLOCKY));
+    await settle();
+    mounted.dispose();
+  });
+
+  it('reads nothing for an event naming no thing, where no society of things is drawn, or once the page is gone', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
+    try {
+      const looksClient = { read: vi.fn(async (_versionId: string) => knightIn(MANNEQUIN)) };
+      const { mounted, shell } = mount(true, looksClient);
+      document.body.append(shell);
+      await mounted.begin();
+      await vi.advanceTimersByTimeAsync(10);
+      expect(looksClient.read).toHaveBeenCalledTimes(1);
+      raise(shell, null);
+      raise(shell, { thing: 'person-0' });
+      raise(shell, { thingId: 7 });
+      await vi.advanceTimersByTimeAsync(10);
+      expect(looksClient.read).toHaveBeenCalledTimes(1);
+      mounted.dispose();
+      raise(shell, { thingId: 'person-0' });
+      await vi.advanceTimersByTimeAsync(10);
+      expect(looksClient.read).toHaveBeenCalledTimes(1);
+      // A world whose version places a thing but runs no society of things: no looks are read.
+      const bare = { read: vi.fn(async (_versionId: string): Promise<ReadonlyMap<string, ThingLookChoice>> => new Map()) };
+      const other = mount(false, bare);
+      document.body.append(other.shell);
+      await other.mounted.begin();
+      await vi.advanceTimersByTimeAsync(10);
+      raise(other.shell, { thingId: 'person-0' });
+      await vi.advanceTimersByTimeAsync(10);
+      expect(bare.read).not.toHaveBeenCalled();
+      other.mounted.dispose();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
