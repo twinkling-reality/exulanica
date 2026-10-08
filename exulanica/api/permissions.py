@@ -450,9 +450,10 @@ _WORLD_READS_WITH_A_MODEL: Final = _every(
 #: compared, within the bound its owner stated. Cancelling a comparison takes the same grants as
 #: starting one, so nobody else ends an owner's paid run. A reference request commits the workspace
 #: to a planning and a reading call and to web searches against its credits; stopping one takes
-#: the same grants.
+#: the same grants. A piece request commits the workspace to GPU time against its allowance.
 _WORLD_WRITES_WITH_A_MODEL: Final = _every(
     _requires(_P.WORLD_WRITE, _P.MODEL_INVOKE),
+    "POST /world/piece-requests",
     "POST /world/versions/{version_id}/models/{role_key}",
     "POST /world/versions/{version_id}/society/comparisons",
     "POST /world/versions/{version_id}/society/comparisons/{comparison_id}/cancel",
@@ -593,6 +594,8 @@ _WORLD_READS: Final = _every(
     "GET /world/interactions/proposals/{proposal_id}",
     "GET /world/interactions/recommendations",
     "GET /world/interactions/versions",
+    "GET /world/piece-requests",
+    "GET /world/piece-requests/{piece_request_id}",
     "GET /world/projects",
     "GET /world/projects/{project_id}",
     "GET /world/projects/{project_id}/audit",
@@ -687,6 +690,7 @@ _WORLD_WRITES: Final = _every(
     "DELETE /world/interactions/previews/{preview_id}",
     "POST /world/interactions/previews/{preview_id}/apply",
     "POST /world/interactions/rollback",
+    "DELETE /world/piece-requests/{piece_request_id}",
     "POST /world/projects",
     "PUT /world/projects/{project_id}",
     "POST /world/projects/{project_id}/items",

@@ -103,6 +103,7 @@ from exulanica.api.routes import (
     operations,
     person_consent,
     personal_admission,
+    piece_requests,
     place_name_rights,
     reconstruction_admission,
     references,
@@ -506,6 +507,7 @@ def create_app(services: Services | None = None, *, verify: bool = True) -> Fast
     app.include_router(world_kinds.router)
     app.include_router(world_kinds.site_router)
     app.include_router(references.router)
+    app.include_router(piece_requests.router)
     app.include_router(world_drafts.router)
     app.include_router(door.router)
     # After the last router and before the application is handed to anybody: a route nobody

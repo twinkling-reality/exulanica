@@ -65,6 +65,10 @@ RUNTIME_UPDATES: dict[str, str] = {
     ),
     "person_subject": "a consent write locks its subject FOR KEY SHARE (api person consent)",
     "personal_model_right": "withdrawal, once; migration 0073 refuses every other change",
+    "piece_request": (
+        "a person cancels a piece request no session has taken (generation/store.py), and a "
+        "workspace tombstone cancels every open one (the trigger the table's migration adds)"
+    ),
     "pipeline_run": "the ledger attaches, locks and closes runs; an event insert locks its run",
     "place": "a place bridge decision locks its place",
     "place_record": "a state event locks its record and applies to it",

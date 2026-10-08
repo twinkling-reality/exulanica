@@ -15,7 +15,16 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 PIECES = ROOT / "exulanica_pieces"
 #: What the product may read: plain Python.
-FORMAT_MODULES = ("budgets", "canonical", "colour", "recipes", "records", "vocabulary")
+FORMAT_MODULES = (
+    "budgets",
+    "canonical",
+    "colour",
+    "compute",
+    "recipes",
+    "records",
+    "styles",
+    "vocabulary",
+)
 
 
 def _imports(path: Path) -> set[str]:

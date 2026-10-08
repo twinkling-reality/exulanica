@@ -411,8 +411,10 @@ layers = [
   # read path reaching for a writer. `exulanica.graph` is named here rather than left out for the
   # same reason `exulanica.corpus` is named at the bottom: a module absent from every contract is a
   # module the layering says nothing about. It sits one step under the API, which is where an
-  # upward import is easiest to write and hardest to notice.
-  "graph | selection | ingest",
+  # upward import is easiest to write and hardest to notice. Generation (asking a GPU for a look's
+  # pieces) is their sibling: it reads the world's packs, the thing kinds and the spending authority,
+  # and none of the three workflows asks it for anything.
+  "graph | selection | ingest | generation",
   # Whether a person may be shown. It sits here, between the three top-level workflows and the
   # identity tables, because both `ingest` (which masks a photograph before anything reads it)
   # and `graph` (which decides what the browser may draw) must resolve the same state, and those
@@ -867,9 +869,11 @@ source_modules = [
   "exulanica_pieces.budgets",
   "exulanica_pieces.canonical",
   "exulanica_pieces.colour",
+  "exulanica_pieces.compute",
   "exulanica_pieces.recipes",
   "exulanica_pieces.records",
   "exulanica_pieces.skinned",
+  "exulanica_pieces.styles",
   "exulanica_pieces.vocabulary",
 ]
 forbidden_modules = ["numpy", "exulanica_pieces.geometry"]

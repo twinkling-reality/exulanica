@@ -89,6 +89,11 @@ _BY_EXPERIMENT = (
     "addressed by experiment id, unique in the workspace; the definition row names its own world, "
     "which each read beneath a version compares with the world its caller named"
 )
+#: Why a piece request may be read or cancelled by its own id, or found by its asker's key.
+_BY_PIECE_REQUEST = (
+    "addressed by piece request id (or by the asker's key), unique in the workspace; the request "
+    "row names its own world and the answer carries it"
+)
 
 #: Statements on a world table whose text never names a world.
 ALLOWED_WORLDLESS_QUERIES: dict[str, str] = {
@@ -110,6 +115,14 @@ ALLOWED_WORLDLESS_QUERIES: dict[str, str] = {
     ),
     "exulanica/world/society_experiment_repository.py::SocietyExperimentRepository._definition_row"
     " [society_experiment_definition]": _BY_EXPERIMENT,
+    **{
+        f"exulanica/generation/store.py::{name} [piece_request]": _BY_PIECE_REQUEST
+        for name in ("answer_for_key", "cancel_piece_request", "read_piece_request")
+    },
+    "exulanica/generation/store.py::open_worst_case [piece_request]": (
+        "the GPU allowance is the workspace's, so what its open requests can still cost is summed "
+        "over every world it holds"
+    ),
 }
 
 #: Routes whose ``world_id`` parameter a caller may omit.

@@ -985,6 +985,36 @@ def reference_request(owner) -> uuid.UUID:
     return made.reference_id
 
 
+def piece_request(owner) -> uuid.UUID:
+    """A requested piece of the owner's world's look, a well in the default pack (domain: the
+    API asks only within the workspace's GPU allowance)."""
+    from exulanica.generation import store
+    from exulanica.generation.requests import (
+        GPU_PROVIDER,
+        LookReference,
+        generation_catalogs,
+        plan_requests,
+    )
+    from exulanica.world.style_pack_library import style_pack_library
+
+    world(owner)
+    library = style_pack_library()
+    pack = library.default_pack
+    look = LookReference(pack.pack_id, pack.version, pack.manifest_sha256)
+    planned = plan_requests([("well", 1)], look, library=library)
+    compute = generation_catalogs().compute.for_provider(GPU_PROVIDER)
+    made, _ = store.create_piece_requests(
+        owner.repository.connection,
+        owner.workspace_id,
+        requested_by=owner.actor,
+        world_id=WORLD,
+        look=look,
+        planned=planned,
+        worst_cases=[compute.worst_case_usd(plan.variants) for plan in planned],
+    )
+    return made[0].piece_request_id
+
+
 def reconstruction_job(owner) -> uuid.UUID:
     """A queued scene reconstruction over three admitted captures (domain)."""
     from test_reconstruction_scene_jobs import _captures, _enqueue

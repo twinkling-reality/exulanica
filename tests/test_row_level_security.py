@@ -611,6 +611,53 @@ def test_reference_requests_and_their_searches_are_isolated_for_the_runtime_role
     assert store.read_request(mine, scoped.workspace_a, other.reference_id).status == "queued"
 
 
+def test_piece_requests_are_isolated_for_the_runtime_role(scoped):
+    """The piece request table, written, read and cancelled as a role row-level security binds."""
+    from exulanica.generation import store
+    from exulanica.generation.requests import (
+        GPU_PROVIDER,
+        LookReference,
+        generation_catalogs,
+        plan_requests,
+    )
+    from exulanica.world.style_pack_library import style_pack_library
+
+    from world_support import FIXTURE_WORLD_ID, registered_world
+
+    mine = scoped.connect(_APP_ROLE, scoped.workspace_a)
+    theirs = scoped.connect(_APP_ROLE, scoped.workspace_b)
+    for connection, workspace in ((mine, scoped.workspace_a), (theirs, scoped.workspace_b)):
+        registered_world(connection, workspace)
+    library = style_pack_library()
+    pack = library.default_pack
+    look = LookReference(pack.pack_id, pack.version, pack.manifest_sha256)
+    planned = plan_requests([("well", 1)], look, library=library)
+    compute = generation_catalogs().compute.for_provider(GPU_PROVIDER)
+    (made,), _ = store.create_piece_requests(
+        mine,
+        scoped.workspace_a,
+        requested_by=uuid.uuid4(),
+        world_id=FIXTURE_WORLD_ID,
+        look=look,
+        planned=planned,
+        worst_cases=[compute.worst_case_usd(planned[0].variants)],
+    )
+    assert _count(mine, "piece_request") == 1 and _count(theirs, "piece_request") == 0
+    assert store.read_piece_request(theirs, scoped.workspace_b, made.piece_request_id) is None
+    assert store.cancel_piece_request(theirs, scoped.workspace_b, made.piece_request_id) is None
+    assert store.list_piece_requests(theirs, scoped.workspace_b, FIXTURE_WORLD_ID) == []
+    # Workspace B's update naming workspace A's rows reaches none of them.
+    reached = theirs.execute(
+        "update piece_request set state = 'cancelled', failure = 'x', "
+        "finished_at = now() where workspace_id = %s and world_id = %s",
+        (scoped.workspace_a, FIXTURE_WORLD_ID),
+    )
+    assert reached.rowcount == 0
+    assert store.read_piece_request(mine, scoped.workspace_a, made.piece_request_id).state == (
+        "requested"
+    )
+
+
 def test_a_reference_request_cannot_name_another_workspace_s_job(scoped):
     """A foreign key is checked past row-level security, so it names the job with its workspace."""
     mine = scoped.connect(_APP_ROLE, scoped.workspace_a)

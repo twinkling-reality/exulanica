@@ -845,6 +845,7 @@ EXISTENCE_BUILDERS: Final[Mapping[str, Owned | Shared]] = {
     ),
     "/world/interactions/previews/{preview_id}": Owned(build.interaction_preview),
     "/world/interactions/proposals/{proposal_id}": Owned(build.interaction_proposal),
+    "/world/piece-requests/{piece_request_id}": Owned(build.piece_request),
     "/world/projects/{project_id}": Owned(build.world_project),
     "/world/projects/{project_id}/items/{item_id}": Owned(build.world_project_item),
     "/world/projects/{project_id}/shares/{share_id}": Owned(build.world_project_share),

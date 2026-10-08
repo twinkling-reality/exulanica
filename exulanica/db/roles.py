@@ -288,6 +288,9 @@ INSERT_ONLY_TABLES: Final = (
     # Migration 0156 appends the look each thing of a version wears and refuses every update and
     # delete of one.
     "world_thing_look",
+    # The piece request migration records each ask under a caller's key once and refuses every
+    # update of one.
+    "piece_ask",
     # Migration 0159 appends each version of a workspace's own body recipes, body plans, thing
     # kinds and looks, and each withdrawal of one of its looks, and refuses every update and delete
     # of each.

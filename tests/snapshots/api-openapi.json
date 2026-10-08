@@ -18746,6 +18746,235 @@
     }
    }
   },
+  "/world/piece-requests": {
+   "post": {
+    "tags": [
+     "world"
+    ],
+    "summary": "Ask For Pieces",
+    "description": "Ask for new pieces of a world's look for some thing kinds. Answers 202 with the requests and\ntheir estimate; an idempotency key, or an ask already waiting, answers 200.",
+    "operationId": "ask_for_pieces_world_piece_requests_post",
+    "parameters": [
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/PieceAskBody"
+       }
+      }
+     }
+    },
+    "responses": {
+     "202": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "get": {
+    "tags": [
+     "world"
+    ],
+    "summary": "List Piece Requests",
+    "description": "A world's piece requests, newest first, and whether the piece maker is running.",
+    "operationId": "list_piece_requests_world_piece_requests_get",
+    "parameters": [
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/world/piece-requests/{piece_request_id}": {
+   "get": {
+    "tags": [
+     "world"
+    ],
+    "summary": "Read Piece Request",
+    "description": "One piece request and where it stands.",
+    "operationId": "read_piece_request_world_piece_requests__piece_request_id__get",
+    "parameters": [
+     {
+      "name": "piece_request_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Piece Request Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "delete": {
+    "tags": [
+     "world"
+    ],
+    "summary": "Cancel Piece Request",
+    "description": "Cancel a request no session has taken. One taken or ended is answered 409 with its state.",
+    "operationId": "cancel_piece_request_world_piece_requests__piece_request_id__delete",
+    "parameters": [
+     {
+      "name": "piece_request_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Piece Request Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/worlds/specification/drafts": {
    "post": {
     "tags": [
@@ -27923,6 +28152,27 @@
     "title": "ItemStatus"
    },
    "JsonValue": {},
+   "KindBody": {
+    "properties": {
+     "key": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{0,47}$",
+      "title": "Key"
+     },
+     "version": {
+      "type": "integer",
+      "minimum": 1.0,
+      "title": "Version"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "key",
+     "version"
+    ],
+    "title": "KindBody"
+   },
    "KindLibraryView": {
     "properties": {
      "profile": {
@@ -28376,6 +28626,33 @@
      "regions"
     ],
     "title": "LinkSubject"
+   },
+   "LookBody": {
+    "properties": {
+     "pack_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9.-]{0,63}$",
+      "title": "Pack Id"
+     },
+     "version": {
+      "type": "integer",
+      "minimum": 1.0,
+      "title": "Version"
+     },
+     "manifest_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Manifest Sha256"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "pack_id",
+     "version",
+     "manifest_sha256"
+    ],
+    "title": "LookBody"
    },
    "LookOfferView": {
     "properties": {
@@ -30195,6 +30472,48 @@
     ],
     "title": "PhotographArrivalPin",
     "description": "The source-photograph fallback when an owned region has no authorized geometry."
+   },
+   "PieceAskBody": {
+    "properties": {
+     "world_id": {
+      "type": "string",
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "World Id"
+     },
+     "look": {
+      "$ref": "#/components/schemas/LookBody"
+     },
+     "kinds": {
+      "items": {
+       "$ref": "#/components/schemas/KindBody"
+      },
+      "type": "array",
+      "maxItems": 64,
+      "minItems": 1,
+      "title": "Kinds"
+     },
+     "idempotency_key": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Idempotency Key"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "world_id",
+     "look",
+     "kinds"
+    ],
+    "title": "PieceAskBody"
    },
    "PlaceBridgeRequest": {
     "properties": {

@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "catalog_id": "piece-styles",
+  "catalog_version": 1,
+  "entries": [
+    {
+      "pack_id": "exulanica.cozy-town",
+      "style": "cozy faceted low-poly toon style, warm terracotta, cream and sage colours, chunky simple shapes",
+      "reason": "Measured on Nebius AI Cloud, route A: these words made every cozy town piece of the demo runs and both warm sessions (2026-10-06 and 07); the pack's own description is longer than a request's style allows and names light and fog, which a single piece cannot show.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica from measured runs; see the entry reason"
+      }
+    },
+    {
+      "pack_id": "exulanica.finished-town",
+      "style": "realistic stone, brick and render, slate roofs, dark steel frames, natural muted colours",
+      "reason": "Authored from the pack's description and not yet measured: its materials and colours, without its light, sky and shadows, which a single piece cannot show.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica from the pack's description; see the entry reason"
+      }
+    },
+    {
+      "pack_id": "exulanica.toon-town",
+      "style": "bright flat toon colours, dark ink outlines, white frames, blue glass, round toy-like shapes",
+      "reason": "Authored from the pack's description and not yet measured: its colours, ink lines and toy-like shapes, without its light bands, which a single piece cannot show.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for Exulanica from the pack's description; see the entry reason"
+      }
+    }
+  ]
+}
