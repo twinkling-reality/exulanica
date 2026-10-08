@@ -276,3 +276,41 @@ def test_an_ask_in_a_deleted_workspace_answers_410(api, repository) -> None:
     repository.connection.commit()
     answered = _ask(client)
     assert (answered.status_code, answered.json()["code"]) == (410, "tombstoned")
+
+
+def test_pieces_already_waiting_are_not_weighed_again(api) -> None:
+    # USD 0.12 covers two kinds at worst; the same ask again makes nothing, so nothing is weighed.
+    client = api(granted="0.12")
+    first = _ask(client)
+    assert first.status_code == 202
+    again = _ask(client)
+    assert again.status_code == 200, again.text
+    assert [r["piece_request_id"] for r in again.json()["piece_requests"]] == [
+        r["piece_request_id"] for r in first.json()["piece_requests"]
+    ]
+
+
+def test_only_the_requests_an_ask_would_make_are_weighed(api) -> None:
+    # USD 0.18: two kinds (0.12) open; the same two and a third weigh only the third (0.06).
+    client = api(granted="0.18")
+    assert _ask(client).status_code == 202
+    more = _ask(client, kinds=(("well", 1), ("gate", 1), ("lantern", 1)))
+    assert more.status_code == 202, more.text
+    assert [r["kind"]["key"] for r in more.json()["piece_requests"]] == ["well", "gate", "lantern"]
+    over = _ask(client, kinds=(("well", 1), ("bench", 1)))
+    assert (over.status_code, over.json()["code"]) == (429, "budget_exceeded")
+    assert over.json()["spending"]["requested"] == "0.06000000"
+
+
+def test_a_key_replay_in_a_deleted_workspace_answers_410(api, repository) -> None:
+    client = api()
+    key = str(uuid.uuid4())
+    assert _ask(client, idempotency_key=key).status_code == 202
+    repository.connection.execute(
+        "insert into tombstone (workspace_id, scope, requested_by, reason) "
+        "values (%s, 'workspace', %s, 'the person left')",
+        (repository.workspace_id, uuid.uuid4()),
+    )
+    repository.connection.commit()
+    answered = _ask(client, idempotency_key=key)
+    assert (answered.status_code, answered.json()["code"]) == (410, "tombstoned")

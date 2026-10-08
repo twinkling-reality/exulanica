@@ -51,7 +51,7 @@ from exulanica.generation.requests import (
     plan_requests,
 )
 from exulanica.models.spending import SpendingRefused
-from exulanica.spending.status import admission_refusal, workspace_status
+from exulanica.spending.status import admission_refusal, read_workspace_status
 from exulanica.world.style_pack_library import style_pack_library
 
 __all__ = ["router"]
@@ -119,30 +119,29 @@ def _is_guest(request: Request, services: Services) -> bool:
     return services.accounts.browser_session(request).role == "guest"
 
 
-def _allowance_refusal(
-    services: Services, connection: Any, workspace_id: uuid.UUID, worst_case: Decimal
-) -> SpendingRefused | None:
-    """Why the workspace's GPU allowance cannot cover ``worst_case`` beside what its open requests
-    can still cost, or None when it can. Admission's own answer first (its reason and scope), then
-    the money left once every open request's worst case is set aside."""
-    document = workspace_status(services.database, workspace_id, providers=[GPU_PROVIDER])
-    entry = next(item for item in document["providers"] if item["provider"] == GPU_PROVIDER)
+def _weigher(services: Services, workspace_id: uuid.UUID) -> store.Weigh:
+    """Weigh an ask's new requests against the workspace's GPU allowance, inside the store's
+    transaction and under its lock: admission's own answer first (its reason and scope), then the
+    money left once every open request's worst case is set aside."""
     witnessed = services.spending is not None and services.spending.witness is not None
-    refused = admission_refusal(entry, witness_configured=witnessed)
-    if refused is not None:
-        return refused
-    held = store.open_worst_case(connection, workspace_id)
-    available = Decimal(entry["available_usd"]) - held
-    if available < worst_case:
-        return SpendingRefused(
-            "spending_limit_reached",
-            scope="workspace",
-            detail="usd",
-            limit=entry["grant"]["ceiling_usd"],
-            committed=str(Decimal(entry["committed_usd"]) + held),
-            requested=str(worst_case),
-        )
-    return None
+
+    def weigh(connection: Any, worst_case: Decimal, held: Decimal) -> None:
+        document = read_workspace_status(connection, workspace_id, providers=[GPU_PROVIDER])
+        entry = next(item for item in document["providers"] if item["provider"] == GPU_PROVIDER)
+        refused = admission_refusal(entry, witness_configured=witnessed)
+        if refused is None and Decimal(entry["available_usd"]) - held < worst_case:
+            refused = SpendingRefused(
+                "spending_limit_reached",
+                scope="workspace",
+                detail="usd",
+                limit=entry["grant"]["ceiling_usd"],
+                committed=str(Decimal(entry["committed_usd"]) + held),
+                requested=str(worst_case),
+            )
+        if refused is not None:
+            raise store.PieceAllowanceRefused(refused)
+
+    return weigh
 
 
 def _answer(
@@ -180,31 +179,8 @@ def ask_for_pieces(
             "a visitor's pieces are made only while the piece maker is running",
         )
     key = body.idempotency_key
-    if key is not None:
-        # The same key answers the same requests, before anything is weighed again.
-        try:
-            earlier = store.answer_for_key(
-                connection,
-                session.workspace_id,
-                requested_by=session.actor,
-                request_id=key,
-                ask_sha256=_ask_sha256(body),
-            )
-        except store.PieceAskKeyReused:
-            return _refusal(
-                409, "idempotency_key_reused", "the key names an earlier ask with another body"
-            )
-        if earlier is not None:
-            return JSONResponse(
-                _answer(earlier, {"estimate": estimate(planned, compute).document()}),
-                status_code=200,
-            )
-    refused = _allowance_refusal(
-        services, connection, session.workspace_id, sum(worst_cases, Decimal(0))
-    )
-    if refused is not None:
-        member = {"spending": refused.problem_member()}
-        return _refusal(429, "budget_exceeded", str(refused), member)
+    # Under the workspace's lock the store answers a key's earlier ask first, then weighs only the
+    # requests it would make, beside what the workspace's open requests can still cost.
     try:
         records, made = store.create_piece_requests(
             connection,
@@ -216,7 +192,11 @@ def ask_for_pieces(
             worst_cases=worst_cases,
             request_id=key,
             ask_sha256=None if key is None else _ask_sha256(body),
+            weigh=_weigher(services, session.workspace_id),
         )
+    except store.PieceAllowanceRefused as refused:
+        member = {"spending": refused.refusal.problem_member()}
+        return _refusal(429, "budget_exceeded", str(refused.refusal), member)
     except psycopg.errors.ForeignKeyViolation:
         return _refusal(404, "unknown_world", _UNKNOWN_DETAIL)
     except store.PieceQuotaExceeded as limit:

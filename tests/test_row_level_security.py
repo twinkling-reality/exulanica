@@ -658,6 +658,62 @@ def test_piece_requests_are_isolated_for_the_runtime_role(scoped):
     )
 
 
+def test_piece_asks_are_isolated_for_the_runtime_role(scoped):
+    """The record binding a caller's key to the requests its ask answered, as a role row-level
+    security binds: another workspace neither sees it, answers with it, nor writes one for it."""
+    from exulanica.generation import store
+    from exulanica.generation.requests import (
+        GPU_PROVIDER,
+        LookReference,
+        generation_catalogs,
+        plan_requests,
+    )
+    from exulanica.world.style_pack_library import style_pack_library
+
+    from world_support import FIXTURE_WORLD_ID, registered_world
+
+    mine = scoped.connect(_APP_ROLE, scoped.workspace_a)
+    theirs = scoped.connect(_APP_ROLE, scoped.workspace_b)
+    for connection, workspace in ((mine, scoped.workspace_a), (theirs, scoped.workspace_b)):
+        registered_world(connection, workspace)
+    library = style_pack_library()
+    pack = library.default_pack
+    look = LookReference(pack.pack_id, pack.version, pack.manifest_sha256)
+    planned = plan_requests([("well", 1)], look, library=library)
+    compute = generation_catalogs().compute.for_provider(GPU_PROVIDER)
+    asker, key, digest = uuid.uuid4(), uuid.uuid4(), "a" * 64
+    (made,), _ = store.create_piece_requests(
+        mine,
+        scoped.workspace_a,
+        requested_by=asker,
+        world_id=FIXTURE_WORLD_ID,
+        look=look,
+        planned=planned,
+        worst_cases=[compute.worst_case_usd(planned[0].variants)],
+        request_id=key,
+        ask_sha256=digest,
+    )
+    assert _count(mine, "piece_ask") == 1 and _count(theirs, "piece_ask") == 0
+    # Workspace B, naming A's asker and key, finds no earlier ask to answer with.
+    for workspace in (scoped.workspace_b, scoped.workspace_a):
+        answer = store.answer_for_key(
+            theirs, workspace, requested_by=asker, request_id=key, ask_sha256=digest
+        )
+        assert answer is None
+    # Nor can it record an ask in A's name: the write names a workspace its session is not in.
+    with pytest.raises(psycopg.errors.InsufficientPrivilege, match="workspace context"):
+        theirs.execute(
+            "insert into piece_ask (workspace_id, requested_by, request_id, ask_sha256, "
+            "piece_request_ids) values (%s, %s, %s, %s, %s)",
+            (scoped.workspace_a, asker, uuid.uuid4(), digest, [made.piece_request_id]),
+        )
+    theirs.rollback()
+    [answered] = store.answer_for_key(
+        mine, scoped.workspace_a, requested_by=asker, request_id=key, ask_sha256=digest
+    )
+    assert answered.piece_request_id == made.piece_request_id
+
+
 def test_a_reference_request_cannot_name_another_workspace_s_job(scoped):
     """A foreign key is checked past row-level security, so it names the job with its workspace."""
     mine = scoped.connect(_APP_ROLE, scoped.workspace_a)

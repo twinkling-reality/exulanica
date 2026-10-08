@@ -24,7 +24,7 @@ caller's key) is addressed within the workspace and answers with the world it is
 from __future__ import annotations
 
 import uuid
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
@@ -35,7 +35,7 @@ from exulanica_pieces.records import read_request
 from psycopg.rows import dict_row
 
 from exulanica.db.guards import terminal_if_tombstoned
-from exulanica.errors import ExulanicaError
+from exulanica.errors import ExulanicaError, TombstonedError
 from exulanica.generation.requests import (
     GenerationCatalogs,
     LookReference,
@@ -48,6 +48,7 @@ from exulanica.world.workspace_lock import lock_workspace
 
 __all__ = [
     "OPEN_STATES",
+    "PieceAllowanceRefused",
     "PieceAskKeyReused",
     "PieceQuotaExceeded",
     "PieceRequestNotCancellable",
@@ -73,6 +74,21 @@ _COLUMNS: Final = (
 
 class PieceAskKeyReused(ExulanicaError):
     """The caller's key names an earlier ask with another body."""
+
+
+class PieceAllowanceRefused(ExulanicaError):
+    """The workspace's allowance cannot cover the requests an ask would make; ``refusal`` is the
+    weigher's own account of why."""
+
+    def __init__(self, refusal: Any) -> None:
+        super().__init__(str(refusal))
+        self.refusal = refusal
+
+
+#: Weighs the requests an ask would make: called with the connection, their worst case together
+#: and the worst case of every request the workspace already holds open, both read under the
+#: workspace's lock. It raises :class:`PieceAllowanceRefused` to refuse; nothing is written then.
+Weigh = Callable[[psycopg.Connection, Decimal, Decimal], None]
 
 
 class PieceQuotaExceeded(ExulanicaError):
@@ -213,6 +229,10 @@ def _held_to_its_row(
         raise ValueError("a request names the look its row names")
     if plan.cache_scope != "catalog" or document["look_role"] != plan.look_role:
         raise ValueError("a request is catalog content and names its own look role")
+    # The role's last part is the subject a request with no description is drawn as, so it is the
+    # kind's own: a fixture, or a prop for a thing a hand holds.
+    if plan.look_role not in (f"fixture.{plan.kind_key}", f"prop.{plan.kind_key}"):
+        raise ValueError("a request's look role is its kind's fixture or prop role")
 
 
 def create_piece_requests(
@@ -228,13 +248,17 @@ def create_piece_requests(
     ask_sha256: str | None = None,
     catalogs: GenerationCatalogs | None = None,
     shipped: Mapping[tuple[str, int], ThingKind] | None = None,
+    weigh: Weigh | None = None,
 ) -> tuple[list[PieceRequestRecord], bool]:
     """The ask's requests, in the order planned, and whether any was made now.
 
-    A request already open for the same world and request digest is answered rather than made
-    again. Under a caller's key the ask is recorded with every request it answered with, and the
-    same key asked again answers with them. A workspace over its limits is
-    :class:`PieceQuotaExceeded`; a deleted workspace is :class:`~exulanica.errors.TombstonedError`.
+    Everything runs under the workspace's lock, taken first. A deleted workspace is
+    :class:`~exulanica.errors.TombstonedError`, a key replay included. A caller's key asked again
+    answers with the requests its ask answered with. A request already open for the same world and
+    request digest is answered rather than made again. Only the requests left to make are weighed
+    (``weigh``, beside what the workspace's open requests can still cost); when it refuses, nothing
+    is written. Under a key the ask is recorded with every request it answered with. A workspace
+    over its limits is :class:`PieceQuotaExceeded`.
     """
     if (request_id is None) != (ask_sha256 is None):
         raise ValueError("a key comes with the digest of the ask it names")
@@ -253,6 +277,7 @@ def create_piece_requests(
             connection.cursor(row_factory=dict_row) as cursor,
         ):
             lock_workspace(connection, workspace_id)
+            _refuse_if_tombstoned(cursor, workspace_id)
             if request_id is not None:
                 earlier = answer_for_key(
                     connection,
@@ -263,7 +288,8 @@ def create_piece_requests(
                 )
                 if earlier is not None:
                     return earlier, False
-            for plan, worst in zip(planned, worst_cases, strict=True):
+            waiting: dict[int, PieceRequestRecord] = {}
+            for index, plan in enumerate(planned):
                 open_row = cursor.execute(
                     f"select {_COLUMNS} from piece_request where workspace_id = %s "
                     "and world_id = %s and request_sha256 = %s "
@@ -271,7 +297,16 @@ def create_piece_requests(
                     (workspace_id, world_id, plan.request_sha256),
                 ).fetchone()
                 if open_row is not None:
-                    answered.append(_record(open_row))
+                    waiting[index] = _record(open_row)
+            to_make = sum(
+                (worst for index, worst in enumerate(worst_cases) if index not in waiting),
+                Decimal(0),
+            )
+            if weigh is not None and len(waiting) < len(planned):
+                weigh(connection, to_make, open_worst_case(connection, workspace_id))
+            for index, (plan, worst) in enumerate(zip(planned, worst_cases, strict=True)):
+                if index in waiting:
+                    answered.append(waiting[index])
                     continue
                 row = cursor.execute(
                     "insert into piece_request (workspace_id, requested_by, world_id, kind_key, "
@@ -316,6 +351,15 @@ def create_piece_requests(
     except psycopg.errors.ProgramLimitExceeded as limit:
         raise PieceQuotaExceeded(str(limit.diag.message_primary or limit)) from limit
     return answered, made
+
+
+def _refuse_if_tombstoned(cursor: Any, workspace_id: uuid.UUID) -> None:
+    """Refuse every ask in a deleted workspace, a key replay as much as a new request."""
+    if cursor.execute(
+        "select 1 from tombstone where workspace_id = %s and scope = 'workspace' limit 1",
+        (workspace_id,),
+    ).fetchone():
+        raise TombstonedError("tombstoned: the workspace has been deleted and takes no ask")
 
 
 def list_piece_requests(

@@ -320,3 +320,15 @@ def test_the_store_writes_no_request_whose_row_and_document_disagree(world, fiel
     with pytest.raises(ValueError, match="names the"):
         _ask(connection, workspace_id, **changes)
     assert connection.execute("select count(*) as n from piece_request").fetchone()["n"] == 0
+
+
+@pytest.mark.parametrize("role", ["fixture.bench", "prop.bench", "fixture.gate.bench"])
+def test_the_store_writes_no_request_whose_look_role_is_not_its_kinds(world, role) -> None:
+    # The role's last part is what a request with no description is drawn as.
+    connection, workspace_id = world.connection, world.workspace_id
+    (gate,) = plan_requests([("gate", 1)], _look(), library=LIBRARY)
+    raw = canonical_bytes({**json.loads(gate.request), "look_role": role})
+    forged = dataclasses.replace(gate, look_role=role, request=raw, request_sha256=sha256_hex(raw))
+    with pytest.raises(ValueError, match="look role"):
+        _ask(connection, workspace_id, planned=[forged])
+    assert connection.execute("select count(*) as n from piece_request").fetchone()["n"] == 0

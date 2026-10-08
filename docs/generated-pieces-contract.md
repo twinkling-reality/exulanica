@@ -92,7 +92,7 @@ Asking needs `world.write` and `model.invoke`; reading needs `world.read`; cance
 | 409 | `idempotency_key_reused` | The key names an earlier ask with another body. |
 | 409 | `piece_request_not_cancellable` | The request was taken or has ended; the body states its state. |
 | 410 | `tombstoned` | The workspace has been deleted. |
-| 429 | `budget_exceeded` | Admission would refuse the workspace's next `nebius_ai_cloud_gpu` attempt, or its allowance, less what its open requests can still cost, cannot cover the ask's worst case; the `spending` member states admission's reason and scope. |
+| 429 | `budget_exceeded` | Admission would refuse the workspace's next `nebius_ai_cloud_gpu` attempt, or its allowance, less what its open requests can still cost, cannot cover the worst case of the requests the ask would make (pieces already waiting are not weighed again); the `spending` member states admission's reason and scope. |
 | 429 | `piece_quota_exceeded` | The workspace has made as many requests as a day allows, or holds as many open (section 7). |
 
 ## 5. Who runs the GPU, and who pays
@@ -102,10 +102,12 @@ account; the operator creates the account, project, bucket and service account a
 session for a stated window. The product creates no cloud resource or credential. Every charge
 lands on the operator's Nebius bill, which is the only authoritative total.
 
-A request states its worst case at the listed rate; asking checks what admission would answer the
-workspace's next `nebius_ai_cloud_gpu` attempt, and that the allowance left, less the worst case of
-every request the workspace holds open, covers the ask's worst case. It reserves nothing, because a reservation lapses within
-ten minutes and a request may wait hours for a session. The worker that queues a request admits,
+A request states its worst case at the listed rate. Under the workspace's lock, after the requests
+already waiting are found, asking checks what admission would answer the workspace's next
+`nebius_ai_cloud_gpu` attempt, and that the allowance left, less the worst case of every request the
+workspace holds open, covers the worst case of the requests the ask would make; two concurrent asks
+are weighed one after the other. It reserves nothing, because a reservation lapses within ten
+minutes and a request may wait hours for a session. The worker that queues a request admits,
 dispatches and settles it from the milliseconds the GPU measured for its items; a session's own
 start, loading and idle time is charged to the operator, not to a workspace. A guest asks only while
 a session is running.
@@ -124,7 +126,7 @@ chosen bounds the test checks lie above everything measured:
   seconds), and a bounding item, 30 seconds, chosen above the slowest;
 - a cold start, 680 seconds, chosen above what was seen: from the first starting state to the first
   batch took 596 and 608 seconds (the run records and done markers), after about 70 seconds of
-  provisioning that the lane's job watcher timed (76 and 69 seconds; no record on main states it);
+  provisioning that a job watcher timed (76 and 69 seconds; no record on main states it);
 - the service's shortest timeout, one hour.
 
 An estimate states the items, the seconds to every request's first variant and to every variant on
