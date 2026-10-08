@@ -215,9 +215,16 @@ def test_reference_vision_declares_no_fallback(manifest):
     assert manifest[Role.REFERENCE_VISION].chain == (manifest[Role.REFERENCE_VISION].primary,)
 
 
+def test_kind_drafter_declares_no_fallback(manifest):
+    """One model was eligible by the rule pre-registered for the kind drafter's measurement, so the
+    role drafts a kind with that model or not at all, never with one the rule did not admit."""
+    assert manifest[Role.KIND_DRAFTER].fallback is None
+    assert manifest[Role.KIND_DRAFTER].chain == (manifest[Role.KIND_DRAFTER].primary,)
+
+
 def test_every_other_role_has_a_distinct_fallback(manifest):
     for role, binding in manifest.roles.items():
-        if role in (Role.EMBEDDING, Role.REFERENCE_VISION):
+        if role in (Role.EMBEDDING, Role.REFERENCE_VISION, Role.KIND_DRAFTER):
             continue
         assert binding.fallback is not None, f"{role} has no fallback"
         assert binding.fallback.model_id != binding.primary.model_id

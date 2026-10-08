@@ -567,8 +567,7 @@ def run_creature_drafting(world: World) -> Witness:
 
 
 def run_kind_drafting(world: World) -> Witness:
-    """The kind drafter, handed a person's words. It has no role of its own until a measured
-    choice gives it one; it is run on the role its measurement drives it with."""
+    """The kind drafter, handed a person's words as the drafting route will hand them."""
     from exulanica.world.kinds.document import read_kind
     from exulanica.world.kinds.samples import check_samples
 
@@ -577,11 +576,11 @@ def run_kind_drafting(world: World) -> Witness:
         return KindVerdict(True, kind, check_samples(kind))
 
     form = held_to_form(brief_of(fixture_kind("farm")))
-    client, transport = world.hosted([_json_reply(form, Role.SPECIFICATION_DRAFTER)])
+    client, transport = world.hosted([_json_reply(form, Role.KIND_DRAFTER)])
     outcome = draft_kind(
         client,
         f"a farm with a duck pond where {PERSON} lives beside {PLACE}",
-        role=Role.SPECIFICATION_DRAFTER,
+        role=Role.KIND_DRAFTER,
         check=check,
     )
     assert outcome.document is not None, outcome.refusal

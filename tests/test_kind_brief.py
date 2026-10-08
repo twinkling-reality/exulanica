@@ -241,6 +241,42 @@ def test_a_structure_grown_for_its_rooms_is_trimmed_to_the_smallest_that_passes(
             _passes(smaller)
 
 
+def _zone(document: Mapping[str, Any], label: str) -> dict[str, Any]:
+    return next(zone for zone in document["zones"] if zone["label"] == label)
+
+
+def test_a_zone_the_brief_states_closed_stays_closed_and_what_it_holds_is_only_seen() -> None:
+    """The words said nobody goes there: the pond corner stays closed, and its rail, stated as a
+    gathering spot, is kept to be seen rather than opening the corner to reach it."""
+    brief = held_to_form(brief_of(fixture_kind("farm")))
+    next(zone for zone in brief["zones"] if zone["label"] == "pond corner")["access"] = "closed"
+    compiled = compile_brief(brief, provenance=PROVENANCE)
+    document = compiled.document
+    assert _zone(document, "pond corner")["access"] == "closed"
+    rail = _farm_part(document, "pond rail")
+    assert (rail["roles"], rail["use_class"], rail["stands"]) == (["decoration"], "", 0)
+    assert _passes(document)["verdict"] == "passed"
+
+
+def test_a_field_in_a_zone_the_brief_states_closed_is_kept_without_its_work() -> None:
+    brief = held_to_form(brief_of(fixture_kind("farm")))
+    next(zone for zone in brief["zones"] if zone["label"] == "fields")["access"] = "closed"
+    document = compile_brief(brief, provenance=PROVENANCE).document
+    assert _zone(document, "fields")["access"] == "closed"
+    field = _farm_part(document, "field")
+    assert (field["roles"], field["use_class"]) == (["field"], "")
+    assert _passes(document)["verdict"] == "passed"
+
+
+def test_a_zone_stated_closed_around_a_structure_is_opened_to_its_door() -> None:
+    brief = held_to_form(brief_of(fixture_kind("farm")))
+    next(zone for zone in brief["zones"] if zone["label"] == "farmyard")["access"] = "closed"
+    compiled = compile_brief(brief, provenance=PROVENANCE)
+    assert _zone(compiled.document, "farmyard")["access"] == "open"
+    assert _farm_part(compiled.document, "bench")["roles"] == ["seat"]  # still sat on
+    assert _passes(compiled.document)["verdict"] == "passed"
+
+
 def test_people_come_in_where_nobody_lives_and_the_brief_says_nobody_comes() -> None:
     brief = held_to_form(brief_of(fixture_kind("site")))
     brief["offsite_residents"] = 0
@@ -282,7 +318,7 @@ def test_what_a_model_gets_wrong_is_made_what_the_checks_need() -> None:
     stall = {**copy.deepcopy(hay), "label": "farm_stall", "roles": []}
     farmyard["fixtures"].append(stall)
     pond = next(zone for zone in brief["zones"] if zone["label"] == "pond corner")
-    pond["access"] = "closed"  # people come to its rail
+    pond["access"] = "closed"  # the words close it; its rail is only seen
     pond["placement"] = "edge_back"
     farmyard["placement"] = "edge_back"  # a second zone across the far edge
     brief["zones"].append({**pond, "label": "empty", "structures": [], "areas": [], "fixtures": []})
@@ -302,7 +338,8 @@ def test_what_a_model_gets_wrong_is_made_what_the_checks_need() -> None:
     assert (stall_part["key"], stall_part["roles"]) == ("farm_stall", ["shop"])
     assert uses[stall_part["use_class"]]["visitor_capacity"] == 4
     zones = {zone["label"]: zone for zone in document["zones"]}
-    assert zones["pond corner"]["access"] == "open"
+    assert zones["pond corner"]["access"] == "closed"
+    assert _farm_part(document, "pond rail")["roles"] == ["decoration"]
     assert [zone["placement"] for zone in document["zones"]].count("edge_back") == 1
     assert "empty" not in zones
 

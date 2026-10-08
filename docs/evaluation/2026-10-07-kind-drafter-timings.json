@@ -1,0 +1,42 @@
+{
+ "profile": "exulanica.digest-bound-record/v1",
+ "record": {
+  "kind": "exulanica.kind-drafter-timings/v1",
+  "measured": {
+   "roles": {
+    "kind_drafter": {
+     "primary": "deepseek-ai/DeepSeek-V4-Flash-0731",
+     "primary_measured": {
+      "longest_ms": 41677,
+      "p50_ms": 28987,
+      "p99_ms": 41677,
+      "rows": 10
+     }
+    }
+   }
+  },
+  "note": "The kind drafter's primary's own calls when its pre-registered measurement asked six held-out descriptions: rows are its calls, a brief and up to two repairs where one was asked. Nothing of any other model is published here.",
+  "provider": "Nebius Token Factory",
+  "run_sha256": "1153fb6e1ff38aabf3d51ab961ab05ccd2acaca5e32e20b56aea3d37784dfde9",
+  "script_sha256": "2c4a6c195a9591e3dae8a92c805ffc4e15af183be330fdc6c70446ea7da67365",
+  "tree": {
+   "diff_head_sha256": "9124374807f34bbb5317bdc0d168703ba3cc5011aaf6827b5049c96bf7abb4ee",
+   "head": "f50e6e35d19dc75b5eb690f96a7f73d46c30a685",
+   "untracked_sha256": {
+    "exulanica/selection/kind-drafting.v4.json": "e61010f58a6e2877e6a54113150ff03b643d5d64c821be9711b68a6caeaaf16f",
+    "exulanica/selection/kind_brief.py": "b0d0655ac214275b7b4d1a34b1cb67cac0a2352b0546268399792efa802606cf",
+    "exulanica/selection/kind_drafting.py": "d3f41bdaf2085139ad486af0de8a7d10ffa688fa103d946e8ec7572f7c0d9623",
+    "scripts/measure_kind_drafting_models.py": "2c4a6c195a9591e3dae8a92c805ffc4e15af183be330fdc6c70446ea7da67365",
+    "tests/kind_briefs.py": "dc071f2b54c289d024048264021a076b042462ebc06fbade092cb132b73346a3",
+    "tests/test_kind_brief.py": "debdd4bb8567d93dbfe9d3600ecd2d3aaadf226f1feb033705e9a96607a1837a",
+    "tests/test_kind_drafting.py": "27248e5c17dfbdf9ac21897479401162ba0dd56ff5ac860bd411efe813359742",
+    "tests/test_kind_drafting_continuation.py": "19dfddd651e66cad8e028aff2899ce58f3e75e879c94bd05460918566104768d"
+   }
+  },
+  "window": {
+   "ended": "2026-10-07T19:47:08-0400",
+   "started": "2026-10-07T19:08:30-0400"
+  }
+ },
+ "record_sha256": "27a4c363ddf09c9ea04cfccc950a26b18c3600ba306b780569d5510b61500a6d"
+}

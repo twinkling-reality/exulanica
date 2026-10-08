@@ -72,6 +72,7 @@ from exulanica.world.kinds.document import KIND_CODES, KindDocument
 from exulanica.world.society_catalogs import RoutineModel
 
 __all__ = [
+    "DRAFTER_ROLE",
     "DRAFT_ATTEMPTS",
     "PROMPT_PATH",
     "KindCheck",
@@ -86,6 +87,9 @@ __all__ = [
 ]
 
 PROMPT_PATH: Final = Path(__file__).with_name("kind-drafting.v4.json")
+#: The manifest role a kind is drafted under, bound to the model the drafter's pre-registered
+#: measurement chose (docs/evaluation/2026-10-07-kind-drafter-timings.json).
+DRAFTER_ROLE: Final = Role.KIND_DRAFTER
 _PROMPT_PROFILE: Final = "exulanica.kind-drafting-prompt/v3"
 #: One brief and two repairs: a kind the checks refuse three times is refused by name, never
 #: escalated to a larger model. Each repair names one check, so a second lets a draft that met one

@@ -372,6 +372,23 @@
       "required_use_cases": ["text"],
       "rationale": "Drafts a creature from a person's description (exulanica/selection/creature_drafting.py): a flat form of its body, colours, abilities and offers, assembled into a recipe, a body plan, a sketch and a thing kind that every reader a thing passes holds, with one repair naming the check's code, field and sentence and no fallback to another model on a refused form. Chosen by the rule pre-registered for the measurement over three licence-resolved text models with a JSON schema in this manifest: eligible at 6 of 8 valid and 5 of 8 matching the words by rule; the NVIDIA model with the shortest slowest draft within 60 s is the primary, and the next in that order the fallback. Model-unavailability errors select the fallback."
     },
+    "kind_drafter": {
+      "primary": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "fallback": null,
+      "timeout_seconds": 85,
+      "timeout_basis": {
+        "record": "docs/evaluation/2026-10-07-kind-drafter-timings.json",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "rows": 10,
+        "p50_ms": 28987,
+        "p99_ms": 41677,
+        "longest_ms": 41677,
+        "note": "The primary's own calls in the pre-registered measurement of the kind drafter: six held-out descriptions, one brief each and up to two repairs where a check refused or the token limit cut a reply. No other model serves this role."
+      },
+      "max_tokens": {"value": 16384, "basis": "The ceiling every candidate was asked with in the measurement the timeout names, one for all so none was truncated by a choice made for another. A ceiling is not a spend; a low one costs a failed draft."},
+      "required_use_cases": ["text"],
+      "rationale": "Drafts a kind of world from a person's description (exulanica/selection/kind_drafting.py): a brief with no keys, zones holding their structures, rooms, areas and fixtures and each part's use where it stands, compiled by code into a kind document and held to both stages of the kind checks, with two repairs naming the check's code, place and sentence and no fallback to another model on a refused brief. Chosen by the rule pre-registered for the measurement over four licence-resolved text models with a JSON schema in this manifest: eligible at 5 of 6 valid and 4 of 6 matching the words by rule; an eligible NVIDIA model with the shortest slowest draft within 120 s first, otherwise the eligible model with the shortest slowest draft. One model was eligible, so the role has no fallback."
+    },
     "reference_drafting": {
       "primary": "Qwen/Qwen3-235B-A22B-Instruct-2507",
       "fallback": "deepseek-ai/DeepSeek-V4-Flash-0731",

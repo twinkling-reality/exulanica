@@ -42,7 +42,7 @@ from model_fakes import FakeTransport, RecordingPolicy, chat_body
 
 #: The scripted transport's model, as every reply names it.
 MODEL = "test/model"
-ROLE = Role.SPECIFICATION_DRAFTER
+ROLE = Role.KIND_DRAFTER
 DESCRIPTION = "A small farm with a farmhouse, a barn, fields and a duck pond."
 
 

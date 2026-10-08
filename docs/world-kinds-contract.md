@@ -345,9 +345,9 @@ town's receipt or digest depends on the adapter.
 
 - The application draws a site's slots as the engine's primitives in fallback colours; no style
   pack dresses them.
-- No route drafts a kind, and the drafter has no model chosen for it; only
-  `scripts/measure_kind_drafting_models.py` runs it. The API keeps only a creator's upload;
-  `drafted` is an origin the document states.
+- No route drafts a kind yet; only `scripts/measure_kind_drafting_models.py` runs the drafter,
+  under the `kind_drafter` role (see [model and service selection](model-and-service-selection.md)).
+  The API keeps only a creator's upload; `drafted` is an origin the document states.
 - The library ships the town's adapter and no site-grammar kind. The three kinds under
   `tests/fixtures/world-kinds` are hand-written test fixtures.
 - Only the ground storey of a structure is walked inside.

@@ -638,11 +638,27 @@ class _Compiler:
         part.update(roles=sorted(roles), use_class=use_class)
         return self._part(part, where)
 
+    @staticmethod
+    def _unused(raw: Mapping[str, Any]) -> dict[str, Any]:
+        """A fixture or an area held where nobody may go, kept to be seen: its uses dropped, so
+        nothing in it waits for a worker, a resident or a visitor who cannot reach it."""
+        return {
+            **raw,
+            "use_role": "",
+            "roles": [role for role in raw["roles"] if role not in _USED_ROLES],
+            "work": [],
+            "visit": [],
+        }
+
     def zone(
         self, raw: Mapping[str, Any], where: str, keys: _Keys, boundary: str
     ) -> tuple[dict[str, Any], tuple[str, ...]]:
         holds: list[dict[str, Any]] = []
         origins: list[str] = []
+        # A zone the brief states closed stays closed: the words said nobody goes there, so what
+        # it holds is kept to be seen and nothing in it is used. A structure is entered by its
+        # door, so a zone holding one is opened where anything in it is used.
+        closed = raw["access"] == "closed" and not raw["structures"]
         for index, held in enumerate(raw["structures"]):
             at = f"{where}.structures[{index}]"
             holds.append(
@@ -651,15 +667,17 @@ class _Compiler:
             origins.append(at)
         for index, held in enumerate(raw["areas"]):
             at = f"{where}.areas[{index}]"
+            area = self._unused(held) if closed else held
             holds.append(
-                {"part": self.area(held, at), "count": _span(held["count"]), "pattern": "fill"}
+                {"part": self.area(area, at), "count": _span(held["count"]), "pattern": "fill"}
             )
             origins.append(at)
         for index, held in enumerate(raw["fixtures"]):
             at = f"{where}.fixtures[{index}]"
+            fixture = self._unused(held) if closed else held
             holds.append(
                 {
-                    "part": self.fixture(held, at),
+                    "part": self.fixture(fixture, at),
                     "count": _span(held["count"]),
                     "pattern": held["pattern"],
                 }

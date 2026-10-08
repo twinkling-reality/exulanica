@@ -25,6 +25,13 @@ def measure() -> Any:
     return module
 
 
+@pytest.fixture(autouse=True)
+def _v32(measure: Any, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The continuation continues the v3.2 run, asked of these two candidates."""
+    monkeypatch.setattr(measure, "CANDIDATES", (SUPER, QWEN))
+    monkeypatch.setattr(measure, "REFUSED_IN_A_ROW", 2)
+
+
 def _line(number: int, model_id: str, *, valid: bool) -> str:
     outcomes = "['passed']" if valid else "[]"
     unanswered = "None" if valid else "timed_out"
@@ -154,3 +161,15 @@ def test_combined_counts_take_the_observed_lines_as_given(
     assert (summaries[SUPER]["valid"], summaries[SUPER]["observed_from_the_log"]) == (6, 6)
     assert (summaries[QWEN]["valid"], summaries[QWEN]["descriptions"]) == (5, 6)
     assert summaries[QWEN]["cost_known"] is False
+
+
+def test_the_measured_run_writes_each_draft_before_asking_the_next(
+    measure: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sink = tmp_path / "run-asks.jsonl"
+    asked = _scripted_asks(monkeypatch, measure, sink, {draft: True for draft in measure._order()})
+    _, ended_as = measure._asks(lambda model_id: model_id, measure.CANDIDATES, sink)
+    assert ended_as == "complete"
+    assert [held for _, _, held in asked] == list(range(len(measure._order())))
+    written = [json.loads(line) for line in sink.read_text("utf-8").splitlines()]
+    assert [(w["description"], w["model_id"]) for w in written] == measure._order()

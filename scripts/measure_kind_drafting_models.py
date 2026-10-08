@@ -20,9 +20,9 @@ comparison of models is kept out of the repository until the provider's terms ar
 manifest can quote them.
 
 Every candidate is asked every fixed description through ``draft_kind``, the product's own drafting
-path (:mod:`exulanica.selection.kind_drafting`), with the specification drafter's role pointed at
-the candidate on an in-memory copy of the manifest, the vehicle the kind drafter's role takes until
-this measurement gives that role its models and timeout. A drafted kind is held to both stages of
+path (:mod:`exulanica.selection.kind_drafting`), with the kind drafter's role pointed at the
+candidate on an in-memory copy of the manifest (the measurements up to v3.3 drove the specification
+drafter's role, before the kind drafter had one; their as-run copies say so). A drafted kind is held to both stages of
 the kind checks in this process, as the kind worker holds it. Within each description the
 candidates take turns, so a slow minute at the provider falls on all of them.
 
@@ -60,6 +60,7 @@ ROOT: Final = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tests"))
 
 from exulanica.canonical import canonical_json  # noqa: E402
+from exulanica.selection.kind_drafting import DRAFTER_ROLE  # noqa: E402
 
 PROFILE: Final = "exulanica.digest-bound-record/v1"
 SCRIPT: Final = "scripts/measure_kind_drafting_models.py"
@@ -68,22 +69,26 @@ COMPILER: Final = "exulanica/selection/kind_brief.py"
 BUDGET_VARIABLE: Final = "EXULANICA_BUDGET_USD"
 CALLS_VARIABLE: Final = "EXULANICA_BUDGET_MAX_CALLS"
 KEY_VARIABLE: Final = "NEBIUS_API_KEY"
-#: The two models root's v3.1 ruling names: the specification drafter's primary (Super) and
-#: fallback (Qwen3 235B). Nano 30B, measured in the v3 run, ran on in blank space to the token
-#: ceiling on 17 of its 18 calls there and on every drafter before it, and is not asked again.
+#: The open models root's v3.3 ruling approves from the manifest's catalog on Nebius Token Factory,
+#: each with a SHIP licence verdict in docs/license-matrix.md: Nemotron 3.5 Lightning
+#: (OpenMDW-1.1), Nemotron 3 Super (the NVIDIA open model licence; the specification drafter's
+#: primary), DeepSeek V4 Flash (MIT) and Qwen3 235B Instruct (Apache-2.0; its fallback). Nano 30B
+#: ran on in blank space to the token ceiling on 17 of its 18 calls in the v3 run; MiniMax M3's
+#: licence is conditional; Nemotron 3 Ultra's is read from the catalog only.
 CANDIDATES: Final = (
+    "nvidia/Nemotron-3_5-Lightning",
     "nvidia/nemotron-3-super-120b-a12b",
+    "deepseek-ai/DeepSeek-V4-Flash-0731",
     "Qwen/Qwen3-235B-A22B-Instruct-2507",
 )
-#: The most this measurement may spend, on Nebius Token Factory: root's v3.2 allocation, what the
-#: v3.1 allocation (36 calls, USD 0.20) had left after that run's 9 calls and USD 0.048. Every call
-#: at the 16,384-token completion ceiling would cost about USD 0.016 on Super and 0.010 on Qwen3
-#: 235B; the v3 run spent USD 0.0040 a call on Super and 0.0061 on Qwen3 235B, timed-out calls
-#: charged their reservations.
-BOUND_USD: Final = Decimal("0.152")
-#: Root's v3.2 allocation: fewer than six descriptions, two candidates and three attempts could
-#: ask (36); a run that reaches it stops, recorded as stopped.
-MAX_CALLS: Final = 27
+#: The most this measurement may spend, on Nebius Token Factory, under root's allocation
+#: KINDS-V3.3: every draft at three attempts, each at the budget guard's own worst-case reservation
+#: (the 16,384-token ceiling and the longest repairs), USD 0.64243464 over the six descriptions and
+#: four candidates, so the bound never cuts the registered order short. The v3 run spent USD
+#: 0.0040 a call on Super and 0.0061 on Qwen3 235B.
+BOUND_USD: Final = Decimal("0.643")
+#: Six descriptions, four candidates and three attempts.
+MAX_CALLS: Final = 72
 #: The completion ceiling every candidate is asked with, one for all so none is truncated by a
 #: choice made for another: the specification drafter's.
 MAX_TOKENS: Final = 16384
@@ -92,10 +97,10 @@ MAX_TOKENS: Final = 16384
 #: Qwen3 235B timed out at 180 s on three of six in the v3 run and answered the others in 15 to
 #: 85 s; Super's longest there was 33 s.
 CALL_TIMEOUT_SECONDS: Final = 240
-#: The run stops when this many drafts in a row for one description gave no valid kind, which with
-#: two candidates is every candidate: a brief or an instruction every model fails is a defect to
+#: The run stops when this many drafts in a row for one description gave no valid kind, every
+#: candidate: a brief or an instruction every model fails is a defect to
 #: fix before more is spent, not a model's skill.
-REFUSED_IN_A_ROW: Final = 2
+REFUSED_IN_A_ROW: Final = len(CANDIDATES)
 
 #: The fixed descriptions, written for this measurement as a person might type them, with the
 #: checks a drafted kind must pass to count as matching its words: what any kind true to the words
@@ -112,6 +117,55 @@ CHECKS: Final = {
     "not empty)",
 }
 DESCRIPTIONS: Final = (
+    {
+        "description": (
+            "A summer camp in a forest clearing with wooden cabins, a dining hall, a campfire "
+            "circle and a lake for canoeing."
+        ),
+        "checks": [{"role": "water"}, {"people": True}, {"structures": 2}],
+    },
+    {
+        "description": (
+            "The inside of a small vet's surgery: a waiting room with chairs, a reception desk, "
+            "two consulting rooms and kennels at the back."
+        ),
+        "checks": [
+            {"enclosure": "indoor"},
+            {"role": "seat"},
+            {"role": "workplace"},
+            {"visitors": True},
+        ],
+    },
+    {
+        "description": "A tennis club with three grass courts, a clubhouse with a bar and a small car park.",
+        "checks": [
+            {"role": ["ground", "field"], "form": "area"},
+            {"role": "parking", "form": "area"},
+            {"visitors": True},
+        ],
+    },
+    {
+        "description": "A monastery with a cloister garden, a chapel, a refectory and the monks' cells.",
+        "checks": [{"role": ["bed", "home"]}, {"people": True}, {"structures": 2}],
+    },
+    {
+        "description": (
+            "A rooftop community garden with raised vegetable beds, a small greenhouse, benches "
+            "and a beehive corner nobody may enter."
+        ),
+        "checks": [{"closed_zone": True}, {"role": "seat"}, {"role": "field"}],
+    },
+    {
+        "description": (
+            "A motorway service station with a petrol forecourt, a shop, a cafe, toilets and a "
+            "lorry park."
+        ),
+        "checks": [{"role": "shop"}, {"role": "parking", "form": "area"}, {"visitors": True}],
+    },
+)
+#: The v3.2 run's six held-out descriptions (pre-registration c157f252 and its amendment), all
+#: asked and read, so spent: they join the development set.
+SPENT_V32: Final = (
     {
         "description": (
             "The inside of a small hairdresser's: a reception desk, styling chairs at mirrors, "
@@ -315,11 +369,10 @@ def _manifest_sha256() -> str:
 
 def _pinned(manifest: Any, model_id: str) -> Any:
     """The manifest with the vehicle role pointed at ``model_id`` alone, in memory only."""
-    from exulanica.models.manifest import Role
 
-    binding = manifest[Role.SPECIFICATION_DRAFTER]
+    binding = manifest[DRAFTER_ROLE]
     roles = dict(manifest.roles)
-    roles[Role.SPECIFICATION_DRAFTER] = dataclasses.replace(
+    roles[DRAFTER_ROLE] = dataclasses.replace(
         binding,
         primary=manifest.spec(model_id),
         fallback=None,
@@ -356,7 +409,7 @@ def _registration() -> dict[str, Any]:
             "share matching the words by rule, draft time, and cost"
         ),
         "candidates": list(CANDIDATES),
-        "candidates_rule": "the two models root's v3.1 and v3.2 rulings name",
+        "candidates_rule": "the open models root's v3.3 ruling approves, NVIDIA models first",
         "descriptions": [dict(entry) for entry in DESCRIPTIONS],
         "checks_meaning": dict(CHECKS),
         "rule": dict(RULE),
@@ -367,15 +420,15 @@ def _registration() -> dict[str, Any]:
             "reservation, as the budget guard holds it"
         ),
         "order": "description by description; within a description every candidate in turn",
-        "vehicle_role": "specification_drafter, pinned in memory to each candidate",
+        "vehicle_role": f"{DRAFTER_ROLE}, pinned in memory to each candidate",
         "bound_usd": str(BOUND_USD),
         "max_calls": MAX_CALLS,
         "provider": "Nebius Token Factory",
         "stop_rules": [
             f"the bound, USD {BOUND_USD}: a call whose reservation would pass it is not sent",
             f"{MAX_CALLS} calls",
-            f"{REFUSED_IN_A_ROW} drafts in a row for one description without a valid kind (with "
-            "two candidates, every candidate); a draft is one candidate's brief and its repairs",
+            f"{REFUSED_IN_A_ROW} drafts in a row for one description without a valid kind (every "
+            "candidate); a draft is one candidate's brief and its repairs",
             "a run that stops is recorded as stopped, with every call made, and chooses nothing",
         ],
         "call_timeout_seconds": CALL_TIMEOUT_SECONDS,
@@ -498,7 +551,6 @@ def _checked(document: dict[str, Any]) -> Any:
 
 def _ask(client: Any, entry: Mapping[str, Any]) -> dict[str, Any]:
     from exulanica.models.errors import BudgetExceededError, ModelError
-    from exulanica.models.manifest import Role
     from exulanica.selection.calls import CallLog
     from exulanica.selection.kind_drafting import draft_kind
 
@@ -512,7 +564,7 @@ def _ask(client: Any, entry: Mapping[str, Any]) -> dict[str, Any]:
         drafted = draft_kind(
             sender,
             entry["description"],
-            role=Role.SPECIFICATION_DRAFTER,
+            role=DRAFTER_ROLE,
             check=_checked,
             log=CallLog(),
             max_tokens=MAX_TOKENS,
@@ -570,7 +622,20 @@ def _ask(client: Any, entry: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
-def _asks(client_for: Callable[[str], Any], candidates: Sequence[str]) -> tuple[list[Any], str]:
+def _append(sink: Path, asked: Mapping[str, Any]) -> None:
+    """One draft's result appended to ``sink`` and on disk before the next is asked."""
+    sink.parent.mkdir(parents=True, exist_ok=True)
+    with sink.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(asked, sort_keys=True) + "\n")
+        handle.flush()
+        os.fsync(handle.fileno())
+
+
+def _asks(
+    client_for: Callable[[str], Any], candidates: Sequence[str], sink: Path | None = None
+) -> tuple[list[Any], str]:
+    """Every description asked of every candidate in turn; each result appended to ``sink`` as
+    it ends, so a run cut off from outside keeps every draft it saw."""
     asks: list[dict[str, Any]] = []
     for number, entry in enumerate(DESCRIPTIONS, 1):
         refused_in_a_row = 0
@@ -583,6 +648,8 @@ def _asks(client_for: Callable[[str], Any], candidates: Sequence[str]) -> tuple[
                 wall_ms=round((time.monotonic() - started) * 1000),
             )
             asks.append(asked)
+            if sink is not None:
+                _append(sink, asked)
             print(
                 f"d{number} {model_id}: valid={asked['valid']} first={asked['valid_first_try']} "
                 f"matched={asked['matched']} outcomes={asked['outcomes']} "
@@ -666,10 +733,14 @@ def _now() -> str:
 
 
 def _run(
-    client_for: Callable[[str], Any], *, dry: bool, spent: Callable[[], Decimal]
+    client_for: Callable[[str], Any],
+    *,
+    dry: bool,
+    spent: Callable[[], Decimal],
+    sink: Path | None = None,
 ) -> dict[str, Any]:
     started = _now()
-    asks, ended_as = _asks(client_for, CANDIDATES)
+    asks, ended_as = _asks(client_for, CANDIDATES, sink)
     summaries = _summaries(asks, CANDIDATES)
     return {
         "dry_run": dry,
@@ -726,7 +797,10 @@ def dry_run(out: Path) -> None:
 
     budget = BudgetGuard(ceiling_usd=BOUND_USD, max_calls=MAX_CALLS)
     client_for, _ = _scripted(budget)
-    run = _run(client_for, dry=True, spent=lambda: budget.spent_usd)
+    sink = out / "dry-run-asks.jsonl"
+    if sink.exists():
+        raise SystemExit(f"{sink} exists")
+    run = _run(client_for, dry=True, spent=lambda: budget.spent_usd, sink=sink)
     _write_new(out, "dry-run.json", run, record=False)
 
 
@@ -750,8 +824,12 @@ def run(out: Path, as_run: bytes, env_file: Path | None) -> None:
         raise SystemExit(f"{CALLS_VARIABLE}={calls} is not within (0, {registered['max_calls']}]")
     if env_file is None or not env_file.is_file():
         raise SystemExit("--env-file names the .env file the provider's key is read from")
-    if (out / "record.json").exists():
-        raise SystemExit(f"{out / 'record.json'} exists")
+    sink = out / "run-asks.jsonl"
+    for done in (out / "record.json", sink):
+        if done.exists():
+            raise SystemExit(f"{done} exists; a measurement runs once")
+    # Kept before any call, so a cut-off still names the script that asked.
+    (out / "measure_kind_drafting_models-as-run.py.txt").write_bytes(as_run)
     # Only this variable is read from the file, into this process; it is never exported.
     key = api_key_from_env(KEY_VARIABLE, dotenv=env_file)
     os.environ[EGRESS_ALLOWLIST_ENV] = json.dumps(sorted(load_manifest().bound_origins()))
@@ -765,9 +843,8 @@ def run(out: Path, as_run: bytes, env_file: Path | None) -> None:
         for model_id in CANDIDATES
     }
     del key
-    measured = _run(clients.__getitem__, dry=False, spent=lambda: budget.spent_usd)
+    measured = _run(clients.__getitem__, dry=False, spent=lambda: budget.spent_usd, sink=sink)
     _write_new(out, "run.json", measured, record=False)
-    (out / "measure_kind_drafting_models-as-run.py.txt").write_bytes(as_run)
     decision = measured["decision"]
     _write_new(
         out,
@@ -1316,6 +1393,58 @@ def continue_run(out: Path, as_run: bytes, env_file: Path | None) -> None:
     )
 
 
+#: The record the manifest's timeout basis quotes: the chosen primary's own timings and nothing
+#: else. The candidates' comparison stays out of the repository until the provider's terms are
+#: confirmed.
+TIMINGS: Final = ROOT / "docs/evaluation/2026-10-07-kind-drafter-timings.json"
+
+
+def timings(out: Path) -> None:
+    """Write the chosen primary's own call timings from a complete run's record."""
+    record = _read_record(out / "record.json")
+    if record["run_sha256"] != _sha256((out / "run.json").read_bytes()):
+        raise SystemExit("record.json names a run.json other than the one in --out")
+    if record["ended_as"] != "complete" or record["decision"] is None:
+        raise SystemExit("only a complete run's decision has timings to write")
+    primary = record["decision"]["primary"]
+    if primary is None:
+        raise SystemExit("the run chose no model, so there are no timings to write")
+    [summary] = [s for s in record["summaries"] if s["model_id"] == primary]
+    calls = summary["calls"]
+    timing = {
+        "kind": "exulanica.kind-drafter-timings/v1",
+        # The shape every timeout basis's record has (tests/test_models_call_bounds.py): the
+        # role's primary and its own measured calls. The primary's alone, nothing else.
+        "measured": {
+            "roles": {
+                "kind_drafter": {
+                    "primary": primary,
+                    "primary_measured": {
+                        key: calls[key] for key in ("rows", "p50_ms", "p99_ms", "longest_ms")
+                    },
+                }
+            }
+        },
+        "run_sha256": record["run_sha256"],
+        "provider": record["provider"],
+        "script_sha256": record["script_sha256"],
+        "tree": record["tree"],
+        "window": record["window"],
+        "note": (
+            "The kind drafter's primary's own calls when its pre-registered measurement asked six "
+            "held-out descriptions: rows are its calls, a brief and up to two repairs where one "
+            "was asked. Nothing of any other model is published here."
+        ),
+    }
+    document = {
+        "profile": PROFILE,
+        "record": timing,
+        "record_sha256": _sha256(canonical_json(timing)),
+    }
+    TIMINGS.write_text(json.dumps(document, indent=1, sort_keys=True) + "\n", encoding="utf-8")
+    print(f"wrote {TIMINGS.relative_to(ROOT)}", file=sys.stderr)
+
+
 #: Descriptions written for developing the drafter, never the measurement's: a kind drafted from one
 #: of these is seen, read and fixed against, so it says nothing of how the drafter meets words it
 #: was not developed on.
@@ -1330,6 +1459,7 @@ DEVELOPMENT: Final = (
     "A vineyard with rows of vines, a winery and a tasting room.",
     *(entry["description"] for entry in SPENT_DESCRIPTIONS),
     *(entry["description"] for entry in SPENT_V31),
+    *(entry["description"] for entry in SPENT_V32),
 )
 #: Root's development allocation for the brief drafter, KINDS-5-DEV, on Nebius Token Factory,
 #: over every development run that names it (KINDS-4-DEV's runs, of the earlier drafters, are not
@@ -1483,13 +1613,14 @@ def main() -> None:
             "amend",
             "continuation-dry-run",
             "continue",
+            "timings",
         ),
     )
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--env-file", type=Path, help="run: the .env file the key is read from")
     parser.add_argument("--models", nargs="*", default=list(CANDIDATES), help="develop: models")
     parser.add_argument(
-        "--descriptions", nargs="*", type=int, default=[], help="develop: numbers, 1 to 16"
+        "--descriptions", nargs="*", type=int, default=[], help="develop: numbers, 1 to 22"
     )
     parser.add_argument(
         "--confirm", action="store_true", help="develop: ask every description named"
@@ -1518,6 +1649,8 @@ def main() -> None:
         continuation_dry_run(out)
     elif arguments.step == "continue":
         continue_run(out, as_run, arguments.env_file)
+    elif arguments.step == "timings":
+        timings(out)
     elif arguments.step == "develop":
         numbers = arguments.descriptions or list(range(1, len(DEVELOPMENT) + 1))
         develop(out, arguments.env_file, arguments.models, numbers, confirm=arguments.confirm)
