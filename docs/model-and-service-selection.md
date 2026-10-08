@@ -198,6 +198,16 @@ Flash 196 and 131, and Qwen3 16 and 17. The contract asks by a forced call whene
 its first-ranked mechanism, unless a model's entry states an order of its own. The probe cost
 0.006226 USD.
 
+Nemotron 3 Super 120B and Nemotron 3 Ultra 550B were probed as a being's mind in a society of
+things, by both mechanisms, on six of its choices that take no line and sixteen that take one,
+asked as the host asks them ([verdicts](evaluation/2026-10-08-society-mind-probe-verdicts.json):
+each verdict, the rule it was read by, and the digests of the pre-registration and of the full
+record, which stays unpublished under the provider's terms). Ultra answers by both, lines
+included. Super answers by a strict schema, lines included, but by a forced call only the
+choices that take no line: it writes a line where the action it chose says none. A contract asks
+a model by the first mechanism of its order for every choice, and the person's contract ranks a
+forced call first, so Super's entry names the schema alone.
+
 The [measurement](evaluation/2026-09-25-society-person-models.json) gave each model the eight
 people of the small square for 60 simulated minutes, on one fixed development seed
 (`BROWSER_SEED` in [`measure_living_world_pace.py`](../scripts/measure_living_world_pace.py)),

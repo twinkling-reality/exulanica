@@ -388,7 +388,15 @@ def test_a_model_the_role_does_not_take_is_refused_for_that_being_alone(made):
     _offer(api)
     document = copy.deepcopy(dict(_scene().document))
     # Declared by the manifest, so the scene reads, but not verified to answer a person's choice.
-    document["minds"][0]["decider"]["model_id"] = "nvidia/nemotron-3-super-120b-a12b"
+    unverified = [
+        spec
+        for _, spec in sorted(load_manifest().models.items())
+        if spec.is_chat and not spec.answering
+    ]
+    assert unverified, "the positive control: the manifest declares a chat model nobody verified"
+    document["minds"][0]["decider"].update(
+        provider=unverified[0].provider, model_id=unverified[0].model_id
+    )
     scene = read_scene(document)
     dressed = _dress(api, _starter(api), scene)
     by_thing = {mind["thing_id"]: mind for mind in dressed.minds}

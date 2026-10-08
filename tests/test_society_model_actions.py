@@ -1024,9 +1024,12 @@ def test_the_manifests_answering_orders_are_the_ones_the_probes_rules_selected()
     record = json.loads(Path(PROBE).read_text(encoding="utf-8"))["record"]
     manifest = load_manifest()
     offered = {spec.model_id: spec for spec in manifest.offered_models(person_role().chosen)}
-    # A positive control: the probe asked every offered model, and selected an order for one.
-    assert set(record["models"]) == set(offered)
+    # A positive control: every model the probe asked is offered, and it selected an order for one.
+    assert set(record["models"]) <= set(offered)
     assert any(found["answering_order_selected"] for found in record["models"].values())
+    # A model admitted by a later probe was never measured for an order, so it states none.
+    for model_id in set(offered) - set(record["models"]):
+        assert offered[model_id].answering_order == (), model_id
     for model_id, found in record["models"].items():
         spec = offered[model_id]
         selected = found["answering_order_selected"] or []

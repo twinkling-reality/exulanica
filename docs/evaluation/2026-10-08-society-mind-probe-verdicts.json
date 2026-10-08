@@ -1,0 +1,72 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "answering": {
+      "nvidia/Nemotron-3-Ultra-550b-a55b": [
+        "json_schema",
+        "tool_call"
+      ],
+      "nvidia/nemotron-3-super-120b-a12b": [
+        "json_schema"
+      ]
+    },
+    "answering_rule": "A model's answering names each mechanism verified for it; where at least one of its verified mechanisms answers lines, only those that answer lines. A contract asks a model by the first mechanism of its order for every choice, a choice that takes a line included, and the person's contract ranks a forced call first, so a mechanism that answers only choices without a line would fail every choice that takes one wherever it is ranked first.",
+    "candidates": [
+      "nvidia/nemotron-3-super-120b-a12b",
+      "nvidia/Nemotron-3-Ultra-550b-a55b"
+    ],
+    "deviation": "The pre-registered manifest clause admits every mechanism that answers. This answering admits fewer: a verified mechanism that does not answer lines is left out for a model another mechanism serves for lines.",
+    "full_record": "Kept untracked beside the worktree that measured it, with every call, until the provider's terms allow publishing per-model figures; record_sha256 above binds it.",
+    "measured": {
+      "contexts_sha256": "7d987c324cba74d903ef4b7a38a1b70d23c51ba1bec3286f27616fa6d7386cc1",
+      "contract": {
+        "catalog_versions": {
+          "society-decision-action": 4,
+          "society-decision-policy": 4
+        },
+        "sha256": "2f7c2e3145695054990fc44aee39139a64b4f113d6906c35a21b63371ea408a4"
+      },
+      "manifest_sha256": "2fd4cd2fc22271174016380a542b828f9859c3300118e99819410bde89a68982",
+      "preregistration_record_sha256": "4ef520e297c3955bec22f63fc5b36b21703df0f5830ea72cc44f8f7092688a46",
+      "prompt_version": "society-person-choice/v3",
+      "record_sha256": "9d0dcb20340a49dad2ee3b416e941b2310eefc49641707e91afc928a5bb61efc",
+      "script": "scripts/measure_society_mind_probe.py",
+      "script_sha256": "4eed7faabcbd23a9b630602963399113cb79afc2436bc546e902ae2e99c73223",
+      "tree_head": "7f93b3419354d13d01a572ebcfcbba2f8a27acb4"
+    },
+    "mechanisms": [
+      "json_schema",
+      "tool_call"
+    ],
+    "publisher_sha256": "f9598cf963851233f9d435f1596bf62e3f245af04d36f002947410d339e18578",
+    "question": "Can each candidate be a being's mind: by each mechanism the client asks with, does it answer a society of things' person's choice as the host asks it, naming an offered label, with a line of at most the request's bound exactly where the label says something, within the host's token bound and the contract's deadline?",
+    "verdict_rule": {
+      "answers": "at least 5 of the 6 plain cases' answers name an offered label",
+      "answers_lines": "at least 14 of the 16 line cases' answers name an offered label with a line exactly where it says something, within the rule",
+      "manifest": "a mechanism that answers joins the model's answering, naming the record; a model none of whose answering mechanisms answers_lines gets a not_offered_for_lines sentence; a model with no mechanism that answers is left out of the answering set"
+    },
+    "verdicts": {
+      "nvidia/Nemotron-3-Ultra-550b-a55b": {
+        "json_schema": {
+          "answers_lines": true,
+          "verified": true
+        },
+        "tool_call": {
+          "answers_lines": true,
+          "verified": true
+        }
+      },
+      "nvidia/nemotron-3-super-120b-a12b": {
+        "json_schema": {
+          "answers_lines": true,
+          "verified": true
+        },
+        "tool_call": {
+          "answers_lines": false,
+          "verified": true
+        }
+      }
+    }
+  },
+  "record_sha256": "c4ccdd61ead311ee19caa1ecf0be8fca094c98ceca31927eb4ab10b7ea33dedf"
+}

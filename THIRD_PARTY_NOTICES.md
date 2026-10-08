@@ -106,16 +106,8 @@ as a verified license. Closing this is item **T-1** in section 9.
 | --- | --- | --- | --- | --- |
 | `nvidia/Nemotron-3_5-Lightning` | reasoning, cheap tier, primary | **OpenMDW-1.1** | Raw HuggingFace card frontmatter, read 2026-08-27. The Nebius catalog agrees (`OpenMDW v1.1`) | **VERIFIED** |
 | `nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B` | reasoning, cheap tier, fallback | **NVIDIA Nemotron Open Model License** | HuggingFace card. The Nebius catalog says `nvidia-open-model-license`, which is the stricter of the two and is a derived label | **DISPUTED between sources, resolved in favour of the card** per license-matrix section 5 |
-| `nvidia/nemotron-3-super-120b-a12b` | reasoning, mid tier, primary | **NVIDIA Nemotron Open Model License** | HuggingFace card. Nebius catalog again says `nvidia-open-model-license` | **DISPUTED between sources, resolved in favour of the card** |
-| `nvidia/Nemotron-3-Ultra-550b-a55b` | reasoning, hard tier, primary | `openmdw-1.1` **per the Nebius catalog only** | Nebius catalog. No HuggingFace card reading exists for this model | **UNVERIFIED. See the warning below** |
-
-**Warning, and it is a change from what license-matrix section 5 records.** The matrix states that
-`nvidia/Nemotron-3-Ultra-550b-a55b` is the one row where the catalog is *more permissive* than any
-verified reading, and that "the exposure is currently zero because Ultra has no role in Exulanica".
-**That is no longer true.** The model manifest names it as the primary for the `reasoning_hard`
-role. Nothing routes to it by default and it is reachable only by asking for the hard role
-explicitly, so the exposure is small, but it is not zero. The HuggingFace card must be read before
-that role is used. Item **T-2** in section 9.
+| `nvidia/nemotron-3-super-120b-a12b` | reasoning, mid tier, primary; the answer composer's primary; offered for a person's decisions | **NVIDIA Nemotron Open Model License** | Raw HuggingFace card frontmatter of `nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-BF16` at `2dc98e2afe4face0e4ce40972a915c45368bd34a`, read 2026-10-08. Nebius catalog again says `nvidia-open-model-license` | **DISPUTED between sources, resolved in favour of the card** |
+| `nvidia/Nemotron-3-Ultra-550b-a55b` | reasoning, hard tier, primary; offered for a person's decisions | **OpenMDW-1.1** | Raw HuggingFace card frontmatter of `nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-BF16` at `77df655d5e9f8362164ed14dd8b48f8bce657498` and `-NVFP4` at `02462641f13d3af838b904f48195b9bb8a1e4ebc`, read 2026-10-08. The Nebius catalog agrees (`openmdw-1.1`) | **VERIFIED** |
 
 **Attribution strings required by the NVIDIA instruments**, conditional on a notices file being
 present in the distribution, which this file is:
@@ -126,8 +118,7 @@ applies to `nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B` and `nvidia/nemotron-3-super-
 
 **OpenMDW-1.1 condition.** On redistribution of the materials, retain a copy of the agreement and
 all notices of origin. Exulanica redistributes no weights, so the condition is recorded rather than
-triggered. It applies to `nvidia/Nemotron-3_5-Lightning`, and to
-`nvidia/Nemotron-3-Ultra-550b-a55b` if its catalog reading is confirmed.
+triggered. It applies to `nvidia/Nemotron-3_5-Lightning` and `nvidia/Nemotron-3-Ultra-550b-a55b`.
 
 License instrument texts:
 
@@ -433,13 +424,12 @@ That is a difference in kind, not a difference in confidence.
 
 ## 9. What still needs verification before submission
 
-Every item is a gap, not a verdict. Each names the check that closes it. Items T-1 through T-4 are
+Every item is a gap, not a verdict. Each names the check that closes it. Items T-1, T-3 and T-4 are
 the ones that would matter to a reviewer.
 
 | # | Item | Why it matters | Check | Effort |
 | --- | --- | --- | --- | --- |
 | **T-1** | No model in `models.manifest.json` has a pinned HuggingFace revision SHA, and the recorded `catalog_license` values are Nebius catalog strings, which are derived labels known to be wrong in three of three checked cases | The standing decision (license-matrix section 5) is to record the license from raw card frontmatter at a pinned SHA. It has not been carried out for any model | For each identifier, `curl https://huggingface.co/api/models/<id>` and record `cardData.license`, `gated` and `sha`. Add the SHA and the frontmatter license to the manifest | 30 min |
-| **T-2** | `nvidia/Nemotron-3-Ultra-550b-a55b` carries a catalog-only `openmdw-1.1` reading, which is the one known case where the catalog is more permissive than any verified reading, **and it is now the declared primary for the `reasoning_hard` role** | This is the error direction that invalidates a compliance claim. license-matrix section 5 records the exposure as zero, which is out of date | Read the HuggingFace card before the hard role is used, and correct license-matrix section 5 either way | 5 min |
 | **T-3** | `MiniMaxAI/MiniMax-M3` custom license text has never been read | It is the **primary** vision sensor. Every photograph passes through it | Read <https://huggingface.co/MiniMaxAI/MiniMax-M3/blob/main/LICENSE> | 10 min |
 | **T-4** | Two Nebius Token Factory terms (section 3.4) are not yet answered: section 7's training of speculative-decoding models on inputs and outputs, and section 5f's bar on "competitive analysis or benchmarking" and "biometric processing" | Photographs and their descriptions go to the vision role, and model comparisons are published from hosted calls | Record whether the operator's account has opted out under section 7; read section 5f against published model comparisons and photograph screening, and record the reading | 30 min |
 | **T-5** | Pillow's bundled native imaging library licenses not enumerated | The wheels bundle native libraries with their own notices, at least one of which (Alliance for Open Media) appears in the shipped license file | Read the complete license file shipped in the wheel and reproduce the bundled notices here | 15 min |
@@ -454,15 +444,11 @@ the ones that would matter to a reviewer.
 
 ## 10. Corrections to the license matrix that this file records
 
-Building this file from the manifests rather than from the analysis surfaced two places where
-[docs/license-matrix.md](docs/license-matrix.md) is now out of date. They are recorded here rather
-than silently reconciled.
+Building this file from the manifests rather than from the analysis surfaced a place where
+[docs/license-matrix.md](docs/license-matrix.md) is out of date. It is recorded here rather than
+silently reconciled.
 
-1. **License matrix section 3.1 and section 5 state that `nvidia/Nemotron-3-Ultra-550b-a55b` has
-   "no role in Exulanica" and that its exposure is "currently zero".** The model manifest declares it
-   as the `reasoning_hard` primary. Nothing routes there by default, so the exposure is small, but it
-   is not zero. See item T-2.
-2. **The license matrix does not cover `psycopg`**, an LGPL-3.0-only dependency reachable through the
+1. **The license matrix does not cover `psycopg`**, an LGPL-3.0-only dependency reachable through the
    `postgres` optional extra and required to run the database migration. See item T-6.
 
 ---

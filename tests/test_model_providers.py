@@ -233,6 +233,51 @@ def test_every_verified_mechanism_names_a_probe_record_whose_verdict_verified_it
             assert verdict["verified"] is True, (spec.model_id, mechanism)
 
 
+def _verdict_records(manifest):
+    """Each probe record the shipped manifest names, read once, by path."""
+    root = MANIFEST_PATH.parents[2]
+    paths = {path for spec in manifest.models.values() for path in spec.answering.values()}
+    return {path: json.loads((root / path).read_bytes())["record"] for path in sorted(paths)}
+
+
+def test_a_model_offered_for_lines_names_only_mechanisms_its_probe_found_answer_them():
+    """Where a probe judged a mechanism on choices that take a line, a model offered for lines
+    names that mechanism only if it answers them.
+
+    A contract asks a model by the first mechanism of its order for every choice, so a mechanism
+    verified on choices without a line but failing those with one would fail every choice that
+    takes a line wherever the contract ranks it first.
+    """
+    manifest = load_manifest()
+    records = _verdict_records(manifest)
+    judged = 0
+    for spec in manifest.models.values():
+        for mechanism, record_path in spec.answering.items():
+            verdict = records[record_path]["verdicts"][spec.model_id][mechanism.value]
+            if "answers_lines" not in verdict:
+                continue
+            judged += 1
+            if spec.not_offered_for_lines is None:
+                assert verdict["answers_lines"] is True, (spec.model_id, mechanism)
+    assert judged, "the positive control: a probe judged lines for a mechanism the manifest names"
+
+
+def test_each_model_a_probe_admitted_answers_by_exactly_the_mechanisms_it_admitted():
+    """A probe record that states the answering it admits is the manifest's, model by model: no
+    mechanism it left out is named, and none it admitted is missing."""
+    manifest = load_manifest()
+    admitting = {
+        path: record["answering"]
+        for path, record in _verdict_records(manifest).items()
+        if "answering" in record
+    }
+    assert admitting, "the positive control: a probe record states the answering it admits"
+    for path, answering in admitting.items():
+        for model_id, mechanisms in answering.items():
+            named = {m.value for m, at in manifest.spec(model_id).answering.items() if at == path}
+            assert named == set(mechanisms), (model_id, path)
+
+
 @pytest.mark.parametrize(
     "variable",
     ["EXULANICA_DATABASE_URL", "EXULANICA_API_TOKENS", "HOME", "nebius_api_key", "_API_KEY"],

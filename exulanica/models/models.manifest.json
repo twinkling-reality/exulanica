@@ -55,6 +55,7 @@
     "nvidia/nemotron-3-super-120b-a12b": {
       "provider": "nebius_token_factory",
       "description": "Nemotron 3 Super 120B, an open reasoning model from NVIDIA.",
+      "answering": {"json_schema": "docs/evaluation/2026-10-08-society-mind-probe-verdicts.json"},
       "input_usd_per_mtok": 0.3,
       "output_usd_per_mtok": 0.9,
       "context_window_tokens": 262144,
@@ -66,11 +67,12 @@
       "catalog_use_cases": ["dedicated-endpoint", "text", "summarization", "context_and_rag", "code", "reasoning", "function_calling", "complex_writing"],
       "catalog_license": "nvidia-open-model-license",
       "region_informational": "us-central1",
-      "note": "The answer_composer and specification_drafter primary, and configured as the reasoning_mid primary and reasoning_hard fallback. No production caller selects reasoning_mid. The callable identifier uses lowercase letters as listed."
+      "note": "The answer_composer and specification_drafter primary, and configured as the reasoning_mid primary and reasoning_hard fallback. No production caller selects reasoning_mid. The callable identifier uses lowercase letters as listed. A decision role asks it by a strict JSON schema alone: asked by a forced call, it writes a line where the action it chose says nothing."
     },
     "nvidia/Nemotron-3-Ultra-550b-a55b": {
       "provider": "nebius_token_factory",
       "description": "Nemotron 3 Ultra 550B, an open reasoning model from NVIDIA.",
+      "answering": {"json_schema": "docs/evaluation/2026-10-08-society-mind-probe-verdicts.json", "tool_call": "docs/evaluation/2026-10-08-society-mind-probe-verdicts.json"},
       "input_usd_per_mtok": 1.0,
       "output_usd_per_mtok": 3.0,
       "context_window_tokens": 1048576,
@@ -82,7 +84,7 @@
       "catalog_use_cases": ["dedicated-endpoint", "text", "summarization", "context_and_rag", "code", "reasoning", "function_calling", "complex_writing", "responses_api"],
       "catalog_license": "openmdw-1.1",
       "region_informational": "us-central1",
-      "note": "Configured as the reasoning_hard primary, with no production caller. Availability and task-specific quality must be evaluated before adoption; configuration alone does not establish either."
+      "note": "Configured as the reasoning_hard primary, which no production caller selects; for that role availability and task-specific quality must be evaluated before adoption, and configuration alone establishes neither. A decision role may ask it by either mechanism, as a recorded probe verified."
     },
     "MiniMaxAI/MiniMax-M3": {
       "provider": "nebius_token_factory",

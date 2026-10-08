@@ -453,7 +453,9 @@ A contract stating any of these four outside its range is refused when it loads:
 taking a line: a model whose manifest entry says it is not offered for lines
 ([model selection](model-and-service-selection.md)) is not listed in a society of things' models
 read, and choosing it for one of its people is refused `model_not_askable`. Nemotron 3.5 Lightning
-is not offered for lines; it stays offered to the people of every other society.
+is not offered for lines; it stays offered to the people of every other society. Nemotron 3 Super
+120B is offered for lines by a strict JSON schema alone, the one mechanism its entry names: asked by
+a forced call, it writes a line where the action it chose says none.
 
 **When they are asked.** At the routine's own choice point, as every person; and also the minute
 after a line was said to them, whatever is under way. A being an outside program decides for is

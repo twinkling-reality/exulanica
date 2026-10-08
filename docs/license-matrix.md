@@ -148,7 +148,7 @@ the NVIDIA Open Model License must not be vendored, and per section 6 must not b
 
 | Instrument | Models |
 | --- | --- |
-| **OpenMDW-1.1** (permissive) | `nvidia/Nemotron-3_5-Lightning` / `NVIDIA-Nemotron-3.5-Lightning-30B-A3B-*`, `nvidia/nemotron-3.5-asr-streaming-0.6b`, `nvidia/Nemotron-3-Embed-1B-BF16`, `nvidia/Nemotron-3-Embed-8B-BF16`. All four VERIFIED in raw HF frontmatter (F39). `nvidia/Nemotron-3-Ultra-550b-a55b` is **catalog-only**, see section 5. `nvidia/Cosmos3-Nano`, `nvidia/Cosmos3-Super` and `nvidia/Cosmos3-Edge`, VERIFIED in raw HF card data at pinned revisions, see section 12 |
+| **OpenMDW-1.1** (permissive) | `nvidia/Nemotron-3_5-Lightning` / `NVIDIA-Nemotron-3.5-Lightning-30B-A3B-*`, `nvidia/nemotron-3.5-asr-streaming-0.6b`, `nvidia/Nemotron-3-Embed-1B-BF16`, `nvidia/Nemotron-3-Embed-8B-BF16`. All four VERIFIED in raw HF frontmatter (F39). `nvidia/Nemotron-3-Ultra-550b-a55b`, VERIFIED in the raw HF frontmatter of `nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-BF16` and `-NVFP4` on 2026-10-08, see section 5. `nvidia/Cosmos3-Nano`, `nvidia/Cosmos3-Super` and `nvidia/Cosmos3-Edge`, VERIFIED in raw HF card data at pinned revisions, see section 12 |
 | **NVIDIA Nemotron Open Model License** (permissive) | `nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-*`, `nvidia/nemotron-3-super-120b-a12b`. Both per HF card; the Nebius catalog disagrees, see section 5 |
 | **NVIDIA Open Model Agreement** (permissive) | `nvidia/Nemotron-3-Nano-Omni-30B-A3B-Reasoning-*`. Per HF card; the Nebius catalog disagrees. Removed from Token Factory Serverless 2026-08-31 (F4), so it has no role in the manifest |
 | **NVIDIA Open Model License** (restrictive) | Cosmos family before Cosmos 3's public weights (`Cosmos3-Super-Reasoner`, not a public Hugging Face repository on 2026-09-17, see section 12; `Cosmos-Transfer1-*`, `Cosmos-Transfer2.5-*`, the Cosmos DiffusionRenderer and the Cosmos guardrail models; `Cosmos-Reason1-7B`, `Cosmos-Reason2-*`, `Cosmos-Embed1-*`, `C-RADIOv4-H`), `nvidia/parakeet-unified-en-0.6b`, `nvidia/multitalker-parakeet-streaming-0.6b-v1`, `nvidia/diar_streaming_sortformer_4spk-v2.1`, `nvidia/NVIDIA-Nemotron-Parse-v1.2`, `nvidia/NV-DINOv2`, `nvidia/nv-grounding-dino`, `nvidia/Llama-3_1-Nemotron-Ultra-253B-v1` |
@@ -174,9 +174,9 @@ bases.
 | Component | Code license | Weights license | Apache-2.0 compatible | Source URL | Verdict |
 | --- | --- | --- | --- | --- | --- |
 | `nvidia/Nemotron-3_5-Lightning` (Token Factory) / `NVIDIA-Nemotron-3.5-Lightning-30B-A3B-*` | NeMo / Nemotron Apache-2.0 | OpenMDW-1.1 | **Yes** | <https://openmdw.ai/license/1-1/> | **SHIP.** The fallback of the Companion's reasoning role, and a model offered for a person's decisions |
-| `nvidia/nemotron-3-super-120b-a12b` (Token Factory) | Apache-2.0 | nvidia-nemotron-open-model-license per HF; nvidia-open-model-license per Nebius catalog | Yes per HF | <https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-nemotron-open-model-license> | **SHIP**, trust HF (section 5) |
+| `nvidia/nemotron-3-super-120b-a12b` (Token Factory) | Apache-2.0 | nvidia-nemotron-open-model-license per HF (raw frontmatter of `nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-BF16` at `2dc98e2afe4face0e4ce40972a915c45368bd34a`, read 2026-10-08); nvidia-open-model-license per Nebius catalog | Yes per HF | <https://huggingface.co/nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-BF16> | **SHIP**, trust HF (section 5). The answer composer's primary, and a model offered for a person's decisions |
 | `nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-*` | Apache-2.0 | nvidia-nemotron-open-model-license per HF; nvidia-open-model-license per Nebius catalog | Yes per HF | <https://huggingface.co/nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B> | **SHIP**, trust HF (section 5). The Companion's reasoning primary, and a model offered for a person's decisions |
-| `nvidia/Nemotron-3-Ultra-550b-a55b` (Token Factory) | Apache-2.0 | `openmdw-1.1` **per Nebius catalog only** | Yes if catalog is right | <https://tokenfactory.nebius.com/api/public/models_info> | **UNVERIFIED direction of error.** No role in Exulanica. See section 5 |
+| `nvidia/Nemotron-3-Ultra-550b-a55b` (Token Factory) | Apache-2.0 | OpenMDW-1.1 per HF (raw frontmatter of `nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-BF16` at `77df655d5e9f8362164ed14dd8b48f8bce657498` and `-NVFP4` at `02462641f13d3af838b904f48195b9bb8a1e4ebc`, read 2026-10-08; the card says the model is ready for commercial use); the Nebius catalog agrees | **Yes** | <https://huggingface.co/nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-BF16> | **SHIP.** A model offered for a person's decisions, and the declared primary of the `reasoning_hard` role, which no production caller selects |
 | `nvidia/Nemotron-3-Embed-1B-BF16` / `-8B-BF16` | Apache-2.0 | OpenMDW-1.1 (base Ministral is Apache-2.0, so nothing restrictive flows through) | **Yes** | <https://huggingface.co/nvidia/Nemotron-3-Embed-1B-BF16> | **SHIP** |
 | `nvidia/Nemotron-3-Nano-Omni-30B-A3B-Reasoning-*` | Apache-2.0 | NVIDIA Open Model Agreement | **Yes** | <https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-open-model-agreement/> | SHIP by license, but **removed from Token Factory Serverless 2026-08-31** (F4). No role in the manifest |
 | `nvidia/omnivinci` | n/a | apache-2.0 | **Yes** | <https://huggingface.co/nvidia/omnivinci> | **SHIP.** Joint video-plus-audio, self-hosted only. No current role given the photo corpus |
@@ -410,13 +410,12 @@ frontmatter at a pinned revision SHA**, never the Nebius catalog string and neve
 Rejected alternative: using the catalog field, which is one API call away and machine-readable, but
 is wrong in three of three checked cases.
 
-**The dangerous direction, and where it lands. OPEN.** All three verified mismatches are Nebius
-being *stricter* than reality, which costs rights but is safe. The case that ends a project is the
-opposite: the catalog being more permissive than the card. Exactly one row in this matrix has that
-shape. `nvidia/Nemotron-3-Ultra-550b-a55b` is recorded as `openmdw-1.1` **from the catalog only**; it
-does not appear in the four models whose OpenMDW-1.1 attribution was verified in raw HF frontmatter
-(F39). The exposure is zero because Ultra has no role in Exulanica. **If that changes, run
-the same `curl` used in section 4a against the Ultra card first.**
+**The dangerous direction, and where it lands.** All three verified mismatches are Nebius being
+*stricter* than reality, which costs rights but is safe. The case that ends a project is the
+opposite: the catalog being more permissive than the card. No row of this matrix has that shape:
+for `nvidia/Nemotron-3-Ultra-550b-a55b`, the one catalog reading more permissive than the others,
+the raw HF frontmatter (read 2026-10-08, section 3.1) and the catalog both say `openmdw-1.1`. A
+model whose license is known only from the catalog is read from its card before it is given any role.
 
 ---
 
@@ -543,7 +542,6 @@ that closes it.
 | --- | --- | --- | --- |
 | L-1 | `nvidia/diar_streaming_sortformer_4spk-v2` license, **DISPUTED** | Determines whether diarization is commercially clean | X-0e, section 4a. 5 min |
 | L-2 | `MiniMaxAI/MiniMax-M3` license is CONDITIONAL (section 3.2) | It is the vision role's primary, asked about every photograph, and commercial use through an API needs a displayed "Built with MiniMax M3" and a notice to MiniMax, neither of which the product has | Decide between displaying the attribution with the notice sent and making `openbmb/MiniCPM-V-4_5`, the fallback, the vision primary |
-| L-4 | `nvidia/Nemotron-3-Ultra-550b-a55b` OpenMDW-1.1 attribution is catalog-only, and is the one row where the catalog is **more** permissive than any verified reading | The error direction that ends a project. Exposure is zero because Ultra has no role | `curl` the HF card before any use. 5 min |
 | L-5 | PostgreSQL 18 and pgvector 0.8.6 license text never read | Two core dependencies | X-0g. 15 min, with the GitHub chip check |
 | L-6 | ffmpeg build configuration in the container: LGPL or GPL | Matters only if the binary is redistributed. We invoke it as a subprocess and do not link it | Inspect the container's ffmpeg build flags |
 | L-7 | RO-Crate and Croissant **tooling library** licenses | The specs are open standards; the libraries were never checked | Read each library's LICENSE before adoption. Fallback: write the RO-Crate JSON-LD by hand |
