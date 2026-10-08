@@ -90,6 +90,15 @@ class ComputeEntry:
         usd = Decimal(self.rate_cents_per_hour) * seconds / Decimal(360_000)
         return usd.quantize(_USD_QUANTUM, rounding=ROUND_CEILING)
 
+    def usd_for_milliseconds(self, milliseconds: int) -> Decimal:
+        """What a request's measured milliseconds cost: the listed rate times them, rounded up to
+        the millionth of a dollar, the rounding a GPU run record's charge lines use, so the ledger
+        and the run record settle a request to the same amount."""
+        if not is_count(milliseconds):
+            raise Refused("a duration is a whole, non-negative number of milliseconds")
+        microdollars = -(-self.rate_cents_per_hour * 10_000 * milliseconds // 3_600_000)
+        return Decimal(microdollars) / Decimal(1_000_000)
+
     def worst_case_usd(self, items: int) -> Decimal:
         """What ``items`` items can cost at most: each at its bounding seconds."""
         return self.usd_for_seconds(items * self.item_seconds_bound)

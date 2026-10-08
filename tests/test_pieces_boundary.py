@@ -20,6 +20,7 @@ FORMAT_MODULES = (
     "canonical",
     "colour",
     "compute",
+    "queue",
     "recipes",
     "records",
     "styles",
