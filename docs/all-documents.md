@@ -7,7 +7,7 @@ Start from the [documentation hub](README.md). Each document has one subject hom
 an explicit responsibility. A role describes how to use a document, not whether a feature
 is implemented. Contracts and scoped evidence establish capability claims.
 
-**108 documents** in the public catalog.
+**109 documents** in the public catalog.
 
 - [Product and architecture](#orientation)
 - [Capability guides](#capabilities)
@@ -101,6 +101,7 @@ Generation vocabulary, world kinds and the site grammar, generated streets and t
 | [Generated-world representation decisions](representation-decisions.md) | reference | Generated-world representation decisions, supports and limits |
 | [Texture package](texture-package.md) | contract | Texture sets, recipes, storage and publication; sets dress world objects and tiles |
 | [Style pack contract](style-pack-contract.md) | contract | Style packs: the manifest, look roles and their fit, palette and colour encoding, light presets, piece budgets and the readers |
+| [Generated pieces](generated-pieces-contract.md) | contract | Asking for generated pieces of a world's look: requests built from catalogs, their cost and time, routes, limits and deletion |
 | [Lettering](lettering.md) | contract | Glyph catalogs, layout and lettering geometry; nothing draws a letter |
 | [Generated appearance](generated-appearance.md) | reference | Research on model-made textures over exact structure |
 | [Owned district and source admission](owned-district-and-admission.md) | contract | External environment admission and the development-preview district |
