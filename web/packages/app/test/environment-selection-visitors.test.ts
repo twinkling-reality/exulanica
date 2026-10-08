@@ -442,3 +442,42 @@ describe('who decides for a visitor, handed to its card', () => {
     mounted.dispose();
   });
 });
+
+describe('what a person who came in from outside is, in Selected', () => {
+  // Root's ruling (2026-10-08 17:03, from a crossing rehearsal): a being that crossed in is never called
+  // invented for this world; the sentence says where it came from, as the door lists its bridge, and
+  // who decides for it here, from its arrival's record. Expected words are the catalog's own.
+  it('says where each came from and who decides for it, and leaves the world\'s own people as they are', async () => {
+    const words = (code: string) => catalog.entries.find((entry) => entry.kind === 'phrase' && entry.code === code)!.words;
+    const fill = (text: string, values: Record<string, string>) => text.replace(/\{(\w+)\}/gu, (_all, key: string) => values[key]!);
+    server.tick = 4;
+    server.people = [
+      person('knight-0', { kind: KNIGHT, came_by: 'placed', placed_id: 'knight-1' }),
+      person('visitor-1', { kind: KNIGHT, came_by: 'crossed', placed_id: null, crossing: { arrival_id: 'a1', bridge: 'blockgame', grant_id: 'g1' } }),
+      person('visitor-2', { kind: KNIGHT, came_by: 'crossed', placed_id: null, crossing: { arrival_id: 'a2', bridge: 'blockgame', grant_id: 'g2', decided_by: 'world' } }),
+      person('visitor-3', { kind: KNIGHT, came_by: 'crossed', placed_id: null, crossing: { arrival_id: 'a3', bridge: 'elsewhere', grant_id: 'g3' } }),
+    ];
+    server.things = [];
+    server.events = [];
+    const { mounted, shown, crowd } = mount();
+    crowd.visibleInhabitantIds = ['knight-0', 'visitor-1', 'visitor-2', 'visitor-3'];
+    await mounted.begin();
+    await settle();
+    const pick = [...document.querySelectorAll('select')].find((one) => one.getAttribute('aria-label') === 'Inspect nearby inhabitant')!;
+    const whatOf = (id: string): string => {
+      pick.value = id;
+      pick.dispatchEvent(new Event('change'));
+      return shown.at(-1)!.about.note.description;
+    };
+    expect(whatOf('visitor-1')).toBe(fill(words('what_crossed_program'), { role: 'steward', from: 'Block Game' }));
+    expect(whatOf('visitor-2')).toBe(fill(words('what_crossed_world'), { role: 'steward', from: 'Block Game' }));
+    // A bridge the door does not list is not guessed at.
+    expect(whatOf('visitor-3')).toBe(fill(words('what_crossed_program'), { role: 'steward', from: words('from_outside') }));
+    for (const id of ['visitor-1', 'visitor-2', 'visitor-3']) {
+      expect(whatOf(id)).not.toBe(fill(words('what'), { role: 'steward' }));
+      expect(whatOf(id)).not.toMatch(/simulated/u);
+    }
+    expect(whatOf('knight-0')).toBe(fill(words('what'), { role: 'steward' }));
+    mounted.dispose();
+  });
+});

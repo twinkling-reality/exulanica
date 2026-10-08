@@ -21,7 +21,7 @@ import {
   type SocietyPlaybackSpeed,
 } from '../society-control-api.js';
 import { societyEngine } from '../society-engines.js';
-import { inhabitantWordsFrom, type InhabitantWords } from '../society-inhabitant-words.js';
+import { inhabitantWordsFrom, type BridgeLabel, type InhabitantWords } from '../society-inhabitant-words.js';
 import { say } from './copy.js';
 import { el, replace, setText } from './dom.js';
 import './world-inhabitants.css';
@@ -332,6 +332,8 @@ export function inhabitantWords(
   profile: string | null = null,
   /** Set where a program from outside the world decides for them (`inhabitantWordsFrom`). */
   decidedFromOutside = false,
+  /** The label the door lists for a bridge, for one who came in from outside (`inhabitantWordsFrom`). */
+  bridgeLabel: BridgeLabel | null = null,
 ): InhabitantWords {
   const named = new Map<string, string>();
   for (const row of rows) if (row.status.kind === 'usable') named.set(row.status.targetId, row.label);
@@ -342,6 +344,7 @@ export function inhabitantWords(
     profile,
     null,
     decidedFromOutside,
+    bridgeLabel,
   );
 }
 

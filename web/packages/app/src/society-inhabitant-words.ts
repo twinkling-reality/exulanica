@@ -134,7 +134,14 @@ export interface WordedPerson {
     readonly remaining_ticks?: number | null;
     readonly reason: string;
   } | null;
+  /** How they came to be here (a society of things): `crossed` for one who came in from outside. */
+  readonly came_by?: string | null;
+  /** For one who came in from outside, their arrival's record: the bridge, and `decided_by: world` where this world decides. */
+  readonly crossing?: { readonly bridge: string; readonly decided_by?: string | null } | null;
 }
+
+/** The label the door lists for a bridge, or null where it lists none. */
+export type BridgeLabel = (bridge: string) => string | null;
 
 interface WordedGoal {
   readonly kind: string;
@@ -159,6 +166,12 @@ export function inhabitantWordsFrom(
    * own program chose. The server's Companion does not pass it.
    */
   decidedFromOutside = false,
+  /**
+   * Writes the label the door lists for a bridge. A person who came in from outside is never called
+   * invented for this world: their arrival's record says where they came from (this label, or
+   * "outside this world" where there is none) and who decides for them here.
+   */
+  bridgeLabel: BridgeLabel | null = null,
 ): InhabitantWords {
   const living = person as unknown as {
     readonly ordinal?: number;
@@ -181,7 +194,13 @@ export function inhabitantWordsFrom(
     }, living.ordinal, placeWords);
   }
   const who = person.display_name ?? words('phrase', 'who_unnamed');
-  const what = fill(words('phrase', 'what'), { role: person.role ?? words('phrase', 'role_unknown') });
+  const role = person.role ?? words('phrase', 'role_unknown');
+  const crossing = person.came_by === 'crossed' ? person.crossing ?? null : null;
+  const what = crossing === null
+    ? fill(words('phrase', 'what'), { role })
+    : fill(words('phrase', crossing.decided_by === 'world' ? 'what_crossed_world' : 'what_crossed_program'), {
+      role, from: bridgeLabel?.(crossing.bridge) ?? words('phrase', 'from_outside'),
+    });
   const action = person.action ?? undefined;
   const goal = person.goal !== null && typeof person.goal === 'object' && 'kind' in person.goal ? (person.goal as WordedGoal) : null;
   if (action === undefined) return { who, what, doing: words('doing', 'nothing_recorded'), why: '' };

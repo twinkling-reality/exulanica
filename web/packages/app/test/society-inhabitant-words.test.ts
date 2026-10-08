@@ -126,3 +126,38 @@ describe('a person a program from outside decides for', () => {
       .toBe(inhabitantWordsFrom(person, () => null, () => null, null, null, false).why);
   });
 });
+
+describe('a person who came in from outside', () => {
+  // Never called invented for this world: where they came from, as the door lists their bridge, and
+  // who decides for them here, from their arrival's record (root's ruling 2026-10-08). The words are
+  // the catalog's.
+  const phrase = (code: string) => CATALOG.entries.find((entry) => entry.kind === 'phrase' && entry.code === code)!.words;
+  const fill = (text: string, values: Record<string, string>) => text.replace(/\{(\w+)\}/gu, (_all, key: string) => values[key]!);
+  const person = (extra: Record<string, unknown>) => ({
+    display_name: 'Visitor', role: 'traveller', goal: null,
+    action: { kind: 'idle', status: 'active', target_id: null, remaining_ticks: 0, reason: 'awaiting_goal' }, ...extra,
+  } as unknown as WordedPerson);
+  const listed = (bridge: string) => (bridge === 'blockgame' ? 'Block Game' : null);
+  const words = (extra: Record<string, unknown>) => inhabitantWordsFrom(person(extra), () => null, () => null, null, null, false, listed);
+
+  it('says the world decides, or the program they came with, from their arrival', () => {
+    expect(words({ came_by: 'crossed', crossing: { bridge: 'blockgame', decided_by: 'world' } }).what)
+      .toBe(fill(phrase('what_crossed_world'), { role: 'traveller', from: 'Block Game' }));
+    expect(words({ came_by: 'crossed', crossing: { bridge: 'blockgame' } }).what)
+      .toBe(fill(phrase('what_crossed_program'), { role: 'traveller', from: 'Block Game' }));
+    // A bridge the door does not list, or no writer at all, is not guessed at.
+    expect(words({ came_by: 'crossed', crossing: { bridge: 'elsewhere' } }).what)
+      .toBe(fill(phrase('what_crossed_program'), { role: 'traveller', from: phrase('from_outside') }));
+    expect(inhabitantWordsFrom(person({ came_by: 'crossed', crossing: { bridge: 'blockgame' } }), () => null, () => null).what)
+      .toBe(fill(phrase('what_crossed_program'), { role: 'traveller', from: phrase('from_outside') }));
+  });
+
+  it('changes nothing else, and nothing for anyone who did not cross', () => {
+    const plain = words({ came_by: 'placed' });
+    expect(plain.what).toBe(fill(phrase('what'), { role: 'traveller' }));
+    expect(words({}).what).toBe(plain.what);
+    // Only how they came decides: a crossing record on anyone who did not cross is not read.
+    expect(words({ came_by: 'placed', crossing: { bridge: 'blockgame' } }).what).toBe(plain.what);
+    expect({ ...words({ came_by: 'crossed', crossing: { bridge: 'blockgame', decided_by: 'world' } }), what: '' }).toEqual({ ...plain, what: '' });
+  });
+});

@@ -350,7 +350,12 @@ Who someone is, what they are doing and why are the inspector's own words, from 
 read ([inhabitant words](../assets/catalogs/society-words/society-inhabitant-words.v1.json)), cited
 to the society's state and to the event that explains it, read by its id however long ago it was
 recorded, with no model call. The page and the server choose among those words by one rule, held by
-cases both run (`tests/test_inhabitant_words.py`, `society-inhabitant-words.test.ts`). What happened
+cases both run (`tests/test_inhabitant_words.py`, `society-inhabitant-words.test.ts`). A person who
+came in from outside this world is never called invented for it: the page says where they came from, as
+the door lists their bridge (or "outside this world" where it lists none), and who decides for them
+there, this world or the program they came with, from their arrival's record (`what_crossed_world`,
+`what_crossed_program`). The server's Companion does not yet choose those words, and still describes
+such a person as simulated. What happened
 over the whole world is chosen by the answer composer role (`answer_composer` in the
 [model manifest](../exulanica/models/models.manifest.json)) from at most 24 event lines rebuilt from each
 event's recorded outcome, reason and minute in the same words, never from a stored summary, a

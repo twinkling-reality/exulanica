@@ -875,7 +875,9 @@ export function mountEnvironmentSelection(
         // Anyone an outside program decides for (a visitor it brought, or one of this world's own
         // people a grant hands it): their choices are that program's, never a model's.
         (inhabitant.came_by === 'crossed' && inhabitant.crossing != null && inhabitant.crossing.decided_by !== 'world')
-          || societyModels?.mindOf(id)?.outside != null)
+          || societyModels?.mindOf(id)?.outside != null,
+        // Anyone who came in from outside is said to come from where the door lists their bridge.
+        (bridge) => bridges?.get(bridge)?.label ?? null)
       : null;
     inspector.show({
       subject: id,

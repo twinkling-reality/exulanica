@@ -289,6 +289,27 @@
       "reason": "Authored: one piece of the sentence that says who a simulated person is or what they are doing, shared by the inspector and the Companion so the two never say it differently."
     },
     {
+      "key": "phrase.what_crossed_world",
+      "kind": "phrase",
+      "code": "what_crossed_world",
+      "words": "A {role} who came in from {from}, not invented for this world: this world decides what they do here.",
+      "reason": "Authored: what a person who came in from outside this world is, said where the inspector would otherwise say what a simulated person is; who decides for them comes from their arrival's record (decided_by world, or the program they came with), and no person is claimed for a program."
+    },
+    {
+      "key": "phrase.what_crossed_program",
+      "kind": "phrase",
+      "code": "what_crossed_program",
+      "words": "A {role} who came in from {from}, not invented for this world: the program they came with decides what they do here.",
+      "reason": "Authored: what a person who came in from outside this world is, said where the inspector would otherwise say what a simulated person is; who decides for them comes from their arrival's record (decided_by world, or the program they came with), and no person is claimed for a program."
+    },
+    {
+      "key": "phrase.from_outside",
+      "kind": "phrase",
+      "code": "from_outside",
+      "words": "outside this world",
+      "reason": "Authored: where a person came in from when the door does not name the bridge they crossed through, so nothing is guessed."
+    },
+    {
       "key": "phrase.role_unknown",
       "kind": "phrase",
       "code": "role_unknown",
