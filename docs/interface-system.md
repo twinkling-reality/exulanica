@@ -272,6 +272,14 @@ agent") and says "Decided from outside, through" the bridge, adding "It is not a
 the door's entry says no AI runs that bridge; a bridge the door does not list reads "Decided from
 outside this world." with no claim either way.
 
+A visitor's card also says what came across with it and what stayed behind, from its crossing's
+translation manifest (`GET /door/crossings/{arrival_id}/manifest`, the stored document): "Came
+across" lists what crossed exactly, then what changed with its reason; "Stayed behind" groups what
+was dropped or kept by the program it came from under each reason, said once. Every line is the
+game's own words from its mapping file, shown as text; the page holds none. Where the manifest
+cannot be read (a server that does not serve it, or a first-profile manifest, which states no
+words), both rows are left out and the rest of the card shows.
+
 A visitor notice: when a newly read minute records a crossing, the toast region says so in one
 sentence, from the event, the kinds' labels, the door's entry and the words catalog's reasons:
 "A knight came in from Block Game, carrying a sword." with See who, which opens its card; "The

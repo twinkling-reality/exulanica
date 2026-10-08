@@ -241,7 +241,7 @@ describe('visitors crossing into a saved world', () => {
     expect(card.id).toBe('visitor-1');
     expect(card.about.being).toEqual({
       kind: KNIGHT, cameBy: 'crossed', placedId: null,
-      crossing: { bridge: 'blockgame', entry: { bridge: 'blockgame', label: 'Block Game', game: 'Block Game', runBy: 'server', ai: false } },
+      crossing: { bridge: 'blockgame', entry: { bridge: 'blockgame', label: 'Block Game', game: 'Block Game', runBy: 'server', ai: false }, arrivalId: 'arrival-visitor-1' },
       holding: [{ id: 'sword-1', kind: SWORD }],
       world: { worldId: WORLD, versionId: 'version' },
       said: [], heard: [],

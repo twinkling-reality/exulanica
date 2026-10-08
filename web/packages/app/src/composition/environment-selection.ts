@@ -196,7 +196,7 @@ export interface SelectedBeing {
    * For a visitor: the bridge it crossed through and the door's entry for it, null where the door
    * does not list that bridge here (or has not been read yet).
    */
-  readonly crossing: { readonly bridge: string; readonly entry: DoorBridge | null } | null;
+  readonly crossing: { readonly bridge: string; readonly entry: DoorBridge | null; readonly arrivalId: string } | null;
   /** The things it holds now, by the state's own ids and kinds. */
   readonly holding: readonly { readonly id: string; readonly kind: KindReference }[];
   /** The saved world and version it lives in, for the looks chosen for its things. */
@@ -2106,7 +2106,7 @@ export function mountEnvironmentSelection(
       kind: person.kind,
       cameBy: person.came_by,
       placedId: person.placed_id ?? null,
-      crossing: crossing === null ? null : { bridge: crossing.bridge, entry: bridges?.get(crossing.bridge) ?? null },
+      crossing: crossing === null ? null : { bridge: crossing.bridge, entry: bridges?.get(crossing.bridge) ?? null, arrivalId: crossing.arrival_id },
       holding: (state?.things ?? []).filter((thing) => thing.held_by === id).map((thing) => ({ id: thing.id, kind: thing.kind })),
       world: savedWorld === null ? null : { worldId: savedWorld.worldId, versionId: savedWorld.versionId },
       said: saidBy(id, events, names),

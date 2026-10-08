@@ -14,6 +14,7 @@ import type { SelectedBeing, SelectedPerson } from '../src/composition/environme
 import type { DoorBridge } from '../src/door-bridges-api.js';
 import type { LookReference } from '../src/thing-card-api.js';
 import { readKindFacts, readLookFacts } from '../src/thing-card-api.js';
+import { readCrossingManifest } from '../src/crossing-manifest-api.js';
 import { AN_AI_MODEL, markLabel } from '../src/composition/thing-marks.js';
 
 const repository = `${process.cwd()}/..`;
@@ -61,7 +62,7 @@ const facts = (look: string | null, holding: string | null = null) => ({
 
 describe('a person of a society of things, on the card', () => {
   it('a visitor a person plays: marked by its game, decided from outside, with no Change', () => {
-    const card = personCard('visitor-1', about(being({ cameBy: 'crossed', placedId: null, crossing: { bridge: 'blockgame', entry: GAME } })), null, facts(null, 'a sword'));
+    const card = personCard('visitor-1', about(being({ cameBy: 'crossed', placedId: null, crossing: { bridge: 'blockgame', entry: GAME, arrivalId: 'arrival-blockgame' } })), null, facts(null, 'a sword'));
     expect(card.mark).toEqual({ kind: 'from', text: 'from Block Game', label: 'A person playing Block Game' });
     expect(card.mind).toMatchObject({ name: 'A person playing Block Game', line: 'Decided from outside, through Block Game. It is not an AI.', choices: [] });
     expect(card.summary).toBe(KINDS['knight']!['summary']);
@@ -70,14 +71,14 @@ describe('a person of a society of things, on the card', () => {
   });
 
   it('a visitor an outside agent runs wears the AI mark and is not called a person', () => {
-    const card = personCard('visitor-2', about(being({ cameBy: 'crossed', placedId: null, crossing: { bridge: 'agents', entry: AGENTS } })), null);
+    const card = personCard('visitor-2', about(being({ cameBy: 'crossed', placedId: null, crossing: { bridge: 'agents', entry: AGENTS, arrivalId: 'arrival-agents' } })), null);
     expect(card.mark).toEqual({ kind: 'ai', text: 'AI', label: 'An outside AI agent' });
     expect(card.mind?.line).toBe('Decided from outside, through an outside agent. It is not one of this world\'s own minds.');
     expect(card.mind?.line).not.toContain('not an AI');
   });
 
   it('a visitor through a bridge the door does not list claims nothing about who runs it', () => {
-    const card = personCard('visitor-3', about(being({ cameBy: 'crossed', placedId: null, crossing: { bridge: 'elsewhere', entry: null } })), null);
+    const card = personCard('visitor-3', about(being({ cameBy: 'crossed', placedId: null, crossing: { bridge: 'elsewhere', entry: null, arrivalId: 'arrival-elsewhere' } })), null);
     expect(card.mind?.line).toBe('Decided from outside this world.');
     expect(card.cameFrom).toBe('Came in from outside this world.');
   });
@@ -89,6 +90,84 @@ describe('a person of a society of things, on the card', () => {
     expect(placed.holding).toBeNull();
     const villager = personCard('person-0', about(being({ kind: ref('villager'), cameBy: 'populated', placedId: null })), null);
     expect(villager.cameFrom).toBe('One of the people who live in this world.');
+  });
+});
+
+describe('what came across with a visitor, on its card', () => {
+  function mountWith(manifest: (world: string, arrival: string) => Promise<unknown>) {
+    const shell = document.createElement('div');
+    document.body.replaceChildren(shell);
+    const asked: string[] = [];
+    const card = mountThingCard({
+      selection: { decide: vi.fn(), models: () => null, openDecides: vi.fn() }, compare: null,
+      shell, credentials: { baseUrl: 'https://example.test', token: 't' },
+      library: async () => library(), looks: async () => new Map(),
+      manifest: async (world, arrival) => { asked.push(arrival); return readCrossingManifest(await manifest(world, arrival)); },
+    });
+    shell.append(card.view.root);
+    return { card, root: card.view.root, asked };
+  }
+  const visitor = being({ cameBy: 'crossed', placedId: null, crossing: { bridge: 'blockgame', entry: GAME, arrivalId: 'arrival-1' } });
+  const answer = {
+    manifest_sha256: 'e'.repeat(64), from: { bridge: 'blockgame', label: 'Block Game', ai: false },
+    manifest: { profile: 'exulanica.translation-manifest/v2', translator: {}, source: {}, target: {}, fields: [
+      { path: '/type', disposition: 'approximated', to: '/kind', reason: 'it crosses as a person of this world', words: 'a player crosses as a traveller' },
+      { path: '/items/0', disposition: 'exact', to: '/carried/0', reason: null, words: 'a steel sword is a sword here' },
+      { path: '/hp', disposition: 'dropped', to: null, reason: 'this world has no health', words: 'the player\'s health' },
+    ] },
+  };
+
+  it('shows what came across and what stayed behind, read once for its crossing', async () => {
+    const { card, root, asked } = mountWith(async () => answer);
+    card.view.show('visitor-1', about(visitor));
+    await settle();
+    expect(rowText(root, 'Came across')).toBe('Came acrossa steel sword is a sword herea player crosses as a travellerit crosses as a person of this world');
+    expect(rowText(root, 'Stayed behind')).toBe('Stayed behindthe player\'s healththis world has no health');
+    card.view.show('visitor-1', about(visitor));
+    await settle();
+    expect(asked).toEqual(['arrival-1']);
+  });
+
+  it('reads a visitor\'s crossing even when its kind and look were read for another card first', async () => {
+    const { card, root, asked } = mountWith(async () => answer);
+    card.view.show('knight-0', about(being({})));
+    await settle();
+    card.view.show('visitor-1', about(visitor));
+    await settle();
+    expect(asked).toEqual(['arrival-1']);
+    expect(rowText(root, 'Stayed behind')).toContain('this world has no health');
+  });
+
+  it('asks again for a manifest it could not read at most once a minute, and shows the rows once it can', async () => {
+    let served = false;
+    const { card, root, asked } = mountWith(async () => { if (!served) throw new Error('404'); return answer; });
+    let now = 1_000;
+    const clock = vi.spyOn(performance, 'now').mockImplementation(() => now);
+    try {
+      card.view.show('visitor-1', about(visitor));
+      await settle();
+      card.view.show('visitor-1', about(visitor));
+      await settle();
+      expect(asked).toEqual(['arrival-1']);
+      expect(rowText(root, 'Came across')).toBeNull();
+      served = true;
+      now += 61_000;
+      card.view.show('visitor-1', about(visitor));
+      await settle();
+      expect(asked).toEqual(['arrival-1', 'arrival-1']);
+      expect(rowText(root, 'Stayed behind')).toContain('this world has no health');
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
+  it('leaves both rows out where the manifest cannot be read, and shows the rest of the card', async () => {
+    const { card, root } = mountWith(async () => { throw new Error('404'); });
+    card.view.show('visitor-1', about(visitor));
+    await settle();
+    expect(rowText(root, 'Came across')).toBeNull();
+    expect(rowText(root, 'Stayed behind')).toBeNull();
+    expect(root.querySelector('.thing-card-summary')?.textContent).toBe(KINDS['knight']!['summary']);
   });
 });
 
@@ -161,6 +240,8 @@ function mount(worn: ReadonlyMap<string, LookReference> = new Map()) {
     shell, credentials: { baseUrl: 'https://example.test', token: 't' },
     library: async () => library(),
     looks: async (_world, versionId) => { lookReads.push(versionId); return worn; },
+    // No crossing here is served: a visitor's rows are left out, with no network asked.
+    manifest: async () => { throw new Error('not served'); },
   });
   shell.append(card.view.root);
   return { card, root: card.view.root, lookReads };
@@ -173,7 +254,7 @@ describe('the mounted card for a being', () => {
   it('reads its kind, the look chosen for it by its own id, and what it holds, then shows them', async () => {
     const blocky = looksOf('knight')[1]!;
     const { card, root, lookReads } = mount(new Map([['visitor-1', { key: blocky.look, version: blocky.version, sha256: blocky.sha256 }]]));
-    const visitor = being({ cameBy: 'crossed', placedId: null, crossing: { bridge: 'blockgame', entry: GAME }, holding: [{ id: 'sword-1', kind: ref('sword') }] });
+    const visitor = being({ cameBy: 'crossed', placedId: null, crossing: { bridge: 'blockgame', entry: GAME, arrivalId: 'arrival-blockgame' }, holding: [{ id: 'sword-1', kind: ref('sword') }] });
     card.view.show('visitor-1', about(visitor));
     await settle();
     expect(root.querySelector('.thing-card-summary')?.textContent).toBe(KINDS['knight']!['summary']);

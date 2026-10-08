@@ -112,6 +112,9 @@
 }
 #shell a.thing-card-link { font: var(--weight-medium) var(--text-md)/var(--text-md-line) var(--font-ui); color: var(--color-accent-text); }
 #shell .thing-card-credit { color: var(--color-text-muted); }
+/* What came across with a visitor and what stayed behind: each in the game's words, its reason under it. */
+#shell .thing-card-crossing { display: flex; flex-direction: column; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+#shell .thing-card-crossing p { overflow-wrap: anywhere; }
 /* Lines a being said or heard: who and when on one line, the words under it, quoted. */
 #shell .thing-card-lines { display: flex; flex-direction: column; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
 #shell .thing-card-line-who { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); font-size: var(--text-sm) !important; line-height: var(--text-sm-line) !important; color: var(--color-text-muted); }

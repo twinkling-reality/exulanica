@@ -69,6 +69,14 @@ export interface CardLine {
   readonly minute: number;
 }
 
+/** What came across with a visitor from its game, and what stayed behind, in the game's own words. */
+export interface CardCrossing {
+  /** Each thing that came across, and why it changed where it did. */
+  readonly came: readonly { readonly words: string; readonly reason: string | null }[];
+  /** What stayed behind, grouped by the reason it did. */
+  readonly stayed: readonly { readonly words: readonly string[]; readonly reason: string }[];
+}
+
 export interface ThingCardModel {
   /** Which thing this is: a new subject closes an open choice and forgets the last outcome. */
   readonly subject: string;
@@ -86,6 +94,8 @@ export interface ThingCardModel {
   readonly said?: readonly CardLine[];
   /** The last lines it heard, newest first; empty or absent leaves the row out. */
   readonly heard?: readonly CardLine[];
+  /** For a visitor: what came across and what stayed behind; null or absent leaves the rows out. */
+  readonly crossing?: CardCrossing | null;
   readonly cameFrom: string;
 }
 
@@ -213,6 +223,35 @@ export function buildThingCard(handlers: ThingCardHandlers): ThingCard {
     return box;
   }
 
+  function crossingRows(crossing: CardCrossing): HTMLElement[] {
+    const rows: HTMLElement[] = [];
+    if (crossing.came.length > 0) {
+      const box = row('Came across');
+      const list = el('ul', { class: 'thing-card-crossing' });
+      for (const came of crossing.came) {
+        list.append(el('li', {}, [
+          el('p', { text: came.words }),
+          ...(came.reason === null ? [] : [el('p', { class: 'thing-card-muted', text: came.reason })]),
+        ]));
+      }
+      box.append(list);
+      rows.push(box);
+    }
+    if (crossing.stayed.length > 0) {
+      const box = row('Stayed behind');
+      const list = el('ul', { class: 'thing-card-crossing' });
+      for (const stayed of crossing.stayed) {
+        list.append(el('li', {}, [
+          el('p', { text: stayed.words.join('; ') }),
+          el('p', { class: 'thing-card-muted', text: stayed.reason }),
+        ]));
+      }
+      box.append(list);
+      rows.push(box);
+    }
+    return rows;
+  }
+
   async function choose(key: string): Promise<void> {
     if (busy) return;
     busy = true;
@@ -246,6 +285,7 @@ export function buildThingCard(handlers: ThingCardHandlers): ThingCard {
       holding.append(el('p', { text: model.holding }));
       parts.push(holding);
     }
+    if (model.crossing != null) parts.push(...crossingRows(model.crossing));
     if (model.said !== undefined && model.said.length > 0) parts.push(linesRow('Said lately', model.said));
     if (model.heard !== undefined && model.heard.length > 0) parts.push(linesRow('Heard lately', model.heard));
     const came = row('Came from');

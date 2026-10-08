@@ -23,6 +23,7 @@ import { creditOf, kindCameWords, lookLine, sourceLink } from './thing-origin-wo
 import { lineMarkOf, markLabel, markOf, type ThingMark } from './thing-marks.js';
 import { carriedWords, type KindReference } from './visitor-notices.js';
 import type { BeingLine } from './being-lines.js';
+import { fetchCrossingManifest, type CrossingManifest, type CrossingRows } from '../crossing-manifest-api.js';
 import { THING_PICK_EVENT, type ThingPickDetail } from './things.js';
 import '../ui/thing-card.css';
 
@@ -44,6 +45,8 @@ export interface BeingFacts {
   readonly look: LookFacts | null;
   /** What it holds, in words ("a sword"), or null for nothing. */
   readonly holding: string | null;
+  /** For a visitor: what came across and what stayed behind, or null where its manifest is unread or unreadable. */
+  readonly crossing?: CrossingRows | null;
 }
 
 /** A visitor's mind: the program it came with decides for it, in words from the door's entry alone. */
@@ -106,6 +109,7 @@ export function personCard(
       mind: outsideMind(outside, crossing),
       looks: looksOf(facts?.look ?? null),
       holding: facts?.holding ?? null,
+      crossing: facts?.crossing ?? null,
       said: cardLines(being.said, subjectId, models, true),
       heard: cardLines(being.heard, subjectId, models, false),
       cameFrom: beingCameWords(being, facts?.kind ?? null),
@@ -209,6 +213,8 @@ export function mountThingCard(options: {
   readonly library?: () => Promise<ThingLibrary>;
   /** A version's look choices by placed id; read with the credentials when left out. */
   readonly looks?: (worldId: string, versionId: string) => Promise<ReadonlyMap<string, LookReference>>;
+  /** A visitor's crossing manifest; read with the credentials when left out. */
+  readonly manifest?: (worldId: string, arrivalId: string) => Promise<CrossingManifest>;
 }): MountedThingCard {
   const { selection } = options;
   let subject: string | null = null;
@@ -221,6 +227,17 @@ export function mountThingCard(options: {
     return library;
   };
   const readLooks = options.looks ?? ((worldId: string, versionId: string) => fetchThingLooks(options.credentials, worldId, versionId));
+  const readManifest = options.manifest ?? ((worldId: string, arrivalId: string) => fetchCrossingManifest(options.credentials, worldId, arrivalId));
+  /** Each crossing's rows by its arrival, read once (a manifest never changes); null where unreadable. */
+  const manifests = new Map<string, CrossingRows | null>();
+  /** When a manifest read last failed, by arrival: asked again at most once a minute, quietly. */
+  const manifestFailedAt = new Map<string, number>();
+  const manifestDue = (arrival: string): boolean => {
+    if (!manifests.has(arrival)) return true;
+    const failed = manifestFailedAt.get(arrival);
+    return failed !== undefined && performance.now() - failed >= 60_000;
+  };
+  const crossingOf = (being: SelectedBeing): string | null => (being.world === null ? null : being.crossing?.arrivalId ?? null);
 
   // A being's card is drawn again every minute, so what it reads is kept: kinds and looks by their
   // digests (they never change), the version's look choices for a minute at a time.
@@ -249,7 +266,12 @@ export function mountThingCard(options: {
     const worn = wornLook(subjectId, being);
     const look = worn === null ? null : looks.get(refKey(worn, worn.key));
     if (look === undefined) return null;
-    return { kind, look, holding: carriedWords(being.holding.flatMap((held) => kindRead(held.kind)?.label ?? [])) };
+    const arrival = crossingOf(being);
+    return {
+      kind, look,
+      holding: carriedWords(being.holding.flatMap((held) => kindRead(held.kind)?.label ?? [])),
+      crossing: arrival === null ? null : manifests.get(arrival) ?? null,
+    };
   };
   const readBeing = async (subjectId: string, being: SelectedBeing): Promise<void> => {
     const library = await openLibrary();
@@ -265,6 +287,18 @@ export function mountThingCard(options: {
     await readKind(being.kind);
     // What it holds is named by each held thing's own kind; one that cannot be read is left unnamed.
     await Promise.allSettled(being.holding.map((held) => readKind(held.kind)));
+    const arrival = crossingOf(being);
+    if (arrival !== null && manifestDue(arrival) && being.world !== null) {
+      // A server without the route answers no manifest, and a first-profile manifest states no words:
+      // no rows, and a failed read is asked again at most once a minute.
+      manifests.set(arrival, await readManifest(being.world.worldId, arrival).then((read) => {
+        manifestFailedAt.delete(arrival);
+        return read.rows;
+      }, () => {
+        manifestFailedAt.set(arrival, performance.now());
+        return null;
+      }));
+    }
     const worn = wornLook(subjectId, being);
     if (worn !== null && !looks.has(refKey(worn, worn.key))) {
       // A look from the people catalog draws the being as one of the world's people, and one that
@@ -318,7 +352,8 @@ export function mountThingCard(options: {
         shownThing = null;
         const being = about.being ?? null;
         card.render(personCard(subjectId, about, selection.models(), being === null ? null : factsNow(subjectId, being)));
-        if (being !== null && (factsNow(subjectId, being) === null || !choicesFresh(being))) {
+        const arrival = being === null ? null : crossingOf(being);
+        if (being !== null && (factsNow(subjectId, being) === null || !choicesFresh(being) || (arrival !== null && manifestDue(arrival)))) {
           void readBeing(subjectId, being).then(() => {
             // Shown again from what Selected knows now, unless the card moved on meanwhile.
             if (subject === subjectId && factsNow(subjectId, being) !== null) {
