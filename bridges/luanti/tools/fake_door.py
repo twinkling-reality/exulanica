@@ -1,19 +1,17 @@
-"""A stand-in door that plays one traveller's visit, for building the gate's crossing side early.
+"""A stand-in door that plays the world's side of characters' visits, for checking the gate early.
 
     python3 bridges/luanti/tools/fake_door.py --port 19525 --log FILE [--minute-s 2]
 
 It is not the door. It serves the channel routes a bridge uses (hello, frames by long-poll,
-answers, arrivals, delivered, gone) with the frame shapes agreed with lane BRIDGE for crossings,
-keeps everything in memory, checks almost nothing, and plays a short script: the grant lets one
-traveller in and things be carried both ways; an arrival is placed at the next minute; the
-traveller is asked every minute with the options a visitor would be offered (one of them a walk
-whose distance changes every minute); with ``--refuse-look`` an arrival in that look is refused
-``look_not_shipped``, as a door refuses a look its library does not hold; a line said to the
-knight is answered by a scripted knight,
-who then gives the traveller a sword; choosing to leave departs the traveller carrying what it
-holds, and the departure repeats in every poll until it is reported delivered. A traveller whose
-player is gone departs two minutes later carrying nothing. Every body a bridge sends is appended
-to the log as one JSON line, headers never.
+answers, arrivals, delivered, gone) with the frame shapes the door's protocol states for crossings,
+keeps everything in memory and plays a short script, a world minute every ``--minute-s`` seconds:
+the grant lets one traveller in and things be carried both ways; an arrival is placed at the next
+minute; the world asks about the character every minute it is there (the gate leaves those asks to
+the world, so any answer is counted); on its first visit someone gives it a sword, and after three
+minutes it chooses to leave carrying what it holds; on a later visit it leaves after two minutes. A
+departure repeats in every poll until it is reported delivered. With ``--refuse-look`` an arrival
+in that look is refused ``look_not_shipped``, as a door refuses a look its library does not hold.
+Every body a bridge sends is appended to the log as one JSON line, headers never.
 
 Standard library only; listens on 127.0.0.1.
 """
@@ -21,7 +19,6 @@ Standard library only; listens on 127.0.0.1.
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import threading
 import time
@@ -31,12 +28,12 @@ from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 NAMESPACE = uuid.UUID("6f1b9a52-4d1e-4c55-9e4b-0c8f0d2b7a11")
-KNIGHT = str(uuid.uuid5(NAMESPACE, "knight"))
-WELL = str(uuid.uuid5(NAMESPACE, "well"))
 SWORD = str(uuid.uuid5(NAMESPACE, "sword"))
 GRANT = str(uuid.uuid5(NAMESPACE, "grant"))
 KINDS = {"default:torch": "lantern", "default:sword_steel": "sword"}
 GAME_ITEMS = {"lantern": "default:torch", "sword": "default:sword_steel"}
+#: Minutes a character stays on its first visit and on any later one.
+FIRST_STAY, LATER_STAY = 3, 2
 
 
 class Visit:
@@ -49,15 +46,12 @@ class Visit:
         self.frames: list[dict[str, Any]] = []
         self.minute = 0
         self.ask_seq = 0
-        self.open_ask: dict[str, Any] | None = None
-        self.answers: dict[str, dict[str, Any]] = {}
+        self.visits = 0
         self.pending_arrival: dict[str, Any] | None = None
         self.arrivals: dict[str, str] = {}
         self.visitor: dict[str, Any] | None = None
         self.departures: dict[str, dict[str, Any]] = {}
         self.delivered: set[str] = set()
-        self.knight_replies = 0
-        self.gone_at: int | None = None
         self.refused_looks: set[str] = set()
 
     def log(self, route: str, body: Any) -> None:
@@ -72,99 +66,38 @@ class Visit:
 
     # -- the minute --------------------------------------------------------------------------
 
-    def options(self) -> list[dict[str, Any]]:
-        visitor = self.visitor
-        held = visitor["held"]
-        offered = [
-            {"label": "wait here a minute", "kind": "wait", "action": "wait"},
-            {
-                "label": "say something to the knight (person 2), 3 m away",
-                "kind": "say_to",
-                "action": "say",
-                "target_id": KNIGHT,
-                "line_characters_maximum": 200,
-            },
-            {
-                "label": "say something to everyone near you",
-                "kind": "say_all",
-                "action": "say",
-                "line_characters_maximum": 200,
-            },
-            {
-                "label": f"walk to the well ({max(1, 14 - self.minute)} m)",
-                "kind": "target",
-                "action": "go",
-                "target_id": WELL,
-                "walk_mm": max(1, 14 - self.minute) * 1000,
-            },
-        ]
-        for thing in held:
-            if thing["kind"] == "lantern":
-                offered.append(
-                    {
-                        "label": "give the lantern to the knight (person 2)",
-                        "kind": "give",
-                        "action": "give",
-                        "target_id": KNIGHT,
-                        "thing_id": thing["thing_id"],
-                    }
-                )
-        offered.append({"label": "leave through the gate", "kind": "leave", "action": "leave"})
-        return offered
-
     def tick(self) -> None:
         with self.lock:
             self.minute += 1
-            self.close_ask()
             if self.pending_arrival is not None:
                 self.place(self.pending_arrival)
                 self.pending_arrival = None
+                return
             visitor = self.visitor
             if visitor is None:
                 return
-            if self.gone_at is not None and self.minute - self.gone_at >= 2:
-                self.depart("decider_lost", carrying=False)
-                return
-            if visitor.get("knight_due"):
-                visitor["knight_due"] = False
-                self.knight_replies += 1
-                self.add(
-                    {
-                        "kind": "said",
-                        "tick": self.minute,
-                        "speaker": {
-                            "id": KNIGHT,
-                            "label": "the knight (person 2)",
-                            "mind": {"ai": True, "words": "a scripted stand-in"},
-                        },
-                        "to": visitor["thing_id"],
-                        "line": "A sword is no small thing, traveller. Take this one.",
-                    }
-                )
+            stayed = self.minute - visitor["arrived_at"]
+            if visitor["first"] and stayed == 2:
                 visitor["held"].append({"thing_id": SWORD, "kind": "sword"})
-                self.add(
-                    {
-                        "kind": "happened",
-                        "tick": self.minute,
-                        "event": "given",
-                        "words": "the knight (person 2) gave you a sword",
-                    }
-                )
-            if self.gone_at is None:
-                self.ask()
+            if stayed >= (FIRST_STAY if visitor["first"] else LATER_STAY):
+                self.depart("chose_to_leave")
+                return
+            self.ask()
 
     def place(self, arrival: dict[str, Any]) -> None:
         thing_id = str(uuid.uuid5(NAMESPACE, "arrival:" + arrival["arrival_id"]))
-        carried = []
-        for index, item in enumerate(arrival["carried"]):
-            carried.append(
-                {
-                    "thing_id": str(uuid.uuid5(NAMESPACE, f"{thing_id}:{index}")),
-                    "game_item": item["game_item"],
-                }
-            )
+        carried = [
+            {
+                "thing_id": str(uuid.uuid5(NAMESPACE, f"{thing_id}:{index}")),
+                "game_item": item["game_item"],
+            }
+            for index, item in enumerate(arrival["carried"])
+        ]
+        self.visits += 1
         self.visitor = {
             "thing_id": thing_id,
+            "first": self.visits == 1,
+            "arrived_at": self.minute,
             "held": [
                 {"thing_id": entry["thing_id"], "kind": KINDS[entry["game_item"]]}
                 for entry in carried
@@ -183,107 +116,48 @@ class Visit:
         )
 
     def ask(self) -> None:
+        """An ask about the character, as the door sends one while its bridge is named its
+        decider; the gate leaves it to the world."""
         self.ask_seq += 1
-        request_id = str(uuid.uuid4())
-        context = {"tick": self.minute, "options": self.options()}
-        self.open_ask = {
-            "request_id": request_id,
-            "ask_seq": self.ask_seq,
-            "context": context,
-            "asked_at": time.monotonic(),
-        }
+        options = [
+            {"label": "wait here a minute", "kind": "wait", "action": "wait"},
+            {"label": "leave this world", "kind": "leave", "action": "leave"},
+        ]
         self.add(
             {
                 "kind": "asked",
                 "ask_seq": self.ask_seq,
-                "request_id": request_id,
-                "request_sha256": hashlib.sha256(request_id.encode()).hexdigest(),
-                "subject_id": self.visitor["thing_id"],
+                "request_id": str(uuid.uuid4()),
+                "request_sha256": "0" * 64,
+                "subject_id": self.visitor["thing_id"] if self.visitor else None,
+                "base_tick": self.minute,
                 "deadline_ms": 3000,
                 "instruction": "Choose what this traveller does next.",
                 "choice_description": "One of the options offered.",
-                "context": context,
-                "idle_label": "wait here a minute",
+                "context": {"tick": self.minute, "options": options},
+                "messages": [],
+                "act": {},
+                "idle_label": options[0]["label"],
             }
         )
 
-    def close_ask(self) -> None:
-        ask = self.open_ask
-        if ask is None:
-            return
-        self.open_ask = None
-        answer = self.answers.get(ask["request_id"])
-        if answer is None:
-            self.add(
-                {
-                    "kind": "outcome",
-                    "ask_seq": ask["ask_seq"],
-                    "request_id": ask["request_id"],
-                    "status": "unavailable",
-                    "reason": "no_answer_in_time",
-                }
-            )
-            return
-        self.add(
-            {
-                "kind": "outcome",
-                "ask_seq": ask["ask_seq"],
-                "request_id": ask["request_id"],
-                "status": "accepted",
-                "reason": "validated_choice",
-            }
-        )
-        option = next(o for o in ask["context"]["options"] if o["label"] == answer["label"])
+    def depart(self, why: str) -> None:
         visitor = self.visitor
-        if option["action"] == "say":
-            self.add(
-                {
-                    "kind": "said",
-                    "tick": self.minute,
-                    "speaker": {
-                        "id": visitor["thing_id"],
-                        "label": "the traveller from Luanti (person 9)",
-                        "mind": {"ai": False, "words": "a player in Luanti"},
-                    },
-                    "to": option.get("target_id"),
-                    "line": answer["line"],
-                }
-            )
-            if option.get("target_id") == KNIGHT and self.knight_replies == 0:
-                visitor["knight_due"] = True
-        elif option["action"] == "give":
-            visitor["held"] = [t for t in visitor["held"] if t["thing_id"] != option["thing_id"]]
-            self.add(
-                {
-                    "kind": "happened",
-                    "tick": self.minute,
-                    "event": "given",
-                    "words": "you gave the lantern to the knight (person 2)",
-                }
-            )
-        elif option["action"] == "leave":
-            self.depart("chose_to_leave", carrying=True)
-
-    def depart(self, why: str, *, carrying: bool) -> None:
-        visitor = self.visitor
-        departure_id = str(uuid.uuid4())
-        carried = []
-        if carrying:
-            carried = [
-                {
-                    "thing_id": thing["thing_id"],
-                    "kind": thing["kind"],
-                    "game_item": GAME_ITEMS[thing["kind"]],
-                }
-                for thing in visitor["held"]
-            ]
+        departure_id = str(uuid.uuid5(NAMESPACE, f"departure:{visitor['thing_id']}:{why}"))
         self.departures[departure_id] = {
             "kind": "departed",
             "tick": self.minute,
             "departure_id": departure_id,
             "thing_id": visitor["thing_id"],
             "why": why,
-            "carried": carried,
+            "carried": [
+                {
+                    "thing_id": thing["thing_id"],
+                    "kind": thing["kind"],
+                    "game_item": GAME_ITEMS[thing["kind"]],
+                }
+                for thing in visitor["held"]
+            ],
         }
         self.visitor = None
         self.lock.notify_all()
@@ -352,11 +226,10 @@ class Handler(BaseHTTPRequestHandler):
                                 "things": [],
                                 "may_carry_in": True,
                                 "may_carry_out": True,
-                                "may_speak": True,
+                                "world_words": "The Crossroads",
                             },
                         },
                         "hold_seconds": 3,
-                        "world_words": "The Crossroads",
                         "cursor": str(len(visit.frames)),
                     },
                 )
@@ -369,19 +242,13 @@ class Handler(BaseHTTPRequestHandler):
                     return
                 if body["arrival_id"] not in visit.arrivals and visit.visitor is None:
                     visit.pending_arrival = body
-                self._answer(202, {"received": True})
-            elif url.path == "/door/channel/answers":
-                ask = visit.open_ask
-                if ask is None or ask["request_id"] != body.get("request_id"):
-                    self._answer(409, {"code": "answer_too_late", "detail": "decided"})
-                    return
-                visit.answers[body["request_id"]] = body
-                self._answer(202, {"received": True})
+                thing_id = str(uuid.uuid5(NAMESPACE, "arrival:" + body["arrival_id"]))
+                self._answer(201, {"arrival_id": body["arrival_id"], "thing_id": thing_id})
             elif url.path.startswith("/door/channel/departures/"):
                 visit.delivered.add(url.path.split("/")[4])
                 self._answer(202, {"received": True})
-            elif url.path == "/door/channel/gone":
-                visit.gone_at = visit.minute
+            elif url.path in ("/door/channel/answers", "/door/channel/gone"):
+                # Counted in the log; the gate sends neither.
                 self._answer(202, {"received": True})
             else:
                 self._answer(404, {"code": "unknown_reference", "detail": "no such route here"})

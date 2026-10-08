@@ -1,10 +1,8 @@
 {
-  "adapter_version": "0.1.0",
+  "adapter_version": "0.2.0",
   "reads": [
     "player",
     "player name",
-    "chat",
-    "menu choice",
     "hp",
     "breath",
     "privileges",

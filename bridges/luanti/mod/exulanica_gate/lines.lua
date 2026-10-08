@@ -1,14 +1,6 @@
--- Lines of chat crossing in either direction.
---
--- Outgoing (a player's chat said by their traveller): escapes stripped, then the line is refused
--- whole rather than changed if it holds a control, format or private-use character or is not
--- UTF-8; every name of a player this server knows becomes "someone"; spaces at either end are
--- trimmed; it must hold 1 to `maximum` characters. This screen answers the player at once. The
--- world's own check (the host's line rule and the owner's saved names) stays the authority, so the
--- set of characters refused here is the common subset a chat box can produce, not all of Unicode.
---
--- Incoming (a world's line shown in chat): escapes and control characters removed, length
--- bounded. Never run, parsed or used as anything but text.
+-- Text from a world, made safe to show a player as a chat or panel line: escapes and control,
+-- format and private-use characters removed, length bounded. Never run, parsed or used as anything
+-- but text.
 
 local lines = {}
 
@@ -67,14 +59,6 @@ local function refused(point)
 		or point == 0xE0001 or (point >= 0xE0020 and point <= 0xE007F)
 		or point >= 0xF0000
 end
-lines.refused = refused
-
--- White space trimmed from either end of a line.
-local function space(point)
-	return point == 0x20 or point == 0xA0 or point == 0x1680
-		or (point >= 0x2000 and point <= 0x200A)
-		or point == 0x202F or point == 0x205F or point == 0x3000
-end
 
 -- The bytes of one code point.
 local function utf8_char(point)
@@ -89,7 +73,6 @@ local function utf8_char(point)
 	return string.char(0xF0 + math.floor(point / 262144), 0x80 + math.floor(point / 4096) % 64,
 		0x80 + math.floor(point / 64) % 64, 0x80 + point % 64)
 end
-lines.utf8_char = utf8_char
 
 local function join(points, first, last)
 	local parts = {}
@@ -97,52 +80,6 @@ local function join(points, first, last)
 		parts[#parts + 1] = utf8_char(points[index])
 	end
 	return table.concat(parts)
-end
-
--- Every run of the player-name alphabet that is, ignoring case, a name in `names` (a set of
--- lowercase names) becomes "someone".
-function lines.replace_names(text, names)
-	return (text:gsub("[A-Za-z0-9_%-]+", function(run)
-		if names[run:lower()] then
-			return "someone"
-		end
-		return nil
-	end))
-end
-
--- What to say for a player's chat line: the line, or nil, a code and words for the player.
-function lines.outgoing(text, names, maximum)
-	if type(text) ~= "string" then
-		return nil, "line_not_text", "That was not a line of text."
-	end
-	local stripped = core.strip_escapes(text)
-	local points = code_points(stripped)
-	if points == nil then
-		return nil, "line_not_text", "That line could not be read as text, so it was not said."
-	end
-	for _, point in ipairs(points) do
-		if refused(point) then
-			return nil, "line_has_hidden_characters",
-				"That line holds hidden or control characters, so it was not said."
-		end
-	end
-	local first, last = 1, #points
-	while first <= last and space(points[first]) do
-		first = first + 1
-	end
-	while last >= first and space(points[last]) do
-		last = last - 1
-	end
-	if first > last then
-		return nil, "line_empty", "There was nothing to say."
-	end
-	local line = lines.replace_names(join(points, first, last), names)
-	local count = #code_points(line)
-	if count > maximum then
-		return nil, "line_too_long", string.format(
-			"That line is longer than the world takes (%d letters); it was not said.", maximum)
-	end
-	return line
 end
 
 -- A line from the world, made safe to show as chat or a panel line: escapes and control,
@@ -165,12 +102,6 @@ function lines.incoming(text, maximum)
 		return join(kept, 1, maximum - 3) .. "..."
 	end
 	return join(kept, 1, #kept)
-end
-
--- The number of characters in a line.
-function lines.length(text)
-	local points = code_points(text)
-	return points and #points or nil
 end
 
 return lines

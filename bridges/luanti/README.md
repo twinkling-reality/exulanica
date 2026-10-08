@@ -1,35 +1,42 @@
 # The Luanti gate
 
 A Luanti server mod, `exulanica_gate`, that puts a gate in a Luanti world. A player who walks into
-the gate's light plays a part in an Exulanica world through the [door](../../docs/door-contract.md):
-the world's options for that part appear as the player's menu, and the player's choices are its
-choices at the next world minute. The world keeps every choice as a receipt, so it replays with no
-game running.
+the gate's light sends their character through it into an Exulanica world, through the
+[door](../../docs/door-contract.md): the character arrives there as a thing of its own, looking like
+itself and carrying one thing from the player's hand, and lives there, with a mind of that world.
+The player is never held and decides nothing for it: they play on, and one line above their hotbar
+says where their character is. When it comes home (it chooses to leave, the world's owner sends it,
+or the gate closes), what it carries lands in the player's inventory, or waits for them if they are
+away. Nothing in the Luanti window is a menu of the world's options; the world is seen in Exulanica.
 
 The mod uses the engine's own API and nothing of any game, so one mod serves every Luanti game.
 What a game's characters and items become in Exulanica is that game's mapping file
-(`mod/exulanica_gate/mapping/`, profile `exulanica.bridge-mapping/v1`), which is data.
+(`mod/exulanica_gate/mapping/`), which is data. Each published version of a mapping stays beside
+the next, so a deployment that pinned one keeps working: version 1 (profile
+`exulanica.bridge-mapping/v1`) names a look by its digest, and version 2 (profile
+`exulanica.bridge-mapping/v2`, the mod's default) by the thing library's reference.
 
 ## What works today, and what does not yet
 
 | Part | State |
 | --- | --- |
-| The channel: hello with the adapter's version, mapping and the game fields it reads; one held poll per grant; answers; refusals read from bodies | Works against the door's channel routes |
-| Taking the part of a thing a grant names: the menu of offered options, held choices answered at the next ask, stepping back | Works; a scripted check plays it on a headless server (below) |
-| A traveller crossing in as a thing of its own: arriving, chat both ways, items both ways, leaving | Built against the door's agreed crossing frames and checked against a stand-in door (`tools/fake_door.py`); it needs the door's crossing routes |
-| A traveller in the game's own picture arriving in their own look | The look is built by `tools/build_look.py`; a world draws it once its thing store holds it, and until then the traveller arrives in the CC0 look |
+| The channel: hello with the adapter's version, mapping and the game fields it reads; one held poll per grant; refusals read from bodies | Works against the door's channel routes |
+| A character crossing into a world: through the world's gate with one thing from the hand, the player told once when it arrives, its things delivered once when it comes home (also to a player who left the game meanwhile) | Works against the door's crossing routes; a scripted check plays it on a headless server against the demo's scene (below) |
+| The world deciding for the character | The gate answers no ask about it; until the door hands a crossed character to a mind the world's owner chose, the world's routine settles each ask |
+| A character in the player's own look (the game's own player picture, built by `tools/build_look.py`) | The world shows it once its thing store holds the built look; until then the character arrives in the CC0 look |
+| Calling a character home from the game (`/home`) | Waits for the door's route for it |
 | Invites (`/cross`, a code pasted into a masked form) | Written to the door's invite route; not yet run against it |
 
 ## Layout
 
 | Path | What it is |
 | --- | --- |
-| `mod/exulanica_gate/` | The mod: `init.lua` wires settings and callbacks; `channel.lua` speaks to the door; `journey.lua` is one player's time through the gate; `choices.lua` answers asks from a player's held choices; `menu.lua` and `panel.lua` are what the player sees; `lines.lua` screens chat; `gate.lua` draws and places the gate; `store.lua`, `record.lua`, `json.lua` and `engine.lua` are plumbing |
+| `mod/exulanica_gate/` | The mod: `init.lua` wires settings and callbacks; `channel.lua` speaks to the door; `journey.lua` is one player's character away; `crossing.lua` sends it and brings it home; `panel.lua` is the one line the player sees; `lines.lua` makes a world's words plain text; `gate.lua` draws and places the gate; `store.lua`, `record.lua`, `json.lua` and `engine.lua` are plumbing |
 | `mod/exulanica_gate/adapter.json` | The adapter's version and the game fields it reads (with every item its mapping lists) |
-| `mod/exulanica_gate/mapping/` | One mapping file per Luanti game |
-| `check/exulanica_gate_check/` | A test mod that plays a player on a headless server, and the table of line cases |
+| `mod/exulanica_gate/mapping/` | The mapping files for each Luanti game, every published version kept |
+| `check/exulanica_gate_check/` | A test mod that plays a player on a headless server |
 | `run/` | `install.sh` unpacks the engine and the game; `check.py` runs the scripted check, or with `--play NAME` serves a world for a person; `serve.sh` and `play.sh` run the demo server and a window joined to it |
-| `tools/` | `build_look.py` builds a player's own look; `fake_door.py` is a stand-in door for the crossing check; `fixtures.py` turns a recorded run into a fixture |
+| `tools/` | `build_look.py` builds a player's own look; `cross_once.py` makes one character cross into a running stack exactly as the mod would, with no game (for checking how a world shows it); `fake_door.py` is a stand-in door for checks; `fixtures.py` turns a recorded run into a fixture |
 | `fixtures/` | Exchanges recorded from real runs, which the repository's tests read |
 | `LICENCE-NOTES.md` | What the adapter uses of Luanti and Minetest Game, and their licences |
 
@@ -48,17 +55,23 @@ What a game's characters and items become in Exulanica is that game's mapping fi
 ## The scripted check
 
 `<checkout>/.venv/bin/python bridges/luanti/run/check.py` starts this checkout's stack on one port
-slot, makes a world with people in it, grants the `luanti` bridge one of its people, and starts a
-headless Luanti server whose check mod walks a stand-in player into the gate and plays the part
-through the same handlers a person's actions reach. It then reads the world's own receipts and
-replay. Each run's folder (ignored) holds the server's log, the mod's recording of every exchange
-and a summary with no credential in it.
+slot with a society of things, builds a scene (the demo's by default, `scripts/demo/build_scene.py`,
+every being on its routine, no model called) and grants the `luanti` bridge one traveller through
+the scene's gate, carrying things both ways. A headless Luanti server's check mod then walks a
+stand-in player into the gate with torches through the same handlers a person's actions reach,
+while the check acts as the world's owner from the mod's recording: it sends the character home
+after it has lived in the world for a while, and closes the gate once its player has left the game
+with the character away again. It then reads the world's own records: the gate posted no answer,
+each ask about the character was settled by the world, and the society replays with no game
+running. Each run's folder (ignored) holds the server's log, the mod's recording of every exchange
+and a summary with no credential in it. With `--against fake` the same crossing runs against the
+stand-in door instead, with no stack, where the character is given a sword and leaves on its own.
 
 ## Security notes
 
 - Only the operator's own server, bound to the address it is given; Luanti's sandbox stays on.
-- Everything from the world is text: cleaned, bounded, and escaped before it enters a form; never
-  run, never turned into a node, an item or a path. A departing item is delivered only if the
-  mapping lists it as travelling out.
+- Everything from the world is text: cleaned and bounded before it is shown; never run, never
+  turned into a node, an item or a path. A departing item is delivered only if the mapping lists it
+  as travelling out.
 - A channel credential an invite opened is kept in the mod's own storage, a file in the world
   folder; whoever hosts a server for other people should treat that folder as secret.

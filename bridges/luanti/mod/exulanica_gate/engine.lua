@@ -67,38 +67,4 @@ function engine.show_form(name, formname, formspec)
 	core.show_formspec(name, formname, formspec)
 end
 
-function engine.close_form(name, formname)
-	local stand_in = stand_ins[name]
-	if stand_in then
-		stand_in:shown(formname, "")
-		return
-	end
-	core.close_formspec(name, formname)
-end
-
--- Every player name this server knows, lowercased, as a set: those connected and those in its
--- authentication database, at most `limit` in all.
-function engine.known_names(limit)
-	local names, count = {}, 0
-	local function add(name)
-		if count < limit and type(name) == "string" and not names[name:lower()] then
-			names[name:lower()] = true
-			count = count + 1
-		end
-	end
-	for _, name in ipairs(engine.connected()) do
-		add(name)
-	end
-	local handler = core.get_auth_handler()
-	if handler and handler.iterate then
-		for name in handler.iterate() do
-			if count >= limit then
-				break
-			end
-			add(name)
-		end
-	end
-	return names
-end
-
 return engine

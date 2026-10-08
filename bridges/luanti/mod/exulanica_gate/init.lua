@@ -23,8 +23,6 @@ local engine = load("engine")
 local lines = load("lines")
 local gate = load("gate")
 local channel = load("channel")
-local choices = load("choices")
-local menu = load("menu")
 local panel = load("panel")
 local journey = load("journey")
 local crossing = load("crossing")
@@ -45,13 +43,12 @@ end
 local settings = {
 	door_url = (setting("door_url", ""):gsub("/+$", "")),
 	world_words = setting("world_words", "The world beyond the gate"),
-	mapping = setting("mapping", "luanti-minetest-game.v1.json"),
+	mapping = setting("mapping", "luanti-minetest-game.v2.json"),
 	allowed_players = setting("allowed_players", ""),
 	frame_node = setting("frame_node", ""),
 	gate_at_spawn = core.settings:get_bool(modname .. ".gate_at_spawn", false),
 	record_exchanges = core.settings:get_bool(modname .. ".record_exchanges", false),
 	check_mode = core.settings:get_bool(modname .. ".check_mode", false),
-	names_maximum = 5000,
 }
 
 -- A door address the mod will send a credential to: HTTPS anywhere, plain HTTP only on this
@@ -137,8 +134,6 @@ local deps = {
 	store = store,
 	engine = engine,
 	lines = lines,
-	choices = choices,
-	menu = menu,
 	panel = panel,
 	record = record,
 	settings = settings,
@@ -159,99 +154,25 @@ local deps = {
 journey.init(deps)
 crossing.init(deps)
 
--- Asks, answers and outcomes ---------------------------------------------------------------------
-
-local function dropped(subject, label)
-	journey.note(subject.player, "That choice is no longer offered: " .. lines.incoming(label, 72)
-		.. ".")
-end
-
-local function answer_ask(chan, frame)
-	local decision, why = choices.decide(frame, dropped)
-	local subject = choices.subject(frame.subject_id)
-	if subject and subject.player then
-		journey.refresh(subject.player)
-	end
-	if not decision then
-		record.mark("not_answered", {request = frame.request_id, why = why})
-		return
-	end
-	local body = json.object({
-		{"request_id", json.string(frame.request_id)},
-		{"request_sha256", json.string(frame.request_sha256)},
-		{"label", json.string(decision.label)},
-		{"line", decision.line and json.string(decision.line) or nil},
-	})
-	choices.sent(frame, decision)
-	chan.post("/door/channel/answers", body, function(code, answer, ms)
-		record.mark("answered", {request = frame.request_id, what = decision.what, status = code,
-			ms = ms, label = decision.label})
-		if code == 202 then
-			return
-		end
-		local sent = choices.take(frame.request_id)
-		local refusal = type(answer) == "table" and answer.code or nil
-		if code == 0 or refusal == "answer_too_late" then
-			choices.restore(sent)
-		end
-		if sent and sent.decision.what ~= "idle" and subject and subject.player then
-			journey.note(subject.player, journey.reason_words(refusal or "no_answer_in_time")
-				or ("That was not done this minute (" .. lines.incoming(tostring(refusal), 40) .. ")."))
-		end
-	end)
-end
-
-local function on_outcome(frame)
-	local sent = choices.take(frame.request_id)
-	record.mark("outcome", {request = frame.request_id, status = frame.status, reason = frame.reason,
-		what = sent and sent.decision.what or "not_answered_here"})
-	if not sent then
-		return
-	end
-	local subject = choices.subject(sent.subject_id)
-	if not (subject and subject.player) then
-		return
-	end
-	local decision = sent.decision
-	if frame.status == "accepted" then
-		if decision.what == "action" then
-			journey.note(subject.player, "Done: " .. lines.incoming(decision.label, 72) .. ".")
-		elseif decision.what == "line" then
-			journey.note(subject.player, "Said.")
-		end
-		return
-	end
-	if frame.reason == "no_answer_in_time" then
-		choices.restore(sent)
-	end
-	if decision.what ~= "idle" or frame.reason ~= "no_answer_in_time" then
-		journey.note(subject.player, journey.reason_words(frame.reason)
-			or ("That was not done this minute (" .. lines.incoming(tostring(frame.reason), 40) .. ")."))
-	end
-end
+-- Frames ------------------------------------------------------------------------------------------
 
 local function on_frames(chan, frames)
 	for _, frame in ipairs(frames) do
 		local kind = frame.kind
-		if kind == "asked" then
-			answer_ask(chan, frame)
-		elseif kind == "outcome" then
-			on_outcome(frame)
-		elseif kind == "grant" then
+		if kind == "grant" then
 			if chan.grant then
 				chan.grant.scope = frame.scope
 				chan.grant.grant_seq = frame.grant_seq
-				if type(frame.world_words) == "string" then
-					chan.world_words = frame.world_words
-				end
-				journey.scope_changed(chan.grant.grant_id, frame.scope)
+				local scope = type(frame.scope) == "table" and frame.scope or {}
+				chan.world_words = type(scope.world_words) == "string" and scope.world_words or nil
 			end
 		elseif kind == "grant_ended" then
 			journey.grant_ended(chan.grant and chan.grant.grant_id, frame.reason)
-		elseif deps.crossing and deps.crossing.handles(kind) then
-			deps.crossing.frame(chan, frame)
+		elseif crossing.handles(kind) then
+			crossing.frame(chan, frame)
 		else
-			record.mark("frame_ignored", {kind = tostring(kind)})
+			-- Asks and outcomes included: the world decides for a character that crossed.
+			record.mark("frame_ignored", {kind = tostring(kind), request = frame.request_id})
 		end
 	end
 end
@@ -281,81 +202,7 @@ local function open_channel(credential, label)
 	return chan
 end
 
--- Chat, the menu and the gate ----------------------------------------------------------------------
-
-local function on_chat(name, message)
-	if not journey.record_of(name) then
-		return false
-	end
-	local _, subject = choices.of_player(name)
-	if not subject then
-		journey.note(name, "Your line was kept out of this server's chat; nothing was said.")
-		return true
-	end
-	local options = subject.asked and subject.asked.context and subject.asked.context.options
-	if options then
-		local speaks = false
-		for _, option in ipairs(options) do
-			speaks = speaks or choices.says(option)
-		end
-		if not speaks then
-			journey.note(name, "The one you play cannot speak in this world; choose from the menu "
-				.. "(I or /x).")
-			return true
-		end
-	end
-	local line, _, words = lines.outgoing(message, engine.known_names(settings.names_maximum),
-		choices.line_maximum(subject))
-	if not line then
-		journey.note(name, words)
-		return true
-	end
-	if not choices.queue_line(subject, line) then
-		journey.note(name, "Three lines are already waiting to be said; that one was not kept.")
-		return true
-	end
-	engine.tell(name, "you: " .. line .. "  (said at the next world minute)")
-	journey.refresh(name)
-	return true
-end
-
-local function on_fields(name, fields)
-	local _, subject = choices.of_player(name)
-	if not subject then
-		return false
-	end
-	return menu.fields(name, fields, {
-		hold = function(option)
-			choices.hold_action(subject, option)
-			journey.tell(name, "Next minute: " .. lines.incoming(option.label, 72) .. ".")
-		end,
-		addressee = function(option)
-			choices.choose_addressee(subject, option)
-			journey.tell(name, "Your lines now go: " .. lines.incoming(option.label, 72) .. ".")
-		end,
-		back = function()
-			journey.step_back(name, "You stepped back out of the gate.")
-		end,
-	})
-end
-
-local function show_menu(name)
-	local _, subject = choices.of_player(name)
-	if not subject then
-		return false, "You are not through a gate."
-	end
-	engine.show_form(name, menu.FORM, menu.build(name, subject, deps))
-	return true
-end
-
-core.register_on_chat_message(on_chat)
-
-core.register_chatcommand("x", {
-	description = "Choose what the one you play does, from what the world offers this minute",
-	func = function(name)
-		return show_menu(name)
-	end,
-})
+-- Invites and the gate ----------------------------------------------------------------------------
 
 -- Invites: a code a world's owner gave a player opens that world's gate for them. The code is
 -- pasted into a masked field (a chat command's parameters reach the engine's log), redeemed with
@@ -440,16 +287,6 @@ core.register_on_player_receive_fields(function(player, formname, fields)
 	if formname == INVITE_FORM then
 		on_invite(name, fields)
 		return true
-	end
-	if formname == menu.FORM then
-		on_fields(name, fields)
-		return true
-	end
-	if formname == "" and journey.record_of(name) then
-		on_fields(name, fields)
-		core.after(0, function()
-			journey.refresh(name)
-		end)
 	end
 	return false
 end)
@@ -590,15 +427,10 @@ if settings.check_mode then
 	exulanica_gate.check = {
 		add_stand_in = engine.add_stand_in,
 		remove_stand_in = engine.remove_stand_in,
-		chat = on_chat,
-		fields = on_fields,
-		menu = show_menu,
 		left = journey.left,
 		joined = journey.joined,
 		journey = journey.record_of,
-		subject_of = choices.of_player,
 		lines = lines,
-		choices = choices,
 		reads = reads,
 		picture_bytes = gate.picture_bytes,
 		state = function()
@@ -606,16 +438,13 @@ if settings.check_mode then
 				return nil
 			end
 			return {state = server_channel.state, grant = server_channel.grant,
-				hold_seconds = server_channel.hold_seconds}
+				hold_seconds = server_channel.hold_seconds, world_words = server_channel.world_words}
 		end,
 		build_gate = function(origin, across_x)
 			gate.build(origin, across_x, frame_node)
 		end,
 		listen = function(listener)
 			record.listener = listener
-		end,
-		menu_build = function(name, subject)
-			return menu.build(name, subject, deps)
 		end,
 	}
 	log("check mode: stand-in players allowed")

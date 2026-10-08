@@ -104,8 +104,8 @@ function channel.open(options)
 				failures = 0
 				chan.grant = answer.grant
 				chan.hold_seconds = tonumber(answer.hold_seconds) or 15
-				chan.world_words = type(answer.world_words) == "string" and answer.world_words
-					or (answer.grant and answer.grant.world_words) or nil
+				local scope = type(answer.grant.scope) == "table" and answer.grant.scope or {}
+				chan.world_words = type(scope.world_words) == "string" and scope.world_words or nil
 				chan.cursor = answer.cursor
 				chan.state = "polling"
 				options.log("channel %s hello: adapter %s, hold %d s", chan.grant.grant_id:sub(1, 8),

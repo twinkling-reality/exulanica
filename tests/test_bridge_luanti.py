@@ -3,17 +3,19 @@
 CI has no Luanti, so what can be held without it is held here, each against a source other than the
 adapter's own code:
 
-*   the mapping file meets the door's own checks (``exulanica.door.mapping``), with every game field
-    the adapter declares it reads accounted for;
+*   each mapping file meets the door's own checks (``exulanica.door.mapping``), with every game
+    field the adapter declares it reads accounted for, and every published profile of it (v1
+    naming looks by digest, v2 by the library's reference) means the same looks through the door's
+    own reader;
 *   every thing kind it names exists in the catalogs at that version and the item kinds can be held;
     a CC0 look is one the library ships, with the licence the catalog records; the share-alike look
     (a player's own picture, built at a deployment and never committed) states its credit and the
     picture's digest the builder pins, and the builder makes a look the thing contract reads from
     any 64 by 32 picture, putting the picture's left on the character's right;
 *   at most one game item per kind travels out, so a departing thing's game item is never a guess;
-*   the line cases the mod's screen meets in a check run agree with Unicode's own categories;
-*   every request the real mod sent in a recorded run validates against the door's own request
-    models, and every frame it received has the fields the door's frame builders write;
+*   the mod decides nothing for a character that crossed: in a recorded run it posted only its
+    hello, its arrivals and its delivery reports, each valid against the door's own request models,
+    and every frame it received has the fields the door's frame builders write;
 *   nothing kept with the adapter looks like a channel credential or an invite code.
 
 Each guard is shown to refuse a mutant first.
@@ -27,20 +29,30 @@ import json
 import re
 import struct
 import sys
-import unicodedata
 import zlib
 from pathlib import Path
 from typing import Any
 
 import pytest
-from exulanica.api.routes.door import ChannelAnswerBody, HelloBody
+from exulanica.api.routes.door import ArrivalBody, DeliveryBody, HelloBody
 from exulanica.canonical import sha256_of_canonical
+from exulanica.door.crossings import _look_reference
 from exulanica.door.mapping import MappingRefused, check_mapping, check_reads
-from exulanica.door.protocol import asked_frame, grant_ended_frame, grant_frame, outcome_frame
+from exulanica.door.protocol import (
+    arrival_refused_frame,
+    arrived_frame,
+    asked_frame,
+    departed_frame,
+    grant_ended_frame,
+    grant_frame,
+    outcome_frame,
+)
 from exulanica.things.lines import check_line
 from exulanica.things.looks import read_look
 from exulanica.things.origin import read_origin
 from exulanica.world.deciders import ADAPTER_VERSION
+from exulanica.world.placed_things import named_kind
+from exulanica.world.thing_looks import LookReference, ThingLookRefused, check_crossing_look
 
 ROOT = Path(__file__).resolve().parents[1]
 ADAPTER = ROOT / "bridges" / "luanti"
@@ -48,11 +60,7 @@ MOD = ADAPTER / "mod" / "exulanica_gate"
 MAPPINGS = sorted((MOD / "mapping").glob("*.json"))
 KINDS = ROOT / "assets" / "catalogs" / "things" / "kinds"
 LOOKS = ROOT / "assets" / "catalogs" / "things" / "looks"
-LINE_CASES = ADAPTER / "check" / "exulanica_gate_check" / "line-cases.json"
 FIXTURES = sorted((ADAPTER / "fixtures").glob("*.jsonl"))
-#: What a line may not hold, by Unicode category: controls, formats, surrogates, private use and
-#: the line and paragraph separators (the door's and the thing contract's line rule).
-REFUSED_CATEGORIES = frozenset({"Cc", "Cf", "Cs", "Co", "Zl", "Zp"})
 
 
 def _adapter() -> dict[str, Any]:
@@ -70,7 +78,17 @@ def _document(path: Path) -> dict[str, Any]:
 
 
 def test_there_is_a_mapping_for_the_game_the_demo_runs():
-    assert [path.name for path in MAPPINGS] == ["luanti-minetest-game.v1.json"]
+    """Each published version stays beside the next: a deployment pinning either keeps working."""
+    assert [path.name for path in MAPPINGS] == [
+        "luanti-minetest-game.v1.json",
+        "luanti-minetest-game.v2.json",
+    ]
+
+
+def _look_digest(named: str | dict[str, Any]) -> str:
+    """A mapping's look as a digest: ``sha256:<digest>`` in v1, ``{look, version, sha256}``
+    in v2."""
+    return named["sha256"] if isinstance(named, dict) else named.removeprefix("sha256:")
 
 
 @pytest.mark.parametrize("path", MAPPINGS, ids=lambda path: path.name)
@@ -134,7 +152,7 @@ def test_every_kind_and_look_the_mapping_names_is_in_the_catalogs(path):
         kind = _kind(visitor["kind"]["key"], visitor["kind"]["version"])
         assert kind["class"] == "being"
         for look in visitor["looks"]:
-            digest = look["look"].removeprefix("sha256:")
+            digest = _look_digest(look["look"])
             licence = look["licence"]
             if licence["spdx"] == "CC0-1.0":
                 assert digest in looks, f"no look in the catalog has digest {digest}"
@@ -153,13 +171,46 @@ def test_every_kind_and_look_the_mapping_names_is_in_the_catalogs(path):
         assert "holdable" in {offer["key"] for offer in kind["offers"]}, item["game_item"]
 
 
-def test_the_adapter_names_looks_its_mapping_lists():
+@pytest.mark.parametrize("path", MAPPINGS, ids=lambda path: path.name)
+def test_the_adapter_names_looks_its_mapping_lists(path):
     adapter = _adapter()
-    mapping = json.loads(MAPPINGS[0].read_text())
+    mapping = json.loads(path.read_text())
     listed = {look["look_key"]: look for look in mapping["visitors"][0]["looks"]}
     assert set(adapter["looks"]["by_texture"].values()) <= set(listed)
     # Any picture the adapter does not name arrives in a look free of any obligation.
     assert listed[adapter["looks"]["otherwise"]]["licence"]["spdx"] == "CC0-1.0"
+
+
+def _worn(kind: Any, named: str | dict[str, Any]) -> LookReference | str:
+    """What the door makes of a mapping's look for a visitor of ``kind``: the look it wears, or
+    the code it refuses the arrival with."""
+    reference = {"kind": kind.kind, "version": kind.version, "sha256": kind.sha256}
+    try:
+        return check_crossing_look(reference, _look_reference(named))
+    except ThingLookRefused as refused:
+        return refused.code
+
+
+def test_every_mapping_profile_means_the_same_looks_through_the_doors_reader():
+    """v1 names a look by its digest and v2 by the library's reference: through the door's own
+    reader each look key comes to the same look in both, the CC0 look the library ships and the
+    player's own look refused until a world's store holds it (the traveller then arrives in the
+    CC0 look)."""
+    worn: dict[str, dict[str, LookReference | str]] = {}
+    for path in MAPPINGS:
+        mapping = json.loads(path.read_text())
+        for visitor in mapping["visitors"]:
+            kind = named_kind(visitor["kind"]["key"], visitor["kind"]["version"])
+            for look in visitor["looks"]:
+                worn.setdefault(look["look_key"], {})[path.name] = _worn(kind, look["look"])
+    blocky = _document(LOOKS / "blocky-traveller.v1.json")
+    assert worn == {
+        "cc0-traveller": dict.fromkeys(
+            [path.name for path in MAPPINGS],
+            LookReference("blocky-traveller", 1, sha256_of_canonical(blocky).hex()),
+        ),
+        "default-skin": dict.fromkeys([path.name for path in MAPPINGS], "look_not_shipped"),
+    }
 
 
 def _png(width: int, height: int, pixel: Any) -> bytes:
@@ -279,47 +330,6 @@ def test_the_adapter_version_meets_the_decider_rule():
     assert ADAPTER_VERSION.fullmatch(_adapter()["adapter_version"])
 
 
-def _hidden(text: str) -> bool:
-    return any(unicodedata.category(character) in REFUSED_CATEGORIES for character in text)
-
-
-def _named(text: str, names: list[str]) -> str:
-    lowered = {name.lower() for name in names}
-    return re.sub(
-        r"[A-Za-z0-9_-]+",
-        lambda run: "someone" if run.group(0).lower() in lowered else run.group(0),
-        text,
-    )
-
-
-def _verdict(case: dict[str, Any], maximum: int) -> tuple[str, str | None]:
-    """What a line should become, from Unicode's categories and Python's own idea of space."""
-    text = case["text"]
-    if _hidden(text):
-        return "refused", "line_has_hidden_characters"
-    trimmed = text.strip()
-    if not trimmed:
-        return "refused", "line_empty"
-    said = _named(trimmed, case.get("names", []))
-    if len(said) > maximum:
-        return "refused", "line_too_long"
-    return "said", said
-
-
-def test_the_line_cases_agree_with_unicode():
-    table = json.loads(LINE_CASES.read_text())
-    assert len(table["cases"]) >= 20
-    for case in table["cases"]:
-        expected = ("said", case["said"]) if "said" in case else ("refused", case["refused"])
-        assert _verdict(case, table["maximum"]) == expected, case["case"]
-
-
-def test_the_line_verdict_sees_a_hidden_character():
-    """The guard on the guard: a zero-width space claimed as said disagrees with Unicode."""
-    mutant = {"case": "mutant", "text": "zero​width", "said": "zero​width"}
-    assert _verdict(mutant, 200) != ("said", mutant["said"])
-
-
 def _exchanges() -> list[dict[str, Any]]:
     found = []
     for path in FIXTURES:
@@ -333,18 +343,36 @@ def _exchanges() -> list[dict[str, Any]]:
 def test_fixtures_were_recorded_from_a_real_run():
     exchanges = _exchanges()
     paths = {entry["path"].split("?")[0] for entry in exchanges}
-    assert {"/door/channel/hello", "/door/channel/frames", "/door/channel/answers"} <= paths
+    assert {"/door/channel/hello", "/door/channel/frames", "/door/channel/arrivals"} <= paths
+
+
+#: Everything the mod posts, with the door's request model for it (a departure's path names it).
+#: It never answers an ask or says its player is gone: the world decides for a character that
+#: crossed, and the character lives on when its player leaves the game.
+REQUEST_MODELS = {
+    "/door/channel/hello": HelloBody,
+    "/door/channel/arrivals": ArrivalBody,
+    "/door/channel/departures/*/delivered": DeliveryBody,
+}
+
+
+def _route(path: str) -> str:
+    parts = path.split("/")
+    if parts[1:4] == ["door", "channel", "departures"] and len(parts) == 6:
+        parts[4] = "*"
+    return "/".join(parts)
 
 
 def test_every_request_the_mod_sent_meets_the_doors_request_models():
-    models = {"/door/channel/hello": HelloBody, "/door/channel/answers": ChannelAnswerBody}
-    checked = 0
+    checked = set()
     for entry in _exchanges():
-        model = models.get(entry["path"])
-        if model is not None:
-            model.model_validate(json.loads(entry["request_text"]))
-            checked += 1
-    assert checked >= 2
+        if entry["method"] != "POST":
+            continue
+        route = _route(entry["path"])
+        assert route in REQUEST_MODELS, f"the mod posted to {route}"
+        REQUEST_MODELS[route].model_validate(json.loads(entry["request_text"]))
+        checked.add(route)
+    assert checked == set(REQUEST_MODELS)
 
 
 #: The fields each frame kind carries, as the door's own builders write them.
@@ -365,9 +393,13 @@ FRAME_FIELDS = {
             deadline_ms=1,
             messages=[],
             act={},
+            idle_label=None,
         )
     ),
     "outcome": set(outcome_frame(ask_seq=1, request_id="r", status="s", reason="r")),
+    "arrived": set(arrived_frame(arrival_id="a", thing_id="t", carried=[])),
+    "arrival_refused": set(arrival_refused_frame(arrival_id="a", reason="r")),
+    "departed": set(departed_frame(departure_id="d", thing_id="t", why="w", carried=[])),
     "grant": set(grant_frame(grant_seq=1, scope={})),
     "grant_ended": set(grant_ended_frame(grant_id="g", grant_seq=1, reason="r")),
 }
@@ -388,7 +420,7 @@ def test_every_frame_the_mod_read_has_the_fields_the_door_writes():
                 "kind"
             ]
             kinds.add(frame["kind"])
-    assert {"grant", "asked", "outcome"} <= kinds
+    assert {"grant", "arrived", "departed", "grant_ended"} <= kinds
 
 
 #: A channel credential is 32 random bytes as URL-safe base64 (43 characters); an invite is 16

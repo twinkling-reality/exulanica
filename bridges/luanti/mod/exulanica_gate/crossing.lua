@@ -1,23 +1,23 @@
--- A traveller's crossing: a player walks through the gate and arrives in the world as a thing of
--- its own, talks and acts there through their held choices, and comes home with what it held.
+-- A character's crossing: a player walks through the gate, and their character arrives in the world
+-- as a thing of its own, lives there with the world's mind, and comes home with what it carries. The
+-- player is never held and decides nothing for it: the world asks this server nothing about it.
 --
--- Leaving home: one unit of what is in the player's hand goes with them if the mapping lets that
--- item travel in and the grant lets things be carried in; its whole stack (wear, metadata) is kept
--- here, and once the world says which thing it became, it is kept under that thing's id. The
+-- Leaving home: one unit of what is in the player's hand goes with the character if the mapping lets
+-- that item travel in and the grant lets things be carried in; its whole stack (wear, metadata) is
+-- kept here, and once the world says which thing it became, it is kept under that thing's id. The
 -- arrival is sent with a fresh id, and sent again with the same id every minute until the world
 -- answers. The kept stack is settled only by the world's answer (refused: back to the player;
 -- arrived: kept under the thing's id), never by a timeout, so nothing exists twice.
 --
--- Coming home: a departure lists what the traveller carried. A thing whose own stack the game kept
+-- Coming home: a departure lists what the character carried. A thing whose own stack the game kept
 -- comes back as itself; any other becomes the game item the mapping names, only if the mapping lets
 -- it travel out and the server has that item. Each departure is delivered once (its id is recorded
--- before the door is told), into the inventory, or kept for the player until there is room.
+-- before the door is told), into the inventory, or kept for the player until they join and have room.
 
 local crossing = {}
 
 local deps
-local FRAMES = {arrived = true, arrival_refused = true, said = true, happened = true,
-	departed = true}
+local FRAMES = {arrived = true, arrival_refused = true, departed = true}
 local RESEND_SECONDS = 60
 local KEPT_SECONDS = 30 * 24 * 3600
 
@@ -26,23 +26,29 @@ local REFUSAL_WORDS = {
 	visitors_full = "The world has as many travellers as it takes right now.",
 	look_not_offered = "The world does not offer that look.",
 	item_not_mapped = "What you hold has no counterpart in that world.",
-	kind_not_admitted = "The world's owner does not let this kind of traveller in.",
+	kind_not_admitted = "The world's owner does not let characters from here in.",
 	no_arrival_place = "The world has no gate for travellers to come through.",
-	unknown_kind = "The world does not know what a traveller from here is.",
+	unknown_kind = "The world does not know what a character from here is.",
 	grant_ended = "The world's owner closed the gate.",
-	kinds_not_allowed = "The world's owner does not let this kind of traveller in.",
+	kinds_not_allowed = "The world's owner does not let characters from here in.",
 	carrying_not_allowed = "The world's owner does not let things be carried in.",
 	world_not_open_to_visitors = "The world is not open to travellers.",
-	already_here = "That traveller is already there.",
+	already_here = "Your character is already there.",
+	no_visitors_allowed = "The world's owner lets no travellers in through this gate.",
+	thing_kind_not_shipped = "The world does not know what a character from here is.",
+	kind_not_shipped = "The world does not know what a character from here is.",
+	look_not_shipped = "The world cannot show a character from here yet.",
+	look_unfit = "The world cannot show a character from here yet.",
+	malformed_crossing = "The world could not read that arrival.",
 }
 
 local WHY_WORDS = {
-	chose_to_leave = "You came back",
-	sent_home = "You were sent back",
-	sent_away = "You were sent back",
-	grant_ended = "The world's owner closed the gate, and you came back",
-	decider_lost = "Your traveller waited for you, then came home",
-	world_changed = "The world changed, and you came back",
+	chose_to_leave = "Your character came back",
+	sent_home = "Your character was sent back",
+	sent_away = "Your character was sent back",
+	grant_ended = "The world's owner closed the gate, and your character came back",
+	decider_lost = "Your character came back",
+	world_changed = "The world changed, and your character came back",
 }
 
 function crossing.init(dependencies)
@@ -120,6 +126,7 @@ local function keep_for(name, item_string)
 	deps.store.put("waiting:" .. name, {items = items})
 end
 
+-- The journey ends before the character ever arrived: what it held is the player's again.
 local function home(name, record, words)
 	local player = deps.engine.player(name)
 	if record.escrow then
@@ -130,7 +137,7 @@ local function home(name, record, words)
 		end
 		record.escrow = nil
 	end
-	deps.journey.step_back(name, words)
+	deps.journey.finish(name, words)
 end
 
 local function send_arrival(name, record)
@@ -155,10 +162,13 @@ local function send_arrival(name, record)
 	deps.journey.save(name, record)
 	deps.record.mark("arrival_sent", {request = record.arrival_id})
 	chan.post("/door/channel/arrivals", body, function(code, answer)
-		if code == 201 or code == 202 or code == 200 or code == 0 then
+		local reason = type(answer) == "table" and answer.code or tostring(code)
+		if code == 201 or code == 200 or code == 0 or code == 429 or code >= 500
+				or reason == "hello_first" then
+			-- Taken, or not heard this time (the channel says hello again on hello_first): the
+			-- arrival stands, and the crossing tick sends it again with the same id.
 			return
 		end
-		local reason = type(answer) == "table" and answer.code or tostring(code)
 		deps.record.mark("arrival_refused_at_the_door", {request = record.arrival_id, reason = reason})
 		local otherwise = deps.adapter_looks.otherwise
 		if (reason == "look_not_shipped" or reason == "look_unfit") and record.look_key ~= otherwise then
@@ -167,8 +177,8 @@ local function send_arrival(name, record)
 			record.look_key = otherwise
 			record.arrival_id = uuid4()
 			deps.journey.save(name, record)
-			deps.engine.tell(name, "Your own look cannot cross into this world yet; you arrive in "
-				.. "its own look instead.")
+			deps.engine.tell(name, "This world cannot show your own look yet, so your character "
+				.. "arrives in its traveller look.")
 			send_arrival(name, record)
 			return
 		end
@@ -190,7 +200,8 @@ function crossing.look_key(player, visitor)
 	return looks.otherwise
 end
 
--- A player walked into the gate of a grant that lets travellers in.
+-- A player walked into the gate of a grant that lets travellers in: their character crosses, and
+-- they play on.
 function crossing.leave_home(name, chan, portal, outside)
 	local player = deps.engine.player(name)
 	local visitor = deps.mapping_visitor("player")
@@ -205,8 +216,6 @@ function crossing.leave_home(name, chan, portal, outside)
 		grant_id = chan.grant.grant_id,
 		arrival_id = uuid4(),
 		look_key = crossing.look_key(player, visitor),
-		portal = portal,
-		return_to = outside,
 		carried = {},
 	}
 	local stack = player:get_wielded_item()
@@ -218,16 +227,15 @@ function crossing.leave_home(name, chan, portal, outside)
 		record.escrow = one:to_string()
 		record.carried = {{game_item = one:get_name(), count = 1}}
 	end
-	deps.journey.begin(name, record)
 	if leaves_hand and not scope.may_carry_in then
 		deps.engine.tell(name, "The world's owner does not let things be carried in; what you hold "
 			.. "stays here.")
 	end
-	deps.engine.tell(name, "Crossing into " .. deps.journey.world_words(record) .. "...")
+	deps.journey.push_through(name, portal, outside)
 	send_arrival(name, record)
 end
 
-local function on_arrived(chan, frame)
+local function on_arrived(frame)
 	for _, name in ipairs(journeys_where(function(record)
 		return record.arrival_id == frame.arrival_id
 	end)) do
@@ -253,22 +261,13 @@ local function on_arrived(chan, frame)
 				deps.engine.tell(name, "What you held could not cross; it is back in your hands.")
 			end
 			deps.journey.save(name, record)
-			if record.away or not player then
-				-- Its player left the game while it crossed: the world is told at once, and sends
-				-- the traveller home after its quiet minutes.
-				deps.choices.bind(frame.thing_id, {grant_id = record.grant_id, mode = "visitor"})
-				crossing.left(name, record)
-				return
-			end
-			deps.choices.bind(frame.thing_id, {grant_id = record.grant_id, player = name,
-				mode = "visitor"})
 			deps.record.mark("arrived", {request = frame.arrival_id, subject = frame.thing_id,
 				kind = crossed and "carried" or "empty-handed"})
-			local words = "You are in " .. deps.journey.world_words(record) .. "."
+			local words = "Your character is in " .. deps.journey.world_words(record)
 			if #carried_words > 0 then
-				words = words .. " You arrived carrying " .. table.concat(carried_words, " and ") .. "."
+				words = words .. ", carrying " .. table.concat(carried_words, " and ")
 			end
-			deps.journey.note(name, words .. " Chat to speak; press I (or type /x) to choose.")
+			deps.engine.tell(name, words .. ".")
 		end
 	end
 end
@@ -278,67 +277,7 @@ local function on_arrival_refused(frame)
 		return record.arrival_id == frame.arrival_id
 	end)) do
 		local record = deps.journey.record_of(name)
-		home(name, record, REFUSAL_WORDS[frame.reason] or "The world did not let you in.")
-	end
-end
-
-local function speaker_words(speaker)
-	local label = deps.lines.incoming(speaker.label or "someone", 60)
-	local mind = speaker.mind
-	if type(mind) == "table" and mind.ai then
-		local words = type(mind.words) == "string" and deps.lines.incoming(mind.words, 60) or nil
-		return label .. (words and (" (AI, run by " .. words .. ")") or " (AI)")
-	end
-	return label
-end
-
-local function hearers(chan, frame)
-	local names = {}
-	for _, name in ipairs(journeys_where(function(record)
-		return record.state == "across" and record.grant_id == (chan.grant and chan.grant.grant_id)
-	end)) do
-		local record = deps.journey.record_of(name)
-		local heard = frame.heard_by
-		local hears = type(heard) ~= "table"
-		if not hears then
-			for _, thing in ipairs(heard) do
-				hears = hears or thing == record.subject_id
-			end
-		end
-		if hears or frame.to == record.subject_id then
-			names[#names + 1] = name
-		end
-	end
-	return names
-end
-
-local function on_said(chan, frame)
-	local speaker = type(frame.speaker) == "table" and frame.speaker or {}
-	local line = deps.lines.incoming(frame.line, 200)
-	for _, name in ipairs(hearers(chan, frame)) do
-		local record = deps.journey.record_of(name)
-		local prefix = "[" .. deps.journey.world_words(record) .. "] "
-		if speaker.id == record.subject_id then
-			deps.engine.tell(name, prefix .. "you said: " .. line)
-		else
-			local _, subject = deps.choices.of_player(name)
-			if subject and frame.to == record.subject_id then
-				subject.last_speaker = speaker.id
-			end
-			deps.engine.tell(name, prefix .. speaker_words(speaker) .. ": " .. line)
-		end
-	end
-	deps.record.mark("said", {kind = speaker.mind and speaker.mind.ai and "ai" or "other"})
-end
-
-local function on_happened(chan, frame)
-	local words = type(frame.words) == "string" and deps.lines.incoming(frame.words, 160) or nil
-	if not words then
-		return
-	end
-	for _, name in ipairs(hearers(chan, frame)) do
-		local record = deps.journey.record_of(name)
-		deps.journey.note(name, "[" .. deps.journey.world_words(record) .. "] " .. words)
+		home(name, record, REFUSAL_WORDS[frame.reason] or "The world did not let your character in.")
 	end
 end
 
@@ -416,15 +355,15 @@ local function on_departed(chan, frame)
 		why = frame.why})
 	if name then
 		local record = deps.journey.record_of(name)
-		deps.choices.unbind(frame.thing_id)
-		local sentence = (WHY_WORDS[frame.why] or "You came back") .. " from "
+		local sentence = (WHY_WORDS[frame.why] or "Your character came back") .. " from "
 			.. deps.journey.world_words(record)
 		if #words > 0 then
 			sentence = sentence .. ", carrying " .. table.concat(words, " and ")
 		end
 		if player then
-			deps.journey.step_back(name, sentence .. ".")
+			deps.journey.finish(name, sentence .. ".")
 		else
+			-- Told when the player next joins.
 			record.state = "returned"
 			record.words = sentence .. "."
 			deps.journey.save(name, record)
@@ -435,33 +374,11 @@ end
 function crossing.frame(chan, frame)
 	local kind = frame.kind
 	if kind == "arrived" then
-		on_arrived(chan, frame)
+		on_arrived(frame)
 	elseif kind == "arrival_refused" then
 		on_arrival_refused(frame)
-	elseif kind == "said" then
-		on_said(chan, frame)
-	elseif kind == "happened" then
-		on_happened(chan, frame)
 	elseif kind == "departed" then
 		on_departed(chan, frame)
-	end
-end
-
--- The player left the game while their traveller was across: the door is told at once, and the
--- world sends the traveller home once it has waited its quiet minutes.
-function crossing.left(name, record)
-	record.away = true
-	deps.journey.save(name, record)
-	if record.subject_id then
-		deps.choices.unbind(record.subject_id)
-	end
-	local chan = deps.channel_of(record.grant_id)
-	if record.state == "across" and chan and record.subject_id then
-		chan.post("/door/channel/gone", deps.json.object({
-			{"thing_id", deps.json.string(record.subject_id)},
-		}), function(code)
-			deps.record.mark("gone", {subject = record.subject_id, status = code})
-		end)
 	end
 end
 
@@ -484,39 +401,22 @@ local function give_waiting(name)
 	end
 end
 
--- The player joined again with a crossing on record: home if their traveller came back while they
--- were away; still in the gate if it is crossing or (after a server stop, with nobody told it
--- left) still across, where their choices go to it again.
+-- The player joined with a character on record: told what came home while they were away, or shown
+-- where their character still is.
 function crossing.rejoined(name, record)
-	record.inventory_form = nil
-	local player = deps.engine.player(name)
 	if record.state == "returned" then
-		deps.journey.step_back(name, record.words)
+		deps.journey.finish(name, record.words)
 	else
-		player:set_physics_override({speed = 0, jump = 0})
-		player:set_pos({x = record.portal.x, y = record.portal.y - 0.5, z = record.portal.z})
-		if record.state == "across" and not record.away then
-			deps.choices.bind(record.subject_id, {grant_id = record.grant_id, player = name,
-				mode = "visitor"})
-			deps.engine.tell(name, "You are back in " .. deps.journey.world_words(record) .. ".")
-		elseif record.state == "across" then
-			deps.engine.tell(name, "You were away, so your traveller is coming home; wait a moment.")
-		else
-			deps.engine.tell(name, "Still crossing; the world has not answered yet.")
-		end
-		deps.journey.save(name, record)
 		deps.journey.refresh(name)
 	end
 	give_waiting(name)
 end
 
--- The grant ended: a traveller still leaving comes home with what they held; one across waits for
--- the world's departure, which is the door's to send.
-function crossing.grant_ended(name, record, reason)
+-- The grant ended: a character still crossing comes straight back with what the player held; one
+-- across comes home when the world sends its departure, which the door sends before the gate's end.
+function crossing.grant_ended(name, record)
 	if record.state == "leaving" then
 		home(name, record, REFUSAL_WORDS.grant_ended)
-	else
-		deps.journey.note(name, WHY_WORDS.grant_ended .. "...")
 	end
 end
 
