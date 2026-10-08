@@ -197,6 +197,65 @@ def test_every_definer_belongs_to_the_login_less_owner_and_the_check_passes(admi
     assert_definer_role(admin)
 
 
+def _held(admin) -> tuple[dict[str, set[str]], dict[str, dict[str, set[str]]]]:
+    """What the owner holds on this schema's relations: each table's table-level privileges, and
+    each column's privileges the table level does not already give (a column grant of a privilege
+    the table holds adds nothing, so it is not counted)."""
+    tables: dict[str, set[str]] = {}
+    for row in admin.execute(
+        "select c.relname, p.privilege from pg_class c, "
+        "unnest(array['SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER']) "
+        "as p(privilege) "
+        "where c.relnamespace = current_schema()::regnamespace "
+        "and c.relkind in ('r', 'p', 'v', 'm', 'f') "
+        "and has_table_privilege(%s, c.oid, p.privilege)",
+        (DEFINER_ROLE,),
+    ).fetchall():
+        tables.setdefault(row["relname"], set()).add(row["privilege"])
+    columns: dict[str, dict[str, set[str]]] = {}
+    for row in admin.execute(
+        "select c.relname, a.attname, p.privilege from pg_class c "
+        "join pg_attribute a on a.attrelid = c.oid and a.attnum > 0 and not a.attisdropped, "
+        "unnest(array['SELECT','INSERT','UPDATE','REFERENCES']) as p(privilege) "
+        "where c.relnamespace = current_schema()::regnamespace "
+        "and c.relkind in ('r', 'p', 'v', 'm', 'f') "
+        "and has_column_privilege(%s, c.oid, a.attnum, p.privilege) "
+        "and not has_table_privilege(%s, c.oid, p.privilege)",
+        (DEFINER_ROLE, DEFINER_ROLE),
+    ).fetchall():
+        columns.setdefault(row["relname"], {}).setdefault(row["attname"], set()).add(
+            row["privilege"]
+        )
+    return tables, columns
+
+
+def test_the_held_view_counts_a_column_grant_as_the_column_alone(admin, monkeypatch):
+    """A synthetic entry with a column grant: the view shows it under its column, not as a
+    privilege on the table, and agrees with the deployment check. A column grant of a privilege
+    the table already holds (SELECT of embedding.embedding_id, beside SELECT on embedding) is not
+    a column of its own."""
+    import dataclasses
+
+    base = definer_role.GRANTS_BY_MIGRATION[DEFINER_MIGRATION]
+    with_column = dataclasses.replace(
+        base, columns={"embedding": {"embedding_id": frozenset({"UPDATE"})}}
+    )
+    monkeypatch.setattr(
+        definer_role,
+        "GRANTS_BY_MIGRATION",
+        {**definer_role.GRANTS_BY_MIGRATION, DEFINER_MIGRATION: with_column},
+    )
+    role = sql.Identifier(DEFINER_ROLE)
+    admin.execute(sql.SQL("grant update (embedding_id) on embedding to {}").format(role))
+    assert_definer_role(admin)
+    tables, columns = _held(admin)
+    assert tables == TABLE_PRIVILEGES
+    assert columns == {"embedding": {"embedding_id": {"UPDATE"}}}
+    assert "SELECT" in TABLE_PRIVILEGES["embedding"]
+    admin.execute(sql.SQL("grant select (embedding_id) on embedding to {}").format(role))
+    assert _held(admin) == (TABLE_PRIVILEGES, {"embedding": {"embedding_id": {"UPDATE"}}})
+
+
 def test_the_owner_holds_the_privileges_its_bodies_use_and_nothing_else(admin):
     # This file's literal is read from the bodies apart from the module's; the deployment check
     # refuses by the module's, so the two must agree as well as match the database.
@@ -208,21 +267,8 @@ def test_the_owner_holds_the_privileges_its_bodies_use_and_nothing_else(admin):
         table: {column: set(held) for column, held in columns.items()}
         for table, columns in definer_role.COLUMN_PRIVILEGES.items()
     } == COLUMN_PRIVILEGES
-    held: dict[str, set[str]] = {}
-    for row in admin.execute(
-        "select c.relname, p.privilege from pg_class c, "
-        "unnest(array['SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER']) "
-        "as p(privilege) "
-        "where c.relnamespace = current_schema()::regnamespace "
-        "and c.relkind in ('r', 'p', 'v', 'm', 'f') "
-        "and (has_table_privilege(%s, c.oid, p.privilege) "
-        "or (p.privilege in ('SELECT', 'INSERT', 'UPDATE', 'REFERENCES') "
-        "and has_any_column_privilege(%s, c.oid, p.privilege)))",
-        (DEFINER_ROLE, DEFINER_ROLE),
-    ).fetchall():
-        held.setdefault(row["relname"], set()).add(row["privilege"])
     # A partition is read through its parent and holds nothing of its own.
-    assert held == TABLE_PRIVILEGES
+    assert _held(admin) == (TABLE_PRIVILEGES, COLUMN_PRIVILEGES)
     sequences = admin.execute(
         "select c.relname from pg_class c where c.relnamespace = current_schema()::regnamespace "
         "and case when c.relkind = 'S' "
